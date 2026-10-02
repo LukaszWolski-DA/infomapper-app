@@ -58,7 +58,9 @@ const eslintConfig = defineConfig([
               message: "src/domain does not touch storage; use src/data (AD-19).",
             },
             {
-              group: ["**/data", "**/data/**", "**/app", "**/app/**", "**/ui", "**/ui/**", "**/canvas", "**/canvas/**"],
+              // Climbing out with ../ or using the @/ alias to reach another layer. (So src/domain must not have
+              // folders or files of its own named data, app, ui or canvas; ./canvas within a folder is fine.)
+              regex: "^(@/|(\\.\\./)+)(data|app|ui|canvas)(/|$)",
               message: "src/domain imports nothing from the other layers (AD-19).",
             },
           ],
