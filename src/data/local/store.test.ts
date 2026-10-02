@@ -7,13 +7,13 @@ import { renameCanvas } from "@/domain/commands/canvas";
 import { createProject } from "@/domain/commands/project";
 import { updateWorkspaceSettings } from "@/domain/commands/workspace";
 import { STALE_VERSION_MESSAGE } from "@/domain/errors";
-import { uuidv7 } from "@/domain/ids";
+import { isUuid, uuidv7 } from "@/domain/ids";
 import { isGuest } from "@/domain/permissions";
 import type { DataStore } from "../ports";
 import { resetDevData, seedDevData } from "./dev-data";
 import { readDb, writeDb } from "./file";
-import { emptyDb, findViolation } from "./schema";
-import { buildSeed, SEED_USERS } from "./seed";
+import { emptyDb, findViolation, keyOf, TABLES } from "./schema";
+import { buildSeed, SEED_IDS, SEED_USERS } from "./seed";
 import { createLocalDataStore } from "./store";
 
 let dir: string;
@@ -94,6 +94,35 @@ describe("seed data (mirrors the prototype)", () => {
     };
     expect(await tabs("Customer 360")).toEqual(["Customer & orders"]);
     expect(await tabs("Order management")).toEqual(["Customer & orders", "Order lines & products"]);
+  });
+
+  it("makes Łukasz owner of InfoMate and Marek owner of Retail Co; everyone else is a member", async () => {
+    const db = await readDb(file);
+    const roles = db.organization_member.map((m) => {
+      const org = db.organization.find((o) => o.id === m.organization_id)!.name;
+      const name = db.app_user.find((u) => u.id === m.user_id)!.display_name;
+      return `${org}: ${name} ${m.role}`;
+    });
+    expect(roles.sort()).toEqual([
+      "InfoMate: Anna Nowak member",
+      "InfoMate: Piotr Wiśniewski member",
+      "InfoMate: Łukasz owner",
+      "Retail Co: Kasia Zielińska member",
+      "Retail Co: Marek Lis owner",
+    ]);
+  });
+
+  it("uses fixed UUID v7 ids that survive a reset", async () => {
+    expect(Object.values(SEED_IDS).every((id) => isUuid(id) && id[14] === "7")).toBe(true);
+    expect(new Set(Object.values(SEED_IDS)).size).toBe(Object.values(SEED_IDS).length);
+
+    const before = await readDb(file);
+    await resetDevData(file);
+    const after = await readDb(file);
+    for (const table of TABLES) {
+      expect(after[table].map((r) => keyOf(table, r as never))).toEqual(before[table].map((r) => keyOf(table, r as never)));
+    }
+    expect((await workspaceNamed("Retail Co – DWH")).id).toBe(SEED_IDS.wsRetailDwh);
   });
 
   it("has no change events and breaks no rule", async () => {
