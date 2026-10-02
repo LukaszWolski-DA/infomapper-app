@@ -1,7 +1,11 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": ["dom", "dom.iterable", "esnext"],
+    "lib": [
+      "dom",
+      "dom.iterable",
+      "esnext"
+    ],
     "allowJs": false,
     "skipLibCheck": true,
     "strict": true,
@@ -14,9 +18,15 @@
     "isolatedModules": true,
     "jsx": "react-jsx",
     "incremental": true,
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": [
+        "./src/*"
+      ]
     }
   },
   "include": [
@@ -25,7 +35,14 @@
     "**/*.tsx",
     "**/*.mts",
     ".next/types/**/*.ts",
-    ".next/dev/types/**/*.ts"
+    ".next/dev/types/**/*.ts",
+    ".next-e2e/types/**/*.ts",
+    ".next-e2e/dev/types/**/*.ts"
   ],
-  "exclude": ["node_modules", "spikes", "docs"]
+  "exclude": [
+    "node_modules",
+    "spikes",
+    "docs",
+    ".next-e2e"
+  ]
 }

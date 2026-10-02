@@ -124,3 +124,59 @@
     @apply bg-background text-foreground;
     }
 }
+/* InfoMapper tokens from the prototype (docs/prototype), light and dark. Used as bg-im-surface, text-im-ink-2, … */
+:root {
+  --im-canvas: #e8ecf0;
+  --im-panel: #f6f7f9;
+  --im-surface: #ffffff;
+  --im-hover: #f1f4f7;
+  --im-ink: #18212c;
+  --im-ink-2: #4a5767;
+  --im-ink-3: #7c8998;
+  --im-line: #d6dce3;
+  --im-logical: #3346c4;
+  --im-logical-soft: #e7eafb;
+  --im-warn: #c2410c;
+  --im-warn-soft: #fceadd;
+  --im-review: #854f0b;
+  --im-review-strong: #ba7517;
+  --im-review-soft: #faeeda;
+  --im-shadow: rgba(22, 32, 48, 0.16);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --im-canvas: #13181e;
+    --im-panel: #181e25;
+    --im-surface: #1f262f;
+    --im-hover: #252d37;
+    --im-ink: #e5eaf0;
+    --im-ink-2: #a8b3c0;
+    --im-ink-3: #798595;
+    --im-line: #2f3944;
+    --im-logical: #8f9cff;
+    --im-logical-soft: #262d55;
+    --im-warn: #ff8b4e;
+    --im-warn-soft: #3e2518;
+    --im-review: #fac775;
+    --im-review-soft: #412402;
+    --im-shadow: rgba(0, 0, 0, 0.5);
+  }
+}
+
+@theme inline {
+  --color-im-canvas: var(--im-canvas);
+  --color-im-panel: var(--im-panel);
+  --color-im-surface: var(--im-surface);
+  --color-im-hover: var(--im-hover);
+  --color-im-ink: var(--im-ink);
+  --color-im-ink-2: var(--im-ink-2);
+  --color-im-ink-3: var(--im-ink-3);
+  --color-im-line: var(--im-line);
+  --color-im-logical: var(--im-logical);
+  --color-im-logical-soft: var(--im-logical-soft);
+  --color-im-warn: var(--im-warn);
+  --color-im-warn-soft: var(--im-warn-soft);
+  --color-im-review: var(--im-review);
+  --color-im-review-strong: var(--im-review-strong);
+  --color-im-review-soft: var(--im-review-soft);
+}

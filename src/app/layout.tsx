@@ -23,7 +23,7 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}>
-      <body className="flex min-h-full flex-col font-sans text-[13px]">{children}</body>
+      <body className="flex min-h-full flex-col bg-im-panel font-sans text-[13px] text-im-ink">{children}</body>
     </html>
   );
 }
