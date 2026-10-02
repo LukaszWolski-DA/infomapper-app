@@ -99,7 +99,7 @@ describe("canvas in several projects (D-28)", () => {
     if (!r.ok) throw new Error(r.error.message);
     expect(r.writeSet.writes).toEqual([{ kind: "remove", table: "project_canvas", before: link(projectB, canvas1, 0) }]);
     expect(r.writeSet.events).toMatchObject([
-      { operation: "delete", object_type: "project_canvas", object_id: canvas1, before_image: link(projectB, canvas1, 0), after_image: {} },
+      { operation: "delete", object_type: "project_canvas", object_id: canvas1, before_image: link(projectB, canvas1, 0), after_image: null },
     ]);
   });
 

@@ -3,7 +3,7 @@
 Version 2.0 · 2 October 2026 · replaces `INFOMAPPER_DATA_MODEL_v1_0.md` (the old application is not migrated, D-40)
 
 This document describes every table of the new InfoMapper application: what it holds, its columns, keys and rules.
-The SQL is in `supabase/migrations/0001_initial_schema.sql`. Behaviour is defined by the prototype
+The SQL is in `supabase/migrations/20261002000000_initial_schema.sql`. Behaviour is defined by the prototype
 (`docs/prototype/infomapper-model-prototype.html`); the decisions behind this model are listed at the end.
 
 ---
@@ -427,6 +427,12 @@ Append-only log of every change (AD-13). One user action is one `change_group_id
 | `operation` | text | no | `create`, `update`, `delete`, `restore` |
 | `before_image`, `after_image` | jsonb | yes | the row before and after |
 | `context_label_id` | uuid | yes | the active working context (D-26) |
+
+Images: `create` has only an after image; `update` and `restore` have both. A soft `delete` has both (the after
+image carries `deleted_at`). Link rows without `deleted_at` (`project_canvas`, `workspace_member`, …) are removed,
+not soft-deleted: their `delete` event has a before image and a null after image. Link tables have no `id`, so
+`object_id` names the moved thing (the canvas for `project_canvas`, the user for `workspace_member`); the images
+always contain the full row with both keys.
 
 ### `baseline`
 A frozen, named snapshot of the model part of a workspace (AD-03, AD-14).

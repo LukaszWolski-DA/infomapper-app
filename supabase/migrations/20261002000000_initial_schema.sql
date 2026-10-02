@@ -575,7 +575,9 @@ create table change_event (
   constraint change_event_operation_ck check (operation in ('create', 'update', 'delete', 'restore')),
   constraint change_event_images_ck check (
     (operation = 'create' and before_image is null and after_image is not null) or
-    (operation in ('update', 'delete', 'restore') and before_image is not null and after_image is not null))
+    (operation in ('update', 'restore') and before_image is not null and after_image is not null) or
+    -- a removed link row (e.g. project_canvas) has no after state
+    (operation = 'delete' and before_image is not null))
 );
 create index change_event_object_ix on change_event (object_id, occurred_at);
 create index change_event_group_ix on change_event (change_group_id);

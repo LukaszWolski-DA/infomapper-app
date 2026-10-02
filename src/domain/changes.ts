@@ -74,8 +74,8 @@ export function buildWriteSet(ctx: CommandContext, workspaceId: Uuid, writes: Wr
     object_id: objectId(write),
     operation: operation(write),
     before_image: write.kind === "insert" ? null : image(write.before),
-    // A removed link row has no after state; the schema requires an image, so it is empty.
-    after_image: write.kind === "remove" ? {} : image(write.row),
+    // A removed link row has no after state (data model, change_event).
+    after_image: write.kind === "remove" ? null : image(write.row),
     context_label_id: null,
   }));
   return { changeGroupId, writes, events };
