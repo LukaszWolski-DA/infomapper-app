@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { notFound } from "next/navigation";
 import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
-import { isArchived, isGuest } from "@/domain/permissions";
+import { can, checkCreateWorkspace, isArchived, isGuest } from "@/domain/permissions";
 import type { AppUser, WorkspaceRole } from "@/domain/types";
 import { LAST_PROJECTS_COOKIE, parseLastProjects } from "./preferences";
 import { standingOf, type Standing } from "./roles";
@@ -25,6 +25,9 @@ export interface ShellData {
   projects: { id: Uuid; name: string; canvasCount: number }[];
   canvas: { id: Uuid; name: string } | null;
   page: "workspace" | "project" | "canvas";
+  /** Whether "New workspace" (current organization) and "New project" are offered. The server checks again. */
+  canCreateWorkspace: boolean;
+  canCreateProject: boolean;
 }
 
 interface Where {
@@ -105,5 +108,8 @@ export async function loadShellFor(user: AppUser, where: Where): Promise<ShellDa
     projects: projectRows,
     canvas,
     page: where.canvasId ? "canvas" : where.projectId ? "project" : "workspace",
+    canCreateWorkspace:
+      checkCreateWorkspace(organization.id, myOrgMemberships.find((m) => m.organization_id === organization.id) ?? null) === null,
+    canCreateProject: can({ workspace, member }, "project.create"),
   };
 }

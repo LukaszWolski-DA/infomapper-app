@@ -4,6 +4,7 @@
 // Canvas tools (layers, Focus, Hand, Entity, Note, Frame, notation, zoom, panels) arrive with the canvas (AD-24).
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import { cn } from "@/ui/lib/utils";
 import {
@@ -15,6 +16,9 @@ import {
   DropdownMenuTrigger,
 } from "@/ui/components/dropdown-menu";
 import { signOut } from "../_actions/session";
+import { createProjectAction, createWorkspaceAction } from "../_actions/workspace";
+import { useAction } from "./use-action";
+import type { ActionResult } from "../_lib/run-command";
 import type { ShellData } from "../_lib/shell";
 import { projectHref, workspaceHref } from "../_lib/paths";
 import { ROLE_CAN, ROLE_LABEL } from "../_lib/roles";
@@ -138,6 +142,14 @@ function WorkspaceSwitcher({ shell }: { shell: ShellData }) {
         ))}
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
         <MenuLink href={workspaceHref(shell.workspace.id)}>Workspace home</MenuLink>
+        {shell.canCreateWorkspace && (
+          <NameThenEnter
+            testId="input-new-workspace"
+            placeholder="New workspace name, then Enter"
+            create={(name) => createWorkspaceAction({ organizationId: shell.organization.id, name })}
+            success={(name) => `Created the workspace ${name}.`}
+          />
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
@@ -169,8 +181,49 @@ function ProjectSwitcher({ shell }: { shell: ShellData }) {
             <MenuLink href={projectHref(workspace.id, project.id)}>Project home</MenuLink>
           </>
         )}
+        {shell.canCreateProject && (
+          <NameThenEnter
+            testId="input-new-project"
+            placeholder="New project name, then Enter"
+            create={(name) => createProjectAction({ workspaceId: workspace.id, name })}
+            success={(name) => `Created the project ${name}.`}
+          />
+        )}
       </DropdownMenuContent>
     </DropdownMenu>
+  );
+}
+
+/** "Name, then Enter" field at the bottom of a switcher menu: creates the thing and opens it. */
+function NameThenEnter({
+  testId,
+  placeholder,
+  create,
+  success,
+}: {
+  testId: string;
+  placeholder: string;
+  create: (name: string) => Promise<ActionResult<{ href: string }>>;
+  success: (name: string) => string;
+}) {
+  const { run, pending } = useAction();
+  const router = useRouter();
+  return (
+    <input
+      data-testid={testId}
+      placeholder={placeholder}
+      autoComplete="off"
+      spellCheck={false}
+      disabled={pending}
+      className="mx-1.5 mb-0.5 mt-1 h-[30px] w-[calc(100%-12px)] rounded-md border border-im-line bg-im-surface px-2"
+      onKeyDown={async (e) => {
+        e.stopPropagation(); // keep the menu's type-ahead out of the field
+        const name = e.currentTarget.value.trim();
+        if (e.key !== "Enter" || !name) return;
+        const result = await run(() => create(name), success(name));
+        if (result.ok) router.push(result.value.href);
+      }}
+    />
   );
 }
 

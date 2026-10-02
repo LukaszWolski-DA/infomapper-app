@@ -2,129 +2,13 @@
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 
-@custom-variant dark (&:is(.dark *));
+/* Dark mode follows the system, as in the prototype. */
+@custom-variant dark (@media (prefers-color-scheme: dark));
 
-@theme inline {
-    --font-sans: var(--font-plex-sans);
-    --font-mono: var(--font-plex-mono);
-    --radius-sm: calc(var(--radius) * 0.6);
-    --radius-md: calc(var(--radius) * 0.8);
-    --radius-lg: var(--radius);
-    --radius-xl: calc(var(--radius) * 1.4);
-    --radius-2xl: calc(var(--radius) * 1.8);
-    --radius-3xl: calc(var(--radius) * 2.2);
-    --radius-4xl: calc(var(--radius) * 2.6);
-    --color-background: var(--background);
-    --color-foreground: var(--foreground);
-    --color-card: var(--card);
-    --color-card-foreground: var(--card-foreground);
-    --color-popover: var(--popover);
-    --color-popover-foreground: var(--popover-foreground);
-    --color-primary: var(--primary);
-    --color-primary-foreground: var(--primary-foreground);
-    --color-secondary: var(--secondary);
-    --color-secondary-foreground: var(--secondary-foreground);
-    --color-muted: var(--muted);
-    --color-muted-foreground: var(--muted-foreground);
-    --color-accent: var(--accent);
-    --color-accent-foreground: var(--accent-foreground);
-    --color-destructive: var(--destructive);
-    --color-border: var(--border);
-    --color-input: var(--input);
-    --color-ring: var(--ring);
-    --color-chart-1: var(--chart-1);
-    --color-chart-2: var(--chart-2);
-    --color-chart-3: var(--chart-3);
-    --color-chart-4: var(--chart-4);
-    --color-chart-5: var(--chart-5);
-    --color-sidebar: var(--sidebar);
-    --color-sidebar-foreground: var(--sidebar-foreground);
-    --color-sidebar-primary: var(--sidebar-primary);
-    --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
-    --color-sidebar-accent: var(--sidebar-accent);
-    --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
-    --color-sidebar-border: var(--sidebar-border);
-    --color-sidebar-ring: var(--sidebar-ring);
-}
-
-:root {
-    --radius: 0.625rem;
-    --background: oklch(1 0 0);
-    --foreground: oklch(0.145 0 0);
-    --card: oklch(1 0 0);
-    --card-foreground: oklch(0.145 0 0);
-    --popover: oklch(1 0 0);
-    --popover-foreground: oklch(0.145 0 0);
-    --primary: oklch(0.205 0 0);
-    --primary-foreground: oklch(0.985 0 0);
-    --secondary: oklch(0.97 0 0);
-    --secondary-foreground: oklch(0.205 0 0);
-    --muted: oklch(0.97 0 0);
-    --muted-foreground: oklch(0.556 0 0);
-    --accent: oklch(0.97 0 0);
-    --accent-foreground: oklch(0.205 0 0);
-    --destructive: oklch(0.577 0.245 27.325);
-    --border: oklch(0.922 0 0);
-    --input: oklch(0.922 0 0);
-    --ring: oklch(0.708 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.985 0 0);
-    --sidebar-foreground: oklch(0.145 0 0);
-    --sidebar-primary: oklch(0.205 0 0);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.97 0 0);
-    --sidebar-accent-foreground: oklch(0.205 0 0);
-    --sidebar-border: oklch(0.922 0 0);
-    --sidebar-ring: oklch(0.708 0 0);
-}
-
-.dark {
-    --background: oklch(0.145 0 0);
-    --foreground: oklch(0.985 0 0);
-    --card: oklch(0.205 0 0);
-    --card-foreground: oklch(0.985 0 0);
-    --popover: oklch(0.205 0 0);
-    --popover-foreground: oklch(0.985 0 0);
-    --primary: oklch(0.922 0 0);
-    --primary-foreground: oklch(0.205 0 0);
-    --secondary: oklch(0.269 0 0);
-    --secondary-foreground: oklch(0.985 0 0);
-    --muted: oklch(0.269 0 0);
-    --muted-foreground: oklch(0.708 0 0);
-    --accent: oklch(0.269 0 0);
-    --accent-foreground: oklch(0.985 0 0);
-    --destructive: oklch(0.704 0.191 22.216);
-    --border: oklch(1 0 0 / 10%);
-    --input: oklch(1 0 0 / 15%);
-    --ring: oklch(0.556 0 0);
-    --chart-1: oklch(0.87 0 0);
-    --chart-2: oklch(0.556 0 0);
-    --chart-3: oklch(0.439 0 0);
-    --chart-4: oklch(0.371 0 0);
-    --chart-5: oklch(0.269 0 0);
-    --sidebar: oklch(0.205 0 0);
-    --sidebar-foreground: oklch(0.985 0 0);
-    --sidebar-primary: oklch(0.488 0.243 264.376);
-    --sidebar-primary-foreground: oklch(0.985 0 0);
-    --sidebar-accent: oklch(0.269 0 0);
-    --sidebar-accent-foreground: oklch(0.985 0 0);
-    --sidebar-border: oklch(1 0 0 / 10%);
-    --sidebar-ring: oklch(0.556 0 0);
-}
-
-@layer base {
-  * {
-    @apply border-border outline-ring/50;
-    }
-  body {
-    @apply bg-background text-foreground;
-    }
-}
-/* InfoMapper tokens from the prototype (docs/prototype), light and dark. Used as bg-im-surface, text-im-ink-2, … */
+/*
+ * One palette: the prototype's colour tokens (docs/prototype), light and dark.
+ * Use them as bg-im-surface, text-im-ink-2, …; shadcn's variables below are mapped onto them.
+ */
 :root {
   --im-canvas: #e8ecf0;
   --im-panel: #f6f7f9;
@@ -136,11 +20,14 @@
   --im-line: #d6dce3;
   --im-logical: #3346c4;
   --im-logical-soft: #e7eafb;
+  --im-map: #0b8a72;
   --im-warn: #c2410c;
   --im-warn-soft: #fceadd;
   --im-review: #854f0b;
   --im-review-strong: #ba7517;
   --im-review-soft: #faeeda;
+  --im-req-soft: #eeedfe;
+  --im-req-ink: #3c3489;
   --im-shadow: rgba(22, 32, 48, 0.16);
 }
 @media (prefers-color-scheme: dark) {
@@ -155,15 +42,66 @@
     --im-line: #2f3944;
     --im-logical: #8f9cff;
     --im-logical-soft: #262d55;
+    --im-map: #3ecfae;
     --im-warn: #ff8b4e;
     --im-warn-soft: #3e2518;
     --im-review: #fac775;
     --im-review-soft: #412402;
+    --im-req-soft: #26215c;
+    --im-req-ink: #cecbf6;
     --im-shadow: rgba(0, 0, 0, 0.5);
   }
 }
 
+/* shadcn/ui variables, mapped onto the prototype palette (they follow light and dark through it). */
+:root {
+  --radius: 0.5rem;
+  --background: var(--im-panel);
+  --foreground: var(--im-ink);
+  --card: var(--im-surface);
+  --card-foreground: var(--im-ink);
+  --popover: var(--im-surface);
+  --popover-foreground: var(--im-ink);
+  --primary: var(--im-map);
+  --primary-foreground: var(--im-surface);
+  --secondary: var(--im-hover);
+  --secondary-foreground: var(--im-ink);
+  --muted: var(--im-hover);
+  --muted-foreground: var(--im-ink-3);
+  --accent: var(--im-hover);
+  --accent-foreground: var(--im-ink);
+  --destructive: var(--im-warn);
+  --border: var(--im-line);
+  --input: var(--im-line);
+  --ring: var(--im-logical);
+}
+
 @theme inline {
+  --font-sans: var(--font-plex-sans);
+  --font-mono: var(--font-plex-mono);
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
   --color-im-canvas: var(--im-canvas);
   --color-im-panel: var(--im-panel);
   --color-im-surface: var(--im-surface);
@@ -174,9 +112,21 @@
   --color-im-line: var(--im-line);
   --color-im-logical: var(--im-logical);
   --color-im-logical-soft: var(--im-logical-soft);
+  --color-im-map: var(--im-map);
   --color-im-warn: var(--im-warn);
   --color-im-warn-soft: var(--im-warn-soft);
   --color-im-review: var(--im-review);
   --color-im-review-strong: var(--im-review-strong);
   --color-im-review-soft: var(--im-review-soft);
+  --color-im-req-soft: var(--im-req-soft);
+  --color-im-req-ink: var(--im-req-ink);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
 }

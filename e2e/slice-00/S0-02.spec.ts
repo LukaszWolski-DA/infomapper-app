@@ -14,7 +14,7 @@ test("S0-02: the top bar shows organization / workspace / project, and the switc
   await expect(page.getByTestId("switcher-workspace")).toHaveText("Sales analytics");
 
   // switching workspace opens its home
-  await pickFromMenu(page, "switcher-organization", "InfoMate 2 workspaces");
+  await pickFromMenu(page, "switcher-organization", /^InfoMate \d+ workspaces$/);
   await expect(page).toHaveURL(new RegExp(`/w/${SEED_IDS.wsRetailDwh}$`));
   await pickFromMenu(page, "switcher-workspace", "Bank X – Risk DWH archived");
   await expect(page).toHaveURL(new RegExp(`/w/${SEED_IDS.wsBankX}$`));
