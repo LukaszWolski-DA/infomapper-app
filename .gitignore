@@ -1,0 +1,26 @@
+# dependencies
+node_modules/
+
+# Next.js
+.next/
+out/
+next-env.d.ts
+
+# TypeScript
+*.tsbuildinfo
+
+# Playwright
+test-results/
+playwright-report/
+
+# env and local files
+.env*
+!.env.example
+*.log
+.DS_Store
+Thumbs.db
+
+# editors
+.vscode/*
+!.vscode/extensions.json
+.idea/

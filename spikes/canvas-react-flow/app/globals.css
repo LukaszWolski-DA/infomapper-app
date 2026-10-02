@@ -1,0 +1,167 @@
+/* Tokens copied from docs/prototype/infomapper-model-prototype.html */
+:root {
+  --canvas: #E8ECF0; --grid: #BFC8D2; --panel: #F6F7F9; --surface: #FFFFFF; --hover: #F1F4F7;
+  --ink: #18212C; --ink-2: #4A5767; --ink-3: #7C8998; --line: #D6DCE3;
+  --logical: #3346C4; --logical-soft: #E7EAFB;
+  --physical: #A0660F; --physical-soft: #F6ECDA;
+  --map: #0B8A72; --map-soft: #DCF1EB;
+  --rel: #556273; --warn: #C2410C; --warn-soft: #FCEADD;
+  --shadow: rgba(22, 32, 48, .16);
+  --sans: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --canvas: #13181E; --grid: #2B343E; --panel: #181E25; --surface: #1F262F; --hover: #252D37;
+    --ink: #E5EAF0; --ink-2: #A8B3C0; --ink-3: #798595; --line: #2F3944;
+    --logical: #8F9CFF; --logical-soft: #262D55;
+    --physical: #E2A74B; --physical-soft: #3A2F1C;
+    --map: #3ECFAE; --map-soft: #173B33;
+    --rel: #95A2B2; --warn: #FF8B4E; --warn-soft: #3E2518;
+    --shadow: rgba(0, 0, 0, .5);
+  }
+}
+
+*, *::before, *::after { box-sizing: border-box }
+html, body { height: 100%; margin: 0 }
+body { background: var(--panel); color: var(--ink); font: 13px/1.45 var(--sans); overflow: hidden; -webkit-font-smoothing: antialiased }
+
+.shell { height: 100vh; display: grid; grid-template-rows: 44px 1fr }
+.bar { display: flex; align-items: center; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line); background: var(--surface); white-space: nowrap; overflow: hidden }
+.bar b { font-weight: 600; font-size: 14px }
+.bar span { color: var(--ink-3) }
+.bar .stats { margin-left: auto; font-variant-numeric: tabular-nums }
+.stage { position: relative; min-height: 0 }
+
+/* React Flow canvas in prototype colours */
+.react-flow { --xy-background-color: var(--canvas); --xy-background-pattern-color: var(--grid) }
+
+/* FPS readout */
+.fps { position: absolute; top: 10px; right: 12px; z-index: 10; padding: 3px 10px; border-radius: 12px; font-size: 12px; color: var(--ink-2);
+  background: var(--surface); box-shadow: 0 0 0 1px var(--line); font-variant-numeric: tabular-nums; pointer-events: none }
+.fps b { font-weight: 600; color: var(--ink) }
+.fps span { color: var(--ink-3) }
+.fps-ok b { color: var(--map) }
+.fps-mid b { color: var(--physical) }
+.fps-bad b { color: var(--warn) }
+
+/* ---------- cards (prototype .card / .c-head / .row) ---------- */
+.react-flow__node-card { padding: 0; border: 0; background: none }
+.card { background: var(--surface); border-radius: 10px; user-select: none; font-size: 13px; color: var(--ink);
+  box-shadow: 0 0 0 1px var(--line), 0 1px 2px var(--shadow), 0 8px 18px -12px var(--shadow) }
+.card.src { border-radius: 3px }
+.card.sel { box-shadow: 0 0 0 2px var(--logical), 0 10px 24px -12px var(--shadow) }
+.card.src.sel { box-shadow: 0 0 0 2px var(--physical), 0 10px 24px -12px var(--shadow) }
+.c-head { height: 54px; padding: 7px 8px 0 14px; position: relative; cursor: move; border-bottom: 1px solid var(--line) }
+.card.collapsed .c-head { border-bottom-color: transparent }
+.ent .c-head::before { content: ""; position: absolute; left: 0; top: 0; bottom: -1px; width: 4px; border-radius: 10px 0 0 0; background: var(--cc) }
+.ent.collapsed .c-head::before { border-radius: 10px 0 0 10px }
+.src .c-head { background: linear-gradient(var(--physical), var(--physical)) top/100% 3px no-repeat }
+.c-l1 { display: flex; align-items: center; gap: 6px; height: 17px; font-size: 11px; color: var(--ink-3); min-width: 0 }
+.c-l1 > span { white-space: nowrap; flex: none }
+.c-l1 > span:nth-child(2) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis }
+.c-l1 .path { font-family: var(--mono) }
+.stereo { color: var(--ink-2) }
+/* no opacity on per-card elements: thousands of opacity effects stop Chrome from panning the canvas as one GPU layer (REPORT.md, C-01) */
+.c-tools { margin-left: auto; display: flex; gap: 1px }
+.ib { display: inline-flex; align-items: center; gap: 4px; height: 20px; min-width: 20px; padding: 0 4px; border: 0; border-radius: 4px;
+  background: transparent; color: var(--ink-2); font: 10.5px var(--sans); cursor: pointer }
+.ib:hover { background: var(--hover); color: var(--ink) }
+.c-l2 { display: flex; align-items: center; gap: 8px; height: 24px; min-width: 0 }
+.c-name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.src .c-name { font-family: var(--mono); font-weight: 500; font-size: 13.5px }
+.cov-t { font-size: 11px; color: var(--ink-3); font-variant-numeric: tabular-nums; flex: none }
+.c-body { padding: 6px 0 }
+.row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 12px; position: relative; font-size: 12.5px }
+.row:hover { background: var(--hover) }
+.row.hl { background: var(--map-soft) }
+.row.sel { background: var(--logical-soft); box-shadow: inset 3px 0 var(--logical) }
+.src .row.sel { background: var(--physical-soft); box-shadow: inset 3px 0 var(--physical) }
+.row.empty { color: var(--ink-3); font-style: italic }
+.key { width: 18px; font-size: 9.5px; font-weight: 600; color: var(--ink-3); flex: none; letter-spacing: .02em }
+.key b { font-weight: 600 }
+.key .pk { color: var(--logical) }
+.src .key .pk { color: var(--physical) }
+.nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.src .nm { font-family: var(--mono); font-size: 12px }
+.dt { color: var(--ink-3); font-size: 11px; flex: none }
+.src .dt { font-family: var(--mono); font-size: 10.5px }
+
+/* row handles: React Flow <Handle>s styled like the prototype's .hnd, visible on row hover */
+.card .react-flow__handle.hnd { width: 9px; height: 9px; min-width: 0; min-height: 0; border: 0; border-radius: 50%;
+  background: var(--surface); box-shadow: 0 0 0 1.5px var(--map); visibility: hidden; pointer-events: none }
+.card .react-flow__handle.hh { top: 27px }
+.row:hover .react-flow__handle.hnd { visibility: visible }
+
+/* ---------- lines (prototype .lnk / .map) ---------- */
+.lnk .hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer }
+.lnk .s { fill: none; stroke-width: 1.6; pointer-events: none }
+.map .s { stroke: var(--map) }
+.map.part .s { stroke-opacity: .45 }
+.map .end { fill: var(--map) }
+.lnk:hover .s { stroke-width: 2.6 }
+
+/* relationships (prototype .rel / .rlab / .mult) */
+.rel .s { stroke: var(--rel) }
+.rel .mk { fill: none; stroke: var(--rel); stroke-width: 1.6; pointer-events: none }
+.rel circle.mk { fill: var(--canvas) }
+.rlab rect { fill: var(--canvas); stroke: var(--line) }
+.rlab text, .mult { font: 500 11px var(--sans); fill: var(--ink-2); text-anchor: middle; dominant-baseline: central }
+
+/* segmented toggle in the top bar */
+.seg { display: inline-flex; border-radius: 6px; box-shadow: 0 0 0 1px var(--line); overflow: hidden }
+.seg button { border: 0; background: var(--surface); color: var(--ink-2); font: 12px var(--sans); padding: 3px 10px; cursor: pointer }
+.seg button[aria-pressed="true"] { background: var(--logical-soft); color: var(--logical); font-weight: 500 }
+
+/* ---------- frames (prototype .frame / .f-lab / .fblock) ---------- */
+.react-flow__node-frame { padding: 0; border: 0; background: none }
+.frame { position: absolute; inset: 0; border-radius: 16px; cursor: move;
+  border: 1.5px solid color-mix(in srgb, var(--fc) 50%, transparent); background: color-mix(in srgb, var(--fc) 7%, transparent) }
+.frame.sel { border-color: var(--fc); box-shadow: 0 0 0 1px var(--fc) }
+.frame .react-flow__handle.hnd, .fblock .react-flow__handle.hnd { visibility: hidden }
+.f-lab { position: absolute; left: 4px; bottom: 100%; display: flex; align-items: center; gap: 6px; padding-bottom: 7px; white-space: nowrap; font-size: 13px; color: var(--ink) }
+.f-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--fc); flex: none }
+.f-name { font-weight: 600 }
+.f-kind { font-size: 11.5px; color: var(--ink-3) }
+.f-lab .ib { background: var(--surface); box-shadow: 0 0 0 1px var(--line) }
+.fblock { position: absolute; inset: 0; border-radius: 12px; overflow: hidden;
+  box-shadow: 0 0 0 1px var(--line), 4px 4px 0 -1px var(--surface), 4px 4px 0 0 var(--line), 8px 8px 0 -1px var(--surface), 8px 8px 0 0 var(--line), 0 12px 24px -12px var(--shadow) }
+.fblock.sel { box-shadow: 0 0 0 2px var(--fc), 4px 4px 0 -1px var(--surface), 4px 4px 0 0 var(--line), 8px 8px 0 -1px var(--surface), 8px 8px 0 0 var(--line) }
+.fblock .c-head { background: color-mix(in srgb, var(--fc) 10%, var(--surface)) }
+.fblock .c-head::before { content: ""; position: absolute; left: 0; top: 0; bottom: -1px; width: 4px; background: var(--fc) }
+.b-body { padding: 6px 0 }
+.brow { display: flex; align-items: center; gap: 8px; height: 22px; padding: 0 12px 0 14px; font-size: 12px }
+.brow .bk { width: 8px; height: 8px; flex: none; border-radius: 2px; background: var(--physical) }
+.brow .bk.ent { border-radius: 50%; background: var(--logical) }
+.brow .dt { color: var(--ink-3); font-size: 11px; font-variant-numeric: tabular-nums }
+.brow.more { color: var(--ink-3) }
+.b-foot { height: 30px; display: flex; align-items: center; padding: 0 10px; border-top: 1px solid var(--line); font-size: 11px; color: var(--ink-3); white-space: nowrap; overflow: hidden }
+
+/* merged lines: count chip (prototype .chip) */
+.chip circle { fill: var(--surface); stroke: var(--map); stroke-width: 1.4 }
+.chip text { font: 600 10px var(--sans); fill: var(--map); text-anchor: middle; dominant-baseline: central; pointer-events: none }
+.lnk.bundle .s { stroke-linecap: round }
+
+/* ---------- step 5: highlight, resize, lasso, minimap ---------- */
+.focus-root { position: absolute; inset: 0 }
+.focus .lnk:not(.hl) { opacity: .12 }
+.focus .card:not(.lit) { opacity: .25 }
+.lnk.hl .s { stroke-width: 2.6 }
+.row { cursor: pointer }
+/* width handle on the right edge (prototype .c-rs) */
+.react-flow__resize-control.line.right.c-rs { width: 10px; border: 0; background: transparent; cursor: ew-resize }
+.react-flow__resize-control.line.right.c-rs::after { content: ""; position: absolute; left: 4px; top: 12px; bottom: 12px; width: 2px; border-radius: 1px; background: var(--logical); visibility: hidden }
+.card:hover .react-flow__resize-control.line.right.c-rs::after { visibility: visible; background: color-mix(in srgb, var(--logical) 35%, transparent) }
+.react-flow__resize-control.line.right.c-rs:hover::after { visibility: visible; background: var(--logical) }
+.react-flow__node.selected .card.src { box-shadow: 0 0 0 2px var(--logical), 0 10px 24px -12px var(--shadow) }
+.react-flow__node.selected .card.ent { box-shadow: 0 0 0 2px var(--logical), 0 10px 24px -12px var(--shadow) }
+/* lasso (prototype #lasso) */
+.react-flow .react-flow__selection { background: color-mix(in srgb, var(--logical) 8%, transparent); border: 1px solid var(--logical); border-radius: 2px }
+/* React Flow's selection box sits on top of the selected cards and would swallow clicks (e.g. Shift-click on a card
+   inside it). Like the prototype's #selbox it is only a marker; group drag works by dragging any selected card. */
+.react-flow .react-flow__nodesselection-rect { border: 1.5px dashed var(--logical); border-radius: 14px; background: transparent; pointer-events: none }
+/* minimap (prototype .mini) */
+.react-flow__minimap { background: var(--canvas); border-radius: 8px; overflow: hidden; box-shadow: 0 0 0 1px var(--line), 0 6px 16px -10px var(--shadow) }
+.react-flow__minimap-node { fill-opacity: .55 }
+.zoom-panel { margin-bottom: 162px !important }
+.zoomr { padding: 2px 8px; border-radius: 10px; font-size: 11.5px; color: var(--ink-2); background: var(--surface); box-shadow: 0 0 0 1px var(--line); font-variant-numeric: tabular-nums }

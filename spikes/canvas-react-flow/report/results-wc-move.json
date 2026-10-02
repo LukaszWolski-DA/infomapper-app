@@ -1,0 +1,194 @@
+{
+  "environment": {
+    "browser": "Chrome 154.0.8037.57",
+    "headed": true,
+    "build": "next build + next start (production)",
+    "gpu": "ANGLE (Intel, Intel(R) UHD Graphics 620 (0x00005917) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+    "dpr": 1,
+    "cores": 8,
+    "viewport": [
+      1536,
+      864
+    ]
+  },
+  "C-01": {
+    "final: overview (all 101 cards in view)": {
+      "frames": 256,
+      "durationMs": 10029,
+      "avgFps": 25.5,
+      "maxFrameMs": 133.4,
+      "p95FrameMs": 99.9,
+      "over50ms": 54,
+      "longFrames": 49,
+      "longestLoafMs": 101,
+      "zoom": 0.121,
+      "zoomRange": [
+        0.1,
+        0.12
+      ]
+    },
+    "final: 100% zoom, dense area": {
+      "frames": 258,
+      "durationMs": 10033,
+      "avgFps": 25.7,
+      "maxFrameMs": 250,
+      "p95FrameMs": 83.4,
+      "over50ms": 64,
+      "longFrames": 63,
+      "longestLoafMs": 211,
+      "zoom": 1.171,
+      "zoomRange": [
+        1,
+        1.2
+      ]
+    },
+    "vanilla (no will-change, dotted background): overview": {
+      "frames": 92,
+      "durationMs": 10075,
+      "avgFps": 9.1,
+      "maxFrameMs": 216.7,
+      "p95FrameMs": 166.5,
+      "over50ms": 88,
+      "longFrames": 84,
+      "longestLoafMs": 187,
+      "zoom": 0.109,
+      "zoomRange": [
+        0.1,
+        0.11
+      ]
+    },
+    "vanilla (no will-change, dotted background): 100%": {
+      "frames": 153,
+      "durationMs": 10048,
+      "avgFps": 15.2,
+      "maxFrameMs": 83.5,
+      "p95FrameMs": 83.4,
+      "over50ms": 132,
+      "longFrames": 140,
+      "longestLoafMs": 73,
+      "zoom": 1.047,
+      "zoomRange": [
+        0.99,
+        1.06
+      ]
+    },
+    "final + onlyRenderVisibleElements: 100%": {
+      "frames": 337,
+      "durationMs": 10038,
+      "avgFps": 33.6,
+      "maxFrameMs": 216.6,
+      "p95FrameMs": 83.4,
+      "over50ms": 63,
+      "longFrames": 65,
+      "longestLoafMs": 214,
+      "zoom": 1.273,
+      "zoomRange": [
+        1,
+        1.3
+      ]
+    }
+  },
+  "C-02": {
+    "one card (src:57, 11 lines)": {
+      "frames": 484,
+      "durationMs": 8066,
+      "avgFps": 60,
+      "maxFrameMs": 17.1,
+      "p95FrameMs": 16.9,
+      "over50ms": 0,
+      "longFrames": 0,
+      "longestLoafMs": 0,
+      "zoom": 0.6
+    },
+    "15-card group (85 mapping lines attached)": {
+      "frames": 482,
+      "durationMs": 8026,
+      "avgFps": 60.1,
+      "maxFrameMs": 17.2,
+      "p95FrameMs": 16.9,
+      "over50ms": 0,
+      "longFrames": 0,
+      "longestLoafMs": 0,
+      "zoom": 0.6
+    }
+  },
+  "C-04": {
+    "pan": {
+      "frames": 423,
+      "durationMs": 10037,
+      "avgFps": 42.1,
+      "maxFrameMs": 50,
+      "p95FrameMs": 33.4,
+      "over50ms": 0,
+      "longFrames": 0,
+      "longestLoafMs": 0,
+      "zoom": 1
+    },
+    "cardHeightPx": 5266,
+    "mappingsOnCard": 25,
+    "endsChecked": 50,
+    "endsOff": 0
+  },
+  "C-08": {
+    "msFromNavigationStart": [
+      1074,
+      1058,
+      1054,
+      1043,
+      1026
+    ],
+    "median": 1054,
+    "max": 1074
+  },
+  "C-09": {
+    "resize": {
+      "frames": 150,
+      "durationMs": 6103,
+      "avgFps": 24.6,
+      "maxFrameMs": 133.3,
+      "p95FrameMs": 100,
+      "over50ms": 49,
+      "longFrames": 16,
+      "longestLoafMs": 672,
+      "zoom": 0.5
+    },
+    "midDragSamples": [
+      {
+        "width": 538,
+        "onRight": 13,
+        "onLeft": 12,
+        "total": 25
+      }
+    ],
+    "final": {
+      "width": 444,
+      "onRight": 13,
+      "onLeft": 12,
+      "total": 25
+    }
+  },
+  "C-10": {
+    "rows": 16,
+    "commitMs": {
+      "median": 2.4,
+      "p95": 8.3,
+      "max": 8.3
+    },
+    "toNextFrameMs": {
+      "median": 98.7,
+      "p95": 451.2,
+      "max": 451.2
+    },
+    "hoverSweep": {
+      "frames": 232,
+      "durationMs": 5044,
+      "avgFps": 46,
+      "maxFrameMs": 100,
+      "p95FrameMs": 66.5,
+      "over50ms": 12,
+      "longFrames": 15,
+      "longestLoafMs": 111,
+      "zoom": 1
+    }
+  }
+}
