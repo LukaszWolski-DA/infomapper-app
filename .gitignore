@@ -4,19 +4,27 @@ node_modules/
 # Next.js
 .next/
 out/
+build/
 next-env.d.ts
 
 # TypeScript
 *.tsbuildinfo
 
-# Playwright
+# tests
+coverage/
 test-results/
 playwright-report/
+blob-report/
+
+# local development data (AD-29)
+.data/
 
 # env and local files
 .env*
 !.env.example
+*.pem
 *.log
+.vercel
 .DS_Store
 Thumbs.db
 

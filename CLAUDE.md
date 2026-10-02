@@ -102,12 +102,16 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 
 ## Commands
 
-Filled in by slice 0 once the application is scaffolded:
+```
+npm run dev              # local app on http://localhost:3000
+npm run build            # production build (npm start serves it)
+npm run lint             # ESLint, including the layer rules (eslint-plugin-boundaries)
+npm run typecheck        # tsc --noEmit
+npm test                 # Vitest: src/**/*.test.ts and tests/
+npm run e2e              # Playwright: e2e/, starts the dev server itself
+npm run seed             # demo data into .data/dev-db.json
+npm run reset-dev-data   # wipe .data/ and seed again
+```
 
-```
-npm run dev         # local app
-npm run lint
-npm run typecheck
-npm test            # Vitest
-npm run e2e         # Playwright
-```
+Next.js 16 notes for agents are in `AGENTS.md` (managed by `next dev`; keep it committed).
+shadcn/ui components go to `src/ui/components` (`npx shadcn add <name>`).
