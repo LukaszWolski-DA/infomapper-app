@@ -105,12 +105,12 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 ## Commands
 
 ```
-npm run dev              # local app on http://localhost:3000
+npm run dev              # local app on http://localhost:3000 (sign in at /sign-in; run npm run seed first)
 npm run build            # production build (npm start serves it)
 npm run lint             # ESLint, including the layer rules (eslint-plugin-boundaries)
 npm run typecheck        # tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
-npm run e2e              # Playwright: e2e/, starts the dev server itself
+npm run e2e              # Playwright: e2e/, own dev server (port 3200) on fresh data in .data/e2e-db.json
 npm run seed             # demo data into .data/dev-db.json
 npm run reset-dev-data   # wipe .data/ and seed again
 ```

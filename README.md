@@ -9,7 +9,8 @@ Requires Node.js 22 and npm.
 ```
 npm install
 npx playwright install chromium   # once, for the end-to-end tests
-npm run dev                       # http://localhost:3000
+npm run seed                      # demo data in .data/dev-db.json
+npm run dev                       # http://localhost:3000, sign in at /sign-in
 ```
 
 | Command | What it does |
@@ -19,7 +20,7 @@ npm run dev                       # http://localhost:3000
 | `npm run lint` | ESLint, including the layer rules (AD-19) |
 | `npm run typecheck` | TypeScript, strict |
 | `npm test` | Vitest unit tests |
-| `npm run e2e` | Playwright end-to-end tests (starts the dev server) |
+| `npm run e2e` | Playwright end-to-end tests; starts its own dev server on port 3200 with fresh seed data in `.data/e2e-db.json` |
 | `npm run seed` | Creates the demo data in `.data/dev-db.json` (slice 0, step 3) |
 | `npm run reset-dev-data` | Wipes the local data and seeds again (slice 0, step 3) |
 

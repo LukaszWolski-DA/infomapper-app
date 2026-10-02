@@ -17,11 +17,8 @@ const eslintConfig = defineConfig([
     plugins: { boundaries },
     settings: {
       "import/resolver": { typescript: { alwaysTryTypes: true } },
-      "boundaries/elements": layers.map((type) => ({
-        type,
-        pattern: `src/${type}/**`,
-        partialMatch: false,
-      })),
+      // src/proxy.ts (Next.js wants it next to src/app) is not a layer; it only imports src/app/_lib.
+      "boundaries/elements": layers.map((type) => ({ type, pattern: `src/${type}/**`, partialMatch: false })),
     },
     rules: {
       "boundaries/dependencies": [
