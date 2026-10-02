@@ -29,7 +29,7 @@ type Patch = Partial<Omit<SettingsValues, "workspaceId" | "version">>;
 
 const SAVED_MESSAGE = (patch: Patch): string => {
   if (patch.dv2Mode !== undefined)
-    return patch.dv2Mode ? "Data Vault 2.0 mode is on: see the hints in entity panels." : "Data Vault 2.0 mode is off.";
+    return patch.dv2Mode ? "Data Vault 2.0 mode is on." : "Data Vault 2.0 mode is off.";
   if (patch.fourEyes !== undefined) return patch.fourEyes ? "Four-eyes approval is on." : "Four-eyes approval is off.";
   return "Settings saved.";
 };

@@ -11,6 +11,7 @@
  */
 :root {
   --im-canvas: #e8ecf0;
+  --im-grid: #bfc8d2;
   --im-panel: #f6f7f9;
   --im-surface: #ffffff;
   --im-hover: #f1f4f7;
@@ -33,6 +34,7 @@
 @media (prefers-color-scheme: dark) {
   :root {
     --im-canvas: #13181e;
+    --im-grid: #2b343e;
     --im-panel: #181e25;
     --im-surface: #1f262f;
     --im-hover: #252d37;

@@ -145,7 +145,7 @@ function WorkspaceSwitcher({ shell }: { shell: ShellData }) {
         {shell.canCreateWorkspace && (
           <NameThenEnter
             testId="input-new-workspace"
-            placeholder="New workspace name, then Enter"
+            placeholder="New workspace, press Enter"
             create={(name) => createWorkspaceAction({ organizationId: shell.organization.id, name })}
             success={(name) => `Created the workspace ${name}.`}
           />
