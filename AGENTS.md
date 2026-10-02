@@ -1,3 +1,7 @@
+# AGENTS.md
+
+The instructions for this repository are in [CLAUDE.md](CLAUDE.md). Read it first.
+
 <!-- BEGIN:nextjs-agent-rules -->
 
 # This is NOT the Next.js you know

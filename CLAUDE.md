@@ -45,10 +45,12 @@ src/data     repository interfaces and their adapters: a local JSON-file adapter
 src/app      Next.js App Router routes, server actions, route handlers, screens.
 src/ui       shared UI components (shadcn/ui based).
 src/canvas   the modeling canvas.
+tests/       repository-level checks outside the layers (e.g. the layer rules). Not application code.
 ```
 
-Imports go one way: `app` → `ui`/`canvas` → `domain`; `app` → `data` → `domain`. `domain` imports nothing from the
-other layers.
+Imports go one way: `app` → `canvas` → `ui` → `domain`; `app` and `canvas` may also skip a step (e.g. `canvas` → `domain`);
+`app` → `data` → `domain`. `ui` never imports from `canvas`. `domain` imports nothing from the other layers.
+`npm run lint` enforces this (`eslint.config.mjs`).
 
 **Writes (AD-23).**
 - Every write goes through the server (server actions or route handlers) and then through a `domain` command.

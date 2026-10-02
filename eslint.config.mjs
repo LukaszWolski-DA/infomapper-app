@@ -4,7 +4,7 @@ import nextTs from "eslint-config-next/typescript";
 import boundaries from "eslint-plugin-boundaries";
 
 // Layer rules from CLAUDE.md (AD-19):
-//   app -> ui / canvas -> domain
+//   app -> canvas -> ui -> domain (canvas may also import domain; ui never imports canvas)
 //   app -> data -> domain
 //   domain imports nothing from the other layers, and no React, Next.js or storage code.
 const layers = ["domain", "data", "app", "ui", "canvas"];
@@ -34,7 +34,7 @@ const eslintConfig = defineConfig([
             { from: { element: { type: "domain" } }, allow: { to: { element: { type: "domain" } } } },
             { from: { element: { type: "data" } }, allow: { to: { element: { types: { anyOf: ["data", "domain"] } } } } },
             { from: { element: { type: "ui" } }, allow: { to: { element: { types: { anyOf: ["ui", "domain"] } } } } },
-            { from: { element: { type: "canvas" } }, allow: { to: { element: { types: { anyOf: ["canvas", "domain"] } } } } },
+            { from: { element: { type: "canvas" } }, allow: { to: { element: { types: { anyOf: ["canvas", "ui", "domain"] } } } } },
             { from: { element: { type: "app" } }, allow: { to: { element: { types: { anyOf: layers } } } } },
           ],
         },
