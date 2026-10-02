@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { addMember, callActionDirectly, captureActionId, createFromSwitcher, expectToast, newSession, SEED_IDS } from "./helpers";
 
 const bank = SEED_IDS.wsBankX;
@@ -37,12 +37,6 @@ test("S0-07: in an archived workspace all writes are refused; after the owner un
   await page.getByTestId("input-new-project-tile").press("Enter");
   await expectToast(page, "Created the project Risk models.");
   await expect(page.getByTestId("page-project-home")).toContainText("Risk models");
-
-  // and archive it again for the other tests
-  await page.goto(`/w/${bank}`);
-  await page.getByTestId("button-archive").click();
-  await expectToast(page, "Archived Bank X – Risk DWH. It is read-only now.");
-  await expect(page.getByTestId("banner-archived")).toBeVisible();
 });
 
 test("S0-07: only the owner can archive; an admin sees the button disabled with a hint", async ({ browser }) => {

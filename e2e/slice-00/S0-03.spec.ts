@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { SEED_IDS, signInAs } from "./helpers";
 
 test("S0-03: the user indicator shows the role, coloured by what it allows, and its menu explains the role", async ({ page }) => {

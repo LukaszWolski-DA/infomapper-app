@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { createFromSwitcher, expectToast, signInAs } from "./helpers";
 
 test("S0-04: Łukasz creates project Finance and canvas Invoices; Finance has First canvas and Invoices as tiles and tabs", async ({ page }) => {

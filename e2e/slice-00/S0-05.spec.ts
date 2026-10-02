@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { createFromSwitcher, expectToast, SEED_IDS, signInAs } from "./helpers";
 
 const ws = SEED_IDS.wsRetailDwh;
@@ -48,16 +48,6 @@ test("S0-05: a canvas can be added to a second project and removed from one; a s
   await inProject(page, "Order management").click();
   await expectToast(page, "This project would have no canvas left.");
   await page.keyboard.press("Escape");
-
-  // put things back for the other tests
-  await openCanvasMenu(page, "Order lines & products");
-  await inProject(page, "Customer 360").click();
-  await expectToast(page, "Took Order lines & products out of Customer 360. It is still in Order management.");
-  await page.keyboard.press("Escape");
-  await page.goto(c360);
-  await openCanvasMenu(page, "Customer & orders");
-  await inProject(page, "Order management").click();
-  await expectToast(page, "Customer & orders is now also in Order management.");
 });
 
 test("S0-05: a canvas that is only in one project cannot be taken out of it", async ({ page }) => {

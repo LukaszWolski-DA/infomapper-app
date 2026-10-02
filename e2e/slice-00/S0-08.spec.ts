@@ -1,8 +1,8 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { createFromSwitcher, expectToast, newSession } from "./helpers";
 
 test("S0-08: of two sessions saving settings from the same version, the second is refused and nothing is overwritten", async ({ browser }) => {
-  // A fresh workspace (Marek, Retail Co), so the seeded ones keep their names for the other tests.
+  // Marek creates a workspace of his own (Retail Co), which also covers "New workspace".
   const first = await newSession(browser, "Marek Lis");
   await createFromSwitcher(first.page, "switcher-workspace", "input-new-workspace", "Pricing");
   await expectToast(first.page, "Created the workspace Pricing.");

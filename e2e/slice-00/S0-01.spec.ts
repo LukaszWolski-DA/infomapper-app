@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./fixtures";
 import { SEED_IDS, signInAs, signOutViaMenu } from "./helpers";
 
 test("S0-01: without a session every page redirects to /sign-in; Łukasz lands on Retail Co – DWH; sign-out returns to /sign-in", async ({ page }) => {

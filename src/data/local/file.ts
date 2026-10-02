@@ -7,7 +7,8 @@ import { DEV_DB_FORMAT, type DevDb } from "./schema";
 
 /** Where the file lives: INFOMAPPER_DEV_DB if set (tests), else .data/dev-db.json in the project. */
 export function devDbPath(): string {
-  return path.resolve(process.env.INFOMAPPER_DEV_DB ?? path.join(process.cwd(), ".data", "dev-db.json"));
+  // Development only (AD-29): keep the production build from tracing the whole project because of this path.
+  return path.resolve(/*turbopackIgnore: true*/ process.env.INFOMAPPER_DEV_DB ?? path.join(process.cwd(), ".data", "dev-db.json"));
 }
 
 export class ProductionRefusedError extends Error {

@@ -105,15 +105,23 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 ## Commands
 
 ```
-npm run dev              # local app on http://localhost:3000 (sign in at /sign-in; run npm run seed first)
-npm run build            # production build (npm start serves it)
+npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet)
+npm run reset-dev-data   # replace .data/dev-db.json with fresh demo data
+npm run dev              # local app on http://localhost:3000; sign in at /sign-in by picking a test user
+npm run build            # production build (npm start serves it; no dev sign-in, no local data)
 npm run lint             # ESLint, including the layer rules (eslint-plugin-boundaries)
-npm run typecheck        # tsc --noEmit
+npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
-npm run e2e              # Playwright: e2e/, own dev server (port 3200) on fresh data in .data/e2e-db.json
-npm run seed             # demo data into .data/dev-db.json
-npm run reset-dev-data   # wipe .data/ and seed again
+npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
 ```
 
-Next.js 16 notes for agents are in `AGENTS.md` (managed by `next dev`; keep it committed).
-shadcn/ui components go to `src/ui/components` (`npx shadcn add <name>`).
+- e2e tests import `test`/`expect` from `e2e/slice-XX/fixtures.ts` (fresh seed per test); shared steps are in
+  `helpers.ts`. One file per acceptance criterion, named after its id (`S0-04.spec.ts`).
+- e2e servers use their own build folders (`.next-e2e`, `.next-e2e-restart`) via `NEXT_DIST_DIR`, because Next.js
+  refuses a second dev server on the same folder. Next.js adds them to `tsconfig.json`'s `include`; keep that.
+- Next.js 16 notes for agents are in `AGENTS.md` (managed by `next dev`; keep it committed). Read
+  `node_modules/next/dist/docs/` before using a Next.js API you have not used here yet (e.g. `proxy.ts`, not middleware).
+- shadcn/ui components go to `src/ui/components` (`npx shadcn add <name>`); colours come from the prototype palette in
+  `src/app/globals.css` (`bg-im-surface`, `text-im-ink-2`, …).
+- Writes: a server action calls `runCommand()` (`src/app/_lib/run-command.ts`), which runs the domain command and
+  applies its write set through the adapter; refusals come back with the domain's message and are shown as toasts.

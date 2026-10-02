@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./fixtures";
 import { SEED_IDS, signInAs } from "./helpers";
 
 const crumbs = (page: Page) => page.getByTestId("breadcrumb");
