@@ -1,6 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { access, archived, ids, makeCtx, NOW, sourceSystem, sourceTable } from "../__fixtures__/domain";
-import { createSourceTable } from "./source";
+import {
+  access,
+  archived,
+  attribute,
+  canvasItem,
+  entity,
+  ids,
+  makeCtx,
+  mapping,
+  mappingInput,
+  NOW,
+  sourceColumn,
+  sourceSystem,
+  sourceTable,
+} from "../__fixtures__/domain";
+import { createSourceTable, deleteSourceTable, updateSourceColumn } from "./source";
 
 const input = { systemName: "crm", databaseName: "crmprod", schemaName: "dbo", name: "address", columns: "addr_id int\nline1 varchar(255)\namount decimal(18,2)" };
 const state = { systems: [sourceSystem()], tables: [sourceTable()] };
@@ -51,5 +65,90 @@ describe("createSourceTable (S1A-13)", () => {
     expect(createSourceTable(makeCtx(), access("owner"), state, { ...input, schemaName: "" })).toMatchObject({ ok: false, error: { code: "invalid" } });
     expect(createSourceTable(makeCtx(), access("reviewer"), state, input)).toMatchObject({ ok: false, error: { code: "forbidden" } });
     expect(createSourceTable(makeCtx(), access("owner", archived), state, input)).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
+
+describe("updateSourceColumn", () => {
+  const ref = { sourceColumnId: ids.colEmail, expectedVersion: 1 };
+  const state = { column: sourceColumn(ids.colEmail) };
+
+  it("changes BK, PII and the comment", () => {
+    expect(updateSourceColumn(makeCtx(), access("modeler"), state, { ...ref, isBusinessKey: true, isPii: false, comment: " Main address " })).toMatchObject({
+      ok: true,
+      value: { column: { is_business_key: true, is_pii: false, comment: "Main address", version: 2 } },
+    });
+    expect(updateSourceColumn(makeCtx(), access("modeler"), { column: sourceColumn(ids.colEmail, { comment: "x" }) }, { ...ref, comment: "" })).toMatchObject({
+      ok: true,
+      value: { column: { comment: null } },
+    });
+  });
+
+  it("does not change name, type or other flags", () => {
+    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, name: "mail" })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, isPrimaryKey: true })).toMatchObject({ ok: false, error: { code: "invalid" } });
+  });
+
+  it("refuses no change, a stale version, reviewers and an archived workspace", () => {
+    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, isPii: true })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(updateSourceColumn(makeCtx(), access("owner"), state, { sourceColumnId: ids.colEmail, expectedVersion: 3, isPii: false })).toMatchObject({
+      ok: false,
+      error: { code: "stale_version" },
+    });
+    expect(updateSourceColumn(makeCtx(), access("reviewer"), state, { ...ref, isPii: false })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(updateSourceColumn(makeCtx(), access("admin", archived), state, { ...ref, isPii: false })).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
+
+describe("deleteSourceTable", () => {
+  const columns = [sourceColumn(ids.colCustId), sourceColumn(ids.colEmail), sourceColumn(ids.colFirstName)];
+  const free = {
+    table: sourceTable(),
+    columns,
+    canvasItems: [canvasItem(ids.itemCrmCustomer), canvasItem(ids.itemCustomer)],
+    mappings: [],
+    mappingInputs: [],
+    attributes: [],
+    entities: [],
+  };
+  const ref = { sourceTableId: ids.crmCustomer, expectedVersion: 1 };
+
+  it("deletes a table no mapping reads, with its columns and its cards, in one change group", () => {
+    const r = deleteSourceTable(makeCtx(), access("modeler"), free, ref);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toEqual({ columns: 3 });
+    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["canvas_item", "source_column", "source_column", "source_column", "source_table"]);
+    expect(r.writeSet.writes[0]).toMatchObject({ row: { id: ids.itemCrmCustomer, deleted_at: NOW } });
+    expect(r.writeSet.events.every((e) => e.operation === "delete" && e.change_group_id === r.writeSet.changeGroupId)).toBe(true);
+  });
+
+  it("refuses while a mapping reads one of its columns, and lists the mappings", () => {
+    const custMap = mapping({ id: "01900000-0000-7000-8000-00000000a002", attribute_id: ids.customerId });
+    const used = {
+      ...free,
+      mappings: [mapping(), custMap],
+      mappingInputs: [mappingInput(), mappingInput("01900000-0000-7000-8000-00000000b002", { mapping_id: custMap.id, source_column_id: ids.colCustId })],
+      attributes: [attribute(ids.email), attribute(ids.customerId)],
+      entities: [entity(ids.customer)],
+    };
+    expect(deleteSourceTable(makeCtx(), access("owner"), used, ref)).toMatchObject({
+      ok: false,
+      error: { code: "conflict", message: "Remove its mappings first. cust_id → Customer.customer_id; email → Customer.email." },
+    });
+  });
+
+  it("ignores deleted mappings and inputs", () => {
+    const oldMapping = { ...free, mappings: [mapping({ deleted_at: NOW })], mappingInputs: [mappingInput()] };
+    expect(deleteSourceTable(makeCtx(), access("owner"), oldMapping, ref).ok).toBe(true);
+    const removedInput = { ...free, mappings: [mapping()], mappingInputs: [mappingInput(ids.inEmail, { deleted_at: NOW })] };
+    expect(deleteSourceTable(makeCtx(), access("owner"), removedInput, ref).ok).toBe(true);
+  });
+
+  it("refuses a stale version, reviewers and an archived workspace", () => {
+    expect(deleteSourceTable(makeCtx(), access("owner"), free, { sourceTableId: ids.crmCustomer, expectedVersion: 2 })).toMatchObject({
+      ok: false,
+      error: { code: "stale_version" },
+    });
+    expect(deleteSourceTable(makeCtx(), access("reviewer"), free, ref)).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(deleteSourceTable(makeCtx(), access("owner", archived), free, ref)).toMatchObject({ ok: false, error: { code: "archived" } });
   });
 });
