@@ -2,7 +2,7 @@
 
 // One card on the canvas: an entity or a source table with its rows (prototype entCard, srcCard, attrRow, colRow).
 // AD-24: no React Flow handle per row (rows are positioned from data), and below 40 % zoom the body is one plain
-// block of the same height instead of rows.
+// block of the same height instead of rows. Cards are dragged by their header (prototype .c-head, cursor: move).
 
 import { memo, useContext } from "react";
 import { useStore, type Node, type NodeProps } from "@xyflow/react";
@@ -32,11 +32,16 @@ function keyTitle(r: CardRow) {
   return r.pk ? "Primary key" : "Foreign key";
 }
 
-function Row({ row, kind }: { row: CardRow; kind: CardData["kind"] }) {
+function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; selected: boolean }) {
   const { head, tail } = splitName(row.name);
   const status = row.mappings === 0 ? "" : row.warn ? " warn" : " ok";
   return (
-    <div className="row" data-testid={kind === "ent" ? "row-attribute" : "row-column"} data-row={row.id}>
+    <div
+      className={`row${selected ? " sel" : ""}`}
+      data-testid={kind === "ent" ? "row-attribute" : "row-column"}
+      data-row={row.id}
+      aria-selected={selected || undefined}
+    >
       <span className="key" title={row.pk || row.fk ? keyTitle(row) : undefined}>
         {row.pk && <b className="pk">PK</b>}
         {row.fk && <b>FK</b>}
@@ -72,15 +77,28 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   const dual = rows.some((r) => r.pk && r.fk);
   const total = card.rows.length;
   const label = FILTER_LABEL[card.rowFilter];
+  const sel = ctx.selection;
+  const cardSelected = sel?.t === "card" && sel.id === card.id;
+  const selectedRow = sel?.t === "row" && sel.cardId === card.id ? sel.id : null;
+
+  // A click on a row selects the row, anywhere else on the card the card; the card tools do their own thing.
+  const onClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    if (target.closest(".c-tools")) return;
+    const row = target.closest<HTMLElement>("[data-row]")?.dataset.row;
+    ctx.select(row ? { t: "row", cardId: card.id, id: row } : { t: "card", id: card.id });
+  };
 
   return (
     <div
-      className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}`}
+      onClick={onClick}
+      className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}`}
       style={isEnt ? ({ "--cc": card.color ?? "#888899" } as React.CSSProperties) : undefined}
       data-testid={isEnt ? "card-entity" : "card-source"}
       data-card={card.id}
       data-collapsed={card.collapsed || undefined}
       data-filter={card.rowFilter}
+      aria-selected={cardSelected || undefined}
     >
       <div className="c-head">
         <div className="c-l1">
@@ -137,7 +155,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
       {!card.collapsed && !lod && (
         <div className="c-body">
           {rows.map((r) => (
-            <Row key={r.id} row={r} kind={card.kind} />
+            <Row key={r.id} row={r} kind={card.kind} selected={r.id === selectedRow} />
           ))}
           {rows.length === 0 && (
             <div className="row empty">

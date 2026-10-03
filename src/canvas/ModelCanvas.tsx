@@ -1,13 +1,22 @@
 "use client";
 
-// The model canvas (AD-24): React Flow with one node per card, positions from data, the report's CSS rules
-// (no dotted background, no opacity on repeated elements, will-change on the viewport). Navigation as in the
-// prototype: the wheel pans, Ctrl/pinch zooms, Space-drag or the middle/right button pans; F fits, M toggles the
-// Overview. The last view of each canvas is remembered in the browser (data model section 12).
-// Slice 1a, step 3a: cards, rows, collapse and row filters, zoom, fit, Overview, detail by zoom level.
+// The model canvas (AD-24): React Flow with one node per card, positions from data, all lines in one layer, and the
+// report's CSS rules (no dotted background, no opacity on repeated elements, will-change on the viewport).
+// Navigation as in the prototype: the wheel pans, Ctrl/pinch zooms, Space-drag or the middle/right button pans;
+// F fits, M toggles the Overview, Esc clears the selection. The last view of each canvas is remembered in the
+// browser (data model section 12). Cards are dragged by their header, snapped to 8 px, and saved when the drag ends.
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { applyNodeChanges, ReactFlow, useReactFlow, useStore, useStoreApi, type NodeChange, type Viewport } from "@xyflow/react";
+import {
+  applyNodeChanges,
+  ReactFlow,
+  useReactFlow,
+  useStore,
+  useStoreApi,
+  type NodeChange,
+  type OnNodeDrag,
+  type Viewport,
+} from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./canvas.css";
 import { useToast } from "@/ui/components/toast";
@@ -16,6 +25,8 @@ import CardNode, { FILTER_ORDER, type CardNodeT } from "./CardNode";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, type CanvasCardsApi } from "./context";
 import { cardHeight, cardWidth, contentBounds, fitViewport, MAX_ZOOM, MIN_ZOOM } from "./geometry";
+import { relatedLines, type CanvasLines, type Selection } from "./line-data";
+import LineLayer from "./LineLayer";
 import { Overview } from "./Overview";
 
 const nodeTypes = { card: CardNode };
@@ -25,28 +36,34 @@ export interface CardChange {
   expectedVersion: number;
   collapsed?: boolean;
   rowFilter?: CardData["rowFilter"];
+  x?: number;
+  y?: number;
 }
 export type SaveCardResult = { ok: true; value: { version: number } } | { ok: false; message: string };
 
 export interface ModelCanvasProps {
   canvasId: string;
   cards: CardData[];
+  lines: CanvasLines;
   editable: boolean;
-  /** Saves a card's collapse state or row filter (a server action). */
+  /** Saves a card's position, collapse state or row filter (a server action). */
   saveCard: (change: CardChange) => Promise<SaveCardResult>;
 }
 
-const toNode = (card: CardData): CardNodeT => ({
+type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y">>;
+
+const toNode = (card: CardData, editable: boolean): CardNodeT => ({
   id: card.id,
   type: "card",
   position: { x: card.x, y: card.y },
   width: cardWidth(card),
   height: cardHeight(card),
   data: { card },
-  draggable: false,
+  draggable: editable,
+  dragHandle: ".c-head",
   selectable: false,
   connectable: false,
-  // React Flow lets clicks through nodes that are neither draggable nor selectable; cards have their own buttons.
+  // React Flow lets clicks through nodes that are neither draggable nor selectable; cards have their own clicks.
   style: { pointerEvents: "all" },
 });
 
@@ -66,14 +83,16 @@ function readView(canvasId: string): Viewport | null {
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
 
-export function ModelCanvas({ canvasId, cards: initialCards, editable, saveCard }: ModelCanvasProps) {
+export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, saveCard }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const rf = useReactFlow();
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
-  const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map(toNode));
+  const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(c, editable)));
   const [ready, setReady] = useState(false);
+  const [selection, setSelection] = useState<Selection>(null);
+  const related = useMemo(() => relatedLines(selection, lines), [selection, lines]);
 
   // ---- view: the remembered one, else fit everything ----
   const storeApi = useStoreApi();
@@ -102,13 +121,14 @@ export function ModelCanvas({ canvasId, cards: initialCards, editable, saveCard 
     [canvasId],
   );
 
-  // ---- keyboard: F fits, M toggles the Overview ----
+  // ---- keyboard: F fits, M toggles the Overview, Esc clears the selection ----
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       const k = e.key.toLowerCase();
       if (k === "f") fit();
       else if (k === "m") ui.toggleOverview();
+      else if (k === "escape") setSelection(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -118,18 +138,18 @@ export function ModelCanvas({ canvasId, cards: initialCards, editable, saveCard 
   const queue = useRef(new Map<string, Promise<void>>());
   const versions = useRef(new Map(initialCards.map((c) => [c.id, c.version])));
 
-  const patchCard = useCallback((id: string, patch: Partial<CardData>) => {
+  const patchCard = useCallback((id: string, patch: CardPatch) => {
     setNodes((ns) =>
       ns.map((n) => {
         if (n.id !== id) return n;
         const card = { ...n.data.card, ...patch };
-        return { ...n, height: cardHeight(card), data: { card } };
+        return { ...n, position: { x: card.x, y: card.y }, height: cardHeight(card), data: { card } };
       }),
     );
   }, []);
 
   const change = useCallback(
-    (id: string, patch: Pick<CardData, "collapsed"> | Pick<CardData, "rowFilter">, undo: Partial<CardData>) => {
+    (id: string, patch: CardPatch, undo: CardPatch) => {
       patchCard(id, patch);
       const previous = queue.current.get(id) ?? Promise.resolve();
       const next = previous.then(async () => {
@@ -153,6 +173,8 @@ export function ModelCanvas({ canvasId, cards: initialCards, editable, saveCard 
   const cardsApi = useMemo<CanvasCardsApi>(
     () => ({
       editable,
+      selection,
+      select: setSelection,
       toggleCollapse: (id) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
         if (card) change(id, { collapsed: !card.collapsed }, { collapsed: card.collapsed });
@@ -164,7 +186,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, editable, saveCard 
         change(id, { rowFilter: next }, { rowFilter: card.rowFilter });
       },
     }),
-    [editable, change, rf],
+    [editable, selection, change, rf],
   );
 
   const onNodesChange = useCallback(
@@ -172,16 +194,37 @@ export function ModelCanvas({ canvasId, cards: initialCards, editable, saveCard 
     [],
   );
 
+  /** A drag ends: save the new position (S1A-05); a refusal puts the card back. */
+  const onNodeDragStop: OnNodeDrag<CardNodeT> = useCallback(
+    (_, node) => {
+      const card = node.data.card;
+      const x = Math.round(node.position.x), y = Math.round(node.position.y);
+      if (x === card.x && y === card.y) return;
+      change(node.id, { x, y }, { x: card.x, y: card.y });
+    },
+    [change],
+  );
+
   return (
     <CanvasCardsCtx.Provider value={cardsApi}>
-      <div className="im-canvas" data-testid="area-canvas" data-ready={ready || undefined} style={{ visibility: ready ? "visible" : "hidden" }}>
+      <div
+        className="im-canvas"
+        data-testid="area-canvas"
+        data-ready={ready || undefined}
+        data-notation={ui.notation}
+        style={{ visibility: ready ? "visible" : "hidden" }}
+      >
         <ReactFlow
           nodes={nodes}
           onNodesChange={onNodesChange}
+          onNodeDragStop={onNodeDragStop}
+          onPaneClick={() => setSelection(null)}
           nodeTypes={nodeTypes}
-          nodesDraggable={false}
+          nodesDraggable={editable}
           nodesConnectable={false}
           elementsSelectable={false}
+          snapToGrid
+          snapGrid={[8, 8]}
           panOnScroll
           zoomOnScroll={false}
           zoomOnPinch
@@ -191,11 +234,11 @@ export function ModelCanvas({ canvasId, cards: initialCards, editable, saveCard 
           minZoom={MIN_ZOOM}
           maxZoom={MAX_ZOOM}
           onMoveEnd={onMoveEnd}
-          proOptions={{ hideAttribution: false }}
           attributionPosition="bottom-left"
           aria-label="Model canvas"
         >
-          <Overview />
+          <LineLayer lines={lines} selection={selection} related={related} onSelect={setSelection} />
+          <Overview lines={lines} />
         </ReactFlow>
         {nodes.length === 0 && (
           <div className="im-empty" data-testid="canvas-empty">
@@ -209,4 +252,3 @@ export function ModelCanvas({ canvasId, cards: initialCards, editable, saveCard 
     </CanvasCardsCtx.Provider>
   );
 }
-

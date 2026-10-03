@@ -3,8 +3,10 @@ import { AppShell } from "@/app/_components/app-shell";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { loadShell } from "@/app/_lib/shell";
 import { buildCards } from "@/canvas/card-data";
+import { buildLines } from "@/canvas/line-data";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
+import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
 
@@ -22,14 +24,16 @@ export default async function CanvasPage({
     store.model.load(shell.workspace.id),
     store.canvasItems.listOfCanvas(shell.workspace.id, canvasId),
   ]);
+  const cards = buildCards(model, items);
 
   return (
     <CanvasProvider>
-      <AppShell shell={shell} project={{ view, currentCanvasId: canvasId, renameOnOpen, tools: <ZoomControls /> }}>
+      <AppShell shell={shell} project={{ view, currentCanvasId: canvasId, renameOnOpen, tools: <CanvasTools /> }}>
         <ModelCanvas
           key={canvasId}
           canvasId={canvasId}
-          cards={buildCards(model, items)}
+          cards={cards}
+          lines={buildLines(model, cards)}
           editable={shell.standing === "full"}
           saveCard={updateCardAction.bind(null, shell.workspace.id)}
         />
@@ -37,3 +41,10 @@ export default async function CanvasPage({
     </CanvasProvider>
   );
 }
+
+const CanvasTools = () => (
+  <>
+    <NotationSwitch />
+    <ZoomControls />
+  </>
+);

@@ -80,11 +80,58 @@
 .im-canvas .overview-z { margin-left: auto; color: var(--im-ink-3); font-variant-numeric: tabular-nums }
 .im-canvas .overview .ib svg { transition: transform .15s }
 .im-canvas .overview.closed .ib svg { transform: rotate(180deg) }
-.im-canvas .overview .react-flow__minimap { position: static; margin: 0; border-radius: 0; box-shadow: none; background: var(--im-canvas) }
-.im-canvas .overview .react-flow__minimap svg { display: block; cursor: pointer }
-.im-canvas .react-flow__minimap-node.mini-ent { rx: 12px; fill-opacity: .55 }
-.im-canvas .react-flow__minimap-node.mini-src { fill-opacity: .5 }
+.im-canvas .overview-svg { display: block; background: var(--im-canvas); cursor: pointer; touch-action: none }
+.im-canvas .overview-svg .me { fill-opacity: .55; stroke: none }
+.im-canvas .overview-svg .ms { fill: var(--im-physical); fill-opacity: .5; stroke: none }
+.im-canvas .overview-svg .mm { stroke: var(--im-map); stroke-opacity: .55; stroke-width: 1; vector-effect: non-scaling-stroke }
+.im-canvas .overview-svg .mr { stroke: var(--im-rel); stroke-opacity: .7; stroke-width: 1; vector-effect: non-scaling-stroke }
+.im-canvas .overview-svg .mv { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab }
 @media (max-width: 600px) {
   .im-canvas .overview { width: 160px }
-  .im-canvas .overview .react-flow__minimap { width: 160px !important; height: 104px !important }
+  .im-canvas .overview-svg { width: 160px; height: 104px }
 }
+
+/* ---------- lines (prototype .lnk / .map / .rel), one layer under the cards (AD-24 rule 3) ---------- */
+/* Fading uses stroke and fill opacity on the paths, never the opacity property (AD-24 rule 4). */
+.im-canvas .line-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
+.im-canvas .lnk .hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer }
+.im-canvas .lnk .s { fill: none; stroke-width: 1.6; pointer-events: none }
+.im-canvas .map .s { stroke: var(--im-map) }
+.im-canvas .map.draft .s { stroke-dasharray: 6 4 }
+.im-canvas .map.review .s { stroke-dasharray: 10 3 2 3 }
+.im-canvas .map.warn .s { stroke: var(--im-warn) }
+.im-canvas .map.part .s { stroke-opacity: .45 }
+.im-canvas .map .end { fill: var(--im-map) }
+.im-canvas .map.warn .end { fill: var(--im-warn) }
+.im-canvas .lnk.sel .s { stroke-width: 3 }
+.im-canvas .lnk:hover .s { stroke-width: 2.6 }
+.im-canvas .chip { pointer-events: none }
+.im-canvas .chip circle { fill: var(--im-surface); stroke: var(--im-map); stroke-width: 1.4 }
+.im-canvas .map.warn .chip circle { stroke: var(--im-warn) }
+.im-canvas .chip text { font: 600 10px var(--font-plex-sans), system-ui, sans-serif; fill: var(--im-map); text-anchor: middle; dominant-baseline: central }
+.im-canvas .map.warn .chip text { fill: var(--im-warn) }
+.im-canvas .rel .s { stroke: var(--im-rel) }
+.im-canvas .rel .mk { fill: none; stroke: var(--im-rel); stroke-width: 1.6; pointer-events: none }
+.im-canvas .rel circle.mk { fill: var(--im-canvas) }
+.im-canvas .rel.sel .mk { stroke-width: 2.4 }
+.im-canvas .rlab { pointer-events: none }
+.im-canvas .rlab rect { fill: var(--im-canvas); stroke: var(--im-line) }
+.im-canvas .rlab text, .im-canvas .mult { font: 500 11px var(--font-plex-sans), system-ui, sans-serif; fill: var(--im-ink-2); text-anchor: middle; dominant-baseline: central }
+/* a selection: its lines stay, the others fade (prototype .dimmed .lnk:not(.hl)) */
+.im-canvas .dimmed .lnk:not(.hl) .s,
+.im-canvas .dimmed .lnk:not(.hl) .mk { stroke-opacity: .12 }
+.im-canvas .dimmed .lnk:not(.hl) .end,
+.im-canvas .dimmed .lnk:not(.hl) .mult,
+.im-canvas .dimmed .lnk:not(.hl) .rlab text { fill-opacity: .12 }
+.im-canvas .dimmed .lnk:not(.hl) .chip circle,
+.im-canvas .dimmed .lnk:not(.hl) .rlab rect { stroke-opacity: .12; fill-opacity: .12 }
+.im-canvas .dimmed .lnk:not(.hl) .chip text { fill-opacity: .12 }
+
+/* ---------- selection and dragging (prototype .card.sel, .row.sel, .c-head cursor) ---------- */
+.im-canvas .card.sel { box-shadow: 0 0 0 2px var(--im-logical), 0 10px 24px -12px var(--im-shadow) }
+.im-canvas .card.src.sel { box-shadow: 0 0 0 2px var(--im-physical), 0 10px 24px -12px var(--im-shadow) }
+.im-canvas .row { cursor: pointer }
+.im-canvas .row.sel { background: var(--im-logical-soft); box-shadow: inset 3px 0 var(--im-logical) }
+.im-canvas .src .row.sel { background: var(--im-physical-soft); box-shadow: inset 3px 0 var(--im-physical) }
+.im-canvas .react-flow__node.draggable .c-head { cursor: move }
+.im-canvas .react-flow__node.dragging .card { box-shadow: 0 0 0 1px var(--im-line), 0 18px 36px -14px var(--im-shadow) }

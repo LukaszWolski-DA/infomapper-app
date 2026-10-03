@@ -1,6 +1,6 @@
 "use server";
 
-// Card writes on the canvas (slice 1a): collapse and row filter (step 3a); position and placing come later.
+// Card writes on the canvas (slice 1a): position (when a drag ends), collapse and row filter.
 
 import { updateCanvasItem } from "@/domain/commands/canvas-item";
 import { runCommand, type ActionResult } from "../_lib/run-command";
@@ -12,9 +12,11 @@ export interface CardChangeInput {
   expectedVersion: number;
   collapsed?: boolean;
   rowFilter?: string;
+  x?: number;
+  y?: number;
 }
 
-/** Saves a card's collapse state or row filter. Returns the card's new version for the next change. */
+/** Saves a card's position, collapse state or row filter. Returns the card's new version for the next change. */
 export async function updateCardAction(workspaceId: string, change: CardChangeInput): Promise<ActionResult<{ version: number }>> {
   return runCommand(async (ctx, store, user) => {
     const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
