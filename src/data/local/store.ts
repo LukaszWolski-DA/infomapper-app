@@ -8,7 +8,7 @@ import type { Uuid } from "@/domain/ids";
 import type { ProjectCanvas } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
 import { assertNotProduction, readDb, writeDb } from "./file";
-import { findViolation, keyOf, rowsOf, type AnyRow, type DevDb, type DevTable, type IntegrityViolation } from "./schema";
+import { findViolation, keyOf, RULES, rowsOf, type AnyRow, type DevDb, type DevTable, type IntegrityViolation } from "./schema";
 
 const live = <R extends { deleted_at: string | null }>(rows: R[]): R[] => rows.filter((r) => r.deleted_at === null);
 
@@ -114,7 +114,9 @@ async function applyToFile(file: string, writeSet: WriteSet): Promise<ApplyResul
 }
 
 function applyWrite(db: DevDb, write: Write): DomainError | null {
-  const table: DevTable = write.table;
+  // The model tables arrive in the local file with slice 1a, step 2; until then they are refused.
+  if (!(write.table in RULES)) return domainError("invalid", `The local data store has no table ${write.table} yet.`);
+  const table = write.table as DevTable;
   const rows = rowsOf(db, table);
 
   if (write.kind === "insert") {
