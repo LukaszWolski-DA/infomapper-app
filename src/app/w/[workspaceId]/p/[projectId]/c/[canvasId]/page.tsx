@@ -33,7 +33,7 @@ export default async function CanvasPage({
   const liveCanvases = new Set(canvases.map((c) => c.id));
   const items = allItems.filter((i) => liveCanvases.has(i.canvas_id));
   const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId));
-  const tree = buildTree(model, items, canvasId);
+  const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id));
   const editable = shell.standing === "full";
 
   return (

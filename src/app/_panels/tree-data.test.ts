@@ -10,7 +10,7 @@ import {
   sourceTable,
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
-import { buildTree, filterConcepts, filterSystems, isOpen, type TreeFilter } from "./tree-data";
+import { allGroups, buildTree, filterConcepts, filterSystems, isOpen, type TreeFilter } from "./tree-data";
 
 // Customer (customer_id, email) on canvas 1; Sales Order on canvas 2 only; concept Sales holds Sales Order.
 // CRM: crmprod.dbo.customer on canvas 1, crmprod.stage.orders nowhere.
@@ -31,7 +31,8 @@ const items = [
   canvasItem(ids.itemCrmCustomer),
   canvasItem("01900000-0000-7000-8000-00000000c003", { canvas_id: ids.canvas2, entity_id: ids.salesOrder }),
 ];
-const tree = buildTree(model, items, ids.canvas1);
+// Customer 360 (project A) has canvas 1 only.
+const tree = buildTree(model, items, ids.canvas1, [ids.canvas1]);
 const all: TreeFilter = { q: "", canvasOnly: false };
 
 describe("buildTree", () => {
@@ -76,6 +77,18 @@ describe("filtering the tree", () => {
     expect(filterConcepts(tree.concepts, { q: "", canvasOnly: true }).map((g) => g.concept.name)).toEqual(["Customer"]);
     const systems = filterSystems(tree.systems, { q: "", canvasOnly: true });
     expect(systems[0]!.schemas.map((s) => s.name)).toEqual(["crmprod.dbo"]);
+  });
+
+  it("“Only what this project uses” keeps what has a card on a canvas of the project", () => {
+    expect(filterConcepts(tree.concepts, { q: "", canvasOnly: false, projectOnly: true }).map((g) => g.concept.name)).toEqual(["Customer"]);
+    const wider = buildTree(model, items, ids.canvas1, [ids.canvas1, ids.canvas2]);
+    expect(filterConcepts(wider.concepts, { q: "", canvasOnly: false, projectOnly: true }).map((g) => g.concept.name)).toEqual(["Customer", "Sales"]);
+    expect(filterSystems(tree.systems, { q: "", canvasOnly: false, projectOnly: true })[0]!.total).toBe(1);
+  });
+
+  it("lists every group of a tab for collapse all and expand all", () => {
+    expect(allGroups(tree, "model")).toEqual([`model:${ids.conceptCustomer}`, `model:${ids.conceptSales}`]);
+    expect(allGroups(tree, "sources")).toEqual([`src:${ids.crm}`, `src:${ids.crm}/crmprod.dbo`, `src:${ids.crm}/crmprod.stage`]);
   });
 
   it("opens every group while searching, without forgetting which were folded", () => {

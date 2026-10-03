@@ -1,10 +1,10 @@
 "use client";
 
-// The left panel (prototype #side): Model and Sources tabs, search over names and fields, “Only on this canvas”,
-// folding groups with sticky headers. A click on an item places it in a free spot of the view (or shows its card);
+// The left panel (prototype #side): Model and Sources tabs, search over names and fields, “Only what this project
+// uses”, “Only on this canvas”, folding groups with sticky headers, collapse all and expand all (D-35). A click on an item places it in a free spot of the view (or shows its card);
 // dragging it onto the canvas places it there. Model tab, for those who may edit: “+” per concept, “New concept”,
 // rename a concept by double-click, and its ⋯ menu (D-46, D-47).
-// The Requirements tab, “Only what this project uses” and collapse/expand all come with later slices.
+// The Requirements tab comes with requirements.
 
 import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { createConceptAction, createEntityAction, renameConceptAction } from "@/app/_actions/model";
@@ -24,6 +24,7 @@ import { useToast } from "@/ui/components/toast";
 import { DeleteConceptDialog } from "./delete-concept-dialog";
 import { usePanels } from "./panels-context";
 import {
+  allGroups,
   conceptGroup,
   filterConcepts,
   filterSystems,
@@ -38,6 +39,7 @@ import {
 
 const SHUT_KEY = "infomapper:tree-shut";
 const CANVAS_ONLY_KEY = "infomapper:tree-canvas-only";
+const PROJECT_ONLY_KEY = "infomapper:tree-project-only";
 
 type Tab = "model" | "sources";
 
@@ -57,6 +59,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
   const [tab, setTab] = useState<Tab>("model");
   const [q, setQ] = useState("");
   const [canvasOnly, setCanvasOnly] = useState(false);
+  const [projectOnly, setProjectOnly] = useState(false);
   const [shut, setShut] = useState<ReadonlySet<string>>(new Set());
   const [renaming, setRenaming] = useState<string | null>(null);
   const [addingConcept, setAddingConcept] = useState(false);
@@ -73,9 +76,10 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
     // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only preferences
     if (Array.isArray(saved)) setShut(new Set(saved.filter((k) => typeof k === "string")));
     if (readPreference(CANVAS_ONLY_KEY) === "1") setCanvasOnly(true);
+    if (readPreference(PROJECT_ONLY_KEY) === "1") setProjectOnly(true);
   }, []);
 
-  const filter: TreeFilter = { q, canvasOnly };
+  const filter: TreeFilter = { q, canvasOnly, projectOnly };
   const searching = !!q.trim();
 
   const saveShut = (next: Set<string>) => {
@@ -101,6 +105,19 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
   const onCanvasOnly = (on: boolean) => {
     writePreference(CANVAS_ONLY_KEY, on ? "1" : "0");
     setCanvasOnly(on);
+  };
+  const onProjectOnly = (on: boolean) => {
+    writePreference(PROJECT_ONLY_KEY, on ? "1" : "0");
+    setProjectOnly(on);
+  };
+  /** Collapse all and expand all: every group of the open tab. */
+  const foldAll = (fold: boolean) => {
+    const next = new Set(shut);
+    for (const k of allGroups(tree, tab)) {
+      if (fold) next.add(k);
+      else next.delete(k);
+    }
+    saveShut(next);
   };
 
   /** A click: show the card that is here, else place the element in a free spot of the view. */
@@ -349,9 +366,26 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
         />
       </div>
       <label className="mx-3 mb-1.5 flex items-center gap-2 text-xs text-im-ink-2">
-        <input type="checkbox" checked={canvasOnly} onChange={(e) => onCanvasOnly(e.target.checked)} data-testid="check-canvas-only" />
-        Only on this canvas
+        <input type="checkbox" checked={projectOnly} onChange={(e) => onProjectOnly(e.target.checked)} data-testid="check-project-only" />
+        Only what this project uses
       </label>
+      <div className="mb-1 ml-3 mr-2 flex items-center gap-1">
+        <label className="flex items-center gap-2 text-xs text-im-ink-2">
+          <input type="checkbox" checked={canvasOnly} onChange={(e) => onCanvasOnly(e.target.checked)} data-testid="check-canvas-only" />
+          Only on this canvas
+        </label>
+        <span className="flex-1" />
+        <button type="button" className={barButton} title="Collapse all groups" aria-label="Collapse all groups" data-testid="button-collapse-all" onClick={() => foldAll(true)}>
+          <svg viewBox="0 0 16 16" className={barIcon} aria-hidden>
+            <path d="M4 6l4-3 4 3M4 13l4-3 4 3" />
+          </svg>
+        </button>
+        <button type="button" className={barButton} title="Expand all groups" aria-label="Expand all groups" data-testid="button-expand-all" onClick={() => foldAll(false)}>
+          <svg viewBox="0 0 16 16" className={barIcon} aria-hidden>
+            <path d="M4 3l4 3 4-3M4 10l4 3 4-3" />
+          </svg>
+        </button>
+      </div>
       <div className="min-h-0 flex-1 overflow-auto px-1.5 pb-4" data-testid="tree">
         {content ?? (
           <p className="p-3 text-im-ink-3">
@@ -376,6 +410,8 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
 
 const addClass =
   "grid size-[22px] flex-none place-items-center rounded-[5px] mr-1 text-[15px] leading-none text-im-ink-3 opacity-0 hover:bg-im-hover hover:text-im-logical focus-visible:opacity-100 group-hover/head:opacity-100 data-[state=open]:opacity-100";
+const barButton = "grid size-7 place-items-center rounded-md text-im-ink-3 hover:bg-im-hover hover:text-im-ink";
+const barIcon = "size-4 fill-none stroke-current stroke-[1.6]";
 const smallButton = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover";
 
 const Chevron = ({ open }: { open: boolean }) => (

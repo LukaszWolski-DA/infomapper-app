@@ -16,6 +16,8 @@ export interface TreeEntity {
   /** Attribute names, for the search (prototype: search includes fields). */
   fields: string[];
   presence: Presence;
+  /** It has a card on a canvas of this project (“Only what this project uses”). */
+  inProject: boolean;
   /** The card on this canvas, when there is one. */
   cardId: Uuid | null;
 }
@@ -34,6 +36,7 @@ export interface TreeTable {
   /** Column names, for the search and the `n cols` count. */
   fields: string[];
   presence: Presence;
+  inProject: boolean;
   cardId: Uuid | null;
 }
 
@@ -58,15 +61,23 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * The model in panel order: concepts with their entities; source systems with their `database.schema` groups and
- * tables. `items` are the live cards of every live canvas of the workspace.
+ * tables. `items` are the live cards of every live canvas of the workspace; `projectCanvasIds` the canvases of the
+ * open project.
  */
-export function buildTree(model: WorkspaceModel, items: readonly CanvasItem[], canvasId: Uuid): TreeData {
-  const here = new Map<Uuid, Uuid>(), elsewhere = new Set<Uuid>();
+export function buildTree(
+  model: WorkspaceModel,
+  items: readonly CanvasItem[],
+  canvasId: Uuid,
+  projectCanvasIds: readonly Uuid[],
+): TreeData {
+  const here = new Map<Uuid, Uuid>(), elsewhere = new Set<Uuid>(), inProject = new Set<Uuid>();
+  const projectCanvases = new Set(projectCanvasIds);
   for (const i of items) {
     const target = i.entity_id ?? i.source_table_id;
     if (!target) continue;
     if (i.canvas_id === canvasId) here.set(target, i.id);
     else elsewhere.add(target);
+    if (projectCanvases.has(i.canvas_id)) inProject.add(target);
   }
   const presence = (id: Uuid): Presence => (here.has(id) ? "here" : elsewhere.has(id) ? "elsewhere" : "none");
 
@@ -88,6 +99,7 @@ export function buildTree(model: WorkspaceModel, items: readonly CanvasItem[], c
         stereotype: cap(e.stereotype),
         fields: fieldsOf.get(e.id) ?? [],
         presence: presence(e.id),
+        inProject: inProject.has(e.id),
         cardId: here.get(e.id) ?? null,
       })),
   }));
@@ -99,7 +111,7 @@ export function buildTree(model: WorkspaceModel, items: readonly CanvasItem[], c
       const key = `${t.database_name}.${t.schema_name}`;
       schemas.set(key, [
         ...(schemas.get(key) ?? []),
-        { id: t.id, name: t.name, fields: fieldsOf.get(t.id) ?? [], presence: presence(t.id), cardId: here.get(t.id) ?? null },
+        { id: t.id, name: t.name, fields: fieldsOf.get(t.id) ?? [], presence: presence(t.id), inProject: inProject.has(t.id), cardId: here.get(t.id) ?? null },
       ]);
     }
     return { id: s.id, name: s.name, schemas: [...schemas].map(([name, tables]) => ({ name, tables })) };
@@ -113,6 +125,8 @@ export function buildTree(model: WorkspaceModel, items: readonly CanvasItem[], c
 export interface TreeFilter {
   q: string;
   canvasOnly: boolean;
+  /** “Only what this project uses”: elements with a card on a canvas of this project. */
+  projectOnly?: boolean;
 }
 
 /** An item that passes the filter; `hint` names the field that matched when the name did not (`attribute email`). */
@@ -132,10 +146,15 @@ export interface ShownSystem {
   schemas: { name: string; items: Shown<TreeTable>[] }[];
 }
 
-const isFiltering = (f: TreeFilter) => !!f.q.trim() || f.canvasOnly;
+const isFiltering = (f: TreeFilter) => !!f.q.trim() || f.canvasOnly || !!f.projectOnly;
 
-function show<T extends { name: string; fields: string[]; presence: Presence }>(item: T, f: TreeFilter, field: string): Shown<T> | null {
+function show<T extends { name: string; fields: string[]; presence: Presence; inProject: boolean }>(
+  item: T,
+  f: TreeFilter,
+  field: string,
+): Shown<T> | null {
   if (f.canvasOnly && item.presence !== "here") return null;
+  if (f.projectOnly && !item.inProject) return null;
   const q = f.q.trim().toLowerCase();
   if (!q || item.name.toLowerCase().includes(q)) return { item, hint: null };
   const hit = item.fields.find((n) => n.toLowerCase().includes(q));
@@ -169,6 +188,12 @@ export function filterSystems(systems: readonly TreeSystem[], f: TreeFilter): Sh
 export const conceptGroup = (conceptId: Uuid) => `model:${conceptId}`;
 export const systemGroup = (systemId: Uuid) => `src:${systemId}`;
 export const schemaGroup = (systemId: Uuid, schema: string) => `src:${systemId}/${schema}`;
+
+/** Every group key of a tab, for collapse all and expand all. */
+export function allGroups(tree: TreeData, tab: "model" | "sources"): string[] {
+  if (tab === "model") return tree.concepts.map((c) => conceptGroup(c.id));
+  return tree.systems.flatMap((s) => [systemGroup(s.id), ...s.schemas.map((sc) => schemaGroup(s.id, sc.name))]);
+}
 
 /** Groups fold and the panel remembers it; while searching, every group is open without changing what is remembered. */
 export const isOpen = (shut: ReadonlySet<string>, key: string, q: string) => !!q.trim() || !shut.has(key);
