@@ -72,3 +72,117 @@ export function zoomAround(v: Viewport, factor: number, screen: { width: number;
   const mx = screen.width / 2, my = screen.height / 2;
   return { zoom, x: mx - ((mx - v.x) * zoom) / v.zoom, y: my - ((my - v.y) * zoom) / v.zoom };
 }
+
+// ---- lines (prototype rowY, endOf, curve, relGeomRects, ieMarker, umlMarker) ----
+
+export interface Pt {
+  x: number;
+  y: number;
+}
+
+/** A card where it is now: React Flow's position, the card's width and its data (rows, collapse, filter). */
+export interface Placed {
+  x: number;
+  y: number;
+  card: Pick<CardData, "rows" | "collapsed" | "rowFilter" | "width">;
+}
+
+/** One end of a line on a card: the card's left edge and width, and the anchor height. */
+export interface End {
+  x: number;
+  w: number;
+  y: number;
+  cx: number;
+  /** The row is not shown (collapsed card, row filter): the line re-anchors to the header. */
+  hidden: boolean;
+}
+
+/** Where a row's line starts or ends; a hidden row anchors at the middle of the header. */
+export function rowEnd(p: Placed, rowId: string): End {
+  const w = cardWidth(p.card);
+  const i = visibleRows(p.card).findIndex((r) => r.id === rowId);
+  const y = i < 0 ? p.y + HEAD_H / 2 : p.y + HEAD_H + BODY_PAD + i * ROW_H + ROW_H / 2;
+  return { x: p.x, w, y, cx: p.x + w / 2, hidden: i < 0 };
+}
+
+export const bez = (a: Pt, b: Pt, c: Pt, d: Pt, t: number): Pt => {
+  const u = 1 - t;
+  return {
+    x: u * u * u * a.x + 3 * u * u * t * b.x + 3 * u * t * t * c.x + t * t * t * d.x,
+    y: u * u * u * a.y + 3 * u * u * t * b.y + 3 * u * t * t * c.y + t * t * t * d.y,
+  };
+};
+
+/** A curve between two ends, leaving and entering on the sides that face each other. */
+export function curve(a: End, b: End) {
+  const ltr = a.cx <= b.cx, sn = ltr ? 1 : -1;
+  const p0 = { x: ltr ? a.x + a.w : a.x, y: a.y };
+  const p3 = { x: ltr ? b.x : b.x + b.w, y: b.y };
+  const k = Math.max(60, Math.abs(p3.x - p0.x) * 0.45);
+  const p1 = { x: p0.x + sn * k, y: p0.y }, p2 = { x: p3.x - sn * k, y: p3.y };
+  return { d: `M${p0.x},${p0.y} C${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`, mid: bez(p0, p1, p2, p3, 0.5), p0, p3 };
+}
+
+/** Distance of the ƒ node from the attribute's card edge (D-49). */
+export const F_NODE_GAP = 36;
+
+/**
+ * A combined mapping (D-49): the inputs meet in an ƒ node next to the attribute, on the side facing the inputs, and
+ * one line continues to the attribute's row. Returns the node and the end the input curves go to.
+ */
+export function fNode(attribute: End, inputs: readonly End[]) {
+  const mean = inputs.reduce((s, e) => s + e.cx, 0) / Math.max(1, inputs.length);
+  const left = mean <= attribute.cx;
+  const node = { x: left ? attribute.x - F_NODE_GAP : attribute.x + attribute.w + F_NODE_GAP, y: attribute.y };
+  const to = { x: left ? attribute.x : attribute.x + attribute.w, y: attribute.y };
+  const end: End = { x: node.x, w: 0, y: node.y, cx: node.x, hidden: false };
+  return { node, end, out: `M${node.x},${node.y} L${to.x},${to.y}`, to };
+}
+
+/** The rectangle of a card for relationship lines. */
+export const cardRect = (p: Placed): Rect => ({ x: p.x, y: p.y, w: cardWidth(p.card), h: cardHeight(p.card) });
+
+/** Side to side when the cards are apart horizontally, otherwise top to bottom; anchored at header height. */
+export function relGeom(A: Rect, B: Rect, off: number) {
+  let pa: Pt, pb: Pt, na: Pt, nb: Pt;
+  if (A.x + A.w + 24 < B.x || B.x + B.w + 24 < A.x) {
+    const aLeft = A.x < B.x;
+    pa = { x: aLeft ? A.x + A.w : A.x, y: A.y + HEAD_H / 2 + off };
+    na = { x: aLeft ? 1 : -1, y: 0 };
+    pb = { x: aLeft ? B.x : B.x + B.w, y: B.y + HEAD_H / 2 + off };
+    nb = { x: -na.x, y: 0 };
+  } else {
+    const aTop = A.y < B.y;
+    pa = { x: A.x + A.w / 2 + off, y: aTop ? A.y + A.h : A.y };
+    na = { x: 0, y: aTop ? 1 : -1 };
+    pb = { x: B.x + B.w / 2 + off, y: aTop ? B.y : B.y + B.h };
+    nb = { x: 0, y: -na.y };
+  }
+  const dist = Math.hypot(pb.x - pa.x, pb.y - pa.y), k = Math.max(40, dist * 0.4);
+  const c1 = { x: pa.x + na.x * k, y: pa.y + na.y * k }, c2 = { x: pb.x + nb.x * k, y: pb.y + nb.y * k };
+  return { d: `M${pa.x},${pa.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${pb.x},${pb.y}`, mid: bez(pa, c1, c2, pb, 0.5), pa, pb, na, nb };
+}
+
+/** Crow's foot end: many = foot, one = bar; optional = circle, mandatory = a second bar. */
+export function ieMarker(p: Pt, n: Pt, min: 0 | 1, max: "1" | "n") {
+  const t = { x: -n.y, y: n.x };
+  let d = "";
+  if (max === "n") {
+    const tip = { x: p.x + n.x * 14, y: p.y + n.y * 14 };
+    d += `M${tip.x},${tip.y}L${p.x + t.x * 7},${p.y + t.y * 7}M${tip.x},${tip.y}L${p.x},${p.y}M${tip.x},${tip.y}L${p.x - t.x * 7},${p.y - t.y * 7}`;
+  } else {
+    const b = { x: p.x + n.x * 9, y: p.y + n.y * 9 };
+    d += `M${b.x + t.x * 6},${b.y + t.y * 6}L${b.x - t.x * 6},${b.y - t.y * 6}`;
+  }
+  const q = { x: p.x + n.x * 22, y: p.y + n.y * 22 };
+  if (min !== 0) d += `M${q.x + t.x * 6},${q.y + t.y * 6}L${q.x - t.x * 6},${q.y - t.y * 6}`;
+  return { d, circle: min === 0 ? q : null };
+}
+
+/** UML multiplicity, written next to the end. */
+export const multText = (min: 0 | 1, max: "1" | "n") => (max === "n" ? (min ? "1..*" : "0..*") : min ? "1" : "0..1");
+
+export function umlMarker(p: Pt, n: Pt): Pt {
+  const t = { x: -n.y, y: n.x };
+  return { x: p.x + n.x * 16 + t.x * 11, y: p.y + n.y * 16 + t.y * 11 };
+}
