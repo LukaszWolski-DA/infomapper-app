@@ -7,6 +7,7 @@ Oct 2, 2026 · spike in `/spikes/canvas-react-flow` · brief: `docs/spike-canvas
 - **React Flow does all the behaviour.** Rows, row-to-row lines, re-anchoring, relationships with crow's foot and UML ends, frames with collapse and merged lines, lasso, Shift-click, group drag, card width, highlight and minimap all work, and the scripted checks pass. The workarounds needed are small, and most are stable.
 - **React Flow fails on pan and zoom smoothness (C-01).** Out of the box it pans at **9–15 fps** on a business laptop. With two CSS fixes found in the spike it reaches **41–45 fps**, still below 50. The fix that gets it there makes card resizing and hover highlighting much slower (C-09, C-10).
 - **The limit is the amount of DOM, not React Flow.** The same cards and lines drawn as plain DOM with one SVG, the way the prototype does it, pan at **12–17 fps**: no better than React Flow. An own engine "modeled on the prototype" would hit the same limit.
+- **Follow-up (Oct 3):** with detail by zoom level, no row handles and one line layer, C-01 passes in setup B (58–60 fps, no frame over 50 ms); C-09 and C-10 still fail in B. See [Follow-up](#follow-up).
 - **Recommendation:** a hybrid. Keep React Flow for interaction and the viewport. Change what the canvas paints (detail by zoom level, no per-row handles), and confirm it with a one-day follow-up before AD-24 is closed. Details in the [Recommendation](#recommendation) section.
 
 ## Set-up
@@ -126,3 +127,44 @@ Open issues the spike found but did not fix:
 - **If it still misses 50 fps:** the evidence points to canvas or WebGL rendering of cards and lines. Then an own engine is justified, because React Flow's DOM nodes are its core.
 
 Łukasz takes the decision and records it in AD-24.
+
+## Follow-up
+
+Oct 3, 2026 · steps 1–3 from the recommendation, built into this spike and measured again.
+
+### What changed
+
+1. **Detail by zoom level.** Below 40% zoom a card shows its header and one plain block of the same height instead of its rows (`CardNode`, `.c-lod`). Lines lose their end dots. At the overview zoom this takes most of the 17,900 DOM elements out of the page.
+2. **No React Flow handles.** Cards and frames have no `<Handle>` any more (the 4,674 row handles and the header handles are removed). A line end's y is computed from the card data: header 54 px, body padding 6 px, 26 px per shown row, taking collapse and filter into account (`geometry.rowEnd`). Workaround 1 (`internals.handleBounds`) and workaround 2 (`ConnectionMode.Loose`, declared header handles) are gone.
+3. **One SVG layer for all lines.** React Flow gets no edges. `LineLayer` draws all 340 lines (mappings, relationships and merged lines) in one `<svg>` inside the viewport. It reads node positions and sizes from React Flow's store (`nodeLookup`) and re-renders only when nodes change, not on pan or zoom. Each line is memoised on its geometry, so dragging a card only updates the lines attached to it. The layer is portalled into React Flow's edge-label container (`EdgeLabelRenderer`). That container sits before the nodes in the viewport, so lines paint above frames and below cards, as the edges did.
+4. **CSS rules kept:** no opacity on repeated elements, dotted background off, `will-change` setups B and C as before.
+
+The functional checks still pass (12/12: C-03, C-05, C-06, C-07). The C-03 check at 25% compares line ends with the row's band inside the plain block, because rows are not rendered there.
+
+### New numbers
+
+Same machine, browser and data set as above (i7-8550U, UHD 620, Chrome 154, 1536 × 864). Raw numbers: `report/results-followup-b.json` (whole measure project) and `report/results-followup-c.json` (C-01, C-04, C-09, C-10). Screenshots from these runs: `report/followup/`.
+
+| ID | Bar | Before, B | **Follow-up, B** | Before, C | **Follow-up, C** |
+| --- | --- | --- | --- | --- | --- |
+| C-01 overview | ≥ 50 fps, no frame > 50 ms | 40.9 fps, 3 frames > 50 ms | **60.0 fps, 0 frames > 50 ms** (longest 17 ms) | 25.5 fps | 46.6 fps, 4 frames > 50 ms (longest 50 ms) |
+| C-01 100% | same | 44.5 fps, 2 frames > 50 ms | **58.3 fps, 0 frames > 50 ms** (longest 33 ms) | 25.7 fps | 33.0 fps, 56 frames > 50 ms |
+| C-04 200-row card pan | same bar as C-01 | 42.4 fps, 0 > 50 ms | **53.1 fps, 0 frames > 50 ms**, 50/50 ends attached | 42.1 fps | 53.2 fps, 2 frames > 50 ms (longest 67 ms), 50/50 attached |
+| C-09 resize smoothness | no visible lag | 3.6 fps | **4.0 fps** (longest frame 1.1 s) | 24.6 fps | 23.5 fps |
+| C-10 hover → next frame | no visible delay | 403 ms median | **366 ms** median | 99 ms median | 69 ms median (p95 342 ms) |
+| C-10 hover sweep | | 26.6 fps | 36.6 fps | 46.0 fps | 48.5 fps |
+
+Setup B also re-measured, for reference: C-02 drag stays at 60 fps (one card and the 15-card group). C-08 initial render dropped from 1,061 ms to **789 ms** median (max 852 ms). Without `will-change` (and with the dotted background) the canvas now pans at 21.4 fps overview / 10.8 fps at 100% (before: 7.6 / 14.3). With `onlyRenderVisibleElements` it reaches 51.6 fps but 12 frames over 50 ms, so that switch is still not useful.
+
+**Second machine:** not done. Only this laptop was available for the follow-up. C-01 on a newer machine is still open.
+
+### What it means
+
+- **C-01 passes in setup B,** with margin: 58–60 fps and no frame over 50 ms, against 41–45 fps before. C-04 passes on the same bar. All must-haves now pass in setup B.
+- **The C-01 fix still costs C-09 and C-10 in setup B.** Resize and hover change content inside the one big GPU layer, and Chrome re-renders the whole layer. The steps did not change this (4 fps, 366 ms). It is the cost described in point 5 of [Why C-01 fails](#why-c-01-fails).
+- **Setup C keeps resize and hover close to before (23.5 fps, 69 ms) but misses C-01** (47 / 33 fps). So no single setup passes C-01, C-09 and C-10 together on this laptop.
+- **Steps 1–3 did what the report expected:** at overview the cards were the cost, and LOD removed it; at 100% the lines were the cost, and one layer plus no handles made B pass. The remaining conflict is between `will-change` on the whole viewport and live changes inside it. That is a rendering question, not a React Flow one: an own DOM engine would have the same trade-off.
+
+Not measured, possible next step (not built): keep `will-change` on, but turn it off for the duration of a resize drag or while a row is hovered, and back on when the pointer leaves. That would combine B's pan with C's resize and hover, if the switch itself does not cause a visible re-render. C-09 and C-10 are should-haves, so this is not needed to decide AD-24.
+
+Side effects of the steps, for the product: the row-hover dots (the prototype's `.hnd`) went away with the handles and would come back as plain elements; and below 40% zoom rows cannot be hovered or clicked, since they are not drawn.

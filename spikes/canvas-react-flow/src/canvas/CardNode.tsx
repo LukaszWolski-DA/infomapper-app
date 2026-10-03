@@ -1,10 +1,11 @@
 "use client";
 
 import { memo, useContext } from "react";
-import { Handle, NodeResizeControl, Position, ResizeControlVariant, type Node, type NodeProps } from "@xyflow/react";
-import { MAX_W, MIN_W, type Card, type Row } from "@/data/generate";
+import { NodeResizeControl, ResizeControlVariant, useStore, type Node, type NodeProps } from "@xyflow/react";
+import { BODY_PAD, MAX_W, MIN_W, ROW_H, type Card, type Row } from "@/data/generate";
 import { setHoverRow, toggleSelectedRow, useCardHl } from "./highlight";
 import { CanvasCtx } from "./context";
+import { LOD_ZOOM, visibleRowsOf } from "./geometry";
 
 export type RowFilter = "all" | "mapped" | "keys";
 
@@ -16,13 +17,8 @@ export type CardNodeData = {
 };
 export type CardNodeT = Node<CardNodeData, "card">;
 
-/* Handle ids: "<rowId>:l" / "<rowId>:r" on every row, "h:l" / "h:r" on the header (re-anchor target). */
-export const visibleRows = (d: CardNodeData): Row[] => {
-  if (d.collapsed) return [];
-  if (d.filter === "mapped") return d.card.rows.filter(r => d.mapped.has(r.id));
-  if (d.filter === "keys") return d.card.rows.filter(r => r.pk || r.fk);
-  return d.card.rows;
-};
+/* No React Flow handles (follow-up step 2): lines compute row positions from the same list of shown rows. */
+export const visibleRows = (d: CardNodeData): Row[] => visibleRowsOf(d);
 
 const FILTER_NEXT: Record<RowFilter, RowFilter> = { all: "mapped", mapped: "keys", keys: "all" };
 
@@ -30,6 +26,8 @@ function CardNode({ id, data, selected }: NodeProps<CardNodeT>) {
   const ctx = useContext(CanvasCtx);
   const { card } = data;
   const rows = visibleRows(data);
+  // follow-up step 1: below 40 % zoom the body is one plain block of the same height, without row elements
+  const lod = useStore(s => s.transform[2] < LOD_ZOOM);
   const isSrc = card.kind === "src";
   const hl = useCardHl(id);
   const hlRows = hl.startsWith("on:") ? hl.slice(3).split(",") : [];
@@ -42,8 +40,6 @@ function CardNode({ id, data, selected }: NodeProps<CardNodeT>) {
       data-card={id}
     >
       <div className="c-head">
-        <Handle id="h:l" type="source" position={Position.Left} className="hnd hh" isConnectable={false} />
-        <Handle id="h:r" type="source" position={Position.Right} className="hnd hh" isConnectable={false} />
         <div className="c-l1">
           <span className="stereo">{isSrc ? "Source" : "Entity"}</span>
           <span className={isSrc ? "path" : ""}>{card.sub}</span>
@@ -73,7 +69,10 @@ function CardNode({ id, data, selected }: NodeProps<CardNodeT>) {
           </span>
         </div>
       </div>
-      {!data.collapsed && (
+      {!data.collapsed && lod && (
+        <div className="c-lod" style={{ height: BODY_PAD * 2 + Math.max(1, rows.length) * ROW_H }}><div className="c-block" /></div>
+      )}
+      {!data.collapsed && !lod && (
         <div
           className="c-body"
           onMouseOver={e => setHoverRow((e.target as HTMLElement).closest<HTMLElement>("[data-row]")?.dataset.row ?? null)}
@@ -85,11 +84,9 @@ function CardNode({ id, data, selected }: NodeProps<CardNodeT>) {
         >
           {rows.map(r => (
             <div className={`row${rowClass(r.id)}`} key={r.id} data-row={r.id}>
-              <Handle id={`${r.id}:l`} type="source" position={Position.Left} className="hnd" isConnectable={false} />
               <span className="key">{r.pk ? <b className="pk">PK</b> : r.fk ? <b>FK</b> : null}</span>
               <span className="nm">{r.name}</span>
               <span className="dt">{r.dataType}</span>
-              <Handle id={`${r.id}:r`} type="source" position={Position.Right} className="hnd" isConnectable={false} />
             </div>
           ))}
           {rows.length === 0 && <div className="row empty">No rows match the filter</div>}
