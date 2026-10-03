@@ -4,6 +4,7 @@
 import type { Uuid } from "@/domain/ids";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
 import type { CanvasItem, RowFilter, WorkspaceModel } from "@/domain/types";
+import { lineNeedsClip, rowNeedsClip, titleNeedsClip } from "./text-fit";
 
 export type CardKind = "ent" | "src";
 
@@ -25,6 +26,8 @@ export interface CardRow {
   warn: boolean;
   /** Tooltip of the mapped dot: where it comes from or goes to. */
   title: string;
+  /** The name may not fit: it gets the clip and the ellipsis (text-fit.ts). */
+  clip: boolean;
 }
 
 export interface CardData {
@@ -44,6 +47,9 @@ export interface CardData {
   rows: CardRow[];
   /** Rows with at least one mapping, for the coverage bar. */
   mapped: number;
+  /** The title or the first line may not fit: they get the clip and the ellipsis (text-fit.ts). */
+  clipName: boolean;
+  clipLine1: boolean;
   x: number;
   y: number;
   /** null = default width (D-37). */
@@ -90,7 +96,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
     return { mappings: r?.n ?? 0, warn: r?.warn ?? false, title: r ? r.lines.join("\n") : empty };
   };
 
-  const cards: CardData[] = [];
+  const cards: Omit<CardData, "clipName" | "clipLine1">[] = [];
   for (const item of items) {
     const base = {
       id: item.id,
@@ -116,6 +122,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
           pii: a.is_pii,
           bk: a.is_business_key,
           ...rowState(a.id, "Not mapped yet"),
+          clip: false,
         }));
       cards.push({
         ...base,
@@ -142,6 +149,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
           pii: false,
           bk: c.is_business_key,
           ...rowState(c.id, "Not used yet"),
+          clip: false,
         }));
       cards.push({
         ...base,
@@ -156,7 +164,19 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
       });
     }
   }
-  return cards.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "src" ? -1 : 1));
+  return cards.map(withClips).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "src" ? -1 : 1));
+}
+
+/** Marks the names that may not fit, so only they are clipped (S1A-14). */
+function withClips(card: Omit<CardData, "clipName" | "clipLine1">): CardData {
+  const width = card.width ?? undefined;
+  const dual = card.rows.some((r) => r.pk && r.fk);
+  return {
+    ...card,
+    rows: card.rows.map((r) => ({ ...r, clip: rowNeedsClip(r, card.kind, dual, width) })),
+    clipName: titleNeedsClip(card.name, card.kind, `${card.mapped}/${card.rows.length}`, width),
+    clipLine1: lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, width),
+  };
 }
 
 /** The rows a card shows under its filter (prototype rowsOf); a collapsed card shows none. */

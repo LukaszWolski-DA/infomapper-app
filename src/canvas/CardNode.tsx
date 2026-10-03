@@ -46,7 +46,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
         {row.pk && <b className="pk">PK</b>}
         {row.fk && <b>FK</b>}
       </span>
-      <span className="nm" title={row.name}>
+      <span className={`nm${row.clip ? " clip" : ""}`} title={row.name}>
         <span className="a">{head}</span>
         {tail && <span className="b">{tail}</span>}
       </span>
@@ -92,7 +92,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   return (
     <div
       onClick={onClick}
-      className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}`}
+      className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${card.clipName ? " clip-name" : ""}${card.clipLine1 ? " clip-l1" : ""}`}
       style={isEnt ? ({ "--cc": card.color ?? "#888899" } as React.CSSProperties) : undefined}
       data-testid={isEnt ? "card-entity" : "card-source"}
       data-card={card.id}

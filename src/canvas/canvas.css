@@ -1,7 +1,9 @@
 /*
  * The model canvas: the prototype's card, row and Overview styles (docs/prototype), with the AD-24 rules from the
  * spike report: no dotted background, no opacity on repeated elements (card tools are always fully visible), and
- * will-change: transform on the viewport so Chrome pans and zooms one GPU layer.
+ * will-change: transform on the viewport so Chrome pans and zooms one GPU layer. And no clip (overflow: hidden) on
+ * repeated elements unless the text may not fit (text-fit.ts): clips on every row made Chrome re-layerize the canvas
+ * at about 25 ms per frame while panning (S1A-14).
  */
 
 .im-canvas { position: absolute; inset: 0; overflow: hidden; background: var(--im-canvas); font-size: 13px; color: var(--im-ink) }
@@ -21,8 +23,9 @@
 .im-canvas .src .c-head { background: linear-gradient(var(--im-physical), var(--im-physical)) top / 100% 3px no-repeat }
 .im-canvas .c-l1 { display: flex; align-items: center; gap: 6px; height: 17px; font-size: 11px; color: var(--im-ink-3); min-width: 0 }
 .im-canvas .c-l1 > span { white-space: nowrap; flex: none }
-.im-canvas .c-l1 > span:nth-child(2) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis }
-.im-canvas .c-l1 .path { flex: 0 1 auto; min-width: 0; font-family: var(--font-plex-mono), ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis }
+.im-canvas .c-l1 > span:nth-child(2) { flex: 0 1 auto; min-width: 0 }
+.im-canvas .c-l1 .path { flex: 0 1 auto; min-width: 0; font-family: var(--font-plex-mono), ui-monospace, monospace }
+.im-canvas .clip-l1 .c-l1 > span:nth-child(2), .im-canvas .clip-l1 .c-l1 .path { overflow: hidden; text-overflow: ellipsis }
 .im-canvas .stereo { color: var(--im-ink-2) }
 .im-canvas .c-tools { margin-left: auto; display: flex; gap: 1px }
 .im-canvas .ib { display: inline-flex; align-items: center; gap: 4px; height: 20px; min-width: 20px; padding: 0 4px; border: 0; border-radius: 4px;
@@ -31,10 +34,11 @@
 .im-canvas .ib:focus-visible { outline: 2px solid var(--im-logical); outline-offset: -1px }
 .im-canvas .ib svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round }
 .im-canvas .c-l2 { display: flex; align-items: center; gap: 8px; height: 24px; min-width: 0 }
-.im-canvas .c-name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.im-canvas .c-name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; white-space: nowrap }
+.im-canvas .clip-name .c-name { overflow: hidden; text-overflow: ellipsis }
 .im-canvas .src .c-name { font-family: var(--font-plex-mono), ui-monospace, monospace; font-weight: 500; font-size: 13.5px }
-.im-canvas .cov { width: 42px; height: 4px; border-radius: 2px; background: var(--im-line); overflow: hidden; flex: none }
-.im-canvas .cov i { display: block; height: 100%; background: var(--im-map) }
+.im-canvas .cov { width: 42px; height: 4px; border-radius: 2px; background: var(--im-line); flex: none }
+.im-canvas .cov i { display: block; height: 100%; border-radius: 2px; background: var(--im-map) }
 .im-canvas .src .cov i { background: var(--im-physical) }
 .im-canvas .cov-t { font-size: 11px; color: var(--im-ink-3); font-variant-numeric: tabular-nums; flex: none }
 
@@ -49,8 +53,10 @@
 .im-canvas .src .key .pk { color: var(--im-physical) }
 .im-canvas .card.dualkeys .key { width: 34px }
 /* middle truncation (D-37): the head is cut with an ellipsis, the tail stays */
-.im-canvas .nm { flex: 1; min-width: 0; display: flex; overflow: hidden; white-space: nowrap }
-.im-canvas .nm .a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.im-canvas .nm { flex: 1; min-width: 0; display: flex; white-space: nowrap }
+.im-canvas .nm .a { min-width: 0; white-space: nowrap }
+.im-canvas .nm.clip, .im-canvas .nm.clip .a { overflow: hidden }
+.im-canvas .nm.clip .a { text-overflow: ellipsis }
 .im-canvas .nm .b { flex: none; white-space: nowrap }
 .im-canvas .src .nm { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 12px }
 .im-canvas .tag { font-size: 9.5px; font-weight: 600; padding: 0 4px; border-radius: 3px; line-height: 15px; flex: none }
@@ -80,7 +86,9 @@
 .im-canvas .overview-z { margin-left: auto; color: var(--im-ink-3); font-variant-numeric: tabular-nums }
 .im-canvas .overview .ib svg { transition: transform .15s }
 .im-canvas .overview.closed .ib svg { transform: rotate(180deg) }
-.im-canvas .overview-svg { display: block; background: var(--im-canvas); cursor: pointer; touch-action: none }
+.im-canvas .overview-box { position: relative }
+.im-canvas .overview-svg { display: block; background: var(--im-canvas) }
+.im-canvas .overview-view { position: absolute; inset: 0; display: block; cursor: pointer; touch-action: none }
 .im-canvas .overview-svg .me { fill-opacity: .55; stroke: none }
 .im-canvas .overview-svg .ms { fill: var(--im-physical); fill-opacity: .5; stroke: none }
 .im-canvas .overview-svg .mm { stroke: var(--im-map); stroke-opacity: .55; stroke-width: 1; vector-effect: non-scaling-stroke }
@@ -88,7 +96,7 @@
 .im-canvas .overview-svg .mv { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab }
 @media (max-width: 600px) {
   .im-canvas .overview { width: 160px }
-  .im-canvas .overview-svg { width: 160px; height: 104px }
+  .im-canvas .overview-svg, .im-canvas .overview-view { width: 160px; height: 104px }
 }
 
 /* ---------- lines (prototype .lnk / .map / .rel), one layer under the cards (AD-24 rule 3) ---------- */
