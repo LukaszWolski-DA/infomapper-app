@@ -1,12 +1,14 @@
 "use client";
 
-// Wraps the canvas page so the canvas and its tools in the top bar (zoom, fit) share one React Flow instance.
+// Wraps the canvas page so the canvas, the panels and the tools in the top bar share one React Flow instance and one
+// selection.
 // Per-browser view preferences (whether the Overview is open, the notation) stay in the browser (data model
 // section 12). The notation is one setting for every canvas (D-22).
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { CanvasUiCtx, type CanvasUiApi, type Notation } from "./context";
+import { CanvasUiCtx, type CanvasHandle, type CanvasUiApi, type Notation } from "./context";
+import type { Selection } from "./line-data";
 
 const OVERVIEW_KEY = "infomapper:overview";
 const NOTATION_KEY = "infomapper:notation";
@@ -30,7 +32,8 @@ export function writePreference(key: string, value: string): void {
 export function CanvasProvider({ children }: { children: ReactNode }) {
   const [overviewOpen, setOverviewOpen] = useState(true);
   const [notation, setNotationState] = useState<Notation>("ie");
-  const fitRef = useRef<() => void>(() => {});
+  const [selection, select] = useState<Selection>(null);
+  const handle = useRef<CanvasHandle | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after mount: localStorage is not available on the server
@@ -56,12 +59,18 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       toggleOverview,
       notation,
       setNotation,
-      fit: () => fitRef.current(),
-      registerFit: (fit) => {
-        fitRef.current = fit;
+      selection,
+      select,
+      fit: () => handle.current?.fit(),
+      place: (target, rows) => handle.current?.place(target, rows),
+      remove: (cardId) => handle.current?.remove(cardId),
+      centerOn: (cardId) => handle.current?.centerOn(cardId),
+      freeSpot: () => handle.current?.freeSpot() ?? { x: 40, y: 40 },
+      registerCanvas: (h) => {
+        handle.current = h;
       },
     }),
-    [overviewOpen, toggleOverview, notation, setNotation],
+    [overviewOpen, toggleOverview, notation, setNotation, selection],
   );
 
   return (

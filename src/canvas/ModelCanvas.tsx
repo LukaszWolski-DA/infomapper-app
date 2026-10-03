@@ -5,8 +5,10 @@
 // Navigation as in the prototype: the wheel pans, Ctrl/pinch zooms, Space-drag or the middle/right button pans;
 // F fits, M toggles the Overview, Esc clears the selection. The last view of each canvas is remembered in the
 // browser (data model section 12). Cards are dragged by their header, snapped to 8 px, and saved when the drag ends.
+// Items from the left panel are placed by a click (a free spot in the view) or dropped where the mouse is.
+// After a write the server sends fresh cards; a card with a save still on its way keeps what the user did.
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   applyNodeChanges,
   ReactFlow,
@@ -23,9 +25,23 @@ import { useToast } from "@/ui/components/toast";
 import type { CardData } from "./card-data";
 import CardNode, { FILTER_ORDER, type CardNodeT } from "./CardNode";
 import { readPreference, writePreference } from "./CanvasProvider";
-import { CanvasCardsCtx, CanvasUiCtx, type CanvasCardsApi } from "./context";
-import { cardHeight, cardWidth, contentBounds, fitViewport, MAX_ZOOM, MIN_ZOOM } from "./geometry";
-import { relatedLines, type CanvasLines, type Selection } from "./line-data";
+import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget } from "./context";
+import {
+  CARD_W,
+  cardHeight,
+  cardWidth,
+  contentBounds,
+  fitViewport,
+  freeSpot,
+  inside,
+  MAX_ZOOM,
+  MIN_ZOOM,
+  newCardHeight,
+  snap8,
+  stackSpot,
+  type Rect,
+} from "./geometry";
+import { relatedLines, type CanvasLines } from "./line-data";
 import LineLayer from "./LineLayer";
 import { Overview } from "./Overview";
 
@@ -39,7 +55,9 @@ export interface CardChange {
   x?: number;
   y?: number;
 }
-export type SaveCardResult = { ok: true; value: { version: number } } | { ok: false; message: string };
+/** What a canvas write returns: the value, or the domain's message for a toast. */
+export type CanvasWriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
+export type SaveCardResult = CanvasWriteResult<{ version: number }>;
 
 export interface ModelCanvasProps {
   canvasId: string;
@@ -48,6 +66,10 @@ export interface ModelCanvasProps {
   editable: boolean;
   /** Saves a card's position, collapse state or row filter (a server action). */
   saveCard: (change: CardChange) => Promise<SaveCardResult>;
+  /** Places an entity or a source table on this canvas (a server action). */
+  placeCard: (input: CardTarget & { x: number; y: number }) => Promise<CanvasWriteResult<{ canvasItemId: string }>>;
+  /** Takes a card off this canvas (a server action). */
+  removeCard: (input: { canvasItemId: string; expectedVersion: number }) => Promise<CanvasWriteResult<unknown>>;
 }
 
 type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y">>;
@@ -83,15 +105,18 @@ function readView(canvasId: string): Viewport | null {
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
 
-export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, saveCard }: ModelCanvasProps) {
+const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
+const isEntity = (t: CardTarget): t is { entityId: string } => "entityId" in t;
+
+export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, saveCard, placeCard, removeCard }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
+  const { selection, select, registerCanvas } = ui;
   const toast = useToast();
   const rf = useReactFlow();
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
   const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(c, editable)));
   const [ready, setReady] = useState(false);
-  const [selection, setSelection] = useState<Selection>(null);
   const related = useMemo(() => relatedLines(selection, lines), [selection, lines]);
 
   // ---- view: the remembered one, else fit everything ----
@@ -106,8 +131,6 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
     const { width: w, height: h } = storeApi.getState();
     void rf.setViewport(fitView(w, h), { duration: 250 });
   }, [rf, storeApi, fitView]);
-
-  useEffect(() => ui.registerFit(fit), [ui, fit]);
 
   useEffect(() => {
     if (ready || width === 0 || height === 0) return;
@@ -128,15 +151,41 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       const k = e.key.toLowerCase();
       if (k === "f") fit();
       else if (k === "m") ui.toggleOverview();
-      else if (k === "escape") setSelection(null);
+      else if (k === "escape") select(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fit, ui]);
+  }, [fit, ui, select]);
 
   // ---- card changes: applied at once, saved in order, undone on refusal ----
   const queue = useRef(new Map<string, Promise<void>>());
   const versions = useRef(new Map(initialCards.map((c) => [c.id, c.version])));
+  /** Writes still on their way, per card. */
+  const pending = useRef(new Map<string, number>());
+
+  /** Runs a card's writes one after the other, so each one sends the version the previous one returned. */
+  const enqueue = useCallback((id: string, write: () => Promise<void>) => {
+    pending.current.set(id, (pending.current.get(id) ?? 0) + 1);
+    const next = (queue.current.get(id) ?? Promise.resolve()).then(write).finally(() => {
+      pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
+    });
+    queue.current.set(id, next);
+  }, []);
+
+  // ---- fresh cards from the server (after a place, remove or rename): take them, except what is still saving ----
+  useEffect(() => {
+    // The server's cards arrive as props after each write.
+    setNodes((ns) => {
+      const local = new Map(ns.map((n) => [n.id, n]));
+      return initialCards.map((c) => {
+        const mine = local.get(c.id);
+        if (!mine || (!(pending.current.get(c.id) ?? 0) && !mine.dragging)) return toNode(c, editable);
+        const { x, y, collapsed, rowFilter } = mine.data.card;
+        return { ...toNode({ ...c, x, y, collapsed, rowFilter }, editable), position: mine.position, dragging: mine.dragging };
+      });
+    });
+    for (const c of initialCards) if (!(pending.current.get(c.id) ?? 0)) versions.current.set(c.id, c.version);
+  }, [initialCards, editable]);
 
   const patchCard = useCallback((id: string, patch: CardPatch) => {
     setNodes((ns) =>
@@ -151,13 +200,12 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   const change = useCallback(
     (id: string, patch: CardPatch, undo: CardPatch) => {
       patchCard(id, patch);
-      const previous = queue.current.get(id) ?? Promise.resolve();
-      const next = previous.then(async () => {
+      enqueue(id, async () => {
         let result: SaveCardResult;
         try {
           result = await saveCard({ canvasItemId: id, expectedVersion: versions.current.get(id) ?? 1, ...patch });
         } catch {
-          result = { ok: false, message: "Something went wrong. Nothing was saved." };
+          result = FAILED;
         }
         if (result.ok) versions.current.set(id, result.value.version);
         else {
@@ -165,16 +213,145 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
           toast(result.message, "refusal");
         }
       });
-      queue.current.set(id, next);
     },
-    [patchCard, saveCard, toast],
+    [patchCard, saveCard, toast, enqueue],
+  );
+
+  // ---- placing and removing cards (left and right panel) ----
+  /** The part of the board the user sees, in canvas coordinates. */
+  const viewRect = useCallback((): Rect => {
+    const { width: w, height: h, transform: [tx, ty, z] } = storeApi.getState();
+    return { x: -tx / z, y: -ty / z, w: w / z, h: h / z };
+  }, [storeApi]);
+
+  const occupied = useCallback(
+    (): Rect[] =>
+      (rf.getNodes() as CardNodeT[]).map((n) => ({
+        x: n.position.x,
+        y: n.position.y,
+        w: cardWidth(n.data.card),
+        h: cardHeight(n.data.card),
+      })),
+    [rf],
+  );
+
+  /** Moves the view so a box is in the middle (prototype centerOn); of a tall card the top part shows. */
+  const centerOnRect = useCallback(
+    (r: Rect) => {
+      const { width: w, height: h, transform: [, , z] } = storeApi.getState();
+      const x = w / 2 - (r.x + r.w / 2) * z;
+      const y = h / 2 - (r.y + Math.min(r.h, (h / z) * 0.8) / 2) * z;
+      void rf.setViewport({ x, y, zoom: z }, { duration: 250 });
+    },
+    [rf, storeApi],
+  );
+
+  const centerOn = useCallback(
+    (cardId: string) => {
+      const n = rf.getNode(cardId) as CardNodeT | undefined;
+      if (n) centerOnRect({ x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) });
+    },
+    [rf, centerOnRect],
+  );
+
+  const cardOf = useCallback(
+    (t: CardTarget) =>
+      (rf.getNodes() as CardNodeT[]).find(({ data: { card } }) =>
+        isEntity(t) ? card.kind === "ent" && card.targetId === t.entityId : card.kind === "src" && card.targetId === t.sourceTableId,
+      ),
+    [rf],
+  );
+
+  /** Places an element at a spot; an element already here is selected and shown instead (prototype addToCanvas). */
+  const placeAt = useCallback(
+    async (target: CardTarget, spot: { x: number; y: number }, h: number, clicked: boolean) => {
+      const here = cardOf(target);
+      if (here) {
+        select({ t: "card", id: here.id });
+        centerOn(here.id);
+        return;
+      }
+      let result: CanvasWriteResult<{ canvasItemId: string }>;
+      try {
+        result = await placeCard({ ...target, ...spot });
+      } catch {
+        result = FAILED;
+      }
+      if (!result.ok) {
+        toast(result.message, "refusal");
+        return;
+      }
+      select({ t: "card", id: result.value.canvasItemId });
+      const box = { ...spot, w: CARD_W, h };
+      if (!inside(viewRect(), box)) centerOnRect(box);
+      if (clicked) toast(`Added 1 ${isEntity(target) ? "entity" : "source table"} to the canvas.`);
+    },
+    [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect],
+  );
+
+  const place = useCallback(
+    (target: CardTarget, rows: number) => {
+      const h = newCardHeight(rows);
+      void placeAt(target, stackSpot(viewRect(), occupied(), h), h, true);
+    },
+    [placeAt, viewRect, occupied],
+  );
+
+  const remove = useCallback(
+    (cardId: string) => {
+      enqueue(cardId, async () => {
+        let result: CanvasWriteResult<unknown>;
+        try {
+          result = await removeCard({ canvasItemId: cardId, expectedVersion: versions.current.get(cardId) ?? 1 });
+        } catch {
+          result = FAILED;
+        }
+        if (!result.ok) {
+          toast(result.message, "refusal");
+          return;
+        }
+        setNodes((ns) => ns.filter((n) => n.id !== cardId));
+        select(null);
+        toast("Removed from this canvas. It stays in the model, with its mappings and on other canvases.");
+      });
+    },
+    [enqueue, removeCard, select, toast],
+  );
+
+  useEffect(() => {
+    registerCanvas({ fit, place, remove, centerOn, freeSpot: () => freeSpot(viewRect(), occupied()) });
+    return () => registerCanvas(null);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied]);
+
+  // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
+  const onDragOver = useCallback((e: DragEvent) => {
+    if (!e.dataTransfer.types.includes(CARD_DRAG_TYPE)) return;
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "copy";
+  }, []);
+
+  const onDrop = useCallback(
+    (e: DragEvent) => {
+      const raw = e.dataTransfer.getData(CARD_DRAG_TYPE);
+      if (!raw) return;
+      e.preventDefault();
+      let data: { target: CardTarget; rows: number };
+      try {
+        data = JSON.parse(raw) as { target: CardTarget; rows: number };
+      } catch {
+        return;
+      }
+      const at = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+      void placeAt(data.target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(data.rows), false);
+    },
+    [rf, placeAt],
   );
 
   const cardsApi = useMemo<CanvasCardsApi>(
     () => ({
       editable,
       selection,
-      select: setSelection,
+      select,
       toggleCollapse: (id) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
         if (card) change(id, { collapsed: !card.collapsed }, { collapsed: card.collapsed });
@@ -186,7 +363,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         change(id, { rowFilter: next }, { rowFilter: card.rowFilter });
       },
     }),
-    [editable, selection, change, rf],
+    [editable, selection, select, change, rf],
   );
 
   const onNodesChange = useCallback(
@@ -213,12 +390,14 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         data-ready={ready || undefined}
         data-notation={ui.notation}
         style={{ visibility: ready ? "visible" : "hidden" }}
+        onDragOver={onDragOver}
+        onDrop={onDrop}
       >
         <ReactFlow
           nodes={nodes}
           onNodesChange={onNodesChange}
           onNodeDragStop={onNodeDragStop}
-          onPaneClick={() => setSelection(null)}
+          onPaneClick={() => select(null)}
           nodeTypes={nodeTypes}
           nodesDraggable={editable}
           nodesConnectable={false}
@@ -237,7 +416,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
           attributionPosition="bottom-left"
           aria-label="Model canvas"
         >
-          <LineLayer lines={lines} selection={selection} related={related} onSelect={setSelection} />
+          <LineLayer lines={lines} selection={selection} related={related} onSelect={select} />
           <Overview lines={lines} />
         </ReactFlow>
         {nodes.length === 0 && (

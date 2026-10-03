@@ -73,6 +73,51 @@ export function zoomAround(v: Viewport, factor: number, screen: { width: number;
   return { zoom, x: mx - ((mx - v.x) * zoom) / v.zoom, y: my - ((my - v.y) * zoom) / v.zoom };
 }
 
+// ---- placing new cards (prototype placeNear, createEntity) ----
+
+/** Space kept free around a new card. */
+const PLACE_GAP = 24;
+/** Height assumed for a new entity, which has no rows yet (prototype createEntity). */
+export const NEW_CARD_H = 140;
+
+export const snap8 = (v: number) => Math.round(v / 8) * 8;
+
+/** Height of a new, expanded card with this many rows. */
+export const newCardHeight = (rows: number) => HEAD_H + BODY_PAD * 2 + Math.max(1, rows) * ROW_H;
+
+const clashes = (occupied: readonly Rect[], x: number, y: number, w: number, h: number) =>
+  occupied.some((r) => x < r.x + r.w + PLACE_GAP && x + w + PLACE_GAP > r.x && y < r.y + r.h + PLACE_GAP && y + h + PLACE_GAP > r.y);
+
+/**
+ * Where a clicked item from the left panel lands (prototype placeNear): in the middle of the view, 80 px below its
+ * top, moved down until it covers no other card.
+ */
+export function stackSpot(view: Rect, occupied: readonly Rect[], h: number, w = CARD_W): Pt {
+  const x = snap8(view.x + view.w / 2 - w / 2);
+  let y = snap8(view.y + 80);
+  for (let n = 0; n < 600 && clashes(occupied, x, y, w, h); n++) y += 16;
+  return { x, y };
+}
+
+/**
+ * Where a new entity from "+" lands (prototype createEntity, D-46): the first free spot on rings of 48 px around a
+ * point in the middle of the view, a third down from its top.
+ */
+export function freeSpot(view: Rect, occupied: readonly Rect[], h = NEW_CARD_H, w = CARD_W): Pt {
+  const cx = view.x + view.w / 2 - w / 2, cy = view.y + view.h / 3;
+  const dirs = [[0, 0], [1, 0], [0, 1], [-1, 0], [0, -1], [1, 1], [-1, 1], [1, -1], [-1, -1]] as const;
+  for (let ring = 0; ring < 40; ring++) {
+    for (const [dx, dy] of dirs) {
+      const x = cx + dx * ring * 48, y = cy + dy * ring * 48;
+      if (!clashes(occupied, x, y, w, h)) return { x: snap8(x), y: snap8(y) };
+    }
+  }
+  return { x: snap8(cx), y: snap8(cy) };
+}
+
+/** Whether a box lies fully inside the view. */
+export const inside = (view: Rect, r: Rect) => r.x >= view.x && r.y >= view.y && r.x + r.w <= view.x + view.w && r.y + r.h <= view.y + view.h;
+
 // ---- lines (prototype rowY, endOf, curve, relGeomRects, ieMarker, umlMarker) ----
 
 export interface Pt {

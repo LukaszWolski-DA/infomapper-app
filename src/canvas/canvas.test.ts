@@ -15,7 +15,7 @@ import {
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
 import { buildCards, visibleRows, type CardData } from "./card-data";
-import { cardHeight, contentBounds, fitViewport, zoomAround } from "./geometry";
+import { cardHeight, contentBounds, fitViewport, freeSpot, newCardHeight, stackSpot, zoomAround } from "./geometry";
 import { splitName } from "./names";
 
 // Customer (customer_id, email) and CRM customers (cust_id, email, first_name):
@@ -159,5 +159,31 @@ describe("middle truncation (D-37)", () => {
   it("keeps the last five characters when there is no short last part", () => {
     expect(splitName("averyveryverylongname")).toEqual({ head: "averyveryverylon", tail: "gname" });
     expect(splitName("customer_averyverylongpart")).toEqual({ head: "customer_averyverylon", tail: "gpart" });
+  });
+});
+
+describe("placing new cards (prototype placeNear, createEntity)", () => {
+  const view = { x: 0, y: 0, w: 1000, h: 600 };
+
+  it("a clicked item lands in the middle of the view, 80 px down, below any card in the way", () => {
+    expect(stackSpot(view, [], 200)).toEqual({ x: 376, y: 80 });
+    const spot = stackSpot(view, [{ x: 300, y: 50, w: 256, h: 300 }], 200);
+    expect(spot.x).toBe(376);
+    expect(spot.y).toBeGreaterThanOrEqual(50 + 300 + 24);
+  });
+
+  it("a new entity lands a third down the middle of the view, or on the nearest free ring (D-46)", () => {
+    expect(freeSpot(view, [])).toEqual({ x: 376, y: 200 });
+    const taken = { x: 372, y: 200, w: 256, h: 140 };
+    const spot = freeSpot(view, [taken]);
+    expect(spot).not.toEqual({ x: 376, y: 200 });
+    const clear = spot.x >= taken.x + taken.w + 24 || spot.x + 256 + 24 <= taken.x || spot.y >= taken.y + taken.h + 24 || spot.y + 140 + 24 <= taken.y;
+    expect(clear).toBe(true);
+    expect(spot.x % 8 + spot.y % 8).toBe(0);
+  });
+
+  it("sizes a new card by its rows", () => {
+    expect(newCardHeight(0)).toBe(54 + 12 + 26);
+    expect(newCardHeight(3)).toBe(54 + 12 + 78);
   });
 });
