@@ -128,12 +128,19 @@ describe("demo model (slice 1a PRD, demo data)", () => {
     expect(impact.projects.map((p) => p.name)).toEqual(["Customer 360", "Order management"]);
   });
 
-  it("gives Sales analytics the same model without cards, and leaves Bank X empty", async () => {
+  it("gives Sales analytics the same model and the cards of “Customer & orders”, and leaves Bank X empty", async () => {
     const sales = await store.model.load(SEED_IDS.wsSales);
     expect(sales.entities).toHaveLength(6);
     expect(sales.mappings).toHaveLength(14);
     expect(sales.mappings.find((x) => x.status === "approved")).toMatchObject({ created_by: SEED_IDS.userMarek, approved_by: SEED_IDS.userLukasz });
-    expect(await store.canvasItems.list(SEED_IDS.wsSales)).toEqual([]);
+    const retailCards = await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders);
+    const salesCards = await store.canvasItems.listOfCanvas(SEED_IDS.wsSales, SEED_IDS.canvasSalesFirst);
+    const place = (items: CanvasItem[], m: WorkspaceModel) =>
+      items
+        .map((i) => `${i.entity_id ? m.entities.find((e) => e.id === i.entity_id)!.name : m.sourceTables.find((t) => t.id === i.source_table_id)!.name} ${i.x},${i.y}`)
+        .sort();
+    expect(place(salesCards, sales)).toEqual(place(retailCards, await store.model.load(RETAIL)));
+    expect(salesCards).toHaveLength(7);
     // Different rows: ids are derived per workspace.
     expect(sales.entities.map((e) => e.id)).not.toContain(seedId(RETAIL, "entity:customer"));
 

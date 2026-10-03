@@ -181,8 +181,15 @@ export function buildSeed(now: Date = new Date()): DevDb {
   );
   const salesProject = project(SEED_IDS.projSalesFirst, sales.id, "marek", "First project");
   canvas(SEED_IDS.canvasSalesFirst, sales.id, "marek", "First canvas", [salesProject]);
-  // The same model, without cards: its canvas starts empty. Four-eyes is on here, so Marek authored, Łukasz approved.
-  addDemoModel(db, { workspaceId: sales.id, at, authorId: users.marek.id, approverId: users.lukasz.id, canvases: [] });
+  // The same model; its canvas shows the cards of “Customer & orders”. Four-eyes is on here, so Marek authored and
+  // Łukasz approved.
+  addDemoModel(db, {
+    workspaceId: sales.id,
+    at,
+    authorId: users.marek.id,
+    approverId: users.lukasz.id,
+    canvases: [{ canvasId: SEED_IDS.canvasSalesFirst, layout: DEMO_LAYOUT.customerOrders }],
+  });
 
   const violation = findViolation(db);
   if (violation) throw new Error(`Seed data breaks a rule: ${violation.table}: ${violation.detail}`);
