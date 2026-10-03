@@ -73,7 +73,7 @@ Imports go one way: `app` → `canvas` → `ui` → `domain`; `app` and `canvas`
 **UI (AD-20).** Tailwind and shadcn/ui; Tiptap for rich text. Match the prototype’s layout, wording and behaviour;
 visual polish may improve, behaviour may not change without a decision.
 
-**Canvas (AD-24).** The engine decision is still open. Do not start canvas work beyond what the current PRD asks.
+**Canvas (AD-24).** React Flow with the named workarounds listed under AD-24 in docs/decisions.md. Follow them in all canvas work; the spike in spikes/canvas-react-flow shows how.
 
 **Local adapter and development sign-in (AD-29).** Until the Supabase slice, data lives in a JSON file on the server
 (`.data/dev-db.json`, git-ignored) and people sign in by picking a test user. Both exist only in development: a
