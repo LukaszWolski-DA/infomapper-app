@@ -9,6 +9,8 @@ interface ProjectFrame {
   view: ProjectView;
   currentCanvasId: string | null;
   renameOnOpen?: boolean;
+  /** Canvas tools for the top bar (zoom, fit), on canvas pages. */
+  tools?: ReactNode;
 }
 
 /**
@@ -27,7 +29,7 @@ export function AppShell({ shell, project, children }: { shell: ShellData; proje
   }
   return (
     <div className="flex h-dvh min-h-0 flex-col bg-im-panel text-im-ink">
-      <TopBar shell={shell} />
+      <TopBar shell={shell} tools={project.tools} />
       <div className="grid min-h-0 flex-1 grid-cols-[1fr] lg:grid-cols-[264px_1fr_340px]">
         <aside
           data-testid="panel-left"
