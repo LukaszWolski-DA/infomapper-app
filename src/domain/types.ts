@@ -203,6 +203,23 @@ export interface MappingInput extends StandardColumns {
   sort_order: number;
 }
 
+/** The live model of one workspace (slice 1a). */
+export interface WorkspaceModel {
+  /** In panel order (sort_order). */
+  concepts: Concept[];
+  entities: Entity[];
+  /** Per entity in model order (sort_order, D-36). */
+  attributes: Attribute[];
+  relationships: Relationship[];
+  sourceSystems: SourceSystem[];
+  sourceTables: SourceTable[];
+  /** Per table in physical order (ordinal). */
+  sourceColumns: SourceColumn[];
+  mappings: Mapping[];
+  /** Per mapping in rule order (sort_order). */
+  mappingInputs: MappingInput[];
+}
+
 // ---- Organisation of work ----
 
 export interface Project extends StandardColumns {

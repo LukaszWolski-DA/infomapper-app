@@ -7,25 +7,19 @@ import type { DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
 import type {
   AppUser,
-  Attribute,
   Canvas,
   CanvasItem,
   ChangeEvent,
-  Concept,
-  Entity,
-  Mapping,
-  MappingInput,
   Organization,
   OrganizationMember,
   Project,
   ProjectCanvas,
-  Relationship,
-  SourceColumn,
-  SourceSystem,
-  SourceTable,
   Workspace,
   WorkspaceMember,
+  WorkspaceModel,
 } from "@/domain/types";
+
+export type { WorkspaceModel } from "@/domain/types";
 
 export interface UserRepository {
   list(): Promise<AppUser[]>;
@@ -61,23 +55,6 @@ export interface CanvasRepository {
   listLinksOfProject(workspaceId: Uuid, projectId: Uuid): Promise<ProjectCanvas[]>;
   /** Links of a canvas to its live projects. */
   listLinksOfCanvas(workspaceId: Uuid, canvasId: Uuid): Promise<ProjectCanvas[]>;
-}
-
-/** The live model of one workspace (slice 1a). */
-export interface WorkspaceModel {
-  /** In panel order (sort_order). */
-  concepts: Concept[];
-  entities: Entity[];
-  /** Per entity in model order (sort_order, D-36). */
-  attributes: Attribute[];
-  relationships: Relationship[];
-  sourceSystems: SourceSystem[];
-  sourceTables: SourceTable[];
-  /** Per table in physical order (ordinal). */
-  sourceColumns: SourceColumn[];
-  mappings: Mapping[];
-  /** Per mapping in rule order (sort_order). */
-  mappingInputs: MappingInput[];
 }
 
 export interface ModelRepository {
