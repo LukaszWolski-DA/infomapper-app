@@ -87,13 +87,13 @@ body { background: var(--panel); color: var(--ink); font: 13px/1.45 var(--sans);
 .dt { color: var(--ink-3); font-size: 11px; flex: none }
 .src .dt { font-family: var(--mono); font-size: 10.5px }
 
-/* row handles: React Flow <Handle>s styled like the prototype's .hnd, visible on row hover */
-.card .react-flow__handle.hnd { width: 9px; height: 9px; min-width: 0; min-height: 0; border: 0; border-radius: 50%;
-  background: var(--surface); box-shadow: 0 0 0 1.5px var(--map); visibility: hidden; pointer-events: none }
-.card .react-flow__handle.hh { top: 27px }
-.row:hover .react-flow__handle.hnd { visibility: visible }
+/* follow-up step 1: plain body block below 40 % zoom (same height as the rows it replaces) */
+.c-lod { padding: 6px 10px }
+.c-block { height: 100%; border-radius: 4px; background: var(--hover) }
 
 /* ---------- lines (prototype .lnk / .map) ---------- */
+/* follow-up step 3: all lines in one <svg> in the viewport, above frames and below cards */
+.line-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
 .lnk .hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer }
 .lnk .s { fill: none; stroke-width: 1.6; pointer-events: none }
 .map .s { stroke: var(--map) }
@@ -118,7 +118,6 @@ body { background: var(--panel); color: var(--ink); font: 13px/1.45 var(--sans);
 .frame { position: absolute; inset: 0; border-radius: 16px; cursor: move;
   border: 1.5px solid color-mix(in srgb, var(--fc) 50%, transparent); background: color-mix(in srgb, var(--fc) 7%, transparent) }
 .frame.sel { border-color: var(--fc); box-shadow: 0 0 0 1px var(--fc) }
-.frame .react-flow__handle.hnd, .fblock .react-flow__handle.hnd { visibility: hidden }
 .f-lab { position: absolute; left: 4px; bottom: 100%; display: flex; align-items: center; gap: 6px; padding-bottom: 7px; white-space: nowrap; font-size: 13px; color: var(--ink) }
 .f-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--fc); flex: none }
 .f-name { font-weight: 600 }

@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Background,
-  ConnectionMode,
   Controls,
   MiniMap,
   Panel,
@@ -19,20 +18,16 @@ import {
 import "@xyflow/react/dist/style.css";
 import { getData } from "@/data/generate";
 import CardNode, { type CardNodeT, type RowFilter } from "./CardNode";
-import MappingEdge, { type MappingEdgeT } from "./MappingEdge";
-import RelEdge, { type RelEdgeT } from "./RelEdge";
 import FrameNode, { BLOCK_W, blockH, type FrameNodeT } from "./FrameNode";
-import BundleEdge, { type BundleEdgeT } from "./BundleEdge";
+import LineLayer, { type BundleLine, type Line, type MapLine, type RelLine } from "./LineLayer";
 import { CanvasCtx, type CanvasApi, type Notation } from "./context";
 import FpsMeter from "./FpsMeter";
 import { toggleSelectedRow, useFocusActive } from "./highlight";
 
 const nodeTypes = { card: CardNode, frame: FrameNode };
-const edgeTypes = { map: MappingEdge, rel: RelEdge, bundle: BundleEdge };
 
 type AppNode = CardNodeT | FrameNodeT;
-type BaseEdge = MappingEdgeT | RelEdgeT;
-type AppEdge = BaseEdge | BundleEdgeT;
+type BaseLine = MapLine | RelLine;
 
 /* Frames first (React Flow needs parents before children), cards nested with positions relative to their frame. */
 function buildNodes(): AppNode[] {
@@ -75,32 +70,18 @@ function buildNodes(): AppNode[] {
   return [...frames, ...cards];
 }
 
-function buildEdges(): BaseEdge[] {
+/* Lines are not React Flow edges any more (follow-up step 3); LineLayer draws them all in one <svg>. */
+function buildLines(): BaseLine[] {
   const data = getData();
-  const maps: MappingEdgeT[] = data.mappings.map(m => ({
-    id: m.id,
-    type: "map",
-    source: m.srcCard,
-    target: m.entCard,
-    // declared handles only satisfy React Flow; MappingEdge computes the real ends from the row handles
-    sourceHandle: "h:r",
-    targetHandle: "h:l",
-    data: { column: m.column, attribute: m.attribute },
+  const maps: MapLine[] = data.mappings.map(m => ({
+    id: m.id, kind: "map", source: m.srcCard, target: m.entCard, column: m.column, attribute: m.attribute,
   }));
   // parallel relationships between the same pair are offset by 16 px, as in the prototype
   const pairCount: Record<string, number> = {};
-  const rels: RelEdgeT[] = data.relationships.map(r => {
+  const rels: RelLine[] = data.relationships.map(r => {
     const key = [r.from, r.to].sort().join("|");
     const n = (pairCount[key] = (pairCount[key] ?? 0) + 1);
-    return {
-      id: r.id,
-      type: "rel",
-      source: r.from,
-      target: r.to,
-      sourceHandle: "h:r",
-      targetHandle: "h:l",
-      data: { rel: r, offset: (n - 1) * 16 },
-    };
+    return { id: r.id, kind: "rel", source: r.from, target: r.to, rel: r, offset: (n - 1) * 16 };
   });
   return [...rels, ...maps];
 }
@@ -109,32 +90,29 @@ function buildEdges(): BaseEdge[] {
  * Lines for the current set of collapsed frames: ordinary lines where both ends are visible,
  * merged lines (one per frame ↔ target card, with a count) where an end sits in a collapsed frame.
  */
-function linesFor(base: BaseEdge[], collapsed: Set<string>): AppEdge[] {
+function linesFor(base: BaseLine[], collapsed: Set<string>): Line[] {
   if (collapsed.size === 0) return base;
   const frameOfCard = new Map(getData().cards.map(c => [c.id, c.frameId]));
   const endOf = (card: string) => {
     const f = frameOfCard.get(card);
     return f && collapsed.has(f) ? f : card;
   };
-  const out: AppEdge[] = [];
-  const bundles = new Map<string, BundleEdgeT>();
+  const out: Line[] = [];
+  const bundles = new Map<string, BundleLine>();
   for (const e of base) {
     const a = endOf(e.source), z = endOf(e.target);
     if (a === e.source && z === e.target) { out.push(e); continue; }
     if (a === z) continue; // both ends inside the same collapsed frame
-    const isMap = e.type === "map";
+    const isMap = e.kind === "map";
     const key = isMap ? `m|${a}|${z}` : `r|${[a, z].sort().join("|")}`;
-    const sRow = isMap && a === e.source ? (e as MappingEdgeT).data!.column : null;
-    const tRow = isMap && z === e.target ? (e as MappingEdgeT).data!.attribute : null;
+    const sRow = isMap && a === e.source ? e.column : null;
+    const tRow = isMap && z === e.target ? e.attribute : null;
     let b = bundles.get(key);
     if (!b) {
-      b = {
-        id: "b:" + key, type: "bundle", source: a, target: z, sourceHandle: "h:r", targetHandle: "h:l",
-        data: { kind: isMap ? "map" : "rel", ids: [], sourceRow: sRow, targetRow: tRow },
-      };
+      b = { id: "b:" + key, kind: "bundle", source: a, target: z, lineKind: isMap ? "map" : "rel", ids: [], sourceRow: sRow, targetRow: tRow };
       bundles.set(key, b);
     }
-    const d = b.data!;
+    const d = b;
     d.ids.push(e.id);
     if (d.sourceRow !== sRow) d.sourceRow = null; // rows differ → anchor at the card header
     if (d.targetRow !== tRow) d.targetRow = null;
@@ -160,9 +138,9 @@ function ZoomReadout() {
 function Flow() {
   const data = getData();
   const [nodes, setNodes] = useState<AppNode[]>(buildNodes);
-  const [baseEdges] = useState(buildEdges);
+  const [baseLines] = useState(buildLines);
   const [collapsedFrames, setCollapsedFrames] = useState<Set<string>>(() => new Set());
-  const edges = useMemo(() => linesFor(baseEdges, collapsedFrames), [baseEdges, collapsedFrames]);
+  const lines = useMemo(() => linesFor(baseLines, collapsedFrames), [baseLines, collapsedFrames]);
   const [notation, setNotation] = useState<Notation>("ie");
   // ?visibleOnly → React Flow renders only nodes/edges in the viewport (compared in REPORT.md, C-01)
   const [visibleOnly] = useState(() => new URLSearchParams(window.location.search).has("visibleOnly"));
@@ -254,11 +232,8 @@ function Flow() {
           <FocusRoot>
           <ReactFlow
             nodes={nodes}
-            edges={edges}
             onNodesChange={onNodesChange}
             nodeTypes={nodeTypes}
-            edgeTypes={edgeTypes}
-            connectionMode={ConnectionMode.Loose}
             nodesConnectable={false}
             // D-15/D-16: drag on empty canvas = lasso that takes only fully enclosed nodes; Shift-click adds
             selectionOnDrag
@@ -276,6 +251,7 @@ function Flow() {
             minZoom={0.1}
             maxZoom={3}
           >
+            <LineLayer lines={lines} />
             {bg === "dots" && <Background gap={24} />}
             <Controls showInteractive={false} />
             <MiniMap

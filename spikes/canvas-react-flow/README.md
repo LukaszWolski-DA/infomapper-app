@@ -43,10 +43,10 @@ URL switches used for the measurements:
 | --- | --- |
 | `src/data/generate.ts` | Seeded data and layout |
 | `src/canvas/Canvas.tsx` | React Flow setup, nodes and edges, frame collapse, merged lines |
-| `src/canvas/CardNode.tsx` | Card with a handle on both sides of every row, filter, collapse, width control |
+| `src/canvas/CardNode.tsx` | Card with filter, collapse, width control; a plain block below 40% zoom |
 | `src/canvas/FrameNode.tsx` | Frame group node and the collapsed block |
-| `src/canvas/MappingEdge.tsx`, `RelEdge.tsx`, `BundleEdge.tsx` | Mapping, relationship and merged lines |
-| `src/canvas/geometry.ts` | Curves and markers, ported from the prototype |
+| `src/canvas/LineLayer.tsx` | All mapping, relationship and merged lines in one SVG layer (follow-up step 3) |
+| `src/canvas/geometry.ts` | Curves and markers, ported from the prototype; row positions from data |
 | `src/canvas/highlight.ts` | Row hover and selection highlight |
 | `src/canvas/FpsMeter.tsx` | FPS readout and `window.__perf` recorder |
 | `src/baseline/Baseline.tsx` | The plain-DOM comparison page |

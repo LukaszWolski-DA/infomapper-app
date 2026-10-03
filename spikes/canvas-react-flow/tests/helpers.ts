@@ -85,7 +85,17 @@ export const checkMappingEnds = (page: Page, filter?: string[]) =>
       const expectX = [ltr ? cards[0].right : cards[0].left, ltr ? cards[1].left : cards[1].right];
       [m.column, m.attribute].forEach((row: string, i: number) => {
         checked++;
-        const r = document.querySelector(`[data-card="${i ? m.entCard : m.srcCard}"] [data-row="${row}"]`)!.getBoundingClientRect();
+        const cardId = i ? m.entCard : m.srcCard;
+        const el = document.querySelector(`[data-card="${cardId}"] [data-row="${row}"]`);
+        let r: { top: number; bottom: number; left: number; right: number };
+        if (el) r = el.getBoundingClientRect();
+        else {
+          // below 40 % zoom the card shows a plain block instead of rows (unfiltered): the row's band inside the block
+          const block = document.querySelector(`[data-card="${cardId}"] .c-block`)!.getBoundingClientRect();
+          const rows = data.cards.find((c: any) => c.id === cardId).rows;
+          const k = rows.findIndex((x: any) => x.id === row), rh = block.height / rows.length;
+          r = { left: block.left, right: block.right, top: block.top + k * rh, bottom: block.top + (k + 1) * rh };
+        }
         const e = ends[i];
         const inRow = e.y >= r.top - tol && e.y <= r.bottom + tol;
         const onSide = Math.abs(e.x - expectX[i]) <= tol;

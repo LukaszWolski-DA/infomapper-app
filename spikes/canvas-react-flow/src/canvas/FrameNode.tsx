@@ -1,7 +1,7 @@
 "use client";
 
 import { memo, useContext } from "react";
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+import { type Node, type NodeProps } from "@xyflow/react";
 import { BODY_PAD, HEAD_H, type Card, type Frame } from "@/data/generate";
 import { CanvasCtx } from "./context";
 
@@ -29,18 +29,11 @@ function FrameNode({ id, data, selected }: NodeProps<FrameNodeT>) {
       {collapsed ? "Expand" : "Collapse"}
     </button>
   );
-  const handles = (
-    <>
-      <Handle id="h:l" type="source" position={Position.Left} className="hnd" isConnectable={false} />
-      <Handle id="h:r" type="source" position={Position.Right} className="hnd" isConnectable={false} />
-    </>
-  );
 
   if (collapsed) {
     return (
       <div className={`card fblock${selected ? " sel" : ""}`} style={{ ["--fc" as string]: frame.color }} data-frame={id}>
         <div className="c-head">
-          {handles}
           <div className="c-l1"><span className="stereo">Frame</span><span>{members.length} cards</span><span className="c-tools">{toggle}</span></div>
           <div className="c-l2"><span className="c-name">{frame.name}</span></div>
         </div>
@@ -63,7 +56,6 @@ function FrameNode({ id, data, selected }: NodeProps<FrameNodeT>) {
 
   return (
     <div className={`frame${selected ? " sel" : ""}`} style={{ ["--fc" as string]: frame.color }} data-frame={id}>
-      {handles}
       <div className="f-lab">
         <span className="f-dot" />
         <span className="f-name">{frame.name}</span>

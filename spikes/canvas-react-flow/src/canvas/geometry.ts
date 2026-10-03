@@ -1,10 +1,14 @@
 import type { InternalNode } from "@xyflow/react";
-import { HEAD_H } from "@/data/generate";
+import { BODY_PAD, HEAD_H, ROW_H, type Row } from "@/data/generate";
 
 /*
  * Line geometry, ported from the prototype (curve(), bez()).
- * Ends are taken from React Flow's measured handle bounds, so they follow whatever the DOM actually rendered.
+ * Follow-up step 2: row positions are computed from the card data (header, body padding, row height and the
+ * rows the card currently shows), as the prototype does. Node position and width come from React Flow's store.
  */
+
+/** Below this zoom cards draw a plain block instead of rows, and lines lose their end dots (follow-up step 1). */
+export const LOD_ZOOM = 0.4;
 
 export interface Pt { x: number; y: number }
 export interface End {
@@ -15,14 +19,40 @@ export interface End {
   hidden: boolean; // row not rendered → anchored to the header
 }
 
+/** What a card node needs for row geometry; set by CardNode's data (kept structural to avoid an import cycle). */
+interface RowSource { card: { rows: Row[] }; collapsed: boolean; filter: string; mapped: Set<string> }
+
+export const visibleRowsOf = (d: RowSource): Row[] => {
+  if (d.collapsed) return [];
+  if (d.filter === "mapped") return d.card.rows.filter(r => d.mapped.has(r.id));
+  if (d.filter === "keys") return d.card.rows.filter(r => r.pk || r.fk);
+  return d.card.rows;
+};
+
+/* row id → index among the shown rows, cached per data object (node data is replaced, never mutated) */
+const indexCache = new WeakMap<object, Map<string, number>>();
+const rowIndex = (d: RowSource) => {
+  let m = indexCache.get(d);
+  if (!m) {
+    m = new Map(visibleRowsOf(d).map((r, i) => [r.id, i]));
+    indexCache.set(d, m);
+  }
+  return m;
+};
+
 /** Anchor of a row on a card; falls back to the header when the row is hidden (collapse, filter). */
 export function rowEnd(node: InternalNode, rowId: string): End {
   const x = node.internals.positionAbsolute.x;
   const w = node.measured.width ?? node.width ?? 0;
-  const hb = node.internals.handleBounds?.source ?? [];
-  const h = hb.find(b => b.id === rowId + ":l");
-  const y = node.internals.positionAbsolute.y + (h ? h.y + h.height / 2 : HEAD_H / 2);
-  return { x, w, y, cx: x + w / 2, hidden: !h };
+  const i = rowIndex(node.data as unknown as RowSource).get(rowId);
+  const y = node.internals.positionAbsolute.y + (i === undefined ? HEAD_H / 2 : HEAD_H + BODY_PAD + i * ROW_H + ROW_H / 2);
+  return { x, w, y, cx: x + w / 2, hidden: i === undefined };
+}
+
+/** A collapsed frame block: lines meet it at mid-height. */
+export function frameEnd(node: InternalNode): End {
+  const r = nodeRect(node);
+  return { x: r.x, w: r.w, y: r.y + r.h / 2, cx: r.x + r.w / 2, hidden: false };
 }
 
 export const bez = (a: Pt, b: Pt, c: Pt, d: Pt, t: number): Pt => {
