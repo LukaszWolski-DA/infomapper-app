@@ -290,9 +290,9 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   );
 
   const place = useCallback(
-    (target: CardTarget, rows: number) => {
+    (target: CardTarget, rows: number, options?: { quiet?: boolean }) => {
       const h = newCardHeight(rows);
-      void placeAt(target, stackSpot(viewRect(), occupied(), h), h, true);
+      void placeAt(target, stackSpot(viewRect(), occupied(), h), h, !options?.quiet);
     },
     [placeAt, viewRect, occupied],
   );

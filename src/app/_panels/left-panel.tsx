@@ -3,7 +3,7 @@
 // The left panel (prototype #side): Model and Sources tabs, search over names and fields, “Only what this project
 // uses”, “Only on this canvas”, folding groups with sticky headers, collapse all and expand all (D-35). A click on an item places it in a free spot of the view (or shows its card);
 // dragging it onto the canvas places it there. Model tab, for those who may edit: “+” per concept, “New concept”,
-// rename a concept by double-click, and its ⋯ menu (D-46, D-47).
+// rename a concept by double-click, and its ⋯ menu (D-46, D-47). Sources tab: “New source table”.
 // The Requirements tab comes with requirements.
 
 import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -22,6 +22,7 @@ import {
 } from "@/ui/components/dropdown-menu";
 import { useToast } from "@/ui/components/toast";
 import { DeleteConceptDialog } from "./delete-concept-dialog";
+import { NewSourceTableDialog } from "./new-source-table-dialog";
 import { usePanels } from "./panels-context";
 import {
   allGroups,
@@ -64,6 +65,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
   const [renaming, setRenaming] = useState<string | null>(null);
   const [addingConcept, setAddingConcept] = useState(false);
   const [deleting, setDeleting] = useState<TreeConcept | null>(null);
+  const [addingTable, setAddingTable] = useState(false);
 
   useEffect(() => {
     // Read once after mount: localStorage is not available on the server.
@@ -276,10 +278,17 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
   };
 
   // ---- the Sources tab ----
+  const newTable = editable && !searching && (
+    <div className="px-2 py-2.5">
+      <button type="button" className={smallButton} data-testid="button-new-source-table" onClick={() => setAddingTable(true)}>
+        New source table
+      </button>
+    </div>
+  );
   const sourceTree = () => {
     const systems = filterSystems(tree.systems, filter);
-    if (!systems.length) return null;
-    return systems.map(({ system: s, total, schemas }) => {
+    if (!systems.length) return newTable || null;
+    return [...systems.map(({ system: s, total, schemas }) => {
       const key = systemGroup(s.id);
       return (
         <div key={s.id} data-testid="tree-system">
@@ -327,7 +336,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
             })}
         </div>
       );
-    });
+    }), <div key="new-table">{newTable}</div>];
   };
 
   const content = tab === "model" ? modelTree() : sourceTree();
@@ -396,6 +405,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
       <div className="border-t border-im-line px-3 py-2.5 text-[11.5px] text-im-ink-3">
         Drag onto the canvas, or click to add. A filled dot means it is on this canvas, a ring means it is on another one.
       </div>
+      {addingTable && <NewSourceTableDialog workspaceId={workspaceId} systems={tree.systems.map((s) => s.name)} onClose={() => setAddingTable(false)} />}
       {deleting && (
         <DeleteConceptDialog
           workspaceId={workspaceId}

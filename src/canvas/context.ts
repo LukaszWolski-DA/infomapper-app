@@ -34,7 +34,7 @@ export interface CanvasHandle {
   /** Fits all cards into the view. */
   fit: () => void;
   /** Places an element in a free spot of the view, or shows its card when it is already here. `rows` sizes the card. */
-  place: (target: CardTarget, rows: number) => void;
+  place: (target: CardTarget, rows: number, options?: { quiet?: boolean }) => void;
   /** Takes a card off this canvas (D-02); waits for the card's pending saves. */
   remove: (cardId: Uuid) => void;
   /** Moves the view so the card is in the middle. */

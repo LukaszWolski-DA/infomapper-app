@@ -13,7 +13,7 @@ import type { Uuid } from "@/domain/ids";
 import { STEREOTYPES, type Entity, type Stereotype } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
-import { Actions, buttonClass, dangerClass, Field, Hint, inputClass, Li, List, Section, smallButtonClass, TextArea, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextArea, TextField } from "./fields";
 import { usePanel } from "./inspector";
 import { feedingSources, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -108,75 +108,83 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         />
       </Field>
 
-      <Section>Attributes and their sources</Section>
-      {attributes.length ? (
-        <List testId="list-entity-attributes">
-          {attributes.map((a) => {
-            const ms = ix.mappingsOf.get(a.id) ?? [];
-            return (
-              <Li
-                key={a.id}
-                onClick={() => p.goAttribute(a.id)}
-                meta={
-                  ms.length ? (
-                    <span className="font-mono text-xs">{ms.map((m) => inputsLabel(ix, m.id)).join(", ")}</span>
-                  ) : (
-                    <span className="italic">unmapped</span>
-                  )
-                }
-              >
-                {a.name}
-              </Li>
-            );
-          })}
-        </List>
-      ) : (
-        <Hint>No attributes yet.</Hint>
-      )}
-      {p.editable && (
-        <div className="mt-2 flex gap-2">
-          <button type="button" className={smallButtonClass} onClick={() => void addAttribute()} data-testid="button-add-attribute">
-            Add attribute
-          </button>
-        </div>
-      )}
+      <Fold title="Attributes and their sources" count={attributes.length}>
+        {attributes.length ? (
+          <LongList
+            items={attributes}
+            testId="list-entity-attributes"
+            text={(a) => `${a.name} ${(ix.mappingsOf.get(a.id) ?? []).map((m) => inputsLabel(ix, m.id)).join(" ")}`}
+            render={(a) => {
+              const ms = ix.mappingsOf.get(a.id) ?? [];
+              return (
+                <Li
+                  key={a.id}
+                  onClick={() => p.goAttribute(a.id)}
+                  meta={
+                    ms.length ? (
+                      <span className="font-mono text-xs">{ms.map((m) => inputsLabel(ix, m.id)).join(", ")}</span>
+                    ) : (
+                      <span className="italic">unmapped</span>
+                    )
+                  }
+                >
+                  {a.name}
+                </Li>
+              );
+            }}
+          />
+        ) : (
+          <Hint>No attributes yet.</Hint>
+        )}
+        {p.editable && (
+          <div className="mt-2 flex gap-2">
+            <button type="button" className={smallButtonClass} onClick={() => void addAttribute()} data-testid="button-add-attribute">
+              Add attribute
+            </button>
+          </div>
+        )}
+      </Fold>
 
-      <Section>Feeding sources</Section>
-      {feeds.length ? (
-        <List>
-          {feeds.map(({ table, mappings }) => {
-            const here = p.cardOf(table.id);
-            const dot = here ? "bg-im-physical" : p.elsewhere(table.id) ? "shadow-[inset_0_0_0_1.5px_var(--im-ink-3)]" : "";
-            return (
-              <Li
-                key={table.id}
-                title={here ? "On this canvas. Click to show it." : "Click to place it on the canvas."}
-                onClick={() => (here ? (ui.select({ t: "card", id: here }), ui.centerOn(here)) : ui.place({ sourceTableId: table.id }, (ix.columnsOf.get(table.id) ?? []).length))}
-                meta={`${ix.systemName.get(table.source_system_id) ?? ""}, ${mappings} mapping${mappings === 1 ? "" : "s"}`}
-              >
-                <span className="flex items-center gap-2">
-                  <span className={`size-[7px] flex-none rounded-full ${dot}`} />
-                  <span className="truncate font-mono text-xs">{table.name}</span>
-                </span>
-              </Li>
-            );
-          })}
-        </List>
-      ) : (
-        <Hint>No source table maps into this entity yet.</Hint>
-      )}
+      <Fold title="Feeding sources" count={feeds.length}>
+        {feeds.length ? (
+          <LongList
+            items={feeds}
+            text={(f) => f.table.name}
+            render={({ table, mappings }) => {
+              const here = p.cardOf(table.id);
+              const dot = here ? "bg-im-physical" : p.elsewhere(table.id) ? "shadow-[inset_0_0_0_1.5px_var(--im-ink-3)]" : "";
+              return (
+                <Li
+                  key={table.id}
+                  title={here ? "On this canvas. Click to show it." : "Click to place it on the canvas."}
+                  onClick={() => (here ? (ui.select({ t: "card", id: here }), ui.centerOn(here)) : ui.place({ sourceTableId: table.id }, (ix.columnsOf.get(table.id) ?? []).length))}
+                  meta={`${ix.systemName.get(table.source_system_id) ?? ""}, ${mappings} mapping${mappings === 1 ? "" : "s"}`}
+                >
+                  <span className="flex items-center gap-2">
+                    <span className={`size-[7px] flex-none rounded-full ${dot}`} />
+                    <span className="truncate font-mono text-xs">{table.name}</span>
+                  </span>
+                </Li>
+              );
+            }}
+          />
+        ) : (
+          <Hint>No source table maps into this entity yet.</Hint>
+        )}
+      </Fold>
 
       {relationships.length > 0 && (
-        <>
-          <Section>Relationships</Section>
-          <List>
-            {relationships.map((r) => (
+        <Fold title="Relationships" count={relationships.length}>
+          <LongList
+            items={relationships}
+            text={(r) => `${ix.entity.get(r.from_entity_id)?.name} ${r.label ?? ""} ${ix.entity.get(r.to_entity_id)?.name}`}
+            render={(r) => (
               <Li key={r.id} onClick={() => ui.select({ t: "rel", id: r.id })}>
                 {ix.entity.get(r.from_entity_id)?.name} {r.label || "relates to"} {ix.entity.get(r.to_entity_id)?.name}
               </Li>
-            ))}
-          </List>
-        </>
+            )}
+          />
+        </Fold>
       )}
 
       {p.editable && (

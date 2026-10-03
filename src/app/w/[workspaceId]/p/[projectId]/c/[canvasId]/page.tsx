@@ -5,6 +5,7 @@ import { loadShell } from "@/app/_lib/shell";
 import { Inspector } from "@/app/_panels/inspector";
 import { LeftPanel } from "@/app/_panels/left-panel";
 import { PanelsProvider } from "@/app/_panels/panels-context";
+import { StatusBar } from "@/app/_panels/status-bar";
 import { buildTree } from "@/app/_panels/tree-data";
 import { buildCards } from "@/canvas/card-data";
 import { buildLines } from "@/canvas/line-data";
@@ -57,6 +58,8 @@ export default async function CanvasPage({
               <Inspector
                 workspaceId={ws}
                 canvasId={canvasId}
+                canvasName={shell.canvas?.name ?? ""}
+                canvasCount={canvases.length}
                 model={model}
                 cards={cards.map((c) => ({ id: c.id, kind: c.kind, targetId: c.targetId }))}
                 tree={tree}
@@ -67,6 +70,7 @@ export default async function CanvasPage({
                 contentAuthors={contentAuthors}
               />
             ),
+            status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} />,
           }}
         >
           <ModelCanvas

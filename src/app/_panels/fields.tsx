@@ -250,3 +250,98 @@ export function ConfirmDelete({ label, also, onConfirm, testId }: { label: strin
     </button>
   );
 }
+
+// ---- folding sections and long lists (D-35) ----
+
+const SECTIONS_KEY = "infomapper:sections-shut";
+/** Sections fold per title, numbers aside (“Other sources for email” and “… for name” are different titles). */
+const sectionKey = (title: string) => title.replace(/\d+/g, "#").replace(/\s+/g, " ").trim();
+
+function readShut(): Set<string> {
+  try {
+    const v = JSON.parse(window.localStorage.getItem(SECTIONS_KEY) ?? "[]") as unknown;
+    return new Set(Array.isArray(v) ? v.filter((k): k is string => typeof k === "string") : []);
+  } catch {
+    return new Set();
+  }
+}
+
+/** A panel section whose heading folds it; the state is remembered per title in this browser. */
+export function Fold({ title, count, children, testId }: { title: string; count?: number; children: ReactNode; testId?: string }) {
+  const key = sectionKey(title);
+  const [shut, setShut] = useState(false);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only preference, read after mount
+    setShut(readShut().has(key));
+  }, [key]);
+  const toggle = () => {
+    const all = readShut();
+    if (!all.delete(key)) all.add(key);
+    try {
+      window.localStorage.setItem(SECTIONS_KEY, JSON.stringify([...all]));
+    } catch {
+      // not remembered
+    }
+    setShut(all.has(key));
+  };
+  return (
+    <section data-testid={testId}>
+      <h3 className="-ml-1 mb-2 mt-5 text-xs font-semibold text-im-ink-2">
+        <button
+          type="button"
+          aria-expanded={!shut}
+          onClick={toggle}
+          className="flex w-full items-center gap-1.5 rounded px-1 py-0.5 text-left hover:bg-im-hover hover:text-im-ink"
+        >
+          <svg viewBox="0 0 16 16" aria-hidden className={`size-2.5 flex-none fill-none stroke-current stroke-[1.8] transition-transform ${shut ? "-rotate-90" : ""}`}>
+            <path d="M4 6l4 4 4-4" />
+          </svg>
+          <span className="min-w-0 flex-1 truncate">{title}</span>
+          {count !== undefined && count > 0 && <span className="text-[11.5px] font-normal text-im-ink-3">{count}</span>}
+        </button>
+      </h3>
+      <div hidden={shut}>{children}</div>
+    </section>
+  );
+}
+
+/** Lists over 20 rows get a filter and “Show all” (D-35, prototype foldSections). */
+export function LongList<T>({
+  items,
+  text,
+  render,
+  testId,
+}: {
+  items: readonly T[];
+  text: (item: T) => string;
+  render: (item: T) => ReactNode;
+  testId?: string;
+}) {
+  const [q, setQ] = useState("");
+  const [all, setAll] = useState(false);
+  const long = items.length > 20;
+  const query = q.trim().toLowerCase();
+  const hits = query ? items.filter((i) => text(i).toLowerCase().includes(query)) : items;
+  const shown = long && !all && !query ? hits.slice(0, 20) : hits;
+  return (
+    <>
+      {long && (
+        <input
+          type="search"
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          placeholder={`Filter ${items.length} items…`}
+          aria-label="Filter the list"
+          data-testid="input-list-filter"
+          className="mb-1.5 h-7 w-full rounded-md border border-im-line bg-im-surface px-2 text-xs outline-none focus:border-im-logical"
+        />
+      )}
+      <List testId={testId}>{shown.map(render)}</List>
+      {long && !all && !query && hits.length > 20 && (
+        <button type="button" className={`${smallButtonClass} mt-1`} onClick={() => setAll(true)} data-testid="button-show-all">
+          Show all ({hits.length})
+        </button>
+      )}
+    </>
+  );
+}

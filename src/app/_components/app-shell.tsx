@@ -14,6 +14,8 @@ interface ProjectFrame {
   /** Panel contents on canvas pages; project pages show placeholders. */
   left?: ReactNode;
   right?: ReactNode;
+  /** The status bar under the panels, on canvas pages. */
+  status?: ReactNode;
 }
 
 /**
@@ -52,6 +54,7 @@ export function AppShell({ shell, project, children }: { shell: ShellData; proje
           {project.right ?? <PanelPlaceholder>Details of what you select appear here in a later slice.</PanelPlaceholder>}
         </aside>
       </div>
+      {project.status}
     </div>
   );
 }

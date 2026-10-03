@@ -1,7 +1,7 @@
 "use server";
 
-// Model writes from the panels (slice 1a): concepts (D-46, D-47), entities with their impact before deleting, and
-// attributes. Mappings are in mapping.ts.
+// Model writes from the panels (slice 1a): concepts (D-46, D-47), entities with their impact before deleting,
+// attributes, relationships, and source tables and columns. Mappings are in mapping.ts.
 
 import { revalidatePath } from "next/cache";
 import { getDataStore, type DataStore } from "@/data";
@@ -9,6 +9,8 @@ import type { CommandContext, CommandResult } from "@/domain/changes";
 import { addAttribute, deleteAttribute, updateAttribute, type UpdateAttributeInput } from "@/domain/commands/attribute";
 import { createConcept, deleteConcept, renameConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity, type UpdateEntityInput } from "@/domain/commands/entity";
+import { deleteRelationship, swapRelationship, updateRelationship, type UpdateRelationshipInput } from "@/domain/commands/relationship";
+import { createSourceTable, deleteSourceTable, updateSourceColumn, type CreateSourceTableInput, type UpdateSourceColumnInput } from "@/domain/commands/source";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceModel } from "@/domain/types";
 import { entityImpact, type EntityImpact } from "@/domain/model/impact";
@@ -150,4 +152,76 @@ export async function deleteAttributeAction(
   return modelCommand(workspaceId, (ctx, access, { attributes, mappings, mappingInputs }) =>
     deleteAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), mappings, mappingInputs }, input),
   );
+}
+
+// ---- relationships ----
+
+/** Verb phrase and the cardinality at both ends. */
+export async function updateRelationshipAction(workspaceId: string, input: UpdateRelationshipInput): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { relationships }) => {
+    const result = updateRelationship(ctx, access, { relationship: byId(relationships, input?.relationshipId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+export async function swapRelationshipAction(workspaceId: string, input: { relationshipId: string; expectedVersion: number }): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { relationships }) => {
+    const result = swapRelationship(ctx, access, { relationship: byId(relationships, input?.relationshipId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+export async function deleteRelationshipAction(workspaceId: string, input: { relationshipId: string; expectedVersion: number }): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { relationships }) => {
+    const result = deleteRelationship(ctx, access, { relationship: byId(relationships, input?.relationshipId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+// ---- source tables and columns ----
+
+/** “New source table”: system (reused by name, or created), database, schema, name and the columns as lines. */
+export async function createSourceTableAction(
+  workspaceId: string,
+  input: CreateSourceTableInput,
+): Promise<ActionResult<{ sourceTableId: string; columns: number; createdSystem: boolean }>> {
+  return modelCommand(workspaceId, (ctx, access, { sourceSystems, sourceTables }) => {
+    const result = createSourceTable(ctx, access, { systems: sourceSystems, tables: sourceTables }, input);
+    if (!result.ok) return result;
+    const columns = result.writeSet.writes.filter((w) => w.kind === "insert" && w.table === "source_column").length;
+    return { ...result, value: { sourceTableId: result.value.sourceTableId, columns, createdSystem: result.value.createdSystem } };
+  });
+}
+
+/** BK and PII flags and the comment of a column. */
+export async function updateSourceColumnAction(workspaceId: string, input: UpdateSourceColumnInput): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { sourceColumns }) => {
+    const result = updateSourceColumn(ctx, access, { column: byId(sourceColumns, input?.sourceColumnId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+/** Deletes a table with its columns and cards; refused while a mapping reads one of its columns. */
+export async function deleteSourceTableAction(
+  workspaceId: string,
+  input: { sourceTableId: string; expectedVersion: number },
+): Promise<ActionResult<{ columns: number }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => {
+    const canvasItems = await store.canvasItems.list(access.workspace.id);
+    const table = byId(model.sourceTables, input?.sourceTableId);
+    return deleteSourceTable(
+      ctx,
+      access,
+      {
+        table,
+        columns: model.sourceColumns.filter((c) => c.source_table_id === table?.id),
+        canvasItems,
+        mappings: model.mappings,
+        mappingInputs: model.mappingInputs,
+        attributes: model.attributes,
+        entities: model.entities,
+      },
+      input,
+    );
+  });
 }

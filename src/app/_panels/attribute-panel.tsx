@@ -23,9 +23,9 @@ import {
   inputClass,
   Kind,
   Li,
-  List,
   Note,
-  Section,
+  Fold,
+  LongList,
   smallButtonClass,
   TextArea,
   TextField,
@@ -185,32 +185,36 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         />
       </Field>
 
-      <Section>Comes from</Section>
-      {mappings.length ? (
-        <List testId="list-attribute-mappings">
-          {mappings.map((m) => (
-            <Li key={m.id} onClick={() => p.goMapping(m.id)} meta={`${m.kind === "transform" ? "ƒ " : ""}${STATUS_LABEL[m.status]}`}>
-              <span className="flex items-center gap-2">
-                <TypeDot ok={typeCheckOf(ix, m).ok} />
-                <span className="truncate font-mono text-xs">{inputsLabel(ix, m.id)}</span>
-              </span>
-            </Li>
-          ))}
-        </List>
-      ) : (
-        <Hint>Not mapped yet. Pick a source column below.</Hint>
-      )}
-      {p.editable && (
-        <Field label="Add a source column" htmlFor="f-addc">
-          <GroupedSelect
-            id="f-addc"
-            placeholder="Choose a column…"
-            groups={columnOptions(ix, p.tablesHere, mappedColumns)}
-            onPick={(id) => void addColumn(id)}
-            testId="select-add-source-column"
+      <Fold title="Comes from" count={mappings.length}>
+        {mappings.length ? (
+          <LongList
+            items={mappings}
+            testId="list-attribute-mappings"
+            text={(m) => inputsLabel(ix, m.id)}
+            render={(m) => (
+              <Li key={m.id} onClick={() => p.goMapping(m.id)} meta={`${m.kind === "transform" ? "ƒ " : ""}${STATUS_LABEL[m.status]}`}>
+                <span className="flex items-center gap-2">
+                  <TypeDot ok={typeCheckOf(ix, m).ok} />
+                  <span className="truncate font-mono text-xs">{inputsLabel(ix, m.id)}</span>
+                </span>
+              </Li>
+            )}
           />
-        </Field>
-      )}
+        ) : (
+          <Hint>Not mapped yet. Pick a source column below.</Hint>
+        )}
+        {p.editable && (
+          <Field label="Add a source column" htmlFor="f-addc">
+            <GroupedSelect
+              id="f-addc"
+              placeholder="Choose a column…"
+              groups={columnOptions(ix, p.tablesHere, mappedColumns)}
+              onPick={(id) => void addColumn(id)}
+              testId="select-add-source-column"
+            />
+          </Field>
+        )}
+      </Fold>
 
       {p.editable && (
         <Actions>

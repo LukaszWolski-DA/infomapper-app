@@ -11,7 +11,7 @@ import {
   sourceTable,
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
-import { attributeLabel, businessKeyHint, columnLabel, columnOptions, feedingSources, indexModel, inputsLabel, typeCheckOf } from "./model-index";
+import { attributeLabel, businessKeyHint, fedEntities, mappingsOfColumn, columnLabel, columnOptions, feedingSources, indexModel, inputsLabel, typeCheckOf } from "./model-index";
 
 // Customer.email ← customer.email (fits); Customer.customer_id ← customer.cust_id (BK column) and customer.first_name
 // as a transform without a rule: first_name varchar(50) does not fit integer.
@@ -57,6 +57,13 @@ describe("the panel's model index", () => {
 
   it("counts the mappings each source table feeds into an entity", () => {
     expect(feedingSources(ix, ids.customer).map((f) => [f.table.name, f.mappings])).toEqual([["customer", 2]]);
+  });
+
+  it("finds the mappings reading a column and the entities a table feeds", () => {
+    expect(mappingsOfColumn(ix, ids.colCustId).map((m) => m.id)).toEqual([idMap]);
+    expect(mappingsOfColumn(ix, ids.colEmail).map((m) => m.id)).toEqual([ids.mapEmail]);
+    expect(fedEntities(ix, ids.crmCustomer).map((f) => [f.entity.name, f.mappings])).toEqual([["Customer", 2]]);
+    expect(fedEntities(ix, otherTable)).toEqual([]);
   });
 
   it("offers columns of tables on this canvas first, and leaves out excluded ones", () => {

@@ -62,7 +62,7 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       selection,
       select,
       fit: () => handle.current?.fit(),
-      place: (target, rows) => handle.current?.place(target, rows),
+      place: (target, rows, options) => handle.current?.place(target, rows, options),
       remove: (cardId) => handle.current?.remove(cardId),
       centerOn: (cardId) => handle.current?.centerOn(cardId),
       freeSpot: () => handle.current?.freeSpot() ?? { x: 40, y: 40 },

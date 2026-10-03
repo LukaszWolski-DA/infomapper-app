@@ -24,7 +24,7 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, ConfirmDelete, Field, GroupedSelect, inputClass, Kind, Li, List, Note, Section, Seg, TextArea, TypeDot } from "./fields";
+import { Actions, buttonClass, ConfirmDelete, Field, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { columnLabel, columnOptions, inputsLabel, typeCheckOf } from "./model-index";
 
@@ -168,75 +168,76 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
         {check.message}
       </Note>
 
-      <Section>Inputs</Section>
-      <List testId="list-mapping-inputs">
-        {inputs.map((i, index) => {
-          const c = ix.column.get(i.source_column_id);
-          const problem = check.problems.find((x) => x.source_column_id === i.source_column_id);
-          return (
-            <div key={i.id} className="flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-im-hover" data-testid="mapping-input">
-              <span className="w-4 flex-none text-right text-[11px] tabular-nums text-im-ink-3">{index + 1}</span>
+      <Fold title="Inputs" count={inputs.length}>
+        <List testId="list-mapping-inputs">
+          {inputs.map((i, index) => {
+            const c = ix.column.get(i.source_column_id);
+            const problem = check.problems.find((x) => x.source_column_id === i.source_column_id);
+            return (
+              <div key={i.id} className="flex items-center gap-1.5 rounded-md px-2 py-1 hover:bg-im-hover" data-testid="mapping-input">
+                <span className="w-4 flex-none text-right text-[11px] tabular-nums text-im-ink-3">{index + 1}</span>
+                <button
+                  type="button"
+                  className="min-w-0 flex-1 truncate text-left font-mono text-xs disabled:cursor-default"
+                  title={ruleOpen ? "Click to put this column into the rule" : columnLabel(ix, i.source_column_id)}
+                  disabled={!ruleOpen}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => insert(i.source_column_id)}
+                >
+                  {columnLabel(ix, i.source_column_id)}
+                </button>
+                <span className={`flex-none font-mono text-[11px] ${problem ? "text-im-warn" : "text-im-ink-3"}`} title={problem?.message}>
+                  {c ? formatColumnType(c) : ""}
+                </span>
+                {p.editable && (
+                  <>
+                    <button type="button" className={iconButton} aria-label="Move up" disabled={index === 0} onClick={() => move(index, -1)}>
+                      ↑
+                    </button>
+                    <button type="button" className={iconButton} aria-label="Move down" disabled={index === inputs.length - 1} onClick={() => move(index, 1)}>
+                      ↓
+                    </button>
+                    <button
+                      type="button"
+                      className={iconButton}
+                      aria-label={`Remove ${columnLabel(ix, i.source_column_id)}`}
+                      data-testid="button-remove-input"
+                      onClick={() => void write(() => removeMappingInputAction(p.workspaceId, { ...ref, mappingInputId: i.id }))}
+                    >
+                      ×
+                    </button>
+                  </>
+                )}
+              </div>
+            );
+          })}
+          {pending && (
+            <div className="flex items-center gap-1.5 rounded-md border border-dashed border-im-line px-2 py-1" data-testid="mapping-input-pending">
+              <span className="w-4 flex-none text-right text-[11px] text-im-ink-3">{inputs.length + 1}</span>
               <button
                 type="button"
-                className="min-w-0 flex-1 truncate text-left font-mono text-xs disabled:cursor-default"
-                title={ruleOpen ? "Click to put this column into the rule" : columnLabel(ix, i.source_column_id)}
-                disabled={!ruleOpen}
+                className="min-w-0 flex-1 truncate text-left font-mono text-xs"
+                title="Click to put this column into the rule"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => insert(i.source_column_id)}
+                onClick={() => insert(pending)}
               >
-                {columnLabel(ix, i.source_column_id)}
+                {columnLabel(ix, pending)}
               </button>
-              <span className={`flex-none font-mono text-[11px] ${problem ? "text-im-warn" : "text-im-ink-3"}`} title={problem?.message}>
-                {c ? formatColumnType(c) : ""}
-              </span>
-              {p.editable && (
-                <>
-                  <button type="button" className={iconButton} aria-label="Move up" disabled={index === 0} onClick={() => move(index, -1)}>
-                    ↑
-                  </button>
-                  <button type="button" className={iconButton} aria-label="Move down" disabled={index === inputs.length - 1} onClick={() => move(index, 1)}>
-                    ↓
-                  </button>
-                  <button
-                    type="button"
-                    className={iconButton}
-                    aria-label={`Remove ${columnLabel(ix, i.source_column_id)}`}
-                    data-testid="button-remove-input"
-                    onClick={() => void write(() => removeMappingInputAction(p.workspaceId, { ...ref, mappingInputId: i.id }))}
-                  >
-                    ×
-                  </button>
-                </>
-              )}
+              <span className="text-[11px] text-im-ink-3">not saved yet</span>
             </div>
-          );
-        })}
-        {pending && (
-          <div className="flex items-center gap-1.5 rounded-md border border-dashed border-im-line px-2 py-1" data-testid="mapping-input-pending">
-            <span className="w-4 flex-none text-right text-[11px] text-im-ink-3">{inputs.length + 1}</span>
-            <button
-              type="button"
-              className="min-w-0 flex-1 truncate text-left font-mono text-xs"
-              title="Click to put this column into the rule"
-              onMouseDown={(e) => e.preventDefault()}
-              onClick={() => insert(pending)}
-            >
-              {columnLabel(ix, pending)}
-            </button>
-            <span className="text-[11px] text-im-ink-3">not saved yet</span>
+          )}
+        </List>
+        {p.editable && !pending && (
+          <div className="mt-2">
+            <GroupedSelect
+              placeholder="Add an input…"
+              groups={columnOptions(ix, p.tablesHere, new Set(inputs.map((i) => i.source_column_id)))}
+              onPick={addInput}
+              testId="select-add-input"
+            />
           </div>
         )}
-      </List>
-      {p.editable && !pending && (
-        <div className="mt-2">
-          <GroupedSelect
-            placeholder="Add an input…"
-            groups={columnOptions(ix, p.tablesHere, new Set(inputs.map((i) => i.source_column_id)))}
-            onPick={addInput}
-            testId="select-add-input"
-          />
-        </div>
-      )}
+      </Fold>
 
       <Field label="How the value is carried">
         <Seg value={kind} options={KINDS} onChange={chooseKind} disabled={!p.editable} testId="seg-mapping-kind" />
@@ -292,19 +293,20 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
       </Field>
 
       {others.length > 0 && attribute && (
-        <>
-          <Section>Other sources for {attribute.name}</Section>
-          <List>
-            {others.map((o) => (
+        <Fold title={`Other sources for ${attribute.name}`} count={others.length}>
+          <LongList
+            items={others}
+            text={(o) => inputsLabel(ix, o.id)}
+            render={(o) => (
               <Li key={o.id} onClick={() => p.goMapping(o.id)} meta={STATUS_LABEL[o.status]}>
                 <span className="flex items-center gap-2">
                   <TypeDot ok={typeCheckOf(ix, o).ok} />
                   <span className="truncate font-mono text-xs">{inputsLabel(ix, o.id)}</span>
                 </span>
               </Li>
-            ))}
-          </List>
-        </>
+            )}
+          />
+        </Fold>
       )}
 
       {p.editable && (

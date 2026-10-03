@@ -115,3 +115,23 @@ export function columnOptions(ix: ModelIndex, tablesHere: ReadonlySet<Uuid>, exc
     }))
     .filter((g) => g.columns.length > 0);
 }
+
+/** Mappings that read a column (one of their inputs), in model order. */
+export function mappingsOfColumn(ix: ModelIndex, columnId: Uuid): Mapping[] {
+  return ix.model.mappings.filter((m) => (ix.inputsOf.get(m.id) ?? []).some((i) => i.source_column_id === columnId));
+}
+
+/** Entities a source table feeds, with the number of mappings that read from it (prototype feeds for a source). */
+export function fedEntities(ix: ModelIndex, tableId: Uuid): { entity: Entity; mappings: number }[] {
+  const columns = new Set((ix.columnsOf.get(tableId) ?? []).map((c) => c.id));
+  const counts = new Map<Uuid, number>();
+  for (const m of ix.model.mappings) {
+    if (!(ix.inputsOf.get(m.id) ?? []).some((i) => columns.has(i.source_column_id))) continue;
+    const entityId = ix.attribute.get(m.attribute_id)?.entity_id;
+    if (entityId) counts.set(entityId, (counts.get(entityId) ?? 0) + 1);
+  }
+  return [...counts]
+    .map(([id, mappings]) => ({ entity: ix.entity.get(id)!, mappings }))
+    .filter((f) => !!f.entity)
+    .sort((a, b) => b.mappings - a.mappings || a.entity.name.localeCompare(b.entity.name));
+}
