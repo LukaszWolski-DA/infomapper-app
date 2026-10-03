@@ -1,21 +1,45 @@
 // The shape of .data/dev-db.json and the rules the database would enforce on it: primary keys, unique indexes,
 // foreign keys and CHECK constraints, mirroring supabase/migrations/20261002000000_initial_schema.sql
-// for the slice 0 tables.
+// for the tables of slices 0 and 1a.
 
 import type {
   AppUser,
+  Attribute,
   Canvas,
+  CanvasItem,
   ChangeEvent,
+  Concept,
+  Entity,
+  Mapping,
+  MappingInput,
   Organization,
   OrganizationMember,
   Project,
   ProjectCanvas,
+  Relationship,
+  SourceColumn,
+  SourceSystem,
+  SourceTable,
   Workspace,
   WorkspaceMember,
 } from "@/domain/types";
-import { CHANGE_OPERATIONS, DOC_LANGUAGES, ORGANIZATION_ROLES, WORKSPACE_ROLES } from "@/domain/types";
+import {
+  CARDINALITY_MAX,
+  CHANGE_OPERATIONS,
+  DOC_LANGUAGES,
+  LIVE_LEVELS,
+  LOGICAL_TYPES,
+  MAPPING_KINDS,
+  MAPPING_STATUSES,
+  ORGANIZATION_ROLES,
+  ROW_FILTERS,
+  SOURCE_OBJECT_TYPES,
+  STEREOTYPES,
+  WORKSPACE_ROLES,
+} from "@/domain/types";
 
-export const DEV_DB_FORMAT = 1;
+/** 2 = slice 1a (model tables). An older file is refused with a hint to run "npm run reset-dev-data". */
+export const DEV_DB_FORMAT = 2;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -27,6 +51,16 @@ export interface DevDb {
   project: Project[];
   canvas: Canvas[];
   project_canvas: ProjectCanvas[];
+  concept: Concept[];
+  entity: Entity[];
+  attribute: Attribute[];
+  relationship: Relationship[];
+  source_system: SourceSystem[];
+  source_table: SourceTable[];
+  source_column: SourceColumn[];
+  mapping: Mapping[];
+  mapping_input: MappingInput[];
+  canvas_item: CanvasItem[];
   change_event: ChangeEvent[];
 }
 
@@ -43,6 +77,16 @@ export const emptyDb = (): DevDb => ({
   project: [],
   canvas: [],
   project_canvas: [],
+  concept: [],
+  entity: [],
+  attribute: [],
+  relationship: [],
+  source_system: [],
+  source_table: [],
+  source_column: [],
+  mapping: [],
+  mapping_input: [],
+  canvas_item: [],
   change_event: [],
 });
 
@@ -50,13 +94,30 @@ interface TableRules {
   key: readonly string[];
   /** column -> referenced table (always its `id`). Null values are allowed where the column is nullable. */
   foreignKeys: Readonly<Record<string, DevTable>>;
-  /** Unique indexes besides the key; `live` = only rows with deleted_at null (partial index). */
-  unique?: readonly { columns: readonly string[]; live?: boolean }[];
+  /**
+   * Unique indexes besides the key; `live` = only rows with deleted_at null, `where` = a further condition
+   * (partial indexes such as "where entity_id is not null and deleted_at is null").
+   */
+  unique?: readonly { columns: readonly string[]; live?: boolean; where?: (row: AnyRow) => boolean }[];
   checks?: readonly { name: string; test: (row: AnyRow) => boolean }[];
 }
 
 const audit = { created_by: "app_user", updated_by: "app_user" } as const;
 const oneOf = (values: readonly string[], column: string) => (row: AnyRow) => values.includes(row[column] as string);
+const isSet = (v: unknown) => v !== null && v !== undefined;
+/** Standard model columns: the workspace and the audit users. */
+const model = { workspace_id: "workspace", ...audit } as const;
+
+function typeParamsFit(r: AnyRow): boolean {
+  const length = r.type_length as number | null;
+  const precision = r.type_precision as number | null;
+  const scale = r.type_scale as number | null;
+  return (
+    (length === null || length > 0) &&
+    (precision === null || precision > 0) &&
+    (scale === null || (scale >= 0 && precision !== null && scale <= precision))
+  );
+}
 
 export const RULES: Record<DevTable, TableRules> = {
   app_user: {
@@ -86,6 +147,82 @@ export const RULES: Record<DevTable, TableRules> = {
   project_canvas: {
     key: ["project_id", "canvas_id"],
     foreignKeys: { project_id: "project", canvas_id: "canvas", workspace_id: "workspace", added_by: "app_user" },
+  },
+  concept: {
+    key: ["id"],
+    foreignKeys: model,
+    // Shape only, as in SQL; the palette (no violet, D-41) is the domain's rule.
+    checks: [{ name: "concept_color_ck", test: (r) => typeof r.color === "string" && /^#.{6}$/.test(r.color) }],
+  },
+  entity: {
+    key: ["id"],
+    foreignKeys: { ...model, concept_id: "concept" },
+    checks: [{ name: "entity_stereotype_ck", test: oneOf(STEREOTYPES, "stereotype") }],
+  },
+  attribute: {
+    key: ["id"],
+    foreignKeys: { ...model, entity_id: "entity" },
+    checks: [
+      { name: "attribute_data_type_ck", test: oneOf(LOGICAL_TYPES, "data_type") },
+      { name: "attribute_custom_type_ck", test: (r) => (r.data_type === "custom") === isSet(r.custom_type) },
+      { name: "attribute_type_params_ck", test: typeParamsFit },
+    ],
+  },
+  relationship: {
+    key: ["id"],
+    foreignKeys: { ...model, from_entity_id: "entity", to_entity_id: "entity" },
+    checks: [
+      { name: "relationship_min_ck", test: (r) => [0, 1].includes(r.from_min as number) && [0, 1].includes(r.to_min as number) },
+      { name: "relationship_max_ck", test: (r) => oneOf(CARDINALITY_MAX, "from_max")(r) && oneOf(CARDINALITY_MAX, "to_max")(r) },
+    ],
+  },
+  source_system: {
+    key: ["id"],
+    foreignKeys: model,
+    unique: [{ columns: ["workspace_id", "name"], live: true }],
+  },
+  source_table: {
+    key: ["id"],
+    foreignKeys: { ...model, source_system_id: "source_system" },
+    unique: [{ columns: ["source_system_id", "database_name", "schema_name", "name"], live: true }],
+    checks: [{ name: "source_table_object_type_ck", test: oneOf(SOURCE_OBJECT_TYPES, "object_type") }],
+  },
+  source_column: {
+    key: ["id"],
+    foreignKeys: { ...model, source_table_id: "source_table" },
+    unique: [{ columns: ["source_table_id", "name"], live: true }],
+  },
+  mapping: {
+    key: ["id"],
+    foreignKeys: { ...model, attribute_id: "attribute", approved_by: "app_user" },
+    checks: [
+      { name: "mapping_kind_ck", test: oneOf(MAPPING_KINDS, "kind") },
+      { name: "mapping_status_ck", test: oneOf(MAPPING_STATUSES, "status") },
+      { name: "mapping_rule_ck", test: (r) => r.kind === "direct" || isSet(r.rule_expression) },
+      { name: "mapping_approval_ck", test: (r) => (r.status === "approved") === isSet(r.approved_at) },
+    ],
+  },
+  mapping_input: {
+    key: ["id"],
+    foreignKeys: { ...model, mapping_id: "mapping", source_column_id: "source_column" },
+    unique: [{ columns: ["mapping_id", "source_column_id"], live: true }],
+  },
+  canvas_item: {
+    key: ["id"],
+    // requirement_id and frame_id point to tables the local file does not have yet (requirements, frames).
+    foreignKeys: { ...model, canvas_id: "canvas", entity_id: "entity", source_table_id: "source_table" },
+    unique: [
+      { columns: ["canvas_id", "entity_id"], live: true, where: (r) => isSet(r.entity_id) },
+      { columns: ["canvas_id", "source_table_id"], live: true, where: (r) => isSet(r.source_table_id) },
+      { columns: ["canvas_id", "requirement_id"], live: true, where: (r) => isSet(r.requirement_id) },
+    ],
+    checks: [
+      { name: "canvas_item_one_target_ck", test: (r) => [r.entity_id, r.source_table_id, r.requirement_id].filter(isSet).length === 1 },
+      { name: "canvas_item_width_ck", test: (r) => r.width === null || ((r.width as number) >= 200 && (r.width as number) <= 600) },
+      { name: "canvas_item_row_filter_ck", test: oneOf(ROW_FILTERS, "row_filter") },
+      { name: "canvas_item_live_level_ck", test: (r) => r.live_level === null || oneOf(LIVE_LEVELS, "live_level")(r) },
+      { name: "canvas_item_no_requirement_or_frame_yet", test: (r) => !isSet(r.requirement_id) && !isSet(r.frame_id) },
+    ],
   },
   change_event: {
     key: ["id"],
@@ -144,6 +281,7 @@ export function findViolation(db: DevDb): IntegrityViolation | null {
       const seen = new Set<string>();
       for (const row of rows) {
         if (index.live && row.deleted_at !== null) continue;
+        if (index.where && !index.where(row)) continue;
         const value = index.columns.map((c) => String(row[c])).join("|");
         if (seen.has(value)) return { kind: "unique", table, detail: `${index.columns.join(", ")} = ${value} exists already` };
         seen.add(value);
