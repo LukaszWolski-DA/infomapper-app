@@ -1,4 +1,4 @@
-// Demo data for development and end-to-end tests. Mirrors the prototype (slice 0 PRD, step 3).
+// Demo data for development and end-to-end tests. Mirrors the prototype (slice 0 PRD, step 3; slice 1a PRD, demo data).
 
 import type { Uuid } from "@/domain/ids";
 import {
@@ -11,6 +11,7 @@ import {
   type WorkspaceRole,
 } from "@/domain/types";
 import { emptyDb, findViolation, type DevDb } from "./schema";
+import { addDemoModel, DEMO_LAYOUT } from "./seed-model";
 
 /**
  * Fixed UUID v7 ids for the seed rows, so they stay the same after "npm run reset-dev-data".
@@ -136,6 +137,16 @@ export function buildSeed(now: Date = new Date()): DevDb {
   const orders = project(SEED_IDS.projOrderManagement, retailDwh.id, "lukasz", "Order management", "Orders, order lines and products from ERP.");
   canvas(SEED_IDS.canvasCustomerOrders, retailDwh.id, "lukasz", "Customer & orders", [c360, orders]);
   canvas(SEED_IDS.canvasOrderLines, retailDwh.id, "lukasz", "Order lines & products", [orders]);
+  addDemoModel(db, {
+    workspaceId: retailDwh.id,
+    at,
+    authorId: users.anna.id,
+    approverId: users.piotr.id,
+    canvases: [
+      { canvasId: SEED_IDS.canvasCustomerOrders, layout: DEMO_LAYOUT.customerOrders },
+      { canvasId: SEED_IDS.canvasOrderLines, layout: DEMO_LAYOUT.orderLines },
+    ],
+  });
 
   const bankX = workspace(
     SEED_IDS.wsBankX,
@@ -170,6 +181,8 @@ export function buildSeed(now: Date = new Date()): DevDb {
   );
   const salesProject = project(SEED_IDS.projSalesFirst, sales.id, "marek", "First project");
   canvas(SEED_IDS.canvasSalesFirst, sales.id, "marek", "First canvas", [salesProject]);
+  // The same model, without cards: its canvas starts empty. Four-eyes is on here, so Marek authored, Łukasz approved.
+  addDemoModel(db, { workspaceId: sales.id, at, authorId: users.marek.id, approverId: users.lukasz.id, canvases: [] });
 
   const violation = findViolation(db);
   if (violation) throw new Error(`Seed data breaks a rule: ${violation.table}: ${violation.detail}`);
