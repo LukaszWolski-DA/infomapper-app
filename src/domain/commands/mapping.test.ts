@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { access, archived, attribute, ids, makeCtx, mapping, mappingInput, NOW, sourceColumn } from "../__fixtures__/domain";
-import { FOUR_EYES_MESSAGE } from "../model/mapping-rules";
+import { BACK_TO_REVIEW_MESSAGE, FOUR_EYES_MESSAGE } from "../model/mapping-rules";
 import type { WorkspaceRole } from "../types";
 import {
   addMappingInput,
@@ -233,5 +233,54 @@ describe("deleteMapping", () => {
 
   it("is refused to reviewers", () => {
     expect(deleteMapping(makeCtx(), access("reviewer"), { mapping: mapping(), inputs: [] }, ref)).toMatchObject({ ok: false, error: { code: "forbidden" } });
+  });
+});
+
+describe("an approved mapping goes back to review when what it does changes (D-51)", () => {
+  const approved = { status: "approved" as const, approved_by: ids.someoneElse, approved_at: NOW };
+  const back = { status: "review", approved_by: null, approved_at: null };
+  const one = { mapping: mapping(approved), inputs: [mappingInput()] };
+  const two = {
+    mapping: mapping({ ...approved, kind: "transform", rule_expression: "CONCAT(a, b)" }),
+    inputs: [mappingInput(), mappingInput(in2, { source_column_id: colFirstName, sort_order: 1 })],
+  };
+
+  it("changing the kind or the rule", () => {
+    expect(updateMapping(makeCtx(), access("modeler"), one, { ...ref, kind: "transform", ruleExpression: "LOWER(email)" })).toMatchObject({
+      ok: true,
+      value: { mapping: back, notice: BACK_TO_REVIEW_MESSAGE },
+    });
+    expect(updateMapping(makeCtx(), access("modeler"), two, { ...ref, ruleExpression: "CONCAT(b, a)" })).toMatchObject({ ok: true, value: { mapping: back } });
+  });
+
+  it("adding, removing or reordering inputs", () => {
+    const s = { ...one, column: sourceColumn(colFirstName) };
+    expect(addMappingInput(makeCtx(), access("modeler"), s, { ...ref, sourceColumnId: colFirstName, ruleExpression: "x" })).toMatchObject({
+      ok: true,
+      value: { mapping: back, notice: BACK_TO_REVIEW_MESSAGE },
+    });
+    expect(removeMappingInput(makeCtx(), access("modeler"), two, { ...ref, mappingInputId: in2 })).toMatchObject({ ok: true, value: { mapping: back, notice: BACK_TO_REVIEW_MESSAGE } });
+    expect(reorderMappingInputs(makeCtx(), access("modeler"), two, { ...ref, mappingInputIds: [in2, inEmail] })).toMatchObject({
+      ok: true,
+      value: { mapping: back, notice: BACK_TO_REVIEW_MESSAGE },
+    });
+  });
+
+  it("also when four-eyes is off", () => {
+    expect(updateMapping(makeCtx(), access("owner", { four_eyes: false }), one, { ...ref, kind: "transform", ruleExpression: "x" })).toMatchObject({ ok: true, value: { mapping: back } });
+  });
+
+  it("changing only the note keeps the approval", () => {
+    expect(updateMapping(makeCtx(), access("modeler"), one, { ...ref, note: "Checked with CRM." })).toMatchObject({
+      ok: true,
+      value: { mapping: { status: "approved", approved_by: ids.someoneElse, approved_at: NOW }, notice: null },
+    });
+  });
+
+  it("does nothing to a mapping that is not approved", () => {
+    expect(updateMapping(makeCtx(), access("modeler"), { ...one, mapping: mapping({ status: "draft" }) }, { ...ref, kind: "transform", ruleExpression: "x" })).toMatchObject({
+      ok: true,
+      value: { mapping: { status: "draft" }, notice: null },
+    });
   });
 });

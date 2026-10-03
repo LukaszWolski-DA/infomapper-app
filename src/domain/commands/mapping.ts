@@ -1,12 +1,13 @@
 // Mapping commands (AD-26, D-49): create from the attribute panel (“Add a source column”), edit kind, rule and note,
-// the Inputs section (add, remove, order), status with four-eyes (AD-06), delete.
+// the Inputs section (add, remove, order), status with four-eyes (AD-06), delete. Changing what an approved mapping
+// does (inputs, their order, kind, rule) sends it back to review (D-51); `notice` then carries the message.
 // Input changes also bump the mapping's version, so one expectedVersion guards the whole mapping.
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound } from "../errors";
 import type { Uuid } from "../ids";
-import { checkFourEyes, checkMappingShape } from "../model/mapping-rules";
+import { afterContentChange, checkFourEyes, checkMappingShape } from "../model/mapping-rules";
 import { plainTextPair } from "../model/plain-text";
 import type { WorkspaceAccess } from "../permissions";
 import { MAPPING_KINDS, MAPPING_STATUSES, type Attribute, type Mapping, type MappingInput, type SourceColumn } from "../types";
@@ -105,7 +106,7 @@ export function updateMapping(
   access: WorkspaceAccess,
   state: MappingState,
   input: unknown,
-): CommandResult<{ mapping: Mapping }> {
+): CommandResult<{ mapping: Mapping; notice: string | null }> {
   const parsed = begin(access, "model.edit", updateMappingInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { mappingId, expectedVersion, kind, ruleExpression, note } = parsed.data;
@@ -122,10 +123,11 @@ export function updateMapping(
   }
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
 
-  const row = nextVersion(ctx, before, patch);
+  const content = patch.kind !== undefined || patch.rule_expression !== undefined ? afterContentChange(before) : { patch: {}, notice: null };
+  const row = nextVersion(ctx, before, { ...patch, ...content.patch });
   const shape = checkMappingShape(row.kind, row.rule_expression, liveInputs(access, before, state.inputs).length);
   if (shape) return fail(shape);
-  return done(ctx, access, { mapping: row }, [{ kind: "update", table: "mapping", before, row }]);
+  return done(ctx, access, { mapping: row, notice: content.notice }, [{ kind: "update", table: "mapping", before, row }]);
 }
 
 // ---- inputs (D-49) ----
@@ -142,7 +144,7 @@ export function addMappingInput(
   access: WorkspaceAccess,
   state: MappingState & { column: SourceColumn | null },
   input: unknown,
-): CommandResult<{ mapping: Mapping; mappingInputId: Uuid }> {
+): CommandResult<{ mapping: Mapping; mappingInputId: Uuid; notice: string | null }> {
   const parsed = begin(access, "model.edit", addInputInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { mappingId, expectedVersion, sourceColumnId, ruleExpression } = parsed.data;
@@ -156,9 +158,11 @@ export function addMappingInput(
     return fail(domainError("conflict", "This column is already an input of the mapping."));
   }
 
+  const content = afterContentChange(before);
   const row = nextVersion(ctx, before, {
     kind: inputs.length >= 1 ? "transform" : before.kind,
     rule_expression: ruleExpression !== undefined ? ruleExpression : before.rule_expression,
+    ...content.patch,
   });
   const shape = checkMappingShape(row.kind, row.rule_expression, inputs.length + 1);
   if (shape) return fail(shape);
@@ -170,7 +174,7 @@ export function addMappingInput(
     source_column_id: sourceColumnId,
     sort_order: nextSortOrder(inputs),
   };
-  return done(ctx, access, { mapping: row, mappingInputId: added.id }, [
+  return done(ctx, access, { mapping: row, mappingInputId: added.id, notice: content.notice }, [
     { kind: "update", table: "mapping", before, row },
     { kind: "insert", table: "mapping_input", row: added },
   ]);
@@ -185,7 +189,7 @@ export function removeMappingInput(
   access: WorkspaceAccess,
   state: MappingState,
   input: unknown,
-): CommandResult<{ mapping: Mapping }> {
+): CommandResult<{ mapping: Mapping; notice: string | null }> {
   const parsed = begin(access, "model.edit", removeInputInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { mappingId, expectedVersion, mappingInputId } = parsed.data;
@@ -198,8 +202,9 @@ export function removeMappingInput(
   const shape = checkMappingShape(before.kind, before.rule_expression, inputs.length - 1);
   if (shape) return fail(shape);
 
-  const row = nextVersion(ctx, before, {});
-  return done(ctx, access, { mapping: row }, [
+  const content = afterContentChange(before);
+  const row = nextVersion(ctx, before, content.patch);
+  return done(ctx, access, { mapping: row, notice: content.notice }, [
     { kind: "update", table: "mapping", before, row },
     softDelete(ctx, "mapping_input", removed),
   ]);
@@ -214,7 +219,7 @@ export function reorderMappingInputs(
   access: WorkspaceAccess,
   state: MappingState,
   input: unknown,
-): CommandResult<{ mapping: Mapping }> {
+): CommandResult<{ mapping: Mapping; notice: string | null }> {
   const parsed = begin(access, "model.edit", reorderInputsInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { mappingId, expectedVersion, mappingInputIds } = parsed.data;
@@ -232,8 +237,9 @@ export function reorderMappingInputs(
     if (i.sort_order !== index) moved.push({ kind: "update", table: "mapping_input", before: i, row: nextVersion(ctx, i, { sort_order: index }) });
   });
   if (moved.length === 0) return fail(nothingToChange());
-  const row = nextVersion(ctx, before, {});
-  return done(ctx, access, { mapping: row }, [{ kind: "update", table: "mapping", before, row }, ...moved]);
+  const content = afterContentChange(before);
+  const row = nextVersion(ctx, before, content.patch);
+  return done(ctx, access, { mapping: row, notice: content.notice }, [{ kind: "update", table: "mapping", before, row }, ...moved]);
 }
 
 // ---- status (AD-06) ----

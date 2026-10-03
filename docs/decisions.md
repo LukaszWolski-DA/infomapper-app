@@ -20,6 +20,7 @@ Behaviour reference: `docs/prototype/infomapper-model-prototype.html`. Data refe
 - **D-48** Dragging a column onto an attribute without mappings creates a direct mapping. If the attribute already has a mapping, a choice appears: “Separate mapping (alternative source)” or “Add to mapping …”, pre-selected by a hint (same table: add; other system: separate). Enter confirms, Esc cancels.
 - **D-49** A combined mapping: input lines meet in an ƒ node next to the attribute, one line continues; its status colours all its lines. The mapping panel has an Inputs section (order, add, remove); more than one input requires a rule, into which columns are inserted by click. Actions “Split into separate mappings” and “Merge mappings”. The attribute panel shows one row per mapping.
 - **D-50** A combined mapping may use columns from different source systems; in Data Vault 2.0 mode the hints warn that it mixes systems (suggest a business rule in a later layer).
+- **D-51** Changing an approved mapping's inputs, kind or rule sends it back to review and clears the approval; approval belongs to a version of the mapping. Changing only the note keeps the status.
 - **D-47** Deleting an entity from the model first shows its impact (attributes, mappings incl. approved ones, relationships, canvases, projects, requirements). A concept with entities is deleted only after its entities are moved to another concept; no cascade. Concept frames become free frames.
 
 ### Canvases, frames, selection

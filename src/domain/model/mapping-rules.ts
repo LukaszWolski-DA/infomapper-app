@@ -1,10 +1,21 @@
-// Rules for mappings: input counts (AD-26, D-49), four-eyes approval (AD-06) and the business-key suggestion (AD-28).
+// Rules for mappings: input counts (AD-26, D-49), four-eyes approval (AD-06), approval belongs to a version (D-51)
+// and the business-key suggestion (AD-28).
 
 import { domainError, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import type { Attribute, ChangeEvent, Mapping, MappingKind, SourceColumn, Workspace } from "../types";
 
 export const FOUR_EYES_MESSAGE = "Four-eyes is on: someone else has to approve your change.";
+export const BACK_TO_REVIEW_MESSAGE = "This mapping was approved; your change sends it back to review.";
+
+/**
+ * D-51: changing an approved mapping's inputs, kind or rule sends it back to review and clears the approval, whether
+ * four-eyes is on or not. Returns the extra columns for the mapping's next version and the message to show.
+ */
+export function afterContentChange(before: Pick<Mapping, "status">): { patch: Partial<Mapping>; notice: string | null } {
+  if (before.status !== "approved") return { patch: {}, notice: null };
+  return { patch: { status: "review", approved_by: null, approved_at: null }, notice: BACK_TO_REVIEW_MESSAGE };
+}
 
 /**
  * The shape every saved mapping must have: at least one input; a direct mapping exactly one; a transform a rule.
