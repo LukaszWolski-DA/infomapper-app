@@ -107,7 +107,9 @@ export function CanvasTabs({
                 {canvas.name}
               </span>
             )}
-            <span className="text-[10.5px] font-normal tabular-nums text-im-ink-3">0</span>
+            <span className="text-[10.5px] font-normal tabular-nums text-im-ink-3" data-testid="tab-canvas-count">
+              {canvas.cards}
+            </span>
             {view.canEdit ? (
               <CanvasMenu
                 view={view}

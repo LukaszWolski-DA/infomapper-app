@@ -92,8 +92,42 @@ export function createLocalDataStore(file: string): DataStore {
         liveLinks(await load(), workspaceId).filter((l) => l.canvas_id === canvasId),
     },
 
+    model: {
+      load: async (workspaceId) => {
+        const db = await load();
+        const of = <R extends { workspace_id: Uuid; deleted_at: string | null }>(rows: R[]) =>
+          live(rows).filter((r) => r.workspace_id === workspaceId);
+        return {
+          concepts: of(db.concept).sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name)),
+          entities: of(db.entity).sort((a, b) => a.name.localeCompare(b.name)),
+          attributes: of(db.attribute).sort((a, b) => a.entity_id.localeCompare(b.entity_id) || a.sort_order - b.sort_order),
+          relationships: of(db.relationship),
+          sourceSystems: of(db.source_system).sort((a, b) => a.name.localeCompare(b.name)),
+          sourceTables: of(db.source_table).sort((a, b) => a.name.localeCompare(b.name)),
+          sourceColumns: of(db.source_column).sort((a, b) => a.source_table_id.localeCompare(b.source_table_id) || a.ordinal - b.ordinal),
+          mappings: of(db.mapping),
+          mappingInputs: of(db.mapping_input).sort((a, b) => a.mapping_id.localeCompare(b.mapping_id) || a.sort_order - b.sort_order),
+        };
+      },
+    },
+
+    canvasItems: {
+      get: async (workspaceId, canvasItemId) =>
+        live((await load()).canvas_item).find((i) => i.workspace_id === workspaceId && i.id === canvasItemId) ?? null,
+      list: async (workspaceId) => live((await load()).canvas_item).filter((i) => i.workspace_id === workspaceId),
+      listOfCanvas: async (workspaceId, canvasId) =>
+        live((await load()).canvas_item).filter((i) => i.workspace_id === workspaceId && i.canvas_id === canvasId),
+    },
+
     changeEvents: {
       list: async (workspaceId) => (await load()).change_event.filter((e) => e.workspace_id === workspaceId),
+      listForMapping: async (workspaceId, mappingId) =>
+        (await load()).change_event.filter(
+          (e) =>
+            e.workspace_id === workspaceId &&
+            ((e.object_type === "mapping" && e.object_id === mappingId) ||
+              (e.object_type === "mapping_input" && (e.after_image ?? e.before_image)?.mapping_id === mappingId)),
+        ),
     },
 
     apply: (writeSet) => serialise(file, () => applyToFile(file, writeSet)),

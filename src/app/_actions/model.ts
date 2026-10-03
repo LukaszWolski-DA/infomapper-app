@@ -1,0 +1,227 @@
+"use server";
+
+// Model writes from the panels (slice 1a): concepts (D-46, D-47), entities with their impact before deleting,
+// attributes, relationships, and source tables and columns. Mappings are in mapping.ts.
+
+import { revalidatePath } from "next/cache";
+import { getDataStore, type DataStore } from "@/data";
+import type { CommandContext, CommandResult } from "@/domain/changes";
+import { addAttribute, deleteAttribute, updateAttribute, type UpdateAttributeInput } from "@/domain/commands/attribute";
+import { createConcept, deleteConcept, renameConcept } from "@/domain/commands/concept";
+import { createEntity, deleteEntity, updateEntity, type UpdateEntityInput } from "@/domain/commands/entity";
+import { deleteRelationship, swapRelationship, updateRelationship, type UpdateRelationshipInput } from "@/domain/commands/relationship";
+import { createSourceTable, deleteSourceTable, updateSourceColumn, type CreateSourceTableInput, type UpdateSourceColumnInput } from "@/domain/commands/source";
+import type { Uuid } from "@/domain/ids";
+import type { WorkspaceModel } from "@/domain/types";
+import { entityImpact, type EntityImpact } from "@/domain/model/impact";
+import type { WorkspaceAccess } from "@/domain/permissions";
+import { getSessionUser } from "../_lib/session";
+import { runCommand, type ActionResult } from "../_lib/run-command";
+
+const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
+const str = (v: unknown) => (typeof v === "string" ? v : "");
+
+async function loadAccess(store: DataStore, workspaceId: unknown, userId: Uuid): Promise<WorkspaceAccess | null> {
+  if (typeof workspaceId !== "string") return null;
+  const workspace = await store.workspaces.get(workspaceId);
+  if (!workspace) return null;
+  return { workspace, member: await store.workspaces.getMember(workspace.id, userId) };
+}
+
+/** Runs a model command with the workspace's live model loaded; on success the pages are fresh again. */
+async function modelCommand<T>(
+  workspaceId: unknown,
+  build: (ctx: CommandContext, access: WorkspaceAccess, model: WorkspaceModel, store: DataStore) => Promise<CommandResult<T>> | CommandResult<T>,
+): Promise<ActionResult<T>> {
+  const result = await runCommand<T>(async (ctx, store, user) => {
+    const access = await loadAccess(store, workspaceId, user.id);
+    if (!access) return NOT_FOUND;
+    return build(ctx, access, await store.model.load(access.workspace.id), store);
+  });
+  if (result.ok) revalidatePath("/", "layout");
+  return result;
+}
+
+const byId = <R extends { id: string }>(rows: readonly R[], id: unknown): R | null => rows.find((r) => r.id === id) ?? null;
+
+// ---- concepts ----
+
+export async function createConceptAction(workspaceId: string, input: { name: string }): Promise<ActionResult<{ conceptId: string }>> {
+  return modelCommand(workspaceId, (ctx, access, { concepts }) => createConcept(ctx, access, { concepts }, input));
+}
+
+export async function renameConceptAction(
+  workspaceId: string,
+  input: { conceptId: string; expectedVersion: number; name: string },
+): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { concepts }) => {
+    const result = renameConcept(ctx, access, { concept: byId(concepts, input?.conceptId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+export async function deleteConceptAction(
+  workspaceId: string,
+  input: { conceptId: string; expectedVersion: number; moveToConceptId?: string | null },
+): Promise<ActionResult<{ movedEntities: number }>> {
+  return modelCommand(workspaceId, (ctx, access, { concepts, entities }) => {
+    const concept = byId(concepts, input?.conceptId);
+    return deleteConcept(ctx, access, { concept, concepts, entities: entities.filter((e) => e.concept_id === concept?.id) }, input);
+  });
+}
+
+// ---- entities ----
+
+/** A new entity in a concept, with its card on the canvas at the given spot (D-46). */
+export async function createEntityAction(
+  workspaceId: string,
+  input: { conceptId: string; placement: { canvasId: string; x: number; y: number } },
+): Promise<ActionResult<{ entityId: string; canvasItemId: string | null; name: string }>> {
+  return modelCommand(workspaceId, async (ctx, access, { concepts, entities }, store) => {
+    const canvas = await store.canvases.get(access.workspace.id, str(input?.placement?.canvasId));
+    const result = createEntity(ctx, access, { concept: byId(concepts, input?.conceptId), entities, canvas }, input);
+    if (!result.ok) return result;
+    const write = result.writeSet.writes.find((w) => w.kind === "insert" && w.table === "entity");
+    const name = write?.kind === "insert" && write.table === "entity" ? write.row.name : "";
+    return { ...result, value: { ...result.value, name } };
+  });
+}
+
+/** Name, stereotype, concept, definition (right panel). A duplicate name comes back as a warning (B-25). */
+export async function updateEntityAction(workspaceId: string, input: UpdateEntityInput): Promise<ActionResult<{ warning: string | null }>> {
+  return modelCommand(workspaceId, (ctx, access, { entities, concepts }) => {
+    const state = { entity: byId(entities, input?.entityId), entities, concept: byId(concepts, input?.conceptId) };
+    const result = updateEntity(ctx, access, state, input);
+    return result.ok ? { ...result, value: { warning: result.value.warning } } : result;
+  });
+}
+
+/** What deleting an entity takes with it (D-47), for the dialog. Reading only. */
+export async function entityImpactAction(workspaceId: string, entityId: string): Promise<ActionResult<EntityImpact>> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const store = getDataStore();
+  const access = await loadAccess(store, workspaceId, user.id);
+  if (!access?.member) return { ok: false, code: "not_found", message: "This workspace does not exist." };
+  const ws = access.workspace.id;
+  const [model, canvasItems, canvases, projects] = await Promise.all([
+    store.model.load(ws),
+    store.canvasItems.list(ws),
+    store.canvases.list(ws),
+    store.projects.list(ws),
+  ]);
+  const entity = byId(model.entities, entityId);
+  if (!entity) return { ok: false, code: "not_found", message: "This entity does not exist any more." };
+  const projectCanvases = (await Promise.all(projects.map((p) => store.canvases.listLinksOfProject(ws, p.id)))).flat();
+  const rows = { entity, ...model, canvasItems };
+  return { ok: true, value: entityImpact(rows, { canvases, projects, projectCanvases }) };
+}
+
+/** Deletes an entity with its attributes, mappings, relationships and cards, in one change group (D-47). */
+export async function deleteEntityAction(
+  workspaceId: string,
+  input: { entityId: string; expectedVersion: number },
+): Promise<ActionResult<{ attributes: number; mappings: number; relationships: number }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => {
+    const canvasItems = await store.canvasItems.list(access.workspace.id);
+    return deleteEntity(ctx, access, { ...model, entity: byId(model.entities, input?.entityId), canvasItems }, input);
+  });
+}
+
+// ---- attributes ----
+
+export async function addAttributeAction(workspaceId: string, input: { entityId: string }): Promise<ActionResult<{ attributeId: string }>> {
+  return modelCommand(workspaceId, (ctx, access, { entities, attributes }) =>
+    addAttribute(ctx, access, { entity: byId(entities, input?.entityId), attributes }, input),
+  );
+}
+
+/** Name, type with parameters, flags and definition. */
+export async function updateAttributeAction(workspaceId: string, input: UpdateAttributeInput): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { attributes }) => {
+    const result = updateAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+/** Deletes an attribute with its mappings and their inputs. */
+export async function deleteAttributeAction(
+  workspaceId: string,
+  input: { attributeId: string; expectedVersion: number },
+): Promise<ActionResult<{ mappings: number }>> {
+  return modelCommand(workspaceId, (ctx, access, { attributes, mappings, mappingInputs }) =>
+    deleteAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), mappings, mappingInputs }, input),
+  );
+}
+
+// ---- relationships ----
+
+/** Verb phrase and the cardinality at both ends. */
+export async function updateRelationshipAction(workspaceId: string, input: UpdateRelationshipInput): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { relationships }) => {
+    const result = updateRelationship(ctx, access, { relationship: byId(relationships, input?.relationshipId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+export async function swapRelationshipAction(workspaceId: string, input: { relationshipId: string; expectedVersion: number }): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { relationships }) => {
+    const result = swapRelationship(ctx, access, { relationship: byId(relationships, input?.relationshipId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+export async function deleteRelationshipAction(workspaceId: string, input: { relationshipId: string; expectedVersion: number }): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { relationships }) => {
+    const result = deleteRelationship(ctx, access, { relationship: byId(relationships, input?.relationshipId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+// ---- source tables and columns ----
+
+/** “New source table”: system (reused by name, or created), database, schema, name and the columns as lines. */
+export async function createSourceTableAction(
+  workspaceId: string,
+  input: CreateSourceTableInput,
+): Promise<ActionResult<{ sourceTableId: string; columns: number; createdSystem: boolean }>> {
+  return modelCommand(workspaceId, (ctx, access, { sourceSystems, sourceTables }) => {
+    const result = createSourceTable(ctx, access, { systems: sourceSystems, tables: sourceTables }, input);
+    if (!result.ok) return result;
+    const columns = result.writeSet.writes.filter((w) => w.kind === "insert" && w.table === "source_column").length;
+    return { ...result, value: { sourceTableId: result.value.sourceTableId, columns, createdSystem: result.value.createdSystem } };
+  });
+}
+
+/** BK and PII flags and the comment of a column. */
+export async function updateSourceColumnAction(workspaceId: string, input: UpdateSourceColumnInput): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { sourceColumns }) => {
+    const result = updateSourceColumn(ctx, access, { column: byId(sourceColumns, input?.sourceColumnId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+/** Deletes a table with its columns and cards; refused while a mapping reads one of its columns. */
+export async function deleteSourceTableAction(
+  workspaceId: string,
+  input: { sourceTableId: string; expectedVersion: number },
+): Promise<ActionResult<{ columns: number }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => {
+    const canvasItems = await store.canvasItems.list(access.workspace.id);
+    const table = byId(model.sourceTables, input?.sourceTableId);
+    return deleteSourceTable(
+      ctx,
+      access,
+      {
+        table,
+        columns: model.sourceColumns.filter((c) => c.source_table_id === table?.id),
+        canvasItems,
+        mappings: model.mappings,
+        mappingInputs: model.mappingInputs,
+        attributes: model.attributes,
+        entities: model.entities,
+      },
+      input,
+    );
+  });
+}

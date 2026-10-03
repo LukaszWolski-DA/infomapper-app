@@ -1,5 +1,5 @@
 // What each workspace role may do (AD-05), the archive (AD-09) and guests (AD-01).
-// Only the actions of slice 0 are listed; later slices add theirs.
+// Actions of slices 0 and 1a; later slices add theirs.
 
 import { ARCHIVED_MESSAGE, domainError, notFound, type DomainError } from "./errors";
 import type { Uuid } from "./ids";
@@ -14,13 +14,16 @@ export const WORKSPACE_ACTIONS = [
   "canvas.create",
   "canvas.rename",
   "canvas.edit_projects",
+  "canvas.edit_items",
+  "model.edit",
+  "mapping.set_status",
 ] as const;
 export type WorkspaceAction = (typeof WORKSPACE_ACTIONS)[number];
 
 const EDITORS: readonly WorkspaceRole[] = ["owner", "admin", "modeler"];
 const ALL_ROLES: readonly WorkspaceRole[] = ["owner", "admin", "modeler", "reviewer", "reader"];
 
-/** Roles allowed to perform each action. Reviewers and readers change nothing in slice 0. */
+/** Roles allowed to perform each action. Reviewers may only change a mapping's status (approve); readers nothing. */
 export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]> = {
   "workspace.view": ALL_ROLES,
   "workspace.edit_settings": ["owner", "admin"],
@@ -30,6 +33,9 @@ export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]>
   "canvas.create": EDITORS,
   "canvas.rename": EDITORS,
   "canvas.edit_projects": EDITORS,
+  "canvas.edit_items": EDITORS,
+  "model.edit": EDITORS,
+  "mapping.set_status": ["owner", "admin", "modeler", "reviewer"],
 };
 
 /** Actions that remain possible while the workspace is archived (AD-09). */
@@ -44,6 +50,9 @@ const ACTION_TEXT: Record<WorkspaceAction, string> = {
   "canvas.create": "create canvases",
   "canvas.rename": "rename canvases",
   "canvas.edit_projects": "change which projects a canvas belongs to",
+  "canvas.edit_items": "change what is on a canvas",
+  "model.edit": "edit the model",
+  "mapping.set_status": "change the status of a mapping",
 };
 
 /** The acting user's standing in one workspace, as loaded by the caller. */

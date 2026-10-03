@@ -1,0 +1,137 @@
+/*
+ * The model canvas: the prototype's card, row and Overview styles (docs/prototype), with the AD-24 rules from the
+ * spike report: no dotted background, no opacity on repeated elements (card tools are always fully visible), and
+ * will-change: transform on the viewport so Chrome pans and zooms one GPU layer.
+ */
+
+.im-canvas { position: absolute; inset: 0; overflow: hidden; background: var(--im-canvas); font-size: 13px; color: var(--im-ink) }
+.im-canvas .react-flow { --xy-background-color: var(--im-canvas) }
+.im-canvas .react-flow__viewport { will-change: transform }
+.im-canvas .react-flow__node-card { padding: 0; border: 0; background: none; border-radius: 0; cursor: default }
+.im-canvas .react-flow__attribution { background: transparent; font-size: 9px }
+
+/* ---------- cards (prototype .card / .c-head / .row) ---------- */
+.im-canvas .card { height: 100%; background: var(--im-surface); border-radius: 10px; user-select: none;
+  box-shadow: 0 0 0 1px var(--im-line), 0 1px 2px var(--im-shadow), 0 8px 18px -12px var(--im-shadow) }
+.im-canvas .card.src { border-radius: 3px }
+.im-canvas .c-head { height: 54px; padding: 7px 8px 0 14px; position: relative; border-bottom: 1px solid var(--im-line) }
+.im-canvas .card.collapsed .c-head { border-bottom-color: transparent }
+.im-canvas .ent .c-head::before { content: ""; position: absolute; left: 0; top: 0; bottom: -1px; width: 4px; border-radius: 10px 0 0 0; background: var(--cc) }
+.im-canvas .ent.collapsed .c-head::before { border-radius: 10px 0 0 10px }
+.im-canvas .src .c-head { background: linear-gradient(var(--im-physical), var(--im-physical)) top / 100% 3px no-repeat }
+.im-canvas .c-l1 { display: flex; align-items: center; gap: 6px; height: 17px; font-size: 11px; color: var(--im-ink-3); min-width: 0 }
+.im-canvas .c-l1 > span { white-space: nowrap; flex: none }
+.im-canvas .c-l1 > span:nth-child(2) { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis }
+.im-canvas .c-l1 .path { flex: 0 1 auto; min-width: 0; font-family: var(--font-plex-mono), ui-monospace, monospace; overflow: hidden; text-overflow: ellipsis }
+.im-canvas .stereo { color: var(--im-ink-2) }
+.im-canvas .c-tools { margin-left: auto; display: flex; gap: 1px }
+.im-canvas .ib { display: inline-flex; align-items: center; gap: 4px; height: 20px; min-width: 20px; padding: 0 4px; border: 0; border-radius: 4px;
+  background: transparent; color: var(--im-ink-2); font-size: 10.5px; cursor: pointer }
+.im-canvas .ib:hover { background: var(--im-hover); color: var(--im-ink) }
+.im-canvas .ib:focus-visible { outline: 2px solid var(--im-logical); outline-offset: -1px }
+.im-canvas .ib svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round }
+.im-canvas .c-l2 { display: flex; align-items: center; gap: 8px; height: 24px; min-width: 0 }
+.im-canvas .c-name { flex: 1; min-width: 0; font-weight: 600; font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.im-canvas .src .c-name { font-family: var(--font-plex-mono), ui-monospace, monospace; font-weight: 500; font-size: 13.5px }
+.im-canvas .cov { width: 42px; height: 4px; border-radius: 2px; background: var(--im-line); overflow: hidden; flex: none }
+.im-canvas .cov i { display: block; height: 100%; background: var(--im-map) }
+.im-canvas .src .cov i { background: var(--im-physical) }
+.im-canvas .cov-t { font-size: 11px; color: var(--im-ink-3); font-variant-numeric: tabular-nums; flex: none }
+
+.im-canvas .c-body { padding: 6px 0 }
+.im-canvas .row { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 12px; position: relative; font-size: 12.5px }
+.im-canvas .row:hover { background: var(--im-hover) }
+.im-canvas .row.empty { color: var(--im-ink-3); font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis }
+.im-canvas .row.empty:hover { background: transparent }
+.im-canvas .key { width: 18px; font-size: 9.5px; font-weight: 600; color: var(--im-ink-3); flex: none; letter-spacing: .02em; display: flex; gap: 3px; white-space: nowrap }
+.im-canvas .key b { font-weight: 600 }
+.im-canvas .key .pk { color: var(--im-logical) }
+.im-canvas .src .key .pk { color: var(--im-physical) }
+.im-canvas .card.dualkeys .key { width: 34px }
+/* middle truncation (D-37): the head is cut with an ellipsis, the tail stays */
+.im-canvas .nm { flex: 1; min-width: 0; display: flex; overflow: hidden; white-space: nowrap }
+.im-canvas .nm .a { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.im-canvas .nm .b { flex: none; white-space: nowrap }
+.im-canvas .src .nm { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 12px }
+.im-canvas .tag { font-size: 9.5px; font-weight: 600; padding: 0 4px; border-radius: 3px; line-height: 15px; flex: none }
+.im-canvas .tag.pii { color: var(--im-warn); background: var(--im-warn-soft) }
+.im-canvas .tag.bk { color: var(--im-physical); background: var(--im-physical-soft) }
+.im-canvas .dt { color: var(--im-ink-3); font-size: 11px; flex: none }
+.im-canvas .src .dt { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 10.5px }
+.im-canvas .st { flex: none; display: inline-grid; place-items: center; width: 10px; height: 10px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--im-ink-3);
+  font-size: 9px; font-weight: 600; color: var(--im-surface) }
+.im-canvas .st.ok { background: var(--im-map); box-shadow: none }
+.im-canvas .st.warn { background: var(--im-warn); box-shadow: none }
+.im-canvas .st.n { width: auto; min-width: 16px; height: 14px; border-radius: 7px; padding: 0 4px }
+
+/* below 40 % zoom: one plain block of the same height as the rows it replaces (AD-24 rule 1) */
+.im-canvas .c-lod { padding: 6px 10px }
+.im-canvas .c-block { height: 100%; border-radius: 4px; background: var(--im-hover) }
+
+/* ---------- empty canvas (prototype #empty) ---------- */
+.im-empty { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: var(--im-ink-3); text-align: center }
+.im-empty b { display: block; color: var(--im-ink-2); font-size: 15px; font-weight: 500; margin-bottom: 4px }
+
+/* ---------- Overview (prototype .mini) ---------- */
+.im-canvas .overview { margin: 12px; width: 216px; background: var(--im-surface); border-radius: 8px; overflow: hidden; user-select: none;
+  box-shadow: 0 0 0 1px var(--im-line), 0 6px 16px -10px var(--im-shadow) }
+.im-canvas .overview-h { display: flex; align-items: center; gap: 8px; height: 28px; padding: 0 4px 0 10px; font-size: 11.5px; color: var(--im-ink-2); border-bottom: 1px solid var(--im-line) }
+.im-canvas .overview.closed .overview-h { border-bottom: 0 }
+.im-canvas .overview-z { margin-left: auto; color: var(--im-ink-3); font-variant-numeric: tabular-nums }
+.im-canvas .overview .ib svg { transition: transform .15s }
+.im-canvas .overview.closed .ib svg { transform: rotate(180deg) }
+.im-canvas .overview-svg { display: block; background: var(--im-canvas); cursor: pointer; touch-action: none }
+.im-canvas .overview-svg .me { fill-opacity: .55; stroke: none }
+.im-canvas .overview-svg .ms { fill: var(--im-physical); fill-opacity: .5; stroke: none }
+.im-canvas .overview-svg .mm { stroke: var(--im-map); stroke-opacity: .55; stroke-width: 1; vector-effect: non-scaling-stroke }
+.im-canvas .overview-svg .mr { stroke: var(--im-rel); stroke-opacity: .7; stroke-width: 1; vector-effect: non-scaling-stroke }
+.im-canvas .overview-svg .mv { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab }
+@media (max-width: 600px) {
+  .im-canvas .overview { width: 160px }
+  .im-canvas .overview-svg { width: 160px; height: 104px }
+}
+
+/* ---------- lines (prototype .lnk / .map / .rel), one layer under the cards (AD-24 rule 3) ---------- */
+/* Fading uses stroke and fill opacity on the paths, never the opacity property (AD-24 rule 4). */
+.im-canvas .line-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
+.im-canvas .lnk .hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer }
+.im-canvas .lnk .s { fill: none; stroke-width: 1.6; pointer-events: none }
+.im-canvas .map .s { stroke: var(--im-map) }
+.im-canvas .map.draft .s { stroke-dasharray: 6 4 }
+.im-canvas .map.review .s { stroke-dasharray: 10 3 2 3 }
+.im-canvas .map.warn .s { stroke: var(--im-warn) }
+.im-canvas .map.part .s { stroke-opacity: .45 }
+.im-canvas .map .end { fill: var(--im-map) }
+.im-canvas .map.warn .end { fill: var(--im-warn) }
+.im-canvas .lnk.sel .s { stroke-width: 3 }
+.im-canvas .lnk:hover .s { stroke-width: 2.6 }
+.im-canvas .chip { pointer-events: none }
+.im-canvas .chip circle { fill: var(--im-surface); stroke: var(--im-map); stroke-width: 1.4 }
+.im-canvas .map.warn .chip circle { stroke: var(--im-warn) }
+.im-canvas .chip text { font: 600 10px var(--font-plex-sans), system-ui, sans-serif; fill: var(--im-map); text-anchor: middle; dominant-baseline: central }
+.im-canvas .map.warn .chip text { fill: var(--im-warn) }
+.im-canvas .rel .s { stroke: var(--im-rel) }
+.im-canvas .rel .mk { fill: none; stroke: var(--im-rel); stroke-width: 1.6; pointer-events: none }
+.im-canvas .rel circle.mk { fill: var(--im-canvas) }
+.im-canvas .rel.sel .mk { stroke-width: 2.4 }
+.im-canvas .rlab { pointer-events: none }
+.im-canvas .rlab rect { fill: var(--im-canvas); stroke: var(--im-line) }
+.im-canvas .rlab text, .im-canvas .mult { font: 500 11px var(--font-plex-sans), system-ui, sans-serif; fill: var(--im-ink-2); text-anchor: middle; dominant-baseline: central }
+/* a selection: its lines stay, the others fade (prototype .dimmed .lnk:not(.hl)) */
+.im-canvas .dimmed .lnk:not(.hl) .s,
+.im-canvas .dimmed .lnk:not(.hl) .mk { stroke-opacity: .12 }
+.im-canvas .dimmed .lnk:not(.hl) .end,
+.im-canvas .dimmed .lnk:not(.hl) .mult,
+.im-canvas .dimmed .lnk:not(.hl) .rlab text { fill-opacity: .12 }
+.im-canvas .dimmed .lnk:not(.hl) .chip circle,
+.im-canvas .dimmed .lnk:not(.hl) .rlab rect { stroke-opacity: .12; fill-opacity: .12 }
+.im-canvas .dimmed .lnk:not(.hl) .chip text { fill-opacity: .12 }
+
+/* ---------- selection and dragging (prototype .card.sel, .row.sel, .c-head cursor) ---------- */
+.im-canvas .card.sel { box-shadow: 0 0 0 2px var(--im-logical), 0 10px 24px -12px var(--im-shadow) }
+.im-canvas .card.src.sel { box-shadow: 0 0 0 2px var(--im-physical), 0 10px 24px -12px var(--im-shadow) }
+.im-canvas .row { cursor: pointer }
+.im-canvas .row.sel { background: var(--im-logical-soft); box-shadow: inset 3px 0 var(--im-logical) }
+.im-canvas .src .row.sel { background: var(--im-physical-soft); box-shadow: inset 3px 0 var(--im-physical) }
+.im-canvas .react-flow__node.draggable .c-head { cursor: move }
+.im-canvas .react-flow__node.dragging .card { box-shadow: 0 0 0 1px var(--im-line), 0 18px 36px -14px var(--im-shadow) }
