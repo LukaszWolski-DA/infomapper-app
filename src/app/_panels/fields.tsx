@@ -4,7 +4,7 @@
 // .actions). Text fields save when they lose the focus (prototype "change"); the panel remounts them, keyed by the
 // row's version, once the server has the new value.
 
-import type { ReactNode, TextareaHTMLAttributes } from "react";
+import { useEffect, useState, type ReactNode, type TextareaHTMLAttributes } from "react";
 
 export const Kind = ({ children }: { children: ReactNode }) => <div className="mb-1.5 text-[11.5px] text-im-ink-3">{children}</div>;
 
@@ -217,5 +217,36 @@ export function GroupedSelect({
         </optgroup>
       ))}
     </select>
+  );
+}
+
+/**
+ * A delete button that asks for a second click (until undo arrives in slice 1b): the first click turns it into
+ * “Click again to delete”, with what goes along; it turns back after a few seconds or when the focus leaves.
+ */
+export function ConfirmDelete({ label, also, onConfirm, testId }: { label: string; also?: string; onConfirm: () => void; testId?: string }) {
+  const [armed, setArmed] = useState(false);
+  useEffect(() => {
+    if (!armed) return;
+    const t = setTimeout(() => setArmed(false), 4000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  return (
+    <button
+      type="button"
+      className={`${dangerClass} ${armed ? "border-im-warn bg-im-warn-soft" : ""}`}
+      data-testid={testId}
+      data-armed={armed || undefined}
+      onBlur={() => setArmed(false)}
+      onClick={() => {
+        if (!armed) setArmed(true);
+        else {
+          setArmed(false);
+          onConfirm();
+        }
+      }}
+    >
+      {armed ? `Click again to delete${also ? `, with ${also}` : ""}` : label}
+    </button>
   );
 }

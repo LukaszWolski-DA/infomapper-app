@@ -14,3 +14,16 @@ moment can therefore both pass the check and leave a canvas or project without i
 - **Accepted** in the local adapter: it is development only and has one user at a time in practice.
 - **Supabase slice:** check this rule in the same transaction as the write (e.g. lock the project's and the canvas's
   `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed.
+
+## Right panel (slice 1a)
+
+### Panel links only reach rows whose card is on this canvas (step 5a)
+
+The canvas selection points at a card (a card, a row of a card, or a line), so the right panel can only show an
+attribute or a column whose entity or source table has a card on the open canvas. Links in the panels (the
+attribute list of an entity, the source and target of a mapping, “Comes from”) do nothing for attributes and columns
+whose card is not here. Mappings open from anywhere, because a mapping is selected by itself.
+
+- **Accepted** by Łukasz for slice 1a.
+- **Later:** let the selection name an attribute or a column directly (as the prototype's `attr` and `col`
+  selections do), so the panel can show them without a card.

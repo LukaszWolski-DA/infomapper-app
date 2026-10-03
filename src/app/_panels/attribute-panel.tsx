@@ -15,7 +15,7 @@ import { LOGICAL_TYPES, type Attribute, type LogicalType } from "@/domain/types"
 import { useToast } from "@/ui/components/toast";
 import {
   Actions,
-  dangerClass,
+  ConfirmDelete,
   Field,
   Flag,
   GroupedSelect,
@@ -214,9 +214,12 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
 
       {p.editable && (
         <Actions>
-          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-attribute">
-            Delete attribute
-          </button>
+          <ConfirmDelete
+            label="Delete attribute"
+            also={mappings.length ? `${mappings.length} mapping${mappings.length > 1 ? "s" : ""}` : undefined}
+            onConfirm={() => void remove()}
+            testId="button-delete-attribute"
+          />
         </Actions>
       )}
     </div>

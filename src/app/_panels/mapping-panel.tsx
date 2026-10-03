@@ -24,7 +24,7 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, dangerClass, Field, GroupedSelect, inputClass, Kind, Li, List, Note, Section, Seg, TextArea, TypeDot } from "./fields";
+import { Actions, buttonClass, ConfirmDelete, Field, GroupedSelect, inputClass, Kind, Li, List, Note, Section, Seg, TextArea, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { columnLabel, columnOptions, inputsLabel, typeCheckOf } from "./model-index";
 
@@ -309,9 +309,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
 
       {p.editable && (
         <Actions>
-          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-mapping">
-            Delete mapping
-          </button>
+          <ConfirmDelete label="Delete mapping" onConfirm={() => void remove()} testId="button-delete-mapping" />
         </Actions>
       )}
     </div>
