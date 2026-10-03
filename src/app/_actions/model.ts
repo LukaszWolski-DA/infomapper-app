@@ -1,17 +1,23 @@
 "use server";
 
-// Model writes from the left panel (slice 1a, step 4): “New concept”, concept rename and delete (D-46, D-47),
-// a new entity from “+” with its card, and the entity name from the right panel.
+// Model writes from the panels (slice 1a): concepts (D-46, D-47), entities with their impact before deleting, and
+// attributes. Mappings are in mapping.ts.
 
 import { revalidatePath } from "next/cache";
-import type { DataStore } from "@/data";
+import { getDataStore, type DataStore } from "@/data";
+import type { CommandContext, CommandResult } from "@/domain/changes";
+import { addAttribute, deleteAttribute, updateAttribute, type UpdateAttributeInput } from "@/domain/commands/attribute";
 import { createConcept, deleteConcept, renameConcept } from "@/domain/commands/concept";
-import { createEntity, updateEntity } from "@/domain/commands/entity";
+import { createEntity, deleteEntity, updateEntity, type UpdateEntityInput } from "@/domain/commands/entity";
 import type { Uuid } from "@/domain/ids";
+import type { WorkspaceModel } from "@/domain/types";
+import { entityImpact, type EntityImpact } from "@/domain/model/impact";
 import type { WorkspaceAccess } from "@/domain/permissions";
+import { getSessionUser } from "../_lib/session";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
+const str = (v: unknown) => (typeof v === "string" ? v : "");
 
 async function loadAccess(store: DataStore, workspaceId: unknown, userId: Uuid): Promise<WorkspaceAccess | null> {
   if (typeof workspaceId !== "string") return null;
@@ -20,88 +26,128 @@ async function loadAccess(store: DataStore, workspaceId: unknown, userId: Uuid):
   return { workspace, member: await store.workspaces.getMember(workspace.id, userId) };
 }
 
-function done<T>(result: ActionResult<T>): ActionResult<T> {
+/** Runs a model command with the workspace's live model loaded; on success the pages are fresh again. */
+async function modelCommand<T>(
+  workspaceId: unknown,
+  build: (ctx: CommandContext, access: WorkspaceAccess, model: WorkspaceModel, store: DataStore) => Promise<CommandResult<T>> | CommandResult<T>,
+): Promise<ActionResult<T>> {
+  const result = await runCommand<T>(async (ctx, store, user) => {
+    const access = await loadAccess(store, workspaceId, user.id);
+    if (!access) return NOT_FOUND;
+    return build(ctx, access, await store.model.load(access.workspace.id), store);
+  });
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
 
+const byId = <R extends { id: string }>(rows: readonly R[], id: unknown): R | null => rows.find((r) => r.id === id) ?? null;
+
+// ---- concepts ----
+
 export async function createConceptAction(workspaceId: string, input: { name: string }): Promise<ActionResult<{ conceptId: string }>> {
-  return done(
-    await runCommand(async (ctx, store, user) => {
-      const access = await loadAccess(store, workspaceId, user.id);
-      if (!access) return NOT_FOUND;
-      const { concepts } = await store.model.load(access.workspace.id);
-      return createConcept(ctx, access, { concepts }, input);
-    }),
-  );
+  return modelCommand(workspaceId, (ctx, access, { concepts }) => createConcept(ctx, access, { concepts }, input));
 }
 
 export async function renameConceptAction(
   workspaceId: string,
   input: { conceptId: string; expectedVersion: number; name: string },
-): Promise<ActionResult> {
-  return done(
-    await runCommand(async (ctx, store, user) => {
-      const access = await loadAccess(store, workspaceId, user.id);
-      if (!access) return NOT_FOUND;
-      const { concepts } = await store.model.load(access.workspace.id);
-      const result = renameConcept(ctx, access, { concept: concepts.find((c) => c.id === input?.conceptId) ?? null }, input);
-      return result.ok ? { ...result, value: undefined } : result;
-    }),
-  );
+): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { concepts }) => {
+    const result = renameConcept(ctx, access, { concept: byId(concepts, input?.conceptId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
 }
 
 export async function deleteConceptAction(
   workspaceId: string,
   input: { conceptId: string; expectedVersion: number; moveToConceptId?: string | null },
 ): Promise<ActionResult<{ movedEntities: number }>> {
-  return done(
-    await runCommand(async (ctx, store, user) => {
-      const access = await loadAccess(store, workspaceId, user.id);
-      if (!access) return NOT_FOUND;
-      const { concepts, entities } = await store.model.load(access.workspace.id);
-      const concept = concepts.find((c) => c.id === input?.conceptId) ?? null;
-      return deleteConcept(ctx, access, { concept, concepts, entities: entities.filter((e) => e.concept_id === concept?.id) }, input);
-    }),
-  );
+  return modelCommand(workspaceId, (ctx, access, { concepts, entities }) => {
+    const concept = byId(concepts, input?.conceptId);
+    return deleteConcept(ctx, access, { concept, concepts, entities: entities.filter((e) => e.concept_id === concept?.id) }, input);
+  });
 }
+
+// ---- entities ----
 
 /** A new entity in a concept, with its card on the canvas at the given spot (D-46). */
 export async function createEntityAction(
   workspaceId: string,
   input: { conceptId: string; placement: { canvasId: string; x: number; y: number } },
 ): Promise<ActionResult<{ entityId: string; canvasItemId: string | null; name: string }>> {
-  return done(
-    await runCommand(async (ctx, store, user) => {
-      const access = await loadAccess(store, workspaceId, user.id);
-      if (!access) return NOT_FOUND;
-      const [{ concepts, entities }, canvas] = await Promise.all([
-        store.model.load(access.workspace.id),
-        store.canvases.get(access.workspace.id, typeof input?.placement?.canvasId === "string" ? input.placement.canvasId : ""),
-      ]);
-      const concept = concepts.find((c) => c.id === input?.conceptId) ?? null;
-      const result = createEntity(ctx, access, { concept, entities, canvas }, input);
-      if (!result.ok) return result;
-      const write = result.writeSet.writes.find((w) => w.kind === "insert" && w.table === "entity");
-      const name = write?.kind === "insert" && write.table === "entity" ? write.row.name : "";
-      return { ...result, value: { ...result.value, name } };
-    }),
+  return modelCommand(workspaceId, async (ctx, access, { concepts, entities }, store) => {
+    const canvas = await store.canvases.get(access.workspace.id, str(input?.placement?.canvasId));
+    const result = createEntity(ctx, access, { concept: byId(concepts, input?.conceptId), entities, canvas }, input);
+    if (!result.ok) return result;
+    const write = result.writeSet.writes.find((w) => w.kind === "insert" && w.table === "entity");
+    const name = write?.kind === "insert" && write.table === "entity" ? write.row.name : "";
+    return { ...result, value: { ...result.value, name } };
+  });
+}
+
+/** Name, stereotype, concept, definition (right panel). A duplicate name comes back as a warning (B-25). */
+export async function updateEntityAction(workspaceId: string, input: UpdateEntityInput): Promise<ActionResult<{ warning: string | null }>> {
+  return modelCommand(workspaceId, (ctx, access, { entities, concepts }) => {
+    const state = { entity: byId(entities, input?.entityId), entities, concept: byId(concepts, input?.conceptId) };
+    const result = updateEntity(ctx, access, state, input);
+    return result.ok ? { ...result, value: { warning: result.value.warning } } : result;
+  });
+}
+
+/** What deleting an entity takes with it (D-47), for the dialog. Reading only. */
+export async function entityImpactAction(workspaceId: string, entityId: string): Promise<ActionResult<EntityImpact>> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const store = getDataStore();
+  const access = await loadAccess(store, workspaceId, user.id);
+  if (!access?.member) return { ok: false, code: "not_found", message: "This workspace does not exist." };
+  const ws = access.workspace.id;
+  const [model, canvasItems, canvases, projects] = await Promise.all([
+    store.model.load(ws),
+    store.canvasItems.list(ws),
+    store.canvases.list(ws),
+    store.projects.list(ws),
+  ]);
+  const entity = byId(model.entities, entityId);
+  if (!entity) return { ok: false, code: "not_found", message: "This entity does not exist any more." };
+  const projectCanvases = (await Promise.all(projects.map((p) => store.canvases.listLinksOfProject(ws, p.id)))).flat();
+  const rows = { entity, ...model, canvasItems };
+  return { ok: true, value: entityImpact(rows, { canvases, projects, projectCanvases }) };
+}
+
+/** Deletes an entity with its attributes, mappings, relationships and cards, in one change group (D-47). */
+export async function deleteEntityAction(
+  workspaceId: string,
+  input: { entityId: string; expectedVersion: number },
+): Promise<ActionResult<{ attributes: number; mappings: number; relationships: number }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => {
+    const canvasItems = await store.canvasItems.list(access.workspace.id);
+    return deleteEntity(ctx, access, { ...model, entity: byId(model.entities, input?.entityId), canvasItems }, input);
+  });
+}
+
+// ---- attributes ----
+
+export async function addAttributeAction(workspaceId: string, input: { entityId: string }): Promise<ActionResult<{ attributeId: string }>> {
+  return modelCommand(workspaceId, (ctx, access, { entities, attributes }) =>
+    addAttribute(ctx, access, { entity: byId(entities, input?.entityId), attributes }, input),
   );
 }
 
-/** The entity's name (right panel). A duplicate name comes back as a warning; it does not block (B-25). */
-export async function renameEntityAction(
+/** Name, type with parameters, flags and definition. */
+export async function updateAttributeAction(workspaceId: string, input: UpdateAttributeInput): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, (ctx, access, { attributes }) => {
+    const result = updateAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId) }, input);
+    return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+/** Deletes an attribute with its mappings and their inputs. */
+export async function deleteAttributeAction(
   workspaceId: string,
-  input: { entityId: string; expectedVersion: number; name: string },
-): Promise<ActionResult<{ warning: string | null }>> {
-  return done(
-    await runCommand(async (ctx, store, user) => {
-      const access = await loadAccess(store, workspaceId, user.id);
-      if (!access) return NOT_FOUND;
-      const { entities } = await store.model.load(access.workspace.id);
-      const entity = entities.find((e) => e.id === input?.entityId) ?? null;
-      const result = updateEntity(ctx, access, { entity, entities, concept: null }, input);
-      return result.ok ? { ...result, value: { warning: result.value.warning } } : result;
-    }),
+  input: { attributeId: string; expectedVersion: number },
+): Promise<ActionResult<{ mappings: number }>> {
+  return modelCommand(workspaceId, (ctx, access, { attributes, mappings, mappingInputs }) =>
+    deleteAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), mappings, mappingInputs }, input),
   );
 }

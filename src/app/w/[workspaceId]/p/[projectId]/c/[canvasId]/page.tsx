@@ -13,6 +13,7 @@ import { ModelCanvas } from "@/canvas/ModelCanvas";
 import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
+import { lastContentEditor } from "@/domain/model/mapping-rules";
 
 // Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a).
 export default async function CanvasPage({
@@ -25,11 +26,16 @@ export default async function CanvasPage({
   const view = await loadProjectView(shell);
   const store = getDataStore();
   const ws = shell.workspace.id;
-  const [model, allItems, canvases] = await Promise.all([
+  const [model, allItems, canvases, workspace] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.canvases.list(ws),
+    store.workspaces.get(ws),
   ]);
+  // Four-eyes (AD-06): the panel says beforehand who may not approve; the server checks again.
+  const fourEyes = !!workspace?.four_eyes;
+  const events = fourEyes ? await store.changeEvents.list(ws) : [];
+  const contentAuthors = Object.fromEntries(model.mappings.map((m) => [m.id, fourEyes ? lastContentEditor(m, events) : ""]).filter(([, u]) => u));
   const liveCanvases = new Set(canvases.map((c) => c.id));
   const items = allItems.filter((i) => liveCanvases.has(i.canvas_id));
   const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId));
@@ -47,7 +53,20 @@ export default async function CanvasPage({
             renameOnOpen,
             tools: <CanvasTools />,
             left: <LeftPanel workspaceId={ws} canvasId={canvasId} tree={tree} editable={editable} />,
-            right: <Inspector workspaceId={ws} tree={tree} editable={editable} />,
+            right: (
+              <Inspector
+                workspaceId={ws}
+                canvasId={canvasId}
+                model={model}
+                cards={cards.map((c) => ({ id: c.id, kind: c.kind, targetId: c.targetId }))}
+                tree={tree}
+                editable={editable}
+                canSetStatus={shell.standing !== "none"}
+                userId={shell.user.id}
+                fourEyes={fourEyes}
+                contentAuthors={contentAuthors}
+              />
+            ),
           }}
         >
           <ModelCanvas

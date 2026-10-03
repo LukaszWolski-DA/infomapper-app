@@ -1,59 +1,125 @@
 "use client";
 
-// The right panel (prototype #ins). Step 4 of slice 1a: a selected card shows what it is, the entity's name (focused
-// right after “+” created it, D-46) and “Remove from this canvas”. The rest of the panel comes in step 5.
+// The right panel (prototype #ins): shows and edits what is selected on the canvas. Slice 1a step 5a: entity,
+// attribute and mapping. Source tables, columns, relationships and the overview when nothing is selected are step 5b.
 
-import { useContext, useEffect, useRef } from "react";
-import { renameEntityAction } from "@/app/_actions/model";
-import { useAction } from "@/app/_components/use-action";
+import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
-import { useToast } from "@/ui/components/toast";
-import { usePanels } from "./panels-context";
-import type { TreeData, TreeEntity } from "./tree-data";
+import type { Uuid } from "@/domain/ids";
+import type { WorkspaceModel } from "@/domain/types";
+import { AttributePanel } from "./attribute-panel";
+import { EntityPanel } from "./entity-panel";
+import { Kind } from "./fields";
+import { MappingPanel } from "./mapping-panel";
+import { indexModel, tablePath, type ModelIndex } from "./model-index";
+import type { TreeData } from "./tree-data";
 
 export interface InspectorProps {
   workspaceId: string;
+  canvasId: string;
+  /** The live model of the workspace. */
+  model: WorkspaceModel;
+  /** The cards of this canvas: card id, what it shows. */
+  cards: { id: Uuid; kind: "ent" | "src"; targetId: Uuid }[];
   tree: TreeData;
+  /** Owner, admin or modeler, not archived. */
   editable: boolean;
+  /** May set a mapping's status (also reviewers). */
+  canSetStatus: boolean;
+  userId: Uuid;
+  fourEyes: boolean;
+  /** Who last changed each mapping's inputs, kind or rule (AD-06); only filled when four-eyes is on. */
+  contentAuthors: Record<Uuid, Uuid>;
 }
 
-/** The entity or source table behind a card of this canvas. */
-function cardTarget(tree: TreeData, cardId: string) {
-  for (const c of tree.concepts) {
-    const e = c.entities.find((x) => x.cardId === cardId);
-    if (e) return { kind: "ent" as const, entity: e };
-  }
-  for (const s of tree.systems) {
-    for (const sc of s.schemas) {
-      const t = sc.tables.find((x) => x.cardId === cardId);
-      if (t) return { kind: "src" as const, table: t, path: `${s.name} / ${sc.name}` };
-    }
-  }
-  return null;
+export interface PanelContext extends Omit<InspectorProps, "model" | "cards" | "tree"> {
+  ix: ModelIndex;
+  /** The card of an entity or source table on this canvas. */
+  cardOf: (targetId: Uuid) => Uuid | null;
+  /** Elements on another canvas but not here (rings in the left panel). */
+  elsewhere: (targetId: Uuid) => boolean;
+  tablesHere: ReadonlySet<Uuid>;
+  goEntity: (entityId: Uuid) => void;
+  goAttribute: (attributeId: Uuid) => void;
+  goMapping: (mappingId: Uuid) => void;
+  /** Selects a column row when its table is on this canvas. */
+  goColumn: (columnId: Uuid) => void;
 }
 
-export function Inspector({ workspaceId, tree, editable }: InspectorProps) {
-  const { selection, remove } = useContext(CanvasUiCtx);
-  const cardId = selection?.t === "card" ? selection.id : null;
-  const target = cardId ? cardTarget(tree, cardId) : null;
+const Ctx = createContext<PanelContext | null>(null);
+export const usePanel = () => useContext(Ctx)!;
 
-  if (!cardId || !target) {
-    return <div className="grid flex-1 place-items-center p-6 text-center text-xs text-im-ink-3">Details of what you select appear here in a later slice.</div>;
+export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
+  const ui = useContext(CanvasUiCtx);
+  const ix = useMemo(() => indexModel(model), [model]);
+
+  const panel = useMemo<PanelContext>(() => {
+    const cardByTarget = new Map(cards.map((c) => [c.targetId, c.id]));
+    const elsewhere = new Set<Uuid>();
+    for (const c of tree.concepts) for (const e of c.entities) if (e.presence === "elsewhere") elsewhere.add(e.id);
+    for (const s of tree.systems) for (const sc of s.schemas) for (const t of sc.tables) if (t.presence === "elsewhere") elsewhere.add(t.id);
+    const cardOf = (id: Uuid) => cardByTarget.get(id) ?? null;
+    return {
+      ...rest,
+      ix,
+      cardOf,
+      elsewhere: (id) => elsewhere.has(id),
+      tablesHere: new Set(cards.filter((c) => c.kind === "src").map((c) => c.targetId)),
+      goEntity: (entityId) => {
+        const card = cardOf(entityId);
+        if (!card) return;
+        ui.select({ t: "card", id: card });
+        ui.centerOn(card);
+      },
+      goAttribute: (attributeId) => {
+        const card = cardOf(ix.attribute.get(attributeId)?.entity_id ?? "");
+        if (card) ui.select({ t: "row", cardId: card, id: attributeId });
+      },
+      goMapping: (mappingId) => ui.select({ t: "map", id: mappingId }),
+      goColumn: (columnId) => {
+        const card = cardOf(ix.column.get(columnId)?.source_table_id ?? "");
+        if (card) ui.select({ t: "row", cardId: card, id: columnId });
+      },
+    };
+  }, [cards, tree, rest, ix, ui]);
+
+  const sel = ui.selection;
+  let body: ReactNode = null;
+  const card = sel?.t === "card" || sel?.t === "row" ? cards.find((c) => c.id === (sel.t === "card" ? sel.id : sel.cardId)) : null;
+  if (sel?.t === "card" && card?.kind === "ent" && ix.entity.has(card.targetId)) {
+    body = <EntityPanel key={card.targetId} entity={ix.entity.get(card.targetId)!} cardId={card.id} />;
+  } else if (sel?.t === "card" && card?.kind === "src" && ix.table.has(card.targetId)) {
+    const t = ix.table.get(card.targetId)!;
+    body = <SourceCard name={t.name} path={tablePath(ix, t)} cardId={card.id} editable={rest.editable} />;
+  } else if (sel?.t === "row" && card?.kind === "ent" && ix.attribute.has(sel.id)) {
+    body = <AttributePanel key={sel.id} attribute={ix.attribute.get(sel.id)!} />;
+  } else if (sel?.t === "map" && ix.mapping.has(sel.id)) {
+    body = <MappingPanel key={sel.id} mapping={ix.mapping.get(sel.id)!} />;
   }
+
   return (
-    <div className="flex-1 overflow-auto px-4 pb-6 pt-4" data-testid="inspector-card">
-      {target.kind === "ent" ? (
-        <>
-          <div className="mb-1.5 text-[11.5px] text-im-ink-3">Entity</div>
-          <EntityName key={`${target.entity.id}:${target.entity.version}`} workspaceId={workspaceId} cardId={cardId} entity={target.entity} editable={editable} />
-        </>
+    <Ctx.Provider value={panel}>
+      {body ? (
+        <div className="flex-1 overflow-auto px-4 pb-6 pt-4 text-[13px]" data-testid="inspector-body">
+          {body}
+        </div>
       ) : (
-        <>
-          <div className="mb-1.5 text-[11.5px] text-im-ink-3">Source table</div>
-          <h2 className="font-mono text-[15px] font-semibold leading-tight">{target.table.name}</h2>
-          <p className="mt-1 font-mono text-im-ink-3">{target.path}</p>
-        </>
+        <div className="grid flex-1 place-items-center p-6 text-center text-xs text-im-ink-3">
+          Details of what you select appear here in a later slice.
+        </div>
       )}
+    </Ctx.Provider>
+  );
+}
+
+/** A source table card until its panel arrives (step 5b): what it is and “Remove from this canvas”. */
+function SourceCard({ name, path, cardId, editable }: { name: string; path: string; cardId: Uuid; editable: boolean }) {
+  const { remove } = useContext(CanvasUiCtx);
+  return (
+    <div data-testid="inspector-card">
+      <Kind>Source table</Kind>
+      <h2 className="font-mono text-[15px] font-semibold leading-tight">{name}</h2>
+      <p className="mt-1 font-mono text-im-ink-3">{path}</p>
       {editable && (
         <div className="mt-5 flex flex-wrap gap-2">
           <button
@@ -67,48 +133,5 @@ export function Inspector({ workspaceId, tree, editable }: InspectorProps) {
         </div>
       )}
     </div>
-  );
-}
-
-/** The name field (prototype f-en): saved when it changes; empty goes back; a duplicate name warns (B-25). */
-function EntityName({ workspaceId, cardId, entity, editable }: { workspaceId: string; cardId: string; entity: TreeEntity; editable: boolean }) {
-  const { run } = useAction();
-  const toast = useToast();
-  const { nameFocus, setNameFocus } = usePanels();
-  const ref = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (nameFocus !== cardId) return;
-    ref.current?.focus();
-    ref.current?.select();
-    setNameFocus(null);
-  }, [nameFocus, cardId, setNameFocus]);
-
-  async function save(input: HTMLInputElement) {
-    const name = input.value.trim();
-    if (!name || name === entity.name) {
-      input.value = entity.name;
-      return;
-    }
-    const result = await run(() => renameEntityAction(workspaceId, { entityId: entity.id, expectedVersion: entity.version, name }));
-    if (!result.ok) input.value = entity.name;
-    else if (result.value.warning) toast(result.value.warning);
-  }
-
-  return (
-    <label className="mt-3 block">
-      <span className="mb-1 block text-xs text-im-ink-2">Name</span>
-      <input
-        ref={ref}
-        defaultValue={entity.name}
-        readOnly={!editable}
-        data-testid="input-entity-name"
-        className="min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 outline-none focus:border-im-logical"
-        onKeyDown={(e) => {
-          if (e.key === "Enter") e.currentTarget.blur();
-        }}
-        onBlur={(e) => editable && void save(e.currentTarget)}
-      />
-    </label>
   );
 }
