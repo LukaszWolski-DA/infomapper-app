@@ -97,13 +97,9 @@ describe("relatedLines (selection emphasis)", () => {
     expect(ids_(relatedLines({ t: "row", cardId: ids.itemCrmCustomer, id: ids.colFirstName }, lines))).toEqual({ maps: [combined.id], rels: [] });
     expect(ids_(relatedLines({ t: "row", cardId: ids.itemCustomer, id: ids.email }, lines))).toEqual({ maps: [ids.mapEmail], rels: [] });
   });
-  it("an entity card: its mappings and relationships; a source card: its mappings", () => {
-    expect(ids_(relatedLines({ t: "card", id: ids.itemCustomer }, lines))).toEqual({
-      maps: [ids.mapEmail, combined.id].sort(),
-      rels: [ids.relPlaces, "01900000-0000-7000-8000-000000006002"].sort(),
-    });
-    expect(ids_(relatedLines({ t: "card", id: ids.itemCrmCustomer }, lines))?.rels).toEqual([]);
-    expect(ids_(relatedLines({ t: "card", id: orderCard }, lines))?.maps).toEqual([]);
+  it("a card: nothing fades (card emphasis is Focus mode, a later slice)", () => {
+    expect(relatedLines({ t: "card", id: ids.itemCustomer }, lines)).toBeNull();
+    expect(relatedLines({ t: "card", id: ids.itemCrmCustomer }, lines)).toBeNull();
   });
 });
 

@@ -110,8 +110,8 @@ for `canvas_item`, value lists, foreign keys). The demo model and `seed:large`. 
   attribute and one line on (D-49). A line whose row is hidden re-anchors to the card header.
 - Relationship lines with crow’s foot or UML ends and the label; the notation switch in the top bar (shared, D-22).
 - Detail by zoom level below 40%. Pan, zoom 10–300%, fit, and the Overview minimap.
-- Clicking a card, a row or a line selects it; the selected element’s lines are emphasised and the rest fade (as the
-  prototype does on selection; hover highlight is 1b).
+- Clicking a card, a row or a line selects it. Selecting a row or a line emphasises its lines and fades the rest (as the
+  prototype does on selection); selecting a card fades nothing (that is Focus mode, a later slice; hover highlight is 1b).
 - Dragging a card moves it; the new position is saved through a server action when the drag ends.
 
 ### Step 4 – Left panel and the canvas contents

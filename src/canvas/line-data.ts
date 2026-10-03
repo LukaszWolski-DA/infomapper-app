@@ -114,11 +114,11 @@ export interface Related {
 }
 
 /**
- * The lines a selection emphasises (prototype relatedOf); every other line fades. A card: the mappings of its rows
- * and, for an entity, its relationships. A row: its mappings. A line: itself.
+ * The lines a selection emphasises (prototype relatedOf); every other line fades. A row: its mappings. A line: itself.
+ * A selected card fades nothing: in the prototype that belongs to Focus mode, a later slice.
  */
 export function relatedLines(sel: Selection, lines: CanvasLines): Related | null {
-  if (!sel) return null;
+  if (!sel || sel.t === "card") return null;
   const maps = new Set<Uuid>(), rels = new Set<Uuid>();
   switch (sel.t) {
     case "map":
@@ -131,12 +131,6 @@ export function relatedLines(sel: Selection, lines: CanvasLines): Related | null
       for (const m of lines.mappings) {
         if (m.attributeId === sel.id || m.inputs.some((i) => i.columnId === sel.id)) maps.add(m.id);
       }
-      break;
-    case "card":
-      for (const m of lines.mappings) {
-        if (m.cardId === sel.id || m.inputs.some((i) => i.cardId === sel.id)) maps.add(m.id);
-      }
-      for (const r of lines.relationships) if (r.fromCardId === sel.id || r.toCardId === sel.id) rels.add(r.id);
       break;
   }
   return { maps, rels };
