@@ -1,7 +1,7 @@
 # Slice 1a – Acceptance
 
 Branch `slice/01a-model-visible` · PRD: [slice-01a-model-visible.md](slice-01a-model-visible.md) · Pull request #2 (draft) ·
-Status: ready for acceptance by Łukasz, **except S1A-14** (see [Performance](#performance-s1a-14))
+Status: ready for acceptance by Łukasz; **S1A-14 is partly met** (see [Performance](#performance-s1a-14))
 
 Every end-to-end test starts from freshly seeded data (the fixture in `e2e/slice-01a/fixtures.ts` is slice 0's: it
 resets `.data/e2e-db.json` before each test), so no test depends on another. Tests that need more data make it
@@ -28,7 +28,7 @@ runs of `npm run e2e` in a row (slice 0 and 1a, 35 tests each) passed 105 of 105
 | S1A-11 | As Piotr (reviewer): no edit controls except the mapping status; approving works; other edits called directly are refused | e2e `S1A-11.spec.ts`: no controls in the left panel, on cards, in the entity, attribute and mapping panels; status Approved works; four server actions called directly are refused with the domain's message and change nothing; unit `permissions.test.ts` | Pass |
 | S1A-12 | Four-eyes on: whoever changed the rule cannot approve; another modeler can | e2e `S1A-12.spec.ts`: Łukasz turns four-eyes on, changes the rule, sees the message, is refused; Anna approves; unit `mapping.test.ts` (four-eyes) | Pass |
 | S1A-13 | “New source table” with columns as lines creates the table and its columns with types and lengths | e2e `S1A-13.spec.ts`: five columns incl. `varchar(255)`, `decimal(18,2)`, `nvarchar(max)` and trailing commas; existing system reused; a bad line refused with its line number; unit `column-lines.test.ts`, `source.test.ts` | Pass |
-| S1A-14 | Performance on `seed:large`: pan and zoom ≥ 50 fps, no frame > 50 ms, at overview and 100%; initial render < 1.5 s | e2e `S1A-14.spec.ts` (functional in the normal run; measurement with `MEASURE=1`) | **Partly**: overview passes, 100% and initial render do not – see below |
+| S1A-14 | Performance on `seed:large`: pan and zoom ≥ 50 fps, no frame > 50 ms, at overview and 100%; initial render < 1.5 s | e2e `S1A-14.spec.ts` (functional in the normal run; measurement with `MEASURE=1`) | **Partly met**: overview about at the bar, 100% and initial render miss it – see below and [known limitations](../known-limitations.md#s1a-14-is-only-partly-met-and-measured-on-the-dev-server) |
 | S1A-15 | CI runs on the pull request and passes; lint, typecheck, unit and e2e pass locally | e2e `S1A-15.spec.ts` (the workflow runs on pull requests and on `main` with the same checks); CI on PR #2 passed on the pushes of steps 3b to 6 (checked each time); local runs above | Pass |
 
 ## Performance (S1A-14)
@@ -45,11 +45,15 @@ measurement-only production run with local data. As a control, the spike was mea
 production build **and** under `next dev`: dev mode does not change its pan and zoom (60 fps either way), but doubles its
 initial render.
 
-| Measurement | Bar | Spike follow-up (setup B, production) | Spike today, production / dev | **App, first measurement** | **App after the fixes below** |
-| --- | --- | --- | --- | --- | --- |
-| C-01 overview | ≥ 50 fps, 0 frames > 50 ms | 60.0 fps, 0 | 60.1 / 60.0 fps, 0 / 0 | 34.9 fps, 19 frames > 50 ms | **51.8–53.4 fps, 0 frames > 50 ms** (longest 34 ms) |
-| C-01 100%, dense area | same | 58.3 fps, 0 | 59.9 / 59.6 fps, 0 / 0 | 19.8 fps, 61 frames > 50 ms | **46.3–46.8 fps, 4–5 frames > 50 ms** (longest 83 ms) |
-| C-08 initial render | < 1.5 s (median of 5 cold loads) | 789 ms | – / 1,721 ms | 4,895 ms | **4,985–5,476 ms** |
+| Measurement | Bar | Spike follow-up (setup B, production) | Spike today, production / dev | App, first measurement | App after fixes 1 and 2 | **App after fix 3 (3 runs)** |
+| --- | --- | --- | --- | --- | --- | --- |
+| C-01 overview | ≥ 50 fps, 0 frames > 50 ms | 60.0 fps, 0 | 60.1 / 60.0 fps, 0 / 0 | 34.9 fps, 19 frames > 50 ms | 51.8–53.4 fps, 0 frames > 50 ms (longest 34 ms) | **49.8–55.8 fps, 1–3 frames > 50 ms** |
+| C-01 100%, dense area | same | 58.3 fps, 0 | 59.9 / 59.6 fps, 0 / 0 | 19.8 fps, 61 frames > 50 ms | 46.3–46.8 fps, 4–5 frames > 50 ms (longest 83 ms) | **41.5–52.5 fps, 1–8 frames > 50 ms** (longest 100 ms) |
+| C-08 initial render | < 1.5 s (median of 5 cold loads) | 789 ms | – / 1,721 ms | 4,895 ms | 4,985–5,476 ms | **4,174–6,633 ms** (single loads 3,593–7,201 ms) |
+
+Fix 3 changes only the server, so the spread in pan and zoom between runs (and against the runs before it) is the
+laptop's: the same code gave 41.5 and 52.5 fps at 100% within half an hour. The runs after fix 3 were on 4 October
+2026, one after the other.
 
 Raw results: `test-results/S1A-14.json` after a run (not committed).
 
@@ -63,20 +67,30 @@ Raw results: `test-results/S1A-14.json` after a run (not committed).
    Chrome's paint tree, and with thousands of them the per-frame “Layerize” step took about 25 ms (the spike: about
    10 ms). Names now get the clip and the ellipsis only when they may not fit, from a conservative width estimate
    (`src/canvas/text-fit.ts`, unit-tested). Checked on both canvases: no unclipped name or title overflows; on the large
-   canvas 204 of 2,228 rows need the clip. Truncation looks the same as before.
+   canvas 204 of 2,228 rows need the clip. Truncation looks the same as before. AD-24 now names this rule.
+3. **The local adapter read and parsed the whole data file for every repository call.** It now keeps the last read in
+   memory (frozen) and re-reads the file only when its modification time, size or inode changes, so the seed scripts
+   and the e2e reset, which write it from other processes, are still seen (`src/data/local/file.ts`, unit-tested in
+   `store.test.ts`). The initial render's best runs went from about 5.0 s to about 4.2 s.
+
+**Tried and not kept:** React Flow's `onlyRenderVisibleElements` (draw only the cards in view). The line layer and the
+Overview read positions from the store, so they kept working, but mounting and unmounting cards at the edges of the
+view during pan and zoom cost more than it saved: overview 42.9 fps with 22 frames > 50 ms, 100% 45.4 fps with 20,
+initial render unchanged (4,154 ms).
 
 ### What is left, and why
 
-- **100%: about 46 fps, 4–5 frames over 50 ms.** Scripts are now short (the long frames run 6–10 ms of script); the
+- **100%: about 42–53 fps, 1–8 frames over 50 ms.** Scripts are now short (the long frames run 6–10 ms of script); the
   rest is Chrome rasterising the large GPU layer during the zoom segments. The app's rows draw more than the spike's
   (key, name in two parts, PII and BK badges, type, mapped dot, web fonts): 18,500 elements in the canvas at 100% against
   the spike's 12,300. Closing the Overview gives about 52 fps. Getting further means drawing less per row, which
   changes the card design – a decision for Łukasz (options: fewer elements per row, or detail by zoom level also
   between 40% and 100%).
-- **Initial render about 5 s.** About 2.4 s is the server before the first byte: the local JSON adapter reads and parses
-  the whole data file (2.5 MB with the large workspace) for every repository call. About 2.7 s is the browser in dev
-  mode. Neither says much about production on Supabase; the spike shows dev mode alone doubles this number. To be
-  measured again in the Supabase slice, or with a measurement-only production run if Łukasz allows it.
+- **Initial render about 4–7 s.** Before fix 3 about 2.4 s was the server before the first byte, mostly the local
+  adapter reading the 2.5 MB data file again for every repository call; fix 3 removes that, but the split between
+  server and browser was not measured again. The browser part was about 2.7 s in dev mode. Neither says much about
+  production on Supabase; the spike shows dev mode alone doubles this number. The Supabase slice must measure S1A-14
+  in a production build ([known limitations](../known-limitations.md#s1a-14-is-only-partly-met-and-measured-on-the-dev-server)).
 
 ## Three runs in a row
 

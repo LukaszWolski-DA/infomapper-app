@@ -15,6 +15,22 @@ moment can therefore both pass the check and leave a canvas or project without i
 - **Supabase slice:** check this rule in the same transaction as the write (e.g. lock the project's and the canvas's
   `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed.
 
+## Canvas performance (slice 1a)
+
+### S1A-14 is only partly met, and measured on the dev server
+
+On the “Performance test” workspace (`seed:large`), pan and zoom at the overview mostly reach the bar, but at 100% the
+canvas runs at about 42–53 fps with 1–8 frames over 50 ms (bar: 50 fps, none over 50 ms), and the initial render takes
+about 4–7 s (bar: 1.5 s). The numbers and what was tried are in
+[slice-01a-acceptance.md](prd/slice-01a-acceptance.md#performance-s1a-14). All of it was measured under `next dev`,
+because the local data adapter refuses a production build (AD-29); the spike shows that dev mode alone doubles the
+initial render.
+
+- **Recorded** as “partly met” for slice 1a, as Łukasz asked on 4 October 2026.
+- **Supabase slice:** measure S1A-14 again in a production build (`npm run build`, `npm start`) with the same method
+  (`MEASURE=1`, headed Chrome, same laptop), and decide on the card design (fewer elements per row, or detail by zoom
+  level between 40% and 100%) if 100% still misses the bar.
+
 ## Right panel (slice 1a)
 
 ### Panel links only reach rows whose card is on this canvas (step 5a)
