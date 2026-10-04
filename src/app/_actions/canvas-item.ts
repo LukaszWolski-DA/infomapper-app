@@ -16,9 +16,10 @@ export interface CardChangeInput {
   rowFilter?: string;
   x?: number;
   y?: number;
+  width?: number | null;
 }
 
-/** Saves a card's position, collapse state or row filter. Returns the card's new version for the next change. */
+/** Saves a card's position, collapse state, row filter or width. Returns the card's new version for the next change. */
 export async function updateCardAction(workspaceId: string, change: CardChangeInput): Promise<ActionResult<{ version: number }>> {
   return runCommand(async (ctx, store, user) => {
     const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
