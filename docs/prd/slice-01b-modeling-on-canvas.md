@@ -48,10 +48,14 @@ hovering, and undo any change. After this slice a person can build a model from 
    or bottom; dragging in the entity panel’s attribute list; the attribute panel’s “Position 3 of 8” with arrows. The
    moved row flashes briefly. Order belongs to the model; lines follow.
 8. **Card width (D-37, C-09).** A handle on the right edge of entity and source cards, 200–600 px, snapping to 8 px;
-   double-click or the toolbox fits the width to the longest name. Saved per canvas. Lines follow live while dragging;
-   `will-change` is switched off during the drag (spike follow-up).
-9. **Hover highlight (C-10).** Hovering a row highlights its lines and the rows at the other end, and fades the rest;
-   drawn in the overlay layer, not by restyling cards. Row dots for connections appear in the overlay.
+   double-click or the toolbox fits the width to the longest name. Saved per canvas. While dragging, a light outline
+   shows the new width, and the card and its lines take it on release: changing the card on every step, with or
+   without its rows drawn, measured about 20 fps (Łukasz, 4 October 2026). `will-change` is switched off during the
+   drag (spike follow-up).
+9. **Hover highlight (C-10).** Hovering a row highlights its lines (drawn again, a little stronger, above the others)
+   and the rows at the other end; the other lines do not fade, because fading them, by restyling every line or with one
+   veil over them, measured too slow (Łukasz, 4 October 2026). Drawn in the overlay layer, not by restyling cards or
+   lines. Row dots for connections appear in the overlay.
 10. **Below 40% zoom.** Clicking a card’s block selects the card; hovering shows its name.
 11. **Feeding sources (B-08).** In the entity panel: “Add the N missing to this canvas” places the missing source
     tables next to the entity’s card, and a single feeding source clicked in the list is placed next to it too
