@@ -108,7 +108,7 @@ measurements, manual checklist for S1B-01 to S1B-12, assumptions). Update README
 | ID | Criterion |
 | --- | --- |
 | S1B-01 | Dragging `customers.segment` onto `Customer.segment_code` creates a direct mapping and its line. |
-| S1B-02 | Dragging `web_users.email` onto `Customer.email` (already mapped from CRM) shows the choice with “Separate mapping” pre-selected; Enter creates a second mapping. Dragging `customers.lname` onto an attribute mapped from `customers.fname` pre-selects “Add to mapping” and asks for a rule. |
+| S1B-02 | Dragging `web_users.cust_no` onto `Customer.customer_number` (already mapped from CRM `customers.cust_no`) shows the choice with “Separate mapping” pre-selected; Enter creates a second mapping. Dragging `customers.lname` onto an attribute mapped from `customers.fname` pre-selects “Add to mapping” and asks for a rule. |
 | S1B-03 | Dropping `order_line.price` on the Order Line header creates attribute `price` (decimal with the column’s precision and scale) and a direct mapping. |
 | S1B-04 | “Map to an attribute” in the column panel creates the mapping. |
 | S1B-05 | Split turns a combined mapping into one mapping per input; merge turns two mappings of one attribute into one transform after a rule is given. |
