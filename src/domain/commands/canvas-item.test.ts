@@ -72,6 +72,18 @@ describe("updateCanvasItem: move, collapse, row filter", () => {
     });
   });
 
+  it("sets the card's width, 200–600 px in steps of 8, and back to the default (slice 1b, D-37)", () => {
+    expect(updateCanvasItem(makeCtx(), access("modeler"), state, { ...ref, width: 344 })).toMatchObject({ ok: true, value: { item: { width: 344, version: 2 } } });
+    expect(updateCanvasItem(makeCtx(), access("modeler"), { item: canvasItem(itemCustomer, { width: 344 }) }, { ...ref, width: null })).toMatchObject({
+      ok: true,
+      value: { item: { width: null } },
+    });
+    for (const width of [192, 608, 301]) {
+      expect(updateCanvasItem(makeCtx(), access("modeler"), state, { ...ref, width })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    }
+    expect(updateCanvasItem(makeCtx(), access("modeler"), state, { ...ref, width: null })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+  });
+
   it("refuses the labeled filter (labels come later), half a position and no change", () => {
     expect(updateCanvasItem(makeCtx(), access("owner"), state, { ...ref, rowFilter: "labeled" })).toMatchObject({ ok: false, error: { code: "invalid" } });
     expect(updateCanvasItem(makeCtx(), access("owner"), state, { ...ref, x: 1 })).toMatchObject({ ok: false, error: { code: "invalid" } });
