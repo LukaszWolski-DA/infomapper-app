@@ -5,6 +5,9 @@ import { visibleRows, type CardData } from "./card-data";
 
 /** Default card width (D-37), header height, row height and body padding: prototype W, H, R, PAD. */
 export const CARD_W = 256;
+/** A card can be made 200–600 px wide, in steps of 8 (D-37, C-09). */
+export const CARD_W_MIN = 200;
+export const CARD_W_MAX = 600;
 export const HEAD_H = 54;
 export const ROW_H = 26;
 export const BODY_PAD = 6;

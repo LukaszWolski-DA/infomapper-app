@@ -167,8 +167,8 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
   return cards.map(withClips).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "src" ? -1 : 1));
 }
 
-/** Marks the names that may not fit, so only they are clipped (S1A-14). */
-function withClips(card: Omit<CardData, "clipName" | "clipLine1">): CardData {
+/** Marks the names that may not fit, so only they are clipped (S1A-14); again whenever the width changes. */
+export function withClips(card: Omit<CardData, "clipName" | "clipLine1">): CardData {
   const width = card.width ?? undefined;
   const dual = card.rows.some((r) => r.pk && r.fk);
   return {

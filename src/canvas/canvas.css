@@ -154,3 +154,19 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas.tool-entity, .im-canvas.tool-entity * { cursor: copy !important }
 .im-canvas.relating .card.ent, .im-canvas.relating .card.ent .c-head { cursor: crosshair }
 .im-canvas.relating .card.ent:hover { box-shadow: 0 0 0 2px var(--im-rel) }
+
+/* ---------- card width (slice 1b, D-37, C-09; prototype .c-rs) ---------- */
+.im-canvas .c-rs { position: absolute; top: 0; bottom: 0; right: -4px; width: 8px; cursor: ew-resize; z-index: 3 }
+.im-canvas .c-rs::after { content: ""; position: absolute; top: 50%; right: 3px; width: 3px; height: 28px; margin-top: -14px; border-radius: 2px; background: var(--im-line); visibility: hidden }
+.im-canvas .card:hover .c-rs::after, .im-canvas .c-rs:hover::after { visibility: visible }
+/* While a card is resized, Chrome repaints that card instead of re-rastering the whole layer (spike follow-up, C-09). */
+.im-canvas.resizing .react-flow__viewport { will-change: auto }
+.im-canvas.resizing, .im-canvas.resizing * { cursor: ew-resize !important }
+
+/* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */
+/* One overlay above the cards; the cards are not restyled. Fill opacity on a handful of overlay shapes only. */
+.im-canvas .hover-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
+.im-canvas .hover-layer .hl { fill: var(--im-map); fill-opacity: .12 }
+.im-canvas .hover-layer .hnd { fill: var(--im-surface); stroke: var(--im-map); stroke-width: 1.5 }
+.im-canvas .hover-layer .moved { fill: var(--im-logical); animation: im-moved .6s ease-out forwards }
+@keyframes im-moved { from { fill-opacity: .22 } to { fill-opacity: 0 } }

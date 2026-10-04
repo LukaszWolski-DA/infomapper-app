@@ -163,6 +163,19 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
           </span>
         </div>
       </div>
+      {ctx.editable && (
+        <div
+          className="c-rs nodrag"
+          data-resize={card.id}
+          data-testid="handle-card-width"
+          title="Drag to change the width; double-click to fit the names"
+          onClick={(e) => e.stopPropagation()}
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            ctx.fitWidth(card.id);
+          }}
+        />
+      )}
       {!card.collapsed && lod && (
         <div className="c-lod" data-testid="card-block" title={card.name} style={{ height: BODY_PAD * 2 + Math.max(1, rows.length) * ROW_H }}>
           <div className="c-block" />

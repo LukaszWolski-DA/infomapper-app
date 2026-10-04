@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { lineNeedsClip, rowNeedsClip, titleNeedsClip } from "./text-fit";
+import { fitWidth, lineNeedsClip, rowNeedsClip, titleNeedsClip } from "./text-fit";
 
 const row = { name: "email", type: "String(100)", pk: false, fk: false, pii: false, bk: false, mappings: 1 };
 
@@ -29,5 +29,22 @@ describe("which names need a clip (S1A-14)", () => {
   it("counts wide letters wider", () => {
     expect(rowNeedsClip({ ...row, name: "iiiiiiiiiiiiiiiiiiii" }, "ent", false)).toBe(false);
     expect(rowNeedsClip({ ...row, name: "MMMMMMMMMMMMMMMMMMMM" }, "ent", false)).toBe(true);
+  });
+});
+
+describe("fit width to names (slice 1b, D-37)", () => {
+  const card = (names: string[]) => ({ kind: "ent" as const, name: "Customer", coverage: "1/2", rows: names.map((name) => ({ ...row, name })) });
+
+  it("is the narrowest width, in steps of 8, at which every name fits: short names shrink the card", () => {
+    expect(fitWidth(card(["id", "email"]))).toBe(200);
+    const w = fitWidth(card(["customer_preferred_contact_channel_code"]))!;
+    expect(w % 8).toBe(0);
+    expect(w).toBeGreaterThan(256);
+    expect(rowNeedsClip({ ...row, name: "customer_preferred_contact_channel_code" }, "ent", false, w)).toBe(false);
+    expect(rowNeedsClip({ ...row, name: "customer_preferred_contact_channel_code" }, "ent", false, w - 8)).toBe(true);
+  });
+
+  it("stays within 200–600 px", () => {
+    expect(fitWidth(card(["x".repeat(200)]))).toBe(600);
   });
 });

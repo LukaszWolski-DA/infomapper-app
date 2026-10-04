@@ -36,6 +36,13 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
   const handle = useRef<CanvasHandle | null>(null);
   const host = useRef<CanvasHost | null>(null);
   const [mode, setMode] = useState<CanvasMode>(null);
+  const [flash, setFlash] = useState<{ rowId: string; n: number } | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashRow = useCallback((rowId: string) => {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    setFlash((f) => ({ rowId, n: (f?.n ?? 0) + 1 }));
+    flashTimer.current = setTimeout(() => setFlash(null), 700);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after mount: localStorage is not available on the server
@@ -73,6 +80,9 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       },
       placeAt: (target, rows, at) => handle.current?.placeAt(target, rows, at),
       setCardView: (cardId, view) => handle.current?.setCardView(cardId, view),
+      fitWidth: (cardId) => handle.current?.fitWidth(cardId),
+      flash,
+      flashRow,
       mode,
       setMode,
       host: () => host.current,
@@ -80,7 +90,7 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
         host.current = h;
       },
     }),
-    [overviewOpen, toggleOverview, notation, setNotation, selection, mode],
+    [overviewOpen, toggleOverview, notation, setNotation, selection, mode, flash, flashRow],
   );
 
   return (

@@ -15,7 +15,7 @@ import {
 import type { WorkspaceModel } from "@/domain/types";
 import { buildCards } from "./card-data";
 import { curve, fNode, ieMarker, multText, relGeom, rowEnd, umlMarker, type Placed } from "./geometry";
-import { buildLines, relatedLines } from "./line-data";
+import { buildLines, hoverRows, relatedLines } from "./line-data";
 
 // Customer (customer_id, email) and Sales Order on the canvas, CRM customer as the source.
 // email ← email (direct, approved); customer_id ← cust_id + first_name (combined transform, D-49).
@@ -143,5 +143,27 @@ describe("line geometry", () => {
     expect(ieMarker({ x: 0, y: 0 }, { x: 1, y: 0 }, 1, "1").circle).toBeNull();
     expect([multText(0, "1"), multText(1, "1"), multText(0, "n"), multText(1, "n")]).toEqual(["0..1", "1", "0..*", "1..*"]);
     expect(umlMarker({ x: 0, y: 0 }, { x: 1, y: 0 })).toEqual({ x: 16, y: 11 });
+  });
+});
+
+describe("hoverRows (slice 1b, C-10)", () => {
+  const keys = (r: ReturnType<typeof hoverRows>) => r.map((x) => `${x.cardId}|${x.rowId}`).sort();
+
+  it("a hovered row marks itself and the rows at the other end of its mappings", () => {
+    expect(keys(hoverRows({ t: "row", cardId: ids.itemCustomer, id: ids.email }, lines))).toEqual(
+      [`${ids.itemCustomer}|${ids.email}`, `${ids.itemCrmCustomer}|${ids.colEmail}`].sort(),
+    );
+  });
+  it("a hovered column of a combined mapping marks every input and the attribute", () => {
+    const line = lines.mappings.find((m) => m.id === combined.id)!;
+    const r = keys(hoverRows({ t: "row", cardId: ids.itemCrmCustomer, id: ids.colFirstName }, lines));
+    expect(r).toContain(`${ids.itemCrmCustomer}|${ids.colFirstName}`);
+    expect(r).toContain(`${line.cardId}|${line.attributeId}`);
+    expect(r.length).toBe(new Set(line.inputs.map((i) => i.columnId)).size + 1);
+  });
+  it("a hovered mapping line marks its rows; nothing else marks rows", () => {
+    expect(keys(hoverRows({ t: "map", id: ids.mapEmail }, lines))).toEqual([`${ids.itemCrmCustomer}|${ids.colEmail}`, `${ids.itemCustomer}|${ids.email}`].sort());
+    expect(hoverRows(null, lines)).toEqual([]);
+    expect(hoverRows({ t: "card", id: ids.itemCustomer }, lines)).toEqual([]);
   });
 });

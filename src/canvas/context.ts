@@ -14,6 +14,8 @@ export interface CanvasCardsApi {
   cycleFilter: (cardId: string) => void;
   /** The relate button on an entity card: click, then click the other entity. */
   startRelate: (cardId: string) => void;
+  /** Double-click on the width handle. */
+  fitWidth: (cardId: string) => void;
 }
 
 const noop = () => {};
@@ -24,6 +26,7 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
   toggleCollapse: noop,
   cycleFilter: noop,
   startRelate: noop,
+  fitWidth: noop,
 });
 
 /** Relationship ends: crow's foot (Information Engineering) or UML multiplicity. Shared by all canvases (D-22). */
@@ -46,6 +49,8 @@ export interface CanvasHandle {
   freeSpot: () => { x: number; y: number };
   /** Places an element with the top middle of its card at a canvas point (toolbox “Add an entity or table here”). */
   placeAt: (target: CardTarget, rows: number, at: { x: number; y: number }) => void;
+  /** “Fit width to names” (D-37): the narrowest width at which every name of the card fits. */
+  fitWidth: (cardId: Uuid) => void;
   /** Collapses or expands a card, or sets its row filter (toolbox); saved like the card's own buttons. */
   setCardView: (cardId: Uuid, view: { collapsed?: boolean; rowFilter?: RowFilter }) => void;
 }
@@ -92,7 +97,11 @@ export interface CanvasHost {
   /** A relationship from one entity card to another (relate button or “Draw a relationship from here”). */
   relate: (fromCardId: Uuid, toCardId: Uuid) => void;
   openToolbox: (request: ToolboxRequest) => void;
+  /** Ctrl/Alt + ↑/↓ with an attribute selected (D-36): one place up or down, with Shift to the top or bottom. */
+  moveAttribute: (attributeId: Uuid, how: AttributeMove) => void;
 }
+
+export type AttributeMove = "up" | "down" | "top" | "bottom";
 
 /** Shared between the canvas, the panels and the canvas tools in the top bar (notation, zoom, fit). */
 export interface CanvasUiApi extends CanvasHandle {
@@ -107,6 +116,9 @@ export interface CanvasUiApi extends CanvasHandle {
   /** The active canvas tool, shared with the top bar's Entity tool button. */
   mode: CanvasMode;
   setMode: (mode: CanvasMode) => void;
+  /** A row that was just moved flashes briefly (D-36); `n` restarts the flash. */
+  flash: { rowId: Uuid; n: number } | null;
+  flashRow: (rowId: Uuid) => void;
   /** The page's handlers for what happens on the canvas; null until the page registers them. */
   host: () => CanvasHost | null;
   registerHost: (host: CanvasHost | null) => void;
@@ -125,10 +137,13 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   centerOn: noop,
   freeSpot: () => ({ x: 0, y: 0 }),
   placeAt: noop,
+  fitWidth: noop,
   setCardView: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,
+  flash: null,
+  flashRow: noop,
   host: () => null,
   registerHost: noop,
 });

@@ -22,10 +22,13 @@ import {
 import "@xyflow/react/dist/style.css";
 import "./canvas.css";
 import { useToast } from "@/ui/components/toast";
-import type { CardData } from "./card-data";
+import { withClips, type CardData } from "./card-data";
 import CardNode, { FILTER_ORDER, type CardNodeT } from "./CardNode";
 import { RelateLine, useCanvasModes } from "./CanvasModes";
+import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
+import HoverOverlay from "./HoverOverlay";
+import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop } from "./context";
 import {
@@ -43,7 +46,7 @@ import {
   stackSpot,
   type Rect,
 } from "./geometry";
-import { relatedLines, type CanvasLines } from "./line-data";
+import { relatedLines, type CanvasLines, type Selection } from "./line-data";
 import LineLayer from "./LineLayer";
 import { Overview } from "./Overview";
 
@@ -56,6 +59,7 @@ export interface CardChange {
   rowFilter?: CardData["rowFilter"];
   x?: number;
   y?: number;
+  width?: number | null;
 }
 /** What a canvas write returns: the value, or the domain's message for a toast. */
 export type CanvasWriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
@@ -74,7 +78,7 @@ export interface ModelCanvasProps {
   removeCard: (input: { canvasItemId: string; expectedVersion: number }) => Promise<CanvasWriteResult<unknown>>;
 }
 
-type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y">>;
+type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width">>;
 
 const toNode = (card: CardData, editable: boolean): CardNodeT => ({
   id: card.id,
@@ -119,7 +123,9 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   const height = useStore((s) => s.height);
   const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(c, editable)));
   const [ready, setReady] = useState(false);
-  const related = useMemo(() => relatedLines(selection, lines), [selection, lines]);
+  /** The row or line under the mouse (C-10); it takes over the emphasis from the selection while it lasts. */
+  const [hover, setHover] = useState<Selection>(null);
+  const related = useMemo(() => relatedLines(hover, lines) ?? relatedLines(selection, lines), [hover, selection, lines]);
   const onColumnDrop = useCallback((drop: ColumnDrop) => ui.host()?.dropColumn(drop), [ui]);
   const { draft, onPointerDown } = useColumnDrag(editable, onColumnDrop);
   const modes = useCanvasModes(editable);
@@ -153,7 +159,17 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   const { toggleEntityTool } = modes;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
+      if (isTyping(e.target)) return;
+      // Ctrl or Alt + up/down moves the selected attribute, with Shift to the top or bottom (D-36)
+      if ((e.ctrlKey || e.altKey) && (e.key === "ArrowUp" || e.key === "ArrowDown") && editable && selection?.t === "row") {
+        const card = (rf.getNode(selection.cardId) as CardNodeT | undefined)?.data.card;
+        if (card?.kind !== "ent") return;
+        e.preventDefault();
+        const up = e.key === "ArrowUp";
+        ui.host()?.moveAttribute(selection.id, e.shiftKey ? (up ? "top" : "bottom") : up ? "up" : "down");
+        return;
+      }
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       const k = e.key.toLowerCase();
       if (k === "f") fit();
       else if (k === "m") ui.toggleOverview();
@@ -165,7 +181,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fit, ui, select, toggleEntityTool]);
+  }, [fit, ui, select, toggleEntityTool, editable, selection, rf]);
 
   // ---- card changes: applied at once, saved in order, undone on refusal ----
   const queue = useRef(new Map<string, Promise<void>>());
@@ -190,8 +206,8 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       return initialCards.map((c) => {
         const mine = local.get(c.id);
         if (!mine || (!(pending.current.get(c.id) ?? 0) && !mine.dragging)) return toNode(c, editable);
-        const { x, y, collapsed, rowFilter } = mine.data.card;
-        return { ...toNode({ ...c, x, y, collapsed, rowFilter }, editable), position: mine.position, dragging: mine.dragging };
+        const { x, y, collapsed, rowFilter, width } = mine.data.card;
+        return { ...toNode({ ...c, x, y, collapsed, rowFilter, width }, editable), position: mine.position, dragging: mine.dragging };
       });
     });
     for (const c of initialCards) if (!(pending.current.get(c.id) ?? 0)) versions.current.set(c.id, c.version);
@@ -201,8 +217,9 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
     setNodes((ns) =>
       ns.map((n) => {
         if (n.id !== id) return n;
-        const card = { ...n.data.card, ...patch };
-        return { ...n, position: { x: card.x, y: card.y }, height: cardHeight(card), data: { card } };
+        const merged = { ...n.data.card, ...patch };
+        const card = patch.width !== undefined ? withClips(merged) : merged;
+        return { ...n, position: { x: card.x, y: card.y }, width: cardWidth(card), height: cardHeight(card), data: { card } };
       }),
     );
   }, []);
@@ -225,6 +242,19 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       });
     },
     [patchCard, saveCard, toast, enqueue],
+  );
+
+  // ---- card width (D-37, C-09) ----
+  const resize = useCardResize(editable, patchCard, change);
+  const fitWidth = useCallback(
+    (id: string) => {
+      const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
+      if (!card) return;
+      const width = fitWidthOf({ kind: card.kind, name: card.name, coverage: `${card.mapped}/${card.rows.length}`, rows: card.rows });
+      if (width !== card.width) change(id, { width }, { width: card.width });
+      toast("Fitted the card to its names.");
+    },
+    [rf, change, toast],
   );
 
   // ---- placing and removing cards (left and right panel) ----
@@ -335,6 +365,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       remove,
       centerOn,
       freeSpot: () => freeSpot(viewRect(), occupied()),
+      fitWidth,
       placeAt: (target, rows, at) => void placeAt(target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(rows), false),
       setCardView: (id, view) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
@@ -346,7 +377,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -388,8 +419,9 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         change(id, { rowFilter: next }, { rowFilter: card.rowFilter });
       },
       startRelate: modes.startRelate,
+      fitWidth,
     }),
-    [editable, selection, select, change, rf, modes.startRelate],
+    [editable, selection, select, change, rf, modes.startRelate, fitWidth],
   );
 
   const onNodesChange = useCallback(
@@ -408,10 +440,23 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
     [change],
   );
 
+  // ---- hover (C-10): a row of a card or a mapping line; nothing while dragging or with a tool on ----
+  const busy = !!draft || !!ui.mode || resize.resizing;
+  const onHoverOver = useCallback((e: React.PointerEvent) => {
+    if (e.buttons) return;
+    const el = e.target as Element;
+    const row = el.closest<HTMLElement>(".row[data-row]");
+    const cardId = row?.closest<HTMLElement>("[data-card]")?.dataset.card;
+    const mappingId = el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
+    const next: Selection = row && cardId ? { t: "row", cardId, id: row.dataset.row! } : mappingId ? { t: "map", id: mappingId } : null;
+    setHover((h) => (h?.t === next?.t && (h && "id" in h ? h.id : null) === (next && "id" in next ? next.id : null) ? h : next));
+  }, []);
+  const emphasis = busy ? relatedLines(selection, lines) : related;
+
   return (
     <CanvasCardsCtx.Provider value={cardsApi}>
       <div
-        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}`}
+        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${resize.resizing ? " resizing" : ""}`}
         data-testid="area-canvas"
         data-mode={ui.mode?.kind}
         data-ready={ready || undefined}
@@ -420,7 +465,11 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         onDragOver={onDragOver}
         onDrop={onDrop}
         onPointerDown={onPointerDown}
-        onPointerDownCapture={modes.onPointerDownCapture}
+        onPointerDownCapture={(e) => {
+          if (!resize.onPointerDown(e)) modes.onPointerDownCapture(e);
+        }}
+        onPointerOver={onHoverOver}
+        onPointerLeave={() => setHover(null)}
         onContextMenu={modes.onContextMenu}
       >
         <ReactFlow
@@ -450,8 +499,9 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
           attributionPosition="bottom-left"
           aria-label="Model canvas"
         >
-          <LineLayer lines={lines} selection={selection} related={related} onSelect={select} />
+          <LineLayer lines={lines} selection={selection} related={emphasis} onSelect={select} />
           <Overview lines={lines} />
+          <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>
