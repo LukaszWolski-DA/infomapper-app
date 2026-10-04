@@ -43,7 +43,8 @@ export function CanvasTiles({ view }: { view: ProjectView }) {
                 {canvas.name}
               </span>
               <span className="block px-3 pb-3 text-[11.5px] text-im-ink-3">
-                0 cards{also.length ? `. Also in ${also.map((p) => p.name).join(", ")}` : ""}
+                {canvas.cards} card{canvas.cards === 1 ? "" : "s"}
+                {also.length ? `. Also in ${also.map((p) => p.name).join(", ")}` : ""}
               </span>
             </Link>
             {view.canEdit && (

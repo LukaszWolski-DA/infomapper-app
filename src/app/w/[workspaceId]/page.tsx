@@ -4,6 +4,7 @@ import { AppShell } from "@/app/_components/app-shell";
 import { projectHref, workspaceHref } from "@/app/_lib/paths";
 import { ROLE_LABEL } from "@/app/_lib/roles";
 import { loadShell } from "@/app/_lib/shell";
+import { workspaceStats } from "@/app/_panels/stats";
 import { getDataStore } from "@/data";
 import { can } from "@/domain/permissions";
 import { ArchiveBox, UnarchiveButton } from "./_components/lifecycle";
@@ -21,10 +22,11 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const shell = await loadShell({ workspaceId });
   const store = getDataStore();
   const workspace = (await store.workspaces.get(workspaceId))!;
-  const [members, users, projects] = await Promise.all([
+  const [members, users, projects, model] = await Promise.all([
     store.workspaces.listMembers(workspaceId),
     store.users.list(),
     store.projects.list(workspaceId),
+    store.model.load(workspaceId),
   ]);
   const orgMemberships = await store.organizations.listMembershipsOfUsers(members.map((m) => m.user_id));
   const organizations = await Promise.all(
@@ -45,6 +47,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     return { user, role: m.role, guestFrom: guest ? homes.map((o) => orgName(o.organization_id)).join(", ") : null };
   });
 
+  const stats = workspaceStats(model);
   const counts = new Map(shell.projects.map((p) => [p.id, p.canvasCount]));
 
   return (
@@ -110,22 +113,29 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                   <b>{projects.length}</b> project{projects.length === 1 ? "" : "s"}
                 </Stat>
                 <Stat>
-                  <b>0</b> entities
+                  <b>{stats.entities}</b> entities
                 </Stat>
                 <Stat>
-                  <b>0</b> source tables
+                  <b>{stats.sourceTables}</b> source tables
                 </Stat>
                 <Stat>
-                  <b>0</b> of <b>0</b> mappings approved
+                  <b>{stats.approved}</b> of <b>{stats.mappings}</b> mappings approved
                 </Stat>
                 <Stat>
                   <b>0</b> of <b>0</b> requirements covered
                 </Stat>
+                {stats.typeProblems > 0 && (
+                  <Stat warn>
+                    <b>{stats.typeProblems}</b> type problem{stats.typeProblems > 1 ? "s" : ""}
+                  </Stat>
+                )}
               </div>
-              <Banner tone="info">
-                This workspace is empty. Next steps: add sources (import comes with architecture area A-04), create
-                concepts and entities, then set up projects and canvases.
-              </Banner>
+              {stats.entities === 0 && stats.sourceTables === 0 && (
+                <Banner tone="info">
+                  This workspace is empty. Next steps: add sources (import comes with architecture area A-04), create
+                  concepts and entities, then set up projects and canvases.
+                </Banner>
+              )}
 
               <H3>Projects</H3>
               <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-4" data-testid="tiles-projects">
@@ -287,8 +297,10 @@ function Banner({ tone, testId, children }: { tone: "warn" | "info"; testId?: st
   );
 }
 
-const Stat = ({ children }: { children: ReactNode }) => (
-  <span className="rounded-[14px] bg-im-surface px-[11px] py-[3px] text-xs text-im-ink-2 shadow-[0_0_0_1px_var(--im-line)] [&_b]:font-semibold [&_b]:text-im-ink">
+const Stat = ({ children, warn }: { children: ReactNode; warn?: boolean }) => (
+  <span
+    className={`rounded-[14px] bg-im-surface px-[11px] py-[3px] text-xs shadow-[0_0_0_1px_var(--im-line)] [&_b]:font-semibold ${warn ? "text-im-warn [&_b]:text-im-warn" : "text-im-ink-2 [&_b]:text-im-ink"}`}
+  >
     {children}
   </span>
 );

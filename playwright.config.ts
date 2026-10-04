@@ -22,7 +22,8 @@ export default defineConfig({
   // Its own port and data file, so a running `npm run dev` and its data are left alone.
   webServer: {
     // The server starts before globalSetup, so it seeds its data file itself.
-    command: `npm run reset-dev-data && npm run dev -- --port ${E2E_PORT}`,
+    // a fresh build folder every run: the server is stopped by force at the end, so nothing of the last run is reused
+    command: `npx tsx scripts/clean-e2e-build.ts .next-e2e && npm run reset-dev-data && npm run dev -- --port ${E2E_PORT}`,
     url: `${baseURL}/sign-in`,
     env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e" },
     reuseExistingServer: !process.env.CI,

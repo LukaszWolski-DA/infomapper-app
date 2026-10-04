@@ -35,10 +35,11 @@ export async function signOutViaMenu(page: Page) {
   await expect(page).toHaveURL(/\/sign-in$/);
 }
 
-export async function expectToast(page: Page, message: string | RegExp) {
+/** The toast shows the message. `timeout` is for steps on a freshly started server, which compiles on first use. */
+export async function expectToast(page: Page, message: string | RegExp, timeout?: number) {
   const toast = page.getByTestId("toast");
-  await expect(toast).toHaveAttribute("data-visible", "true");
-  await expect(toast).toHaveText(message);
+  await expect(toast).toHaveAttribute("data-visible", "true", { timeout });
+  await expect(toast).toHaveText(message, { timeout });
 }
 
 /** Types a name into a switcher's "…, then Enter" field. */

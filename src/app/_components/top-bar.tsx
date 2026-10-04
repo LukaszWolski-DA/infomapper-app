@@ -1,7 +1,7 @@
 "use client";
 
 // The top bar as in the prototype: brand, Organization ▾ / Workspace ▾ / Project ▾ switchers and the user indicator.
-// Canvas tools (layers, Focus, Hand, Entity, Note, Frame, notation, zoom, panels) arrive with the canvas (AD-24).
+// Canvas pages add their tools (slice 1a: zoom and fit) before the user indicator.
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -23,11 +23,11 @@ import type { ShellData } from "../_lib/shell";
 import { projectHref, workspaceHref } from "../_lib/paths";
 import { ROLE_CAN, ROLE_LABEL } from "../_lib/roles";
 
-export function TopBar({ shell }: { shell: ShellData }) {
+export function TopBar({ shell, tools }: { shell: ShellData; tools?: ReactNode }) {
   return (
     <header
       data-testid="bar-top"
-      className="flex h-12 min-w-0 flex-none items-center gap-2.5 border-b border-im-line bg-im-surface px-2.5"
+      className="flex h-12 min-w-0 flex-none items-center gap-2.5 overflow-hidden border-b border-im-line bg-im-surface px-2.5"
     >
       <div className="mr-1.5 hidden whitespace-nowrap sm:block">
         <b className="text-sm font-semibold">InfoMapper</b>
@@ -38,6 +38,7 @@ export function TopBar({ shell }: { shell: ShellData }) {
       <PathSep />
       <ProjectSwitcher shell={shell} />
       <div className="flex-1" />
+      {tools}
       <UserIndicator shell={shell} />
     </header>
   );
@@ -50,9 +51,9 @@ function SwitcherButton({ testId, title, children }: { testId: string; title: st
     <DropdownMenuTrigger
       data-testid={testId}
       title={title}
-      className="inline-flex h-[30px] max-w-[260px] items-center gap-1.5 rounded-md px-2 font-medium text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover"
+      className="inline-flex h-[30px] min-w-0 max-w-[260px] items-center gap-1.5 rounded-md px-2 font-medium text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover"
     >
-      <span className="truncate">{children}</span>
+      <span className="min-w-0 truncate">{children}</span>
       <svg viewBox="0 0 16 16" className="size-3 flex-none fill-none stroke-current stroke-[1.6]" aria-hidden>
         <path d="M4.5 6.5L8 10l3.5-3.5" />
       </svg>

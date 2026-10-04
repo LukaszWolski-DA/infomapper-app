@@ -25,7 +25,7 @@ test("S0-04: Łukasz creates project Finance and canvas Invoices; Finance has Fi
   await expect(page.getByTestId("tab-canvas-name")).toHaveText(["First canvas", "Invoices"]);
   await expect(page.getByTestId("tab-canvas").filter({ hasText: "Invoices" })).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("area-canvas")).toContainText("The canvas is empty");
-  await expect(page.getByTestId("area-canvas")).toContainText("The canvas arrives in slice 1.");
+  await expect(page.getByTestId("area-canvas")).toContainText("Drag entities and source tables here from the left panel.");
   await expect(page.getByTestId("panel-left")).toBeVisible();
   await expect(page.getByTestId("panel-inspector")).toBeVisible();
   await expect(page).not.toHaveURL(/rename=1/);

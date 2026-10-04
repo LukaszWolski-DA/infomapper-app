@@ -7,9 +7,15 @@ import { WORKSPACE_ROLES, type WorkspaceRole } from "./types";
 // Expected matrix (AD-05, prototype "What each role can do").
 const expected: Record<WorkspaceRole, WorkspaceAction[]> = {
   owner: [...WORKSPACE_ACTIONS].filter((a) => a !== "workspace.unarchive"),
-  admin: ["workspace.view", "workspace.edit_settings", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects"],
-  modeler: ["workspace.view", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects"],
-  reviewer: ["workspace.view"],
+  admin: [
+    "workspace.view", "workspace.edit_settings", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects",
+    "canvas.edit_items", "model.edit", "mapping.set_status",
+  ],
+  modeler: [
+    "workspace.view", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects", "canvas.edit_items",
+    "model.edit", "mapping.set_status",
+  ],
+  reviewer: ["workspace.view", "mapping.set_status"],
   reader: ["workspace.view"],
 };
 

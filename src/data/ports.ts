@@ -8,6 +8,7 @@ import type { Uuid } from "@/domain/ids";
 import type {
   AppUser,
   Canvas,
+  CanvasItem,
   ChangeEvent,
   Organization,
   OrganizationMember,
@@ -15,7 +16,10 @@ import type {
   ProjectCanvas,
   Workspace,
   WorkspaceMember,
+  WorkspaceModel,
 } from "@/domain/types";
+
+export type { WorkspaceModel } from "@/domain/types";
 
 export interface UserRepository {
   list(): Promise<AppUser[]>;
@@ -53,9 +57,23 @@ export interface CanvasRepository {
   listLinksOfCanvas(workspaceId: Uuid, canvasId: Uuid): Promise<ProjectCanvas[]>;
 }
 
+export interface ModelRepository {
+  /** Every live model row of the workspace, from concepts to mapping inputs. */
+  load(workspaceId: Uuid): Promise<WorkspaceModel>;
+}
+
+export interface CanvasItemRepository {
+  get(workspaceId: Uuid, canvasItemId: Uuid): Promise<CanvasItem | null>;
+  /** Cards on every canvas of the workspace (for the delete impact, D-47). */
+  list(workspaceId: Uuid): Promise<CanvasItem[]>;
+  listOfCanvas(workspaceId: Uuid, canvasId: Uuid): Promise<CanvasItem[]>;
+}
+
 export interface ChangeEventRepository {
   /** The change log of a workspace, oldest first. */
   list(workspaceId: Uuid): Promise<ChangeEvent[]>;
+  /** Events about one mapping and its inputs, oldest first (four-eyes, AD-06). */
+  listForMapping(workspaceId: Uuid, mappingId: Uuid): Promise<ChangeEvent[]>;
 }
 
 export type ApplyResult = { ok: true } | { ok: false; error: DomainError };
@@ -66,6 +84,8 @@ export interface DataStore {
   workspaces: WorkspaceRepository;
   projects: ProjectRepository;
   canvases: CanvasRepository;
+  model: ModelRepository;
+  canvasItems: CanvasItemRepository;
   changeEvents: ChangeEventRepository;
   /**
    * Applies the rows and change events of one command together or not at all (AD-13). Refuses a stale version,

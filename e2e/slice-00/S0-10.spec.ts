@@ -1,4 +1,5 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
+import { rmSync } from "node:fs";
 import { E2E_DB } from "../config";
 import { expect, test } from "./fixtures";
 import { createFromSwitcher, expectToast, signInAs } from "./helpers";
@@ -7,10 +8,11 @@ import { createFromSwitcher, expectToast, signInAs } from "./helpers";
 // so it can restart it without touching the server the other tests use.
 const PORT = 3201;
 const BASE = `http://localhost:${PORT}`;
+const DIST = ".next-e2e-restart";
 
 function startServer(): ChildProcess {
   return spawn("npx", ["next", "dev", "--port", String(PORT)], {
-    env: { ...process.env, INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e-restart" },
+    env: { ...process.env, INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: DIST },
     shell: true,
     stdio: "ignore",
     detached: process.platform !== "win32",
@@ -40,6 +42,20 @@ function stopServer(server?: ChildProcess) {
   }
 }
 
+/** This test's server, stopped after the test even when it times out (a `finally` does not run then, and a server
+ * left on port 3201 disturbed the next run's server). */
+let server: ChildProcess | undefined;
+test.afterEach(async () => {
+  stopServer(server);
+  server = undefined;
+  await waitUntil(false);
+  // a server stopped by force can leave half-written files (route types that `tsc` reads); this folder is only ours
+  rmSync(DIST, { recursive: true, force: true });
+});
+
+/** Steps on a freshly started dev server wait longer: it compiles each page and action on first use. */
+const COLD = 60_000;
+
 async function waitUntil(up: boolean) {
   for (let i = 0; i < 240; i++) {
     const ok = await fetch(`${BASE}/sign-in`).then(
@@ -53,10 +69,11 @@ async function waitUntil(up: boolean) {
 }
 
 test("S0-10: after stopping and restarting the dev server, created projects and canvases are still there", async ({ browser }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(480_000);
   stopServer(); // a server left over from an interrupted run
   await waitUntil(false);
-  let server = startServer();
+  rmSync(DIST, { recursive: true, force: true });
+  server = startServer();
   // a browser session that talks to this test's own server, not the shared one
   const context = await browser.newContext({ baseURL: BASE });
   const page = await context.newPage();
@@ -65,11 +82,11 @@ test("S0-10: after stopping and restarting the dev server, created projects and 
     await signInAs(page, "Łukasz");
     expect(new URL(page.url()).port).toBe(String(PORT));
     await createFromSwitcher(page, "switcher-project", "input-new-project", "Survivor");
-    await expectToast(page, "Created the project Survivor.");
+    await expectToast(page, "Created the project Survivor.", COLD);
     await page.getByTestId("tile-new-canvas").click();
     await page.getByTestId("input-canvas-name").fill("Still here");
     await page.getByTestId("input-canvas-name").press("Enter");
-    await expectToast(page, "Renamed the canvas to Still here.");
+    await expectToast(page, "Renamed the canvas to Still here.", COLD);
     await expect(page).not.toHaveURL(/rename=1/);
     const canvasUrl = page.url();
 
@@ -80,11 +97,10 @@ test("S0-10: after stopping and restarting the dev server, created projects and 
 
     await page.goto(canvasUrl);
     expect(new URL(page.url()).port).toBe(String(PORT));
-    await expect(page.getByTestId("switcher-project")).toHaveText("Survivor");
-    await expect(page.getByTestId("tab-canvas-name")).toHaveText(["First canvas", "Still here"]);
-    await expect(page.getByTestId("area-canvas")).toBeVisible();
+    await expect(page.getByTestId("switcher-project")).toHaveText("Survivor", { timeout: COLD });
+    await expect(page.getByTestId("tab-canvas-name")).toHaveText(["First canvas", "Still here"], { timeout: COLD });
+    await expect(page.getByTestId("area-canvas")).toBeVisible({ timeout: COLD });
   } finally {
     await context.close();
-    stopServer(server);
   }
 });

@@ -1,6 +1,8 @@
 import { AppShell } from "@/app/_components/app-shell";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { loadShell } from "@/app/_lib/shell";
+import { projectStats } from "@/app/_panels/stats";
+import { getDataStore } from "@/data";
 import { CanvasTiles } from "./_components/project-tiles";
 
 // Project home (D-29): the project's canvases as tiles. Requirements, labels and open notes come with those slices.
@@ -9,6 +11,9 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   const shell = await loadShell({ workspaceId, projectId });
   const view = await loadProjectView(shell);
   const n = view.canvases.length;
+  const store = getDataStore();
+  const [model, items] = await Promise.all([store.model.load(shell.workspace.id), store.canvasItems.list(shell.workspace.id)]);
+  const st = projectStats(model, items, view.canvases.map((c) => c.id));
 
   return (
     <AppShell shell={shell} project={{ view, currentCanvasId: null }}>
@@ -22,13 +27,13 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
               <b>{n}</b> canvas{n === 1 ? "" : "es"}
             </span>
             <span>
-              <b>0</b> entities
+              <b>{st.entities}</b> entit{st.entities === 1 ? "y" : "ies"}
             </span>
             <span>
-              <b>0</b> source tables
+              <b>{st.sourceTables}</b> source table{st.sourceTables === 1 ? "" : "s"}
             </span>
             <span>
-              <b>0</b> of <b>0</b> attributes mapped
+              <b>{st.mapped}</b> of <b>{st.attributes}</b> attributes mapped
             </span>
           </div>
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Canvases</h3>

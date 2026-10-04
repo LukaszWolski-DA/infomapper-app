@@ -9,11 +9,18 @@ interface ProjectFrame {
   view: ProjectView;
   currentCanvasId: string | null;
   renameOnOpen?: boolean;
+  /** Canvas tools for the top bar (zoom, fit), on canvas pages. */
+  tools?: ReactNode;
+  /** Panel contents on canvas pages; project pages show placeholders. */
+  left?: ReactNode;
+  right?: ReactNode;
+  /** The status bar under the panels, on canvas pages. */
+  status?: ReactNode;
 }
 
 /**
  * The page frame. Workspace pages: top bar, breadcrumbs, content. Project and canvas pages, as in the prototype:
- * left panel | canvas tabs, breadcrumbs and content | right panel. The panels are empty until a later slice.
+ * left panel | canvas tabs, breadcrumbs and content | right panel. Canvas pages fill the panels.
  */
 export function AppShell({ shell, project, children }: { shell: ShellData; project?: ProjectFrame; children: ReactNode }) {
   if (!project) {
@@ -27,13 +34,13 @@ export function AppShell({ shell, project, children }: { shell: ShellData; proje
   }
   return (
     <div className="flex h-dvh min-h-0 flex-col bg-im-panel text-im-ink">
-      <TopBar shell={shell} />
+      <TopBar shell={shell} tools={project.tools} />
       <div className="grid min-h-0 flex-1 grid-cols-[1fr] lg:grid-cols-[264px_1fr_340px]">
         <aside
           data-testid="panel-left"
           className="hidden min-h-0 flex-col overflow-hidden border-r border-im-line bg-im-panel lg:flex"
         >
-          <PanelPlaceholder>Model, sources and requirements arrive in a later slice.</PanelPlaceholder>
+          {project.left ?? <PanelPlaceholder>Model, sources and requirements arrive in a later slice.</PanelPlaceholder>}
         </aside>
         <div className="flex min-h-0 min-w-0 flex-col">
           <CanvasTabs view={project.view} currentCanvasId={project.currentCanvasId} renameOnOpen={!!project.renameOnOpen} />
@@ -44,9 +51,10 @@ export function AppShell({ shell, project, children }: { shell: ShellData; proje
           data-testid="panel-inspector"
           className="hidden min-h-0 flex-col overflow-hidden border-l border-im-line bg-im-panel lg:flex"
         >
-          <PanelPlaceholder>Details of what you select appear here in a later slice.</PanelPlaceholder>
+          {project.right ?? <PanelPlaceholder>Details of what you select appear here in a later slice.</PanelPlaceholder>}
         </aside>
       </div>
+      {project.status}
     </div>
   );
 }
