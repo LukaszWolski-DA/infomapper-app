@@ -2,15 +2,15 @@
 
 // Model writes from the panels (slice 1a): concepts (D-46, D-47), entities with their impact before deleting,
 // attributes, relationships, and source tables and columns; from the canvas (slice 1b): a new attribute from a
-// dropped column. Mappings are in mapping.ts.
+// dropped column, attribute order, a new relationship. Mappings are in mapping.ts.
 
 import { revalidatePath } from "next/cache";
 import { getDataStore, type DataStore } from "@/data";
 import type { CommandContext, CommandResult } from "@/domain/changes";
-import { addAttribute, createAttributeFromColumn, deleteAttribute, updateAttribute, type UpdateAttributeInput } from "@/domain/commands/attribute";
+import { addAttribute, createAttributeFromColumn, deleteAttribute, reorderAttribute, updateAttribute, type UpdateAttributeInput } from "@/domain/commands/attribute";
 import { createConcept, deleteConcept, renameConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity, type UpdateEntityInput } from "@/domain/commands/entity";
-import { deleteRelationship, swapRelationship, updateRelationship, type UpdateRelationshipInput } from "@/domain/commands/relationship";
+import { createRelationship, deleteRelationship, swapRelationship, updateRelationship, type UpdateRelationshipInput } from "@/domain/commands/relationship";
 import { createSourceTable, deleteSourceTable, updateSourceColumn, type CreateSourceTableInput, type UpdateSourceColumnInput } from "@/domain/commands/source";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceModel } from "@/domain/types";
@@ -76,7 +76,7 @@ export async function deleteConceptAction(
 /** A new entity in a concept, with its card on the canvas at the given spot (D-46). */
 export async function createEntityAction(
   workspaceId: string,
-  input: { conceptId: string; placement: { canvasId: string; x: number; y: number } },
+  input: { conceptId: string; name?: string; placement: { canvasId: string; x: number; y: number } },
 ): Promise<ActionResult<{ entityId: string; canvasItemId: string | null; name: string }>> {
   return modelCommand(workspaceId, async (ctx, access, { concepts, entities }, store) => {
     const canvas = await store.canvases.get(access.workspace.id, str(input?.placement?.canvasId));
@@ -160,6 +160,16 @@ export async function updateAttributeAction(workspaceId: string, input: UpdateAt
   });
 }
 
+/** Moves an attribute to a position among its entity's attributes (slice 1b, D-36). */
+export async function reorderAttributeAction(
+  workspaceId: string,
+  input: { attributeId: string; expectedVersion: number; position: number },
+): Promise<ActionResult<{ position: number }>> {
+  return modelCommand(workspaceId, (ctx, access, { attributes }) =>
+    reorderAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), attributes }, input),
+  );
+}
+
 /** Deletes an attribute with its mappings and their inputs. */
 export async function deleteAttributeAction(
   workspaceId: string,
@@ -171,6 +181,17 @@ export async function deleteAttributeAction(
 }
 
 // ---- relationships ----
+
+/** The relate button on an entity card (slice 1b): a relationship with the default ends, 1 to 0..n. */
+export async function createRelationshipAction(
+  workspaceId: string,
+  input: { fromEntityId: string; toEntityId: string },
+): Promise<ActionResult<{ relationshipId: string }>> {
+  return modelCommand(workspaceId, (ctx, access, { entities }) => {
+    const result = createRelationship(ctx, access, { from: byId(entities, input?.fromEntityId), to: byId(entities, input?.toEntityId) }, input);
+    return result.ok ? { ...result, value: { relationshipId: result.value.relationship.id } } : result;
+  });
+}
 
 /** Verb phrase and the cardinality at both ends. */
 export async function updateRelationshipAction(workspaceId: string, input: UpdateRelationshipInput): Promise<ActionResult<null>> {
