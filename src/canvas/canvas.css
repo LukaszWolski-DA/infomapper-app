@@ -168,5 +168,11 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .hover-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
 .im-canvas .hover-layer .hl { fill: var(--im-map); fill-opacity: .12 }
 .im-canvas .hover-layer .hnd { fill: var(--im-surface); stroke: var(--im-map); stroke-width: 1.5 }
+.im-canvas .hover-layer .resize-outline { fill: none; stroke: var(--im-logical); stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke }
 .im-canvas .hover-layer .moved { fill: var(--im-logical); animation: im-moved .6s ease-out forwards }
 @keyframes im-moved { from { fill-opacity: .22 } to { fill-opacity: 0 } }
+
+/* Hover (C-10): the hovered lines drawn again, a little stronger, above the others; nothing is restyled. */
+.im-canvas .hover-lines .lnk { pointer-events: none }
+.im-canvas .hover-lines .lnk .hit { display: none }
+.im-canvas .hover-lines .lnk .s { stroke-width: 2.4 }
