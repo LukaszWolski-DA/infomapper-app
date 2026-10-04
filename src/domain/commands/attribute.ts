@@ -1,14 +1,17 @@
-// Attribute commands: “Add attribute” in the entity panel, edit in the attribute panel, delete with its mappings.
+// Attribute commands: “Add attribute” in the entity panel, edit in the attribute panel, delete with its mappings;
+// slice 1b: a new attribute from a column dropped on an entity's header, and the attribute order (D-36).
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { plainTextPair } from "../model/plain-text";
+import { logicalTypeOf } from "../model/type-check";
 import type { WorkspaceAccess } from "../permissions";
-import { LOGICAL_TYPES, type Attribute, type AttributeType, type Entity, type Mapping, type MappingInput } from "../types";
+import { LOGICAL_TYPES, type Attribute, type AttributeType, type Entity, type Mapping, type MappingInput, type SourceColumn } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
-import { begin, current, done, isLive, nextSortOrder, nothingToChange, plainTextSchema, softDelete } from "./shared";
+import { createMapping } from "./mapping";
+import { begin, current, done, found, isLive, nextSortOrder, nothingToChange, plainTextSchema, softDelete } from "./shared";
 
 const DEFAULT_ATTRIBUTE_NAME = "new_attribute";
 
@@ -191,4 +194,114 @@ export function deleteAttribute(
     softDelete(ctx, "attribute", attribute),
   ];
   return done(ctx, access, { mappings: mappings.length }, writes);
+}
+
+// ---- new attribute from a column (slice 1b) ----
+
+const fromColumnInput = z.object({ entityId: uuidSchema, sourceColumnId: uuidSchema }).strict();
+export type CreateAttributeFromColumnInput = z.input<typeof fromColumnInput>;
+
+export interface CreateAttributeFromColumnState {
+  entity: Entity | null;
+  /** The entity's attributes. */
+  attributes: readonly Attribute[];
+  column: SourceColumn | null;
+  /** Live mappings of the entity's attributes and their inputs, to refuse the same mapping twice. */
+  mappings: readonly Mapping[];
+  mappingInputs: readonly MappingInput[];
+}
+
+/**
+ * A column dropped on an entity card's header: a new attribute at the end, named after the column, with the matching
+ * logical type and parameters (`logicalTypeOf`), the column's PII flag, nullability and comment as in the prototype,
+ * and a direct mapping from the column, in one change group. If the entity already has an attribute of that name
+ * (ignoring case), the column is mapped to it instead, as the prototype does.
+ */
+export function createAttributeFromColumn(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: CreateAttributeFromColumnState,
+  input: unknown,
+): CommandResult<{ attributeId: Uuid; mappingId: Uuid; createdAttribute: boolean }> {
+  const parsed = begin(access, "model.edit", fromColumnInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { entityId, sourceColumnId } = parsed.data;
+  const workspaceId = access.workspace.id;
+  const entity = found(state.entity, access, entityId, "entity");
+  if (!entity.ok) return fail(entity.error);
+  const column = found(state.column, access, sourceColumnId, "source column");
+  if (!column.ok) return fail(column.error);
+  const siblings = state.attributes.filter((a) => isLive(a, workspaceId) && a.entity_id === entityId);
+
+  const existing = siblings.find((a) => a.name.toLowerCase() === column.row.name.toLowerCase());
+  if (existing) {
+    const r = createMapping(ctx, access, { attribute: existing, column: column.row, mappings: state.mappings, mappingInputs: state.mappingInputs }, {
+      attributeId: existing.id,
+      sourceColumnId,
+    });
+    if (!r.ok) return r;
+    return { ...r, value: { attributeId: existing.id, mappingId: r.value.mappingId, createdAttribute: false } };
+  }
+
+  const { html, text } = plainTextPair(column.row.comment);
+  const attribute: Attribute = {
+    ...newRowColumns(ctx),
+    workspace_id: workspaceId,
+    entity_id: entityId,
+    name: column.row.name,
+    sort_order: nextSortOrder(siblings),
+    ...logicalTypeOf(column.row),
+    is_primary_key: false,
+    is_foreign_key: false,
+    is_business_key: false,
+    is_pii: column.row.is_pii,
+    is_nullable: column.row.is_nullable,
+    definition_html: html,
+    definition_text: text,
+  };
+  const r = createMapping(ctx, access, { attribute, column: column.row, mappings: [], mappingInputs: [] }, { attributeId: attribute.id, sourceColumnId });
+  if (!r.ok) return r;
+  return done(ctx, access, { attributeId: attribute.id, mappingId: r.value.mappingId, createdAttribute: true }, [
+    { kind: "insert", table: "attribute", row: attribute },
+    ...r.writeSet.writes,
+  ]);
+}
+
+// ---- order (D-36) ----
+
+const reorderInput = z
+  .object({ attributeId: uuidSchema, expectedVersion: versionSchema, position: z.number().int().min(0).max(100_000) })
+  .strict();
+export type ReorderAttributeInput = z.input<typeof reorderInput>;
+
+/**
+ * Moves an attribute to a position (0 = top) among its entity's attributes; a position past the end means the
+ * bottom. The order belongs to the model, so every canvas shows it. The entity's attributes are renumbered 0..n-1
+ * in one change group; only rows whose number changes are written.
+ */
+export function reorderAttribute(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: { attribute: Attribute | null; attributes: readonly Attribute[] },
+  input: unknown,
+): CommandResult<{ position: number }> {
+  const parsed = begin(access, "model.edit", reorderInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { attributeId, expectedVersion, position } = parsed.data;
+  const got = current(state.attribute, access, attributeId, expectedVersion, "attribute");
+  if (!got.ok) return fail(got.error);
+  const moved = got.row;
+  const list = state.attributes
+    .filter((a) => isLive(a, access.workspace.id) && a.entity_id === moved.entity_id && a.id !== moved.id)
+    .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  const before = [...list, moved].sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  const to = Math.min(position, list.length);
+  if (before.findIndex((a) => a.id === moved.id) === to) return fail(nothingToChange());
+  list.splice(to, 0, moved);
+
+  const writes: Write[] = [];
+  list.forEach((a, index) => {
+    if (a.sort_order !== index) writes.push({ kind: "update", table: "attribute", before: a, row: nextVersion(ctx, a, { sort_order: index }) });
+  });
+  return done(ctx, access, { position: to }, writes);
 }
