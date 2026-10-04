@@ -3,13 +3,14 @@
 // Mapping by drag (slice 1b, D-48; prototype "connect"): press on a source column row and move more than 5 px, and a
 // line follows the mouse from the row; entity rows and cards under the mouse light up as drop targets. Dropping on an
 // attribute row or elsewhere on an entity card reports a ColumnDrop; the panels decide what happens. Esc cancels.
+// Near the canvas edge the view scrolls by itself (prototype autoPan), so a distant attribute can be reached.
 // The drop target is found with elementFromPoint and marked with a class, so the cards do not re-render while dragging.
 
 import { memo, useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { EdgeLabelRenderer, useReactFlow, useStore } from "@xyflow/react";
+import { EdgeLabelRenderer, useReactFlow, useStore, useStoreApi } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import type { ColumnDrop } from "./context";
-import { cardWidth, LOD_ZOOM, rowEnd, type Pt } from "./geometry";
+import { cardWidth, edgePush, LOD_ZOOM, rowEnd, type Pt } from "./geometry";
 
 /** How far the mouse must move before a press on a row becomes a drag (prototype: 5 px). */
 const DRAG_START = 5;
@@ -35,10 +36,14 @@ function findDrop(el: Element | null, entityOf: (cardId: string) => string | nul
 
 export function useColumnDrag(editable: boolean, onDrop: (drop: ColumnDrop) => void) {
   const rf = useReactFlow();
+  const storeApi = useStoreApi();
   const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
   const [draft, setDraft] = useState<ColumnDraft | null>(null);
   const press = useRef<{ cardId: string; columnId: string; sx: number; sy: number; dragging: boolean } | null>(null);
   const drop = useRef<Drop | null>(null);
+  /** The mouse on the screen, and the running auto-scroll frame. */
+  const last = useRef<Pt>({ x: 0, y: 0 });
+  const scrolling = useRef<number | null>(null);
 
   const entityOf = useCallback((cardId: string) => {
     const card = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
@@ -54,6 +59,8 @@ export function useColumnDrag(editable: boolean, onDrop: (drop: ColumnDrop) => v
   };
 
   const end = useCallback(() => {
+    if (scrolling.current !== null) cancelAnimationFrame(scrolling.current);
+    scrolling.current = null;
     press.current = null;
     drop.current?.el.classList.remove("drop");
     drop.current = null;
@@ -62,16 +69,34 @@ export function useColumnDrag(editable: boolean, onDrop: (drop: ColumnDrop) => v
   }, []);
 
   useEffect(() => {
+    /** The line and the drop target for the mouse where it is now. */
+    const follow = (p: NonNullable<typeof press.current>) => {
+      const { x, y } = last.current;
+      mark(findDrop(document.elementFromPoint(x, y), entityOf));
+      setDraft({ cardId: p.cardId, columnId: p.columnId, cur: rf.screenToFlowPosition({ x, y }) });
+    };
+    const scroll = () => {
+      scrolling.current = null;
+      const p = press.current, box = storeApi.getState().domNode?.getBoundingClientRect();
+      if (!p?.dragging || !box) return;
+      const push = edgePush(last.current, box);
+      if (!push.x && !push.y) return;
+      const { x, y, zoom } = rf.getViewport();
+      void rf.setViewport({ x: x + push.x, y: y + push.y, zoom });
+      follow(p);
+      scrolling.current = requestAnimationFrame(scroll);
+    };
     const move = (e: PointerEvent) => {
       const p = press.current;
       if (!p) return;
+      last.current = { x: e.clientX, y: e.clientY };
       if (!p.dragging) {
         if (Math.hypot(e.clientX - p.sx, e.clientY - p.sy) <= DRAG_START) return;
         p.dragging = true;
         document.body.classList.add("connecting");
       }
-      mark(findDrop(document.elementFromPoint(e.clientX, e.clientY), entityOf));
-      setDraft({ cardId: p.cardId, columnId: p.columnId, cur: rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }) });
+      follow(p);
+      if (scrolling.current === null) scrolling.current = requestAnimationFrame(scroll);
     };
     const up = (e: PointerEvent) => {
       const p = press.current;
@@ -99,7 +124,7 @@ export function useColumnDrag(editable: boolean, onDrop: (drop: ColumnDrop) => v
       window.removeEventListener("pointercancel", end);
       window.removeEventListener("keydown", key);
     };
-  }, [rf, entityOf, onDrop, end]);
+  }, [rf, storeApi, entityOf, onDrop, end]);
 
   /** On the canvas wrapper: a left press on a source column row may start a drag. */
   const onPointerDown = useCallback(

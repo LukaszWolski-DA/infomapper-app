@@ -231,3 +231,20 @@ export function umlMarker(p: Pt, n: Pt): Pt {
   const t = { x: -n.y, y: n.x };
   return { x: p.x + n.x * 16 + t.x * 11, y: p.y + n.y * 16 + t.y * 11 };
 }
+
+// ---- auto-scroll while dragging (prototype autoPan) ----
+
+/** Within this distance of the canvas edge, a drag scrolls the view. */
+export const EDGE_ZONE = 56;
+/** Scroll per frame at the very edge, in screen pixels. */
+export const EDGE_SPEED = 18;
+
+/**
+ * How far to move the view this frame while dragging at screen point `pt` over the canvas `box`: towards the edge the
+ * pointer is near, faster the closer it is (and faster still beyond it). The view moves, so content slides in from
+ * that side: positive x moves the content right (the pointer is at the left edge).
+ */
+export function edgePush(pt: Pt, box: { left: number; top: number; right: number; bottom: number }): Pt {
+  const push = (d: number) => (d < EDGE_ZONE ? Math.ceil(((EDGE_ZONE - d) / EDGE_ZONE) * EDGE_SPEED) : 0);
+  return { x: push(pt.x - box.left) - push(box.right - pt.x), y: push(pt.y - box.top) - push(box.bottom - pt.y) };
+}

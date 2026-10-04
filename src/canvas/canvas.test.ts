@@ -15,7 +15,7 @@ import {
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
 import { buildCards, visibleRows, type CardData } from "./card-data";
-import { cardHeight, contentBounds, fitViewport, freeSpot, newCardHeight, stackSpot, zoomAround } from "./geometry";
+import { cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, newCardHeight, stackSpot, zoomAround } from "./geometry";
 import { splitName } from "./names";
 
 // Customer (customer_id, email) and CRM customers (cust_id, email, first_name):
@@ -185,5 +185,23 @@ describe("placing new cards (prototype placeNear, createEntity)", () => {
   it("sizes a new card by its rows", () => {
     expect(newCardHeight(0)).toBe(54 + 12 + 26);
     expect(newCardHeight(3)).toBe(54 + 12 + 78);
+  });
+});
+
+describe("auto-scroll while dragging (edgePush)", () => {
+  const box = { left: 100, top: 50, right: 900, bottom: 650 };
+
+  it("does nothing away from the edges", () => {
+    expect(edgePush({ x: 500, y: 300 }, box)).toEqual({ x: 0, y: 0 });
+    expect(edgePush({ x: 156, y: 106 }, box)).toEqual({ x: 0, y: 0 });
+  });
+
+  it("moves the content in from the side the pointer is near, faster closer to the edge", () => {
+    expect(edgePush({ x: 100, y: 300 }, box)).toEqual({ x: EDGE_SPEED, y: 0 });
+    expect(edgePush({ x: 900, y: 650 }, box)).toEqual({ x: -EDGE_SPEED, y: -EDGE_SPEED });
+    const near = edgePush({ x: 128, y: 300 }, box).x;
+    expect(near).toBeGreaterThan(0);
+    expect(near).toBeLessThan(EDGE_SPEED);
+    expect(edgePush({ x: 80, y: 300 }, box).x).toBeGreaterThan(EDGE_SPEED);
   });
 });
