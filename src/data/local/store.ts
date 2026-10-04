@@ -7,7 +7,7 @@ import { domainError, notFound, staleVersion, type DomainError } from "@/domain/
 import type { Uuid } from "@/domain/ids";
 import type { ProjectCanvas } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
-import { assertNotProduction, readDb, writeDb } from "./file";
+import { assertNotProduction, readDbCached, writeDb } from "./file";
 import { findViolation, keyOf, rowsOf, type AnyRow, type DevDb, type DevTable, type IntegrityViolation } from "./schema";
 
 const live = <R extends { deleted_at: string | null }>(rows: R[]): R[] => rows.filter((r) => r.deleted_at === null);
@@ -26,7 +26,7 @@ function serialise<T>(file: string, task: () => Promise<T>): Promise<T> {
 
 export function createLocalDataStore(file: string): DataStore {
   assertNotProduction();
-  const load = () => readDb(file);
+  const load = () => readDbCached(file);
 
   /** Links whose project and canvas both still exist. */
   const liveLinks = (db: DevDb, workspaceId: Uuid) => {
@@ -135,7 +135,7 @@ export function createLocalDataStore(file: string): DataStore {
 }
 
 async function applyToFile(file: string, writeSet: WriteSet): Promise<ApplyResult> {
-  const next = structuredClone(await readDb(file));
+  const next = structuredClone(await readDbCached(file)) as DevDb;
   for (const write of writeSet.writes) {
     const error = applyWrite(next, write);
     if (error) return { ok: false, error };

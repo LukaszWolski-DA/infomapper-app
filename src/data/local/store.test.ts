@@ -11,7 +11,7 @@ import { isUuid, uuidv7 } from "@/domain/ids";
 import { isGuest } from "@/domain/permissions";
 import type { DataStore } from "../ports";
 import { resetDevData, seedDevData } from "./dev-data";
-import { readDb, writeDb } from "./file";
+import { readDb, readDbCached, writeDb } from "./file";
 import { emptyDb, findViolation, keyOf, TABLES } from "./schema";
 import { buildSeed, SEED_IDS, SEED_USERS } from "./seed";
 import { createLocalDataStore } from "./store";
@@ -315,6 +315,40 @@ describe("integrity rules", () => {
     const db = buildSeed();
     const bad = { ...db, workspace_member: [{ ...db.workspace_member[0]!, role: "superuser" as never }, ...db.workspace_member.slice(1)] };
     expect(findViolation(bad)).toMatchObject({ kind: "check", table: "workspace_member" });
+  });
+});
+
+describe("reading from memory until the file changes (S1A-14)", () => {
+  it("reuses the last read while the file is unchanged, and hands out a frozen copy", async () => {
+    const first = await readDbCached(file);
+    expect(await readDbCached(file)).toBe(first);
+    expect(Object.isFrozen(first.workspace[0])).toBe(true);
+    expect(() => (first.workspace as unknown[]).push({})).toThrow();
+  });
+
+  it("re-reads after a write by another process", async () => {
+    const before = await readDbCached(file);
+    const db = await readDb(file);
+    db.workspace[0]!.name = "Renamed outside";
+    await writeDb(file, db);
+    const after = await readDbCached(file);
+    expect(after).not.toBe(before);
+    expect(after.workspace[0]!.name).toBe("Renamed outside");
+  });
+
+  it("sees its own writes", async () => {
+    const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
+    await store.projects.list(access.workspace.id);
+    const r = createProject(ctxFor(actor.id), access, { workspaceId: access.workspace.id, name: "Finance" });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(await store.apply(r.writeSet)).toEqual({ ok: true });
+    expect((await store.projects.list(access.workspace.id)).map((p) => p.name)).toContain("Finance");
+  });
+
+  it("notices a removed file", async () => {
+    await readDbCached(file);
+    await rm(file);
+    await expect(readDbCached(file)).rejects.toThrow(/npm run seed/);
   });
 });
 

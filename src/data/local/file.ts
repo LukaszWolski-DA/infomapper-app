@@ -1,7 +1,7 @@
 // Reading and writing the local JSON file (AD-29). Development only.
 
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { DEV_DB_FORMAT, type DevDb } from "./schema";
 
@@ -45,6 +45,52 @@ export async function readDb(file: string): Promise<DevDb> {
   return db;
 }
 
+// The last read of each file, kept until the file changes on disk (S1A-14: reading and parsing the whole file on
+// every repository call took about half of the canvas page's server time). Frozen, so a caller cannot change it.
+type Stamp = { mtimeMs: number; size: number; ino: number };
+const cache = new Map<string, { stamp: Stamp; db: Readonly<DevDb> }>();
+
+async function stampOf(file: string): Promise<Stamp | null> {
+  try {
+    const s = await withRetry(() => stat(file));
+    return { mtimeMs: s.mtimeMs, size: s.size, ino: s.ino };
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw e;
+  }
+}
+
+const sameStamp = (a: Stamp, b: Stamp) => a.mtimeMs === b.mtimeMs && a.size === b.size && a.ino === b.ino;
+
+/**
+ * Like readDb, but re-reads the file only when it has changed since the last read (another process, such as the
+ * seed scripts or the e2e reset, may write it). The result is shared and deeply frozen: clone it before changing it.
+ */
+export async function readDbCached(file: string): Promise<Readonly<DevDb>> {
+  assertNotProduction();
+  const stamp = await stampOf(file);
+  if (!stamp) {
+    cache.delete(file);
+    throw new NoDevDataError(file);
+  }
+  const hit = cache.get(file);
+  if (hit && sameStamp(hit.stamp, stamp)) return hit.db;
+  const db = deepFreeze(await readDb(file));
+  // Keep it only if the file did not change while it was read.
+  const after = await stampOf(file);
+  if (after && sameStamp(after, stamp)) cache.set(file, { stamp, db });
+  else cache.delete(file);
+  return db;
+}
+
+function deepFreeze<T>(value: T): T {
+  if (value && typeof value === "object" && !Object.isFrozen(value)) {
+    Object.freeze(value);
+    for (const v of Object.values(value)) deepFreeze(v);
+  }
+  return value;
+}
+
 /** Writes the whole file atomically: a temp file next to it, then a rename over the old one. */
 export async function writeDb(file: string, db: DevDb): Promise<void> {
   assertNotProduction();
@@ -57,6 +103,7 @@ export async function writeDb(file: string, db: DevDb): Promise<void> {
     await rm(temp, { force: true });
     throw e;
   }
+  cache.delete(file);
 }
 
 // On Windows a rename or read can fail briefly while another process has the file open.
@@ -74,5 +121,6 @@ async function withRetry<T>(op: () => Promise<T>): Promise<T> {
 
 export async function removeDb(file: string): Promise<void> {
   assertNotProduction();
+  cache.delete(file);
   await rm(file, { force: true });
 }
