@@ -142,3 +142,37 @@ export function checkMappingTypes(
   const message = verdicts.length === 1 ? verdicts[0]!.message : `All inputs fit ${formatAttributeType(attribute)}.`;
   return { ok: true, message, problems: [] };
 }
+
+/**
+ * The logical type for a new attribute made from a column (slice 1b, “New attribute from a column”): the type table
+ * above in reverse, with the column's parameters. `varchar(100)` → string(100), `decimal(18,2)` → decimal(18,2),
+ * `datetime2` → datetime, `date` → date. A time of day has no logical type of its own, so it and anything unknown
+ * become custom with the physical name. The result always passes `checkColumnType` for that column.
+ */
+export function logicalTypeOf(column: ColumnType): AttributeType {
+  const type: AttributeType = { data_type: "custom", custom_type: null, type_length: null, type_precision: null, type_scale: null };
+  const base = baseType(column.data_type);
+  switch (physicalClass(column.data_type)) {
+    case "text":
+      return { ...type, data_type: "string", type_length: column.type_length };
+    case "integer":
+      return { ...type, data_type: "integer" };
+    case "decimal":
+      return {
+        ...type,
+        data_type: "decimal",
+        type_precision: column.type_precision,
+        type_scale: column.type_precision !== null ? column.type_scale : null,
+      };
+    case "temporal":
+      if (base === "date") return { ...type, data_type: "date" };
+      if (base === "time" || base === "timetz") return { ...type, custom_type: column.data_type.trim() };
+      return { ...type, data_type: "datetime" };
+    case "boolean":
+      return { ...type, data_type: "boolean" };
+    case "json":
+      return { ...type, data_type: "json" };
+    case "other":
+      return { ...type, custom_type: column.data_type.trim() };
+  }
+}
