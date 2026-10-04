@@ -27,3 +27,28 @@ whose card is not here. Mappings open from anywhere, because a mapping is select
 - **Accepted** by Łukasz for slice 1a.
 - **Later:** let the selection name an attribute or a column directly (as the prototype's `attr` and `col`
   selections do), so the panel can show them without a card.
+
+## End-to-end tests (slice 1a, step 6)
+
+### “The destination stream closed early” in the e2e server log
+
+The e2e dev server sometimes prints `⨯ Error: The destination stream closed early.` (digest 2208966200). It was seen
+three times in every full run until step 6; two causes were found and fixed: the proxy wrote preference cookies during
+server actions, which made Next.js refresh the page after every action, and a navigation right after an action cut
+that refresh off (after S0-05, S1A-12, S1A-13). What remains is about once in three full runs, after S0-11, which
+clicks through the breadcrumbs quickly: a navigation that starts while the previous page is still streaming. No test
+fails on it, and the browser behaves as it should.
+
+- **Accepted:** it is the dev server noting that the browser left a page early.
+- **Later:** look again if it shows up outside fast navigation, or in a production build.
+
+### e2e dev servers run without Turbopack's file-system cache
+
+Next.js 16.1+ keeps a cache of the dev compilation in the build folder. The e2e runs stop their dev servers by force,
+and a server that reused such a folder answered 404 for whole routes now and then (S0-10, and once a whole run). E2e
+servers (`NEXT_DIST_DIR` set) therefore run without that cache, `npm run e2e` starts from an empty `.next-e2e`, and
+S0-10 removes `.next-e2e-restart` before and after use. A global setup warms the server up (signs in, opens the main
+pages), so the first tests do not wait for compiles.
+
+- **Accepted:** an e2e run compiles every page once (about a minute); `npm run dev` keeps its cache.
+- **Later:** if the e2e runs move to a production build once the local adapter is gone (Supabase slice), this goes away.
