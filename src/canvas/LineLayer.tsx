@@ -4,6 +4,8 @@
 // it sits in the viewport, so lines pan and zoom with the canvas, and paints below the cards (prototype #lines).
 // Card positions come from React Flow's store; row positions from the card data (AD-24 rule 2, geometry.rowEnd).
 // Each line re-renders only when its geometry or state changes (memo on a signature), as in the spike.
+// Hover (slice 1b, C-10): the lines are not restyled and the others do not fade (restyling 340 lines, or one veil over
+// them, made the hover too slow); the hovered lines are drawn again, emphasised, above the others and below the cards.
 
 import { memo, useContext } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi, type InternalNode } from "@xyflow/react";
@@ -141,11 +143,14 @@ function LineLayer({
   lines,
   selection,
   related,
+  hover,
   onSelect,
 }: {
   lines: CanvasLines;
   selection: Selection;
   related: Related | null;
+  /** The lines of the hovered row or line, drawn above the veil; null when nothing is hovered. */
+  hover: Related | null;
   onSelect: (sel: Selection) => void;
 }) {
   // Re-render on any node change (drag, collapse, filter); panning and zooming leave the nodes alone.
@@ -202,6 +207,18 @@ function LineLayer({
         <g>{rels}</g>
         <g>{maps}</g>
       </svg>
+      {hover && (
+        <svg className="line-layer hover-lines" width={1} height={1} data-testid="layer-hover-lines">
+          {lines.mappings
+            .filter((l) => hover.maps.has(l.id))
+            .map((l) => {
+              const geom = mapGeom(l, lookup);
+              if (!geom) return null;
+              const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${l.inputCount > 1 ? " combined" : ""} hl`;
+              return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} className={className} onSelect={() => {}} />;
+            })}
+        </svg>
+      )}
     </EdgeLabelRenderer>
   );
 }

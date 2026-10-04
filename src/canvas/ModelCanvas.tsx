@@ -125,7 +125,8 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   const [ready, setReady] = useState(false);
   /** The row or line under the mouse (C-10); it takes over the emphasis from the selection while it lasts. */
   const [hover, setHover] = useState<Selection>(null);
-  const related = useMemo(() => relatedLines(hover, lines) ?? relatedLines(selection, lines), [hover, selection, lines]);
+  const related = useMemo(() => relatedLines(selection, lines), [selection, lines]);
+  const hoverRelated = useMemo(() => relatedLines(hover, lines), [hover, lines]);
   const onColumnDrop = useCallback((drop: ColumnDrop) => ui.host()?.dropColumn(drop), [ui]);
   const { draft, onPointerDown } = useColumnDrag(editable, onColumnDrop);
   const modes = useCanvasModes(editable);
@@ -245,7 +246,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   );
 
   // ---- card width (D-37, C-09) ----
-  const resize = useCardResize(editable, patchCard, change);
+  const resize = useCardResize(editable, change);
   const fitWidth = useCallback(
     (id: string) => {
       const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
@@ -451,7 +452,6 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
     const next: Selection = row && cardId ? { t: "row", cardId, id: row.dataset.row! } : mappingId ? { t: "map", id: mappingId } : null;
     setHover((h) => (h?.t === next?.t && (h && "id" in h ? h.id : null) === (next && "id" in next ? next.id : null) ? h : next));
   }, []);
-  const emphasis = busy ? relatedLines(selection, lines) : related;
 
   return (
     <CanvasCardsCtx.Provider value={cardsApi}>
@@ -499,9 +499,9 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
           attributionPosition="bottom-left"
           aria-label="Model canvas"
         >
-          <LineLayer lines={lines} selection={selection} related={emphasis} onSelect={select} />
+          <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />
           <Overview lines={lines} />
-          <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} />
+          <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>
