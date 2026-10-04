@@ -12,6 +12,8 @@ export interface CanvasCardsApi {
   select: (sel: Selection) => void;
   toggleCollapse: (cardId: string) => void;
   cycleFilter: (cardId: string) => void;
+  /** The relate button on an entity card: click, then click the other entity. */
+  startRelate: (cardId: string) => void;
 }
 
 const noop = () => {};
@@ -21,6 +23,7 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
   select: noop,
   toggleCollapse: noop,
   cycleFilter: noop,
+  startRelate: noop,
 });
 
 /** Relationship ends: crow's foot (Information Engineering) or UML multiplicity. Shared by all canvases (D-22). */
@@ -41,7 +44,13 @@ export interface CanvasHandle {
   centerOn: (cardId: Uuid) => void;
   /** A free spot near the middle of the view for a new entity (D-46). */
   freeSpot: () => { x: number; y: number };
+  /** Places an element with the top middle of its card at a canvas point (toolbox “Add an entity or table here”). */
+  placeAt: (target: CardTarget, rows: number, at: { x: number; y: number }) => void;
+  /** Collapses or expands a card, or sets its row filter (toolbox); saved like the card's own buttons. */
+  setCardView: (cardId: Uuid, view: { collapsed?: boolean; rowFilter?: RowFilter }) => void;
 }
+
+export type RowFilter = "all" | "mapped" | "unmapped" | "keys";
 
 /**
  * A source column row dropped on an entity card (slice 1b, D-48): on one of its attribute rows, or anywhere else on
@@ -51,6 +60,38 @@ export interface ColumnDrop {
   columnId: Uuid;
   target: { attributeId: Uuid } | { entityId: Uuid };
   at: { x: number; y: number };
+}
+
+/** What a right-click without moving was on (slice 1b, D-19). The canvas has already selected it. */
+export type ToolboxTarget =
+  | { kind: "canvas" }
+  | { kind: "card"; cardId: Uuid }
+  | { kind: "row"; cardId: Uuid; rowId: Uuid }
+  | { kind: "map"; mappingId: Uuid }
+  | { kind: "rel"; relationshipId: Uuid };
+
+export interface ToolboxRequest {
+  target: ToolboxTarget;
+  /** Where the toolbox opens, on the screen. */
+  screen: { x: number; y: number };
+  /** The same point on the canvas, for “here” actions. */
+  at: { x: number; y: number };
+}
+
+/** A canvas tool that changes what a click does: the Entity tool (D-46) or drawing a relationship from a card. */
+export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | null;
+
+/**
+ * What the canvas asks of the page around it. The canvas knows gestures and positions; the page knows the model and
+ * runs the writes, so it registers these handlers.
+ */
+export interface CanvasHost {
+  dropColumn: (drop: ColumnDrop) => void;
+  /** The Entity tool or “New entity here”: a new entity whose card's top left is at a canvas point. */
+  createEntityAt: (at: { x: number; y: number }, name?: string) => void;
+  /** A relationship from one entity card to another (relate button or “Draw a relationship from here”). */
+  relate: (fromCardId: Uuid, toCardId: Uuid) => void;
+  openToolbox: (request: ToolboxRequest) => void;
 }
 
 /** Shared between the canvas, the panels and the canvas tools in the top bar (notation, zoom, fit). */
@@ -63,9 +104,12 @@ export interface CanvasUiApi extends CanvasHandle {
   selection: Selection;
   select: (sel: Selection) => void;
   registerCanvas: (handle: CanvasHandle | null) => void;
-  /** The canvas reports a dropped column; the panels decide what it means (they know the model). */
-  dropColumn: (drop: ColumnDrop) => void;
-  registerColumnDrop: (handler: ((drop: ColumnDrop) => void) | null) => void;
+  /** The active canvas tool, shared with the top bar's Entity tool button. */
+  mode: CanvasMode;
+  setMode: (mode: CanvasMode) => void;
+  /** The page's handlers for what happens on the canvas; null until the page registers them. */
+  host: () => CanvasHost | null;
+  registerHost: (host: CanvasHost | null) => void;
 }
 
 export const CanvasUiCtx = createContext<CanvasUiApi>({
@@ -80,9 +124,13 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   remove: noop,
   centerOn: noop,
   freeSpot: () => ({ x: 0, y: 0 }),
+  placeAt: noop,
+  setCardView: noop,
   registerCanvas: noop,
-  dropColumn: noop,
-  registerColumnDrop: noop,
+  mode: null,
+  setMode: noop,
+  host: () => null,
+  registerHost: noop,
 });
 
 /** Drag data of a left-panel item dropped onto the canvas: JSON `{ target: CardTarget, rows: number }`. */

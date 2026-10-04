@@ -112,6 +112,22 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
           )}
           {ctx.editable && (
             <span className="c-tools nodrag">
+              {isEnt && (
+                <button
+                  type="button"
+                  className="ib"
+                  data-testid="button-card-relate"
+                  data-relate={card.id}
+                  title="Draw a relationship from this entity"
+                  onClick={() => ctx.startRelate(card.id)}
+                >
+                  <svg viewBox="0 0 16 16" aria-hidden>
+                    <rect x="1.5" y="4.5" width="4.5" height="7" rx="1" />
+                    <rect x="10" y="4.5" width="4.5" height="7" rx="1" />
+                    <path d="M6 8h4" />
+                  </svg>
+                </button>
+              )}
               <button
                 type="button"
                 className="ib"
@@ -148,7 +164,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
         </div>
       </div>
       {!card.collapsed && lod && (
-        <div className="c-lod" data-testid="card-block" style={{ height: BODY_PAD * 2 + Math.max(1, rows.length) * ROW_H }}>
+        <div className="c-lod" data-testid="card-block" title={card.name} style={{ height: BODY_PAD * 2 + Math.max(1, rows.length) * ROW_H }}>
           <div className="c-block" />
         </div>
       )}

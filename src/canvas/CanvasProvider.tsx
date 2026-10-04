@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { CanvasUiCtx, type CanvasHandle, type CanvasUiApi, type ColumnDrop, type Notation } from "./context";
+import { CanvasUiCtx, type CanvasHandle, type CanvasHost, type CanvasMode, type CanvasUiApi, type Notation } from "./context";
 import type { Selection } from "./line-data";
 
 const OVERVIEW_KEY = "infomapper:overview";
@@ -34,7 +34,8 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
   const [notation, setNotationState] = useState<Notation>("ie");
   const [selection, select] = useState<Selection>(null);
   const handle = useRef<CanvasHandle | null>(null);
-  const onColumnDrop = useRef<((drop: ColumnDrop) => void) | null>(null);
+  const host = useRef<CanvasHost | null>(null);
+  const [mode, setMode] = useState<CanvasMode>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after mount: localStorage is not available on the server
@@ -70,12 +71,16 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       registerCanvas: (h) => {
         handle.current = h;
       },
-      dropColumn: (drop) => onColumnDrop.current?.(drop),
-      registerColumnDrop: (h) => {
-        onColumnDrop.current = h;
+      placeAt: (target, rows, at) => handle.current?.placeAt(target, rows, at),
+      setCardView: (cardId, view) => handle.current?.setCardView(cardId, view),
+      mode,
+      setMode,
+      host: () => host.current,
+      registerHost: (h) => {
+        host.current = h;
       },
     }),
-    [overviewOpen, toggleOverview, notation, setNotation, selection],
+    [overviewOpen, toggleOverview, notation, setNotation, selection, mode],
   );
 
   return (

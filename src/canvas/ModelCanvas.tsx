@@ -24,9 +24,10 @@ import "./canvas.css";
 import { useToast } from "@/ui/components/toast";
 import type { CardData } from "./card-data";
 import CardNode, { FILTER_ORDER, type CardNodeT } from "./CardNode";
+import { RelateLine, useCanvasModes } from "./CanvasModes";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
 import { readPreference, writePreference } from "./CanvasProvider";
-import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget } from "./context";
+import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop } from "./context";
 import {
   CARD_W,
   cardHeight,
@@ -119,7 +120,9 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(c, editable)));
   const [ready, setReady] = useState(false);
   const related = useMemo(() => relatedLines(selection, lines), [selection, lines]);
-  const { draft, onPointerDown } = useColumnDrag(editable, ui.dropColumn);
+  const onColumnDrop = useCallback((drop: ColumnDrop) => ui.host()?.dropColumn(drop), [ui]);
+  const { draft, onPointerDown } = useColumnDrag(editable, onColumnDrop);
+  const modes = useCanvasModes(editable);
 
   // ---- view: the remembered one, else fit everything ----
   const storeApi = useStoreApi();
@@ -146,18 +149,23 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
     [canvasId],
   );
 
-  // ---- keyboard: F fits, M toggles the Overview, Esc clears the selection ----
+  // ---- keyboard: F fits, M toggles the Overview, E the Entity tool; Esc ends a tool, else clears the selection ----
+  const { toggleEntityTool } = modes;
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey || e.altKey || isTyping(e.target)) return;
       const k = e.key.toLowerCase();
       if (k === "f") fit();
       else if (k === "m") ui.toggleOverview();
-      else if (k === "escape") select(null);
+      else if (k === "e") toggleEntityTool();
+      else if (k === "escape") {
+        if (ui.mode) ui.setMode(null);
+        else select(null);
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [fit, ui, select]);
+  }, [fit, ui, select, toggleEntityTool]);
 
   // ---- card changes: applied at once, saved in order, undone on refusal ----
   const queue = useRef(new Map<string, Promise<void>>());
@@ -321,9 +329,24 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   );
 
   useEffect(() => {
-    registerCanvas({ fit, place, remove, centerOn, freeSpot: () => freeSpot(viewRect(), occupied()) });
+    registerCanvas({
+      fit,
+      place,
+      remove,
+      centerOn,
+      freeSpot: () => freeSpot(viewRect(), occupied()),
+      placeAt: (target, rows, at) => void placeAt(target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(rows), false),
+      setCardView: (id, view) => {
+        const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
+        if (!card) return;
+        const undo: CardPatch = {};
+        if (view.collapsed !== undefined) undo.collapsed = card.collapsed;
+        if (view.rowFilter !== undefined) undo.rowFilter = card.rowFilter;
+        change(id, view, undo);
+      },
+    });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -364,8 +387,9 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         const next = FILTER_ORDER[(FILTER_ORDER.indexOf(card.rowFilter) + 1) % FILTER_ORDER.length]!;
         change(id, { rowFilter: next }, { rowFilter: card.rowFilter });
       },
+      startRelate: modes.startRelate,
     }),
-    [editable, selection, select, change, rf],
+    [editable, selection, select, change, rf, modes.startRelate],
   );
 
   const onNodesChange = useCallback(
@@ -387,14 +411,17 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   return (
     <CanvasCardsCtx.Provider value={cardsApi}>
       <div
-        className="im-canvas"
+        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}`}
         data-testid="area-canvas"
+        data-mode={ui.mode?.kind}
         data-ready={ready || undefined}
         data-notation={ui.notation}
         style={{ visibility: ready ? "visible" : "hidden" }}
         onDragOver={onDragOver}
         onDrop={onDrop}
         onPointerDown={onPointerDown}
+        onPointerDownCapture={modes.onPointerDownCapture}
+        onContextMenu={modes.onContextMenu}
       >
         <ReactFlow
           nodes={nodes}
@@ -426,6 +453,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
           <LineLayer lines={lines} selection={selection} related={related} onSelect={select} />
           <Overview lines={lines} />
           {draft && <DraftLine draft={draft} />}
+          {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>
         {nodes.length === 0 && (
           <div className="im-empty" data-testid="canvas-empty">

@@ -10,13 +10,15 @@ import { buildTree } from "@/app/_panels/tree-data";
 import { buildCards } from "@/canvas/card-data";
 import { buildLines } from "@/canvas/line-data";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
+import { EntityToolButton } from "@/canvas/EntityToolButton";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
 import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 
-// Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a).
+// Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a); the Entity
+// tool in the top bar (slice 1b).
 export default async function CanvasPage({
   params,
   searchParams,
@@ -52,7 +54,7 @@ export default async function CanvasPage({
             view,
             currentCanvasId: canvasId,
             renameOnOpen,
-            tools: <CanvasTools />,
+            tools: <CanvasTools editable={editable} />,
             left: <LeftPanel workspaceId={ws} canvasId={canvasId} tree={tree} editable={editable} />,
             right: (
               <Inspector
@@ -61,7 +63,7 @@ export default async function CanvasPage({
                 canvasName={shell.canvas?.name ?? ""}
                 canvasCount={canvases.length}
                 model={model}
-                cards={cards.map((c) => ({ id: c.id, kind: c.kind, targetId: c.targetId }))}
+                cards={cards.map((c) => ({ id: c.id, kind: c.kind, targetId: c.targetId, collapsed: c.collapsed, rowFilter: c.rowFilter }))}
                 tree={tree}
                 editable={editable}
                 canSetStatus={shell.standing !== "none"}
@@ -89,8 +91,9 @@ export default async function CanvasPage({
   );
 }
 
-const CanvasTools = () => (
+const CanvasTools = ({ editable }: { editable: boolean }) => (
   <>
+    {editable && <EntityToolButton />}
     <NotationSwitch />
     <ZoomControls />
   </>
