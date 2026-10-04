@@ -10,6 +10,8 @@ export const UNDO_LIMIT = 50;
 
 export interface UndoStep {
   changeGroupId: Uuid;
+  /** What the person did, for the toasts, e.g. “Rename entity”. */
+  label: string;
   events: readonly ChangeEvent[];
 }
 
@@ -44,3 +46,16 @@ export const afterRedo = (history: UndoHistory, revert: UndoStep): UndoHistory =
   undo: capped([...history.undo, revert]),
   redo: history.redo.slice(0, -1),
 });
+
+/**
+ * A step that cannot be undone (or redone) because it was changed afterwards is dropped, so the next Ctrl+Z goes
+ * further back (Łukasz, 4 October 2026).
+ */
+export const dropNextUndo = (history: UndoHistory): UndoHistory => ({ ...history, undo: history.undo.slice(0, -1) });
+export const dropNextRedo = (history: UndoHistory): UndoHistory => ({ ...history, redo: history.redo.slice(0, -1) });
+
+/** The toast after a dropped step. */
+export const refusedStepMessage = (mode: "undo" | "redo", label: string): string =>
+  mode === "undo"
+    ? `Couldn't undo “${label}” because it was changed afterwards. Ctrl+Z again goes further back.`
+    : `Couldn't redo “${label}” because it was changed afterwards. Ctrl+Shift+Z again goes further on.`;

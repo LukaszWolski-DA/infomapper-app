@@ -1,7 +1,20 @@
 import { describe, expect, it } from "vitest";
-import { afterRedo, afterUndo, emptyHistory, historyKey, nextRedo, nextUndo, recordChange, UNDO_LIMIT, type UndoStep } from "./undo-history";
+import {
+  afterRedo,
+  afterUndo,
+  dropNextRedo,
+  dropNextUndo,
+  emptyHistory,
+  historyKey,
+  nextRedo,
+  nextUndo,
+  recordChange,
+  refusedStepMessage,
+  UNDO_LIMIT,
+  type UndoStep,
+} from "./undo-history";
 
-const step = (n: number): UndoStep => ({ changeGroupId: `group-${n}`, events: [] });
+const step = (n: number): UndoStep => ({ changeGroupId: `group-${n}`, label: `Step ${n}`, events: [] });
 
 describe("undo history (slice 1b)", () => {
   it("undoes the newest change first and redoes the newest undo first", () => {
@@ -33,5 +46,18 @@ describe("undo history (slice 1b)", () => {
   it("is kept per person and workspace", () => {
     expect(historyKey("ws-1", "user-1")).not.toBe(historyKey("ws-1", "user-2"));
     expect(historyKey("ws-1", "user-1")).not.toBe(historyKey("ws-2", "user-1"));
+  });
+
+  it("drops a refused step, so the next Ctrl+Z goes further back (and the next redo further on)", () => {
+    const h = recordChange(recordChange(emptyHistory, step(1)), step(2));
+    expect(nextUndo(dropNextUndo(h))).toEqual(step(1));
+    const undone = afterUndo(afterUndo(h, step(-2)), step(-1));
+    expect(nextRedo(dropNextRedo(undone))).toEqual(step(-2));
+    expect(dropNextUndo(emptyHistory)).toEqual(emptyHistory);
+  });
+
+  it("says which step was dropped", () => {
+    expect(refusedStepMessage("undo", "Rename entity")).toBe("Couldn't undo “Rename entity” because it was changed afterwards. Ctrl+Z again goes further back.");
+    expect(refusedStepMessage("redo", "Rename entity")).toBe("Couldn't redo “Rename entity” because it was changed afterwards. Ctrl+Shift+Z again goes further on.");
   });
 });
