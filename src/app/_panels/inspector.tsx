@@ -9,6 +9,7 @@ import type { Uuid } from "@/domain/ids";
 import type { WorkspaceModel } from "@/domain/types";
 import { AttributePanel } from "./attribute-panel";
 import { EntityPanel } from "./entity-panel";
+import { useMapColumn, type PendingInput } from "./map-column";
 import { MappingPanel } from "./mapping-panel";
 import { indexModel, type ModelIndex } from "./model-index";
 import { OverviewPanel } from "./overview-panel";
@@ -49,6 +50,12 @@ export interface PanelContext extends Omit<InspectorProps, "model" | "cards" | "
   goMapping: (mappingId: Uuid) => void;
   /** Selects a column row when its table is on this canvas. */
   goColumn: (columnId: Uuid) => void;
+  entitiesHere: ReadonlySet<Uuid>;
+  /** Maps a column to an attribute (D-48): directly, or after the choice shown at `at` (screen coordinates). */
+  mapColumn: (columnId: Uuid, attributeId: Uuid, at: { x: number; y: number }) => void;
+  /** A column chosen with “Add to mapping …”, waiting in the mapping panel for its rule. */
+  pendingInput: PendingInput | null;
+  clearPendingInput: () => void;
 }
 
 const Ctx = createContext<PanelContext | null>(null);
@@ -57,19 +64,26 @@ export const usePanel = () => useContext(Ctx)!;
 export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
   const ui = useContext(CanvasUiCtx);
   const ix = useMemo(() => indexModel(model), [model]);
+  const cardOf = useMemo(() => {
+    const cardByTarget = new Map(cards.map((c) => [c.targetId, c.id]));
+    return (id: Uuid) => cardByTarget.get(id) ?? null;
+  }, [cards]);
+  const { mapColumn, choiceElement, pendingInput, clearPendingInput } = useMapColumn({ ix, workspaceId: rest.workspaceId, editable: rest.editable, cardOf });
 
   const panel = useMemo<PanelContext>(() => {
-    const cardByTarget = new Map(cards.map((c) => [c.targetId, c.id]));
     const elsewhere = new Set<Uuid>();
     for (const c of tree.concepts) for (const e of c.entities) if (e.presence === "elsewhere") elsewhere.add(e.id);
     for (const s of tree.systems) for (const sc of s.schemas) for (const t of sc.tables) if (t.presence === "elsewhere") elsewhere.add(t.id);
-    const cardOf = (id: Uuid) => cardByTarget.get(id) ?? null;
     return {
       ...rest,
       ix,
       cardOf,
       elsewhere: (id) => elsewhere.has(id),
       tablesHere: new Set(cards.filter((c) => c.kind === "src").map((c) => c.targetId)),
+      entitiesHere: new Set(cards.filter((c) => c.kind === "ent").map((c) => c.targetId)),
+      mapColumn,
+      pendingInput,
+      clearPendingInput,
       goEntity: (entityId) => {
         const card = cardOf(entityId);
         if (!card) return;
@@ -86,7 +100,7 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
         if (card) ui.select({ t: "row", cardId: card, id: columnId });
       },
     };
-  }, [cards, tree, rest, ix, ui]);
+  }, [cards, tree, rest, ix, ui, cardOf, mapColumn, pendingInput, clearPendingInput]);
 
   const sel = ui.selection;
   let body: ReactNode = (
@@ -117,6 +131,7 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
       <div className="flex-1 overflow-auto px-4 pb-6 pt-4 text-[13px]" data-testid="inspector-body">
         {body}
       </div>
+      {choiceElement}
     </Ctx.Provider>
   );
 }

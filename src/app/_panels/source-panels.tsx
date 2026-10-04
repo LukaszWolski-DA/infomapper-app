@@ -2,9 +2,10 @@
 
 // Source table and column panels (prototype insSource, insCol). A table: path, columns and where they go, the entities
 // it feeds, “Remove from this canvas”, delete (refused while a mapping reads one of its columns). A column: path,
-// type, BK and PII flags, comment, and the mappings it feeds. Name, type and position come from the source.
+// type, BK and PII flags, comment, the mappings it feeds, and “Map to an attribute” (slice 1b, D-48). Name, type and
+// position come from the source.
 
-import { useContext } from "react";
+import { useContext, useRef } from "react";
 import { deleteSourceTableAction, updateSourceColumnAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
@@ -12,9 +13,9 @@ import type { Uuid } from "@/domain/ids";
 import { formatColumnType } from "@/domain/model/type-check";
 import type { SourceColumn, SourceTable } from "@/domain/types";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, ConfirmDelete, Field, Flag, Fold, Hint, Kind, Li, LongList, TextField, TypeDot } from "./fields";
+import { Actions, buttonClass, ConfirmDelete, Field, Flag, Fold, GroupedSelect, Hint, Kind, Li, LongList, TextField, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
-import { attributeLabel, fedEntities, mappingsOfColumn, tablePath, typeCheckOf } from "./model-index";
+import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tablePath, typeCheckOf } from "./model-index";
 
 export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; cardId: Uuid }) {
   const p = usePanel();
@@ -116,6 +117,8 @@ export function SourceColumnPanel({ column: c, cardId }: { column: SourceColumn;
   const table = p.ix.table.get(c.source_table_id)!;
   const mappings = mappingsOfColumn(p.ix, c.id);
   const ref = { sourceColumnId: c.id, expectedVersion: c.version };
+  /** Where the D-48 choice opens: under the attribute picker. */
+  const mapAt = useRef({ x: 0, y: 0 });
   const save = (change: { isBusinessKey?: boolean; isPii?: boolean; comment?: string | null }) =>
     void run(() => updateSourceColumnAction(p.workspaceId, { ...ref, ...change }));
 
@@ -176,9 +179,28 @@ export function SourceColumnPanel({ column: c, cardId }: { column: SourceColumn;
             )}
           />
         ) : (
-          <Hint>Not used yet. Map it from an attribute’s panel with “Add a source column”.</Hint>
+          <Hint>Not used yet. Drag it onto an attribute, or onto an entity’s header to create a new attribute from it.</Hint>
         )}
       </Fold>
+
+      {p.editable && (
+        <Field label="Map to an attribute" htmlFor="f-adda">
+          <div
+            onChangeCapture={(e) => {
+              const r = (e.target as HTMLElement).getBoundingClientRect();
+              mapAt.current = { x: r.left, y: r.bottom };
+            }}
+          >
+            <GroupedSelect
+              id="f-adda"
+              placeholder="Choose an attribute…"
+              groups={attributeOptions(p.ix, p.entitiesHere)}
+              onPick={(attributeId) => p.mapColumn(c.id, attributeId, mapAt.current)}
+              testId="select-map-to-attribute"
+            />
+          </div>
+        </Field>
+      )}
     </div>
   );
 }

@@ -6,7 +6,7 @@
 // into a transformation and is saved only together with a rule. Changing an approved mapping's inputs, kind or rule
 // sends it back to review (D-51); the server says so and the panel shows it.
 
-import { useContext, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
   addMappingInputAction,
   deleteMappingAction,
@@ -55,6 +55,16 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   const [pending, setPending] = useState<Uuid | null>(null);
   /** Transformation chosen, but no rule written yet. */
   const [wantsRule, setWantsRule] = useState(false);
+
+  // “Add to mapping …” from the canvas or the column panel (D-48): the column waits here for its rule.
+  const { pendingInput, clearPendingInput } = p;
+  useEffect(() => {
+    if (pendingInput?.mappingId !== m.id) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- takes over a request made outside the panel
+    setPending(pendingInput.columnId);
+    clearPendingInput();
+    setTimeout(() => rule.current?.focus(), 0);
+  }, [pendingInput, clearPendingInput, m.id]);
 
   const kind: MappingKind = pending || wantsRule ? "transform" : m.kind;
   const ruleOpen = p.editable && kind === "transform";

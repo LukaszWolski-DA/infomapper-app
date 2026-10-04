@@ -4,7 +4,7 @@
 
 import type { Uuid } from "@/domain/ids";
 import { suggestsBusinessKey } from "@/domain/model/mapping-rules";
-import { checkMappingTypes, formatColumnType, type MappingTypeCheck } from "@/domain/model/type-check";
+import { checkMappingTypes, formatAttributeType, formatColumnType, type MappingTypeCheck } from "@/domain/model/type-check";
 import type { Attribute, Entity, Mapping, MappingInput, SourceColumn, SourceTable, WorkspaceModel } from "@/domain/types";
 
 export interface ModelIndex {
@@ -112,6 +112,17 @@ export function columnOptions(ix: ModelIndex, tablesHere: ReadonlySet<Uuid>, exc
     .map((t) => ({
       label: `${ix.systemName.get(t.source_system_id) ?? "?"} / ${t.name}${tablesHere.has(t.id) ? "" : " (not on canvas)"}`,
       columns: (ix.columnsOf.get(t.id) ?? []).filter((c) => !exclude.has(c.id)).map((c) => ({ id: c.id, label: `${c.name}  ${formatColumnType(c)}` })),
+    }))
+    .filter((g) => g.columns.length > 0);
+}
+
+/** Attributes to pick from (“Map to an attribute” in the column panel): grouped by entity, entities on this canvas first (prototype attrOptions). */
+export function attributeOptions(ix: ModelIndex, entitiesHere: ReadonlySet<Uuid>): ColumnGroup[] {
+  const entities = [...ix.model.entities].sort((a, b) => Number(entitiesHere.has(b.id)) - Number(entitiesHere.has(a.id)));
+  return entities
+    .map((e) => ({
+      label: `${e.name}${entitiesHere.has(e.id) ? "" : " (not on canvas)"}`,
+      columns: (ix.attributesOf.get(e.id) ?? []).map((a) => ({ id: a.id, label: `${a.name}  ${formatAttributeType(a)}` })),
     }))
     .filter((g) => g.columns.length > 0);
 }
