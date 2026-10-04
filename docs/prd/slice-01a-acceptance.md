@@ -9,7 +9,8 @@ themselves: S1A-02 adds a second input to a mapping through the domain, S1A-14 a
 
 Results from 4 October 2026: `npm run lint`, `npm run typecheck` and `npm test` (363 unit tests) pass, and three full
 runs of `npm run e2e` in a row (slice 0 and 1a, 35 tests each) passed 105 of 105 – see
-[Three runs in a row](#three-runs-in-a-row).
+[Three runs in a row](#three-runs-in-a-row). After the follow-up changes (adapter cache, drag offset; 367 unit tests),
+one more full run passed 35 of 35.
 
 ## Criteria and tests
 
