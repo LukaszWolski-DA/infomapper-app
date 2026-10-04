@@ -404,6 +404,10 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
           elementsSelectable={false}
           snapToGrid
           snapGrid={[8, 8]}
+          // React Flow takes the grab offset where the drag starts; with a threshold that is past the first mouse move,
+          // so the card would trail the cursor by that move for the whole drag. 0 starts the drag on mouse down.
+          // A click without a move still ends in onNodeDragStop, which saves nothing for an unchanged position.
+          nodeDragThreshold={0}
           panOnScroll
           zoomOnScroll={false}
           zoomOnPinch

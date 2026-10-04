@@ -72,17 +72,6 @@ export const rowMiddle = (cardBox: Box, rowBox: Box, zoom: number) => (rowBox.y 
 /** The header's middle, where the line of a hidden row ends (prototype: 27 px below the card's top). */
 export const HEADER_MIDDLE = 27;
 
-/** Drag the header of a card by (dx, dy) screen pixels with the real mouse. */
-export async function dragCard(page: Page, name: string, dx: number, dy: number) {
-  const head = card(page, name).locator(".c-head .c-l2");
-  const b = await box(head);
-  const from = { x: b.x + b.width / 3, y: b.y + b.height / 2 };
-  await page.mouse.move(from.x, from.y);
-  await page.mouse.down();
-  for (let i = 1; i <= 10; i++) await page.mouse.move(from.x + (dx * i) / 10, from.y + (dy * i) / 10);
-  await page.mouse.up();
-}
-
 /** Picks an option of a native select by the start of its text. */
 export async function pickOption(select: Locator, startsWith: string) {
   const value = await select.evaluate(
