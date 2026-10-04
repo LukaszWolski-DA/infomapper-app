@@ -93,7 +93,7 @@
 .im-canvas .overview-svg .ms { fill: var(--im-physical); fill-opacity: .5; stroke: none }
 .im-canvas .overview-svg .mm { stroke: var(--im-map); stroke-opacity: .55; stroke-width: 1; vector-effect: non-scaling-stroke }
 .im-canvas .overview-svg .mr { stroke: var(--im-rel); stroke-opacity: .7; stroke-width: 1; vector-effect: non-scaling-stroke }
-.im-canvas .overview-svg .mv { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab }
+.im-canvas .overview-view .mv { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab }
 @media (max-width: 600px) {
   .im-canvas .overview { width: 160px }
   .im-canvas .overview-svg, .im-canvas .overview-view { width: 160px; height: 104px }
