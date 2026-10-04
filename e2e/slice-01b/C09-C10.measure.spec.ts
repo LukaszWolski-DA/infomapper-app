@@ -1,12 +1,12 @@
 // Quick check of the spike's C-09 (card resize) and C-10 (hover highlight delay) on the "Performance test" workspace
-// (seed:large), after step 4 of slice 1b. Runs only with MEASURE=1 (headed Google Chrome, the spike's 1536 × 864):
+// (seed:large), from step 4 of slice 1b. Runs only with MEASURE=1 (headed Google Chrome, the spike's 1536 × 864):
 //
 //   MEASURE=1 npx playwright test e2e/slice-01b/C09-C10.measure.spec.ts
 //
 // The spike's method (spikes/canvas-react-flow/tests/measure.spec.ts): C-09 drags the width handle of the card with
-// 200 rows back and forth for 6 s and records every frame; C-10 dispatches a hover on up to 40 mapped rows in view and
-// times until the overlay mark is in the page and until the next frame, then sweeps the real mouse over a card for
-// 5 s. Results go to test-results/S1B-C09-C10.json. The full measurement with its bars is step 6 (S1B-09, S1B-10).
+// 200 rows back and forth for 6 s and records every frame; C-10 dispatches 40 hovers on the mapped rows in view (going
+// round them) and times until the overlay mark is in the page and until the next frame, then sweeps the real mouse
+// over a card for 5 s. Results go to test-results/S1B-C09-C10.json. The full measurement with its bars is step 6 (S1B-09, S1B-10).
 
 import fs from "node:fs";
 import path from "node:path";
@@ -122,7 +122,9 @@ test("C-09 and C-10 quick check on Performance test (slice 1b, step 4)", async (
       .slice(0, 40);
     if (!rows.length) return { error: "no mapped rows in view" };
     const commit: number[] = [], frame: number[] = [];
-    for (const r of rows) {
+    // 40 hovers, going round the mapped rows in view
+    for (let k = 0; k < 40; k++) {
+      const r = rows[k % rows.length]!;
       // React renders a hover at continuous priority: wait for the overlay mark, then for the frame that shows it
       const t0 = performance.now();
       r.querySelector(".nm")!.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
