@@ -2,7 +2,7 @@
 
 // The attribute panel (prototype insAttr): name, data type with its parameters (AD-27), flags with the business-key
 // suggestion (AD-28), definition (plain text, AD-30), where it comes from (one row per mapping, D-49),
-// “Add a source column” to create a mapping, and delete.
+// “Add a source column” to create a mapping, and delete; slice 1b: its position on the entity (D-36).
 
 import { useContext, useEffect, useRef } from "react";
 import { createMappingAction } from "@/app/_actions/mapping";
@@ -32,6 +32,7 @@ import {
   TypeDot,
 } from "./fields";
 import { usePanel } from "./inspector";
+import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, businessKeyHint, columnLabel, columnOptions, inputColumns, inputsLabel, typeCheckOf } from "./model-index";
 import { usePanels } from "./panels-context";
 
@@ -53,6 +54,7 @@ const toNumber = (v: string): number | null => (v.trim() === "" ? null : Number(
 
 export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   const p = usePanel();
+  const move = useMoveAttribute(p.ix, p.workspaceId);
   const ui = useContext(CanvasUiCtx);
   const { run } = useAction();
   const toast = useToast();
@@ -101,6 +103,8 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   }
 
   const v = `${a.id}:${a.version}`;
+  const siblings = p.ix.attributesOf.get(a.entity_id) ?? [];
+  const position = siblings.findIndex((x) => x.id === a.id) + 1;
   return (
     <div data-testid="panel-attribute">
       <Kind>
@@ -116,6 +120,30 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       </Kind>
       <Field label="Name" htmlFor="f-an">
         <TextField key={v} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-attribute-name" inputRef={nameRef} />
+      </Field>
+
+      <Field label="Position on the entity">
+        <div className="flex items-center gap-1.5" data-testid="position-attribute">
+          <span className="mr-1 tabular-nums" data-testid="value-attribute-position">
+            {position} of {siblings.length}
+          </span>
+          {p.editable && (
+            <>
+              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move to the top (Ctrl Shift ↑)" aria-label="Move to the top" disabled={position === 1} onClick={() => void move(a.id, "top")}>
+                ⤒
+              </button>
+              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move up (Ctrl ↑)" aria-label="Move up" disabled={position === 1} onClick={() => void move(a.id, "up")}>
+                ↑
+              </button>
+              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move down (Ctrl ↓)" aria-label="Move down" disabled={position === siblings.length} onClick={() => void move(a.id, "down")}>
+                ↓
+              </button>
+              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move to the bottom (Ctrl Shift ↓)" aria-label="Move to the bottom" disabled={position === siblings.length} onClick={() => void move(a.id, "bottom")}>
+                ⤓
+              </button>
+            </>
+          )}
+        </div>
       </Field>
 
       <Field label="Data type" htmlFor="f-at">

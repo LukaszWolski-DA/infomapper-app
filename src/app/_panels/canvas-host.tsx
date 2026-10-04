@@ -6,10 +6,11 @@
 //   ready to type in the right panel.
 // - A relationship from one entity card to another, then its panel for the label and cardinality.
 // - The toolbox for what was right-clicked (D-19), with the actions of the prototype that exist so far.
+// - Ctrl/Alt + arrows on a selected attribute (D-36).
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
-import { deleteMappingAction, setMappingStatusAction } from "@/app/_actions/mapping";
-import { createEntityAction, createRelationshipAction, deleteRelationshipAction, reorderAttributeAction, swapRelationshipAction } from "@/app/_actions/model";
+import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
+import { createEntityAction, createRelationshipAction, deleteRelationshipAction, swapRelationshipAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
 import { RELATE_HINT } from "@/canvas/CanvasModes";
 import { FILTER_LABEL, FILTER_ORDER } from "@/canvas/CardNode";
@@ -20,6 +21,7 @@ import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
 import { useMapColumn } from "./map-column";
+import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, columnLabel, inputsLabel, type ModelIndex } from "./model-index";
 import { usePanels } from "./panels-context";
 import { Toolbox, type SearchResult, type ToolboxItem } from "./toolbox";
@@ -70,6 +72,7 @@ export function useCanvasHost({
   const cardById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const cardOf = useCallback((targetId: Uuid) => cards.find((c) => c.targetId === targetId)?.id ?? null, [cards]);
   const columns = useMapColumn({ ix, workspaceId, editable, cardOf });
+  const moveAttribute = useMoveAttribute(ix, workspaceId);
 
   const createEntityAt = useCallback(
     async (at: { x: number; y: number }, name?: string) => {
@@ -121,9 +124,12 @@ export function useCanvasHost({
       createEntityAt: (at, name) => void createEntityAt(at, name),
       relate: (from, to) => void relate(from, to),
       openToolbox: setToolbox,
+      moveAttribute: (attributeId, how) => {
+        if (editable) void moveAttribute(attributeId, how);
+      },
     });
     return () => ui.registerHost(null);
-  }, [ui, columns.dropColumn, createEntityAt, relate]);
+  }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable]);
 
   // ---- the toolbox ----
 
@@ -145,6 +151,7 @@ export function useCanvasHost({
         options: FILTER_ORDER.map((f) => ({ label: FILTER_LABEL[f], on: card.rowFilter === f, act: () => ui.setCardView(card.id, { rowFilter: f }) })),
       });
       items.push({ label: card.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !card.collapsed }) });
+      items.push({ label: "Fit width to names", act: () => ui.fitWidth(card.id) });
       items.push({ sep: true });
       items.push({ label: "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
       if (isEnt) items.push({ label: "Delete from model…", danger: true, act: () => setDeleting(card.targetId) });
@@ -221,6 +228,19 @@ export function useCanvasHost({
       if (editable) {
         items.push({ sep: true });
         items.push({ label: "Edit transformation rule…", act: () => panels.setRuleFocus(m.id) });
+        if ((ix.inputsOf.get(m.id) ?? []).length > 1) {
+          items.push({
+            label: "Split into separate mappings",
+            act: () =>
+              void run(
+                () => splitMappingAction(workspaceId, { mappingId: m.id, expectedVersion: m.version }),
+                (v) => v.notice ?? `Split into ${v.mappings} separate mappings.`,
+              ),
+          });
+        }
+        if ((ix.mappingsOf.get(m.attribute_id) ?? []).length > 1) {
+          items.push({ label: "Merge mappings…", act: () => panels.setMergeFocus(m.id) });
+        }
         items.push({
           label: "Delete mapping",
           danger: true,
@@ -262,12 +282,11 @@ export function useCanvasHost({
         if (editable) {
           const list = ix.attributesOf.get(a.entity_id) ?? [];
           const pos = list.findIndex((x) => x.id === a.id), last = list.length - 1;
-          const move = (position: number) => () =>
-            void run(() => reorderAttributeAction(workspaceId, { attributeId: a.id, expectedVersion: a.version, position }));
-          items.push({ label: "Move up", kbd: "Ctrl ↑", disabled: pos <= 0, act: move(pos - 1) });
-          items.push({ label: "Move down", kbd: "Ctrl ↓", disabled: pos >= last, act: move(pos + 1) });
-          items.push({ label: "Move to the top", kbd: "Ctrl Shift ↑", disabled: pos <= 0, act: move(0) });
-          items.push({ label: "Move to the bottom", kbd: "Ctrl Shift ↓", disabled: pos >= last, act: move(last) });
+          const move = (how: "up" | "down" | "top" | "bottom") => () => void moveAttribute(a.id, how);
+          items.push({ label: "Move up", kbd: "Ctrl ↑", disabled: pos <= 0, act: move("up") });
+          items.push({ label: "Move down", kbd: "Ctrl ↓", disabled: pos >= last, act: move("down") });
+          items.push({ label: "Move to the top", kbd: "Ctrl Shift ↑", disabled: pos <= 0, act: move("top") });
+          items.push({ label: "Move to the bottom", kbd: "Ctrl Shift ↓", disabled: pos >= last, act: move("bottom") });
           items.push({ sep: true });
           items.push({ label: "Map from a column…", act: () => focusField("f-addc") });
         }

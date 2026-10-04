@@ -146,3 +146,10 @@ export function fedEntities(ix: ModelIndex, tableId: Uuid): { entity: Entity; ma
     .filter((f) => !!f.entity)
     .sort((a, b) => b.mappings - a.mappings || a.entity.name.localeCompare(b.entity.name));
 }
+
+/** Where a move takes an attribute (0 = top), or null when it is already there. */
+export function targetPosition(from: number, count: number, how: "up" | "down" | "top" | "bottom" | number): number | null {
+  const to = typeof how === "number" ? how : how === "top" ? 0 : how === "bottom" ? count - 1 : how === "up" ? from - 1 : from + 1;
+  const clamped = Math.max(0, Math.min(count - 1, to));
+  return from < 0 || clamped === from ? null : clamped;
+}

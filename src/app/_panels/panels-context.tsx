@@ -17,6 +17,9 @@ interface PanelsApi {
   /** The mapping whose rule the mapping panel should open next. */
   ruleFocus: string | null;
   setRuleFocus: (mappingId: string | null) => void;
+  /** The mapping whose “Merge mappings” section the mapping panel should open next (toolbox, D-49). */
+  mergeFocus: string | null;
+  setMergeFocus: (mappingId: string | null) => void;
   /** The concept a new entity went into last (it may have been deleted since). */
   lastConcept: () => string | null;
   setLastConcept: (conceptId: string) => void;
@@ -28,6 +31,8 @@ const PanelsCtx = createContext<PanelsApi>({
   setNameFocus: noop,
   ruleFocus: null,
   setRuleFocus: noop,
+  mergeFocus: null,
+  setMergeFocus: noop,
   lastConcept: () => null,
   setLastConcept: noop,
 });
@@ -37,11 +42,12 @@ export const usePanels = () => useContext(PanelsCtx);
 export function PanelsProvider({ children }: { children: ReactNode }) {
   const [nameFocus, setNameFocus] = useState<string | null>(null);
   const [ruleFocus, setRuleFocus] = useState<string | null>(null);
+  const [mergeFocus, setMergeFocus] = useState<string | null>(null);
   const lastConcept = useCallback(() => readPreference(LAST_CONCEPT_KEY), []);
   const setLastConcept = useCallback((conceptId: string) => writePreference(LAST_CONCEPT_KEY, conceptId), []);
   const api = useMemo(
-    () => ({ nameFocus, setNameFocus, ruleFocus, setRuleFocus, lastConcept, setLastConcept }),
-    [nameFocus, ruleFocus, lastConcept, setLastConcept],
+    () => ({ nameFocus, setNameFocus, ruleFocus, setRuleFocus, mergeFocus, setMergeFocus, lastConcept, setLastConcept }),
+    [nameFocus, ruleFocus, mergeFocus, lastConcept, setLastConcept],
   );
   return <PanelsCtx.Provider value={api}>{children}</PanelsCtx.Provider>;
 }

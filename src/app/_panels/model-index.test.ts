@@ -11,7 +11,7 @@ import {
   sourceTable,
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
-import { attributeLabel, businessKeyHint, fedEntities, mappingsOfColumn, columnLabel, columnOptions, feedingSources, indexModel, inputsLabel, typeCheckOf } from "./model-index";
+import { attributeLabel, businessKeyHint, fedEntities, mappingsOfColumn, columnLabel, columnOptions, feedingSources, indexModel, inputsLabel, targetPosition, typeCheckOf } from "./model-index";
 
 // Customer.email ← customer.email (fits); Customer.customer_id ← customer.cust_id (BK column) and customer.first_name
 // as a transform without a rule: first_name varchar(50) does not fit integer.
@@ -70,5 +70,20 @@ describe("the panel's model index", () => {
     const groups = columnOptions(ix, new Set([ids.crmCustomer]), new Set([ids.colEmail]));
     expect(groups.map((g) => g.label)).toEqual(["CRM / customer"]);
     expect(groups[0]!.columns.map((c) => c.label)).toEqual(["cust_id  int", "first_name  varchar(50)"]);
+  });
+});
+
+describe("targetPosition (attribute order, D-36)", () => {
+  it("moves one place, to the top or bottom, or to a position, and not past the ends", () => {
+    expect(targetPosition(2, 5, "up")).toBe(1);
+    expect(targetPosition(2, 5, "down")).toBe(3);
+    expect(targetPosition(2, 5, "top")).toBe(0);
+    expect(targetPosition(2, 5, "bottom")).toBe(4);
+    expect(targetPosition(2, 5, 9)).toBe(4);
+  });
+  it("is null when the attribute stays where it is", () => {
+    expect(targetPosition(0, 5, "up")).toBeNull();
+    expect(targetPosition(4, 5, "bottom")).toBeNull();
+    expect(targetPosition(-1, 5, "up")).toBeNull();
   });
 });
