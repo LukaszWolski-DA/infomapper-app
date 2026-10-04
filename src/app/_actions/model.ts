@@ -1,12 +1,13 @@
 "use server";
 
 // Model writes from the panels (slice 1a): concepts (D-46, D-47), entities with their impact before deleting,
-// attributes, relationships, and source tables and columns. Mappings are in mapping.ts.
+// attributes, relationships, and source tables and columns; from the canvas (slice 1b): a new attribute from a
+// dropped column. Mappings are in mapping.ts.
 
 import { revalidatePath } from "next/cache";
 import { getDataStore, type DataStore } from "@/data";
 import type { CommandContext, CommandResult } from "@/domain/changes";
-import { addAttribute, deleteAttribute, updateAttribute, type UpdateAttributeInput } from "@/domain/commands/attribute";
+import { addAttribute, createAttributeFromColumn, deleteAttribute, updateAttribute, type UpdateAttributeInput } from "@/domain/commands/attribute";
 import { createConcept, deleteConcept, renameConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity, type UpdateEntityInput } from "@/domain/commands/entity";
 import { deleteRelationship, swapRelationship, updateRelationship, type UpdateRelationshipInput } from "@/domain/commands/relationship";
@@ -133,6 +134,21 @@ export async function deleteEntityAction(
 export async function addAttributeAction(workspaceId: string, input: { entityId: string }): Promise<ActionResult<{ attributeId: string }>> {
   return modelCommand(workspaceId, (ctx, access, { entities, attributes }) =>
     addAttribute(ctx, access, { entity: byId(entities, input?.entityId), attributes }, input),
+  );
+}
+
+/** A column dropped on an entity card's header (slice 1b): a new attribute mapped from it, or a mapping to the attribute of that name. */
+export async function createAttributeFromColumnAction(
+  workspaceId: string,
+  input: { entityId: string; sourceColumnId: string },
+): Promise<ActionResult<{ attributeId: string; mappingId: string; createdAttribute: boolean }>> {
+  return modelCommand(workspaceId, (ctx, access, { entities, attributes, sourceColumns, mappings, mappingInputs }) =>
+    createAttributeFromColumn(
+      ctx,
+      access,
+      { entity: byId(entities, input?.entityId), attributes, column: byId(sourceColumns, input?.sourceColumnId), mappings, mappingInputs },
+      input,
+    ),
   );
 }
 
