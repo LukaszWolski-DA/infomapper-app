@@ -26,6 +26,7 @@ import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
 import { Actions, buttonClass, ConfirmDelete, Field, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
+import { usePanels } from "./panels-context";
 import { columnLabel, columnOptions, inputsLabel, typeCheckOf } from "./model-index";
 
 const KINDS = [
@@ -65,6 +66,20 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
     clearPendingInput();
     setTimeout(() => rule.current?.focus(), 0);
   }, [pendingInput, clearPendingInput, m.id]);
+
+  // “Edit transformation rule…” in the toolbox: a direct copy becomes a transformation waiting for its rule.
+  const { ruleFocus, setRuleFocus } = usePanels();
+  useEffect(() => {
+    if (ruleFocus !== m.id) return;
+    setRuleFocus(null);
+    if (!p.editable) return;
+    if (m.kind === "transform") setTimeout(() => rule.current?.focus(), 0);
+    else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- takes over a request made in the toolbox
+      setWantsRule(true);
+      setTimeout(() => rule.current?.focus(), 0);
+    }
+  }, [ruleFocus, setRuleFocus, m.id, m.kind, p.editable]);
 
   const kind: MappingKind = pending || wantsRule ? "transform" : m.kind;
   const ruleOpen = p.editable && kind === "transform";

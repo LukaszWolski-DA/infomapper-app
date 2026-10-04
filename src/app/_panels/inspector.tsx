@@ -9,7 +9,8 @@ import type { Uuid } from "@/domain/ids";
 import type { WorkspaceModel } from "@/domain/types";
 import { AttributePanel } from "./attribute-panel";
 import { EntityPanel } from "./entity-panel";
-import { useMapColumn, type PendingInput } from "./map-column";
+import { useCanvasHost, type HostCard } from "./canvas-host";
+import type { PendingInput } from "./map-column";
 import { MappingPanel } from "./mapping-panel";
 import { indexModel, type ModelIndex } from "./model-index";
 import { OverviewPanel } from "./overview-panel";
@@ -25,8 +26,8 @@ export interface InspectorProps {
   canvasCount: number;
   /** The live model of the workspace. */
   model: WorkspaceModel;
-  /** The cards of this canvas: card id, what it shows. */
-  cards: { id: Uuid; kind: "ent" | "src"; targetId: Uuid }[];
+  /** The cards of this canvas: card id, what it shows, collapsed and row filter (for the toolbox). */
+  cards: HostCard[];
   tree: TreeData;
   /** Owner, admin or modeler, not archived. */
   editable: boolean;
@@ -68,7 +69,8 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     const cardByTarget = new Map(cards.map((c) => [c.targetId, c.id]));
     return (id: Uuid) => cardByTarget.get(id) ?? null;
   }, [cards]);
-  const { mapColumn, choiceElement, pendingInput, clearPendingInput } = useMapColumn({ ix, workspaceId: rest.workspaceId, editable: rest.editable, cardOf });
+  const host = useCanvasHost({ ix, workspaceId: rest.workspaceId, canvasId: rest.canvasId, editable: rest.editable, canSetStatus: rest.canSetStatus, cards });
+  const { mapColumn, pendingInput, clearPendingInput } = host;
 
   const panel = useMemo<PanelContext>(() => {
     const elsewhere = new Set<Uuid>();
@@ -131,7 +133,7 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
       <div className="flex-1 overflow-auto px-4 pb-6 pt-4 text-[13px]" data-testid="inspector-body">
         {body}
       </div>
-      {choiceElement}
+      {host.elements}
     </Ctx.Provider>
   );
 }

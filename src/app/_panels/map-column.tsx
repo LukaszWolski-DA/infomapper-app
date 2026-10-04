@@ -113,19 +113,15 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
     [ix, run, workspaceId, cardOf, ui, toast],
   );
 
-  // The canvas reports drops; the handler always sees the latest model.
-  const onDrop = useRef<(drop: ColumnDrop) => void>(() => {});
-  useEffect(() => {
-    onDrop.current = (drop) => {
+  /** A column dropped on the canvas: on an attribute row, or elsewhere on an entity card. */
+  const dropColumn = useCallback(
+    (drop: ColumnDrop) => {
       if (!editable) return;
       if ("attributeId" in drop.target) mapColumn(drop.columnId, drop.target.attributeId, drop.at);
       else void dropOnEntity(drop.columnId, drop.target.entityId);
-    };
-  }, [editable, mapColumn, dropOnEntity]);
-  useEffect(() => {
-    ui.registerColumnDrop((drop) => onDrop.current(drop));
-    return () => ui.registerColumnDrop(null);
-  }, [ui]);
+    },
+    [editable, mapColumn, dropOnEntity],
+  );
 
   // On the body: the right panel may be hidden on a narrow screen while the canvas is in use.
   const choiceElement = choice
@@ -135,7 +131,7 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
       )
     : null;
 
-  return { mapColumn, choiceElement, pendingInput, clearPendingInput: useCallback(() => setPendingInput(null), []) };
+  return { mapColumn, dropColumn, choiceElement, pendingInput, clearPendingInput: useCallback(() => setPendingInput(null), []) };
 }
 
 function MapChoice({ choice, ix, onConfirm, onCancel }: { choice: Choice; ix: ModelIndex; onConfirm: (o: MappingChoice) => void; onCancel: () => void }) {
