@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { CanvasUiCtx, type CanvasHandle, type CanvasUiApi, type Notation } from "./context";
+import { CanvasUiCtx, type CanvasHandle, type CanvasUiApi, type ColumnDrop, type Notation } from "./context";
 import type { Selection } from "./line-data";
 
 const OVERVIEW_KEY = "infomapper:overview";
@@ -34,6 +34,7 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
   const [notation, setNotationState] = useState<Notation>("ie");
   const [selection, select] = useState<Selection>(null);
   const handle = useRef<CanvasHandle | null>(null);
+  const onColumnDrop = useRef<((drop: ColumnDrop) => void) | null>(null);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after mount: localStorage is not available on the server
@@ -68,6 +69,10 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       freeSpot: () => handle.current?.freeSpot() ?? { x: 40, y: 40 },
       registerCanvas: (h) => {
         handle.current = h;
+      },
+      dropColumn: (drop) => onColumnDrop.current?.(drop),
+      registerColumnDrop: (h) => {
+        onColumnDrop.current = h;
       },
     }),
     [overviewOpen, toggleOverview, notation, setNotation, selection],

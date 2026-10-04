@@ -43,6 +43,16 @@ export interface CanvasHandle {
   freeSpot: () => { x: number; y: number };
 }
 
+/**
+ * A source column row dropped on an entity card (slice 1b, D-48): on one of its attribute rows, or anywhere else on
+ * the card (its header, an empty card). `at` is the drop point on the screen, for the choice that may follow.
+ */
+export interface ColumnDrop {
+  columnId: Uuid;
+  target: { attributeId: Uuid } | { entityId: Uuid };
+  at: { x: number; y: number };
+}
+
 /** Shared between the canvas, the panels and the canvas tools in the top bar (notation, zoom, fit). */
 export interface CanvasUiApi extends CanvasHandle {
   overviewOpen: boolean;
@@ -53,6 +63,9 @@ export interface CanvasUiApi extends CanvasHandle {
   selection: Selection;
   select: (sel: Selection) => void;
   registerCanvas: (handle: CanvasHandle | null) => void;
+  /** The canvas reports a dropped column; the panels decide what it means (they know the model). */
+  dropColumn: (drop: ColumnDrop) => void;
+  registerColumnDrop: (handler: ((drop: ColumnDrop) => void) | null) => void;
 }
 
 export const CanvasUiCtx = createContext<CanvasUiApi>({
@@ -68,6 +81,8 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   centerOn: noop,
   freeSpot: () => ({ x: 0, y: 0 }),
   registerCanvas: noop,
+  dropColumn: noop,
+  registerColumnDrop: noop,
 });
 
 /** Drag data of a left-panel item dropped onto the canvas: JSON `{ target: CardTarget, rows: number }`. */

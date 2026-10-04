@@ -24,6 +24,7 @@ import "./canvas.css";
 import { useToast } from "@/ui/components/toast";
 import type { CardData } from "./card-data";
 import CardNode, { FILTER_ORDER, type CardNodeT } from "./CardNode";
+import { DraftLine, useColumnDrag } from "./ColumnDrag";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget } from "./context";
 import {
@@ -118,6 +119,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(c, editable)));
   const [ready, setReady] = useState(false);
   const related = useMemo(() => relatedLines(selection, lines), [selection, lines]);
+  const { draft, onPointerDown } = useColumnDrag(editable, ui.dropColumn);
 
   // ---- view: the remembered one, else fit everything ----
   const storeApi = useStoreApi();
@@ -392,6 +394,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         style={{ visibility: ready ? "visible" : "hidden" }}
         onDragOver={onDragOver}
         onDrop={onDrop}
+        onPointerDown={onPointerDown}
       >
         <ReactFlow
           nodes={nodes}
@@ -422,6 +425,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         >
           <LineLayer lines={lines} selection={selection} related={related} onSelect={select} />
           <Overview lines={lines} />
+          {draft && <DraftLine draft={draft} />}
         </ReactFlow>
         {nodes.length === 0 && (
           <div className="im-empty" data-testid="canvas-empty">

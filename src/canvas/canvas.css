@@ -143,3 +143,9 @@
 .im-canvas .src .row.sel { background: var(--im-physical-soft); box-shadow: inset 3px 0 var(--im-physical) }
 .im-canvas .react-flow__node.draggable .c-head { cursor: move }
 .im-canvas .react-flow__node.dragging .card { box-shadow: 0 0 0 1px var(--im-line), 0 18px 36px -14px var(--im-shadow) }
+
+/* ---------- mapping by drag (slice 1b, D-48; prototype .tmp, .row.drop, .card.drop, body.connecting) ---------- */
+.im-canvas .draft-layer .tmp { fill: none; stroke: var(--im-ink-2); stroke-width: 1.6; stroke-dasharray: 4 4 }
+body.connecting .im-canvas .row { cursor: crosshair }
+.im-canvas .row.drop { background: var(--im-map-soft); box-shadow: inset 0 0 0 1.5px var(--im-map) }
+.im-canvas .card.drop { box-shadow: 0 0 0 2px var(--im-map), 0 10px 24px -12px var(--im-shadow) }
