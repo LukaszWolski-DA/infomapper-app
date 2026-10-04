@@ -107,18 +107,27 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 ```
 npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet)
 npm run reset-dev-data   # replace .data/dev-db.json with fresh demo data
+npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards) to .data/dev-db.json
 npm run dev              # local app on http://localhost:3000; sign in at /sign-in by picking a test user
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
 npm run lint             # ESLint, including the layer rules (eslint-plugin-boundaries)
 npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
+MEASURE=1 npx playwright test e2e/slice-01a/S1A-14.spec.ts   # canvas performance in headed Chrome (S1A-14)
 ```
 
 - e2e tests import `test`/`expect` from `e2e/slice-XX/fixtures.ts` (fresh seed per test); shared steps are in
-  `helpers.ts`. One file per acceptance criterion, named after its id (`S0-04.spec.ts`).
+  `helpers.ts`. One file per acceptance criterion, named after its id (`S0-04.spec.ts`, `S1A-07.spec.ts`). Slice 1a's
+  helpers read the model from the e2e data file (`loadModel`) and open a canvas at a given view (`openCanvas`).
+- Never run `npm run e2e` while your own dev server runs: stop it first.
+- Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window). The local data adapter refuses a
+  production build, so the app is measured on the dev server; keep the AD-24 CSS rules, including no `overflow: hidden`
+  on repeated card elements unless the text may not fit (`src/canvas/text-fit.ts`).
 - e2e servers use their own build folders (`.next-e2e`, `.next-e2e-restart`) via `NEXT_DIST_DIR`, because Next.js
   refuses a second dev server on the same folder. Next.js adds them to `tsconfig.json`'s `include`; keep that.
+  They run without Turbopack's dev cache and start empty each run (`scripts/clean-e2e-build.ts`); the global setup
+  warms the server up. See `docs/known-limitations.md` (end-to-end tests).
 - Next.js 16 notes for agents are in `AGENTS.md` (managed by `next dev`; keep it committed). Read
   `node_modules/next/dist/docs/` before using a Next.js API you have not used here yet (e.g. `proxy.ts`, not middleware).
 - shadcn/ui components go to `src/ui/components` (`npx shadcn add <name>`); colours come from the prototype palette in
