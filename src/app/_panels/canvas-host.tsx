@@ -7,6 +7,8 @@
 // - A relationship from one entity card to another, then its panel for the label and cardinality.
 // - The toolbox for what was right-clicked (D-19), with the actions of the prototype that exist so far.
 // - Ctrl/Alt + arrows on a selected attribute (D-36).
+// - Delete on a selected mapping or relationship line: deleted at once, with Undo in the toast (slice 1b).
+// - “Show its sources” and “Show the entities it feeds” place them beside the card (B-08).
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
@@ -22,7 +24,7 @@ import { STATUS_LABEL } from "./attribute-panel";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
 import { useMapColumn } from "./map-column";
 import { useMoveAttribute } from "./move-attribute";
-import { attributeLabel, columnLabel, inputsLabel, type ModelIndex } from "./model-index";
+import { attributeLabel, columnLabel, fedEntities, feedingSources, inputsLabel, type ModelIndex } from "./model-index";
 import { usePanels } from "./panels-context";
 import { Toolbox, type SearchResult, type ToolboxItem } from "./toolbox";
 
@@ -118,6 +120,27 @@ export function useCanvasHost({
     [editable, cardById, toast, run, workspaceId, ui],
   );
 
+  /** Deletes a mapping or a relationship at once; the toast offers Undo (slice 1b). */
+  const deleteLine = useCallback(
+    async (line: { t: "map" | "rel"; id: Uuid }) => {
+      if (!editable) return;
+      if (line.t === "map") {
+        const m = ix.mapping.get(line.id);
+        if (!m) return;
+        const r = await run(() => deleteMappingAction(workspaceId, { mappingId: m.id, expectedVersion: m.version }), "Mapping deleted", { undoable: true });
+        if (r.ok) ui.select(null);
+      } else {
+        const rel = ix.model.relationships.find((x) => x.id === line.id);
+        if (!rel) return;
+        const r = await run(() => deleteRelationshipAction(workspaceId, { relationshipId: rel.id, expectedVersion: rel.version }), "Relationship deleted", {
+          undoable: true,
+        });
+        if (r.ok) ui.select(null);
+      }
+    },
+    [editable, ix, run, workspaceId, ui],
+  );
+
   useEffect(() => {
     ui.registerHost({
       dropColumn: columns.dropColumn,
@@ -127,15 +150,32 @@ export function useCanvasHost({
       moveAttribute: (attributeId, how) => {
         if (editable) void moveAttribute(attributeId, how);
       },
+      deleteLine: (line) => void deleteLine(line),
     });
     return () => ui.registerHost(null);
-  }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable]);
+  }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable, deleteLine]);
 
   // ---- the toolbox ----
 
   const cardItems = (card: HostCard): ToolboxItem[] => {
     const items: ToolboxItem[] = [];
     const isEnt = card.kind === "ent";
+    if (editable) {
+      // Feeding sources (left) or fed entities (right), placed beside the card (B-08).
+      const missing = isEnt
+        ? feedingSources(ix, card.targetId)
+            .filter((f) => !cardOf(f.table.id))
+            .map((f) => ({ target: { sourceTableId: f.table.id }, rows: (ix.columnsOf.get(f.table.id) ?? []).length }))
+        : fedEntities(ix, card.targetId)
+            .filter((f) => !cardOf(f.entity.id))
+            .map((f) => ({ target: { entityId: f.entity.id }, rows: (ix.attributesOf.get(f.entity.id) ?? []).length }));
+      const n = missing.length;
+      items.push({
+        label: isEnt ? (n ? `Show its sources (${n})` : "Sources are all on this canvas") : n ? `Show the entities it feeds (${n})` : "Fed entities are all on this canvas",
+        disabled: !n,
+        act: () => ui.placeBeside(missing, card.id, isEnt ? "left" : "right"),
+      });
+    }
     if (isEnt && editable) {
       items.push({
         label: "Draw a relationship from here",
@@ -245,10 +285,7 @@ export function useCanvasHost({
           label: "Delete mapping",
           danger: true,
           kbd: "Del",
-          act: () =>
-            void run(() => deleteMappingAction(workspaceId, { mappingId: m.id, expectedVersion: m.version }), "Mapping deleted").then((r) => {
-              if (r.ok) ui.select(null);
-            }),
+          act: () => void deleteLine({ t: "map", id: m.id }),
         });
       }
       return items;
@@ -265,10 +302,7 @@ export function useCanvasHost({
           label: "Delete relationship",
           danger: true,
           kbd: "Del",
-          act: () =>
-            void run(() => deleteRelationshipAction(workspaceId, ref), "Relationship deleted").then((res) => {
-              if (res.ok) ui.select(null);
-            }),
+          act: () => void deleteLine({ t: "rel", id: r.id }),
         });
       }
       return items;

@@ -13,7 +13,7 @@ import type { Uuid } from "@/domain/ids";
 import { formatColumnType } from "@/domain/model/type-check";
 import type { SourceColumn, SourceTable } from "@/domain/types";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, ConfirmDelete, Field, Flag, Fold, GroupedSelect, Hint, Kind, Li, LongList, TextField, TypeDot } from "./fields";
+import { Actions, buttonClass, ConfirmDelete, dangerClass, Field, Flag, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TextField, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tablePath, typeCheckOf } from "./model-index";
 
@@ -23,12 +23,17 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
   const { run } = useAction();
   const columns = p.ix.columnsOf.get(t.id) ?? [];
   const feeds = fedEntities(p.ix, t.id);
+  /** Fed entities not on this canvas, to place on the right of the card (B-08). */
+  const missing = feeds
+    .filter((f) => !p.cardOf(f.entity.id))
+    .map((f) => ({ target: { entityId: f.entity.id }, rows: (p.ix.attributesOf.get(f.entity.id) ?? []).length }));
   const goes = (c: SourceColumn) => mappingsOfColumn(p.ix, c.id).map((m) => attributeLabel(p.ix, m.attribute_id));
 
   async function remove() {
     const result = await run(
       () => deleteSourceTableAction(p.workspaceId, { sourceTableId: t.id, expectedVersion: t.version }),
-      `Deleted ${t.name} with its ${columns.length} column${columns.length === 1 ? "" : "s"}.`,
+      columns.length ? `Deleted ${t.name} with its ${columns.length} column${columns.length === 1 ? "" : "s"}.` : `Deleted ${t.name}.`,
+      { undoable: true },
     );
     if (result.ok) ui.select(null);
   }
@@ -74,9 +79,11 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
               return (
                 <Li
                   key={entity.id}
-                  title={here ? "On this canvas. Click to show it." : "Click to place it on the canvas."}
+                  title={here ? "On this canvas. Click to show it." : "Click to place it next to this card."}
                   onClick={() =>
-                    here ? p.goEntity(entity.id) : ui.place({ entityId: entity.id }, (p.ix.attributesOf.get(entity.id) ?? []).length)
+                    here
+                      ? p.goEntity(entity.id)
+                      : ui.placeBeside([{ target: { entityId: entity.id }, rows: (p.ix.attributesOf.get(entity.id) ?? []).length }], cardId, "right")
                   }
                   meta={`${mappings} mapping${mappings === 1 ? "" : "s"}`}
                 >
@@ -91,6 +98,13 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
         ) : (
           <Hint>This table does not feed any entity yet.</Hint>
         )}
+        {p.editable && missing.length > 0 && (
+          <div className="mt-2 flex gap-2">
+            <button type="button" className={smallButtonClass} onClick={() => ui.placeBeside(missing, cardId, "right")} data-testid="button-feed-all">
+              {missing.length === feeds.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}
+            </button>
+          </div>
+        )}
       </Fold>
 
       {p.editable && (
@@ -98,12 +112,19 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
           <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
             Remove from this canvas
           </button>
-          <ConfirmDelete
-            label="Delete table"
-            also={`${columns.length} column${columns.length === 1 ? "" : "s"}`}
-            onConfirm={() => void remove()}
-            testId="button-delete-table"
-          />
+          {columns.length ? (
+            // With columns it still asks (slice 1b, item 13).
+            <ConfirmDelete
+              label="Delete table"
+              also={`${columns.length} column${columns.length === 1 ? "" : "s"}`}
+              onConfirm={() => void remove()}
+              testId="button-delete-table"
+            />
+          ) : (
+            <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-table">
+              Delete table
+            </button>
+          )}
         </Actions>
       )}
     </div>

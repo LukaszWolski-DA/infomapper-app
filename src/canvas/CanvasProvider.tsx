@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { CanvasUiCtx, type CanvasHandle, type CanvasHost, type CanvasMode, type CanvasUiApi, type Notation } from "./context";
+import { CanvasUiCtx, type CanvasHandle, type CanvasHost, type CanvasMode, type CanvasUiApi, type Notation, type UndoHooks } from "./context";
 import type { Selection } from "./line-data";
 
 const OVERVIEW_KEY = "infomapper:overview";
@@ -35,6 +35,7 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
   const [selection, select] = useState<Selection>(null);
   const handle = useRef<CanvasHandle | null>(null);
   const host = useRef<CanvasHost | null>(null);
+  const undo = useRef<UndoHooks | null>(null);
   const [mode, setMode] = useState<CanvasMode>(null);
   const [flash, setFlash] = useState<{ rowId: string; n: number } | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,6 +82,8 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       placeAt: (target, rows, at) => handle.current?.placeAt(target, rows, at),
       setCardView: (cardId, view) => handle.current?.setCardView(cardId, view),
       fitWidth: (cardId) => handle.current?.fitWidth(cardId),
+      placeBeside: (cards, anchorCardId, side) => handle.current?.placeBeside(cards, anchorCardId, side),
+      settled: () => handle.current?.settled() ?? Promise.resolve(),
       flash,
       flashRow,
       mode,
@@ -88,6 +91,10 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       host: () => host.current,
       registerHost: (h) => {
         host.current = h;
+      },
+      undo: () => undo.current,
+      registerUndo: (u) => {
+        undo.current = u;
       },
     }),
     [overviewOpen, toggleOverview, notation, setNotation, selection, mode, flash, flashRow],

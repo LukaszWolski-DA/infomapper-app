@@ -7,6 +7,8 @@
 // browser (data model section 12). Cards are dragged by their header, snapped to 8 px, and saved when the drag ends.
 // Items from the left panel are placed by a click (a free spot in the view) or dropped where the mouse is.
 // After a write the server sends fresh cards; a card with a save still on its way keeps what the user did.
+// Slice 1b: feeding sources and fed entities are placed beside a card in one change (B-08); Delete removes a selected
+// line at once, with Undo in the toast.
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -32,6 +34,7 @@ import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop } from "./context";
 import {
+  besideSpots,
   CARD_W,
   cardHeight,
   cardWidth,
@@ -74,6 +77,8 @@ export interface ModelCanvasProps {
   saveCard: (change: CardChange) => Promise<SaveCardResult>;
   /** Places an entity or a source table on this canvas (a server action). */
   placeCard: (input: CardTarget & { x: number; y: number }) => Promise<CanvasWriteResult<{ canvasItemId: string }>>;
+  /** Places several elements on this canvas in one change (a server action). */
+  placeCards: (cards: (CardTarget & { x: number; y: number })[]) => Promise<CanvasWriteResult<{ canvasItemIds: string[] }>>;
   /** Takes a card off this canvas (a server action). */
   removeCard: (input: { canvasItemId: string; expectedVersion: number }) => Promise<CanvasWriteResult<unknown>>;
 }
@@ -114,7 +119,7 @@ const isTyping = (el: EventTarget | null) =>
 const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
 const isEntity = (t: CardTarget): t is { entityId: string } => "entityId" in t;
 
-export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, saveCard, placeCard, removeCard }: ModelCanvasProps) {
+export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, saveCard, placeCard, placeCards, removeCard }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
   const { selection, select, registerCanvas } = ui;
   const toast = useToast();
@@ -171,6 +176,11 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         return;
       }
       if (e.ctrlKey || e.metaKey || e.altKey) return;
+      if ((e.key === "Delete" || e.key === "Backspace") && editable && (selection?.t === "map" || selection?.t === "rel")) {
+        e.preventDefault();
+        ui.host()?.deleteLine({ t: selection.t, id: selection.id });
+        return;
+      }
       const k = e.key.toLowerCase();
       if (k === "f") fit();
       else if (k === "m") ui.toggleOverview();
@@ -235,14 +245,16 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         } catch {
           result = FAILED;
         }
-        if (result.ok) versions.current.set(id, result.value.version);
-        else {
+        if (result.ok) {
+          versions.current.set(id, result.value.version);
+          ui.undo()?.noteSaved();
+        } else {
           patchCard(id, undo);
           toast(result.message, "refusal");
         }
       });
     },
-    [patchCard, saveCard, toast, enqueue],
+    [patchCard, saveCard, toast, enqueue, ui],
   );
 
   // ---- card width (D-37, C-09) ----
@@ -353,11 +365,56 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         }
         setNodes((ns) => ns.filter((n) => n.id !== cardId));
         select(null);
-        toast("Removed from this canvas. It stays in the model, with its mappings and on other canvases.");
+        const undo = ui.undo();
+        toast("Removed from this canvas. It stays in the model, with its mappings and on other canvases.", "info", undo ? { label: "Undo", run: undo.undo } : undefined);
       });
     },
-    [enqueue, removeCard, select, toast],
+    [enqueue, removeCard, select, toast, ui],
   );
+
+  /** Feeding sources (left) or fed entities (right) beside a card, in one change (prototype placeNear, B-08). */
+  const placeBeside = useCallback(
+    async (wanted: readonly { target: CardTarget; rows: number }[], anchorCardId: string, side: "left" | "right") => {
+      const anchor = rf.getNode(anchorCardId) as CardNodeT | undefined;
+      if (!anchor) return;
+      const missing = wanted.filter((w) => !cardOf(w.target));
+      if (!missing.length) {
+        toast("Everything is already on this canvas.");
+        return;
+      }
+      const a: Rect = { x: anchor.position.x, y: anchor.position.y, w: cardWidth(anchor.data.card), h: cardHeight(anchor.data.card) };
+      const heights = missing.map((m) => newCardHeight(m.rows));
+      const spots = besideSpots(a, side, heights, occupied());
+      let result: CanvasWriteResult<{ canvasItemIds: string[] }>;
+      try {
+        result = await placeCards(missing.map((m, i) => ({ ...m.target, ...spots[i]! })));
+      } catch {
+        result = FAILED;
+      }
+      if (!result.ok) {
+        toast(result.message, "refusal");
+        return;
+      }
+      if (result.value.canvasItemIds.length === 1) select({ t: "card", id: result.value.canvasItemIds[0]! });
+      // Bring the new cards into view if they landed outside it.
+      const placed = spots.map((p, i) => ({ ...p, w: CARD_W, h: heights[i]! }));
+      if (placed.some((r) => !inside(viewRect(), r))) {
+        const all = [a, ...placed];
+        const x0 = Math.min(...all.map((r) => r.x)), y0 = Math.min(...all.map((r) => r.y));
+        const x1 = Math.max(...all.map((r) => r.x + r.w)), y1 = Math.max(...all.map((r) => r.y + r.h));
+        void rf.fitBounds({ x: x0 - 40, y: y0 - 40, width: x1 - x0 + 80, height: y1 - y0 + 80 }, { duration: 250, padding: 0 });
+      }
+      const n = missing.length;
+      const what = isEntity(missing[0]!.target) ? `entit${n === 1 ? "y" : "ies"}` : `source table${n === 1 ? "" : "s"}`;
+      toast(`Added ${n} ${what} next to the selection.`);
+    },
+    [rf, cardOf, toast, occupied, placeCards, select, viewRect],
+  );
+
+  /** Every card change still on its way, saved. */
+  const settled = useCallback(async () => {
+    await Promise.all([...queue.current.values()]);
+  }, []);
 
   useEffect(() => {
     registerCanvas({
@@ -367,6 +424,8 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       centerOn,
       freeSpot: () => freeSpot(viewRect(), occupied()),
       fitWidth,
+      placeBeside: (cards, anchorCardId, side) => void placeBeside(cards, anchorCardId, side),
+      settled,
       placeAt: (target, rows, at) => void placeAt(target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(rows), false),
       setCardView: (id, view) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
@@ -378,7 +437,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {

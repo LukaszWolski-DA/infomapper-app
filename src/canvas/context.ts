@@ -53,6 +53,13 @@ export interface CanvasHandle {
   fitWidth: (cardId: Uuid) => void;
   /** Collapses or expands a card, or sets its row filter (toolbox); saved like the card's own buttons. */
   setCardView: (cardId: Uuid, view: { collapsed?: boolean; rowFilter?: RowFilter }) => void;
+  /**
+   * Places elements beside a card in one change (B-08): feeding sources on the left, fed entities on the right, each
+   * in a free spot. Elements already here are skipped.
+   */
+  placeBeside: (cards: readonly { target: CardTarget; rows: number }[], anchorCardId: Uuid, side: "left" | "right") => void;
+  /** Resolves once every card change still on its way has been saved (before an undo). */
+  settled: () => Promise<void>;
 }
 
 export type RowFilter = "all" | "mapped" | "unmapped" | "keys";
@@ -99,6 +106,16 @@ export interface CanvasHost {
   openToolbox: (request: ToolboxRequest) => void;
   /** Ctrl/Alt + ↑/↓ with an attribute selected (D-36): one place up or down, with Shift to the top or bottom. */
   moveAttribute: (attributeId: Uuid, how: AttributeMove) => void;
+  /** Delete or Backspace with a mapping or relationship line selected: deleted at once, with Undo in the toast. */
+  deleteLine: (line: { t: "map" | "rel"; id: Uuid }) => void;
+}
+
+/** The page's undo (slice 1b), for the canvas's own toasts and for card changes saved without a fresh page. */
+export interface UndoHooks {
+  /** Undoes the person's last step (the toast's “Undo”). */
+  undo: () => void;
+  /** A card change was saved: there is something to undo now, and nothing to redo. */
+  noteSaved: () => void;
 }
 
 export type AttributeMove = "up" | "down" | "top" | "bottom";
@@ -122,6 +139,8 @@ export interface CanvasUiApi extends CanvasHandle {
   /** The page's handlers for what happens on the canvas; null until the page registers them. */
   host: () => CanvasHost | null;
   registerHost: (host: CanvasHost | null) => void;
+  undo: () => UndoHooks | null;
+  registerUndo: (undo: UndoHooks | null) => void;
 }
 
 export const CanvasUiCtx = createContext<CanvasUiApi>({
@@ -139,6 +158,8 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   placeAt: noop,
   fitWidth: noop,
   setCardView: noop,
+  placeBeside: noop,
+  settled: () => Promise.resolve(),
   registerCanvas: noop,
   mode: null,
   setMode: noop,
@@ -146,6 +167,8 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   flashRow: noop,
   host: () => null,
   registerHost: noop,
+  undo: () => null,
+  registerUndo: noop,
 });
 
 /** Drag data of a left-panel item dropped onto the canvas: JSON `{ target: CardTarget, rows: number }`. */

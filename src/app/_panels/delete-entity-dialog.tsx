@@ -44,7 +44,7 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
   }, [p.workspaceId, e.id]);
 
   async function confirm() {
-    const result = await run(() => deleteEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: e.version }), `Deleted ${e.name} from the model.`);
+    const result = await run(() => deleteEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: e.version }), `Deleted ${e.name} from the model.`, { undoable: true });
     if (result.ok) {
       ui.select(null);
       onClose();
@@ -69,7 +69,8 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
         <DialogDescription asChild>
           <div className="mt-2 text-[13px] text-im-ink-2">
             <p>
-              This deletes the entity everywhere in this workspace, in every project and on every canvas.
+              This deletes the entity everywhere in this workspace, in every project and on every canvas. You can undo it right
+              after.
             </p>
             {impact ? (
               <table className="mt-3 w-full border-collapse text-left" data-testid="table-entity-impact">

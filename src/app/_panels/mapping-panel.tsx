@@ -27,7 +27,7 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, ConfirmDelete, Field, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
 import { columnLabel, columnOptions, inputsLabel, typeCheckOf } from "./model-index";
@@ -190,7 +190,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   }
 
   async function remove() {
-    const result = await run(() => deleteMappingAction(p.workspaceId, ref), "Mapping deleted");
+    const result = await run(() => deleteMappingAction(p.workspaceId, ref), "Mapping deleted", { undoable: true });
     if (result.ok) ui.select(null);
   }
 
@@ -426,7 +426,9 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
               Merge mappings…
             </button>
           )}
-          <ConfirmDelete label="Delete mapping" onConfirm={() => void remove()} testId="button-delete-mapping" />
+          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-mapping">
+            Delete mapping
+          </button>
         </Actions>
       )}
     </div>

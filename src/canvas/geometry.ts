@@ -118,6 +118,27 @@ export function freeSpot(view: Rect, occupied: readonly Rect[], h = NEW_CARD_H, 
   return { x: snap8(cx), y: snap8(cy) };
 }
 
+/** Gap between a card and the cards placed beside it (prototype placeNear). */
+export const BESIDE_GAP = 160;
+
+/**
+ * Where feeding sources (left) or fed entities (right) land next to a card (prototype placeNear, B-08): a column
+ * 160 px beside it, from its top down, each card moved down until it covers no other card, 32 px apart.
+ */
+export function besideSpots(anchor: Rect, side: "left" | "right", heights: readonly number[], occupied: readonly Rect[], w = CARD_W): Pt[] {
+  const x = snap8(side === "left" ? anchor.x - w - BESIDE_GAP : anchor.x + anchor.w + BESIDE_GAP);
+  const taken = [...occupied];
+  const spots: Pt[] = [];
+  let y = snap8(anchor.y);
+  for (const h of heights) {
+    for (let n = 0; n < 600 && clashes(taken, x, y, w, h); n++) y += 16;
+    spots.push({ x, y });
+    taken.push({ x, y, w, h });
+    y = snap8(y + h + 32);
+  }
+  return spots;
+}
+
 /** Whether a box lies fully inside the view. */
 export const inside = (view: Rect, r: Rect) => r.x >= view.x && r.y >= view.y && r.x + r.w <= view.x + view.w && r.y + r.h <= view.y + view.h;
 

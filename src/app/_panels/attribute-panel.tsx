@@ -16,6 +16,7 @@ import { useToast } from "@/ui/components/toast";
 import {
   Actions,
   ConfirmDelete,
+  dangerClass,
   Field,
   Flag,
   GroupedSelect,
@@ -98,6 +99,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
     const result = await run(
       () => deleteAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: a.version }),
       `Attribute deleted${n ? ` together with ${n} mapping${n > 1 ? "s" : ""}` : ""}`,
+      { undoable: true },
     );
     if (result.ok) ui.select(null);
   }
@@ -246,12 +248,19 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
 
       {p.editable && (
         <Actions>
-          <ConfirmDelete
-            label="Delete attribute"
-            also={mappings.length ? `${mappings.length} mapping${mappings.length > 1 ? "s" : ""}` : undefined}
-            onConfirm={() => void remove()}
-            testId="button-delete-attribute"
-          />
+          {mappings.length ? (
+            // With mappings it still asks (slice 1b, item 13); without, it goes at once with Undo in the toast.
+            <ConfirmDelete
+              label="Delete attribute"
+              also={`${mappings.length} mapping${mappings.length > 1 ? "s" : ""}`}
+              onConfirm={() => void remove()}
+              testId="button-delete-attribute"
+            />
+          ) : (
+            <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-attribute">
+              Delete attribute
+            </button>
+          )}
         </Actions>
       )}
     </div>

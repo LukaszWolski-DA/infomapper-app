@@ -1,7 +1,8 @@
 "use client";
 
 // The entity panel (prototype insEntity): name (focused right after “+”, D-46), stereotype, concept, definition
-// (plain text, AD-30), attributes with their sources and “Add attribute”, feeding sources, relationships,
+// (plain text, AD-30), attributes with their sources and “Add attribute”, feeding sources (placed beside the card,
+// “Add the N missing to this canvas”, B-08), relationships,
 // “Remove from this canvas” and “Delete from model…” with the impact dialog (D-47).
 
 import { useContext, useEffect, useRef, useState } from "react";
@@ -35,6 +36,8 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   const ix = p.ix;
   const attributes = ix.attributesOf.get(e.id) ?? [];
   const feeds = feedingSources(ix, e.id);
+  /** Feeding sources not on this canvas, to place on the left of the card (B-08). */
+  const missing = feeds.filter((f) => !p.cardOf(f.table.id)).map((f) => ({ target: { sourceTableId: f.table.id }, rows: (ix.columnsOf.get(f.table.id) ?? []).length }));
   const relationships = ix.model.relationships.filter((r) => r.from_entity_id === e.id || r.to_entity_id === e.id);
 
   useEffect(() => {
@@ -198,8 +201,12 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
               return (
                 <Li
                   key={table.id}
-                  title={here ? "On this canvas. Click to show it." : "Click to place it on the canvas."}
-                  onClick={() => (here ? (ui.select({ t: "card", id: here }), ui.centerOn(here)) : ui.place({ sourceTableId: table.id }, (ix.columnsOf.get(table.id) ?? []).length))}
+                  title={here ? "On this canvas. Click to show it." : "Click to place it next to this card."}
+                  onClick={() =>
+                    here
+                      ? (ui.select({ t: "card", id: here }), ui.centerOn(here))
+                      : ui.placeBeside([{ target: { sourceTableId: table.id }, rows: (ix.columnsOf.get(table.id) ?? []).length }], cardId, "left")
+                  }
                   meta={`${ix.systemName.get(table.source_system_id) ?? ""}, ${mappings} mapping${mappings === 1 ? "" : "s"}`}
                 >
                   <span className="flex items-center gap-2">
@@ -212,6 +219,13 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
           />
         ) : (
           <Hint>No source table maps into this entity yet.</Hint>
+        )}
+        {p.editable && missing.length > 0 && (
+          <div className="mt-2 flex gap-2">
+            <button type="button" className={smallButtonClass} onClick={() => ui.placeBeside(missing, cardId, "left")} data-testid="button-feed-all">
+              {missing.length === feeds.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}
+            </button>
+          </div>
         )}
       </Fold>
 

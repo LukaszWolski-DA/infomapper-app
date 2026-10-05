@@ -8,7 +8,7 @@ import { deleteRelationshipAction, swapRelationshipAction, updateRelationshipAct
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { CardinalityMax, CardinalityMin, Relationship } from "@/domain/types";
-import { Actions, buttonClass, ConfirmDelete, Field, Kind, Seg, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, Kind, Seg, TextField } from "./fields";
 import { usePanel } from "./inspector";
 
 /** The four cardinalities the prototype offers (CARDS). */
@@ -40,7 +40,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
     void run(() => updateRelationshipAction(p.workspaceId, { ...ref, ...change }));
 
   async function remove() {
-    const result = await run(() => deleteRelationshipAction(p.workspaceId, ref), "Relationship deleted");
+    const result = await run(() => deleteRelationshipAction(p.workspaceId, ref), "Relationship deleted", { undoable: true });
     if (result.ok) ui.select(null);
   }
 
@@ -102,7 +102,9 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
           >
             Swap direction
           </button>
-          <ConfirmDelete label="Delete relationship" onConfirm={() => void remove()} testId="button-delete-relationship" />
+          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-relationship">
+            Delete relationship
+          </button>
         </Actions>
       )}
     </div>

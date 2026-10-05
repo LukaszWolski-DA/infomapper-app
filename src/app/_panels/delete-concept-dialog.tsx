@@ -33,6 +33,7 @@ export function DeleteConceptDialog({
     const result = await run(
       () => deleteConceptAction(workspaceId, { conceptId: c.id, expectedVersion: c.version, moveToConceptId: n ? moveTo : null }),
       n ? `Moved the entities to ${target?.name ?? ""} and deleted ${c.name}.` : `Deleted the concept ${c.name}.`,
+      { undoable: true },
     );
     if (result.ok) onClose();
   }
@@ -49,7 +50,7 @@ export function DeleteConceptDialog({
             {blocked ? (
               <p>It is the only concept and holds {entities(n)}. Create another concept to move them to first.</p>
             ) : n === 0 ? (
-              <p>It has no entities.</p>
+              <p>It has no entities. You can undo it right after.</p>
             ) : (
               <>
                 <p>
