@@ -7,6 +7,7 @@
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
+import { doneStepMessage } from "@/domain/model/undo-history";
 import { useToast } from "@/ui/components/toast";
 import { undoAction, type UndoState } from "../_actions/undo";
 
@@ -21,7 +22,18 @@ const UndoCtx = createContext<UndoApi | null>(null);
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
 
-export function UndoProvider({ workspaceId, state: server, children }: { workspaceId: string; state: UndoState; children: ReactNode }) {
+export function UndoProvider({
+  workspaceId,
+  canvasId,
+  state: server,
+  children,
+}: {
+  workspaceId: string;
+  /** The open canvas: a step on another canvas says which one in its toast. */
+  canvasId: string;
+  state: UndoState;
+  children: ReactNode;
+}) {
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   /** What happened here since the server's state arrived; a fresh page replaces it. */
@@ -50,10 +62,11 @@ export function UndoProvider({ workspaceId, state: server, children }: { workspa
           return;
         }
         setLocal({ from: serverRef.current, state: { canUndo: result.value.canUndo, canRedo: result.value.canRedo } });
-        toast(mode === "undo" ? "Undone" : "Redone");
+        const { label, canvas } = result.value;
+        toast(doneStepMessage(mode, label, canvas && canvas.id !== canvasId ? canvas.name : null));
       });
     },
-    [ui, workspaceId, toast],
+    [ui, workspaceId, canvasId, toast],
   );
   const undo = useCallback(() => run("undo"), [run]);
   const redo = useCallback(() => run("redo"), [run]);

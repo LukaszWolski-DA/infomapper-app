@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   afterRedo,
   afterUndo,
+  doneStepMessage,
   dropNextRedo,
   dropNextUndo,
   emptyHistory,
@@ -59,5 +60,12 @@ describe("undo history (slice 1b)", () => {
   it("says which step was dropped", () => {
     expect(refusedStepMessage("undo", "Rename entity")).toBe("Couldn't undo “Rename entity” because it was changed afterwards. Ctrl+Z again goes further back.");
     expect(refusedStepMessage("redo", "Rename entity")).toBe("Couldn't redo “Rename entity” because it was changed afterwards. Ctrl+Shift+Z again goes further on.");
+  });
+});
+
+describe("undo and redo toasts (slice 1b)", () => {
+  it("name the step, and the canvas when it is another one", () => {
+    expect(doneStepMessage("undo", "Delete mapping", null)).toBe("Undone: Delete mapping");
+    expect(doneStepMessage("redo", "Move card", "Order lines & products")).toBe("Redone: Move card on Order lines & products");
   });
 });

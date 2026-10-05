@@ -59,3 +59,10 @@ export const refusedStepMessage = (mode: "undo" | "redo", label: string): string
   mode === "undo"
     ? `Couldn't undo “${label}” because it was changed afterwards. Ctrl+Z again goes further back.`
     : `Couldn't redo “${label}” because it was changed afterwards. Ctrl+Shift+Z again goes further on.`;
+
+/**
+ * The toast after an undo or redo: what it was, and on which canvas when that is not the one open (Łukasz,
+ * 5 October 2026), e.g. “Undone: Move card on Order lines & products”.
+ */
+export const doneStepMessage = (mode: "undo" | "redo", label: string, otherCanvas: string | null): string =>
+  `${mode === "undo" ? "Undone" : "Redone"}: ${label}${otherCanvas ? ` on ${otherCanvas}` : ""}`;

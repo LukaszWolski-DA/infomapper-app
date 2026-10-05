@@ -92,3 +92,11 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
       return only(main, ["name"]) ? `Rename ${noun}` : cap(`change ${noun}`);
   }
 }
+
+/** The canvas a change group's cards are on, when they are all on one; null for a change of the model only. */
+export function changeCanvasId(events: readonly ChangeEvent[]): string | null {
+  const ids = new Set(
+    events.filter((e) => e.object_type === "canvas_item").map((e) => String((e.after_image ?? e.before_image)?.canvas_id ?? "")),
+  );
+  return ids.size === 1 ? [...ids][0]! || null : null;
+}

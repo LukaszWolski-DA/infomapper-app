@@ -38,6 +38,18 @@ initial render.
   machine. If production misses the bars, the next step is drawing the mapping lines on an HTML canvas instead of SVG
   (the lines are already drawn by one component, `src/canvas/LineLayer.tsx`, so the change stays inside it).
 
+## Undo history (slice 1b)
+
+### The undo history lives in server memory
+
+Each person's undo history in a workspace (the last 50 steps, slice 1b PRD item 12) is kept in the
+memory of the server process, as the PRD asks for now. It is lost when the server restarts (and, in development, when
+the demo data is replaced: steps whose change group is no longer in the change log are left out).
+
+- **Accepted** for the local adapter: one development server, one user at a time in practice.
+- **Supabase slice:** decide whether the history must survive a restart (and several server instances). If it must,
+  keep it in the database next to `change_event`.
+
 ## Right panel (slice 1a)
 
 ### Panel links only reach rows whose card is on this canvas (step 5a)

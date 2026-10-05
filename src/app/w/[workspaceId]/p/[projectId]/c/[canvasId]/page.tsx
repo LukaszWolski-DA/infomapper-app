@@ -51,7 +51,7 @@ export default async function CanvasPage({
   return (
     <CanvasProvider>
       <PanelsProvider>
-        <UndoProvider workspaceId={ws} state={undoState}>
+        <UndoProvider workspaceId={ws} canvasId={canvasId} state={undoState}>
           <AppShell
             shell={shell}
             project={{

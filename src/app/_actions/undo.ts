@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import { getDataStore } from "@/data";
 import type { CommandContext } from "@/domain/changes";
 import { revertChangeGroup } from "@/domain/commands/undo";
+import { changeCanvasId } from "@/domain/model/change-label";
 import { uuidv7 } from "@/domain/ids";
 import {
   afterRedo,
@@ -30,6 +31,8 @@ export interface UndoState {
 export interface UndoOutcome extends UndoState {
   /** What was undone or redone, e.g. “Delete mapping”. */
   label: string;
+  /** The canvas whose cards it changed, if any, for “… on {canvas}” when another canvas is open. */
+  canvas: { id: string; name: string } | null;
 }
 
 const stateOf = (h: UndoHistory): UndoState => ({ canUndo: h.undo.length > 0, canRedo: h.redo.length > 0 });
@@ -72,7 +75,9 @@ export async function undoAction(workspaceId: string, mode: "undo" | "redo"): Pr
       isNext(h) ? (mode === "undo" ? afterUndo(h, revert) : afterRedo(h, revert)) : h,
     );
     revalidatePath("/", "layout");
-    return { ok: true, value: { label: step.label, ...stateOf(next) } };
+    const canvasId = changeCanvasId(step.events);
+    const canvas = canvasId ? await store.canvases.get(workspace.id, canvasId) : null;
+    return { ok: true, value: { label: step.label, canvas: canvas ? { id: canvas.id, name: canvas.name } : null, ...stateOf(next) } };
   } catch (e) {
     console.error("Undo failed:", e instanceof Error ? `${e.name}: ${e.message}` : "unknown error");
     return { ok: false, code: "unexpected", message: "Something went wrong. Nothing was changed." };
