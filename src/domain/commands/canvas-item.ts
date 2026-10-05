@@ -99,6 +99,69 @@ export function placeOnCanvas(
   return done(ctx, access, { canvasItemId: item.id }, [{ kind: "insert", table: "canvas_item", row: item }]);
 }
 
+// ---- place several (feeding sources, B-08) ----
+
+const placeManyInput = z
+  .object({
+    canvasId: uuidSchema,
+    cards: z
+      .array(
+        z
+          .object({ entityId: uuidSchema.optional(), sourceTableId: uuidSchema.optional(), ...positionSchema.shape })
+          .strict()
+          .refine((v) => (v.entityId === undefined) !== (v.sourceTableId === undefined), "Place either an entity or a source table."),
+      )
+      .min(1, "Nothing to place.")
+      .max(200, "Place at most 200 cards at once."),
+  })
+  .strict();
+export type PlaceManyOnCanvasInput = z.input<typeof placeManyInput>;
+
+export interface PlaceManyOnCanvasState {
+  canvas: Canvas | null;
+  entities: readonly Entity[];
+  sourceTables: readonly SourceTable[];
+  items: readonly CanvasItem[];
+}
+
+/**
+ * Places several entities or source tables on a canvas in one change group, so one undo takes them all off again
+ * (“Add the N missing to this canvas”). Elements already on the canvas are refused, as for one card.
+ */
+export function placeManyOnCanvas(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: PlaceManyOnCanvasState,
+  input: unknown,
+): CommandResult<{ canvasItemIds: Uuid[] }> {
+  const parsed = begin(access, "canvas.edit_items", placeManyInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { canvasId, cards } = parsed.data;
+  const workspaceId = access.workspace.id;
+  if (!isLive(state.canvas, workspaceId) || state.canvas.id !== canvasId) return fail(notFound("canvas"));
+
+  const here = new Set(
+    state.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvasId).map((i) => i.entity_id ?? i.source_table_id),
+  );
+  const items: CanvasItem[] = [];
+  for (const { entityId, sourceTableId, x, y } of cards) {
+    const id = (entityId ?? sourceTableId)!;
+    const live = entityId
+      ? state.entities.some((e) => e.id === entityId && isLive(e, workspaceId))
+      : state.sourceTables.some((t) => t.id === sourceTableId && isLive(t, workspaceId));
+    if (!live) return fail(notFound(entityId ? "entity" : "source table"));
+    if (here.has(id)) return fail(domainError("conflict", "It is already on this canvas."));
+    here.add(id);
+    items.push(newCanvasItem(ctx, workspaceId, canvasId, entityId ? { entity_id: entityId } : { source_table_id: id }, { x, y }));
+  }
+  return done(
+    ctx,
+    access,
+    { canvasItemIds: items.map((i) => i.id) },
+    items.map((row) => ({ kind: "insert", table: "canvas_item", row })),
+  );
+}
+
 // ---- move, collapse, row filter, width ----
 
 const updateItemInput = z
