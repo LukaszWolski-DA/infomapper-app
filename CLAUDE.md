@@ -115,11 +115,16 @@ npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
 MEASURE=1 npx playwright test e2e/slice-01a/S1A-14.spec.ts   # canvas performance in headed Chrome (S1A-14)
+MEASURE=1 npx playwright test e2e/slice-01b/S1B-09.spec.ts   # card resize (C-09), same way
+MEASURE=1 npx playwright test e2e/slice-01b/S1B-10.spec.ts   # hover delay (C-10), pan and zoom against slice 1a's median
 ```
 
 - e2e tests import `test`/`expect` from `e2e/slice-XX/fixtures.ts` (fresh seed per test); shared steps are in
   `helpers.ts`. One file per acceptance criterion, named after its id (`S0-04.spec.ts`, `S1A-07.spec.ts`). Slice 1a's
   helpers read the model from the e2e data file (`loadModel`) and open a canvas at a given view (`openCanvas`).
+  Slice 1b's add a real-mouse drag (`dragTo`), the toolbox (`toolboxAt`), an empty spot (`emptySpot`) and test data
+  made through the domain (`asLukasz`, `asUser`); its measurement steps are in `e2e/slice-01b/measure.ts`. The undo
+  history lives in the server's memory and is empty again after each reseed.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window). The local data adapter refuses a
   production build, so the app is measured on the dev server; keep the AD-24 CSS rules, including no `overflow: hidden`
