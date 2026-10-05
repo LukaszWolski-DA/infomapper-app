@@ -3,8 +3,10 @@
 // plus version checks, and writes the rows and change events of one command together or not at all.
 
 import type { Write, WriteSet } from "@/domain/changes";
+import { UNDOABLE_TABLES, type WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
+import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-history";
 import type { ProjectCanvas } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
 import { assertNotProduction, readDbCached, writeDb } from "./file";
@@ -24,6 +26,10 @@ function serialise<T>(file: string, task: () => Promise<T>): Promise<T> {
   return next;
 }
 
+// Undo histories live in this process's memory (slice 1b), per data file, person and workspace. Kept on globalThis
+// so a module reload in development does not empty them.
+const histories: Map<string, UndoHistory> = ((globalThis as { __infomapperUndo?: Map<string, UndoHistory> }).__infomapperUndo ??= new Map());
+
 export function createLocalDataStore(file: string): DataStore {
   assertNotProduction();
   const load = () => readDbCached(file);
@@ -36,6 +42,15 @@ export function createLocalDataStore(file: string): DataStore {
       (l) => l.workspace_id === workspaceId && projects.has(l.project_id) && canvases.has(l.canvas_id),
     );
   };
+
+  /** The change groups in the workspace's log: a history step outside it belongs to data that was replaced. */
+  const groupsOf = async (workspaceId: Uuid) =>
+    new Set((await load()).change_event.filter((e) => e.workspace_id === workspaceId).map((e) => e.change_group_id));
+  const withKnown = (h: UndoHistory, known: ReadonlySet<Uuid>): UndoHistory =>
+    h.undo.every((s) => known.has(s.changeGroupId)) && h.redo.every((s) => known.has(s.changeGroupId))
+      ? h
+      : { undo: h.undo.filter((s) => known.has(s.changeGroupId)), redo: h.redo.filter((s) => known.has(s.changeGroupId)) };
+  const current = async (workspaceId: Uuid, h: UndoHistory) => withKnown(h, await groupsOf(workspaceId));
 
   return {
     users: {
@@ -109,6 +124,12 @@ export function createLocalDataStore(file: string): DataStore {
           mappingInputs: of(db.mapping_input).sort((a, b) => a.mapping_id.localeCompare(b.mapping_id) || a.sort_order - b.sort_order),
         };
       },
+      loadForUndo: async (workspaceId) => {
+        const db = await load();
+        const rows = {} as Record<string, unknown[]>;
+        for (const table of UNDOABLE_TABLES) rows[table] = (db[table] as readonly { workspace_id: Uuid }[]).filter((r) => r.workspace_id === workspaceId);
+        return rows as unknown as WorkspaceRows;
+      },
     },
 
     canvasItems: {
@@ -128,6 +149,23 @@ export function createLocalDataStore(file: string): DataStore {
             ((e.object_type === "mapping" && e.object_id === mappingId) ||
               (e.object_type === "mapping_input" && (e.after_image ?? e.before_image)?.mapping_id === mappingId)),
         ),
+    },
+
+    undoHistory: {
+      get: async (workspaceId, userId) => {
+        const key = `${file}|${historyKey(workspaceId, userId)}`;
+        const fresh = await current(workspaceId, histories.get(key) ?? emptyHistory);
+        histories.set(key, fresh);
+        return fresh;
+      },
+      update: async (workspaceId, userId, change) => {
+        const key = `${file}|${historyKey(workspaceId, userId)}`;
+        const known = await groupsOf(workspaceId);
+        // From here on synchronous, so no other request changes the history in between.
+        const next = change(withKnown(histories.get(key) ?? emptyHistory, known));
+        histories.set(key, next);
+        return next;
+      },
     },
 
     apply: (writeSet) => serialise(file, () => applyToFile(file, writeSet)),

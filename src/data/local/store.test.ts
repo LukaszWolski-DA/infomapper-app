@@ -302,6 +302,34 @@ describe("applying a write set", () => {
   });
 });
 
+describe("undo (slice 1b)", () => {
+  it("reads the undoable rows of a workspace with deleted ones", async () => {
+    const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
+    const ws = access.workspace.id;
+    const ctx = ctxFor(actor.id);
+    const target = (await store.canvases.list(ws)).find((c) => c.name === "Order lines & products")!;
+    await store.apply(buildWriteSet(ctx, ws, [{ kind: "update", table: "canvas", before: target, row: { ...target, deleted_at: ctx.now, version: 2 } }]));
+    const rows = await store.model.loadForUndo(ws);
+    expect(rows.canvas.find((c) => c.id === target.id)?.deleted_at).toBe(ctx.now);
+    expect([...rows.canvas, ...rows.entity, ...rows.canvas_item].every((r) => r.workspace_id === ws)).toBe(true);
+  });
+
+  it("keeps a history per person and workspace, and forgets steps whose data was replaced", async () => {
+    const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
+    const ws = access.workspace.id;
+    const r = createProject(ctxFor(actor.id), access, { workspaceId: ws, name: "Finance" });
+    if (!r.ok) throw new Error(r.error.message);
+    await store.apply(r.writeSet);
+    const step = { changeGroupId: r.writeSet.changeGroupId, label: "Create project", events: r.writeSet.events };
+    await store.undoHistory.update(ws, actor.id, (h) => ({ ...h, undo: [...h.undo, step] }));
+    expect((await store.undoHistory.get(ws, actor.id)).undo).toEqual([step]);
+    expect((await store.undoHistory.get(ws, (await user("marek")).id)).undo).toEqual([]);
+
+    await resetDevData(file);
+    expect((await store.undoHistory.get(ws, actor.id)).undo).toEqual([]);
+  });
+});
+
 describe("integrity rules", () => {
   it("refuses a duplicate e-mail (unique index) and an upper-case e-mail (CHECK)", () => {
     const db = buildSeed();
