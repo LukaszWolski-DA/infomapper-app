@@ -337,11 +337,14 @@ export function useCanvasHost({
   };
 
   const closeToolbox = useCallback(() => setToolbox(null), []);
+  // Only headings (a reader or reviewer on a card): nothing to offer, so no toolbox.
+  const toolboxItems = toolbox ? items(toolbox) : [];
+  const offersSomething = toolboxItems.some((i) => !("head" in i) && !("sep" in i));
   const deletingEntity = deleting ? ix.entity.get(deleting) : undefined;
   const elements = (
     <>
       {columns.choiceElement}
-      {toolbox && <Toolbox key={`${toolbox.screen.x}:${toolbox.screen.y}`} items={items(toolbox)} at={toolbox.screen} onClose={closeToolbox} />}
+      {toolbox && offersSomething && <Toolbox key={`${toolbox.screen.x}:${toolbox.screen.y}`} items={toolboxItems} at={toolbox.screen} onClose={closeToolbox} />}
       {deletingEntity && <DeleteEntityDialog entity={deletingEntity} onClose={() => setDeleting(null)} />}
     </>
   );

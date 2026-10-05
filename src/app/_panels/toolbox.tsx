@@ -57,13 +57,21 @@ export function Toolbox({ items, at, onClose }: { items: ToolboxItem[]; at: { x:
     const away = (e: Event) => {
       if (!box.current?.contains(e.target as Node)) onClose();
     };
+    // Esc closes it also when nothing in it has the focus.
+    const escape = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onClose();
+    };
     window.addEventListener("pointerdown", away, true);
     window.addEventListener("wheel", away, true);
     window.addEventListener("resize", onClose);
+    window.addEventListener("keydown", escape, true);
     return () => {
       window.removeEventListener("pointerdown", away, true);
       window.removeEventListener("wheel", away, true);
       window.removeEventListener("resize", onClose);
+      window.removeEventListener("keydown", escape, true);
     };
   }, [onClose]);
 
