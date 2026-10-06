@@ -6,6 +6,7 @@ import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResu
 import { domainError, notFound, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { plainTextPair } from "../model/plain-text";
+import { attributeNamedAfter } from "../model/mapping-choice";
 import { logicalTypeOf } from "../model/type-check";
 import type { WorkspaceAccess } from "../permissions";
 import { LOGICAL_TYPES, type Attribute, type AttributeType, type Entity, type Mapping, type MappingInput, type SourceColumn } from "../types";
@@ -233,7 +234,7 @@ export function createAttributeFromColumn(
   if (!column.ok) return fail(column.error);
   const siblings = state.attributes.filter((a) => isLive(a, workspaceId) && a.entity_id === entityId);
 
-  const existing = siblings.find((a) => a.name.toLowerCase() === column.row.name.toLowerCase());
+  const existing = attributeNamedAfter(siblings, column.row);
   if (existing) {
     const r = createMapping(ctx, access, { attribute: existing, column: column.row, mappings: state.mappings, mappingInputs: state.mappingInputs }, {
       attributeId: existing.id,

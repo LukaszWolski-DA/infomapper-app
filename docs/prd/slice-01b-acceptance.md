@@ -20,7 +20,7 @@ Results from 5 October 2026: `npm run lint`, `npm run typecheck` and `npm test` 
 | --- | --- | --- | --- |
 | S1B-01 | Dragging `customers.segment` onto `Customer.segment_code` creates a direct mapping and its line | e2e `S1B-01.spec.ts`: real mouse drag from the column row to the attribute row; toast, one direct draft mapping with that input, its line, the mapping panel open | Pass |
 | S1B-02 | `web_users.cust_no` onto `Customer.customer_number` pre-selects “Separate mapping”, Enter creates a second mapping; `customers.lname` onto an attribute mapped from `customers.fname` pre-selects “Add to mapping” and asks for a rule | e2e `S1B-02.spec.ts`: the popover's options and pre-selection, Enter, a second direct mapping; then “Add to mapping customers.fname” pre-selected, the column waiting in the mapping panel with the rule note, saved with a rule as a transform with both inputs in order; unit `mapping-choice.test.ts` | Pass |
-| S1B-03 | Dropping `order_line.price` on the Order Line header creates attribute `price` (decimal with the column's precision and scale) and a direct mapping | e2e `S1B-03.spec.ts`: drop on the header; `price` decimal(10,2), one direct mapping from the column, the new row on the card; its precision and scale fields (and a string's length) fit the right panel at 340 px and at its narrowest, 280 px, wrapping under the type ([finding 3](#findings-from-the-definition-of-done)); unit `type-check.test.ts` (the type table in reverse), `attribute.test.ts` | Pass |
+| S1B-03 | Dropping `order_line.price` on the Order Line header creates attribute `price` (decimal with the column's precision and scale) and a direct mapping | e2e `S1B-03.spec.ts`: drop on the header; `price` decimal(10,2), one direct mapping from the column, the new row on the card; its precision and scale fields (and a string's length) fit the right panel at 340 px and at its narrowest, 280 px, wrapping under the type ([finding 3](#findings-from-the-definition-of-done)); a column dropped on a header whose entity has an attribute of its name maps to it, with the D-48 choice when it has a mapping ([assumption 11](#assumptions)); unit `mapping-choice.test.ts`, `type-check.test.ts` (the type table in reverse), `attribute.test.ts` | Pass |
 | S1B-04 | “Map to an attribute” in the column panel creates the mapping | e2e `S1B-04.spec.ts`: the column panel's picker, the mapping and its line | Pass |
 | S1B-05 | Split turns a combined mapping into one mapping per input; merge turns two mappings of one attribute into one transform after a rule is given | e2e `S1B-05.spec.ts`: split of a two-input mapping into two direct ones; merge of Customer.email's two mappings refused without a rule, then a transform in review with both inputs; unit `mapping.test.ts` | Pass |
 | S1B-06 | Relate from Customer to Country creates a relationship; the panel sets its label and ends | e2e `S1B-06.spec.ts`: Country placed from the left panel, relate button, click on Country; default ends 1 to 0..n; label and both ends set in the panel; unit `relationship.test.ts` | Pass |
@@ -140,8 +140,11 @@ Assumed while building (please check):
    without columns are deleted at once; an attribute with mappings and a table with columns ask for a second click;
    entities and concepts keep their dialog. Delete or Backspace deletes a selected line, as in the prototype.
 10. “Map to an attribute” is one picker grouped by entity (entities on this canvas first), not two steps.
-11. A column dropped on an entity's header whose name is already an attribute of that entity maps to that attribute
-    instead of creating a second one.
+11. A column dropped on an entity's header whose name is already an attribute of that entity (ignoring case) maps to
+    that attribute instead of creating a second one, as if it had been dropped on its row: a direct mapping when the
+    attribute has none, otherwise the same D-48 choice with the same hint (“Separate mapping (alternative source)” or
+    “Add to mapping …”), and nothing is added without it. Checked by Łukasz on 6 October, the choice added then. Tests:
+    S1B-03 (both cases), `mapping-choice.test.ts`.
 12. Feeding sources go 160 px to the left of the card and fed entities 160 px to the right, from the card's top down,
     each moved down until it covers no card; several are placed in one change, so one undo takes them all off. They
     are placed by a click; dragging them from the right panel is not built ([ideas](../ideas.md)). The toolbox's “Show

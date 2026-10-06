@@ -5,7 +5,8 @@
 // a small choice opens at the drop point: “Separate mapping (alternative source)” or “Add to mapping …”, pre-selected
 // by the hint (`planMapColumn`). Keyboard first: ↑/↓ choose, Enter confirms, Esc cancels. Adding to a mapping without
 // a rule opens the mapping panel with the column waiting for its rule (the 1a rule for a second input).
-// A column dropped elsewhere on an entity card becomes a new attribute with its mapping (prototype createAttrFromCol).
+// A column dropped elsewhere on an entity card becomes a new attribute with its mapping (prototype createAttrFromCol);
+// if the entity already has an attribute of the column's name, the column is mapped to it as if dropped on its row.
 
 import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
@@ -14,7 +15,7 @@ import { addMappingInputAction, createMappingAction } from "@/app/_actions/mappi
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx, type ColumnDrop } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
-import { planMapColumn, type MappingChoice } from "@/domain/model/mapping-choice";
+import { attributeNamedAfter, planMapColumn, type MappingChoice } from "@/domain/model/mapping-choice";
 import { checkColumnType } from "@/domain/model/type-check";
 import { useToast } from "@/ui/components/toast";
 import { attributeLabel, columnLabel, inputsLabel, type ModelIndex } from "./model-index";
@@ -94,13 +95,21 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
     [ix, createDirect, run, workspaceId, ui, toast],
   );
 
-  /** A column dropped on an entity card but not on a row: a new attribute mapped from it (or the one of that name). */
+  /**
+   * A column dropped on an entity card but not on a row: a new attribute mapped from it. If the entity has an attribute
+   * of the column's name, the column goes to that one as on its row: a direct mapping, or the D-48 choice.
+   */
   const dropOnEntity = useCallback(
-    async (columnId: Uuid, entityId: Uuid) => {
+    async (columnId: Uuid, entityId: Uuid, at: { x: number; y: number }) => {
+      const column = ix.column.get(columnId);
+      const named = column && attributeNamedAfter(ix.attributesOf.get(entityId) ?? [], column);
+      if (named) {
+        mapColumn(columnId, named.id, at);
+        return;
+      }
       const result = await run(() => createAttributeFromColumnAction(workspaceId, { entityId, sourceColumnId: columnId }));
       if (!result.ok) return;
       const { attributeId, mappingId, createdAttribute } = result.value;
-      const column = ix.column.get(columnId);
       if (createdAttribute) {
         const card = cardOf(entityId);
         if (card) ui.select({ t: "row", cardId: card, id: attributeId });
@@ -110,7 +119,7 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
         toast(`Mapped ${columnLabel(ix, columnId)} to ${attributeLabel(ix, attributeId)}`);
       }
     },
-    [ix, run, workspaceId, cardOf, ui, toast],
+    [ix, mapColumn, run, workspaceId, cardOf, ui, toast],
   );
 
   /** A column dropped on the canvas: on an attribute row, or elsewhere on an entity card. */
@@ -118,7 +127,7 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
     (drop: ColumnDrop) => {
       if (!editable) return;
       if ("attributeId" in drop.target) mapColumn(drop.columnId, drop.target.attributeId, drop.at);
-      else void dropOnEntity(drop.columnId, drop.target.entityId);
+      else void dropOnEntity(drop.columnId, drop.target.entityId, drop.at);
     },
     [editable, mapColumn, dropOnEntity],
   );

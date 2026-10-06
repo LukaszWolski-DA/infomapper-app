@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ids, mapping, mappingInput, sourceColumn } from "../__fixtures__/domain";
-import { planMapColumn } from "./mapping-choice";
+import { attributeNamedAfter, planMapColumn } from "./mapping-choice";
 
 const otherTable = "01900000-0000-7000-8000-000000008002";
 const webEmail = sourceColumn("01900000-0000-7000-8000-000000009010", { name: "email", source_table_id: otherTable });
@@ -38,5 +38,17 @@ describe("planMapColumn (D-48)", () => {
       options: [{ kind: "separate" }, { kind: "add", mappingId: other }, { kind: "add", mappingId: ids.mapEmail }],
       preselected: 2,
     });
+  });
+});
+
+describe("attributeNamedAfter (a column dropped on an entity's header)", () => {
+  const attributes = [{ id: "a", name: "Customer_Number" }, { id: "b", name: "email" }];
+
+  it("finds the attribute named like the column, ignoring case", () => {
+    expect(attributeNamedAfter(attributes, { name: "customer_number" })?.id).toBe("a");
+  });
+
+  it("finds nothing when no attribute has the column's name", () => {
+    expect(attributeNamedAfter(attributes, { name: "lname" })).toBeUndefined();
   });
 });

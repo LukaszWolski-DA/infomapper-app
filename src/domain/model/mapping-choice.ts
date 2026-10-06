@@ -36,3 +36,13 @@ export function planMapColumn(
   const sameTable = mappings.findIndex((m) => inputsOf(m).some((i) => columnOf(i.source_column_id)?.source_table_id === column.source_table_id));
   return { kind: "choose", options, preselected: sameTable < 0 ? 0 : sameTable + 1 };
 }
+
+/**
+ * A column dropped on an entity card's header (slice 1b): the entity's attribute named like the column, ignoring case,
+ * if there is one. The column is then mapped to it (with the choice above when it has mappings) instead of adding a
+ * second attribute of that name.
+ */
+export function attributeNamedAfter<A extends { name: string }>(attributes: readonly A[], column: Pick<SourceColumn, "name">): A | undefined {
+  const name = column.name.toLowerCase();
+  return attributes.find((a) => a.name.toLowerCase() === name);
+}
