@@ -227,10 +227,21 @@ export interface Project extends StandardColumns {
   description: string | null;
 }
 
+/** A canvas's look (D-12): background and grid, and its layer mode (D-22). Stored as JSON in `canvas.look`. */
+export const CANVAS_BACKGROUNDS = ["grey", "white", "blue", "warm"] as const;
+export type CanvasBackground = (typeof CANVAS_BACKGROUNDS)[number];
+
+export const CANVAS_GRIDS = ["dots", "lines", "none"] as const;
+export type CanvasGrid = (typeof CANVAS_GRIDS)[number];
+
+/** Everything, only the mapping lines, or only the relationship lines; cards always show. */
+export const CANVAS_LAYERS = ["all", "mappings", "relationships"] as const;
+export type CanvasLayer = (typeof CANVAS_LAYERS)[number];
+
 export interface CanvasLook {
-  background: string;
-  grid: string;
-  layer: string;
+  background: CanvasBackground;
+  grid: CanvasGrid;
+  layer: CanvasLayer;
 }
 
 export const DEFAULT_CANVAS_LOOK: CanvasLook = { background: "grey", grid: "dots", layer: "all" };

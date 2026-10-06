@@ -59,11 +59,15 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
   const cards = of("canvas_item");
   if (cards.length === events.length && cards.every((e) => e.operation === "update")) {
     if (cards.every((e) => only(e, ["x", "y"]))) return cards.length > 1 ? "Move cards" : "Move card";
-    if (cards.every((e) => only(e, ["width"]))) return "Resize card";
+    if (cards.every((e) => only(e, ["width"]))) return cards.length > 1 ? "Resize cards" : "Resize card";
     if (cards.every((e) => only(e, ["collapsed"]))) return cards[0]!.after_image?.collapsed ? "Collapse card" : "Expand card";
     if (cards.every((e) => only(e, ["row_filter"]))) return "Filter card rows";
   }
   if (cards.length === events.length && cards.every((e) => e.operation === "create")) return cards.length > 1 ? `Place ${cards.length} cards` : "Place card";
+  if (cards.length === events.length && cards.length > 1 && cards.every((e) => e.operation === "delete")) return `Remove ${cards.length} cards`;
+
+  // A new canvas that comes with cards is a duplicated layout (slice 2a).
+  if (of("canvas").some((e) => e.operation === "create") && cards.some((e) => e.operation === "create")) return "Duplicate canvas";
 
   // Attribute order (D-36): only sort orders changed.
   const attributes = of("attribute");
