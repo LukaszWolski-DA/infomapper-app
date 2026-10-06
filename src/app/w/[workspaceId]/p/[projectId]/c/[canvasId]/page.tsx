@@ -1,4 +1,13 @@
-import { placeCardAction, placeCardsAction, removeCardAction, updateCardAction } from "@/app/_actions/canvas-item";
+import {
+  arrangeCardsAction,
+  moveCardsAction,
+  placeCardAction,
+  placeCardsAction,
+  removeCardAction,
+  removeCardsAction,
+  setCardWidthsAction,
+  updateCardAction,
+} from "@/app/_actions/canvas-item";
 import { AppShell } from "@/app/_components/app-shell";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { loadProjectView } from "@/app/_lib/project-view";
@@ -20,7 +29,7 @@ import { getDataStore } from "@/data";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 
 // Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a); the Entity
-// tool and Undo and Redo in the top bar (slice 1b).
+// tool and Undo and Redo in the top bar (slice 1b); the Hand tool and a selection of several cards (slice 2a).
 export default async function CanvasPage({
   params,
   searchParams,
@@ -90,6 +99,10 @@ export default async function CanvasPage({
               placeCard={placeCardAction.bind(null, ws, canvasId)}
               placeCards={placeCardsAction.bind(null, ws, canvasId)}
               removeCard={removeCardAction.bind(null, ws)}
+              moveCards={moveCardsAction.bind(null, ws, canvasId)}
+              arrangeCards={arrangeCardsAction.bind(null, ws, canvasId)}
+              setCardWidths={setCardWidthsAction.bind(null, ws, canvasId)}
+              removeCards={removeCardsAction.bind(null, ws, canvasId)}
             />
           </AppShell>
         </UndoProvider>

@@ -6,7 +6,7 @@
 //   the next click on another entity creates the relationship, a click elsewhere ends it. Dragging from the button
 //   and releasing over an entity does the same.
 // - A right-click without moving opens the toolbox for what is under the mouse, after selecting it (D-19); a right-drag
-//   still pans (React Flow).
+//   still pans (React Flow). On a card of a selection of several it opens the group's toolbox (slice 2a).
 // - Hand tool (H, slice 2a, D-18): a left drag anywhere, over cards too, pans the canvas and selects nothing; V or Esc
 //   end it. Right drag, the middle button and Space still pan as before. It is not saved.
 // The page does the writes and draws the toolbox (CanvasHost); this file only reads gestures.
@@ -16,6 +16,7 @@ import { EdgeLabelRenderer, useReactFlow, useStore } from "@xyflow/react";
 import { useToast } from "@/ui/components/toast";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type ToolboxTarget } from "./context";
+import { cardKey } from "./selection";
 import { cardWidth, HEAD_H, type Pt } from "./geometry";
 
 /** A right-click that moved more than this is a pan, not a toolbox. */
@@ -166,6 +167,16 @@ export function useCanvasModes(editable: boolean) {
     [mode, editable, rf, setMode, ui],
   );
 
+  /** A card that is part of a selection of several. */
+  const inSelection = useCallback(
+    (cardId: string) => {
+      const sel = ui.selection;
+      const card = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
+      return sel?.t === "multi" && !!card && sel.keys.includes(cardKey(card));
+    },
+    [ui.selection, rf],
+  );
+
   /** A right-click without moving: select what is under the mouse, then ask the page for its toolbox. */
   const onContextMenu = useCallback(
     (e: ReactMouseEvent) => {
@@ -188,6 +199,9 @@ export function useCanvasModes(editable: boolean) {
       } else if (relationshipId) {
         target = { kind: "rel", relationshipId };
         select({ t: "rel", id: relationshipId });
+      } else if (cardId && inSelection(cardId)) {
+        // anywhere on a selected card, its rows too (prototype ctxFor)
+        target = { kind: "selection" };
       } else if (cardId && rowId) {
         target = { kind: "row", cardId, rowId };
         select({ t: "row", cardId, id: rowId });
@@ -200,7 +214,7 @@ export function useCanvasModes(editable: boolean) {
       }
       ui.host()?.openToolbox({ target, screen: { x: e.clientX, y: e.clientY }, at: rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }) });
     },
-    [mode, setMode, select, rf, ui],
+    [mode, setMode, select, rf, ui, inSelection],
   );
 
   const relateFrom = mode?.kind === "relate" ? mode.fromCardId : null;

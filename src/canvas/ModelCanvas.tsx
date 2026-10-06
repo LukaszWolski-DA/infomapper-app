@@ -10,7 +10,8 @@
 // Slice 1b: feeding sources and fed entities are placed beside a card in one change (B-08); Delete removes a selected
 // line at once, with Undo in the toast.
 // Slice 2a: several cards are selected with a lasso on the empty canvas, Shift+click or Ctrl+A (`selection.ts`); the
-// marks are drawn in an overlay. H turns the Hand tool on, V or Esc off.
+// marks are drawn in an overlay. H turns the Hand tool on, V or Esc off. Dragging a selected card moves the group,
+// arrow keys nudge the selection, and the group's actions (toolbox, selection panel) are in `GroupActions.ts`.
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -31,6 +32,7 @@ import CardNode, { FILTER_ORDER, type CardNodeT } from "./CardNode";
 import { RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
+import { NUDGE, useGroupActions, type GroupWrites } from "./GroupActions";
 import HoverOverlay from "./HoverOverlay";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
@@ -86,6 +88,11 @@ export interface ModelCanvasProps {
   placeCards: (cards: (CardTarget & { x: number; y: number })[]) => Promise<CanvasWriteResult<{ canvasItemIds: string[] }>>;
   /** Takes a card off this canvas (a server action). */
   removeCard: (input: { canvasItemId: string; expectedVersion: number }) => Promise<CanvasWriteResult<unknown>>;
+  /** A group of selected cards: moved, arranged, sized or removed in one change (slice 2a, server actions). */
+  moveCards: GroupWrites["moveCards"];
+  arrangeCards: GroupWrites["arrangeCards"];
+  setCardWidths: GroupWrites["setCardWidths"];
+  removeCards: GroupWrites["removeCards"];
 }
 
 type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width">>;
@@ -124,7 +131,20 @@ const isTyping = (el: EventTarget | null) =>
 const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
 const isEntity = (t: CardTarget): t is { entityId: string } => "entityId" in t;
 
-export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, saveCard, placeCard, placeCards, removeCard }: ModelCanvasProps) {
+export function ModelCanvas({
+  canvasId,
+  cards: initialCards,
+  lines,
+  editable,
+  saveCard,
+  placeCard,
+  placeCards,
+  removeCard,
+  moveCards,
+  arrangeCards,
+  setCardWidths,
+  removeCards,
+}: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
   const { selection, select, registerCanvas } = ui;
   const toast = useToast();
@@ -261,6 +281,17 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
     });
     queue.current.set(id, next);
+  }, []);
+
+  /** Runs a write for several cards after every write still on its way for any of them (slice 2a). */
+  const enqueueGroup = useCallback((ids: readonly string[], write: () => Promise<void>) => {
+    for (const id of ids) pending.current.set(id, (pending.current.get(id) ?? 0) + 1);
+    const next = Promise.all(ids.map((id) => queue.current.get(id) ?? Promise.resolve()))
+      .then(write)
+      .finally(() => {
+        for (const id of ids) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
+      });
+    for (const id of ids) queue.current.set(id, next);
   }, []);
 
   // ---- fresh cards from the server (after a place, remove or rename): take them, except what is still saving ----
@@ -465,6 +496,40 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
     [rf, cardOf, toast, occupied, placeCards, select, viewRect],
   );
 
+  // ---- several selected cards (slice 2a): group drag, nudge and the group's actions ----
+  const group = useGroupActions({
+    editable,
+    selection,
+    select,
+    setNodes,
+    patchCard,
+    enqueueGroup,
+    versions,
+    pending,
+    occupied,
+    viewRect,
+    undo: ui.undo,
+    moveCards,
+    arrangeCards,
+    setCardWidths,
+    removeCards,
+    placeCards,
+  });
+
+  // Arrow keys nudge the selected cards by 8 px, with Shift by 32 px (outside text fields).
+  const { nudge } = group;
+  useEffect(() => {
+    const steps: Record<string, [number, number]> = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    const onKey = (e: KeyboardEvent) => {
+      const d = steps[e.key];
+      if (!d || isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
+      const step = e.shiftKey ? NUDGE.big : NUDGE.step;
+      if (nudge(d[0] * step, d[1] * step)) e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [nudge]);
+
   /** Every card change still on its way, saved. */
   const settled = useCallback(async () => {
     await Promise.all([...queue.current.values()]);
@@ -485,6 +550,10 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         return card ? { collapsed: card.collapsed, rowFilter: card.rowFilter } : null;
       },
       selectAll,
+      arrangeSelection: group.arrangeSelection,
+      fitSelectionWidths: group.fitSelectionWidths,
+      removeSelection: group.removeSelection,
+      placeSourcesOfSelection: group.placeSourcesOfSelection,
       placeAt: (target, rows, at) => void placeAt(target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(rows), false),
       setCardView: (id, view) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
@@ -496,7 +565,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -544,20 +613,27 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
     [editable, selection, select, change, rf, modes.startRelate, fitWidth, toggleCard],
   );
 
+  // A selected card dragged in a group moves the others too, in the same update (slice 2a).
+  const { withGroup, onNodeDragStart: groupDragStart, onGroupDragStop } = group;
   const onNodesChange = useCallback(
-    (changes: NodeChange<CardNodeT>[]) => setNodes((ns) => applyNodeChanges(changes, ns)),
-    [],
+    (changes: NodeChange<CardNodeT>[]) => {
+      const all = withGroup(changes);
+      setNodes((ns) => applyNodeChanges(all, ns));
+    },
+    [withGroup],
   );
+  const onNodeDragStart: OnNodeDrag<CardNodeT> = useCallback((_, node) => groupDragStart(node), [groupDragStart]);
 
   /** A drag ends: save the new position (S1A-05); a refusal puts the card back. */
   const onNodeDragStop: OnNodeDrag<CardNodeT> = useCallback(
     (_, node) => {
+      if (onGroupDragStop()) return;
       const card = node.data.card;
       const x = Math.round(node.position.x), y = Math.round(node.position.y);
       if (x === card.x && y === card.y) return;
       change(node.id, { x, y }, { x: card.x, y: card.y });
     },
-    [change],
+    [change, onGroupDragStop],
   );
 
   // ---- hover (C-10): a row of a card or a mapping line; nothing while dragging or with a tool on ----
@@ -597,6 +673,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         <ReactFlow
           nodes={nodes}
           onNodesChange={onNodesChange}
+          onNodeDragStart={onNodeDragStart}
           onNodeDragStop={onNodeDragStop}
           // Shift+click on the empty canvas keeps the selection (prototype)
           onPaneClick={(e) => !e.shiftKey && select(null)}

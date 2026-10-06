@@ -2,6 +2,7 @@
 
 import { createContext } from "react";
 import type { Uuid } from "@/domain/ids";
+import type { ArrangeMode } from "./arrange";
 import type { Selection } from "./line-data";
 
 /** What the card nodes may do and see; kept in a context so node data stays plain and memo-friendly. */
@@ -67,6 +68,17 @@ export interface CanvasHandle {
   cardView: (cardId: Uuid) => { collapsed: boolean; rowFilter: RowFilter } | null;
   /** Selects every card on the canvas (Ctrl+A, toolbox “Select all”; slice 2a). */
   selectAll: () => void;
+  /** The selected cards aligned, stacked or lined up, in one change (slice 2a). */
+  arrangeSelection: (mode: ArrangeMode) => void;
+  /** “Fit widths to names” for every selected card, in one change. */
+  fitSelectionWidths: () => void;
+  /** Takes the selected cards off this canvas in one change, with Undo in the toast. */
+  removeSelection: () => void;
+  /**
+   * “Add sources of selected entities”: the missing feeding source tables of each selected entity, beside its card,
+   * in one change. `sourcesOf` gives an entity's feeding source tables and their row counts (the page knows the model).
+   */
+  placeSourcesOfSelection: (sourcesOf: (entityId: Uuid) => { sourceTableId: Uuid; rows: number }[]) => void;
 }
 
 export type RowFilter = "all" | "mapped" | "unmapped" | "keys";
@@ -85,6 +97,8 @@ export interface ColumnDrop {
 export type ToolboxTarget =
   | { kind: "canvas" }
   | { kind: "card"; cardId: Uuid }
+  /** A right-click on a card of a selection of several (slice 2a): the group's toolbox. */
+  | { kind: "selection" }
   | { kind: "row"; cardId: Uuid; rowId: Uuid }
   | { kind: "map"; mappingId: Uuid }
   | { kind: "rel"; relationshipId: Uuid };
@@ -172,6 +186,10 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   settled: () => Promise.resolve(),
   cardView: () => null,
   selectAll: noop,
+  arrangeSelection: noop,
+  fitSelectionWidths: noop,
+  removeSelection: noop,
+  placeSourcesOfSelection: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,

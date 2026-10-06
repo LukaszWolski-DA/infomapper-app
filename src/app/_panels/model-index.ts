@@ -100,6 +100,10 @@ export function feedingSources(ix: ModelIndex, entityId: Uuid): { table: SourceT
     .sort((a, b) => b.mappings - a.mappings || a.table.name.localeCompare(b.table.name));
 }
 
+/** An entity's feeding source tables as cards to place, with their row counts (“Add sources of selected entities”). */
+export const feedingSourceCards = (ix: ModelIndex, entityId: Uuid): { sourceTableId: Uuid; rows: number }[] =>
+  feedingSources(ix, entityId).map(({ table }) => ({ sourceTableId: table.id, rows: (ix.columnsOf.get(table.id) ?? []).length }));
+
 export interface ColumnGroup {
   label: string;
   columns: { id: Uuid; label: string }[];
