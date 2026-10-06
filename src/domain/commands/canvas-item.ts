@@ -1,4 +1,5 @@
-// Cards on a canvas (AD-16): place from the left panel, move, collapse, row filter, remove from this canvas.
+// Cards on a canvas (AD-16): place from the left panel, move, collapse, row filter, width (slice 1b, D-37), remove
+// from this canvas.
 // Layout belongs to the canvas, not the model (D-04): removing a card leaves the entity and its mappings alone (D-02).
 
 import { z } from "zod";
@@ -13,6 +14,16 @@ import { begin, current, done, isLive, nothingToChange, softDelete } from "./sha
 /** Canvas coordinates: finite and within a generous board. */
 const coordinate = z.number().finite().min(-1_000_000).max(1_000_000);
 export const positionSchema = z.object({ x: coordinate, y: coordinate });
+
+/** Card width (D-37, C-09): 200–600 px in steps of 8; null is the default width. */
+export const CARD_WIDTH = { min: 200, max: 600, step: 8 } as const;
+const widthSchema = z
+  .number()
+  .int()
+  .min(CARD_WIDTH.min, `A card is at least ${CARD_WIDTH.min} px wide.`)
+  .max(CARD_WIDTH.max, `A card is at most ${CARD_WIDTH.max} px wide.`)
+  .refine((w) => w % CARD_WIDTH.step === 0, `A card's width is a multiple of ${CARD_WIDTH.step} px.`)
+  .nullable();
 
 /** Row filters offered in slice 1a (`labeled` comes with labels). */
 export const CARD_ROW_FILTERS = ["all", "mapped", "unmapped", "keys"] as const;
@@ -88,7 +99,70 @@ export function placeOnCanvas(
   return done(ctx, access, { canvasItemId: item.id }, [{ kind: "insert", table: "canvas_item", row: item }]);
 }
 
-// ---- move, collapse, row filter ----
+// ---- place several (feeding sources, B-08) ----
+
+const placeManyInput = z
+  .object({
+    canvasId: uuidSchema,
+    cards: z
+      .array(
+        z
+          .object({ entityId: uuidSchema.optional(), sourceTableId: uuidSchema.optional(), ...positionSchema.shape })
+          .strict()
+          .refine((v) => (v.entityId === undefined) !== (v.sourceTableId === undefined), "Place either an entity or a source table."),
+      )
+      .min(1, "Nothing to place.")
+      .max(200, "Place at most 200 cards at once."),
+  })
+  .strict();
+export type PlaceManyOnCanvasInput = z.input<typeof placeManyInput>;
+
+export interface PlaceManyOnCanvasState {
+  canvas: Canvas | null;
+  entities: readonly Entity[];
+  sourceTables: readonly SourceTable[];
+  items: readonly CanvasItem[];
+}
+
+/**
+ * Places several entities or source tables on a canvas in one change group, so one undo takes them all off again
+ * (“Add the N missing to this canvas”). Elements already on the canvas are refused, as for one card.
+ */
+export function placeManyOnCanvas(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: PlaceManyOnCanvasState,
+  input: unknown,
+): CommandResult<{ canvasItemIds: Uuid[] }> {
+  const parsed = begin(access, "canvas.edit_items", placeManyInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { canvasId, cards } = parsed.data;
+  const workspaceId = access.workspace.id;
+  if (!isLive(state.canvas, workspaceId) || state.canvas.id !== canvasId) return fail(notFound("canvas"));
+
+  const here = new Set(
+    state.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvasId).map((i) => i.entity_id ?? i.source_table_id),
+  );
+  const items: CanvasItem[] = [];
+  for (const { entityId, sourceTableId, x, y } of cards) {
+    const id = (entityId ?? sourceTableId)!;
+    const live = entityId
+      ? state.entities.some((e) => e.id === entityId && isLive(e, workspaceId))
+      : state.sourceTables.some((t) => t.id === sourceTableId && isLive(t, workspaceId));
+    if (!live) return fail(notFound(entityId ? "entity" : "source table"));
+    if (here.has(id)) return fail(domainError("conflict", "It is already on this canvas."));
+    here.add(id);
+    items.push(newCanvasItem(ctx, workspaceId, canvasId, entityId ? { entity_id: entityId } : { source_table_id: id }, { x, y }));
+  }
+  return done(
+    ctx,
+    access,
+    { canvasItemIds: items.map((i) => i.id) },
+    items.map((row) => ({ kind: "insert", table: "canvas_item", row })),
+  );
+}
+
+// ---- move, collapse, row filter, width ----
 
 const updateItemInput = z
   .object({
@@ -98,12 +172,13 @@ const updateItemInput = z
     y: coordinate.optional(),
     collapsed: z.boolean().optional(),
     rowFilter: z.enum(CARD_ROW_FILTERS).optional(),
+    width: widthSchema.optional(),
   })
   .strict()
   .refine((v) => (v.x === undefined) === (v.y === undefined), "A position needs x and y.");
 export type UpdateCanvasItemInput = z.input<typeof updateItemInput>;
 
-/** Saves a card's position (when a drag ends), whether it is collapsed, and its row filter. */
+/** Saves a card's position (when a drag ends), whether it is collapsed, its row filter and its width (per canvas). */
 export function updateCanvasItem(
   ctx: CommandContext,
   access: WorkspaceAccess,
@@ -112,7 +187,7 @@ export function updateCanvasItem(
 ): CommandResult<{ item: CanvasItem }> {
   const parsed = begin(access, "canvas.edit_items", updateItemInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { canvasItemId, expectedVersion, x, y, collapsed, rowFilter } = parsed.data;
+  const { canvasItemId, expectedVersion, x, y, collapsed, rowFilter, width } = parsed.data;
   const got = current(state.item, access, canvasItemId, expectedVersion, "card");
   if (!got.ok) return fail(got.error);
   const before = got.row;
@@ -121,6 +196,7 @@ export function updateCanvasItem(
   if (x !== undefined && y !== undefined && (x !== before.x || y !== before.y)) Object.assign(patch, { x, y });
   if (collapsed !== undefined && collapsed !== before.collapsed) patch.collapsed = collapsed;
   if (rowFilter !== undefined && rowFilter !== before.row_filter) patch.row_filter = rowFilter;
+  if (width !== undefined && width !== before.width) patch.width = width;
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
 
   const row = nextVersion(ctx, before, patch);

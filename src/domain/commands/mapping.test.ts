@@ -6,9 +6,11 @@ import {
   addMappingInput,
   createMapping,
   deleteMapping,
+  mergeMappings,
   removeMappingInput,
   reorderMappingInputs,
   setMappingStatus,
+  splitMapping,
   updateMapping,
 } from "./mapping";
 
@@ -282,5 +284,121 @@ describe("an approved mapping goes back to review when what it does changes (D-5
       ok: true,
       value: { mapping: { status: "draft" }, notice: null },
     });
+  });
+});
+
+describe("splitMapping: “Split into separate mappings” (D-49, slice 1b)", () => {
+  const in3 = "01900000-0000-7000-8000-00000000b003";
+  const combined = {
+    mapping: mapping({ kind: "transform", rule_expression: "CONCAT(first_name, ' ', email)", status: "approved", approved_by: ids.someoneElse, approved_at: NOW, note_text: "kept", note_html: "<p>kept</p>" }),
+    inputs: [
+      mappingInput(inEmail, { source_column_id: colFirstName, sort_order: 0 }),
+      mappingInput(in2, { source_column_id: colEmail, sort_order: 1 }),
+      mappingInput(in3, { source_column_id: colCustId, sort_order: 2, deleted_at: NOW }),
+    ],
+  };
+
+  it("keeps the first input as a direct copy and moves every other input to a new direct draft mapping, in one change group", () => {
+    const r = splitMapping(makeCtx(), access("modeler"), combined, ref);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value.newMappingIds).toHaveLength(1);
+    const [newId] = r.value.newMappingIds;
+    expect(r.writeSet.writes).toMatchObject([
+      { kind: "update", table: "mapping", row: { id: mapEmail, kind: "direct", rule_expression: null, note_text: "kept", version: 2 } },
+      { kind: "insert", table: "mapping", row: { id: newId, attribute_id: email, kind: "direct", rule_expression: null, status: "draft", note_text: null } },
+      { kind: "update", table: "mapping_input", row: { id: in2, mapping_id: newId, source_column_id: colEmail, sort_order: 0, version: 2 } },
+    ]);
+    expect(r.writeSet.writes).toHaveLength(3);
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+  });
+
+  it("sends an approved mapping back to review (D-51)", () => {
+    const r = splitMapping(makeCtx(), access("modeler"), combined, ref);
+    expect(r).toMatchObject({ ok: true, value: { mapping: { status: "review", approved_by: null, approved_at: null }, notice: BACK_TO_REVIEW_MESSAGE } });
+  });
+
+  it("refuses a mapping with one input, a stale version, reviewers and an archived workspace", () => {
+    expect(splitMapping(makeCtx(), access("owner"), { mapping: mapping(), inputs: [mappingInput()] }, ref)).toMatchObject({
+      ok: false,
+      error: { code: "invalid", message: "Only a mapping with more than one input can be split." },
+    });
+    expect(splitMapping(makeCtx(), access("owner"), combined, { mappingId: mapEmail, expectedVersion: 3 })).toMatchObject({ ok: false, error: { code: "stale_version" } });
+    expect(splitMapping(makeCtx(), access("reviewer"), combined, ref)).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(splitMapping(makeCtx(), access("owner", archived), combined, ref)).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
+
+describe("mergeMappings: “Merge mappings” (D-49, slice 1b)", () => {
+  const map2 = "01900000-0000-7000-8000-00000000a002";
+  const map3 = "01900000-0000-7000-8000-00000000a003";
+  const in3 = "01900000-0000-7000-8000-00000000b003";
+  const in4 = "01900000-0000-7000-8000-00000000b004";
+  const state = {
+    mappings: [
+      mapping({ status: "approved", approved_by: ids.someoneElse, approved_at: NOW }),
+      mapping({ id: map2, version: 4 }),
+      mapping({ id: map3, kind: "transform", rule_expression: "x" }),
+    ],
+    inputs: [
+      mappingInput(inEmail),
+      mappingInput(in2, { mapping_id: map2, source_column_id: colFirstName }),
+      mappingInput(in3, { mapping_id: map3, source_column_id: colCustId, sort_order: 0 }),
+      mappingInput(in4, { mapping_id: map3, source_column_id: colEmail, sort_order: 1 }),
+    ],
+  };
+  const two = [{ mappingId: mapEmail, expectedVersion: 1 }, { mappingId: map2, expectedVersion: 4 }];
+
+  it("combines two mappings of one attribute into one transform with the rule, status review, in one change group", () => {
+    const r = mergeMappings(makeCtx(), access("modeler"), state, { mappings: two, ruleExpression: " CONCAT(email, first_name) " });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value.mapping).toMatchObject({ id: mapEmail, kind: "transform", rule_expression: "CONCAT(email, first_name)", status: "review", approved_by: null, approved_at: null, version: 2 });
+    expect(r.writeSet.writes).toMatchObject([
+      { kind: "update", table: "mapping", row: { id: mapEmail } },
+      { kind: "update", table: "mapping_input", row: { id: in2, mapping_id: mapEmail, sort_order: 1 } },
+      { kind: "update", table: "mapping", row: { id: map2, deleted_at: NOW } },
+    ]);
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+  });
+
+  it("keeps the inputs in order and does not add a column twice", () => {
+    const all = [...two, { mappingId: map3, expectedVersion: 1 }];
+    const r = mergeMappings(makeCtx(), access("modeler"), state, { mappings: all, ruleExpression: "r" });
+    if (!r.ok) throw new Error(r.error.message);
+    const inputs = r.writeSet.writes.filter((w) => w.table === "mapping_input").map((w) => w.kind === "update" && [w.row.id, w.row.mapping_id, w.row.sort_order, w.row.deleted_at]);
+    expect(inputs).toEqual([
+      [in2, mapEmail, 1, null],
+      [in3, mapEmail, 2, null],
+      [in4, map3, 1, NOW], // colEmail is already the first input
+    ]);
+  });
+
+  it("requires a rule", () => {
+    expect(mergeMappings(makeCtx(), access("modeler"), state, { mappings: two, ruleExpression: "  " })).toMatchObject({
+      ok: false,
+      error: { code: "invalid", message: "A mapping with more than one input needs a transformation rule." },
+    });
+  });
+
+  it("only merges two or more different mappings of the same attribute", () => {
+    const other = { ...state, mappings: [state.mappings[0]!, mapping({ id: map2, version: 4, attribute_id: ids.customerId })] };
+    expect(mergeMappings(makeCtx(), access("modeler"), other, { mappings: two, ruleExpression: "r" })).toMatchObject({
+      ok: false,
+      error: { code: "invalid", message: "Only mappings of the same attribute can be merged." },
+    });
+    expect(mergeMappings(makeCtx(), access("modeler"), state, { mappings: [two[0]!], ruleExpression: "r" })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    expect(mergeMappings(makeCtx(), access("modeler"), state, { mappings: [two[0]!, two[0]!], ruleExpression: "r" })).toMatchObject({ ok: false, error: { code: "invalid" } });
+  });
+
+  it("refuses a stale or missing mapping, reviewers and an archived workspace", () => {
+    expect(mergeMappings(makeCtx(), access("owner"), state, { mappings: [two[0]!, { mappingId: map2, expectedVersion: 3 }], ruleExpression: "r" })).toMatchObject({
+      ok: false,
+      error: { code: "stale_version" },
+    });
+    expect(mergeMappings(makeCtx(), access("owner"), { ...state, mappings: [state.mappings[0]!] }, { mappings: two, ruleExpression: "r" })).toMatchObject({
+      ok: false,
+      error: { code: "not_found" },
+    });
+    expect(mergeMappings(makeCtx(), access("reviewer"), state, { mappings: two, ruleExpression: "r" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(mergeMappings(makeCtx(), access("owner", archived), state, { mappings: two, ruleExpression: "r" })).toMatchObject({ ok: false, error: { code: "archived" } });
   });
 });

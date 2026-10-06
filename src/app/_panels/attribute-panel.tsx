@@ -2,7 +2,7 @@
 
 // The attribute panel (prototype insAttr): name, data type with its parameters (AD-27), flags with the business-key
 // suggestion (AD-28), definition (plain text, AD-30), where it comes from (one row per mapping, D-49),
-// “Add a source column” to create a mapping, and delete.
+// “Add a source column” to create a mapping, and delete; slice 1b: its position on the entity (D-36).
 
 import { useContext, useEffect, useRef } from "react";
 import { createMappingAction } from "@/app/_actions/mapping";
@@ -16,6 +16,7 @@ import { useToast } from "@/ui/components/toast";
 import {
   Actions,
   ConfirmDelete,
+  dangerClass,
   Field,
   Flag,
   GroupedSelect,
@@ -32,6 +33,7 @@ import {
   TypeDot,
 } from "./fields";
 import { usePanel } from "./inspector";
+import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, businessKeyHint, columnLabel, columnOptions, inputColumns, inputsLabel, typeCheckOf } from "./model-index";
 import { usePanels } from "./panels-context";
 
@@ -53,6 +55,7 @@ const toNumber = (v: string): number | null => (v.trim() === "" ? null : Number(
 
 export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   const p = usePanel();
+  const move = useMoveAttribute(p.ix, p.workspaceId);
   const ui = useContext(CanvasUiCtx);
   const { run } = useAction();
   const toast = useToast();
@@ -96,11 +99,14 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
     const result = await run(
       () => deleteAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: a.version }),
       `Attribute deleted${n ? ` together with ${n} mapping${n > 1 ? "s" : ""}` : ""}`,
+      { undoable: true },
     );
     if (result.ok) ui.select(null);
   }
 
   const v = `${a.id}:${a.version}`;
+  const siblings = p.ix.attributesOf.get(a.entity_id) ?? [];
+  const position = siblings.findIndex((x) => x.id === a.id) + 1;
   return (
     <div data-testid="panel-attribute">
       <Kind>
@@ -118,14 +124,39 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         <TextField key={v} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-attribute-name" inputRef={nameRef} />
       </Field>
 
+      <Field label="Position on the entity">
+        <div className="flex items-center gap-1.5" data-testid="position-attribute">
+          <span className="mr-1 tabular-nums" data-testid="value-attribute-position">
+            {position} of {siblings.length}
+          </span>
+          {p.editable && (
+            <>
+              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move to the top (Ctrl Shift ↑)" aria-label="Move to the top" disabled={position === 1} onClick={() => void move(a.id, "top")}>
+                ⤒
+              </button>
+              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move up (Ctrl ↑)" aria-label="Move up" disabled={position === 1} onClick={() => void move(a.id, "up")}>
+                ↑
+              </button>
+              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move down (Ctrl ↓)" aria-label="Move down" disabled={position === siblings.length} onClick={() => void move(a.id, "down")}>
+                ↓
+              </button>
+              <button type="button" className="grid size-7 place-items-center rounded-md border border-im-line bg-im-surface text-im-ink-2 hover:bg-im-hover disabled:opacity-30" title="Move to the bottom (Ctrl Shift ↓)" aria-label="Move to the bottom" disabled={position === siblings.length} onClick={() => void move(a.id, "bottom")}>
+                ⤓
+              </button>
+            </>
+          )}
+        </div>
+      </Field>
+
       <Field label="Data type" htmlFor="f-at">
-        <div className="flex gap-2">
+        {/* the parameters sit next to the type, and wrap under it when the panel is narrow */}
+        <div className="flex flex-wrap gap-2" data-testid="field-attribute-type">
           <select
             key={v}
             id="f-at"
             defaultValue={a.data_type}
             disabled={!p.editable}
-            className={`${inputClass} flex-1`}
+            className={`${inputClass} min-w-[120px] flex-1 basis-[120px]`}
             data-testid="select-attribute-type"
             onChange={(e) => saveType({ dataType: e.target.value as LogicalType })}
           >
@@ -139,10 +170,10 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
             <ParamField key={`l${v}`} label="Length" value={a.type_length} disabled={!p.editable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
           )}
           {a.data_type === "decimal" && (
-            <>
+            <div className="flex flex-none gap-2">
               <ParamField key={`p${v}`} label="Precision" value={a.type_precision} disabled={!p.editable} onSave={(n) => saveType({ precision: n })} testId="input-type-precision" />
               <ParamField key={`s${v}`} label="Scale" value={a.type_scale} disabled={!p.editable} onSave={(n) => saveType({ scale: n })} testId="input-type-scale" />
-            </>
+            </div>
           )}
         </div>
         {a.data_type === "custom" && (
@@ -218,12 +249,19 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
 
       {p.editable && (
         <Actions>
-          <ConfirmDelete
-            label="Delete attribute"
-            also={mappings.length ? `${mappings.length} mapping${mappings.length > 1 ? "s" : ""}` : undefined}
-            onConfirm={() => void remove()}
-            testId="button-delete-attribute"
-          />
+          {mappings.length ? (
+            // With mappings it still asks (slice 1b, item 13); without, it goes at once with Undo in the toast.
+            <ConfirmDelete
+              label="Delete attribute"
+              also={`${mappings.length} mapping${mappings.length > 1 ? "s" : ""}`}
+              onConfirm={() => void remove()}
+              testId="button-delete-attribute"
+            />
+          ) : (
+            <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-attribute">
+              Delete attribute
+            </button>
+          )}
         </Actions>
       )}
     </div>
@@ -253,7 +291,8 @@ function ParamField({
       defaultValue={value ?? ""}
       disabled={disabled}
       data-testid={testId}
-      className={`${inputClass} w-[84px] flex-none`}
+      // 84 px, not the input's usual full width (which made the type's parameters run out of the panel)
+      className={`${inputClass.replace("w-full", "w-[84px]")} flex-none`}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
       }}

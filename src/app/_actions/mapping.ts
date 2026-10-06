@@ -1,7 +1,7 @@
 "use server";
 
 // Mapping writes from the right panel (slice 1a, AD-26, D-49): create from the attribute panel, kind, rule and note,
-// the Inputs section, status with four-eyes (AD-06), delete. Changes to an approved mapping's inputs, kind or rule
+// the Inputs section, status with four-eyes (AD-06), delete; slice 1b: split and merge (D-49). Changes to an approved mapping's inputs, kind or rule
 // send it back to review (D-51); the domain's notice comes back for a toast.
 
 import { revalidatePath } from "next/cache";
@@ -11,11 +11,14 @@ import {
   addMappingInput,
   createMapping,
   deleteMapping,
+  mergeMappings,
   removeMappingInput,
   reorderMappingInputs,
   setMappingStatus,
+  splitMapping,
   updateMapping,
   type AddMappingInputInput,
+  type MergeMappingsInput,
   type RemoveMappingInputInput,
   type ReorderMappingInputsInput,
   type SetMappingStatusInput,
@@ -111,5 +114,30 @@ export async function deleteMappingAction(workspaceId: string, input: { mappingI
   return mappingCommand(workspaceId, (ctx, access, model) => {
     const result = deleteMapping(ctx, access, mappingState(model, input?.mappingId), input);
     return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+/** “Split into separate mappings” (D-49): one direct mapping per input. */
+export async function splitMappingAction(
+  workspaceId: string,
+  input: { mappingId: string; expectedVersion: number },
+): Promise<ActionResult<{ mappings: number; notice: string | null }>> {
+  return mappingCommand(workspaceId, (ctx, access, model) => {
+    const result = splitMapping(ctx, access, mappingState(model, input?.mappingId), input);
+    return result.ok ? { ...result, value: { mappings: result.value.newMappingIds.length + 1, notice: result.value.notice } } : result;
+  });
+}
+
+/** “Merge mappings” (D-49): mappings of one attribute become one transformation with the given rule. */
+export async function mergeMappingsAction(workspaceId: string, input: MergeMappingsInput): Promise<ActionResult<{ mappingId: Uuid }>> {
+  return mappingCommand(workspaceId, (ctx, access, model) => {
+    const ids = new Set(Array.isArray(input?.mappings) ? input.mappings.map((m) => m?.mappingId) : []);
+    const result = mergeMappings(
+      ctx,
+      access,
+      { mappings: model.mappings.filter((m) => ids.has(m.id)), inputs: model.mappingInputs.filter((i) => ids.has(i.mapping_id)) },
+      input,
+    );
+    return result.ok ? { ...result, value: { mappingId: result.value.mapping.id } } : result;
   });
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AttributeType } from "../types";
-import { checkColumnType, checkMappingTypes, formatAttributeType, formatColumnType, physicalClass, type ColumnType } from "./type-check";
+import { checkColumnType, checkMappingTypes, formatAttributeType, formatColumnType, logicalTypeOf, physicalClass, type ColumnType } from "./type-check";
 
 const attr = (data_type: AttributeType["data_type"], over: Partial<AttributeType> = {}): AttributeType => ({
   data_type,
@@ -148,5 +148,38 @@ describe("checkMappingTypes", () => {
     expect(checkMappingTypes({ kind: "direct", rule_expression: null }, s100, [narrow, { ...narrow, id: "c3" }]).message).toBe(
       "All inputs fit string(100).",
     );
+  });
+});
+
+describe("logicalTypeOf: the type table in reverse (slice 1b, new attribute from a column)", () => {
+  it("keeps the column's parameters", () => {
+    expect(logicalTypeOf(col("varchar", { type_length: 100 }))).toEqual(attr("string", { type_length: 100 }));
+    expect(logicalTypeOf(col("nvarchar"))).toEqual(attr("string"));
+    expect(logicalTypeOf(col("decimal", { type_precision: 18, type_scale: 2 }))).toEqual(attr("decimal", { type_precision: 18, type_scale: 2 }));
+    expect(logicalTypeOf(col("money"))).toEqual(attr("decimal"));
+  });
+
+  it("maps each class of the table", () => {
+    expect(logicalTypeOf(col("bigint")).data_type).toBe("integer");
+    expect(logicalTypeOf(col("date")).data_type).toBe("date");
+    expect(logicalTypeOf(col("datetime2")).data_type).toBe("datetime");
+    expect(logicalTypeOf(col("TIMESTAMP")).data_type).toBe("datetime");
+    expect(logicalTypeOf(col("bit")).data_type).toBe("boolean");
+    expect(logicalTypeOf(col("jsonb")).data_type).toBe("json");
+    expect(logicalTypeOf(col("uniqueidentifier")).data_type).toBe("string");
+  });
+
+  it("makes anything unknown, and a time of day, a custom type with the physical name", () => {
+    expect(logicalTypeOf(col("geography"))).toEqual(attr("custom", { custom_type: "geography" }));
+    expect(logicalTypeOf(col("time"))).toEqual(attr("custom", { custom_type: "time" }));
+  });
+
+  it("always gives a type the column fits", () => {
+    const columns = [
+      col("varchar", { type_length: 255 }), col("char", { type_length: 2 }), col("int"), col("tinyint"),
+      col("numeric", { type_precision: 10 }), col("decimal", { type_precision: 18, type_scale: 4 }), col("float"),
+      col("date"), col("datetimeoffset"), col("time"), col("boolean"), col("json"), col("xml"), col("varbinary", { type_length: 16 }),
+    ];
+    for (const c of columns) expect(fits(logicalTypeOf(c), c), formatColumnType(c)).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { access, archived, canvas, canvasItem, entity, ids, makeCtx, NOW, sourceTable } from "../__fixtures__/domain";
-import { placeOnCanvas, removeFromCanvas, updateCanvasItem } from "./canvas-item";
+import { placeManyOnCanvas, placeOnCanvas, removeFromCanvas, updateCanvasItem } from "./canvas-item";
 
 const { canvas1, customer, crmCustomer, itemCustomer } = ids;
 
@@ -55,6 +55,37 @@ describe("placeOnCanvas", () => {
   });
 });
 
+describe("placeManyOnCanvas (slice 1b, B-08)", () => {
+  const state = { canvas: canvas(), entities: [entity(customer)], sourceTables: [sourceTable()], items: [] };
+  const place = (cards: object[], s: object = {}, role: "owner" | "modeler" | "reviewer" = "owner") =>
+    placeManyOnCanvas(makeCtx(), access(role), { ...state, ...s }, { canvasId: canvas1, cards });
+
+  it("places several cards in one change group", () => {
+    const r = place([
+      { sourceTableId: crmCustomer, x: -400, y: 0 },
+      { entityId: customer, x: 400, y: 0 },
+    ]);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value.canvasItemIds).toHaveLength(2);
+    expect(r.writeSet.writes).toMatchObject([
+      { kind: "insert", table: "canvas_item", row: { source_table_id: crmCustomer, x: -400, y: 0 } },
+      { kind: "insert", table: "canvas_item", row: { entity_id: customer, x: 400, y: 0 } },
+    ]);
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+  });
+
+  it("refuses an element already on the canvas, twice in the list, unknown, or nothing at all", () => {
+    expect(place([{ entityId: customer, x: 0, y: 0 }], { items: [canvasItem()] })).toMatchObject({ ok: false, error: { code: "conflict" } });
+    expect(place([{ entityId: customer, x: 0, y: 0 }, { entityId: customer, x: 0, y: 300 }])).toMatchObject({ ok: false, error: { code: "conflict" } });
+    expect(place([{ entityId: customer, x: 0, y: 0 }], { entities: [entity(customer, { deleted_at: NOW })] })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(place([])).toMatchObject({ ok: false, error: { code: "invalid" } });
+  });
+
+  it("is refused to reviewers", () => {
+    expect(place([{ entityId: customer, x: 0, y: 0 }], {}, "reviewer")).toMatchObject({ ok: false, error: { code: "forbidden" } });
+  });
+});
+
 describe("updateCanvasItem: move, collapse, row filter", () => {
   const state = { item: canvasItem() };
   const ref = { canvasItemId: itemCustomer, expectedVersion: 1 };
@@ -70,6 +101,18 @@ describe("updateCanvasItem: move, collapse, row filter", () => {
       ok: true,
       value: { item: { collapsed: true, row_filter: "keys" } },
     });
+  });
+
+  it("sets the card's width, 200–600 px in steps of 8, and back to the default (slice 1b, D-37)", () => {
+    expect(updateCanvasItem(makeCtx(), access("modeler"), state, { ...ref, width: 344 })).toMatchObject({ ok: true, value: { item: { width: 344, version: 2 } } });
+    expect(updateCanvasItem(makeCtx(), access("modeler"), { item: canvasItem(itemCustomer, { width: 344 }) }, { ...ref, width: null })).toMatchObject({
+      ok: true,
+      value: { item: { width: null } },
+    });
+    for (const width of [192, 608, 301]) {
+      expect(updateCanvasItem(makeCtx(), access("modeler"), state, { ...ref, width })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    }
+    expect(updateCanvasItem(makeCtx(), access("modeler"), state, { ...ref, width: null })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
   });
 
   it("refuses the labeled filter (labels come later), half a position and no change", () => {

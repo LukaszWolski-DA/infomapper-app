@@ -1,10 +1,10 @@
 "use server";
 
 // Card writes on the canvas (slice 1a): position (when a drag ends), collapse and row filter, which need no fresh page;
-// placing a card and removing it, which do.
+// placing a card and removing it, which do; slice 1b: placing several at once (feeding sources, B-08).
 
 import { revalidatePath } from "next/cache";
-import { placeOnCanvas, removeFromCanvas, updateCanvasItem } from "@/domain/commands/canvas-item";
+import { placeManyOnCanvas, placeOnCanvas, removeFromCanvas, updateCanvasItem } from "@/domain/commands/canvas-item";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
@@ -16,9 +16,10 @@ export interface CardChangeInput {
   rowFilter?: string;
   x?: number;
   y?: number;
+  width?: number | null;
 }
 
-/** Saves a card's position, collapse state or row filter. Returns the card's new version for the next change. */
+/** Saves a card's position, collapse state, row filter or width. Returns the card's new version for the next change. */
 export async function updateCardAction(workspaceId: string, change: CardChangeInput): Promise<ActionResult<{ version: number }>> {
   return runCommand(async (ctx, store, user) => {
     const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
@@ -53,6 +54,28 @@ export async function placeCardAction(
       items,
     };
     return placeOnCanvas(ctx, access, state, { ...input, canvasId });
+  });
+  if (result.ok) revalidatePath("/", "layout");
+  return result;
+}
+
+/** Places several entities or source tables on a canvas in one change (feeding sources and fed entities). */
+export async function placeCardsAction(
+  workspaceId: string,
+  canvasId: string,
+  cards: { entityId?: string; sourceTableId?: string; x: number; y: number }[],
+): Promise<ActionResult<{ canvasItemIds: string[] }>> {
+  const result = await runCommand(async (ctx, store, user) => {
+    const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
+    if (!workspace) return NOT_FOUND;
+    const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
+    const cid = typeof canvasId === "string" ? canvasId : "";
+    const [canvas, model, items] = await Promise.all([
+      store.canvases.get(workspace.id, cid),
+      store.model.load(workspace.id),
+      store.canvasItems.listOfCanvas(workspace.id, cid),
+    ]);
+    return placeManyOnCanvas(ctx, access, { canvas, entities: model.entities, sourceTables: model.sourceTables, items }, { canvasId, cards });
   });
   if (result.ok) revalidatePath("/", "layout");
   return result;

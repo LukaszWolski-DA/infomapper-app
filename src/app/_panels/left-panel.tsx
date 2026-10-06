@@ -56,7 +56,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const { run } = useAction();
-  const { setNameFocus } = usePanels();
+  const { setNameFocus, setLastConcept } = usePanels();
   const [tab, setTab] = useState<Tab>("model");
   const [q, setQ] = useState("");
   const [canvasOnly, setCanvasOnly] = useState(false);
@@ -135,6 +135,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
     const spot = ui.freeSpot();
     const result = await run(() => createEntityAction(workspaceId, { conceptId: c.id, placement: { canvasId, ...spot } }));
     if (!result.ok) return;
+    setLastConcept(c.id);
     toast(`Created ${result.value.name} in ${c.name}. Type its name now; change the concept in the panel.`);
     const cardId = result.value.canvasItemId;
     if (cardId) {
@@ -153,7 +154,9 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
   async function createConcept(name: string) {
     setAddingConcept(false);
     const result = await run(() => createConceptAction(workspaceId, { name }));
-    if (result.ok) toast(`Created the concept ${name}. Use + next to it to add entities.`);
+    if (!result.ok) return;
+    setLastConcept(result.value.conceptId);
+    toast(`Created the concept ${name}. Use + next to it to add entities.`);
   }
 
   // ---- the Model tab ----

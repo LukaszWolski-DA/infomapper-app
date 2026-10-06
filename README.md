@@ -2,11 +2,13 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slice 1a (the model, visible) – on top of slice 0's sign-in, organizations, workspaces, projects and
-canvases: concepts, entities, attributes, relationships, source systems, tables and columns, and mappings with one or
-more inputs, shown on a React Flow canvas with mapping and relationship lines and edited in the left and right panels.
-Modeling on the canvas itself (dragging mappings, drawing relationships, undo) is slice 1b. Acceptance:
-[slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md).
+**Status:** slice 1b (modeling on the canvas) – on top of slice 0's sign-in, organizations, workspaces, projects and
+canvases, and slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
+mappings with one or more inputs) on a React Flow canvas: drag a column onto an attribute to map it, draw
+relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
+row's connections by hovering, place feeding sources beside a card, and undo and redo every change. Acceptance:
+[slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
+[slice 1b](docs/prd/slice-01b-acceptance.md).
 
 ## Getting started
 
@@ -46,6 +48,8 @@ exist only in development: a production build refuses them.
 | `npm run reset-dev-data` | Replaces `.data/dev-db.json` with fresh demo data |
 | `npm run seed:large` | Adds the workspace “Performance test” for Łukasz (the canvas spike's 100-card data set) to `.data/dev-db.json` |
 | `MEASURE=1 npx playwright test e2e/slice-01a/S1A-14.spec.ts` | The canvas performance measurement (S1A-14) in installed Google Chrome, headed; results in `test-results/S1A-14.json` |
+| `MEASURE=1 npx playwright test e2e/slice-01b/S1B-09.spec.ts` | Card resize on “Performance test” (C-09), same way; results in `test-results/S1B-09.json` |
+| `MEASURE=1 npx playwright test e2e/slice-01b/S1B-10.spec.ts` | Hover delay (C-10) and three pan-and-zoom runs against slice 1a's median, same way; results in `test-results/S1B-10.json` |
 
 Optional variables are listed in `.env.example`.
 

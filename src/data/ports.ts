@@ -3,8 +3,10 @@
 // Every read of workspace data takes the workspace id and filters on it. Soft-deleted rows are never returned.
 
 import type { WriteSet } from "@/domain/changes";
+import type { WorkspaceRows } from "@/domain/commands/undo";
 import type { DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
+import type { UndoHistory } from "@/domain/model/undo-history";
 import type {
   AppUser,
   Canvas,
@@ -60,6 +62,8 @@ export interface CanvasRepository {
 export interface ModelRepository {
   /** Every live model row of the workspace, from concepts to mapping inputs. */
   load(workspaceId: Uuid): Promise<WorkspaceModel>;
+  /** Every row of the undoable tables, deleted ones included (undo and redo, slice 1b). */
+  loadForUndo(workspaceId: Uuid): Promise<WorkspaceRows>;
 }
 
 export interface CanvasItemRepository {
@@ -76,6 +80,16 @@ export interface ChangeEventRepository {
   listForMapping(workspaceId: Uuid, mappingId: Uuid): Promise<ChangeEvent[]>;
 }
 
+/**
+ * The undo history of each person in each workspace (slice 1b). In memory on the server for now; it comes into the
+ * database with Supabase. Steps whose change group is no longer in the change log (fresh demo data) are left out.
+ */
+export interface UndoHistoryRepository {
+  get(workspaceId: Uuid, userId: Uuid): Promise<UndoHistory>;
+  /** Changes the history in one step, so two writes at the same moment cannot lose a step. */
+  update(workspaceId: Uuid, userId: Uuid, change: (history: UndoHistory) => UndoHistory): Promise<UndoHistory>;
+}
+
 export type ApplyResult = { ok: true } | { ok: false; error: DomainError };
 
 export interface DataStore {
@@ -87,6 +101,7 @@ export interface DataStore {
   model: ModelRepository;
   canvasItems: CanvasItemRepository;
   changeEvents: ChangeEventRepository;
+  undoHistory: UndoHistoryRepository;
   /**
    * Applies the rows and change events of one command together or not at all (AD-13). Refuses a stale version,
    * unknown ids, duplicate keys and broken rules with the same error a database would cause.

@@ -2,6 +2,7 @@
 // the Inputs section (add, remove, order), status with four-eyes (AD-06), delete. Changing what an approved mapping
 // does (inputs, their order, kind, rule) sends it back to review (D-51); `notice` then carries the message.
 // Input changes also bump the mapping's version, so one expectedVersion guards the whole mapping.
+// Slice 1b: split a combined mapping into one mapping per input, merge mappings of one attribute (D-49).
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
@@ -298,4 +299,123 @@ export function deleteMapping(ctx: CommandContext, access: WorkspaceAccess, stat
     ...inputs.map((i) => softDelete(ctx, "mapping_input", i)),
     softDelete(ctx, "mapping", got.row),
   ]);
+}
+
+// ---- split and merge (D-49, slice 1b) ----
+
+const splitInput = z.object(ref).strict();
+export type SplitMappingInput = z.input<typeof splitInput>;
+
+/**
+ * “Split into separate mappings”: a mapping with several inputs becomes one direct mapping per input. The mapping
+ * keeps its first input, its id and its note, and becomes a direct copy without the rule (the rule combined the
+ * inputs); an approved mapping goes back to review (D-51). Every other input moves to a new direct draft mapping of
+ * the same attribute, as if it had been mapped on its own. One change group.
+ */
+export function splitMapping(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: MappingState,
+  input: unknown,
+): CommandResult<{ mapping: Mapping; newMappingIds: Uuid[]; notice: string | null }> {
+  const parsed = begin(access, "model.edit", splitInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const got = current(state.mapping, access, parsed.data.mappingId, parsed.data.expectedVersion, "mapping");
+  if (!got.ok) return fail(got.error);
+  const before = got.row;
+  const inputs = liveInputs(access, before, state.inputs);
+  if (inputs.length < 2) return fail(domainError("invalid", "Only a mapping with more than one input can be split."));
+
+  const content = afterContentChange(before);
+  const row = nextVersion(ctx, before, { kind: "direct", rule_expression: null, ...content.patch });
+  const writes: Write[] = [{ kind: "update", table: "mapping", before, row }];
+  const newMappingIds: Uuid[] = [];
+  for (const moved of inputs.slice(1)) {
+    const mapping: Mapping = {
+      ...newRowColumns(ctx),
+      workspace_id: access.workspace.id,
+      attribute_id: before.attribute_id,
+      kind: "direct",
+      rule_expression: null,
+      status: "draft",
+      note_html: null,
+      note_text: null,
+      approved_by: null,
+      approved_at: null,
+    };
+    newMappingIds.push(mapping.id);
+    writes.push(
+      { kind: "insert", table: "mapping", row: mapping },
+      { kind: "update", table: "mapping_input", before: moved, row: nextVersion(ctx, moved, { mapping_id: mapping.id, sort_order: 0 }) },
+    );
+  }
+  if (inputs[0]!.sort_order !== 0) {
+    writes.push({ kind: "update", table: "mapping_input", before: inputs[0]!, row: nextVersion(ctx, inputs[0]!, { sort_order: 0 }) });
+  }
+  return done(ctx, access, { mapping: row, newMappingIds, notice: content.notice }, writes);
+}
+
+const mergeInput = z
+  .object({
+    mappings: z.array(z.object({ mappingId: uuidSchema, expectedVersion: versionSchema }).strict()).min(2, "Select at least two mappings to merge."),
+    ruleExpression: ruleSchema,
+  })
+  .strict();
+export type MergeMappingsInput = z.input<typeof mergeInput>;
+
+export interface MergeMappingsState {
+  /** The selected mappings (others are ignored). */
+  mappings: readonly Mapping[];
+  /** Their inputs. */
+  inputs: readonly MappingInput[];
+}
+
+/**
+ * “Merge mappings”: mappings of one attribute become one transform. The first selected mapping keeps its id and
+ * note and receives all inputs in order (its own first, then each other mapping's, in the order selected); a column
+ * that is already an input is not added twice. The others are deleted. The result is a transform with the given
+ * rule (required) and status “review”, whatever the statuses were. One change group.
+ */
+export function mergeMappings(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: MergeMappingsState,
+  input: unknown,
+): CommandResult<{ mapping: Mapping }> {
+  const parsed = begin(access, "model.edit", mergeInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { mappings: refs, ruleExpression } = parsed.data;
+  if (new Set(refs.map((r) => r.mappingId)).size !== refs.length) return fail(domainError("invalid", "Each mapping can be selected only once."));
+  const selected: Mapping[] = [];
+  for (const r of refs) {
+    const got = current(state.mappings.find((m) => m.id === r.mappingId), access, r.mappingId, r.expectedVersion, "mapping");
+    if (!got.ok) return fail(got.error);
+    selected.push(got.row);
+  }
+  const [target, ...others] = selected as [Mapping, ...Mapping[]];
+  if (others.some((m) => m.attribute_id !== target.attribute_id)) {
+    return fail(domainError("invalid", "Only mappings of the same attribute can be merged."));
+  }
+
+  const row = nextVersion(ctx, target, { kind: "transform", rule_expression: ruleExpression, status: "review", approved_by: null, approved_at: null });
+  const columns = new Set<Uuid>();
+  const writes: Write[] = [{ kind: "update", table: "mapping", before: target, row }];
+  let order = 0;
+  for (const m of selected) {
+    for (const i of liveInputs(access, m, state.inputs)) {
+      if (columns.has(i.source_column_id)) {
+        writes.push(softDelete(ctx, "mapping_input", i));
+        continue;
+      }
+      columns.add(i.source_column_id);
+      if (i.mapping_id !== target.id || i.sort_order !== order) {
+        writes.push({ kind: "update", table: "mapping_input", before: i, row: nextVersion(ctx, i, { mapping_id: target.id, sort_order: order }) });
+      }
+      order++;
+    }
+  }
+  const shape = checkMappingShape(row.kind, row.rule_expression, columns.size);
+  if (shape) return fail(shape);
+  writes.push(...others.map((m) => softDelete(ctx, "mapping", m)));
+  return done(ctx, access, { mapping: row }, writes);
 }

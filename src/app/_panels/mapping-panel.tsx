@@ -4,15 +4,18 @@
 // (order, add, remove; a click on an input puts its column into the rule), how the value is carried (kind), the rule,
 // status with four-eyes (AD-06), note, other sources of the attribute, delete. A second input turns the mapping
 // into a transformation and is saved only together with a rule. Changing an approved mapping's inputs, kind or rule
-// sends it back to review (D-51); the server says so and the panel shows it.
+// sends it back to review (D-51); the server says so and the panel shows it. Slice 1b: “Split into separate
+// mappings” and “Merge mappings” with the attribute's other mappings, which needs a rule (D-49).
 
-import { useContext, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import {
   addMappingInputAction,
   deleteMappingAction,
+  mergeMappingsAction,
   removeMappingInputAction,
   reorderMappingInputsAction,
   setMappingStatusAction,
+  splitMappingAction,
   updateMappingAction,
 } from "@/app/_actions/mapping";
 import { useAction } from "@/app/_components/use-action";
@@ -24,8 +27,9 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, ConfirmDelete, Field, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
+import { usePanels } from "./panels-context";
 import { columnLabel, columnOptions, inputsLabel, typeCheckOf } from "./model-index";
 
 const KINDS = [
@@ -55,6 +59,63 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   const [pending, setPending] = useState<Uuid | null>(null);
   /** Transformation chosen, but no rule written yet. */
   const [wantsRule, setWantsRule] = useState(false);
+
+  // “Add to mapping …” from the canvas or the column panel (D-48): the column waits here for its rule.
+  const { pendingInput, clearPendingInput } = p;
+  useEffect(() => {
+    if (pendingInput?.mappingId !== m.id) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- takes over a request made outside the panel
+    setPending(pendingInput.columnId);
+    clearPendingInput();
+    setTimeout(() => rule.current?.focus(), 0);
+  }, [pendingInput, clearPendingInput, m.id]);
+
+  /** “Merge mappings”: open, and the other mappings ticked to go into this one. */
+  const [merging, setMerging] = useState<Set<Uuid> | null>(null);
+  const mergeRule = useRef<HTMLTextAreaElement>(null);
+  const { mergeFocus, setMergeFocus } = usePanels();
+  useEffect(() => {
+    if (mergeFocus !== m.id) return;
+    setMergeFocus(null);
+    if (!p.editable) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- takes over a request made in the toolbox
+    setMerging(new Set());
+  }, [mergeFocus, setMergeFocus, m.id, p.editable]);
+
+  async function split() {
+    await run(
+      () => splitMappingAction(p.workspaceId, ref),
+      (v) => v.notice ?? `Split into ${v.mappings} separate mappings.`,
+    );
+  }
+
+  async function merge() {
+    if (!merging?.size) return;
+    const chosen = others.filter((o) => merging.has(o.id));
+    const result = await run(
+      () =>
+        mergeMappingsAction(p.workspaceId, {
+          mappings: [ref, ...chosen.map((o) => ({ mappingId: o.id, expectedVersion: o.version }))],
+          ruleExpression: mergeRule.current?.value ?? "",
+        }),
+      `Merged ${chosen.length + 1} mappings into one transformation.`,
+    );
+    if (result.ok) setMerging(null);
+  }
+
+  // “Edit transformation rule…” in the toolbox: a direct copy becomes a transformation waiting for its rule.
+  const { ruleFocus, setRuleFocus } = usePanels();
+  useEffect(() => {
+    if (ruleFocus !== m.id) return;
+    setRuleFocus(null);
+    if (!p.editable) return;
+    if (m.kind === "transform") setTimeout(() => rule.current?.focus(), 0);
+    else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- takes over a request made in the toolbox
+      setWantsRule(true);
+      setTimeout(() => rule.current?.focus(), 0);
+    }
+  }, [ruleFocus, setRuleFocus, m.id, m.kind, p.editable]);
 
   const kind: MappingKind = pending || wantsRule ? "transform" : m.kind;
   const ruleOpen = p.editable && kind === "transform";
@@ -129,7 +190,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   }
 
   async function remove() {
-    const result = await run(() => deleteMappingAction(p.workspaceId, ref), "Mapping deleted");
+    const result = await run(() => deleteMappingAction(p.workspaceId, ref), "Mapping deleted", { undoable: true });
     if (result.ok) ui.select(null);
   }
 
@@ -309,9 +370,65 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
         </Fold>
       )}
 
+      {merging && (
+        <Fold title="Merge mappings" count={others.length}>
+          <p className="mb-1.5 text-im-ink-3">Tick the mappings to combine with this one. Their inputs follow this mapping’s, in this order.</p>
+          <List testId="list-merge-mappings">
+            {others.map((o) => (
+              <label key={o.id} className="flex cursor-pointer items-center gap-2 rounded-md px-2 py-1 hover:bg-im-hover">
+                <input
+                  type="checkbox"
+                  checked={merging.has(o.id)}
+                  data-testid="check-merge-mapping"
+                  onChange={(e) => {
+                    const next = new Set(merging);
+                    if (e.target.checked) next.add(o.id);
+                    else next.delete(o.id);
+                    setMerging(next);
+                  }}
+                />
+                <span className="min-w-0 flex-1 truncate font-mono text-xs">{inputsLabel(ix, o.id)}</span>
+                <span className="text-[11.5px] text-im-ink-3">{STATUS_LABEL[o.status]}</span>
+              </label>
+            ))}
+          </List>
+          <Field label="Transformation rule of the merged mapping" htmlFor="f-merge-rule">
+            <textarea
+              ref={mergeRule}
+              id="f-merge-rule"
+              defaultValue={m.rule_expression ?? ""}
+              placeholder="e.g. COALESCE(crm_email, web_email)"
+              data-testid="input-merge-rule"
+              className={`${inputClass} min-h-[60px] resize-y font-mono text-xs`}
+            />
+          </Field>
+          <Note warn>The merged mapping is a transformation and goes to review; it needs a rule.</Note>
+          <div className="mt-2 flex gap-2">
+            <button type="button" className={buttonClass} disabled={!merging.size} onClick={() => void merge()} data-testid="button-merge">
+              Merge
+            </button>
+            <button type="button" className={buttonClass} onClick={() => setMerging(null)}>
+              Cancel
+            </button>
+          </div>
+        </Fold>
+      )}
+
       {p.editable && (
         <Actions>
-          <ConfirmDelete label="Delete mapping" onConfirm={() => void remove()} testId="button-delete-mapping" />
+          {inputs.length > 1 && (
+            <button type="button" className={buttonClass} onClick={() => void split()} data-testid="button-split-mapping">
+              Split into separate mappings
+            </button>
+          )}
+          {others.length > 0 && !merging && (
+            <button type="button" className={buttonClass} onClick={() => setMerging(new Set())} data-testid="button-merge-mappings">
+              Merge mappings…
+            </button>
+          )}
+          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-mapping">
+            Delete mapping
+          </button>
         </Actions>
       )}
     </div>

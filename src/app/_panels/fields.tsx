@@ -221,7 +221,8 @@ export function GroupedSelect({
 }
 
 /**
- * A delete button that asks for a second click (until undo arrives in slice 1b): the first click turns it into
+ * A delete button that asks for a second click (slice 1b keeps it for an attribute with mappings and a table with
+ * columns; other deletes go at once with Undo in the toast): the first click turns it into
  * “Click again to delete”, with what goes along; it turns back after a few seconds or when the focus leaves.
  */
 export function ConfirmDelete({ label, also, onConfirm, testId }: { label: string; also?: string; onConfirm: () => void; testId?: string }) {

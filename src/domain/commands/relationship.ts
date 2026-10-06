@@ -1,12 +1,54 @@
-// Relationship commands in the right panel: label, cardinality on both ends, swap direction, delete.
-// Drawing new relationships on the canvas is slice 1b (AD-30).
+// Relationship commands: create (the relate button on an entity card, slice 1b), and in the right panel label,
+// cardinality on both ends, swap direction, delete.
 
 import { z } from "zod";
-import { fail, nextVersion, type CommandContext, type CommandResult } from "../changes";
+import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult } from "../changes";
+import { domainError } from "../errors";
 import type { WorkspaceAccess } from "../permissions";
-import { CARDINALITY_MAX, type Relationship } from "../types";
+import { CARDINALITY_MAX, type Entity, type Relationship } from "../types";
 import { optionalTextSchema, uuidSchema, versionSchema } from "../validation";
-import { begin, current, done, nothingToChange, softDelete } from "./shared";
+import { begin, current, done, found, nothingToChange, softDelete } from "./shared";
+
+// ---- create ----
+
+const createRelationshipInput = z.object({ fromEntityId: uuidSchema, toEntityId: uuidSchema }).strict();
+export type CreateRelationshipInput = z.input<typeof createRelationshipInput>;
+
+/**
+ * A relationship between two different entities with the prototype's default ends, 1 to 0..n, and no label yet;
+ * the panel then sets the label and the cardinality.
+ */
+export function createRelationship(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: { from: Entity | null; to: Entity | null },
+  input: unknown,
+): CommandResult<{ relationship: Relationship }> {
+  const parsed = begin(access, "model.edit", createRelationshipInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { fromEntityId, toEntityId } = parsed.data;
+  if (fromEntityId === toEntityId) return fail(domainError("invalid", "Pick a different entity to relate to."));
+  const from = found(state.from, access, fromEntityId, "entity");
+  if (!from.ok) return fail(from.error);
+  const to = found(state.to, access, toEntityId, "entity");
+  if (!to.ok) return fail(to.error);
+
+  const relationship: Relationship = {
+    ...newRowColumns(ctx),
+    workspace_id: access.workspace.id,
+    from_entity_id: fromEntityId,
+    to_entity_id: toEntityId,
+    label: null,
+    from_min: 1,
+    from_max: "1",
+    to_min: 0,
+    to_max: "n",
+    description: null,
+  };
+  return done(ctx, access, { relationship }, [{ kind: "insert", table: "relationship", row: relationship }]);
+}
+
+// ---- edit ----
 
 const ref = { relationshipId: uuidSchema, expectedVersion: versionSchema };
 const min = z.union([z.literal(0), z.literal(1)]);

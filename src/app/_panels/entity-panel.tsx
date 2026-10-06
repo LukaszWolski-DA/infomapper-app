@@ -1,7 +1,8 @@
 "use client";
 
 // The entity panel (prototype insEntity): name (focused right after “+”, D-46), stereotype, concept, definition
-// (plain text, AD-30), attributes with their sources and “Add attribute”, feeding sources, relationships,
+// (plain text, AD-30), attributes with their sources and “Add attribute”, feeding sources (placed beside the card,
+// “Add the N missing to this canvas”, B-08), relationships,
 // “Remove from this canvas” and “Delete from model…” with the impact dialog (D-47).
 
 import { useContext, useEffect, useRef, useState } from "react";
@@ -15,6 +16,7 @@ import { useToast } from "@/ui/components/toast";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
 import { Actions, buttonClass, dangerClass, Field, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextArea, TextField } from "./fields";
 import { usePanel } from "./inspector";
+import { useMoveAttribute } from "./move-attribute";
 import { feedingSources, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
 
@@ -22,6 +24,9 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uuid }) {
   const p = usePanel();
+  const move = useMoveAttribute(p.ix, p.workspaceId);
+  /** Dragging in the attribute list: which attribute, and where it would go. */
+  const [order, setOrder] = useState<{ dragging: string | null; over: { id: string; after: boolean } | null }>({ dragging: null, over: null });
   const ui = useContext(CanvasUiCtx);
   const { run } = useAction();
   const toast = useToast();
@@ -31,6 +36,8 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   const ix = p.ix;
   const attributes = ix.attributesOf.get(e.id) ?? [];
   const feeds = feedingSources(ix, e.id);
+  /** Feeding sources not on this canvas, to place on the left of the card (B-08). */
+  const missing = feeds.filter((f) => !p.cardOf(f.table.id)).map((f) => ({ target: { sourceTableId: f.table.id }, rows: (ix.columnsOf.get(f.table.id) ?? []).length }));
   const relationships = ix.model.relationships.filter((r) => r.from_entity_id === e.id || r.to_entity_id === e.id);
 
   useEffect(() => {
@@ -116,20 +123,58 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
             text={(a) => `${a.name} ${(ix.mappingsOf.get(a.id) ?? []).map((m) => inputsLabel(ix, m.id)).join(" ")}`}
             render={(a) => {
               const ms = ix.mappingsOf.get(a.id) ?? [];
+              const meta = ms.length ? (
+                <span className="font-mono text-xs">{ms.map((m) => inputsLabel(ix, m.id)).join(", ")}</span>
+              ) : (
+                <span className="italic">unmapped</span>
+              );
+              if (!p.editable) {
+                return (
+                  <Li key={a.id} onClick={() => p.goAttribute(a.id)} meta={meta}>
+                    {a.name}
+                  </Li>
+                );
+              }
+              // Drag to reorder (D-36, prototype .li.ord): the line above or below shows where it goes.
+              const hint = order.over?.id === a.id ? (order.over.after ? "shadow-[inset_0_-2px_0_var(--im-logical)]" : "shadow-[inset_0_2px_0_var(--im-logical)]") : "";
               return (
-                <Li
+                <div
                   key={a.id}
+                  draggable
+                  data-testid="attribute-order-item"
+                  data-attribute={a.id}
+                  className={`flex w-full cursor-grab items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-im-hover ${hint} ${order.dragging === a.id ? "text-im-ink-3" : ""}`}
                   onClick={() => p.goAttribute(a.id)}
-                  meta={
-                    ms.length ? (
-                      <span className="font-mono text-xs">{ms.map((m) => inputsLabel(ix, m.id)).join(", ")}</span>
-                    ) : (
-                      <span className="italic">unmapped</span>
-                    )
-                  }
+                  onDragStart={(e) => {
+                    e.dataTransfer.effectAllowed = "move";
+                    e.dataTransfer.setData("text/plain", `attrorder:${a.id}`);
+                    setOrder({ dragging: a.id, over: null });
+                  }}
+                  onDragOver={(e) => {
+                    if (!order.dragging) return;
+                    e.preventDefault();
+                    const r = e.currentTarget.getBoundingClientRect();
+                    const after = e.clientY >= r.top + r.height / 2;
+                    if (order.over?.id !== a.id || order.over.after !== after) setOrder({ dragging: order.dragging, over: { id: a.id, after } });
+                  }}
+                  onDrop={(e) => {
+                    e.preventDefault();
+                    const from = attributes.findIndex((x) => x.id === order.dragging);
+                    const target = attributes.findIndex((x) => x.id === a.id);
+                    let to = order.over?.after ? target + 1 : target;
+                    if (from < to) to--;
+                    const id = order.dragging;
+                    setOrder({ dragging: null, over: null });
+                    if (id && from >= 0) void move(id, to);
+                  }}
+                  onDragEnd={() => setOrder({ dragging: null, over: null })}
                 >
-                  {a.name}
-                </Li>
+                  <span className="w-3 flex-none text-[11px] tracking-[-2px] text-im-ink-3" aria-hidden>
+                    ⋮⋮
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{a.name}</span>
+                  <span className="whitespace-nowrap text-[11.5px] text-im-ink-3">{meta}</span>
+                </div>
               );
             }}
           />
@@ -156,8 +201,12 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
               return (
                 <Li
                   key={table.id}
-                  title={here ? "On this canvas. Click to show it." : "Click to place it on the canvas."}
-                  onClick={() => (here ? (ui.select({ t: "card", id: here }), ui.centerOn(here)) : ui.place({ sourceTableId: table.id }, (ix.columnsOf.get(table.id) ?? []).length))}
+                  title={here ? "On this canvas. Click to show it." : "Click to place it next to this card."}
+                  onClick={() =>
+                    here
+                      ? (ui.select({ t: "card", id: here }), ui.centerOn(here))
+                      : ui.placeBeside([{ target: { sourceTableId: table.id }, rows: (ix.columnsOf.get(table.id) ?? []).length }], cardId, "left")
+                  }
                   meta={`${ix.systemName.get(table.source_system_id) ?? ""}, ${mappings} mapping${mappings === 1 ? "" : "s"}`}
                 >
                   <span className="flex items-center gap-2">
@@ -170,6 +219,13 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
           />
         ) : (
           <Hint>No source table maps into this entity yet.</Hint>
+        )}
+        {p.editable && missing.length > 0 && (
+          <div className="mt-2 flex gap-2">
+            <button type="button" className={smallButtonClass} onClick={() => ui.placeBeside(missing, cardId, "left")} data-testid="button-feed-all">
+              {missing.length === feeds.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}
+            </button>
+          </div>
         )}
       </Fold>
 

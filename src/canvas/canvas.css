@@ -93,7 +93,7 @@
 .im-canvas .overview-svg .ms { fill: var(--im-physical); fill-opacity: .5; stroke: none }
 .im-canvas .overview-svg .mm { stroke: var(--im-map); stroke-opacity: .55; stroke-width: 1; vector-effect: non-scaling-stroke }
 .im-canvas .overview-svg .mr { stroke: var(--im-rel); stroke-opacity: .7; stroke-width: 1; vector-effect: non-scaling-stroke }
-.im-canvas .overview-svg .mv { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab }
+.im-canvas .overview-view .mv { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab }
 @media (max-width: 600px) {
   .im-canvas .overview { width: 160px }
   .im-canvas .overview-svg, .im-canvas .overview-view { width: 160px; height: 104px }
@@ -143,3 +143,36 @@
 .im-canvas .src .row.sel { background: var(--im-physical-soft); box-shadow: inset 3px 0 var(--im-physical) }
 .im-canvas .react-flow__node.draggable .c-head { cursor: move }
 .im-canvas .react-flow__node.dragging .card { box-shadow: 0 0 0 1px var(--im-line), 0 18px 36px -14px var(--im-shadow) }
+
+/* ---------- mapping by drag (slice 1b, D-48; prototype .tmp, .row.drop, .card.drop, body.connecting) ---------- */
+.im-canvas .draft-layer .tmp { fill: none; stroke: var(--im-ink-2); stroke-width: 1.6; stroke-dasharray: 4 4 }
+body.connecting .im-canvas .row { cursor: crosshair }
+.im-canvas .row.drop { background: var(--im-map-soft); box-shadow: inset 0 0 0 1.5px var(--im-map) }
+.im-canvas .card.drop { box-shadow: 0 0 0 2px var(--im-map), 0 10px 24px -12px var(--im-shadow) }
+
+/* ---------- canvas tools (slice 1b; prototype .tool-entity, body.relating) ---------- */
+.im-canvas.tool-entity, .im-canvas.tool-entity * { cursor: copy !important }
+.im-canvas.relating .card.ent, .im-canvas.relating .card.ent .c-head { cursor: crosshair }
+.im-canvas.relating .card.ent:hover { box-shadow: 0 0 0 2px var(--im-rel) }
+
+/* ---------- card width (slice 1b, D-37, C-09; prototype .c-rs) ---------- */
+.im-canvas .c-rs { position: absolute; top: 0; bottom: 0; right: -4px; width: 8px; cursor: ew-resize; z-index: 3 }
+.im-canvas .c-rs::after { content: ""; position: absolute; top: 50%; right: 3px; width: 3px; height: 28px; margin-top: -14px; border-radius: 2px; background: var(--im-line); visibility: hidden }
+.im-canvas .card:hover .c-rs::after, .im-canvas .c-rs:hover::after { visibility: visible }
+/* While a card is resized, Chrome repaints that card instead of re-rastering the whole layer (spike follow-up, C-09). */
+.im-canvas.resizing .react-flow__viewport { will-change: auto }
+.im-canvas.resizing, .im-canvas.resizing * { cursor: ew-resize !important }
+
+/* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */
+/* One overlay above the cards; the cards are not restyled. Fill opacity on a handful of overlay shapes only. */
+.im-canvas .hover-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
+.im-canvas .hover-layer .hl { fill: var(--im-map); fill-opacity: .12 }
+.im-canvas .hover-layer .hnd { fill: var(--im-surface); stroke: var(--im-map); stroke-width: 1.5 }
+.im-canvas .hover-layer .resize-outline { fill: none; stroke: var(--im-logical); stroke-width: 1.5; stroke-dasharray: 5 4; vector-effect: non-scaling-stroke }
+.im-canvas .hover-layer .moved { fill: var(--im-logical); animation: im-moved .6s ease-out forwards }
+@keyframes im-moved { from { fill-opacity: .22 } to { fill-opacity: 0 } }
+
+/* Hover (C-10): the hovered lines drawn again, a little stronger, above the others; nothing is restyled. */
+.im-canvas .hover-lines .lnk { pointer-events: none }
+.im-canvas .hover-lines .lnk .hit { display: none }
+.im-canvas .hover-lines .lnk .s { stroke-width: 2.4 }

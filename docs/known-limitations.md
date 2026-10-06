@@ -30,6 +30,25 @@ initial render.
 - **Supabase slice:** measure S1A-14 again in a production build (`npm run build`, `npm start`) with the same method
   (`MEASURE=1`, headed Chrome, same laptop), and decide on the card design (fewer elements per row, or detail by zoom
   level between 40% and 100%) if 100% still misses the bar.
+- **Slice 1b** adds two more that are only partly met on the development laptop (S1B-09, S1B-10): card resize (C-09)
+  runs at 31–36 fps with an outline while dragging (bar: 45 fps), and the hover highlight (C-10) takes about 190 ms
+  (bar: 100 ms). A veil over the lines and a block view while resizing were tried and did not help: every change
+  repaints the canvas's one large GPU layer. Recorded as “partly met”, as Łukasz decided.
+- **Supabase slice:** measure S1A-14, C-09 and C-10 in a production build, if possible also on a second, newer
+  machine. If production misses the bars, the next step is drawing the mapping lines on an HTML canvas instead of SVG
+  (the lines are already drawn by one component, `src/canvas/LineLayer.tsx`, so the change stays inside it).
+
+## Undo history (slice 1b)
+
+### The undo history lives in server memory
+
+Each person's undo history in a workspace (the last 50 steps, slice 1b PRD item 12) is kept in the
+memory of the server process, as the PRD asks for now. It is lost when the server restarts (and, in development, when
+the demo data is replaced: steps whose change group is no longer in the change log are left out).
+
+- **Accepted** for the local adapter: one development server, one user at a time in practice.
+- **Supabase slice:** decide whether the history must survive a restart (and several server instances). If it must,
+  keep it in the database next to `change_event`.
 
 ## Right panel (slice 1a)
 

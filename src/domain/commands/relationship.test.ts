@@ -1,6 +1,34 @@
 import { describe, expect, it } from "vitest";
-import { access, archived, ids, makeCtx, NOW, relationship } from "../__fixtures__/domain";
-import { deleteRelationship, swapRelationship, updateRelationship } from "./relationship";
+import { access, archived, entity, ids, makeCtx, NOW, relationship } from "../__fixtures__/domain";
+import { createRelationship, deleteRelationship, swapRelationship, updateRelationship } from "./relationship";
+
+describe("createRelationship (relate button on an entity card, slice 1b)", () => {
+  const ends = { from: entity(ids.customer), to: entity(ids.salesOrder) };
+  const input = { fromEntityId: ids.customer, toEntityId: ids.salesOrder };
+
+  it("creates a relationship with the default ends 1 to 0..n and no label", () => {
+    const r = createRelationship(makeCtx(), access("modeler"), ends, input);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value.relationship).toMatchObject({
+      from_entity_id: ids.customer, to_entity_id: ids.salesOrder, label: null, from_min: 1, from_max: "1", to_min: 0, to_max: "n", version: 1, deleted_at: null,
+    });
+    expect(r.writeSet.writes).toMatchObject([{ kind: "insert", table: "relationship" }]);
+    expect(r.writeSet.events).toMatchObject([{ operation: "create", object_type: "relationship" }]);
+  });
+
+  it("refuses relating an entity to itself, and unknown or deleted entities", () => {
+    expect(createRelationship(makeCtx(), access("owner"), ends, { fromEntityId: ids.customer, toEntityId: ids.customer })).toMatchObject({
+      ok: false, error: { code: "invalid", message: "Pick a different entity to relate to." },
+    });
+    expect(createRelationship(makeCtx(), access("owner"), { ...ends, to: null }, input)).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(createRelationship(makeCtx(), access("owner"), { ...ends, from: entity(ids.customer, { deleted_at: NOW }) }, input)).toMatchObject({ ok: false, error: { code: "not_found" } });
+  });
+
+  it("is refused to reviewers and in an archived workspace", () => {
+    expect(createRelationship(makeCtx(), access("reviewer"), ends, input)).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(createRelationship(makeCtx(), access("owner", archived), ends, input)).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
 
 const ref = { relationshipId: ids.relPlaces, expectedVersion: 1 };
 const state = { relationship: relationship() };

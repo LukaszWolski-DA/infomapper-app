@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
-import { CanvasUiCtx, type CanvasHandle, type CanvasUiApi, type Notation } from "./context";
+import { CanvasUiCtx, type CanvasHandle, type CanvasHost, type CanvasMode, type CanvasUiApi, type Notation, type UndoHooks } from "./context";
 import type { Selection } from "./line-data";
 
 const OVERVIEW_KEY = "infomapper:overview";
@@ -34,6 +34,16 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
   const [notation, setNotationState] = useState<Notation>("ie");
   const [selection, select] = useState<Selection>(null);
   const handle = useRef<CanvasHandle | null>(null);
+  const host = useRef<CanvasHost | null>(null);
+  const undo = useRef<UndoHooks | null>(null);
+  const [mode, setMode] = useState<CanvasMode>(null);
+  const [flash, setFlash] = useState<{ rowId: string; n: number } | null>(null);
+  const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const flashRow = useCallback((rowId: string) => {
+    if (flashTimer.current) clearTimeout(flashTimer.current);
+    setFlash((f) => ({ rowId, n: (f?.n ?? 0) + 1 }));
+    flashTimer.current = setTimeout(() => setFlash(null), 700);
+  }, []);
 
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after mount: localStorage is not available on the server
@@ -69,8 +79,26 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       registerCanvas: (h) => {
         handle.current = h;
       },
+      placeAt: (target, rows, at) => handle.current?.placeAt(target, rows, at),
+      setCardView: (cardId, view) => handle.current?.setCardView(cardId, view),
+      fitWidth: (cardId) => handle.current?.fitWidth(cardId),
+      placeBeside: (cards, anchorCardId, side) => handle.current?.placeBeside(cards, anchorCardId, side),
+      settled: () => handle.current?.settled() ?? Promise.resolve(),
+      cardView: (cardId) => handle.current?.cardView(cardId) ?? null,
+      flash,
+      flashRow,
+      mode,
+      setMode,
+      host: () => host.current,
+      registerHost: (h) => {
+        host.current = h;
+      },
+      undo: () => undo.current,
+      registerUndo: (u) => {
+        undo.current = u;
+      },
     }),
-    [overviewOpen, toggleOverview, notation, setNotation, selection],
+    [overviewOpen, toggleOverview, notation, setNotation, selection, mode, flash, flashRow],
   );
 
   return (

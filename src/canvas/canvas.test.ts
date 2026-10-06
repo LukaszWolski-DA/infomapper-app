@@ -15,7 +15,7 @@ import {
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
 import { buildCards, visibleRows, type CardData } from "./card-data";
-import { cardHeight, contentBounds, fitViewport, freeSpot, newCardHeight, stackSpot, zoomAround } from "./geometry";
+import { besideSpots, cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, newCardHeight, stackSpot, zoomAround } from "./geometry";
 import { splitName } from "./names";
 
 // Customer (customer_id, email) and CRM customers (cust_id, email, first_name):
@@ -182,8 +182,39 @@ describe("placing new cards (prototype placeNear, createEntity)", () => {
     expect(spot.x % 8 + spot.y % 8).toBe(0);
   });
 
+  it("places feeding sources left of a card and fed entities right of it, without overlaps (B-08)", () => {
+    const anchor = { x: 1000, y: 200, w: 256, h: 300 };
+    const inTheWay = { x: 584, y: 180, w: 256, h: 200 };
+    const spots = besideSpots(anchor, "left", [150, 150, 150], [anchor, inTheWay]);
+    expect(spots.every((s) => s.x === 1000 - 256 - 160)).toBe(true);
+    const boxes = [anchor, inTheWay, ...spots.map((s) => ({ ...s, w: 256, h: 150 }))];
+    for (const [i, a] of boxes.entries()) {
+      for (const b of boxes.slice(i + 1)) expect(a.x + a.w <= b.x || b.x + b.w <= a.x || a.y + a.h <= b.y || b.y + b.h <= a.y).toBe(true);
+    }
+    expect(spots[0]!.y).toBeGreaterThanOrEqual(180 + 200 + 24);
+    expect(besideSpots(anchor, "right", [150], [anchor])).toEqual([{ x: 1000 + 256 + 160, y: 200 }]);
+  });
+
   it("sizes a new card by its rows", () => {
     expect(newCardHeight(0)).toBe(54 + 12 + 26);
     expect(newCardHeight(3)).toBe(54 + 12 + 78);
+  });
+});
+
+describe("auto-scroll while dragging (edgePush)", () => {
+  const box = { left: 100, top: 50, right: 900, bottom: 650 };
+
+  it("does nothing away from the edges", () => {
+    expect(edgePush({ x: 500, y: 300 }, box)).toEqual({ x: 0, y: 0 });
+    expect(edgePush({ x: 156, y: 106 }, box)).toEqual({ x: 0, y: 0 });
+  });
+
+  it("moves the content in from the side the pointer is near, faster closer to the edge", () => {
+    expect(edgePush({ x: 100, y: 300 }, box)).toEqual({ x: EDGE_SPEED, y: 0 });
+    expect(edgePush({ x: 900, y: 650 }, box)).toEqual({ x: -EDGE_SPEED, y: -EDGE_SPEED });
+    const near = edgePush({ x: 128, y: 300 }, box).x;
+    expect(near).toBeGreaterThan(0);
+    expect(near).toBeLessThan(EDGE_SPEED);
+    expect(edgePush({ x: 80, y: 300 }, box).x).toBeGreaterThan(EDGE_SPEED);
   });
 });

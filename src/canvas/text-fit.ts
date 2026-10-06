@@ -3,7 +3,7 @@
 // cards had none). So only text that may not fit gets the clip and the ellipsis; the rest is drawn without one.
 // The estimate errs on the side of clipping: a wide glyph counts wide, and the other parts of the row count in full.
 
-import { CARD_W } from "./geometry";
+import { CARD_W, CARD_W_MAX, CARD_W_MIN } from "./geometry";
 
 /** Width estimate of IBM Plex Sans at `px`, per character, rounded up (wide letters, capitals and digits count more). */
 function sansWidth(text: string, px: number): number {
@@ -54,7 +54,22 @@ export function titleNeedsClip(name: string, kind: "ent" | "src", coverage: stri
 
 /** Whether a card's first line (stereotype and concept, or the source path) may not fit beside the card tools. */
 export function lineNeedsClip(parts: string[], kind: "ent" | "src", width: number = CARD_W): boolean {
-  const tools = 64 + 20 + 1; // filter button with its longest label, collapse button
+  // filter button with its longest label, collapse button, and on entities the relate button (slice 1b)
+  const tools = 64 + 20 + 1 + (kind === "ent" ? 21 : 0);
   const text = kind === "src" ? monoWidth(parts.join(""), 11) : parts.reduce((w, p) => w + sansWidth(p, 11), 0) + 6 * (parts.length - 1);
   return text > width - 14 - 8 - 6 - tools - SAFETY;
+}
+
+/**
+ * “Fit width to names” (D-37, prototype fitWidths): the narrowest width, in steps of 8 between 200 and 600 px, at which
+ * no row name and not the title needs clipping. null when that is the default width (nothing to store).
+ */
+export function fitWidth(card: { kind: "ent" | "src"; name: string; coverage: string; rows: readonly RowText[] }): number | null {
+  const dual = card.rows.some((r) => r.pk && r.fk);
+  for (let w = CARD_W_MIN; w <= CARD_W_MAX; w += 8) {
+    if (titleNeedsClip(card.name, card.kind, card.coverage, w)) continue;
+    if (card.rows.some((r) => rowNeedsClip(r, card.kind, dual, w))) continue;
+    return w === CARD_W ? null : w;
+  }
+  return CARD_W_MAX;
 }

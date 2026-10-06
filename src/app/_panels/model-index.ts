@@ -4,7 +4,7 @@
 
 import type { Uuid } from "@/domain/ids";
 import { suggestsBusinessKey } from "@/domain/model/mapping-rules";
-import { checkMappingTypes, formatColumnType, type MappingTypeCheck } from "@/domain/model/type-check";
+import { checkMappingTypes, formatAttributeType, formatColumnType, type MappingTypeCheck } from "@/domain/model/type-check";
 import type { Attribute, Entity, Mapping, MappingInput, SourceColumn, SourceTable, WorkspaceModel } from "@/domain/types";
 
 export interface ModelIndex {
@@ -116,6 +116,17 @@ export function columnOptions(ix: ModelIndex, tablesHere: ReadonlySet<Uuid>, exc
     .filter((g) => g.columns.length > 0);
 }
 
+/** Attributes to pick from (“Map to an attribute” in the column panel): grouped by entity, entities on this canvas first (prototype attrOptions). */
+export function attributeOptions(ix: ModelIndex, entitiesHere: ReadonlySet<Uuid>): ColumnGroup[] {
+  const entities = [...ix.model.entities].sort((a, b) => Number(entitiesHere.has(b.id)) - Number(entitiesHere.has(a.id)));
+  return entities
+    .map((e) => ({
+      label: `${e.name}${entitiesHere.has(e.id) ? "" : " (not on canvas)"}`,
+      columns: (ix.attributesOf.get(e.id) ?? []).map((a) => ({ id: a.id, label: `${a.name}  ${formatAttributeType(a)}` })),
+    }))
+    .filter((g) => g.columns.length > 0);
+}
+
 /** Mappings that read a column (one of their inputs), in model order. */
 export function mappingsOfColumn(ix: ModelIndex, columnId: Uuid): Mapping[] {
   return ix.model.mappings.filter((m) => (ix.inputsOf.get(m.id) ?? []).some((i) => i.source_column_id === columnId));
@@ -134,4 +145,11 @@ export function fedEntities(ix: ModelIndex, tableId: Uuid): { entity: Entity; ma
     .map(([id, mappings]) => ({ entity: ix.entity.get(id)!, mappings }))
     .filter((f) => !!f.entity)
     .sort((a, b) => b.mappings - a.mappings || a.entity.name.localeCompare(b.entity.name));
+}
+
+/** Where a move takes an attribute (0 = top), or null when it is already there. */
+export function targetPosition(from: number, count: number, how: "up" | "down" | "top" | "bottom" | number): number | null {
+  const to = typeof how === "number" ? how : how === "top" ? 0 : how === "bottom" ? count - 1 : how === "up" ? from - 1 : from + 1;
+  const clamped = Math.max(0, Math.min(count - 1, to));
+  return from < 0 || clamped === from ? null : clamped;
 }

@@ -100,7 +100,7 @@ export function buildLines(model: WorkspaceModel, cards: readonly CardData[]): C
   return { mappings, relationships };
 }
 
-/** What is selected on the canvas. Hover highlight is slice 1b. */
+/** What is selected on the canvas; a hovered row or line uses the same shape (slice 1b, C-10). */
 export type Selection =
   | { t: "card"; id: Uuid }
   | { t: "row"; cardId: Uuid; id: Uuid }
@@ -134,4 +134,19 @@ export function relatedLines(sel: Selection, lines: CanvasLines): Related | null
       break;
   }
   return { maps, rels };
+}
+
+/** The rows a hover marks: the hovered row and the rows at the other end of its mappings, or a mapping's rows. */
+export function hoverRows(hover: Selection, lines: CanvasLines): { cardId: string; rowId: string }[] {
+  if (!hover || (hover.t !== "row" && hover.t !== "map")) return [];
+  const out = new Map<string, { cardId: string; rowId: string }>();
+  const add = (cardId: string, rowId: string) => out.set(`${cardId}|${rowId}`, { cardId, rowId });
+  if (hover.t === "row") add(hover.cardId, hover.id);
+  for (const m of lines.mappings) {
+    const hit = hover.t === "map" ? m.id === hover.id : m.attributeId === hover.id || m.inputs.some((i) => i.columnId === hover.id);
+    if (!hit) continue;
+    add(m.cardId, m.attributeId);
+    for (const i of m.inputs) add(i.cardId, i.columnId);
+  }
+  return [...out.values()];
 }

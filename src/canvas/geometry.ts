@@ -5,6 +5,9 @@ import { visibleRows, type CardData } from "./card-data";
 
 /** Default card width (D-37), header height, row height and body padding: prototype W, H, R, PAD. */
 export const CARD_W = 256;
+/** A card can be made 200–600 px wide, in steps of 8 (D-37, C-09). */
+export const CARD_W_MIN = 200;
+export const CARD_W_MAX = 600;
 export const HEAD_H = 54;
 export const ROW_H = 26;
 export const BODY_PAD = 6;
@@ -113,6 +116,27 @@ export function freeSpot(view: Rect, occupied: readonly Rect[], h = NEW_CARD_H, 
     }
   }
   return { x: snap8(cx), y: snap8(cy) };
+}
+
+/** Gap between a card and the cards placed beside it (prototype placeNear). */
+export const BESIDE_GAP = 160;
+
+/**
+ * Where feeding sources (left) or fed entities (right) land next to a card (prototype placeNear, B-08): a column
+ * 160 px beside it, from its top down, each card moved down until it covers no other card, 32 px apart.
+ */
+export function besideSpots(anchor: Rect, side: "left" | "right", heights: readonly number[], occupied: readonly Rect[], w = CARD_W): Pt[] {
+  const x = snap8(side === "left" ? anchor.x - w - BESIDE_GAP : anchor.x + anchor.w + BESIDE_GAP);
+  const taken = [...occupied];
+  const spots: Pt[] = [];
+  let y = snap8(anchor.y);
+  for (const h of heights) {
+    for (let n = 0; n < 600 && clashes(taken, x, y, w, h); n++) y += 16;
+    spots.push({ x, y });
+    taken.push({ x, y, w, h });
+    y = snap8(y + h + 32);
+  }
+  return spots;
 }
 
 /** Whether a box lies fully inside the view. */
@@ -230,4 +254,21 @@ export const multText = (min: 0 | 1, max: "1" | "n") => (max === "n" ? (min ? "1
 export function umlMarker(p: Pt, n: Pt): Pt {
   const t = { x: -n.y, y: n.x };
   return { x: p.x + n.x * 16 + t.x * 11, y: p.y + n.y * 16 + t.y * 11 };
+}
+
+// ---- auto-scroll while dragging (prototype autoPan) ----
+
+/** Within this distance of the canvas edge, a drag scrolls the view. */
+export const EDGE_ZONE = 56;
+/** Scroll per frame at the very edge, in screen pixels. */
+export const EDGE_SPEED = 18;
+
+/**
+ * How far to move the view this frame while dragging at screen point `pt` over the canvas `box`: towards the edge the
+ * pointer is near, faster the closer it is (and faster still beyond it). The view moves, so content slides in from
+ * that side: positive x moves the content right (the pointer is at the left edge).
+ */
+export function edgePush(pt: Pt, box: { left: number; top: number; right: number; bottom: number }): Pt {
+  const push = (d: number) => (d < EDGE_ZONE ? Math.ceil(((EDGE_ZONE - d) / EDGE_ZONE) * EDGE_SPEED) : 0);
+  return { x: push(pt.x - box.left) - push(box.right - pt.x), y: push(pt.y - box.top) - push(box.bottom - pt.y) };
 }
