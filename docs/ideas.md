@@ -27,3 +27,9 @@ from the right panel is not built; the left panel's drag onto the canvas works a
 The prototype offers “Undo” in almost every toast after a change (a new mapping, a relationship, cards placed beside
 a card). The slice 1b PRD asks for it on destructive actions only (deletes, remove from canvas), so that is what is
 built; Ctrl+Z and the top bar's Undo work for every change.
+
+## Undo and redo on the project and workspace home pages (slice 1b, acceptance)
+
+Undo and redo (the top bar's buttons and Ctrl+Z, Ctrl+Shift+Z) are only on canvas pages (assumption 8 in the slice 1b
+acceptance). Changes made on the project and workspace home pages (projects, canvases) are in the undo history too,
+but can only be undone from a canvas. Better: the same buttons and keys on those home pages as well.
