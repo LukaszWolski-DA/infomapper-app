@@ -207,12 +207,14 @@ export function ModelCanvas({
   );
   const lasso = useLasso(onLasso);
 
-  // Cards that left the canvas (removed, undone) leave the selection too.
+  // Cards that left the canvas (removed, undone) leave the selection too; checked when the set of cards changes, not on
+  // every frame of a drag.
+  const cardIds = useMemo(() => nodes.map((n) => n.id).join(","), [nodes]);
   useEffect(() => {
     if (selection?.t !== "multi") return;
     const next = fromKeys(selection.keys, boxes());
     if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
-  }, [nodes, selection, select, boxes]);
+  }, [cardIds, selection, select, boxes]);
 
   // ---- keyboard: F fits, M toggles the Overview, E the Entity tool; Esc ends a tool, else clears the selection ----
   const { toggleEntityTool, toggleHandTool } = modes;
@@ -622,11 +624,20 @@ export function ModelCanvas({
     },
     [withGroup],
   );
-  const onNodeDragStart: OnNodeDrag<CardNodeT> = useCallback((_, node) => groupDragStart(node), [groupDragStart]);
+  /** A card (or a group) is being dragged: will-change is off on the viewport meanwhile, as for a resize (AD-24). */
+  const [dragging, setDragging] = useState(false);
+  const onNodeDragStart: OnNodeDrag<CardNodeT> = useCallback(
+    (_, node) => {
+      setDragging(true);
+      groupDragStart(node);
+    },
+    [groupDragStart],
+  );
 
   /** A drag ends: save the new position (S1A-05); a refusal puts the card back. */
   const onNodeDragStop: OnNodeDrag<CardNodeT> = useCallback(
     (_, node) => {
+      setDragging(false);
       if (onGroupDragStop()) return;
       const card = node.data.card;
       const x = Math.round(node.position.x), y = Math.round(node.position.y);
@@ -651,7 +662,7 @@ export function ModelCanvas({
   return (
     <CanvasCardsCtx.Provider value={cardsApi}>
       <div
-        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${ui.mode?.kind === "hand" ? " tool-hand" : ""}${modes.panning ? " panning" : ""}${resize.resizing ? " resizing" : ""}`}
+        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${ui.mode?.kind === "hand" ? " tool-hand" : ""}${modes.panning ? " panning" : ""}${resize.resizing ? " resizing" : ""}${dragging ? " node-dragging" : ""}`}
         data-testid="area-canvas"
         data-mode={ui.mode?.kind}
         data-ready={ready || undefined}

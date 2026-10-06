@@ -167,9 +167,23 @@ export interface End {
 }
 
 /** Where a row's line starts or ends; a hidden row anchors at the middle of the header. */
+/**
+ * Where each visible row of a card is, by row id; built once per card object (a changed card is a new object), so a
+ * drag does not filter a card's rows again for every line end on every frame (slice 2a step 3b).
+ */
+const rowIndexOf = new WeakMap<object, Map<string, number>>();
+function rowIndex(card: Placed["card"], rowId: string): number {
+  let index = rowIndexOf.get(card);
+  if (!index) {
+    index = new Map(visibleRows(card).map((r, i) => [r.id, i]));
+    rowIndexOf.set(card, index);
+  }
+  return index.get(rowId) ?? -1;
+}
+
 export function rowEnd(p: Placed, rowId: string): End {
   const w = cardWidth(p.card);
-  const i = visibleRows(p.card).findIndex((r) => r.id === rowId);
+  const i = rowIndex(p.card, rowId);
   const y = i < 0 ? p.y + HEAD_H / 2 : p.y + HEAD_H + BODY_PAD + i * ROW_H + ROW_H / 2;
   return { x: p.x, w, y, cx: p.x + w / 2, hidden: i < 0 };
 }

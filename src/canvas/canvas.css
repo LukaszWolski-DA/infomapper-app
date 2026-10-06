@@ -164,6 +164,8 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .card:hover .c-rs::after, .im-canvas .c-rs:hover::after { visibility: visible }
 /* While a card is resized, Chrome repaints that card instead of re-rastering the whole layer (spike follow-up, C-09). */
 .im-canvas.resizing .react-flow__viewport { will-change: auto }
+/* While cards are dragged too (slice 2a step 3b): the moved cards and lines repaint, not the whole canvas layer. */
+.im-canvas.node-dragging .react-flow__viewport { will-change: auto }
 .im-canvas.resizing, .im-canvas.resizing * { cursor: ew-resize !important }
 
 /* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */

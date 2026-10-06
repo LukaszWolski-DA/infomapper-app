@@ -5,9 +5,10 @@
 // relationship lines between card centres, and the visible area. Clicking moves the view there; dragging the visible
 // area pans. While the view moves, the miniature stays as it is: it is drawn once per change of the cards or lines,
 // and the visible area is a second SVG on top, so moving it repaints only that small layer (S1A-14: repainting the
-// whole miniature on every frame cost a third of each frame).
+// whole miniature on every frame cost a third of each frame). While cards are dragged it keeps the cards where they
+// were and takes their new places on release, as the prototype's miniature does (slice 2a step 3b).
 
-import { memo, useContext, useMemo, useRef, useState } from "react";
+import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, useReactFlow, useStore } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx } from "./context";
@@ -19,7 +20,15 @@ const W = 216, H = 140;
 export function Overview({ lines }: { lines: CanvasLines }) {
   const ui = useContext(CanvasUiCtx);
   const rf = useReactFlow();
-  const nodes = useStore((s) => s.nodes) as CardNodeT[];
+  const current = useStore((s) => s.nodes) as CardNodeT[];
+  const dragging = current.some((n) => n.dragging);
+  /** The cards as they were before the drag that is going on, if any. */
+  const [settled, setSettled] = useState(current);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- remembers the cards between drags, for the next drag
+    if (!dragging) setSettled(current);
+  }, [current, dragging]);
+  const nodes = dragging ? settled : current;
   const [tx, ty, zoom] = useStore((s) => s.transform);
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
