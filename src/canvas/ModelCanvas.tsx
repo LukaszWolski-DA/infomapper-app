@@ -426,6 +426,10 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       fitWidth,
       placeBeside: (cards, anchorCardId, side) => void placeBeside(cards, anchorCardId, side),
       settled,
+      cardView: (id) => {
+        const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
+        return card ? { collapsed: card.collapsed, rowFilter: card.rowFilter } : null;
+      },
       placeAt: (target, rows, at) => void placeAt(target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(rows), false),
       setCardView: (id, view) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;

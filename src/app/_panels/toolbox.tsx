@@ -1,7 +1,8 @@
 "use client";
 
 // The right-click toolbox on the canvas (slice 1b, D-19; prototype #cmenu): a short menu for what was clicked, at the
-// mouse, kept on the screen. Headings, actions (with their shortcut, checked, disabled, danger), segmented choices
+// mouse, kept on the screen. Headings, actions (with their shortcut, checked, disabled, danger, or a second click to
+// confirm), segmented choices
 // and, on the empty canvas, “Add an entity or table here…”: a search whose first result Enter picks. ↑/↓ move between
 // actions, Esc or a click elsewhere closes it.
 
@@ -11,7 +12,17 @@ import { createPortal } from "react-dom";
 export type ToolboxItem =
   | { head: string }
   | { sep: true }
-  | { label: string; act: () => void; kbd?: string; danger?: boolean; disabled?: boolean; checked?: boolean; testId?: string }
+  | {
+      label: string;
+      act: () => void;
+      kbd?: string;
+      danger?: boolean;
+      disabled?: boolean;
+      checked?: boolean;
+      testId?: string;
+      /** Asks for a second click first, with this text (as the panels' delete buttons do). */
+      confirm?: string;
+    }
   | { seg: string; options: { label: string; on: boolean; act: () => void }[] }
   | { search: (query: string) => SearchResult[] };
 
@@ -40,6 +51,8 @@ export function Toolbox({ items, at, onClose }: { items: ToolboxItem[]; at: { x:
   const box = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState(at);
   const [query, setQuery] = useState("");
+  /** The action waiting for its second click. */
+  const [armed, setArmed] = useState<number | null>(null);
   const list = tidy(items);
   const search = list.find((i): i is Extract<ToolboxItem, { search: unknown }> => "search" in i);
   const results = search ? search.search(query) : [];
@@ -190,11 +203,12 @@ export function Toolbox({ items, at, onClose }: { items: ToolboxItem[]; at: { x:
             aria-checked={item.checked}
             disabled={item.disabled}
             data-testid={item.testId ?? "toolbox-item"}
+            data-armed={armed === i || undefined}
             className={`flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-im-hover focus-visible:bg-im-hover focus-visible:outline-none disabled:opacity-40 disabled:hover:bg-transparent ${item.danger ? "text-im-warn" : ""}`}
-            onClick={() => run(item.act)}
+            onClick={() => (item.confirm && armed !== i ? setArmed(i) : run(item.act))}
           >
             <span className="w-3 flex-none text-im-logical">{item.checked ? "✓" : ""}</span>
-            <span className="min-w-0 flex-1 truncate">{item.label}</span>
+            <span className="min-w-0 flex-1 truncate">{armed === i ? item.confirm : item.label}</span>
             {item.kbd && <kbd className="flex-none font-sans text-[11px] text-im-ink-3">{item.kbd}</kbd>}
           </button>
         );

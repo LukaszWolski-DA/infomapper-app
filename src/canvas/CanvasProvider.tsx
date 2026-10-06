@@ -84,6 +84,7 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       fitWidth: (cardId) => handle.current?.fitWidth(cardId),
       placeBeside: (cards, anchorCardId, side) => handle.current?.placeBeside(cards, anchorCardId, side),
       settled: () => handle.current?.settled() ?? Promise.resolve(),
+      cardView: (cardId) => handle.current?.cardView(cardId) ?? null,
       flash,
       flashRow,
       mode,

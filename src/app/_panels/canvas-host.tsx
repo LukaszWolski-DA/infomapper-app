@@ -5,14 +5,15 @@
 // - A new entity from the Entity tool or the toolbox (D-46): in the concept used last, else the first one; its name is
 //   ready to type in the right panel.
 // - A relationship from one entity card to another, then its panel for the label and cardinality.
-// - The toolbox for what was right-clicked (D-19), with the actions of the prototype that exist so far.
+// - The toolbox for what was right-clicked (D-19), with the actions of the prototype that exist so far. A row's toolbox
+//   has only that row's actions; the card's are in its header's toolbox (D-52).
 // - Ctrl/Alt + arrows on a selected attribute (D-36).
 // - Delete on a selected mapping or relationship line: deleted at once, with Undo in the toast (slice 1b).
 // - “Show its sources” and “Show the entities it feeds” place them beside the card (B-08).
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
-import { createEntityAction, createRelationshipAction, deleteRelationshipAction, swapRelationshipAction } from "@/app/_actions/model";
+import { createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, swapRelationshipAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
 import { RELATE_HINT } from "@/canvas/CanvasModes";
 import { FILTER_LABEL, FILTER_ORDER } from "@/canvas/CardNode";
@@ -160,6 +161,8 @@ export function useCanvasHost({
   const cardItems = (card: HostCard): ToolboxItem[] => {
     const items: ToolboxItem[] = [];
     const isEnt = card.kind === "ent";
+    // What the canvas shows now: a collapse or filter is saved without a fresh page.
+    const view = ui.cardView(card.id) ?? card;
     if (editable) {
       // Feeding sources (left) or fed entities (right), placed beside the card (B-08).
       const missing = isEnt
@@ -188,9 +191,9 @@ export function useCanvasHost({
     if (editable) {
       items.push({
         seg: "Rows",
-        options: FILTER_ORDER.map((f) => ({ label: FILTER_LABEL[f], on: card.rowFilter === f, act: () => ui.setCardView(card.id, { rowFilter: f }) })),
+        options: FILTER_ORDER.map((f) => ({ label: FILTER_LABEL[f], on: view.rowFilter === f, act: () => ui.setCardView(card.id, { rowFilter: f }) })),
       });
-      items.push({ label: card.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !card.collapsed }) });
+      items.push({ label: view.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !view.collapsed }) });
       items.push({ label: "Fit width to names", act: () => ui.fitWidth(card.id) });
       items.push({ sep: true });
       items.push({ label: "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
@@ -323,13 +326,30 @@ export function useCanvasHost({
           items.push({ label: "Move to the bottom", kbd: "Ctrl Shift ↓", disabled: pos >= last, act: move("bottom") });
           items.push({ sep: true });
           items.push({ label: "Map from a column…", act: () => focusField("f-addc") });
+          items.push({ sep: true });
+          // the same confirmation as in the attribute panel: with mappings it asks for a second click
+          const n = (ix.mappingsOf.get(a.id) ?? []).length;
+          items.push({
+            label: "Delete attribute",
+            danger: true,
+            ...(n ? { confirm: `Click again to delete, with ${n} mapping${n > 1 ? "s" : ""}` } : {}),
+            act: () =>
+              void run(
+                () => deleteAttributeAction(workspaceId, { attributeId: a.id, expectedVersion: a.version }),
+                `Attribute deleted${n ? ` together with ${n} mapping${n > 1 ? "s" : ""}` : ""}`,
+                { undoable: true },
+              ).then((r) => {
+                if (r.ok) ui.select(null);
+              }),
+          });
         }
-        items.push({ sep: true });
       }
-    } else if (t.kind === "row" && card.kind === "src" && ix.column.has(t.rowId)) {
+      return items;
+    }
+    if (t.kind === "row" && card.kind === "src" && ix.column.has(t.rowId)) {
       items.push({ head: columnLabel(ix, t.rowId) });
       if (editable) items.push({ label: "Map to an attribute…", act: () => focusField("f-adda") });
-      items.push({ sep: true });
+      return items;
     }
     items.push({ head: cardName(card) });
     items.push(...cardItems(card));

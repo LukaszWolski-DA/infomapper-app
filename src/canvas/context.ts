@@ -60,6 +60,8 @@ export interface CanvasHandle {
   placeBeside: (cards: readonly { target: CardTarget; rows: number }[], anchorCardId: Uuid, side: "left" | "right") => void;
   /** Resolves once every card change still on its way has been saved (before an undo). */
   settled: () => Promise<void>;
+  /** A card's collapse state and row filter as the canvas shows them now (changed without a fresh page). */
+  cardView: (cardId: Uuid) => { collapsed: boolean; rowFilter: RowFilter } | null;
 }
 
 export type RowFilter = "all" | "mapped" | "unmapped" | "keys";
@@ -160,6 +162,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   setCardView: noop,
   placeBeside: noop,
   settled: () => Promise.resolve(),
+  cardView: () => null,
   registerCanvas: noop,
   mode: null,
   setMode: noop,
