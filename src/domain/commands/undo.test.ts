@@ -21,8 +21,9 @@ import {
 } from "../__fixtures__/domain";
 import { buildWriteSet, type CommandResult, type WriteSet } from "../changes";
 import type { WorkspaceAccess } from "../permissions";
-import type { ChangeEvent, WorkspaceRole } from "../types";
+import type { Canvas, ChangeEvent, WorkspaceRole } from "../types";
 import { createAttributeFromColumn, deleteAttribute, reorderAttribute } from "./attribute";
+import { deleteCanvas, duplicateCanvas, renameCanvas, setCanvasLook } from "./canvas";
 import { removeFromCanvas } from "./canvas-item";
 import { updateEntity } from "./entity";
 import { deleteMapping, mergeMappings, setMappingStatus } from "./mapping";
@@ -326,5 +327,87 @@ describe("undo and redo (slice 1b)", () => {
       const rows = seed();
       expect(isUndoable(ok(deleteRelationship(ctx, modeler, { relationship: find(rows, "relationship", ids.relPlaces) as never }, { relationshipId: ids.relPlaces, expectedVersion: 1 })).events)).toBe(true);
     });
+  });
+});
+
+describe("undo and a canvas's look and layer mode (slice 2a, D-12)", () => {
+  const c = makeCtx();
+  const undo = (rows: Rows, events: readonly ChangeEvent[]) => {
+    const r = revertChangeGroup(c, modeler, { events, rows }, "undo");
+    if (!r.ok) throw new Error(r.error.message);
+    return { rows: apply(rows, r.writeSet), writeSet: r.writeSet };
+  };
+  const canvasOf = (rows: Rows, id: string) => find(rows, "canvas", id) as unknown as Canvas;
+  const itemsOn = (rows: Rows, canvasId: string) => rows.canvas_item.filter((i) => i.canvas_id === canvasId && i.deleted_at === null);
+  const look = (rows: Rows, canvasId: string, change: object) =>
+    ok(setCanvasLook(c, modeler, { canvas: canvasOf(rows, canvasId) }, { canvasId, expectedVersion: canvasOf(rows, canvasId).version, ...change }));
+
+  it("duplicate, change the copy's look and layer, delete it, undo the delete: the copy comes back with its cards, link and look", () => {
+    let rows = seed();
+    const duplicated = duplicateCanvas(c, modeler, { canvas: canvasOf(rows, ids.canvas1), project: find(rows, "project", ids.projectA) as never, projectLinks: rows.project_canvas, items: rows.canvas_item }, { projectId: ids.projectA, canvasId: ids.canvas1 });
+    if (!duplicated.ok) throw new Error(duplicated.error.message);
+    const copyId = duplicated.value.canvasId;
+    rows = apply(rows, duplicated.writeSet);
+    expect(itemsOn(rows, copyId)).toHaveLength(2);
+
+    rows = apply(rows, look(rows, copyId, { background: "warm", grid: "lines", layer: "relationships" }));
+    const changedLook = { background: "warm", grid: "lines", layer: "relationships" };
+    expect(canvasOf(rows, copyId).look).toEqual(changedLook);
+
+    const copy = canvasOf(rows, copyId);
+    const deleted = ok(
+      deleteCanvas(c, modeler, { canvas: copy, project: find(rows, "project", ids.projectA) as never, canvasLinks: rows.project_canvas.filter((l) => l.canvas_id === copyId), projectLinks: rows.project_canvas.filter((l) => l.project_id === ids.projectA), items: rows.canvas_item }, { projectId: ids.projectA, canvasId: copyId, expectedVersion: copy.version }),
+    );
+    rows = apply(rows, deleted);
+    expect(canvasOf(rows, copyId).deleted_at).toBe(NOW);
+    expect(itemsOn(rows, copyId)).toHaveLength(0);
+    expect(rows.project_canvas.some((l) => l.canvas_id === copyId)).toBe(false);
+
+    rows = undo(rows, deleted.events).rows;
+    expect(canvasOf(rows, copyId)).toMatchObject({ deleted_at: null, look: changedLook });
+    expect(itemsOn(rows, copyId)).toHaveLength(2);
+    expect(rows.project_canvas.some((l) => l.canvas_id === copyId && l.project_id === ids.projectA)).toBe(true);
+  });
+
+  it("duplicate, change the copy's look: undo of the duplicate still removes the copy, its cards and its link", () => {
+    let rows = seed();
+    const duplicated = ok(duplicateCanvas(c, modeler, { canvas: canvasOf(rows, ids.canvas1), project: find(rows, "project", ids.projectA) as never, projectLinks: rows.project_canvas, items: rows.canvas_item }, { projectId: ids.projectA, canvasId: ids.canvas1 }));
+    rows = apply(rows, duplicated);
+    const copyId = insertedId(duplicated);
+    rows = apply(rows, look(rows, copyId, { grid: "none", layer: "mappings" }));
+
+    rows = undo(rows, duplicated.events).rows;
+    expect(canvasOf(rows, copyId).deleted_at).toBe(NOW);
+    expect(itemsOn(rows, copyId)).toHaveLength(0);
+    expect(rows.project_canvas.some((l) => l.canvas_id === copyId)).toBe(false);
+    expect(itemsOn(rows, ids.canvas1)).toHaveLength(2);
+  });
+
+  it("a rename followed by a layer change: undo of the rename brings the name back and keeps the new layer", () => {
+    let rows = seed();
+    const before = canvasOf(rows, ids.canvas1);
+    const renamed = ok(renameCanvas(c, modeler, { canvas: before }, { canvasId: ids.canvas1, expectedVersion: before.version, name: "Customers" }));
+    rows = apply(rows, renamed);
+    rows = apply(rows, look(rows, ids.canvas1, { layer: "mappings" }));
+    const versionBeforeUndo = canvasOf(rows, ids.canvas1).version;
+
+    const undone = undo(rows, renamed.events);
+    expect(canvasOf(undone.rows, ids.canvas1)).toMatchObject({ name: before.name, look: { ...before.look, layer: "mappings" }, version: versionBeforeUndo + 1 });
+    expect(undone.writeSet.events).toMatchObject([{ object_type: "canvas", operation: "update" }]);
+
+    // and redo puts the name back, still with the new layer
+    const redone = revertChangeGroup(c, modeler, { events: undone.writeSet.events, rows: undone.rows }, "redo");
+    if (!redone.ok) throw new Error(redone.error.message);
+    expect(canvasOf(apply(undone.rows, redone.writeSet), ids.canvas1)).toMatchObject({ name: "Customers", look: { layer: "mappings" } });
+  });
+
+  it("a later change of anything besides the look still counts as changed afterwards", () => {
+    let rows = seed();
+    const renamed = ok(renameCanvas(c, modeler, { canvas: canvasOf(rows, ids.canvas1) }, { canvasId: ids.canvas1, expectedVersion: 2, name: "Customers" }));
+    rows = apply(rows, renamed);
+    const again = ok(renameCanvas(makeCtx(ids.someoneElse), modeler, { canvas: canvasOf(rows, ids.canvas1) }, { canvasId: ids.canvas1, expectedVersion: 3, name: "Clients" }));
+    rows = apply(rows, again);
+    rows = apply(rows, look(rows, ids.canvas1, { grid: "none" }));
+    expect(revertChangeGroup(c, modeler, { events: renamed.events, rows }, "undo")).toMatchObject({ ok: false, error: { message: UNDO_REFUSED_MESSAGE } });
   });
 });
