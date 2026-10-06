@@ -37,6 +37,28 @@ initial render.
 - **The database slice (last, AD-31):** measure S1A-14, C-09 and C-10 in a production build, if possible also on a second, newer
   machine. If production misses the bars, the next step is drawing the mapping lines on an HTML canvas instead of SVG
   (the lines are already drawn by one component, `src/canvas/LineLayer.tsx`, so the change stays inside it).
+- **Slice 2a** adds a third (S2A-14): dragging a group of 31 cards at 50 % on “Performance test” runs at about 16–19 fps
+  on the dev server and 25–30 fps in the measurement-only production build (bar: 45 fps). Recorded as “partly met”, as
+  Łukasz decided on 6 October 2026; lines keep following the cards (no outlines while dragging). The production build
+  confirms that the cost is painting, not JavaScript: a hover's React work takes 6.7 ms there, the frame after it 166 ms.
+  A short performance slice comes between slices 2a and 2b. Measured on the development laptop (i7-8550U, Intel UHD 620),
+  headed Chrome 154, 1536 × 864; details in [slice-02a-acceptance.md](prd/slice-02a-acceptance.md).
+
+  Before the speed-up of step 3b:
+
+  | Measurement | Bar | Dev server | Production |
+  | --- | --- | --- | --- |
+  | Group drag, 31 cards at 50 % | ≥ 45 fps | 10.5 fps | 14.2 fps |
+  | Single-card drag, same card | – | 10.0 fps | 11.8 fps |
+  | C-09 card resize, 200-row card at 50 % | ≥ 45 fps | 27.6 fps | 20.3 fps |
+  | C-10 hover to the next frame, median of 40 | ≤ 100 ms | 199 ms | 166 ms |
+
+  After it (no change of behaviour):
+
+  | Measurement | Bar | Dev server | Production |
+  | --- | --- | --- | --- |
+  | Group drag, 31 cards at 50 % | ≥ 45 fps | 15.8, 18.8 fps | 28.9, 29.5, 28.9, 24.7 fps |
+  | Single-card drag, same card | – | 25.2, 23.4 fps | 14.8, 9.3, 12.5, 19.5 fps; 21.5 on a fresh page |
 
 ## Undo history (slice 1b)
 

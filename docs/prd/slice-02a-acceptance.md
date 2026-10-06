@@ -1,6 +1,6 @@
 # Slice 2a – Acceptance
 
-Status: in progress (steps 0–3 and the performance detour 3b done). Branch `slice/02a-selection-and-canvases`, pull request #5. The criteria table,
+Status: in progress (steps 0–4 and the performance detour 3b done). Branch `slice/02a-selection-and-canvases`, pull request #5. The criteria table,
 the measurements, the three runs in a row and the manual checklist are filled in at step 5.
 
 ## Measurements so far
@@ -59,6 +59,40 @@ The group drag in production doubles but stays below 45 fps. Single-card drags i
 between runs on this laptop; dev and production are within that spread. Still open: outlines instead of live lines
 during the drag (behaviour, Łukasz decides), or recording the bar as partly met.
 
+### Step 4: pan and zoom with the grid (S2A-14), 6 October 2026
+
+`MEASURE=1 npx playwright test e2e/slice-02a/S2A-14.spec.ts -g grid` (and with `MEASURE_BUILD=production` after
+`npm run measure:build`), same laptop and method. “Performance test”, pan and zoom for 10 s at the overview and at 100 %
+in the dense area; grid None, Dots and Lines take turns in each of three runs; median of the three. Bars: slice 1b's
+medians minus 5 % (overview 55.2 → **52.4 fps**, 100 % 51.7 → **49.1 fps**). None is the reference that separates the
+grid's own cost from the laptop's spread.
+
+| Session | None (overview / 100 %) | Dots | Lines | Dots vs None | Lines vs None |
+| --- | --- | --- | --- | --- | --- |
+| Dev, first version (grid as the pane's `background-position`) | 49.2 / 39.4 | 46.0 / 33.1 | 41.4 / 23.8 | −6.5 % / −16.0 % | −15.9 % / −39.6 % |
+| Dev, grid on its own layer (a slow spell of the laptop) | 42.4 / 20.6 | 47.0 / 18.1 | 44.2 / 20.7 | +10.8 % / −12.1 % | +4.2 % / +0.5 % |
+| Dev, grid on its own layer | 44.8 / 36.1 | 44.6 / 38.0 | 44.9 / 33.8 | −0.4 % / +5.3 % | +0.2 % / −6.4 % |
+| Production, grid on its own layer | 45.6 / 48.2 | 48.2 / 43.6 | 44.1 / 40.0 | +5.7 % / −9.5 % | −3.3 % / −17.0 % |
+| Production, grid on its own layer | 49.8 / 37.9 | 49.5 / 42.4 | 46.8 / 41.8 | −0.6 % / +11.9 % | −6.0 % / +10.3 % |
+
+The first version moved the pane's background on every frame, so the whole pane repainted while panning. The grid now
+is one element behind the pane, with the same CSS background, on its own layer: panning moves the layer by less than one
+grid step (no repaint), zooming changes the step. That made Dots cost nothing measurable and Lines at most a few percent.
+No session reaches the bars, **None included**; the default stays Dots.
+
+**Is slice 2a the cause of the lower pan and zoom?** `main` (slice 1b) and this branch with grid None, measured in turns
+in one sitting with the same pan-and-zoom steps (dev server, median of three runs each, overview / 100 %):
+
+| Run | `main` | Slice 2a, grid None |
+| --- | --- | --- |
+| 1 | – (did not start) | 43.7 / 37.5 |
+| 2 | 48.8 / 42.5 | 47.8 / 40.1 |
+| 3 | 45.7 / 17.4 (a slow spell) | 49.7 / 41.3 |
+| 4 | 49.1 / 45.5 | 49.4 / 44.0 |
+
+`main` itself runs at about 49 / 43–45 fps today, well below the 55.2 / 51.7 fps slice 1b measured on the same laptop;
+slice 2a is within the spread of `main`. So the drop is the laptop's state (other programs, heat), not slice 2a.
+
 ## Assumptions
 
 Decided with Łukasz during the slice:
@@ -96,6 +130,22 @@ Assumed while building, accepted at step 3:
     while two or more cards are selected; on a row it opens that row's own toolbox. D-52 wins over the prototype, whose
     `ctxFor` gives the group's toolbox on rows too (Łukasz, 6 October).
 
+Assumed while building step 4 (to confirm):
+
+11. **A reviewer's or reader's layer mode** lasts while the canvas stays open in that browser tab; it is not saved and
+    not kept in the browser's storage, so a reload or another canvas shows the saved mode again.
+12. **A canvas address that is no longer in the project** (deleted, taken out of it, or a duplicate undone while it is
+    open) opens the project's first canvas instead of “not found”. Deleting the open canvas therefore opens the next one
+    as the prototype does; undoing a duplicate while the copy is open lands on the project's first canvas, where the
+    prototype returns to the original.
+13. **Look controls are for editors only**: the tab menu was already editors-only; the overview panel's “Canvas look”
+    section is not shown to reviewers and readers. The layer buttons are there for everyone (PRD item 17).
+14. **Short labels** All / Maps / Rels below a window width of 2100 px, the prototype's breakpoint; on the development
+    laptop they are always short.
+15. **The layer mode hides lines everywhere on the canvas**: in the line layer, the hover emphasis and the Overview.
+16. **“On canvases”** sits above the panel's actions, as in the prototype; its click selects the card on the other
+    canvas and brings it into view with the canvas's remembered zoom (prototype `centerOn`).
+
 ## Changes to tests of earlier slices
 
 Deliberate, because slice 2a changes the behaviour they check:
@@ -105,3 +155,5 @@ Deliberate, because slice 2a changes the behaviour they check:
 - **S0-10** (restart): it now waits up to 5 minutes for its own cold dev server (was about 2), warms the canvas page
   after the restart, and leaves the page before restarting, so the old page's dev client cannot reload it in the middle
   of the next navigation. Its steps and checks are unchanged (step 0).
+- **S1A-14, S1B-09, S1B-10** (measurements): the canvases of “Performance test” now draw the default grid Dots, so these
+  measurements include it from step 4 on. Their steps and bars are unchanged.
