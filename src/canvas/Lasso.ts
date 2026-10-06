@@ -29,6 +29,12 @@ export function useLasso(onDone: (lasso: Rect, add: boolean) => void) {
   const rf = useReactFlow();
   const [lasso, setLasso] = useState<Rect | null>(null);
   const press = useRef<Press | null>(null);
+  // The window listeners stay put while the selection changes; they read the latest callback. (Re-subscribing in
+  // the middle of a pointerup would drop the other listeners still to run for it, e.g. a card resize.)
+  const done = useRef(onDone);
+  useEffect(() => {
+    done.current = onDone;
+  }, [onDone]);
 
   const onPointerDown = useCallback(
     (e: ReactPointerEvent) => {
@@ -59,7 +65,7 @@ export function useLasso(onDone: (lasso: Rect, add: boolean) => void) {
       const swallow = (c: MouseEvent) => c.stopPropagation();
       window.addEventListener("click", swallow, { capture: true, once: true });
       setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
-      onDone(rectBetween(p.start, rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })), p.add);
+      done.current(rectBetween(p.start, rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })), p.add);
     };
     const key = (e: KeyboardEvent) => {
       if (e.key === "Escape" && press.current) {
@@ -75,7 +81,7 @@ export function useLasso(onDone: (lasso: Rect, add: boolean) => void) {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("keydown", key, true);
     };
-  }, [rf, onDone]);
+  }, [rf]);
 
   return { lasso, onPointerDown };
 }
