@@ -1,13 +1,20 @@
 /*
  * The model canvas: the prototype's card, row and Overview styles (docs/prototype), with the AD-24 rules from the
- * spike report: no dotted background, no opacity on repeated elements (card tools are always fully visible), and
+ * spike report: no React Flow <Background> (the grid is one CSS background on the canvas pane), no opacity on repeated elements (card tools are always fully visible), and
  * will-change: transform on the viewport so Chrome pans and zooms one GPU layer. And no clip (overflow: hidden) on
  * repeated elements unless the text may not fit (text-fit.ts): clips on every row made Chrome re-layerize the canvas
  * at about 25 ms per frame while panning (S1A-14).
  */
 
-.im-canvas { position: absolute; inset: 0; overflow: hidden; background: var(--im-canvas); font-size: 13px; color: var(--im-ink) }
-.im-canvas .react-flow { --xy-background-color: var(--im-canvas) }
+.im-canvas { position: absolute; inset: 0; overflow: hidden; background-color: var(--im-canvas); font-size: 13px; color: var(--im-ink) }
+.im-canvas .react-flow { --xy-background-color: transparent }
+/* The grid (D-12, slice 2a; prototype #viewport[data-grid]): one background on one element behind the pane, not many
+   elements (AD-24). It has its own layer and reaches 96 px (ModelCanvas GRID_BLEED) past every edge: panning moves the
+   layer by less than one grid step, so nothing repaints; zooming sets the step. */
+.im-canvas .im-grid { position: absolute; inset: -96px; pointer-events: none; will-change: transform }
+.im-canvas[data-grid="dots"] .im-grid { background-image: radial-gradient(var(--im-grid) 1px, transparent 1.2px) }
+.im-canvas[data-grid="lines"] .im-grid { background-image: linear-gradient(color-mix(in srgb, var(--im-grid) 60%, transparent) 1px, transparent 1px),
+  linear-gradient(90deg, color-mix(in srgb, var(--im-grid) 60%, transparent) 1px, transparent 1px) }
 .im-canvas .react-flow__viewport { will-change: transform }
 .im-canvas .react-flow__node-card { padding: 0; border: 0; background: none; border-radius: 0; cursor: default }
 .im-canvas .react-flow__attribution { background: transparent; font-size: 9px }

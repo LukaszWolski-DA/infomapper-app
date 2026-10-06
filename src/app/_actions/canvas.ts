@@ -1,16 +1,22 @@
 "use server";
 
 // Canvas writes (slice 0, step 5c): create, rename, and which projects a canvas belongs to (D-28).
+// Slice 2a: duplicate the layout, delete a canvas (or take it out of this project), its look and layer mode.
 
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";
 import {
   addCanvasToProject,
+  applyLookToAllCanvases,
   createCanvas,
+  deleteCanvas,
+  duplicateCanvas,
   removeCanvasFromProject,
   renameCanvas,
+  setCanvasLook,
   type CanvasMembershipState,
 } from "@/domain/commands/canvas";
+import type { CanvasBackground, CanvasGrid, CanvasLayer } from "@/domain/types";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { canvasHref } from "../_lib/paths";
@@ -93,6 +99,92 @@ export async function removeCanvasFromProjectAction(input: { workspaceId: string
       if (!access) return NOT_FOUND;
       const state = await membershipState(store, access.workspace.id, str(input?.canvasId), str(input?.projectId));
       return removeCanvasFromProject(ctx, access, state, { canvasId: input?.canvasId, projectId: input?.projectId });
+    }),
+  );
+}
+
+export async function duplicateCanvasAction(input: { workspaceId: string; projectId: string; canvasId: string }) {
+  return done(
+    await runCommand(async (ctx, store, user) => {
+      const access = await loadAccess(store, input?.workspaceId, user.id);
+      if (!access) return NOT_FOUND;
+      const ws = access.workspace.id, projectId = str(input?.projectId), canvasId = str(input?.canvasId);
+      const [canvas, project, projectLinks, items] = await Promise.all([
+        store.canvases.get(ws, canvasId),
+        store.projects.get(ws, projectId),
+        store.canvases.listLinksOfProject(ws, projectId),
+        store.canvasItems.listOfCanvas(ws, canvasId),
+      ]);
+      const result = duplicateCanvas(ctx, access, { canvas, project, projectLinks, items }, { projectId: input?.projectId, canvasId: input?.canvasId });
+      return result.ok
+        ? { ...result, value: { name: result.value.name, canvasId: result.value.canvasId, href: canvasHref(ws, projectId, result.value.canvasId) } }
+        : result;
+    }),
+  );
+}
+
+/** The tab menu's last item (D-28): deletes the canvas, or only takes it out of this project when another has it. */
+export async function deleteCanvasAction(input: { workspaceId: string; projectId: string; canvasId: string; expectedVersion: number }) {
+  return done(
+    await runCommand(async (ctx, store, user) => {
+      const access = await loadAccess(store, input?.workspaceId, user.id);
+      if (!access) return NOT_FOUND;
+      const ws = access.workspace.id, canvasId = str(input?.canvasId);
+      const [state, items] = await Promise.all([
+        membershipState(store, ws, canvasId, str(input?.projectId)),
+        store.canvasItems.listOfCanvas(ws, canvasId),
+      ]);
+      return deleteCanvas(ctx, access, { ...state, items }, {
+        projectId: input?.projectId,
+        canvasId: input?.canvasId,
+        expectedVersion: input?.expectedVersion,
+      });
+    }),
+  );
+}
+
+/** Background, grid or layer mode of one canvas (D-12, D-22): saved, not an undo step. Returns the new version. */
+export async function setCanvasLookAction(input: {
+  workspaceId: string;
+  canvasId: string;
+  expectedVersion: number;
+  background?: CanvasBackground;
+  grid?: CanvasGrid;
+  layer?: CanvasLayer;
+}) {
+  return done(
+    await runCommand(async (ctx, store, user) => {
+      const access = await loadAccess(store, input?.workspaceId, user.id);
+      if (!access) return NOT_FOUND;
+      const canvas = await store.canvases.get(access.workspace.id, str(input?.canvasId));
+      const result = setCanvasLook(ctx, access, { canvas }, {
+        canvasId: input?.canvasId,
+        expectedVersion: input?.expectedVersion,
+        background: input?.background,
+        grid: input?.grid,
+        layer: input?.layer,
+      });
+      return result.ok ? { ...result, value: { version: result.value.canvas.version } } : result;
+    }),
+  );
+}
+
+/** The same, with the workspace bound first (the canvas page passes it to the canvas's look). */
+export async function saveCanvasLookAction(
+  workspaceId: string,
+  input: { canvasId: string; expectedVersion: number; background?: CanvasBackground; grid?: CanvasGrid; layer?: CanvasLayer },
+) {
+  return setCanvasLookAction({ ...input, workspaceId });
+}
+
+/** “Use this look on all canvases”: background and grid of one canvas go to every canvas of the workspace. */
+export async function applyLookToAllCanvasesAction(input: { workspaceId: string; canvasId: string }) {
+  return done(
+    await runCommand(async (ctx, store, user) => {
+      const access = await loadAccess(store, input?.workspaceId, user.id);
+      if (!access) return NOT_FOUND;
+      const canvases = await store.canvases.list(access.workspace.id);
+      return applyLookToAllCanvases(ctx, access, { canvases }, { canvasId: input?.canvasId });
     }),
   );
 }

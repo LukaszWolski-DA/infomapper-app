@@ -1,15 +1,22 @@
 "use client";
 
-// Canvas options, as in the prototype's canvas menu: Rename and "In projects" (D-28).
-// Duplicate layout, background, grid and delete belong to later slices.
+// Canvas options, as in the prototype's canvas menu: Rename and "In projects" (D-28); slice 2a adds Duplicate layout,
+// the look (background, grid, "Use this look on all canvases", D-12) and, last, Delete canvas or Remove from this
+// project (D-28). A look change on the open canvas shows at once (`look.tsx`).
 
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
 import {
   addCanvasToProjectAction,
+  applyLookToAllCanvasesAction,
   createCanvasAction,
+  deleteCanvasAction,
+  duplicateCanvasAction,
   removeCanvasFromProjectAction,
+  setCanvasLookAction,
 } from "@/app/_actions/canvas";
+import { LookControls, useCanvasLook, type LookPatch } from "@/canvas/look";
+import { copyView } from "@/canvas/views";
 import { useAction } from "@/app/_components/use-action";
 import { canvasHref } from "@/app/_lib/paths";
 import type { ProjectView } from "@/app/_lib/project-view";
@@ -53,6 +60,42 @@ export function CanvasMenu({
 }) {
   const { run } = useAction();
   const router = useRouter();
+  const lookApi = useCanvasLook();
+  const open = lookApi?.canvasId === canvas.id ? lookApi : null;
+  const look = open?.look ?? canvas.look;
+  const others = view.projects.filter((p) => p.id !== view.project.id && canvas.projectIds.includes(p.id));
+  const isLast = view.canvases.length < 2;
+
+  function setLook(patch: LookPatch) {
+    if (open) open.setLook(patch);
+    else void run(() => setCanvasLookAction({ workspaceId: view.workspaceId, canvasId: canvas.id, expectedVersion: canvas.version, ...patch }));
+  }
+
+  async function duplicate() {
+    const result = await run(
+      () => duplicateCanvasAction({ workspaceId: view.workspaceId, projectId: view.project.id, canvasId: canvas.id }),
+      `Duplicated ${canvas.name}. Only the layout is copied; the model is shared.`,
+      { undoable: true },
+    );
+    if (!result.ok) return;
+    copyView(canvas.id, result.value.canvasId);
+    router.push(result.value.href);
+  }
+
+  async function remove() {
+    const result = await run(
+      () => deleteCanvasAction({ workspaceId: view.workspaceId, projectId: view.project.id, canvasId: canvas.id, expectedVersion: canvas.version }),
+      others.length
+        ? `Took ${canvas.name} out of ${view.project.name}. It is still in ${others.map((p) => p.name).join(", ")}.`
+        : `Deleted the canvas ${canvas.name}. The model and its mappings are untouched.`,
+      { undoable: true },
+    );
+    // The open canvas went: the next canvas of the project opens.
+    if (result.ok && canvas.id === currentCanvasId) {
+      const next = view.canvases.find((c) => c.id !== canvas.id);
+      if (next) router.push(canvasHref(view.workspaceId, view.project.id, next.id));
+    }
+  }
 
   async function toggle(projectId: string, on: boolean) {
     const project = view.projects.find((p) => p.id === projectId)!;
@@ -86,6 +129,25 @@ export function CanvasMenu({
         <DropdownMenuItem className={itemClass} onSelect={onRename} data-testid="menu-item-rename">
           Rename
         </DropdownMenuItem>
+        <DropdownMenuItem className={itemClass} onSelect={() => void duplicate()} data-testid="menu-item-duplicate">
+          Duplicate layout
+        </DropdownMenuItem>
+        <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+        <DropdownMenuLabel className={sectionClass}>Background</DropdownMenuLabel>
+        <div className="px-1.5 pb-1">
+          <LookControls part="background" look={look} onChange={setLook} />
+        </div>
+        <DropdownMenuLabel className={sectionClass}>Grid</DropdownMenuLabel>
+        <div className="mx-2 mb-1.5">
+          <LookControls part="grid" look={look} onChange={setLook} />
+        </div>
+        <DropdownMenuItem
+          className={itemClass}
+          data-testid="menu-item-look-all"
+          onSelect={() => void run(() => applyLookToAllCanvasesAction({ workspaceId: view.workspaceId, canvasId: canvas.id }), "All canvases now use this look.")}
+        >
+          Use this look on all canvases
+        </DropdownMenuItem>
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
         <DropdownMenuLabel className={sectionClass}>In projects</DropdownMenuLabel>
         {view.projects.map((p) => {
@@ -107,6 +169,16 @@ export function CanvasMenu({
             </DropdownMenuItem>
           );
         })}
+        <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+        <DropdownMenuItem
+          className={itemClass + " text-im-warn focus:text-im-warn data-[disabled]:pointer-events-none data-[disabled]:opacity-50"}
+          disabled={isLast}
+          title={isLast ? "A project keeps at least one canvas." : undefined}
+          onSelect={() => void remove()}
+          data-testid="menu-item-delete-canvas"
+        >
+          {others.length ? "Remove from this project" : "Delete canvas"}
+        </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>
   );

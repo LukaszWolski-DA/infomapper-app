@@ -41,7 +41,9 @@
     ".next-e2e-restart/types/**/*.ts",
     ".next-e2e-restart/dev/types/**/*.ts",
     ".next-measure/types/**/*.ts",
-    ".next-measure/dev/types/**/*.ts"
+    ".next-measure/dev/types/**/*.ts",
+    ".next-e2e-preview/types/**/*.ts",
+    ".next-e2e-preview/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",

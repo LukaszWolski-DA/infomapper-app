@@ -1,7 +1,7 @@
 "use client";
 
 // The model canvas (AD-24): React Flow with one node per card, positions from data, all lines in one layer, and the
-// report's CSS rules (no dotted background, no opacity on repeated elements, will-change on the viewport).
+// report's CSS rules (no React Flow <Background>, no opacity on repeated elements, will-change on the viewport).
 // Navigation as in the prototype: the wheel pans, Ctrl/pinch zooms, Space-drag or the middle/right button pans;
 // F fits, M toggles the Overview, Esc clears the selection. The last view of each canvas is remembered in the
 // browser (data model section 12). Cards are dragged by their header, snapped to 8 px, and saved when the drag ends.
@@ -12,6 +12,9 @@
 // Slice 2a: several cards are selected with a lasso on the empty canvas, Shift+click or Ctrl+A (`selection.ts`); the
 // marks are drawn in an overlay. H turns the Hand tool on, V or Esc off. Dragging a selected card moves the group,
 // arrow keys nudge the selection, and the group's actions (toolbox, selection panel) are in `GroupActions.ts`.
+// Each canvas has its look (`look.tsx`): the grid is one CSS background on the pane that follows the view, and the
+// layer mode hides the relationship or the mapping lines. A card named in `focusCardId` is selected and shown on arrival
+// (“On canvases” in the panels).
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -57,10 +60,15 @@ import {
   type Rect,
 } from "./geometry";
 import { relatedLines, type CanvasLines, type Selection } from "./line-data";
+import { useCanvasLook } from "./look";
+import { viewKey } from "./views";
 import LineLayer from "./LineLayer";
 import { Overview } from "./Overview";
 
 const nodeTypes = { card: CardNode };
+
+/** How far the grid layer reaches past the pane: the largest grid step (Lines at the highest zoom). Also in canvas.css. */
+const GRID_BLEED = 32 * MAX_ZOOM;
 
 export interface CardChange {
   canvasItemId: string;
@@ -93,6 +101,9 @@ export interface ModelCanvasProps {
   arrangeCards: GroupWrites["arrangeCards"];
   setCardWidths: GroupWrites["setCardWidths"];
   removeCards: GroupWrites["removeCards"];
+  /** A card to select and bring into view once the canvas is ready (“On canvases”, slice 2a); then the address
+   * loses its query, so a reload keeps the remembered view. */
+  focusCardId?: string | null;
 }
 
 type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width">>;
@@ -112,7 +123,6 @@ const toNode = (card: CardData, editable: boolean): CardNodeT => ({
   style: { pointerEvents: "all" },
 });
 
-const viewKey = (canvasId: string) => `infomapper:view:${canvasId}`;
 
 function readView(canvasId: string): Viewport | null {
   const raw = readPreference(viewKey(canvasId));
@@ -134,7 +144,7 @@ const isEntity = (t: CardTarget): t is { entityId: string } => "entityId" in t;
 export function ModelCanvas({
   canvasId,
   cards: initialCards,
-  lines,
+  lines: allLines,
   editable,
   saveCard,
   placeCard,
@@ -144,8 +154,20 @@ export function ModelCanvas({
   arrangeCards,
   setCardWidths,
   removeCards,
+  focusCardId,
 }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
+  const look = useCanvasLook()?.look;
+  const layer = look?.layer ?? "all";
+  const grid = look?.grid ?? "dots";
+  // Layer mode (D-22): Mappings hides the relationship lines, Relationships the mapping lines; cards stay.
+  const lines = useMemo<CanvasLines>(
+    () =>
+      layer === "all"
+        ? allLines
+        : { mappings: layer === "relationships" ? [] : allLines.mappings, relationships: layer === "mappings" ? [] : allLines.relationships },
+    [allLines, layer],
+  );
   const { selection, select, registerCanvas } = ui;
   const toast = useToast();
   const rf = useReactFlow();
@@ -185,6 +207,29 @@ export function ModelCanvas({
     (_: unknown, v: Viewport) => writePreference(viewKey(canvasId), JSON.stringify(v)),
     [canvasId],
   );
+
+  // ---- the grid (D-12): one CSS background behind the pane, on its own layer. Panning moves that layer by less than
+  // one grid step (no repaint); zooming changes the step. Set without a render. ----
+  const gridRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = gridRef.current;
+    if (!el || grid === "none") return;
+    const step = grid === "lines" ? 32 : 16; // prototype applyT
+    let last: readonly number[] | null = null;
+    let lastSize = 0;
+    const follow = (t: readonly [number, number, number]) => {
+      if (t === last) return;
+      last = t;
+      const size = step * t[2];
+      if (size !== lastSize) el.style.backgroundSize = `${size}px ${size}px`;
+      lastSize = size;
+      // the layer reaches GRID_BLEED past every edge, so a shift of up to one step keeps the pane covered
+      const shift = (v: number) => (((v + GRID_BLEED) % size) + size) % size;
+      el.style.transform = `translate3d(${shift(t[0])}px, ${shift(t[1])}px, 0)`;
+    };
+    follow(storeApi.getState().transform);
+    return storeApi.subscribe((s) => follow(s.transform));
+  }, [grid, storeApi]);
 
   // ---- several cards (slice 2a): the cards as keys and rectangles, select all, Shift+click, lasso ----
   const boxes = useCallback(
@@ -393,6 +438,18 @@ export function ModelCanvas({
     },
     [rf, centerOnRect],
   );
+
+  // A card asked for on arrival (“On canvases”): selected and in view, once the view is set.
+  const focused = useRef(false);
+  useEffect(() => {
+    if (!ready || !focusCardId || focused.current) return;
+    focused.current = true;
+    if (rf.getNode(focusCardId)) {
+      select({ t: "card", id: focusCardId });
+      centerOn(focusCardId);
+    }
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [ready, focusCardId, rf, select, centerOn]);
 
   const cardOf = useCallback(
     (t: CardTarget) =>
@@ -664,6 +721,8 @@ export function ModelCanvas({
       <div
         className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${ui.mode?.kind === "hand" ? " tool-hand" : ""}${modes.panning ? " panning" : ""}${resize.resizing ? " resizing" : ""}${dragging ? " node-dragging" : ""}`}
         data-testid="area-canvas"
+        data-grid={grid}
+        data-layer={layer}
         data-mode={ui.mode?.kind}
         data-ready={ready || undefined}
         data-notation={ui.notation}
@@ -681,6 +740,7 @@ export function ModelCanvas({
         onPointerLeave={() => setHover(null)}
         onContextMenu={modes.onContextMenu}
       >
+        {grid !== "none" && <div className="im-grid" ref={gridRef} aria-hidden data-testid="canvas-grid" />}
         <ReactFlow
           nodes={nodes}
           onNodesChange={onNodesChange}

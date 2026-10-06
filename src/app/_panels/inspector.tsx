@@ -38,6 +38,20 @@ export interface InspectorProps {
   fourEyes: boolean;
   /** Who last changed each mapping's inputs, kind or rule (AD-06); only filled when four-eyes is on. */
   contentAuthors: Record<Uuid, Uuid>;
+  /** Every canvas of the workspace, where it opens and how “On canvases” names it (slice 2a). */
+  places: CanvasPlace[];
+  /** The canvases each entity or source table has a card on. */
+  canvasesOf: Record<Uuid, Uuid[]>;
+}
+
+export interface CanvasPlace {
+  id: Uuid;
+  name: string;
+  href: string;
+  /** “this canvas”, “open” (another canvas of this project) or “in {project}”. */
+  where: string;
+  /** The project it opens in, when that is not this one. */
+  switchTo: string | null;
 }
 
 export interface PanelContext extends Omit<InspectorProps, "model" | "cards" | "tree"> {

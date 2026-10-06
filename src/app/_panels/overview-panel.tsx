@@ -1,8 +1,10 @@
 "use client";
 
 // The right panel when nothing is selected (prototype insOverview, the parts of slice 1a): what is on this canvas,
-// mapping coverage per entity, and the mappings with a type problem to look at.
+// mapping coverage per entity, and the mappings with a type problem to look at. Slice 2a: the canvas's look
+// (background and grid) for those who may change it.
 
+import { LookControls, useCanvasLook } from "@/canvas/look";
 import { Fold, Hint, Kind, Li, LongList, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { inputsLabel, typeCheckOf } from "./model-index";
@@ -10,6 +12,7 @@ import { coverage } from "./stats";
 
 export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }: { entityIds: string[]; tableCount: number; canvasName: string; canvasCount: number }) {
   const p = usePanel();
+  const look = useCanvasLook();
   const cov = coverage(p.ix, entityIds);
   const problems = p.ix.model.mappings.filter((m) => !typeCheckOf(p.ix, m).ok);
   const ents = cov.length;
@@ -55,6 +58,14 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
               </Li>
             )}
           />
+        </Fold>
+      )}
+      {look?.editable && (
+        <Fold title="Canvas look" testId="section-canvas-look">
+          <LookControls part="background" look={look.look} onChange={look.setLook} />
+          <div className="mt-2">
+            <LookControls part="grid" look={look.look} onChange={look.setLook} />
+          </div>
         </Fold>
       )}
     </div>

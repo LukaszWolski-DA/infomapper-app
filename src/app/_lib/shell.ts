@@ -1,6 +1,6 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { can, checkCreateWorkspace, isArchived, isGuest } from "@/domain/permissions";
@@ -81,6 +81,9 @@ export async function loadShellFor(user: AppUser, where: Where): Promise<ShellDa
     const row = links.some((l) => l.canvas_id === where.canvasId)
       ? await store.canvases.get(workspace.id, where.canvasId)
       : null;
+    // A canvas that just left this project (deleted, taken out, or a duplicate undone while open): the project's first
+    // canvas opens instead, as in the prototype (slice 2a).
+    if (!row && project && links.length) redirect(`/w/${workspace.id}/p/${project.id}/c/${links[0]!.canvas_id}`);
     if (!row) notFound();
     canvas = { id: row.id, name: row.name };
   }
