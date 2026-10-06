@@ -65,8 +65,9 @@ test("S1B-14: a reviewer gets no drag, relate, tool or reorder actions, and can 
   await card(page, "Customer").getByTestId("card-name").click();
   await expect(page.getByTestId("attribute-order-item")).toHaveCount(0);
   await expect(page.getByTestId("button-feed-all")).toHaveCount(0);
-  // the toolbox has no editing actions: on the canvas only “Fit everything on screen”, on a card nothing to change
-  expect(await toolboxAt(page, await emptySpot(page))).toEqual(["Fit everything on screen"]);
+  // the toolbox has no editing actions: on the canvas only what selects or moves the view (slice 2a adds “Select all”
+  // and the Hand tool for every role), on a card nothing to change
+  expect(await toolboxAt(page, await emptySpot(page))).toEqual(["Select all", "Fit everything on screen", "Hand tool"]);
   await expect(page.getByTestId("input-toolbox-search")).toHaveCount(0);
   await closeToolbox(page);
   const head = (await card(page, "Customer").locator(".c-head").boundingBox())!;

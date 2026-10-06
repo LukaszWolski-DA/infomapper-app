@@ -85,6 +85,7 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       placeBeside: (cards, anchorCardId, side) => handle.current?.placeBeside(cards, anchorCardId, side),
       settled: () => handle.current?.settled() ?? Promise.resolve(),
       cardView: (cardId) => handle.current?.cardView(cardId) ?? null,
+      selectAll: () => handle.current?.selectAll(),
       flash,
       flashRow,
       mode,

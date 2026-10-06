@@ -9,6 +9,8 @@
 // After a write the server sends fresh cards; a card with a save still on its way keeps what the user did.
 // Slice 1b: feeding sources and fed entities are placed beside a card in one change (B-08); Delete removes a selected
 // line at once, with Undo in the toast.
+// Slice 2a: several cards are selected with a lasso on the empty canvas, Shift+click or Ctrl+A (`selection.ts`); the
+// marks are drawn in an overlay. H turns the Hand tool on, V or Esc off.
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -30,6 +32,9 @@ import { RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
 import HoverOverlay from "./HoverOverlay";
+import { useLasso } from "./Lasso";
+import SelectionOverlay from "./SelectionOverlay";
+import { afterLasso, cardKey, fromKeys, lassoHits, toggleCard as toggledSelection, type CardBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop } from "./context";
@@ -161,11 +166,48 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
     [canvasId],
   );
 
+  // ---- several cards (slice 2a): the cards as keys and rectangles, select all, Shift+click, lasso ----
+  const boxes = useCallback(
+    (): CardBox[] =>
+      (rf.getNodes() as CardNodeT[]).map(({ id, position, data: { card } }) => ({
+        id,
+        key: cardKey(card),
+        rect: { x: position.x, y: position.y, w: cardWidth(card), h: cardHeight(card) },
+      })),
+    [rf],
+  );
+  const selectAll = useCallback(() => select(fromKeys(boxes().map((b) => b.key), boxes())), [select, boxes]);
+  const toggleCard = useCallback((cardId: string) => select(toggledSelection(selection, cardId, boxes())), [select, selection, boxes]);
+  const onLasso = useCallback(
+    (rect: Rect, add: boolean) => {
+      const all = boxes();
+      select(afterLasso(selection, lassoHits(all, rect), add, all));
+    },
+    [select, selection, boxes],
+  );
+  const lasso = useLasso(onLasso);
+
+  // Cards that left the canvas (removed, undone) leave the selection too.
+  useEffect(() => {
+    if (selection?.t !== "multi") return;
+    const next = fromKeys(selection.keys, boxes());
+    if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
+  }, [nodes, selection, select, boxes]);
+
   // ---- keyboard: F fits, M toggles the Overview, E the Entity tool; Esc ends a tool, else clears the selection ----
-  const { toggleEntityTool } = modes;
+  const { toggleEntityTool, toggleHandTool } = modes;
+  /** Space held: a left drag pans (React Flow), so it must not start a lasso. */
+  const spaceDown = useRef(false);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (isTyping(e.target)) return;
+      if (e.code === "Space") spaceDown.current = true;
+      // Ctrl+A (⌘A) selects every card on the canvas
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "a") {
+        e.preventDefault();
+        selectAll();
+        return;
+      }
       // Ctrl or Alt + up/down moves the selected attribute, with Shift to the top or bottom (D-36)
       if ((e.ctrlKey || e.altKey) && (e.key === "ArrowUp" || e.key === "ArrowDown") && editable && selection?.t === "row") {
         const card = (rf.getNode(selection.cardId) as CardNodeT | undefined)?.data.card;
@@ -185,14 +227,26 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       if (k === "f") fit();
       else if (k === "m") ui.toggleOverview();
       else if (k === "e") toggleEntityTool();
+      else if (k === "h") toggleHandTool();
+      else if (k === "v" && ui.mode?.kind === "hand") ui.setMode(null);
       else if (k === "escape") {
         if (ui.mode) ui.setMode(null);
         else select(null);
       }
     };
+    const onKeyUp = (e: KeyboardEvent) => {
+      if (e.code === "Space") spaceDown.current = false;
+    };
+    const onBlur = () => (spaceDown.current = false);
     window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [fit, ui, select, toggleEntityTool, editable, selection, rf]);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", onBlur);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", onBlur);
+    };
+  }, [fit, ui, select, toggleEntityTool, toggleHandTool, selectAll, editable, selection, rf]);
 
   // ---- card changes: applied at once, saved in order, undone on refusal ----
   const queue = useRef(new Map<string, Promise<void>>());
@@ -430,6 +484,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
         return card ? { collapsed: card.collapsed, rowFilter: card.rowFilter } : null;
       },
+      selectAll,
       placeAt: (target, rows, at) => void placeAt(target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(rows), false),
       setCardView: (id, view) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
@@ -441,7 +496,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -484,8 +539,9 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
       },
       startRelate: modes.startRelate,
       fitWidth,
+      toggleCard,
     }),
-    [editable, selection, select, change, rf, modes.startRelate, fitWidth],
+    [editable, selection, select, change, rf, modes.startRelate, fitWidth, toggleCard],
   );
 
   const onNodesChange = useCallback(
@@ -505,7 +561,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   );
 
   // ---- hover (C-10): a row of a card or a mapping line; nothing while dragging or with a tool on ----
-  const busy = !!draft || !!ui.mode || resize.resizing;
+  const busy = !!draft || !!ui.mode || resize.resizing || !!lasso.lasso;
   const onHoverOver = useCallback((e: React.PointerEvent) => {
     if (e.buttons) return;
     const el = e.target as Element;
@@ -519,7 +575,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
   return (
     <CanvasCardsCtx.Provider value={cardsApi}>
       <div
-        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${resize.resizing ? " resizing" : ""}`}
+        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${ui.mode?.kind === "hand" ? " tool-hand" : ""}${modes.panning ? " panning" : ""}${resize.resizing ? " resizing" : ""}`}
         data-testid="area-canvas"
         data-mode={ui.mode?.kind}
         data-ready={ready || undefined}
@@ -527,7 +583,10 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
         style={{ visibility: ready ? "visible" : "hidden" }}
         onDragOver={onDragOver}
         onDrop={onDrop}
-        onPointerDown={onPointerDown}
+        onPointerDown={(e) => {
+          if (!ui.mode && !spaceDown.current) lasso.onPointerDown(e);
+          onPointerDown(e);
+        }}
         onPointerDownCapture={(e) => {
           if (!resize.onPointerDown(e)) modes.onPointerDownCapture(e);
         }}
@@ -539,7 +598,8 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
           nodes={nodes}
           onNodesChange={onNodesChange}
           onNodeDragStop={onNodeDragStop}
-          onPaneClick={() => select(null)}
+          // Shift+click on the empty canvas keeps the selection (prototype)
+          onPaneClick={(e) => !e.shiftKey && select(null)}
           nodeTypes={nodeTypes}
           nodesDraggable={editable}
           nodesConnectable={false}
@@ -565,6 +625,7 @@ export function ModelCanvas({ canvasId, cards: initialCards, lines, editable, sa
           <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />
           <Overview lines={lines} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
+          <SelectionOverlay selection={selection} lasso={lasso.lasso} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>

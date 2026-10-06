@@ -7,6 +7,8 @@
 //   and releasing over an entity does the same.
 // - A right-click without moving opens the toolbox for what is under the mouse, after selecting it (D-19); a right-drag
 //   still pans (React Flow).
+// - Hand tool (H, slice 2a, D-18): a left drag anywhere, over cards too, pans the canvas and selects nothing; V or Esc
+//   end it. Right drag, the middle button and Space still pan as before. It is not saved.
 // The page does the writes and draws the toolbox (CanvasHost); this file only reads gestures.
 
 import { memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
@@ -22,6 +24,7 @@ const CLICK_SLOP = 5;
 const NEW_ENTITY_OFFSET = { x: 24, y: 20 };
 
 export const ENTITY_TOOL_HINT = "Click on the canvas where the new entity should go. Esc cancels.";
+export const HAND_TOOL_HINT = "Hand tool: drag anywhere to move the canvas. V or Esc returns to selecting.";
 export const RELATE_HINT = "Now click the entity to relate to. Esc cancels.";
 
 const entityCardAt = (el: Element | null) => el?.closest<HTMLElement>(".card.ent[data-card]")?.dataset.card ?? null;
@@ -35,6 +38,9 @@ export function useCanvasModes(editable: boolean) {
   const rightDown = useRef<Pt | null>(null);
   /** A press on a relate button: becomes a relate drag after a few pixels. */
   const relatePress = useRef<{ cardId: string; sx: number; sy: number; dragging: boolean } | null>(null);
+  /** A left drag with the Hand tool: where it started, on the screen and in the view. */
+  const handPan = useRef<{ sx: number; sy: number; x: number; y: number; zoom: number } | null>(null);
+  const [panning, setPanning] = useState(false);
 
   const startRelate = useCallback(
     (cardId: string) => {
@@ -53,6 +59,37 @@ export function useCanvasModes(editable: boolean) {
       toast(ENTITY_TOOL_HINT);
     }
   }, [editable, mode, setMode, toast]);
+
+  /** H, the toolbar button and the toolbox: the Hand tool on or off (for every role; it only moves the view). */
+  const toggleHandTool = useCallback(() => {
+    if (mode?.kind === "hand") setMode(null);
+    else {
+      setMode({ kind: "hand" });
+      toast(HAND_TOOL_HINT);
+    }
+  }, [mode, setMode, toast]);
+
+  // The Hand tool's drag moves the view with the mouse; the release is not a click on what lies under it.
+  useEffect(() => {
+    const move = (e: PointerEvent) => {
+      const p = handPan.current;
+      if (p) void rf.setViewport({ x: p.x + e.clientX - p.sx, y: p.y + e.clientY - p.sy, zoom: p.zoom });
+    };
+    const up = () => {
+      if (!handPan.current) return;
+      handPan.current = null;
+      setPanning(false);
+      const swallow = (c: MouseEvent) => c.stopPropagation();
+      window.addEventListener("click", swallow, { capture: true, once: true });
+      setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", up);
+    return () => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", up);
+    };
+  }, [rf]);
 
   // Leaving relate mode clears its line.
   useEffect(() => {
@@ -107,6 +144,13 @@ export function useCanvasModes(editable: boolean) {
       if ((e.target as HTMLElement).closest(".overview, .react-flow__panel")) return;
       e.preventDefault();
       e.stopPropagation();
+      if (mode.kind === "hand") {
+        // Before the cards and the pane see it: nothing is dragged or selected.
+        const { x, y, zoom } = rf.getViewport();
+        handPan.current = { sx: e.clientX, sy: e.clientY, x, y, zoom };
+        setPanning(true);
+        return;
+      }
       const swallow = (c: MouseEvent) => c.stopPropagation();
       window.addEventListener("click", swallow, { capture: true, once: true });
       setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 300);
@@ -129,7 +173,8 @@ export function useCanvasModes(editable: boolean) {
       const down = rightDown.current;
       rightDown.current = null;
       if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_SLOP) return;
-      if (mode) setMode(null);
+      // A tool that takes the next click ends; the Hand tool stays (its toolbox offers “Back to selecting”).
+      if (mode && mode.kind !== "hand") setMode(null);
       const el = e.target as HTMLElement;
       if (el.closest(".overview, .react-flow__panel")) return;
       const mappingId = el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
@@ -159,7 +204,7 @@ export function useCanvasModes(editable: boolean) {
   );
 
   const relateFrom = mode?.kind === "relate" ? mode.fromCardId : null;
-  return { startRelate, toggleEntityTool, onPointerDownCapture, onContextMenu, relateFrom, cursor };
+  return { startRelate, toggleEntityTool, toggleHandTool, panning, onPointerDownCapture, onContextMenu, relateFrom, cursor };
 }
 
 /** The line from the card a relationship starts at to the mouse (prototype: from the card's header middle). */

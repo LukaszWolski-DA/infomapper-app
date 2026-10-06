@@ -12,6 +12,7 @@ import { buildCards } from "@/canvas/card-data";
 import { buildLines } from "@/canvas/line-data";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
 import { EntityToolButton } from "@/canvas/EntityToolButton";
+import { HandToolButton } from "@/canvas/HandToolButton";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
 import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
@@ -100,6 +101,7 @@ export default async function CanvasPage({
 const CanvasTools = ({ editable }: { editable: boolean }) => (
   <>
     {editable && <EntityToolButton />}
+    <HandToolButton />
     <NotationSwitch />
     <UndoButtons />
     <ZoomControls />

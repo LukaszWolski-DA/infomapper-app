@@ -152,6 +152,9 @@ body.connecting .im-canvas .row { cursor: crosshair }
 
 /* ---------- canvas tools (slice 1b; prototype .tool-entity, body.relating) ---------- */
 .im-canvas.tool-entity, .im-canvas.tool-entity * { cursor: copy !important }
+/* Hand tool (slice 2a, D-18): grab anywhere, grabbing while it pans */
+.im-canvas.tool-hand, .im-canvas.tool-hand * { cursor: grab !important }
+.im-canvas.tool-hand.panning, .im-canvas.tool-hand.panning * { cursor: grabbing !important }
 .im-canvas.relating .card.ent, .im-canvas.relating .card.ent .c-head { cursor: crosshair }
 .im-canvas.relating .card.ent:hover { box-shadow: 0 0 0 2px var(--im-rel) }
 
@@ -176,3 +179,11 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .hover-lines .lnk { pointer-events: none }
 .im-canvas .hover-lines .lnk .hit { display: none }
 .im-canvas .hover-lines .lnk .s { stroke-width: 2.4 }
+
+/* ---------- several selected cards and the lasso (slice 2a; prototype .card.msel, #selbox, #lasso) ----------
+   Drawn in the overlay: the cards are not restyled (AD-24). One box, one label and one lasso, so the fills are fine. */
+.im-canvas .selection-layer .msel { fill: none; stroke: var(--im-logical); stroke-width: 2; vector-effect: non-scaling-stroke }
+.im-canvas .selection-layer .selbox { fill: none; stroke: var(--im-logical); stroke-width: 1.5; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke }
+.im-canvas .selection-layer .lasso { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1; vector-effect: non-scaling-stroke }
+.im-canvas .selbox-label { position: absolute; transform-origin: 0 0; pointer-events: none; white-space: nowrap; background: var(--im-logical);
+  color: var(--im-surface); font-size: 11.5px; font-weight: 500; padding: 2px 9px; border-radius: 10px }

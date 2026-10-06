@@ -16,6 +16,8 @@ export interface CanvasCardsApi {
   startRelate: (cardId: string) => void;
   /** Double-click on the width handle. */
   fitWidth: (cardId: string) => void;
+  /** Shift+click on a card: in or out of the selection (slice 2a). */
+  toggleCard: (cardId: string) => void;
 }
 
 const noop = () => {};
@@ -27,6 +29,7 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
   cycleFilter: noop,
   startRelate: noop,
   fitWidth: noop,
+  toggleCard: noop,
 });
 
 /** Relationship ends: crow's foot (Information Engineering) or UML multiplicity. Shared by all canvases (D-22). */
@@ -62,6 +65,8 @@ export interface CanvasHandle {
   settled: () => Promise<void>;
   /** A card's collapse state and row filter as the canvas shows them now (changed without a fresh page). */
   cardView: (cardId: Uuid) => { collapsed: boolean; rowFilter: RowFilter } | null;
+  /** Selects every card on the canvas (Ctrl+A, toolbox “Select all”; slice 2a). */
+  selectAll: () => void;
 }
 
 export type RowFilter = "all" | "mapped" | "unmapped" | "keys";
@@ -92,8 +97,11 @@ export interface ToolboxRequest {
   at: { x: number; y: number };
 }
 
-/** A canvas tool that changes what a click does: the Entity tool (D-46) or drawing a relationship from a card. */
-export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | null;
+/**
+ * A canvas tool that changes what a click does: the Entity tool (D-46), drawing a relationship from a card, or the
+ * Hand tool (D-18, slice 2a), with which a left drag anywhere pans. One at a time; Esc ends it.
+ */
+export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | { kind: "hand" } | null;
 
 /**
  * What the canvas asks of the page around it. The canvas knows gestures and positions; the page knows the model and
@@ -163,6 +171,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   placeBeside: noop,
   settled: () => Promise.resolve(),
   cardView: () => null,
+  selectAll: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,

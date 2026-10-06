@@ -82,9 +82,14 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   const selectedRow = sel?.t === "row" && sel.cardId === card.id ? sel.id : null;
 
   // A click on a row selects the row, anywhere else on the card the card; the card tools do their own thing.
+  // Shift+click anywhere on the card puts the card in or out of a selection of several (slice 2a).
   const onClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest(".c-tools")) return;
+    if (e.shiftKey) {
+      ctx.toggleCard(card.id);
+      return;
+    }
     const row = target.closest<HTMLElement>("[data-row]")?.dataset.row;
     ctx.select(row ? { t: "row", cardId: card.id, id: row } : { t: "card", id: card.id });
   };
