@@ -1,7 +1,8 @@
 // S2A-14 on “Performance test” (seed:large), with slice 1b's measuring method (e2e/slice-01b/measure.ts). Step 3 has
 // the group drag: a lasso at about 20 % selects at least 20 cards, the view zooms in to 50 %, then one of them is
 // dragged by its header in circles
-// for 6 s while every frame is recorded, against the bar of 45 fps on average. Step 5 adds the lasso's marks and pan
+// for 6 s while every frame is recorded, against the bar of 45 fps on average; then the same card alone, for
+// comparison. Step 5 adds the lasso's marks and pan
 // and zoom with the grid. The normal run checks the steps briefly without judging the speed:
 //
 //   MEASURE=1 npx playwright test e2e/slice-02a/S2A-14.spec.ts
@@ -68,7 +69,25 @@ test("S2A-14: on “Performance test”, dragging a group of at least 20 cards a
   // the whole group was saved in one change
   await expect.poll(async () => (await loadItems(LARGE_IDS.workspace, LARGE_IDS.canvas)).find((i) => i.id === lead)!.version).toBeGreaterThan(before.version);
 
-  const results = { measured: MEASURE, browser: browser.version(), viewport: page.viewportSize(), zoom: 0.5, selected, "group drag": drag };
+  // for comparison: the same card dragged alone (no selection)
+  await page.keyboard.press("Escape");
+  await expect(marks).toHaveCount(0);
+  const head1 = await box(page.locator(`.react-flow__node[data-id="${lead}"] .c-head`));
+  const at1 = { x: head1.x + 30, y: head1.y + head1.height / 2 };
+  await page.mouse.move(at1.x, at1.y);
+  await page.mouse.down();
+  await startRecording(page);
+  const t1 = Date.now();
+  let b = 0;
+  while (Date.now() - t1 < (MEASURE ? 6000 : 1500)) {
+    b += 0.05;
+    await page.mouse.move(at1.x + 80 * Math.sin(b) + 80, at1.y + 60 * Math.cos(b) - 60);
+  }
+  const single = await stopRecording(page);
+  await page.mouse.up();
+
+  const build = process.env.MEASURE_BUILD === "production" ? "production (measurement build)" : "dev server";
+  const results = { measured: MEASURE, build, browser: browser.version(), viewport: page.viewportSize(), zoom: 0.5, selected, "group drag": drag, "single-card drag": single };
   saveResults("S2A-14", results);
   await test.info().attach("S2A-14 results", { body: JSON.stringify(results, null, 2), contentType: "application/json" });
   if (MEASURE) expect.soft(drag.avgFps, "group drag, average fps (bar 45)").toBeGreaterThanOrEqual(45);
