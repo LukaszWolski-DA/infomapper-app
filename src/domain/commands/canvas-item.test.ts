@@ -174,7 +174,7 @@ describe("several cards at once (slice 2a): move, arrange, widths, remove", () =
       items: [ref(itemCustomer, { x: 408, y: 128 }), ref(ids.itemCrmCustomer, { x: 48, y: 48 }), ref(second, { x: 800, y: 40 })],
     });
     if (!r.ok) throw new Error(r.error.message);
-    expect(r.value).toEqual({ moved: 2 });
+    expect(r.value).toEqual({ moved: 2, versions: { [itemCustomer]: 2, [ids.itemCrmCustomer]: 2 } });
     expect(r.writeSet.writes).toMatchObject([
       { kind: "update", table: "canvas_item", row: { id: itemCustomer, x: 408, y: 128, version: 2, updated_at: NOW } },
       { kind: "update", table: "canvas_item", row: { id: ids.itemCrmCustomer, x: 48, y: 48, version: 2 } },
@@ -214,7 +214,7 @@ describe("several cards at once (slice 2a): move, arrange, widths, remove", () =
       items: [ref(itemCustomer, { width: 312 }), ref(second, { width: null })],
     });
     if (!r.ok) throw new Error(r.error.message);
-    expect(r.value).toEqual({ changed: 1 });
+    expect(r.value).toEqual({ changed: 1, versions: { [itemCustomer]: 2 } });
     expect(r.writeSet.writes).toMatchObject([{ row: { id: itemCustomer, width: 312 } }]);
     for (const width of [192, 608, 301]) {
       expect(setCanvasItemWidths(makeCtx(), access("modeler"), state, { canvasId: canvas1, items: [ref(itemCustomer, { width })] }).ok).toBe(false);

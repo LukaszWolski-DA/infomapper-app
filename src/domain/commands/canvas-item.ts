@@ -265,6 +265,10 @@ function cardsOf(
   return { ok: true, rows };
 }
 
+/** The new version of each card a write set updates, for the canvas's next write. */
+const versionsOf = (writes: readonly Write[]): Record<string, number> =>
+  Object.fromEntries(writes.flatMap((w) => (w.kind === "update" && w.table === "canvas_item" ? [[w.row.id, w.row.version]] : [])));
+
 /** One update per card whose values change; refused when none does. */
 function updates(ctx: CommandContext, rows: readonly CanvasItem[], patches: readonly Partial<CanvasItem>[]): Write[] | null {
   const writes: Write[] = [];
@@ -273,6 +277,12 @@ function updates(ctx: CommandContext, rows: readonly CanvasItem[], patches: read
     if (Object.keys(patch).length) writes.push({ kind: "update", table: "canvas_item", before, row: nextVersion(ctx, before, patch) });
   });
   return writes.length ? writes : null;
+}
+
+/** How many cards changed, and the new version of each. */
+export interface GroupMoved {
+  moved: number;
+  versions: Record<string, number>;
 }
 
 const moveInput = (position: typeof coordinate) =>
@@ -289,14 +299,14 @@ function moveItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasIt
   if (!got.ok) return fail(got.error);
   const writes = updates(ctx, got.rows, items.map(({ x, y }) => ({ x, y })));
   if (!writes) return fail(nothingToChange());
-  return done(ctx, access, { moved: writes.length }, writes);
+  return done(ctx, access, { moved: writes.length, versions: versionsOf(writes) }, writes);
 }
 
 /**
  * Moves several cards of one canvas in one change group, so one undo puts them all back: a group drag, or arrow-key
  * nudges once the keys are still. Cards whose position does not change are left out.
  */
-export function moveCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<{ moved: number }> {
+export function moveCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<GroupMoved> {
   return moveItems(ctx, access, state, input, moveItemsInput);
 }
 
@@ -304,7 +314,7 @@ export function moveCanvasItems(ctx: CommandContext, access: WorkspaceAccess, st
  * Align, stack or line up (the group toolbox): the canvas computes the positions from the cards' sizes; every
  * position must lie on the 8 px grid. One change group.
  */
-export function arrangeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<{ moved: number }> {
+export function arrangeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<GroupMoved> {
   return moveItems(ctx, access, state, input, arrangeItemsInput);
 }
 
@@ -312,7 +322,12 @@ const widthsInput = z.object({ canvasId: uuidSchema, items: groupOf(z.object({ .
 export type SetCanvasItemWidthsInput = z.input<typeof widthsInput>;
 
 /** “Fit widths to names” for several cards: the canvas measures, the domain checks the widths (D-37). One change group. */
-export function setCanvasItemWidths(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<{ changed: number }> {
+export function setCanvasItemWidths(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: CanvasItemsState,
+  input: unknown,
+): CommandResult<{ changed: number; versions: Record<string, number> }> {
   const parsed = begin(access, "canvas.edit_items", widthsInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { canvasId, items } = parsed.data;
@@ -320,7 +335,7 @@ export function setCanvasItemWidths(ctx: CommandContext, access: WorkspaceAccess
   if (!got.ok) return fail(got.error);
   const writes = updates(ctx, got.rows, items.map(({ width }) => ({ width })));
   if (!writes) return fail(nothingToChange());
-  return done(ctx, access, { changed: writes.length }, writes);
+  return done(ctx, access, { changed: writes.length, versions: versionsOf(writes) }, writes);
 }
 
 const removeItemsInput = z.object({ canvasId: uuidSchema, items: groupOf(z.object(itemRef).strict()) }).strict();

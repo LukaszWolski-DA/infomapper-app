@@ -1,10 +1,23 @@
 "use server";
 
 // Card writes on the canvas (slice 1a): position (when a drag ends), collapse and row filter, which need no fresh page;
-// placing a card and removing it, which do; slice 1b: placing several at once (feeding sources, B-08).
+// placing a card and removing it, which do; slice 1b: placing several at once (feeding sources, B-08); slice 2a:
+// moving, arranging, sizing and removing a group of selected cards, each in one change.
 
 import { revalidatePath } from "next/cache";
-import { placeManyOnCanvas, placeOnCanvas, removeFromCanvas, updateCanvasItem } from "@/domain/commands/canvas-item";
+import {
+  arrangeCanvasItems,
+  moveCanvasItems,
+  placeManyOnCanvas,
+  placeOnCanvas,
+  removeCanvasItems,
+  removeFromCanvas,
+  setCanvasItemWidths,
+  updateCanvasItem,
+  type CanvasItemsState,
+} from "@/domain/commands/canvas-item";
+import type { CommandContext, CommandResult } from "@/domain/changes";
+import type { WorkspaceAccess } from "@/domain/permissions";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
@@ -93,6 +106,55 @@ export async function removeCardAction(
     const id = typeof input?.canvasItemId === "string" ? input.canvasItemId : "";
     return removeFromCanvas(ctx, access, { item: await store.canvasItems.get(workspace.id, id) }, input);
   });
+  if (result.ok) revalidatePath("/", "layout");
+  return result;
+}
+
+// ---- a group of selected cards (slice 2a) ----
+
+type GroupCommand<T> = (ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown) => CommandResult<T>;
+
+/** Runs a group command on one canvas with its cards as they are stored now. */
+function onCanvasCards<T>(workspaceId: string, canvasId: string, command: GroupCommand<T>, input: object): Promise<ActionResult<T>> {
+  return runCommand(async (ctx, store, user) => {
+    const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
+    if (!workspace) return NOT_FOUND;
+    const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
+    const cid = typeof canvasId === "string" ? canvasId : "";
+    const [canvas, items] = await Promise.all([store.canvases.get(workspace.id, cid), store.canvasItems.listOfCanvas(workspace.id, cid)]);
+    return command(ctx, access, { canvas, items }, { ...input, canvasId });
+  });
+}
+
+export interface CardPositionInput {
+  canvasItemId: string;
+  expectedVersion: number;
+  x: number;
+  y: number;
+}
+
+/** A group drag or arrow-key nudges: every card's new position in one change. Returns the new versions. */
+export async function moveCardsAction(workspaceId: string, canvasId: string, items: CardPositionInput[]) {
+  return onCanvasCards(workspaceId, canvasId, moveCanvasItems, { items });
+}
+
+/** Align, stack or line up: positions on the 8 px grid, in one change. */
+export async function arrangeCardsAction(workspaceId: string, canvasId: string, items: CardPositionInput[]) {
+  return onCanvasCards(workspaceId, canvasId, arrangeCanvasItems, { items });
+}
+
+/** “Fit widths to names” for several cards, in one change. */
+export async function setCardWidthsAction(
+  workspaceId: string,
+  canvasId: string,
+  items: { canvasItemId: string; expectedVersion: number; width: number | null }[],
+) {
+  return onCanvasCards(workspaceId, canvasId, setCanvasItemWidths, { items });
+}
+
+/** Takes several cards off the canvas in one change; the elements stay in the model (D-02). */
+export async function removeCardsAction(workspaceId: string, canvasId: string, items: { canvasItemId: string; expectedVersion: number }[]) {
+  const result = await onCanvasCards(workspaceId, canvasId, removeCanvasItems, { items });
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
