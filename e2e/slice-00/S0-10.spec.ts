@@ -104,6 +104,9 @@ test("S0-10: after stopping and restarting the dev server, created projects and 
     await expectToast(page, "Renamed the canvas to Still here.", COLD);
     await expect(page).not.toHaveURL(/rename=1/);
     const canvasUrl = page.url();
+    // Leave the page first: its dev client would reload it on its own once the server is back, and that reload would
+    // cut the navigation below short.
+    await page.goto("about:blank");
 
     stopServer(server);
     await waitUntil(false);
