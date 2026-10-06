@@ -39,13 +39,16 @@
     ".next-e2e/types/**/*.ts",
     ".next-e2e/dev/types/**/*.ts",
     ".next-e2e-restart/types/**/*.ts",
-    ".next-e2e-restart/dev/types/**/*.ts"
+    ".next-e2e-restart/dev/types/**/*.ts",
+    ".next-measure/types/**/*.ts",
+    ".next-measure/dev/types/**/*.ts"
   ],
   "exclude": [
     "node_modules",
     "spikes",
     "docs",
     ".next-e2e",
-    ".next-e2e-restart"
+    ".next-e2e-restart",
+    ".next-measure"
   ]
 }

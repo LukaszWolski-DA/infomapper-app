@@ -16,7 +16,9 @@
     "seed": "tsx scripts/seed.ts",
     "seed:large": "tsx scripts/seed-large.ts",
     "reset-dev-data": "tsx scripts/reset-dev-data.ts",
-    "schema:check": "tsx scripts/check-schema.ts"
+    "schema:check": "tsx scripts/check-schema.ts",
+    "measure:build": "tsx scripts/measure.ts build",
+    "measure:start": "tsx scripts/measure.ts start"
   },
   "dependencies": {
     "@xyflow/react": "^12.12.0",

@@ -3,6 +3,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { isLocalModeAllowed } from "./measure-mode";
 import { DEV_DB_FORMAT, type DevDb } from "./schema";
 
 /** Where the file lives: INFOMAPPER_DEV_DB if set (tests), else .data/dev-db.json in the project. */
@@ -13,7 +14,9 @@ export function devDbPath(): string {
 
 export class ProductionRefusedError extends Error {
   constructor() {
-    super("The local data adapter is for development only and refuses to run with NODE_ENV=production (AD-29).");
+    super(
+      "The local data adapter is for development only and refuses to run with NODE_ENV=production (AD-29), except in the measurement-only build started with INFOMAPPER_MEASURE=1 (AD-31).",
+    );
     this.name = "ProductionRefusedError";
   }
 }
@@ -26,7 +29,7 @@ export class NoDevDataError extends Error {
 }
 
 export function assertNotProduction(): void {
-  if (process.env.NODE_ENV === "production") throw new ProductionRefusedError();
+  if (!isLocalModeAllowed()) throw new ProductionRefusedError();
 }
 
 export async function readDb(file: string): Promise<DevDb> {

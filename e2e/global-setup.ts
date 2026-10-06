@@ -4,12 +4,12 @@
 import { chromium } from "@playwright/test";
 import { SEED_IDS } from "../src/data/local/seed";
 import { resetDevData } from "../src/data/local/dev-data";
-import { E2E_DB, E2E_PORT } from "./config";
+import { E2E_BASE, E2E_DB } from "./config";
 
 export default async function globalSetup() {
   await resetDevData(E2E_DB);
 
-  const base = `http://localhost:${E2E_PORT}`;
+  const base = E2E_BASE;
   const browser = await chromium.launch();
   try {
     const page = await browser.newPage();
