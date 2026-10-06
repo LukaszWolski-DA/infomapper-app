@@ -75,9 +75,9 @@ visual polish may improve, behaviour may not change without a decision.
 
 **Canvas (AD-24).** React Flow with the named workarounds listed under AD-24 in docs/decisions.md. Follow them in all canvas work; the spike in spikes/canvas-react-flow shows how.
 
-**Local adapter and development sign-in (AD-29).** Until the Supabase slice, data lives in a JSON file on the server
-(`.data/dev-db.json`, git-ignored) and people sign in by picking a test user. Both exist only in development: a
-production build must refuse to start them. The local adapter enforces the same rules as a real database would:
+**Local adapter and development sign-in (AD-29).** Until the database slice (last, AD-31), data lives in a JSON file
+on the server (`.data/dev-db.json`, git-ignored) and people sign in by picking a test user. Both exist only in
+development: a production build must refuse to start them. The local adapter enforces the same rules as a real database would:
 versions, change events in the same write, uniqueness and the “exactly one target” checks from the data model.
 
 ## Testing (AD-21)

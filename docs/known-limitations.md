@@ -12,7 +12,7 @@ re-checks versions, keys and references inside its serialised write, but not thi
 moment can therefore both pass the check and leave a canvas or project without its last link.
 
 - **Accepted** in the local adapter: it is development only and has one user at a time in practice.
-- **Supabase slice:** check this rule in the same transaction as the write (e.g. lock the project's and the canvas's
+- **The database slice (last, AD-31):** check this rule in the same transaction as the write (e.g. lock the project's and the canvas's
   `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed.
 
 ## Canvas performance (slice 1a)
@@ -27,14 +27,14 @@ because the local data adapter refuses a production build (AD-29); the spike sho
 initial render.
 
 - **Recorded** as “partly met” for slice 1a, as Łukasz asked on 4 October 2026.
-- **Supabase slice:** measure S1A-14 again in a production build (`npm run build`, `npm start`) with the same method
+- **The database slice (last, AD-31):** measure S1A-14 again in a production build (`npm run build`, `npm start`) with the same method
   (`MEASURE=1`, headed Chrome, same laptop), and decide on the card design (fewer elements per row, or detail by zoom
   level between 40% and 100%) if 100% still misses the bar.
 - **Slice 1b** adds two more that are only partly met on the development laptop (S1B-09, S1B-10): card resize (C-09)
   runs at 31–36 fps with an outline while dragging (bar: 45 fps), and the hover highlight (C-10) takes about 190 ms
   (bar: 100 ms). A veil over the lines and a block view while resizing were tried and did not help: every change
   repaints the canvas's one large GPU layer. Recorded as “partly met”, as Łukasz decided.
-- **Supabase slice:** measure S1A-14, C-09 and C-10 in a production build, if possible also on a second, newer
+- **The database slice (last, AD-31):** measure S1A-14, C-09 and C-10 in a production build, if possible also on a second, newer
   machine. If production misses the bars, the next step is drawing the mapping lines on an HTML canvas instead of SVG
   (the lines are already drawn by one component, `src/canvas/LineLayer.tsx`, so the change stays inside it).
 
@@ -47,7 +47,7 @@ memory of the server process, as the PRD asks for now. It is lost when the serve
 the demo data is replaced: steps whose change group is no longer in the change log are left out).
 
 - **Accepted** for the local adapter: one development server, one user at a time in practice.
-- **Supabase slice:** decide whether the history must survive a restart (and several server instances). If it must,
+- **The database slice (last, AD-31):** decide whether the history must survive a restart (and several server instances). If it must,
   keep it in the database next to `change_event`.
 
 ## Right panel (slice 1a)
@@ -86,4 +86,4 @@ S0-10 removes `.next-e2e-restart` before and after use. A global setup warms the
 pages), so the first tests do not wait for compiles.
 
 - **Accepted:** an e2e run compiles every page once (about a minute); `npm run dev` keeps its cache.
-- **Later:** if the e2e runs move to a production build once the local adapter is gone (Supabase slice), this goes away.
+- **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.

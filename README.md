@@ -31,8 +31,8 @@ Retail Co – DWH and Sales analytics:
 | InfoMate | Bank X – Risk DWH (archived) | Łukasz owner, Anna Nowak modeler |
 | Retail Co | Sales analytics | Marek Lis owner, Łukasz reviewer (guest) |
 
-Until the Supabase slice, data lives in a JSON file on the server and sign-in means picking a test user (AD-29). Both
-exist only in development: a production build refuses them.
+Until the database slice (last, AD-31), data lives in a JSON file on the server and sign-in means picking a test user
+(AD-29). Both exist only in development: a production build refuses them.
 
 ## Commands
 
@@ -65,7 +65,7 @@ Optional variables are listed in `.env.example`.
 | `e2e/` | Playwright acceptance tests, one folder per slice, one file per criterion |
 | `tests/` | Repository-level checks (the layer rules) |
 | `docs/` | Decisions, data model, PRDs, acceptance, ideas, known limitations, and the prototype (the reference for behaviour) |
-| `supabase/migrations/` | Database migrations (Supabase arrives in its own slice) |
+| `supabase/migrations/` | Database migrations (Supabase arrives with the database slice, last, AD-31) |
 | `spikes/` | Throwaway experiments; not part of the application |
 
 How we work and the architecture rules are in `CLAUDE.md`.
