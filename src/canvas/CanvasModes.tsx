@@ -6,7 +6,8 @@
 //   the next click on another entity creates the relationship, a click elsewhere ends it. Dragging from the button
 //   and releasing over an entity does the same.
 // - A right-click without moving opens the toolbox for what is under the mouse, after selecting it (D-19); a right-drag
-//   still pans (React Flow). On a card of a selection of several it opens the group's toolbox (slice 2a).
+//   still pans (React Flow). On the header or body of a card of a selection of several it opens the group's toolbox
+//   (slice 2a); on a row, that row's own toolbox (D-52).
 // - Hand tool (H, slice 2a, D-18): a left drag anywhere, over cards too, pans the canvas and selects nothing; V or Esc
 //   end it. Right drag, the middle button and Space still pan as before. It is not saved.
 // The page does the writes and draws the toolbox (CanvasHost); this file only reads gestures.
@@ -199,12 +200,13 @@ export function useCanvasModes(editable: boolean) {
       } else if (relationshipId) {
         target = { kind: "rel", relationshipId };
         select({ t: "rel", id: relationshipId });
-      } else if (cardId && inSelection(cardId)) {
-        // anywhere on a selected card, its rows too (prototype ctxFor)
-        target = { kind: "selection" };
       } else if (cardId && rowId) {
+        // a row keeps its own toolbox, also on a selected card (D-52 over the prototype's ctxFor)
         target = { kind: "row", cardId, rowId };
         select({ t: "row", cardId, id: rowId });
+      } else if (cardId && inSelection(cardId)) {
+        // the header or body of a selected card: the group's toolbox
+        target = { kind: "selection" };
       } else if (cardId) {
         target = { kind: "card", cardId };
         select({ t: "card", id: cardId });

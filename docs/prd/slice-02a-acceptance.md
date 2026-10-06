@@ -48,13 +48,14 @@ Assumed while building, accepted at step 1:
 8. **One command for the tab menu's last item** (D-28): it takes the canvas out of this project or deletes it,
    depending on whether another project has it.
 
-Assumed while building (please check):
+Assumed while building, accepted at step 3:
 
 9. **“Add sources of selected entities”** places each entity's missing feeding source tables beside that entity's own
    card, as PRD item 9 says. The prototype stacks them beside the whole group instead. A table feeding several selected
    entities is placed once, beside the first of them from top to bottom.
-10. **A right-click anywhere on a selected card**, its rows too, opens the group's toolbox while two or more cards are
-    selected, as in the prototype (`ctxFor`: the card decides, not the row).
+10. **A right-click on a selected card** opens the group's toolbox from the card's header or body (outside its rows)
+    while two or more cards are selected; on a row it opens that row's own toolbox. D-52 wins over the prototype, whose
+    `ctxFor` gives the group's toolbox on rows too (Łukasz, 6 October).
 
 ## Changes to tests of earlier slices
 
