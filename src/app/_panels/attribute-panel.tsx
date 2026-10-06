@@ -149,13 +149,14 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       </Field>
 
       <Field label="Data type" htmlFor="f-at">
-        <div className="flex gap-2">
+        {/* the parameters sit next to the type, and wrap under it when the panel is narrow */}
+        <div className="flex flex-wrap gap-2" data-testid="field-attribute-type">
           <select
             key={v}
             id="f-at"
             defaultValue={a.data_type}
             disabled={!p.editable}
-            className={`${inputClass} flex-1`}
+            className={`${inputClass} min-w-[120px] flex-1 basis-[120px]`}
             data-testid="select-attribute-type"
             onChange={(e) => saveType({ dataType: e.target.value as LogicalType })}
           >
@@ -169,10 +170,10 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
             <ParamField key={`l${v}`} label="Length" value={a.type_length} disabled={!p.editable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
           )}
           {a.data_type === "decimal" && (
-            <>
+            <div className="flex flex-none gap-2">
               <ParamField key={`p${v}`} label="Precision" value={a.type_precision} disabled={!p.editable} onSave={(n) => saveType({ precision: n })} testId="input-type-precision" />
               <ParamField key={`s${v}`} label="Scale" value={a.type_scale} disabled={!p.editable} onSave={(n) => saveType({ scale: n })} testId="input-type-scale" />
-            </>
+            </div>
           )}
         </div>
         {a.data_type === "custom" && (
@@ -290,7 +291,8 @@ function ParamField({
       defaultValue={value ?? ""}
       disabled={disabled}
       data-testid={testId}
-      className={`${inputClass} w-[84px] flex-none`}
+      // 84 px, not the input's usual full width (which made the type's parameters run out of the panel)
+      className={`${inputClass.replace("w-full", "w-[84px]")} flex-none`}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
       }}
