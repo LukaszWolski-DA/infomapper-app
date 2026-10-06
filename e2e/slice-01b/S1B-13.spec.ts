@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { canvasUrl, card, expectToast, ids, LEFT_AT_100, loadModel, openCanvas, pointOnLine, rowNamed, signInAs } from "./helpers";
+import { canvasUrl, card, expectToast, ids, LEFT_AT_100, loadModel, openCanvas, pointOnLine, rowNamed, signInAs, toolboxAt } from "./helpers";
 
 test("S1B-13: deleting a mapping or relationship is immediate with “Undo” in the toast; an attribute with mappings still asks for confirmation", async ({ page }) => {
   const { model, attribute, entity } = await ids();
@@ -56,4 +56,32 @@ test("S1B-13: deleting a mapping or relationship is immediate with “Undo” in
   await page.getByTestId("button-delete-attribute").click();
   await expectToast(page, "Attribute deleted");
   await expect.poll(async () => (await loadModel()).attributes.some((a) => a.id === segment.id)).toBe(false);
+
+  // the same rules in the attribute row's toolbox (D-52): with mappings a second click, without at once
+  const first = attribute("Customer", "first_name");
+  const firstLive = async () => (await loadModel()).attributes.some((a) => a.id === first.id);
+  let row = (await rowNamed(page, "Customer", "first_name").boundingBox())!;
+  await toolboxAt(page, { x: row.x + 30, y: row.y + row.height / 2 });
+  const item = page.getByTestId("menu-toolbox").getByRole("menuitem", { name: "Delete attribute" });
+  await item.click();
+  const armed = page.getByTestId("menu-toolbox").locator('[data-armed="true"]');
+  await expect(armed).toHaveText(/Click again to delete, with 1 mapping$/);
+  expect(await firstLive()).toBe(true);
+  await armed.click();
+  await expectToast(page, "Attribute deleted together with 1 mapping");
+  await expect.poll(firstLive).toBe(false);
+  await expect(page.getByTestId("menu-toolbox")).toHaveCount(0);
+
+  // a new attribute (no mappings) goes at once from its toolbox
+  const ids0 = new Set((await loadModel()).attributes.map((a) => a.id));
+  await card(page, "Customer").getByTestId("card-name").click();
+  await page.getByTestId("button-add-attribute").click();
+  await expect.poll(async () => (await loadModel()).attributes.filter((a) => !ids0.has(a.id)).length).toBe(1);
+  const fresh = (await loadModel()).attributes.find((a) => !ids0.has(a.id))!;
+  await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  row = (await card(page, "Customer").locator(`[data-row="${fresh.id}"]`).boundingBox())!;
+  await toolboxAt(page, { x: row.x + 30, y: row.y + row.height / 2 });
+  await page.getByTestId("menu-toolbox").getByRole("menuitem", { name: "Delete attribute" }).click();
+  await expectToast(page, "Attribute deleted");
+  await expect.poll(async () => (await loadModel()).attributes.some((a) => a.id === fresh.id)).toBe(false);
 });

@@ -20,17 +20,17 @@ Results from 5 October 2026: `npm run lint`, `npm run typecheck` and `npm test` 
 | --- | --- | --- | --- |
 | S1B-01 | Dragging `customers.segment` onto `Customer.segment_code` creates a direct mapping and its line | e2e `S1B-01.spec.ts`: real mouse drag from the column row to the attribute row; toast, one direct draft mapping with that input, its line, the mapping panel open | Pass |
 | S1B-02 | `web_users.cust_no` onto `Customer.customer_number` pre-selects “Separate mapping”, Enter creates a second mapping; `customers.lname` onto an attribute mapped from `customers.fname` pre-selects “Add to mapping” and asks for a rule | e2e `S1B-02.spec.ts`: the popover's options and pre-selection, Enter, a second direct mapping; then “Add to mapping customers.fname” pre-selected, the column waiting in the mapping panel with the rule note, saved with a rule as a transform with both inputs in order; unit `mapping-choice.test.ts` | Pass |
-| S1B-03 | Dropping `order_line.price` on the Order Line header creates attribute `price` (decimal with the column's precision and scale) and a direct mapping | e2e `S1B-03.spec.ts`: drop on the header; `price` decimal(10,2), one direct mapping from the column, the new row on the card; unit `type-check.test.ts` (the type table in reverse), `attribute.test.ts` | Pass |
+| S1B-03 | Dropping `order_line.price` on the Order Line header creates attribute `price` (decimal with the column's precision and scale) and a direct mapping | e2e `S1B-03.spec.ts`: drop on the header; `price` decimal(10,2), one direct mapping from the column, the new row on the card; its precision and scale fields (and a string's length) fit the right panel at 340 px and at its narrowest, 280 px, wrapping under the type ([finding 3](#findings-from-the-definition-of-done)); unit `type-check.test.ts` (the type table in reverse), `attribute.test.ts` | Pass |
 | S1B-04 | “Map to an attribute” in the column panel creates the mapping | e2e `S1B-04.spec.ts`: the column panel's picker, the mapping and its line | Pass |
 | S1B-05 | Split turns a combined mapping into one mapping per input; merge turns two mappings of one attribute into one transform after a rule is given | e2e `S1B-05.spec.ts`: split of a two-input mapping into two direct ones; merge of Customer.email's two mappings refused without a rule, then a transform in review with both inputs; unit `mapping.test.ts` | Pass |
 | S1B-06 | Relate from Customer to Country creates a relationship; the panel sets its label and ends | e2e `S1B-06.spec.ts`: Country placed from the left panel, relate button, click on Country; default ends 1 to 0..n; label and both ends set in the panel; unit `relationship.test.ts` | Pass |
-| S1B-07 | The Entity tool and “New entity here” create an entity at the clicked spot with the name ready to type; the toolbox offers the actions listed for each kind of item | e2e `S1B-07.spec.ts`: Entity tool click (card at the click − 24, − 20, within the 8 px snap), name focused and typed; “New entity here”; the toolbox's actions on the empty canvas, a card, an attribute row, a column row, a mapping line and a relationship line | Pass |
+| S1B-07 | The Entity tool and “New entity here” create an entity at the clicked spot with the name ready to type; the toolbox offers the actions listed for each kind of item | e2e `S1B-07.spec.ts`: Entity tool click (card at the click − 24, − 20, within the 8 px snap), name focused and typed; “New entity here”; the toolbox's actions on the empty canvas, a card, an attribute row, a column row, a mapping line and a relationship line; a row's toolbox has exactly that row's actions and no card actions (D-52); “Collapse card” turns into “Expand card” on a collapsed card and expands it ([findings 1 and 2](#findings-from-the-definition-of-done)) | Pass |
 | S1B-08 | Ctrl+↑ moves an attribute up, Ctrl+Shift+↓ to the bottom; panel drag reorders; lines follow; the order is the same on every canvas and after reload | e2e `S1B-08.spec.ts`: both keys, the flash, the line end on the moved row, a drag in the entity panel, the order after reload and on a second canvas; unit `attribute.test.ts` (reorder in one change group) | Pass |
 | S1B-09 | Card width by dragging the edge and by “Fit width to names”, per canvas; on “Performance test” resize at 45 fps or better on average (C-09) | e2e `S1B-09.spec.ts`: the outline while dragging, the width on release (snapped to 8 px), double-click and toolbox fit, a different width for Order Line on the other canvas, after reload; C-09 with `MEASURE=1` | **Partly met**: the behaviour passes; C-09 24.0–32.1 fps (bar 45) – see [Performance](#performance-s1b-09-s1b-10) |
 | S1B-10 | Hovering a row highlights its lines and far-end rows within 100 ms on “Performance test” (C-10); pan and zoom do not regress against slice 1a | e2e `S1B-10.spec.ts`: hovering Customer.email marks its row and both far-end rows and draws its dots in the overlay, draws its two lines again above the others, fades nothing and restyles no card; C-10 and three pan-and-zoom runs with `MEASURE=1` | **Partly met**: the behaviour and pan and zoom pass (55.2 / 51.7 fps against 52.8 / 47.0); C-10 169 ms median (bar 100) |
 | S1B-11 | “Add the N missing to this canvas” places Customer's missing sources to the left of its card without overlaps | e2e `S1B-11.spec.ts`: with a third feeding source on the canvas, “Add the 2 missing” places both 160 px left of Customer from its top down; no two cards overlap; a fed entity clicked in the source table panel lands on the table's right; unit `canvas.test.ts` (`besideSpots`), `canvas-item.test.ts` (several cards in one change group) | Pass |
 | S1B-12 | Undo and redo: create, edit, move, reorder and delete are each undone with Ctrl+Z and redone; undo is refused with the message when another session changed the row afterwards | e2e `S1B-12.spec.ts`: each of the five undone and redone (Ctrl+Shift+Z and Ctrl+Y) with its toast; a move on another canvas named in the toast; a rename changed afterwards by Anna refused with the agreed message and dropped, the next Ctrl+Z going further back; Anna's change not in Łukasz's history; unit `undo.test.ts`, `undo-history.test.ts`, `change-label.test.ts` | Pass |
-| S1B-13 | Deleting a mapping or relationship is immediate with “Undo” in the toast; an attribute with mappings still asks for confirmation | e2e `S1B-13.spec.ts`: a mapping from its panel and a relationship with Delete, each undone from the toast's link; an attribute with mappings needs a second click; one without goes at once | Pass |
+| S1B-13 | Deleting a mapping or relationship is immediate with “Undo” in the toast; an attribute with mappings still asks for confirmation | e2e `S1B-13.spec.ts`: a mapping from its panel and a relationship with Delete, each undone from the toast's link; an attribute with mappings needs a second click; one without goes at once; the same in an attribute row's toolbox (D-52) | Pass |
 | S1B-14 | A reviewer gets no drag, relate, tool or reorder actions, and can undo only their own status changes; direct server calls are refused | e2e `S1B-14.spec.ts`: as Piotr no Entity tool, relate button, width handle, column drag, Ctrl+↑, panel order or feeding-source buttons; the toolbox only fits the view or sets a status; his status change undone and redone; relate, reorder, attribute from a column and width called directly are refused; undo called directly undoes his own step and then nothing of Łukasz's; unit `undo.test.ts`, `permissions.test.ts` | Pass |
 | S1B-15 | CI passes on the pull request; lint, typecheck, unit and all e2e suites pass three times in a row | e2e `S1B-15.spec.ts` (the workflow and scripts, and one test file per criterion); CI on PR #3 passed on every push of this slice (checked each time); local runs below | Pass |
 
@@ -80,6 +80,9 @@ server inside the test and waits up to two minutes for it; on this laptop a cold
 longer (it timed out in slice 1a's runs too). It is not caused by slice 1b, and the test was not changed. The server-log
 line is the accepted one from slice 1a ([known limitations](../known-limitations.md#the-destination-stream-closed-early-in-the-e2e-server-log)).
 
+After the three [findings](#findings-from-the-definition-of-done) were fixed (6 October): lint, typecheck, 437 unit
+tests and one more full run, 50/50.
+
 ## Manual checklist (S1B-01 to S1B-12)
 
 On http://localhost:3000 after `npm run reset-dev-data`, signed in as Łukasz, canvas “Customer & orders”:
@@ -95,7 +98,8 @@ On http://localhost:3000 after `npm run reset-dev-data`, signed in as Łukasz, c
       other one, merge without a rule (refused), with a rule (one transform, in review).
 - [ ] **S1B-06** Place Country, press the relate button on Customer, click Country; set the verb and the ends.
 - [ ] **S1B-07** Press E, click an empty spot, type a name. Right-click the empty canvas, a card, an attribute row, a
-      column row, a mapping line and a relationship line: each shows its actions; “New entity here” works.
+      column row, a mapping line and a relationship line: each shows its actions (a row only its own, D-52); “New entity
+      here” works; “Collapse card” on a card, then right-click it again: “Expand card”.
 - [ ] **S1B-08** Select an attribute, Ctrl+↑ and Ctrl+Shift+↓ (the row flashes, its lines follow); drag in the entity
       panel's list; reload: same order.
 - [ ] **S1B-09** Drag a card's right edge (an outline follows, the card takes the width on release); double-click the
@@ -120,7 +124,7 @@ Decided with Łukasz during the slice:
    hovered lines above the others and does not fade the rest (C-09, C-10; 4 October). Both are partly met; the
    production measurement is in the Supabase slice (5 October).
 4. S1B-10's pan-and-zoom bar is slice 1a's median of three runs minus 5 % (4 October).
-5. Deleting from the toolbox is immediate.
+5. Deleting from the toolbox is immediate (a mapping or a relationship; an attribute follows the panel's rules, D-52).
 6. The undo history is kept in server memory and lost when the server restarts; the Supabase slice decides whether it
    must survive a restart ([known limitations](../known-limitations.md#the-undo-history-lives-in-server-memory)).
 
@@ -146,6 +150,27 @@ Assumed while building (please check):
 14. The toolbox does not open when it would offer nothing (a reviewer or reader on a card), and Esc closes it from
     anywhere.
 15. A reviewer can set a mapping's status from the toolbox; everything else in it is for editors.
+
+Decided after the definition of done (6 October):
+
+16. **D-52** A row's right-click menu shows only that row's actions (move, map from or to, “Delete attribute”); card
+    actions are only in the card header's menu, so deleting an attribute can't be mistaken for deleting its entity.
+
+## Findings from the definition of done
+
+Łukasz built a small model from scratch on an empty canvas on 6 October 2026 and found three things, fixed before
+acceptance:
+
+1. **The toolbox could not expand a collapsed card.** Its entry read the card's state from the page, which a collapse
+   on the canvas does not refresh, so it kept offering “Collapse card”. It now reads the card as the canvas shows it
+   and toggles: “Collapse card” or “Expand card” (the rows filter likewise). Test: S1B-07.
+2. **A row's toolbox also listed the card's actions** (remove from canvas, delete from model, …), so deleting an
+   attribute could be mistaken for deleting its entity. New rule **D-52**: a row's toolbox shows only that row's actions
+   (move up, down, to top, to bottom; map from a column or to an attribute; “Delete attribute” with the panel's
+   confirmation rules); card actions are only in the header's toolbox. Tests: S1B-07, S1B-13.
+3. **The data type's length, precision and scale fields ran out of the right panel.** They took the inputs' full
+   width instead of their own; now they keep 84 px and wrap under the type field when the panel is narrow, down to its
+   narrowest, 280 px. Test: S1B-03.
 
 ## Known limitations carried forward
 

@@ -40,17 +40,30 @@ test("S1B-07: the Entity tool and “New entity here” create an entity at the 
     expect(onCard, item).toContain(item);
   }
   await expect(page.getByTestId("menu-toolbox").getByText("Rows", { exact: true })).toBeVisible();
+  // collapse from the toolbox, and the entry turns into “Expand card”, which expands it again
+  await page.getByTestId("menu-toolbox").getByRole("menuitem", { name: "Collapse card" }).click();
+  const customerCard = (await card(page, "Customer").locator("[data-card]").getAttribute("data-card"))!;
+  await expect(card(page, "Customer").locator(".row[data-row]")).toHaveCount(0);
+  await expect.poll(async () => (await loadItems()).find((i) => i.id === customerCard)!.collapsed).toBe(true);
+  const onCollapsed = await toolboxAt(page, { x: head.x + 20, y: head.y + 10 });
+  expect(onCollapsed).toContain("Expand card");
+  expect(onCollapsed).not.toContain("Collapse card");
+  await page.getByTestId("menu-toolbox").getByRole("menuitem", { name: "Expand card" }).click();
+  await expect(card(page, "Customer").locator(".row[data-row]")).toHaveCount(8);
+  await expect.poll(async () => (await loadItems()).find((i) => i.id === customerCard)!.collapsed).toBe(false);
+  expect(await toolboxAt(page, { x: head.x + 20, y: head.y + 10 })).toContain("Collapse card");
   await closeToolbox(page);
 
-  // an attribute row: map from a column, move up, down, to top, to bottom
+  // an attribute row: only the row's actions, no card actions (D-52)
   const email = (await rowNamed(page, "Customer", "email").boundingBox())!;
   const onRow = await toolboxAt(page, { x: email.x + 30, y: email.y + email.height / 2 });
-  for (const item of ["Move up", "Move down", "Move to the top", "Move to the bottom", "Map from a column…"]) expect(onRow, item).toContain(item);
+  expect(onRow).toEqual(["Move up", "Move down", "Move to the top", "Move to the bottom", "Map from a column…", "Delete attribute"]);
+  await expect(page.getByTestId("menu-toolbox").getByText("Rows", { exact: true })).toHaveCount(0);
   await closeToolbox(page);
 
-  // a column row
+  // a column row: only the row's action (D-52)
   const segment = (await rowNamed(page, "customers", "segment").boundingBox())!;
-  expect(await toolboxAt(page, { x: segment.x + 30, y: segment.y + segment.height / 2 })).toContain("Map to an attribute…");
+  expect(await toolboxAt(page, { x: segment.x + 30, y: segment.y + segment.height / 2 })).toEqual(["Map to an attribute…"]);
   await closeToolbox(page);
 
   // a mapping line: status, edit rule, delete
