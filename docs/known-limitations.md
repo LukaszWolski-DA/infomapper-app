@@ -50,6 +50,30 @@ the demo data is replaced: steps whose change group is no longer in the change l
 - **The database slice (last, AD-31):** decide whether the history must survive a restart (and several server instances). If it must,
   keep it in the database next to `change_event`.
 
+## Dependencies (slice 2a, step 0)
+
+### `npm audit`: 11 high, all from one advisory without a fix
+
+On 6 October 2026 `npm audit` reports 11 high-severity findings. All come from one advisory,
+[GHSA-vfj7-8cjw-p6xm](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm) (published 18 September 2026): `braces`
+up to 3.0.3 can exhaust the stack on deeply nested brace patterns and crash the Node.js process. 3.0.3 is the newest
+`braces`, so there is no patched version yet. The other ten are the packages that reach it through `micromatch` and
+`fast-glob`:
+
+| Package (we depend on it directly) | Path to `braces` | npm's suggested “fix” |
+| --- | --- | --- |
+| `eslint-plugin-boundaries` 7.2.0 (dev) | `micromatch` → `braces`; `@boundaries/elements` | downgrade to 1.1.1 (breaking) |
+| `eslint-config-next` 16.3.8 (dev) | `@next/eslint-plugin-next` → `fast-glob` → `micromatch` | downgrade to 14.2.35 (breaking) |
+| `shadcn` 4.21.1 (dev) | `@shadcn/registry`, `ts-morph`, `fast-glob` → `micromatch` | downgrade to 1.0.0 (breaking) |
+
+`npm audit fix` without `--force` resolves none of them (it only moves `shadcn` to 4.21.3), so nothing was changed.
+
+- **Risk: low for us.** All three are development tools (lint and the shadcn CLI) and are not part of the application
+  the server runs. They match glob patterns from this repository's own configuration, not input from users, so an
+  attacker would need to change the repository to trigger it, and the worst outcome is a crashed lint run.
+- **Accepted** until `braces` (or `micromatch`) publishes a fix; then update within the current majors and run
+  `npm audit` again. Do not take the suggested downgrades: they would break lint (the layer rules) and the shadcn CLI.
+
 ## Right panel (slice 1a)
 
 ### Panel links only reach rows whose card is on this canvas (step 5a)
