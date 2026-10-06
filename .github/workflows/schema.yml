@@ -1,0 +1,41 @@
+name: Schema
+
+# AD-31: the SQL migrations, applied to a real Postgres, must match the domain's tables (npm run schema:check).
+# Postgres 17 is what Supabase gives new projects (checked 6 October 2026); the image is pinned to a minor version.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: schema-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  migrations:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17.11-alpine
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: schemacheck
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgres://postgres:postgres@localhost:5432/schemacheck
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npm run schema:check
