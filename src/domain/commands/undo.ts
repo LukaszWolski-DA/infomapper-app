@@ -1,6 +1,9 @@
 // Undo and redo (slice 1b, AD-13): one change group is one step. Undo writes the group's before-images back as a new
 // change group; redo is the undo of that undo. A step is refused when any of its rows has changed since (another
-// person, or a later change), or when reverting it would leave the model inconsistent: a live row whose parent is
+// person, or a later change): its content differs from what the step left, version and updated_* aside, so steps can
+// be undone one after the other and a row changed and changed back counts as unchanged. The write itself still carries
+// the row's current version (AD-12), so a change that arrives meanwhile is refused by the adapter. A step is also
+// refused when reverting it would leave the model inconsistent: a live row whose parent is
 // deleted, or a deleted row that live rows still point to. Permissions and the archive apply as to any write; the
 // steps themselves come from the person's own history (`model/undo-history.ts`).
 // A canvas's look and layer mode are outside undo (D-12, slice 2a): a later change of only `canvas.look` does not
@@ -183,12 +186,13 @@ export function revertChangeGroup(
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
 }
 
-/** The row is as the step left it: the same version, or for a canvas, only its look changed since (D-12). */
+/**
+ * The row's content is what the step left (its after-image), version and updated_* aside, and for a canvas its look
+ * (D-12). An undo before it only raised the version, so the next older step still matches.
+ */
 function unchangedSince(table: UndoableTable, current: AnyRow, image: AnyRow): boolean {
-  if (current.version === image.version) return true;
-  if (table !== "canvas") return false;
   const keys = new Set([...Object.keys(current), ...Object.keys(image)]);
-  return [...keys].every((k) => BOOKKEEPING.has(k) || k === "look" || sameValue(current[k], image[k]));
+  return [...keys].every((k) => BOOKKEEPING.has(k) || (table === "canvas" && k === "look") || sameValue(current[k], image[k]));
 }
 
 /**

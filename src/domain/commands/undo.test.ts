@@ -21,10 +21,10 @@ import {
 } from "../__fixtures__/domain";
 import { buildWriteSet, type CommandResult, type WriteSet } from "../changes";
 import type { WorkspaceAccess } from "../permissions";
-import type { Canvas, ChangeEvent, WorkspaceRole } from "../types";
+import type { Canvas, CanvasItem, ChangeEvent, WorkspaceRole } from "../types";
 import { createAttributeFromColumn, deleteAttribute, reorderAttribute } from "./attribute";
 import { deleteCanvas, duplicateCanvas, renameCanvas, setCanvasLook } from "./canvas";
-import { removeFromCanvas } from "./canvas-item";
+import { removeFromCanvas, updateCanvasItem } from "./canvas-item";
 import { updateEntity } from "./entity";
 import { deleteMapping, mergeMappings, setMappingStatus } from "./mapping";
 import { createRelationship, deleteRelationship } from "./relationship";
@@ -409,5 +409,91 @@ describe("undo and a canvas's look and layer mode (slice 2a, D-12)", () => {
     rows = apply(rows, again);
     rows = apply(rows, look(rows, ids.canvas1, { grid: "none" }));
     expect(revertChangeGroup(c, modeler, { events: renamed.events, rows }, "undo")).toMatchObject({ ok: false, error: { message: UNDO_REFUSED_MESSAGE } });
+  });
+});
+
+describe("“changed afterwards” compares content, not version (slice 2a fix of slice 1b)", () => {
+  const entityName = (rows: Rows) => (find(rows, "entity", ids.customer) as { name: string }).name;
+  const versionOf = (rows: Rows, table: UndoableTable, id: string) => (find(rows, table, id) as { version: number }).version;
+  const revert = (rows: Rows, events: readonly ChangeEvent[], mode: "undo" | "redo") => {
+    const r = revertChangeGroup(makeCtx(), modeler, { events, rows }, mode);
+    if (!r.ok) throw new Error(`${mode}: ${r.error.message}`);
+    return { rows: apply(rows, r.writeSet), writeSet: r.writeSet };
+  };
+
+  it("rename twice, undo twice, redo twice", () => {
+    let rows = seed();
+    const original = entityName(rows);
+    const first = rename(rows, "Client", versionOf(rows, "entity", ids.customer));
+    rows = apply(rows, first);
+    const second = rename(rows, "Party", versionOf(rows, "entity", ids.customer));
+    rows = apply(rows, second);
+
+    const undoSecond = revert(rows, second.events, "undo");
+    expect(entityName(undoSecond.rows)).toBe("Client");
+    const undoFirst = revert(undoSecond.rows, first.events, "undo");
+    expect(entityName(undoFirst.rows)).toBe(original);
+
+    const redoFirst = revert(undoFirst.rows, undoFirst.writeSet.events, "redo");
+    expect(entityName(redoFirst.rows)).toBe("Client");
+    const redoSecond = revert(redoFirst.rows, undoSecond.writeSet.events, "redo");
+    expect(entityName(redoSecond.rows)).toBe("Party");
+  });
+
+  it("move a card twice, undo twice: back where it started", () => {
+    let rows = seed();
+    const move = (x: number, y: number) => {
+      const item = find(rows, "canvas_item", ids.itemCustomer) as unknown as CanvasItem;
+      return ok(updateCanvasItem(makeCtx(), modeler, { item }, { canvasItemId: ids.itemCustomer, expectedVersion: item.version, x, y }));
+    };
+    const start = find(rows, "canvas_item", ids.itemCustomer);
+    const m1 = move(480, 200);
+    rows = apply(rows, m1);
+    const m2 = move(560, 240);
+    rows = apply(rows, m2);
+    rows = revert(rows, m2.events, "undo").rows;
+    expect(find(rows, "canvas_item", ids.itemCustomer)).toMatchObject({ x: 480, y: 200 });
+    rows = revert(rows, m1.events, "undo").rows;
+    expect(find(rows, "canvas_item", ids.itemCustomer)).toMatchObject({ x: start.x, y: start.y });
+  });
+
+  it("undo a delete of a duplicated canvas, then undo the duplicate", () => {
+    let rows = seed();
+    const canvasOf = (id: string) => find(rows, "canvas", id) as unknown as Canvas;
+    const duplicated = ok(duplicateCanvas(makeCtx(), modeler, { canvas: canvasOf(ids.canvas1), project: find(rows, "project", ids.projectA) as never, projectLinks: rows.project_canvas, items: rows.canvas_item }, { projectId: ids.projectA, canvasId: ids.canvas1 }));
+    rows = apply(rows, duplicated);
+    const copyId = insertedId(duplicated);
+    const copy = canvasOf(copyId);
+    const deleted = ok(
+      deleteCanvas(makeCtx(), modeler, { canvas: copy, project: find(rows, "project", ids.projectA) as never, canvasLinks: rows.project_canvas.filter((l) => l.canvas_id === copyId), projectLinks: rows.project_canvas.filter((l) => l.project_id === ids.projectA), items: rows.canvas_item }, { projectId: ids.projectA, canvasId: copyId, expectedVersion: copy.version }),
+    );
+    rows = apply(rows, deleted);
+    rows = revert(rows, deleted.events, "undo").rows;
+    expect(canvasOf(copyId).deleted_at).toBeNull();
+    rows = revert(rows, duplicated.events, "undo").rows;
+    expect(canvasOf(copyId).deleted_at).toBe(NOW);
+    expect(rows.canvas_item.filter((i) => i.canvas_id === copyId && i.deleted_at === null)).toHaveLength(0);
+    expect(rows.project_canvas.some((l) => l.canvas_id === copyId)).toBe(false);
+  });
+
+  it("another session's rename still blocks the undo", () => {
+    let rows = seed();
+    const mine = rename(rows, "Client", versionOf(rows, "entity", ids.customer));
+    rows = apply(rows, mine);
+    rows = apply(rows, rename(rows, "Party", versionOf(rows, "entity", ids.customer), ids.someoneElse));
+    expect(revertChangeGroup(makeCtx(), modeler, { events: mine.events, rows }, "undo")).toMatchObject({ ok: false, error: { message: UNDO_REFUSED_MESSAGE } });
+  });
+
+  it("a row changed and changed back (A-B-A) counts as unchanged, and the write carries the row's current version", () => {
+    let rows = seed();
+    const mine = rename(rows, "Client", versionOf(rows, "entity", ids.customer));
+    rows = apply(rows, mine);
+    rows = apply(rows, rename(rows, "Party", versionOf(rows, "entity", ids.customer), ids.someoneElse));
+    rows = apply(rows, rename(rows, "Client", versionOf(rows, "entity", ids.customer), ids.someoneElse));
+    const current = versionOf(rows, "entity", ids.customer);
+    const undone = revertChangeGroup(makeCtx(), modeler, { events: mine.events, rows }, "undo");
+    if (!undone.ok) throw new Error(undone.error.message);
+    // the adapter refuses the write if the stored row is no longer at this version (AD-12)
+    expect(undone.writeSet.writes).toMatchObject([{ kind: "update", table: "entity", before: { version: current }, row: { version: current + 1 } }]);
   });
 });
