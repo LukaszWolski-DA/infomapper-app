@@ -60,6 +60,14 @@ initial render.
   | Group drag, 31 cards at 50 % | ≥ 45 fps | 15.8, 18.8 fps | 28.9, 29.5, 28.9, 24.7 fps |
   | Single-card drag, same card | – | 25.2, 23.4 fps | 14.8, 9.3, 12.5, 19.5 fps; 21.5 on a fresh page |
 
+  At step 5 (7 October, the laptop prepared): group drag 22.4 fps on the dev server, 24.5 fps in production. The marks
+  after a lasso around the whole view at the overview take 139 ms in production and 280 ms on the dev server (bar: 100 ms;
+  Łukasz decides). A diagnosis in the measurement build (slice-02a-acceptance.md) shows two separate causes: the hover
+  delay (C-10) is the line layer (without it about 49 ms instead of about 150 ms); the resize (C-09) and the drags are the
+  cards' row elements (with every card as a block the resize runs at 57–59 fps and a single-card drag doubles).
+- **The performance slice between 2a and 2b** starts from that diagnosis: the line layer for the hover (for example an
+  HTML canvas, as above), and fewer row elements to repaint for a moved or resized card.
+
 ## Undo history (slice 1b)
 
 ### The undo history lives in server memory

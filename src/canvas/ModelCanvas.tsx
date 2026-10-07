@@ -12,8 +12,8 @@
 // Slice 2a: several cards are selected with a lasso on the empty canvas, Shift+click or Ctrl+A (`selection.ts`); the
 // marks are drawn in an overlay. H turns the Hand tool on, V or Esc off. Dragging a selected card moves the group,
 // arrow keys nudge the selection, and the group's actions (toolbox, selection panel) are in `GroupActions.ts`.
-// Each canvas has its look (`look.tsx`): the grid is one CSS background on the pane that follows the view, and the
-// layer mode hides the relationship or the mapping lines. A card named in `focusCardId` is selected and shown on arrival
+// Each canvas has its look (`look.tsx`): the grid is one CSS background on its own element behind the pane, following
+// the view, and the layer mode hides the relationship or the mapping lines. A card named in `focusCardId` is selected and shown on arrival
 // (“On canvases” in the panels). The measurement-only build may switch off the line layer or draw every card as a block
 // (`diagnosis`), to find what the frame time is spent on.
 
