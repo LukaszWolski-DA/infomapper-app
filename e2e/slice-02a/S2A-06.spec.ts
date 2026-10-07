@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { canvasUrl, expectToast, headPoint, ids, key, lasso, loadItems, loadModel, openCanvas, signInAs, toolboxAt, WHOLE } from "./helpers";
+import { canvasUrl, expectToast, headPoint, ids, lasso, loadItems, loadModel, openCanvas, signInAs, toolboxAt, WHOLE } from "./helpers";
 
 test("S2A-06: with Customer and Sales Order selected and their sources taken off the canvas, “Add sources of selected entities” places all missing sources without overlaps in one undo step; “Remove from this canvas” removes the group, and “Undo” in the toast brings it back", async ({ page }) => {
   const { entity } = await ids();
@@ -44,8 +44,9 @@ test("S2A-06: with Customer and Sales Order selected and their sources taken off
       expect(overlap, `cards ${a} and ${b} overlap`).toBe(false);
     }
   }
-  // one Ctrl+Z takes all of them off again
-  await key(page, "Control+z");
+  // one undo step takes all of them off again (the Undo button, once the page knows the step)
+  await expect(page.getByTestId("button-undo")).toBeEnabled();
+  await page.getByTestId("button-undo").click();
   await expectToast(page, /^Undone: Place \d+ cards$|^Undone: Place card$/);
   await expect.poll(onCanvas).toBe(left);
 

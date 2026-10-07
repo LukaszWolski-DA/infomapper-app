@@ -12,7 +12,7 @@ import { seedLargeData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";
 import { expect, test } from "./fixtures";
 import { box, canvasUrl, card, expectToast, ids, LEFT_AT_100, loadItems, openCanvas, SEED_IDS, signInAs, toolboxAt } from "./helpers";
-import { MEASURE, MEASURE_USE, openLarge, saveResults, startRecording, stopRecording } from "./measure";
+import { DIAG, MEASURE, MEASURE_USE, openLarge, saveResults, startRecording, stopRecording } from "./measure";
 
 if (MEASURE) test.use(MEASURE_USE);
 
@@ -89,11 +89,12 @@ test("S1B-09: card width changes by dragging the edge and by “Fit width to nam
   await openLarge(page, { x: 0, y: 0, zoom: 0.5 });
   const big = await page.evaluate(() => {
     const nodes = [...document.querySelectorAll<HTMLElement>(".react-flow__node")];
-    const n = nodes.sort((a, b) => b.querySelectorAll(".row[data-row]").length - a.querySelectorAll(".row[data-row]").length)[0]!;
+    // the tallest card (also when slice 2a's DIAG=blocks draws it as a block without rows)
+    const n = nodes.sort((a, b) => b.offsetHeight - a.offsetHeight)[0]!;
     const m = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(n.style.transform)!;
     return { id: n.dataset.id!, x: +m[1]!, y: +m[2]!, w: n.offsetWidth, rows: n.querySelectorAll(".row[data-row]").length };
   });
-  expect(big.rows).toBe(200);
+  if (DIAG !== "blocks") expect(big.rows).toBe(200);
   const size = page.viewportSize()!;
   await openLarge(page, { x: size.width / 2 - (big.x + big.w / 2) * 0.5, y: 120 - big.y * 0.5, zoom: 0.5 });
   const edge = await box(page.locator(`.react-flow__node[data-id="${big.id}"] [data-testid="handle-card-width"]`));

@@ -70,8 +70,9 @@ function conditions() {
     programsWithWindows: ps("Get-Process | Where-Object { $_.MainWindowTitle } | Select-Object -ExpandProperty ProcessName | Sort-Object -Unique")
       .split(/\r?\n/)
       .filter(Boolean),
+    // processor time per program over 3 s, as a share of all cores (Get-Counter's names are localised on Windows)
     busiestProcesses: ps(
-      "Get-Counter '\\Process(*)\\% Processor Time' -SampleInterval 2 -MaxSamples 1 | Select-Object -ExpandProperty CounterSamples | Where-Object { $_.InstanceName -notin '_total','idle' } | Sort-Object CookedValue -Descending | Select-Object -First 8 | ForEach-Object { '{0} {1:N0}%' -f $_.InstanceName, ($_.CookedValue / $env:NUMBER_OF_PROCESSORS) }",
+      "$a = @{}; Get-Process | ForEach-Object { if ($_.CPU) { $a[$_.Id] = $_.CPU } }; Start-Sleep -Seconds 3; $n = [Environment]::ProcessorCount; Get-Process | Where-Object { $_.CPU -and $a.ContainsKey($_.Id) } | ForEach-Object { [pscustomobject]@{ Name = $_.ProcessName; Pct = ($_.CPU - $a[$_.Id]) / 3 / $n * 100 } } | Group-Object Name | ForEach-Object { [pscustomobject]@{ Name = $_.Name; Pct = ($_.Group | Measure-Object Pct -Sum).Sum } } | Sort-Object Pct -Descending | Select-Object -First 8 | ForEach-Object { '{0} {1:N1}%' -f $_.Name, $_.Pct }",
     )
       .split(/\r?\n/)
       .filter(Boolean),
@@ -84,6 +85,8 @@ function prepareMain(withMeasurementBuild: boolean) {
   spawnSync("git", ["cherry-pick", "--quit"], { cwd: MAIN, stdio: "ignore" });
   sh("git reset -q --hard", MAIN);
   sh("git checkout -q --detach main", MAIN);
+  // a throwaway tree: build folders left by an earlier sitting would be scanned by Tailwind (main does not ignore them)
+  sh("git clean -q -fdx -e node_modules", MAIN);
   if (withMeasurementBuild) {
     // only package.json conflicts (its scripts): keep main's and add the two measure scripts
     spawnSync("git", ["cherry-pick", "-n", MEASUREMENT_BUILD_COMMIT], { cwd: MAIN, stdio: "ignore" });
@@ -97,6 +100,11 @@ function prepareMain(withMeasurementBuild: boolean) {
     sh("git reset -q", MAIN);
   }
   if (!fs.existsSync(path.join(MAIN, "node_modules", "next"))) sh("npm ci --no-audit --no-fund", MAIN);
+  // the spec goes in after any build: `next build` type-checks e2e/, and main's domain lacks what the branch side uses
+  fs.rmSync(path.join(MAIN, SPEC), { force: true });
+}
+
+function copySpec() {
   fs.mkdirSync(path.join(MAIN, "e2e", "slice-02a"), { recursive: true });
   fs.copyFileSync(path.join(BRANCH, SPEC), path.join(MAIN, SPEC));
 }
@@ -117,17 +125,24 @@ async function main() {
   for (const port of [3200, 3300]) if (!(await portFree(port))) throw new Error(`Port ${port} is in use: stop that server first.`);
   const before = conditions();
   const all: Record<string, { main: Fps[]; branch: Fps[] }> = {};
+  /** After every side of every round: what else used the processor (to spot a slow spell or an unexpected process). */
+  const perRound: { build: string; round: number; side: string; busiest: string[] }[] = [];
   for (const build of builds) {
     prepareMain(build === "production");
     if (build === "production") {
       sh("npm run measure:build", MAIN);
       sh("npm run measure:build", BRANCH);
     }
+    copySpec();
     all[build] = { main: [], branch: [] };
     for (let r = 0; r < rounds; r++) {
       // the side that starts changes every round
       for (const side of r % 2 === 0 ? (["main", "branch"] as const) : (["branch", "main"] as const)) {
         all[build]![side].push(measure(side === "main" ? MAIN : BRANCH, side, build));
+        perRound.push({ build, round: r + 1, side, busiest: (conditions() as { busiestProcesses?: string[] }).busiestProcesses ?? [] });
+        // kept after every side, so an interrupted sitting keeps what it measured
+        fs.mkdirSync(path.join(BRANCH, "test-results"), { recursive: true });
+        fs.writeFileSync(path.join(BRANCH, "test-results", "S2A-14-ab-partial.json"), JSON.stringify({ before, perRound, all }, null, 2));
       }
     }
   }
@@ -151,7 +166,7 @@ async function main() {
       table.push(`| ${build} | ${view} | ${base.toFixed(1)} | ${cells.join(" | ")} |`);
     }
   }
-  const results = { bar: `branch medians at most ${-BAR_PERCENT} % below main's (grids dots and lines)`, pass, rounds, runsPerRound: Number(runs), conditions: { before, after }, summary, all };
+  const results = { bar: `branch medians at most ${-BAR_PERCENT} % below main's (grids dots and lines)`, pass, rounds, runsPerRound: Number(runs), conditions: { before, after, perRound }, summary, all };
   fs.mkdirSync(path.join(BRANCH, "test-results"), { recursive: true });
   fs.writeFileSync(path.join(BRANCH, "test-results", "S2A-14-ab.json"), JSON.stringify(results, null, 2));
   console.log(table.join("\n"));
