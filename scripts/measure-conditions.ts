@@ -47,7 +47,7 @@ function conditions() {
  * cores) below `belowPercent` for `quietSeconds` in a row, sampled every second; gives up after `timeoutSeconds`.
  * Keeps scans that follow a side (Explorer, Defender) out of the next side's figures (slice 2p). The sum leaves out the
  * Claude app and the measuring command's own programs: the wait is for Windows' own background work, not for us
- * (Łukasz, 8 October 2026); the names left out are recorded with the result.
+ * (Łukasz, 7 October 2026); the names left out are recorded with the result.
  */
 export const QUIET_EXCLUDED = ["claude", "node", "bash", "sh", "cmd", "conhost", "powershell", "git"];
 

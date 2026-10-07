@@ -102,9 +102,9 @@ lines or the notation change. S1A-14 counts drawn lines from the SVG elements or
 
 The measuring command now waits before each side until the machine is quiet: total processor use below 2 % for 30 s
 (at most 3 minutes), leaving out the Claude app and the command's own programs (`claude`, `node`, `bash`, `sh`, `cmd`,
-`conhost`, `powershell`, `git`), as Łukasz asked on 8 October; the waits and the names left out are recorded.
+`conhost`, `powershell`, `git`), as Łukasz asked on 7 October; the waits and the names left out are recorded.
 
-### Conditions, 8 October 2026, about 00:15–03:00
+### Conditions, 7 October 2026, from about 22:15 (local time)
 
 As at step 0, prepared by Łukasz: mains, “Best performance” plugged in and on battery, Spotify, Chrome, Teams and
 Outlook closed (at the first check Chrome and Teams were still running; Łukasz closed them before anything was
