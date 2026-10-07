@@ -1,6 +1,6 @@
 # Slice 2a – Acceptance
 
-Status: steps 0–5 done, waiting for Łukasz's acceptance. Branch `slice/02a-selection-and-canvases`, pull request #5.
+Status: **accepted by Łukasz on 7 October 2026**, merged into `main` with pull request #5, tag `slice-02a`. Branch `slice/02a-selection-and-canvases`, pull request #5.
 
 ## Criteria
 
@@ -22,7 +22,7 @@ data file and does not depend on another.
 | S2A-11 | `S2A-11.spec.ts`: Mappings and Relationships hide the other lines, cards stay; saved per canvas; Ctrl+Z does not change it | passes |
 | S2A-12 | `S2A-12.spec.ts`: Customer and order_line list both canvases (“this canvas”, “in Order management”); a click switches the project with its toast, opens the canvas with Customer selected and in view | passes |
 | S2A-13 | `S2A-13.spec.ts`: Piotr lassoes, Ctrl+A, pans and switches layers (not saved, gone after a reload); no tab menu, look section, group actions, drag or nudge; nine direct calls refused, nothing changed | passes |
-| S2A-14 | `S2A-14.spec.ts` (group drag, lasso marks), `S2A-14-pan-zoom.spec.ts` with `scripts/measure-ab.ts` (pan and zoom against `main`) | pan and zoom: **met in production**, missed on the dev server for Lines at the overview (−8.9 %) and Dots at 100 % (−5.9 %); group drag 24.5 fps in production: **partly met** (decided); lasso marks 139 ms in production: **missed** (bar 100 ms). Łukasz decides |
+| S2A-14 | `S2A-14.spec.ts` (group drag, lasso marks), `S2A-14-pan-zoom.spec.ts` with `scripts/measure-ab.ts` (pan and zoom against `main`) | pan and zoom: **met** (accepted as met in the production measurement build; the dev server misses for Lines at the overview, −8.9 %, and Dots at 100 %, −5.9 %); group drag 24.5 fps: **partly met**; lasso marks 139 ms in production: **partly met** (bar 100 ms); all three decided by Łukasz on 7 October |
 | S2A-15 | CI (lint, typecheck, unit tests, Postgres migration check) and three full e2e runs in a row | passes: lint, typecheck, 502 unit tests; three full runs in a row on 7 October, 68 of 68 each (15.7, 15.5, 15.5 min), no dev server running; CI green on the pull request |
 
 ### Three full runs in a row
@@ -162,8 +162,8 @@ overview 56.4, 58.7, 57.3 · 58.1, 55.3, 56.1; 100 % 54.5, 53.5, 49.8 · 51.8, 5
 54.4, 50.4, 47.5 · 49.6, 52.0, 46.7.
 
 **Result:** met in the production measurement build for both grids at both zoom levels. Missed on the dev server for
-Lines at the overview (−8.9 %) and Dots at 100 % (−5.9 %); without a grid the dev server is within 5 % of `main`. For
-Łukasz to decide (the production build is what users will run; the dev server adds its own work per frame).
+Lines at the overview (−8.9 %) and Dots at 100 % (−5.9 %); without a grid the dev server is within 5 % of `main`.
+**Accepted by Łukasz as met in production** (7 October).
 
 Absolute numbers next to slice 1b's medians, not judged (slice 1b measured the dev server only):
 
@@ -184,7 +184,8 @@ Absolute numbers next to slice 1b's medians, not judged (slice 1b measured the d
 
 The lasso selects the 85 of the 101 cards that lie fully inside the view: at the overview the zoom is already at its
 10 % minimum and the tallest cards stick out of the 1536 × 864 window, so no lasso can hold all 101. The lasso-marks bar
-is missed in both builds (production 139 ms); the group drag stays “partly met” (known-limitations.md).
+is missed in both builds; **recorded as partly met at 139 ms in production** (Łukasz, 7 October). The group drag stays
+“partly met” (known-limitations.md).
 
 ### Step 5: diagnosis in the production measurement build
 
@@ -308,7 +309,7 @@ Assumed while building step 4, accepted at step 5 (7 October); 12 as changed by 
   build. The absolute numbers are recorded next to slice 1b's without judging them, with the measuring conditions.
   Reason: the laptop's own speed changes from day to day by more than 5 % (`main` itself measured 42–53 fps where slice 1b
   measured 51.7–55.2), so only a comparison in the same sitting says whether the slice made things slower.
-- **S2A-14, lasso marks** (found while measuring, to confirm). The criterion says “a lasso around every card at the overview”; on the 1536 × 864 window the
+- **S2A-14, lasso marks** (found while measuring, confirmed by Łukasz on 7 October). The criterion says “a lasso around every card at the overview”; on the 1536 × 864 window the
   tallest cards of “Performance test” stick out of the view even at the 10 % minimum zoom, so the lasso holds the 85
   cards fully inside the view (recorded with the result).
 
