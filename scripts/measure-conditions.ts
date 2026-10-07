@@ -44,18 +44,22 @@ function conditions() {
 
 /**
  * Waits until the whole machine is quiet: total processor use (every program's processor time, as a share of all
- * cores, leaving out the sampling itself) below `belowPercent` for `quietSeconds` in a row, sampled every second; gives up after `timeoutSeconds`.
- * Keeps scans that follow a side (Explorer, Defender) out of the next side's figures (slice 2p).
+ * cores) below `belowPercent` for `quietSeconds` in a row, sampled every second; gives up after `timeoutSeconds`.
+ * Keeps scans that follow a side (Explorer, Defender) out of the next side's figures (slice 2p). The sum leaves out the
+ * Claude app and the measuring command's own programs: the wait is for Windows' own background work, not for us
+ * (Łukasz, 8 October 2026); the names left out are recorded with the result.
  */
+export const QUIET_EXCLUDED = ["claude", "node", "bash", "sh", "cmd", "conhost", "powershell", "git"];
+
 export function waitUntilQuiet(belowPercent = 2, quietSeconds = 30, timeoutSeconds = 180) {
   if (process.platform !== "win32") return { waitedSeconds: 0, quiet: true, note: "not measured on this platform" };
   const script = [
+    `$skip = @(${QUIET_EXCLUDED.map((n) => `'${n}'`).join(",")})`,
     "$n = [Environment]::ProcessorCount; $quiet = 0; $t0 = Get-Date; $samples = @()",
     "$last = @{}; Get-Process | ForEach-Object { if ($_.CPU) { $last[$_.Id] = $_.CPU } }",
     `while ($quiet -lt ${quietSeconds} -and ((Get-Date) - $t0).TotalSeconds -lt ${timeoutSeconds}) {`,
     "  Start-Sleep -Seconds 1; $sum = 0; $now = @{}",
-    // the sampling PowerShell itself ($PID) is left out
-    "  Get-Process | Where-Object { $_.Id -ne $PID } | ForEach-Object { if ($_.CPU) { $now[$_.Id] = $_.CPU; if ($last.ContainsKey($_.Id)) { $sum += $_.CPU - $last[$_.Id] } } }",
+    "  Get-Process | Where-Object { $skip -notcontains $_.ProcessName } | ForEach-Object { if ($_.CPU) { $now[$_.Id] = $_.CPU; if ($last.ContainsKey($_.Id)) { $sum += $_.CPU - $last[$_.Id] } } }",
     "  $last = $now; $pct = $sum / $n * 100; $samples += [math]::Round($pct, 1)",
     `  if ($pct -lt ${belowPercent}) { $quiet++ } else { $quiet = 0 }`,
     "}",
@@ -64,7 +68,7 @@ export function waitUntilQuiet(belowPercent = 2, quietSeconds = 30, timeoutSecon
   ].join("\n");
   const r = spawnSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8" });
   try {
-    return JSON.parse(r.stdout.trim()) as { waitedSeconds: number; quiet: boolean; maxPercent: number; lastPercent: number };
+    return { ...(JSON.parse(r.stdout.trim()) as { waitedSeconds: number; quiet: boolean; maxPercent: number; lastPercent: number }), excluded: QUIET_EXCLUDED };
   } catch {
     return { waitedSeconds: 0, quiet: false, note: "the wait could not be measured" };
   }
