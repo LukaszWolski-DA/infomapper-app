@@ -105,8 +105,8 @@ Decided with Łukasz during the slice:
    the write still carries the row's current version (AD-12). So steps can be undone one after another on the same
    row. **A row someone changed and changed back (A-B-A) counts as unchanged**, and the undo goes through (6 October).
 3. **AD-24 and the grid.** AD-24's “no dotted background” becomes “no React Flow `<Background>` component; a grid is
-   one CSS background on the canvas pane and must pass the pan-and-zoom regression check”, changed with the grid code
-   in step 4 (6 October).
+   one CSS background on its own element behind the canvas pane, and must pass the pan-and-zoom regression check”
+   (step 4, wording settled at step 5, 7 October).
 4. **“On canvases”.** A canvas that is in several projects opens in the first of them, as in the prototype (6 October).
 
 Assumed while building, accepted at step 1:
@@ -130,14 +130,16 @@ Assumed while building, accepted at step 3:
     while two or more cards are selected; on a row it opens that row's own toolbox. D-52 wins over the prototype, whose
     `ctxFor` gives the group's toolbox on rows too (Łukasz, 6 October).
 
-Assumed while building step 4 (to confirm):
+Assumed while building step 4, accepted at step 5 (7 October); 12 as changed by Łukasz:
 
 11. **A reviewer's or reader's layer mode** lasts while the canvas stays open in that browser tab; it is not saved and
     not kept in the browser's storage, so a reload or another canvas shows the saved mode again.
-12. **A canvas address that is no longer in the project** (deleted, taken out of it, or a duplicate undone while it is
-    open) opens the project's first canvas instead of “not found”. Deleting the open canvas therefore opens the next one
-    as the prototype does; undoing a duplicate while the copy is open lands on the project's first canvas, where the
-    prototype returns to the original.
+12. **A canvas address that is no longer in the project** opens the project's first canvas instead of “not found”, with
+    the toast “This canvas is no longer in {project}. Opened {canvas}.” Your own actions open the right canvas without
+    that toast: deleting or taking out the open canvas opens the project's next one (prototype `delDia`), and undoing a
+    duplicate while the copy is open returns to the original, as in the prototype; only if the original is gone too,
+    the first canvas. (How: the action remembers the canvas to open for a minute in a cookie, and the page drawn as the
+    action's result uses it; `src/app/_lib/next-canvas.ts`, `src/domain/model/next-canvas.ts`.)
 13. **Look controls are for editors only**: the tab menu was already editors-only; the overview panel's “Canvas look”
     section is not shown to reviewers and readers. The layer buttons are there for everyone (PRD item 17).
 14. **Short labels** All / Maps / Rels below a window width of 2100 px, the prototype's breakpoint; on the development
