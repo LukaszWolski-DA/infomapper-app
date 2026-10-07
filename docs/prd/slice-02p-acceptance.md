@@ -1,6 +1,6 @@
 # Slice 2p – Acceptance
 
-Status: in progress (step 0 done). Branch `slice/02p-canvas-performance`, pull request #6. Written step by step; the
+Status: in progress (steps 0 and 1 done; step 2 waits for Łukasz's go). Branch `slice/02p-canvas-performance`, pull request #6. Written step by step; the
 criteria table, the final measurements and the three runs in a row follow at step 5.
 
 ## Decisions during the slice
@@ -87,3 +87,62 @@ repository). Per round, `slice-02a` / other side: pan overview 51.8, 53.5, 54.4 
   for `main`), C-08 1.6–2.0 s (slice 2a step 3b: 2.1 s), C-10 about 170 ms (slice 2a diagnosis: 145–153 ms), lasso
   about 140 ms (139 ms). Today's sitting ran with grid Dots and all checks of S1A-14; pan and zoom at 100 % are lower
   than in slice 2a's A/B, where a shorter spec ran without the other measurements in between.
+
+## Step 1 – Line layer trial
+
+### What was built
+
+A trial renderer, `src/canvas/CanvasLineLayer.tsx`, behind the measurement-only switch `?diag=canvaslines` (honoured
+only by the measurement build, like `nolines` and `blocks`). It draws every mapping and relationship line on one
+`<canvas>` the size of the visible area, redrawn on every pan, zoom or change, from the same geometry as the SVG layer
+(mapping geometry moved to `src/canvas/line-geometry.ts`): statuses, colours from the CSS variables, end dots above
+40 %, ƒ nodes, crow's foot and UML ends, labels, 45 % for a hidden row end, the 12 % fade on a selection, the hovered
+row's lines drawn again. No interaction. The line shapes (`Path2D`) are kept between frames and rebuilt only when cards,
+lines or the notation change. S1A-14 counts drawn lines from the SVG elements or from the renderer's count (decision 3).
+
+The measuring command now waits before each side until the machine is quiet: total processor use below 2 % for 30 s
+(at most 3 minutes), leaving out the Claude app and the command's own programs (`claude`, `node`, `bash`, `sh`, `cmd`,
+`conhost`, `powershell`, `git`), as Łukasz asked on 8 October; the waits and the names left out are recorded.
+
+### Conditions, 8 October 2026, about 00:15–03:00
+
+As at step 0, prepared by Łukasz: mains, “Best performance” plugged in and on battery, Spotify, Chrome, Teams and
+Outlook closed (at the first check Chrome and Teams were still running; Łukasz closed them before anything was
+measured), OneDrive paused, no dev server. 19 idle `msedgewebview2` processes stayed (no measurable processor use).
+Every side started after a quiet wait of 31–71 s; nothing waited until the time-out.
+
+### The trial against `slice-02a`'s SVG lines
+
+`npm run measure:canvas -- --rounds 5 --branch-diag canvaslines` (sitting `2026-10-07-20-17`, UTC):
+
+| Figure | Bar | `slice-02a` (SVG): median (min–max) | Canvas renderer: median (min–max) | Change | Result |
+| --- | --- | --- | --- | --- | --- |
+| Pan and zoom at the overview | ≥ 50 fps, ≥ −5 % vs reference | 56.5 (55.1–58.7) | **20.8 (18.8–24.5)** | −63.2 % | not met |
+| – frames over 50 ms | 0 | 0 (0–0) | 67 (43–77) | – | not met |
+| Pan and zoom at 100 %, dense area | ≥ 50 fps, ≥ −5 % vs reference | 49.0 (40.6–52.5) | **22.2 (20.7–22.8)** | −54.7 % | not met |
+| – frames over 50 ms | 0 | 5 (4–7) | 60 (54–80) | – | not met |
+| Initial render (C-08), median of 5 | ≤ 1500 ms | 1659 (1539–1859) | 1875 (1530–1949) | +13.0 % | not met |
+| Card resize (C-09) | ≥ 45 fps | 28.1 (26.8–31.2) | 31.5 (22.9–32.7) | +12.1 % | not met |
+| Hover to the next frame (C-10) | ≤ 100 ms | 148 (147–155) | **63 (62–92)** | −57.3 % | **met** |
+| Single-card drag | ≥ 45 fps | 12.5 (11.3–12.8) | 14.2 (13.9–14.7) | +13.6 % | not met |
+| Group drag, 31 cards | ≥ 45 fps | 28.8 (26.1–30.2) | 25.3 (23.9–26.3) | −12.2 % | not met |
+| Lasso marks | ≤ 100 ms | 121 (113–129) | **29 (27–34)** | −75.8 % | **met** |
+
+Flagged, not dropped: round 4's `slice-02a` side gave 40.6 fps at 100 % (47.3–52.5 in the other rounds); its quiet wait
+passed (71 s) and dropping it would change no conclusion.
+
+### The lasso marks: line layer or `SelectionOverlay`?
+
+S2A-14's lasso in this branch's measurement build, three variants in turns, three rounds, each after a quiet wait
+(`.data/measure/lasso-step1.json`): SVG line layer **133, 111, 133 ms**; no line layer at all (`DIAG=nolines`) **29, 27,
+32 ms**; canvas renderer **30, 27, 30 ms**. The marks themselves (`SelectionOverlay`) take under 35 ms; the rest is the
+SVG line layer repainting. The canvas renderer removes that cost entirely.
+
+### Reading
+
+- **Hover (C-10) and lasso marks are solved by the canvas line layer**: 63 ms and 29 ms against 100 ms.
+- **Pan and zoom collapse** (about 21 fps against 49–56): redrawing 340 lines on every frame costs more than the SVG
+  layer, which the browser only moves and scales. This needs a decision before step 2 (options in the report).
+- Drags and resize change little (single-card drag +14 %, group drag −12 %, C-09 +12 %, all near the method's spread):
+  their cost is the cards' rows, as the slice 2a diagnosis said (step 3).
+
