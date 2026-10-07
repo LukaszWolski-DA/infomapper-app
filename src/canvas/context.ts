@@ -42,6 +42,8 @@ export interface Diagnosis {
   noLines?: boolean;
   /** Every card drawn as its below-40 % block, at any zoom. */
   blocks?: boolean;
+  /** Slice 2p, step 1: the lines drawn by the trial renderer on an HTML canvas instead of the SVG line layer. */
+  canvasLines?: boolean;
 }
 export const DiagnosisCtx = createContext<Diagnosis>({});
 

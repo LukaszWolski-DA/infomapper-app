@@ -2,7 +2,7 @@
 // battery, power plan, Windows power mode, the programs with a window, and the busiest programs over 3 s.
 // Shared by scripts/measure-ab.ts and scripts/measure-canvas.ts.
 
-import { execSync } from "node:child_process";
+import { execSync, spawnSync } from "node:child_process";
 
 const out = (cmd: string) => {
   try {
@@ -40,4 +40,32 @@ function conditions() {
       .split(/\r?\n/)
       .filter(Boolean),
   };
+}
+
+/**
+ * Waits until the whole machine is quiet: total processor use (every program's processor time, as a share of all
+ * cores, leaving out the sampling itself) below `belowPercent` for `quietSeconds` in a row, sampled every second; gives up after `timeoutSeconds`.
+ * Keeps scans that follow a side (Explorer, Defender) out of the next side's figures (slice 2p).
+ */
+export function waitUntilQuiet(belowPercent = 2, quietSeconds = 30, timeoutSeconds = 180) {
+  if (process.platform !== "win32") return { waitedSeconds: 0, quiet: true, note: "not measured on this platform" };
+  const script = [
+    "$n = [Environment]::ProcessorCount; $quiet = 0; $t0 = Get-Date; $samples = @()",
+    "$last = @{}; Get-Process | ForEach-Object { if ($_.CPU) { $last[$_.Id] = $_.CPU } }",
+    `while ($quiet -lt ${quietSeconds} -and ((Get-Date) - $t0).TotalSeconds -lt ${timeoutSeconds}) {`,
+    "  Start-Sleep -Seconds 1; $sum = 0; $now = @{}",
+    // the sampling PowerShell itself ($PID) is left out
+    "  Get-Process | Where-Object { $_.Id -ne $PID } | ForEach-Object { if ($_.CPU) { $now[$_.Id] = $_.CPU; if ($last.ContainsKey($_.Id)) { $sum += $_.CPU - $last[$_.Id] } } }",
+    "  $last = $now; $pct = $sum / $n * 100; $samples += [math]::Round($pct, 1)",
+    `  if ($pct -lt ${belowPercent}) { $quiet++ } else { $quiet = 0 }`,
+    "}",
+    `$o = @{ waitedSeconds = [math]::Round(((Get-Date) - $t0).TotalSeconds); quiet = ($quiet -ge ${quietSeconds}); maxPercent = ($samples | Measure-Object -Maximum).Maximum; lastPercent = $samples[-1] }`,
+    "$o | ConvertTo-Json -Compress",
+  ].join("\n");
+  const r = spawnSync("powershell", ["-NoProfile", "-Command", script], { encoding: "utf8" });
+  try {
+    return JSON.parse(r.stdout.trim()) as { waitedSeconds: number; quiet: boolean; maxPercent: number; lastPercent: number };
+  } catch {
+    return { waitedSeconds: 0, quiet: false, note: "the wait could not be measured" };
+  }
 }

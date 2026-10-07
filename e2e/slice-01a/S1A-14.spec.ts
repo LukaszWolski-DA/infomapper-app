@@ -32,7 +32,11 @@ if (MEASURE) {
   });
 }
 
-const url = canvasUrl(LARGE_IDS.canvas, LARGE_IDS.project, LARGE_IDS.workspace);
+// slice 2p: DIAG (e.g. canvaslines) is passed to the measurement build, as e2e/slice-01b/measure.ts does
+const DIAG = process.env.DIAG ?? "";
+const url = canvasUrl(LARGE_IDS.canvas, LARGE_IDS.project, LARGE_IDS.workspace) + (DIAG ? `?diag=${DIAG}` : "");
+/** Lines drawn: the SVG line elements, or the count the canvas line renderer reports (slice 2p, its test hook). */
+const LINES_DRAWN = `(document.querySelectorAll('[data-testid="line-mapping"], [data-testid="line-relationship"]').length + Number(document.querySelector('[data-testid="layer-lines-canvas"]')?.getAttribute("data-drawn") ?? 0))`;
 const OUT = path.resolve("test-results", "S1A-14.json");
 
 async function startRecording(page: Page) {
@@ -133,7 +137,7 @@ test("S1A-14: performance on seed:large, Chrome, same laptop as the spike: pan a
   // the whole canvas is drawn: every card and line; at the overview zoom cards show a plain block
   await open(page);
   await expect(page.locator(".react-flow__node")).toHaveCount(cards);
-  await expect(page.locator('[data-testid="line-mapping"], [data-testid="line-relationship"]')).toHaveCount(lines);
+  await expect.poll(() => page.evaluate(LINES_DRAWN)).toBe(lines);
   const fitZoom = await zoomOf(page);
   expect(fitZoom).toBeLessThan(0.4);
   await expect(page.getByTestId("card-block")).toHaveCount(cards);
@@ -161,19 +165,19 @@ test("S1A-14: performance on seed:large, Chrome, same laptop as the spike: pan a
     const context = await browser.newContext({ viewport: page.viewportSize() ?? VIEWPORT, storageState: await page.context().storageState() });
     const p = await context.newPage();
     await p.addInitScript(
-      ([cards, lines]) => {
+      ([cards, lines, drawn]) => {
         const w = window as unknown as { __stableAt?: number };
         const check = () => {
           const ready =
             document.querySelector('[data-testid="area-canvas"][data-ready="true"]') &&
             document.querySelectorAll(".react-flow__node").length === cards &&
-            document.querySelectorAll('[data-testid="line-mapping"], [data-testid="line-relationship"]').length === lines;
+            (0, eval)(drawn) === lines;
           if (ready) requestAnimationFrame((t) => (w.__stableAt = t));
           else requestAnimationFrame(check);
         };
         requestAnimationFrame(check);
       },
-      [cards, lines] as const,
+      [cards, lines, LINES_DRAWN] as const,
     );
     await p.goto(url);
     await p.waitForFunction(() => (window as unknown as { __stableAt?: number }).__stableAt, undefined, { timeout: 60_000 });

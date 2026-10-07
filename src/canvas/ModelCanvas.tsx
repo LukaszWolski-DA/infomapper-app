@@ -14,8 +14,8 @@
 // arrow keys nudge the selection, and the group's actions (toolbox, selection panel) are in `GroupActions.ts`.
 // Each canvas has its look (`look.tsx`): the grid is one CSS background on its own element behind the pane, following
 // the view, and the layer mode hides the relationship or the mapping lines. A card named in `focusCardId` is selected and shown on arrival
-// (“On canvases” in the panels). The measurement-only build may switch off the line layer or draw every card as a block
-// (`diagnosis`), to find what the frame time is spent on.
+// (“On canvases” in the panels). The measurement-only build may switch off the line layer, draw every card as a block,
+// or draw the lines with the trial canvas renderer (`diagnosis`), to find what the frame time is spent on.
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -63,6 +63,7 @@ import {
 import { relatedLines, type CanvasLines, type Selection } from "./line-data";
 import { useCanvasLook } from "./look";
 import { viewKey } from "./views";
+import CanvasLineLayer from "./CanvasLineLayer";
 import LineLayer from "./LineLayer";
 import { Overview } from "./Overview";
 
@@ -749,6 +750,9 @@ export function ModelCanvas({
         onContextMenu={modes.onContextMenu}
       >
         {grid !== "none" && <div className="im-grid" ref={gridRef} aria-hidden data-testid="canvas-grid" />}
+        {diagnosis.canvasLines && !diagnosis.noLines && (
+          <CanvasLineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} />
+        )}
         <ReactFlow
           nodes={nodes}
           onNodesChange={onNodesChange}
@@ -778,7 +782,7 @@ export function ModelCanvas({
           attributionPosition="bottom-left"
           aria-label="Model canvas"
         >
-          {!diagnosis.noLines && <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />}
+          {!diagnosis.noLines && !diagnosis.canvasLines && <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />}
           <Overview lines={lines} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
           <SelectionOverlay selection={selection} lasso={lasso.lasso} />
