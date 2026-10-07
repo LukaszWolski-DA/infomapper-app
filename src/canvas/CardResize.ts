@@ -29,6 +29,12 @@ export function useCardResize(editable: boolean, change: (id: string, patch: Wid
   const rf = useReactFlow();
   const [outline, setOutline] = useState<ResizeOutline | null>(null);
   const press = useRef<{ cardId: string; original: CardData["width"]; startW: number; sx: number; zoom: number; last: number; box: ResizeOutline } | null>(null);
+  // Stable window listeners that read the latest `change`: a selection change during the same pointerup (the lasso,
+  // slice 2a) gives `change` a new identity, and re-subscribing then would drop this pointerup.
+  const changeRef = useRef(change);
+  useEffect(() => {
+    changeRef.current = change;
+  }, [change]);
 
   useEffect(() => {
     const move = (e: PointerEvent) => {
@@ -44,7 +50,7 @@ export function useCardResize(editable: boolean, change: (id: string, patch: Wid
       if (!p) return;
       press.current = null;
       setOutline(null);
-      if (p.last !== p.startW) change(p.cardId, { width: storedWidth(p.last) }, { width: p.original });
+      if (p.last !== p.startW) changeRef.current(p.cardId, { width: storedWidth(p.last) }, { width: p.original });
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -54,7 +60,7 @@ export function useCardResize(editable: boolean, change: (id: string, patch: Wid
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, [change]);
+  }, []);
 
   /** Capture phase on the canvas: a press on a card's width handle. Returns whether it took the press. */
   const onPointerDown = useCallback(

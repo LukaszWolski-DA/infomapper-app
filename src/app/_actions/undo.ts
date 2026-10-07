@@ -3,12 +3,16 @@
 // Undo and redo (slice 1b): the person's last change group in this workspace is reverted as a new change group
 // (`revertChangeGroup`). A step that was changed afterwards is dropped from the history with a toast that says so,
 // and the next Ctrl+Z goes further back (Łukasz, 4 October 2026). Other refusals (archive, role) keep the step.
+// Slice 2a: when the step takes the open canvas out of its project (undoing its duplicate, redoing its deletion), the
+// canvas to open instead is remembered: the original of an undone duplicate, as in the prototype, else the project's
+// first canvas.
 
 import { revalidatePath } from "next/cache";
 import { getDataStore } from "@/data";
 import type { CommandContext } from "@/domain/changes";
 import { revertChangeGroup } from "@/domain/commands/undo";
 import { changeCanvasId } from "@/domain/model/change-label";
+import { canvasAfterStep } from "@/domain/model/next-canvas";
 import { uuidv7 } from "@/domain/ids";
 import {
   afterRedo,
@@ -20,6 +24,7 @@ import {
   refusedStepMessage,
   type UndoHistory,
 } from "@/domain/model/undo-history";
+import { rememberNextCanvas } from "../_lib/next-canvas";
 import type { ActionResult } from "../_lib/run-command";
 import { getSessionUser } from "../_lib/session";
 
@@ -39,7 +44,11 @@ const stateOf = (h: UndoHistory): UndoState => ({ canUndo: h.undo.length > 0, ca
 const NOTHING = { undo: "Nothing to undo.", redo: "Nothing to redo." } as const;
 
 /** Undoes (or redoes) the signed-in person's last step in the workspace. */
-export async function undoAction(workspaceId: string, mode: "undo" | "redo"): Promise<ActionResult<UndoOutcome>> {
+export async function undoAction(
+  workspaceId: string,
+  mode: "undo" | "redo",
+  open?: { projectId: string; canvasId: string },
+): Promise<ActionResult<UndoOutcome>> {
   const user = await getSessionUser();
   if (!user) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
   if (mode !== "undo" && mode !== "redo") return { ok: false, code: "invalid", message: "Undo or redo?" };
@@ -74,6 +83,11 @@ export async function undoAction(workspaceId: string, mode: "undo" | "redo"): Pr
     const next = await store.undoHistory.update(workspace.id, user.id, (h) =>
       isNext(h) ? (mode === "undo" ? afterUndo(h, revert) : afterRedo(h, revert)) : h,
     );
+    if (open && typeof open.projectId === "string" && typeof open.canvasId === "string") {
+      const links = await store.canvases.listLinksOfProject(workspace.id, open.projectId);
+      const next = canvasAfterStep(open, links, step.events);
+      if (next) await rememberNextCanvas(open.canvasId, next);
+    }
     revalidatePath("/", "layout");
     const canvasId = changeCanvasId(step.events);
     const canvas = canvasId ? await store.canvases.get(workspace.id, canvasId) : null;

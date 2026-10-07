@@ -1,8 +1,13 @@
 // Undo and redo (slice 1b, AD-13): one change group is one step. Undo writes the group's before-images back as a new
 // change group; redo is the undo of that undo. A step is refused when any of its rows has changed since (another
-// person, or a later change), or when reverting it would leave the model inconsistent: a live row whose parent is
+// person, or a later change): its content differs from what the step left, version and updated_* aside, so steps can
+// be undone one after the other and a row changed and changed back counts as unchanged. The write itself still carries
+// the row's current version (AD-12), so a change that arrives meanwhile is refused by the adapter. A step is also
+// refused when reverting it would leave the model inconsistent: a live row whose parent is
 // deleted, or a deleted row that live rows still point to. Permissions and the archive apply as to any write; the
 // steps themselves come from the person's own history (`model/undo-history.ts`).
+// A canvas's look and layer mode are outside undo (D-12, slice 2a): a later change of only `canvas.look` does not
+// count as “changed afterwards”, and a canvas row that is written back keeps its current look.
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
@@ -94,7 +99,7 @@ function actionFor(e: ChangeEvent): WorkspaceAction {
     case "project":
       return "project.create";
     case "canvas":
-      return e.operation === "create" ? "canvas.create" : "canvas.rename";
+      return e.operation === "create" ? "canvas.create" : e.operation === "update" ? "canvas.rename" : "canvas.delete";
     default:
       return "model.edit";
   }
@@ -168,9 +173,10 @@ export function revertChangeGroup(
       continue;
     }
 
-    if (!current || !e.after_image || current.version !== e.after_image.version) return fail(refused());
+    if (!current || !e.after_image || !unchangedSince(table, current, e.after_image)) return fail(refused());
     const base = e.before_image ?? { ...current, deleted_at: ctx.now };
     const row: AnyRow = { ...structuredClone(base), version: (current.version as number) + 1, updated_at: ctx.now, updated_by: ctx.actorId };
+    if (table === "canvas") row.look = structuredClone(current.look);
     writes.push({ kind: "update", table, before: current, row } as unknown as Write);
     rows.set(key, row);
   }
@@ -178,6 +184,15 @@ export function revertChangeGroup(
   if (!consistent(after, touched)) return fail(refused());
   const writeSet = buildWriteSet(ctx, workspaceId, writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
+}
+
+/**
+ * The row's content is what the step left (its after-image), version and updated_* aside, and for a canvas its look
+ * (D-12). An undo before it only raised the version, so the next older step still matches.
+ */
+function unchangedSince(table: UndoableTable, current: AnyRow, image: AnyRow): boolean {
+  const keys = new Set([...Object.keys(current), ...Object.keys(image)]);
+  return [...keys].every((k) => BOOKKEEPING.has(k) || (table === "canvas" && k === "look") || sameValue(current[k], image[k]));
 }
 
 /**

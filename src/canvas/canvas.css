@@ -1,13 +1,20 @@
 /*
  * The model canvas: the prototype's card, row and Overview styles (docs/prototype), with the AD-24 rules from the
- * spike report: no dotted background, no opacity on repeated elements (card tools are always fully visible), and
+ * spike report: no React Flow <Background> (the grid is one CSS background on the canvas pane), no opacity on repeated elements (card tools are always fully visible), and
  * will-change: transform on the viewport so Chrome pans and zooms one GPU layer. And no clip (overflow: hidden) on
  * repeated elements unless the text may not fit (text-fit.ts): clips on every row made Chrome re-layerize the canvas
  * at about 25 ms per frame while panning (S1A-14).
  */
 
-.im-canvas { position: absolute; inset: 0; overflow: hidden; background: var(--im-canvas); font-size: 13px; color: var(--im-ink) }
-.im-canvas .react-flow { --xy-background-color: var(--im-canvas) }
+.im-canvas { position: absolute; inset: 0; overflow: hidden; background-color: var(--im-canvas); font-size: 13px; color: var(--im-ink) }
+.im-canvas .react-flow { --xy-background-color: transparent }
+/* The grid (D-12, slice 2a; prototype #viewport[data-grid]): one background on one element behind the pane, not many
+   elements (AD-24). It has its own layer and reaches 96 px (ModelCanvas GRID_BLEED) past every edge: panning moves the
+   layer by less than one grid step, so nothing repaints; zooming sets the step. */
+.im-canvas .im-grid { position: absolute; inset: -96px; pointer-events: none; will-change: transform }
+.im-canvas[data-grid="dots"] .im-grid { background-image: radial-gradient(var(--im-grid) 1px, transparent 1.2px) }
+.im-canvas[data-grid="lines"] .im-grid { background-image: linear-gradient(color-mix(in srgb, var(--im-grid) 60%, transparent) 1px, transparent 1px),
+  linear-gradient(90deg, color-mix(in srgb, var(--im-grid) 60%, transparent) 1px, transparent 1px) }
 .im-canvas .react-flow__viewport { will-change: transform }
 .im-canvas .react-flow__node-card { padding: 0; border: 0; background: none; border-radius: 0; cursor: default }
 .im-canvas .react-flow__attribution { background: transparent; font-size: 9px }
@@ -152,6 +159,9 @@ body.connecting .im-canvas .row { cursor: crosshair }
 
 /* ---------- canvas tools (slice 1b; prototype .tool-entity, body.relating) ---------- */
 .im-canvas.tool-entity, .im-canvas.tool-entity * { cursor: copy !important }
+/* Hand tool (slice 2a, D-18): grab anywhere, grabbing while it pans */
+.im-canvas.tool-hand, .im-canvas.tool-hand * { cursor: grab !important }
+.im-canvas.tool-hand.panning, .im-canvas.tool-hand.panning * { cursor: grabbing !important }
 .im-canvas.relating .card.ent, .im-canvas.relating .card.ent .c-head { cursor: crosshair }
 .im-canvas.relating .card.ent:hover { box-shadow: 0 0 0 2px var(--im-rel) }
 
@@ -161,6 +171,8 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .card:hover .c-rs::after, .im-canvas .c-rs:hover::after { visibility: visible }
 /* While a card is resized, Chrome repaints that card instead of re-rastering the whole layer (spike follow-up, C-09). */
 .im-canvas.resizing .react-flow__viewport { will-change: auto }
+/* While cards are dragged too (slice 2a step 3b): the moved cards and lines repaint, not the whole canvas layer. */
+.im-canvas.node-dragging .react-flow__viewport { will-change: auto }
 .im-canvas.resizing, .im-canvas.resizing * { cursor: ew-resize !important }
 
 /* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */
@@ -176,3 +188,11 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .hover-lines .lnk { pointer-events: none }
 .im-canvas .hover-lines .lnk .hit { display: none }
 .im-canvas .hover-lines .lnk .s { stroke-width: 2.4 }
+
+/* ---------- several selected cards and the lasso (slice 2a; prototype .card.msel, #selbox, #lasso) ----------
+   Drawn in the overlay: the cards are not restyled (AD-24). One box, one label and one lasso, so the fills are fine. */
+.im-canvas .selection-layer .msel { fill: none; stroke: var(--im-logical); stroke-width: 2; vector-effect: non-scaling-stroke }
+.im-canvas .selection-layer .selbox { fill: none; stroke: var(--im-logical); stroke-width: 1.5; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke }
+.im-canvas .selection-layer .lasso { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1; vector-effect: non-scaling-stroke }
+.im-canvas .selbox-label { position: absolute; transform-origin: 0 0; pointer-events: none; white-space: nowrap; background: var(--im-logical);
+  color: var(--im-surface); font-size: 11.5px; font-weight: 500; padding: 2px 9px; border-radius: 10px }

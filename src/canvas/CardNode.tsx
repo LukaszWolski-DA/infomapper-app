@@ -7,7 +7,7 @@
 import { memo, useContext } from "react";
 import { useStore, type Node, type NodeProps } from "@xyflow/react";
 import { visibleRows, type CardData, type CardRow } from "./card-data";
-import { CanvasCardsCtx } from "./context";
+import { CanvasCardsCtx, DiagnosisCtx } from "./context";
 import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
 import { splitName } from "./names";
 
@@ -71,7 +71,8 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
 function CardNode({ data }: NodeProps<CardNodeT>) {
   const { card } = data;
   const ctx = useContext(CanvasCardsCtx);
-  const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
+  const blocks = !!useContext(DiagnosisCtx).blocks;
+  const lod = useStore((s) => blocks || s.transform[2] < LOD_ZOOM);
   const rows = visibleRows(card);
   const isEnt = card.kind === "ent";
   const dual = rows.some((r) => r.pk && r.fk);
@@ -82,9 +83,14 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   const selectedRow = sel?.t === "row" && sel.cardId === card.id ? sel.id : null;
 
   // A click on a row selects the row, anywhere else on the card the card; the card tools do their own thing.
+  // Shift+click anywhere on the card puts the card in or out of a selection of several (slice 2a).
   const onClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest(".c-tools")) return;
+    if (e.shiftKey) {
+      ctx.toggleCard(card.id);
+      return;
+    }
     const row = target.closest<HTMLElement>("[data-row]")?.dataset.row;
     ctx.select(row ? { t: "row", cardId: card.id, id: row } : { t: "card", id: card.id });
   };

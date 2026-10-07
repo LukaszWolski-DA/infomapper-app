@@ -1,6 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { access, archived, canvas, canvasItem, entity, ids, makeCtx, NOW, sourceTable } from "../__fixtures__/domain";
-import { placeManyOnCanvas, placeOnCanvas, removeFromCanvas, updateCanvasItem } from "./canvas-item";
+import { STALE_VERSION_MESSAGE } from "../errors";
+import { changeLabel } from "../model/change-label";
+import {
+  arrangeCanvasItems,
+  moveCanvasItems,
+  placeManyOnCanvas,
+  placeOnCanvas,
+  removeCanvasItems,
+  removeFromCanvas,
+  setCanvasItemWidths,
+  updateCanvasItem,
+} from "./canvas-item";
 
 const { canvas1, customer, crmCustomer, itemCustomer } = ids;
 
@@ -144,5 +155,88 @@ describe("removeFromCanvas", () => {
       ok: false,
       error: { code: "forbidden" },
     });
+  });
+});
+
+describe("several cards at once (slice 2a): move, arrange, widths, remove", () => {
+  const second = "01900000-0000-7000-8000-00000000c003";
+  const items = [
+    canvasItem(itemCustomer, { x: 400, y: 120 }),
+    canvasItem(ids.itemCrmCustomer, { x: 40, y: 40 }),
+    canvasItem(second, { x: 800, y: 40, entity_id: ids.salesOrder }),
+  ];
+  const state = { canvas: canvas(), items };
+  const ref = (id: string, over: object = {}) => ({ canvasItemId: id, expectedVersion: 1, ...over });
+
+  it("moves a group in one change group; cards that do not move are left out", () => {
+    const r = moveCanvasItems(makeCtx(), access("modeler"), state, {
+      canvasId: canvas1,
+      items: [ref(itemCustomer, { x: 408, y: 128 }), ref(ids.itemCrmCustomer, { x: 48, y: 48 }), ref(second, { x: 800, y: 40 })],
+    });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toEqual({ moved: 2, versions: { [itemCustomer]: 2, [ids.itemCrmCustomer]: 2 } });
+    expect(r.writeSet.writes).toMatchObject([
+      { kind: "update", table: "canvas_item", row: { id: itemCustomer, x: 408, y: 128, version: 2, updated_at: NOW } },
+      { kind: "update", table: "canvas_item", row: { id: ids.itemCrmCustomer, x: 48, y: 48, version: 2 } },
+    ]);
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id))).toEqual(new Set([r.writeSet.changeGroupId]));
+  });
+
+  it("does not ask for the grid when moving (a group keeps its offsets), but does when arranging", () => {
+    expect(moveCanvasItems(makeCtx(), access("owner"), state, { canvasId: canvas1, items: [ref(itemCustomer, { x: 403.5, y: 121 })] }).ok).toBe(true);
+    expect(arrangeCanvasItems(makeCtx(), access("owner"), state, { canvasId: canvas1, items: [ref(itemCustomer, { x: 403, y: 120 })] })).toMatchObject({
+      ok: false,
+      error: { code: "invalid", message: "Positions lie on the 8 px grid." },
+    });
+    const r = arrangeCanvasItems(makeCtx(), access("owner"), state, { canvasId: canvas1, items: [ref(itemCustomer, { x: 40, y: 120 }), ref(second, { x: 40, y: 400 })] });
+    expect(r.ok && r.writeSet.writes.map((w) => w.kind === "update" && w.table === "canvas_item" && [w.row.x, w.row.y])).toEqual([
+      [40, 120],
+      [40, 400],
+    ]);
+  });
+
+  it("refuses a card of another canvas, a deleted or unknown card, a stale version, a card twice, and nothing to change", () => {
+    const run = (refs: object[], s: object = {}) => moveCanvasItems(makeCtx(), access("owner"), { ...state, ...s }, { canvasId: canvas1, items: refs });
+    const elsewhere = { items: [canvasItem(itemCustomer, { canvas_id: ids.canvas2 })] };
+    expect(run([ref(itemCustomer, { x: 0, y: 0 })], elsewhere)).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(run([ref(itemCustomer, { x: 0, y: 0 })], { items: [canvasItem(itemCustomer, { deleted_at: NOW })] })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(run([ref("01900000-0000-7000-8000-00000000c0ff", { x: 0, y: 0 })])).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(run([ref(itemCustomer, { x: 0, y: 0, expectedVersion: 7 })])).toMatchObject({ ok: false, error: { code: "stale_version", message: STALE_VERSION_MESSAGE } });
+    expect(run([ref(itemCustomer, { x: 0, y: 0 }), ref(itemCustomer, { x: 8, y: 0 })])).toMatchObject({ ok: false, error: { message: "A card is listed twice." } });
+    expect(run([])).toMatchObject({ ok: false, error: { message: "Select at least one card." } });
+    expect(run([ref(itemCustomer, { x: 400, y: 120 })])).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(run([ref(itemCustomer, { x: 0, y: 0 })], { canvas: canvas(canvas1, { deleted_at: NOW }) })).toMatchObject({ ok: false, error: { code: "not_found" } });
+  });
+
+  it("sets several widths in one change group, within 200–600 px in steps of 8, null for the default", () => {
+    const r = setCanvasItemWidths(makeCtx(), access("modeler"), state, {
+      canvasId: canvas1,
+      items: [ref(itemCustomer, { width: 312 }), ref(second, { width: null })],
+    });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toEqual({ changed: 1, versions: { [itemCustomer]: 2 } });
+    expect(r.writeSet.writes).toMatchObject([{ row: { id: itemCustomer, width: 312 } }]);
+    for (const width of [192, 608, 301]) {
+      expect(setCanvasItemWidths(makeCtx(), access("modeler"), state, { canvasId: canvas1, items: [ref(itemCustomer, { width })] }).ok).toBe(false);
+    }
+  });
+
+  it("removes several cards in one change group; the elements stay in the model", () => {
+    const r = removeCanvasItems(makeCtx(), access("modeler"), state, { canvasId: canvas1, items: [ref(itemCustomer), ref(second)] });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toEqual({ removed: 2 });
+    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["canvas_item", "canvas_item"]);
+    expect(r.writeSet.events.map((e) => e.operation)).toEqual(["delete", "delete"]);
+    expect(changeLabel(r.writeSet.events)).toBe("Remove 2 cards");
+  });
+
+  it("is refused to reviewers and readers, and in an archived workspace, before reading the input", () => {
+    const commands = [moveCanvasItems, arrangeCanvasItems, setCanvasItemWidths, removeCanvasItems];
+    for (const command of commands) {
+      for (const role of ["reviewer", "reader"] as const) {
+        expect(command(makeCtx(), access(role), state, { canvasId: canvas1, items: [ref(itemCustomer, { x: 0, y: 0 })] })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+      }
+      expect(command(makeCtx(), access("owner", archived), state, {})).toMatchObject({ ok: false, error: { code: "archived" } });
+    }
   });
 });

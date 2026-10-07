@@ -1,5 +1,5 @@
 // What each workspace role may do (AD-05), the archive (AD-09) and guests (AD-01).
-// Actions of slices 0 and 1a; later slices add theirs.
+// Actions of slices 0 to 2a; later slices add theirs.
 
 import { ARCHIVED_MESSAGE, domainError, notFound, type DomainError } from "./errors";
 import type { Uuid } from "./ids";
@@ -15,6 +15,8 @@ export const WORKSPACE_ACTIONS = [
   "canvas.rename",
   "canvas.edit_projects",
   "canvas.edit_items",
+  "canvas.edit_look",
+  "canvas.delete",
   "model.edit",
   "mapping.set_status",
 ] as const;
@@ -34,6 +36,8 @@ export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]>
   "canvas.rename": EDITORS,
   "canvas.edit_projects": EDITORS,
   "canvas.edit_items": EDITORS,
+  "canvas.edit_look": EDITORS,
+  "canvas.delete": EDITORS,
   "model.edit": EDITORS,
   "mapping.set_status": ["owner", "admin", "modeler", "reviewer"],
 };
@@ -51,6 +55,8 @@ const ACTION_TEXT: Record<WorkspaceAction, string> = {
   "canvas.rename": "rename canvases",
   "canvas.edit_projects": "change which projects a canvas belongs to",
   "canvas.edit_items": "change what is on a canvas",
+  "canvas.edit_look": "change the look of a canvas",
+  "canvas.delete": "delete canvases",
   "model.edit": "edit the model",
   "mapping.set_status": "change the status of a mapping",
 };

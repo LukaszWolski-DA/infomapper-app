@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import { LookFrame } from "@/canvas/look";
 import { CanvasTabs } from "@/app/w/[workspaceId]/p/[projectId]/_components/canvas-tabs";
 import type { ProjectView } from "../_lib/project-view";
 import type { ShellData } from "../_lib/shell";
@@ -42,11 +43,12 @@ export function AppShell({ shell, project, children }: { shell: ShellData; proje
         >
           {project.left ?? <PanelPlaceholder>Model, sources and requirements arrive in a later slice.</PanelPlaceholder>}
         </aside>
-        <div className="flex min-h-0 min-w-0 flex-col">
+        {/* The open canvas's background colours the tabs and the canvas (prototype #center[data-bg], slice 2a). */}
+        <LookFrame className="flex min-h-0 min-w-0 flex-col">
           <CanvasTabs view={project.view} currentCanvasId={project.currentCanvasId} renameOnOpen={!!project.renameOnOpen} />
           <Breadcrumbs shell={shell} />
           <main className="relative min-h-0 flex-1 overflow-auto">{children}</main>
-        </div>
+        </LookFrame>
         <aside
           data-testid="panel-inspector"
           className="hidden min-h-0 flex-col overflow-hidden border-l border-im-line bg-im-panel lg:flex"

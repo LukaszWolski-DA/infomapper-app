@@ -15,6 +15,7 @@ import { MappingPanel } from "./mapping-panel";
 import { indexModel, type ModelIndex } from "./model-index";
 import { OverviewPanel } from "./overview-panel";
 import { RelationshipPanel } from "./relationship-panel";
+import { SelectionPanel } from "./selection-panel";
 import { SourceColumnPanel, SourceTablePanel } from "./source-panels";
 import type { TreeData } from "./tree-data";
 
@@ -37,6 +38,20 @@ export interface InspectorProps {
   fourEyes: boolean;
   /** Who last changed each mapping's inputs, kind or rule (AD-06); only filled when four-eyes is on. */
   contentAuthors: Record<Uuid, Uuid>;
+  /** Every canvas of the workspace, where it opens and how “On canvases” names it (slice 2a). */
+  places: CanvasPlace[];
+  /** The canvases each entity or source table has a card on. */
+  canvasesOf: Record<Uuid, Uuid[]>;
+}
+
+export interface CanvasPlace {
+  id: Uuid;
+  name: string;
+  href: string;
+  /** “this canvas”, “open” (another canvas of this project) or “in {project}”. */
+  where: string;
+  /** The project it opens in, when that is not this one. */
+  switchTo: string | null;
 }
 
 export interface PanelContext extends Omit<InspectorProps, "model" | "cards" | "tree"> {
@@ -124,6 +139,8 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     body = <SourceColumnPanel key={sel.id} column={ix.column.get(sel.id)!} cardId={card.id} />;
   } else if (sel?.t === "map" && ix.mapping.has(sel.id)) {
     body = <MappingPanel key={sel.id} mapping={ix.mapping.get(sel.id)!} />;
+  } else if (sel?.t === "multi") {
+    body = <SelectionPanel keys={sel.keys} />;
   } else if (sel?.t === "rel" && ix.model.relationships.some((r) => r.id === sel.id)) {
     body = <RelationshipPanel key={sel.id} relationship={ix.model.relationships.find((r) => r.id === sel.id)!} />;
   }

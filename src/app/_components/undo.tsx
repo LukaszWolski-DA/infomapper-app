@@ -24,11 +24,14 @@ const isTyping = (el: EventTarget | null) =>
 
 export function UndoProvider({
   workspaceId,
+  projectId,
   canvasId,
   state: server,
   children,
 }: {
   workspaceId: string;
+  /** The open project: a step that takes the open canvas out of it opens another canvas (slice 2a). */
+  projectId: string;
   /** The open canvas: a step on another canvas says which one in its toast. */
   canvasId: string;
   state: UndoState;
@@ -53,7 +56,7 @@ export function UndoProvider({
       if (!always && !(mode === "undo" ? stateRef.current.canUndo : stateRef.current.canRedo)) return;
       queue.current = queue.current.then(async () => {
         await ui.settled();
-        const result = await undoAction(workspaceId, mode).catch(() => ({
+        const result = await undoAction(workspaceId, mode, { projectId, canvasId }).catch(() => ({
           ok: false as const,
           message: "Something went wrong. Nothing was changed.",
         }));
@@ -66,7 +69,7 @@ export function UndoProvider({
         toast(doneStepMessage(mode, label, canvas && canvas.id !== canvasId ? canvas.name : null));
       });
     },
-    [ui, workspaceId, canvasId, toast],
+    [ui, workspaceId, projectId, canvasId, toast],
   );
   const undo = useCallback(() => run("undo"), [run]);
   const redo = useCallback(() => run("redo"), [run]);

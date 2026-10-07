@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
+import { connection } from "next/server";
 import { getDataStore } from "@/data";
 import { signInAsDevUser } from "../_actions/session";
 import { isDevSignInEnabled } from "../_lib/dev-session";
@@ -7,6 +8,9 @@ import { isDevSignInEnabled } from "../_lib/dev-session";
 export const metadata: Metadata = { title: "Sign in · InfoMapper" };
 
 export default async function SignInPage() {
+  // Decided per request, not at build time: the measurement-only build (AD-31) is built like a normal production build
+  // and only differs in how it is started.
+  await connection();
   if (!isDevSignInEnabled()) notFound();
 
   const store = getDataStore();

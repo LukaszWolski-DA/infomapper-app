@@ -1,10 +1,11 @@
 import "server-only";
-import { cookies } from "next/headers";
-import { notFound } from "next/navigation";
+import { cookies, headers } from "next/headers";
+import { notFound, redirect } from "next/navigation";
 import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { can, checkCreateWorkspace, isArchived, isGuest } from "@/domain/permissions";
 import type { AppUser, WorkspaceRole } from "@/domain/types";
+import { nextCanvasFor } from "./next-canvas";
 import { LAST_PROJECTS_COOKIE, parseLastProjects } from "./preferences";
 import { standingOf, type Standing } from "./roles";
 import { requireSessionUser } from "./session";
@@ -81,6 +82,17 @@ export async function loadShellFor(user: AppUser, where: Where): Promise<ShellDa
     const row = links.some((l) => l.canvas_id === where.canvasId)
       ? await store.canvases.get(workspace.id, where.canvasId)
       : null;
+    // A canvas no longer in this project (slice 2a). While the page is drawn again after your own delete, removal or
+    // undo (a server action), the canvas that action chose opens (`next-canvas.ts`), else the first one, without more
+    // ado; any other visit opens the project's first canvas with a toast (`?moved=1`).
+    if (!row && project && links.length) {
+      const base = `/w/${workspace.id}/p/${project.id}/c/`;
+      if ((await headers()).has("next-action")) {
+        const next = await nextCanvasFor(where.canvasId);
+        redirect(base + (next && links.some((l) => l.canvas_id === next) ? next : links[0]!.canvas_id));
+      }
+      redirect(`${base}${links[0]!.canvas_id}?moved=1`);
+    }
     if (!row) notFound();
     canvas = { id: row.id, name: row.name };
   }

@@ -1,6 +1,7 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
 import { rmSync } from "node:fs";
 import { E2E_DB } from "../config";
+import type { BrowserContext } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { createFromSwitcher, expectToast, signInAs } from "./helpers";
 
@@ -55,21 +56,35 @@ test.afterEach(async () => {
 
 /** Steps on a freshly started dev server wait longer: it compiles each page and action on first use. */
 const COLD = 60_000;
+/**
+ * How long a cold dev server may take to answer: it starts without Turbopack's cache and compiles the sign-in page on
+ * the first request. On the development laptop that sometimes took more than two minutes (slice 1a and 1b runs).
+ */
+const START = 300_000;
+const STOP = 120_000;
 
+/** Waits until the server answers (or no longer answers), by the clock: a request that hangs on a compile counts too. */
 async function waitUntil(up: boolean) {
-  for (let i = 0; i < 240; i++) {
-    const ok = await fetch(`${BASE}/sign-in`).then(
+  const deadline = Date.now() + (up ? START : STOP);
+  while (Date.now() < deadline) {
+    const ok = await fetch(`${BASE}/sign-in`, { signal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())) }).then(
       (r) => r.ok,
       () => false,
     );
     if (ok === up) return;
     await new Promise((r) => setTimeout(r, 500));
   }
-  throw new Error(`Server did not ${up ? "start" : "stop"} in time`);
+  throw new Error(`Server did not ${up ? "start" : "stop"} within ${(up ? START : STOP) / 1000} s`);
+}
+
+/** Compiles a page on the restarted server before the test looks at it, as the global setup does for the shared one. */
+async function warm(context: BrowserContext, url: string) {
+  await context.request.get(url, { timeout: START });
 }
 
 test("S0-10: after stopping and restarting the dev server, created projects and canvases are still there", async ({ browser }) => {
-  test.setTimeout(480_000);
+  // two cold starts (START each), two stops and the steps with COLD waits
+  test.setTimeout(900_000);
   stopServer(); // a server left over from an interrupted run
   await waitUntil(false);
   rmSync(DIST, { recursive: true, force: true });
@@ -89,11 +104,15 @@ test("S0-10: after stopping and restarting the dev server, created projects and 
     await expectToast(page, "Renamed the canvas to Still here.", COLD);
     await expect(page).not.toHaveURL(/rename=1/);
     const canvasUrl = page.url();
+    // Leave the page first: its dev client would reload it on its own once the server is back, and that reload would
+    // cut the navigation below short.
+    await page.goto("about:blank");
 
     stopServer(server);
     await waitUntil(false);
     server = startServer();
     await waitUntil(true);
+    await warm(context, canvasUrl);
 
     await page.goto(canvasUrl);
     expect(new URL(page.url()).port).toBe(String(PORT));

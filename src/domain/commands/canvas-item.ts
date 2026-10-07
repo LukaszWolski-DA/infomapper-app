@@ -1,10 +1,10 @@
 // Cards on a canvas (AD-16): place from the left panel, move, collapse, row filter, width (slice 1b, D-37), remove
-// from this canvas.
+// from this canvas; and the same for several selected cards at once, each as one change group (slice 2a).
 // Layout belongs to the canvas, not the model (D-04): removing a card leaves the entity and its mappings alone (D-02).
 
 import { z } from "zod";
-import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult } from "../changes";
-import { domainError, notFound } from "../errors";
+import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
+import { domainError, notFound, staleVersion, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import type { WorkspaceAccess } from "../permissions";
 import type { Canvas, CanvasItem, Entity, SourceTable } from "../types";
@@ -17,7 +17,7 @@ export const positionSchema = z.object({ x: coordinate, y: coordinate });
 
 /** Card width (D-37, C-09): 200–600 px in steps of 8; null is the default width. */
 export const CARD_WIDTH = { min: 200, max: 600, step: 8 } as const;
-const widthSchema = z
+export const widthSchema = z
   .number()
   .int()
   .min(CARD_WIDTH.min, `A card is at least ${CARD_WIDTH.min} px wide.`)
@@ -220,4 +220,137 @@ export function removeFromCanvas(
   const got = current(state.item, access, parsed.data.canvasItemId, parsed.data.expectedVersion, "card");
   if (!got.ok) return fail(got.error);
   return done(ctx, access, undefined, [softDelete(ctx, "canvas_item", got.row)]);
+}
+
+// ---- several cards at once (slice 2a): move, arrange, widths, remove ----
+
+/** The step of the canvas grid: arranged positions lie on it (D-37). */
+export const GRID = 8;
+/** At most this many cards in one group action (the “Performance test” canvas has 101). */
+const MAX_GROUP = 500;
+
+const itemRef = { canvasItemId: uuidSchema, expectedVersion: versionSchema };
+const onGrid = coordinate.refine((v) => Number.isInteger(v) && v % GRID === 0, `Positions lie on the ${GRID} px grid.`);
+
+const groupOf = <S extends z.ZodTypeAny>(item: S) =>
+  z
+    .array(item)
+    .min(1, "Select at least one card.")
+    .max(MAX_GROUP, `Change at most ${MAX_GROUP} cards at once.`)
+    .refine((items) => new Set(items.map((i) => (i as { canvasItemId: string }).canvasItemId)).size === items.length, "A card is listed twice.");
+
+export interface CanvasItemsState {
+  canvas: Canvas | null;
+  /** The canvas's cards (deleted ones may be included; they are refused). */
+  items: readonly CanvasItem[];
+}
+
+/** Each named card: live, on this canvas, at the version the user read. */
+function cardsOf(
+  access: WorkspaceAccess,
+  state: CanvasItemsState,
+  canvasId: Uuid,
+  refs: readonly { canvasItemId: Uuid; expectedVersion: number }[],
+): { ok: true; rows: CanvasItem[] } | { ok: false; error: DomainError } {
+  const workspaceId = access.workspace.id;
+  if (!isLive(state.canvas, workspaceId) || state.canvas.id !== canvasId) return { ok: false, error: notFound("canvas") };
+  const byId = new Map(state.items.map((i) => [i.id, i]));
+  const rows: CanvasItem[] = [];
+  for (const { canvasItemId, expectedVersion } of refs) {
+    const row = byId.get(canvasItemId);
+    if (!isLive(row, workspaceId) || row.canvas_id !== canvasId) return { ok: false, error: notFound("card") };
+    if (row.version !== expectedVersion) return { ok: false, error: staleVersion() };
+    rows.push(row);
+  }
+  return { ok: true, rows };
+}
+
+/** The new version of each card a write set updates, for the canvas's next write. */
+const versionsOf = (writes: readonly Write[]): Record<string, number> =>
+  Object.fromEntries(writes.flatMap((w) => (w.kind === "update" && w.table === "canvas_item" ? [[w.row.id, w.row.version]] : [])));
+
+/** One update per card whose values change; refused when none does. */
+function updates(ctx: CommandContext, rows: readonly CanvasItem[], patches: readonly Partial<CanvasItem>[]): Write[] | null {
+  const writes: Write[] = [];
+  rows.forEach((before, i) => {
+    const patch = Object.fromEntries(Object.entries(patches[i]!).filter(([k, v]) => before[k as keyof CanvasItem] !== v));
+    if (Object.keys(patch).length) writes.push({ kind: "update", table: "canvas_item", before, row: nextVersion(ctx, before, patch) });
+  });
+  return writes.length ? writes : null;
+}
+
+/** How many cards changed, and the new version of each. */
+export interface GroupMoved {
+  moved: number;
+  versions: Record<string, number>;
+}
+
+const moveInput = (position: typeof coordinate) =>
+  z.object({ canvasId: uuidSchema, items: groupOf(z.object({ ...itemRef, x: position, y: position }).strict()) }).strict();
+const moveItemsInput = moveInput(coordinate);
+const arrangeItemsInput = moveInput(onGrid);
+export type MoveCanvasItemsInput = z.input<typeof moveItemsInput>;
+
+function moveItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown, schema: typeof moveItemsInput) {
+  const parsed = begin(access, "canvas.edit_items", schema, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { canvasId, items } = parsed.data;
+  const got = cardsOf(access, state, canvasId, items);
+  if (!got.ok) return fail(got.error);
+  const writes = updates(ctx, got.rows, items.map(({ x, y }) => ({ x, y })));
+  if (!writes) return fail(nothingToChange());
+  return done(ctx, access, { moved: writes.length, versions: versionsOf(writes) }, writes);
+}
+
+/**
+ * Moves several cards of one canvas in one change group, so one undo puts them all back: a group drag, or arrow-key
+ * nudges once the keys are still. Cards whose position does not change are left out.
+ */
+export function moveCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<GroupMoved> {
+  return moveItems(ctx, access, state, input, moveItemsInput);
+}
+
+/**
+ * Align, stack or line up (the group toolbox): the canvas computes the positions from the cards' sizes; every
+ * position must lie on the 8 px grid. One change group.
+ */
+export function arrangeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<GroupMoved> {
+  return moveItems(ctx, access, state, input, arrangeItemsInput);
+}
+
+const widthsInput = z.object({ canvasId: uuidSchema, items: groupOf(z.object({ ...itemRef, width: widthSchema }).strict()) }).strict();
+export type SetCanvasItemWidthsInput = z.input<typeof widthsInput>;
+
+/** “Fit widths to names” for several cards: the canvas measures, the domain checks the widths (D-37). One change group. */
+export function setCanvasItemWidths(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: CanvasItemsState,
+  input: unknown,
+): CommandResult<{ changed: number; versions: Record<string, number> }> {
+  const parsed = begin(access, "canvas.edit_items", widthsInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { canvasId, items } = parsed.data;
+  const got = cardsOf(access, state, canvasId, items);
+  if (!got.ok) return fail(got.error);
+  const writes = updates(ctx, got.rows, items.map(({ width }) => ({ width })));
+  if (!writes) return fail(nothingToChange());
+  return done(ctx, access, { changed: writes.length, versions: versionsOf(writes) }, writes);
+}
+
+const removeItemsInput = z.object({ canvasId: uuidSchema, items: groupOf(z.object(itemRef).strict()) }).strict();
+export type RemoveCanvasItemsInput = z.input<typeof removeItemsInput>;
+
+/** Takes several cards off this canvas in one change group; the elements stay in the model (D-02). */
+export function removeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<{ removed: number }> {
+  const parsed = begin(access, "canvas.edit_items", removeItemsInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const got = cardsOf(access, state, parsed.data.canvasId, parsed.data.items);
+  if (!got.ok) return fail(got.error);
+  return done(
+    ctx,
+    access,
+    { removed: got.rows.length },
+    got.rows.map((row) => softDelete(ctx, "canvas_item", row)),
+  );
 }

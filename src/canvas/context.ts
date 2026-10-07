@@ -2,6 +2,7 @@
 
 import { createContext } from "react";
 import type { Uuid } from "@/domain/ids";
+import type { ArrangeMode } from "./arrange";
 import type { Selection } from "./line-data";
 
 /** What the card nodes may do and see; kept in a context so node data stays plain and memo-friendly. */
@@ -16,6 +17,8 @@ export interface CanvasCardsApi {
   startRelate: (cardId: string) => void;
   /** Double-click on the width handle. */
   fitWidth: (cardId: string) => void;
+  /** Shift+click on a card: in or out of the selection (slice 2a). */
+  toggleCard: (cardId: string) => void;
 }
 
 const noop = () => {};
@@ -27,7 +30,20 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
   cycleFilter: noop,
   startRelate: noop,
   fitWidth: noop,
+  toggleCard: noop,
 });
+
+/**
+ * Measurement-only switches (slice 2a diagnosis, AD-31): only the measurement-only production build passes them, from
+ * `?diag=nolines` or `?diag=blocks`. Users never see them.
+ */
+export interface Diagnosis {
+  /** No line layer at all. */
+  noLines?: boolean;
+  /** Every card drawn as its below-40 % block, at any zoom. */
+  blocks?: boolean;
+}
+export const DiagnosisCtx = createContext<Diagnosis>({});
 
 /** Relationship ends: crow's foot (Information Engineering) or UML multiplicity. Shared by all canvases (D-22). */
 export type Notation = "ie" | "uml";
@@ -62,6 +78,19 @@ export interface CanvasHandle {
   settled: () => Promise<void>;
   /** A card's collapse state and row filter as the canvas shows them now (changed without a fresh page). */
   cardView: (cardId: Uuid) => { collapsed: boolean; rowFilter: RowFilter } | null;
+  /** Selects every card on the canvas (Ctrl+A, toolbox “Select all”; slice 2a). */
+  selectAll: () => void;
+  /** The selected cards aligned, stacked or lined up, in one change (slice 2a). */
+  arrangeSelection: (mode: ArrangeMode) => void;
+  /** “Fit widths to names” for every selected card, in one change. */
+  fitSelectionWidths: () => void;
+  /** Takes the selected cards off this canvas in one change, with Undo in the toast. */
+  removeSelection: () => void;
+  /**
+   * “Add sources of selected entities”: the missing feeding source tables of each selected entity, beside its card,
+   * in one change. `sourcesOf` gives an entity's feeding source tables and their row counts (the page knows the model).
+   */
+  placeSourcesOfSelection: (sourcesOf: (entityId: Uuid) => { sourceTableId: Uuid; rows: number }[]) => void;
 }
 
 export type RowFilter = "all" | "mapped" | "unmapped" | "keys";
@@ -80,6 +109,8 @@ export interface ColumnDrop {
 export type ToolboxTarget =
   | { kind: "canvas" }
   | { kind: "card"; cardId: Uuid }
+  /** A right-click on a card of a selection of several (slice 2a): the group's toolbox. */
+  | { kind: "selection" }
   | { kind: "row"; cardId: Uuid; rowId: Uuid }
   | { kind: "map"; mappingId: Uuid }
   | { kind: "rel"; relationshipId: Uuid };
@@ -92,8 +123,11 @@ export interface ToolboxRequest {
   at: { x: number; y: number };
 }
 
-/** A canvas tool that changes what a click does: the Entity tool (D-46) or drawing a relationship from a card. */
-export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | null;
+/**
+ * A canvas tool that changes what a click does: the Entity tool (D-46), drawing a relationship from a card, or the
+ * Hand tool (D-18, slice 2a), with which a left drag anywhere pans. One at a time; Esc ends it.
+ */
+export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | { kind: "hand" } | null;
 
 /**
  * What the canvas asks of the page around it. The canvas knows gestures and positions; the page knows the model and
@@ -163,6 +197,11 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   placeBeside: noop,
   settled: () => Promise.resolve(),
   cardView: () => null,
+  selectAll: noop,
+  arrangeSelection: noop,
+  fitSelectionWidths: noop,
+  removeSelection: noop,
+  placeSourcesOfSelection: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,

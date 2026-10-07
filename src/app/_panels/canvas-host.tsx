@@ -15,7 +15,7 @@ import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
 import { createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, swapRelationshipAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
-import { RELATE_HINT } from "@/canvas/CanvasModes";
+import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
 import { FILTER_LABEL, FILTER_ORDER } from "@/canvas/CardNode";
 import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
@@ -25,7 +25,7 @@ import { STATUS_LABEL } from "./attribute-panel";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
 import { useMapColumn } from "./map-column";
 import { useMoveAttribute } from "./move-attribute";
-import { attributeLabel, columnLabel, fedEntities, feedingSources, inputsLabel, type ModelIndex } from "./model-index";
+import { attributeLabel, columnLabel, fedEntities, feedingSourceCards, feedingSources, inputsLabel, type ModelIndex } from "./model-index";
 import { usePanels } from "./panels-context";
 import { Toolbox, type SearchResult, type ToolboxItem } from "./toolbox";
 
@@ -252,7 +252,18 @@ export function useCanvasHost({
         items.push({ search });
         items.push({ label: "New entity here", kbd: "E", act: () => void createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }) });
       }
+      // every role: these only change what is selected or how the view moves (slice 2a)
+      items.push({ label: "Select all", kbd: "Ctrl A", act: () => ui.selectAll() });
       items.push({ label: "Fit everything on screen", kbd: "F", act: () => ui.fit() });
+      const hand = ui.mode?.kind === "hand";
+      items.push({
+        label: hand ? "Back to selecting" : "Hand tool",
+        kbd: hand ? "V" : "H",
+        act: () => {
+          ui.setMode(hand ? null : { kind: "hand" });
+          if (!hand) toast(HAND_TOOL_HINT);
+        },
+      });
       return items;
     }
     if (t.kind === "map") {
@@ -308,6 +319,27 @@ export function useCanvasHost({
           act: () => void deleteLine({ t: "rel", id: r.id }),
         });
       }
+      return items;
+    }
+    if (t.kind === "selection") {
+      // a group (slice 2a; prototype ctxFor “a group”): reviewers and readers only clear it
+      const sel = ui.selection;
+      const keys = sel?.t === "multi" ? sel.keys : [];
+      items.push({ head: `${keys.length} items selected` });
+      if (editable) {
+        items.push({ label: "Align left", act: () => ui.arrangeSelection("left") });
+        items.push({ label: "Align top", act: () => ui.arrangeSelection("top") });
+        items.push({ label: "Stack in a column", act: () => ui.arrangeSelection("column") });
+        items.push({ label: "Line up in a row", act: () => ui.arrangeSelection("row") });
+        items.push({ label: "Fit widths to names", act: () => ui.fitSelectionWidths() });
+        items.push({ sep: true });
+        if (keys.some((k) => k.startsWith("entity:"))) {
+          items.push({ label: "Add sources of selected entities", act: () => ui.placeSourcesOfSelection((id) => feedingSourceCards(ix, id)) });
+        }
+        items.push({ label: "Remove from this canvas", danger: true, act: () => ui.removeSelection() });
+      }
+      items.push({ sep: true });
+      items.push({ label: "Clear selection", kbd: "Esc", act: () => ui.select(null) });
       return items;
     }
     const card = cardById.get(t.cardId);

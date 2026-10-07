@@ -5,6 +5,7 @@ import type { Uuid } from "@/domain/ids";
 import { checkMappingTypes } from "@/domain/model/type-check";
 import type { CardinalityMax, CardinalityMin, MappingKind, MappingStatus, WorkspaceModel } from "@/domain/types";
 import type { CardData } from "./card-data";
+import type { SelectionKey } from "./selection";
 
 export interface MapLineData {
   /** The mapping id. */
@@ -103,6 +104,8 @@ export function buildLines(model: WorkspaceModel, cards: readonly CardData[]): C
 /** What is selected on the canvas; a hovered row or line uses the same shape (slice 1b, C-10). */
 export type Selection =
   | { t: "card"; id: Uuid }
+  /** Two or more cards (slice 2a): their keys, see `selection.ts`. */
+  | { t: "multi"; keys: readonly SelectionKey[] }
   | { t: "row"; cardId: Uuid; id: Uuid }
   | { t: "map"; id: Uuid }
   | { t: "rel"; id: Uuid }
@@ -118,7 +121,7 @@ export interface Related {
  * A selected card fades nothing: in the prototype that belongs to Focus mode, a later slice.
  */
 export function relatedLines(sel: Selection, lines: CanvasLines): Related | null {
-  if (!sel || sel.t === "card") return null;
+  if (!sel || sel.t === "card" || sel.t === "multi") return null;
   const maps = new Set<Uuid>(), rels = new Set<Uuid>();
   switch (sel.t) {
     case "map":

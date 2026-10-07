@@ -2,6 +2,7 @@ import "server-only";
 import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { can } from "@/domain/permissions";
+import type { CanvasLook } from "@/domain/types";
 import { cardsPerCanvas } from "../_panels/stats";
 import type { ShellData } from "./shell";
 
@@ -11,8 +12,8 @@ export interface ProjectView {
   project: { id: Uuid; name: string; description: string | null };
   /** May create, rename and move canvases between projects. The server checks again. */
   canEdit: boolean;
-  /** The project's canvases in tab order, with the projects each one is in and their number of cards. */
-  canvases: { id: Uuid; name: string; version: number; projectIds: Uuid[]; cards: number }[];
+  /** The project's canvases in tab order, with the projects each one is in, their number of cards and their look. */
+  canvases: { id: Uuid; name: string; version: number; projectIds: Uuid[]; cards: number; look: CanvasLook }[];
   projects: { id: Uuid; name: string }[];
   /** Canvases of this workspace that are not in this project ("Add a canvas from another project"). */
   outside: { id: Uuid; name: string; projectNames: string[] }[];
@@ -46,7 +47,7 @@ export async function loadProjectView(shell: ShellData): Promise<ProjectView> {
     canEdit: can({ workspace: workspace!, member }, "canvas.create"),
     canvases: links.map((l) => {
       const c = canvases.find((x) => x.id === l.canvas_id)!;
-      return { id: c.id, name: c.name, version: c.version, projectIds: linksByCanvas.get(c.id) ?? [], cards: cards.get(c.id) ?? 0 };
+      return { id: c.id, name: c.name, version: c.version, projectIds: linksByCanvas.get(c.id) ?? [], cards: cards.get(c.id) ?? 0, look: c.look };
     }),
     projects: projects.map((p) => ({ id: p.id, name: p.name })),
     outside: canvases

@@ -3,11 +3,13 @@
 // All mapping and relationship lines in one <svg> (AD-24 rule 3), portalled into React Flow's edge-label layer:
 // it sits in the viewport, so lines pan and zoom with the canvas, and paints below the cards (prototype #lines).
 // Card positions come from React Flow's store; row positions from the card data (AD-24 rule 2, geometry.rowEnd).
-// Each line re-renders only when its geometry or state changes (memo on a signature), as in the spike.
+// Each line re-renders only when its geometry or state changes (memo on a signature), as in the spike. Its geometry is
+// computed again only when one of its cards moved or changed (slice 2a step 3b): a drag recomputes the lines of the
+// dragged cards, not all of them, on every frame.
 // Hover (slice 1b, C-10): the lines are not restyled and the others do not fade (restyling 340 lines, or one veil over
 // them, made the hover too slow); the hovered lines are drawn again, emphasised, above the others and below the cards.
 
-import { memo, useContext } from "react";
+import { memo, useContext, useState, type ReactNode } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi, type InternalNode } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type Notation } from "./context";
@@ -136,6 +138,15 @@ const RelPath = memo(
   (a, b) => a.sig === b.sig,
 );
 
+/** A number per object, to tell a changed card (a new object) from the same one. */
+const objectIds = new WeakMap<object, number>();
+let nextObjectId = 1;
+const objectId = (o: object) => {
+  let id = objectIds.get(o);
+  if (id === undefined) objectIds.set(o, (id = nextObjectId++));
+  return id;
+};
+
 /** Position, size and the card state that moves rows: what a relationship line depends on. */
 const placedSig = (p: Placed) => `${p.x},${p.y},${p.card.width ?? ""},${p.card.collapsed ? 1 : 0},${p.card.rowFilter}`;
 
@@ -159,46 +170,75 @@ function LineLayer({
   const { notation } = useContext(CanvasUiCtx);
   const lookup = useStoreApi().getState().nodeLookup;
   const dots = !lod;
+  /** Each line's element and what it was drawn from; reused while nothing it depends on changed. A cache, not state. */
+  const [drawn] = useState(() => new Map<string, { key: string; el: ReactNode }>());
+  /** A card's position and data, as one string; "-" when it is not on the canvas or hidden. */
+  const cardKeys = new Map<string, string>();
+  const cardKey = (id: string) => {
+    let k = cardKeys.get(id);
+    if (k === undefined) {
+      const n = lookup.get(id);
+      k = n && !n.hidden ? `${n.internals.positionAbsolute.x},${n.internals.positionAbsolute.y}#${objectId((n as unknown as CardNodeT).data.card)}` : "-";
+      cardKeys.set(id, k);
+    }
+    return k;
+  };
+  /** The line's element from last time when its key is the same, else a new one. */
+  const reuse = (id: string, key: string, make: () => ReactNode): ReactNode => {
+    const last = drawn.get(id);
+    if (last?.key === key) return last.el;
+    const el = make();
+    drawn.set(id, { key, el });
+    return el;
+  };
   const state = (kind: "map" | "rel", id: string) => {
     const sel = selection?.t === kind && selection.id === id ? " sel" : "";
     const hl = related && (kind === "map" ? related.maps : related.rels).has(id) ? " hl" : "";
     return sel + hl;
   };
 
-  const rels: React.ReactNode[] = [];
+  const rels: ReactNode[] = [];
   for (const l of lines.relationships) {
-    const a = placedOf(lookup.get(l.fromCardId)), z = placedOf(lookup.get(l.toCardId));
-    if (!a || !z) continue;
-    const className = `lnk rel${state("rel", l.id)}`;
-    rels.push(
-      <RelPath
-        key={l.id}
-        sig={`${placedSig(a)}|${placedSig(z)}|${notation}|${className}|${l.label}|${l.fromMin}${l.fromMax}${l.toMin}${l.toMax}`}
-        line={l}
-        a={a}
-        z={z}
-        notation={notation}
-        className={className}
-        onSelect={() => onSelect({ t: "rel", id: l.id })}
-      />,
-    );
+    const key = `${cardKey(l.fromCardId)}|${cardKey(l.toCardId)}|${notation}|${state("rel", l.id)}|${objectId(l)}`;
+    const el = reuse(`rel:${l.id}`, key, () => {
+      const a = placedOf(lookup.get(l.fromCardId)), z = placedOf(lookup.get(l.toCardId));
+      if (!a || !z) return null;
+      const className = `lnk rel${state("rel", l.id)}`;
+      return (
+        <RelPath
+          key={l.id}
+          sig={`${placedSig(a)}|${placedSig(z)}|${notation}|${className}|${l.label}|${l.fromMin}${l.fromMax}${l.toMin}${l.toMax}`}
+          line={l}
+          a={a}
+          z={z}
+          notation={notation}
+          className={className}
+          onSelect={() => onSelect({ t: "rel", id: l.id })}
+        />
+      );
+    });
+    if (el) rels.push(el);
   }
-  const maps: React.ReactNode[] = [];
+  const maps: ReactNode[] = [];
   for (const l of lines.mappings) {
-    const geom = mapGeom(l, lookup);
-    if (!geom) continue;
-    const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.part ? " part" : ""}${l.inputCount > 1 ? " combined" : ""}${state("map", l.id)}`;
-    maps.push(
-      <MapPath
-        key={l.id}
-        sig={`${geom.paths.join("")}|${dots}|${className}|${geom.chip?.text ?? ""}`}
-        id={l.id}
-        geom={geom}
-        dots={dots}
-        className={className}
-        onSelect={() => onSelect({ t: "map", id: l.id })}
-      />,
-    );
+    const key = `${cardKey(l.cardId)}|${l.inputs.map((i) => cardKey(i.cardId)).join(",")}|${dots}|${state("map", l.id)}|${objectId(l)}`;
+    const el = reuse(`map:${l.id}`, key, () => {
+      const geom = mapGeom(l, lookup);
+      if (!geom) return null;
+      const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.part ? " part" : ""}${l.inputCount > 1 ? " combined" : ""}${state("map", l.id)}`;
+      return (
+        <MapPath
+          key={l.id}
+          sig={`${geom.paths.join("")}|${dots}|${className}|${geom.chip?.text ?? ""}`}
+          id={l.id}
+          geom={geom}
+          dots={dots}
+          className={className}
+          onSelect={() => onSelect({ t: "map", id: l.id })}
+        />
+      );
+    });
+    if (el) maps.push(el);
   }
 
   return (

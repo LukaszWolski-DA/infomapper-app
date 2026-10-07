@@ -63,6 +63,18 @@
   }
 }
 
+/* Canvas looks (D-12, slice 2a; prototype #center[data-bg]): the frame around the tabs and the canvas, and the
+   swatches in the menus, set the canvas and grid colours. Grey is the palette's own. */
+[data-bg="white"] { --im-canvas: #ffffff; --im-grid: #d3d9e0; }
+[data-bg="blue"] { --im-canvas: #ecf1f8; --im-grid: #c2cedf; }
+[data-bg="warm"] { --im-canvas: #f4f1eb; --im-grid: #d8d0c2; }
+@media (prefers-color-scheme: dark) {
+  [data-bg="white"] { --im-canvas: #1b2128; --im-grid: #2c343e; }
+  [data-bg="blue"] { --im-canvas: #101925; --im-grid: #233247; }
+  [data-bg="warm"] { --im-canvas: #1c1a17; --im-grid: #35302a; }
+}
+.im-swatch { background: radial-gradient(var(--im-grid) 1px, transparent 1.2px) 0 0 / 6px 6px, var(--im-canvas); }
+
 /* shadcn/ui variables, mapped onto the prototype palette (they follow light and dark through it). */
 :root {
   --radius: 0.5rem;

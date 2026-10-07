@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
-import { E2E_DB, E2E_PORT } from "./e2e/config";
+import { E2E_BASE, E2E_DB, E2E_PORT, E2E_PRODUCTION } from "./e2e/config";
 
-const baseURL = `http://localhost:${E2E_PORT}`;
+const baseURL = E2E_BASE;
 
 export default defineConfig({
   testDir: "e2e",
@@ -20,13 +20,22 @@ export default defineConfig({
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   // Its own port and data file, so a running `npm run dev` and its data are left alone.
-  webServer: {
-    // The server starts before globalSetup, so it seeds its data file itself.
-    // a fresh build folder every run: the server is stopped by force at the end, so nothing of the last run is reused
-    command: `npx tsx scripts/clean-e2e-build.ts .next-e2e && npm run reset-dev-data && npm run dev -- --port ${E2E_PORT}`,
-    url: `${baseURL}/sign-in`,
-    env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e" },
-    reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
-  },
+  webServer: E2E_PRODUCTION
+    ? {
+        // MEASURE_BUILD=production: the measurement-only production build (AD-31), built with `npm run measure:build`
+        command: `npm run reset-dev-data && npx tsx scripts/measure.ts start`,
+        url: `${baseURL}/sign-in`,
+        env: { INFOMAPPER_DEV_DB: E2E_DB, PORT: String(E2E_PORT) },
+        reuseExistingServer: false,
+        timeout: 120_000,
+      }
+    : {
+        // The server starts before globalSetup, so it seeds its data file itself.
+        // a fresh build folder every run: the server is stopped by force at the end, so nothing of the last run is reused
+        command: `npx tsx scripts/clean-e2e-build.ts .next-e2e && npm run reset-dev-data && npm run dev -- --port ${E2E_PORT}`,
+        url: `${baseURL}/sign-in`,
+        env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e" },
+        reuseExistingServer: !process.env.CI,
+        timeout: 120_000,
+      },
 });

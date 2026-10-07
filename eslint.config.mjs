@@ -17,7 +17,8 @@ const eslintConfig = defineConfig([
     plugins: { boundaries },
     settings: {
       "import/resolver": { typescript: { alwaysTryTypes: true } },
-      // src/proxy.ts (Next.js wants it next to src/app) is not a layer; it only imports src/app/_lib.
+      // src/proxy.ts (Next.js wants it next to src/app) is not a layer; it imports src/app/_lib and the measurement gate
+      // in src/data/local/measure-mode.ts (AD-31).
       "boundaries/elements": layers.map((type) => ({ type, pattern: `src/${type}/**`, partialMatch: false })),
     },
     rules: {
@@ -68,6 +69,7 @@ const eslintConfig = defineConfig([
   globalIgnores([
     ".next/**",
     ".next-e2e*/**",
+    ".next-measure/**",
     "out/**",
     "build/**",
     "next-env.d.ts",

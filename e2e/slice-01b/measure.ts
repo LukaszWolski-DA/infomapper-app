@@ -6,10 +6,18 @@
 import fs from "node:fs";
 import path from "node:path";
 import { LARGE_IDS } from "../../src/data/local/seed-large";
+import { E2E_PRODUCTION } from "../config";
 import { expect, type Page } from "./fixtures";
 import { canvasUrl } from "./helpers";
 
 export const MEASURE = !!process.env.MEASURE;
+
+/**
+ * Slice 2a's diagnosis: `DIAG=nolines` (no line layer) or `DIAG=blocks` (every card as its below-40 % block), passed to
+ * the canvas as `?diag=`. Only the measurement-only production build honours it (MEASURE_BUILD=production).
+ */
+export const DIAG = process.env.DIAG ?? "";
+if (DIAG && !E2E_PRODUCTION) throw new Error("DIAG works only with MEASURE_BUILD=production (the measurement-only build).");
 
 /** Headed Google Chrome at the spike's window size, kept drawing while another window is in front. */
 export const MEASURE_USE = {
@@ -101,7 +109,7 @@ export async function openLarge(page: Page, view?: { x: number; y: number; zoom:
     ([k, v]) => (v ? localStorage.setItem(k, v) : localStorage.removeItem(k)),
     [`infomapper:view:${LARGE_IDS.canvas}`, view ? JSON.stringify(view) : ""] as const,
   );
-  await page.goto(LARGE_URL);
+  await page.goto(DIAG ? `${LARGE_URL}?diag=${DIAG}` : LARGE_URL);
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true", { timeout: 60_000 });
   await page.waitForTimeout(MEASURE ? 1500 : 300);
 }
@@ -110,6 +118,10 @@ export const median = (xs: readonly number[]) => [...xs].sort((a, b) => a - b)[M
 
 /** Writes a run's results to test-results/<name>.json and attaches them to the test report. */
 export function saveResults(name: string, results: unknown) {
+  if (DIAG) {
+    name = `${name}-diag-${DIAG}`;
+    results = { diag: DIAG, ...(results as object) };
+  }
   const out = path.resolve("test-results", `${name}.json`);
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, JSON.stringify(results, null, 2));
