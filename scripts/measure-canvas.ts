@@ -13,7 +13,8 @@
 // every side and round go to .data/measure/<sitting>/, the summary to .data/measure/<sitting>/summary.json and
 // summary.md (one table: median, spread, bar, result). A round disturbed by something else is repeated, not averaged
 // in: `--drop <round>` leaves it out of the summary (`--resummarize <sitting>` redoes only the summary). `--prepare-only`
-// checks the worktree and both builds without measuring. Measuring only:
+// checks the worktree and both builds without measuring; `--add-round <sitting>` measures a replacement round with the
+// builds already made (pair it with `--drop`). Measuring only:
 // no dev or measurement server may run (ports 3200, 3300); prepare the laptop first.
 
 import { execSync, spawnSync } from "node:child_process";
@@ -154,6 +155,25 @@ function summarize(dir: string, s: Sitting) {
 }
 
 async function main() {
+  const more = arg("add-round", "");
+  if (more) {
+    // a replacement for a disturbed round: one more round in the same sitting, with the builds already made
+    for (const port of [3200, 3300]) if (!(await portFree(port))) throw new Error(`Port ${port} is in use: stop that server first.`);
+    const dir = path.resolve(BRANCH, ".data", "measure", more);
+    const sitting = JSON.parse(fs.readFileSync(path.join(dir, "sitting.json"), "utf8")) as Sitting;
+    if (read("git rev-parse HEAD").slice(0, 7) !== sitting.branchCommit.slice(0, 7) && !process.argv.includes("--any-commit")) {
+      throw new Error("This branch moved since the sitting; measure a new sitting instead.");
+    }
+    const r = Math.max(...sitting.sides.map((x) => x.round)) + 1;
+    for (const side of r % 2 ? (["reference", "branch"] as const) : (["branch", "reference"] as const)) {
+      const raw = measure(side === "reference" ? REF_TREE : BRANCH, path.join(dir, `round-${r}-${side}`));
+      sitting.sides.push({ round: r, side, raw });
+      sitting.conditions.perSide.push({ round: r, side, busiest: (conditions() as { busiestProcesses?: string[] }).busiestProcesses ?? [] });
+      fs.writeFileSync(path.join(dir, "sitting.json"), JSON.stringify(sitting, null, 2));
+    }
+    summarize(dir, sitting);
+    return;
+  }
   const again = arg("resummarize", "");
   if (again) {
     const dir = path.resolve(BRANCH, ".data", "measure", again);
@@ -173,7 +193,7 @@ async function main() {
   const sitting: Sitting = {
     against,
     branchCommit: read("git rev-parse HEAD"),
-    referenceCommit: read(`git rev-parse ${against}^{commit}`),
+    referenceCommit: read(`git rev-list -n 1 ${against}`),
     conditions: { before: conditions(), perSide: [] },
     sides: [],
   };
