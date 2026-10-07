@@ -10,6 +10,7 @@ import {
 } from "@/app/_actions/canvas-item";
 import { saveCanvasLookAction } from "@/app/_actions/canvas";
 import { AppShell } from "@/app/_components/app-shell";
+import { MovedNotice } from "@/app/_components/moved-notice";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { canvasHref } from "@/app/_lib/paths";
@@ -30,12 +31,13 @@ import { ModelCanvas } from "@/canvas/ModelCanvas";
 import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
+import { isMeasurementBuild } from "@/data/local/measure-mode";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 
 // Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a); the Entity
 // tool and Undo and Redo in the top bar (slice 1b); the Hand tool, a selection of several cards, the canvas's look and
 // layer mode, and “On canvases” in the panels (slice 2a). `?card=entity:<id>` or `?card=source:<id>` selects that card
-// and shows it on arrival.
+// and shows it on arrival; `?moved=1` says that the address you opened is no longer in this project.
 export default async function CanvasPage({
   params,
   searchParams,
@@ -66,6 +68,8 @@ export default async function CanvasPage({
   const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId));
   const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id));
   const editable = shell.standing === "full";
+  // measurement-only switches (slice 2a diagnosis): only in the measurement-only production build (AD-31)
+  const diag = isMeasurementBuild() && typeof query.diag === "string" ? query.diag.split(",") : [];
   const focus = typeof query.card === "string" ? /^(entity|source):(.+)$/.exec(query.card) : null;
   const focusCardId = focus ? (cards.find((c) => c.kind === (focus[1] === "entity" ? "ent" : "src") && c.targetId === focus[2])?.id ?? null) : null;
 
@@ -103,7 +107,7 @@ export default async function CanvasPage({
         save={saveCanvasLookAction.bind(null, ws)}
       >
       <PanelsProvider>
-        <UndoProvider workspaceId={ws} canvasId={canvasId} state={undoState}>
+        <UndoProvider workspaceId={ws} projectId={projectId} canvasId={canvasId} state={undoState}>
           <AppShell
             shell={shell}
             project={{
@@ -133,6 +137,7 @@ export default async function CanvasPage({
               status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} />,
             }}
           >
+            {query.moved === "1" && <MovedNotice project={view.project.name} canvas={canvas.name} />}
             <ModelCanvas
               key={canvasId}
               canvasId={canvasId}
@@ -148,6 +153,7 @@ export default async function CanvasPage({
               setCardWidths={setCardWidthsAction.bind(null, ws, canvasId)}
               removeCards={removeCardsAction.bind(null, ws, canvasId)}
               focusCardId={focusCardId}
+              diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks") } : undefined}
             />
           </AppShell>
         </UndoProvider>

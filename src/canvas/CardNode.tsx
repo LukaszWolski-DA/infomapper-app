@@ -7,7 +7,7 @@
 import { memo, useContext } from "react";
 import { useStore, type Node, type NodeProps } from "@xyflow/react";
 import { visibleRows, type CardData, type CardRow } from "./card-data";
-import { CanvasCardsCtx } from "./context";
+import { CanvasCardsCtx, DiagnosisCtx } from "./context";
 import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
 import { splitName } from "./names";
 
@@ -71,7 +71,8 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
 function CardNode({ data }: NodeProps<CardNodeT>) {
   const { card } = data;
   const ctx = useContext(CanvasCardsCtx);
-  const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
+  const blocks = !!useContext(DiagnosisCtx).blocks;
+  const lod = useStore((s) => blocks || s.transform[2] < LOD_ZOOM);
   const rows = visibleRows(card);
   const isEnt = card.kind === "ent";
   const dual = rows.some((r) => r.pk && r.fk);

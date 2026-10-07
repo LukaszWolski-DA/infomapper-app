@@ -14,7 +14,8 @@
 // arrow keys nudge the selection, and the group's actions (toolbox, selection panel) are in `GroupActions.ts`.
 // Each canvas has its look (`look.tsx`): the grid is one CSS background on the pane that follows the view, and the
 // layer mode hides the relationship or the mapping lines. A card named in `focusCardId` is selected and shown on arrival
-// (“On canvases” in the panels).
+// (“On canvases” in the panels). The measurement-only build may switch off the line layer or draw every card as a block
+// (`diagnosis`), to find what the frame time is spent on.
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -42,7 +43,7 @@ import SelectionOverlay from "./SelectionOverlay";
 import { afterLasso, cardKey, fromKeys, lassoHits, toggleCard as toggledSelection, type CardBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
-import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop } from "./context";
+import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis } from "./context";
 import {
   besideSpots,
   CARD_W,
@@ -66,6 +67,7 @@ import LineLayer from "./LineLayer";
 import { Overview } from "./Overview";
 
 const nodeTypes = { card: CardNode };
+const NO_DIAGNOSIS: Diagnosis = {};
 
 /** How far the grid layer reaches past the pane: the largest grid step (Lines at the highest zoom). Also in canvas.css. */
 const GRID_BLEED = 32 * MAX_ZOOM;
@@ -104,6 +106,8 @@ export interface ModelCanvasProps {
   /** A card to select and bring into view once the canvas is ready (“On canvases”, slice 2a); then the address
    * loses its query, so a reload keeps the remembered view. */
   focusCardId?: string | null;
+  /** Measurement-only switches (only the measurement-only production build passes them). */
+  diagnosis?: Diagnosis;
 }
 
 type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width">>;
@@ -155,6 +159,7 @@ export function ModelCanvas({
   setCardWidths,
   removeCards,
   focusCardId,
+  diagnosis = NO_DIAGNOSIS,
 }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
   const look = useCanvasLook()?.look;
@@ -163,10 +168,12 @@ export function ModelCanvas({
   // Layer mode (D-22): Mappings hides the relationship lines, Relationships the mapping lines; cards stay.
   const lines = useMemo<CanvasLines>(
     () =>
-      layer === "all"
+      diagnosis.noLines
+        ? { mappings: [], relationships: [] }
+        : layer === "all"
         ? allLines
         : { mappings: layer === "relationships" ? [] : allLines.mappings, relationships: layer === "mappings" ? [] : allLines.relationships },
-    [allLines, layer],
+    [allLines, layer, diagnosis.noLines],
   );
   const { selection, select, registerCanvas } = ui;
   const toast = useToast();
@@ -717,6 +724,7 @@ export function ModelCanvas({
   }, []);
 
   return (
+    <DiagnosisCtx.Provider value={diagnosis}>
     <CanvasCardsCtx.Provider value={cardsApi}>
       <div
         className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${ui.mode?.kind === "hand" ? " tool-hand" : ""}${modes.panning ? " panning" : ""}${resize.resizing ? " resizing" : ""}${dragging ? " node-dragging" : ""}`}
@@ -770,7 +778,7 @@ export function ModelCanvas({
           attributionPosition="bottom-left"
           aria-label="Model canvas"
         >
-          <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />
+          {!diagnosis.noLines && <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />}
           <Overview lines={lines} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
           <SelectionOverlay selection={selection} lasso={lasso.lasso} />
@@ -787,5 +795,6 @@ export function ModelCanvas({
         )}
       </div>
     </CanvasCardsCtx.Provider>
+    </DiagnosisCtx.Provider>
   );
 }

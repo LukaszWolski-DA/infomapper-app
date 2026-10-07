@@ -19,6 +19,7 @@ import {
 import type { CanvasBackground, CanvasGrid, CanvasLayer } from "@/domain/types";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
+import { rememberNextCanvas } from "../_lib/next-canvas";
 import { canvasHref } from "../_lib/paths";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 
@@ -93,14 +94,17 @@ export async function addCanvasToProjectAction(input: { workspaceId: string; can
 }
 
 export async function removeCanvasFromProjectAction(input: { workspaceId: string; canvasId: string; projectId: string }) {
-  return done(
-    await runCommand(async (ctx, store, user) => {
-      const access = await loadAccess(store, input?.workspaceId, user.id);
-      if (!access) return NOT_FOUND;
-      const state = await membershipState(store, access.workspace.id, str(input?.canvasId), str(input?.projectId));
-      return removeCanvasFromProject(ctx, access, state, { canvasId: input?.canvasId, projectId: input?.projectId });
-    }),
-  );
+  let next: string | undefined;
+  const result = await runCommand(async (ctx, store, user) => {
+    const access = await loadAccess(store, input?.workspaceId, user.id);
+    if (!access) return NOT_FOUND;
+    const state = await membershipState(store, access.workspace.id, str(input?.canvasId), str(input?.projectId));
+    next = state.projectLinks.find((l) => l.canvas_id !== input?.canvasId)?.canvas_id;
+    return removeCanvasFromProject(ctx, access, state, { canvasId: input?.canvasId, projectId: input?.projectId });
+  });
+  // if it was the open canvas, the project's next canvas opens
+  if (result.ok && next) await rememberNextCanvas(str(input?.canvasId), next);
+  return done(result);
 }
 
 export async function duplicateCanvasAction(input: { workspaceId: string; projectId: string; canvasId: string }) {
@@ -125,22 +129,25 @@ export async function duplicateCanvasAction(input: { workspaceId: string; projec
 
 /** The tab menu's last item (D-28): deletes the canvas, or only takes it out of this project when another has it. */
 export async function deleteCanvasAction(input: { workspaceId: string; projectId: string; canvasId: string; expectedVersion: number }) {
-  return done(
-    await runCommand(async (ctx, store, user) => {
-      const access = await loadAccess(store, input?.workspaceId, user.id);
-      if (!access) return NOT_FOUND;
-      const ws = access.workspace.id, canvasId = str(input?.canvasId);
-      const [state, items] = await Promise.all([
-        membershipState(store, ws, canvasId, str(input?.projectId)),
-        store.canvasItems.listOfCanvas(ws, canvasId),
-      ]);
-      return deleteCanvas(ctx, access, { ...state, items }, {
-        projectId: input?.projectId,
-        canvasId: input?.canvasId,
-        expectedVersion: input?.expectedVersion,
-      });
-    }),
-  );
+  let next: string | undefined;
+  const result = await runCommand(async (ctx, store, user) => {
+    const access = await loadAccess(store, input?.workspaceId, user.id);
+    if (!access) return NOT_FOUND;
+    const ws = access.workspace.id, canvasId = str(input?.canvasId);
+    const [state, items] = await Promise.all([
+      membershipState(store, ws, canvasId, str(input?.projectId)),
+      store.canvasItems.listOfCanvas(ws, canvasId),
+    ]);
+    next = state.projectLinks.find((l) => l.canvas_id !== canvasId)?.canvas_id;
+    return deleteCanvas(ctx, access, { ...state, items }, {
+      projectId: input?.projectId,
+      canvasId: input?.canvasId,
+      expectedVersion: input?.expectedVersion,
+    });
+  });
+  // if it was the open canvas, the project's next canvas opens (prototype delDia)
+  if (result.ok && next) await rememberNextCanvas(str(input?.canvasId), next);
+  return done(result);
 }
 
 /** Background, grid or layer mode of one canvas (D-12, D-22): saved, not an undo step. Returns the new version. */

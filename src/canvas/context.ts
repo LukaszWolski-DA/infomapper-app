@@ -33,6 +33,18 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
   toggleCard: noop,
 });
 
+/**
+ * Measurement-only switches (slice 2a diagnosis, AD-31): only the measurement-only production build passes them, from
+ * `?diag=nolines` or `?diag=blocks`. Users never see them.
+ */
+export interface Diagnosis {
+  /** No line layer at all. */
+  noLines?: boolean;
+  /** Every card drawn as its below-40 % block, at any zoom. */
+  blocks?: boolean;
+}
+export const DiagnosisCtx = createContext<Diagnosis>({});
+
 /** Relationship ends: crow's foot (Information Engineering) or UML multiplicity. Shared by all canvases (D-22). */
 export type Notation = "ie" | "uml";
 
