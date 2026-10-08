@@ -28,21 +28,23 @@ test("S2A-14: on “Performance test”, dragging a group of at least 20 cards a
   // selection stays
   await openLarge(page, { x: 0, y: 0, zoom: 0.5 / 1.2 ** 5 });
   const pane = await box(page.locator(".react-flow__pane"));
+  // With Shift held: since slice 2b the canvas has frames, and a plain drag inside a frame moves it (D-14), while
+  // Shift + drag draws a lasso there too (D-15); with nothing selected yet it is the same as a plain lasso.
   const lassoView = async () => {
+    await page.keyboard.down("Shift");
     await page.mouse.move(pane.x + 4, pane.y + 4);
     await page.mouse.down();
     for (let i = 1; i <= 10; i++) await page.mouse.move(pane.x + 4 + ((pane.width - 250) * i) / 10, pane.y + 4 + ((pane.height - 8) * i) / 10);
     await page.mouse.up();
+    await page.keyboard.up("Shift");
   };
   await lassoView();
-  // a smaller window catches fewer: pan right by most of the view and add a second lasso (Shift)
+  // a smaller window catches fewer: pan right by most of the view and add a second lasso
   if ((await page.getByTestId("mark-selected").count()) < 24) {
     await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2);
     await page.mouse.wheel(pane.width - 300, 0);
     await page.waitForTimeout(300);
-    await page.keyboard.down("Shift");
     await lassoView();
-    await page.keyboard.up("Shift");
   }
   for (let i = 0; i < 5; i++) await page.getByTestId("button-zoom-in").click();
   await expect(page.getByTestId("value-zoom")).toHaveText("50%");
