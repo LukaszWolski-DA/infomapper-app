@@ -65,9 +65,10 @@ export async function deleteConceptAction(
   workspaceId: string,
   input: { conceptId: string; expectedVersion: number; moveToConceptId?: string | null },
 ): Promise<ActionResult<{ movedEntities: number }>> {
-  return modelCommand(workspaceId, (ctx, access, { concepts, entities }) => {
+  return modelCommand(workspaceId, async (ctx, access, { concepts, entities }, store) => {
     const concept = byId(concepts, input?.conceptId);
-    return deleteConcept(ctx, access, { concept, concepts, entities: entities.filter((e) => e.concept_id === concept?.id) }, input);
+    const frames = await store.frames.list(access.workspace.id);
+    return deleteConcept(ctx, access, { concept, concepts, entities: entities.filter((e) => e.concept_id === concept?.id), frames }, input);
   });
 }
 
@@ -76,11 +77,16 @@ export async function deleteConceptAction(
 /** A new entity in a concept, with its card on the canvas at the given spot (D-46). */
 export async function createEntityAction(
   workspaceId: string,
-  input: { conceptId: string; name?: string; placement: { canvasId: string; x: number; y: number } },
+  input: {
+    conceptId: string;
+    name?: string;
+    placement: { canvasId: string; x: number; y: number; height?: number; frames?: { frameId: string; expectedVersion: number }[] };
+  },
 ): Promise<ActionResult<{ entityId: string; canvasItemId: string | null; name: string }>> {
   return modelCommand(workspaceId, async (ctx, access, { concepts, entities }, store) => {
-    const canvas = await store.canvases.get(access.workspace.id, str(input?.placement?.canvasId));
-    const result = createEntity(ctx, access, { concept: byId(concepts, input?.conceptId), entities, canvas }, input);
+    const canvasId = str(input?.placement?.canvasId);
+    const [canvas, frames] = await Promise.all([store.canvases.get(access.workspace.id, canvasId), store.frames.listOfCanvas(access.workspace.id, canvasId)]);
+    const result = createEntity(ctx, access, { concept: byId(concepts, input?.conceptId), entities, canvas, frames }, input);
     if (!result.ok) return result;
     const write = result.writeSet.writes.find((w) => w.kind === "insert" && w.table === "entity");
     const name = write?.kind === "insert" && write.table === "entity" ? write.row.name : "";

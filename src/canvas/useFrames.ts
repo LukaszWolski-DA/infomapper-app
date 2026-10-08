@@ -11,17 +11,30 @@
 // - The Frame tool (A): drag on the canvas to draw a frame; a press without dragging (or a frame under 160 × 96)
 //   makes a 480 × 320 frame centred on it; the tool ends after one frame; Esc cancels. “New frame here” in the toolbox.
 // - Delete, fit to content, zoom to a frame, select its cards, rename.
+// - Slice 2b step 3: a drag drop that brings entities into a concept frame of another concept asks once whether to
+//   move them in the model (D-05, D-17); the drop and the answer are saved together. Other moves only mark them.
+//   “Put in a new frame”; the frames as the panels see them (`frameView`, `framesView`, `cardFrame`, `frameAt`).
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import { applyNodeChanges, useReactFlow, type NodeChange } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
-import { FRAME_MIN_SIZE, FREE_FRAME_COLORS, frameAround, NEW_FRAME_NAME, NEW_FRAME_SIZE, type FrameBox } from "@/domain/model/frames";
+import {
+  conceptQuestions,
+  FRAME_MIN_SIZE,
+  frameAt as smallestFrameAt,
+  FREE_FRAME_COLORS,
+  frameAround,
+  isMisplaced,
+  NEW_FRAME_NAME,
+  NEW_FRAME_SIZE,
+  type FrameBox,
+} from "@/domain/model/frames";
 import type { Frame } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import type { CardData } from "./card-data";
 import type { CardNodeT } from "./CardNode";
-import type { FramePatch, UndoHooks } from "./context";
-import type { FrameData } from "./frame-data";
+import type { FramePatch, FrameView, UndoHooks } from "./context";
+import { buildFrames, conceptAsk, frameStats, type ConceptAsk, type FrameData } from "./frame-data";
 import type { FramePart } from "./FrameLayer";
 import { cardHeight, cardWidth, snap8, type Pt, type Rect } from "./geometry";
 import { planLayout, planReframe, type LayoutChange, type PlanCard } from "./layout-plan";
@@ -40,12 +53,17 @@ export interface FrameWrites {
     items: (CardRef & { x?: number; y?: number; width?: number | null; height?: number })[];
     onGrid?: boolean;
     moveToConcepts?: boolean;
-  }) => Promise<WriteResult<Versions>>;
+  }) => Promise<WriteResult<Versions & { movedToConcepts: number }>>;
   createFrame: (input: { x: number; y: number; width: number; height: number; cards: SizedRef[] }) => Promise<WriteResult<Versions & { frameId: Uuid; claimed: number }>>;
   updateFrame: (input: { frameId: Uuid; expectedVersion: number } & FramePatch) => Promise<WriteResult<{ frame: Frame }>>;
   resizeFrame: (input: { frameId: Uuid; expectedVersion: number; width: number; height: number; cards: CardRef[] }) => Promise<WriteResult<Versions>>;
   fitFrame: (input: { frameId: Uuid; expectedVersion: number; cards: SizedRef[] }) => Promise<WriteResult<Versions>>;
   deleteFrame: (input: { frameId: Uuid; expectedVersion: number; cards: CardRef[] }) => Promise<WriteResult<{ name: string; released: number }>>;
+  putInNewFrame: (input: { cards: SizedRef[]; others?: SizedRef[] }) => Promise<WriteResult<Versions & { frameId: Uuid; kind: Frame["kind"]; cards: number }>>;
+  arrangeIntoFrames: (input: {
+    frames: { frameId: Uuid; expectedVersion: number }[];
+    cards: SizedRef[];
+  }) => Promise<WriteResult<Versions & { frames: number; built: Frame[]; cards: { id: Uuid; x: number; y: number; frameId: Uuid | null }[] }>>;
 }
 
 export type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width" | "frameId">>;
@@ -59,6 +77,8 @@ export interface SaveLayoutOptions {
   framesFrom?: ReadonlyMap<Uuid, Pt>;
   /** Runs once saved. */
   saved?: () => void;
+  /** A drag drop (single card or group): entities that land in a concept frame of another concept are asked about. */
+  ask?: boolean;
 }
 
 interface Options {
@@ -81,6 +101,10 @@ interface Options {
   onCreated: (frameId: Uuid) => void;
   /** Selects the cards with these ids. */
   selectCards: (cardIds: readonly Uuid[]) => void;
+  /** Concept names, for the drop's question. */
+  conceptName: (id: Uuid) => string;
+  /** Shows the drop's question; resolves with the answer (true: move them in the model). */
+  ask: (question: ConceptAsk) => Promise<boolean>;
 }
 
 const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
@@ -105,6 +129,13 @@ export function useFrames(o: Options) {
     framesRef.current = frames;
   }, [frames]);
   const [busy, setBusy] = useState(false);
+  // the drop's question, read when asked (stable callbacks)
+  const askRef = useRef(o.ask);
+  const conceptNameRef = useRef(o.conceptName);
+  useEffect(() => {
+    askRef.current = o.ask;
+    conceptNameRef.current = o.conceptName;
+  });
 
   // ---- fresh frames from the server: take them, except what is still saving ----
   const { initialFrames } = o;
@@ -168,12 +199,41 @@ export function useFrames(o: Options) {
 
       const moved = new Map((change.frames ?? []).map((f) => [f.id, f]));
       const touched = [...plan.carried, ...plan.changed];
+
+      // a drag drop asks about entities that landed in a concept frame of another concept (D-05), once for all
+      const planById = new Map(plan.cards.map((c) => [c.id, c]));
+      const questions = opts.ask
+        ? conceptQuestions(
+            framesBefore.map((f) => ({ id: f.id, kind: f.kind, concept_id: f.conceptId })),
+            [...plan.changed].map((id) => {
+              const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
+              return {
+                cardId: id,
+                entityId: card?.kind === "ent" ? card.targetId : null,
+                conceptId: card?.subject.entityConceptId ?? null,
+                frameBefore: beforeById.get(id)!.frameId,
+                frameAfter: planById.get(id)!.frameId,
+              };
+            }),
+          )
+        : [];
+      const question = questions.length
+        ? conceptAsk(
+            questions.map((q) => {
+              const card = (rf.getNode(q.cardId) as CardNodeT).data.card;
+              return { name: card.name, from: conceptNameRef.current(card.subject.entityConceptId ?? ""), to: conceptNameRef.current(q.conceptId) };
+            }),
+          )
+        : null;
+      // asked at once, while the write waits in the queue (the drop is already on the screen)
+      const answer = question ? askRef.current(question) : Promise.resolve(false);
       if (!touched.length && !moved.size) return;
       const widths = new Map((change.cards ?? []).filter((c) => c.width !== undefined).map((c) => [c.id, c.width]));
       const positions = new Map((change.cards ?? []).filter((c) => c.x !== undefined).map((c) => [c.id, c]));
       const frameIds = framesBefore.map((f) => f.id);
       enqueueGroup([...frameIds, ...touched], async () => {
-        let result: WriteResult<Versions>;
+        const moveToConcepts = await answer;
+        let result: WriteResult<Versions & { movedToConcepts: number }>;
         try {
           result = await writes.moveOnCanvas({
             frames: frameIds.map((id) => ({ frameId: id, expectedVersion: ver(id), ...(moved.has(id) ? { x: moved.get(id)!.x, y: moved.get(id)!.y } : {}) })),
@@ -189,14 +249,17 @@ export function useFrames(o: Options) {
               };
             }),
             ...(opts.onGrid ? { onGrid: true } : {}),
+            ...(moveToConcepts ? { moveToConcepts: true } : {}),
           });
         } catch {
           result = FAILED;
         }
         if (result.ok) {
           noteVersions(result.value.versions);
-          undo()?.noteSaved();
+          const u = undo();
+          u?.noteSaved();
           opts.saved?.();
+          if (question) toast(moveToConcepts ? question.moved : question.kept, "info", moveToConcepts && u ? { label: "Undo", run: u.undo } : undefined);
         } else {
           for (const [id, back] of cardsBack) patchCard(id, back);
           patchFrames(framesBack);
@@ -562,12 +625,117 @@ export function useFrames(o: Options) {
     [editable, enqueueGroup, writes, ver, toast, versions, patchFrames, undo],
   );
 
+  /**
+   * “Arrange into frames by concept and system” (prototype arrangeLayout): every card and frame of the canvas in one
+   * change; the new layout comes back from the server and is shown at once, then the view fits it.
+   */
+  const arrangeIntoFrames = useCallback(
+    (fit: () => void) => {
+      if (!editable) return;
+      const all = nodes();
+      if (!all.length) {
+        toast("Add some cards to the canvas first.");
+        return;
+      }
+      const frameIds = framesRef.current.map((f) => f.id);
+      enqueueGroup([...frameIds, ...all.map((n) => n.id)], async () => {
+        let result: Awaited<ReturnType<FrameWrites["arrangeIntoFrames"]>>;
+        try {
+          result = await writes.arrangeIntoFrames({
+            frames: frameIds.map((id) => ({ frameId: id, expectedVersion: ver(id) })),
+            cards: all.map((n) => ({ canvasItemId: n.id, expectedVersion: ver(n.id), height: cardHeight(n.data.card) })),
+          });
+        } catch {
+          result = FAILED;
+        }
+        if (!result.ok) {
+          toast(result.message, "refusal");
+          return;
+        }
+        const { versions: v, built, cards, frames: n } = result.value;
+        noteVersions(v);
+        setFrames((fs) => [...fs.filter((f) => f.kind === "free"), ...buildFrames(built)]);
+        for (const c of cards) patchCard(c.id, { x: c.x, y: c.y, frameId: c.frameId });
+        select(null);
+        const u = undo();
+        u?.noteSaved();
+        setTimeout(fit, 0);
+        toast(`Arranged the canvas into ${n} frames. Undo restores your previous layout.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
+      });
+    },
+    [editable, nodes, toast, enqueueGroup, writes, ver, noteVersions, patchCard, select, undo],
+  );
+
+  const viewOf = useCallback(
+    (frame: FrameData, cards: readonly CardData[]): FrameView => {
+      const members = cards.filter((c) => c.frameId === frame.id);
+      const asFrame = { kind: frame.kind, concept_id: frame.conceptId, source_system_id: frame.sourceSystemId };
+      return {
+        frame,
+        cardIds: members.map((c) => c.id),
+        members: members.map((c) => ({ id: c.id, kind: c.kind, targetId: c.targetId, name: c.name, misplaced: isMisplaced(asFrame, c.subject) })),
+        stats: frameStats(frame, members),
+      };
+    },
+    [],
+  );
+  const cardsNow = useCallback(() => nodes().map((n) => n.data.card), [nodes]);
   const frameView = useCallback(
     (frameId: Uuid) => {
       const frame = framesRef.current.find((x) => x.id === frameId);
-      return frame ? { frame, cardIds: membersOf(frameId).map((n) => n.id) } : null;
+      return frame ? viewOf(frame, cardsNow()) : null;
     },
-    [membersOf],
+    [viewOf, cardsNow],
+  );
+  const framesView = useCallback(() => {
+    const cards = cardsNow();
+    return framesRef.current.map((f) => viewOf(f, cards));
+  }, [viewOf, cardsNow]);
+  const cardFrame = useCallback(
+    (cardId: Uuid) => {
+      const id = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card.frameId;
+      return (id && framesRef.current.find((f) => f.id === id)) || null;
+    },
+    [rf],
+  );
+  const frameAt = useCallback((at: Pt) => smallestFrameAt(framesRef.current, at), []);
+  const frameRefs = useCallback(() => framesRef.current.map((f) => ({ frameId: f.id, expectedVersion: ver(f.id) })), [ver]);
+
+  /** “Put in a new frame” (a selection) or “Put in a new concept / source system frame” (one card). */
+  const putInNewFrame = useCallback(
+    (cardIds: readonly Uuid[], fromCard: boolean) => {
+      if (!editable || !cardIds.length) return;
+      const all = nodes();
+      const sized = (n: CardNodeT) => ({ canvasItemId: n.id, expectedVersion: ver(n.id), height: cardHeight(n.data.card) });
+      const named = all.filter((n) => cardIds.includes(n.id));
+      const others = fromCard ? all.filter((n) => !cardIds.includes(n.id) && n.data.card.frameId === null) : [];
+      enqueueGroup([...framesRef.current.map((f) => f.id), ...all.map((n) => n.id)], async () => {
+        let result: Awaited<ReturnType<FrameWrites["putInNewFrame"]>>;
+        try {
+          result = await writes.putInNewFrame({ cards: named.map(sized), ...(fromCard ? { others: others.map(sized) } : {}) });
+        } catch {
+          result = FAILED;
+        }
+        if (!result.ok) {
+          toast(result.message, "refusal");
+          return;
+        }
+        const { frameId, kind, versions: v } = result.value;
+        noteVersions(v);
+        for (const id of Object.keys(v)) if (id !== frameId) patchCard(id, { frameId });
+        select({ t: "frame", id: frameId });
+        onCreated(frameId);
+        const u = undo();
+        u?.noteSaved();
+        const what = kind === "concept" ? "concept " : kind === "source_system" ? "source system " : "";
+        toast(
+          fromCard ? "Frame added. Name it on the right. Drag cards in to add them." : `Put ${named.length} cards in a new ${what}frame.`,
+          "info",
+          u ? { label: "Undo", run: u.undo } : undefined,
+        );
+      });
+    },
+    [editable, nodes, ver, enqueueGroup, writes, toast, noteVersions, patchCard, select, onCreated, undo],
   );
 
   return {
@@ -584,6 +752,12 @@ export function useFrames(o: Options) {
     zoomToFrame,
     selectFrameCards,
     updateFrame,
+    arrangeIntoFrames,
     frameView,
+    framesView,
+    cardFrame,
+    frameAt,
+    frameRefs,
+    putInNewFrame,
   };
 }

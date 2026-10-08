@@ -48,8 +48,9 @@ export function buildFrames(frames: readonly Frame[]): FrameData[] {
     .sort((a, b) => b.width * b.height - a.width * a.height || a.id.localeCompare(b.id));
 }
 
-/** Concept colours by id, for `frameColor`. */
-export const conceptColors = (model: Pick<WorkspaceModel, "concepts">): Record<Uuid, string> => Object.fromEntries(model.concepts.map((c) => [c.id, c.color]));
+/** Concept names and colours by id: a concept frame's colour, the drop's question. */
+export const conceptsOf = (model: Pick<WorkspaceModel, "concepts">): Record<Uuid, { name: string; color: string }> =>
+  Object.fromEntries(model.concepts.map((c) => [c.id, { name: c.name, color: c.color }]));
 
 export interface FrameStats {
   /** Cards in the frame. */
@@ -108,4 +109,48 @@ export function frameChips(stats: FrameStats, kind: FrameKind): FrameChip[] {
     });
   }
   return chips;
+}
+
+/** An entity whose drop asks the concept question, with the names the question uses. */
+export interface AskedEntity {
+  name: string;
+  /** The entity's concept now. */
+  from: string;
+  /** The frame's concept. */
+  to: string;
+}
+
+export interface ConceptAsk {
+  message: string;
+  yes: string;
+  no: string;
+  /** The toast after each answer. */
+  moved: string;
+  kept: string;
+}
+
+/**
+ * The drop's question (D-05, D-17; prototype askConcept, askConcepts): one entity is asked about by name; a group drop
+ * asks once for all.
+ */
+export function conceptAsk(asked: readonly AskedEntity[]): ConceptAsk {
+  if (asked.length === 1) {
+    const { name, from, to } = asked[0]!;
+    return {
+      message: `${name} is now inside the ${to} frame, but belongs to the ${from} concept. Move it to ${to} in the model?`,
+      yes: `Move to ${to}`,
+      no: `Keep in ${from}`,
+      moved: `${name} now belongs to ${to}.`,
+      kept: `${name} stays in ${from}. The frame marks it as outside this concept.`,
+    };
+  }
+  const targets = [...new Set(asked.map((a) => a.to))];
+  const one = targets.length === 1 ? targets[0]! : null;
+  return {
+    message: `${asked.length} entities (${asked.map((a) => a.name).join(", ")}) landed in ${one ? `the ${one} frame` : "frames of other concepts"}. Move them to ${one ?? "those concepts"} in the model?`,
+    yes: one ? `Move to ${one}` : "Move them",
+    no: "Keep their concepts",
+    moved: `Moved ${asked.length} entities to ${one ?? "their frames' concepts"}.`,
+    kept: "Concepts unchanged. The frames mark these entities as misplaced.",
+  };
 }

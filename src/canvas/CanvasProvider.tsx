@@ -37,6 +37,7 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
   const host = useRef<CanvasHost | null>(null);
   const undo = useRef<UndoHooks | null>(null);
   const [mode, setMode] = useState<CanvasMode>(null);
+  const [layoutKey, setLayoutKey] = useState("");
   const [flash, setFlash] = useState<{ rowId: string; n: number } | null>(null);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const flashRow = useCallback((rowId: string) => {
@@ -92,6 +93,12 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       placeSourcesOfSelection: (sourcesOf) => handle.current?.placeSourcesOfSelection(sourcesOf),
       createFrameAt: (at) => handle.current?.createFrameAt(at),
       frameView: (frameId) => handle.current?.frameView(frameId) ?? null,
+      framesView: () => handle.current?.framesView() ?? [],
+      cardFrame: (cardId) => handle.current?.cardFrame(cardId) ?? null,
+      frameAt: (at) => handle.current?.frameAt(at) ?? null,
+      frameRefs: () => handle.current?.frameRefs() ?? [],
+      putInNewFrame: (cardIds, fromCard) => handle.current?.putInNewFrame(cardIds, fromCard),
+      arrangeIntoFrames: () => handle.current?.arrangeIntoFrames(),
       updateFrame: (frameId, patch) => handle.current?.updateFrame(frameId, patch) ?? Promise.resolve(false),
       deleteFrame: (frameId) => handle.current?.deleteFrame(frameId),
       fitFrame: (frameId) => handle.current?.fitFrame(frameId),
@@ -109,8 +116,10 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       registerUndo: (u) => {
         undo.current = u;
       },
+      layoutKey,
+      publishLayout: setLayoutKey,
     }),
-    [overviewOpen, toggleOverview, notation, setNotation, selection, mode, flash, flashRow],
+    [overviewOpen, toggleOverview, notation, setNotation, selection, mode, flash, flashRow, layoutKey],
   );
 
   return (

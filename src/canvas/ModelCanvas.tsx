@@ -40,7 +40,8 @@ import { RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
 import { NUDGE, useGroupActions, type GroupWrites } from "./GroupActions";
-import type { FrameData } from "./frame-data";
+import type { ConceptAsk, FrameData } from "./frame-data";
+import { ConceptQuestion } from "./ConceptQuestion";
 import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
@@ -103,9 +104,9 @@ export interface ModelCanvasProps {
   removeCard: (input: { canvasItemId: string; expectedVersion: number }) => Promise<CanvasWriteResult<unknown>>;
   /** Selected cards taken off the canvas in one change (slice 2a, a server action). */
   removeCards: GroupWrites["removeCards"];
-  /** The canvas's frames (slice 2b) and the concept colours of concept frames. */
+  /** The canvas's frames (slice 2b), and the concepts' names and colours (concept frames, the drop's question). */
   frames: FrameData[];
-  conceptColors: Record<string, string>;
+  concepts: Record<string, { name: string; color: string }>;
   /** Frame writes and every change of positions and widths (slice 2b, server actions). */
   frameWrites: FrameWrites;
   /** A card to select and bring into view once the canvas is ready (“On canvases”, slice 2a); then the address
@@ -162,7 +163,7 @@ export function ModelCanvas({
   removeCard,
   removeCards,
   frames: initialFrames,
-  conceptColors,
+  concepts,
   frameWrites,
   focusCardId,
   diagnosis = NO_DIAGNOSIS,
@@ -615,6 +616,23 @@ export function ModelCanvas({
     [boxes, select],
   );
   const endFrameTool = useCallback(() => ui.setMode(null), [ui]);
+  const conceptColors = useMemo(() => Object.fromEntries(Object.entries(concepts).map(([id, c]) => [id, c.color])), [concepts]);
+  const conceptName = useCallback((id: string) => concepts[id]?.name ?? "–", [concepts]);
+  // the drop's question (D-05): one at a time, answered in the bar
+  const [asking, setAsking] = useState<{ question: ConceptAsk; answer: (move: boolean) => void } | null>(null);
+  const ask = useCallback(
+    (question: ConceptAsk) =>
+      new Promise<boolean>((resolve) =>
+        setAsking({
+          question,
+          answer: (move) => {
+            setAsking(null);
+            resolve(move);
+          },
+        }),
+      ),
+    [],
+  );
   const onFrameCreated = useCallback((id: string) => ui.host()?.frameCreated(id), [ui]);
   const frameState = useFrames({
     editable,
@@ -632,14 +650,27 @@ export function ModelCanvas({
     endFrameTool,
     onCreated: onFrameCreated,
     selectCards,
+    conceptName,
+    ask,
   });
-  const { frames, saveLayout } = frameState;
+  const { frames, saveLayout, arrangeIntoFrames } = frameState;
   useEffect(() => {
     saveLayoutRef.current = saveLayout;
     deleteFrameRef.current = frameState.deleteFrame;
     framesNowRef.current = frameState.framesNow;
   });
   const cardData = useMemo(() => nodes.map((n) => n.data.card), [nodes]);
+  // The panels that show frames draw again when frames, their cards or the cards' numbers change; not on a move.
+  const layoutKey = useMemo(
+    () =>
+      JSON.stringify([
+        frames.map((f) => [f.id, f.name, f.kind, f.conceptId, f.sourceSystemId, f.color, f.version]),
+        cardData.map((c) => [c.id, c.frameId, c.mapped, c.links.length, c.subject.entityConceptId ?? c.subject.sourceSystemId]),
+      ]),
+    [frames, cardData],
+  );
+  const { publishLayout } = ui;
+  useEffect(() => publishLayout(layoutKey), [publishLayout, layoutKey]);
   const selectedFrameId = selection?.t === "frame" ? selection.id : null;
   const onFramePointerDown = useCallback(
     (e: React.PointerEvent, frameId: string, part: FramePart) => {
@@ -717,6 +748,12 @@ export function ModelCanvas({
       fitFrame: frameState.fitFrame,
       zoomToFrame: frameState.zoomToFrame,
       selectFrameCards: frameState.selectFrameCards,
+      framesView: frameState.framesView,
+      cardFrame: frameState.cardFrame,
+      frameAt: frameState.frameAt,
+      frameRefs: frameState.frameRefs,
+      putInNewFrame: frameState.putInNewFrame,
+      arrangeIntoFrames: () => arrangeIntoFrames(fit),
       placeAt: (target, rows, at) => void placeAt(target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(rows), false),
       setCardView: (id, view) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
@@ -728,7 +765,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -803,7 +840,7 @@ export function ModelCanvas({
       const card = node.data.card;
       const x = Math.round(node.position.x), y = Math.round(node.position.y);
       if (x === card.x && y === card.y) return;
-      saveLayout({ cards: [{ id: node.id, x, y }] });
+      saveLayout({ cards: [{ id: node.id, x, y }] }, { ask: true });
     },
     [saveLayout, onGroupDragStop],
   );
@@ -893,6 +930,7 @@ export function ModelCanvas({
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>
+        {asking && <ConceptQuestion question={asking.question} onAnswer={asking.answer} />}
         {nodes.length === 0 && frames.length === 0 && (
           <div className="im-empty" data-testid="canvas-empty">
             <div>

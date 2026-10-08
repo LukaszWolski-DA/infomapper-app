@@ -652,7 +652,7 @@ export function arrangeCanvasIntoFrames(
   access: WorkspaceAccess,
   state: FrameCanvasState & FrameModelState,
   input: unknown,
-): CommandResult<FrameWriteResult & { frames: number }> {
+): CommandResult<FrameWriteResult & { frames: number; built: Frame[]; cards: { id: Uuid; x: number; y: number; frameId: Uuid | null }[] }> {
   const parsed = begin(access, "canvas.edit_items", arrangeInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { canvasId, frames, cards } = parsed.data;
@@ -710,5 +710,11 @@ export function arrangeCanvasIntoFrames(
 
   const committed = commit(ctx, draft, seen(frames, cards));
   if (!committed.ok) return fail(committed.error);
-  return done(ctx, access, { frames: layout.frames.length, versions: committed.versions }, committed.writes);
+  const value = {
+    frames: layout.frames.length,
+    versions: committed.versions,
+    built: draft.added,
+    cards: placed.map((c) => ({ id: c.id, x: c.x, y: c.y, frameId: c.frame_id })),
+  };
+  return done(ctx, access, value, committed.writes);
 }

@@ -6,6 +6,7 @@
 // rename a concept by double-click, and its ⋯ menu (D-46, D-47). Sources tab: “New source table”.
 // The Requirements tab comes with requirements.
 
+import { newCardHeight } from "@/canvas/geometry";
 import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { createConceptAction, createEntityAction, renameConceptAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
@@ -50,9 +51,11 @@ export interface LeftPanelProps {
   tree: TreeData;
   /** Owner, admin or modeler in a workspace that is not archived. */
   editable: boolean;
+  /** How many concept frames each concept has on all canvases (slice 2b, the delete dialog). */
+  conceptFrames?: Record<string, number>;
 }
 
-export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelProps) {
+export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames = {} }: LeftPanelProps) {
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const { run } = useAction();
@@ -133,7 +136,9 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
   async function addEntity(c: TreeConcept) {
     unfold(conceptGroup(c.id));
     const spot = ui.freeSpot();
-    const result = await run(() => createEntityAction(workspaceId, { conceptId: c.id, placement: { canvasId, ...spot } }));
+    const result = await run(() =>
+      createEntityAction(workspaceId, { conceptId: c.id, placement: { canvasId, ...spot, height: newCardHeight(0), frames: ui.frameRefs() } }),
+    );
     if (!result.ok) return;
     setLastConcept(c.id);
     toast(`Created ${result.value.name} in ${c.name}. Type its name now; change the concept in the panel.`);
@@ -414,6 +419,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable }: LeftPanelPr
           workspaceId={workspaceId}
           concept={deleting}
           others={tree.concepts.filter((c) => c.id !== deleting.id)}
+          frames={conceptFrames[deleting.id] ?? 0}
           onClose={() => setDeleting(null)}
         />
       )}

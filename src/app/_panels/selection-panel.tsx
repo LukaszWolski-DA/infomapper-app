@@ -34,6 +34,16 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
         <span data-testid="selection-kinds">{counts.join(", ")}.</span>
       </Hint>
       <Actions>
+        {p.editable && (
+          <button
+            type="button"
+            className={buttonClass}
+            data-testid="button-selection-put-in-frame"
+            onClick={() => ui.putInNewFrame(keys.map((k) => p.cardOf(k.slice(k.indexOf(":") + 1))).filter((id): id is string => !!id), false)}
+          >
+            Put in a new frame
+          </button>
+        )}
         {p.editable && entities.length > 0 && (
           <button type="button" className={buttonClass} data-testid="button-selection-sources" onClick={() => ui.placeSourcesOfSelection((id) => feedingSourceCards(p.ix, id))}>
             Add sources of selected entities

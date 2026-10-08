@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { access, archived, concept, entity, ids, makeCtx, NOW } from "../__fixtures__/domain";
+import { access, archived, concept, entity, frame, ids, makeCtx, NOW } from "../__fixtures__/domain";
 import { STALE_VERSION_MESSAGE } from "../errors";
 import { createConcept, deleteConcept, renameConcept } from "./concept";
 
@@ -109,5 +109,32 @@ describe("deleteConcept (D-47)", () => {
       ok: false,
       error: { code: "forbidden", message: "As a reviewer you cannot edit the model." },
     });
+  });
+});
+
+describe("deleteConcept and its frames (D-47, slice 2b)", () => {
+  const sales = concept(conceptSales);
+  const salesFrame = frame(ids.frameA, { kind: "concept", concept_id: conceptSales, name: "Sales", color: null });
+  const other = frame(ids.frameB, { kind: "concept", concept_id: conceptCustomer, name: "Customer", color: null, canvas_id: ids.canvas2 });
+
+  it("turns its concept frames on every canvas into free frames in its colour, in the same change group", () => {
+    const r = deleteConcept(makeCtx(), access("modeler"), { concept: sales, concepts: [concept(conceptCustomer), sales], entities: [], frames: [salesFrame, other] }, {
+      conceptId: conceptSales,
+      expectedVersion: 1,
+    });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["frame", "concept"]);
+    expect(r.writeSet.writes[0]).toMatchObject({ row: { id: ids.frameA, kind: "free", concept_id: null, color: sales.color, name: "Sales", x: 0, y: 0 } });
+  });
+
+  it("does the same when it moves its entities first, and keeps a frame's own colour", () => {
+    const coloured = { ...salesFrame, color: "#2F7DD1" };
+    const r = deleteConcept(makeCtx(), access("modeler"), { concept: sales, concepts: [concept(conceptCustomer), sales], entities: [entity(salesOrder)], frames: [coloured] }, {
+      conceptId: conceptSales,
+      expectedVersion: 1,
+      moveToConceptId: conceptCustomer,
+    });
+    expect(r.ok && r.writeSet.writes.map((w) => w.table)).toEqual(["entity", "frame", "concept"]);
+    expect(r.ok && r.writeSet.writes[1]).toMatchObject({ row: { kind: "free", color: "#2F7DD1" } });
   });
 });

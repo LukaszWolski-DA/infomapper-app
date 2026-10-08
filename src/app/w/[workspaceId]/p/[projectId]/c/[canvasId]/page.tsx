@@ -1,9 +1,11 @@
 import { placeCardAction, placeCardsAction, removeCardAction, removeCardsAction, updateCardAction } from "@/app/_actions/canvas-item";
 import {
+  arrangeIntoFramesAction,
   createFrameAction,
   deleteFrameAction,
   fitFrameAction,
   moveOnCanvasAction,
+  putInNewFrameAction,
   resizeFrameAction,
   updateFrameAction,
 } from "@/app/_actions/frame";
@@ -20,7 +22,7 @@ import { PanelsProvider } from "@/app/_panels/panels-context";
 import { StatusBar } from "@/app/_panels/status-bar";
 import { buildTree } from "@/app/_panels/tree-data";
 import { buildCards } from "@/canvas/card-data";
-import { buildFrames, conceptColors } from "@/canvas/frame-data";
+import { buildFrames, conceptsOf } from "@/canvas/frame-data";
 import { FrameToolButton } from "@/canvas/FrameToolButton";
 import { buildLines } from "@/canvas/line-data";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
@@ -57,9 +59,11 @@ export default async function CanvasPage({
     store.workspaces.get(ws),
     store.undoHistory.get(ws, shell.user.id),
     store.projects.list(ws),
-    store.frames.listOfCanvas(ws, canvasId),
+    store.frames.list(ws),
   ]);
-  const frames = buildFrames(frameRows);
+  const frames = buildFrames(frameRows.filter((f) => f.canvas_id === canvasId));
+  const conceptFrames: Record<string, number> = {};
+  for (const f of frameRows) if (f.concept_id && canvases.some((c) => c.id === f.canvas_id)) conceptFrames[f.concept_id] = (conceptFrames[f.concept_id] ?? 0) + 1;
   const canvas = canvases.find((c) => c.id === canvasId)!;
   const undoState = { canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 };
   // Four-eyes (AD-06): the panel says beforehand who may not approve; the server checks again.
@@ -118,7 +122,7 @@ export default async function CanvasPage({
               currentCanvasId: canvasId,
               renameOnOpen,
               tools: <CanvasTools editable={editable} />,
-              left: <LeftPanel workspaceId={ws} canvasId={canvasId} tree={tree} editable={editable} />,
+              left: <LeftPanel workspaceId={ws} canvasId={canvasId} tree={tree} editable={editable} conceptFrames={conceptFrames} />,
               right: (
                 <Inspector
                   workspaceId={ws}
@@ -153,7 +157,7 @@ export default async function CanvasPage({
               removeCard={removeCardAction.bind(null, ws)}
               removeCards={removeCardsAction.bind(null, ws, canvasId)}
               frames={frames}
-              conceptColors={conceptColors(model)}
+              concepts={conceptsOf(model)}
               frameWrites={{
                 moveOnCanvas: moveOnCanvasAction.bind(null, ws, canvasId),
                 createFrame: createFrameAction.bind(null, ws, canvasId),
@@ -161,6 +165,8 @@ export default async function CanvasPage({
                 resizeFrame: resizeFrameAction.bind(null, ws),
                 fitFrame: fitFrameAction.bind(null, ws),
                 deleteFrame: deleteFrameAction.bind(null, ws),
+                putInNewFrame: putInNewFrameAction.bind(null, ws, canvasId),
+                arrangeIntoFrames: arrangeIntoFramesAction.bind(null, ws, canvasId),
               }}
               focusCardId={focusCardId}
               diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks") } : undefined}

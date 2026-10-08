@@ -8,10 +8,12 @@
 import { revalidatePath } from "next/cache";
 import type { CommandContext, CommandResult } from "@/domain/changes";
 import {
+  arrangeCanvasIntoFrames,
   createFrame,
   deleteFrame,
   fitFrameToContent,
   moveOnCanvas,
+  putCardsInNewFrame,
   resizeFrame,
   updateFrame,
   type FrameCanvasState,
@@ -128,4 +130,35 @@ export async function deleteFrameAction(
   input: { frameId: string; expectedVersion: number; cards: { canvasItemId: string; expectedVersion: number }[] },
 ) {
   return refreshed(await onCanvas(workspaceId, canvasOfFrame(input?.frameId), (ctx, access, state) => deleteFrame(ctx, access, state, input)));
+}
+
+/**
+ * “Put in a new frame” (a selection) and “Put in a new concept / source system frame” (one card, which also takes the
+ * free cards fully inside, `others`).
+ */
+export async function putInNewFrameAction(
+  workspaceId: string,
+  canvasId: string,
+  input: { cards: { canvasItemId: string; expectedVersion: number; height: number }[]; others?: { canvasItemId: string; expectedVersion: number; height: number }[] },
+) {
+  return refreshed(
+    await onCanvas(workspaceId, canvasId, async (ctx, access, state, store) => {
+      const model = await store.model.load(access.workspace.id);
+      return putCardsInNewFrame(ctx, access, { ...state, ...model }, { ...input, canvasId });
+    }),
+  );
+}
+
+/** “Arrange into frames by concept and system” (the canvas overview, PRD items 14 and 15). One change. */
+export async function arrangeIntoFramesAction(
+  workspaceId: string,
+  canvasId: string,
+  input: { frames: { frameId: string; expectedVersion: number }[]; cards: { canvasItemId: string; expectedVersion: number; height: number }[] },
+) {
+  return refreshed(
+    await onCanvas(workspaceId, canvasId, async (ctx, access, state, store) => {
+      const model = await store.model.load(access.workspace.id);
+      return arrangeCanvasIntoFrames(ctx, access, { ...state, ...model }, { ...input, canvasId });
+    }),
+  );
 }

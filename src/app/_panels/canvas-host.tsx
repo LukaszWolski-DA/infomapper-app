@@ -18,6 +18,7 @@ import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from 
 import { createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, swapRelationshipAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
 import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
+import { newCardHeight } from "@/canvas/geometry";
 import { FILTER_LABEL, FILTER_ORDER } from "@/canvas/CardNode";
 import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
@@ -84,13 +85,21 @@ export function useCanvasHost({
       if (!editable) return;
       const concepts = [...ix.model.concepts].sort((a, b) => a.sort_order - b.sort_order);
       const last = panels.lastConcept();
-      const concept = concepts.find((c) => c.id === last) ?? concepts[0];
+      // inside a concept frame the new entity belongs to its concept (D-46, prototype conceptAt), else the last used
+      const frame = ui.frameAt({ x: at.x + 24, y: at.y + 20 });
+      const fromFrame = frame?.kind === "concept" ? concepts.find((c) => c.id === frame.conceptId) : undefined;
+      const concept = fromFrame ?? concepts.find((c) => c.id === last) ?? concepts[0];
       if (!concept) {
         toast("Create a concept first (left panel, New concept).");
         return;
       }
       const result = await run(() =>
-        createEntityAction(workspaceId, { conceptId: concept.id, ...(name ? { name } : {}), placement: { canvasId, x: snap8(at.x), y: snap8(at.y) } }),
+        createEntityAction(workspaceId, {
+          conceptId: concept.id,
+          ...(name ? { name } : {}),
+          // with its height the new card joins the frame it lands in (slice 2b)
+          placement: { canvasId, x: snap8(at.x), y: snap8(at.y), height: newCardHeight(0), frames: ui.frameRefs() },
+        }),
       );
       if (!result.ok) return;
       panels.setLastConcept(concept.id);
@@ -198,6 +207,9 @@ export function useCanvasHost({
       });
       items.push({ label: view.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !view.collapsed }) });
       items.push({ label: "Fit width to names", act: () => ui.fitWidth(card.id) });
+      if (!ui.cardFrame(card.id)) {
+        items.push({ label: `Put in a new ${isEnt ? "concept" : "source system"} frame`, act: () => ui.putInNewFrame([card.id], true) });
+      }
       items.push({ sep: true });
       items.push({ label: "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
       if (isEnt) items.push({ label: "Delete from model…", danger: true, act: () => setDeleting(card.targetId) });
@@ -337,6 +349,10 @@ export function useCanvasHost({
         items.push({ label: "Line up in a row", act: () => ui.arrangeSelection("row") });
         items.push({ label: "Fit widths to names", act: () => ui.fitSelectionWidths() });
         items.push({ sep: true });
+        items.push({
+          label: "Put in a new frame",
+          act: () => ui.putInNewFrame(keys.map((k) => cardOf(k.slice(k.indexOf(":") + 1))).filter((id): id is Uuid => !!id), false),
+        });
         if (keys.some((k) => k.startsWith("entity:"))) {
           items.push({ label: "Add sources of selected entities", act: () => ui.placeSourcesOfSelection((id) => feedingSourceCards(ix, id)) });
         }

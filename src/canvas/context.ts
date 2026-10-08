@@ -3,7 +3,7 @@
 import { createContext } from "react";
 import type { Uuid } from "@/domain/ids";
 import type { ArrangeMode } from "./arrange";
-import type { FrameData } from "./frame-data";
+import type { FrameData, FrameStats } from "./frame-data";
 import type { Selection } from "./line-data";
 
 /** What the card nodes may do and see; kept in a context so node data stays plain and memo-friendly. */
@@ -94,8 +94,23 @@ export interface CanvasHandle {
   placeSourcesOfSelection: (sourcesOf: (entityId: Uuid) => { sourceTableId: Uuid; rows: number }[]) => void;
   /** “New frame here” (slice 2b): a 480 × 320 frame centred on a canvas point. */
   createFrameAt: (at: { x: number; y: number }) => void;
-  /** A frame as the canvas shows it now, with its cards (they change without a fresh page). */
-  frameView: (frameId: Uuid) => { frame: FrameData; cardIds: Uuid[] } | null;
+  /** A frame as the canvas shows it now, with its cards and numbers (they change without a fresh page). */
+  frameView: (frameId: Uuid) => FrameView | null;
+  /** Every frame of the canvas as it shows them now, largest first. */
+  framesView: () => FrameView[];
+  /** The frame a card belongs to on this canvas now. */
+  cardFrame: (cardId: Uuid) => FrameData | null;
+  /** The smallest frame around a canvas point (the Entity tool takes a concept frame's concept, D-46). */
+  frameAt: (at: { x: number; y: number }) => FrameData | null;
+  /** Every frame at the version the canvas knows: a new card may make one grow (slice 2b). */
+  frameRefs: () => { frameId: Uuid; expectedVersion: number }[];
+  /**
+   * Puts cards in a new frame around them (PRD item 12): a selection takes only itself; one card (`fromCard`) also
+   * takes the free cards fully inside the new frame.
+   */
+  putInNewFrame: (cardIds: readonly Uuid[], fromCard: boolean) => void;
+  /** “Arrange into frames by concept and system” (canvas overview). */
+  arrangeIntoFrames: () => void;
   /** Renames a frame or changes what it stands for (the frame panel); resolves whether it was saved. */
   updateFrame: (frameId: Uuid, patch: FramePatch) => Promise<boolean>;
   /** Deletes a frame; its cards stay. The toast offers Undo. */
@@ -104,6 +119,23 @@ export interface CanvasHandle {
   zoomToFrame: (frameId: Uuid) => void;
   /** Selects the frame's cards (toolbox “Select its cards”). */
   selectFrameCards: (frameId: Uuid) => void;
+}
+
+/** A card in a frame, for the frame panel. */
+export interface FrameMember {
+  id: Uuid;
+  kind: "ent" | "src";
+  targetId: Uuid;
+  name: string;
+  misplaced: boolean;
+}
+
+/** A frame as the canvas shows it now: its cards and the numbers of its label (slice 2b). */
+export interface FrameView {
+  frame: FrameData;
+  cardIds: Uuid[];
+  members: FrameMember[];
+  stats: FrameStats;
 }
 
 /** What the frame panel may change (slice 2b, item 9). */
@@ -203,6 +235,12 @@ export interface CanvasUiApi extends CanvasHandle {
   registerHost: (host: CanvasHost | null) => void;
   undo: () => UndoHooks | null;
   registerUndo: (undo: UndoHooks | null) => void;
+  /**
+   * Changes whenever the canvas changes its frames or which cards are in them (slice 2b), so the panels that show
+   * frames draw again; positions alone do not change it.
+   */
+  layoutKey: string;
+  publishLayout: (key: string) => void;
 }
 
 export const CanvasUiCtx = createContext<CanvasUiApi>({
@@ -230,6 +268,12 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   placeSourcesOfSelection: noop,
   createFrameAt: noop,
   frameView: () => null,
+  framesView: () => [],
+  cardFrame: () => null,
+  frameAt: () => null,
+  frameRefs: () => [],
+  putInNewFrame: noop,
+  arrangeIntoFrames: noop,
   updateFrame: () => Promise.resolve(false),
   deleteFrame: noop,
   fitFrame: noop,
@@ -244,6 +288,8 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   registerHost: noop,
   undo: () => null,
   registerUndo: noop,
+  layoutKey: "",
+  publishLayout: noop,
 });
 
 /** Drag data of a left-panel item dropped onto the canvas: JSON `{ target: CardTarget, rows: number }`. */

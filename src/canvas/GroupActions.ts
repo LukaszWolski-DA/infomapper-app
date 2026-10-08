@@ -72,7 +72,7 @@ export function useGroupActions(o: Options) {
 
   /** New positions on screen at once, saved in one change with the cards' frames; a refusal puts the cards back. */
   const savePositions = useCallback(
-    (moves: { id: string; to: Pt; from: Pt }[], options: { onGrid?: boolean; saved?: () => void } = {}) => {
+    (moves: { id: string; to: Pt; from: Pt }[], options: { onGrid?: boolean; ask?: boolean; saved?: () => void } = {}) => {
       if (!moves.length) return;
       saveLayout({ cards: moves.map((m) => ({ id: m.id, ...m.to })) }, { ...options, from: new Map(moves.map((m) => [m.id, m.from])) });
     },
@@ -120,7 +120,8 @@ export function useGroupActions(o: Options) {
     const swallow = (c: MouseEvent) => c.stopPropagation();
     window.addEventListener("click", swallow, { capture: true, once: true });
     setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
-    savePositions(moves);
+    // a drag drop: entities that land in a concept frame of another concept are asked about (D-05)
+    savePositions(moves, { ask: true });
     return true;
   }, [rf, savePositions]);
 

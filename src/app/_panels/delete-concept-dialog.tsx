@@ -1,7 +1,8 @@
 "use client";
 
 // Deleting a concept (D-47, prototype askDeleteConcept): an empty concept goes at once; a concept with entities only
-// after its entities move to another concept; the only concept holding entities cannot be deleted.
+// after its entities move to another concept; the only concept holding entities cannot be deleted. Its concept frames
+// on every canvas stay as free frames (slice 2b).
 
 import { useState } from "react";
 import { deleteConceptAction } from "@/app/_actions/model";
@@ -16,11 +17,14 @@ export function DeleteConceptDialog({
   workspaceId,
   concept: c,
   others,
+  frames = 0,
   onClose,
 }: {
   workspaceId: string;
   concept: TreeConcept;
   others: TreeConcept[];
+  /** The concept's frames on all canvases. */
+  frames?: number;
   onClose: () => void;
 }) {
   const { run, pending } = useAction();
@@ -73,6 +77,11 @@ export function DeleteConceptDialog({
                   </select>
                 </label>
               </>
+            )}
+            {!blocked && frames > 0 && (
+              <p className="mt-2 text-im-ink-3" data-testid="text-concept-frames">
+                {frames > 1 ? `Its ${frames} frames on canvases stay as free frames.` : "Its frame on a canvas stays as a free frame."}
+              </p>
             )}
           </div>
         </DialogDescription>

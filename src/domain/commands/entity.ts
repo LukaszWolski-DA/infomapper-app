@@ -7,10 +7,10 @@ import type { Uuid } from "../ids";
 import { entityCascade, type EntityRows } from "../model/impact";
 import { plainTextPair } from "../model/plain-text";
 import type { WorkspaceAccess } from "../permissions";
-import { STEREOTYPES, type Canvas, type CanvasItem, type Concept, type Entity } from "../types";
+import { STEREOTYPES, type Canvas, type CanvasItem, type Concept, type Entity, type Frame } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, isLive, nothingToChange, plainTextSchema, softDelete } from "./shared";
-import { newCanvasItem, positionSchema } from "./canvas-item";
+import { cardHeightSchema, frameRefsSchema, joinFrames, newCanvasItem, positionSchema } from "./canvas-item";
 
 const DEFAULT_ENTITY_NAME = "New entity";
 
@@ -37,8 +37,15 @@ const createEntityInput = z
   .object({
     conceptId: uuidSchema,
     name: nameSchema.optional(),
-    /** Where to place the card: the panel finds a free spot near the middle of the view (D-46). */
-    placement: z.object({ canvasId: uuidSchema, ...positionSchema.shape }).strict().optional(),
+    /**
+     * Where to place the card: the panel finds a free spot near the middle of the view (D-46). With the card's height
+     * it joins the frame it lands in, which grows to hold it (slice 2b, D-05); `frames` are the canvas's frames at the
+     * versions the user read.
+     */
+    placement: z
+      .object({ canvasId: uuidSchema, ...positionSchema.shape, height: cardHeightSchema.optional(), frames: frameRefsSchema })
+      .strict()
+      .optional(),
   })
   .strict();
 export type CreateEntityInput = z.input<typeof createEntityInput>;
@@ -49,6 +56,8 @@ export interface CreateEntityState {
   entities: readonly Entity[];
   /** The canvas to place the card on, when the input has a placement. */
   canvas: Canvas | null;
+  /** The canvas's frames, for the frame the card lands in (slice 2b). */
+  frames?: readonly Frame[];
 }
 
 /** Creates an entity in a concept and, when asked, its card on a canvas, as one change. */
@@ -77,8 +86,10 @@ export function createEntity(
   const writes: Write[] = [{ kind: "insert", table: "entity", row: entity }];
   let item: CanvasItem | null = null;
   if (placement) {
-    item = newCanvasItem(ctx, workspaceId, placement.canvasId, { entity_id: entity.id }, placement);
-    writes.push({ kind: "insert", table: "canvas_item", row: item });
+    item = newCanvasItem(ctx, workspaceId, placement.canvasId, { entity_id: entity.id }, { x: placement.x, y: placement.y });
+    const joined = joinFrames(ctx, access, placement.canvasId, state.frames ?? [], placement.frames, [{ item, height: placement.height }]);
+    if (!joined.ok) return fail(joined.error);
+    writes.push({ kind: "insert", table: "canvas_item", row: item }, ...joined.writes);
   }
   const warning = name && hasDuplicate(state.entities, name, null) ? duplicateNameWarning(name) : null;
   return done(ctx, access, { entityId: entity.id, canvasItemId: item?.id ?? null, warning }, writes);

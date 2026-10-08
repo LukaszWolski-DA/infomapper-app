@@ -2,17 +2,24 @@
 
 // The right panel when nothing is selected (prototype insOverview, the parts of slice 1a): what is on this canvas,
 // mapping coverage per entity, and the mappings with a type problem to look at. Slice 2a: the canvas's look
-// (background and grid) for those who may change it.
+// (background and grid) for those who may change it. Slice 2b: the frames on this canvas, each a link, and “Arrange
+// into frames by concept and system”.
 
+import { useContext } from "react";
+import { CanvasUiCtx } from "@/canvas/context";
+import { frameColor } from "@/canvas/frame-data";
 import { LookControls, useCanvasLook } from "@/canvas/look";
-import { Fold, Hint, Kind, Li, LongList, TypeDot } from "./fields";
+import { Actions, Fold, Hint, Kind, Li, LongList, smallButtonClass, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { inputsLabel, typeCheckOf } from "./model-index";
 import { coverage } from "./stats";
 
 export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }: { entityIds: string[]; tableCount: number; canvasName: string; canvasCount: number }) {
   const p = usePanel();
+  const ui = useContext(CanvasUiCtx);
   const look = useCanvasLook();
+  const frames = ui.framesView();
+  const conceptColor = (id: string) => p.ix.model.concepts.find((c) => c.id === id)?.color;
   const cov = coverage(p.ix, entityIds);
   const problems = p.ix.model.mappings.filter((m) => !typeCheckOf(p.ix, m).ok);
   const ents = cov.length;
@@ -60,6 +67,47 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
           />
         </Fold>
       )}
+      <Fold title="Frames on this canvas" count={frames.length} testId="section-frames">
+        {frames.length ? (
+          <LongList
+            items={frames}
+            testId="list-frames"
+            text={(v) => v.frame.name}
+            render={({ frame: f, stats }) => (
+              <Li
+                key={f.id}
+                testId="frame-link"
+                onClick={() => {
+                  ui.select({ t: "frame", id: f.id });
+                  ui.zoomToFrame(f.id);
+                }}
+                meta={
+                  <>
+                    {stats.cards} card{stats.cards === 1 ? "" : "s"}
+                    {stats.typeProblems > 0 && <span className="text-im-warn">, {stats.typeProblems} type</span>}
+                  </>
+                }
+              >
+                <span className="flex items-center gap-2">
+                  <span className="size-2.5 flex-none rounded-[3px]" style={{ background: frameColor(f, conceptColor) }} />
+                  <span className="min-w-0 flex-1 truncate">{f.name}</span>
+                </span>
+              </Li>
+            )}
+          />
+        ) : (
+          <p className="text-im-ink-2" data-testid="text-no-frames">
+            No frames yet. Draw one with the Frame tool (<kbd>A</kbd>), or let the canvas arrange itself.
+          </p>
+        )}
+        {p.editable && (
+          <Actions>
+            <button type="button" className={smallButtonClass} onClick={() => ui.arrangeIntoFrames()} data-testid="button-arrange-frames">
+              Arrange into frames by concept and system
+            </button>
+          </Actions>
+        )}
+      </Fold>
       {look?.editable && (
         <Fold title="Canvas look" testId="section-canvas-look">
           <LookControls part="background" look={look.look} onChange={look.setLook} />

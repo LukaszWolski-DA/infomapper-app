@@ -61,8 +61,9 @@ export function newCanvasItem(
 
 // ---- a placed card joins the frame it lands in (D-05) ----
 
-const height = z.number().finite().positive().max(1_000_000);
-const frameRefs = z
+export const cardHeightSchema = z.number().finite().positive().max(1_000_000);
+const height = cardHeightSchema;
+export const frameRefsSchema = z
   .array(z.object({ frameId: uuidSchema, expectedVersion: versionSchema }).strict())
   .max(200)
   .optional();
@@ -71,7 +72,7 @@ const frameRefs = z
  * Puts new cards that came with their height in the frame under the middle of their header, growing that frame to
  * hold them, as a drop does. A frame that grows must be named at the version the user read. Returns the frame writes.
  */
-function joinFrames(
+export function joinFrames(
   ctx: CommandContext,
   access: WorkspaceAccess,
   canvasId: Uuid,
@@ -108,7 +109,7 @@ const placeInput = z
     ...positionSchema.shape,
     /** The new card's height as the canvas draws it: with it, the card joins the frame it lands in. */
     height: height.optional(),
-    frames: frameRefs,
+    frames: frameRefsSchema,
   })
   .strict()
   .refine((v) => (v.entityId === undefined) !== (v.sourceTableId === undefined), "Place either an entity or a source table.");
@@ -170,7 +171,7 @@ const placeManyInput = z
       )
       .min(1, "Nothing to place.")
       .max(200, "Place at most 200 cards at once."),
-    frames: frameRefs,
+    frames: frameRefsSchema,
   })
   .strict();
 export type PlaceManyOnCanvasInput = z.input<typeof placeManyInput>;
