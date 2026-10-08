@@ -78,7 +78,8 @@ export interface DeleteConceptState {
 
 /**
  * Deletes a concept. Its concept frames on every canvas become free frames, keeping their name, place and the
- * concept's colour (D-47; Łukasz, slice 2b step 1 answer 9), in the same change group. An empty concept is deleted directly. A concept with entities is deleted only together with
+ * concept's colour, which they were drawn in (D-47; Łukasz, slice 2b step 1 answer 9), in the same change group. An
+ * empty concept is deleted directly. A concept with entities is deleted only together with
  * moving its entities to another concept, in one change group; there is no cascade. The only concept cannot be
  * deleted while it holds entities.
  */
@@ -99,7 +100,7 @@ export function deleteConcept(
 
   const freed = (state.frames ?? [])
     .filter((f) => isLive(f, access.workspace.id) && f.kind === "concept" && f.concept_id === concept.id)
-    .map((f) => ({ kind: "update" as const, table: "frame" as const, before: f, row: nextVersion(ctx, f, { kind: "free", concept_id: null, color: f.color ?? concept.color }) }));
+    .map((f) => ({ kind: "update" as const, table: "frame" as const, before: f, row: nextVersion(ctx, f, { kind: "free", concept_id: null, color: concept.color }) }));
 
   if (entities.length === 0) {
     return done(ctx, access, { movedEntities: 0 }, [

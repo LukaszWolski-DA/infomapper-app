@@ -127,7 +127,8 @@ describe("deleteConcept and its frames (D-47, slice 2b)", () => {
     expect(r.writeSet.writes[0]).toMatchObject({ row: { id: ids.frameA, kind: "free", concept_id: null, color: sales.color, name: "Sales", x: 0, y: 0 } });
   });
 
-  it("does the same when it moves its entities first, and keeps a frame's own colour", () => {
+  it("does the same when it moves its entities first; a colour the frame kept from its time as a free frame gives way to the concept's", () => {
+    // the frame was drawn in the concept's colour, so it keeps that one (answer 9 of step 1)
     const coloured = { ...salesFrame, color: "#2F7DD1" };
     const r = deleteConcept(makeCtx(), access("modeler"), { concept: sales, concepts: [concept(conceptCustomer), sales], entities: [entity(salesOrder)], frames: [coloured] }, {
       conceptId: conceptSales,
@@ -135,6 +136,6 @@ describe("deleteConcept and its frames (D-47, slice 2b)", () => {
       moveToConceptId: conceptCustomer,
     });
     expect(r.ok && r.writeSet.writes.map((w) => w.table)).toEqual(["entity", "frame", "concept"]);
-    expect(r.ok && r.writeSet.writes[1]).toMatchObject({ row: { kind: "free", color: "#2F7DD1" } });
+    expect(r.ok && r.writeSet.writes[1]).toMatchObject({ row: { kind: "free", color: sales.color } });
   });
 });
