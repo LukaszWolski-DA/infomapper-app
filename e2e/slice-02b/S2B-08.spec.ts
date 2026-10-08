@@ -3,6 +3,7 @@ import {
   canvasUrl,
   cardMarks,
   emptyIn,
+  expectDrawnAt,
   frameMarks,
   frameNamed,
   headPoint,
@@ -86,6 +87,8 @@ test("S2B-08: a lasso around a whole frame selects the frame, not its cards; gro
   expectCarried(now, start);
   await key(page, "Control+z");
   await expect.poll(async () => (await layout()).frame).toEqual(start.frame);
+  // right after an undo the page may still lag the data: the next action reads positions from the page
+  await expectDrawnAt(page, "Customer", start.customer);
 
   // Stack in a column: the frame is first (higher), web_users 64 px below it (after a frame)
   await groupAction(page, "Stack in a column");
@@ -95,6 +98,7 @@ test("S2B-08: a lasso around a whole frame selects the frame, not its cards; gro
   expect(now.frame).toEqual(start.frame);
   await key(page, "Control+z");
   await expect.poll(async () => (await layout()).web).toEqual(start.web);
+  await expectDrawnAt(page, "web_users", start.web);
 
   // Line up in a row: web_users first (left), the frame 64 px after it, at web_users' top
   await groupAction(page, "Line up in a row");
