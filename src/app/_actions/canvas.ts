@@ -113,13 +113,14 @@ export async function duplicateCanvasAction(input: { workspaceId: string; projec
       const access = await loadAccess(store, input?.workspaceId, user.id);
       if (!access) return NOT_FOUND;
       const ws = access.workspace.id, projectId = str(input?.projectId), canvasId = str(input?.canvasId);
-      const [canvas, project, projectLinks, items] = await Promise.all([
+      const [canvas, project, projectLinks, items, frames] = await Promise.all([
         store.canvases.get(ws, canvasId),
         store.projects.get(ws, projectId),
         store.canvases.listLinksOfProject(ws, projectId),
         store.canvasItems.listOfCanvas(ws, canvasId),
+        store.frames.listOfCanvas(ws, canvasId),
       ]);
-      const result = duplicateCanvas(ctx, access, { canvas, project, projectLinks, items }, { projectId: input?.projectId, canvasId: input?.canvasId });
+      const result = duplicateCanvas(ctx, access, { canvas, project, projectLinks, items, frames }, { projectId: input?.projectId, canvasId: input?.canvasId });
       return result.ok
         ? { ...result, value: { name: result.value.name, canvasId: result.value.canvasId, href: canvasHref(ws, projectId, result.value.canvasId) } }
         : result;

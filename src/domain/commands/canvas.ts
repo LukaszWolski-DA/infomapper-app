@@ -203,11 +203,14 @@ export interface DuplicateCanvasState {
   projectLinks: readonly ProjectCanvas[];
   /** The canvas's cards (deleted ones are skipped). */
   items: readonly CanvasItem[];
+  /** The canvas's frames (deleted ones are skipped; slice 2b). */
+  frames: readonly Frame[];
 }
 
 /**
  * “Duplicate layout”: a new canvas “{name} (copy)” in this project with copies of the cards (positions, widths,
- * collapsed state, row filters) and the same look and layer mode. The model is shared, not copied. The copy's link
+ * collapsed state, row filters) and the same look and layer mode. Slice 2b: its frames are copied too, with new ids,
+ * and each copied card is in the copy of its frame. The model is shared, not copied. The copy's link
  * takes the original's sort order; tabs with the same order follow when they were added, so it sits right after the
  * original. One change group, so one undo removes the copy.
  */
@@ -243,9 +246,13 @@ export function duplicateCanvas(
     added_at: ctx.now,
     added_by: ctx.actorId,
   };
+  const frameCopies = new Map<Uuid, Frame>();
+  for (const f of state.frames) {
+    if (isLive(f, workspaceId) && f.canvas_id === canvas.id) frameCopies.set(f.id, { ...f, ...newRowColumns(ctx), canvas_id: copy.id });
+  }
   const items: CanvasItem[] = state.items
     .filter((i) => isLive(i, workspaceId) && i.canvas_id === canvas.id)
-    .map((i) => ({ ...i, ...newRowColumns(ctx), canvas_id: copy.id, frame_id: null }));
+    .map((i) => ({ ...i, ...newRowColumns(ctx), canvas_id: copy.id, frame_id: (i.frame_id && frameCopies.get(i.frame_id)?.id) || null }));
 
   return {
     ok: true,
@@ -253,6 +260,7 @@ export function duplicateCanvas(
     writeSet: buildWriteSet(ctx, workspaceId, [
       { kind: "insert", table: "canvas", row: copy },
       { kind: "insert", table: "project_canvas", row: link },
+      ...[...frameCopies.values()].map((row): Write => ({ kind: "insert", table: "frame", row })),
       ...items.map((row): Write => ({ kind: "insert", table: "canvas_item", row })),
     ]),
   };
