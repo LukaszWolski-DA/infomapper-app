@@ -82,7 +82,7 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
   it("reads every stored table, none of the not-yet-built ones", () => {
     expect(tables.map((t) => t.table).sort()).toEqual(
       [
-        "app_user", "attribute", "canvas", "canvas_item", "change_event", "concept", "entity", "mapping", "mapping_input",
+        "app_user", "attribute", "canvas", "canvas_item", "change_event", "concept", "entity", "frame", "mapping", "mapping_input",
         "organization", "organization_member", "project", "project_canvas", "relationship", "source_column",
         "source_system", "source_table", "workspace", "workspace_member",
       ].sort(),
@@ -98,6 +98,9 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
     expect(column("canvas_item", "live_level")).toEqual({ name: "live_level", kind: "text", nullable: true });
     expect(column("canvas_item", "width")).toEqual({ name: "width", kind: "number", nullable: true });
     expect(column("canvas_item", "collapsed")).toEqual({ name: "collapsed", kind: "boolean", nullable: false });
+    expect(column("frame", "kind")).toEqual({ name: "kind", kind: "text", nullable: false });
+    expect(column("frame", "color")).toEqual({ name: "color", kind: "text", nullable: true });
+    expect(column("frame", "x")).toEqual({ name: "x", kind: "number", nullable: false });
     expect(column("canvas", "look")).toEqual({ name: "look", kind: "jsonb", nullable: false });
     expect(column("change_event", "before_image")).toEqual({ name: "before_image", kind: "jsonb", nullable: true });
     expect(column("relationship", "from_min")).toEqual({ name: "from_min", kind: "number", nullable: false });

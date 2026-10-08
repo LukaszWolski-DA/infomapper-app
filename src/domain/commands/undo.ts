@@ -37,6 +37,7 @@ export const UNDOABLE_TABLES = [
   "mapping",
   "mapping_input",
   "canvas_item",
+  "frame",
 ] as const;
 export type UndoableTable = (typeof UNDOABLE_TABLES)[number];
 
@@ -55,7 +56,8 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   source_column: [["source_table_id", "source_table"]],
   mapping: [["attribute_id", "attribute"]],
   mapping_input: [["mapping_id", "mapping"], ["source_column_id", "source_column"]],
-  canvas_item: [["canvas_id", "canvas"], ["entity_id", "entity"], ["source_table_id", "source_table"]],
+  canvas_item: [["canvas_id", "canvas"], ["entity_id", "entity"], ["source_table_id", "source_table"], ["frame_id", "frame"]],
+  frame: [["canvas_id", "canvas"], ["concept_id", "concept"], ["source_system_id", "source_system"]],
 };
 
 const isUndoableTable = (table: string): table is UndoableTable => (UNDOABLE_TABLES as readonly string[]).includes(table);
@@ -93,6 +95,7 @@ function actionFor(e: ChangeEvent): WorkspaceAction {
       return changed.length > 0 && changed.every((k) => STATUS_COLUMNS.has(k)) ? "mapping.set_status" : "model.edit";
     }
     case "canvas_item":
+    case "frame":
       return "canvas.edit_items";
     case "project_canvas":
       return "canvas.edit_projects";

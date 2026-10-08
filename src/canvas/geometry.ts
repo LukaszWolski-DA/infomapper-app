@@ -1,14 +1,16 @@
 // Canvas geometry, as in the prototype: card sizes come from data (header, body padding, row height and the rows a
 // card shows), never from measuring the DOM (AD-24 rule 2). Pure functions, tested without a browser.
 
+import { CARD_HEADER_HEIGHT, DEFAULT_CARD_WIDTH } from "@/domain/model/frames";
 import { visibleRows, type CardData } from "./card-data";
 
-/** Default card width (D-37), header height, row height and body padding: prototype W, H, R, PAD. */
-export const CARD_W = 256;
+/** Default card width (D-37), header height, row height and body padding: prototype W, H, R, PAD. The first two are
+ * the domain's, because frame membership is decided by the middle of a card's header (D-05). */
+export const CARD_W = DEFAULT_CARD_WIDTH;
 /** A card can be made 200–600 px wide, in steps of 8 (D-37, C-09). */
 export const CARD_W_MIN = 200;
 export const CARD_W_MAX = 600;
-export const HEAD_H = 54;
+export const HEAD_H = CARD_HEADER_HEIGHT;
 export const ROW_H = 26;
 export const BODY_PAD = 6;
 

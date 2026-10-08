@@ -1,6 +1,6 @@
 // npm run seed:large: adds the workspace “Performance test” for Łukasz with the canvas spike's data set
 // (100 cards: 60 source tables and 40 entities, one more entity with 200 attributes, 300 mappings, 40 relationships),
-// all on one canvas at the spike's positions. For the performance check S1A-14.
+// all on one canvas at the spike's positions, with its 8 frames as free frames (slice 2b). For the performance checks.
 
 import type { Uuid } from "@/domain/ids";
 import { CONCEPT_PALETTE } from "@/domain/model/concept-colors";
@@ -75,6 +75,24 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
 
   const systems = new Map<string, Uuid>();
   const rowIds = new Map<string, Uuid>();
+
+  // The spike's frames, as free frames in its colours; each holds the cards the generator put in it.
+  for (const f of data.frames) {
+    db.frame.push({
+      ...std(`frame:${f.id}`),
+      canvas_id: LARGE_IDS.canvas,
+      name: f.name,
+      kind: "free",
+      concept_id: null,
+      source_system_id: null,
+      color: f.color,
+      x: f.x,
+      y: f.y,
+      width: f.w,
+      height: f.h,
+      collapsed: false,
+    });
+  }
 
   for (const card of data.cards) {
     if (card.kind === "src") {
@@ -158,7 +176,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
       width: null,
       collapsed: false,
       row_filter: "all",
-      frame_id: null,
+      frame_id: card.frameId ? id(`frame:${card.frameId}`) : null,
       live_level: null,
     });
   }

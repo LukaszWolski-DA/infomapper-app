@@ -14,6 +14,7 @@ import {
   type Canvas,
   type CanvasItem,
   type CanvasLook,
+  type Frame,
   type Project,
   type ProjectCanvas,
 } from "../types";
@@ -271,13 +272,15 @@ export interface DeleteCanvasState {
   projectLinks: readonly ProjectCanvas[];
   /** The canvas's cards (deleted ones are skipped). */
   items: readonly CanvasItem[];
+  /** The canvas's frames (deleted ones are skipped). */
+  frames: readonly Frame[];
 }
 
 export const LAST_CANVAS_MESSAGE = "A project keeps at least one canvas. Delete the project from its home screen instead.";
 
 /**
  * The tab menu's last item (D-28). A canvas that is also in another project is only taken out of this one; otherwise
- * the canvas and its cards are soft-deleted and its link to the project goes. The model is untouched. Refused for the
+ * the canvas, its cards and its frames are soft-deleted and its link to the project goes. The model is untouched. Refused for the
  * project's last canvas. One change group.
  */
 export function deleteCanvas(
@@ -306,11 +309,13 @@ export function deleteCanvas(
     return { ok: true, value: { deleted: false, otherProjectIds }, writeSet: buildWriteSet(ctx, workspaceId, [unlink]) };
   }
   const items = state.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvas.id);
+  const frames = state.frames.filter((f) => isLive(f, workspaceId) && f.canvas_id === canvas.id);
   return {
     ok: true,
     value: { deleted: true, otherProjectIds: [] },
     writeSet: buildWriteSet(ctx, workspaceId, [
       ...items.map((i): Write => ({ kind: "update", table: "canvas_item", before: i, row: nextVersion(ctx, i, { deleted_at: ctx.now }) })),
+      ...frames.map((f): Write => ({ kind: "update", table: "frame", before: f, row: nextVersion(ctx, f, { deleted_at: ctx.now }) })),
       { kind: "update", table: "canvas", before: canvas, row: nextVersion(ctx, canvas, { deleted_at: ctx.now }) },
       unlink,
     ]),

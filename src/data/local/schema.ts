@@ -1,6 +1,6 @@
 // The shape of .data/dev-db.json and the rules the database would enforce on it: primary keys, unique indexes,
 // foreign keys and CHECK constraints, mirroring supabase/migrations/20261002000000_initial_schema.sql
-// for the tables of slices 0 and 1a.
+// for the tables built so far, plus the one rule the SQL cannot express: a card's frame is on the card's canvas.
 
 import type {
   AppUser,
@@ -10,6 +10,7 @@ import type {
   ChangeEvent,
   Concept,
   Entity,
+  Frame,
   Mapping,
   MappingInput,
   Organization,
@@ -27,6 +28,7 @@ import {
   CARDINALITY_MAX,
   CHANGE_OPERATIONS,
   DOC_LANGUAGES,
+  FRAME_KINDS,
   LIVE_LEVELS,
   LOGICAL_TYPES,
   MAPPING_KINDS,
@@ -38,8 +40,11 @@ import {
   WORKSPACE_ROLES,
 } from "@/domain/types";
 
-/** 2 = slice 1a (model tables). An older file is refused with a hint to run "npm run reset-dev-data". */
-export const DEV_DB_FORMAT = 2;
+/**
+ * 2 = slice 1a (model tables), 3 = slice 2b (frames). A format-2 file is read as format 3 with no frames (it is
+ * written back as 3 with the next write); an older file is refused with a hint to run "npm run reset-dev-data".
+ */
+export const DEV_DB_FORMAT = 3;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -61,6 +66,7 @@ export interface DevDb {
   mapping: Mapping[];
   mapping_input: MappingInput[];
   canvas_item: CanvasItem[];
+  frame: Frame[];
   change_event: ChangeEvent[];
 }
 
@@ -87,6 +93,7 @@ export const emptyDb = (): DevDb => ({
   mapping: [],
   mapping_input: [],
   canvas_item: [],
+  frame: [],
   change_event: [],
 });
 
@@ -209,8 +216,8 @@ export const RULES: Record<DevTable, TableRules> = {
   },
   canvas_item: {
     key: ["id"],
-    // requirement_id and frame_id point to tables the local file does not have yet (requirements, frames).
-    foreignKeys: { ...model, canvas_id: "canvas", entity_id: "entity", source_table_id: "source_table" },
+    // requirement_id points to a table the local file does not have yet (requirements).
+    foreignKeys: { ...model, canvas_id: "canvas", entity_id: "entity", source_table_id: "source_table", frame_id: "frame" },
     unique: [
       { columns: ["canvas_id", "entity_id"], live: true, where: (r) => isSet(r.entity_id) },
       { columns: ["canvas_id", "source_table_id"], live: true, where: (r) => isSet(r.source_table_id) },
@@ -221,7 +228,22 @@ export const RULES: Record<DevTable, TableRules> = {
       { name: "canvas_item_width_ck", test: (r) => r.width === null || ((r.width as number) >= 200 && (r.width as number) <= 600) },
       { name: "canvas_item_row_filter_ck", test: oneOf(ROW_FILTERS, "row_filter") },
       { name: "canvas_item_live_level_ck", test: (r) => r.live_level === null || oneOf(LIVE_LEVELS, "live_level")(r) },
-      { name: "canvas_item_no_requirement_or_frame_yet", test: (r) => !isSet(r.requirement_id) && !isSet(r.frame_id) },
+      { name: "canvas_item_no_requirement_yet", test: (r) => !isSet(r.requirement_id) },
+    ],
+  },
+  frame: {
+    key: ["id"],
+    foreignKeys: { ...model, canvas_id: "canvas", concept_id: "concept", source_system_id: "source_system" },
+    checks: [
+      { name: "frame_kind_ck", test: oneOf(FRAME_KINDS, "kind") },
+      {
+        name: "frame_ref_ck",
+        test: (r) =>
+          (r.kind === "concept" && isSet(r.concept_id) && !isSet(r.source_system_id)) ||
+          (r.kind === "source_system" && isSet(r.source_system_id) && !isSet(r.concept_id)) ||
+          (r.kind === "free" && !isSet(r.concept_id) && !isSet(r.source_system_id)),
+      },
+      { name: "frame_size_ck", test: (r) => (r.width as number) > 0 && (r.height as number) > 0 },
     ],
   },
   change_event: {
@@ -286,6 +308,17 @@ export function findViolation(db: DevDb): IntegrityViolation | null {
         if (seen.has(value)) return { kind: "unique", table, detail: `${index.columns.join(", ")} = ${value} exists already` };
         seen.add(value);
       }
+    }
+  }
+  return crossTableViolation(db);
+}
+
+/** Rules across tables that the SQL cannot express; the domain keeps them, the local file checks them too. */
+function crossTableViolation(db: DevDb): IntegrityViolation | null {
+  const frameCanvas = new Map(db.frame.map((f) => [f.id, f.canvas_id]));
+  for (const item of db.canvas_item) {
+    if (item.frame_id !== null && frameCanvas.get(item.frame_id) !== item.canvas_id) {
+      return { kind: "check", table: "canvas_item", detail: `canvas_item_frame_on_canvas failed for ${item.id}` };
     }
   }
   return null;

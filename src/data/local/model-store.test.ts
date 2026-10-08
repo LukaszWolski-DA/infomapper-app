@@ -1,5 +1,5 @@
 // The local adapter for the model tables (slice 1a, step 2): the demo model, reads, the data model's checks,
-// domain commands applied end to end, and seed:large.
+// domain commands applied end to end, and seed:large. Frames since slice 2b.
 
 import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -8,13 +8,15 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildWriteSet, type CommandContext, type Write } from "@/domain/changes";
 import { createConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity } from "@/domain/commands/entity";
+import { createFrame } from "@/domain/commands/frame";
 import { addMappingInput, setMappingStatus } from "@/domain/commands/mapping";
 import { uuidv7 } from "@/domain/ids";
+import { frameOfCard } from "@/domain/model/frames";
 import { entityImpact } from "@/domain/model/impact";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 import { checkMappingTypes } from "@/domain/model/type-check";
 import type { WorkspaceAccess } from "@/domain/permissions";
-import type { CanvasItem, Entity } from "@/domain/types";
+import type { CanvasItem, Entity, Frame } from "@/domain/types";
 import type { DataStore, WorkspaceModel } from "../ports";
 import { seedDevData, seedLargeData } from "./dev-data";
 import { readDb } from "./file";
@@ -385,10 +387,97 @@ describe("the data model's checks on the model tables", () => {
   });
 });
 
+describe("frames (slice 2b)", () => {
+  const anna = SEED_IDS.userAnna;
+  const apply = (writes: Write[]) => store.apply(buildWriteSet(ctxFor(anna), RETAIL, writes));
+  const now = new Date().toISOString();
+  const frameRow = (over: Partial<Frame> = {}): Frame => ({
+    id: uuidv7(),
+    workspace_id: RETAIL,
+    version: 1,
+    created_at: now,
+    created_by: anna,
+    updated_at: now,
+    updated_by: anna,
+    deleted_at: null,
+    canvas_id: SEED_IDS.canvasCustomerOrders,
+    name: "Area",
+    kind: "free",
+    concept_id: null,
+    source_system_id: null,
+    color: "#7C8998",
+    x: 0,
+    y: 0,
+    width: 400,
+    height: 300,
+    collapsed: false,
+    ...over,
+  });
+
+  it("frame: a concept frame has a concept, a source frame a system, a free frame neither (frame_ref_ck)", async () => {
+    const m = await store.model.load(RETAIL);
+    const concept = m.concepts[0]!.id;
+    const system = m.sourceSystems[0]!.id;
+    const refused = { ok: false, error: { code: "invalid", message: expect.stringContaining("frame_ref_ck") } };
+    expect(await apply([{ kind: "insert", table: "frame", row: frameRow({ kind: "concept" }) }])).toMatchObject(refused);
+    expect(await apply([{ kind: "insert", table: "frame", row: frameRow({ concept_id: concept }) }])).toMatchObject(refused);
+    expect(await apply([{ kind: "insert", table: "frame", row: frameRow({ kind: "source_system", source_system_id: system, concept_id: concept }) }])).toMatchObject(refused);
+    expect(await apply([{ kind: "insert", table: "frame", row: frameRow({ kind: "area" as "free" }) }])).toMatchObject({ ok: false, error: { message: expect.stringContaining("frame_kind_ck") } });
+    expect(await apply([{ kind: "insert", table: "frame", row: frameRow({ width: 0 }) }])).toMatchObject({ ok: false, error: { message: expect.stringContaining("frame_size_ck") } });
+    expect(await apply([{ kind: "insert", table: "frame", row: frameRow({ kind: "concept", concept_id: concept, color: null }) }])).toEqual({ ok: true });
+    expect(await apply([{ kind: "insert", table: "frame", row: frameRow({ kind: "source_system", source_system_id: system, color: null }) }])).toEqual({ ok: true });
+  });
+
+  it("frame: refers to a canvas and a concept that exist", async () => {
+    expect(await apply([{ kind: "insert", table: "frame", row: frameRow({ canvas_id: uuidv7() }) }])).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(await apply([{ kind: "insert", table: "frame", row: frameRow({ kind: "concept", concept_id: uuidv7() }) }])).toMatchObject({ ok: false, error: { code: "not_found" } });
+  });
+
+  it("canvas_item: its frame exists and is on the card's canvas (the rule the SQL cannot express)", async () => {
+    const elsewhere = frameRow({ canvas_id: SEED_IDS.canvasOrderLines });
+    const here = frameRow();
+    expect(await apply([{ kind: "insert", table: "frame", row: elsewhere }, { kind: "insert", table: "frame", row: here }])).toEqual({ ok: true });
+    const card = (await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders))[0]!;
+    const into = (frameId: string) => apply([{ kind: "update", table: "canvas_item", before: card, row: { ...card, version: card.version + 1, frame_id: frameId } }]);
+    expect(await into(elsewhere.id)).toMatchObject({ ok: false, error: { code: "invalid", message: expect.stringContaining("canvas_item_frame_on_canvas") } });
+    expect(await into(uuidv7())).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(await into(here.id)).toEqual({ ok: true });
+  });
+
+  it("a frame drawn through the domain is read back with the card it took, and is part of the undo rows", async () => {
+    const access = await accessAs(anna);
+    const canvas = (await store.canvases.get(RETAIL, SEED_IDS.canvasCustomerOrders))!;
+    const items = await store.canvasItems.listOfCanvas(RETAIL, canvas.id);
+    const first = [...items].sort((a, b) => a.x - b.x || a.y - b.y)[0]!;
+    const r = createFrame(ctxFor(anna), access, { canvas, frames: [], items }, {
+      canvasId: canvas.id,
+      x: first.x - 32,
+      y: first.y - 40,
+      width: 256 + 64,
+      height: 2000,
+      cards: items.map((i) => ({ canvasItemId: i.id, expectedVersion: i.version, height: 200 })),
+    });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(await store.apply(r.writeSet)).toEqual({ ok: true });
+    expect(await store.frames.listOfCanvas(RETAIL, canvas.id)).toMatchObject([{ id: r.value.frameId, name: "New frame", kind: "free" }]);
+    expect(await store.frames.listOfCanvas(RETAIL, SEED_IDS.canvasOrderLines)).toEqual([]);
+    expect((await store.canvasItems.get(RETAIL, first.id))!.frame_id).toBe(r.value.frameId);
+    expect((await store.model.loadForUndo(RETAIL)).frame).toHaveLength(1);
+  });
+});
+
 describe("file format", () => {
   it("refuses a slice 0 file and says how to fix it", async () => {
     await writeFile(file, JSON.stringify({ ...(await readDb(file)), format: 1 }), "utf8");
     await expect(store.model.load(RETAIL)).rejects.toThrow('Run "npm run reset-dev-data"');
+  });
+
+  it("reads a slice 1a to 2p file (format 2) as one without frames", async () => {
+    const old: Record<string, unknown> = { ...(await readDb(file)), format: 2 };
+    delete old.frame;
+    await writeFile(file, JSON.stringify(old), "utf8");
+    expect(await store.frames.list(RETAIL)).toEqual([]);
+    expect((await store.model.load(RETAIL)).entities).toHaveLength(6);
   });
 });
 
@@ -404,7 +493,14 @@ describe("seed:large (S1A-14)", () => {
     expect(attributesOf(m, "Wide Customer Profile")).toHaveLength(200);
     expect(m.mappings).toHaveLength(300);
     expect(m.relationships).toHaveLength(40);
-    expect(await store.canvasItems.listOfCanvas(ws, LARGE_IDS.canvas)).toHaveLength(101);
+    const cards = await store.canvasItems.listOfCanvas(ws, LARGE_IDS.canvas);
+    expect(cards).toHaveLength(101);
+    // The spike's 8 frames, as free frames; every card is in the frame the header-middle rule gives (D-05).
+    const frames = await store.frames.listOfCanvas(ws, LARGE_IDS.canvas);
+    expect(frames).toHaveLength(8);
+    expect(frames.every((f) => f.kind === "free")).toBe(true);
+    for (const c of cards) expect(c.frame_id).toBe(frameOfCard(frames, { x: c.x, y: c.y, width: c.width ?? 256 })?.id ?? null);
+    expect(cards.filter((c) => c.frame_id).length).toBeGreaterThanOrEqual(8 * 6);
     // The demo workspaces are untouched.
     expect((await store.model.load(RETAIL)).entities).toHaveLength(6);
   });

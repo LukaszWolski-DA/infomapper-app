@@ -58,6 +58,7 @@ function seed(): Rows {
     mapping: [mapping()],
     mapping_input: [mappingInput()],
     canvas_item: [canvasItem(ids.itemCustomer), canvasItem(ids.itemCrmCustomer)],
+    frame: [],
   };
 }
 
@@ -356,7 +357,7 @@ describe("undo and a canvas's look and layer mode (slice 2a, D-12)", () => {
 
     const copy = canvasOf(rows, copyId);
     const deleted = ok(
-      deleteCanvas(c, modeler, { canvas: copy, project: find(rows, "project", ids.projectA) as never, canvasLinks: rows.project_canvas.filter((l) => l.canvas_id === copyId), projectLinks: rows.project_canvas.filter((l) => l.project_id === ids.projectA), items: rows.canvas_item }, { projectId: ids.projectA, canvasId: copyId, expectedVersion: copy.version }),
+      deleteCanvas(c, modeler, { canvas: copy, project: find(rows, "project", ids.projectA) as never, canvasLinks: rows.project_canvas.filter((l) => l.canvas_id === copyId), projectLinks: rows.project_canvas.filter((l) => l.project_id === ids.projectA), items: rows.canvas_item, frames: rows.frame }, { projectId: ids.projectA, canvasId: copyId, expectedVersion: copy.version }),
     );
     rows = apply(rows, deleted);
     expect(canvasOf(rows, copyId).deleted_at).toBe(NOW);
@@ -465,7 +466,7 @@ describe("“changed afterwards” compares content, not version (slice 2a fix o
     const copyId = insertedId(duplicated);
     const copy = canvasOf(copyId);
     const deleted = ok(
-      deleteCanvas(makeCtx(), modeler, { canvas: copy, project: find(rows, "project", ids.projectA) as never, canvasLinks: rows.project_canvas.filter((l) => l.canvas_id === copyId), projectLinks: rows.project_canvas.filter((l) => l.project_id === ids.projectA), items: rows.canvas_item }, { projectId: ids.projectA, canvasId: copyId, expectedVersion: copy.version }),
+      deleteCanvas(makeCtx(), modeler, { canvas: copy, project: find(rows, "project", ids.projectA) as never, canvasLinks: rows.project_canvas.filter((l) => l.canvas_id === copyId), projectLinks: rows.project_canvas.filter((l) => l.project_id === ids.projectA), items: rows.canvas_item, frames: rows.frame }, { projectId: ids.projectA, canvasId: copyId, expectedVersion: copy.version }),
     );
     rows = apply(rows, deleted);
     rows = revert(rows, deleted.events, "undo").rows;

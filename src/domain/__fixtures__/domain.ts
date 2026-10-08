@@ -10,6 +10,7 @@ import {
   type ChangeEvent,
   type Concept,
   type Entity,
+  type Frame,
   type Mapping,
   type MappingInput,
   type Organization,
@@ -56,6 +57,9 @@ export const ids = {
   inEmail: "01900000-0000-7000-8000-00000000b001",
   itemCustomer: "01900000-0000-7000-8000-00000000c001",
   itemCrmCustomer: "01900000-0000-7000-8000-00000000c002",
+  // frames (slice 2b)
+  frameA: "01900000-0000-7000-8000-00000000f001",
+  frameB: "01900000-0000-7000-8000-00000000f002",
 } as const;
 
 /** A context whose ids count up predictably: 01900000-0000-7000-8000-9000000000NN. */
@@ -291,6 +295,24 @@ export const canvasItem = (id: string = ids.itemCustomer, over: Partial<CanvasIt
   row_filter: "all",
   frame_id: null,
   live_level: null,
+  ...over,
+});
+
+/** A free frame on canvas 1 at (0, 0), 800 × 600. */
+export const frame = (id: string = ids.frameA, over: Partial<Frame> = {}): Frame => ({
+  id,
+  ...ws,
+  canvas_id: ids.canvas1,
+  name: "Area",
+  kind: "free",
+  concept_id: null,
+  source_system_id: null,
+  color: "#7C8998",
+  x: 0,
+  y: 0,
+  width: 800,
+  height: 600,
+  collapsed: false,
   ...over,
 });
 

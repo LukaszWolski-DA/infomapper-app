@@ -140,6 +140,12 @@ export function createLocalDataStore(file: string): DataStore {
         live((await load()).canvas_item).filter((i) => i.workspace_id === workspaceId && i.canvas_id === canvasId),
     },
 
+    frames: {
+      list: async (workspaceId) => live((await load()).frame).filter((f) => f.workspace_id === workspaceId),
+      listOfCanvas: async (workspaceId, canvasId) =>
+        live((await load()).frame).filter((f) => f.workspace_id === workspaceId && f.canvas_id === canvasId),
+    },
+
     changeEvents: {
       list: async (workspaceId) => (await load()).change_event.filter((e) => e.workspace_id === workspaceId),
       listForMapping: async (workspaceId, mappingId) =>

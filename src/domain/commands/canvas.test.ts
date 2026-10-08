@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { access, archived, canvas, canvasItem, ids, link, makeCtx, NOW, project } from "../__fixtures__/domain";
+import { access, archived, canvas, canvasItem, frame, ids, link, makeCtx, NOW, project } from "../__fixtures__/domain";
 import { STALE_VERSION_MESSAGE } from "../errors";
 import { changeLabel } from "../model/change-label";
 import {
@@ -208,6 +208,7 @@ describe("deleteCanvas (slice 2a, D-28)", () => {
     canvasLinks: [link(projectA, canvas1)],
     projectLinks: [link(projectA, canvas1), link(projectA, canvas2)],
     items,
+    frames: [],
   };
   const input = { projectId: projectA, canvasId: canvas1, expectedVersion: 2 };
 
@@ -222,6 +223,13 @@ describe("deleteCanvas (slice 2a, D-28)", () => {
       { kind: "remove", table: "project_canvas", before: { project_id: projectA, canvas_id: canvas1 } },
     ]);
     expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+    expect(changeLabel(r.writeSet.events)).toBe("Delete canvas");
+  });
+
+  it("deletes the canvas's frames with it (slice 2b)", () => {
+    const r = deleteCanvas(makeCtx(), access("modeler"), { ...base, frames: [frame(), frame(ids.frameB, { deleted_at: NOW })] }, input);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes.filter((w) => w.table === "frame")).toMatchObject([{ kind: "update", row: { id: ids.frameA, deleted_at: NOW } }]);
     expect(changeLabel(r.writeSet.events)).toBe("Delete canvas");
   });
 
