@@ -34,9 +34,9 @@ initial render.
   runs at 31–36 fps with an outline while dragging (bar: 45 fps), and the hover highlight (C-10) takes about 190 ms
   (bar: 100 ms). A veil over the lines and a block view while resizing were tried and did not help: every change
   repaints the canvas's one large GPU layer. Recorded as “partly met”, as Łukasz decided.
-- **The database slice (last, AD-31):** measure S1A-14, C-09 and C-10 in a production build, if possible also on a second, newer
-  machine. If production misses the bars, the next step is drawing the mapping lines on an HTML canvas instead of SVG
-  (the lines are already drawn by one component, `src/canvas/LineLayer.tsx`, so the change stays inside it).
+- **The database slice (last, AD-31):** measure S1A-14, C-09 and C-10 in a production build. (Slice 2p: the reference
+  machine is the development laptop in the production measuring build; the HTML canvas line layer was tried and is no
+  longer the next step, see below and AD-24.)
 - **Slice 2a** adds a third (S2A-14): dragging a group of 31 cards at 50 % on “Performance test” runs at about 16–19 fps
   on the dev server and 25–30 fps in the measurement-only production build (bar: 45 fps). Recorded as “partly met”, as
   Łukasz decided on 6 October 2026; lines keep following the cards (no outlines while dragging). The production build
@@ -71,8 +71,23 @@ initial render.
   hover** (C-10: without it about 49 ms instead of about 150 ms, with the same 5 ms of React work); the **card rows are
   the cost of resize and drag** (with every card as a block the resize C-09 runs at 57–59 fps instead of 28–32 and a
   single-card drag doubles; without lines the drags and the resize barely change).
-- **The performance slice between 2a and 2b** starts from that diagnosis: the line layer for the hover (for example an
-  HTML canvas, as above), and fewer row elements to repaint for a moved or resized card.
+- **Slice 2p (canvas performance, 7–8 October 2026) was closed without changing the renderer.** Its baseline (production
+  measuring build, `slice-02a` against itself, `npm run measure:canvas`): pan and zoom 53.5 / 44.7 fps, initial render
+  (C-08) about 1.75 s, C-09 about 25 fps, C-10 about 170 ms, single-card drag about 13 fps, group drag about 28 fps,
+  lasso marks about 140 ms. A trial line renderer on an HTML canvas (tag `perf/canvas-lines-trial`) met the hover
+  (63 ms) and the lasso marks (29 ms; with no line layer at all 27–32 ms, so their cost is the SVG line layer, not
+  `SelectionOverlay`), but pan and zoom fell to about 21 fps against about 55 (5 rounds), and batching the strokes and
+  skipping lines outside the view (about 28 fps) did not change that. The profile: about 3 ms of script per frame; the
+  cost is the GPU rasterising 340 antialiased, partly dashed curves on every frame (with strokes switched off 56 fps),
+  where the SVG layer is rasterised once and moved by the compositor. Details in
+  [slice-02p-acceptance.md](prd/slice-02p-acceptance.md); AD-24 keeps the SVG line layer.
+- **Deferred to before the database slice (AD-31), all still “partly met”:** card resize (C-09), hover (C-10), the
+  single-card and group drags, the lasso marks, and the initial render (C-08). What is known: the hover and the lasso
+  marks are the SVG line layer repainting; resize and drags are the cards' row elements; the initial render was not
+  diagnosed (slice 2p's step 4 was dropped). **Untested idea:** put the hover and selection overlays on their own
+  compositing layer, so that their changes do not repaint the line layer (the hover and the lasso marks would then cost
+  what the overlays themselves cost, under 35 ms for the marks). The card rows need a decision on the card's look
+  (fewer elements per row, or detail by zoom between 40 % and 100 %), measured with `DIAG=blocks` as the upper limit.
 
 ## Undo history (slice 1b)
 

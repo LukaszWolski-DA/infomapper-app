@@ -1,7 +1,7 @@
 # Slice 2p – Acceptance
 
-Status: in progress (steps 0 and 1 done; step 2 waits for Łukasz's go). Branch `slice/02p-canvas-performance`, pull request #6. Written step by step; the
-criteria table, the final measurements and the three runs in a row follow at step 5.
+Status: **closed without changing the renderer** (Łukasz, 8 October 2026): steps 0, 1 and 1b done; steps 2–4 dropped or
+deferred; waiting for Łukasz's acceptance of the closing. Branch `slice/02p-canvas-performance`, pull request #6.
 
 ## Decisions during the slice
 
@@ -145,4 +145,59 @@ SVG line layer repainting. The canvas renderer removes that cost entirely.
   layer, which the browser only moves and scales. This needs a decision before step 2 (options in the report).
 - Drags and resize change little (single-card drag +14 %, group drag −12 %, C-09 +12 %, all near the method's spread):
   their cost is the cards' rows, as the slice 2a diagnosis said (step 3).
+
+## Step 1b – Profile and option C (8 October 2026)
+
+Bounded to one session, no long sitting; probes in the production measurement build, headed Chrome, at the overview of
+“Performance test” with the trial renderer, 4 s of the spike's pan-and-zoom steps each.
+
+**The profile.** One redraw per animation frame (0.96 redraws per frame); the redraw's script takes **2.7 ms** (median,
+95th percentile 4.4 ms); no line shape is rebuilt while panning; the main thread is idle about 60 % of the time. None of
+the suspects was there: no CSS variables read per frame, no `measureText`, no style change per line, no extra redraws,
+no React or store work. Canvas 2D only records the drawing in script; the GPU rasterises it afterwards, and that is the
+cost: switching one kind of drawing off at a time gave 31 fps with everything, 36 without dashes, 30 without texts, 33
+without fills and texts, and **56 fps without strokes**. `chrome://gpu` reports canvas and rasterization as hardware
+accelerated. So the frame time is the Intel UHD 620 rasterising **340 antialiased, partly dashed curves on every frame**;
+the SVG layer is rasterised once and then only moved by the compositor.
+
+**Option C** (no change to the look): lines of one colour, dash, width and alpha drawn with one stroke (about 10 instead
+of about 400), circles of one style with one fill, lines outside the view skipped, colours read once and again only on
+a theme or look change, label widths computed. Probe: **28 fps at the overview and 25 at 100 %** (31 and 26 before):
+fewer draw calls do not reduce the raster work.
+
+## Decision
+
+The gate (canvas pan and zoom within about 5 % of the SVG side) fails clearly; Łukasz decided on 8 October 2026 not to
+run the quick A/B round and to close the slice without changing the renderer. The trial renderer and option C were
+tagged `perf/canvas-lines-trial` (commit 3e85355) and removed from the code. AD-24 now names the reference machine and
+records that the canvas line layer loses pan and zoom on it, so SVG stays (changed in this pull request, with Łukasz's
+agreement). Card painting (step 3) and the initial render (step 4) are deferred to before the database slice
+(`docs/known-limitations.md`, with the 2a diagnosis, these findings and the untested overlay idea). After this slice the
+work returns to features (slice 2b, frames).
+
+### What stays in the code
+
+- `npm run measure:canvas` (`scripts/measure-canvas.ts`): every canvas figure in the production measuring build, A/B
+  against a reference (default `slice-02a`), with the quiet wait (`scripts/measure-conditions.ts`), `--drop`,
+  `--add-round`, `--quick`, `--prepare-only`, `--branch-diag`.
+- The shared line geometry, `src/canvas/line-geometry.ts`, used by the SVG line layer.
+- The diagnosis switches `DIAG=nolines` and `DIAG=blocks` (measurement build only).
+- Not kept: the test hook for the drawn line count (only the canvas renderer used it); S1A-14 counts SVG line elements
+  as before.
+
+## Criteria
+
+| ID | Result | Reason |
+| --- | --- | --- |
+| S2P-01 | **met** | `npm run measure:canvas` measures every figure in the production measuring build, A/B against `slice-02a`, and writes one table with median, spread, bar and result (step 0). |
+| S2P-02 | **dropped** | The renderer did not change: the lines are the same SVG lines as in `slice-02a`; there is nothing to compare. |
+| S2P-03 | **met in part, rest dropped** | Every existing e2e test passes (one full run, below); the line tests still read SVG elements, because SVG stays; the test hook was only needed for the canvas renderer. |
+| S2P-04 | **dropped** | Line interaction is unchanged (SVG); the existing e2e tests cover it. |
+| S2P-05 | **not met, deferred** | C-10 about 174 ms in production (baseline). The canvas trial met it (63 ms) but lost pan and zoom; deferred to before the database slice, with the untested overlay idea. |
+| S2P-06 | **not met, deferred** | Lasso marks about 138 ms (baseline); their cost is the SVG line layer (27–32 ms without it). Deferred, as S2P-05. |
+| S2P-07 | **not met, deferred** | C-09 about 25 fps; card painting (step 3) deferred to before the database slice. |
+| S2P-08 | **not met, deferred** | Single-card drag about 13 fps, group drag about 28 fps; deferred with step 3. |
+| S2P-09 | **met for pan and zoom; initial render recorded without breakdown** | The renderer is `slice-02a`'s, and the baseline shows the two sides within the method's spread (−1.1 % / +3.4 %). S1A-14's absolute bar is recorded: 53.5 fps with no frame over 50 ms at the overview, 44.7 fps with 4–6 frames over 50 ms at 100 % (not met). Initial render 1.6–2.0 s; its breakdown (step 4) was dropped. |
+| S2P-10 | **met** | This file records the numbers, what was tried (canvas renderer, option C) and Łukasz's decision for every criterion not met: deferred to before the database slice. |
+| S2P-11 | **met, with one full e2e run** | AD-24 and `docs/known-limitations.md` are updated; CI passes; Łukasz asked for one full e2e run with no dev server instead of three in a row. |
 
