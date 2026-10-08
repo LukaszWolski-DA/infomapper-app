@@ -16,7 +16,8 @@
 // checks the worktree and both builds without measuring; `--branch-diag <switch>` runs this branch's side with a
 // measurement-only switch (DIAG); before each side the machine must be quiet (below 2 % for 30 s, at most 3 minutes,
 // recorded); `--add-round <sitting>` measures a replacement round with the
-// builds already made (pair it with `--drop`). Measuring only:
+// builds already made (pair it with `--drop`); `--quick` measures only pan and zoom, C-08, C-10 and the lasso marks.
+// Measuring only:
 // no dev or measurement server may run (ports 3200, 3300); prepare the laptop first.
 
 import { execSync, spawnSync } from "node:child_process";
@@ -27,8 +28,13 @@ import { conditions, waitUntilQuiet } from "./measure-conditions";
 
 const BRANCH = process.cwd();
 const REF_TREE = path.resolve(BRANCH, "..", "infomapper-ab-main");
-const SPECS = ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-09.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts"];
-const RESULT_FILES = ["S1A-14.json", "S1B-09.json", "S1B-10.json", "S2A-14.json", "S2A-14-lasso.json"];
+/** `--quick`: pan and zoom, C-08 (S1A-14), C-10 (S1B-10) and the lasso marks only, without C-09 and the drags. */
+const QUICK = process.argv.includes("--quick");
+const SPECS = QUICK
+  ? ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts"]
+  : ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-09.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts"];
+const SPEC_ARGS = QUICK ? ["--grep-invert", "dragging a group"] : [];
+const RESULT_FILES = QUICK ? ["S1A-14.json", "S1B-10.json", "S2A-14-lasso.json"] : ["S1A-14.json", "S1B-09.json", "S1B-10.json", "S2A-14.json", "S2A-14-lasso.json"];
 
 const arg = (name: string, fallback: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -77,7 +83,7 @@ function measure(tree: string, dir: string, diag = ""): Raw {
   delete env.DIAG;
   if (diag) env.DIAG = diag;
   // a soft bar that is missed makes Playwright exit with 1; the result files decide whether the run worked
-  spawnSync("npx", ["playwright", "test", ...SPECS, "--reporter=line"], { cwd: tree, env, stdio: "inherit", shell: process.platform === "win32" });
+  spawnSync("npx", ["playwright", "test", ...SPECS, ...SPEC_ARGS, "--reporter=line"], { cwd: tree, env, stdio: "inherit", shell: process.platform === "win32" });
   fs.mkdirSync(dir, { recursive: true });
   const raw: Raw = {};
   for (const f of RESULT_FILES) {
@@ -137,7 +143,8 @@ interface Sitting {
 function summarize(dir: string, s: Sitting) {
   const kept = s.sides.filter((x) => !dropped.has(x.round));
   const values = (side: string, f: Figure) => kept.filter((x) => x.side === side).map((x) => f.get(x.raw)).filter((v) => Number.isFinite(v));
-  const rows = FIGURES.map((f) => {
+  // figures a quick sitting did not measure are left out of the table
+  const rows = FIGURES.filter((f) => kept.some((x) => Number.isFinite(f.get(x.raw)))).map((f) => {
     const ref = values("reference", f), br = values("branch", f);
     const mr = median(ref), mb = median(br);
     const diff = ((mb - mr) / mr) * 100;
