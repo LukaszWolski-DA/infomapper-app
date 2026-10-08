@@ -3,7 +3,8 @@
 //   by its header in circles for 6 s while every frame is recorded, against the bar of 45 fps on average (partly met,
 //   known-limitations.md); then the same card alone, for comparison;
 // - the selection marks after a lasso around the whole view at the overview (every card fully inside it; the tallest
-//   stick out even at the lowest zoom), median of 20, against 100 ms.
+//   stick out even at the lowest zoom), median of 20, against 100 ms. Since slice 2b a frame fully inside is caught
+//   instead of its cards (D-17), so the marks counted are the caught frames and the caught cards outside them.
 // Pan and zoom are compared with `main` by S2A-14-pan-zoom.spec.ts and scripts/measure-ab.ts. The normal run checks
 // the steps briefly without judging the speed:
 //
@@ -105,17 +106,23 @@ test("S2A-14: on “Performance test”, the selection marks appear within 100 m
   const pane = await box(page.locator(".react-flow__pane"));
   // the cards fully in the view: at the spike's 1536 × 864 (MEASURE=1) every card; in a normal run's smaller window not all
   const total = await page.locator(".react-flow__node").count();
-  const inView = () =>
-    page.locator(".react-flow__node").evaluateAll(
-      (els, p) => els.filter((e) => {
+  const frameOf = Object.fromEntries((await loadItems(LARGE_IDS.workspace, LARGE_IDS.canvas)).map((i) => [i.id, i.frame_id]));
+  // even at the overview (10 %, the lowest zoom) the tallest cards of “Performance test” stick out of the view, so the
+  // lasso around the whole view selects what is fully inside it: whole frames, and the cards not in one of those
+  // (slice 2b, D-17); how many is recorded
+  const { frames, cards } = await page.evaluate(
+    ({ p, frameOf }) => {
+      const within = (e: Element) => {
         const r = e.getBoundingClientRect();
         return r.left >= p.x + 3 && r.top >= p.y + 3 && r.right <= p.x + p.width - 3 && r.bottom <= p.y + p.height - 3;
-      }).length,
-      pane,
-    );
-  // even at the overview (10 %, the lowest zoom) the tallest cards of “Performance test” stick out of the view, so the
-  // lasso around the whole view selects the cards fully inside it; how many is recorded
-  const cards = await inView();
+      };
+      const caught = new Set([...document.querySelectorAll<HTMLElement>("[data-frame]")].filter(within).map((e) => e.dataset.frame!));
+      const cards = [...document.querySelectorAll<HTMLElement>(".react-flow__node")].filter((e) => within(e) && !caught.has(frameOf[e.dataset.id!] ?? ""));
+      return { frames: caught.size, cards: cards.length };
+    },
+    { p: pane, frameOf },
+  );
+  const marks = '[data-testid="mark-selected"], [data-testid="mark-selected-frame"]';
   // the time from the release to the first frame after the marks are in the page (as C-10: to the next frame)
   await page.evaluate(() => {
     const w = window as unknown as { __up: number };
@@ -124,30 +131,31 @@ test("S2A-14: on “Performance test”, the selection marks appear within 100 m
   const times: number[] = [];
   for (let i = 0; i < (MEASURE ? 20 : 3); i++) {
     await page.keyboard.press("Escape");
-    await expect(page.getByTestId("mark-selected")).toHaveCount(0);
+    await expect(page.locator(marks)).toHaveCount(0);
     await page.mouse.move(pane.x + 3, pane.y + 3);
     await page.mouse.down();
     for (let k = 1; k <= 8; k++) await page.mouse.move(pane.x + 3 + ((pane.width - 6) * k) / 8, pane.y + 3 + ((pane.height - 6) * k) / 8);
     const waiting = page.evaluate(
-      (n) =>
+      ({ n, marks }) =>
         new Promise<number>((done) => {
           const tick = () => {
-            if (document.querySelectorAll('[data-testid="mark-selected"]').length >= n) {
+            if (document.querySelectorAll(marks).length >= n) {
               requestAnimationFrame((t) => done(t - (window as unknown as { __up: number }).__up));
             } else requestAnimationFrame(tick);
           };
           requestAnimationFrame(tick);
         }),
-      cards,
+      { n: frames + cards, marks },
     );
     await page.mouse.up();
     times.push(+(await waiting).toFixed(1));
   }
+  await expect(page.getByTestId("mark-selected-frame")).toHaveCount(frames);
   await expect(page.getByTestId("mark-selected")).toHaveCount(cards);
   const sorted = [...times].sort((a, b) => a - b);
   const medianMs = sorted[Math.floor(sorted.length / 2)]!;
   const build = process.env.MEASURE_BUILD === "production" ? "production (measurement build)" : "dev server";
-  const results = { measured: MEASURE, build, browser: browser.version(), viewport: page.viewportSize(), cards, total, medianMs, maxMs: sorted[sorted.length - 1], times };
+  const results = { measured: MEASURE, build, browser: browser.version(), viewport: page.viewportSize(), frames, cards, total, medianMs, maxMs: sorted[sorted.length - 1], times };
   saveResults("S2A-14-lasso", results);
   await test.info().attach("S2A-14 lasso results", { body: JSON.stringify(results, null, 2), contentType: "application/json" });
   if (MEASURE) expect.soft(medianMs, "marks after the lasso, median ms of 20 (bar 100)").toBeLessThanOrEqual(100);
