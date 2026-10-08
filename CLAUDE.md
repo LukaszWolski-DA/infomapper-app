@@ -121,6 +121,7 @@ MEASURE=1 npx playwright test e2e/slice-01b/S1B-09.spec.ts   # card resize (C-09
 MEASURE=1 npx playwright test e2e/slice-01b/S1B-10.spec.ts   # hover delay (C-10), pan and zoom against slice 1a's median
 MEASURE=1 npx playwright test e2e/slice-02a/S2A-14.spec.ts   # group drag and lasso marks (S2A-14)
 npm run measure:canvas                                        # every canvas figure, production build, A/B vs slice-02a (slice 2p)
+npm run measure:canvas -- --rounds 1 --against slice-02p     # one quick round against slice 2p (slice 2b, S2B-14)
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
 DIAG=nolines MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # diagnosis: no line layer (or DIAG=blocks)
@@ -132,8 +133,11 @@ DIAG=nolines MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # d
   Slice 1b's add a real-mouse drag (`dragTo`), the toolbox (`toolboxAt`), an empty spot (`emptySpot`) and test data
   made through the domain (`asLukasz`, `asUser`); its measurement steps are in `e2e/slice-01b/measure.ts`. Slice 2a's add
   a real-mouse lasso (`lasso`), canvas points on the screen (`screenPoint`), the canvas tab menu (`openCanvasMenu`) and
-  `expectDrawnAt` (right after a write or an undo the page may still lag the data: wait before clicking by position). The undo
-  history lives in the server's memory and is empty again after each reseed.
+  `expectDrawnAt` (right after a write or an undo the page may still lag the data: wait before clicking by position). Slice
+  2b's add frames as test data made through the domain (`makeFrame`, `place` for a card), frames on the page and in the
+  data (`frameEl`, `loadFrames`, `item`), a point on a frame's name or an empty spot inside it (`namePoint`, `emptyIn`),
+  `toolboxLabels` (a frame's toolbox items have their own test ids) and the view `FRAMED` (room above a frame's name at
+  the top). The undo history lives in the server's memory and is empty again after each reseed.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only
