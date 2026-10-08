@@ -18,7 +18,8 @@
     "reset-dev-data": "tsx scripts/reset-dev-data.ts",
     "schema:check": "tsx scripts/check-schema.ts",
     "measure:build": "tsx scripts/measure.ts build",
-    "measure:start": "tsx scripts/measure.ts start"
+    "measure:start": "tsx scripts/measure.ts start",
+    "measure:canvas": "tsx scripts/measure-canvas.ts"
   },
   "dependencies": {
     "@xyflow/react": "^12.12.0",
