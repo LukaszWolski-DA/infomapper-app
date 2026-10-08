@@ -153,7 +153,7 @@ export default async function CanvasPage({
               setCardWidths={setCardWidthsAction.bind(null, ws, canvasId)}
               removeCards={removeCardsAction.bind(null, ws, canvasId)}
               focusCardId={focusCardId}
-              diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks"), canvasLines: diag.includes("canvaslines") } : undefined}
+              diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks") } : undefined}
             />
           </AppShell>
         </UndoProvider>

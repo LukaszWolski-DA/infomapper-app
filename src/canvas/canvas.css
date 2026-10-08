@@ -109,8 +109,6 @@
 /* ---------- lines (prototype .lnk / .map / .rel), one layer under the cards (AD-24 rule 3) ---------- */
 /* Fading uses stroke and fill opacity on the paths, never the opacity property (AD-24 rule 4). */
 .im-canvas .line-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
-/* slice 2p step 1: the trial canvas renderer, the size of the visible area, under the cards (measurement build only) */
-.im-canvas .im-line-canvas { position: absolute; left: 0; top: 0; pointer-events: none }
 .im-canvas .lnk .hit { fill: none; stroke: transparent; stroke-width: 12; pointer-events: stroke; cursor: pointer }
 .im-canvas .lnk .s { fill: none; stroke-width: 1.6; pointer-events: none }
 .im-canvas .map .s { stroke: var(--im-map) }

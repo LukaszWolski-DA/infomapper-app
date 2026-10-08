@@ -43,7 +43,7 @@ const arg = (name: string, fallback: string) => {
 const against = arg("against", "slice-02a");
 const rounds = Number(arg("rounds", "3"));
 const dropped = new Set(arg("drop", "").split(",").filter(Boolean).map(Number));
-/** A measurement-only switch for this branch's side only (slice 2p step 1: `canvaslines`, the trial line renderer). */
+/** A measurement-only switch (DIAG) for this branch's side only, e.g. `nolines` or `blocks` (slice 2p used it for a trial renderer). */
 const branchDiag = arg("branch-diag", "");
 
 const sh = (cmd: string, cwd = BRANCH) => execSync(cmd, { cwd, stdio: "inherit" });
