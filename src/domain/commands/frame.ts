@@ -643,9 +643,9 @@ const byName = <R extends { name: string }>(a: R, b: R) => a.name.localeCompare(
 
 /**
  * “Arrange into frames by concept and system”: free frames stay as they are; concept and source frames are deleted
- * and built again: the tables grouped by system on the left (systems and tables by name), the entities grouped by
- * concept on the right (concepts in panel order, entities by name). Every card ends up in its new frame, also cards
- * that were in a free frame. `cards` must be every card of the canvas with its height; `frames` every frame.
+ * and built again: the tables grouped by system on the left, the entities grouped by concept on the right, in the left
+ * panel's order (systems by name, tables by `database.schema` group then name; concepts in panel order, entities by
+ * name). Every card ends up in its new frame, also cards that were in a free frame. `cards` must be every card of the canvas with its height; `frames` every frame.
  */
 export function arrangeCanvasIntoFrames(
   ctx: CommandContext,
@@ -668,6 +668,14 @@ export function arrangeCanvasIntoFrames(
   const placed = [...draft.items.values()];
   const sized = (c: CanvasItem) => ({ id: c.id, width: cardWidthOf(c), height: heights.get(c.id)! });
 
+  // the left panel's order: within a system, tables by `database.schema` group in order of first appearance, then by name
+  const schemaRank = new Map<string, number>();
+  for (const t of [...tables.values()].sort(byName)) {
+    const key = `${t.source_system_id}|${t.database_name}.${t.schema_name}`;
+    if (!schemaRank.has(key)) schemaRank.set(key, schemaRank.size);
+  }
+  const tableOrder = (a: SourceTable, b: SourceTable) =>
+    schemaRank.get(`${a.source_system_id}|${a.database_name}.${a.schema_name}`)! - schemaRank.get(`${b.source_system_id}|${b.database_name}.${b.schema_name}`)! || byName(a, b);
   const systemGroups = state.sourceSystems
     .filter((s) => isLive(s, ws))
     .sort(byName)
@@ -676,7 +684,7 @@ export function arrangeCanvasIntoFrames(
       name: s.name,
       cards: placed
         .filter((c) => c.source_table_id && tables.get(c.source_table_id)?.source_system_id === s.id)
-        .sort((a, b) => byName(tables.get(a.source_table_id!)!, tables.get(b.source_table_id!)!))
+        .sort((a, b) => tableOrder(tables.get(a.source_table_id!)!, tables.get(b.source_table_id!)!))
         .map(sized),
     }));
   const conceptGroups = state.concepts

@@ -430,6 +430,18 @@ describe("arrangeCanvasIntoFrames (prototype arrangeLayout)", () => {
     expect(r.value.frames).toBe(3);
   });
 
+  it("orders a system's tables as the left panel does: by database.schema group, in order of first appearance, then by name", () => {
+    const t = (n: number, name: string, schema: string) => sourceTable({ id: `01900000-0000-7000-8000-0000000051${n}0`, name, schema_name: schema });
+    const tables = [t(1, "a_table", "sales"), t(2, "b_table", "inv"), t(3, "c_table", "sales")];
+    const cards = tables.map((tb, i) => canvasItem(`01900000-0000-7000-8000-00000000d${i}00`, { entity_id: null, source_table_id: tb.id, x: 0, y: i * 300 }));
+    const r = ok(
+      arrangeCanvasIntoFrames(makeCtx(), access("modeler"), { ...state, items: cards, frames: [], sourceTables: tables }, { canvasId: canvas1, frames: [], cards: cards.map((c) => sized(c, 96)) }),
+    );
+    const ys = Object.fromEntries(r.value.cards.map((c) => [c.id, c.y]));
+    // sales: a_table, c_table; then inv: b_table (96 high, 32 apart)
+    expect([ys[cards[0]!.id], ys[cards[2]!.id], ys[cards[1]!.id]]).toEqual([40, 168, 296]);
+  });
+
   it("needs every card of the canvas and every frame it deletes, at the versions the user saw", () => {
     expect(arrange({ cards: items.slice(1).map((i) => sized(i)) })).toMatchObject(refusedAsStale);
     expect(arrange({ frames: [fref(free)] })).toMatchObject(refusedAsStale);
@@ -440,6 +452,35 @@ describe("arrangeCanvasIntoFrames (prototype arrangeLayout)", () => {
       ok: false,
       error: { message: "There is nothing on this canvas to arrange." },
     });
+  });
+});
+
+// ---- permissions (item 19): reviewers and readers may select, zoom and select a frame's cards, which write nothing ----
+
+describe("frame writes and roles (item 19)", () => {
+  const fA = frame(frameA);
+  const member = customerCard({ frame_id: frameA });
+  const state = { canvas: canvas(), frames: [fA], items: [member, tableCard()], ...model };
+  const cards = state.items.map((i) => sized(i));
+  const writes: [string, (role: "reviewer" | "reader") => CommandResult<unknown>][] = [
+    ["create", (role) => createFrame(makeCtx(), access(role), state, { canvasId: canvas1, x: 0, y: 0, width: 480, height: 320, cards })],
+    ["update", (role) => updateFrame(makeCtx(), access(role), { frame: fA, ...model }, { frameId: frameA, expectedVersion: 1, name: "X" })],
+    ["move", (role) => moveOnCanvas(makeCtx(), access(role), state, { canvasId: canvas1, frames: [{ ...fref(fA), x: 8, y: 8 }], items: [] })],
+    ["resize", (role) => resizeFrame(makeCtx(), access(role), state, { frameId: frameA, expectedVersion: 1, width: 600, height: 600, cards: state.items.map(ref) })],
+    ["fit", (role) => fitFrameToContent(makeCtx(), access(role), state, { frameId: frameA, expectedVersion: 1, cards })],
+    ["delete", (role) => deleteFrame(makeCtx(), access(role), state, { frameId: frameA, expectedVersion: 1, cards: [ref(member)] })],
+    ["put in a new frame", (role) => putCardsInNewFrame(makeCtx(), access(role), state, { canvasId: canvas1, cards: [sized(tableCard())] })],
+    ["arrange", (role) => arrangeCanvasIntoFrames(makeCtx(), access(role), state, { canvasId: canvas1, frames: [fref(fA)], cards })],
+  ];
+
+  it("refuses every frame write to reviewers and readers with the domain's message", () => {
+    for (const role of ["reviewer", "reader"] as const) {
+      for (const [name, run] of writes) {
+        const r = run(role);
+        expect(r, `${name} as ${role}`).toMatchObject({ ok: false, error: { code: "forbidden" } });
+        if (!r.ok) expect(r.error.message, `${name} as ${role}`).toMatch(/change what is on a canvas/);
+      }
+    }
   });
 });
 
