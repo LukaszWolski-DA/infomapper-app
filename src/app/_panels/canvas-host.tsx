@@ -21,6 +21,7 @@ import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
 import { newCardHeight } from "@/canvas/geometry";
 import { FILTER_LABEL, FILTER_ORDER } from "@/canvas/CardNode";
 import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
+import { isFrameKey } from "@/canvas/selection";
 import type { Uuid } from "@/domain/ids";
 import type { MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
@@ -341,22 +342,26 @@ export function useCanvasHost({
       // a group (slice 2a; prototype ctxFor “a group”): reviewers and readers only clear it
       const sel = ui.selection;
       const keys = sel?.t === "multi" ? sel.keys : [];
+      // frames stand for their cards (slice 2b): fit widths, put in a new frame and remove act on the selected cards
+      const cardKeys = keys.filter((k) => !isFrameKey(k));
       items.push({ head: `${keys.length} items selected` });
       if (editable) {
         items.push({ label: "Align left", act: () => ui.arrangeSelection("left") });
         items.push({ label: "Align top", act: () => ui.arrangeSelection("top") });
         items.push({ label: "Stack in a column", act: () => ui.arrangeSelection("column") });
         items.push({ label: "Line up in a row", act: () => ui.arrangeSelection("row") });
-        items.push({ label: "Fit widths to names", act: () => ui.fitSelectionWidths() });
+        if (cardKeys.length) items.push({ label: "Fit widths to names", act: () => ui.fitSelectionWidths() });
         items.push({ sep: true });
-        items.push({
-          label: "Put in a new frame",
-          act: () => ui.putInNewFrame(keys.map((k) => cardOf(k.slice(k.indexOf(":") + 1))).filter((id): id is Uuid => !!id), false),
-        });
+        if (cardKeys.length) {
+          items.push({
+            label: "Put in a new frame",
+            act: () => ui.putInNewFrame(cardKeys.map((k) => cardOf(k.slice(k.indexOf(":") + 1))).filter((id): id is Uuid => !!id), false),
+          });
+        }
         if (keys.some((k) => k.startsWith("entity:"))) {
           items.push({ label: "Add sources of selected entities", act: () => ui.placeSourcesOfSelection((id) => feedingSourceCards(ix, id)) });
         }
-        items.push({ label: "Remove from this canvas", danger: true, act: () => ui.removeSelection() });
+        if (cardKeys.length) items.push({ label: "Remove from this canvas", danger: true, act: () => ui.removeSelection() });
       }
       items.push({ sep: true });
       items.push({ label: "Clear selection", kbd: "Esc", act: () => ui.select(null) });

@@ -14,6 +14,8 @@
 // - Slice 2b step 3: a drag drop that brings entities into a concept frame of another concept asks once whether to
 //   move them in the model (D-05, D-17); the drop and the answer are saved together. Other moves only mark them.
 //   “Put in a new frame”; the frames as the panels see them (`frameView`, `framesView`, `cardFrame`, `frameAt`).
+// - Slice 2b step 4: a frame that is part of a selection of several, dragged by its name or an empty spot, moves the
+//   whole selection: every selected frame with its cards and every other selected card (D-17, prototype startGroupDrag).
 
 import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import { applyNodeChanges, useReactFlow, type NodeChange } from "@xyflow/react";
@@ -105,6 +107,8 @@ interface Options {
   conceptName: (id: Uuid) => string;
   /** Shows the drop's question; resolves with the answer (true: move them in the model). */
   ask: (question: ConceptAsk) => Promise<boolean>;
+  /** When this frame is part of a selection of several: what the selection moves (`unitsOf`), else null. */
+  groupOf: (frameId: Uuid) => { frames: Uuid[]; cards: Uuid[]; members: Uuid[] } | null;
 }
 
 const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
@@ -131,9 +135,11 @@ export function useFrames(o: Options) {
   const [busy, setBusy] = useState(false);
   // the drop's question, read when asked (stable callbacks)
   const askRef = useRef(o.ask);
+  const groupOfRef = useRef(o.groupOf);
   const conceptNameRef = useRef(o.conceptName);
   useEffect(() => {
     askRef.current = o.ask;
+    groupOfRef.current = o.groupOf;
     conceptNameRef.current = o.conceptName;
   });
 
@@ -160,6 +166,7 @@ export function useFrames(o: Options) {
     setFrames((fs) => fs.map((f) => (patch.has(f.id) ? { ...f, ...patch.get(f.id) } : f)));
   }, []);
   const ver = useCallback((id: Uuid) => versions.current.get(id) ?? 1, [versions]);
+  const framesNow = useCallback(() => framesRef.current, []);
   const noteVersions = useCallback(
     (v: Record<string, number>) => {
       for (const [id, n] of Object.entries(v)) versions.current.set(id, n);
@@ -272,7 +279,21 @@ export function useFrames(o: Options) {
 
   // ---- dragging a frame, resizing it ----
   const press = useRef<
-    | { kind: "move"; frameId: Uuid; sx: number; sy: number; zoom: number; start: Pt; members: Map<Uuid, Pt>; dx: number; dy: number; moved: boolean }
+    | {
+        kind: "move";
+        frameId: Uuid;
+        sx: number;
+        sy: number;
+        zoom: number;
+        /** The frames that move (this one, or every selected frame) and where each started. */
+        frames: Map<Uuid, Pt>;
+        /** Every card that moves and where it started; `loose` are those not carried by a moving frame. */
+        members: Map<Uuid, Pt>;
+        loose: Set<Uuid>;
+        dx: number;
+        dy: number;
+        moved: boolean;
+      }
     | { kind: "resize"; frameId: Uuid; sx: number; sy: number; zoom: number; start: { w: number; h: number }; w: number; h: number }
     | { kind: "click"; frameId: Uuid; sx: number; sy: number; moved: boolean }
     | null
@@ -296,8 +317,17 @@ export function useFrames(o: Options) {
         setBusy(true);
         return;
       }
-      const members = new Map(nodes().filter((n) => n.data.card.frameId === frameId).map((n) => [n.id, { ...n.position }]));
-      press.current = { kind: "move", frameId, sx: e.clientX, sy: e.clientY, zoom, start: { x: f.x, y: f.y }, members, dx: 0, dy: 0, moved: false };
+      // part of a selection of several: the whole selection moves (D-17)
+      const group = groupOfRef.current(frameId);
+      const frameIds = new Set(group?.frames ?? [frameId]);
+      const frames = new Map(framesRef.current.filter((x) => frameIds.has(x.id)).map((x) => [x.id, { x: x.x, y: x.y }]));
+      const loose = new Set(group?.cards ?? []);
+      const members = new Map(
+        nodes()
+          .filter((n) => loose.has(n.id) || (n.data.card.frameId !== null && frameIds.has(n.data.card.frameId)))
+          .map((n) => [n.id, { ...n.position }]),
+      );
+      press.current = { kind: "move", frameId, sx: e.clientX, sy: e.clientY, zoom, frames, members, loose, dx: 0, dy: 0, moved: false };
     },
     [editable, rf, nodes, spaceDown],
   );
@@ -346,7 +376,7 @@ export function useFrames(o: Options) {
         raf.current = null;
         const q = press.current;
         if (q?.kind !== "move") return;
-        patchFrames(new Map([[q.frameId, { x: q.start.x + q.dx, y: q.start.y + q.dy }]]));
+        patchFrames(new Map([...q.frames].map(([id, s]) => [id, { x: s.x + q.dx, y: s.y + q.dy }])));
         // not marked as dragging: a card marked so would ignore the server's next version of it (ModelCanvas)
         const changes: NodeChange<CardNodeT>[] = [...q.members].map(([id, s]) => ({ type: "position", id, position: { x: s.x + q.dx, y: s.y + q.dy } }));
         if (changes.length) setNodes((ns) => applyNodeChanges(changes, ns));
@@ -376,12 +406,20 @@ export function useFrames(o: Options) {
       if (!p.moved || (p.dx === 0 && p.dy === 0)) {
         // put the members back exactly (a move below one grid step), then a click selects the frame
         if (p.moved) setNodes((ns) => applyNodeChanges([...p.members].map(([id, s]) => ({ type: "position", id, position: s, dragging: false })), ns));
-        if (p.moved) patchFrames(new Map([[p.frameId, p.start]]));
+        if (p.moved) patchFrames(p.frames);
         else select({ t: "frame", id: p.frameId });
         return;
       }
       swallowNextClick();
-      saveLayout({ frames: [{ id: p.frameId, x: p.start.x + p.dx, y: p.start.y + p.dy }] }, { framesFrom: new Map([[p.frameId, p.start]]) });
+      const by = (s: Pt) => ({ x: s.x + p.dx, y: s.y + p.dy });
+      saveLayout(
+        {
+          frames: [...p.frames].map(([id, s]) => ({ id, ...by(s) })),
+          cards: [...p.loose].map((id) => ({ id, ...by(p.members.get(id)!) })),
+        },
+        // a group with cards of its own is a drag drop: they may be asked about (D-05)
+        { framesFrom: p.frames, from: p.members, ...(p.loose.size ? { ask: true } : {}) },
+      );
     };
     window.addEventListener("pointermove", move);
     window.addEventListener("pointerup", up);
@@ -740,7 +778,8 @@ export function useFrames(o: Options) {
 
   return {
     frames,
-    framesNow: () => framesRef.current,
+    framesNow,
+    patchFrames,
     busy: busy || drawing !== null,
     drawing,
     saveLayout,

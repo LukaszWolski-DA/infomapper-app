@@ -11,7 +11,8 @@
 // - Hand tool (H, slice 2a, D-18): a left drag anywhere, over cards too, pans the canvas and selects nothing; V or Esc
 //   end it. Right drag, the middle button and Space still pan as before. It is not saved.
 // - Frame tool (A, slice 2b): its presses are the canvas's (`useFrames`); here only on and off. A right-click on a
-//   frame's name, handle or an empty spot inside it opens the frame's toolbox; on a card or line inside a frame, theirs.
+//   frame's name, handle or an empty spot inside it opens the frame's toolbox, or the group's when the frame is part of
+//   a selection of several (step 4); on a card or line inside a frame, theirs.
 // The page does the writes and draws the toolbox (CanvasHost); this file only reads gestures.
 
 import { memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
@@ -19,7 +20,7 @@ import { EdgeLabelRenderer, useReactFlow, useStore } from "@xyflow/react";
 import { useToast } from "@/ui/components/toast";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type ToolboxTarget } from "./context";
-import { cardKey } from "./selection";
+import { cardKey, frameKey } from "./selection";
 import { cardWidth, HEAD_H, type Pt } from "./geometry";
 
 /** A right-click that moved more than this is a pan, not a toolbox. */
@@ -224,6 +225,9 @@ export function useCanvasModes(editable: boolean) {
       } else if (cardId) {
         target = { kind: "card", cardId };
         select({ t: "card", id: cardId });
+      } else if (frameId && ui.selection?.t === "multi" && ui.selection.keys.includes(frameKey(frameId))) {
+        // a frame that is part of a selection of several: the group's toolbox (prototype ctxFor)
+        target = { kind: "selection" };
       } else if (frameId) {
         target = { kind: "frame", frameId };
         select({ t: "frame", id: frameId });

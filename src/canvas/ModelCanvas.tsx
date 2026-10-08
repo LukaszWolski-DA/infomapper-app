@@ -18,7 +18,9 @@
 // (`diagnosis`), to find what the frame time is spent on.
 // Slice 2b: frames in their own layer under the lines and cards (`FrameLayer`, `useFrames`); every change of positions
 // and widths goes through `saveLayout`, which also decides the cards' frames. A draws a frame (the Frame tool); Delete
-// removes a selected frame.
+// removes a selected frame. Step 4: frames take part in the selection of several (`frame:` keys): a lasso around a
+// whole frame, Shift+click on its name, Ctrl+A (every frame and the cards in no frame); the group moves and arranges
+// frames with their cards.
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -47,7 +49,7 @@ import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
-import { afterLasso, cardKey, fromKeys, lassoHits, toggleCard as toggledSelection, type CardBox } from "./selection";
+import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis } from "./context";
@@ -268,17 +270,23 @@ export function ModelCanvas({
     return storeApi.subscribe((s) => follow(s.transform));
   }, [grid, storeApi]);
 
-  // ---- several cards (slice 2a): the cards as keys and rectangles, select all, Shift+click, lasso ----
+  // ---- several cards (slice 2a) and frames (2b): their keys and rectangles, select all, Shift+click, lasso ----
   const boxes = useCallback(
-    (): CardBox[] =>
-      (rf.getNodes() as CardNodeT[]).map(({ id, position, data: { card } }) => ({
+    (): ItemBox[] => [
+      ...framesNowRef.current().map((f) => ({ id: f.id, key: frameKey(f.id), rect: { x: f.x, y: f.y, w: f.width, h: f.height } })),
+      ...(rf.getNodes() as CardNodeT[]).map(({ id, position, data: { card } }) => ({
         id,
         key: cardKey(card),
         rect: { x: position.x, y: position.y, w: cardWidth(card), h: cardHeight(card) },
+        frameId: card.frameId,
       })),
+    ],
     [rf],
   );
-  const selectAll = useCallback(() => select(fromKeys(boxes().map((b) => b.key), boxes())), [select, boxes]);
+  const selectAll = useCallback(() => {
+    const all = boxes();
+    select(fromKeys(allKeys(all), all));
+  }, [select, boxes]);
   const toggleCard = useCallback((cardId: string) => select(toggledSelection(selection, cardId, boxes())), [select, selection, boxes]);
   const onLasso = useCallback(
     (rect: Rect, add: boolean) => {
@@ -288,15 +296,6 @@ export function ModelCanvas({
     [select, selection, boxes],
   );
   const lasso = useLasso(onLasso);
-
-  // Cards that left the canvas (removed, undone) leave the selection too; checked when the set of cards changes, not on
-  // every frame of a drag.
-  const cardIds = useMemo(() => nodes.map((n) => n.id).join(","), [nodes]);
-  useEffect(() => {
-    if (selection?.t !== "multi") return;
-    const next = fromKeys(selection.keys, boxes());
-    if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
-  }, [cardIds, selection, select, boxes]);
 
   // ---- keyboard: F fits, M toggles the Overview, E the Entity tool; Esc ends a tool, else clears the selection ----
   const { toggleEntityTool, toggleHandTool, toggleFrameTool } = modes;
@@ -652,6 +651,7 @@ export function ModelCanvas({
     selectCards,
     conceptName,
     ask,
+    groupOf: (frameId) => (selection?.t === "multi" && selection.keys.includes(frameKey(frameId)) ? unitsOf(selection.keys, boxes()) : null),
   });
   const { frames, saveLayout, arrangeIntoFrames } = frameState;
   useEffect(() => {
@@ -669,6 +669,14 @@ export function ModelCanvas({
       ]),
     [frames, cardData],
   );
+  // Cards and frames that left the canvas (removed, deleted, undone) leave the selection too; checked when the set of
+  // cards or frames changes, not on every frame of a drag.
+  const itemIds = useMemo(() => [...frames.map((f) => f.id), ...nodes.map((n) => n.id)].join(","), [frames, nodes]);
+  useEffect(() => {
+    if (selection?.t !== "multi") return;
+    const next = fromKeys(selection.keys, boxes());
+    if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
+  }, [itemIds, selection, select, boxes]);
   const { publishLayout } = ui;
   useEffect(() => publishLayout(layoutKey), [publishLayout, layoutKey]);
   const selectedFrameId = selection?.t === "frame" ? selection.id : null;
@@ -680,9 +688,15 @@ export function ModelCanvas({
         return;
       }
       if (ui.mode) return;
+      // Shift+click on a frame's name adds it to the selection or takes it out (D-16, prototype pick)
+      if (part === "label" && e.shiftKey && e.button === 0 && !spaceDown.current) {
+        e.preventDefault();
+        select(toggleItem(selection, frameKey(frameId), boxes()));
+        return;
+      }
       frameState.onFramePointerDown(e, frameId, part);
     },
-    [lasso, ui.mode, frameState],
+    [lasso, ui.mode, frameState, select, selection, boxes],
   );
 
   // ---- several selected cards (slice 2a): group drag, nudge and the group's actions ----
@@ -701,6 +715,9 @@ export function ModelCanvas({
     saveLayout,
     removeCards,
     placeCards: (cards) => placeCards(cards, frameRefs()),
+    items: boxes,
+    framesNow: frameState.framesNow,
+    patchFrames: frameState.patchFrames,
   });
 
   // Arrow keys nudge the selected cards by 8 px, with Shift by 32 px (outside text fields).
@@ -926,7 +943,7 @@ export function ModelCanvas({
           {!diagnosis.noLines && <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />}
           <Overview lines={lines} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
-          <SelectionOverlay selection={selection} lasso={lasso.lasso} />
+          <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>
