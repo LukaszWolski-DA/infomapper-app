@@ -682,16 +682,18 @@ export function ModelCanvas({
   const selectedFrameId = selection?.t === "frame" ? selection.id : null;
   const onFramePointerDown = useCallback(
     (e: React.PointerEvent, frameId: string, part: FramePart) => {
-      // Shift + drag inside a frame draws a lasso that adds to the selection (D-15)
+      const toggle = () => select(toggleItem(selection, frameKey(frameId), boxes()));
+      // Shift + drag inside a frame draws a lasso that adds to the selection (D-15); a Shift+click there without moving
+      // adds the frame or takes it out, as a plain click there selects it (answer 2 of step 4, unlike the prototype)
       if (part === "body" && e.shiftKey && e.button === 0 && !spaceDown.current && !ui.mode) {
-        lasso.onPointerDown(e, true);
+        lasso.onPointerDown(e, true, toggle);
         return;
       }
       if (ui.mode) return;
       // Shift+click on a frame's name adds it to the selection or takes it out (D-16, prototype pick)
       if (part === "label" && e.shiftKey && e.button === 0 && !spaceDown.current) {
         e.preventDefault();
-        select(toggleItem(selection, frameKey(frameId), boxes()));
+        toggle();
         return;
       }
       frameState.onFramePointerDown(e, frameId, part);

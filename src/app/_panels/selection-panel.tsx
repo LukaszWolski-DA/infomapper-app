@@ -3,7 +3,7 @@
 // The right panel with several cards selected (slice 2a, PRD item 6; prototype insMulti): how many and of which kind,
 // the group's actions, the selected cards (each a link that selects that card) and a short help text. Reviewers and
 // readers only clear the selection.
-// Slice 2b: frames in the selection are counted (“2 frames, 3 entities”) and listed (a link selects the frame); they
+// Slice 2b: frames in the selection are counted (“3 entities, 2 frames”, the prototype's order) and listed (a link selects the frame); they
 // stand for their cards, so “Put in a new frame” and “Remove from this canvas” act on the selected cards only and are
 // offered only when there are some.
 
@@ -25,9 +25,9 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
   const frames = keys.filter(isFrameKey).map(idOf);
   const cardKeys = keys.filter((k) => !isFrameKey(k));
   const counts = [
-    frames.length && plural(frames.length, "frame", "frames"),
     entities.length && plural(entities.length, "entity", "entities"),
     tables.length && plural(tables.length, "table", "tables"),
+    frames.length && plural(frames.length, "frame", "frames"),
   ].filter(Boolean);
   const open = (targetId: string) => {
     const card = p.cardOf(targetId);
