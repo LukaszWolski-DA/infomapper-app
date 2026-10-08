@@ -4,6 +4,7 @@
 // multi-feed, multi-remove): drag the group, nudge it with the arrow keys, align, stack, line up, fit widths, bring in
 // the feeding sources of the selected entities and take the group off the canvas. Each is one change group, so one
 // undo puts everything back. The cards change on screen at once; a refusal puts them back with the domain's message.
+// Slice 2b: moves and widths are saved through `saveLayout`, which also decides the cards' frames (answer 1).
 
 import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useReactFlow, type NodeChange } from "@xyflow/react";
@@ -12,6 +13,8 @@ import { ARRANGED, arrange, type ArrangeMode } from "./arrange";
 import type { CardData } from "./card-data";
 import type { CardNodeT } from "./CardNode";
 import type { CardTarget, UndoHooks } from "./context";
+import type { SaveLayoutOptions } from "./useFrames";
+import type { LayoutChange } from "./layout-plan";
 import { besideSpots, CARD_W, cardHeight, cardWidth, inside, newCardHeight, type Pt, type Rect } from "./geometry";
 import type { Selection } from "./line-data";
 import { cardKey } from "./selection";
@@ -20,22 +23,9 @@ import { fitWidth as fitWidthOf } from "./text-fit";
 /** What a canvas write returns: the value, or the domain's message for a toast. */
 type WriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
 
-export interface CardPosition {
-  canvasItemId: string;
-  expectedVersion: number;
-  x: number;
-  y: number;
-}
-type Versions = { versions: Record<string, number> };
-
 export interface GroupWrites {
-  /** A group drag or nudges, in one change. */
-  moveCards: (items: CardPosition[]) => Promise<WriteResult<Versions>>;
-  /** Align, stack or line up, in one change (positions on the 8 px grid). */
-  arrangeCards: (items: CardPosition[]) => Promise<WriteResult<Versions>>;
-  setCardWidths: (items: { canvasItemId: string; expectedVersion: number; width: number | null }[]) => Promise<WriteResult<Versions>>;
   removeCards: (items: { canvasItemId: string; expectedVersion: number }[]) => Promise<WriteResult<unknown>>;
-  placeCards: (cards: (CardTarget & { x: number; y: number })[]) => Promise<WriteResult<{ canvasItemIds: string[] }>>;
+  placeCards: (cards: (CardTarget & { x: number; y: number; height: number })[]) => Promise<WriteResult<{ canvasItemIds: string[] }>>;
 }
 
 /** Arrow keys move the selection this far, with Shift further (prototype nudge). */
@@ -57,6 +47,8 @@ interface Options extends GroupWrites {
   occupied: () => Rect[];
   viewRect: () => Rect;
   undo: () => UndoHooks | null;
+  /** Every change of positions and widths (slice 2b): saved in one change, frames decided again. */
+  saveLayout: (change: LayoutChange, opts?: SaveLayoutOptions) => void;
 }
 
 const rectOf = (n: CardNodeT): Rect => ({ x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) });
@@ -65,7 +57,7 @@ export function useGroupActions(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
   const { editable, selection, select, setNodes, patchCard, enqueueGroup, versions, pending, undo, occupied, viewRect } = o;
-  const { moveCards, arrangeCards, setCardWidths, removeCards, placeCards } = o;
+  const { saveLayout, removeCards, placeCards } = o;
 
   /** The selected cards on this canvas: several, or the one selected card. */
   const selectedNodes = useCallback((): CardNodeT[] => {
@@ -78,32 +70,13 @@ export function useGroupActions(o: Options) {
     return [];
   }, [rf, selection]);
 
-  /** New positions on screen at once, saved in one change; a refusal puts the cards back. */
+  /** New positions on screen at once, saved in one change with the cards' frames; a refusal puts the cards back. */
   const savePositions = useCallback(
-    (moves: { id: string; to: Pt; from: Pt }[], send: GroupWrites["moveCards"], saved?: () => void) => {
+    (moves: { id: string; to: Pt; from: Pt }[], options: { onGrid?: boolean; saved?: () => void } = {}) => {
       if (!moves.length) return;
-      for (const m of moves) patchCard(m.id, m.to);
-      enqueueGroup(
-        moves.map((m) => m.id),
-        async () => {
-          let result: WriteResult<Versions>;
-          try {
-            result = await send(moves.map((m) => ({ canvasItemId: m.id, expectedVersion: versions.current.get(m.id) ?? 1, ...m.to })));
-          } catch {
-            result = FAILED;
-          }
-          if (result.ok) {
-            for (const [id, v] of Object.entries(result.value.versions)) versions.current.set(id, v);
-            undo()?.noteSaved();
-            saved?.();
-          } else {
-            for (const m of moves) patchCard(m.id, m.from);
-            toast(result.message, "refusal");
-          }
-        },
-      );
+      saveLayout({ cards: moves.map((m) => ({ id: m.id, ...m.to })) }, { ...options, from: new Map(moves.map((m) => [m.id, m.from])) });
     },
-    [patchCard, enqueueGroup, versions, undo, toast],
+    [saveLayout],
   );
 
   // ---- group drag: the dragged card leads, the others follow by the same amount (snapped as a whole) ----
@@ -147,9 +120,9 @@ export function useGroupActions(o: Options) {
     const swallow = (c: MouseEvent) => c.stopPropagation();
     window.addEventListener("click", swallow, { capture: true, once: true });
     setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
-    savePositions(moves, moveCards);
+    savePositions(moves);
     return true;
-  }, [rf, savePositions, moveCards]);
+  }, [rf, savePositions]);
 
   // ---- nudge: the cards move at once, the moves are saved together after the keys are still ----
   const nudging = useRef<{ from: Map<string, Pt>; at: Map<string, Pt>; timer: ReturnType<typeof setTimeout> | null } | null>(null);
@@ -160,8 +133,8 @@ export function useGroupActions(o: Options) {
     if (!n) return;
     for (const id of n.from.keys()) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
     const moves = [...n.from].map(([id, from]) => ({ id, from, to: n.at.get(id)! })).filter((m) => m.to.x !== m.from.x || m.to.y !== m.from.y);
-    savePositions(moves, moveCards);
-  }, [pending, savePositions, moveCards]);
+    savePositions(moves);
+  }, [pending, savePositions]);
 
   const nudge = useCallback(
     (dx: number, dy: number): boolean => {
@@ -214,9 +187,9 @@ export function useGroupActions(o: Options) {
         toast(ARRANGED[mode]);
         return;
       }
-      savePositions(moves, arrangeCards, () => toast(ARRANGED[mode]));
+      savePositions(moves, { onGrid: true, saved: () => toast(ARRANGED[mode]) });
     },
-    [editable, selectedNodes, savePositions, arrangeCards, toast],
+    [editable, selectedNodes, savePositions, toast],
   );
 
   const fitSelectionWidths = useCallback(() => {
@@ -234,27 +207,8 @@ export function useGroupActions(o: Options) {
       done();
       return;
     }
-    for (const c of changes) patchCard(c.id, { width: c.to });
-    enqueueGroup(
-      changes.map((c) => c.id),
-      async () => {
-        let result: WriteResult<Versions>;
-        try {
-          result = await setCardWidths(changes.map((c) => ({ canvasItemId: c.id, expectedVersion: versions.current.get(c.id) ?? 1, width: c.to })));
-        } catch {
-          result = FAILED;
-        }
-        if (result.ok) {
-          for (const [id, v] of Object.entries(result.value.versions)) versions.current.set(id, v);
-          undo()?.noteSaved();
-          done();
-        } else {
-          for (const c of changes) patchCard(c.id, { width: c.from });
-          toast(result.message, "refusal");
-        }
-      },
-    );
-  }, [editable, selectedNodes, patchCard, enqueueGroup, setCardWidths, versions, undo, toast]);
+    saveLayout({ cards: changes.map((c) => ({ id: c.id, width: c.to })) }, { saved: done });
+  }, [editable, selectedNodes, saveLayout, toast]);
 
   const removeSelection = useCallback(() => {
     const nodes = selectedNodes();
@@ -297,7 +251,7 @@ export function useGroupActions(o: Options) {
       if (!entities.length) return;
       const here = new Set((rf.getNodes() as CardNodeT[]).filter((n) => n.data.card.kind === "src").map((n) => n.data.card.targetId));
       const taken = occupied();
-      const placed: (CardTarget & { x: number; y: number })[] = [];
+      const placed: (CardTarget & { x: number; y: number; height: number })[] = [];
       const boxes: Rect[] = [];
       for (const anchor of entities) {
         const wanted = sourcesOf(anchor.data.card.targetId).filter((s) => !here.has(s.sourceTableId));
@@ -309,7 +263,7 @@ export function useGroupActions(o: Options) {
           const box = { ...spots[i]!, w: CARD_W, h: heights[i]! };
           taken.push(box);
           boxes.push(box);
-          placed.push({ sourceTableId: w.sourceTableId, ...spots[i]! });
+          placed.push({ sourceTableId: w.sourceTableId, ...spots[i]!, height: heights[i]! });
         });
       }
       if (!placed.length) {

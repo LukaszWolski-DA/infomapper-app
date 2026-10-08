@@ -29,6 +29,7 @@ import {
 import { checkPermission, type WorkspaceAccess } from "../permissions";
 import { FRAME_KINDS, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type SourceSystem, type SourceTable } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
+import { GRID, widthSchema } from "./canvas-item";
 import { begin, current, done, isLive, nothingToChange } from "./shared";
 
 // ---- input pieces ----
@@ -38,6 +39,7 @@ const extent = z.number().finite().positive().max(1_000_000);
 const frameWidth = extent.min(FRAME_MIN_SIZE.width, `A frame is at least ${FRAME_MIN_SIZE.width} px wide.`);
 const frameHeight = extent.min(FRAME_MIN_SIZE.height, `A frame is at least ${FRAME_MIN_SIZE.height} px high.`);
 const cardHeight = extent;
+const isOnGrid = (v: number) => Number.isInteger(v) && v % GRID === 0;
 const colorSchema = z.enum(FREE_FRAME_COLORS, { message: "Choose one of the frame colours." });
 
 const MAX_CARDS = 500;
@@ -271,9 +273,10 @@ export interface UpdateFrameState {
 
 /**
  * Renames a frame, changes what it stands for (free area, concept, source system) or a free frame's colour. Changing
- * what it stands for never moves cards or changes the model; the misplaced marks follow from it. As in the prototype,
- * a frame still called “New frame” or after what it stood for takes the name of what it stands for now, unless a
- * name is given; a frame that becomes free keeps its colour, or takes the first free colour.
+ * what it stands for never moves cards or changes the model; the misplaced marks follow from it. A frame still called
+ * “New frame”, or after the concept or system it stood for, takes the name of what it stands for now, unless a name
+ * is given; a name the user typed is kept (Łukasz, step 1 answer 5). A frame that becomes free keeps its colour, or
+ * takes the first free colour.
  */
 export function updateFrame(
   ctx: CommandContext,
@@ -290,8 +293,8 @@ export function updateFrame(
   const ws = access.workspace.id;
   const concept = (id: Uuid | null) => state.concepts.find((c) => c.id === id && isLive(c, ws)) ?? null;
   const system = (id: Uuid | null) => state.sourceSystems.find((s) => s.id === id && isLive(s, ws)) ?? null;
-  const refName = (f: Pick<Frame, "kind" | "concept_id" | "source_system_id" | "name">) =>
-    f.kind === "concept" ? concept(f.concept_id)?.name : f.kind === "source_system" ? system(f.source_system_id)?.name : f.name;
+  const refName = (f: Pick<Frame, "kind" | "concept_id" | "source_system_id">) =>
+    f.kind === "concept" ? concept(f.concept_id)?.name : f.kind === "source_system" ? system(f.source_system_id)?.name : undefined;
 
   const kind = parsed.data.kind ?? before.kind;
   if ((kind !== "concept" && conceptId !== undefined) || (kind !== "source_system" && sourceSystemId !== undefined)) {
@@ -322,11 +325,18 @@ export function updateFrame(
   return done(ctx, access, { frame: row }, [{ kind: "update", table: "frame", before, row }]);
 }
 
-// ---- move (D-14), group moves, and drops (D-05) ----
+// ---- moving and sizing cards and frames: drags, drops, nudges, arranging, card widths (D-05, D-14) ----
 
 const movedFrame = z.object({ frameId: uuidSchema, expectedVersion: versionSchema, x: coordinate.optional(), y: coordinate.optional() }).strict();
 const movedCard = z
-  .object({ canvasItemId: uuidSchema, expectedVersion: versionSchema, x: coordinate.optional(), y: coordinate.optional(), height: cardHeight.optional() })
+  .object({
+    canvasItemId: uuidSchema,
+    expectedVersion: versionSchema,
+    x: coordinate.optional(),
+    y: coordinate.optional(),
+    width: widthSchema.optional(),
+    height: cardHeight.optional(),
+  })
   .strict();
 const bothOrNeither = (v: { x?: number; y?: number }) => (v.x === undefined) === (v.y === undefined);
 
@@ -335,14 +345,23 @@ const moveInput = z
     canvasId: uuidSchema,
     frames: listOf(movedFrame.refine(bothOrNeither, "A position needs x and y."), MAX_FRAMES, (f) => f.frameId, "A frame is listed twice."),
     items: listOf(movedCard.refine(bothOrNeither, "A position needs x and y."), MAX_CARDS, (c) => c.canvasItemId, "A card is listed twice."),
+    /** Align, stack and line up: every new position must lie on the 8 px grid (slice 2a). */
+    onGrid: z.boolean().optional(),
+    /** The answer to the drop's concept question (D-05): move the entities to the frame's concept in the model. */
+    moveToConcepts: z.boolean().optional(),
   })
-  .strict();
-const dropInput = moveInput.extend({ moveToConcepts: z.boolean().optional() }).strict();
-export type MoveFramesInput = z.input<typeof moveInput>;
-export type DropOnCanvasInput = z.input<typeof dropInput>;
+  .strict()
+  .refine(
+    (v) => !v.onGrid || [...v.frames, ...v.items].every((p) => p.x === undefined || (isOnGrid(p.x) && isOnGrid(p.y!))),
+    `Positions lie on the ${GRID} px grid.`,
+  );
+export type MoveOnCanvasInput = z.input<typeof moveInput>;
 
-/** Moves the frames that have a new position with every card in them, and the other cards that have one. */
-function applyMoves(draft: Draft, input: z.output<typeof moveInput>): Got<{ loose: CanvasItem[] }> | Failed {
+/**
+ * Moves the frames that have a new position with every card in them (they keep their frame), then gives the other
+ * named cards their new position or width. Returns those other cards: their membership is decided again.
+ */
+function applyMoves(draft: Draft, input: z.output<typeof moveInput>): Got<{ changed: CanvasItem[] }> | Failed {
   const carried = new Set<Uuid>();
   for (const f of input.frames) {
     const frame = draft.frames.get(f.frameId);
@@ -358,60 +377,39 @@ function applyMoves(draft: Draft, input: z.output<typeof moveInput>): Got<{ loos
       carried.add(card.id);
     }
   }
-  const loose: CanvasItem[] = [];
+  const changed: CanvasItem[] = [];
   for (const c of input.items) {
     const card = draft.items.get(c.canvasItemId);
     if (!card) return { ok: false, error: notFound("card") };
-    if (carried.has(card.id) || c.x === undefined || c.y === undefined) continue;
-    card.x = c.x;
-    card.y = c.y;
-    loose.push(card);
+    if (c.width !== undefined) card.width = c.width;
+    if (carried.has(card.id)) continue;
+    if (c.x !== undefined && c.y !== undefined) Object.assign(card, { x: c.x, y: c.y });
+    if (c.x !== undefined || c.width !== undefined) changed.push(card);
   }
-  return { ok: true, loose };
+  return { ok: true, changed };
 }
 
-/**
- * Moves frames with the cards in them (dragging a frame's name or an empty spot inside it, D-14; group nudges and
- * arranging) and other cards, in one change group. A card in a moved frame moves with it, whatever position it was
- * given. Membership does not change. Frames and cards that do not move are left out of the write.
- */
-export function moveFrames(
-  ctx: CommandContext,
-  access: WorkspaceAccess,
-  state: FrameCanvasState,
-  input: unknown,
-): CommandResult<FrameWriteResult & { moved: number }> {
-  const parsed = begin(access, "canvas.edit_items", moveInput, input);
-  if (!parsed.ok) return fail(parsed.error);
-  const opened = openDraft(access, state, parsed.data.canvasId);
-  if (!opened.ok) return fail(opened.error);
-  const moved = applyMoves(opened.draft, parsed.data);
-  if (!moved.ok) return fail(moved.error);
-  const committed = commit(ctx, opened.draft, seen(parsed.data.frames, parsed.data.items));
-  if (!committed.ok) return fail(committed.error);
-  if (!committed.writes.length) return fail(nothingToChange());
-  return done(ctx, access, { moved: committed.writes.length, versions: committed.versions }, committed.writes);
-}
-
-export interface DropState extends FrameCanvasState {
+export interface MoveState extends FrameCanvasState {
   entities: readonly Entity[];
   concepts: readonly Concept[];
 }
 
 /**
- * A drop: a card or a group dragged to a new place. Moved frames carry their cards; every other card with a new
- * position (it needs its height) then joins the smallest frame under the middle of its header, or none, and that
- * frame grows to hold it (D-05, D-23). Entities that joined a concept frame of another concept are the drop's
- * questions; with `moveToConcepts` they move to the frame's concept in the model, in the same change group, so one
- * undo puts back the drop and the concepts together.
+ * Every change of where cards and frames are or how wide cards are, in one change group (slice 2b answer 1): a card
+ * or group dragged and dropped, a frame dragged by its name or an empty spot inside it (D-14), arrow-key nudges,
+ * align, stack and line up, a card resized and “Fit width to names”. Moved frames carry their cards, which keep
+ * their frame. Every other card that got a new position or width (it needs its height) joins the smallest frame under
+ * the middle of its header, or none, and that frame grows to hold it (D-05, D-23). Entities that joined a concept
+ * frame of another concept are the questions; only a drag drop asks them, and with `moveToConcepts` the entities move
+ * to the frame's concept in the model, in the same change group, so one undo puts both back.
  */
-export function dropOnCanvas(
+export function moveOnCanvas(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: DropState,
+  state: MoveState,
   input: unknown,
 ): CommandResult<FrameWriteResult & { moved: number; questions: ConceptQuestion[]; movedToConcepts: number }> {
-  const parsed = begin(access, "canvas.edit_items", dropInput, input);
+  const parsed = begin(access, "canvas.edit_items", moveInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const opened = openDraft(access, state, parsed.data.canvasId);
   if (!opened.ok) return fail(opened.error);
@@ -421,12 +419,12 @@ export function dropOnCanvas(
 
   const heights = new Map(parsed.data.items.map((c) => [c.canvasItemId, c.height]));
   const boxes: CardBox[] = [];
-  for (const card of moved.loose) {
+  for (const card of moved.changed) {
     const h = heights.get(card.id);
-    if (h === undefined) return fail(domainError("invalid", "A dropped card needs its height."));
+    if (h === undefined) return fail(domainError("invalid", "A moved card needs its height."));
     boxes.push(boxOf(card, h));
   }
-  const frameBefore = new Map(moved.loose.map((c) => [c.id, c.frame_id]));
+  const frameBefore = new Map(moved.changed.map((c) => [c.id, c.frame_id]));
   const result = dropCards(liveFrames(draft).map(frameBox), boxes);
   for (const f of result.frames) Object.assign(draft.frames.get(f.id)!, { x: f.x, y: f.y, width: f.width, height: f.height });
   for (const m of result.membership) draft.items.get(m.cardId)!.frame_id = m.frameId;
@@ -435,7 +433,7 @@ export function dropOnCanvas(
   const entities = new Map(state.entities.filter((e) => isLive(e, ws)).map((e) => [e.id, e]));
   const questions = conceptQuestions(
     liveFrames(draft),
-    moved.loose.map((c) => ({
+    moved.changed.map((c) => ({
       cardId: c.id,
       entityId: c.entity_id,
       conceptId: c.entity_id ? (entities.get(c.entity_id)?.concept_id ?? null) : null,
@@ -468,27 +466,31 @@ export function dropOnCanvas(
   );
 }
 
-// ---- resize (D-06) ----
+// ---- resize (D-06) and fit to content ----
 
 const resizeInput = z
   .object({ frameId: uuidSchema, expectedVersion: versionSchema, width: frameWidth, height: frameHeight, cards: cardRefs })
   .strict();
 export type ResizeFrameInput = z.input<typeof resizeInput>;
 
+const fitInput = z.object({ frameId: uuidSchema, expectedVersion: versionSchema, cards: sizedCards }).strict();
+export type FitFrameInput = z.input<typeof fitInput>;
+
+type Reframed = CommandResult<FrameWriteResult & { joined: number; left: number }>;
+
 /**
- * Resizes a frame from its bottom-right corner (its top-left stays). Its cards whose header middle is now outside go
- * to the frame under them or to none; free cards whose header middle is now inside join. Cards of other frames are
- * never taken (D-06). `cards` are the canvas's cards at the versions the user read.
+ * Gives a frame a new rectangle, then decides membership again (D-06): its cards whose header middle is now outside
+ * go to the frame under them or to none; free cards whose header middle is now inside join. Cards of other frames
+ * are never taken. `cards` are the canvas's cards at the versions the user read.
  */
-export function resizeFrame(
+function reframe(
   ctx: CommandContext,
   access: WorkspaceAccess,
   state: FrameCanvasState,
-  input: unknown,
-): CommandResult<FrameWriteResult & { joined: number; left: number }> {
-  const parsed = begin(access, "canvas.edit_items", resizeInput, input);
-  if (!parsed.ok) return fail(parsed.error);
-  const { frameId, expectedVersion, width, height, cards } = parsed.data;
+  ref: { frameId: Uuid; expectedVersion: number; cards: readonly { canvasItemId: Uuid; expectedVersion: number }[] },
+  rectOf: (frame: Frame, draft: Draft) => Rect | DomainError,
+): Reframed {
+  const { frameId, expectedVersion, cards } = ref;
   const frameRow = state.frames.find((f) => f.id === frameId) ?? null;
   const got = current(frameRow, access, frameId, expectedVersion, "frame");
   if (!got.ok) return fail(got.error);
@@ -496,7 +498,9 @@ export function resizeFrame(
   if (!opened.ok) return fail(opened.error);
   const { draft } = opened;
   const frame = draft.frames.get(frameId)!;
-  Object.assign(frame, { width, height });
+  const rect = rectOf(frame, draft);
+  if ("code" in rect) return fail(rect);
+  Object.assign(frame, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
 
   const changes = membershipAfterResize(frameBox(frame), liveFrames(draft).map(frameBox), [...draft.items.values()].map((i) => boxOf(i, 0)));
   for (const c of changes) draft.items.get(c.cardId)!.frame_id = c.frameId;
@@ -506,6 +510,31 @@ export function resizeFrame(
   if (!committed.writes.length) return fail(nothingToChange());
   const joined = changes.filter((c) => c.frameId === frameId).length;
   return done(ctx, access, { joined, left: changes.length - joined, versions: committed.versions }, committed.writes);
+}
+
+/** Resizes a frame from its bottom-right corner (its top-left stays), at least 160 × 96 px; then membership (D-06). */
+export function resizeFrame(ctx: CommandContext, access: WorkspaceAccess, state: FrameCanvasState, input: unknown): Reframed {
+  const parsed = begin(access, "canvas.edit_items", resizeInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { width, height } = parsed.data;
+  return reframe(ctx, access, state, parsed.data, (f) => ({ x: f.x, y: f.y, width, height }));
+}
+
+/**
+ * “Fit frame to its content”: the frame drawn around its cards (32 px at the sides, 40 above, 32 below), at least
+ * 160 × 96 px; then membership as after a resize. `cards` are the canvas's cards with their heights.
+ */
+export function fitFrameToContent(ctx: CommandContext, access: WorkspaceAccess, state: FrameCanvasState, input: unknown): Reframed {
+  const parsed = begin(access, "canvas.edit_items", fitInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const heights = new Map(parsed.data.cards.map((c) => [c.canvasItemId, c.height]));
+  return reframe(ctx, access, state, parsed.data, (f, draft) => {
+    const members = [...draft.items.values()].filter((i) => i.frame_id === f.id);
+    if (!members.length) return domainError("invalid", "This frame is empty. Drag cards into it first.");
+    if (members.some((m) => !heights.has(m.id))) return staleVersion();
+    const r = frameAround(members.map((m) => boxOf(m, heights.get(m.id)!)));
+    return { ...r, width: Math.max(r.width, FRAME_MIN_SIZE.width), height: Math.max(r.height, FRAME_MIN_SIZE.height) };
+  });
 }
 
 // ---- delete ----
@@ -544,14 +573,21 @@ export function deleteFrame(
 // ---- put cards in a new frame (group toolbox, selection panel, card panel) ----
 
 const putInput = z
-  .object({ canvasId: uuidSchema, cards: sizedCards.refine((l) => l.length > 0, "Select at least one card.") })
+  .object({
+    canvasId: uuidSchema,
+    cards: sizedCards.refine((l) => l.length > 0, "Select at least one card."),
+    /** From a card (“Put in a new concept frame”): the new frame also takes these free cards when fully inside (D-06). */
+    others: sizedCards.optional(),
+  })
   .strict();
 export type PutInNewFrameInput = z.input<typeof putInput>;
 
 /**
  * Draws a frame around the named cards (32 px at the sides, 40 above, 32 below) and puts them in it, also from other
  * frames: a concept frame named after the concept when all are entities of one concept, a source frame named after
- * the system when all are tables of one system, else a free frame “New frame”.
+ * the system when all are tables of one system, else a free frame “New frame”. From a selection it takes only the
+ * selection; from one card's panel or toolbox (`others` given) it also takes the free cards fully inside it, as a
+ * drawn frame does (D-06, Łukasz, step 1 answer 4).
  */
 export function putCardsInNewFrame(
   ctx: CommandContext,
@@ -587,8 +623,13 @@ export function putCardsInNewFrame(
   });
   draft.added.push(frame);
   for (const card of named.cards) card.frame_id = frame.id;
+  const others = (parsed.data.others ?? []).flatMap((c) => {
+    const item = draft.items.get(c.canvasItemId);
+    return item && item.frame_id !== frame.id ? [boxOf(item, c.height)] : [];
+  });
+  for (const c of cardsFullyInside(frame, others)) draft.items.get(c.id)!.frame_id = frame.id;
 
-  const committed = commit(ctx, draft, seen([], cards));
+  const committed = commit(ctx, draft, seen([], [...cards, ...(parsed.data.others ?? [])]));
   if (!committed.ok) return fail(committed.error);
   return done(ctx, access, { frameId: frame.id, kind, cards: named.cards.length, versions: committed.versions }, committed.writes);
 }

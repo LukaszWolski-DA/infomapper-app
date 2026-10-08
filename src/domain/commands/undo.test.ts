@@ -24,7 +24,8 @@ import type { WorkspaceAccess } from "../permissions";
 import type { Canvas, CanvasItem, ChangeEvent, WorkspaceRole } from "../types";
 import { createAttributeFromColumn, deleteAttribute, reorderAttribute } from "./attribute";
 import { deleteCanvas, duplicateCanvas, renameCanvas, setCanvasLook } from "./canvas";
-import { removeFromCanvas, updateCanvasItem } from "./canvas-item";
+import { removeFromCanvas } from "./canvas-item";
+import { moveOnCanvas } from "./frame";
 import { updateEntity } from "./entity";
 import { deleteMapping, mergeMappings, setMappingStatus } from "./mapping";
 import { createRelationship, deleteRelationship } from "./relationship";
@@ -445,7 +446,8 @@ describe("“changed afterwards” compares content, not version (slice 2a fix o
     let rows = seed();
     const move = (x: number, y: number) => {
       const item = find(rows, "canvas_item", ids.itemCustomer) as unknown as CanvasItem;
-      return ok(updateCanvasItem(makeCtx(), modeler, { item }, { canvasItemId: ids.itemCustomer, expectedVersion: item.version, x, y }));
+      const state = { canvas: find(rows, "canvas", ids.canvas1) as never, frames: [], items: [item], entities: rows.entity, concepts: rows.concept };
+      return ok(moveOnCanvas(makeCtx(), modeler, state, { canvasId: ids.canvas1, frames: [], items: [{ canvasItemId: ids.itemCustomer, expectedVersion: item.version, x, y, height: 200 }] }));
     };
     const start = find(rows, "canvas_item", ids.itemCustomer);
     const m1 = move(480, 200);

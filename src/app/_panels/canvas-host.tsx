@@ -10,6 +10,8 @@
 // - Ctrl/Alt + arrows on a selected attribute (D-36).
 // - Delete on a selected mapping or relationship line: deleted at once, with Undo in the toast (slice 1b).
 // - “Show its sources” and “Show the entities it feeds” place them beside the card (B-08).
+// - Frames (slice 2b): “New frame here” on the empty canvas; a frame's toolbox (Rename…, Fit frame to its content,
+//   Select its cards, Zoom to frame, Delete frame); a new frame's name is ready to type in the panel.
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
@@ -152,9 +154,10 @@ export function useCanvasHost({
         if (editable) void moveAttribute(attributeId, how);
       },
       deleteLine: (line) => void deleteLine(line),
+      frameCreated: (frameId) => panels.setNameFocus(frameId),
     });
     return () => ui.registerHost(null);
-  }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable, deleteLine]);
+  }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable, deleteLine, panels]);
 
   // ---- the toolbox ----
 
@@ -251,6 +254,7 @@ export function useCanvasHost({
       if (editable) {
         items.push({ search });
         items.push({ label: "New entity here", kbd: "E", act: () => void createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }) });
+        items.push({ label: "New frame here", kbd: "A", act: () => ui.createFrameAt(req.at) });
       }
       // every role: these only change what is selected or how the view moves (slice 2a)
       items.push({ label: "Select all", kbd: "Ctrl A", act: () => ui.selectAll() });
@@ -340,6 +344,21 @@ export function useCanvasHost({
       }
       items.push({ sep: true });
       items.push({ label: "Clear selection", kbd: "Esc", act: () => ui.select(null) });
+      return items;
+    }
+    if (t.kind === "frame") {
+      // a frame (slice 2b, prototype ctxFor “a frame”, D-19): reviewers and readers may select, zoom and select its cards
+      const view = ui.frameView(t.frameId);
+      if (!view) return items;
+      items.push({ head: view.frame.name });
+      if (editable) items.push({ label: "Rename…", act: () => focusField("f-fn"), testId: "toolbox-frame-rename" });
+      if (editable) items.push({ label: "Fit frame to its content", act: () => ui.fitFrame(t.frameId), testId: "toolbox-frame-fit" });
+      items.push({ label: "Select its cards", disabled: !view.cardIds.length, act: () => ui.selectFrameCards(t.frameId), testId: "toolbox-frame-select-cards" });
+      items.push({ label: "Zoom to frame", act: () => ui.zoomToFrame(t.frameId), testId: "toolbox-frame-zoom" });
+      if (editable) {
+        items.push({ sep: true });
+        items.push({ label: "Delete frame (keeps its cards)", kbd: "Del", danger: true, act: () => ui.deleteFrame(t.frameId), testId: "toolbox-frame-delete" });
+      }
       return items;
     }
     const card = cardById.get(t.cardId);

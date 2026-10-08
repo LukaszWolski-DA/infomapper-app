@@ -196,3 +196,28 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .selection-layer .lasso { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1; vector-effect: non-scaling-stroke }
 .im-canvas .selbox-label { position: absolute; transform-origin: 0 0; pointer-events: none; white-space: nowrap; background: var(--im-logical);
   color: var(--im-surface); font-size: 11.5px; font-weight: 500; padding: 2px 9px; border-radius: 10px }
+
+/* Frames (slice 2b; prototype .frame, .f-lab, .f-rs, #mkf). Under the lines and cards: z-index −1 in the viewport. No
+   `opacity` on them (AD-24): fills and borders are colours mixed in CSS. --iz (1 / zoom) keeps the label's size. */
+.im-canvas .frame-layer { position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none }
+.im-canvas .im-frame { position: absolute; border-radius: 16px; pointer-events: all; cursor: move; box-sizing: border-box;
+  border: 1.5px solid color-mix(in srgb, var(--fc) 50%, transparent); background: color-mix(in srgb, var(--fc) 7%, transparent) }
+.im-canvas .im-frame.free { border-style: dashed }
+.im-canvas .im-frame.sel { border-color: var(--fc); box-shadow: 0 0 0 1px var(--fc) }
+.im-canvas .f-lab { position: absolute; left: 4px; bottom: 100%; display: flex; align-items: center; gap: 6px; padding-bottom: 7px; white-space: nowrap;
+  pointer-events: all; cursor: move; transform: scale(var(--iz, 1)); transform-origin: 0 100%; font-size: 13px; user-select: none;
+  max-width: calc(var(--fw) * 1px / var(--iz, 1) - 8px); overflow: hidden }
+.im-canvas .f-lab > * { flex: none }
+.im-canvas .f-lab .f-name { flex: 0 0 auto; max-width: calc(100% - 16px); overflow: hidden; text-overflow: ellipsis; font-weight: 600; color: var(--im-ink) }
+.im-canvas .f-dot { width: 10px; height: 10px; border-radius: 3px; background: var(--fc) }
+.im-canvas .im-frame.free .f-dot { border-radius: 50% }
+.im-canvas .f-chip { font-size: 11px; white-space: nowrap; color: var(--im-ink-2); background: var(--im-surface); border-radius: 10px; padding: 1px 8px;
+  box-shadow: 0 0 0 1px var(--im-line) }
+.im-canvas .f-chip.w { color: var(--im-warn) }
+.im-canvas .f-chip.m { color: var(--im-physical) }
+.im-canvas .f-rs { position: absolute; right: -7px; bottom: -7px; width: 14px; height: 14px; border-radius: 4px; pointer-events: all; cursor: nwse-resize;
+  background: var(--im-surface); box-shadow: 0 0 0 1.5px color-mix(in srgb, var(--fc) 35%, var(--im-surface)); transform: scale(var(--iz, 1)); transform-origin: 50% 50% }
+.im-canvas .f-rs:hover, .im-canvas .im-frame.sel .f-rs { box-shadow: 0 0 0 1.5px var(--fc) }
+.im-canvas .frame-draw { position: absolute; border: 1.5px dashed var(--im-logical); background: color-mix(in srgb, var(--im-logical) 6%, transparent);
+  border-radius: 16px; pointer-events: none }
+.im-canvas.tool-frame .react-flow__pane, .im-canvas.tool-frame .im-frame, .im-canvas.tool-frame .f-lab { cursor: crosshair }

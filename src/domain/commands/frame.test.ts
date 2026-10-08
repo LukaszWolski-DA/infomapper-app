@@ -20,8 +20,8 @@ import {
   arrangeCanvasIntoFrames,
   createFrame,
   deleteFrame,
-  dropOnCanvas,
-  moveFrames,
+  fitFrameToContent,
+  moveOnCanvas,
   putCardsInNewFrame,
   resizeFrame,
   updateFrame,
@@ -115,9 +115,9 @@ describe("updateFrame", () => {
     expect(ok(update({ kind: "concept", conceptId: conceptSales })).value.frame).toMatchObject({ kind: "concept", concept_id: conceptSales, source_system_id: null, name: "Sales" });
   });
 
-  it("follows what it stands for, as the prototype does, unless the name was changed or one is given", () => {
-    // a free frame's own name is what it stood for (prototype refName), so it always takes the concept's name
-    expect(ok(update({ kind: "concept", conceptId: conceptSales }, frame(frameA, { name: "Orders" }))).value.frame.name).toBe("Sales");
+  it("takes the new name only from “New frame” or the previous concept's or system's name; a typed name is kept", () => {
+    expect(ok(update({ kind: "concept", conceptId: conceptSales }, frame(frameA, { name: "Orders" }))).value.frame.name).toBe("Orders");
+    expect(ok(update({ kind: "source_system", sourceSystemId: crm }, frame(frameA, { name: "Area" }))).value.frame.name).toBe("Area");
     const renamed = frame(frameA, { kind: "concept", concept_id: conceptCustomer, name: "Our customers", color: null });
     expect(ok(update({ conceptId: conceptSales }, renamed)).value.frame.name).toBe("Our customers");
     const customerFrame = frame(frameA, { kind: "concept", concept_id: conceptCustomer, name: "Customer", color: null });
@@ -157,12 +157,13 @@ describe("updateFrame", () => {
   });
 });
 
-describe("moveFrames (D-14)", () => {
+describe("moveOnCanvas: frames (D-14)", () => {
   const fA = frame(frameA);
   const inA = customerCard({ frame_id: frameA });
   const items = [inA, tableCard()];
   const state = { canvas: canvas(), frames: [fA], items };
-  const move = (input: object) => moveFrames(makeCtx(), access("modeler"), state, { canvasId: canvas1, frames: [], items: [], ...input });
+  const move = (input: object) =>
+    moveOnCanvas(makeCtx(), access("modeler"), { ...state, entities: model.entities, concepts: model.concepts }, { canvasId: canvas1, frames: [], items: [], ...input });
 
   it("moves a frame with every card in it, in one change group", () => {
     const r = ok(move({ frames: [{ ...fref(fA), x: 100, y: 48 }], items: [ref(inA)] }));
@@ -179,7 +180,7 @@ describe("moveFrames (D-14)", () => {
   });
 
   it("moves frames and loose cards together (group drag, nudge)", () => {
-    const r = ok(move({ frames: [{ ...fref(fA), x: 8, y: 8 }], items: [ref(inA), { ...ref(tableCard()), x: 1208, y: 128 }] }));
+    const r = ok(move({ frames: [{ ...fref(fA), x: 8, y: 8 }], items: [ref(inA), { ...sized(tableCard()), x: 1208, y: 128 }] }));
     expect(r.value.moved).toBe(3);
   });
 
@@ -196,12 +197,12 @@ describe("moveFrames (D-14)", () => {
   });
 });
 
-describe("dropOnCanvas (D-05)", () => {
+describe("moveOnCanvas: drops (D-05)", () => {
   const salesFrame = frame(frameA, { kind: "concept", concept_id: conceptSales, name: "Sales", color: null, x: 0, y: 0, width: 800, height: 400 });
   const items = [customerCard({ x: 2000, y: 0 }), tableCard()];
   const state = { canvas: canvas(), frames: [salesFrame], items, entities: model.entities, concepts: model.concepts };
   const drop = (input: object, role: "modeler" | "reviewer" = "modeler") =>
-    dropOnCanvas(makeCtx(), access(role), state, { canvasId: canvas1, frames: [fref(salesFrame)], items: [], ...input });
+    moveOnCanvas(makeCtx(), access(role), state, { canvasId: canvas1, frames: [fref(salesFrame)], items: [], ...input });
 
   it("puts a dropped card in the frame under its header and grows the frame to hold it", () => {
     const r = ok(drop({ items: [{ ...sized(items[0]!, 300), x: 400, y: 200 }] }));
@@ -223,13 +224,13 @@ describe("dropOnCanvas (D-05)", () => {
 
   it("does not ask again about an entity that stays in its frame", () => {
     const inSales = { ...state, items: [customerCard({ x: 100, y: 100, frame_id: frameA })] };
-    const r = ok(dropOnCanvas(makeCtx(), access("modeler"), inSales, { canvasId: canvas1, frames: [fref(salesFrame)], items: [{ ...sized(inSales.items[0]!), x: 108, y: 100 }] }));
+    const r = ok(moveOnCanvas(makeCtx(), access("modeler"), inSales, { canvasId: canvas1, frames: [fref(salesFrame)], items: [{ ...sized(inSales.items[0]!), x: 108, y: 100 }] }));
     expect(r.value.questions).toEqual([]);
   });
 
   it("takes a card out of its frame when it is dropped outside every frame", () => {
     const inSales = { ...state, items: [customerCard({ x: 100, y: 100, frame_id: frameA })] };
-    const r = ok(dropOnCanvas(makeCtx(), access("modeler"), inSales, { canvasId: canvas1, frames: [fref(salesFrame)], items: [{ ...sized(inSales.items[0]!), x: 3000, y: 100 }] }));
+    const r = ok(moveOnCanvas(makeCtx(), access("modeler"), inSales, { canvasId: canvas1, frames: [fref(salesFrame)], items: [{ ...sized(inSales.items[0]!), x: 3000, y: 100 }] }));
     expect(written(r.writeSet)[`canvas_item:${itemCustomer}`]).toMatchObject({ x: 3000, frame_id: null });
     expect(written(r.writeSet)[`frame:${frameA}`]).toBeUndefined();
   });
@@ -237,7 +238,7 @@ describe("dropOnCanvas (D-05)", () => {
   it("moves a dropped frame with its cards and recomputes only the loose cards", () => {
     const inSales = { ...state, items: [customerCard({ x: 100, y: 100, frame_id: frameA }), tableCard({ x: 2000, y: 0 })] };
     const r = ok(
-      dropOnCanvas(makeCtx(), access("modeler"), inSales, {
+      moveOnCanvas(makeCtx(), access("modeler"), inSales, {
         canvasId: canvas1,
         frames: [{ ...fref(salesFrame), x: 2000, y: 0 }],
         items: [ref(inSales.items[0]!), { ...sized(inSales.items[1]!), x: 2008, y: 0 }],
@@ -250,12 +251,69 @@ describe("dropOnCanvas (D-05)", () => {
   });
 
   it("needs the height of a dropped card, and the frame it grows at the version the user saw", () => {
-    expect(drop({ items: [{ ...ref(items[0]!), x: 100, y: 100 }] })).toMatchObject({ ok: false, error: { message: "A dropped card needs its height." } });
+    expect(drop({ items: [{ ...ref(items[0]!), x: 100, y: 100 }] })).toMatchObject({ ok: false, error: { message: "A moved card needs its height." } });
     expect(drop({ frames: [], items: [{ ...sized(items[0]!), x: 100, y: 300 }] })).toMatchObject(refusedAsStale); // the frame grows
   });
 
   it("is refused to reviewers", () => {
     expect(drop({ items: [{ ...sized(items[0]!), x: 100, y: 100 }] }, "reviewer")).toMatchObject({ ok: false, error: { code: "forbidden" } });
+  });
+});
+
+describe("moveOnCanvas: card widths, nudges and arranging (slice 2b answer 1)", () => {
+  const fA = frame(frameA, { width: 400, height: 400 });
+  const card = customerCard({ x: 100, y: 100 });
+  const state = { canvas: canvas(), frames: [fA], items: [card], entities: model.entities, concepts: model.concepts };
+  const move = (input: object) => moveOnCanvas(makeCtx(), access("modeler"), state, { canvasId: canvas1, frames: [fref(fA)], items: [], ...input });
+
+  it("a card made wider joins the frame under its header again and the frame grows to hold it", () => {
+    const r = ok(move({ items: [{ ...sized(card), width: 400 }] }));
+    const rows = written(r.writeSet);
+    expect(rows[`canvas_item:${itemCustomer}`]).toMatchObject({ width: 400, frame_id: frameA, x: 100 });
+    expect(rows[`frame:${frameA}`]).toMatchObject({ width: 100 + 400 + 24 });
+  });
+
+  it("checks widths: 200–600 px in steps of 8, null for the default", () => {
+    for (const width of [192, 608, 301]) expect(move({ items: [{ ...sized(card), width }] })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    expect(ok(move({ items: [{ ...sized(customerCard({ x: 100, y: 100, width: 320 })), width: null }] })).writeSet.writes).toBeDefined();
+  });
+
+  it("asks for the 8 px grid only when arranging", () => {
+    expect(move({ items: [{ ...sized(card), x: 103, y: 100 }], onGrid: true })).toMatchObject({ ok: false, error: { message: "Positions lie on the 8 px grid." } });
+    expect(move({ items: [{ ...sized(card), x: 103, y: 100 }] }).ok).toBe(true);
+  });
+
+  it("returns the questions without moving an entity unless told, so nudges and arranging only mark it", () => {
+    const sales = frame(frameA, { kind: "concept", concept_id: conceptSales, name: "Sales", color: null, width: 400, height: 400 });
+    const r = ok(moveOnCanvas(makeCtx(), access("modeler"), { ...state, frames: [sales], items: [customerCard({ x: 2000, y: 0 })] }, {
+      canvasId: canvas1,
+      frames: [fref(sales)],
+      items: [{ ...sized(customerCard()), x: 8, y: 8 }],
+    }));
+    expect(r.value.questions).toHaveLength(1);
+    expect(r.writeSet.writes.some((w) => w.table === "entity")).toBe(false);
+  });
+});
+
+describe("fitFrameToContent", () => {
+  const fA = frame(frameA, { x: 0, y: 0, width: 2000, height: 2000 });
+  const member = customerCard({ x: 400, y: 120, frame_id: frameA });
+  const free = tableCard({ x: 1200, y: 40 });
+  const state = { canvas: canvas(), frames: [fA], items: [member, free] };
+  const fit = (input: object = {}) => fitFrameToContent(makeCtx(), access("modeler"), state, { frameId: frameA, expectedVersion: 1, cards: [sized(member, 300), sized(free)], ...input });
+
+  it("draws the frame around its cards: 32 px at the sides, 40 above, 32 below; then decides membership as a resize does", () => {
+    const r = ok(fit());
+    expect(written(r.writeSet)[`frame:${frameA}`]).toMatchObject({ x: 368, y: 80, width: 256 + 64, height: 300 + 72 });
+    expect(written(r.writeSet)[`canvas_item:${itemCrmCustomer}`]).toBeUndefined();
+  });
+
+  it("refuses an empty frame and a member it was not given", () => {
+    expect(fitFrameToContent(makeCtx(), access("modeler"), { ...state, items: [free] }, { frameId: frameA, expectedVersion: 1, cards: [] })).toMatchObject({
+      ok: false,
+      error: { message: "This frame is empty. Drag cards into it first." },
+    });
+    expect(fit({ cards: [sized(free)] })).toMatchObject(refusedAsStale);
   });
 });
 
@@ -328,6 +386,15 @@ describe("putCardsInNewFrame", () => {
     expect(ok(put([items[2]!])).writeSet.writes[0]).toMatchObject({ table: "frame", row: { kind: "source_system", source_system_id: crm, name: "CRM", color: null } });
     expect(ok(put([items[0]!, items[3]!])).writeSet.writes[0]).toMatchObject({ table: "frame", row: { kind: "free", name: "New frame", color: "#7C8998" } });
     expect(ok(put([items[0]!, items[2]!])).value.kind).toBe("free");
+  });
+
+  it("from a card it also takes free cards fully inside the new frame (answer 4); from a selection it does not", () => {
+    const inside = canvasItem(itemOrder, { entity_id: salesOrder, x: 400, y: 200 });
+    const s2 = { ...state, items: [customerCard({ x: 400, y: 120 }), inside] };
+    const fromCard = ok(putCardsInNewFrame(makeCtx(), access("modeler"), s2, { canvasId: canvas1, cards: [sized(s2.items[0]!, 600)], others: [sized(inside, 100)] }));
+    expect(written(fromCard.writeSet)[`canvas_item:${itemOrder}`]).toMatchObject({ frame_id: fromCard.value.frameId });
+    const fromSelection = ok(putCardsInNewFrame(makeCtx(), access("modeler"), s2, { canvasId: canvas1, cards: [sized(s2.items[0]!, 600)] }));
+    expect(written(fromSelection.writeSet)[`canvas_item:${itemOrder}`]).toBeUndefined();
   });
 
   it("needs at least one card on the canvas", () => {
@@ -442,7 +509,7 @@ describe("undo of frame steps", () => {
     const card = customerCard({ x: 2000, y: 0 });
     const before = rowsOf([card], [sales]);
     const dropped = ok(
-      dropOnCanvas(makeCtx(), access("modeler"), { canvas: canvas(), frames: [sales], items: [card], entities: model.entities, concepts: model.concepts }, {
+      moveOnCanvas(makeCtx(), access("modeler"), { canvas: canvas(), frames: [sales], items: [card], entities: model.entities, concepts: model.concepts }, {
         canvasId: canvas1,
         frames: [fref(sales)],
         items: [{ ...sized(card), x: 100, y: 100 }],
@@ -461,7 +528,7 @@ describe("undo of frame steps", () => {
     const newFrame = withFrame.frame[0]!;
     const table = withFrame.canvas_item[1]!;
     const dropped = ok(
-      dropOnCanvas(makeCtx(), access("modeler"), { canvas: canvas(), frames: [newFrame], items: withFrame.canvas_item, entities: model.entities, concepts: model.concepts }, {
+      moveOnCanvas(makeCtx(), access("modeler"), { canvas: canvas(), frames: [newFrame], items: withFrame.canvas_item, entities: model.entities, concepts: model.concepts }, {
         canvasId: canvas1,
         frames: [fref(newFrame)],
         items: [{ ...sized(table), x: 100, y: 100 }],

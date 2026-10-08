@@ -36,9 +36,10 @@ export function useLasso(onDone: (lasso: Rect, add: boolean) => void) {
     done.current = onDone;
   }, [onDone]);
 
+  /** A press that may start a lasso: on the empty canvas, or anywhere when `force` (Shift inside a frame, slice 2b). */
   const onPointerDown = useCallback(
-    (e: ReactPointerEvent) => {
-      if (e.button !== 0 || !onEmptyCanvas(e.target)) return;
+    (e: ReactPointerEvent, force = false) => {
+      if (e.button !== 0 || (!force && !onEmptyCanvas(e.target))) return;
       press.current = { sx: e.clientX, sy: e.clientY, start: rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }), add: e.shiftKey, moved: false };
     },
     [rf],

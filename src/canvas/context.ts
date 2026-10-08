@@ -3,6 +3,7 @@
 import { createContext } from "react";
 import type { Uuid } from "@/domain/ids";
 import type { ArrangeMode } from "./arrange";
+import type { FrameData } from "./frame-data";
 import type { Selection } from "./line-data";
 
 /** What the card nodes may do and see; kept in a context so node data stays plain and memo-friendly. */
@@ -91,6 +92,27 @@ export interface CanvasHandle {
    * in one change. `sourcesOf` gives an entity's feeding source tables and their row counts (the page knows the model).
    */
   placeSourcesOfSelection: (sourcesOf: (entityId: Uuid) => { sourceTableId: Uuid; rows: number }[]) => void;
+  /** “New frame here” (slice 2b): a 480 × 320 frame centred on a canvas point. */
+  createFrameAt: (at: { x: number; y: number }) => void;
+  /** A frame as the canvas shows it now, with its cards (they change without a fresh page). */
+  frameView: (frameId: Uuid) => { frame: FrameData; cardIds: Uuid[] } | null;
+  /** Renames a frame or changes what it stands for (the frame panel); resolves whether it was saved. */
+  updateFrame: (frameId: Uuid, patch: FramePatch) => Promise<boolean>;
+  /** Deletes a frame; its cards stay. The toast offers Undo. */
+  deleteFrame: (frameId: Uuid) => void;
+  fitFrame: (frameId: Uuid) => void;
+  zoomToFrame: (frameId: Uuid) => void;
+  /** Selects the frame's cards (toolbox “Select its cards”). */
+  selectFrameCards: (frameId: Uuid) => void;
+}
+
+/** What the frame panel may change (slice 2b, item 9). */
+export interface FramePatch {
+  name?: string;
+  kind?: "concept" | "source_system" | "free";
+  conceptId?: Uuid;
+  sourceSystemId?: Uuid;
+  color?: string;
 }
 
 export type RowFilter = "all" | "mapped" | "unmapped" | "keys";
@@ -113,7 +135,9 @@ export type ToolboxTarget =
   | { kind: "selection" }
   | { kind: "row"; cardId: Uuid; rowId: Uuid }
   | { kind: "map"; mappingId: Uuid }
-  | { kind: "rel"; relationshipId: Uuid };
+  | { kind: "rel"; relationshipId: Uuid }
+  /** A frame's name, handle or an empty spot inside it (slice 2b). */
+  | { kind: "frame"; frameId: Uuid };
 
 export interface ToolboxRequest {
   target: ToolboxTarget;
@@ -127,7 +151,7 @@ export interface ToolboxRequest {
  * A canvas tool that changes what a click does: the Entity tool (D-46), drawing a relationship from a card, or the
  * Hand tool (D-18, slice 2a), with which a left drag anywhere pans. One at a time; Esc ends it.
  */
-export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | { kind: "hand" } | null;
+export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | { kind: "hand" } | { kind: "frame" } | null;
 
 /**
  * What the canvas asks of the page around it. The canvas knows gestures and positions; the page knows the model and
@@ -144,6 +168,8 @@ export interface CanvasHost {
   moveAttribute: (attributeId: Uuid, how: AttributeMove) => void;
   /** Delete or Backspace with a mapping or relationship line selected: deleted at once, with Undo in the toast. */
   deleteLine: (line: { t: "map" | "rel"; id: Uuid }) => void;
+  /** A frame was just made (slice 2b): its name is ready to type in the right panel. */
+  frameCreated: (frameId: Uuid) => void;
 }
 
 /** The page's undo (slice 1b), for the canvas's own toasts and for card changes saved without a fresh page. */
@@ -202,6 +228,13 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   fitSelectionWidths: noop,
   removeSelection: noop,
   placeSourcesOfSelection: noop,
+  createFrameAt: noop,
+  frameView: () => null,
+  updateFrame: () => Promise.resolve(false),
+  deleteFrame: noop,
+  fitFrame: noop,
+  zoomToFrame: noop,
+  selectFrameCards: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,

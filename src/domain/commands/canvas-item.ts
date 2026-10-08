@@ -1,13 +1,16 @@
-// Cards on a canvas (AD-16): place from the left panel, move, collapse, row filter, width (slice 1b, D-37), remove
-// from this canvas; and the same for several selected cards at once, each as one change group (slice 2a).
-// Layout belongs to the canvas, not the model (D-04): removing a card leaves the entity and its mappings alone (D-02).
+// Cards on a canvas (AD-16): place from the left panel, collapse, row filter, remove from this canvas; several cards
+// placed or removed at once, each as one change group (slices 1b, 2a). Layout belongs to the canvas, not the model
+// (D-04): removing a card leaves the entity and its mappings alone (D-02). Where cards are and how wide they are is
+// changed by `moveOnCanvas` in `frame.ts`, which also decides their frames (slice 2b); a placed card joins the frame
+// it lands in by the same rule (D-05).
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound, staleVersion, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
+import { cardWidthOf, dropCards } from "../model/frames";
 import type { WorkspaceAccess } from "../permissions";
-import type { Canvas, CanvasItem, Entity, SourceTable } from "../types";
+import type { Canvas, CanvasItem, Entity, Frame, SourceTable } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, isLive, nothingToChange, softDelete } from "./shared";
 
@@ -24,6 +27,9 @@ export const widthSchema = z
   .max(CARD_WIDTH.max, `A card is at most ${CARD_WIDTH.max} px wide.`)
   .refine((w) => w % CARD_WIDTH.step === 0, `A card's width is a multiple of ${CARD_WIDTH.step} px.`)
   .nullable();
+
+/** The step of the canvas grid: arranged positions lie on it (D-37). */
+export const GRID = 8;
 
 /** Row filters offered in slice 1a (`labeled` comes with labels). */
 export const CARD_ROW_FILTERS = ["all", "mapped", "unmapped", "keys"] as const;
@@ -53,10 +59,57 @@ export function newCanvasItem(
   };
 }
 
+// ---- a placed card joins the frame it lands in (D-05) ----
+
+const height = z.number().finite().positive().max(1_000_000);
+const frameRefs = z
+  .array(z.object({ frameId: uuidSchema, expectedVersion: versionSchema }).strict())
+  .max(200)
+  .optional();
+
+/**
+ * Puts new cards that came with their height in the frame under the middle of their header, growing that frame to
+ * hold them, as a drop does. A frame that grows must be named at the version the user read. Returns the frame writes.
+ */
+function joinFrames(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  canvasId: Uuid,
+  frames: readonly Frame[],
+  seenFrames: readonly { frameId: Uuid; expectedVersion: number }[] | undefined,
+  placed: readonly { item: CanvasItem; height: number | undefined }[],
+): { ok: true; writes: Write[] } | { ok: false; error: DomainError } {
+  const live = frames.filter((f) => isLive(f, access.workspace.id) && f.canvas_id === canvasId);
+  const sized = placed.filter((p) => p.height !== undefined);
+  if (!live.length || !sized.length) return { ok: true, writes: [] };
+  const result = dropCards(
+    live.map((f) => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height })),
+    sized.map(({ item, height: h }) => ({ id: item.id, x: item.x, y: item.y, width: cardWidthOf(item), height: h!, frameId: null })),
+  );
+  for (const m of result.membership) sized.find((p) => p.item.id === m.cardId)!.item.frame_id = m.frameId;
+  const versions = new Map((seenFrames ?? []).map((f) => [f.frameId, f.expectedVersion]));
+  const writes: Write[] = [];
+  for (const after of result.frames) {
+    const before = live.find((f) => f.id === after.id)!;
+    if (before.x === after.x && before.y === after.y && before.width === after.width && before.height === after.height) continue;
+    if (versions.get(before.id) !== before.version) return { ok: false, error: staleVersion() };
+    writes.push({ kind: "update", table: "frame", before, row: nextVersion(ctx, before, { x: after.x, y: after.y, width: after.width, height: after.height }) });
+  }
+  return { ok: true, writes };
+}
+
 // ---- place ----
 
 const placeInput = z
-  .object({ canvasId: uuidSchema, entityId: uuidSchema.optional(), sourceTableId: uuidSchema.optional(), ...positionSchema.shape })
+  .object({
+    canvasId: uuidSchema,
+    entityId: uuidSchema.optional(),
+    sourceTableId: uuidSchema.optional(),
+    ...positionSchema.shape,
+    /** The new card's height as the canvas draws it: with it, the card joins the frame it lands in. */
+    height: height.optional(),
+    frames: frameRefs,
+  })
   .strict()
   .refine((v) => (v.entityId === undefined) !== (v.sourceTableId === undefined), "Place either an entity or a source table.");
 export type PlaceOnCanvasInput = z.input<typeof placeInput>;
@@ -67,6 +120,8 @@ export interface PlaceOnCanvasState {
   sourceTable: SourceTable | null;
   /** Live cards of the canvas, to refuse a second card for the same element. */
   items: readonly CanvasItem[];
+  /** The canvas's frames, for the frame the card lands in (none: it joins none). */
+  frames?: readonly Frame[];
 }
 
 /** Places an entity or a source table on a canvas. Each element has at most one card per canvas. */
@@ -96,7 +151,9 @@ export function placeOnCanvas(
   if (already) return fail(domainError("conflict", "It is already on this canvas."));
 
   const item = newCanvasItem(ctx, workspaceId, canvasId, target, { x, y });
-  return done(ctx, access, { canvasItemId: item.id }, [{ kind: "insert", table: "canvas_item", row: item }]);
+  const joined = joinFrames(ctx, access, canvasId, state.frames ?? [], parsed.data.frames, [{ item, height: parsed.data.height }]);
+  if (!joined.ok) return fail(joined.error);
+  return done(ctx, access, { canvasItemId: item.id }, [{ kind: "insert", table: "canvas_item", row: item }, ...joined.writes]);
 }
 
 // ---- place several (feeding sources, B-08) ----
@@ -107,12 +164,13 @@ const placeManyInput = z
     cards: z
       .array(
         z
-          .object({ entityId: uuidSchema.optional(), sourceTableId: uuidSchema.optional(), ...positionSchema.shape })
+          .object({ entityId: uuidSchema.optional(), sourceTableId: uuidSchema.optional(), ...positionSchema.shape, height: height.optional() })
           .strict()
           .refine((v) => (v.entityId === undefined) !== (v.sourceTableId === undefined), "Place either an entity or a source table."),
       )
       .min(1, "Nothing to place.")
       .max(200, "Place at most 200 cards at once."),
+    frames: frameRefs,
   })
   .strict();
 export type PlaceManyOnCanvasInput = z.input<typeof placeManyInput>;
@@ -122,6 +180,7 @@ export interface PlaceManyOnCanvasState {
   entities: readonly Entity[];
   sourceTables: readonly SourceTable[];
   items: readonly CanvasItem[];
+  frames?: readonly Frame[];
 }
 
 /**
@@ -143,8 +202,8 @@ export function placeManyOnCanvas(
   const here = new Set(
     state.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvasId).map((i) => i.entity_id ?? i.source_table_id),
   );
-  const items: CanvasItem[] = [];
-  for (const { entityId, sourceTableId, x, y } of cards) {
+  const placed: { item: CanvasItem; height: number | undefined }[] = [];
+  for (const { entityId, sourceTableId, x, y, height: h } of cards) {
     const id = (entityId ?? sourceTableId)!;
     const live = entityId
       ? state.entities.some((e) => e.id === entityId && isLive(e, workspaceId))
@@ -152,33 +211,31 @@ export function placeManyOnCanvas(
     if (!live) return fail(notFound(entityId ? "entity" : "source table"));
     if (here.has(id)) return fail(domainError("conflict", "It is already on this canvas."));
     here.add(id);
-    items.push(newCanvasItem(ctx, workspaceId, canvasId, entityId ? { entity_id: entityId } : { source_table_id: id }, { x, y }));
+    placed.push({ item: newCanvasItem(ctx, workspaceId, canvasId, entityId ? { entity_id: entityId } : { source_table_id: id }, { x, y }), height: h });
   }
+  const joined = joinFrames(ctx, access, canvasId, state.frames ?? [], parsed.data.frames, placed);
+  if (!joined.ok) return fail(joined.error);
   return done(
     ctx,
     access,
-    { canvasItemIds: items.map((i) => i.id) },
-    items.map((row) => ({ kind: "insert", table: "canvas_item", row })),
+    { canvasItemIds: placed.map((p) => p.item.id) },
+    [...placed.map(({ item }): Write => ({ kind: "insert", table: "canvas_item", row: item })), ...joined.writes],
   );
 }
 
-// ---- move, collapse, row filter, width ----
+// ---- collapse, row filter ----
 
 const updateItemInput = z
   .object({
     canvasItemId: uuidSchema,
     expectedVersion: versionSchema,
-    x: coordinate.optional(),
-    y: coordinate.optional(),
     collapsed: z.boolean().optional(),
     rowFilter: z.enum(CARD_ROW_FILTERS).optional(),
-    width: widthSchema.optional(),
   })
-  .strict()
-  .refine((v) => (v.x === undefined) === (v.y === undefined), "A position needs x and y.");
+  .strict();
 export type UpdateCanvasItemInput = z.input<typeof updateItemInput>;
 
-/** Saves a card's position (when a drag ends), whether it is collapsed, its row filter and its width (per canvas). */
+/** Saves whether a card is collapsed and its row filter (per canvas). Position and width: `moveOnCanvas`. */
 export function updateCanvasItem(
   ctx: CommandContext,
   access: WorkspaceAccess,
@@ -187,16 +244,14 @@ export function updateCanvasItem(
 ): CommandResult<{ item: CanvasItem }> {
   const parsed = begin(access, "canvas.edit_items", updateItemInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { canvasItemId, expectedVersion, x, y, collapsed, rowFilter, width } = parsed.data;
+  const { canvasItemId, expectedVersion, collapsed, rowFilter } = parsed.data;
   const got = current(state.item, access, canvasItemId, expectedVersion, "card");
   if (!got.ok) return fail(got.error);
   const before = got.row;
 
   const patch: Partial<CanvasItem> = {};
-  if (x !== undefined && y !== undefined && (x !== before.x || y !== before.y)) Object.assign(patch, { x, y });
   if (collapsed !== undefined && collapsed !== before.collapsed) patch.collapsed = collapsed;
   if (rowFilter !== undefined && rowFilter !== before.row_filter) patch.row_filter = rowFilter;
-  if (width !== undefined && width !== before.width) patch.width = width;
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
 
   const row = nextVersion(ctx, before, patch);
@@ -222,22 +277,12 @@ export function removeFromCanvas(
   return done(ctx, access, undefined, [softDelete(ctx, "canvas_item", got.row)]);
 }
 
-// ---- several cards at once (slice 2a): move, arrange, widths, remove ----
+// ---- several cards at once (slice 2a): remove ----
 
-/** The step of the canvas grid: arranged positions lie on it (D-37). */
-export const GRID = 8;
 /** At most this many cards in one group action (the “Performance test” canvas has 101). */
 const MAX_GROUP = 500;
 
 const itemRef = { canvasItemId: uuidSchema, expectedVersion: versionSchema };
-const onGrid = coordinate.refine((v) => Number.isInteger(v) && v % GRID === 0, `Positions lie on the ${GRID} px grid.`);
-
-const groupOf = <S extends z.ZodTypeAny>(item: S) =>
-  z
-    .array(item)
-    .min(1, "Select at least one card.")
-    .max(MAX_GROUP, `Change at most ${MAX_GROUP} cards at once.`)
-    .refine((items) => new Set(items.map((i) => (i as { canvasItemId: string }).canvasItemId)).size === items.length, "A card is listed twice.");
 
 export interface CanvasItemsState {
   canvas: Canvas | null;
@@ -245,112 +290,37 @@ export interface CanvasItemsState {
   items: readonly CanvasItem[];
 }
 
-/** Each named card: live, on this canvas, at the version the user read. */
-function cardsOf(
-  access: WorkspaceAccess,
-  state: CanvasItemsState,
-  canvasId: Uuid,
-  refs: readonly { canvasItemId: Uuid; expectedVersion: number }[],
-): { ok: true; rows: CanvasItem[] } | { ok: false; error: DomainError } {
-  const workspaceId = access.workspace.id;
-  if (!isLive(state.canvas, workspaceId) || state.canvas.id !== canvasId) return { ok: false, error: notFound("canvas") };
-  const byId = new Map(state.items.map((i) => [i.id, i]));
-  const rows: CanvasItem[] = [];
-  for (const { canvasItemId, expectedVersion } of refs) {
-    const row = byId.get(canvasItemId);
-    if (!isLive(row, workspaceId) || row.canvas_id !== canvasId) return { ok: false, error: notFound("card") };
-    if (row.version !== expectedVersion) return { ok: false, error: staleVersion() };
-    rows.push(row);
-  }
-  return { ok: true, rows };
-}
-
-/** The new version of each card a write set updates, for the canvas's next write. */
-const versionsOf = (writes: readonly Write[]): Record<string, number> =>
-  Object.fromEntries(writes.flatMap((w) => (w.kind === "update" && w.table === "canvas_item" ? [[w.row.id, w.row.version]] : [])));
-
-/** One update per card whose values change; refused when none does. */
-function updates(ctx: CommandContext, rows: readonly CanvasItem[], patches: readonly Partial<CanvasItem>[]): Write[] | null {
-  const writes: Write[] = [];
-  rows.forEach((before, i) => {
-    const patch = Object.fromEntries(Object.entries(patches[i]!).filter(([k, v]) => before[k as keyof CanvasItem] !== v));
-    if (Object.keys(patch).length) writes.push({ kind: "update", table: "canvas_item", before, row: nextVersion(ctx, before, patch) });
-  });
-  return writes.length ? writes : null;
-}
-
-/** How many cards changed, and the new version of each. */
-export interface GroupMoved {
-  moved: number;
-  versions: Record<string, number>;
-}
-
-const moveInput = (position: typeof coordinate) =>
-  z.object({ canvasId: uuidSchema, items: groupOf(z.object({ ...itemRef, x: position, y: position }).strict()) }).strict();
-const moveItemsInput = moveInput(coordinate);
-const arrangeItemsInput = moveInput(onGrid);
-export type MoveCanvasItemsInput = z.input<typeof moveItemsInput>;
-
-function moveItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown, schema: typeof moveItemsInput) {
-  const parsed = begin(access, "canvas.edit_items", schema, input);
-  if (!parsed.ok) return fail(parsed.error);
-  const { canvasId, items } = parsed.data;
-  const got = cardsOf(access, state, canvasId, items);
-  if (!got.ok) return fail(got.error);
-  const writes = updates(ctx, got.rows, items.map(({ x, y }) => ({ x, y })));
-  if (!writes) return fail(nothingToChange());
-  return done(ctx, access, { moved: writes.length, versions: versionsOf(writes) }, writes);
-}
-
-/**
- * Moves several cards of one canvas in one change group, so one undo puts them all back: a group drag, or arrow-key
- * nudges once the keys are still. Cards whose position does not change are left out.
- */
-export function moveCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<GroupMoved> {
-  return moveItems(ctx, access, state, input, moveItemsInput);
-}
-
-/**
- * Align, stack or line up (the group toolbox): the canvas computes the positions from the cards' sizes; every
- * position must lie on the 8 px grid. One change group.
- */
-export function arrangeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<GroupMoved> {
-  return moveItems(ctx, access, state, input, arrangeItemsInput);
-}
-
-const widthsInput = z.object({ canvasId: uuidSchema, items: groupOf(z.object({ ...itemRef, width: widthSchema }).strict()) }).strict();
-export type SetCanvasItemWidthsInput = z.input<typeof widthsInput>;
-
-/** “Fit widths to names” for several cards: the canvas measures, the domain checks the widths (D-37). One change group. */
-export function setCanvasItemWidths(
-  ctx: CommandContext,
-  access: WorkspaceAccess,
-  state: CanvasItemsState,
-  input: unknown,
-): CommandResult<{ changed: number; versions: Record<string, number> }> {
-  const parsed = begin(access, "canvas.edit_items", widthsInput, input);
-  if (!parsed.ok) return fail(parsed.error);
-  const { canvasId, items } = parsed.data;
-  const got = cardsOf(access, state, canvasId, items);
-  if (!got.ok) return fail(got.error);
-  const writes = updates(ctx, got.rows, items.map(({ width }) => ({ width })));
-  if (!writes) return fail(nothingToChange());
-  return done(ctx, access, { changed: writes.length, versions: versionsOf(writes) }, writes);
-}
-
-const removeItemsInput = z.object({ canvasId: uuidSchema, items: groupOf(z.object(itemRef).strict()) }).strict();
+const removeItemsInput = z
+  .object({
+    canvasId: uuidSchema,
+    items: z
+      .array(z.object(itemRef).strict())
+      .min(1, "Select at least one card.")
+      .max(MAX_GROUP, `Change at most ${MAX_GROUP} cards at once.`)
+      .refine((items) => new Set(items.map((i) => i.canvasItemId)).size === items.length, "A card is listed twice."),
+  })
+  .strict();
 export type RemoveCanvasItemsInput = z.input<typeof removeItemsInput>;
 
 /** Takes several cards off this canvas in one change group; the elements stay in the model (D-02). */
 export function removeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, state: CanvasItemsState, input: unknown): CommandResult<{ removed: number }> {
   const parsed = begin(access, "canvas.edit_items", removeItemsInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const got = cardsOf(access, state, parsed.data.canvasId, parsed.data.items);
-  if (!got.ok) return fail(got.error);
+  const { canvasId, items } = parsed.data;
+  const workspaceId = access.workspace.id;
+  if (!isLive(state.canvas, workspaceId) || state.canvas.id !== canvasId) return fail(notFound("canvas"));
+  const byId = new Map(state.items.map((i) => [i.id, i]));
+  const rows: CanvasItem[] = [];
+  for (const { canvasItemId, expectedVersion } of items) {
+    const row = byId.get(canvasItemId);
+    if (!isLive(row, workspaceId) || row.canvas_id !== canvasId) return fail(notFound("card"));
+    if (row.version !== expectedVersion) return fail(staleVersion());
+    rows.push(row);
+  }
   return done(
     ctx,
     access,
-    { removed: got.rows.length },
-    got.rows.map((row) => softDelete(ctx, "canvas_item", row)),
+    { removed: rows.length },
+    rows.map((row) => softDelete(ctx, "canvas_item", row)),
   );
 }

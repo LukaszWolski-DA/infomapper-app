@@ -1,13 +1,12 @@
+import { placeCardAction, placeCardsAction, removeCardAction, removeCardsAction, updateCardAction } from "@/app/_actions/canvas-item";
 import {
-  arrangeCardsAction,
-  moveCardsAction,
-  placeCardAction,
-  placeCardsAction,
-  removeCardAction,
-  removeCardsAction,
-  setCardWidthsAction,
-  updateCardAction,
-} from "@/app/_actions/canvas-item";
+  createFrameAction,
+  deleteFrameAction,
+  fitFrameAction,
+  moveOnCanvasAction,
+  resizeFrameAction,
+  updateFrameAction,
+} from "@/app/_actions/frame";
 import { saveCanvasLookAction } from "@/app/_actions/canvas";
 import { AppShell } from "@/app/_components/app-shell";
 import { MovedNotice } from "@/app/_components/moved-notice";
@@ -21,6 +20,8 @@ import { PanelsProvider } from "@/app/_panels/panels-context";
 import { StatusBar } from "@/app/_panels/status-bar";
 import { buildTree } from "@/app/_panels/tree-data";
 import { buildCards } from "@/canvas/card-data";
+import { buildFrames, conceptColors } from "@/canvas/frame-data";
+import { FrameToolButton } from "@/canvas/FrameToolButton";
 import { buildLines } from "@/canvas/line-data";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
 import { EntityToolButton } from "@/canvas/EntityToolButton";
@@ -36,7 +37,7 @@ import { lastContentEditor } from "@/domain/model/mapping-rules";
 
 // Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a); the Entity
 // tool and Undo and Redo in the top bar (slice 1b); the Hand tool, a selection of several cards, the canvas's look and
-// layer mode, and “On canvases” in the panels (slice 2a). `?card=entity:<id>` or `?card=source:<id>` selects that card
+// layer mode, and “On canvases” in the panels (slice 2a); frames and the Frame tool (slice 2b). `?card=entity:<id>` or `?card=source:<id>` selects that card
 // and shows it on arrival; `?moved=1` says that the address you opened is no longer in this project.
 export default async function CanvasPage({
   params,
@@ -49,14 +50,16 @@ export default async function CanvasPage({
   const view = await loadProjectView(shell);
   const store = getDataStore();
   const ws = shell.workspace.id;
-  const [model, allItems, canvases, workspace, history, projects] = await Promise.all([
+  const [model, allItems, canvases, workspace, history, projects, frameRows] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.canvases.list(ws),
     store.workspaces.get(ws),
     store.undoHistory.get(ws, shell.user.id),
     store.projects.list(ws),
+    store.frames.listOfCanvas(ws, canvasId),
   ]);
+  const frames = buildFrames(frameRows);
   const canvas = canvases.find((c) => c.id === canvasId)!;
   const undoState = { canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 };
   // Four-eyes (AD-06): the panel says beforehand who may not approve; the server checks again.
@@ -148,10 +151,17 @@ export default async function CanvasPage({
               placeCard={placeCardAction.bind(null, ws, canvasId)}
               placeCards={placeCardsAction.bind(null, ws, canvasId)}
               removeCard={removeCardAction.bind(null, ws)}
-              moveCards={moveCardsAction.bind(null, ws, canvasId)}
-              arrangeCards={arrangeCardsAction.bind(null, ws, canvasId)}
-              setCardWidths={setCardWidthsAction.bind(null, ws, canvasId)}
               removeCards={removeCardsAction.bind(null, ws, canvasId)}
+              frames={frames}
+              conceptColors={conceptColors(model)}
+              frameWrites={{
+                moveOnCanvas: moveOnCanvasAction.bind(null, ws, canvasId),
+                createFrame: createFrameAction.bind(null, ws, canvasId),
+                updateFrame: updateFrameAction.bind(null, ws),
+                resizeFrame: resizeFrameAction.bind(null, ws),
+                fitFrame: fitFrameAction.bind(null, ws),
+                deleteFrame: deleteFrameAction.bind(null, ws),
+              }}
               focusCardId={focusCardId}
               diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks") } : undefined}
             />
@@ -167,6 +177,7 @@ const CanvasTools = ({ editable }: { editable: boolean }) => (
   <>
     <LayerSwitch />
     {editable && <EntityToolButton />}
+    {editable && <FrameToolButton />}
     <HandToolButton />
     <NotationSwitch />
     <UndoButtons />
