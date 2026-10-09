@@ -86,9 +86,11 @@ export function useGroupActions(o: Options) {
     const u = unitsOf(selectedKeys(selection, all), all);
     const byId = new Map(cardNodesOf(rf).map((n) => [n.id, n]));
     const frames = new Map(framesNow().map((f) => [f.id, f]));
+    // a card hidden in a collapsed frame does not move on its own, even when selected from a panel (slice 2c)
+    const hidden = new Set(all.filter((i) => i.hidden).map((i) => i.id));
     return {
       frames: u.frames.map((id) => frames.get(id)).filter((f): f is FrameData => !!f),
-      cards: u.cards.map((id) => byId.get(id)).filter((n): n is CardNodeT => !!n),
+      cards: u.cards.filter((id) => !hidden.has(id)).map((id) => byId.get(id)).filter((n): n is CardNodeT => !!n),
       members: u.members.map((id) => byId.get(id)).filter((n): n is CardNodeT => !!n),
     };
   }, [items, selection, rf, framesNow]);

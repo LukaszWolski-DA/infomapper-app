@@ -714,12 +714,16 @@ export function ModelCanvas({
       ]),
     [frames, cardData],
   );
-  // Cards and frames that left the canvas (removed, deleted, undone) leave the selection too; checked when the set of
-  // cards or frames changes, not on every frame of a drag.
-  const itemIds = useMemo(() => [...frames.map((f) => f.id), ...nodes.map((n) => n.id)].join(","), [frames, nodes]);
+  // Cards and frames that left the canvas (removed, deleted, undone) leave the selection too, and so do the cards of a
+  // frame that was collapsed (slice 2c, prototype pruneMulti); checked when the set of cards or frames or the collapsed
+  // frames change, not on every frame of a drag.
+  const itemIds = useMemo(
+    () => [...frames.map((f) => `${f.id}${f.collapsed ? "c" : ""}`), ...nodes.map((n) => n.id)].join(","),
+    [frames, nodes],
+  );
   useEffect(() => {
     if (selection?.t !== "multi") return;
-    const next = fromKeys(selection.keys, boxes());
+    const next = fromKeys(selection.keys, boxes().filter((b) => !b.hidden));
     if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
   }, [itemIds, selection, select, boxes]);
   const { publishLayout } = ui;
