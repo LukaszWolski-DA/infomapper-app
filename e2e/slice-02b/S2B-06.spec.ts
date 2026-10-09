@@ -63,7 +63,8 @@ test("S2B-06: inside a frame, Shift + drag draws an adding lasso; right drag, mi
   expect(await frame()).toMatchObject({ x: start.x, y: start.y });
 
   // a right click without moving: the frame's toolbox
-  expect(await toolboxLabels(page, await emptyIn(page, "Area"))).toEqual(["Rename…", "Fit frame to its content", "Select its cards", "Zoom to frame", "Delete frame (keeps its cards)"]);
+  // slice 2c adds “Collapse into one block” (its item 1)
+  expect(await toolboxLabels(page, await emptyIn(page, "Area"))).toEqual(["Rename…", "Collapse into one block", "Fit frame to its content", "Select its cards", "Zoom to frame", "Delete frame (keeps its cards)"]);
   await expect(page.getByTestId("menu-toolbox")).toContainText("Area");
   await closeToolbox(page);
 });
