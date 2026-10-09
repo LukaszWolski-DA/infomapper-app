@@ -90,12 +90,15 @@ test("S2C-01: collapse and expand by the label button and the block's Expand, by
   // the label's button, the block's “Expand”
   await step(page, true, () => frameEl(page, "Area").getByTestId("button-frame-collapse").click(), before);
   await step(page, false, () => blockEl(page, "Area").getByTestId("button-block-expand").click(), before);
-  // each was one undo step: Ctrl+Z collapses again, a second Ctrl+Z expands
+  // each was one undo step: Ctrl+Z collapses again, a second Ctrl+Z expands (after an undo the page may lag the
+  // data: wait until it shows each state, so the next collapse is sent with the frame's latest version)
   await key(page, "Control+z");
   await expect.poll(() => isCollapsed("Area")).toBe(true);
+  await expect(blockEl(page, "Area")).toBeVisible();
   await key(page, "Control+z");
   await expect.poll(() => isCollapsed("Area")).toBe(false);
   await expect(frameEl(page, "Area")).toBeVisible();
+  await expect(blockEl(page, "Area")).toHaveCount(0);
 
   // a double-click on the name; a double-click on the block's header
   await step(page, true, async () => {
