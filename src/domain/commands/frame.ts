@@ -160,8 +160,14 @@ function commit(ctx: CommandContext, draft: Draft, saw: Seen): Got<{ writes: Wri
 }
 
 const boxOf = (item: CanvasItem, height: number): CardBox => ({ id: item.id, x: item.x, y: item.y, width: cardWidthOf(item), height, frameId: item.frame_id });
-const frameBox = (f: Frame): FrameBox => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height });
+const frameBox = (f: Frame, members = 0): FrameBox => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height, collapsed: f.collapsed, members });
 const liveFrames = (draft: Draft) => [...draft.frames.values()].filter((f) => f.deleted_at === null);
+/** The draft's live frames as the rules see them: a collapsed one by its block, which needs its member count (slice 2c). */
+const frameBoxes = (draft: Draft): FrameBox[] => {
+  const members = new Map<Uuid, number>();
+  for (const i of draft.items.values()) if (i.frame_id) members.set(i.frame_id, (members.get(i.frame_id) ?? 0) + 1);
+  return liveFrames(draft).map((f) => frameBox(f, members.get(f.id) ?? 0));
+};
 
 /** The draft's card for each named id, or not found. */
 function cardsNamed(draft: Draft, ids: readonly Uuid[]): Got<{ cards: CanvasItem[] }> | Failed {
@@ -349,6 +355,8 @@ const moveInput = z
     onGrid: z.boolean().optional(),
     /** The answer to the drop's concept question (D-05): move the entities to the frame's concept in the model. */
     moveToConcepts: z.boolean().optional(),
+    /** A drag drop (slice 2c): only then may a card join a collapsed frame, by landing on its block. */
+    dragDrop: z.boolean().optional(),
   })
   .strict()
   .refine(
@@ -425,9 +433,9 @@ export function moveOnCanvas(
     boxes.push(boxOf(card, h));
   }
   const frameBefore = new Map(moved.changed.map((c) => [c.id, c.frame_id]));
-  const result = dropCards(liveFrames(draft).map(frameBox), boxes);
+  const result = dropCards(frameBoxes(draft), boxes, { drag: parsed.data.dragDrop });
   for (const f of result.frames) Object.assign(draft.frames.get(f.id)!, { x: f.x, y: f.y, width: f.width, height: f.height });
-  for (const m of result.membership) draft.items.get(m.cardId)!.frame_id = m.frameId;
+  for (const m of result.membership) Object.assign(draft.items.get(m.cardId)!, { frame_id: m.frameId }, m.filed ?? {});
 
   const ws = access.workspace.id;
   const entities = new Map(state.entities.filter((e) => isLive(e, ws)).map((e) => [e.id, e]));
@@ -498,11 +506,13 @@ function reframe(
   if (!opened.ok) return fail(opened.error);
   const { draft } = opened;
   const frame = draft.frames.get(frameId)!;
+  // a collapsed frame is a block: no resize handle, no “Fit frame to its content” (slice 2c, item 4)
+  if (frame.collapsed) return fail(domainError("invalid", "Expand the frame first."));
   const rect = rectOf(frame, draft);
   if ("code" in rect) return fail(rect);
   Object.assign(frame, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
 
-  const changes = membershipAfterResize(frameBox(frame), liveFrames(draft).map(frameBox), [...draft.items.values()].map((i) => boxOf(i, 0)));
+  const changes = membershipAfterResize(frameBox(frame), frameBoxes(draft), [...draft.items.values()].map((i) => boxOf(i, 0)));
   for (const c of changes) draft.items.get(c.cardId)!.frame_id = c.frameId;
 
   const committed = commit(ctx, draft, seen([{ frameId, expectedVersion }], cards));
@@ -535,6 +545,56 @@ export function fitFrameToContent(ctx: CommandContext, access: WorkspaceAccess, 
     const r = frameAround(members.map((m) => boxOf(m, heights.get(m.id)!)));
     return { ...r, width: Math.max(r.width, FRAME_MIN_SIZE.width), height: Math.max(r.height, FRAME_MIN_SIZE.height) };
   });
+}
+
+// ---- collapse and expand (D-07, slice 2c) ----
+
+const collapseInput = z.object({ frameId: uuidSchema, expectedVersion: versionSchema, collapsed: z.boolean() }).strict();
+export type SetFrameCollapsedInput = z.input<typeof collapseInput>;
+
+/**
+ * Collapses a frame into one block, or expands it (D-07). Nothing else changes: the frame keeps its size and its cards
+ * their places for when it is expanded. Saved for everyone, so it needs edit rights; one undo step.
+ */
+export function setFrameCollapsed(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: { frame: Frame | null },
+  input: unknown,
+): CommandResult<{ frame: Frame }> {
+  const parsed = begin(access, "canvas.edit_items", collapseInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { frameId, expectedVersion, collapsed } = parsed.data;
+  const got = current(state.frame, access, frameId, expectedVersion, "frame");
+  if (!got.ok) return fail(got.error);
+  if (got.row.collapsed === collapsed) return fail(nothingToChange());
+  const frame = nextVersion(ctx, got.row, { collapsed });
+  return done(ctx, access, { frame }, [{ kind: "update", table: "frame", before: got.row, row: frame }]);
+}
+
+const collapseAllInput = z.object({ canvasId: uuidSchema, frames: frameRefs, collapsed: z.boolean() }).strict();
+export type SetAllFramesCollapsedInput = z.input<typeof collapseAllInput>;
+
+/**
+ * “Collapse all” / “Expand all” (canvas overview): every frame of the canvas, one undo step. `frames` are the canvas's
+ * frames at the versions the user read; frames already in that state are left as they are.
+ */
+export function setAllFramesCollapsed(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: FrameCanvasState,
+  input: unknown,
+): CommandResult<FrameWriteResult & { frames: number }> {
+  const parsed = begin(access, "canvas.edit_items", collapseAllInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const opened = openDraft(access, state, parsed.data.canvasId);
+  if (!opened.ok) return fail(opened.error);
+  const { draft } = opened;
+  for (const f of liveFrames(draft)) f.collapsed = parsed.data.collapsed;
+  const committed = commit(ctx, draft, seen(parsed.data.frames, []));
+  if (!committed.ok) return fail(committed.error);
+  if (!committed.writes.length) return fail(nothingToChange());
+  return done(ctx, access, { frames: committed.writes.length, versions: committed.versions }, committed.writes);
 }
 
 // ---- delete ----

@@ -83,8 +83,9 @@ export function joinFrames(
   const live = frames.filter((f) => isLive(f, access.workspace.id) && f.canvas_id === canvasId);
   const sized = placed.filter((p) => p.height !== undefined);
   if (!live.length || !sized.length) return { ok: true, writes: [] };
+  // a placed card is not a drag drop: it never joins a collapsed frame (slice 2c), which needs no member count then
   const result = dropCards(
-    live.map((f) => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height })),
+    live.map((f) => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height, collapsed: f.collapsed })),
     sized.map(({ item, height: h }) => ({ id: item.id, x: item.x, y: item.y, width: cardWidthOf(item), height: h!, frameId: null })),
   );
   for (const m of result.membership) sized.find((p) => p.item.id === m.cardId)!.item.frame_id = m.frameId;

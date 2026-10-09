@@ -218,6 +218,17 @@ describe("duplicateCanvas (slice 2a)", () => {
     expect(r.writeSet.writes.findIndex((w) => w.table === "frame")).toBeLessThan(r.writeSet.writes.findIndex((w) => w.table === "canvas_item"));
     expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
   });
+
+  it("keeps each frame's collapsed state in the copy (slice 2c, item 10)", () => {
+    const frames = [frame(ids.frameA, { collapsed: true }), frame(ids.frameB, { x: 1000, collapsed: false })];
+    const r = duplicateCanvas(makeCtx(), access("modeler"), { ...state, frames }, { projectId: projectA, canvasId: canvas1 });
+    if (!r.ok) throw new Error(r.error.message);
+    const copies = r.writeSet.writes.flatMap((w) => (w.kind === "insert" && w.table === "frame" ? [w.row as unknown as { x: number; collapsed: boolean }] : []));
+    expect(copies.map((f) => [f.x, f.collapsed])).toEqual([
+      [0, true],
+      [1000, false],
+    ]);
+  });
 });
 
 describe("deleteCanvas (slice 2a, D-28)", () => {
