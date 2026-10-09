@@ -240,17 +240,6 @@ export function ModelCanvas({
   // one grid step (no repaint); zooming changes the step. Set without a render. ----
   const gridRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
-  // Frame labels keep their size on the screen (prototype --iz = 1 / zoom); set without a render, only when zooming.
-  useEffect(() => {
-    let last = 0;
-    const follow = (z: number) => {
-      if (z === last) return;
-      last = z;
-      rootRef.current?.style.setProperty("--iz", String(1 / z));
-    };
-    follow(storeApi.getState().transform[2]);
-    return storeApi.subscribe((s) => follow(s.transform[2]));
-  }, [storeApi]);
   useEffect(() => {
     const el = gridRef.current;
     if (!el || grid === "none") return;

@@ -43,7 +43,7 @@ export interface Diagnosis {
   noLines?: boolean;
   /** Every card drawn as its below-40 % block, at any zoom. */
   blocks?: boolean;
-  /** No frame layer at all (slice 2b, S2B-14). The frame names' zoom variable is still set, to tell the two apart. */
+  /** No frames at all (slice 2b, S2B-14). */
   noFrames?: boolean;
   /** Frames without their names and chips (slice 2b, S2B-14). */
   noLabels?: boolean;

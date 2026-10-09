@@ -198,7 +198,8 @@ body.connecting .im-canvas .row { cursor: crosshair }
   color: var(--im-surface); font-size: 11.5px; font-weight: 500; padding: 2px 9px; border-radius: 10px }
 
 /* Frames (slice 2b; prototype .frame, .f-lab, .f-rs, #mkf). Under the lines and cards: z-index −1 in the viewport. No
-   `opacity` on them (AD-24): fills and borders are colours mixed in CSS. --iz (1 / zoom) keeps the label's size. */
+   `opacity` on them (AD-24): fills and borders are colours mixed in CSS. --iz (1 / zoom), set on .frame-layer only, keeps
+   the label's size. */
 .im-canvas .frame-layer { position: absolute; left: 0; top: 0; z-index: -1; pointer-events: none }
 .im-canvas .im-frame { position: absolute; border-radius: 16px; pointer-events: all; cursor: move; box-sizing: border-box;
   border: 1.5px solid color-mix(in srgb, var(--fc) 50%, transparent); background: color-mix(in srgb, var(--fc) 7%, transparent) }

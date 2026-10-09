@@ -9,8 +9,8 @@
 // because nothing here is marked `nopan`. The label keeps its size on the screen at every zoom (prototype --iz); below
 // 40 % the chips are left out (AD-24 rule 1). Fills are a colour mixed in CSS, never `opacity` (AD-24 rule 4).
 
-import { memo, useMemo, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
-import { EdgeLabelRenderer, useStore } from "@xyflow/react";
+import { memo, useCallback, useEffect, useMemo, useRef, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
+import { EdgeLabelRenderer, useStore, useStoreApi } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
 import type { CardData } from "./card-data";
 import { frameChips, frameColor, frameStats, type FrameData } from "./frame-data";
@@ -35,9 +35,30 @@ interface Props {
 function FrameLayer({ frames, cards, conceptColors, selectedId, editable, drawing, labels = true, onPointerDown }: Props) {
   const detailed = useStore((s) => s.transform[2] >= LOD_ZOOM);
   const color = (id: Uuid) => conceptColors[id];
+  // --iz (1 / zoom) keeps the names and handles the same size on the screen. It is set on this layer, without a render,
+  // when the zoom changes: on the canvas root it made every card restyle on each zoom step (S2B-14, slice 2b step 5).
+  const storeApi = useStoreApi();
+  const layer = useRef<HTMLDivElement | null>(null);
+  const setLayer = useCallback(
+    (el: HTMLDivElement | null) => {
+      layer.current = el;
+      el?.style.setProperty("--iz", String(1 / storeApi.getState().transform[2]));
+    },
+    [storeApi],
+  );
+  useEffect(() => {
+    let last = storeApi.getState().transform[2];
+    return storeApi.subscribe((s) => {
+      const z = s.transform[2];
+      if (z === last) return;
+      last = z;
+      layer.current?.style.setProperty("--iz", String(1 / z));
+    });
+  }, [storeApi]);
   return (
     <EdgeLabelRenderer>
       <div
+        ref={setLayer}
         className="frame-layer"
         data-testid="layer-frames"
         onPointerDown={(e) => {
