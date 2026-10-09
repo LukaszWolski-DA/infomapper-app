@@ -6,21 +6,32 @@
 // selected frame gets a mark around it too and counts in “N selected”.
 
 import { memo } from "react";
-import { useStore, ViewportPortal } from "@xyflow/react";
-import type { CardNodeT } from "./CardNode";
+import { useStore, ViewportPortal, type Node } from "@xyflow/react";
+import { isCardNode } from "./CardNode";
 import type { FrameData } from "./frame-data";
 import { cardHeight, cardWidth, type Rect } from "./geometry";
 import type { Selection } from "./line-data";
 import { cardKey, frameKey, selectionBounds } from "./selection";
 
-function SelectionOverlay({ selection, lasso, frames }: { selection: Selection; lasso: Rect | null; frames: readonly FrameData[] }) {
-  const nodes = useStore((s) => s.nodes) as CardNodeT[]; // follow drags, collapses and widths
+function SelectionOverlay({
+  selection,
+  lasso,
+  frames,
+  frameRects,
+}: {
+  selection: Selection;
+  lasso: Rect | null;
+  frames: readonly FrameData[];
+  /** What stands for each frame: the frame, or its block when collapsed (slice 2c). */
+  frameRects: ReadonlyMap<string, Rect>;
+}) {
+  const nodes = (useStore((s) => s.nodes) as Node[]).filter(isCardNode); // follow drags, collapses and widths
   const keys = selection?.t === "multi" ? new Set(selection.keys) : null;
   if (!keys && !lasso) return null;
 
   const marks: { id: string; r: Rect; frame?: boolean }[] = [];
   if (keys) {
-    for (const f of frames) if (keys.has(frameKey(f.id))) marks.push({ id: f.id, r: { x: f.x, y: f.y, w: f.width, h: f.height }, frame: true });
+    for (const f of frames) if (keys.has(frameKey(f.id))) marks.push({ id: f.id, r: frameRects.get(f.id) ?? { x: f.x, y: f.y, w: f.width, h: f.height }, frame: true });
     for (const n of nodes) {
       const card = n.data.card;
       if (keys.has(cardKey(card))) marks.push({ id: n.id, r: { x: n.position.x, y: n.position.y, w: cardWidth(card), h: cardHeight(card) } });

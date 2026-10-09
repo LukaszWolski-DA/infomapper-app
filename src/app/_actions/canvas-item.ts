@@ -42,7 +42,17 @@ export async function updateCardAction(workspaceId: string, change: CardChangeIn
 export async function placeCardAction(
   workspaceId: string,
   canvasId: string,
-  input: { entityId?: string; sourceTableId?: string; x: number; y: number; height?: number; frames?: { frameId: string; expectedVersion: number }[] },
+  input: {
+    entityId?: string;
+    sourceTableId?: string;
+    x: number;
+    y: number;
+    height?: number;
+    frames?: { frameId: string; expectedVersion: number }[];
+    /** Dropped from the left panel (slice 2c): it may join a collapsed frame by landing on its block. */
+    dragDrop?: boolean;
+    moveToConcepts?: boolean;
+  },
 ): Promise<ActionResult<{ canvasItemId: string }>> {
   const result = await runCommand(async (ctx, store, user) => {
     const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;

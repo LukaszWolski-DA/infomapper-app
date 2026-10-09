@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext } from "react";
+import { createContext, type PointerEvent as ReactPointerEvent } from "react";
 import type { Uuid } from "@/domain/ids";
 import type { ArrangeMode } from "./arrange";
 import type { FrameData, FrameStats } from "./frame-data";
@@ -20,6 +20,14 @@ export interface CanvasCardsApi {
   fitWidth: (cardId: string) => void;
   /** Shift+click on a card: in or out of the selection (slice 2a). */
   toggleCard: (cardId: string) => void;
+  /** Collapsed frames (slice 2c): the block's header is pressed (the frame's own press: move, select, Shift+click). */
+  framePress: (e: ReactPointerEvent, frameId: string) => void;
+  /** Collapse or expand a frame. */
+  setFrameCollapsed: (frameId: string, collapsed: boolean) => void;
+  /** A card row of a block: expand the frame and select that card. */
+  openMember: (frameId: string, cardId: string) => void;
+  /** Whether collapse and expand are offered. */
+  canCollapse: boolean;
 }
 
 const noop = () => {};
@@ -32,6 +40,10 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
   startRelate: noop,
   fitWidth: noop,
   toggleCard: noop,
+  framePress: noop,
+  setFrameCollapsed: noop,
+  openMember: noop,
+  canCollapse: false,
 });
 
 /**
@@ -123,6 +135,8 @@ export interface CanvasHandle {
   zoomToFrame: (frameId: Uuid) => void;
   /** Selects the frame's cards (toolbox “Select its cards”). */
   selectFrameCards: (frameId: Uuid) => void;
+  /** Collapses a frame into one block or expands it (slice 2c, D-07). */
+  setFrameCollapsed: (frameId: Uuid, collapsed: boolean) => void;
 }
 
 /** A card in a frame, for the frame panel. */
@@ -283,6 +297,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   fitFrame: noop,
   zoomToFrame: noop,
   selectFrameCards: noop,
+  setFrameCollapsed: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,

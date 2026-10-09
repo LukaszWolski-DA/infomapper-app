@@ -220,10 +220,15 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       )}
 
       <Actions>
+        {p.editable && (
+          <button type="button" className={buttonClass} onClick={() => ui.setFrameCollapsed(f.id, !f.collapsed)} data-testid="button-frame-collapse">
+            {f.collapsed ? "Expand frame" : "Collapse frame"}
+          </button>
+        )}
         <button type="button" className={buttonClass} onClick={() => ui.zoomToFrame(f.id)} data-testid="button-frame-zoom">
           Zoom to frame
         </button>
-        {p.editable && (
+        {p.editable && !f.collapsed && (
           <button type="button" className={buttonClass} onClick={() => ui.fitFrame(f.id)} data-testid="button-frame-fit">
             Fit frame to its content
           </button>

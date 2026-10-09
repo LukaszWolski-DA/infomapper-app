@@ -104,6 +104,7 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       fitFrame: (frameId) => handle.current?.fitFrame(frameId),
       zoomToFrame: (frameId) => handle.current?.zoomToFrame(frameId),
       selectFrameCards: (frameId) => handle.current?.selectFrameCards(frameId),
+      setFrameCollapsed: (frameId, collapsed) => handle.current?.setFrameCollapsed(frameId, collapsed),
       flash,
       flashRow,
       mode,

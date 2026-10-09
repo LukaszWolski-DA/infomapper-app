@@ -29,10 +29,12 @@ interface Props {
   drawing: Rect | null;
   /** Names and chips (off only in the measurement-only diagnosis `nolabels`). */
   labels?: boolean;
+  /** Collapse a frame into one block (slice 2c): the label's button and a double-click on the name. */
+  onCollapse?: (frameId: Uuid, collapsed: boolean) => void;
   onPointerDown: (e: ReactPointerEvent, frameId: Uuid, part: FramePart) => void;
 }
 
-function FrameLayer({ frames, cards, conceptColors, selectedId, editable, drawing, labels = true, onPointerDown }: Props) {
+function FrameLayer({ frames, cards, conceptColors, selectedId, editable, drawing, labels = true, onCollapse, onPointerDown }: Props) {
   const detailed = useStore((s) => s.transform[2] >= LOD_ZOOM);
   const color = (id: Uuid) => conceptColors[id];
   // --iz (1 / zoom) keeps the names and handles the same size on the screen. It is set on this layer, without a render,
@@ -69,9 +71,22 @@ function FrameLayer({ frames, cards, conceptColors, selectedId, editable, drawin
           onPointerDown(e, frameId, part);
         }}
       >
-        {frames.map((f) => (
-          <FrameBox key={f.id} frame={f} cards={cards} color={frameColor(f, color)} selected={f.id === selectedId} editable={editable} detailed={detailed} labels={labels} />
-        ))}
+        {/* a collapsed frame is drawn as a block, a node with the cards (BlockNode, slice 2c) */}
+        {frames
+          .filter((f) => !f.collapsed)
+          .map((f) => (
+            <FrameBox
+              key={f.id}
+              frame={f}
+              cards={cards}
+              color={frameColor(f, color)}
+              selected={f.id === selectedId}
+              editable={editable}
+              detailed={detailed}
+              labels={labels}
+              onCollapse={onCollapse}
+            />
+          ))}
         {drawing && (
           <div className="frame-draw" data-testid="frame-drawing" style={{ left: drawing.x, top: drawing.y, width: drawing.w, height: drawing.h }} />
         )}
@@ -90,6 +105,7 @@ const FrameBox = memo(function FrameBox({
   editable,
   detailed,
   labels,
+  onCollapse,
 }: {
   frame: FrameData;
   cards: Props["cards"];
@@ -98,6 +114,7 @@ const FrameBox = memo(function FrameBox({
   editable: boolean;
   detailed: boolean;
   labels: boolean;
+  onCollapse?: (frameId: Uuid, collapsed: boolean) => void;
 }) {
   const chips = useMemo(() => (detailed ? frameChips(frameStats(f, cards), f.kind) : []), [detailed, f, cards]);
   const kindLabel = f.kind === "concept" ? " (concept)" : f.kind === "source_system" ? " (source system)" : "";
@@ -114,8 +131,26 @@ const FrameBox = memo(function FrameBox({
         <div
           className="f-lab"
           data-testid="frame-label"
-          title={`${f.name}${kindLabel}. Drag to move the frame with everything in it, click to select.`}
+          title={`${f.name}${kindLabel}. Drag to move the frame with everything in it, click to select${onCollapse ? ", double-click to collapse" : ""}.`}
+          onDoubleClick={(e) => {
+            if (!onCollapse || (e.target as HTMLElement).closest("button")) return;
+            onCollapse(f.id, true);
+          }}
         >
+          {onCollapse && (
+            <button
+              type="button"
+              className="ib f-collapse"
+              title="Collapse into one block"
+              data-testid="button-frame-collapse"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={() => onCollapse(f.id, true)}
+            >
+              <svg viewBox="0 0 16 16" aria-hidden>
+                <path d="M2.5 2.5l4 4M6.5 3v3.5H3M13.5 13.5l-4-4M9.5 13v-3.5H13" />
+              </svg>
+            </button>
+          )}
           <span className="f-dot" />
           <span className="f-name" data-testid="frame-name">
             {f.name}

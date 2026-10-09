@@ -21,6 +21,9 @@
 // removes a selected frame. Step 4: frames take part in the selection of several (`frame:` keys): a lasso around a
 // whole frame, Shift+click on its name, Ctrl+A (every frame and the cards in no frame); the group moves and arranges
 // frames with their cards.
+// Slice 2c (D-07): a collapsed frame is drawn as a block, a node of its own kind (`BlockNode`); its cards stay in
+// React Flow's store, hidden, with their places kept. The block stands for the frame (selection key frame:<id>). A card
+// dragged onto a block, from the canvas or the left panel, is filed into the frame.
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -37,12 +40,14 @@ import "@xyflow/react/dist/style.css";
 import "./canvas.css";
 import { useToast } from "@/ui/components/toast";
 import { withClips, type CardData } from "./card-data";
-import CardNode, { FILTER_ORDER, type CardNodeT } from "./CardNode";
+import CardNode, { cardNodesOf, FILTER_ORDER, type CardNodeT } from "./CardNode";
+import BlockNode, { blockNodeId, type BlockNodeT } from "./BlockNode";
 import { RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
 import { NUDGE, useGroupActions, type GroupWrites } from "./GroupActions";
-import type { ConceptAsk, FrameData } from "./frame-data";
+import { conceptAsk, frameChips, frameColor, frameShape, frameStats, memberCounts, type ConceptAsk, type FrameData } from "./frame-data";
+import { conceptQuestions, frameAt as smallestFrameAt } from "@/domain/model/frames";
 import { ConceptQuestion } from "./ConceptQuestion";
 import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
@@ -65,6 +70,7 @@ import {
   MAX_ZOOM,
   MIN_ZOOM,
   newCardHeight,
+  HEAD_H,
   snap8,
   stackSpot,
   type Rect,
@@ -75,9 +81,10 @@ import { viewKey } from "./views";
 import LineLayer from "./LineLayer";
 import { Overview } from "./Overview";
 
-const nodeTypes = { card: CardNode };
+const nodeTypes = { card: CardNode, block: BlockNode };
 const NO_DIAGNOSIS: Diagnosis = {};
 const NO_FRAMES: FrameData[] = [];
+const NO_CONCEPTS: Record<string, string> = {};
 
 /** How far the grid layer reaches past the pane: the largest grid step (Lines at the highest zoom). Also in canvas.css. */
 const GRID_BLEED = 32 * MAX_ZOOM;
@@ -112,6 +119,8 @@ export interface ModelCanvasProps {
   concepts: Record<string, { name: string; color: string }>;
   /** Frame writes and every change of positions and widths (slice 2b, server actions). */
   frameWrites: FrameWrites;
+  /** Each entity's concept: a card dropped from the left panel on a concept frame's block may ask about it (slice 2c). */
+  entityConcepts?: Record<string, string>;
   /** A card to select and bring into view once the canvas is ready (“On canvases”, slice 2a); then the address
    * loses its query, so a reload keeps the remembered view. */
   focusCardId?: string | null;
@@ -168,6 +177,7 @@ export function ModelCanvas({
   frames: initialFrames,
   concepts,
   frameWrites,
+  entityConcepts = NO_CONCEPTS,
   focusCardId,
   diagnosis = NO_DIAGNOSIS,
 }: ModelCanvasProps) {
@@ -202,12 +212,21 @@ export function ModelCanvas({
 
   // ---- view: the remembered one, else fit everything ----
   const storeApi = useStoreApi();
-  const cardsNow = useCallback(() => (rf.getNodes() as CardNodeT[]).map((n) => n.data.card), [rf]);
   /** Everything on the canvas: the cards and the frames with their labels (slice 2b). */
   const framesNowRef = useRef<() => readonly FrameData[]>(() => initialFrames);
+  /** The cards drawn now: not those of a collapsed frame (slice 2c). */
+  const cardsNow = useCallback(() => {
+    const collapsed = new Set(framesNowRef.current().filter((f) => f.collapsed).map((f) => f.id));
+    return cardNodesOf(rf).map((n) => n.data.card).filter((c) => !c.frameId || !collapsed.has(c.frameId));
+  }, [rf]);
+  /** What stands for each frame now: the frame with its label, or its block when collapsed (slice 2c). */
+  const frameRectsNow = useCallback((): { f: FrameData; r: Rect }[] => {
+    const counts = memberCounts(cardNodesOf(rf).map((n) => n.data.card));
+    return framesNowRef.current().map((f) => ({ f, r: frameShape(f, counts) }));
+  }, [rf]);
   const fitView = useCallback(
     (w: number, h: number) => {
-      const boxes = [contentBounds(cardsNow()), ...framesNowRef.current().map((f) => ({ x: f.x, y: f.y - 30, w: f.width, h: f.height + 30 }))].filter((r) => r !== null);
+      const boxes = [contentBounds(cardsNow()), ...frameRectsNow().map(({ f, r }) => (f.collapsed ? r : { x: r.x, y: r.y - 30, w: r.w, h: r.h + 30 }))].filter((r) => r !== null);
       const bounds = boxes.length
         ? (() => {
             const x0 = Math.min(...boxes.map((r) => r.x)), y0 = Math.min(...boxes.map((r) => r.y));
@@ -216,7 +235,7 @@ export function ModelCanvas({
         : null;
       return fitViewport(bounds, { width: w, height: h }, ui.overviewOpen);
     },
-    [cardsNow, ui.overviewOpen],
+    [cardsNow, frameRectsNow, ui.overviewOpen],
   );
 
   const fit = useCallback(() => {
@@ -263,15 +282,17 @@ export function ModelCanvas({
   // ---- several cards (slice 2a) and frames (2b): their keys and rectangles, select all, Shift+click, lasso ----
   const boxes = useCallback(
     (): ItemBox[] => [
-      ...framesNowRef.current().map((f) => ({ id: f.id, key: frameKey(f.id), rect: { x: f.x, y: f.y, w: f.width, h: f.height } })),
-      ...(rf.getNodes() as CardNodeT[]).map(({ id, position, data: { card } }) => ({
+      // a collapsed frame by its block; its cards are hidden: a lasso does not catch them (slice 2c)
+      ...frameRectsNow().map(({ f, r }) => ({ id: f.id, key: frameKey(f.id), rect: r })),
+      ...cardNodesOf(rf).map(({ id, position, data: { card } }) => ({
         id,
         key: cardKey(card),
         rect: { x: position.x, y: position.y, w: cardWidth(card), h: cardHeight(card) },
         frameId: card.frameId,
+        hidden: !!card.frameId && !!framesNowRef.current().find((f) => f.id === card.frameId)?.collapsed,
       })),
     ],
-    [rf],
+    [rf, frameRectsNow],
   );
   const selectAll = useCallback(() => {
     const all = boxes();
@@ -444,15 +465,16 @@ export function ModelCanvas({
     return { x: -tx / z, y: -ty / z, w: w / z, h: h / z };
   }, [storeApi]);
 
+  /** What a new card must not cover: the cards drawn and the blocks of collapsed frames (slice 2c, item 9). */
   const occupied = useCallback(
-    (): Rect[] =>
-      (rf.getNodes() as CardNodeT[]).map((n) => ({
-        x: n.position.x,
-        y: n.position.y,
-        w: cardWidth(n.data.card),
-        h: cardHeight(n.data.card),
-      })),
-    [rf],
+    (): Rect[] => [
+      ...cardsNow().map((c) => {
+        const n = rf.getNode(c.id)!;
+        return { x: n.position.x, y: n.position.y, w: cardWidth(c), h: cardHeight(c) };
+      }),
+      ...frameRectsNow().filter(({ f }) => f.collapsed).map(({ r }) => r),
+    ],
+    [rf, cardsNow, frameRectsNow],
   );
 
   /** Moves the view so a box is in the middle (prototype centerOn); of a tall card the top part shows. */
@@ -469,9 +491,12 @@ export function ModelCanvas({
   const centerOn = useCallback(
     (cardId: string) => {
       const n = rf.getNode(cardId) as CardNodeT | undefined;
-      if (n) centerOnRect({ x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) });
+      if (!n) return;
+      // a card in a collapsed frame: its block (slice 2c, item 3)
+      const block = frameRectsNow().find(({ f }) => f.collapsed && f.id === n.data.card.frameId);
+      centerOnRect(block ? block.r : { x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) });
     },
-    [rf, centerOnRect],
+    [rf, centerOnRect, frameRectsNow],
   );
 
   // A card asked for on arrival (“On canvases”): selected and in view, once the view is set.
@@ -488,7 +513,7 @@ export function ModelCanvas({
 
   const cardOf = useCallback(
     (t: CardTarget) =>
-      (rf.getNodes() as CardNodeT[]).find(({ data: { card } }) =>
+      cardNodesOf(rf).find(({ data: { card } }) =>
         isEntity(t) ? card.kind === "ent" && card.targetId === t.entityId : card.kind === "src" && card.targetId === t.sourceTableId,
       ),
     [rf],
@@ -500,18 +525,43 @@ export function ModelCanvas({
     [],
   );
 
-  /** Places an element at a spot; an element already here is selected and shown instead (prototype addToCanvas). */
+  /** The drop's question (D-05), shown by the canvas further down; read when a drop needs it. */
+  const askRef = useRef<(q: ConceptAsk) => Promise<boolean>>(() => Promise.resolve(false));
+
+  /**
+   * Places an element at a spot; an element already here is selected and shown instead (prototype addToCanvas).
+   * `dropped` (slice 2c): dragged from the left panel; landing with the middle of its header on a collapsed frame's
+   * block files it into that frame, asking first about an entity of another concept (Łukasz's step 1 answer 2).
+   */
   const placeAt = useCallback(
-    async (target: CardTarget, spot: { x: number; y: number }, h: number, clicked: boolean) => {
+    async (target: CardTarget, spot: { x: number; y: number }, h: number, clicked: boolean, dropped?: { name: string }) => {
       const here = cardOf(target);
       if (here) {
         select({ t: "card", id: here.id });
         centerOn(here.id);
         return;
       }
+      const counts = memberCounts(cardNodesOf(rf).map((n) => n.data.card));
+      const block = dropped
+        ? smallestFrameAt(
+            framesNowRef.current().map((f) => ({ ...f, members: counts.get(f.id) ?? 0 })),
+            { x: spot.x + CARD_W / 2, y: spot.y + HEAD_H / 2 },
+          )
+        : null;
+      const filedInto = block?.collapsed ? block : null;
+      let moveToConcepts = false;
+      if (filedInto && isEntity(target)) {
+        const own = entityConcepts[target.entityId] ?? null;
+        const q = conceptQuestions([{ id: filedInto.id, kind: filedInto.kind, concept_id: filedInto.conceptId }], [
+          { cardId: "new", entityId: target.entityId, conceptId: own, frameBefore: null, frameAfter: filedInto.id },
+        ]);
+        if (q.length) {
+          moveToConcepts = await askRef.current(conceptAsk([{ name: dropped!.name, from: concepts[own ?? ""]?.name ?? "–", to: concepts[q[0]!.conceptId]?.name ?? "–" }]));
+        }
+      }
       let result: CanvasWriteResult<{ canvasItemId: string }>;
       try {
-        result = await placeCard({ ...target, ...spot, height: h, frames: frameRefs() });
+        result = await placeCard({ ...target, ...spot, height: h, frames: frameRefs(), ...(dropped ? { dragDrop: true } : {}), ...(moveToConcepts ? { moveToConcepts: true } : {}) });
       } catch {
         result = FAILED;
       }
@@ -520,11 +570,15 @@ export function ModelCanvas({
         return;
       }
       select({ t: "card", id: result.value.canvasItemId });
+      if (filedInto) {
+        toast(`${dropped!.name} added to the collapsed frame ${filedInto.name}.`);
+        return;
+      }
       const box = { ...spot, w: CARD_W, h };
       if (!inside(viewRect(), box)) centerOnRect(box);
       if (clicked) toast(`Added 1 ${isEntity(target) ? "entity" : "source table"} to the canvas.`);
     },
-    [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect, frameRefs],
+    [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect, frameRefs, rf, entityConcepts, concepts],
   );
 
   const place = useCallback(
@@ -645,6 +699,7 @@ export function ModelCanvas({
   });
   const { frames, saveLayout, arrangeIntoFrames } = frameState;
   useEffect(() => {
+    askRef.current = ask;
     saveLayoutRef.current = saveLayout;
     deleteFrameRef.current = frameState.deleteFrame;
     framesNowRef.current = frameState.framesNow;
@@ -654,7 +709,7 @@ export function ModelCanvas({
   const layoutKey = useMemo(
     () =>
       JSON.stringify([
-        frames.map((f) => [f.id, f.name, f.kind, f.conceptId, f.sourceSystemId, f.color, f.version]),
+        frames.map((f) => [f.id, f.name, f.kind, f.conceptId, f.sourceSystemId, f.color, f.version, f.collapsed]),
         cardData.map((c) => [c.id, c.frameId, c.mapped, c.links.length, c.subject.entityConceptId ?? c.subject.sourceSystemId]),
       ]),
     [frames, cardData],
@@ -670,6 +725,57 @@ export function ModelCanvas({
   const { publishLayout } = ui;
   useEffect(() => publishLayout(layoutKey), [publishLayout, layoutKey]);
   const selectedFrameId = selection?.t === "frame" ? selection.id : null;
+
+  // ---- collapsed frames (slice 2c, D-07): their cards hidden, a block standing for each ----
+  const collapsedIds = useMemo(() => new Set(frames.filter((f) => f.collapsed).map((f) => f.id)), [frames]);
+  const counts = useMemo(() => memberCounts(cardData), [cardData]);
+  /** What stands for each frame on the canvas: the frame, or its block (selection marks, slice 2c). */
+  const frameRects = useMemo(() => new Map(frames.map((f) => [f.id, frameShape(f, counts)])), [frames, counts]);
+  const blockNodes = useMemo((): BlockNodeT[] => {
+    if (!collapsedIds.size) return [];
+    const selectedKeys = selection?.t === "multi" ? new Set(selection.keys) : null;
+    return frames
+      .filter((f) => f.collapsed)
+      .map((f) => {
+        const members = cardData.filter((c) => c.frameId === f.id);
+        const r = frameRects.get(f.id)!;
+        return {
+          id: blockNodeId(f.id),
+          type: "block" as const,
+          position: { x: f.x, y: f.y },
+          width: r.w,
+          height: r.h,
+          data: {
+            frame: f,
+            color: frameColor(f, (id) => conceptColors[id]),
+            members: members.map((c) => ({ id: c.id, kind: c.kind, name: c.name, mapped: c.mapped, total: c.rows.length })),
+            // the block's footer: mapped, used, type and drafts; not “misplaced” (prototype blockCard)
+            chips: frameChips(frameStats(f, members), f.kind).filter((c) => c.tone !== "misplaced"),
+            selected: selectedFrameId === f.id || !!selectedKeys?.has(frameKey(f.id)),
+          },
+          draggable: false,
+          selectable: false,
+          connectable: false,
+          style: { pointerEvents: "all" as const },
+        };
+      });
+  }, [collapsedIds, frames, cardData, frameRects, conceptColors, selection, selectedFrameId]);
+  /** The nodes React Flow draws: the cards, those of a collapsed frame hidden, and the blocks. */
+  const flowNodes = useMemo(() => {
+    const cards = collapsedIds.size
+      ? nodes.map((n) => (n.data.card.frameId && collapsedIds.has(n.data.card.frameId) ? { ...n, hidden: true } : n))
+      : nodes;
+    return blockNodes.length ? [...cards, ...blockNodes] : cards;
+  }, [nodes, blockNodes, collapsedIds]);
+  /** A card row of a block: expand the frame, then select the card and bring it into view. */
+  const openMember = useCallback(
+    (frameId: string, cardId: string) => {
+      frameState.setCollapsed(frameId, false);
+      select({ t: "card", id: cardId });
+      setTimeout(() => centerOn(cardId), 0);
+    },
+    [frameState, select, centerOn],
+  );
   const onFramePointerDown = useCallback(
     (e: React.PointerEvent, frameId: string, part: FramePart) => {
       const toggle = () => select(toggleItem(selection, frameKey(frameId), boxes()));
@@ -710,6 +816,7 @@ export function ModelCanvas({
     items: boxes,
     framesNow: frameState.framesNow,
     patchFrames: frameState.patchFrames,
+    frameRect: (f) => frameShape(f, memberCounts(cardNodesOf(rf).map((n) => n.data.card))),
   });
 
   // Arrow keys nudge the selected cards by 8 px, with Shift by 32 px (outside text fields).
@@ -757,6 +864,7 @@ export function ModelCanvas({
       fitFrame: frameState.fitFrame,
       zoomToFrame: frameState.zoomToFrame,
       selectFrameCards: frameState.selectFrameCards,
+      setFrameCollapsed: frameState.setCollapsed,
       framesView: frameState.framesView,
       cardFrame: frameState.cardFrame,
       frameAt: frameState.frameAt,
@@ -774,7 +882,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -788,14 +896,14 @@ export function ModelCanvas({
       const raw = e.dataTransfer.getData(CARD_DRAG_TYPE);
       if (!raw) return;
       e.preventDefault();
-      let data: { target: CardTarget; rows: number };
+      let data: { target: CardTarget; rows: number; name?: string };
       try {
-        data = JSON.parse(raw) as { target: CardTarget; rows: number };
+        data = JSON.parse(raw) as { target: CardTarget; rows: number; name?: string };
       } catch {
         return;
       }
       const at = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-      void placeAt(data.target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(data.rows), false);
+      void placeAt(data.target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(data.rows), false, { name: data.name ?? "The card" });
     },
     [rf, placeAt],
   );
@@ -818,15 +926,20 @@ export function ModelCanvas({
       startRelate: modes.startRelate,
       fitWidth,
       toggleCard,
+      framePress: (e, frameId) => onFramePointerDown(e, frameId, "label"),
+      setFrameCollapsed: frameState.setCollapsed,
+      openMember,
+      canCollapse: editable,
     }),
-    [editable, selection, select, change, rf, modes.startRelate, fitWidth, toggleCard],
+    [editable, selection, select, change, rf, modes.startRelate, fitWidth, toggleCard, onFramePointerDown, frameState.setCollapsed, openMember],
   );
 
   // A selected card dragged in a group moves the others too, in the same update (slice 2a).
   const { withGroup, onNodeDragStart: groupDragStart, onGroupDragStop } = group;
   const onNodesChange = useCallback(
     (changes: NodeChange<CardNodeT>[]) => {
-      const all = withGroup(changes);
+      // a block's changes (its measured size) are not the cards'; it is drawn from its frame (slice 2c)
+      const all = withGroup(changes.filter((c) => !("id" in c) || !c.id.startsWith("block:")));
       setNodes((ns) => applyNodeChanges(all, ns));
     },
     [withGroup],
@@ -895,7 +1008,8 @@ export function ModelCanvas({
       >
         {grid !== "none" && <div className="im-grid" ref={gridRef} aria-hidden data-testid="canvas-grid" />}
         <ReactFlow
-          nodes={nodes}
+          // the blocks are nodes of their own kind (slice 2c); every handler here acts on cards and skips them
+          nodes={flowNodes as CardNodeT[]}
           onNodesChange={onNodesChange}
           onNodeDragStart={onNodeDragStart}
           onNodeDragStop={onNodeDragStop}
@@ -929,6 +1043,7 @@ export function ModelCanvas({
             cards={cardData}
             conceptColors={conceptColors}
             selectedId={selectedFrameId}
+            onCollapse={editable ? frameState.setCollapsed : undefined}
             editable={editable}
             drawing={frameState.drawing}
             onPointerDown={onFramePointerDown}
@@ -936,7 +1051,7 @@ export function ModelCanvas({
           {!diagnosis.noLines && <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />}
           <Overview lines={lines} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
-          <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} />
+          <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} frameRects={frameRects} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>

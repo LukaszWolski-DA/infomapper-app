@@ -78,6 +78,16 @@ describe("bundled lines (slice 2c, D-07): grouping per pair of ends", () => {
     expect(b.relationships).toEqual([]);
   });
 
+  it("a bundle counts distinct mappings: two inputs of one mapping in the same pair of ends put it in once (Łukasz, step 1 answer 1)", () => {
+    const both2: CanvasLines = {
+      mappings: [map("mc", [{ cardId: "crm1", columnId: "c-first" }, { cardId: "crm2", columnId: "c-last" }], { cardId: "line", attributeId: "l-name" }, { kind: "transform", ruled: true })],
+      relationships: [],
+    };
+    expect(bundleLines(both2, inS).bundles).toEqual([
+      { key: "m|f:S|r:l-name", t: "map", a: { key: "f:S", frameId: "S" }, z: { key: "r:l-name", cardId: "line", rowId: "l-name" }, ids: ["mc"] },
+    ]);
+  });
+
   it("relationship bundles are undirected: line→cust and cust→line are the same pair", () => {
     const b = bundleLines(lines, inC);
     expect(b.bundles.filter((x) => x.t === "rel").map((x) => x.ids)).toEqual([["r2", "r3", "r4"]]);

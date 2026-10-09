@@ -222,6 +222,27 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .frame-draw { position: absolute; border: 1.5px dashed var(--im-logical); background: color-mix(in srgb, var(--im-logical) 6%, transparent);
   border-radius: 16px; pointer-events: none }
 .im-canvas.tool-frame .react-flow__pane, .im-canvas.tool-frame .im-frame, .im-canvas.tool-frame .f-lab { cursor: crosshair }
+.im-canvas .f-lab .f-collapse { flex: none; margin-right: -2px }
+
+/* A collapsed frame's block (slice 2c, D-07; prototype .fblock, .b-body, .brow, .b-foot): a card with a stack behind
+   it, in the frame's colour. No opacity (AD-24); its text scales with the canvas like a card's. */
+.im-canvas .card.fblock { border-radius: 12px; overflow: hidden;
+  box-shadow: 0 0 0 1px var(--im-line), 4px 4px 0 -1px var(--im-surface), 4px 4px 0 0 var(--im-line), 8px 8px 0 -1px var(--im-surface), 8px 8px 0 0 var(--im-line), 0 12px 24px -12px var(--im-shadow) }
+.im-canvas .card.fblock.sel { box-shadow: 0 0 0 2px var(--fc), 4px 4px 0 -1px var(--im-surface), 4px 4px 0 0 var(--im-line), 8px 8px 0 -1px var(--im-surface), 8px 8px 0 0 var(--im-line), 0 12px 24px -12px var(--im-shadow) }
+.im-canvas .fblock .c-head { background: color-mix(in srgb, var(--fc) 10%, var(--im-surface)); cursor: move }
+.im-canvas .fblock .c-head::before { content: ""; position: absolute; left: 0; top: 0; bottom: -1px; width: 4px; background: var(--fc) }
+.im-canvas .fblock .b-body { padding: 6px 0 }
+.im-canvas .fblock .brow { display: flex; align-items: center; gap: 8px; height: 22px; padding: 0 12px 0 14px; font-size: 12px; cursor: pointer }
+.im-canvas .fblock .brow:hover { background: var(--im-hover) }
+.im-canvas .fblock .brow .bk { width: 8px; height: 8px; flex: none; border-radius: 2px; background: var(--im-physical) }
+.im-canvas .fblock .brow .bk.ent { border-radius: 50%; background: var(--im-logical) }
+.im-canvas .fblock .brow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.im-canvas .fblock .brow .nm.mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11.5px }
+.im-canvas .fblock .brow .dt { color: var(--im-ink-3); font-size: 11px; font-variant-numeric: tabular-nums }
+.im-canvas .fblock .brow.more, .im-canvas .fblock .brow.none { color: var(--im-ink-3); cursor: default }
+.im-canvas .fblock .brow.more:hover, .im-canvas .fblock .brow.none:hover { background: transparent }
+.im-canvas .fblock .b-foot { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-top: 1px solid var(--im-line); overflow: hidden }
+.im-canvas .overview-svg .mb { fill-opacity: .35; stroke: none }
 
 /* The drop's concept question (slice 2b; prototype #ask) */
 .im-canvas .concept-ask { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 8px;

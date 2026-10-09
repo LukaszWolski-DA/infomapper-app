@@ -98,6 +98,14 @@ describe("frames in the selection (slice 2b, D-16, D-17)", () => {
     expect(lassoHits(items, { x: -10, y: -10, w: 700, h: 300 })).toEqual(["entity:customer", "entity:order"]);
   });
 
+  it("a lasso does not catch a card hidden in a collapsed frame (slice 2c)", () => {
+    const collapsed = items.map((i) => (i.id === "F2" ? { ...i, rect: { x: 1000, y: 0, w: 280, h: 118 } } : i.id === "c4" ? { ...i, hidden: true } : i));
+    // around c4's place but not the whole block: neither the hidden card nor the frame
+    expect(lassoHits(collapsed, { x: 1030, y: 30, w: 300, h: 200 })).toEqual([]);
+    // around the whole block: the frame
+    expect(lassoHits(collapsed, { x: 990, y: -10, w: 300, h: 200 })).toEqual(["frame:F2"]);
+  });
+
   it("Ctrl+A selects every frame and the cards in no frame", () => {
     expect(allKeys(items)).toEqual(["frame:F1", "frame:F2", "source:customers"]);
   });

@@ -15,7 +15,7 @@ import { useToast } from "@/ui/components/toast";
 import { ARRANGED, arrange, type ArrangeMode } from "./arrange";
 import type { CardData } from "./card-data";
 import type { FrameData } from "./frame-data";
-import type { CardNodeT } from "./CardNode";
+import { cardNodesOf, type CardNodeT } from "./CardNode";
 import type { CardTarget, UndoHooks } from "./context";
 import type { SaveLayoutOptions } from "./useFrames";
 import type { LayoutChange } from "./layout-plan";
@@ -58,6 +58,8 @@ interface Options extends GroupWrites {
   /** The frames as the canvas shows them now, and a change of where they are shown (not saved). */
   framesNow: () => readonly FrameData[];
   patchFrames: (patch: ReadonlyMap<string, Partial<FrameData>>) => void;
+  /** What stands for a frame: the frame, or its block when collapsed (slice 2c: align, stack, line up use its size). */
+  frameRect: (f: FrameData) => Rect;
 }
 
 type Move = { id: string; from: Pt; to: Pt };
@@ -69,20 +71,20 @@ export function useGroupActions(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
   const { editable, selection, select, setNodes, patchCard, enqueueGroup, versions, pending, undo, occupied, viewRect } = o;
-  const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames } = o;
+  const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames, frameRect } = o;
 
   /** The selected cards themselves on this canvas (not frames): several, or the one selected card. */
   const selectedNodes = useCallback((): CardNodeT[] => {
     const all = items();
     const ids = new Set(selectedCardIds(selectedKeys(selection, all), all));
-    return (rf.getNodes() as CardNodeT[]).filter((n) => ids.has(n.id));
+    return cardNodesOf(rf).filter((n) => ids.has(n.id));
   }, [rf, selection, items]);
 
   /** What the selection moves: selected frames with their cards, and the other selected cards (slice 2b). */
   const moving = useCallback(() => {
     const all = items();
     const u = unitsOf(selectedKeys(selection, all), all);
-    const byId = new Map((rf.getNodes() as CardNodeT[]).map((n) => [n.id, n]));
+    const byId = new Map(cardNodesOf(rf).map((n) => [n.id, n]));
     const frames = new Map(framesNow().map((f) => [f.id, f]));
     return {
       frames: u.frames.map((id) => frames.get(id)).filter((f): f is FrameData => !!f),
@@ -260,7 +262,7 @@ export function useGroupActions(o: Options) {
       const m = moving();
       if (!editable || m.cards.length + m.frames.length < 2) return;
       const to = arrange(mode, [
-        ...m.frames.map((f) => ({ id: f.id, rect: { x: f.x, y: f.y, w: f.width, h: f.height }, frame: true })),
+        ...m.frames.map((f) => ({ id: f.id, rect: frameRect(f), frame: true })),
         ...m.cards.map((n) => ({ id: n.id, rect: rectOf(n) })),
       ]);
       const frames = changedOnly(m.frames.map((f) => ({ id: f.id, from: { x: f.x, y: f.y }, to: to.get(f.id)! })));
@@ -271,7 +273,7 @@ export function useGroupActions(o: Options) {
       }
       saveMoves({ frames, cards }, { onGrid: true, saved: () => toast(ARRANGED[mode]) });
     },
-    [editable, moving, saveMoves, toast],
+    [editable, moving, saveMoves, toast, frameRect],
   );
 
   const fitSelectionWidths = useCallback(() => {
@@ -331,7 +333,7 @@ export function useGroupActions(o: Options) {
         .filter((n) => n.data.card.kind === "ent")
         .sort((a, b) => a.position.y - b.position.y || a.position.x - b.position.x);
       if (!entities.length) return;
-      const here = new Set((rf.getNodes() as CardNodeT[]).filter((n) => n.data.card.kind === "src").map((n) => n.data.card.targetId));
+      const here = new Set(cardNodesOf(rf).filter((n) => n.data.card.kind === "src").map((n) => n.data.card.targetId));
       const taken = occupied();
       const placed: (CardTarget & { x: number; y: number; height: number })[] = [];
       const boxes: Rect[] = [];

@@ -184,6 +184,35 @@ describe("a placed card joins the frame it lands in (slice 2b, D-05)", () => {
     expect(place({ x: 100, y: 300, height: 200 })).toMatchObject({ ok: false, error: { code: "stale_version" } });
   });
 
+  describe("on a collapsed frame's block (slice 2c, Łukasz's step 1 answer 2)", () => {
+    // a collapsed Sales concept frame with one member: its block is 280 × 118 at (0, 0); the frame is 600 × 400
+    const sales = frame(ids.frameA, { kind: "concept", concept_id: ids.conceptSales, name: "Sales", color: null, x: 0, y: 0, width: 600, height: 400, collapsed: true });
+    const member = canvasItem("01900000-0000-7000-8000-00000000c003", { entity_id: ids.salesOrder, x: 50, y: 60, frame_id: ids.frameA });
+    const onBlock = { ...base, frames: [sales], items: [member] };
+    const drop = (input: object, role: "modeler" | "reviewer" = "modeler") =>
+      placeOnCanvas(makeCtx(), access(role), onBlock, { canvasId: canvas1, entityId: ids.customer, x: 20, y: 10, height: 200, frames: [{ frameId: ids.frameA, expectedVersion: 1 }], ...input });
+
+    it("a drop from the left panel files the card into the frame and grows it", () => {
+      const r = drop({ dragDrop: true });
+      if (!r.ok) throw new Error(r.error.message);
+      expect(r.writeSet.writes).toMatchObject([
+        { kind: "insert", table: "canvas_item", row: { frame_id: ids.frameA, x: 32, y: 392 } }, // 400 − 8
+        { kind: "update", table: "frame", row: { id: ids.frameA, height: 392 + 200 + 24, collapsed: true } },
+      ]);
+    });
+
+    it("with the concept answered, the entity moves to the frame's concept in the same change", () => {
+      const r = drop({ dragDrop: true, moveToConcepts: true });
+      if (!r.ok) throw new Error(r.error.message);
+      expect(r.writeSet.writes.find((w) => w.table === "entity")).toMatchObject({ row: { id: ids.customer, concept_id: ids.conceptSales } });
+      expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+    });
+
+    it("a card the app places there (no drag) does not join the collapsed frame", () => {
+      expect(drop({})).toMatchObject({ ok: true, writeSet: { writes: [{ row: { frame_id: null, x: 20, y: 10 } }] } });
+    });
+  });
+
   it("does the same for several cards placed at once", () => {
     const r = placeManyOnCanvas(makeCtx(), access("modeler"), { canvas: canvas(), entities: [entity(ids.customer)], sourceTables: [sourceTable()], items: [], frames: [area] }, {
       canvasId: canvas1,
