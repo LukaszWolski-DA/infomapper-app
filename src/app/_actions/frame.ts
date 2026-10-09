@@ -15,6 +15,7 @@ import {
   moveOnCanvas,
   putCardsInNewFrame,
   resizeFrame,
+  setAllFramesCollapsed,
   setFrameCollapsed,
   updateFrame,
   type FrameCanvasState,
@@ -120,6 +121,11 @@ export async function setFrameCollapsedAction(workspaceId: string, input: { fram
       return setFrameCollapsed(ctx, access, { frame }, input);
     }),
   );
+}
+
+/** “Collapse all” / “Expand all” in the canvas overview (slice 2c, item 8): every frame of the canvas, one change. */
+export async function setAllFramesCollapsedAction(workspaceId: string, canvasId: string, input: { frames: { frameId: string; expectedVersion: number }[]; collapsed: boolean }) {
+  return refreshed(await onCanvas(workspaceId, canvasId, async (ctx, access, state) => setAllFramesCollapsed(ctx, access, state, { ...input, canvasId })));
 }
 
 /** The resize handle at a frame's bottom-right corner. */

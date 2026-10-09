@@ -15,11 +15,14 @@
 //   move them in the model (D-05, D-17); the drop and the answer are saved together. Other moves only mark them.
 //   “Put in a new frame”; the frames as the panels see them (`frameView`, `framesView`, `cardFrame`, `frameAt`).
 // - Slice 2c (D-07): collapsing a frame into one block and expanding it (`setCollapsed`), one undo step each; a collapsed
-//   frame counts by its block, and a drag drop on the block files the card into the frame (layout-plan.ts).
+//   frame counts by its block, and a drag drop on the block files the card into the frame (layout-plan.ts). “Collapse
+//   all” / “Expand all” (`setAllCollapsed`). Reviewers and readers collapse and expand in their own tab only (item 11,
+//   as the layer mode of slice 2a): the tab keeps an override for each frame they changed, which wins over the saved
+//   state until they leave or reload the canvas; every other frame shows the saved state. Nothing is saved or undone.
 // - Slice 2b step 4: a frame that is part of a selection of several, dragged by its name or an empty spot, moves the
 //   whole selection: every selected frame with its cards and every other selected card (D-17, prototype startGroupDrag).
 
-import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import { applyNodeChanges, useReactFlow, type NodeChange } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
 import {
@@ -63,6 +66,8 @@ export interface FrameWrites {
   }) => Promise<WriteResult<Versions & { movedToConcepts: number }>>;
   /** Collapses a frame into one block or expands it (slice 2c, D-07). */
   setFrameCollapsed: (input: { frameId: Uuid; expectedVersion: number; collapsed: boolean }) => Promise<WriteResult<{ frame: Frame }>>;
+  /** “Collapse all” / “Expand all” (slice 2c, item 8): every frame of the canvas, one change. */
+  setAllFramesCollapsed: (input: { frames: { frameId: Uuid; expectedVersion: number }[]; collapsed: boolean }) => Promise<WriteResult<Versions & { frames: number }>>;
   createFrame: (input: { x: number; y: number; width: number; height: number; cards: SizedRef[] }) => Promise<WriteResult<Versions & { frameId: Uuid; claimed: number }>>;
   updateFrame: (input: { frameId: Uuid; expectedVersion: number } & FramePatch) => Promise<WriteResult<{ frame: Frame }>>;
   resizeFrame: (input: { frameId: Uuid; expectedVersion: number; width: number; height: number; cards: CardRef[] }) => Promise<WriteResult<Versions>>;
@@ -143,7 +148,15 @@ export function useFrames(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
   const { editable, setNodes, patchCard, enqueueGroup, versions, pending, select, undo, writes, spaceDown } = o;
-  const [frames, setFrames] = useState<FrameData[]>(() => [...o.initialFrames]);
+  /** The frames as saved (and as an editor changes them). */
+  const [saved, setFrames] = useState<FrameData[]>(() => [...o.initialFrames]);
+  /** Reviewers and readers: the frames collapsed or expanded in this tab only (item 11), by frame id. */
+  const [tabCollapsed, setTabCollapsed] = useState<ReadonlyMap<Uuid, boolean>>(() => new Map());
+  /** The frames as the canvas shows them: the saved ones with this tab's own collapse state. */
+  const frames = useMemo(
+    () => (tabCollapsed.size ? saved.map((f) => (tabCollapsed.has(f.id) && tabCollapsed.get(f.id) !== f.collapsed ? { ...f, collapsed: tabCollapsed.get(f.id)! } : f)) : saved),
+    [saved, tabCollapsed],
+  );
   const framesRef = useRef(frames);
   useEffect(() => {
     framesRef.current = frames;
@@ -663,11 +676,32 @@ export function useFrames(o: Options) {
     [rf, boxes],
   );
 
-  /** Collapses a frame into one block or expands it (slice 2c, D-07): shown at once, saved as one undo step. */
+  const collapseToast = useCallback(
+    (name: string, collapsed: boolean) => (collapsed ? `Collapsed ${name}. Its lines are bundled; click a bundle to see what is inside.` : `Expanded ${name}.`),
+    [],
+  );
+  /** Reviewers and readers (item 11): frames shown collapsed or expanded in this tab only. */
+  const setInTab = useCallback((frameIds: readonly Uuid[], collapsed: boolean) => {
+    setTabCollapsed((m) => {
+      const next = new Map(m);
+      for (const id of frameIds) next.set(id, collapsed);
+      return next;
+    });
+  }, []);
+
+  /**
+   * Collapses a frame into one block or expands it (slice 2c, D-07): shown at once, saved as one undo step; for
+   * reviewers and readers in this tab only (item 11).
+   */
   const setCollapsed = useCallback(
     (frameId: Uuid, collapsed: boolean) => {
       const f = framesRef.current.find((x) => x.id === frameId);
-      if (!editable || !f || f.collapsed === collapsed) return;
+      if (!f || f.collapsed === collapsed) return;
+      if (!editable) {
+        setInTab([frameId], collapsed);
+        toast(collapseToast(f.name, collapsed));
+        return;
+      }
       patchFrames(new Map([[frameId, { collapsed }]]));
       enqueueGroup([frameId], async () => {
         let result: WriteResult<{ frame: Frame }>;
@@ -685,14 +719,46 @@ export function useFrames(o: Options) {
         patchFrames(new Map([[frameId, { version: result.value.frame.version }]]));
         const u = undo();
         u?.noteSaved();
-        toast(
-          collapsed ? `Collapsed ${f.name}. Its lines are bundled; click a bundle to see what is inside.` : `Expanded ${f.name}.`,
-          "info",
-          u ? { label: "Undo", run: u.undo } : undefined,
-        );
+        toast(collapseToast(f.name, collapsed), "info", u ? { label: "Undo", run: u.undo } : undefined);
       });
     },
-    [editable, patchFrames, enqueueGroup, writes, ver, versions, undo, toast],
+    [editable, patchFrames, enqueueGroup, writes, ver, versions, undo, toast, setInTab, collapseToast],
+  );
+
+  /** “Collapse all” / “Expand all” (item 8): one undo step; for reviewers and readers in this tab only (item 11). */
+  const setAllCollapsed = useCallback(
+    (collapsed: boolean) => {
+      const all = framesRef.current;
+      if (!all.length) return;
+      const message = collapsed ? "All frames collapsed. Lines between them are bundled." : "All frames expanded.";
+      const changing = all.filter((f) => f.collapsed !== collapsed);
+      if (!editable || !changing.length) {
+        if (!editable) setInTab(all.map((f) => f.id), collapsed);
+        toast(message);
+        return;
+      }
+      patchFrames(new Map(changing.map((f) => [f.id, { collapsed }])));
+      const ids = all.map((f) => f.id);
+      enqueueGroup(ids, async () => {
+        let result: WriteResult<Versions & { frames: number }>;
+        try {
+          result = await writes.setAllFramesCollapsed({ frames: ids.map((id) => ({ frameId: id, expectedVersion: ver(id) })), collapsed });
+        } catch {
+          result = FAILED;
+        }
+        if (!result.ok) {
+          patchFrames(new Map(changing.map((f) => [f.id, { collapsed: !collapsed }])));
+          toast(result.message, "refusal");
+          return;
+        }
+        noteVersions(result.value.versions);
+        patchFrames(new Map(Object.entries(result.value.versions).map(([id, version]) => [id, { version }])));
+        const u = undo();
+        u?.noteSaved();
+        toast(message, "info", u ? { label: "Undo", run: u.undo } : undefined);
+      });
+    },
+    [editable, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast, setInTab],
   );
 
   const { selectCards } = o;
@@ -867,5 +933,6 @@ export function useFrames(o: Options) {
     frameRefs,
     putInNewFrame,
     setCollapsed,
+    setAllCollapsed,
   };
 }

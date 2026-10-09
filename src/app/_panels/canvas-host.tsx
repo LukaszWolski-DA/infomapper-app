@@ -375,10 +375,9 @@ export function useCanvasHost({
       items.push({ head: view.frame.name });
       const collapsed = view.frame.collapsed;
       if (editable) items.push({ label: "Rename…", act: () => focusField("f-fn"), testId: "toolbox-frame-rename" });
-      // slice 2c (D-07): collapse into one block or expand; a block offers no fit, and its cards are not selectable
-      if (editable) {
-        items.push({ label: collapsed ? "Expand" : "Collapse into one block", act: () => ui.setFrameCollapsed(t.frameId, !collapsed), testId: "toolbox-frame-collapse" });
-      }
+      // slice 2c (D-07): collapse into one block or expand, for every role (reviewers and readers in their own tab
+      // only, item 11); a block offers no fit, and its cards are not selectable
+      items.push({ label: collapsed ? "Expand" : "Collapse into one block", act: () => ui.setFrameCollapsed(t.frameId, !collapsed), testId: "toolbox-frame-collapse" });
       if (editable && !collapsed) items.push({ label: "Fit frame to its content", act: () => ui.fitFrame(t.frameId), testId: "toolbox-frame-fit" });
       items.push({ label: "Select its cards", disabled: collapsed || !view.cardIds.length, act: () => ui.selectFrameCards(t.frameId), testId: "toolbox-frame-select-cards" });
       items.push({ label: "Zoom to frame", act: () => ui.zoomToFrame(t.frameId), testId: "toolbox-frame-zoom" });
@@ -394,12 +393,11 @@ export function useCanvasHost({
       if (!b) return items;
       items.push({ head: `${b.ids.length} bundled ${b.t === "rel" ? "relationships" : "mappings"}` });
       items.push({ label: "Show what is inside", act: () => ui.select({ t: "bundle", id: b.key }), testId: "toolbox-bundle-show" });
-      if (editable) {
-        for (const e of [b.a, b.z]) {
-          if (!("frameId" in e)) continue;
-          const name = ui.frameView(e.frameId)?.frame.name ?? "?";
-          items.push({ label: `Expand ${name}`, act: () => ui.setFrameCollapsed(e.frameId, false), testId: "toolbox-bundle-expand" });
-        }
+      // every role: reviewers and readers expand in their own tab only (item 11)
+      for (const e of [b.a, b.z]) {
+        if (!("frameId" in e)) continue;
+        const name = ui.frameView(e.frameId)?.frame.name ?? "?";
+        items.push({ label: `Expand ${name}`, act: () => ui.setFrameCollapsed(e.frameId, false), testId: "toolbox-bundle-expand" });
       }
       return items;
     }

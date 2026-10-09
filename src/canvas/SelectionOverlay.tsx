@@ -3,7 +3,8 @@
 // Several selected cards and the lasso (slice 2a; prototype #lasso, #selbox, .card.msel): each selected card gets a
 // mark and a dashed box around the group shows “N selected”. Drawn in an overlay above the cards, so no card is
 // restyled (AD-24, as the hover highlight). Positions come from the store, so the marks follow a drag. Slice 2b: a
-// selected frame gets a mark around it too and counts in “N selected”.
+// selected frame gets a mark around it too and counts in “N selected”. Slice 2c: a collapsed frame's mark goes around
+// its block, with the block's corners; a card hidden in a collapsed frame gets none.
 
 import { memo } from "react";
 import { useStore, ViewportPortal, type Node } from "@xyflow/react";
@@ -29,12 +30,14 @@ function SelectionOverlay({
   const keys = selection?.t === "multi" ? new Set(selection.keys) : null;
   if (!keys && !lasso) return null;
 
-  const marks: { id: string; r: Rect; frame?: boolean }[] = [];
+  const marks: { id: string; r: Rect; frame?: boolean; rx?: number }[] = [];
   if (keys) {
-    for (const f of frames) if (keys.has(frameKey(f.id))) marks.push({ id: f.id, r: frameRects.get(f.id) ?? { x: f.x, y: f.y, w: f.width, h: f.height }, frame: true });
+    for (const f of frames) {
+      if (keys.has(frameKey(f.id))) marks.push({ id: f.id, r: frameRects.get(f.id) ?? { x: f.x, y: f.y, w: f.width, h: f.height }, frame: true, rx: f.collapsed ? 13 : 17 });
+    }
     for (const n of nodes) {
       const card = n.data.card;
-      if (keys.has(cardKey(card))) marks.push({ id: n.id, r: { x: n.position.x, y: n.position.y, w: cardWidth(card), h: cardHeight(card) } });
+      if (!n.hidden && keys.has(cardKey(card))) marks.push({ id: n.id, r: { x: n.position.x, y: n.position.y, w: cardWidth(card), h: cardHeight(card) } });
     }
   }
   const box = selectionBounds(marks.map((m) => m.r));
@@ -42,9 +45,9 @@ function SelectionOverlay({
   return (
     <ViewportPortal>
       <svg className="hover-layer selection-layer" width={1} height={1} data-testid="layer-selection">
-        {marks.map(({ id, r, frame }) =>
+        {marks.map(({ id, r, frame, rx }) =>
           frame ? (
-            <rect key={id} className="msel" data-testid="mark-selected-frame" data-frame-mark={id} x={r.x - 1} y={r.y - 1} width={r.w + 2} height={r.h + 2} rx={17} />
+            <rect key={id} className="msel" data-testid="mark-selected-frame" data-frame-mark={id} x={r.x - 1} y={r.y - 1} width={r.w + 2} height={r.h + 2} rx={rx} />
           ) : (
             <rect key={id} className="msel" data-testid="mark-selected" data-card={id} x={r.x - 1} y={r.y - 1} width={r.w + 2} height={r.h + 2} rx={9} />
           ),

@@ -27,8 +27,6 @@ export interface CanvasCardsApi {
   setFrameCollapsed: (frameId: string, collapsed: boolean) => void;
   /** A card row of a block: expand the frame and select that card. */
   openMember: (frameId: string, cardId: string) => void;
-  /** Whether collapse and expand are offered. */
-  canCollapse: boolean;
 }
 
 const noop = () => {};
@@ -44,7 +42,6 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
   framePress: noop,
   setFrameCollapsed: noop,
   openMember: noop,
-  canCollapse: false,
 });
 
 /**
@@ -136,8 +133,13 @@ export interface CanvasHandle {
   zoomToFrame: (frameId: Uuid) => void;
   /** Selects the frame's cards (toolbox “Select its cards”). */
   selectFrameCards: (frameId: Uuid) => void;
-  /** Collapses a frame into one block or expands it (slice 2c, D-07). */
+  /**
+   * Collapses a frame into one block or expands it (slice 2c, D-07). Editors save it; reviewers and readers change only
+   * what their own tab shows (item 11).
+   */
   setFrameCollapsed: (frameId: Uuid, collapsed: boolean) => void;
+  /** “Collapse all” / “Expand all” (canvas overview), saved or in this tab only, as one frame. */
+  setAllFramesCollapsed: (collapsed: boolean) => void;
   /** A bundle of lines at a collapsed frame as the canvas draws it now (slice 2c, the bundle panel). */
   bundleView: (key: string) => Bundle | null;
 }
@@ -303,6 +305,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   zoomToFrame: noop,
   selectFrameCards: noop,
   setFrameCollapsed: noop,
+  setAllFramesCollapsed: noop,
   bundleView: () => null,
   registerCanvas: noop,
   mode: null,

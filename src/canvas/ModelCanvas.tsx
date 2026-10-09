@@ -901,6 +901,7 @@ export function ModelCanvas({
       zoomToFrame: frameState.zoomToFrame,
       selectFrameCards: frameState.selectFrameCards,
       setFrameCollapsed: frameState.setCollapsed,
+      setAllFramesCollapsed: frameState.setAllCollapsed,
       bundleView: (key) => bundlesRef.current.find((b) => b.key === key) ?? null,
       framesView: frameState.framesView,
       cardFrame: frameState.cardFrame,
@@ -919,7 +920,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -966,7 +967,6 @@ export function ModelCanvas({
       framePress: (e, frameId) => onFramePointerDown(e, frameId, "label"),
       setFrameCollapsed: frameState.setCollapsed,
       openMember,
-      canCollapse: editable,
     }),
     [editable, selection, select, change, rf, modes.startRelate, fitWidth, toggleCard, onFramePointerDown, frameState.setCollapsed, openMember],
   );
@@ -1080,7 +1080,7 @@ export function ModelCanvas({
             cards={cardData}
             conceptColors={conceptColors}
             selectedId={selectedFrameId}
-            onCollapse={editable ? frameState.setCollapsed : undefined}
+            onCollapse={frameState.setCollapsed}
             editable={editable}
             drawing={frameState.drawing}
             onPointerDown={onFramePointerDown}

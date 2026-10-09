@@ -7,6 +7,7 @@ import {
   moveOnCanvasAction,
   putInNewFrameAction,
   resizeFrameAction,
+  setAllFramesCollapsedAction,
   setFrameCollapsedAction,
   updateFrameAction,
 } from "@/app/_actions/frame";
@@ -169,6 +170,7 @@ export default async function CanvasPage({
                 putInNewFrame: putInNewFrameAction.bind(null, ws, canvasId),
                 arrangeIntoFrames: arrangeIntoFramesAction.bind(null, ws, canvasId),
                 setFrameCollapsed: setFrameCollapsedAction.bind(null, ws),
+                setAllFramesCollapsed: setAllFramesCollapsedAction.bind(null, ws, canvasId),
               }}
               entityConcepts={Object.fromEntries(model.entities.map((e) => [e.id, e.concept_id]))}
               focusCardId={focusCardId}

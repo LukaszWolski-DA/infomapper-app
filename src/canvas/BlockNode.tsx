@@ -75,14 +75,12 @@ function BlockNode({ data }: NodeProps<BlockNodeT>) {
           <span data-testid="block-count">
             collapsed, {n} card{n === 1 ? "" : "s"}
           </span>
-          {ctx.canCollapse && (
-            <span className="c-tools nodrag">
-              <button type="button" className="ib" data-testid="button-block-expand" title="Expand the frame" onPointerDown={(e) => e.stopPropagation()} onClick={expand}>
-                <GrowIcon />
-                Expand
-              </button>
-            </span>
-          )}
+          <span className="c-tools nodrag">
+            <button type="button" className="ib" data-testid="button-block-expand" title="Expand the frame" onPointerDown={(e) => e.stopPropagation()} onClick={expand}>
+              <GrowIcon />
+              Expand
+            </button>
+          </span>
         </div>
         <div className="c-l2">
           <span className="c-name" data-testid="block-name" title={f.name}>

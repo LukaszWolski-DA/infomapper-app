@@ -36,7 +36,7 @@ export function BundlePanel({ bundle: b, entityName }: { bundle: Bundle; entityN
   const expand = (
     <Actions>
       {collapsedEnds.map((e) => (
-        <button key={e.frameId} type="button" className={buttonClass} disabled={!p.editable} onClick={() => ui.setFrameCollapsed(e.frameId, false)} data-testid="button-bundle-expand">
+        <button key={e.frameId} type="button" className={buttonClass} onClick={() => ui.setFrameCollapsed(e.frameId, false)} data-testid="button-bundle-expand">
           Expand {frameName(e.frameId)}
         </button>
       ))}
