@@ -19,6 +19,8 @@ interface Press {
   start: Pt;
   add: boolean;
   moved: boolean;
+  /** A release without moving (Shift+click inside a frame, slice 2b). */
+  onClick?: () => void;
 }
 
 /** A press on the empty canvas: the pane itself, not a card, a line, the Overview or a control. */
@@ -36,10 +38,14 @@ export function useLasso(onDone: (lasso: Rect, add: boolean) => void) {
     done.current = onDone;
   }, [onDone]);
 
+  /**
+   * A press that may start a lasso: on the empty canvas, or anywhere when `force` (Shift inside a frame, slice 2b);
+   * `onClick` runs instead when it is released without moving.
+   */
   const onPointerDown = useCallback(
-    (e: ReactPointerEvent) => {
-      if (e.button !== 0 || !onEmptyCanvas(e.target)) return;
-      press.current = { sx: e.clientX, sy: e.clientY, start: rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }), add: e.shiftKey, moved: false };
+    (e: ReactPointerEvent, force = false, onClick?: () => void) => {
+      if (e.button !== 0 || (!force && !onEmptyCanvas(e.target))) return;
+      press.current = { sx: e.clientX, sy: e.clientY, start: rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }), add: e.shiftKey, moved: false, onClick };
     },
     [rf],
   );
@@ -60,7 +66,10 @@ export function useLasso(onDone: (lasso: Rect, add: boolean) => void) {
       const p = press.current;
       if (!p) return;
       end();
-      if (!p.moved) return;
+      if (!p.moved) {
+        p.onClick?.();
+        return;
+      }
       // The release is not a click on the empty canvas (that would clear the new selection).
       const swallow = (c: MouseEvent) => c.stopPropagation();
       window.addEventListener("click", swallow, { capture: true, once: true });

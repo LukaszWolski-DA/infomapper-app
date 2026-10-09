@@ -1,18 +1,15 @@
 "use server";
 
-// Card writes on the canvas (slice 1a): position (when a drag ends), collapse and row filter, which need no fresh page;
-// placing a card and removing it, which do; slice 1b: placing several at once (feeding sources, B-08); slice 2a:
-// moving, arranging, sizing and removing a group of selected cards, each in one change.
+// Card writes on the canvas (slice 1a): collapse and row filter, which need no fresh page; placing a card and removing
+// it, which do; slice 1b: placing several at once (feeding sources, B-08); slice 2a: removing a group of selected
+// cards in one change. Positions and widths are in `frame.ts` (`moveOnCanvasAction`, slice 2b).
 
 import { revalidatePath } from "next/cache";
 import {
-  arrangeCanvasItems,
-  moveCanvasItems,
   placeManyOnCanvas,
   placeOnCanvas,
   removeCanvasItems,
   removeFromCanvas,
-  setCanvasItemWidths,
   updateCanvasItem,
   type CanvasItemsState,
 } from "@/domain/commands/canvas-item";
@@ -27,12 +24,9 @@ export interface CardChangeInput {
   expectedVersion: number;
   collapsed?: boolean;
   rowFilter?: string;
-  x?: number;
-  y?: number;
-  width?: number | null;
 }
 
-/** Saves a card's position, collapse state, row filter or width. Returns the card's new version for the next change. */
+/** Saves a card's collapse state or row filter. Returns the card's new version for the next change. */
 export async function updateCardAction(workspaceId: string, change: CardChangeInput): Promise<ActionResult<{ version: number }>> {
   return runCommand(async (ctx, store, user) => {
     const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
@@ -48,23 +42,25 @@ export async function updateCardAction(workspaceId: string, change: CardChangeIn
 export async function placeCardAction(
   workspaceId: string,
   canvasId: string,
-  input: { entityId?: string; sourceTableId?: string; x: number; y: number },
+  input: { entityId?: string; sourceTableId?: string; x: number; y: number; height?: number; frames?: { frameId: string; expectedVersion: number }[] },
 ): Promise<ActionResult<{ canvasItemId: string }>> {
   const result = await runCommand(async (ctx, store, user) => {
     const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
     if (!workspace) return NOT_FOUND;
     const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
     const cid = typeof canvasId === "string" ? canvasId : "";
-    const [canvas, model, items] = await Promise.all([
+    const [canvas, model, items, frames] = await Promise.all([
       store.canvases.get(workspace.id, cid),
       store.model.load(workspace.id),
       store.canvasItems.listOfCanvas(workspace.id, cid),
+      store.frames.listOfCanvas(workspace.id, cid),
     ]);
     const state = {
       canvas,
       entity: model.entities.find((e) => e.id === input?.entityId) ?? null,
       sourceTable: model.sourceTables.find((t) => t.id === input?.sourceTableId) ?? null,
       items,
+      frames,
     };
     return placeOnCanvas(ctx, access, state, { ...input, canvasId });
   });
@@ -76,19 +72,22 @@ export async function placeCardAction(
 export async function placeCardsAction(
   workspaceId: string,
   canvasId: string,
-  cards: { entityId?: string; sourceTableId?: string; x: number; y: number }[],
+  cards: { entityId?: string; sourceTableId?: string; x: number; y: number; height?: number }[],
+  frames?: { frameId: string; expectedVersion: number }[],
 ): Promise<ActionResult<{ canvasItemIds: string[] }>> {
   const result = await runCommand(async (ctx, store, user) => {
     const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
     if (!workspace) return NOT_FOUND;
     const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
     const cid = typeof canvasId === "string" ? canvasId : "";
-    const [canvas, model, items] = await Promise.all([
+    const [canvas, model, items, frameRows] = await Promise.all([
       store.canvases.get(workspace.id, cid),
       store.model.load(workspace.id),
       store.canvasItems.listOfCanvas(workspace.id, cid),
+      store.frames.listOfCanvas(workspace.id, cid),
     ]);
-    return placeManyOnCanvas(ctx, access, { canvas, entities: model.entities, sourceTables: model.sourceTables, items }, { canvasId, cards });
+    const state = { canvas, entities: model.entities, sourceTables: model.sourceTables, items, frames: frameRows };
+    return placeManyOnCanvas(ctx, access, state, { canvasId, cards, ...(frames ? { frames } : {}) });
   });
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -124,32 +123,6 @@ function onCanvasCards<T>(workspaceId: string, canvasId: string, command: GroupC
     const [canvas, items] = await Promise.all([store.canvases.get(workspace.id, cid), store.canvasItems.listOfCanvas(workspace.id, cid)]);
     return command(ctx, access, { canvas, items }, { ...input, canvasId });
   });
-}
-
-export interface CardPositionInput {
-  canvasItemId: string;
-  expectedVersion: number;
-  x: number;
-  y: number;
-}
-
-/** A group drag or arrow-key nudges: every card's new position in one change. Returns the new versions. */
-export async function moveCardsAction(workspaceId: string, canvasId: string, items: CardPositionInput[]) {
-  return onCanvasCards(workspaceId, canvasId, moveCanvasItems, { items });
-}
-
-/** Align, stack or line up: positions on the 8 px grid, in one change. */
-export async function arrangeCardsAction(workspaceId: string, canvasId: string, items: CardPositionInput[]) {
-  return onCanvasCards(workspaceId, canvasId, arrangeCanvasItems, { items });
-}
-
-/** “Fit widths to names” for several cards, in one change. */
-export async function setCardWidthsAction(
-  workspaceId: string,
-  canvasId: string,
-  items: { canvasItemId: string; expectedVersion: number; width: number | null }[],
-) {
-  return onCanvasCards(workspaceId, canvasId, setCanvasItemWidths, { items });
 }
 
 /** Takes several cards off the canvas in one change; the elements stay in the model (D-02). */

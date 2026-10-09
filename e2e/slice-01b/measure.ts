@@ -13,8 +13,9 @@ import { canvasUrl } from "./helpers";
 export const MEASURE = !!process.env.MEASURE;
 
 /**
- * Slice 2a's diagnosis: `DIAG=nolines` (no line layer) or `DIAG=blocks` (every card as its below-40 % block), passed to
- * the canvas as `?diag=`. Only the measurement-only production build honours it (MEASURE_BUILD=production).
+ * Slice 2a's diagnosis: `DIAG=nolines` (no line layer) or `DIAG=blocks` (every card as its below-40 % block); slice
+ * 2b's: `DIAG=noframes` (no frame layer) or `DIAG=nolabels` (frames without names and chips). Passed to the canvas as
+ * `?diag=`. Only the measurement-only production build honours it (MEASURE_BUILD=production).
  */
 export const DIAG = process.env.DIAG ?? "";
 if (DIAG && !E2E_PRODUCTION) throw new Error("DIAG works only with MEASURE_BUILD=production (the measurement-only build).");

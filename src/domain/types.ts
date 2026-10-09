@@ -1,4 +1,4 @@
-// Row types for the tables in slices 0 and 1a. Names and columns mirror docs/data-model-v2.md and
+// Row types for the tables built so far (slices 0 to 2b). Names and columns mirror docs/data-model-v2.md and
 // supabase/migrations/20261002000000_initial_schema.sql, so the Supabase adapter can map them one to one.
 // Timestamps are ISO 8601 strings (timestamptz).
 
@@ -283,6 +283,29 @@ export interface CanvasItem extends StandardColumns {
   live_level: LiveLevel | null;
 }
 
+/** What a frame stands for (D-04, D-05): a concept, a source system, or only an area of this canvas. */
+export const FRAME_KINDS = ["concept", "source_system", "free"] as const;
+export type FrameKind = (typeof FRAME_KINDS)[number];
+
+/**
+ * An area of one canvas (AD-16, D-04): a concept frame has a concept, a source frame a source system, a free frame
+ * neither (`frame_ref_ck`). Cards belong to it through `canvas_item.frame_id`. `collapsed` stays false until slice 2c.
+ */
+export interface Frame extends StandardColumns {
+  canvas_id: Uuid;
+  name: string;
+  kind: FrameKind;
+  concept_id: Uuid | null;
+  source_system_id: Uuid | null;
+  /** `#RRGGBB`; the colour of a free frame (a concept frame takes its concept's colour). */
+  color: string | null;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  collapsed: boolean;
+}
+
 // ---- History ----
 
 export type RowImage = Record<string, unknown>;
@@ -318,5 +341,6 @@ export interface WritableRows {
   mapping: Mapping;
   mapping_input: MappingInput;
   canvas_item: CanvasItem;
+  frame: Frame;
 }
 export type WritableTable = keyof WritableRows;

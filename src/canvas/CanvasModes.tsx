@@ -10,6 +10,9 @@
 //   (slice 2a); on a row, that row's own toolbox (D-52).
 // - Hand tool (H, slice 2a, D-18): a left drag anywhere, over cards too, pans the canvas and selects nothing; V or Esc
 //   end it. Right drag, the middle button and Space still pan as before. It is not saved.
+// - Frame tool (A, slice 2b): its presses are the canvas's (`useFrames`); here only on and off. A right-click on a
+//   frame's name, handle or an empty spot inside it opens the frame's toolbox, or the group's when the frame is part of
+//   a selection of several (step 4); on a card or line inside a frame, theirs.
 // The page does the writes and draws the toolbox (CanvasHost); this file only reads gestures.
 
 import { memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
@@ -17,7 +20,7 @@ import { EdgeLabelRenderer, useReactFlow, useStore } from "@xyflow/react";
 import { useToast } from "@/ui/components/toast";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type ToolboxTarget } from "./context";
-import { cardKey } from "./selection";
+import { cardKey, frameKey } from "./selection";
 import { cardWidth, HEAD_H, type Pt } from "./geometry";
 
 /** A right-click that moved more than this is a pan, not a toolbox. */
@@ -27,6 +30,7 @@ const NEW_ENTITY_OFFSET = { x: 24, y: 20 };
 
 export const ENTITY_TOOL_HINT = "Click on the canvas where the new entity should go. Esc cancels.";
 export const HAND_TOOL_HINT = "Hand tool: drag anywhere to move the canvas. V or Esc returns to selecting.";
+export const FRAME_TOOL_HINT = "Drag on the canvas to draw a frame. Esc cancels.";
 export const RELATE_HINT = "Now click the entity to relate to. Esc cancels.";
 
 const entityCardAt = (el: Element | null) => el?.closest<HTMLElement>(".card.ent[data-card]")?.dataset.card ?? null;
@@ -59,6 +63,16 @@ export function useCanvasModes(editable: boolean) {
     else {
       setMode({ kind: "entity" });
       toast(ENTITY_TOOL_HINT);
+    }
+  }, [editable, mode, setMode, toast]);
+
+  /** A, the toolbar button: the Frame tool on or off (editors only). */
+  const toggleFrameTool = useCallback(() => {
+    if (!editable) return;
+    if (mode?.kind === "frame") setMode(null);
+    else {
+      setMode({ kind: "frame" });
+      toast(FRAME_TOOL_HINT);
     }
   }, [editable, mode, setMode, toast]);
 
@@ -142,7 +156,7 @@ export function useCanvasModes(editable: boolean) {
         relatePress.current = { cardId: relateButton.dataset.relate!, sx: e.clientX, sy: e.clientY, dragging: false };
         return;
       }
-      if (!mode) return;
+      if (!mode || mode.kind === "frame") return;
       if ((e.target as HTMLElement).closest(".overview, .react-flow__panel")) return;
       e.preventDefault();
       e.stopPropagation();
@@ -193,6 +207,7 @@ export function useCanvasModes(editable: boolean) {
       const relationshipId = el.closest<SVGElement>("[data-relationship]")?.dataset.relationship;
       const cardId = el.closest<HTMLElement>("[data-card]")?.dataset.card;
       const rowId = cardId ? el.closest<HTMLElement>(".row[data-row]")?.dataset.row : undefined;
+      const frameId = cardId ? undefined : el.closest<HTMLElement>("[data-frame]")?.dataset.frame;
       let target: ToolboxTarget;
       if (mappingId) {
         target = { kind: "map", mappingId };
@@ -210,6 +225,12 @@ export function useCanvasModes(editable: boolean) {
       } else if (cardId) {
         target = { kind: "card", cardId };
         select({ t: "card", id: cardId });
+      } else if (frameId && ui.selection?.t === "multi" && ui.selection.keys.includes(frameKey(frameId))) {
+        // a frame that is part of a selection of several: the group's toolbox (prototype ctxFor)
+        target = { kind: "selection" };
+      } else if (frameId) {
+        target = { kind: "frame", frameId };
+        select({ t: "frame", id: frameId });
       } else {
         target = { kind: "canvas" };
         select(null);
@@ -220,7 +241,7 @@ export function useCanvasModes(editable: boolean) {
   );
 
   const relateFrom = mode?.kind === "relate" ? mode.fromCardId : null;
-  return { startRelate, toggleEntityTool, toggleHandTool, panning, onPointerDownCapture, onContextMenu, relateFrom, cursor };
+  return { startRelate, toggleEntityTool, toggleHandTool, toggleFrameTool, panning, onPointerDownCapture, onContextMenu, relateFrom, cursor };
 }
 
 /** The line from the card a relationship starts at to the mouse (prototype: from the card's header middle). */

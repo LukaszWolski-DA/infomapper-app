@@ -25,6 +25,7 @@ test("S2A-05: the group toolbox offers the actions of item 7; Align left, Align 
     "Stack in a column",
     "Line up in a row",
     "Fit widths to names",
+    "Put in a new frame", // slice 2b, PRD item 12
     "Add sources of selected entities",
     "Remove from this canvas",
     "Clear selection",

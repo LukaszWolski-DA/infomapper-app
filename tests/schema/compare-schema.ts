@@ -110,7 +110,6 @@ export const NOT_IN_DOMAIN_YET = [
   "label",
   "label_link",
   "project_pinned_label",
-  "frame",
   "note",
   "baseline",
 ] as const;

@@ -7,6 +7,7 @@ import {
   canvasItem,
   concept,
   entity,
+  frame,
   ids,
   link,
   makeCtx,
@@ -173,6 +174,30 @@ describe("deleting an entity (D-47)", () => {
     expect(deleteEntity(makeCtx(), access("owner"), { ...rows, entity: entity(customer, { deleted_at: NOW }) }, { entityId: customer, expectedVersion: 1 })).toMatchObject({
       ok: false,
       error: { code: "not_found" },
+    });
+  });
+});
+
+describe("createEntity on a canvas with frames (D-46, slice 2b)", () => {
+  const state = { concept: concept(), entities: [], canvas: canvas(), frames: [frame(ids.frameA, { width: 400, height: 300 })] };
+
+  it("the new card joins the frame it lands in, which grows to hold it", () => {
+    const r = createEntity(makeCtx(), access("modeler"), state, {
+      conceptId: conceptCustomer,
+      placement: { canvasId: canvas1, x: 80, y: 200, height: 200, frames: [{ frameId: ids.frameA, expectedVersion: 1 }] },
+    });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes).toMatchObject([
+      { table: "entity" },
+      { table: "canvas_item", row: { frame_id: ids.frameA } },
+      { table: "frame", row: { height: 200 + 200 + 24 } },
+    ]);
+  });
+
+  it("needs the version of the frame that grows", () => {
+    expect(createEntity(makeCtx(), access("modeler"), state, { conceptId: conceptCustomer, placement: { canvasId: canvas1, x: 80, y: 200, height: 200 } })).toMatchObject({
+      ok: false,
+      error: { code: "stale_version" },
     });
   });
 });

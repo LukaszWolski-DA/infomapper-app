@@ -1,5 +1,6 @@
 import { setCanvasLook } from "../../src/domain/commands/canvas";
 import { updateCanvasItem } from "../../src/domain/commands/canvas-item";
+import { moveOnCanvas } from "../../src/domain/commands/frame";
 import { expect, test } from "./fixtures";
 import { asLukasz, canvasTab, canvasUrl, card, expectToast, ids, key, loadItems, loadModel, openCanvas, openCanvasMenu, SEED_IDS, store, tabNames, WHOLE, signInAs } from "./helpers";
 
@@ -13,10 +14,17 @@ test("S2A-08: “Duplicate layout” creates “Customer & orders (copy)” in t
   const ws = SEED_IDS.wsRetailDwh, original = SEED_IDS.canvasCustomerOrders;
   // the original gets a width, a collapsed card, a row filter, a look and a layer mode first
   const items = await loadItems();
+  const canvasRow = (await store().canvases.get(ws, original))!;
   const customer = items.find((i) => i.entity_id === entity("Customer").id)!;
   const web = items.find((i) => i.source_table_id === table("web_users").id)!;
   const header = items.find((i) => i.source_table_id === table("order_header").id)!;
-  await asLukasz((ctx, access) => updateCanvasItem(ctx, access, { item: customer }, { canvasItemId: customer.id, expectedVersion: customer.version, width: 320 }));
+  await asLukasz((ctx, access) =>
+    moveOnCanvas(ctx, access, { canvas: canvasRow, frames: [], items, entities: [], concepts: [] }, {
+      canvasId: original,
+      frames: [],
+      items: [{ canvasItemId: customer.id, expectedVersion: customer.version, width: 320, height: 300 }],
+    }),
+  );
   await asLukasz((ctx, access) => updateCanvasItem(ctx, access, { item: web }, { canvasItemId: web.id, expectedVersion: web.version, collapsed: true }));
   await asLukasz((ctx, access) => updateCanvasItem(ctx, access, { item: header }, { canvasItemId: header.id, expectedVersion: header.version, rowFilter: "keys" }));
   const canvas = (await store().canvases.get(ws, original))!;

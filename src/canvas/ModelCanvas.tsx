@@ -16,6 +16,11 @@
 // the view, and the layer mode hides the relationship or the mapping lines. A card named in `focusCardId` is selected and shown on arrival
 // (“On canvases” in the panels). The measurement-only build may switch off the line layer or draw every card as a block
 // (`diagnosis`), to find what the frame time is spent on.
+// Slice 2b: frames in their own layer under the lines and cards (`FrameLayer`, `useFrames`); every change of positions
+// and widths goes through `saveLayout`, which also decides the cards' frames. A draws a frame (the Frame tool); Delete
+// removes a selected frame. Step 4: frames take part in the selection of several (`frame:` keys): a lasso around a
+// whole frame, Shift+click on its name, Ctrl+A (every frame and the cards in no frame); the group moves and arranges
+// frames with their cards.
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -37,10 +42,14 @@ import { RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
 import { NUDGE, useGroupActions, type GroupWrites } from "./GroupActions";
+import type { ConceptAsk, FrameData } from "./frame-data";
+import { ConceptQuestion } from "./ConceptQuestion";
+import FrameLayer, { type FramePart } from "./FrameLayer";
+import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
-import { afterLasso, cardKey, fromKeys, lassoHits, toggleCard as toggledSelection, type CardBox } from "./selection";
+import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis } from "./context";
@@ -68,6 +77,7 @@ import { Overview } from "./Overview";
 
 const nodeTypes = { card: CardNode };
 const NO_DIAGNOSIS: Diagnosis = {};
+const NO_FRAMES: FrameData[] = [];
 
 /** How far the grid layer reaches past the pane: the largest grid step (Lines at the highest zoom). Also in canvas.css. */
 const GRID_BLEED = 32 * MAX_ZOOM;
@@ -77,9 +87,6 @@ export interface CardChange {
   expectedVersion: number;
   collapsed?: boolean;
   rowFilter?: CardData["rowFilter"];
-  x?: number;
-  y?: number;
-  width?: number | null;
 }
 /** What a canvas write returns: the value, or the domain's message for a toast. */
 export type CanvasWriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
@@ -90,19 +97,21 @@ export interface ModelCanvasProps {
   cards: CardData[];
   lines: CanvasLines;
   editable: boolean;
-  /** Saves a card's position, collapse state or row filter (a server action). */
+  /** Saves a card's collapse state or row filter (a server action). */
   saveCard: (change: CardChange) => Promise<SaveCardResult>;
-  /** Places an entity or a source table on this canvas (a server action). */
-  placeCard: (input: CardTarget & { x: number; y: number }) => Promise<CanvasWriteResult<{ canvasItemId: string }>>;
+  /** Places an entity or a source table on this canvas (a server action); with its height it joins the frame it lands in. */
+  placeCard: (input: CardTarget & PlaceSpot & { frames: FrameRef[] }) => Promise<CanvasWriteResult<{ canvasItemId: string }>>;
   /** Places several elements on this canvas in one change (a server action). */
-  placeCards: (cards: (CardTarget & { x: number; y: number })[]) => Promise<CanvasWriteResult<{ canvasItemIds: string[] }>>;
+  placeCards: (cards: (CardTarget & PlaceSpot)[], frames: FrameRef[]) => Promise<CanvasWriteResult<{ canvasItemIds: string[] }>>;
   /** Takes a card off this canvas (a server action). */
   removeCard: (input: { canvasItemId: string; expectedVersion: number }) => Promise<CanvasWriteResult<unknown>>;
-  /** A group of selected cards: moved, arranged, sized or removed in one change (slice 2a, server actions). */
-  moveCards: GroupWrites["moveCards"];
-  arrangeCards: GroupWrites["arrangeCards"];
-  setCardWidths: GroupWrites["setCardWidths"];
+  /** Selected cards taken off the canvas in one change (slice 2a, a server action). */
   removeCards: GroupWrites["removeCards"];
+  /** The canvas's frames (slice 2b), and the concepts' names and colours (concept frames, the drop's question). */
+  frames: FrameData[];
+  concepts: Record<string, { name: string; color: string }>;
+  /** Frame writes and every change of positions and widths (slice 2b, server actions). */
+  frameWrites: FrameWrites;
   /** A card to select and bring into view once the canvas is ready (“On canvases”, slice 2a); then the address
    * loses its query, so a reload keeps the remembered view. */
   focusCardId?: string | null;
@@ -110,7 +119,8 @@ export interface ModelCanvasProps {
   diagnosis?: Diagnosis;
 }
 
-type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width">>;
+type PlaceSpot = { x: number; y: number; height: number };
+type FrameRef = { frameId: string; expectedVersion: number };
 
 const toNode = (card: CardData, editable: boolean): CardNodeT => ({
   id: card.id,
@@ -154,10 +164,10 @@ export function ModelCanvas({
   placeCard,
   placeCards,
   removeCard,
-  moveCards,
-  arrangeCards,
-  setCardWidths,
   removeCards,
+  frames: initialFrames,
+  concepts,
+  frameWrites,
   focusCardId,
   diagnosis = NO_DIAGNOSIS,
 }: ModelCanvasProps) {
@@ -193,8 +203,19 @@ export function ModelCanvas({
   // ---- view: the remembered one, else fit everything ----
   const storeApi = useStoreApi();
   const cardsNow = useCallback(() => (rf.getNodes() as CardNodeT[]).map((n) => n.data.card), [rf]);
+  /** Everything on the canvas: the cards and the frames with their labels (slice 2b). */
+  const framesNowRef = useRef<() => readonly FrameData[]>(() => initialFrames);
   const fitView = useCallback(
-    (w: number, h: number) => fitViewport(contentBounds(cardsNow()), { width: w, height: h }, ui.overviewOpen),
+    (w: number, h: number) => {
+      const boxes = [contentBounds(cardsNow()), ...framesNowRef.current().map((f) => ({ x: f.x, y: f.y - 30, w: f.width, h: f.height + 30 }))].filter((r) => r !== null);
+      const bounds = boxes.length
+        ? (() => {
+            const x0 = Math.min(...boxes.map((r) => r.x)), y0 = Math.min(...boxes.map((r) => r.y));
+            return { x: x0, y: y0, w: Math.max(...boxes.map((r) => r.x + r.w)) - x0, h: Math.max(...boxes.map((r) => r.y + r.h)) - y0 };
+          })()
+        : null;
+      return fitViewport(bounds, { width: w, height: h }, ui.overviewOpen);
+    },
     [cardsNow, ui.overviewOpen],
   );
 
@@ -218,6 +239,7 @@ export function ModelCanvas({
   // ---- the grid (D-12): one CSS background behind the pane, on its own layer. Panning moves that layer by less than
   // one grid step (no repaint); zooming changes the step. Set without a render. ----
   const gridRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const el = gridRef.current;
     if (!el || grid === "none") return;
@@ -238,17 +260,23 @@ export function ModelCanvas({
     return storeApi.subscribe((s) => follow(s.transform));
   }, [grid, storeApi]);
 
-  // ---- several cards (slice 2a): the cards as keys and rectangles, select all, Shift+click, lasso ----
+  // ---- several cards (slice 2a) and frames (2b): their keys and rectangles, select all, Shift+click, lasso ----
   const boxes = useCallback(
-    (): CardBox[] =>
-      (rf.getNodes() as CardNodeT[]).map(({ id, position, data: { card } }) => ({
+    (): ItemBox[] => [
+      ...framesNowRef.current().map((f) => ({ id: f.id, key: frameKey(f.id), rect: { x: f.x, y: f.y, w: f.width, h: f.height } })),
+      ...(rf.getNodes() as CardNodeT[]).map(({ id, position, data: { card } }) => ({
         id,
         key: cardKey(card),
         rect: { x: position.x, y: position.y, w: cardWidth(card), h: cardHeight(card) },
+        frameId: card.frameId,
       })),
+    ],
     [rf],
   );
-  const selectAll = useCallback(() => select(fromKeys(boxes().map((b) => b.key), boxes())), [select, boxes]);
+  const selectAll = useCallback(() => {
+    const all = boxes();
+    select(fromKeys(allKeys(all), all));
+  }, [select, boxes]);
   const toggleCard = useCallback((cardId: string) => select(toggledSelection(selection, cardId, boxes())), [select, selection, boxes]);
   const onLasso = useCallback(
     (rect: Rect, add: boolean) => {
@@ -259,17 +287,9 @@ export function ModelCanvas({
   );
   const lasso = useLasso(onLasso);
 
-  // Cards that left the canvas (removed, undone) leave the selection too; checked when the set of cards changes, not on
-  // every frame of a drag.
-  const cardIds = useMemo(() => nodes.map((n) => n.id).join(","), [nodes]);
-  useEffect(() => {
-    if (selection?.t !== "multi") return;
-    const next = fromKeys(selection.keys, boxes());
-    if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
-  }, [cardIds, selection, select, boxes]);
-
   // ---- keyboard: F fits, M toggles the Overview, E the Entity tool; Esc ends a tool, else clears the selection ----
-  const { toggleEntityTool, toggleHandTool } = modes;
+  const { toggleEntityTool, toggleHandTool, toggleFrameTool } = modes;
+  const deleteFrameRef = useRef<(id: string) => void>(() => {});
   /** Space held: a left drag pans (React Flow), so it must not start a lasso. */
   const spaceDown = useRef(false);
   useEffect(() => {
@@ -297,11 +317,17 @@ export function ModelCanvas({
         ui.host()?.deleteLine({ t: selection.t, id: selection.id });
         return;
       }
+      if ((e.key === "Delete" || e.key === "Backspace") && editable && selection?.t === "frame") {
+        e.preventDefault();
+        deleteFrameRef.current(selection.id);
+        return;
+      }
       const k = e.key.toLowerCase();
       if (k === "f") fit();
       else if (k === "m") ui.toggleOverview();
       else if (k === "e") toggleEntityTool();
       else if (k === "h") toggleHandTool();
+      else if (k === "a") toggleFrameTool();
       else if (k === "v" && ui.mode?.kind === "hand") ui.setMode(null);
       else if (k === "escape") {
         if (ui.mode) ui.setMode(null);
@@ -320,7 +346,7 @@ export function ModelCanvas({
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [fit, ui, select, toggleEntityTool, toggleHandTool, selectAll, editable, selection, rf]);
+  }, [fit, ui, select, toggleEntityTool, toggleHandTool, toggleFrameTool, selectAll, editable, selection, rf]);
 
   // ---- card changes: applied at once, saved in order, undone on refusal ----
   const queue = useRef(new Map<string, Promise<void>>());
@@ -356,8 +382,8 @@ export function ModelCanvas({
       return initialCards.map((c) => {
         const mine = local.get(c.id);
         if (!mine || (!(pending.current.get(c.id) ?? 0) && !mine.dragging)) return toNode(c, editable);
-        const { x, y, collapsed, rowFilter, width } = mine.data.card;
-        return { ...toNode({ ...c, x, y, collapsed, rowFilter, width }, editable), position: mine.position, dragging: mine.dragging };
+        const { x, y, collapsed, rowFilter, width, frameId } = mine.data.card;
+        return { ...toNode({ ...c, x, y, collapsed, rowFilter, width, frameId }, editable), position: mine.position, dragging: mine.dragging };
       });
     });
     for (const c of initialCards) if (!(pending.current.get(c.id) ?? 0)) versions.current.set(c.id, c.version);
@@ -396,17 +422,19 @@ export function ModelCanvas({
     [patchCard, saveCard, toast, enqueue, ui],
   );
 
-  // ---- card width (D-37, C-09) ----
-  const resize = useCardResize(editable, change);
+  // ---- card width (D-37, C-09): saved like every change of positions and widths, frames decided again ----
+  const saveLayoutRef = useRef<ReturnType<typeof useFrames>["saveLayout"]>(() => {});
+  const setWidth = useCallback((id: string, patch: { width: number | null }) => saveLayoutRef.current({ cards: [{ id, width: patch.width }] }), []);
+  const resize = useCardResize(editable, setWidth);
   const fitWidth = useCallback(
     (id: string) => {
       const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
       if (!card) return;
       const width = fitWidthOf({ kind: card.kind, name: card.name, coverage: `${card.mapped}/${card.rows.length}`, rows: card.rows });
-      if (width !== card.width) change(id, { width }, { width: card.width });
+      if (width !== card.width) setWidth(id, { width });
       toast("Fitted the card to its names.");
     },
-    [rf, change, toast],
+    [rf, setWidth, toast],
   );
 
   // ---- placing and removing cards (left and right panel) ----
@@ -466,6 +494,12 @@ export function ModelCanvas({
     [rf],
   );
 
+  /** Every frame at the version the canvas knows (a placed card may make one grow, slice 2b). */
+  const frameRefs = useCallback(
+    (): FrameRef[] => framesNowRef.current().map((f) => ({ frameId: f.id, expectedVersion: versions.current.get(f.id) ?? f.version })),
+    [],
+  );
+
   /** Places an element at a spot; an element already here is selected and shown instead (prototype addToCanvas). */
   const placeAt = useCallback(
     async (target: CardTarget, spot: { x: number; y: number }, h: number, clicked: boolean) => {
@@ -477,7 +511,7 @@ export function ModelCanvas({
       }
       let result: CanvasWriteResult<{ canvasItemId: string }>;
       try {
-        result = await placeCard({ ...target, ...spot });
+        result = await placeCard({ ...target, ...spot, height: h, frames: frameRefs() });
       } catch {
         result = FAILED;
       }
@@ -490,7 +524,7 @@ export function ModelCanvas({
       if (!inside(viewRect(), box)) centerOnRect(box);
       if (clicked) toast(`Added 1 ${isEntity(target) ? "entity" : "source table"} to the canvas.`);
     },
-    [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect],
+    [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect, frameRefs],
   );
 
   const place = useCallback(
@@ -538,7 +572,7 @@ export function ModelCanvas({
       const spots = besideSpots(a, side, heights, occupied());
       let result: CanvasWriteResult<{ canvasItemIds: string[] }>;
       try {
-        result = await placeCards(missing.map((m, i) => ({ ...m.target, ...spots[i]! })));
+        result = await placeCards(missing.map((m, i) => ({ ...m.target, ...spots[i]!, height: heights[i]! })), frameRefs());
       } catch {
         result = FAILED;
       }
@@ -559,7 +593,102 @@ export function ModelCanvas({
       const what = isEntity(missing[0]!.target) ? `entit${n === 1 ? "y" : "ies"}` : `source table${n === 1 ? "" : "s"}`;
       toast(`Added ${n} ${what} next to the selection.`);
     },
-    [rf, cardOf, toast, occupied, placeCards, select, viewRect],
+    [rf, cardOf, toast, occupied, placeCards, select, viewRect, frameRefs],
+  );
+
+  // ---- frames (slice 2b) ----
+  const selectCards = useCallback(
+    (ids: readonly string[]) => {
+      const all = boxes();
+      select(fromKeys(all.filter((b) => ids.includes(b.id)).map((b) => b.key), all));
+    },
+    [boxes, select],
+  );
+  const endFrameTool = useCallback(() => ui.setMode(null), [ui]);
+  const conceptColors = useMemo(() => Object.fromEntries(Object.entries(concepts).map(([id, c]) => [id, c.color])), [concepts]);
+  const conceptName = useCallback((id: string) => concepts[id]?.name ?? "–", [concepts]);
+  // the drop's question (D-05): one at a time, answered in the bar
+  const [asking, setAsking] = useState<{ question: ConceptAsk; answer: (move: boolean) => void } | null>(null);
+  const ask = useCallback(
+    (question: ConceptAsk) =>
+      new Promise<boolean>((resolve) =>
+        setAsking({
+          question,
+          answer: (move) => {
+            setAsking(null);
+            resolve(move);
+          },
+        }),
+      ),
+    [],
+  );
+  const onFrameCreated = useCallback((id: string) => ui.host()?.frameCreated(id), [ui]);
+  const frameState = useFrames({
+    editable,
+    initialFrames,
+    setNodes,
+    patchCard,
+    enqueueGroup,
+    versions,
+    pending,
+    select,
+    undo: ui.undo,
+    writes: frameWrites,
+    spaceDown,
+    frameTool: ui.mode?.kind === "frame",
+    endFrameTool,
+    onCreated: onFrameCreated,
+    selectCards,
+    conceptName,
+    ask,
+    groupOf: (frameId) => (selection?.t === "multi" && selection.keys.includes(frameKey(frameId)) ? unitsOf(selection.keys, boxes()) : null),
+  });
+  const { frames, saveLayout, arrangeIntoFrames } = frameState;
+  useEffect(() => {
+    saveLayoutRef.current = saveLayout;
+    deleteFrameRef.current = frameState.deleteFrame;
+    framesNowRef.current = frameState.framesNow;
+  });
+  const cardData = useMemo(() => nodes.map((n) => n.data.card), [nodes]);
+  // The panels that show frames draw again when frames, their cards or the cards' numbers change; not on a move.
+  const layoutKey = useMemo(
+    () =>
+      JSON.stringify([
+        frames.map((f) => [f.id, f.name, f.kind, f.conceptId, f.sourceSystemId, f.color, f.version]),
+        cardData.map((c) => [c.id, c.frameId, c.mapped, c.links.length, c.subject.entityConceptId ?? c.subject.sourceSystemId]),
+      ]),
+    [frames, cardData],
+  );
+  // Cards and frames that left the canvas (removed, deleted, undone) leave the selection too; checked when the set of
+  // cards or frames changes, not on every frame of a drag.
+  const itemIds = useMemo(() => [...frames.map((f) => f.id), ...nodes.map((n) => n.id)].join(","), [frames, nodes]);
+  useEffect(() => {
+    if (selection?.t !== "multi") return;
+    const next = fromKeys(selection.keys, boxes());
+    if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
+  }, [itemIds, selection, select, boxes]);
+  const { publishLayout } = ui;
+  useEffect(() => publishLayout(layoutKey), [publishLayout, layoutKey]);
+  const selectedFrameId = selection?.t === "frame" ? selection.id : null;
+  const onFramePointerDown = useCallback(
+    (e: React.PointerEvent, frameId: string, part: FramePart) => {
+      const toggle = () => select(toggleItem(selection, frameKey(frameId), boxes()));
+      // Shift + drag inside a frame draws a lasso that adds to the selection (D-15); a Shift+click there without moving
+      // adds the frame or takes it out, as a plain click there selects it (answer 2 of step 4, unlike the prototype)
+      if (part === "body" && e.shiftKey && e.button === 0 && !spaceDown.current && !ui.mode) {
+        lasso.onPointerDown(e, true, toggle);
+        return;
+      }
+      if (ui.mode) return;
+      // Shift+click on a frame's name adds it to the selection or takes it out (D-16, prototype pick)
+      if (part === "label" && e.shiftKey && e.button === 0 && !spaceDown.current) {
+        e.preventDefault();
+        toggle();
+        return;
+      }
+      frameState.onFramePointerDown(e, frameId, part);
+    },
+    [lasso, ui.mode, frameState, select, selection, boxes],
   );
 
   // ---- several selected cards (slice 2a): group drag, nudge and the group's actions ----
@@ -575,11 +704,12 @@ export function ModelCanvas({
     occupied,
     viewRect,
     undo: ui.undo,
-    moveCards,
-    arrangeCards,
-    setCardWidths,
+    saveLayout,
     removeCards,
-    placeCards,
+    placeCards: (cards) => placeCards(cards, frameRefs()),
+    items: boxes,
+    framesNow: frameState.framesNow,
+    patchFrames: frameState.patchFrames,
   });
 
   // Arrow keys nudge the selected cards by 8 px, with Shift by 32 px (outside text fields).
@@ -620,6 +750,19 @@ export function ModelCanvas({
       fitSelectionWidths: group.fitSelectionWidths,
       removeSelection: group.removeSelection,
       placeSourcesOfSelection: group.placeSourcesOfSelection,
+      createFrameAt: frameState.createFrameAt,
+      frameView: frameState.frameView,
+      updateFrame: frameState.updateFrame,
+      deleteFrame: frameState.deleteFrame,
+      fitFrame: frameState.fitFrame,
+      zoomToFrame: frameState.zoomToFrame,
+      selectFrameCards: frameState.selectFrameCards,
+      framesView: frameState.framesView,
+      cardFrame: frameState.cardFrame,
+      frameAt: frameState.frameAt,
+      frameRefs: frameState.frameRefs,
+      putInNewFrame: frameState.putInNewFrame,
+      arrangeIntoFrames: () => arrangeIntoFrames(fit),
       placeAt: (target, rows, at) => void placeAt(target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(rows), false),
       setCardView: (id, view) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
@@ -631,7 +774,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -706,13 +849,13 @@ export function ModelCanvas({
       const card = node.data.card;
       const x = Math.round(node.position.x), y = Math.round(node.position.y);
       if (x === card.x && y === card.y) return;
-      change(node.id, { x, y }, { x: card.x, y: card.y });
+      saveLayout({ cards: [{ id: node.id, x, y }] }, { ask: true });
     },
-    [change, onGroupDragStop],
+    [saveLayout, onGroupDragStop],
   );
 
   // ---- hover (C-10): a row of a card or a mapping line; nothing while dragging or with a tool on ----
-  const busy = !!draft || !!ui.mode || resize.resizing || !!lasso.lasso;
+  const busy = !!draft || !!ui.mode || resize.resizing || !!lasso.lasso || frameState.busy;
   const onHoverOver = useCallback((e: React.PointerEvent) => {
     if (e.buttons) return;
     const el = e.target as Element;
@@ -727,7 +870,8 @@ export function ModelCanvas({
     <DiagnosisCtx.Provider value={diagnosis}>
     <CanvasCardsCtx.Provider value={cardsApi}>
       <div
-        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${ui.mode?.kind === "hand" ? " tool-hand" : ""}${modes.panning ? " panning" : ""}${resize.resizing ? " resizing" : ""}${dragging ? " node-dragging" : ""}`}
+        ref={rootRef}
+        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${ui.mode?.kind === "hand" ? " tool-hand" : ""}${ui.mode?.kind === "frame" ? " tool-frame" : ""}${modes.panning ? " panning" : ""}${resize.resizing ? " resizing" : ""}${dragging || frameState.busy ? " node-dragging" : ""}`}
         data-testid="area-canvas"
         data-grid={grid}
         data-layer={layer}
@@ -742,6 +886,7 @@ export function ModelCanvas({
           onPointerDown(e);
         }}
         onPointerDownCapture={(e) => {
+          if (frameState.onFrameToolPointerDown(e)) return;
           if (!resize.onPointerDown(e)) modes.onPointerDownCapture(e);
         }}
         onPointerOver={onHoverOver}
@@ -778,14 +923,25 @@ export function ModelCanvas({
           attributionPosition="bottom-left"
           aria-label="Model canvas"
         >
+          <FrameLayer
+            frames={diagnosis.noFrames ? NO_FRAMES : frames}
+            labels={!diagnosis.noLabels}
+            cards={cardData}
+            conceptColors={conceptColors}
+            selectedId={selectedFrameId}
+            editable={editable}
+            drawing={frameState.drawing}
+            onPointerDown={onFramePointerDown}
+          />
           {!diagnosis.noLines && <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />}
           <Overview lines={lines} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
-          <SelectionOverlay selection={selection} lasso={lasso.lasso} />
+          <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>
-        {nodes.length === 0 && (
+        {asking && <ConceptQuestion question={asking.question} onAnswer={asking.answer} />}
+        {nodes.length === 0 && frames.length === 0 && (
           <div className="im-empty" data-testid="canvas-empty">
             <div>
               <b>The canvas is empty</b>

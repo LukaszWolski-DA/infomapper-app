@@ -33,7 +33,9 @@ const QUICK = process.argv.includes("--quick");
 const SPECS = QUICK
   ? ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts"]
   : ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-09.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts"];
-const SPEC_ARGS = QUICK ? ["--grep-invert", "dragging a group"] : [];
+// one word: on Windows the specs run through a shell that does not quote arguments, so "dragging a group" became the
+// filter "dragging" plus the file filters "a" and "group", which ran every spec (found in slice 2b)
+const SPEC_ARGS = QUICK ? ["--grep-invert", "dragging"] : [];
 const RESULT_FILES = QUICK ? ["S1A-14.json", "S1B-10.json", "S2A-14-lasso.json"] : ["S1A-14.json", "S1B-09.json", "S1B-10.json", "S2A-14.json", "S2A-14-lasso.json"];
 
 const arg = (name: string, fallback: string) => {

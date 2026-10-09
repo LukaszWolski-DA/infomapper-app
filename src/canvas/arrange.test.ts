@@ -27,6 +27,18 @@ describe("arrange (slice 2a; prototype arrange, on the 8 px grid)", () => {
     expect(all("row")).toEqual({ b: { x: 40, y: 40 }, a: { x: 384, y: 40 }, c: { x: 704, y: 40 } });
   });
 
+  it("stacks a frame as one unit and leaves 64 px after it (slice 2b)", () => {
+    const units = [
+      { id: "F", rect: { x: 40, y: 40, w: 600, h: 300 }, frame: true },
+      { id: "a", rect: { x: 400, y: 900, w: 256, h: 200 } },
+      { id: "b", rect: { x: 0, y: 1300, w: 256, h: 100 } },
+    ];
+    // F (h 300) → 40 + 300 + 64 = 404 → 408; a (h 200) → 408 + 200 + 32 = 640
+    expect(Object.fromEntries(arrange("column", units))).toEqual({ F: { x: 40, y: 40 }, a: { x: 40, y: 408 }, b: { x: 40, y: 640 } });
+    // a row keeps 64 px after a frame too
+    expect(Object.fromEntries(arrange("row", units))).toEqual({ b: { x: 0, y: 1304 }, F: { x: 320, y: 1304 }, a: { x: 984, y: 1304 } });
+  });
+
   it("leaves nothing to do for no cards", () => {
     expect(arrange("left", []).size).toBe(0);
   });

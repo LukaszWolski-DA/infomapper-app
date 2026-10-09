@@ -17,6 +17,7 @@ import { DeleteEntityDialog } from "./delete-entity-dialog";
 import { Actions, buttonClass, dangerClass, Field, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextArea, TextField } from "./fields";
 import { usePanel } from "./inspector";
 import { OnCanvases } from "./on-canvases";
+import { CardFrame } from "./card-frame";
 import { useMoveAttribute } from "./move-attribute";
 import { feedingSources, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -245,6 +246,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
       )}
 
       <OnCanvases kind="entity" targetId={e.id} cardId={cardId} />
+      <CardFrame cardId={cardId} kind="ent" />
 
       {p.editable && (
         <Actions>

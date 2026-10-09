@@ -12,6 +12,7 @@ import type {
   Canvas,
   CanvasItem,
   ChangeEvent,
+  Frame,
   Organization,
   OrganizationMember,
   Project,
@@ -73,6 +74,12 @@ export interface CanvasItemRepository {
   listOfCanvas(workspaceId: Uuid, canvasId: Uuid): Promise<CanvasItem[]>;
 }
 
+export interface FrameRepository {
+  /** Frames on every canvas of the workspace (concept deletion turns concept frames into free ones, D-47). */
+  list(workspaceId: Uuid): Promise<Frame[]>;
+  listOfCanvas(workspaceId: Uuid, canvasId: Uuid): Promise<Frame[]>;
+}
+
 export interface ChangeEventRepository {
   /** The change log of a workspace, oldest first. */
   list(workspaceId: Uuid): Promise<ChangeEvent[]>;
@@ -100,6 +107,7 @@ export interface DataStore {
   canvases: CanvasRepository;
   model: ModelRepository;
   canvasItems: CanvasItemRepository;
+  frames: FrameRepository;
   changeEvents: ChangeEventRepository;
   undoHistory: UndoHistoryRepository;
   /**

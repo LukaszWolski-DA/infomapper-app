@@ -6,7 +6,7 @@ import { domainError, notFound } from "../errors";
 import type { Uuid } from "../ids";
 import { nextConceptColor } from "../model/concept-colors";
 import type { WorkspaceAccess } from "../permissions";
-import type { Concept, Entity } from "../types";
+import type { Concept, Entity, Frame } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, isLive, nextSortOrder, softDeleted } from "./shared";
 
@@ -72,10 +72,14 @@ export interface DeleteConceptState {
   concepts: readonly Concept[];
   /** Live entities of the concept. */
   entities: readonly Entity[];
+  /** Frames on every canvas of the workspace: the concept's frames become free frames (D-47, slice 2b). */
+  frames?: readonly Frame[];
 }
 
 /**
- * Deletes a concept. An empty concept is deleted directly. A concept with entities is deleted only together with
+ * Deletes a concept. Its concept frames on every canvas become free frames, keeping their name, place and the
+ * concept's colour, which they were drawn in (D-47; Łukasz, slice 2b step 1 answer 9), in the same change group. An
+ * empty concept is deleted directly. A concept with entities is deleted only together with
  * moving its entities to another concept, in one change group; there is no cascade. The only concept cannot be
  * deleted while it holds entities.
  */
@@ -94,8 +98,13 @@ export function deleteConcept(
   const entities = state.entities.filter((e) => isLive(e, access.workspace.id) && e.concept_id === concept.id);
   const others = state.concepts.filter((c) => isLive(c, access.workspace.id) && c.id !== concept.id);
 
+  const freed = (state.frames ?? [])
+    .filter((f) => isLive(f, access.workspace.id) && f.kind === "concept" && f.concept_id === concept.id)
+    .map((f) => ({ kind: "update" as const, table: "frame" as const, before: f, row: nextVersion(ctx, f, { kind: "free", concept_id: null, color: concept.color }) }));
+
   if (entities.length === 0) {
     return done(ctx, access, { movedEntities: 0 }, [
+      ...freed,
       { kind: "update", table: "concept", before: concept, row: softDeleted(ctx, concept) },
     ]);
   }
@@ -115,6 +124,7 @@ export function deleteConcept(
 
   return done(ctx, access, { movedEntities: entities.length }, [
     ...entities.map((e) => ({ kind: "update" as const, table: "entity" as const, before: e, row: nextVersion(ctx, e, { concept_id: target.id }) })),
+    ...freed,
     { kind: "update", table: "concept", before: concept, row: softDeleted(ctx, concept) },
   ]);
 }

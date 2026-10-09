@@ -1,6 +1,7 @@
 // Align, stack and line up a group of cards (slice 2a; prototype `arrange`): align to the leftmost or topmost edge;
 // a column sorted by y with 32 px gaps; a row sorted by x with 64 px gaps. Unlike the prototype, every position is
 // rounded to the 8 px grid before it is saved (the domain requires it); a gap is rounded up, so it never shrinks.
+// Slice 2b (D-17): a selected frame takes part as one unit with its rectangle; a column leaves 64 px after a frame.
 
 import { snap8, type Pt, type Rect } from "./geometry";
 
@@ -15,8 +16,8 @@ export const ARRANGED: Record<ArrangeMode, string> = {
 
 const ceil8 = (v: number) => Math.ceil(v / 8) * 8;
 
-/** The new top left corner of each card, by id. */
-export function arrange(mode: ArrangeMode, cards: readonly { id: string; rect: Rect }[]): Map<string, Pt> {
+/** The new top left corner of each unit (a card, or a frame with `frame`), by id. */
+export function arrange(mode: ArrangeMode, cards: readonly { id: string; rect: Rect; frame?: boolean }[]): Map<string, Pt> {
   const out = new Map<string, Pt>();
   if (cards.length === 0) return out;
   if (mode === "left") {
@@ -31,7 +32,7 @@ export function arrange(mode: ArrangeMode, cards: readonly { id: string; rect: R
     let y = snap8(sorted[0]!.rect.y);
     for (const c of sorted) {
       out.set(c.id, { x, y });
-      y = ceil8(y + c.rect.h + 32);
+      y = ceil8(y + c.rect.h + (c.frame ? 64 : 32));
     }
   } else {
     const sorted = [...cards].sort((a, b) => a.rect.x - b.rect.x || a.rect.y - b.rect.y);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attribute, canvasItem, entity, ids, makeCtx, mapping, mappingInput } from "../__fixtures__/domain";
+import { attribute, canvasItem, entity, frame, ids, makeCtx, mapping, mappingInput } from "../__fixtures__/domain";
 import { buildWriteSet, nextVersion, type Write } from "../changes";
 import { changeCanvasId, changeLabel } from "./change-label";
 
@@ -54,5 +54,32 @@ describe("the canvas of a change (slice 1b)", () => {
     expect(
       changeCanvasId(events([deleted("canvas_item", canvasItem()), deleted("canvas_item", canvasItem(ids.itemCrmCustomer, { canvas_id: ids.canvas2 }))])),
     ).toBeNull();
+  });
+});
+
+describe("change labels for frames (slice 2b)", () => {
+  const member = canvasItem(ids.itemCustomer, { frame_id: ids.frameA });
+  const insert = (row: object) => ({ kind: "insert", table: "frame", row }) as unknown as Write;
+
+  it("names frame steps", () => {
+    expect(changeLabel(events([insert(frame()), update("canvas_item", canvasItem(), { frame_id: ids.frameA })]))).toBe("Create frame");
+    expect(changeLabel(events([update("frame", frame(), { name: "Orders" })]))).toBe("Rename frame");
+    expect(changeLabel(events([update("frame", frame(), { x: 8, y: 8 }), update("canvas_item", member, { x: 408, y: 128 })]))).toBe("Move frame");
+    expect(changeLabel(events([update("frame", frame(), { width: 400 }), update("canvas_item", member, { frame_id: null })]))).toBe("Resize frame");
+    expect(changeLabel(events([deleted("frame", frame()), update("canvas_item", member, { frame_id: null })]))).toBe("Delete frame");
+    expect(changeLabel(events([insert(frame()), insert(frame(ids.frameB)), update("canvas_item", canvasItem(), { x: 32, y: 40, frame_id: ids.frameA })]))).toBe(
+      "Arrange into frames",
+    );
+  });
+
+  it("calls a drop into a frame a move, also when the frame grew", () => {
+    expect(changeLabel(events([update("canvas_item", canvasItem(), { x: 8, y: 8, frame_id: ids.frameA })]))).toBe("Move card");
+    expect(changeLabel(events([update("frame", frame(), { height: 900 }), update("canvas_item", canvasItem(), { x: 8, y: 700, frame_id: ids.frameA })]))).toBe(
+      "Move card",
+    );
+  });
+
+  it("finds the canvas of a frame step", () => {
+    expect(changeCanvasId(events([update("frame", frame(), { name: "Orders" })]))).toBe(ids.canvas1);
   });
 });

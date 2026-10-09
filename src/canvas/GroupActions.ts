@@ -4,38 +4,32 @@
 // multi-feed, multi-remove): drag the group, nudge it with the arrow keys, align, stack, line up, fit widths, bring in
 // the feeding sources of the selected entities and take the group off the canvas. Each is one change group, so one
 // undo puts everything back. The cards change on screen at once; a refusal puts them back with the domain's message.
+// Slice 2b: moves and widths are saved through `saveLayout`, which also decides the cards' frames (answer 1). Frames in
+// the selection stand for their cards (D-17, prototype movingItems): a group drag, a nudge, align, stack and line up move
+// each selected frame with its cards and each other selected card on its own, every card once; fit widths, remove and
+// “Add sources” act on the selected cards only.
 
 import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
 import { useReactFlow, type NodeChange } from "@xyflow/react";
 import { useToast } from "@/ui/components/toast";
 import { ARRANGED, arrange, type ArrangeMode } from "./arrange";
 import type { CardData } from "./card-data";
+import type { FrameData } from "./frame-data";
 import type { CardNodeT } from "./CardNode";
 import type { CardTarget, UndoHooks } from "./context";
+import type { SaveLayoutOptions } from "./useFrames";
+import type { LayoutChange } from "./layout-plan";
 import { besideSpots, CARD_W, cardHeight, cardWidth, inside, newCardHeight, type Pt, type Rect } from "./geometry";
 import type { Selection } from "./line-data";
-import { cardKey } from "./selection";
+import { selectedCardIds, selectedKeys, unitsOf, type ItemBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 
 /** What a canvas write returns: the value, or the domain's message for a toast. */
 type WriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
 
-export interface CardPosition {
-  canvasItemId: string;
-  expectedVersion: number;
-  x: number;
-  y: number;
-}
-type Versions = { versions: Record<string, number> };
-
 export interface GroupWrites {
-  /** A group drag or nudges, in one change. */
-  moveCards: (items: CardPosition[]) => Promise<WriteResult<Versions>>;
-  /** Align, stack or line up, in one change (positions on the 8 px grid). */
-  arrangeCards: (items: CardPosition[]) => Promise<WriteResult<Versions>>;
-  setCardWidths: (items: { canvasItemId: string; expectedVersion: number; width: number | null }[]) => Promise<WriteResult<Versions>>;
   removeCards: (items: { canvasItemId: string; expectedVersion: number }[]) => Promise<WriteResult<unknown>>;
-  placeCards: (cards: (CardTarget & { x: number; y: number })[]) => Promise<WriteResult<{ canvasItemIds: string[] }>>;
+  placeCards: (cards: (CardTarget & { x: number; y: number; height: number })[]) => Promise<WriteResult<{ canvasItemIds: string[] }>>;
 }
 
 /** Arrow keys move the selection this far, with Shift further (prototype nudge). */
@@ -57,7 +51,17 @@ interface Options extends GroupWrites {
   occupied: () => Rect[];
   viewRect: () => Rect;
   undo: () => UndoHooks | null;
+  /** Every change of positions and widths (slice 2b): saved in one change, frames decided again. */
+  saveLayout: (change: LayoutChange, opts?: SaveLayoutOptions) => void;
+  /** The cards and frames of this canvas as the selection sees them (slice 2b). */
+  items: () => ItemBox[];
+  /** The frames as the canvas shows them now, and a change of where they are shown (not saved). */
+  framesNow: () => readonly FrameData[];
+  patchFrames: (patch: ReadonlyMap<string, Partial<FrameData>>) => void;
 }
+
+type Move = { id: string; from: Pt; to: Pt };
+const changedOnly = (list: Move[]) => list.filter((m) => m.to.x !== m.from.x || m.to.y !== m.from.y);
 
 const rectOf = (n: CardNodeT): Rect => ({ x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) });
 
@@ -65,127 +69,176 @@ export function useGroupActions(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
   const { editable, selection, select, setNodes, patchCard, enqueueGroup, versions, pending, undo, occupied, viewRect } = o;
-  const { moveCards, arrangeCards, setCardWidths, removeCards, placeCards } = o;
+  const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames } = o;
 
-  /** The selected cards on this canvas: several, or the one selected card. */
+  /** The selected cards themselves on this canvas (not frames): several, or the one selected card. */
   const selectedNodes = useCallback((): CardNodeT[] => {
-    const nodes = rf.getNodes() as CardNodeT[];
-    if (selection?.t === "multi") {
-      const keys = new Set(selection.keys);
-      return nodes.filter((n) => keys.has(cardKey(n.data.card)));
-    }
-    if (selection?.t === "card") return nodes.filter((n) => n.id === selection.id);
-    return [];
-  }, [rf, selection]);
+    const all = items();
+    const ids = new Set(selectedCardIds(selectedKeys(selection, all), all));
+    return (rf.getNodes() as CardNodeT[]).filter((n) => ids.has(n.id));
+  }, [rf, selection, items]);
 
-  /** New positions on screen at once, saved in one change; a refusal puts the cards back. */
-  const savePositions = useCallback(
-    (moves: { id: string; to: Pt; from: Pt }[], send: GroupWrites["moveCards"], saved?: () => void) => {
-      if (!moves.length) return;
-      for (const m of moves) patchCard(m.id, m.to);
-      enqueueGroup(
-        moves.map((m) => m.id),
-        async () => {
-          let result: WriteResult<Versions>;
-          try {
-            result = await send(moves.map((m) => ({ canvasItemId: m.id, expectedVersion: versions.current.get(m.id) ?? 1, ...m.to })));
-          } catch {
-            result = FAILED;
-          }
-          if (result.ok) {
-            for (const [id, v] of Object.entries(result.value.versions)) versions.current.set(id, v);
-            undo()?.noteSaved();
-            saved?.();
-          } else {
-            for (const m of moves) patchCard(m.id, m.from);
-            toast(result.message, "refusal");
-          }
+  /** What the selection moves: selected frames with their cards, and the other selected cards (slice 2b). */
+  const moving = useCallback(() => {
+    const all = items();
+    const u = unitsOf(selectedKeys(selection, all), all);
+    const byId = new Map((rf.getNodes() as CardNodeT[]).map((n) => [n.id, n]));
+    const frames = new Map(framesNow().map((f) => [f.id, f]));
+    return {
+      frames: u.frames.map((id) => frames.get(id)).filter((f): f is FrameData => !!f),
+      cards: u.cards.map((id) => byId.get(id)).filter((n): n is CardNodeT => !!n),
+      members: u.members.map((id) => byId.get(id)).filter((n): n is CardNodeT => !!n),
+    };
+  }, [items, selection, rf, framesNow]);
+
+  /**
+   * New positions on screen at once, saved in one change with the cards' frames; a refusal puts everything back.
+   * Frames carry their cards; `carried` holds where every moving card was before (shown moved already).
+   */
+  const saveMoves = useCallback(
+    (moves: { frames: Move[]; cards: Move[]; carried?: ReadonlyMap<string, Pt> }, options: { onGrid?: boolean; ask?: boolean; saved?: () => void } = {}) => {
+      if (!moves.frames.length && !moves.cards.length) return;
+      saveLayout(
+        { frames: moves.frames.map((m) => ({ id: m.id, ...m.to })), cards: moves.cards.map((m) => ({ id: m.id, ...m.to })) },
+        {
+          ...options,
+          from: new Map([...(moves.carried ?? []), ...moves.cards.map((m) => [m.id, m.from] as const)]),
+          framesFrom: new Map(moves.frames.map((m) => [m.id, m.from])),
         },
       );
     },
-    [patchCard, enqueueGroup, versions, undo, toast],
+    [saveLayout],
   );
 
-  // ---- group drag: the dragged card leads, the others follow by the same amount (snapped as a whole) ----
-  const drag = useRef<{ lead: string; start: Map<string, Pt> } | null>(null);
+  // ---- group drag: the dragged card leads, the others and the selected frames follow by the same amount ----
+  const drag = useRef<{ lead: string; start: Map<string, Pt>; loose: Set<string>; frames: Map<string, Pt>; dx: number; dy: number } | null>(null);
 
   const onNodeDragStart = useCallback(
     (node: CardNodeT) => {
       drag.current = null;
-      if (!editable || selection?.t !== "multi" || !selection.keys.includes(cardKey(node.data.card))) return;
-      drag.current = { lead: node.id, start: new Map(selectedNodes().map((n) => [n.id, { ...n.position }])) };
+      const lead = items().find((i) => i.id === node.id);
+      if (!editable || selection?.t !== "multi" || !lead || !selection.keys.includes(lead.key)) return;
+      const m = moving();
+      drag.current = {
+        lead: node.id,
+        start: new Map([...m.cards, ...m.members].map((n) => [n.id, { ...n.position }])),
+        loose: new Set(m.cards.map((n) => n.id)),
+        frames: new Map(m.frames.map((f) => [f.id, { x: f.x, y: f.y }])),
+        dx: 0,
+        dy: 0,
+      };
     },
-    [editable, selection, selectedNodes],
+    [editable, selection, items, moving],
   );
 
-  /** React Flow moves the lead; the same change moves the rest of the group, in one update per frame. */
-  const withGroup = useCallback((changes: NodeChange<CardNodeT>[]): NodeChange<CardNodeT>[] => {
-    const g = drag.current;
-    if (!g) return changes;
-    const lead = changes.find((c) => c.type === "position" && c.id === g.lead && c.position);
-    if (!lead || lead.type !== "position" || !lead.position) return changes;
-    const s0 = g.start.get(g.lead)!;
-    const dx = lead.position.x - s0.x, dy = lead.position.y - s0.y;
-    const rest: NodeChange<CardNodeT>[] = [];
-    for (const [id, s] of g.start) if (id !== g.lead) rest.push({ type: "position", id, position: { x: s.x + dx, y: s.y + dy }, dragging: lead.dragging });
-    return [...changes, ...rest];
-  }, []);
+  /** React Flow moves the lead; the same change moves the rest of the group (and its frames), in one update per frame. */
+  const withGroup = useCallback(
+    (changes: NodeChange<CardNodeT>[]): NodeChange<CardNodeT>[] => {
+      const g = drag.current;
+      if (!g) return changes;
+      const lead = changes.find((c) => c.type === "position" && c.id === g.lead && c.position);
+      if (!lead || lead.type !== "position" || !lead.position) return changes;
+      const s0 = g.start.get(g.lead)!;
+      const dx = lead.position.x - s0.x, dy = lead.position.y - s0.y;
+      const rest: NodeChange<CardNodeT>[] = [];
+      for (const [id, s] of g.start) if (id !== g.lead) rest.push({ type: "position", id, position: { x: s.x + dx, y: s.y + dy }, dragging: lead.dragging });
+      if (g.frames.size && (dx !== g.dx || dy !== g.dy)) patchFrames(new Map([...g.frames].map(([id, s]) => [id, { x: s.x + dx, y: s.y + dy }])));
+      g.dx = dx;
+      g.dy = dy;
+      return [...changes, ...rest];
+    },
+    [patchFrames],
+  );
 
   /** The drag ends: one change for the whole group. Returns false when it was not a group drag. */
   const onGroupDragStop = useCallback((): boolean => {
     const g = drag.current;
     drag.current = null;
     if (!g) return false;
-    const moves = [...g.start]
-      .map(([id, from]) => {
-        const n = rf.getNode(id);
-        return { id, from, to: n ? { x: Math.round(n.position.x), y: Math.round(n.position.y) } : from };
-      })
-      .filter((m) => m.to.x !== m.from.x || m.to.y !== m.from.y);
-    if (!moves.length) return true;
+    const leadNode = rf.getNode(g.lead);
+    const s0 = g.start.get(g.lead)!;
+    const dx = leadNode ? Math.round(leadNode.position.x) - s0.x : 0, dy = leadNode ? Math.round(leadNode.position.y) - s0.y : 0;
+    if (dx === 0 && dy === 0) {
+      if (g.frames.size) patchFrames(g.frames);
+      return true;
+    }
     // The release is not a click on the lead card (that would select only it).
     const swallow = (c: MouseEvent) => c.stopPropagation();
     window.addEventListener("click", swallow, { capture: true, once: true });
     setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
-    savePositions(moves, moveCards);
+    const by = (from: Pt): Pt => ({ x: from.x + dx, y: from.y + dy });
+    // a drag drop: entities that land in a concept frame of another concept are asked about (D-05)
+    saveMoves(
+      {
+        frames: [...g.frames].map(([id, from]) => ({ id, from, to: by(from) })),
+        cards: [...g.loose].map((id) => ({ id, from: g.start.get(id)!, to: by(g.start.get(id)!) })),
+        carried: g.start,
+      },
+      { ask: true },
+    );
     return true;
-  }, [rf, savePositions, moveCards]);
+  }, [rf, saveMoves, patchFrames]);
 
-  // ---- nudge: the cards move at once, the moves are saved together after the keys are still ----
-  const nudging = useRef<{ from: Map<string, Pt>; at: Map<string, Pt>; timer: ReturnType<typeof setTimeout> | null } | null>(null);
+  // ---- nudge: the selection moves at once, the moves are saved together after the keys are still ----
+  const nudging = useRef<{
+    from: Map<string, Pt>;
+    at: Map<string, Pt>;
+    loose: Set<string>;
+    frames: Map<string, Pt>;
+    framesAt: Map<string, Pt>;
+    timer: ReturnType<typeof setTimeout> | null;
+  } | null>(null);
 
   const flushNudge = useCallback(() => {
     const n = nudging.current;
     nudging.current = null;
     if (!n) return;
-    for (const id of n.from.keys()) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
-    const moves = [...n.from].map(([id, from]) => ({ id, from, to: n.at.get(id)! })).filter((m) => m.to.x !== m.from.x || m.to.y !== m.from.y);
-    savePositions(moves, moveCards);
-  }, [pending, savePositions, moveCards]);
+    for (const id of [...n.from.keys(), ...n.frames.keys()]) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
+    saveMoves({
+      frames: changedOnly([...n.frames].map(([id, from]) => ({ id, from, to: n.framesAt.get(id)! }))),
+      cards: changedOnly([...n.loose].map((id) => ({ id, from: n.from.get(id)!, to: n.at.get(id)! }))),
+      carried: n.from,
+    });
+  }, [pending, saveMoves]);
 
   const nudge = useCallback(
     (dx: number, dy: number): boolean => {
       if (!editable) return false;
-      const nodes = selectedNodes();
-      if (!nodes.length) return false;
-      const n = (nudging.current ??= { from: new Map(), at: new Map(), timer: null });
-      for (const node of nodes) {
+      const m = moving();
+      if (!m.cards.length && !m.frames.length) return false;
+      const n = (nudging.current ??= { from: new Map(), at: new Map(), loose: new Set(), frames: new Map(), framesAt: new Map(), timer: null });
+      // a fresh page from the server must not put them back before they are saved
+      const hold = (id: string) => pending.current.set(id, (pending.current.get(id) ?? 0) + 1);
+      for (const node of [...m.cards, ...m.members]) {
         if (!n.from.has(node.id)) {
           n.from.set(node.id, { ...node.position });
           n.at.set(node.id, { ...node.position });
-          // a fresh page from the server must not put it back before it is saved
-          pending.current.set(node.id, (pending.current.get(node.id) ?? 0) + 1);
+          hold(node.id);
         }
         const p = n.at.get(node.id)!;
         const to = { x: p.x + dx, y: p.y + dy };
         n.at.set(node.id, to);
         patchCard(node.id, to);
       }
+      for (const node of m.cards) n.loose.add(node.id);
+      const framesTo = new Map<string, Pt>();
+      for (const f of m.frames) {
+        if (!n.frames.has(f.id)) {
+          n.frames.set(f.id, { x: f.x, y: f.y });
+          n.framesAt.set(f.id, { x: f.x, y: f.y });
+          hold(f.id);
+        }
+        const p = n.framesAt.get(f.id)!;
+        const to = { x: p.x + dx, y: p.y + dy };
+        n.framesAt.set(f.id, to);
+        framesTo.set(f.id, to);
+      }
+      patchFrames(framesTo);
       if (n.timer) clearTimeout(n.timer);
       n.timer = setTimeout(flushNudge, NUDGE_SAVE_MS);
       return true;
     },
-    [editable, selectedNodes, pending, patchCard, flushNudge],
+    [editable, moving, pending, patchCard, patchFrames, flushNudge],
   );
 
   // Leaving the canvas saves what was nudged at once.
@@ -204,19 +257,21 @@ export function useGroupActions(o: Options) {
   // ---- the group's actions (toolbox and selection panel) ----
   const arrangeSelection = useCallback(
     (mode: ArrangeMode) => {
-      const nodes = selectedNodes();
-      if (!editable || nodes.length < 2) return;
-      const to = arrange(mode, nodes.map((n) => ({ id: n.id, rect: rectOf(n) })));
-      const moves = nodes
-        .map((n) => ({ id: n.id, from: { ...n.position }, to: to.get(n.id)! }))
-        .filter((m) => m.to.x !== m.from.x || m.to.y !== m.from.y);
-      if (!moves.length) {
+      const m = moving();
+      if (!editable || m.cards.length + m.frames.length < 2) return;
+      const to = arrange(mode, [
+        ...m.frames.map((f) => ({ id: f.id, rect: { x: f.x, y: f.y, w: f.width, h: f.height }, frame: true })),
+        ...m.cards.map((n) => ({ id: n.id, rect: rectOf(n) })),
+      ]);
+      const frames = changedOnly(m.frames.map((f) => ({ id: f.id, from: { x: f.x, y: f.y }, to: to.get(f.id)! })));
+      const cards = changedOnly(m.cards.map((n) => ({ id: n.id, from: { ...n.position }, to: to.get(n.id)! })));
+      if (!frames.length && !cards.length) {
         toast(ARRANGED[mode]);
         return;
       }
-      savePositions(moves, arrangeCards, () => toast(ARRANGED[mode]));
+      saveMoves({ frames, cards }, { onGrid: true, saved: () => toast(ARRANGED[mode]) });
     },
-    [editable, selectedNodes, savePositions, arrangeCards, toast],
+    [editable, moving, saveMoves, toast],
   );
 
   const fitSelectionWidths = useCallback(() => {
@@ -234,27 +289,8 @@ export function useGroupActions(o: Options) {
       done();
       return;
     }
-    for (const c of changes) patchCard(c.id, { width: c.to });
-    enqueueGroup(
-      changes.map((c) => c.id),
-      async () => {
-        let result: WriteResult<Versions>;
-        try {
-          result = await setCardWidths(changes.map((c) => ({ canvasItemId: c.id, expectedVersion: versions.current.get(c.id) ?? 1, width: c.to })));
-        } catch {
-          result = FAILED;
-        }
-        if (result.ok) {
-          for (const [id, v] of Object.entries(result.value.versions)) versions.current.set(id, v);
-          undo()?.noteSaved();
-          done();
-        } else {
-          for (const c of changes) patchCard(c.id, { width: c.from });
-          toast(result.message, "refusal");
-        }
-      },
-    );
-  }, [editable, selectedNodes, patchCard, enqueueGroup, setCardWidths, versions, undo, toast]);
+    saveLayout({ cards: changes.map((c) => ({ id: c.id, width: c.to })) }, { saved: done });
+  }, [editable, selectedNodes, saveLayout, toast]);
 
   const removeSelection = useCallback(() => {
     const nodes = selectedNodes();
@@ -297,7 +333,7 @@ export function useGroupActions(o: Options) {
       if (!entities.length) return;
       const here = new Set((rf.getNodes() as CardNodeT[]).filter((n) => n.data.card.kind === "src").map((n) => n.data.card.targetId));
       const taken = occupied();
-      const placed: (CardTarget & { x: number; y: number })[] = [];
+      const placed: (CardTarget & { x: number; y: number; height: number })[] = [];
       const boxes: Rect[] = [];
       for (const anchor of entities) {
         const wanted = sourcesOf(anchor.data.card.targetId).filter((s) => !here.has(s.sourceTableId));
@@ -309,7 +345,7 @@ export function useGroupActions(o: Options) {
           const box = { ...spots[i]!, w: CARD_W, h: heights[i]! };
           taken.push(box);
           boxes.push(box);
-          placed.push({ sourceTableId: w.sourceTableId, ...spots[i]! });
+          placed.push({ sourceTableId: w.sourceTableId, ...spots[i]!, height: heights[i]! });
         });
       }
       if (!placed.length) {

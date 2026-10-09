@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { afterLasso, cardKey, fromKeys, lassoHits, rectBetween, selectedKeys, selectionBounds, toggleCard, type CardBox } from "./selection";
+import { afterLasso, allKeys, cardKey, fromKeys, lassoHits, rectBetween, selectedCardIds, selectedKeys, selectionBounds, toggleCard, toggleItem, unitsOf, type ItemBox } from "./selection";
 
-const cards: CardBox[] = [
+const cards: ItemBox[] = [
   { id: "c1", key: "entity:customer", rect: { x: 0, y: 0, w: 256, h: 200 } },
   { id: "c2", key: "entity:order", rect: { x: 400, y: 0, w: 256, h: 120 } },
   { id: "c3", key: "source:customers", rect: { x: 0, y: 400, w: 280, h: 300 } },
@@ -65,5 +65,52 @@ describe("the selection box", () => {
   it("surrounds the selected cards 12 px out", () => {
     expect(selectionBounds([cards[0]!.rect, cards[1]!.rect])).toEqual({ x: -12, y: -12, w: 680, h: 224 });
     expect(selectionBounds([])).toBeNull();
+  });
+});
+
+describe("frames in the selection (slice 2b, D-16, D-17)", () => {
+  // frame F1 holds c1 and c2; frame F2 holds c4; c3 is in no frame
+  const items: ItemBox[] = [
+    { id: "F1", key: "frame:F1", rect: { x: -40, y: -40, w: 760, h: 300 } },
+    { id: "F2", key: "frame:F2", rect: { x: 1000, y: 0, w: 400, h: 300 } },
+    { id: "c1", key: "entity:customer", rect: { x: 0, y: 0, w: 256, h: 200 }, frameId: "F1" },
+    { id: "c2", key: "entity:order", rect: { x: 400, y: 0, w: 256, h: 120 }, frameId: "F1" },
+    { id: "c3", key: "source:customers", rect: { x: 0, y: 400, w: 280, h: 300 }, frameId: null },
+    { id: "c4", key: "entity:line", rect: { x: 1040, y: 40, w: 256, h: 120 }, frameId: "F2" },
+  ];
+
+  it("one frame key is the single frame selection, and reads back", () => {
+    expect(fromKeys(["frame:F1"], items)).toEqual({ t: "frame", id: "F1" });
+    expect(selectedKeys({ t: "frame", id: "F2" }, items)).toEqual(["frame:F2"]);
+    expect(fromKeys(["frame:gone", "entity:order"], items)).toEqual({ t: "card", id: "c2" });
+  });
+
+  it("Shift+click adds a frame to a card, or a card to a frame, and takes it out again", () => {
+    const two = toggleItem({ t: "card", id: "c3" }, "frame:F1", items);
+    expect(two).toEqual({ t: "multi", keys: ["source:customers", "frame:F1"] });
+    expect(toggleItem(two, "frame:F1", items)).toEqual({ t: "card", id: "c3" });
+    expect(toggleCard({ t: "frame", id: "F2" }, "c3", items)).toEqual({ t: "multi", keys: ["frame:F2", "source:customers"] });
+  });
+
+  it("a lasso around a whole frame catches the frame, not its cards; a frame partly inside is not caught", () => {
+    expect(lassoHits(items, { x: -50, y: -50, w: 800, h: 800 })).toEqual(["frame:F1", "source:customers"]);
+    // F1 not whole: its cards fully inside are caught on their own
+    expect(lassoHits(items, { x: -10, y: -10, w: 700, h: 300 })).toEqual(["entity:customer", "entity:order"]);
+  });
+
+  it("Ctrl+A selects every frame and the cards in no frame", () => {
+    expect(allKeys(items)).toEqual(["frame:F1", "frame:F2", "source:customers"]);
+  });
+
+  it("units: a selected frame carries its cards, moved once even when also selected; other cards move alone", () => {
+    expect(unitsOf(["frame:F1", "entity:order", "source:customers", "entity:line"], items)).toEqual({
+      frames: ["F1"],
+      cards: ["c3", "c4"],
+      members: ["c1", "c2"],
+    });
+  });
+
+  it("the selected cards themselves, for fit widths, remove and put in a new frame", () => {
+    expect(selectedCardIds(["frame:F1", "entity:order", "source:customers"], items)).toEqual(["c2", "c3"]);
   });
 });

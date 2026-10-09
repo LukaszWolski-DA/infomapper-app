@@ -16,6 +16,7 @@ import { STATUS_LABEL } from "./attribute-panel";
 import { Actions, buttonClass, ConfirmDelete, dangerClass, Field, Flag, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TextField, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { OnCanvases } from "./on-canvases";
+import { CardFrame } from "./card-frame";
 import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tablePath, typeCheckOf } from "./model-index";
 
 export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; cardId: Uuid }) {
@@ -109,6 +110,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
       </Fold>
 
       <OnCanvases kind="source" targetId={t.id} cardId={cardId} />
+      <CardFrame cardId={cardId} kind="src" />
 
       {p.editable && (
         <Actions>

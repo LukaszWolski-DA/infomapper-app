@@ -17,6 +17,7 @@ const NOUN: Record<string, string> = {
   mapping: "mapping",
   mapping_input: "mapping input",
   canvas_item: "card",
+  frame: "frame",
 };
 
 /** The table that names a group: the thing the person acted on, not what came along (cascades, a new card). */
@@ -33,6 +34,7 @@ const PRIORITY = [
   "canvas",
   "project",
   "project_canvas",
+  "frame",
   "canvas_item",
 ];
 
@@ -66,6 +68,20 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
   if (cards.length === events.length && cards.every((e) => e.operation === "create")) return cards.length > 1 ? `Place ${cards.length} cards` : "Place card";
   if (cards.length === events.length && cards.length > 1 && cards.every((e) => e.operation === "delete")) return `Remove ${cards.length} cards`;
 
+  // Frames (slice 2b): moved with their cards, cards dropped into frames (which may grow), resized, arranged.
+  const frames = of("frame");
+  if (frames.length && frames.length + cards.length === events.length && [...frames, ...cards].every((e) => e.operation === "update")) {
+    if (frames.every((e) => only(e, ["x", "y"])) && cards.every((e) => only(e, ["x", "y"]))) return frames.length > 1 ? "Move frames" : "Move frame";
+    if (frames.every((e) => only(e, ["width", "height"])) && cards.every((e) => only(e, ["frame_id"]))) return "Resize frame";
+    if (cards.length && frames.every((e) => only(e, ["x", "y", "width", "height"])) && cards.every((e) => only(e, ["x", "y", "frame_id"]))) {
+      return cards.length > 1 ? "Move cards" : "Move card";
+    }
+  }
+  if (cards.length && cards.length === events.length && cards.every((e) => e.operation === "update" && only(e, ["x", "y", "frame_id"]))) {
+    return cards.length > 1 ? "Move cards" : "Move card";
+  }
+  if (frames.filter((e) => e.operation === "create").length > 1) return "Arrange into frames";
+
   // A new canvas that comes with cards is a duplicated layout (slice 2a).
   if (of("canvas").some((e) => e.operation === "create") && cards.some((e) => e.operation === "create")) return "Duplicate canvas";
 
@@ -97,10 +113,12 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
   }
 }
 
-/** The canvas a change group's cards are on, when they are all on one; null for a change of the model only. */
+/** The canvas a change group's cards and frames are on, when they are all on one; null for a change of the model only. */
 export function changeCanvasId(events: readonly ChangeEvent[]): string | null {
   const ids = new Set(
-    events.filter((e) => e.object_type === "canvas_item").map((e) => String((e.after_image ?? e.before_image)?.canvas_id ?? "")),
+    events
+      .filter((e) => e.object_type === "canvas_item" || e.object_type === "frame")
+      .map((e) => String((e.after_image ?? e.before_image)?.canvas_id ?? "")),
   );
   return ids.size === 1 ? [...ids][0]! || null : null;
 }

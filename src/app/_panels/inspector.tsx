@@ -1,7 +1,7 @@
 "use client";
 
 // The right panel (prototype #ins): shows and edits what is selected on the canvas: an entity, attribute, mapping,
-// relationship, source table or column; with nothing selected, an overview of this canvas.
+// relationship, source table or column, a frame (slice 2b); with nothing selected, an overview of this canvas.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
@@ -9,6 +9,7 @@ import type { Uuid } from "@/domain/ids";
 import type { WorkspaceModel } from "@/domain/types";
 import { AttributePanel } from "./attribute-panel";
 import { EntityPanel } from "./entity-panel";
+import { FramePanel } from "./frame-panel";
 import { useCanvasHost, type HostCard } from "./canvas-host";
 import type { PendingInput } from "./map-column";
 import { MappingPanel } from "./mapping-panel";
@@ -139,6 +140,8 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     body = <SourceColumnPanel key={sel.id} column={ix.column.get(sel.id)!} cardId={card.id} />;
   } else if (sel?.t === "map" && ix.mapping.has(sel.id)) {
     body = <MappingPanel key={sel.id} mapping={ix.mapping.get(sel.id)!} />;
+  } else if (sel?.t === "frame" && ui.frameView(sel.id)) {
+    body = <FramePanel key={sel.id} frameId={sel.id} />;
   } else if (sel?.t === "multi") {
     body = <SelectionPanel keys={sel.keys} />;
   } else if (sel?.t === "rel" && ix.model.relationships.some((r) => r.id === sel.id)) {

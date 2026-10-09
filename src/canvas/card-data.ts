@@ -2,6 +2,7 @@
 // passed to the client canvas. Pure TypeScript, so it is tested without a browser.
 
 import type { Uuid } from "@/domain/ids";
+import type { CardSubject } from "@/domain/model/frames";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
 import type { CanvasItem, RowFilter, WorkspaceModel } from "@/domain/types";
 import { lineNeedsClip, rowNeedsClip, titleNeedsClip } from "./text-fit";
@@ -56,6 +57,12 @@ export interface CardData {
   width: number | null;
   collapsed: boolean;
   rowFilter: Exclude<RowFilter, "labeled">;
+  /** The frame the card belongs to on this canvas (slice 2b, D-05). */
+  frameId: Uuid | null;
+  /** An entity of a concept or a table of a system: what a concept or source frame checks (misplaced cards). */
+  subject: CardSubject;
+  /** The mappings that read or fill the card's rows, for a frame's “type” and “drafts” chips (each counted once). */
+  links: { id: Uuid; warn: boolean; draft: boolean }[];
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -73,14 +80,16 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
   const inputsOf = new Map<Uuid, Uuid[]>();
   for (const i of model.mappingInputs) inputsOf.set(i.mapping_id, [...(inputsOf.get(i.mapping_id) ?? []), i.source_column_id]);
 
-  // Per row: how many mappings, any with a type problem, and the tooltip lines.
+  // Per row: how many mappings, any with a type problem, and the tooltip lines; and the mappings themselves.
   const info = new Map<Uuid, { n: number; warn: boolean; lines: string[] }>();
-  const note = (rowId: Uuid, warn: boolean, line: string) => {
+  const linksOf = new Map<Uuid, CardData["links"]>();
+  const note = (rowId: Uuid, warn: boolean, line: string, link: CardData["links"][number]) => {
     const r = info.get(rowId) ?? { n: 0, warn: false, lines: [] };
     r.n++;
     r.warn ||= warn;
     r.lines.push(line);
     info.set(rowId, r);
+    linksOf.set(rowId, [...(linksOf.get(rowId) ?? []), link]);
   };
   for (const m of model.mappings) {
     const attribute = attributeById.get(m.attribute_id);
@@ -88,8 +97,9 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
     const columns = (inputsOf.get(m.id) ?? []).map((id) => columnById.get(id)).filter((c) => c !== undefined);
     const warn = !checkMappingTypes(m, attribute, columns).ok;
     const attrLabel = `${entityById.get(attribute.entity_id)?.name ?? "?"}.${attribute.name}`;
-    note(attribute.id, warn, `from ${columns.map((c) => `${columnTable(c.id)?.name ?? "?"}.${c.name}`).join(" + ")}`);
-    for (const c of columns) note(c.id, warn, `to ${attrLabel}`);
+    const link = { id: m.id, warn, draft: m.status === "draft" };
+    note(attribute.id, warn, `from ${columns.map((c) => `${columnTable(c.id)?.name ?? "?"}.${c.name}`).join(" + ")}`, link);
+    for (const c of columns) note(c.id, warn, `to ${attrLabel}`, link);
   }
   const rowState = (id: Uuid, empty: string) => {
     const r = info.get(id);
@@ -106,7 +116,10 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
       width: item.width,
       collapsed: item.collapsed,
       rowFilter: item.row_filter === "labeled" ? "all" : item.row_filter,
+      frameId: item.frame_id,
     } as const;
+    /** The distinct mappings of the given rows. */
+    const links = (rows: readonly CardRow[]) => [...new Map(rows.flatMap((r) => linksOf.get(r.id) ?? []).map((l) => [l.id, l])).values()];
     if (item.entity_id) {
       const entity = entityById.get(item.entity_id);
       if (!entity) continue;
@@ -134,6 +147,8 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
         color: concept?.color ?? null,
         rows,
         mapped: rows.filter((r) => r.mappings > 0).length,
+        subject: { entityConceptId: entity.concept_id },
+        links: links(rows),
       });
     } else if (item.source_table_id) {
       const table = tableById.get(item.source_table_id);
@@ -161,6 +176,8 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
         color: null,
         rows,
         mapped: rows.filter((r) => r.mappings > 0).length,
+        subject: { sourceSystemId: table.source_system_id },
+        links: links(rows),
       });
     }
   }

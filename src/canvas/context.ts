@@ -3,6 +3,7 @@
 import { createContext } from "react";
 import type { Uuid } from "@/domain/ids";
 import type { ArrangeMode } from "./arrange";
+import type { FrameData, FrameStats } from "./frame-data";
 import type { Selection } from "./line-data";
 
 /** What the card nodes may do and see; kept in a context so node data stays plain and memo-friendly. */
@@ -35,13 +36,17 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
 
 /**
  * Measurement-only switches (slice 2a diagnosis, AD-31): only the measurement-only production build passes them, from
- * `?diag=nolines` or `?diag=blocks`. Users never see them.
+ * `?diag=nolines`, `?diag=blocks`, `?diag=noframes` or `?diag=nolabels`. Users never see them.
  */
 export interface Diagnosis {
   /** No line layer at all. */
   noLines?: boolean;
   /** Every card drawn as its below-40 % block, at any zoom. */
   blocks?: boolean;
+  /** No frames at all (slice 2b, S2B-14). */
+  noFrames?: boolean;
+  /** Frames without their names and chips (slice 2b, S2B-14). */
+  noLabels?: boolean;
 }
 export const DiagnosisCtx = createContext<Diagnosis>({});
 
@@ -91,6 +96,59 @@ export interface CanvasHandle {
    * in one change. `sourcesOf` gives an entity's feeding source tables and their row counts (the page knows the model).
    */
   placeSourcesOfSelection: (sourcesOf: (entityId: Uuid) => { sourceTableId: Uuid; rows: number }[]) => void;
+  /** “New frame here” (slice 2b): a 480 × 320 frame centred on a canvas point. */
+  createFrameAt: (at: { x: number; y: number }) => void;
+  /** A frame as the canvas shows it now, with its cards and numbers (they change without a fresh page). */
+  frameView: (frameId: Uuid) => FrameView | null;
+  /** Every frame of the canvas as it shows them now, largest first. */
+  framesView: () => FrameView[];
+  /** The frame a card belongs to on this canvas now. */
+  cardFrame: (cardId: Uuid) => FrameData | null;
+  /** The smallest frame around a canvas point (the Entity tool takes a concept frame's concept, D-46). */
+  frameAt: (at: { x: number; y: number }) => FrameData | null;
+  /** Every frame at the version the canvas knows: a new card may make one grow (slice 2b). */
+  frameRefs: () => { frameId: Uuid; expectedVersion: number }[];
+  /**
+   * Puts cards in a new frame around them (PRD item 12): a selection takes only itself; one card (`fromCard`) also
+   * takes the free cards fully inside the new frame.
+   */
+  putInNewFrame: (cardIds: readonly Uuid[], fromCard: boolean) => void;
+  /** “Arrange into frames by concept and system” (canvas overview). */
+  arrangeIntoFrames: () => void;
+  /** Renames a frame or changes what it stands for (the frame panel); resolves whether it was saved. */
+  updateFrame: (frameId: Uuid, patch: FramePatch) => Promise<boolean>;
+  /** Deletes a frame; its cards stay. The toast offers Undo. */
+  deleteFrame: (frameId: Uuid) => void;
+  fitFrame: (frameId: Uuid) => void;
+  zoomToFrame: (frameId: Uuid) => void;
+  /** Selects the frame's cards (toolbox “Select its cards”). */
+  selectFrameCards: (frameId: Uuid) => void;
+}
+
+/** A card in a frame, for the frame panel. */
+export interface FrameMember {
+  id: Uuid;
+  kind: "ent" | "src";
+  targetId: Uuid;
+  name: string;
+  misplaced: boolean;
+}
+
+/** A frame as the canvas shows it now: its cards and the numbers of its label (slice 2b). */
+export interface FrameView {
+  frame: FrameData;
+  cardIds: Uuid[];
+  members: FrameMember[];
+  stats: FrameStats;
+}
+
+/** What the frame panel may change (slice 2b, item 9). */
+export interface FramePatch {
+  name?: string;
+  kind?: "concept" | "source_system" | "free";
+  conceptId?: Uuid;
+  sourceSystemId?: Uuid;
+  color?: string;
 }
 
 export type RowFilter = "all" | "mapped" | "unmapped" | "keys";
@@ -113,7 +171,9 @@ export type ToolboxTarget =
   | { kind: "selection" }
   | { kind: "row"; cardId: Uuid; rowId: Uuid }
   | { kind: "map"; mappingId: Uuid }
-  | { kind: "rel"; relationshipId: Uuid };
+  | { kind: "rel"; relationshipId: Uuid }
+  /** A frame's name, handle or an empty spot inside it (slice 2b). */
+  | { kind: "frame"; frameId: Uuid };
 
 export interface ToolboxRequest {
   target: ToolboxTarget;
@@ -127,7 +187,7 @@ export interface ToolboxRequest {
  * A canvas tool that changes what a click does: the Entity tool (D-46), drawing a relationship from a card, or the
  * Hand tool (D-18, slice 2a), with which a left drag anywhere pans. One at a time; Esc ends it.
  */
-export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | { kind: "hand" } | null;
+export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | { kind: "hand" } | { kind: "frame" } | null;
 
 /**
  * What the canvas asks of the page around it. The canvas knows gestures and positions; the page knows the model and
@@ -144,6 +204,8 @@ export interface CanvasHost {
   moveAttribute: (attributeId: Uuid, how: AttributeMove) => void;
   /** Delete or Backspace with a mapping or relationship line selected: deleted at once, with Undo in the toast. */
   deleteLine: (line: { t: "map" | "rel"; id: Uuid }) => void;
+  /** A frame was just made (slice 2b): its name is ready to type in the right panel. */
+  frameCreated: (frameId: Uuid) => void;
 }
 
 /** The page's undo (slice 1b), for the canvas's own toasts and for card changes saved without a fresh page. */
@@ -177,6 +239,12 @@ export interface CanvasUiApi extends CanvasHandle {
   registerHost: (host: CanvasHost | null) => void;
   undo: () => UndoHooks | null;
   registerUndo: (undo: UndoHooks | null) => void;
+  /**
+   * Changes whenever the canvas changes its frames or which cards are in them (slice 2b), so the panels that show
+   * frames draw again; positions alone do not change it.
+   */
+  layoutKey: string;
+  publishLayout: (key: string) => void;
 }
 
 export const CanvasUiCtx = createContext<CanvasUiApi>({
@@ -202,6 +270,19 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   fitSelectionWidths: noop,
   removeSelection: noop,
   placeSourcesOfSelection: noop,
+  createFrameAt: noop,
+  frameView: () => null,
+  framesView: () => [],
+  cardFrame: () => null,
+  frameAt: () => null,
+  frameRefs: () => [],
+  putInNewFrame: noop,
+  arrangeIntoFrames: noop,
+  updateFrame: () => Promise.resolve(false),
+  deleteFrame: noop,
+  fitFrame: noop,
+  zoomToFrame: noop,
+  selectFrameCards: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,
@@ -211,6 +292,8 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   registerHost: noop,
   undo: () => null,
   registerUndo: noop,
+  layoutKey: "",
+  publishLayout: noop,
 });
 
 /** Drag data of a left-panel item dropped onto the canvas: JSON `{ target: CardTarget, rows: number }`. */

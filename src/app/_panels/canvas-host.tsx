@@ -10,14 +10,18 @@
 // - Ctrl/Alt + arrows on a selected attribute (D-36).
 // - Delete on a selected mapping or relationship line: deleted at once, with Undo in the toast (slice 1b).
 // - “Show its sources” and “Show the entities it feeds” place them beside the card (B-08).
+// - Frames (slice 2b): “New frame here” on the empty canvas; a frame's toolbox (Rename…, Fit frame to its content,
+//   Select its cards, Zoom to frame, Delete frame); a new frame's name is ready to type in the panel.
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
 import { createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, swapRelationshipAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
 import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
+import { newCardHeight } from "@/canvas/geometry";
 import { FILTER_LABEL, FILTER_ORDER } from "@/canvas/CardNode";
 import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
+import { isFrameKey } from "@/canvas/selection";
 import type { Uuid } from "@/domain/ids";
 import type { MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
@@ -82,13 +86,21 @@ export function useCanvasHost({
       if (!editable) return;
       const concepts = [...ix.model.concepts].sort((a, b) => a.sort_order - b.sort_order);
       const last = panels.lastConcept();
-      const concept = concepts.find((c) => c.id === last) ?? concepts[0];
+      // inside a concept frame the new entity belongs to its concept (D-46, prototype conceptAt), else the last used
+      const frame = ui.frameAt({ x: at.x + 24, y: at.y + 20 });
+      const fromFrame = frame?.kind === "concept" ? concepts.find((c) => c.id === frame.conceptId) : undefined;
+      const concept = fromFrame ?? concepts.find((c) => c.id === last) ?? concepts[0];
       if (!concept) {
         toast("Create a concept first (left panel, New concept).");
         return;
       }
       const result = await run(() =>
-        createEntityAction(workspaceId, { conceptId: concept.id, ...(name ? { name } : {}), placement: { canvasId, x: snap8(at.x), y: snap8(at.y) } }),
+        createEntityAction(workspaceId, {
+          conceptId: concept.id,
+          ...(name ? { name } : {}),
+          // with its height the new card joins the frame it lands in (slice 2b)
+          placement: { canvasId, x: snap8(at.x), y: snap8(at.y), height: newCardHeight(0), frames: ui.frameRefs() },
+        }),
       );
       if (!result.ok) return;
       panels.setLastConcept(concept.id);
@@ -152,9 +164,10 @@ export function useCanvasHost({
         if (editable) void moveAttribute(attributeId, how);
       },
       deleteLine: (line) => void deleteLine(line),
+      frameCreated: (frameId) => panels.setNameFocus(frameId),
     });
     return () => ui.registerHost(null);
-  }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable, deleteLine]);
+  }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable, deleteLine, panels]);
 
   // ---- the toolbox ----
 
@@ -195,6 +208,9 @@ export function useCanvasHost({
       });
       items.push({ label: view.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !view.collapsed }) });
       items.push({ label: "Fit width to names", act: () => ui.fitWidth(card.id) });
+      if (!ui.cardFrame(card.id)) {
+        items.push({ label: `Put in a new ${isEnt ? "concept" : "source system"} frame`, act: () => ui.putInNewFrame([card.id], true) });
+      }
       items.push({ sep: true });
       items.push({ label: "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
       if (isEnt) items.push({ label: "Delete from model…", danger: true, act: () => setDeleting(card.targetId) });
@@ -251,6 +267,7 @@ export function useCanvasHost({
       if (editable) {
         items.push({ search });
         items.push({ label: "New entity here", kbd: "E", act: () => void createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }) });
+        items.push({ label: "New frame here", kbd: "A", act: () => ui.createFrameAt(req.at) });
       }
       // every role: these only change what is selected or how the view moves (slice 2a)
       items.push({ label: "Select all", kbd: "Ctrl A", act: () => ui.selectAll() });
@@ -325,21 +342,44 @@ export function useCanvasHost({
       // a group (slice 2a; prototype ctxFor “a group”): reviewers and readers only clear it
       const sel = ui.selection;
       const keys = sel?.t === "multi" ? sel.keys : [];
+      // frames stand for their cards (slice 2b): fit widths, put in a new frame and remove act on the selected cards
+      const cardKeys = keys.filter((k) => !isFrameKey(k));
       items.push({ head: `${keys.length} items selected` });
       if (editable) {
         items.push({ label: "Align left", act: () => ui.arrangeSelection("left") });
         items.push({ label: "Align top", act: () => ui.arrangeSelection("top") });
         items.push({ label: "Stack in a column", act: () => ui.arrangeSelection("column") });
         items.push({ label: "Line up in a row", act: () => ui.arrangeSelection("row") });
-        items.push({ label: "Fit widths to names", act: () => ui.fitSelectionWidths() });
+        if (cardKeys.length) items.push({ label: "Fit widths to names", act: () => ui.fitSelectionWidths() });
         items.push({ sep: true });
+        if (cardKeys.length) {
+          items.push({
+            label: "Put in a new frame",
+            act: () => ui.putInNewFrame(cardKeys.map((k) => cardOf(k.slice(k.indexOf(":") + 1))).filter((id): id is Uuid => !!id), false),
+          });
+        }
         if (keys.some((k) => k.startsWith("entity:"))) {
           items.push({ label: "Add sources of selected entities", act: () => ui.placeSourcesOfSelection((id) => feedingSourceCards(ix, id)) });
         }
-        items.push({ label: "Remove from this canvas", danger: true, act: () => ui.removeSelection() });
+        if (cardKeys.length) items.push({ label: "Remove from this canvas", danger: true, act: () => ui.removeSelection() });
       }
       items.push({ sep: true });
       items.push({ label: "Clear selection", kbd: "Esc", act: () => ui.select(null) });
+      return items;
+    }
+    if (t.kind === "frame") {
+      // a frame (slice 2b, prototype ctxFor “a frame”, D-19): reviewers and readers may select, zoom and select its cards
+      const view = ui.frameView(t.frameId);
+      if (!view) return items;
+      items.push({ head: view.frame.name });
+      if (editable) items.push({ label: "Rename…", act: () => focusField("f-fn"), testId: "toolbox-frame-rename" });
+      if (editable) items.push({ label: "Fit frame to its content", act: () => ui.fitFrame(t.frameId), testId: "toolbox-frame-fit" });
+      items.push({ label: "Select its cards", disabled: !view.cardIds.length, act: () => ui.selectFrameCards(t.frameId), testId: "toolbox-frame-select-cards" });
+      items.push({ label: "Zoom to frame", act: () => ui.zoomToFrame(t.frameId), testId: "toolbox-frame-zoom" });
+      if (editable) {
+        items.push({ sep: true });
+        items.push({ label: "Delete frame (keeps its cards)", kbd: "Del", danger: true, act: () => ui.deleteFrame(t.frameId), testId: "toolbox-frame-delete" });
+      }
       return items;
     }
     const card = cardById.get(t.cardId);

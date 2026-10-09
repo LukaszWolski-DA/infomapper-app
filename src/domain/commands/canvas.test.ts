@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { access, archived, canvas, canvasItem, ids, link, makeCtx, NOW, project } from "../__fixtures__/domain";
+import { access, archived, canvas, canvasItem, frame, ids, link, makeCtx, NOW, project } from "../__fixtures__/domain";
 import { STALE_VERSION_MESSAGE } from "../errors";
 import { changeLabel } from "../model/change-label";
 import {
@@ -161,6 +161,7 @@ describe("duplicateCanvas (slice 2a)", () => {
     project: project(projectA),
     projectLinks: [link(projectA, canvas1, 3), link(projectA, canvas2, 4)],
     items,
+    frames: [],
   };
 
   it("copies the layout into a new canvas “{name} (copy)” right after the original, with the look and layer, in one change group", () => {
@@ -198,6 +199,25 @@ describe("duplicateCanvas (slice 2a)", () => {
       expect(duplicateCanvas(makeCtx(), access(role), state, { projectId: projectA, canvasId: canvas1 })).toMatchObject({ ok: false, error: { code: "forbidden" } });
     }
   });
+
+  it("copies the frames with new ids, and each card is in the copy of its frame (slice 2b)", () => {
+    const frames = [
+      frame(ids.frameA, { name: "Customer", kind: "concept", concept_id: ids.conceptCustomer, color: null, x: 360, y: 80, width: 400, height: 400 }),
+      frame(ids.frameB, { name: "Gone", deleted_at: NOW }),
+    ];
+    const withFrames = { ...state, frames, items: [canvasItem(ids.itemCustomer, { x: 400, y: 120, frame_id: ids.frameA }), canvasItem(ids.itemCrmCustomer, { x: 40, y: 40 })] };
+    const r = duplicateCanvas(makeCtx(), access("modeler"), withFrames, { projectId: projectA, canvasId: canvas1 });
+    if (!r.ok) throw new Error(r.error.message);
+    const inserted = (table: string) => r.writeSet.writes.flatMap((w) => (w.kind === "insert" && w.table === table ? [w.row as unknown as Record<string, unknown>] : []));
+    const [copyFrame, ...more] = inserted("frame");
+    expect(more).toHaveLength(0); // the deleted frame is not copied
+    expect(copyFrame).toMatchObject({ canvas_id: r.value.canvasId, name: "Customer", kind: "concept", concept_id: ids.conceptCustomer, x: 360, y: 80, width: 400, height: 400, version: 1 });
+    expect(copyFrame!.id).not.toBe(ids.frameA);
+    expect(inserted("canvas_item").map((i) => i.frame_id)).toEqual([copyFrame!.id, null]);
+    // frames are written before the cards that name them
+    expect(r.writeSet.writes.findIndex((w) => w.table === "frame")).toBeLessThan(r.writeSet.writes.findIndex((w) => w.table === "canvas_item"));
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+  });
 });
 
 describe("deleteCanvas (slice 2a, D-28)", () => {
@@ -208,6 +228,7 @@ describe("deleteCanvas (slice 2a, D-28)", () => {
     canvasLinks: [link(projectA, canvas1)],
     projectLinks: [link(projectA, canvas1), link(projectA, canvas2)],
     items,
+    frames: [],
   };
   const input = { projectId: projectA, canvasId: canvas1, expectedVersion: 2 };
 
@@ -222,6 +243,13 @@ describe("deleteCanvas (slice 2a, D-28)", () => {
       { kind: "remove", table: "project_canvas", before: { project_id: projectA, canvas_id: canvas1 } },
     ]);
     expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+    expect(changeLabel(r.writeSet.events)).toBe("Delete canvas");
+  });
+
+  it("deletes the canvas's frames with it (slice 2b)", () => {
+    const r = deleteCanvas(makeCtx(), access("modeler"), { ...base, frames: [frame(), frame(ids.frameB, { deleted_at: NOW })] }, input);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes.filter((w) => w.table === "frame")).toMatchObject([{ kind: "update", row: { id: ids.frameA, deleted_at: NOW } }]);
     expect(changeLabel(r.writeSet.events)).toBe("Delete canvas");
   });
 

@@ -109,6 +109,8 @@ export type Selection =
   | { t: "row"; cardId: Uuid; id: Uuid }
   | { t: "map"; id: Uuid }
   | { t: "rel"; id: Uuid }
+  /** A frame (slice 2b): its name or an empty spot inside it was clicked. */
+  | { t: "frame"; id: Uuid }
   | null;
 
 export interface Related {
@@ -121,7 +123,7 @@ export interface Related {
  * A selected card fades nothing: in the prototype that belongs to Focus mode, a later slice.
  */
 export function relatedLines(sel: Selection, lines: CanvasLines): Related | null {
-  if (!sel || sel.t === "card" || sel.t === "multi") return null;
+  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame") return null;
   const maps = new Set<Uuid>(), rels = new Set<Uuid>();
   switch (sel.t) {
     case "map":
