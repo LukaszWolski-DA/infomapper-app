@@ -5,6 +5,7 @@ import type { Uuid } from "@/domain/ids";
 import type { ArrangeMode } from "./arrange";
 import type { FrameData, FrameStats } from "./frame-data";
 import type { Selection } from "./line-data";
+import type { Bundle } from "./line-geometry";
 
 /** What the card nodes may do and see; kept in a context so node data stays plain and memo-friendly. */
 export interface CanvasCardsApi {
@@ -137,6 +138,8 @@ export interface CanvasHandle {
   selectFrameCards: (frameId: Uuid) => void;
   /** Collapses a frame into one block or expands it (slice 2c, D-07). */
   setFrameCollapsed: (frameId: Uuid, collapsed: boolean) => void;
+  /** A bundle of lines at a collapsed frame as the canvas draws it now (slice 2c, the bundle panel). */
+  bundleView: (key: string) => Bundle | null;
 }
 
 /** A card in a frame, for the frame panel. */
@@ -187,7 +190,9 @@ export type ToolboxTarget =
   | { kind: "map"; mappingId: Uuid }
   | { kind: "rel"; relationshipId: Uuid }
   /** A frame's name, handle or an empty spot inside it (slice 2b). */
-  | { kind: "frame"; frameId: Uuid };
+  | { kind: "frame"; frameId: Uuid }
+  /** A bundle of lines at a collapsed frame (slice 2c). */
+  | { kind: "bundle"; key: string };
 
 export interface ToolboxRequest {
   target: ToolboxTarget;
@@ -298,6 +303,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   zoomToFrame: noop,
   selectFrameCards: noop,
   setFrameCollapsed: noop,
+  bundleView: () => null,
   registerCanvas: noop,
   mode: null,
   setMode: noop,

@@ -388,6 +388,21 @@ export function useCanvasHost({
       }
       return items;
     }
+    if (t.kind === "bundle") {
+      // a bundle of lines at a collapsed frame (slice 2c, prototype ctxFor “bundle”)
+      const b = ui.bundleView(t.key);
+      if (!b) return items;
+      items.push({ head: `${b.ids.length} bundled ${b.t === "rel" ? "relationships" : "mappings"}` });
+      items.push({ label: "Show what is inside", act: () => ui.select({ t: "bundle", id: b.key }), testId: "toolbox-bundle-show" });
+      if (editable) {
+        for (const e of [b.a, b.z]) {
+          if (!("frameId" in e)) continue;
+          const name = ui.frameView(e.frameId)?.frame.name ?? "?";
+          items.push({ label: `Expand ${name}`, act: () => ui.setFrameCollapsed(e.frameId, false), testId: "toolbox-bundle-expand" });
+        }
+      }
+      return items;
+    }
     const card = cardById.get(t.cardId);
     if (!card) return items;
     if (t.kind === "row" && card.kind === "ent") {

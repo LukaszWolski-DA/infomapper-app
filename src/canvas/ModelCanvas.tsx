@@ -23,7 +23,8 @@
 // frames with their cards.
 // Slice 2c (D-07): a collapsed frame is drawn as a block, a node of its own kind (`BlockNode`); its cards stay in
 // React Flow's store, hidden, with their places kept. The block stands for the frame (selection key frame:<id>). A card
-// dragged onto a block, from the canvas or the left panel, is filed into the frame.
+// dragged onto a block, from the canvas or the left panel, is filed into the frame. Lines touching a collapsed frame are
+// bundled per pair of ends (`bundleLines`), drawn by the line layer; a bundle can be selected (its panel, its toolbox).
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -79,6 +80,7 @@ import { relatedLines, type CanvasLines, type Selection } from "./line-data";
 import { useCanvasLook } from "./look";
 import { viewKey } from "./views";
 import LineLayer from "./LineLayer";
+import { bundleLines, type Bundle } from "./line-geometry";
 import { Overview } from "./Overview";
 
 const nodeTypes = { card: CardNode, block: BlockNode };
@@ -726,8 +728,6 @@ export function ModelCanvas({
     const next = fromKeys(selection.keys, boxes().filter((b) => !b.hidden));
     if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
   }, [itemIds, selection, select, boxes]);
-  const { publishLayout } = ui;
-  useEffect(() => publishLayout(layoutKey), [publishLayout, layoutKey]);
   const selectedFrameId = selection?.t === "frame" ? selection.id : null;
 
   // ---- collapsed frames (slice 2c, D-07): their cards hidden, a block standing for each ----
@@ -771,6 +771,38 @@ export function ModelCanvas({
       : nodes;
     return blockNodes.length ? [...cards, ...blockNodes] : cards;
   }, [nodes, blockNodes, collapsedIds]);
+  // ---- bundled lines (slice 2c, items 6 and 7): the lines touching a collapsed frame, grouped per pair of ends ----
+  /** Which collapsed frame each hidden card is in, as one string: the bundles change only when it does. */
+  const hiddenIn = useMemo(
+    () => (collapsedIds.size ? cardData.filter((c) => c.frameId && collapsedIds.has(c.frameId)).map((c) => `${c.id}:${c.frameId}`).join(",") : ""),
+    [cardData, collapsedIds],
+  );
+  const bundled = useMemo(() => {
+    if (!hiddenIn) return null;
+    const frameOf = new Map(hiddenIn.split(",").map((s) => s.split(":") as [string, string]));
+    return bundleLines(lines, (id) => frameOf.get(id) ?? null);
+  }, [lines, hiddenIn]);
+  const blocks = useMemo(() => new Map([...frameRects].filter(([id]) => collapsedIds.has(id))), [frameRects, collapsedIds]);
+  const mapsById = useMemo(() => new Map(lines.mappings.map((m) => [m.id, m])), [lines]);
+  /** A selected bundle emphasises its lines, as a selected line does (prototype relatedOf). */
+  const selectedBundle = selection?.t === "bundle" ? (bundled?.bundles.find((b) => b.key === selection.id) ?? null) : null;
+  const bundleRelated = useMemo(
+    () => (selectedBundle ? { maps: new Set(selectedBundle.t === "map" ? selectedBundle.ids : []), rels: new Set(selectedBundle.t === "rel" ? selectedBundle.ids : []) } : null),
+    [selectedBundle],
+  );
+  // a bundle that is gone (its frame expanded) is no longer selected
+  useEffect(() => {
+    if (selection?.t === "bundle" && !selectedBundle) select(null);
+  }, [selection, selectedBundle, select]);
+  // the bundle panel reads the bundles; it draws again when they change (with the frames, through the layout key)
+  const bundlesRef = useRef<readonly Bundle[]>([]);
+  const bundleKey = useMemo(() => (bundled ? bundled.bundles.map((b) => `${b.key}=${b.ids.join(",")}`).join(";") : ""), [bundled]);
+  useEffect(() => {
+    bundlesRef.current = bundled?.bundles ?? [];
+  });
+  const { publishLayout } = ui;
+  useEffect(() => publishLayout(`${layoutKey}|${bundleKey}`), [publishLayout, layoutKey, bundleKey]);
+
   /** A card row of a block: expand the frame, then select the card and bring it into view. */
   const openMember = useCallback(
     (frameId: string, cardId: string) => {
@@ -869,6 +901,7 @@ export function ModelCanvas({
       zoomToFrame: frameState.zoomToFrame,
       selectFrameCards: frameState.selectFrameCards,
       setFrameCollapsed: frameState.setCollapsed,
+      bundleView: (key) => bundlesRef.current.find((b) => b.key === key) ?? null,
       framesView: frameState.framesView,
       cardFrame: frameState.cardFrame,
       frameAt: frameState.frameAt,
@@ -1052,7 +1085,18 @@ export function ModelCanvas({
             drawing={frameState.drawing}
             onPointerDown={onFramePointerDown}
           />
-          {!diagnosis.noLines && <LineLayer lines={lines} selection={selection} related={related} hover={busy ? null : hoverRelated} onSelect={select} />}
+          {!diagnosis.noLines && (
+            <LineLayer
+              lines={bundled ?? lines}
+              bundles={bundled?.bundles}
+              blocks={blocks}
+              mapsById={mapsById}
+              selection={selection}
+              related={bundleRelated ?? related}
+              hover={busy ? null : hoverRelated}
+              onSelect={select}
+            />
+          )}
           <Overview lines={lines} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
           <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} frameRects={frameRects} />

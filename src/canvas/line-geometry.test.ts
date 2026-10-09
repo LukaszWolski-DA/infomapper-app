@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { curve } from "./geometry";
+import type { CardData } from "./card-data";
+import { curve, HEAD_H, type Placed } from "./geometry";
 import type { CanvasLines, MapLineData, RelLineData } from "./line-data";
-import { blockEnd, bundleLines, bundleLook, bundleWidth } from "./line-geometry";
+import { blockEnd, bundleGeom, bundleLines, bundleLook, bundleWidth } from "./line-geometry";
 
 // Cards: crm1, crm2 (tables of a source frame S), web (a table in no frame), cust and order (entities of a concept
 // frame C), line (an entity in no frame). Collapsing S or C hides their cards.
@@ -132,5 +133,60 @@ describe("a line's end at a block (slice 2c, prototype endOf)", () => {
     // to the left: the left side
     const left = curve({ x: -500, w: 256, y: 300, cx: -372, hidden: false }, end);
     expect(left.p3).toEqual({ x: 100, y: 259 });
+  });
+});
+
+describe("drawing a bundle (slice 2c, prototype “Semantic zoom”)", () => {
+  // S collapsed (block at 0,0) and C collapsed (block at 1000,0); cust and line drawn as cards.
+  const card = (rows: string[]): Placed["card"] => ({ rows: rows.map((id) => ({ id, mappings: 1 })) as unknown as CardData["rows"], collapsed: false, rowFilter: "all", width: null });
+  const drawn: Record<string, Placed> = {
+    cust: { x: 600, y: 0, card: card(["a-id", "a-mail"]) },
+    line: { x: 600, y: 400, card: card(["l-no", "l-name"]) },
+  };
+  const placed = (id: string) => drawn[id] ?? null;
+  const blocks = new Map([
+    ["S", { x: 0, y: 0, w: 280, h: 118 }],
+    ["C", { x: 1000, y: 0, w: 280, h: 96 }],
+  ]);
+  const byId = new Map(lines.mappings.map((m) => [m.id, m]));
+  const bundleOf = (collapsed: (c: string) => string | null, key: string) => bundleLines(lines, collapsed).bundles.find((b) => b.key === key)!;
+
+  it("two or more mappings: one line from the block's facing side to the row, with the count, width and look", () => {
+    const g = bundleGeom(bundleOf(inS, "m|f:S|r:a-id"), placed, blocks, byId)!;
+    expect(g).toMatchObject({ kind: "map", count: 2, draft: false, warn: false });
+    expect(g.kind === "map" && g.width).toBeCloseTo(2.9);
+    // from the middle of the block's right side to the row's left edge
+    expect(g.kind === "map" && g.d.startsWith("M280,59 ")).toBe(true);
+    expect(g.kind === "map" && g.d.endsWith(` 600,${HEAD_H + 6 + 13}`)).toBe(true);
+  });
+
+  it("a group of one keeps its mapping: its line, its ends and its chip (! for a type problem, ƒ for a transform)", () => {
+    const warn = bundleGeom(bundleOf(inS, "m|f:S|r:a-mail"), placed, blocks, byId)!;
+    expect(warn).toMatchObject({ kind: "single", line: { id: "m3" }, geom: { chip: { text: "!" }, part: false } });
+    expect(warn.kind === "single" && warn.geom.dots).toHaveLength(2);
+    // the combined mapping m6 with its S input collapsed: no ƒ node, the ƒ chip on its line (Łukasz, step 1 answers 2, 3)
+    const f = bundleGeom(bundleOf(inS, "m|f:S|r:l-name"), placed, blocks, byId)!;
+    expect(f).toMatchObject({ kind: "single", line: { id: "m6" }, geom: { chip: { text: "ƒ" } } });
+    expect(f.kind === "single" && f.geom.paths).toHaveLength(1);
+    const plain = bundleGeom(bundleOf(inS, "m|f:S|r:l-no"), placed, blocks, byId)!;
+    expect(plain.kind === "single" && plain.geom.chip).toBeNull();
+  });
+
+  it("between two blocks: from block to block", () => {
+    const g = bundleGeom(bundleOf(both, "m|f:S|f:C"), placed, blocks, byId)!;
+    expect(g).toMatchObject({ kind: "map", count: 3, warn: true });
+    expect(g.kind === "map" && g.d.startsWith("M280,59 ") && g.d.endsWith(" 1000,48")).toBe(true);
+  });
+
+  it("relationships: one line between the block and the entity card, labelled with the count", () => {
+    const g = bundleGeom(bundleOf(inC, "r|e:line|f:C"), placed, blocks, byId)!;
+    expect(g).toMatchObject({ kind: "rel", label: "3 relationships" });
+    const one = bundleGeom({ key: "r|e:line|f:C", t: "rel", a: { key: "e:line", cardId: "line" }, z: { key: "f:C", frameId: "C" }, ids: ["r2"] }, placed, blocks, byId)!;
+    expect(one).toMatchObject({ kind: "rel", label: "1 relationship" });
+  });
+
+  it("is not drawn when an end is not on the canvas", () => {
+    expect(bundleGeom(bundleOf(inS, "m|f:S|r:a-id"), () => null, blocks, byId)).toBeNull();
+    expect(bundleGeom(bundleOf(inS, "m|f:S|r:a-id"), placed, new Map(), byId)).toBeNull();
   });
 });

@@ -5,7 +5,7 @@
 import type { InternalNode } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import type { CanvasLayer } from "@/domain/types";
-import { curve, fNode, rowEnd, type End, type Placed, type Rect } from "./geometry";
+import { cardRect, curve, fNode, relGeom, rowEnd, type End, type Placed, type Pt, type Rect } from "./geometry";
 import type { CanvasLines, MapLineData, RelLineData } from "./line-data";
 
 export const placedOf = (n: InternalNode | undefined): Placed | null =>
@@ -140,3 +140,65 @@ export function bundleLook(bundle: Bundle, mappings: ReadonlyMap<string, Pick<Ma
 
 /** A line's end at a collapsed frame's block: the middle of its facing side (curve() picks the side). */
 export const blockEnd = (block: Rect): End => ({ x: block.x, w: block.w, y: block.y + block.h / 2, cx: block.x + block.w / 2, hidden: false });
+
+/** A drawn bundle (slice 2c, prototype “Semantic zoom”): a group of one mapping keeps its identity (status, chip,
+ * selection); two or more mappings are one line with a count; relationships are one line with “N relationship(s)”. */
+export type BundleGeom =
+  | { kind: "single"; line: MapLineData; geom: MapGeom }
+  | { kind: "map"; d: string; mid: Pt; count: number; width: number; draft: boolean; warn: boolean }
+  | { kind: "rel"; d: string; mid: Pt; label: string; width: number };
+
+/**
+ * Where a bundle runs. `placed` gives a drawn card (null when it is not drawn), `blocks` the block of each collapsed
+ * frame, `maps` the canvas's mapping lines (for a group of one and the look). Null when an end is not on the canvas.
+ */
+export function bundleGeom(
+  b: Bundle,
+  placed: (cardId: string) => Placed | null,
+  blocks: ReadonlyMap<string, Rect>,
+  maps: ReadonlyMap<string, MapLineData>,
+): BundleGeom | null {
+  const n = b.ids.length;
+  if (b.t === "rel") {
+    const rect = (e: BundleEnd): Rect | null => {
+      if ("frameId" in e) return blocks.get(e.frameId) ?? null;
+      const p = placed(e.cardId);
+      return p ? cardRect(p) : null;
+    };
+    const A = rect(b.a), B = rect(b.z);
+    if (!A || !B) return null;
+    const g = relGeom(A, B, 0);
+    return { kind: "rel", d: g.d, mid: g.mid, label: `${n} relationship${n === 1 ? "" : "s"}`, width: bundleWidth(n) };
+  }
+  const end = (e: BundleEnd): End | null => {
+    if ("frameId" in e) {
+      const r = blocks.get(e.frameId);
+      return r ? blockEnd(r) : null;
+    }
+    const p = placed(e.cardId);
+    return p && "rowId" in e ? rowEnd(p, e.rowId) : null;
+  };
+  const a = end(b.a), z = end(b.z);
+  if (!a || !z) return null;
+  const g = curve(a, z);
+  if (n === 1) {
+    const line = maps.get(b.ids[0]!);
+    if (!line) return null;
+    // no ƒ node with an end collapsed (Łukasz, step 1 answer 3); a transform keeps its ƒ chip (answer 2)
+    const text = line.warn ? "!" : line.ruled || line.inputCount > 1 ? "ƒ" : "";
+    return {
+      kind: "single",
+      line,
+      geom: {
+        paths: [g.d],
+        dots: [
+          [g.p0.x, g.p0.y],
+          [g.p3.x, g.p3.y],
+        ],
+        chip: text ? { x: g.mid.x, y: g.mid.y, text } : null,
+        part: a.hidden || z.hidden,
+      },
+    };
+  }
+  return { kind: "map", d: g.d, mid: g.mid, count: n, width: bundleWidth(n), ...bundleLook(b, maps) };
+}

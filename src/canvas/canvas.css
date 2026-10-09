@@ -129,6 +129,9 @@
 .im-canvas .rel .mk { fill: none; stroke: var(--im-rel); stroke-width: 1.6; pointer-events: none }
 .im-canvas .rel circle.mk { fill: var(--im-canvas) }
 .im-canvas .rel.sel .mk { stroke-width: 2.4 }
+/* bundled lines at a collapsed frame (slice 2c, prototype .lnk.bundle): the width grows with the count (inline) */
+.im-canvas .lnk.bundle .s { stroke-linecap: round }
+.im-canvas .lnk.bundle .chip circle { stroke-width: 1.6 }
 .im-canvas .rlab { pointer-events: none }
 .im-canvas .rlab rect { fill: var(--im-canvas); stroke: var(--im-line) }
 .im-canvas .rlab text, .im-canvas .mult { font: 500 11px var(--font-plex-sans), system-ui, sans-serif; fill: var(--im-ink-2); text-anchor: middle; dominant-baseline: central }
