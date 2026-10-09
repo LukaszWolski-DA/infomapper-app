@@ -36,13 +36,17 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
 
 /**
  * Measurement-only switches (slice 2a diagnosis, AD-31): only the measurement-only production build passes them, from
- * `?diag=nolines` or `?diag=blocks`. Users never see them.
+ * `?diag=nolines`, `?diag=blocks`, `?diag=noframes` or `?diag=nolabels`. Users never see them.
  */
 export interface Diagnosis {
   /** No line layer at all. */
   noLines?: boolean;
   /** Every card drawn as its below-40 % block, at any zoom. */
   blocks?: boolean;
+  /** No frame layer at all (slice 2b, S2B-14). The frame names' zoom variable is still set, to tell the two apart. */
+  noFrames?: boolean;
+  /** Frames without their names and chips (slice 2b, S2B-14). */
+  noLabels?: boolean;
 }
 export const DiagnosisCtx = createContext<Diagnosis>({});
 

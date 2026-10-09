@@ -27,10 +27,12 @@ interface Props {
   editable: boolean;
   /** A frame being drawn with the Frame tool. */
   drawing: Rect | null;
+  /** Names and chips (off only in the measurement-only diagnosis `nolabels`). */
+  labels?: boolean;
   onPointerDown: (e: ReactPointerEvent, frameId: Uuid, part: FramePart) => void;
 }
 
-function FrameLayer({ frames, cards, conceptColors, selectedId, editable, drawing, onPointerDown }: Props) {
+function FrameLayer({ frames, cards, conceptColors, selectedId, editable, drawing, labels = true, onPointerDown }: Props) {
   const detailed = useStore((s) => s.transform[2] >= LOD_ZOOM);
   const color = (id: Uuid) => conceptColors[id];
   return (
@@ -47,7 +49,7 @@ function FrameLayer({ frames, cards, conceptColors, selectedId, editable, drawin
         }}
       >
         {frames.map((f) => (
-          <FrameBox key={f.id} frame={f} cards={cards} color={frameColor(f, color)} selected={f.id === selectedId} editable={editable} detailed={detailed} />
+          <FrameBox key={f.id} frame={f} cards={cards} color={frameColor(f, color)} selected={f.id === selectedId} editable={editable} detailed={detailed} labels={labels} />
         ))}
         {drawing && (
           <div className="frame-draw" data-testid="frame-drawing" style={{ left: drawing.x, top: drawing.y, width: drawing.w, height: drawing.h }} />
@@ -66,6 +68,7 @@ const FrameBox = memo(function FrameBox({
   selected,
   editable,
   detailed,
+  labels,
 }: {
   frame: FrameData;
   cards: Props["cards"];
@@ -73,6 +76,7 @@ const FrameBox = memo(function FrameBox({
   selected: boolean;
   editable: boolean;
   detailed: boolean;
+  labels: boolean;
 }) {
   const chips = useMemo(() => (detailed ? frameChips(frameStats(f, cards), f.kind) : []), [detailed, f, cards]);
   const kindLabel = f.kind === "concept" ? " (concept)" : f.kind === "source_system" ? " (source system)" : "";
@@ -85,21 +89,23 @@ const FrameBox = memo(function FrameBox({
       data-selected={selected || undefined}
       style={{ left: f.x, top: f.y, width: f.width, height: f.height, "--fc": color, "--fw": f.width } as CSSProperties}
     >
-      <div
-        className="f-lab"
-        data-testid="frame-label"
-        title={`${f.name}${kindLabel}. Drag to move the frame with everything in it, click to select.`}
-      >
-        <span className="f-dot" />
-        <span className="f-name" data-testid="frame-name">
-          {f.name}
-        </span>
-        {chips.map((c) => (
-          <span key={c.text} className={`f-chip${c.tone === "warn" ? " w" : c.tone === "misplaced" ? " m" : ""}`} title={c.title} data-testid="frame-chip">
-            {c.text}
+      {labels && (
+        <div
+          className="f-lab"
+          data-testid="frame-label"
+          title={`${f.name}${kindLabel}. Drag to move the frame with everything in it, click to select.`}
+        >
+          <span className="f-dot" />
+          <span className="f-name" data-testid="frame-name">
+            {f.name}
           </span>
-        ))}
-      </div>
+          {chips.map((c) => (
+            <span key={c.text} className={`f-chip${c.tone === "warn" ? " w" : c.tone === "misplaced" ? " m" : ""}`} title={c.title} data-testid="frame-chip">
+              {c.text}
+            </span>
+          ))}
+        </div>
+      )}
       {editable && <div className="f-rs" data-frame-handle title="Drag to resize" data-testid="frame-resize" />}
     </div>
   );

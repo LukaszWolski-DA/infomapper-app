@@ -77,6 +77,7 @@ import { Overview } from "./Overview";
 
 const nodeTypes = { card: CardNode };
 const NO_DIAGNOSIS: Diagnosis = {};
+const NO_FRAMES: FrameData[] = [];
 
 /** How far the grid layer reaches past the pane: the largest grid step (Lines at the highest zoom). Also in canvas.css. */
 const GRID_BLEED = 32 * MAX_ZOOM;
@@ -934,7 +935,8 @@ export function ModelCanvas({
           aria-label="Model canvas"
         >
           <FrameLayer
-            frames={frames}
+            frames={diagnosis.noFrames ? NO_FRAMES : frames}
+            labels={!diagnosis.noLabels}
             cards={cardData}
             conceptColors={conceptColors}
             selectedId={selectedFrameId}

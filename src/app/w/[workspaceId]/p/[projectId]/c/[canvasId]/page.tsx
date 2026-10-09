@@ -169,7 +169,7 @@ export default async function CanvasPage({
                 arrangeIntoFrames: arrangeIntoFramesAction.bind(null, ws, canvasId),
               }}
               focusCardId={focusCardId}
-              diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks") } : undefined}
+              diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks"), noFrames: diag.includes("noframes"), noLabels: diag.includes("nolabels") } : undefined}
             />
           </AppShell>
         </UndoProvider>
