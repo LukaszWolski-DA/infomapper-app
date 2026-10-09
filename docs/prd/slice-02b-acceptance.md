@@ -1,6 +1,6 @@
 # Slice 2b – Acceptance
 
-Status: **waiting for Łukasz's acceptance and his decision on S2B-14 (pan and zoom with frames)**. Branch `slice/02b-frames`, pull request #7 (draft, not merged).
+Status: **waiting for Łukasz's acceptance**. Branch `slice/02b-frames`, pull request #7 (draft, not merged).
 
 ## Criteria
 
@@ -24,7 +24,7 @@ mouse and keyboard.
 | S2B-11 | `S2B-11.spec.ts`: “Arrange into frames by concept and system” builds CRM, ERP, WEB on the left and Customer, Sales on the right at the prototype's positions (worked out in the test), every card in its frame, the free frame “Notes” unchanged; one Ctrl+Z restores the layout, only “Notes” stays | passes |
 | S2B-12 | `S2B-12.spec.ts`: E and a click inside the Sales frame: a new entity of Sales in that frame; deleting the concept Temp in the left panel turns its frames on Customer & orders and on Order lines & products into free frames (name, place, the concept's colour kept); Duplicate layout: the copy's frames match the original's with new ids, every card in the copy of its frame | passes |
 | S2B-13 | `S2B-13.spec.ts`: Łukasz uses each frame write once; Piotr: no Frame tool, handles or arrange button, A does nothing; selecting a frame shows a read-only panel with only “Zoom to frame” (which zooms); its toolbox offers “Select its cards” and “Zoom to frame”; dragging, Delete, Ctrl+A and arrow keys change nothing; the eight frame actions called directly are refused with “As a reviewer you cannot change what is on a canvas.” and change nothing | passes |
-| S2B-14 | one quick `measure:canvas` round on “Performance test” with its 8 frames against `slice-02p` | **not met for pan and zoom**: −20.8 % at the overview, −35.4 % at 100 % (bar: no more than about −10 %); group drag −3.8 %: within. Details below; waiting for Łukasz's decision |
+| S2B-14 | quick `measure:canvas` rounds on “Performance test” with its 8 frames against `slice-02p` | **met after a fix**: the first round missed pan and zoom (−20.8 % at the overview, −35.4 % at 100 %); the frame names' zoom variable restyled the whole canvas on every zoom step. With it set on the frame layer only: ±0.0 % at the overview, −4.2 % at 100 % (bar: within about 10 %); group drag −3.8 % (first round). Details below |
 | S2B-15 | CI (lint, typecheck, unit tests, Postgres migration check with `frame` built) and three full e2e runs in a row | passes: lint, typecheck, 601 unit tests; three full runs in a row on 8–9 October, 81 of 81 each (18.2, 16.4, 16.3 min), no dev server running; CI green on the pull request |
 
 ### Three full runs in a row
@@ -39,7 +39,9 @@ test change the three runs start again.
 | 3 | 3 | Runs 1 and 2 passed (81/81); run 3: S2A-10 (slice 2a, look) timed out waiting for its third look save. The trace shows all three saves sent in order and the dev server answering the first after 10.7 s and the second after 2.9 s; the third had no answer yet when the 15 s wait ended. Nothing was refused or lost; slice 2b does not touch the look. No change. |
 | 4 (8–9 October, 23:13–00:04) | 3 | **81 passed each time** (18.2, 16.4, 16.3 min). |
 
-## S2B-14: one quick round against slice 2p
+## S2B-14: rounds against slice 2p
+
+### First round: frames as built
 
 `npm run measure:canvas -- --rounds 1 --against slice-02p` on 9 October 2026, 07:57–08:10, sitting
 `.data/measure/2026-10-09-07-57`: this branch (d038f54) against `slice-02p` (cc8005a), production measurement build,
@@ -70,7 +72,55 @@ round). Group drag is within (−3.8 %). Pan and zoom are not: about a fifth slo
 difference on this canvas, so they cost the pan and zoom; the single-card drag (−18.5 %) points the same way. Where the
 time goes (the frame layer's painting, its labels resized on every zoom through `--iz`, or the large frame fills) is
 not measured yet; slice 2p's `DIAG` switches show how such a diagnosis is done. The lasso-marks figure is not comparable
-one to one: the lasso now catches 4 frames and 54 cards instead of 85 cards. **Decision pending (Łukasz).**
+one to one: the lasso now catches 4 frames and 54 cards instead of 85 cards.
+
+### Diagnosis (9 October, by reading the code; Łukasz asked for it bounded to one quick round per variant)
+
+- The frame layer is inside React Flow's transformed viewport (`.react-flow__edgelabel-renderer`, beside the cards), so
+  panning and zooming move it on the compositor; no JavaScript or React positions it per frame, and a pan changes
+  nothing about it.
+- Frame fills and outlines are static colours mixed in CSS; nothing changes their style per frame.
+- **The frame names** keep their size on the screen through `--iz` (1 / zoom). It was set on the canvas root
+  (`.im-canvas`) on every zoom change, so on each zoom step (one per frame in the measurement's zoom segments) Chrome
+  restyled the whole canvas, every card and row, because an inherited variable had changed above them; the names were
+  laid out again as well (their `max-width` depends on `--iz`). Only the names (`.f-lab`) and the resize handles
+  (`.f-rs`) read it; the “N selected” label scales itself through React and the hover dots do not use it.
+
+**The fix** (ac757df, normal code, nothing visible changes): `--iz` is set on the frame layer's own element when the
+zoom changes, so a zoom step restyles only the frame names and handles. Measuring-only switches `DIAG=noframes` and
+`DIAG=nolabels` were added for the diagnosis (06d4510, measurement build only, as slice 2a's).
+
+### After the fix
+
+`npm run measure:canvas -- --quick --rounds 1 --against slice-02p` on 9 October, 08:54, sitting
+`.data/measure/2026-10-09-08-54`, this branch at ac757df; the same conditions as the first round (Łukasz prepared the
+laptop again; both sides quiet before measuring: 1.2 % and 1.0 %).
+
+| Figure | Bar | slice-02p | This branch | Change | Result |
+| --- | --- | --- | --- | --- | --- |
+| Pan and zoom at the overview (S1A-14, grid Dots) | ≥ 50 fps, ≥ −5 % vs reference | 58.9 | 58.9 | ±0.0 % | met |
+| – frames over 50 ms | 0 | 0 | 0 | – | met |
+| Pan and zoom at 100 %, dense area (S1A-14) | ≥ 50 fps, ≥ −5 % vs reference | 55.2 | 52.9 | −4.2 % | met |
+| – frames over 50 ms | 0 | 4 | 8 | – | not met (slice 2p misses it too) |
+| Initial render (C-08), median of 5 | ≤ 1500 ms | 1417 | 1461 | +3.1 % | met |
+| Hover to the next frame, median of 40 (C-10) | ≤ 100 ms | 134 | 132 | −0.9 % | not met (as before) |
+| Marks after a lasso around the visible cards, median of 20 | ≤ 100 ms | 95 | 90 | −5.0 % | met |
+
+S2B-14 is **met**: pan and zoom within about 10 % of slice 2p (±0.0 % and −4.2 %); group drag was already within in the
+first round (−3.8 %), and the fix only takes work away from zooming. Both sides were faster in this sitting than in the
+first (slice 2p 58.9 against 54.2 fps at the overview): the laptop's own spread, which is why each figure is compared with
+slice 2p in the same sitting.
+
+### The `noframes` round did not give figures
+
+`--branch-diag noframes` (sitting `2026-10-09-08-24`, also at ac757df) stopped without a summary, for two reasons in the
+measuring tools, not the application: (1) `--quick` ran every e2e spec, because on Windows the specs run through a shell
+that does not quote arguments and `--grep-invert dragging a group` became a filter plus the file filters “a” and
+“group” (slice 2p's tool; fixed: the filter is now the one word `dragging`; the after-the-fix round above ran the extra
+specs too, which made it longer but measured pan and zoom with the same spec as always); (2) with `noframes` the lasso
+still selects the frames, which are in the data, while S2A-14's lasso-marks test counts only frames drawn on the page, so
+it waited for marks that never came. As the fix met the criterion, the `noframes` and `nolabels` rounds were not repeated
+(Łukasz: skip `nolabels` unless the fix does not help).
 
 ### Tests that failed once, not caused by frames
 
