@@ -125,6 +125,24 @@ up to 3.0.3 can exhaust the stack on deeply nested brace patterns and crash the 
 - **Accepted** until `braces` (or `micromatch`) publishes a fix; then update within the current majors and run
   `npm audit` again. Do not take the suggested downgrades: they would break lint (the layer rules) and the shadcn CLI.
 
+### `npm audit`: 1 critical in `handlebars`, fixed release too new (slice 2c, step 0)
+
+On 9 October 2026 `npm install` reports a new critical finding: `handlebars` up to 4.7.9 has three advisories
+([GHSA-8r5x-fm3f-whwj](https://github.com/advisories/GHSA-8r5x-fm3f-whwj) and
+[GHSA-p8wg-vrv2-v86f](https://github.com/advisories/GHSA-p8wg-vrv2-v86f), critical;
+[GHSA-xw65-4hp5-5hc7](https://github.com/advisories/GHSA-xw65-4hp5-5hc7), moderate), JavaScript injection when
+templates are compiled. Its only path is `eslint-plugin-boundaries` 7.2.0 (dev, the newest) → `@boundaries/elements`
+3.1.1, which pins `handlebars` to exactly 4.7.9. npm's suggested “fix” is a downgrade of the plugin to 5.4.0 (breaking).
+`handlebars` 4.7.10, published 5 October 2026, is outside the advisories' range.
+
+- **Risk: low for us.** Only lint uses it, to fill in templates from this repository's own `eslint.config.mjs`; no user
+  input reaches it, and it is not part of the application the server runs.
+- **Plan (Łukasz, 9 October):** add `"overrides": { "handlebars": "4.7.10" }` (or newer) to `package.json` once the release
+  is at least two weeks old, from 19 October 2026; then `npm install`, lint (including a deliberately broken layer rule
+  to confirm the layer rules still catch it), typecheck, unit tests, and `npm audit` again (expected: only the 11 from
+  `braces`). If slice 2c's Step 5 is on or after that date, do it there; otherwise in the next slice. Do not take the
+  suggested downgrade.
+
 ## Right panel (slice 1a)
 
 ### Panel links only reach rows whose card is on this canvas (step 5a)
