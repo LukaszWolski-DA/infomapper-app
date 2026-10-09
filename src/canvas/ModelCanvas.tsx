@@ -60,6 +60,7 @@ import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis } from "./context";
 import {
+  besideAnchor,
   besideSpots,
   CARD_W,
   cardHeight,
@@ -623,7 +624,9 @@ export function ModelCanvas({
         toast("Everything is already on this canvas.");
         return;
       }
-      const a: Rect = { x: anchor.position.x, y: anchor.position.y, w: cardWidth(anchor.data.card), h: cardHeight(anchor.data.card) };
+      // a card hidden in a collapsed frame: beside its block (slice 2c), never on it (occupied)
+      const block = frameRectsNow().find(({ f }) => f.collapsed && f.id === anchor.data.card.frameId)?.r ?? null;
+      const a = besideAnchor({ x: anchor.position.x, y: anchor.position.y, w: cardWidth(anchor.data.card), h: cardHeight(anchor.data.card) }, block);
       const heights = missing.map((m) => newCardHeight(m.rows));
       const spots = besideSpots(a, side, heights, occupied());
       let result: CanvasWriteResult<{ canvasItemIds: string[] }>;
@@ -649,7 +652,7 @@ export function ModelCanvas({
       const what = isEntity(missing[0]!.target) ? `entit${n === 1 ? "y" : "ies"}` : `source table${n === 1 ? "" : "s"}`;
       toast(`Added ${n} ${what} next to the selection.`);
     },
-    [rf, cardOf, toast, occupied, placeCards, select, viewRect, frameRefs],
+    [rf, cardOf, toast, occupied, placeCards, select, viewRect, frameRefs, frameRectsNow],
   );
 
   // ---- frames (slice 2b) ----

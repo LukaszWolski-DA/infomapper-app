@@ -141,6 +141,12 @@ export function besideSpots(anchor: Rect, side: "left" | "right", heights: reado
   return spots;
 }
 
+/**
+ * What cards placed beside a card are placed beside (slice 2c, Łukasz's decision (ii) in step 4): the card itself, or
+ * the block of the collapsed frame it is hidden in.
+ */
+export const besideAnchor = (card: Rect, block: Rect | null): Rect => block ?? card;
+
 /** Whether a box lies fully inside the view. */
 export const inside = (view: Rect, r: Rect) => r.x >= view.x && r.y >= view.y && r.x + r.w <= view.x + view.w && r.y + r.h <= view.y + view.h;
 
