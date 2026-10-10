@@ -236,6 +236,29 @@ export function deleteNote(ctx: CommandContext, access: WorkspaceAccess, state: 
   return done(ctx, access, undefined, [softDelete(ctx, "note", got.row)]);
 }
 
+// ---- when frames move ----
+
+/**
+ * The free notes in frames that moved go with them by the same amount, in the same change group (D-20, slice 3a item 9):
+ * `shifts` are the moved frames' distances. Returns the writes and the notes' new versions.
+ */
+export function carryNotes(
+  ctx: CommandContext,
+  notes: readonly Note[] | undefined,
+  shifts: ReadonlyMap<Uuid, { dx: number; dy: number }>,
+): { writes: Write[]; versions: Record<Uuid, number> } {
+  const writes: Write[] = [];
+  const versions: Record<Uuid, number> = {};
+  for (const note of notes ?? []) {
+    const d = note.deleted_at === null && !isPinned(note) && note.frame_id ? shifts.get(note.frame_id) : undefined;
+    if (!d || (!d.dx && !d.dy)) continue;
+    const row = nextVersion(ctx, note, { x: note.x + d.dx, y: note.y + d.dy });
+    writes.push({ kind: "update", table: "note", before: note, row });
+    versions[note.id] = row.version;
+  }
+  return { writes, versions };
+}
+
 // ---- when cards leave a canvas or frames are deleted ----
 
 /**

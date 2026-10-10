@@ -1,7 +1,7 @@
 "use client";
 
 // The right panel (prototype #ins): shows and edits what is selected on the canvas: an entity, attribute, mapping,
-// relationship, source table or column, a frame (slice 2b), a bundle of lines (slice 2c), a working label (slice 3a);
+// relationship, source table or column, a frame (slice 2b), a bundle of lines (slice 2c), a working label or a note (slice 3a);
 // with nothing selected, an overview of this canvas.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
@@ -13,6 +13,7 @@ import { BundlePanel } from "./bundle-panel";
 import { EntityPanel } from "./entity-panel";
 import { FramePanel } from "./frame-panel";
 import { LabelPanel } from "./label-panel";
+import { NotePanel } from "./note-panel";
 import { useCanvasHost, type HostCard } from "./canvas-host";
 import type { PendingInput } from "./map-column";
 import { MappingPanel } from "./mapping-panel";
@@ -38,6 +39,8 @@ export interface InspectorProps {
   editable: boolean;
   /** May set a mapping's status (also reviewers). */
   canSetStatus: boolean;
+  /** May write notes (slice 3a): editors and reviewers, not archived. */
+  canNote: boolean;
   userId: Uuid;
   fourEyes: boolean;
   /** Who last changed each mapping's inputs, kind or rule (AD-06); only filled when four-eyes is on. */
@@ -95,7 +98,7 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     const cardByTarget = new Map(cards.map((c) => [c.targetId, c.id]));
     return (id: Uuid) => cardByTarget.get(id) ?? null;
   }, [cards]);
-  const host = useCanvasHost({ ix, workspaceId: rest.workspaceId, canvasId: rest.canvasId, editable: rest.editable, canSetStatus: rest.canSetStatus, cards });
+  const host = useCanvasHost({ ix, workspaceId: rest.workspaceId, canvasId: rest.canvasId, editable: rest.editable, canSetStatus: rest.canSetStatus, canNote: rest.canNote, cards });
   const { mapColumn, pendingInput, clearPendingInput } = host;
 
   const panel = useMemo<PanelContext>(() => {
@@ -165,6 +168,8 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     // a bundle of lines at a collapsed frame (slice 2c); a relationship end that is a card is named by its entity
     const entityName = (cardId: Uuid) => ix.entity.get(cards.find((c) => c.id === cardId)?.targetId ?? "")?.name ?? "?";
     body = <BundlePanel key={sel.id} bundle={ui.bundleView(sel.id)!} entityName={entityName} />;
+  } else if (sel?.t === "note" && ui.noteView(sel.id)) {
+    body = <NotePanel key={sel.id} noteId={sel.id} />;
   } else if (sel?.t === "label" && rest.labels.some((l) => l.id === sel.id)) {
     body = <LabelPanel key={sel.id} label={rest.labels.find((l) => l.id === sel.id)!} />;
   } else if (sel?.t === "rel" && ix.model.relationships.some((r) => r.id === sel.id)) {

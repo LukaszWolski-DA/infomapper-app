@@ -268,3 +268,49 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .concept-ask button:hover { background: var(--im-hover) }
 .im-canvas .concept-ask .ask-yes { background: var(--im-logical); border-color: var(--im-logical); color: #fff }
 .im-canvas .concept-ask .ask-yes:hover { background: color-mix(in srgb, var(--im-logical) 88%, black) }
+
+/* ---------- notes (slice 3a, prototype .nt): paper-coloured blocks with a note icon, never confused with model cards.
+   Their own layer above the cards (React Flow's viewport portal). A resolved note is told by its colours, never
+   `opacity` (AD-24 rule 4): the paper mixed with the surface, the text in a quieter ink. ---------- */
+.im-canvas .note-layer { position: absolute; left: 0; top: 0; pointer-events: none }
+.nt, .nsw { --np: #fff1b8; --npe: #e9d27a }
+.nt.c-blue, .nsw.c-blue { --np: #dcebff; --npe: #a9c7ee }
+.nt.c-green, .nsw.c-green { --np: #ddf3e4; --npe: #a7d7b6 }
+.nt.c-pink, .nsw.c-pink { --np: #fbe0ea; --npe: #e9afc4 }
+.nt.c-grey, .nsw.c-grey { --np: #eceef1; --npe: #c9ced6 }
+@media (prefers-color-scheme: dark) {
+  .nt, .nsw { --np: #4a4220; --npe: #6b5f2e }
+  .nt.c-blue, .nsw.c-blue { --np: #1f3550; --npe: #2f4e73 }
+  .nt.c-green, .nsw.c-green { --np: #1e3d2b; --npe: #2d5a40 }
+  .nt.c-pink, .nsw.c-pink { --np: #4a2433; --npe: #6b3449 }
+  .nt.c-grey, .nsw.c-grey { --np: #2e343b; --npe: #444c56 }
+}
+.im-canvas .nt { position: absolute; pointer-events: all; border-radius: 4px 4px 14px 4px; background: var(--np); color: var(--im-ink); font-size: 12.5px;
+  line-height: 1.45; box-shadow: 0 0 0 1px var(--npe), 0 6px 14px -8px var(--im-shadow); user-select: none; cursor: default }
+.im-canvas .nt.movable { cursor: move }
+.im-canvas .nt.sel { box-shadow: 0 0 0 2px var(--im-logical), 0 8px 18px -8px var(--im-shadow) }
+.im-canvas .nt.resolved { background: color-mix(in srgb, var(--np) 45%, var(--im-surface)); color: var(--im-ink-2) }
+.im-canvas .nt-head { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 9px; font-size: 11px; color: var(--im-ink-2) }
+.im-canvas .nt-head svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; flex: none }
+.im-canvas .nt-head .pin { white-space: nowrap; min-width: 0 }
+/* the clip only when the name may not fit (AD-24 rule 4, as `text-fit.ts` for cards) */
+.im-canvas .nt-head .pin.clip { overflow: hidden; text-overflow: ellipsis }
+.im-canvas .nt-head .sp { flex: 1 }
+.im-canvas .nt-head .ib { background: transparent; font-size: 12px }
+.im-canvas .nt-body { padding: 0 10px 4px; white-space: pre-wrap; word-break: break-word; min-height: 20px }
+.im-canvas .nt-body.empty { color: var(--im-ink-3); font-style: italic }
+.im-canvas .nt-lod { margin: 0 10px 8px; border-radius: 3px; background: color-mix(in srgb, var(--npe) 55%, var(--np)) }
+.im-canvas .nt textarea { display: block; width: calc(100% - 12px); margin: 0 6px 4px; border: 0; outline: 1.5px solid var(--im-logical); border-radius: 4px;
+  background: color-mix(in srgb, var(--im-surface) 60%, var(--np)); font: inherit; color: inherit; resize: none; padding: 4px; min-height: 44px;
+  overflow: hidden; cursor: text; user-select: text }
+.im-canvas .nt-foot { display: flex; align-items: center; gap: 6px; padding: 0 10px 7px; font-size: 10.5px; color: var(--im-ink-3) }
+.im-canvas .nt-foot .ok { color: var(--im-map); font-weight: 600 }
+.im-canvas .nt-rs { position: absolute; right: -5px; top: 20%; bottom: 20%; width: 10px; cursor: ew-resize }
+/* the tether of a pinned note (prototype .tether), in the line layer; a quieter ink instead of opacity */
+.im-canvas .tether path { stroke: color-mix(in srgb, var(--im-ink-3) 75%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; fill: none }
+.im-canvas .tether circle { fill: color-mix(in srgb, var(--im-ink-3) 75%, transparent) }
+.im-canvas.tool-note, .im-canvas.tool-note * { cursor: copy !important }
+/* the note panel's colour swatches (prototype .nswatch) */
+.nsw { width: 26px; height: 20px; border-radius: 4px 4px 9px 4px; background: var(--np); box-shadow: 0 0 0 1px var(--npe); cursor: pointer }
+.nsw[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--im-logical) }
+.nsw:disabled { cursor: default }

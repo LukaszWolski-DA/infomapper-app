@@ -85,7 +85,14 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
     if (frames.length > 1) return collapsed ? "Collapse all frames" : "Expand all frames";
     return collapsed ? "Collapse frame" : "Expand frame";
   }
-  if (frames.length && frames.length + cards.length === events.length && [...frames, ...cards].every((e) => e.operation === "update")) {
+  // a moved frame carries its free notes (slice 3a)
+  const carriedNotes = of("note");
+  if (
+    frames.length &&
+    frames.length + cards.length + carriedNotes.length === events.length &&
+    [...frames, ...cards, ...carriedNotes].every((e) => e.operation === "update") &&
+    carriedNotes.every((e) => only(e, ["x", "y"]))
+  ) {
     if (frames.every((e) => only(e, ["x", "y"])) && cards.every((e) => only(e, ["x", "y"]))) return frames.length > 1 ? "Move frames" : "Move frame";
     if (frames.every((e) => only(e, ["width", "height"])) && cards.every((e) => only(e, ["frame_id"]))) return "Resize frame";
     if (cards.length && frames.every((e) => only(e, ["x", "y", "width", "height"])) && cards.every((e) => only(e, ["x", "y", "frame_id"]))) {

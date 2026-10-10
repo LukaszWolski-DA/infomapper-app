@@ -118,6 +118,8 @@ export type Selection =
   | { t: "bundle"; id: string }
   /** A working label (slice 3a): its panel, opened from a label chip or the project home. Nothing on the canvas is selected. */
   | { t: "label"; id: Uuid }
+  /** A note on the canvas (slice 3a). */
+  | { t: "note"; id: Uuid }
   | null;
 
 export interface Related {
@@ -131,7 +133,7 @@ export interface Related {
  */
 export function relatedLines(sel: Selection, lines: CanvasLines): Related | null {
   // a bundle's lines are known to the canvas, which emphasises them itself (slice 2c)
-  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame" || sel.t === "bundle" || sel.t === "label") return null;
+  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame" || sel.t === "bundle" || sel.t === "label" || sel.t === "note") return null;
   const maps = new Set<Uuid>(), rels = new Set<Uuid>();
   switch (sel.t) {
     case "map":

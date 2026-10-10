@@ -4,6 +4,7 @@ import { createContext, type PointerEvent as ReactPointerEvent } from "react";
 import type { Uuid } from "@/domain/ids";
 import type { ArrangeMode } from "./arrange";
 import type { FrameData, FrameStats } from "./frame-data";
+import type { NoteData } from "./note-data";
 import type { Selection } from "./line-data";
 import type { Bundle } from "./line-geometry";
 
@@ -144,6 +145,39 @@ export interface CanvasHandle {
   setAllFramesCollapsed: (collapsed: boolean) => void;
   /** A bundle of lines at a collapsed frame as the canvas draws it now (slice 2c, the bundle panel). */
   bundleView: (key: string) => Bundle | null;
+  /** A note as the canvas has it now (slice 3a, the note panel), or null. */
+  noteView: (noteId: Uuid) => NoteView | null;
+  /** A new note to write on the canvas: free at a canvas point, or pinned to a card or frame (to its right). */
+  newNote: (where: { at: { x: number; y: number } } | { cardId: Uuid } | { frameId: Uuid }) => void;
+  /** Opens a note's text for editing on the canvas (“Edit text”, “Edit on the canvas”). */
+  editNote: (noteId: Uuid) => void;
+  /** Changes a note's text, colour, status or width; saved at once, one undo step each. */
+  updateNote: (noteId: Uuid, patch: NotePatch) => void;
+  pinNote: (noteId: Uuid, pin: { cardId: Uuid } | { frameId: Uuid }) => void;
+  unpinNote: (noteId: Uuid) => void;
+  /** Deletes a note; the toast offers Undo. */
+  deleteNote: (noteId: Uuid) => void;
+}
+
+/** What the note panel and toolbox may change (slice 3a, items 10 and 11). */
+export interface NotePatch {
+  text?: string;
+  color?: NoteData["color"];
+  status?: NoteData["status"];
+  width?: number;
+}
+
+/** A note as the canvas shows it now, for the note panel and toolbox. */
+export interface NoteView {
+  note: NoteData;
+  /** A new note not saved yet (it is saved when its text is written). */
+  draft: boolean;
+  /** The card or frame it is pinned to, by name. */
+  pinnedTo: { kind: "card" | "frame"; id: Uuid; name: string } | null;
+  /** The frame a free note is in, by name. */
+  frameName: string | null;
+  /** What it can be pinned to on this canvas (“Pin to”): the cards that show and the frames. */
+  targets: { kind: "card" | "frame"; id: Uuid; label: string }[];
 }
 
 /** A card in a frame, for the frame panel. */
@@ -196,7 +230,9 @@ export type ToolboxTarget =
   /** A frame's name, handle or an empty spot inside it (slice 2b). */
   | { kind: "frame"; frameId: Uuid }
   /** A bundle of lines at a collapsed frame (slice 2c). */
-  | { kind: "bundle"; key: string };
+  | { kind: "bundle"; key: string }
+  /** A note (slice 3a): before the card or frame under it. */
+  | { kind: "note"; noteId: Uuid };
 
 export interface ToolboxRequest {
   target: ToolboxTarget;
@@ -210,7 +246,7 @@ export interface ToolboxRequest {
  * A canvas tool that changes what a click does: the Entity tool (D-46), drawing a relationship from a card, or the
  * Hand tool (D-18, slice 2a), with which a left drag anywhere pans. One at a time; Esc ends it.
  */
-export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | { kind: "hand" } | { kind: "frame" } | null;
+export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid } | { kind: "hand" } | { kind: "frame" } | { kind: "note" } | null;
 
 /**
  * What the canvas asks of the page around it. The canvas knows gestures and positions; the page knows the model and
@@ -309,6 +345,13 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   setFrameCollapsed: noop,
   setAllFramesCollapsed: noop,
   bundleView: () => null,
+  noteView: () => null,
+  newNote: noop,
+  editNote: noop,
+  updateNote: noop,
+  pinNote: noop,
+  unpinNote: noop,
+  deleteNote: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,

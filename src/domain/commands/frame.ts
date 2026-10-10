@@ -30,7 +30,7 @@ import { checkPermission, type WorkspaceAccess } from "../permissions";
 import { FRAME_KINDS, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type Note, type SourceSystem, type SourceTable } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { GRID, widthSchema } from "./canvas-item";
-import { releaseNotes } from "./note";
+import { carryNotes, releaseNotes } from "./note";
 import { begin, current, done, isLive, nothingToChange } from "./shared";
 
 // ---- input pieces ----
@@ -412,7 +412,8 @@ export interface MoveState extends FrameCanvasState {
  * their frame. Every other card that got a new position or width (it needs its height) joins the smallest frame under
  * the middle of its header, or none, and that frame grows to hold it (D-05, D-23). Entities that joined a concept
  * frame of another concept are the questions; only a drag drop asks them, and with `moveToConcepts` the entities move
- * to the frame's concept in the model, in the same change group, so one undo puts both back.
+ * to the frame's concept in the model, in the same change group, so one undo puts both back. Slice 3a: the free notes
+ * in a moved frame move with it (`state.notes`).
  */
 export function moveOnCanvas(
   ctx: CommandContext,
@@ -425,6 +426,11 @@ export function moveOnCanvas(
   const opened = openDraft(access, state, parsed.data.canvasId);
   if (!opened.ok) return fail(opened.error);
   const { draft } = opened;
+  const shifts = new Map<Uuid, { dx: number; dy: number }>();
+  for (const f of parsed.data.frames) {
+    const frame = draft.frames.get(f.frameId);
+    if (frame && f.x !== undefined && f.y !== undefined) shifts.set(f.frameId, { dx: f.x - frame.x, dy: f.y - frame.y });
+  }
   const moved = applyMoves(draft, parsed.data);
   if (!moved.ok) return fail(moved.error);
 
@@ -455,7 +461,9 @@ export function moveOnCanvas(
 
   const committed = commit(ctx, draft, seen(parsed.data.frames, parsed.data.items));
   if (!committed.ok) return fail(committed.error);
-  const writes = [...committed.writes];
+  const carried = carryNotes(ctx, (state.notes ?? []).filter((n) => n.canvas_id === draft.canvasId), shifts);
+  const writes = [...committed.writes, ...carried.writes];
+  Object.assign(committed.versions, carried.versions);
   let movedToConcepts = 0;
   if (parsed.data.moveToConcepts && questions.length) {
     const denied = checkPermission(access, "model.edit");

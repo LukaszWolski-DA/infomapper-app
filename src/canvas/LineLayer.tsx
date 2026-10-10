@@ -151,6 +151,7 @@ const placedSig = (p: Placed) => `${p.x},${p.y},${p.card.width ?? ""},${p.card.c
 const NO_BUNDLES: Bundle[] = [];
 const NO_BLOCKS = new Map<string, Rect>();
 const NO_MAPS = new Map<string, MapLineData>();
+const NO_TETHERS: readonly { id: string; x1: number; y1: number; x2: number; y2: number }[] = [];
 
 function LineLayer({
   lines,
@@ -161,6 +162,7 @@ function LineLayer({
   related,
   hover,
   onSelect,
+  tethers = NO_TETHERS,
 }: {
   /** The lines drawn on their own: those touching no collapsed frame. */
   lines: CanvasLines;
@@ -175,6 +177,8 @@ function LineLayer({
   /** The lines of the hovered row or line, drawn above the veil; null when nothing is hovered. */
   hover: Related | null;
   onSelect: (sel: Selection) => void;
+  /** The dashed tethers of pinned notes (slice 3a, D-20), drawn here as part of the one line layer (AD-24 rule 3). */
+  tethers?: readonly { id: string; x1: number; y1: number; x2: number; y2: number }[];
 }) {
   // Re-render on any node change (drag, collapse, filter); panning and zooming leave the nodes alone.
   useStore((s) => s.nodes);
@@ -313,6 +317,14 @@ function LineLayer({
         <g>{rels}</g>
         <g>{maps}</g>
         <g>{bundled}</g>
+        <g>
+          {tethers.map((t) => (
+            <g key={t.id} className="tether" data-testid="tether" data-tether={t.id}>
+              <path d={`M${t.x1},${t.y1} L${t.x2},${t.y2}`} />
+              <circle cx={t.x2} cy={t.y2} r={2.5} />
+            </g>
+          ))}
+        </g>
       </svg>
       {hover && (
         <svg className="line-layer hover-lines" width={1} height={1} data-testid="layer-hover-lines">
