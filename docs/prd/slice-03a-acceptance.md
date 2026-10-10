@@ -71,6 +71,31 @@ newest release, with `@boundaries/elements` 3.1.1 pinning `handlebars` 4.7.9. No
    (blue), one by Piotr pinned to Customer, and one by Anna pinned to `web_users`, which Łukasz resolved. No label is
    pinned to a project (the prototype pins CR-23 and JIRA-481; S3A-05 starts from no pins).
 
+### Step 2 (labels)
+
+1. **The Labels field's keys follow the prototype beyond the PRD's list:** besides ↑/↓ and Enter, a comma or Tab (with
+   text) picks too, Backspace in the empty input takes the item's last label off, and Esc closes the list first, then
+   leaves the input (the canvas does not see these keys).
+2. **Without label rights** (reviewers, readers, archived workspace) the field shows the chips with their names as
+   links, no × and no input; “None” when the item has no labels.
+3. **Where the field sits** follows the prototype: after the definition (entity, attribute), after the note and the
+   other sources (mapping), after the table's path (table), after “Feeds” (column).
+4. **Marks:** a tag mark on labeled attribute and column rows and on a labeled table's header, with “Working labels:
+   …” as the tooltip; on a labeled mapping line a tag in a dashed circle a quarter along the line (on a combined
+   mapping, along its first input), with “Labels: …” as the line's tooltip (prototype texts). Below 40 % zoom the rows
+   are not drawn, so their marks go with them, and the line tag is left out like the end dots; the table header's mark
+   stays, like the rest of the header. A single mapping drawn at a collapsed frame keeps its tag; a bundle of several
+   shows none. The mark takes room when deciding whether a name needs clipping (`text-fit.ts`).
+5. **The label panel** names the counts in the prototype's order (entities, attributes, tables, columns, mappings) and
+   lists the items under Entities, Attributes, Mappings, Tables, Columns (folding sections, a filter over 20 items).
+   An entity, attribute, table or column opens only when its card is on this canvas (the known limitation of panel
+   links); a mapping opens anywhere. A refused rename (a name another label has) shows the toast and the stored name
+   again.
+6. **Opening a label from the project home** opens the first canvas of the project (tab order) on which it marks
+   something, with its panel (`?label=<id>`); a pinned label that marks nothing there opens on the first canvas. The
+   star is shown to everyone, active only for those who may change labels; a pinned star uses the palette's amber
+   (`im-review-strong`), the nearest to the prototype's.
+
 ## Changes to earlier tests
 
 - `src/domain/permissions.test.ts`: the role matrix gains `label.edit` (owner, admin, modeler) and `note.edit` (owner,
@@ -78,3 +103,4 @@ newest release, with `@boundaries/elements` 3.1.1 pinning `handlebars` 4.7.9. No
 - `tests/schema/compare-schema.test.ts`: `label`, `label_link`, `project_pinned_label` and `note` are now described by
   the domain (step 1).
 - `src/domain/commands/undo.test.ts` and `frame.test.ts`: their row sets include the four new undoable tables (step 1).
+- `src/canvas/canvas.test.ts` and `lines.test.ts`: the expected card rows and mapping lines have `labels: null` (step 2).
