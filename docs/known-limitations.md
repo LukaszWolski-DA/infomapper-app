@@ -101,6 +101,17 @@ the demo data is replaced: steps whose change group is no longer in the change l
 - **The database slice (last, AD-31):** decide whether the history must survive a restart (and several server instances). If it must,
   keep it in the database next to `change_event`.
 
+### No undo outside canvases (slice 3a, step 0)
+
+Undo and redo (the top bar's buttons, Ctrl+Z, Ctrl+Shift+Z) exist only on canvas pages (slice 1b, assumption 8).
+Changes made on the project and workspace home pages (projects, canvases) are in the undo history, but can only be
+undone from a canvas. Pinning a label to a project and unpinning it (project home, slice 3a) write a change group with
+their change events but are not undo steps at all. Deleting a label is an undo step, and its undo brings its project pins
+back with it.
+
+- **Accepted** by Łukasz in slice 3a, step 0.
+- **Later:** undo on the home pages (`docs/ideas.md`, “Undo and redo on the project and workspace home pages”).
+
 ## Dependencies (slice 2a, step 0)
 
 ### `npm audit`: 11 high, all from one advisory without a fix

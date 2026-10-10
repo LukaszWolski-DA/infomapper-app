@@ -58,7 +58,9 @@ that labels changes automatically (D-26) and live label canvases (D-10, D-11, D-
    The prototype's “Open as live canvas” is slice 3b and not shown.
 5. **Labels on the project home (D-29).** The project home lists the labels used on its canvases (prototype
    `projLabels`: pinned ones first, then by how many items they mark), each opening the label; a label can be pinned
-   to and unpinned from the project (`project_pinned_label`).
+   to and unpinned from the project (`project_pinned_label`). A pinned label stays listed when no canvas of the
+   project uses it any more (as in the prototype). Pinning and unpinning write a change group with their change
+   events; the project home has no undo (Łukasz, Step 0).
 
 ### Notes
 
@@ -102,16 +104,20 @@ that labels changes automatically (D-26) and live label canvases (D-10, D-11, D-
       “All N notes are resolved.”, or “No notes yet. Use the Note tool (N) or right-click the canvas or a card.”, and
       the checkbox “Show resolved notes on the canvas”. Hiding resolved notes is a per-user browser preference (data
       model, section 12), not a canvas setting and not an undo step.
-    - The project home shows the number of open notes on its canvases.
+    - The project home shows the number of open notes on its canvases and, as in the prototype (`renderHome`), the
+      list “Open notes”: each note's first line or “Empty note” and its canvas's name (“, on {card or frame}” when
+      pinned); a click opens that canvas with the note selected; without open notes: “No open notes on this
+      project's canvases.” (Łukasz, Step 0)
 13. **Notes and the selection (D-17).** A click selects a note; Shift+click adds it to a selection; a lasso that fully
     contains a free note selects it, unless its frame is caught as well (the frame stands for it); Ctrl+A also selects
     the visible free notes that are in no frame and not pinned. In a group, notes move with group drag and nudge; a
     pinned note whose element is also moved follows it instead of moving twice. Delete or Backspace deletes a selected
     note. Align, stack, line up and fit widths act on cards and frames only, as in the prototype.
-14. **Notes and the rest of the canvas.** Moving a frame moves its free notes; Duplicate layout copies the notes with
-    new ids, pins and frame membership pointing to the copies (check the prototype's duplicate and say if it
-    differs); Fit everything and content bounds count visible notes; “Remove from this canvas” of a card turns its
-    pinned notes into free notes.
+14. **Notes and the rest of the canvas.** Moving a frame moves its free notes; Duplicate layout does **not** copy
+    notes, as in the prototype's `dupDia` (Łukasz, Step 0: notes are loose remarks about a canvas, not part of its
+    layout): the copy starts with no notes, the original keeps all of them, and the toast stays “Duplicated {name}.
+    Only the layout is copied; the model is shared.”; Fit everything and content bounds count visible notes; “Remove
+    from this canvas” of a card turns its pinned notes into free notes.
 
 ### Both
 
@@ -142,9 +148,9 @@ frame label · labels on frames, notes or canvases.
   links and project pins with it, one change group); add label to item / remove label from item (one link, exactly
   one target); pin / unpin label on a project; create note; update note (text, colour, status, width); move note
   (position or pin offset, frame membership after a free drop); pin / unpin note; delete note. Existing commands that
-  remove a card from a canvas, delete a frame, delete an entity, attribute, mapping, table or column, or duplicate a
-  layout are extended: pinned notes become free notes, label links of deleted items are soft-deleted with them (D-47
-  cascade), duplicated notes follow their copies.
+  remove a card from a canvas, delete a frame, or delete an entity, attribute, mapping, table or column are extended:
+  pinned notes become free notes, label links of deleted items are soft-deleted with them (D-47 cascade). Duplicate
+  layout stays as it is: it copies no notes.
 - Every command checks permission, archive and version, validates input (Zod at the boundary), and writes its change
   events in the same write (AD-12, AD-13, AD-23). Note text is sanitised on the server and `body_text` derived there
   (AD-17), even though it is plain text in this slice.
@@ -202,13 +208,13 @@ S3A-13, assumptions, changes to earlier tests). Update README and CLAUDE.md comm
 | S3A-02 | Labels can be assigned to an entity, attribute, mapping, source table and source column; a second label with the same name in another case is not created (the existing one is used). |
 | S3A-03 | Labeled attribute rows, column rows, table headers and mapping lines show the tag mark with the label names as a tooltip; below 40 % zoom the row marks are not drawn. |
 | S3A-04 | The label panel lists everything the label marks by kind as links; renaming works and refuses a name another label has; “Delete label” takes it off every item, the model is untouched, Undo in the toast restores it with all its links. |
-| S3A-05 | The project home lists the labels used on its canvases; pinning one puts it first and survives a reload; unpinning works. |
+| S3A-05 | The project home lists the labels used on its canvases; pinning one puts it first and survives a reload; unpinning works; a pinned label stays listed when no canvas uses it. It shows the number of open notes and the list “Open notes” (first line or “Empty note”, the canvas's name); a click opens that canvas with the note selected; without open notes it shows “No open notes on this project's canvases.” |
 | S3A-06 | The Note tool (N) makes a free note on the empty canvas and a pinned note on a card, a frame's name and a collapsed block; an empty new note disappears without an undo step; the toolbox and panel entries create notes too. |
 | S3A-07 | A note's text is edited in place (Ctrl+Enter saves, Esc cancels), its width changed by its edge, its colour by the toolbox and panel, and it is resolved and reopened by its ✓ button, the toolbox and the panel; each is one undo step. |
 | S3A-08 | A free note dropped in a frame moves with it and is hidden while the frame is collapsed; a pinned note follows its card while dragged, with a dashed tether; unpinning keeps it in place as a free note; removing its card from the canvas turns it into a free note. |
 | S3A-09 | A card's header shows its open pinned notes; card and frame panels list their notes; a collapsed block shows “N notes”; the canvas overview lists open notes and “Show resolved notes on the canvas” hides resolved ones for this user only, after a reload too, without an undo step. |
 | S3A-10 | Notes take part in the selection: click, Shift+click, lasso (not when their frame is caught), Ctrl+A for free notes outside frames, group drag and nudge (a pinned note moves once), Delete. |
-| S3A-11 | Duplicate layout copies the notes with their pins and frames pointing to the copies. |
+| S3A-11 | Duplicate layout copies no notes: the copy has no notes, and the original's notes are unchanged (text, place, pin, frame, status); the toast reads “Duplicated {name}. Only the layout is copied; the model is shared.” |
 | S3A-12 | Deleting an entity soft-deletes its label links and those of its attributes and mappings in the same change group; Ctrl+Z restores them. |
 | S3A-13 | As Piotr (reviewer) and as a reader: what each may do with notes and labels follows the answers to the questions before Step 1; everything else is not offered, and the commands called directly are refused and change nothing. |
 | S3A-14 | One quick `measure:canvas` round on “Performance test” against `slice-02c`, with labels and notes added by `seed:large` (at least 20 notes, half pinned, and labels on 50 rows and 30 mappings): pan and zoom no more than about 10 % below `slice-02c`; the S2C-12 guard stays quiet. |
