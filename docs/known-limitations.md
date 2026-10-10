@@ -181,6 +181,18 @@ fails on it, and the browser behaves as it should.
 - **Accepted:** it is the dev server noting that the browser left a page early.
 - **Later:** look again if it shows up outside fast navigation, or in a production build.
 
+**Counted again on 10 October 2026 (slice 3a, after step 1).** It is now far more frequent than once in three runs:
+one full run on `main` at 717f42d printed it 9 times (108 passed), one on 1db6f1e (slice 3a, step 1) 11 times (108
+passed); step 1 does not cause it. It is printed right after these specs finish (so at the end of that spec or the start
+of the next): in both runs S0-11, S1B-03 (line 45), S1B-04, S2B-02, S2C-01 (both tests), S2C-04 (line 20) and S2C-07
+(line 66); only on main S2A-03; only on 1db6f1e S2C-06, S2C-07 (line 51) and S2C-08 (line 52). No test fails because
+of it.
+
+- **Cause, inferred, not traced:** these specs write and then end or navigate at once, so the page is probably still
+  loading its refresh after the write when the test closes it or leaves it.
+- **What has to happen later (not in slice 3a):** make tests that write and then end or navigate wait until the page
+  has finished its refresh, and check whether the message goes away.
+
 ### e2e dev servers run without Turbopack's file-system cache
 
 Next.js 16.1+ keeps a cache of the dev compilation in the build folder. The e2e runs stop their dev servers by force,
