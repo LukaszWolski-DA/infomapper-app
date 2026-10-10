@@ -122,9 +122,12 @@ MEASURE=1 npx playwright test e2e/slice-01b/S1B-10.spec.ts   # hover delay (C-10
 MEASURE=1 npx playwright test e2e/slice-02a/S2A-14.spec.ts   # group drag and lasso marks (S2A-14)
 npm run measure:canvas                                        # every canvas figure, production build, A/B vs slice-02a (slice 2p)
 npm run measure:canvas -- --rounds 1 --against slice-02p     # one quick round against slice 2p (slice 2b, S2B-14)
+npm run measure:canvas -- --quick --rounds 1 --against slice-02b                            # S2C-12, frames expanded
+npm run measure:canvas -- --quick --rounds 1 --against slice-02b --branch-diag collapsed    # S2C-12, all frames collapsed
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
 DIAG=nolines MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # diagnosis: no line layer (or DIAG=blocks)
+DIAG=collapsed MEASURE=1 MEASURE_BUILD=production npx playwright test <spec> # every frame shown collapsed (slice 2c)
 ```
 
 - e2e tests import `test`/`expect` from `e2e/slice-XX/fixtures.ts` (fresh seed per test); shared steps are in
@@ -137,7 +140,14 @@ DIAG=nolines MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # d
   2b's add frames as test data made through the domain (`makeFrame`, `place` for a card), frames on the page and in the
   data (`frameEl`, `loadFrames`, `item`), a point on a frame's name or an empty spot inside it (`namePoint`, `emptyIn`),
   `toolboxLabels` (a frame's toolbox items have their own test ids) and the view `FRAMED` (room above a frame's name at
-  the top). The undo history lives in the server's memory and is empty again after each reseed.
+  the top). Slice 2c's add rectangles around the seed's cards (`AROUND`; the e2e data file between tests is not the
+  seed, so read positions from the seed), collapsing as test data (`collapse`, `collapsedFrame`), blocks and bundles on
+  the page (`blockEl`, `blockHeadPoint`, `bundles`, `bundleWithCount`, `relBundle`, `mappingLines`), a mapping by its
+  column and attribute (`mappingId`) and `removeCard`. The undo history lives in the server's memory and is empty again
+  after each reseed.
+- In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
+  nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed. Keep it when changing
+  `ModelCanvas.tsx`; a render loop once cost a collapsed canvas a third of its frames.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only

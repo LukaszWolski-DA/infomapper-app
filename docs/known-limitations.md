@@ -137,11 +137,11 @@ templates are compiled. Its only path is `eslint-plugin-boundaries` 7.2.0 (dev, 
 
 - **Risk: low for us.** Only lint uses it, to fill in templates from this repository's own `eslint.config.mjs`; no user
   input reaches it, and it is not part of the application the server runs.
-- **Plan (Łukasz, 9 October):** add `"overrides": { "handlebars": "4.7.10" }` (or newer) to `package.json` once the release
-  is at least two weeks old, from 19 October 2026; then `npm install`, lint (including a deliberately broken layer rule
-  to confirm the layer rules still catch it), typecheck, unit tests, and `npm audit` again (expected: only the 11 from
-  `braces`). If slice 2c's Step 5 is on or after that date, do it there; otherwise in the next slice. Do not take the
-  suggested downgrade.
+- **Condition (Łukasz, 9 October; still open at the end of slice 2c, 10 October):** add
+  `"overrides": { "handlebars": "4.7.10" }` (or newer) to `package.json` once 4.7.10 is at least 14 days old (from 19
+  October 2026), or earlier if `eslint-plugin-boundaries` ships a release that fixes it; then `npm install`, lint
+  (including a deliberately broken layer rule to confirm the layer rules still catch it), typecheck, unit tests, and
+  `npm audit` again (expected: only the 11 from `braces`). Do not take the suggested downgrade.
 
 ## Right panel (slice 1a)
 
