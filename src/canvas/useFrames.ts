@@ -97,6 +97,8 @@ export interface SaveLayoutOptions {
 
 interface Options {
   editable: boolean;
+  /** Measurement only (`?diag=collapsed`, S2C-12): every frame shown collapsed, nothing saved. */
+  showAllCollapsed?: boolean;
   initialFrames: readonly FrameData[];
   setNodes: Dispatch<SetStateAction<CardNodeT[]>>;
   patchCard: (id: Uuid, patch: CardPatch) => void;
@@ -153,9 +155,15 @@ export function useFrames(o: Options) {
   /** Reviewers and readers: the frames collapsed or expanded in this tab only (item 11), by frame id. */
   const [tabCollapsed, setTabCollapsed] = useState<ReadonlyMap<Uuid, boolean>>(() => new Map());
   /** The frames as the canvas shows them: the saved ones with this tab's own collapse state. */
+  const { showAllCollapsed } = o;
   const frames = useMemo(
-    () => (tabCollapsed.size ? saved.map((f) => (tabCollapsed.has(f.id) && tabCollapsed.get(f.id) !== f.collapsed ? { ...f, collapsed: tabCollapsed.get(f.id)! } : f)) : saved),
-    [saved, tabCollapsed],
+    () =>
+      showAllCollapsed
+        ? saved.map((f) => (f.collapsed ? f : { ...f, collapsed: true }))
+        : tabCollapsed.size
+          ? saved.map((f) => (tabCollapsed.has(f.id) && tabCollapsed.get(f.id) !== f.collapsed ? { ...f, collapsed: tabCollapsed.get(f.id)! } : f))
+          : saved,
+    [saved, tabCollapsed, showAllCollapsed],
   );
   const framesRef = useRef(frames);
   useEffect(() => {

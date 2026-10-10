@@ -15,7 +15,7 @@
 // Each canvas has its look (`look.tsx`): the grid is one CSS background on its own element behind the pane, following
 // the view, and the layer mode hides the relationship or the mapping lines. A card named in `focusCardId` is selected and shown on arrival
 // (“On canvases” in the panels). The measurement-only build may switch off the line layer or draw every card as a block
-// (`diagnosis`), to find what the frame time is spent on.
+// (`diagnosis`), to find what the frame time is spent on; slice 2c: or show every frame collapsed (S2C-12).
 // Slice 2b: frames in their own layer under the lines and cards (`FrameLayer`, `useFrames`); every change of positions
 // and widths goes through `saveLayout`, which also decides the cards' frames. A draws a frame (the Frame tool); Delete
 // removes a selected frame. Step 4: frames take part in the selection of several (`frame:` keys): a lasso around a
@@ -684,6 +684,7 @@ export function ModelCanvas({
   const onFrameCreated = useCallback((id: string) => ui.host()?.frameCreated(id), [ui]);
   const frameState = useFrames({
     editable,
+    showAllCollapsed: diagnosis.collapsed,
     initialFrames,
     setNodes,
     patchCard,

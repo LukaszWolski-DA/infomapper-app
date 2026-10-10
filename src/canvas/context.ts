@@ -46,7 +46,7 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
 
 /**
  * Measurement-only switches (slice 2a diagnosis, AD-31): only the measurement-only production build passes them, from
- * `?diag=nolines`, `?diag=blocks`, `?diag=noframes` or `?diag=nolabels`. Users never see them.
+ * `?diag=nolines`, `?diag=blocks`, `?diag=noframes`, `?diag=nolabels` or `?diag=collapsed`. Users never see them.
  */
 export interface Diagnosis {
   /** No line layer at all. */
@@ -57,6 +57,8 @@ export interface Diagnosis {
   noFrames?: boolean;
   /** Frames without their names and chips (slice 2b, S2B-14). */
   noLabels?: boolean;
+  /** Every frame shown collapsed, nothing saved (slice 2c, S2C-12). */
+  collapsed?: boolean;
 }
 export const DiagnosisCtx = createContext<Diagnosis>({});
 
