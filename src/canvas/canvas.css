@@ -70,6 +70,9 @@
 .im-canvas .tag.pii { color: var(--im-warn); background: var(--im-warn-soft) }
 .im-canvas .tag.bk { color: var(--im-physical); background: var(--im-physical-soft) }
 .im-canvas .dt { color: var(--im-ink-3); font-size: 11px; flex: none }
+/* working labels (slice 3a, prototype .lmark): a tag mark in rows and the table header, never a model tag (D-08) */
+.im-canvas .lmark { display: inline-flex; align-items: center; color: var(--im-ink-3); flex: none; font-style: normal }
+.im-canvas .lmark svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round }
 .im-canvas .src .dt { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 10.5px }
 .im-canvas .st { flex: none; display: inline-grid; place-items: center; width: 10px; height: 10px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--im-ink-3);
   font-size: 9px; font-weight: 600; color: var(--im-surface) }
@@ -132,6 +135,12 @@
 /* bundled lines at a collapsed frame (slice 2c, prototype .lnk.bundle): the width grows with the count (inline) */
 .im-canvas .lnk.bundle .s { stroke-linecap: round }
 .im-canvas .lnk.bundle .chip circle { stroke-width: 1.6 }
+/* a labeled mapping line (slice 3a, prototype .ltag): a small tag in a dashed circle, part of the line's own drawing */
+.im-canvas .ltag { pointer-events: none }
+.im-canvas .ltag circle { fill: var(--im-surface); stroke: var(--im-ink-3); stroke-width: 1.2; stroke-dasharray: 2 2 }
+.im-canvas .ltag path { fill: none; stroke: var(--im-ink-2); stroke-width: 1.3; stroke-linejoin: round }
+.im-canvas .dimmed .lnk:not(.hl) .ltag circle,
+.im-canvas .dimmed .lnk:not(.hl) .ltag path { stroke-opacity: .12; fill-opacity: .12 }
 .im-canvas .rlab { pointer-events: none }
 .im-canvas .rlab rect { fill: var(--im-canvas); stroke: var(--im-line) }
 .im-canvas .rlab text, .im-canvas .mult { font: 500 11px var(--font-plex-sans), system-ui, sans-serif; fill: var(--im-ink-2); text-anchor: middle; dominant-baseline: central }

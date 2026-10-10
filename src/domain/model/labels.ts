@@ -89,3 +89,73 @@ export function labelSuggestions(labels: readonly Label[], links: readonly Label
     .slice(0, LABEL_SUGGESTIONS_MAX);
   return { create: q && !all.some((l) => l.name_key === q) ? name : null, labels: matching };
 }
+
+/** An item as a key of `labelNamesByItem`: `attribute:<id>`, `mapping:<id>`, … */
+export const itemKey = (target: LabelTarget): string => `${target.kind}:${target.id}`;
+
+/** The names of the labels on each item (live links of live labels), sorted, for the canvas marks and their tooltips. */
+export function labelNamesByItem(labels: readonly Label[], links: readonly LabelLink[]): Map<string, string[]> {
+  const names = new Map(live(labels).map((l) => [l.id, l.name]));
+  const out = new Map<string, string[]>();
+  for (const k of live(links)) {
+    const name = names.get(k.label_id);
+    const target = targetOf(k);
+    if (!name || !target) continue;
+    const key = itemKey(target);
+    out.set(key, [...(out.get(key) ?? []), name]);
+  }
+  for (const list of out.values()) list.sort((a, b) => a.localeCompare(b));
+  return out;
+}
+
+/** What `projectLabels` needs to tell whether an item is on one of the project's canvases. */
+export interface ProjectLabelContext {
+  /** Entities and source tables with a card on one of the project's canvases. */
+  entitiesHere: ReadonlySet<Uuid>;
+  tablesHere: ReadonlySet<Uuid>;
+  /** The entity of each attribute, the table of each column. */
+  entityOfAttribute: ReadonlyMap<Uuid, Uuid>;
+  tableOfColumn: ReadonlyMap<Uuid, Uuid>;
+  /** The attribute of each mapping and the columns it reads. */
+  mappingEnds: ReadonlyMap<Uuid, { attributeId: Uuid; columnIds: readonly Uuid[] }>;
+}
+
+/**
+ * The labels of a project's home (D-29, prototype projLabels): the labels pinned to it, and those marking an item on
+ * one of its canvases (an entity or table with a card there, an attribute or column of one, a mapping with an end on
+ * one). Pinned ones first, then by how many items they mark, then by name. A pinned label is listed also when no canvas
+ * uses it (Łukasz, step 0).
+ */
+export function projectLabels(
+  labels: readonly Label[],
+  links: readonly LabelLink[],
+  pinned: ReadonlySet<Uuid>,
+  here: ProjectLabelContext,
+): { label: Label; items: number; pinned: boolean }[] {
+  const onCanvas = (t: LabelTarget): boolean => {
+    switch (t.kind) {
+      case "entity":
+        return here.entitiesHere.has(t.id);
+      case "source_table":
+        return here.tablesHere.has(t.id);
+      case "attribute":
+        return here.entitiesHere.has(here.entityOfAttribute.get(t.id) ?? "");
+      case "source_column":
+        return here.tablesHere.has(here.tableOfColumn.get(t.id) ?? "");
+      case "mapping": {
+        const m = here.mappingEnds.get(t.id);
+        return !!m && (here.entitiesHere.has(here.entityOfAttribute.get(m.attributeId) ?? "") || m.columnIds.some((c) => here.tablesHere.has(here.tableOfColumn.get(c) ?? "")));
+      }
+    }
+  };
+  const ids = new Set([...pinned]);
+  for (const k of live(links)) {
+    const t = targetOf(k);
+    if (t && onCanvas(t)) ids.add(k.label_id);
+  }
+  const counts = labelItemCounts(links);
+  return live(labels)
+    .filter((l) => ids.has(l.id))
+    .map((label) => ({ label, items: counts.get(label.id) ?? 0, pinned: pinned.has(label.id) }))
+    .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.items - a.items || a.label.name.localeCompare(b.label.name));
+}

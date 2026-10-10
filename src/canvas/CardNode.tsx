@@ -32,6 +32,19 @@ const ICON = {
   down: "M4.5 6.5L8 10l3.5-3.5",
 };
 
+/**
+ * The tag mark of working labels (prototype lmark): a small outline tag, the label names as its tooltip (slice 3a). An
+ * <i>, so the header's `span:nth-child(2)` rules (the concept text, its clip) never apply to it.
+ */
+const LabelMark = ({ labels }: { labels: string }) => (
+  <i className="lmark" title={`Working labels: ${labels}`} data-testid="mark-label">
+    <svg viewBox="0 0 16 16" aria-hidden>
+      <path d="M8.5 2.5h5v5l-6 6-5-5z" />
+      <circle cx="11" cy="5" r="0.9" />
+    </svg>
+  </i>
+);
+
 function keyTitle(r: CardRow) {
   if (r.pk && r.fk) return "Primary key and foreign key";
   return r.pk ? "Primary key" : "Foreign key";
@@ -65,6 +78,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
           BK
         </span>
       )}
+      {row.labels && <LabelMark labels={row.labels} />}
       <span className="dt">{row.type}</span>
       <span className={`st${status}${row.mappings > 1 ? " n" : ""}`} data-testid="dot-mapped" title={row.title}>
         {row.mappings > 1 ? row.mappings : ""}
@@ -121,6 +135,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
           ) : (
             <span className="path">{card.line1}</span>
           )}
+          {card.labels && <LabelMark labels={card.labels} />}
           {ctx.editable && (
             <span className="c-tools nodrag">
               {isEnt && (

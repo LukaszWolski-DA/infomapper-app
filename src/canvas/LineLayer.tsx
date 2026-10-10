@@ -25,10 +25,19 @@ interface LineProps {
   onSelect: () => void;
 }
 
+/** The tag of a labeled mapping (prototype lineTag): drawn with the line, left out below 40 % zoom like the end dots. */
+const LineTag = ({ x, y }: { x: number; y: number }) => (
+  <g className="ltag" data-testid="mark-label-line">
+    <circle cx={x} cy={y} r={7} />
+    <path transform={`translate(${x - 5},${y - 5}) scale(0.62)`} d="M8.5 2.5h5v5l-6 6-5-5z" />
+  </g>
+);
+
 const MapPath = memo(
-  function MapPath({ id, geom, dots, className, onSelect }: LineProps & { id: string; geom: MapGeom; dots: boolean }) {
+  function MapPath({ id, geom, dots, labels, className, onSelect }: LineProps & { id: string; geom: MapGeom; dots: boolean; labels: string | null }) {
     return (
-      <g className={className} data-testid="line-mapping" data-mapping={id} onClick={onSelect}>
+      <g className={className} data-testid="line-mapping" data-mapping={id} data-labels={labels ?? undefined} onClick={onSelect}>
+        {labels && <title>{`Labels: ${labels}`}</title>}
         {geom.paths.map((d, i) => (
           <path key={`h${i}`} className="hit" d={d} />
         ))}
@@ -44,6 +53,7 @@ const MapPath = memo(
             </text>
           </g>
         )}
+        {labels && dots && <LineTag x={geom.tag.x} y={geom.tag.y} />}
       </g>
     );
   },
@@ -231,10 +241,11 @@ function LineLayer({
       return (
         <MapPath
           key={l.id}
-          sig={`${geom.paths.join("")}|${dots}|${className}|${geom.chip?.text ?? ""}`}
+          sig={`${geom.paths.join("")}|${dots}|${className}|${geom.chip?.text ?? ""}|${l.labels ?? ""}`}
           id={l.id}
           geom={geom}
           dots={dots}
+          labels={l.labels}
           className={className}
           onSelect={() => onSelect({ t: "map", id: l.id })}
         />
@@ -271,10 +282,11 @@ function LineLayer({
         return (
           <MapPath
             key={b.key}
-            sig={`${geom.geom.paths.join("")}|${dots}|${className}|${geom.geom.chip?.text ?? ""}`}
+            sig={`${geom.geom.paths.join("")}|${dots}|${className}|${geom.geom.chip?.text ?? ""}|${l.labels ?? ""}`}
             id={l.id}
             geom={geom.geom}
             dots={dots}
+            labels={l.labels}
             className={className}
             onSelect={() => onSelect({ t: "map", id: l.id })}
           />
@@ -310,7 +322,7 @@ function LineLayer({
               const geom = mapGeom(l, lookup);
               if (!geom) return null;
               const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${l.inputCount > 1 ? " combined" : ""} hl`;
-              return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} className={className} onSelect={() => {}} />;
+              return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={() => {}} />;
             })}
           {bundles
             .filter((b) => b.t === "map" && b.ids.some((id) => hover.maps.has(id)))
@@ -319,7 +331,7 @@ function LineLayer({
               if (!geom || geom.kind === "rel") return null;
               if (geom.kind === "single") {
                 const l = geom.line;
-                return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} className={`lnk map ${l.status}${l.warn ? " warn" : ""} hl`} onSelect={() => {}} />;
+                return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={`lnk map ${l.status}${l.warn ? " warn" : ""} hl`} onSelect={() => {}} />;
               }
               const className = `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""} hl`;
               return <BundlePath key={b.key} sig="" bundleKey={b.key} geom={geom} className={className} onSelect={() => {}} />;

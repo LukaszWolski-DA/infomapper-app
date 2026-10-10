@@ -15,6 +15,7 @@ import type { SourceColumn, SourceTable } from "@/domain/types";
 import { STATUS_LABEL } from "./attribute-panel";
 import { Actions, buttonClass, ConfirmDelete, dangerClass, Field, Flag, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TextField, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
+import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
 import { CardFrame } from "./card-frame";
 import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tablePath, typeCheckOf } from "./model-index";
@@ -49,6 +50,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
       </p>
       {t.row_count !== null && <Hint>{t.row_count.toLocaleString("en")} rows</Hint>}
       {t.comment && <Hint>{t.comment}</Hint>}
+      <ItemLabels target={{ kind: "source_table", id: t.id }} />
 
       <Fold title="Columns and where they go" count={columns.length}>
         <LongList
@@ -208,6 +210,7 @@ export function SourceColumnPanel({ column: c, cardId }: { column: SourceColumn;
           <Hint>Not used yet. Drag it onto an attribute, or onto an entity’s header to create a new attribute from it.</Hint>
         )}
       </Fold>
+      <ItemLabels target={{ kind: "source_column", id: c.id }} />
 
       {p.editable && (
         <Field label="Map to an attribute" htmlFor="f-adda">

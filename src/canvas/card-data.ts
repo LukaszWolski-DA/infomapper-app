@@ -29,6 +29,8 @@ export interface CardRow {
   title: string;
   /** The name may not fit: it gets the clip and the ellipsis (text-fit.ts). */
   clip: boolean;
+  /** Working labels on the attribute or column, as the tag mark's tooltip (“CR-23, JIRA-481”); null without (slice 3a). */
+  labels: string | null;
 }
 
 export interface CardData {
@@ -63,12 +65,19 @@ export interface CardData {
   subject: CardSubject;
   /** The mappings that read or fill the card's rows, for a frame's “type” and “drafts” chips (each counted once). */
   links: { id: Uuid; warn: boolean; draft: boolean }[];
+  /** Working labels on a source table, for the tag mark in its header (slice 3a); null on entities and unlabeled tables. */
+  labels: string | null;
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
+/** Label names per item (`labelNamesByItem`); empty when the page has no labels to show. */
+export type LabelNames = ReadonlyMap<string, readonly string[]>;
+const NO_LABELS: LabelNames = new Map();
+
 /** The cards of one canvas, in drawing order (sources first, as in the prototype). */
-export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]): CardData[] {
+export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], labelNames: LabelNames = NO_LABELS): CardData[] {
+  const labelsOf = (key: string) => labelNames.get(key)?.join(", ") || null;
   const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
   const columnById = new Map(model.sourceColumns.map((c) => [c.id, c]));
   const entityById = new Map(model.entities.map((e) => [e.id, e]));
@@ -136,6 +145,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
           bk: a.is_business_key,
           ...rowState(a.id, "Not mapped yet"),
           clip: false,
+          labels: labelsOf(`attribute:${a.id}`),
         }));
       cards.push({
         ...base,
@@ -149,6 +159,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
         mapped: rows.filter((r) => r.mappings > 0).length,
         subject: { entityConceptId: entity.concept_id },
         links: links(rows),
+        labels: null,
       });
     } else if (item.source_table_id) {
       const table = tableById.get(item.source_table_id);
@@ -165,6 +176,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
           bk: c.is_business_key,
           ...rowState(c.id, "Not used yet"),
           clip: false,
+          labels: labelsOf(`source_column:${c.id}`),
         }));
       cards.push({
         ...base,
@@ -178,6 +190,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[]):
         mapped: rows.filter((r) => r.mappings > 0).length,
         subject: { sourceSystemId: table.source_system_id },
         links: links(rows),
+        labels: labelsOf(`source_table:${table.id}`),
       });
     }
   }
@@ -192,7 +205,7 @@ export function withClips(card: Omit<CardData, "clipName" | "clipLine1">): CardD
     ...card,
     rows: card.rows.map((r) => ({ ...r, clip: rowNeedsClip(r, card.kind, dual, width) })),
     clipName: titleNeedsClip(card.name, card.kind, `${card.mapped}/${card.rows.length}`, width),
-    clipLine1: lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, width),
+    clipLine1: lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, width, !!card.labels),
   };
 }
 

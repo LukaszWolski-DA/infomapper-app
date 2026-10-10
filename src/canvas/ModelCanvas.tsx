@@ -127,6 +127,8 @@ export interface ModelCanvasProps {
   /** A card to select and bring into view once the canvas is ready (“On canvases”, slice 2a); then the address
    * loses its query, so a reload keeps the remembered view. */
   focusCardId?: string | null;
+  /** A working label asked for on arrival (the project home's labels, slice 3a): its panel opens. */
+  focusLabelId?: string | null;
   /** Measurement-only switches (only the measurement-only production build passes them). */
   diagnosis?: Diagnosis;
 }
@@ -182,6 +184,7 @@ export function ModelCanvas({
   frameWrites,
   entityConcepts = NO_CONCEPTS,
   focusCardId,
+  focusLabelId,
   diagnosis = NO_DIAGNOSIS,
 }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
@@ -521,6 +524,13 @@ export function ModelCanvas({
     }
     window.history.replaceState(null, "", window.location.pathname);
   }, [ready, focusCardId, rf, select, centerOn]);
+  const focusedLabel = useRef(false);
+  useEffect(() => {
+    if (!ready || !focusLabelId || focusedLabel.current) return;
+    focusedLabel.current = true;
+    select({ t: "label", id: focusLabelId });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [ready, focusLabelId, select]);
 
   const cardOf = useCallback(
     (t: CardTarget) =>
