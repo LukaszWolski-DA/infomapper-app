@@ -39,3 +39,9 @@ but can only be undone from a canvas. Better: the same buttons and keys on those
 The Entity tool creates the new entity exactly where clicked, also on a collapsed frame's block, and the new card does
 not join that frame (as in the prototype; Łukasz's decision (i) in step 4). Better: the Entity tool on a collapsed
 block files the new entity into the frame like a drop, and takes the concept of a concept frame.
+
+## Labels on requirements (after slice 2c)
+
+Labels on requirements: `label_link` gets a `requirement_id` target (a new migration, with the “exactly one target”
+check extended to it), and the requirement panel gets a Labels field. D-33 keeps labels and requirements separate today;
+decide with the requirements slice (4).
