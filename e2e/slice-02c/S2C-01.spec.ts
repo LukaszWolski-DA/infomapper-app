@@ -132,3 +132,32 @@ test("S2C-01: collapse and expand by the label button and the block's Expand, by
   await key(page, "Control+z");
   await expect.poll(() => isCollapsed("Area")).toBe(true);
 });
+
+test("S2C-01: the label's collapse button sits just left of the name, on its row, covers neither the name nor the chips and is clickable at 25 %, 40 %, 100 % and 300 %", async ({ page }) => {
+  await makeFrame(AROUND.customer, { name: "Area" }); // at 480, 0
+  await signInAs(page, "Łukasz");
+  for (const zoom of [0.25, 0.4, 1, 3]) {
+    // the frame's top-left corner 300 px from the pane's left and 200 px from its top
+    await openCanvas(page, canvasUrl(), { x: 300 - 480 * zoom, y: 200, zoom });
+    const frame = frameEl(page, "Area");
+    const button = await box(frame.getByTestId("button-frame-collapse"));
+    const name = await box(frame.getByTestId("frame-name"));
+    const label = await box(frame.getByTestId("frame-label"));
+    // left of the label, on its row (the label's middle within the button's height)
+    expect(button.x + button.width, `zoom ${zoom}: left of the label`).toBeLessThanOrEqual(label.x + 0.5);
+    const mid = label.y + label.height / 2 - 3.5; // the row's middle above the label's 7 px bottom padding
+    expect(Math.abs(button.y + button.height / 2 - mid), `zoom ${zoom}: on the label's row`).toBeLessThan(button.height / 2);
+    expect(button.x + button.width, `zoom ${zoom}: not over the name`).toBeLessThanOrEqual(name.x);
+    for (const chip of await frame.getByTestId("frame-chip").all()) expect(button.x + button.width).toBeLessThanOrEqual((await box(chip)).x);
+    // the same size on the screen at every zoom
+    expect(Math.abs(button.height - 20), `zoom ${zoom}: 20 px high`).toBeLessThan(1);
+    // nothing covers its middle
+    const hit = await page.evaluate(({ x, y }) => document.elementFromPoint(x, y)?.closest('[data-testid="button-frame-collapse"]') !== null, { x: button.x + button.width / 2, y: button.y + button.height / 2 });
+    expect(hit, `zoom ${zoom}: clickable`).toBe(true);
+  }
+  // at 300 % a click collapses the frame
+  const at = await box(frameEl(page, "Area").getByTestId("button-frame-collapse"));
+  await page.mouse.click(at.x + at.width / 2, at.y + at.height / 2);
+  await expect.poll(() => isCollapsed("Area")).toBe(true);
+  await expect(blockEl(page, "Area")).toBeVisible();
+});

@@ -137,20 +137,6 @@ const FrameBox = memo(function FrameBox({
             onCollapse(f.id, true);
           }}
         >
-          {onCollapse && (
-            <button
-              type="button"
-              className="ib f-collapse"
-              title="Collapse into one block"
-              data-testid="button-frame-collapse"
-              onPointerDown={(e) => e.stopPropagation()}
-              onClick={() => onCollapse(f.id, true)}
-            >
-              <svg viewBox="0 0 16 16" aria-hidden>
-                <path d="M2.5 2.5l4 4M6.5 3v3.5H3M13.5 13.5l-4-4M9.5 13v-3.5H13" />
-              </svg>
-            </button>
-          )}
           <span className="f-dot" />
           <span className="f-name" data-testid="frame-name">
             {f.name}
@@ -161,6 +147,22 @@ const FrameBox = memo(function FrameBox({
             </span>
           ))}
         </div>
+      )}
+      {/* the collapse button sits just left of the label, outside it: a wider label made zooming at the overview cost
+          about 20 ms of GPU work per frame in Chrome (S2C-12 diagnosis), so the label keeps its slice 2b width */}
+      {labels && onCollapse && (
+        <button
+          type="button"
+          className="ib f-collapse"
+          title="Collapse into one block"
+          data-testid="button-frame-collapse"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={() => onCollapse(f.id, true)}
+        >
+          <svg viewBox="0 0 16 16" aria-hidden>
+            <path d="M2.5 2.5l4 4M6.5 3v3.5H3M13.5 13.5l-4-4M9.5 13v-3.5H13" />
+          </svg>
+        </button>
       )}
       {editable && <div className="f-rs" data-frame-handle title="Drag to resize" data-testid="frame-resize" />}
     </div>

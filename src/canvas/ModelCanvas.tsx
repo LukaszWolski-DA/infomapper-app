@@ -204,6 +204,14 @@ export function ModelCanvas({
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
   const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(c, editable)));
+  // Development only (slice 2c, S2C-12): every commit of the canvas is counted, so a spec can check that nothing
+  // re-renders the canvas while nobody touches it (a render loop once cost a collapsed canvas a third of its frames).
+  useEffect(() => {
+    if (process.env.NODE_ENV === "development") {
+      const w = window as unknown as { __imCanvasCommits?: number };
+      w.__imCanvasCommits = (w.__imCanvasCommits ?? 0) + 1;
+    }
+  });
   const [ready, setReady] = useState(false);
   /** The row or line under the mouse (C-10); it takes over the emphasis from the selection while it lasts. */
   const [hover, setHover] = useState<Selection>(null);
@@ -753,6 +761,8 @@ export function ModelCanvas({
           position: { x: f.x, y: f.y },
           width: r.w,
           height: r.h,
+          // its size is known from its frame: React Flow need not measure it again and again (S2C-12)
+          measured: { width: r.w, height: r.h },
           data: {
             frame: f,
             color: frameColor(f, (id) => conceptColors[id]),
@@ -979,8 +989,11 @@ export function ModelCanvas({
   const { withGroup, onNodeDragStart: groupDragStart, onGroupDragStop } = group;
   const onNodesChange = useCallback(
     (changes: NodeChange<CardNodeT>[]) => {
-      // a block's changes (its measured size) are not the cards'; it is drawn from its frame (slice 2c)
+      // a block's changes (its measured size) are not the cards'; it is drawn from its frame (slice 2c). With none
+      // left, the cards stay as they are: applyNodeChanges returns a new array even for no change, and a new array on
+      // every round of React Flow's measuring re-rendered the whole canvas on every frame (S2C-12 diagnosis)
       const all = withGroup(changes.filter((c) => !("id" in c) || !c.id.startsWith("block:")));
+      if (!all.length) return;
       setNodes((ns) => applyNodeChanges(all, ns));
     },
     [withGroup],

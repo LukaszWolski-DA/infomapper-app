@@ -1,7 +1,8 @@
 // S2C-13 is about the process: CI on the pull request, and lint, typecheck, unit and all e2e suites passing three
 // times in a row. This test checks what can be checked from the repository: the workflows run on pull requests with
 // the same checks as `npm run lint`, `typecheck` and `test`, the schema check runs, and every criterion of slice 2c
-// that is tested here has its test (S2C-12 is a measurement round, recorded in docs/prd/slice-02c-acceptance.md).
+// has its spec (S2C-12 is a measurement round, recorded in docs/prd/slice-02c-acceptance.md; its spec is the guard
+// against the render loop found in its diagnosis).
 
 import fs from "node:fs";
 import { expect, test } from "./fixtures";
@@ -17,7 +18,7 @@ test("S2C-13: CI passes; lint, typecheck, unit and all e2e suites pass three tim
   for (const name of ["lint", "typecheck", "test", "e2e", "measure:canvas"]) expect(scripts[name], `npm run ${name}`).toBeTruthy();
 
   const specs = fs.readdirSync("e2e/slice-02c").filter((f) => f.endsWith(".spec.ts"));
-  for (const n of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 13]) {
+  for (let n = 1; n <= 13; n++) {
     const id = `S2C-${String(n).padStart(2, "0")}`;
     expect(specs, id).toContain(`${id}.spec.ts`);
   }
