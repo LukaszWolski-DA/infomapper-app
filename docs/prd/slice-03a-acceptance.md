@@ -96,6 +96,10 @@ newest release, with `@boundaries/elements` 3.1.1 pinning `handlebars` 4.7.9. No
    star is shown to everyone, active only for those who may change labels; a pinned star uses the palette's amber
    (`im-review-strong`), the nearest to the prototype's.
 
+**Accepted by Łukasz on 10 October 2026** after his manual check of step 2 (all steps, as Łukasz, Piotr and a reader).
+Open question from step 2: the prototype also marks a labeled entity's card header (`lmark("entity", …)`); PRD item 3
+lists rows, table headers and mapping lines only, so entity headers have no mark for now.
+
 ## Changes to earlier tests
 
 - `src/domain/permissions.test.ts`: the role matrix gains `label.edit` (owner, admin, modeler) and `note.edit` (owner,
