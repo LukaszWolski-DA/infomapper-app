@@ -127,7 +127,9 @@ lists rows, table headers and mapping lines only, so entity headers have no mark
 8. **Who may do what:** the Note tool (button and N), the note toolbox's actions, dragging, resizing, ✓ and the
    panel's fields are for editors and reviewers; readers see notes and their panel read-only, and their toolbox shows
    only its heading.
-9. **Not yet:** the card's and frame's “Notes” panel section with its “Add a note” (item 12, step 4), the note count on
+9. **A new card is not placed under a note:** the free spots for cards placed from the left panel or the panels avoid
+   the notes drawn, as the prototype's `freeSpot` does.
+10. **Not yet:** the card's and frame's “Notes” panel section with its “Add a note” (item 12, step 4), the note count on
    card headers and blocks (step 4), Fit everything counting notes (item 14, step 4).
 
 ## Changes to earlier tests
@@ -138,5 +140,10 @@ lists rows, table headers and mapping lines only, so entity headers have no mark
   the domain (step 1).
 - `src/domain/commands/undo.test.ts` and `frame.test.ts`: their row sets include the four new undoable tables (step 1).
 - `src/canvas/canvas.test.ts` and `lines.test.ts`: the expected card rows and mapping lines have `labels: null` (step 2).
-- `src/domain/commands/frame.test.ts`: a new test that a moved frame carries its free notes (step 3); no earlier test
-  changed in step 3.
+- `src/domain/commands/frame.test.ts`: a new test that a moved frame carries its free notes (step 3).
+- `e2e/slice-01b/S1B-14.spec.ts`: a reviewer's toolbox now offers “Add a note here” on the empty canvas and “Add a
+  note to this” on a card (step 0 answer 1); before, the card offered none (step 3).
+- `e2e/slice-02b/S2B-06.spec.ts` and `S2B-13.spec.ts`: the frame's toolbox lists “Add a note to this frame” after “Zoom
+  to frame”, for editors and reviewers (step 3).
+- The first step 3 run also failed S1B-06 and S2B-02 because demo notes lay on the empty spots those tests use; the
+  demo notes moved (step 1, item 9), the tests did not change.
