@@ -3,6 +3,11 @@
 // functions on rectangles; card heights come from the canvas, which knows the rows it draws.
 // Behaviour as in the prototype: frameAt, claimFree, afterResize, afterCardDrop, misfits, frameAroundSelection,
 // arrangeLayout.
+// Slice 2c (D-07): a collapsed frame is drawn as a block (prototype BW, blockH, blockRect) and only the block counts as
+// the frame for membership. A card joins a collapsed frame only when it is dragged and dropped on the block; it is then
+// filed at the bottom of the frame (prototype afterCardDrop), snapped to the grid, and the frame grows to hold it.
+// Every other change of position or width (nudge, align, stack, line up, resize, fit widths, placing a new card)
+// leaves collapsed frames alone: no card joins one, and a card in one keeps it (Łukasz, slice 2c step 0, answer 2).
 
 import type { Uuid } from "../ids";
 import type { FrameKind } from "../types";
@@ -24,6 +29,16 @@ export const FRAME_GROW = { side: 24, top: 40, bottom: 24 } as const;
 /** Room a frame drawn around cards keeps (“Put in a new frame”, “Fit frame to its content”). */
 export const FRAME_PADDING = { side: 32, top: 40, bottom: 32 } as const;
 
+/**
+ * A collapsed frame's block (D-07, prototype BW and blockH): a fixed width; the card header, the body padding, one
+ * 22 px row per member up to six, one more for “and N more” (or one for “Empty frame”), and the 30 px footer.
+ */
+export const BLOCK = { width: 280, bodyPad: 6, rowHeight: 22, maxRows: 6, footer: 30 } as const;
+/** Where a card dropped on a block is filed (prototype afterCardDrop): 32 px in from the frame's left, 8 px above its bottom. */
+export const BLOCK_FILING = { left: 32, aboveBottom: 8 } as const;
+const GRID_STEP = 8;
+const snapToGrid = (v: number) => Math.round(v / GRID_STEP) * GRID_STEP;
+
 export interface Rect {
   x: number;
   y: number;
@@ -36,10 +51,24 @@ export interface Point {
   y: number;
 }
 
-/** A frame's place on the canvas. */
+/** A frame's place on the canvas; a collapsed one also needs its member count (the block's height). */
 export interface FrameBox extends Rect {
   id: Uuid;
+  collapsed?: boolean;
+  members?: number;
 }
+
+/** The height of a collapsed frame's block with this many cards in the frame. */
+export function blockHeight(members: number): number {
+  const rows = Math.max(1, Math.min(members, BLOCK.maxRows) + (members > BLOCK.maxRows ? 1 : 0));
+  return CARD_HEADER_HEIGHT + BLOCK.bodyPad * 2 + rows * BLOCK.rowHeight + BLOCK.footer;
+}
+
+/** What a collapsed frame shows: the block's rectangle at the frame's top-left corner. */
+export const blockRect = (frame: Pick<Rect, "x" | "y">, members: number): Rect => ({ x: frame.x, y: frame.y, width: BLOCK.width, height: blockHeight(members) });
+
+/** The rectangle that counts as the frame: its block when collapsed (prototype rectOf). */
+export const shapeOf = (f: Rect & { collapsed?: boolean; members?: number }): Rect => (f.collapsed ? blockRect(f, f.members ?? 0) : f);
 
 /** A card's place: x, y and width from the data, height from the canvas. */
 export interface CardBox extends Rect {
@@ -60,17 +89,23 @@ const containsPoint = (r: Rect, p: Point) => p.x >= r.x && p.x <= r.x + r.width 
 const containsRect = (outer: Rect, inner: Rect) =>
   inner.x >= outer.x && inner.y >= outer.y && inner.x + inner.width <= outer.x + outer.width && inner.y + inner.height <= outer.y + outer.height;
 
-/** The smallest frame containing the point, or null. Frames may overlap; membership is always one frame (D-23). */
-export function frameAt<F extends Rect>(frames: readonly F[], p: Point): F | null {
+const area = (r: Rect) => r.width * r.height;
+type Shaped = Rect & { collapsed?: boolean; members?: number };
+
+/**
+ * The smallest frame containing the point, or null. Frames may overlap; membership is always one frame (D-23). A
+ * collapsed frame counts by its block (slice 2c).
+ */
+export function frameAt<F extends Shaped>(frames: readonly F[], p: Point): F | null {
   let best: F | null = null;
   for (const f of frames) {
-    if (containsPoint(f, p) && (!best || f.width * f.height < best.width * best.height)) best = f;
+    if (containsPoint(shapeOf(f), p) && (!best || area(shapeOf(f)) < area(shapeOf(best)))) best = f;
   }
   return best;
 }
 
 /** The frame a card at this place belongs to (D-05): the smallest one around the middle of its header. */
-export const frameOfCard = <F extends Rect>(frames: readonly F[], card: Pick<Rect, "x" | "y" | "width">): F | null =>
+export const frameOfCard = <F extends Shaped>(frames: readonly F[], card: Pick<Rect, "x" | "y" | "width">): F | null =>
   frameAt(frames, headerMiddle(card));
 
 /** A new frame takes the cards that are fully inside it and in no other frame (D-06). */
@@ -87,24 +122,36 @@ export function grownToHold(frame: Rect, card: Rect): Rect {
 }
 
 export interface DropResult {
-  /** The frame of each dropped card afterwards (null: none). */
-  membership: { cardId: Uuid; frameId: Uuid | null }[];
-  /** Every frame, grown where a dropped card joined it. */
+  /** The frame of each card afterwards (null: none); `filed`: its new place when it was dropped on a block. */
+  membership: { cardId: Uuid; frameId: Uuid | null; filed?: Point }[];
+  /** Every frame, grown where a card joined it. */
   frames: FrameBox[];
 }
 
 /**
- * After cards are dropped (at their new places, frames at theirs): each card joins the frame under the middle of its
- * header, or none, and that frame grows to hold it. Cards are taken one after the other, so a frame that grew for
- * one card is the grown frame for the next, as in the prototype.
+ * After cards are dropped, or otherwise moved or resized (at their new places, frames at theirs): each card joins the
+ * frame under the middle of its header, or none, and that frame grows to hold it. Cards are taken one after the other,
+ * so a frame that grew for one card is the grown frame for the next, as in the prototype.
+ * Collapsed frames (slice 2c): with `drag` (a drag drop), a card whose header lands on a block joins that frame, is
+ * filed at its bottom (snapped to 8 px) and the frame grows to hold it. Without `drag` they are left alone: no card
+ * joins one, and a card in one keeps it.
  */
-export function dropCards(frames: readonly FrameBox[], dropped: readonly CardBox[]): DropResult {
+export function dropCards(frames: readonly FrameBox[], dropped: readonly CardBox[], options: { drag?: boolean } = {}): DropResult {
   const now = frames.map((f) => ({ ...f }));
+  const byId = new Map(now.map((f) => [f.id, f]));
   const membership = dropped.map((card) => {
-    const f = frameOfCard(now, card);
+    const current = card.frameId ? byId.get(card.frameId) : undefined;
+    if (current?.collapsed && !options.drag) return { cardId: card.id, frameId: current.id };
+    const f = frameOfCard(options.drag ? now : now.filter((x) => !x.collapsed), card);
     if (!f) return { cardId: card.id, frameId: null };
-    Object.assign(f, grownToHold(f, card));
-    return { cardId: card.id, frameId: f.id };
+    if (!f.collapsed) {
+      Object.assign(f, grownToHold(f, card));
+      return { cardId: card.id, frameId: f.id };
+    }
+    const filed = { x: snapToGrid(f.x + BLOCK_FILING.left), y: snapToGrid(f.y + f.height - BLOCK_FILING.aboveBottom) };
+    Object.assign(f, grownToHold(f, { ...card, ...filed }));
+    if (card.frameId !== f.id) f.members = (f.members ?? 0) + 1;
+    return { cardId: card.id, frameId: f.id, filed };
   });
   return { membership, frames: now };
 }
@@ -119,7 +166,8 @@ export function membershipAfterResize(
   frames: readonly FrameBox[],
   cards: readonly CardBox[],
 ): { cardId: Uuid; frameId: Uuid | null }[] {
-  const others = frames.filter((f) => f.id !== resized.id);
+  // a card the resize releases never goes into a collapsed frame (slice 2c)
+  const others = frames.filter((f) => f.id !== resized.id && !f.collapsed);
   const changes: { cardId: Uuid; frameId: Uuid | null }[] = [];
   for (const card of cards) {
     const p = headerMiddle(card);

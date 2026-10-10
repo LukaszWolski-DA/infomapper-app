@@ -7,10 +7,12 @@
 // and the visible area is a second SVG on top, so moving it repaints only that small layer (S1A-14: repainting the
 // whole miniature on every frame cost a third of each frame). While cards are dragged it keeps the cards where they
 // were and takes their new places on release, as the prototype's miniature does (slice 2a step 3b).
+// Slice 2c: a collapsed frame's block is drawn instead of its hidden cards, and their lines go to the block.
 
 import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
-import { Panel, useReactFlow, useStore } from "@xyflow/react";
-import type { CardNodeT } from "./CardNode";
+import { Panel, useReactFlow, useStore, type Node } from "@xyflow/react";
+import { blockNodeId, type BlockNodeT } from "./BlockNode";
+import { isCardNode, type CardNodeT } from "./CardNode";
 import { CanvasUiCtx } from "./context";
 import { cardHeight, cardWidth, type Rect } from "./geometry";
 import type { CanvasLines } from "./line-data";
@@ -20,7 +22,7 @@ const W = 216, H = 140;
 export function Overview({ lines }: { lines: CanvasLines }) {
   const ui = useContext(CanvasUiCtx);
   const rf = useReactFlow();
-  const current = useStore((s) => s.nodes) as CardNodeT[];
+  const current = useStore((s) => s.nodes) as Node[];
   const dragging = current.some((n) => n.dragging);
   /** The cards as they were before the drag that is going on, if any. */
   const [settled, setSettled] = useState(current);
@@ -39,10 +41,19 @@ export function Overview({ lines }: { lines: CanvasLines }) {
   const [frozen, setFrozen] = useState<Rect | null>(null);
 
   const view: Rect = { x: -tx / zoom, y: -ty / zoom, w: width / zoom, h: height / zoom };
+  /** The cards drawn and the blocks (slice 2c); a hidden card's lines go to its block. */
+  const shown = useMemo(() => nodes.filter((n) => !n.hidden) as (CardNodeT | BlockNodeT)[], [nodes]);
   const rects = useMemo(
-    () => new Map(nodes.map((n) => [n.id, { x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) }])),
-    [nodes],
+    () =>
+      new Map(
+        shown.map((n) => [
+          n.id,
+          isCardNode(n) ? { x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) } : { x: n.position.x, y: n.position.y, w: n.width ?? 0, h: n.height ?? 0 },
+        ]),
+      ),
+    [shown],
   );
+  const blockOf = useMemo(() => new Map(nodes.filter((n) => n.hidden && isCardNode(n)).map((n) => [n.id, blockNodeId((n as CardNodeT).data.card.frameId ?? "")])), [nodes]);
   const content = useMemo(() => {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const r of rects.values()) {
@@ -108,7 +119,7 @@ export function Overview({ lines }: { lines: CanvasLines }) {
       {ui.overviewOpen && (
         <div className="overview-box">
           <svg className="overview-svg" width={W} height={H} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden>
-            <Miniature nodes={nodes} rects={rects} lines={lines} />
+            <Miniature nodes={shown} rects={rects} blockOf={blockOf} lines={lines} />
           </svg>
           <svg
             ref={svgRef}
@@ -133,9 +144,19 @@ export function Overview({ lines }: { lines: CanvasLines }) {
 }
 
 /** The cards and lines in miniature: lines between card centres, entities in their concept colour. */
-const Miniature = memo(function Miniature({ nodes, rects, lines }: { nodes: CardNodeT[]; rects: Map<string, Rect>; lines: CanvasLines }) {
+const Miniature = memo(function Miniature({
+  nodes,
+  rects,
+  blockOf,
+  lines,
+}: {
+  nodes: (CardNodeT | BlockNodeT)[];
+  rects: Map<string, Rect>;
+  blockOf: Map<string, string>;
+  lines: CanvasLines;
+}) {
   const centre = (id: string) => {
-    const r = rects.get(id);
+    const r = rects.get(id) ?? rects.get(blockOf.get(id) ?? "");
     return r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : null;
   };
   const pairs = new Set<string>();
@@ -153,6 +174,7 @@ const Miniature = memo(function Miniature({ nodes, rects, lines }: { nodes: Card
       })}
       {nodes.map((n) => {
         const r = rects.get(n.id)!;
+        if (!isCardNode(n)) return <rect key={n.id} className="mb" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: n.data.color }} />;
         const card = n.data.card;
         return card.kind === "ent" ? (
           <rect key={n.id} className="me" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: card.color ?? "#888899" }} />

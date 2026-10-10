@@ -9,7 +9,7 @@ import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResu
 import { domainError, notFound, staleVersion, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { cardWidthOf, dropCards } from "../model/frames";
-import type { WorkspaceAccess } from "../permissions";
+import { checkPermission, type WorkspaceAccess } from "../permissions";
 import type { Canvas, CanvasItem, Entity, Frame, SourceTable } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, isLive, nothingToChange, softDelete } from "./shared";
@@ -71,6 +71,9 @@ export const frameRefsSchema = z
 /**
  * Puts new cards that came with their height in the frame under the middle of their header, growing that frame to
  * hold them, as a drop does. A frame that grows must be named at the version the user read. Returns the frame writes.
+ * A placed card never joins a collapsed frame, except when it was dragged from the left panel onto the frame's block
+ * (`drag`, slice 2c): then it is filed at the frame's bottom like a card dropped there. `items` are the canvas's
+ * cards, for the blocks' sizes.
  */
 export function joinFrames(
   ctx: CommandContext,
@@ -79,15 +82,21 @@ export function joinFrames(
   frames: readonly Frame[],
   seenFrames: readonly { frameId: Uuid; expectedVersion: number }[] | undefined,
   placed: readonly { item: CanvasItem; height: number | undefined }[],
+  options: { drag?: boolean; items?: readonly CanvasItem[] } = {},
 ): { ok: true; writes: Write[] } | { ok: false; error: DomainError } {
   const live = frames.filter((f) => isLive(f, access.workspace.id) && f.canvas_id === canvasId);
   const sized = placed.filter((p) => p.height !== undefined);
   if (!live.length || !sized.length) return { ok: true, writes: [] };
+  const members = new Map<Uuid, number>();
+  for (const i of options.items ?? []) {
+    if (isLive(i, access.workspace.id) && i.canvas_id === canvasId && i.frame_id) members.set(i.frame_id, (members.get(i.frame_id) ?? 0) + 1);
+  }
   const result = dropCards(
-    live.map((f) => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height })),
+    live.map((f) => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height, collapsed: f.collapsed, members: members.get(f.id) ?? 0 })),
     sized.map(({ item, height: h }) => ({ id: item.id, x: item.x, y: item.y, width: cardWidthOf(item), height: h!, frameId: null })),
+    { drag: options.drag },
   );
-  for (const m of result.membership) sized.find((p) => p.item.id === m.cardId)!.item.frame_id = m.frameId;
+  for (const m of result.membership) Object.assign(sized.find((p) => p.item.id === m.cardId)!.item, { frame_id: m.frameId }, m.filed ?? {});
   const versions = new Map((seenFrames ?? []).map((f) => [f.frameId, f.expectedVersion]));
   const writes: Write[] = [];
   for (const after of result.frames) {
@@ -110,6 +119,10 @@ const placeInput = z
     /** The new card's height as the canvas draws it: with it, the card joins the frame it lands in. */
     height: height.optional(),
     frames: frameRefsSchema,
+    /** Dragged from the left panel and dropped (slice 2c): it may join a collapsed frame by landing on its block. */
+    dragDrop: z.boolean().optional(),
+    /** The answer to the drop's concept question (D-05): move the entity to the frame's concept in the model. */
+    moveToConcepts: z.boolean().optional(),
   })
   .strict()
   .refine((v) => (v.entityId === undefined) !== (v.sourceTableId === undefined), "Place either an entity or a source table.");
@@ -125,7 +138,11 @@ export interface PlaceOnCanvasState {
   frames?: readonly Frame[];
 }
 
-/** Places an entity or a source table on a canvas. Each element has at most one card per canvas. */
+/**
+ * Places an entity or a source table on a canvas. Each element has at most one card per canvas. Dropped from the left
+ * panel on a collapsed frame's block, it is filed into that frame; with `moveToConcepts` an entity that joined a concept
+ * frame of another concept moves to it in the model, in the same change group (slice 2c, Łukasz's step 1 answer 2).
+ */
 export function placeOnCanvas(
   ctx: CommandContext,
   access: WorkspaceAccess,
@@ -152,9 +169,20 @@ export function placeOnCanvas(
   if (already) return fail(domainError("conflict", "It is already on this canvas."));
 
   const item = newCanvasItem(ctx, workspaceId, canvasId, target, { x, y });
-  const joined = joinFrames(ctx, access, canvasId, state.frames ?? [], parsed.data.frames, [{ item, height: parsed.data.height }]);
+  const joined = joinFrames(ctx, access, canvasId, state.frames ?? [], parsed.data.frames, [{ item, height: parsed.data.height }], {
+    drag: parsed.data.dragDrop,
+    items: state.items,
+  });
   if (!joined.ok) return fail(joined.error);
-  return done(ctx, access, { canvasItemId: item.id }, [{ kind: "insert", table: "canvas_item", row: item }, ...joined.writes]);
+  const writes: Write[] = [{ kind: "insert", table: "canvas_item", row: item }, ...joined.writes];
+  const frame = item.frame_id ? (state.frames ?? []).find((f) => f.id === item.frame_id) : undefined;
+  const entity = state.entity;
+  if (parsed.data.moveToConcepts && entity && entityId && frame?.kind === "concept" && frame.concept_id && frame.concept_id !== entity.concept_id) {
+    const denied = checkPermission(access, "model.edit");
+    if (denied) return fail(denied);
+    writes.push({ kind: "update", table: "entity", before: entity, row: nextVersion(ctx, entity, { concept_id: frame.concept_id }) });
+  }
+  return done(ctx, access, { canvasItemId: item.id }, writes);
 }
 
 // ---- place several (feeding sources, B-08) ----

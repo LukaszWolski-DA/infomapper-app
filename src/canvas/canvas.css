@@ -129,6 +129,9 @@
 .im-canvas .rel .mk { fill: none; stroke: var(--im-rel); stroke-width: 1.6; pointer-events: none }
 .im-canvas .rel circle.mk { fill: var(--im-canvas) }
 .im-canvas .rel.sel .mk { stroke-width: 2.4 }
+/* bundled lines at a collapsed frame (slice 2c, prototype .lnk.bundle): the width grows with the count (inline) */
+.im-canvas .lnk.bundle .s { stroke-linecap: round }
+.im-canvas .lnk.bundle .chip circle { stroke-width: 1.6 }
 .im-canvas .rlab { pointer-events: none }
 .im-canvas .rlab rect { fill: var(--im-canvas); stroke: var(--im-line) }
 .im-canvas .rlab text, .im-canvas .mult { font: 500 11px var(--font-plex-sans), system-ui, sans-serif; fill: var(--im-ink-2); text-anchor: middle; dominant-baseline: central }
@@ -222,6 +225,30 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .frame-draw { position: absolute; border: 1.5px dashed var(--im-logical); background: color-mix(in srgb, var(--im-logical) 6%, transparent);
   border-radius: 16px; pointer-events: none }
 .im-canvas.tool-frame .react-flow__pane, .im-canvas.tool-frame .im-frame, .im-canvas.tool-frame .f-lab { cursor: crosshair }
+/* the collapse button, just left of the label (outside it, so the label keeps its width; S2C-12): the same size on
+   the screen at every zoom, its bottom on the label's row */
+.im-canvas .im-frame > .f-collapse { position: absolute; left: 4px; bottom: 100%; pointer-events: all; transform-origin: 0 100%;
+  transform: scale(var(--iz, 1)) translate(calc(-100% - 2px), -7px) }
+
+/* A collapsed frame's block (slice 2c, D-07; prototype .fblock, .b-body, .brow, .b-foot): a card with a stack behind
+   it, in the frame's colour. No opacity (AD-24); its text scales with the canvas like a card's. */
+.im-canvas .card.fblock { border-radius: 12px; overflow: hidden;
+  box-shadow: 0 0 0 1px var(--im-line), 4px 4px 0 -1px var(--im-surface), 4px 4px 0 0 var(--im-line), 8px 8px 0 -1px var(--im-surface), 8px 8px 0 0 var(--im-line), 0 12px 24px -12px var(--im-shadow) }
+.im-canvas .card.fblock.sel { box-shadow: 0 0 0 2px var(--fc), 4px 4px 0 -1px var(--im-surface), 4px 4px 0 0 var(--im-line), 8px 8px 0 -1px var(--im-surface), 8px 8px 0 0 var(--im-line), 0 12px 24px -12px var(--im-shadow) }
+.im-canvas .fblock .c-head { background: color-mix(in srgb, var(--fc) 10%, var(--im-surface)); cursor: move }
+.im-canvas .fblock .c-head::before { content: ""; position: absolute; left: 0; top: 0; bottom: -1px; width: 4px; background: var(--fc) }
+.im-canvas .fblock .b-body { padding: 6px 0 }
+.im-canvas .fblock .brow { display: flex; align-items: center; gap: 8px; height: 22px; padding: 0 12px 0 14px; font-size: 12px; cursor: pointer }
+.im-canvas .fblock .brow:hover { background: var(--im-hover) }
+.im-canvas .fblock .brow .bk { width: 8px; height: 8px; flex: none; border-radius: 2px; background: var(--im-physical) }
+.im-canvas .fblock .brow .bk.ent { border-radius: 50%; background: var(--im-logical) }
+.im-canvas .fblock .brow .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.im-canvas .fblock .brow .nm.mono { font-family: var(--font-mono, ui-monospace, monospace); font-size: 11.5px }
+.im-canvas .fblock .brow .dt { color: var(--im-ink-3); font-size: 11px; font-variant-numeric: tabular-nums }
+.im-canvas .fblock .brow.more, .im-canvas .fblock .brow.none { color: var(--im-ink-3); cursor: default }
+.im-canvas .fblock .brow.more:hover, .im-canvas .fblock .brow.none:hover { background: transparent }
+.im-canvas .fblock .b-foot { height: 30px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border-top: 1px solid var(--im-line); overflow: hidden }
+.im-canvas .overview-svg .mb { fill-opacity: .35; stroke: none }
 
 /* The drop's concept question (slice 2b; prototype #ask) */
 .im-canvas .concept-ask { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 8px;

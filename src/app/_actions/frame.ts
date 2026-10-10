@@ -15,6 +15,8 @@ import {
   moveOnCanvas,
   putCardsInNewFrame,
   resizeFrame,
+  setAllFramesCollapsed,
+  setFrameCollapsed,
   updateFrame,
   type FrameCanvasState,
   type MoveState,
@@ -95,6 +97,7 @@ export interface MoveOnCanvasActionInput {
   items: { canvasItemId: string; expectedVersion: number; x?: number; y?: number; width?: number | null; height?: number }[];
   onGrid?: boolean;
   moveToConcepts?: boolean;
+  dragDrop?: boolean;
 }
 
 /** Drags, drops, nudges, align/stack/line up, card resize and fit widths: positions, widths and frames in one change. */
@@ -106,6 +109,23 @@ export async function moveOnCanvasAction(workspaceId: string, canvasId: string, 
   });
   // a concept change is a change of the model: the panels show it
   return result.ok && result.value.movedToConcepts ? refreshed(result) : result;
+}
+
+/** Collapses a frame into one block or expands it (slice 2c, D-07): the label's button, the toolbox, the panel, the block. */
+export async function setFrameCollapsedAction(workspaceId: string, input: { frameId: string; expectedVersion: number; collapsed: boolean }) {
+  return refreshed(
+    await runCommand(async (ctx, store, user) => {
+      const access = await accessOf(store, workspaceId, user.id);
+      if (!access) return NOT_FOUND;
+      const frame = (await store.frames.list(access.workspace.id)).find((f) => f.id === input?.frameId) ?? null;
+      return setFrameCollapsed(ctx, access, { frame }, input);
+    }),
+  );
+}
+
+/** “Collapse all” / “Expand all” in the canvas overview (slice 2c, item 8): every frame of the canvas, one change. */
+export async function setAllFramesCollapsedAction(workspaceId: string, canvasId: string, input: { frames: { frameId: string; expectedVersion: number }[]; collapsed: boolean }) {
+  return refreshed(await onCanvas(workspaceId, canvasId, async (ctx, access, state) => setAllFramesCollapsed(ctx, access, state, { ...input, canvasId })));
 }
 
 /** The resize handle at a frame's bottom-right corner. */

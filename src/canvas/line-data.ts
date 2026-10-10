@@ -111,6 +111,8 @@ export type Selection =
   | { t: "rel"; id: Uuid }
   /** A frame (slice 2b): its name or an empty spot inside it was clicked. */
   | { t: "frame"; id: Uuid }
+  /** A bundle of lines at a collapsed frame (slice 2c): its key, see `bundleLines`. */
+  | { t: "bundle"; id: string }
   | null;
 
 export interface Related {
@@ -123,7 +125,8 @@ export interface Related {
  * A selected card fades nothing: in the prototype that belongs to Focus mode, a later slice.
  */
 export function relatedLines(sel: Selection, lines: CanvasLines): Related | null {
-  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame") return null;
+  // a bundle's lines are known to the canvas, which emphasises them itself (slice 2c)
+  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame" || sel.t === "bundle") return null;
   const maps = new Set<Uuid>(), rels = new Set<Uuid>();
   switch (sel.t) {
     case "map":

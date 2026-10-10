@@ -32,7 +32,7 @@ function HoverOverlay({
 
   const box = (cardId: string, rowId: string) => {
     const n = lookup.get(cardId);
-    if (!n) return null;
+    if (!n || n.hidden) return null;
     const card = (n as unknown as CardNodeT).data.card;
     const { x, y } = n.internals.positionAbsolute;
     const end = rowEnd({ x, y, card }, rowId);
@@ -44,6 +44,7 @@ function HoverOverlay({
   let flashBox = null;
   if (flash && !lod) {
     for (const [id, n] of lookup) {
+      if (n.type !== "card" || n.hidden) continue; // a block, or a card hidden in a collapsed frame (slice 2c)
       if ((n as unknown as CardNodeT).data.card.rows.some((r) => r.id === flash.rowId)) flashBox = box(id, flash.rowId);
       if (flashBox) break;
     }

@@ -33,3 +33,9 @@ built; Ctrl+Z and the top bar's Undo work for every change.
 Undo and redo (the top bar's buttons and Ctrl+Z, Ctrl+Shift+Z) are only on canvas pages (assumption 8 in the slice 1b
 acceptance). Changes made on the project and workspace home pages (projects, canvases) are in the undo history too,
 but can only be undone from a canvas. Better: the same buttons and keys on those home pages as well.
+
+## Entity tool on a collapsed block (slice 2c, step 4)
+
+The Entity tool creates the new entity exactly where clicked, also on a collapsed frame's block, and the new card does
+not join that frame (as in the prototype; Łukasz's decision (i) in step 4). Better: the Entity tool on a collapsed
+block files the new entity into the frame like a drop, and takes the concept of a concept frame.

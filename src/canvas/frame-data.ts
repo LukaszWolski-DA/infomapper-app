@@ -1,9 +1,10 @@
 // What the canvas draws for its frames (slice 2b), as plain serialisable data built on the server, and the label's
 // numbers (prototype frameStats, renderFrames): how far the frame's cards are mapped and what does not belong there.
 // Membership is read from the cards as the canvas has them now, so the label follows a drop before a fresh page.
+// Slice 2c: a collapsed frame is drawn as a block; `frameShape` is the rectangle that stands for the frame then.
 
 import type { Uuid } from "@/domain/ids";
-import { FREE_FRAME_COLORS, isMisplaced } from "@/domain/model/frames";
+import { FREE_FRAME_COLORS, isMisplaced, shapeOf } from "@/domain/model/frames";
 import type { Frame, FrameKind, WorkspaceModel } from "@/domain/types";
 import type { CardData } from "./card-data";
 
@@ -20,6 +21,21 @@ export interface FrameData {
   y: number;
   width: number;
   height: number;
+  /** Drawn as one block (D-07, slice 2c); the frame keeps its size and its cards their places. */
+  collapsed: boolean;
+}
+
+/** How many cards each frame holds, from the cards as the canvas has them now. */
+export function memberCounts(cards: readonly Pick<CardData, "frameId">[]): Map<Uuid, number> {
+  const counts = new Map<Uuid, number>();
+  for (const c of cards) if (c.frameId) counts.set(c.frameId, (counts.get(c.frameId) ?? 0) + 1);
+  return counts;
+}
+
+/** The rectangle that stands for a frame on the canvas: its block when collapsed (slice 2c), else the frame. */
+export function frameShape(f: Pick<FrameData, "id" | "x" | "y" | "width" | "height" | "collapsed">, counts: ReadonlyMap<Uuid, number>): { x: number; y: number; w: number; h: number } {
+  const r = shapeOf({ ...f, members: counts.get(f.id) ?? 0 });
+  return { x: r.x, y: r.y, w: r.width, h: r.height };
 }
 
 /** The colour a frame is drawn in: its concept's, the physical colour for a source frame, or its own (prototype frameColor). */
@@ -44,6 +60,7 @@ export function buildFrames(frames: readonly Frame[]): FrameData[] {
       y: f.y,
       width: f.width,
       height: f.height,
+      collapsed: f.collapsed,
     }))
     .sort((a, b) => b.width * b.height - a.width * a.height || a.id.localeCompare(b.id));
 }

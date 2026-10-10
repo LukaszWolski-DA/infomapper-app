@@ -101,9 +101,10 @@ test("S2B-13: as Piotr (reviewer), frames can be selected, zoomed to and their c
   await page.getByTestId("button-frame-zoom").click();
   await expect.poll(() => viewOf(page)).not.toBe(v0);
 
-  // the frame's toolbox offers only “Select its cards” and “Zoom to frame”; selecting its cards works
+  // the frame's toolbox offers “Select its cards” and “Zoom to frame”, and since slice 2c (item 11) “Collapse into one
+  // block”, in his own tab only; selecting its cards works
   await openCanvas(page, canvasUrl(), FRAMED);
-  expect(await toolboxLabels(page, await namePoint(page, "Sales"))).toEqual(["Select its cards", "Zoom to frame"]);
+  expect(await toolboxLabels(page, await namePoint(page, "Sales"))).toEqual(["Collapse into one block", "Select its cards", "Zoom to frame"]);
   await page.getByTestId("menu-toolbox").getByRole("menuitem", { name: "Select its cards" }).click();
   await expect(cardMarks(page)).toHaveCount(2);
   await expect(page.getByTestId("selection-kinds")).toHaveText("2 entities.");

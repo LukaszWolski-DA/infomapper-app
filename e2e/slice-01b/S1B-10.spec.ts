@@ -16,7 +16,7 @@ import { generate } from "../../src/data/local/large-generator";
 import { E2E_DB } from "../config";
 import { expect, test } from "./fixtures";
 import { canvasUrl, ids, LEFT_AT_100, openCanvas, rowNamed, signInAs } from "./helpers";
-import { median, MEASURE, MEASURE_USE, openLarge, panZoom, saveResults, startRecording, stopRecording, type FrameStats } from "./measure";
+import { DIAG, median, MEASURE, MEASURE_USE, NOT_APPLICABLE, openLarge, panZoom, saveResults, startRecording, stopRecording, type FrameStats } from "./measure";
 
 if (MEASURE) test.use(MEASURE_USE);
 
@@ -56,8 +56,10 @@ test("S1B-10: hovering a row highlights its lines and far-end rows within 100 ms
   const src57 = generate().cards.find((c) => c.id === "src:57")!;
   const size = page.viewportSize()!;
   await openLarge(page, { x: size.width / 2 - src57.x, y: 300 - src57.y, zoom: 1 });
+  // under DIAG=collapsed (S2C-12) the cards are hidden in their blocks: there are no rows to hover
+  const collapsed = DIAG === "collapsed";
   const hovers = MEASURE ? 40 : 10;
-  const latency = await page.evaluate(async (hovers) => {
+  const latency = collapsed ? NOT_APPLICABLE : await page.evaluate(async (hovers) => {
     const pane = document.querySelector(".react-flow__pane")!;
     const p = pane.getBoundingClientRect();
     const rows = [...document.querySelectorAll<HTMLElement>(".row[data-row]")]
@@ -88,19 +90,22 @@ test("S1B-10: hovering a row highlights its lines and far-end rows within 100 ms
     return { rows: rows.length, hovers, commitMs: st(commit), toNextFrameMs: st(frame) };
   }, hovers);
   expect(latency).not.toHaveProperty("error");
-  const sweepCard = await page.evaluate(([x, y]) => {
-    const n = [...document.querySelectorAll<HTMLElement>(".react-flow__node")].find((e) => e.style.transform === `translate(${x}px, ${y}px)`);
-    return n?.dataset.id ?? null;
-  }, [src57.x, src57.y] as const);
-  const card = (await page.locator(`.react-flow__node[data-id="${sweepCard}"]`).boundingBox())!;
-  await startRecording(page);
-  const t1 = Date.now();
-  let i = 0;
-  while (Date.now() - t1 < (MEASURE ? 5000 : 1000)) {
-    i++;
-    await page.mouse.move(card.x + 60, card.y + 70 + ((i * 7) % Math.min(card.height - 80, 700)));
+  let sweep: FrameStats | null = null;
+  if (!collapsed) {
+    const sweepCard = await page.evaluate(([x, y]) => {
+      const n = [...document.querySelectorAll<HTMLElement>(".react-flow__node")].find((e) => e.style.transform === `translate(${x}px, ${y}px)`);
+      return n?.dataset.id ?? null;
+    }, [src57.x, src57.y] as const);
+    const card = (await page.locator(`.react-flow__node[data-id="${sweepCard}"]`).boundingBox())!;
+    await startRecording(page);
+    const t1 = Date.now();
+    let i = 0;
+    while (Date.now() - t1 < (MEASURE ? 5000 : 1000)) {
+      i++;
+      await page.mouse.move(card.x + 60, card.y + 70 + ((i * 7) % Math.min(card.height - 80, 700)));
+    }
+    sweep = await stopRecording(page);
   }
-  const sweep = await stopRecording(page);
 
   // ---- pan and zoom: three runs at the overview (fit) and at 100 % in the dense area ----
   const runs = MEASURE ? 3 : 1;
@@ -131,9 +136,11 @@ test("S1B-10: hovering a row highlights its lines and far-end rows within 100 ms
   };
   saveResults("S1B-10", results);
   await test.info().attach("S1B-10 results", { body: JSON.stringify(results, null, 2), contentType: "application/json" });
-  if (MEASURE) {
+  if (MEASURE && !collapsed) {
     const c10 = latency as { toNextFrameMs: { median: number } };
     expect.soft(c10.toNextFrameMs.median, "C-10: hover to the next frame, median ms (bar 100)").toBeLessThanOrEqual(100);
+  }
+  if (MEASURE) {
     expect.soft(panZoomMedian.overview, "pan and zoom at the overview, median fps of 3 runs (bar 52.8)").toBeGreaterThanOrEqual(PAN_ZOOM_BARS.overview);
     expect.soft(panZoomMedian["100%"], "pan and zoom at 100 %, median fps of 3 runs (bar 47.0)").toBeGreaterThanOrEqual(PAN_ZOOM_BARS["100%"]);
   }

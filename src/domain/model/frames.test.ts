@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   arrangeIntoFrames,
+  BLOCK,
+  blockHeight,
+  blockRect,
   CARD_HEADER_HEIGHT,
   cardsFullyInside,
   conceptQuestions,
@@ -236,5 +239,68 @@ describe("arrange into frames (prototype arrangeLayout)", () => {
 
   it("places concept frames at the left edge when there are no tables", () => {
     expect(arrangeIntoFrames([], [{ refId: "x", cards: [c("e")] }]).frames[0]).toMatchObject({ x: 0, y: 0 });
+  });
+});
+
+describe("collapsed frames: the block (slice 2c, D-07; prototype blockH, blockRect)", () => {
+  it("is 280 px wide; header, body padding, one 22 px row per member up to six, “and N more”, footer", () => {
+    expect(BLOCK.width).toBe(280);
+    expect(blockHeight(0)).toBe(54 + 12 + 22 + 30); // “Empty frame”
+    expect(blockHeight(1)).toBe(54 + 12 + 22 + 30);
+    expect(blockHeight(3)).toBe(54 + 12 + 3 * 22 + 30);
+    expect(blockHeight(6)).toBe(54 + 12 + 6 * 22 + 30);
+    expect(blockHeight(7)).toBe(54 + 12 + 7 * 22 + 30); // six rows and “and 1 more”
+    expect(blockHeight(40)).toBe(blockHeight(7));
+    expect(blockRect({ x: 40, y: 80 }, 3)).toEqual({ x: 40, y: 80, width: 280, height: blockHeight(3) });
+  });
+
+  it("counts as the frame by its block, not by the frame's hidden rectangle", () => {
+    const collapsed = { ...frame("F", 0, 0, 1000, 800), collapsed: true, members: 2 };
+    expect(frameAt([collapsed], { x: 100, y: 50 })).toBe(collapsed);
+    expect(frameAt([collapsed], { x: 500, y: 400 })).toBeNull(); // inside the frame, outside the block
+    // the smaller one by area, measured by the block
+    const around = frame("G", 0, 0, 600, 400);
+    expect(frameAt([around, collapsed], { x: 100, y: 50 })).toBe(collapsed);
+  });
+});
+
+describe("collapsed frames: dropping cards (slice 2c; prototype afterCardDrop, Łukasz's step 0 answers 1–3)", () => {
+  const collapsed = { ...frame("F", 0, 0, 800, 386), collapsed: true, members: 2 };
+  const onBlock = card("c", 20, 10); // header middle (148, 37) is on the block
+
+  it("a drag drop on the block files the card at the frame's bottom, snapped to 8 px, and the frame grows to hold it", () => {
+    const r = dropCards([collapsed], [onBlock], { drag: true });
+    // x: 0 + 32; y: 0 + 386 − 8 = 378 → 376 on the grid
+    expect(r.membership).toEqual([{ cardId: "c", frameId: "F", filed: { x: 32, y: 376 } }]);
+    expect(r.frames[0]).toMatchObject({ x: 0, y: 0, width: 800, height: 376 + onBlock.height + 24, members: 3 });
+  });
+
+  it("a drag drop on the frame's hidden area outside the block does not join it", () => {
+    const r = dropCards([collapsed], [card("c", 400, 200)], { drag: true });
+    expect(r.membership).toEqual([{ cardId: "c", frameId: null }]);
+    expect(r.frames[0]).toEqual(collapsed);
+  });
+
+  it("anything but a drag drop (nudge, align, resize, a placed card) never puts a card into a collapsed frame", () => {
+    const r = dropCards([collapsed], [onBlock]);
+    expect(r.membership).toEqual([{ cardId: "c", frameId: null }]);
+    expect(r.frames[0]).toEqual(collapsed);
+  });
+
+  it("a card of a collapsed frame keeps it when it is moved without a drag drop", () => {
+    const r = dropCards([collapsed, frame("G", 2000, 0, 600, 600)], [card("m", 2100, 100, { frameId: "F" })]);
+    expect(r.membership).toEqual([{ cardId: "m", frameId: "F" }]);
+  });
+
+  it("an expanded frame still takes drops by its whole rectangle", () => {
+    const open = { ...collapsed, collapsed: false };
+    expect(dropCards([open], [card("c", 400, 200)], { drag: true }).membership).toEqual([{ cardId: "c", frameId: "F" }]);
+  });
+
+  it("a card a resize releases never goes into a collapsed frame under it", () => {
+    const resized = frame("R", 0, 0, 200, 200);
+    const under = { ...frame("F", 0, 300, 800, 400), collapsed: true, members: 0 };
+    const changes = membershipAfterResize(resized, [resized, under], [card("m", 20, 310, { frameId: "R" })]);
+    expect(changes).toEqual([{ cardId: "m", frameId: null }]);
   });
 });

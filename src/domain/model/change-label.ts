@@ -70,6 +70,12 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
 
   // Frames (slice 2b): moved with their cards, cards dropped into frames (which may grow), resized, arranged.
   const frames = of("frame");
+  // Collapsed or expanded (slice 2c, D-07): one frame, or all of a canvas.
+  if (frames.length && frames.length === events.length && frames.every((e) => e.operation === "update" && only(e, ["collapsed"]))) {
+    const collapsed = !!frames[0]!.after_image?.collapsed;
+    if (frames.length > 1) return collapsed ? "Collapse all frames" : "Expand all frames";
+    return collapsed ? "Collapse frame" : "Expand frame";
+  }
   if (frames.length && frames.length + cards.length === events.length && [...frames, ...cards].every((e) => e.operation === "update")) {
     if (frames.every((e) => only(e, ["x", "y"])) && cards.every((e) => only(e, ["x", "y"]))) return frames.length > 1 ? "Move frames" : "Move frame";
     if (frames.every((e) => only(e, ["width", "height"])) && cards.every((e) => only(e, ["frame_id"]))) return "Resize frame";

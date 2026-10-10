@@ -13,6 +13,11 @@ import { splitName } from "./names";
 
 export type CardNodeT = Node<{ card: CardData }, "card">;
 
+/** A card node, not a collapsed frame's block (slice 2c): React Flow holds both kinds. */
+export const isCardNode = (n: Node): n is CardNodeT => n.type === "card";
+/** The card nodes React Flow holds now, hidden ones (in a collapsed frame) included. */
+export const cardNodesOf = (rf: { getNodes: () => Node[] }): CardNodeT[] => rf.getNodes().filter(isCardNode);
+
 export const FILTER_LABEL = { all: "All", mapped: "Mapped", unmapped: "Unmapped", keys: "Keys" } as const;
 export const FILTER_ORDER = ["all", "mapped", "unmapped", "keys"] as const;
 

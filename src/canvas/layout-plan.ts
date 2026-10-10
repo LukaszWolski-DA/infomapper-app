@@ -2,6 +2,8 @@
 // rules so the canvas shows it at once; the server's `moveOnCanvas` computes the same again and saves it. Moved frames
 // carry their cards, which keep their frame; every other changed card joins the smallest frame under the middle of its
 // header, or none, and that frame grows to hold it (D-05, answer 1). Pure, tested without a browser.
+// Slice 2c: a drag drop (`drag`) on a collapsed frame's block files the card at the frame's bottom; every other change
+// leaves collapsed frames alone (the domain's dropCards).
 
 import type { Uuid } from "@/domain/ids";
 import { cardWidthOf, dropCards, membershipAfterResize, type FrameBox } from "@/domain/model/frames";
@@ -31,9 +33,11 @@ export interface LayoutPlan {
   carried: Set<Uuid>;
   /** Cards whose position or width changed by themselves: their frame was decided again. */
   changed: Set<Uuid>;
+  /** Cards dropped on a collapsed frame's block and filed into it (slice 2c), with that frame. */
+  filed: Map<Uuid, Uuid>;
 }
 
-export function planLayout(frames: readonly FrameBox[], cards: readonly PlanCard[], change: LayoutChange): LayoutPlan {
+export function planLayout(frames: readonly FrameBox[], cards: readonly PlanCard[], change: LayoutChange, options: { drag?: boolean } = {}): LayoutPlan {
   const nextFrames = new Map(frames.map((f) => [f.id, { ...f }]));
   const nextCards = new Map(cards.map((c) => [c.id, { ...c }]));
   const carried = new Set<Uuid>();
@@ -64,9 +68,18 @@ export function planLayout(frames: readonly FrameBox[], cards: readonly PlanCard
       const c = nextCards.get(id)!;
       return { id, x: c.x, y: c.y, width: cardWidthOf(c), height: c.height, frameId: c.frameId };
     }),
+    { drag: options.drag },
   );
-  for (const m of dropped.membership) nextCards.get(m.cardId)!.frameId = m.frameId;
-  return { frames: dropped.frames, cards: [...nextCards.values()], carried, changed };
+  const filed = new Map<Uuid, Uuid>();
+  for (const m of dropped.membership) {
+    const c = nextCards.get(m.cardId)!;
+    c.frameId = m.frameId;
+    if (m.filed && m.frameId) {
+      Object.assign(c, m.filed);
+      filed.set(m.cardId, m.frameId);
+    }
+  }
+  return { frames: dropped.frames, cards: [...nextCards.values()], carried, changed, filed };
 }
 
 /** A frame given a new rectangle (resize handle, fit to content): the cards whose frame changes (D-06). */

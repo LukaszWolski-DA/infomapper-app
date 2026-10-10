@@ -220,10 +220,14 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       )}
 
       <Actions>
+        {/* every role: reviewers and readers collapse and expand in their own tab only (slice 2c, item 11) */}
+        <button type="button" className={buttonClass} onClick={() => ui.setFrameCollapsed(f.id, !f.collapsed)} data-testid="button-frame-collapse">
+          {f.collapsed ? "Expand frame" : "Collapse frame"}
+        </button>
         <button type="button" className={buttonClass} onClick={() => ui.zoomToFrame(f.id)} data-testid="button-frame-zoom">
           Zoom to frame
         </button>
-        {p.editable && (
+        {p.editable && !f.collapsed && (
           <button type="button" className={buttonClass} onClick={() => ui.fitFrame(f.id)} data-testid="button-frame-fit">
             Fit frame to its content
           </button>

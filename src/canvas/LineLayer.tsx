@@ -8,14 +8,16 @@
 // dragged cards, not all of them, on every frame.
 // Hover (slice 1b, C-10): the lines are not restyled and the others do not fade (restyling 340 lines, or one veil over
 // them, made the hover too slow); the hovered lines are drawn again, emphasised, above the others and below the cards.
+// Slice 2c (D-07): lines touching a collapsed frame come as bundles (`bundleLines`), drawn in the same layer: a group of
+// one mapping as that mapping, two or more as one line with a count, relationships with “N relationship(s)”.
 
 import { memo, useContext, useState, type ReactNode } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type Notation } from "./context";
-import { cardRect, ieMarker, LOD_ZOOM, multText, relGeom, umlMarker, type Placed } from "./geometry";
-import { mapGeom, placedOf, type MapGeom } from "./line-geometry";
-import type { CanvasLines, RelLineData, Related, Selection } from "./line-data";
+import { cardRect, ieMarker, LOD_ZOOM, multText, relGeom, umlMarker, type Placed, type Rect } from "./geometry";
+import { bundleGeom, mapGeom, placedOf, type Bundle, type BundleEnd, type BundleGeom, type MapGeom } from "./line-geometry";
+import type { CanvasLines, MapLineData, RelLineData, Related, Selection } from "./line-data";
 
 interface LineProps {
   sig: string;
@@ -94,6 +96,36 @@ const RelPath = memo(
   (a, b) => a.sig === b.sig,
 );
 
+/** A bundle of two or more mappings, or of relationships (slice 2c, prototype .lnk.bundle). */
+const BundlePath = memo(
+  function BundlePath({ bundleKey, geom, className, onSelect }: LineProps & { bundleKey: string; geom: Exclude<BundleGeom, { kind: "single" }> }) {
+    const lw = geom.kind === "rel" ? geom.label.length * 6.1 + 14 : 0;
+    const r = geom.kind === "map" && geom.count > 9 ? 10 : 8.5;
+    return (
+      <g className={className} data-testid="line-bundle" data-bundle={bundleKey} data-count={geom.kind === "map" ? geom.count : undefined} onClick={onSelect}>
+        <path className="hit" d={geom.d} />
+        <path className="s" d={geom.d} style={{ strokeWidth: `${geom.width.toFixed(2)}px` }} />
+        {geom.kind === "map" ? (
+          <g className="chip" data-testid="chip-count">
+            <circle cx={geom.mid.x} cy={geom.mid.y} r={r} />
+            <text x={geom.mid.x} y={geom.mid.y}>
+              {geom.count}
+            </text>
+          </g>
+        ) : (
+          <g className="rlab">
+            <rect x={geom.mid.x - lw / 2} y={geom.mid.y - 9} width={lw} height={18} rx={9} />
+            <text x={geom.mid.x} y={geom.mid.y}>
+              {geom.label}
+            </text>
+          </g>
+        )}
+      </g>
+    );
+  },
+  (a, b) => a.sig === b.sig,
+);
+
 /** A number per object, to tell a changed card (a new object) from the same one. */
 const objectIds = new WeakMap<object, number>();
 let nextObjectId = 1;
@@ -106,14 +138,28 @@ const objectId = (o: object) => {
 /** Position, size and the card state that moves rows: what a relationship line depends on. */
 const placedSig = (p: Placed) => `${p.x},${p.y},${p.card.width ?? ""},${p.card.collapsed ? 1 : 0},${p.card.rowFilter}`;
 
+const NO_BUNDLES: Bundle[] = [];
+const NO_BLOCKS = new Map<string, Rect>();
+const NO_MAPS = new Map<string, MapLineData>();
+
 function LineLayer({
   lines,
+  bundles = NO_BUNDLES,
+  blocks = NO_BLOCKS,
+  mapsById = NO_MAPS,
   selection,
   related,
   hover,
   onSelect,
 }: {
+  /** The lines drawn on their own: those touching no collapsed frame. */
   lines: CanvasLines;
+  /** The lines touching a collapsed frame, grouped (slice 2c). */
+  bundles?: readonly Bundle[];
+  /** The block of each collapsed frame. */
+  blocks?: ReadonlyMap<string, Rect>;
+  /** Every mapping line of the canvas, bundled or not (a group of one is drawn as its mapping). */
+  mapsById?: ReadonlyMap<string, MapLineData>;
   selection: Selection;
   related: Related | null;
   /** The lines of the hovered row or line, drawn above the veil; null when nothing is hovered. */
@@ -197,11 +243,64 @@ function LineLayer({
     if (el) maps.push(el);
   }
 
+  // ---- bundles (slice 2c) ----
+  const placed = (cardId: string) => placedOf(lookup.get(cardId));
+  const endKey = (e: BundleEnd) => {
+    if ("frameId" in e) {
+      const r = blocks.get(e.frameId);
+      return r ? `${r.x},${r.y},${r.h}` : "-";
+    }
+    return cardKey(e.cardId);
+  };
+  const bundleState = (b: Bundle) => {
+    const sel = selection?.t === "bundle" && selection.id === b.key ? " sel" : "";
+    const hl = related && b.ids.some((id) => (b.t === "map" ? related.maps : related.rels).has(id)) ? " hl" : "";
+    return sel + hl;
+  };
+  const bundled: ReactNode[] = [];
+  for (const b of bundles) {
+    const objs = b.ids.map((id) => (b.t === "map" && mapsById.get(id) ? objectId(mapsById.get(id)!) : 0)).join(",");
+    const st = b.t === "map" && b.ids.length === 1 ? state("map", b.ids[0]!) : bundleState(b);
+    const key = `${b.ids.join(",")}|${objs}|${endKey(b.a)}|${endKey(b.z)}|${dots}|${st}`;
+    const el = reuse(`bundle:${b.key}`, key, () => {
+      const geom = bundleGeom(b, placed, blocks, mapsById);
+      if (!geom) return null;
+      if (geom.kind === "single") {
+        const l = geom.line;
+        const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.geom.part ? " part" : ""}${st}`;
+        return (
+          <MapPath
+            key={b.key}
+            sig={`${geom.geom.paths.join("")}|${dots}|${className}|${geom.geom.chip?.text ?? ""}`}
+            id={l.id}
+            geom={geom.geom}
+            dots={dots}
+            className={className}
+            onSelect={() => onSelect({ t: "map", id: l.id })}
+          />
+        );
+      }
+      const className = geom.kind === "rel" ? `lnk rel bundle${st}` : `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""}${st}`;
+      return (
+        <BundlePath
+          key={b.key}
+          sig={`${geom.d}|${className}|${geom.kind === "map" ? geom.count : geom.label}|${geom.width}`}
+          bundleKey={b.key}
+          geom={geom}
+          className={className}
+          onSelect={() => onSelect({ t: "bundle", id: b.key })}
+        />
+      );
+    });
+    if (el) bundled.push(el);
+  }
+
   return (
     <EdgeLabelRenderer>
       <svg className={`line-layer${related ? " dimmed" : ""}`} width={1} height={1} data-testid="layer-lines">
         <g>{rels}</g>
         <g>{maps}</g>
+        <g>{bundled}</g>
       </svg>
       {hover && (
         <svg className="line-layer hover-lines" width={1} height={1} data-testid="layer-hover-lines">
@@ -212,6 +311,18 @@ function LineLayer({
               if (!geom) return null;
               const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${l.inputCount > 1 ? " combined" : ""} hl`;
               return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} className={className} onSelect={() => {}} />;
+            })}
+          {bundles
+            .filter((b) => b.t === "map" && b.ids.some((id) => hover.maps.has(id)))
+            .map((b) => {
+              const geom = bundleGeom(b, placed, blocks, mapsById);
+              if (!geom || geom.kind === "rel") return null;
+              if (geom.kind === "single") {
+                const l = geom.line;
+                return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} className={`lnk map ${l.status}${l.warn ? " warn" : ""} hl`} onSelect={() => {}} />;
+              }
+              const className = `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""} hl`;
+              return <BundlePath key={b.key} sig="" bundleKey={b.key} geom={geom} className={className} onSelect={() => {}} />;
             })}
         </svg>
       )}

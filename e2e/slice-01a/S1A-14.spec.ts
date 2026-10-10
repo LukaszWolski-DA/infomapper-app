@@ -32,7 +32,13 @@ if (MEASURE) {
   });
 }
 
-const url = canvasUrl(LARGE_IDS.canvas, LARGE_IDS.project, LARGE_IDS.workspace);
+/**
+ * Slice 2c (S2C-12): with `DIAG=collapsed` (measurement build only) every frame is shown collapsed: pan and zoom are
+ * measured with the blocks; the initial render (C-08) waits for every card and is recorded as not applicable. Other
+ * switches leave this spec as it was (it measures the canvas as stored).
+ */
+const COLLAPSED = process.env.DIAG === "collapsed";
+const url = canvasUrl(LARGE_IDS.canvas, LARGE_IDS.project, LARGE_IDS.workspace) + (COLLAPSED ? "?diag=collapsed" : "");
 const OUT = path.resolve("test-results", "S1A-14.json");
 
 async function startRecording(page: Page) {
@@ -130,13 +136,18 @@ test("S1A-14: performance on seed:large, Chrome, same laptop as the spike: pan a
     return { gpu: ext ? gl!.getParameter(ext.UNMASKED_RENDERER_WEBGL) : "unknown", dpr: devicePixelRatio, cores: navigator.hardwareConcurrency };
   });
 
-  // the whole canvas is drawn: every card and line; at the overview zoom cards show a plain block
+  // the whole canvas is drawn: every card and line; at the overview zoom cards show a plain block (with DIAG=collapsed
+  // the 8 frames are blocks instead)
   await open(page);
-  await expect(page.locator(".react-flow__node")).toHaveCount(cards);
-  await expect(page.locator('[data-testid="line-mapping"], [data-testid="line-relationship"]')).toHaveCount(lines);
-  const fitZoom = await zoomOf(page);
-  expect(fitZoom).toBeLessThan(0.4);
-  await expect(page.getByTestId("card-block")).toHaveCount(cards);
+  if (COLLAPSED) {
+    await expect(page.getByTestId("block")).toHaveCount(8);
+  } else {
+    await expect(page.locator(".react-flow__node")).toHaveCount(cards);
+    await expect(page.locator('[data-testid="line-mapping"], [data-testid="line-relationship"]')).toHaveCount(lines);
+    const fitZoom = await zoomOf(page);
+    expect(fitZoom).toBeLessThan(0.4);
+    await expect(page.getByTestId("card-block")).toHaveCount(cards);
+  }
 
   // C-01: pan and zoom, 10 s each, at the overview (fit) and at 100% in the spike's dense area (around src:57)
   const src57 = generate().cards.find((c) => c.id === "src:57")!;
@@ -157,7 +168,7 @@ test("S1A-14: performance on seed:large, Chrome, same laptop as the spike: pan a
   // C-08: navigation start to the first frame with every card shown and every line drawn; one warm-up load (the dev
   // server compiles on first use), then 5 cold loads in fresh browser contexts
   const loads: number[] = [];
-  for (let i = 0; i < 6; i++) {
+  for (let i = 0; i < (COLLAPSED ? 0 : 6); i++) {
     const context = await browser.newContext({ viewport: page.viewportSize() ?? VIEWPORT, storageState: await page.context().storageState() });
     const p = await context.newPage();
     await p.addInitScript(
@@ -181,7 +192,8 @@ test("S1A-14: performance on seed:large, Chrome, same laptop as the spike: pan a
     await context.close();
   }
   const sorted = [...loads].sort((a, b) => a - b);
-  results["C-08"] = { msFromNavigationStart: loads, median: sorted[2], max: sorted[4] };
+  results["C-08"] = COLLAPSED ? { notApplicable: "DIAG=collapsed: every frame is collapsed, its cards are not drawn" } : { msFromNavigationStart: loads, median: sorted[2], max: sorted[4] };
+  if (COLLAPSED) results.diag = "collapsed";
 
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(results, null, 2));

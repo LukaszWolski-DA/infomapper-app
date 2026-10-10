@@ -162,7 +162,9 @@ function summarize(dir: string, s: Sitting) {
       const bar = f.bar === undefined ? "–" : `${f.better === "higher" ? "≥" : "≤"} ${f.bar}${f.unit === "frames" ? "" : ` ${f.unit}`}${f.ab ? ", ≥ −5 % vs reference" : ""}`;
       const cell = (xs: number[], m: number) => (xs.length ? `${fmt(m, f.unit)} (${fmt(Math.min(...xs), f.unit)}–${fmt(Math.max(...xs), f.unit)})` : "–");
       const change = Number.isFinite(diff) && f.unit !== "frames" ? `${diff >= 0 ? "+" : ""}${diff.toFixed(1)} %` : "–";
-      return `| ${f.name} | ${bar} | ${cell(ref, mr)} | ${cell(br, mb)} | ${change} | ${met ? "met" : abOk ? "not met" : "not met (below the reference)"} |`;
+      // under a switch (e.g. DIAG=collapsed) the branch side may not measure a figure: not applicable, not “not met”
+      const result = !br.length ? "not applicable" : met ? "met" : abOk ? "not met" : "not met (below the reference)";
+      return `| ${f.name} | ${bar} | ${cell(ref, mr)} | ${cell(br, mb)} | ${change} | ${result} |`;
     }),
   ].join("\n");
   const summary = { ...s, dropped: [...dropped], table: rows.map((r) => ({ id: r.figure.id, name: r.figure.name, bar: r.figure.bar, reference: r.ref, branch: r.br, referenceMedian: r.mr, branchMedian: r.mb, changePercent: +r.diff.toFixed(1), met: r.met })) };

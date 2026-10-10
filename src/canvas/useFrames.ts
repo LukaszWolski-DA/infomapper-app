@@ -14,10 +14,15 @@
 // - Slice 2b step 3: a drag drop that brings entities into a concept frame of another concept asks once whether to
 //   move them in the model (D-05, D-17); the drop and the answer are saved together. Other moves only mark them.
 //   “Put in a new frame”; the frames as the panels see them (`frameView`, `framesView`, `cardFrame`, `frameAt`).
+// - Slice 2c (D-07): collapsing a frame into one block and expanding it (`setCollapsed`), one undo step each; a collapsed
+//   frame counts by its block, and a drag drop on the block files the card into the frame (layout-plan.ts). “Collapse
+//   all” / “Expand all” (`setAllCollapsed`). Reviewers and readers collapse and expand in their own tab only (item 11,
+//   as the layer mode of slice 2a): the tab keeps an override for each frame they changed, which wins over the saved
+//   state until they leave or reload the canvas; every other frame shows the saved state. Nothing is saved or undone.
 // - Slice 2b step 4: a frame that is part of a selection of several, dragged by its name or an empty spot, moves the
 //   whole selection: every selected frame with its cards and every other selected card (D-17, prototype startGroupDrag).
 
-import { useCallback, useEffect, useRef, useState, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import { applyNodeChanges, useReactFlow, type NodeChange } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
 import {
@@ -27,6 +32,7 @@ import {
   FREE_FRAME_COLORS,
   frameAround,
   isMisplaced,
+  shapeOf,
   NEW_FRAME_NAME,
   NEW_FRAME_SIZE,
   type FrameBox,
@@ -34,9 +40,9 @@ import {
 import type { Frame } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import type { CardData } from "./card-data";
-import type { CardNodeT } from "./CardNode";
+import { cardNodesOf, type CardNodeT } from "./CardNode";
 import type { FramePatch, FrameView, UndoHooks } from "./context";
-import { buildFrames, conceptAsk, frameStats, type ConceptAsk, type FrameData } from "./frame-data";
+import { buildFrames, conceptAsk, frameStats, memberCounts, type ConceptAsk, type FrameData } from "./frame-data";
 import type { FramePart } from "./FrameLayer";
 import { cardHeight, cardWidth, snap8, type Pt, type Rect } from "./geometry";
 import { planLayout, planReframe, type LayoutChange, type PlanCard } from "./layout-plan";
@@ -55,7 +61,13 @@ export interface FrameWrites {
     items: (CardRef & { x?: number; y?: number; width?: number | null; height?: number })[];
     onGrid?: boolean;
     moveToConcepts?: boolean;
+    /** A drag drop: only then may a card join a collapsed frame, by landing on its block (slice 2c). */
+    dragDrop?: boolean;
   }) => Promise<WriteResult<Versions & { movedToConcepts: number }>>;
+  /** Collapses a frame into one block or expands it (slice 2c, D-07). */
+  setFrameCollapsed: (input: { frameId: Uuid; expectedVersion: number; collapsed: boolean }) => Promise<WriteResult<{ frame: Frame }>>;
+  /** “Collapse all” / “Expand all” (slice 2c, item 8): every frame of the canvas, one change. */
+  setAllFramesCollapsed: (input: { frames: { frameId: Uuid; expectedVersion: number }[]; collapsed: boolean }) => Promise<WriteResult<Versions & { frames: number }>>;
   createFrame: (input: { x: number; y: number; width: number; height: number; cards: SizedRef[] }) => Promise<WriteResult<Versions & { frameId: Uuid; claimed: number }>>;
   updateFrame: (input: { frameId: Uuid; expectedVersion: number } & FramePatch) => Promise<WriteResult<{ frame: Frame }>>;
   resizeFrame: (input: { frameId: Uuid; expectedVersion: number; width: number; height: number; cards: CardRef[] }) => Promise<WriteResult<Versions>>;
@@ -85,6 +97,8 @@ export interface SaveLayoutOptions {
 
 interface Options {
   editable: boolean;
+  /** Measurement only (`?diag=collapsed`, S2C-12): every frame shown collapsed, nothing saved. */
+  showAllCollapsed?: boolean;
   initialFrames: readonly FrameData[];
   setNodes: Dispatch<SetStateAction<CardNodeT[]>>;
   patchCard: (id: Uuid, patch: CardPatch) => void;
@@ -121,13 +135,36 @@ const swallowNextClick = () => {
   setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
 };
 
-const boxOf = (f: FrameData): FrameBox => ({ id: f.id, x: f.x, y: f.y, width: f.width, height: f.height });
+/** A frame as the rules see it; a collapsed one counts by its block, whose height needs its member count (slice 2c). */
+const boxOf = (f: FrameData, counts: ReadonlyMap<Uuid, number>): FrameBox => ({
+  id: f.id,
+  x: f.x,
+  y: f.y,
+  width: f.width,
+  height: f.height,
+  collapsed: f.collapsed,
+  members: counts.get(f.id) ?? 0,
+});
 
 export function useFrames(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
   const { editable, setNodes, patchCard, enqueueGroup, versions, pending, select, undo, writes, spaceDown } = o;
-  const [frames, setFrames] = useState<FrameData[]>(() => [...o.initialFrames]);
+  /** The frames as saved (and as an editor changes them). */
+  const [saved, setFrames] = useState<FrameData[]>(() => [...o.initialFrames]);
+  /** Reviewers and readers: the frames collapsed or expanded in this tab only (item 11), by frame id. */
+  const [tabCollapsed, setTabCollapsed] = useState<ReadonlyMap<Uuid, boolean>>(() => new Map());
+  /** The frames as the canvas shows them: the saved ones with this tab's own collapse state. */
+  const { showAllCollapsed } = o;
+  const frames = useMemo(
+    () =>
+      showAllCollapsed
+        ? saved.map((f) => (f.collapsed ? f : { ...f, collapsed: true }))
+        : tabCollapsed.size
+          ? saved.map((f) => (tabCollapsed.has(f.id) && tabCollapsed.get(f.id) !== f.collapsed ? { ...f, collapsed: tabCollapsed.get(f.id)! } : f))
+          : saved,
+    [saved, tabCollapsed, showAllCollapsed],
+  );
   const framesRef = useRef(frames);
   useEffect(() => {
     framesRef.current = frames;
@@ -154,7 +191,12 @@ export function useFrames(o: Options) {
     for (const f of initialFrames) if (!(pending.current.get(f.id) ?? 0)) versions.current.set(f.id, f.version);
   }, [initialFrames, pending, versions]);
 
-  const nodes = useCallback(() => rf.getNodes() as CardNodeT[], [rf]);
+  const nodes = useCallback(() => cardNodesOf(rf), [rf]);
+  /** The frames as the rules see them now (a collapsed one by its block). */
+  const boxes = useCallback((list: readonly FrameData[]) => {
+    const counts = memberCounts(nodes().map((n) => n.data.card));
+    return list.map((f) => boxOf(f, counts));
+  }, [nodes]);
   /** The cards as saved so far (a drag in progress moves only the node, not its data). */
   const planCards = useCallback(
     (from?: ReadonlyMap<Uuid, Pt>): PlanCard[] =>
@@ -180,7 +222,8 @@ export function useFrames(o: Options) {
       const framesBefore = framesRef.current.map((f) => ({ ...f, ...(opts.framesFrom?.get(f.id) ?? {}) }));
       const before = planCards(opts.from);
       const beforeById = new Map(before.map((c) => [c.id, c]));
-      const plan = planLayout(framesBefore.map(boxOf), before, change);
+      // a drag drop may file a card into a collapsed frame by its block (slice 2c)
+      const plan = planLayout(boxes(framesBefore), before, change, { drag: opts.ask });
 
       // at once on the screen
       const cardsBack = new Map<Uuid, CardPatch>();
@@ -257,6 +300,7 @@ export function useFrames(o: Options) {
             }),
             ...(opts.onGrid ? { onGrid: true } : {}),
             ...(moveToConcepts ? { moveToConcepts: true } : {}),
+            ...(opts.ask ? { dragDrop: true } : {}),
           });
         } catch {
           result = FAILED;
@@ -266,6 +310,11 @@ export function useFrames(o: Options) {
           const u = undo();
           u?.noteSaved();
           opts.saved?.();
+          for (const [cardId, frameId] of plan.filed) {
+            const card = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
+            const frame = framesRef.current.find((f) => f.id === frameId);
+            if (card && frame) toast(`${card.name} added to the collapsed frame ${frame.name}.`);
+          }
           if (question) toast(moveToConcepts ? question.moved : question.kept, "info", moveToConcepts && u ? { label: "Undo", run: u.undo } : undefined);
         } else {
           for (const [id, back] of cardsBack) patchCard(id, back);
@@ -274,7 +323,7 @@ export function useFrames(o: Options) {
         }
       });
     },
-    [planCards, rf, patchCard, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast],
+    [planCards, boxes, rf, patchCard, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast],
   );
 
   // ---- dragging a frame, resizing it ----
@@ -437,7 +486,8 @@ export function useFrames(o: Options) {
       const f = framesRef.current.find((x) => x.id === frameId);
       if (!f) return;
       const cards = planCards();
-      const changes = planReframe(framesRef.current.map(boxOf), cards, { ...boxOf(f), width: to.w, height: to.h });
+      const [own] = boxes([f]);
+      const changes = planReframe(boxes(framesRef.current), cards, { ...own!, width: to.w, height: to.h });
       const back = new Map(changes.map((c) => [c.cardId, cards.find((x) => x.id === c.cardId)!.frameId]));
       for (const c of changes) patchCard(c.cardId, { frameId: c.frameId });
       const ids = cards.map((c) => c.id);
@@ -458,7 +508,7 @@ export function useFrames(o: Options) {
         }
       });
     },
-    [planCards, patchCard, enqueueGroup, writes, ver, noteVersions, undo, patchFrames, toast],
+    [planCards, boxes, patchCard, enqueueGroup, writes, ver, noteVersions, undo, patchFrames, toast],
   );
 
   // ---- creating a frame: the Frame tool and “New frame here” ----
@@ -479,7 +529,7 @@ export function useFrames(o: Options) {
       }
       const { frameId, versions: v } = result.value;
       noteVersions(v);
-      const frame: FrameData = { id: frameId, version: v[frameId] ?? 1, name: NEW_FRAME_NAME, kind: "free", conceptId: null, sourceSystemId: null, color: FREE_FRAME_COLORS[0], x: rect.x, y: rect.y, width: rect.w, height: rect.h };
+      const frame: FrameData = { id: frameId, version: v[frameId] ?? 1, name: NEW_FRAME_NAME, kind: "free", conceptId: null, sourceSystemId: null, color: FREE_FRAME_COLORS[0], x: rect.x, y: rect.y, width: rect.w, height: rect.h, collapsed: false };
       setFrames((fs) => (fs.some((f) => f.id === frameId) ? fs : [...fs, frame]));
       for (const id of Object.keys(v)) if (id !== frameId) patchCard(id, { frameId });
       select({ t: "frame", id: frameId });
@@ -597,7 +647,7 @@ export function useFrames(o: Options) {
       const r = frameAround(members.map((n) => ({ x: n.data.card.x, y: n.data.card.y, width: cardWidth(n.data.card), height: cardHeight(n.data.card) })));
       const rect = { id: frameId, x: r.x, y: r.y, width: Math.max(FRAME_MIN_SIZE.width, r.width), height: Math.max(FRAME_MIN_SIZE.height, r.height) };
       const cards = planCards();
-      const changes = planReframe(framesRef.current.map(boxOf), cards, rect);
+      const changes = planReframe(boxes(framesRef.current), cards, rect);
       const back = new Map(changes.map((c) => [c.cardId, cards.find((x) => x.id === c.cardId)!.frameId]));
       patchFrames(new Map([[frameId, rect]]));
       for (const c of changes) patchCard(c.cardId, { frameId: c.frameId });
@@ -619,16 +669,104 @@ export function useFrames(o: Options) {
         }
       });
     },
-    [editable, membersOf, toast, planCards, patchFrames, patchCard, enqueueGroup, writes, ver, noteVersions, undo],
+    [editable, membersOf, toast, planCards, boxes, patchFrames, patchCard, enqueueGroup, writes, ver, noteVersions, undo],
   );
 
   const zoomToFrame = useCallback(
     (frameId: Uuid) => {
       const f = framesRef.current.find((x) => x.id === frameId);
-      // room for the label above it (prototype: 30 px)
-      if (f) void rf.fitBounds({ x: f.x, y: f.y - 30, width: f.width, height: f.height + 30 }, { duration: 250, padding: 0.08 });
+      if (!f) return;
+      // a collapsed frame: its block (slice 2c); else room for the label above it (prototype: 30 px)
+      const [b] = boxes([f]);
+      const r = shapeOf(b!);
+      void rf.fitBounds(f.collapsed ? r : { x: r.x, y: r.y - 30, width: r.width, height: r.height + 30 }, { duration: 250, padding: 0.08 });
     },
-    [rf],
+    [rf, boxes],
+  );
+
+  const collapseToast = useCallback(
+    (name: string, collapsed: boolean) => (collapsed ? `Collapsed ${name}. Its lines are bundled; click a bundle to see what is inside.` : `Expanded ${name}.`),
+    [],
+  );
+  /** Reviewers and readers (item 11): frames shown collapsed or expanded in this tab only. */
+  const setInTab = useCallback((frameIds: readonly Uuid[], collapsed: boolean) => {
+    setTabCollapsed((m) => {
+      const next = new Map(m);
+      for (const id of frameIds) next.set(id, collapsed);
+      return next;
+    });
+  }, []);
+
+  /**
+   * Collapses a frame into one block or expands it (slice 2c, D-07): shown at once, saved as one undo step; for
+   * reviewers and readers in this tab only (item 11).
+   */
+  const setCollapsed = useCallback(
+    (frameId: Uuid, collapsed: boolean) => {
+      const f = framesRef.current.find((x) => x.id === frameId);
+      if (!f || f.collapsed === collapsed) return;
+      if (!editable) {
+        setInTab([frameId], collapsed);
+        toast(collapseToast(f.name, collapsed));
+        return;
+      }
+      patchFrames(new Map([[frameId, { collapsed }]]));
+      enqueueGroup([frameId], async () => {
+        let result: WriteResult<{ frame: Frame }>;
+        try {
+          result = await writes.setFrameCollapsed({ frameId, expectedVersion: ver(frameId), collapsed });
+        } catch {
+          result = FAILED;
+        }
+        if (!result.ok) {
+          patchFrames(new Map([[frameId, { collapsed: !collapsed }]]));
+          toast(result.message, "refusal");
+          return;
+        }
+        versions.current.set(frameId, result.value.frame.version);
+        patchFrames(new Map([[frameId, { version: result.value.frame.version }]]));
+        const u = undo();
+        u?.noteSaved();
+        toast(collapseToast(f.name, collapsed), "info", u ? { label: "Undo", run: u.undo } : undefined);
+      });
+    },
+    [editable, patchFrames, enqueueGroup, writes, ver, versions, undo, toast, setInTab, collapseToast],
+  );
+
+  /** “Collapse all” / “Expand all” (item 8): one undo step; for reviewers and readers in this tab only (item 11). */
+  const setAllCollapsed = useCallback(
+    (collapsed: boolean) => {
+      const all = framesRef.current;
+      if (!all.length) return;
+      const message = collapsed ? "All frames collapsed. Lines between them are bundled." : "All frames expanded.";
+      const changing = all.filter((f) => f.collapsed !== collapsed);
+      if (!editable || !changing.length) {
+        if (!editable) setInTab(all.map((f) => f.id), collapsed);
+        toast(message);
+        return;
+      }
+      patchFrames(new Map(changing.map((f) => [f.id, { collapsed }])));
+      const ids = all.map((f) => f.id);
+      enqueueGroup(ids, async () => {
+        let result: WriteResult<Versions & { frames: number }>;
+        try {
+          result = await writes.setAllFramesCollapsed({ frames: ids.map((id) => ({ frameId: id, expectedVersion: ver(id) })), collapsed });
+        } catch {
+          result = FAILED;
+        }
+        if (!result.ok) {
+          patchFrames(new Map(changing.map((f) => [f.id, { collapsed: !collapsed }])));
+          toast(result.message, "refusal");
+          return;
+        }
+        noteVersions(result.value.versions);
+        patchFrames(new Map(Object.entries(result.value.versions).map(([id, version]) => [id, { version }])));
+        const u = undo();
+        u?.noteSaved();
+        toast(message, "info", u ? { label: "Undo", run: u.undo } : undefined);
+      });
+    },
+    [editable, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast, setInTab],
   );
 
   const { selectCards } = o;
@@ -736,7 +874,11 @@ export function useFrames(o: Options) {
     },
     [rf],
   );
-  const frameAt = useCallback((at: Pt) => smallestFrameAt(framesRef.current, at), []);
+  // a collapsed frame counts by its block (slice 2c)
+  const frameAt = useCallback((at: Pt) => {
+    const counts = memberCounts(nodes().map((n) => n.data.card));
+    return smallestFrameAt(framesRef.current.map((f) => ({ ...f, members: counts.get(f.id) ?? 0 })), at);
+  }, [nodes]);
   const frameRefs = useCallback(() => framesRef.current.map((f) => ({ frameId: f.id, expectedVersion: ver(f.id) })), [ver]);
 
   /** “Put in a new frame” (a selection) or “Put in a new concept / source system frame” (one card). */
@@ -798,5 +940,7 @@ export function useFrames(o: Options) {
     frameAt,
     frameRefs,
     putInNewFrame,
+    setCollapsed,
+    setAllCollapsed,
   };
 }

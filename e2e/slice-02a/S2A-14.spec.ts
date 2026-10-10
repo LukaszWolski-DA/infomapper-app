@@ -15,7 +15,7 @@
 import { seedLargeData } from "../../src/data/local/dev-data";
 import { LARGE_IDS } from "../../src/data/local/seed-large";
 import { E2E_DB } from "../config";
-import { MEASURE, MEASURE_USE, openLarge, saveResults, startRecording, stopRecording } from "../slice-01b/measure";
+import { DIAG, MEASURE, MEASURE_USE, NOT_APPLICABLE, openLarge, saveResults, startRecording, stopRecording } from "../slice-01b/measure";
 import { expect, test, type Page } from "./fixtures";
 import { box, loadItems, signInAs } from "./helpers";
 
@@ -99,6 +99,11 @@ test("S2A-14: on “Performance test”, dragging a group of at least 20 cards a
 });
 
 test("S2A-14: on “Performance test”, the selection marks appear within 100 ms after releasing a lasso around every card at the overview (median of 20)", async ({ page, browser }) => {
+  // the marks of a lasso around the cards: under DIAG=collapsed the cards are hidden in their blocks (S2C-12)
+  if (DIAG === "collapsed") {
+    saveResults("S2A-14-lasso", NOT_APPLICABLE);
+    return;
+  }
   test.setTimeout(MEASURE ? 300_000 : 180_000);
   await seedLargeData(E2E_DB);
   await signInAs(page, "Łukasz");

@@ -24,6 +24,8 @@ export interface ItemBox {
   rect: Rect;
   /** A card's frame (none for a frame, or a card in no frame). */
   frameId?: string | null;
+  /** A card hidden in a collapsed frame (slice 2c): a lasso does not catch it. */
+  hidden?: boolean;
 }
 
 /** The keys a selection holds: several items, one card or frame, or none (a row or a line is not such a selection). */
@@ -77,7 +79,7 @@ const within = (r: Rect, lasso: Rect) => r.x >= lasso.x && r.y >= lasso.y && r.x
 export function lassoHits(items: readonly ItemBox[], lasso: Rect): SelectionKey[] {
   const frames = items.filter((i) => isFrameKey(i.key) && within(i.rect, lasso));
   const caught = new Set(frames.map((f) => f.id));
-  const cards = items.filter((i) => !isFrameKey(i.key) && !(i.frameId && caught.has(i.frameId)) && within(i.rect, lasso));
+  const cards = items.filter((i) => !isFrameKey(i.key) && !i.hidden && !(i.frameId && caught.has(i.frameId)) && within(i.rect, lasso));
   return [...frames, ...cards].map((i) => i.key);
 }
 

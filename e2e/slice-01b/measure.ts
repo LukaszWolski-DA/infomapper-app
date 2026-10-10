@@ -14,10 +14,13 @@ export const MEASURE = !!process.env.MEASURE;
 
 /**
  * Slice 2a's diagnosis: `DIAG=nolines` (no line layer) or `DIAG=blocks` (every card as its below-40 % block); slice
- * 2b's: `DIAG=noframes` (no frame layer) or `DIAG=nolabels` (frames without names and chips). Passed to the canvas as
+ * 2b's: `DIAG=noframes` (no frame layer) or `DIAG=nolabels` (frames without names and chips); slice 2c's:
+ * `DIAG=collapsed` (every frame shown collapsed, nothing saved; S2C-12). Passed to the canvas as
  * `?diag=`. Only the measurement-only production build honours it (MEASURE_BUILD=production).
  */
 export const DIAG = process.env.DIAG ?? "";
+/** Under `DIAG=collapsed` the cards are hidden in their blocks: what needs drawn cards is recorded as not applicable. */
+export const NOT_APPLICABLE = { notApplicable: "DIAG=collapsed: every frame is collapsed, its cards are not drawn" } as const;
 if (DIAG && !E2E_PRODUCTION) throw new Error("DIAG works only with MEASURE_BUILD=production (the measurement-only build).");
 
 /** Headed Google Chrome at the spike's window size, kept drawing while another window is in front. */

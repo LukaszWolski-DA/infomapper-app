@@ -15,7 +15,7 @@ import {
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
 import { buildCards, visibleRows, type CardData } from "./card-data";
-import { besideSpots, cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, newCardHeight, stackSpot, zoomAround } from "./geometry";
+import { besideAnchor, besideSpots, cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, newCardHeight, stackSpot, zoomAround } from "./geometry";
 import { splitName } from "./names";
 
 // Customer (customer_id, email) and CRM customers (cust_id, email, first_name):
@@ -193,6 +193,19 @@ describe("placing new cards (prototype placeNear, createEntity)", () => {
     }
     expect(spots[0]!.y).toBeGreaterThanOrEqual(180 + 200 + 24);
     expect(besideSpots(anchor, "right", [150], [anchor])).toEqual([{ x: 1000 + 256 + 160, y: 200 }]);
+  });
+
+  it("places cards beside the block of a collapsed frame when the card is hidden in it, never on the block (slice 2c, decision (ii))", () => {
+    const hidden = { x: 1400, y: 600, w: 256, h: 300 }; // its stored place, inside the frame's expanded area
+    const block = { x: 1000, y: 200, w: 280, h: 140 };
+    expect(besideAnchor(hidden, null)).toBe(hidden);
+    const a = besideAnchor(hidden, block);
+    expect(a).toBe(block);
+    const right = besideSpots(a, "right", [150, 150], [block]);
+    expect(right[0]).toEqual({ x: 1000 + 280 + 160, y: 200 });
+    const left = besideSpots(a, "left", [150], [block]);
+    expect(left[0]).toEqual({ x: 1000 - 256 - 160, y: 200 });
+    for (const s of [...right, ...left]) expect(s.x + 256 <= block.x || s.x >= block.x + block.w).toBe(true);
   });
 
   it("sizes a new card by its rows", () => {

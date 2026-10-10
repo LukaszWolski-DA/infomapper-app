@@ -205,6 +205,7 @@ export function useCanvasModes(editable: boolean) {
       if (el.closest(".overview, .react-flow__panel")) return;
       const mappingId = el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
       const relationshipId = el.closest<SVGElement>("[data-relationship]")?.dataset.relationship;
+      const bundleKey = el.closest<SVGElement>("[data-bundle]")?.dataset.bundle;
       const cardId = el.closest<HTMLElement>("[data-card]")?.dataset.card;
       const rowId = cardId ? el.closest<HTMLElement>(".row[data-row]")?.dataset.row : undefined;
       const frameId = cardId ? undefined : el.closest<HTMLElement>("[data-frame]")?.dataset.frame;
@@ -212,6 +213,10 @@ export function useCanvasModes(editable: boolean) {
       if (mappingId) {
         target = { kind: "map", mappingId };
         select({ t: "map", id: mappingId });
+      } else if (bundleKey) {
+        // a bundle of lines at a collapsed frame (slice 2c, prototype ctxFor “bundle”)
+        target = { kind: "bundle", key: bundleKey };
+        select({ t: "bundle", id: bundleKey });
       } else if (relationshipId) {
         target = { kind: "rel", relationshipId };
         select({ t: "rel", id: relationshipId });

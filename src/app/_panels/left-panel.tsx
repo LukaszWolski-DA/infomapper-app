@@ -503,7 +503,7 @@ function TreeItem({
   onClick: () => void;
 }) {
   const onDragStart = (e: DragEvent) => {
-    e.dataTransfer.setData(CARD_DRAG_TYPE, JSON.stringify(dragData));
+    e.dataTransfer.setData(CARD_DRAG_TYPE, JSON.stringify({ ...dragData, name }));
     e.dataTransfer.effectAllowed = "copy";
   };
   const dot =

@@ -11,7 +11,8 @@
 // - Delete on a selected mapping or relationship line: deleted at once, with Undo in the toast (slice 1b).
 // - “Show its sources” and “Show the entities it feeds” place them beside the card (B-08).
 // - Frames (slice 2b): “New frame here” on the empty canvas; a frame's toolbox (Rename…, Fit frame to its content,
-//   Select its cards, Zoom to frame, Delete frame); a new frame's name is ready to type in the panel.
+//   Select its cards, Zoom to frame, Delete frame); a new frame's name is ready to type in the panel. Slice 2c:
+//   “Collapse into one block” or “Expand”; a collapsed frame offers no fit and “Select its cards” is disabled.
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
@@ -372,13 +373,31 @@ export function useCanvasHost({
       const view = ui.frameView(t.frameId);
       if (!view) return items;
       items.push({ head: view.frame.name });
+      const collapsed = view.frame.collapsed;
       if (editable) items.push({ label: "Rename…", act: () => focusField("f-fn"), testId: "toolbox-frame-rename" });
-      if (editable) items.push({ label: "Fit frame to its content", act: () => ui.fitFrame(t.frameId), testId: "toolbox-frame-fit" });
-      items.push({ label: "Select its cards", disabled: !view.cardIds.length, act: () => ui.selectFrameCards(t.frameId), testId: "toolbox-frame-select-cards" });
+      // slice 2c (D-07): collapse into one block or expand, for every role (reviewers and readers in their own tab
+      // only, item 11); a block offers no fit, and its cards are not selectable
+      items.push({ label: collapsed ? "Expand" : "Collapse into one block", act: () => ui.setFrameCollapsed(t.frameId, !collapsed), testId: "toolbox-frame-collapse" });
+      if (editable && !collapsed) items.push({ label: "Fit frame to its content", act: () => ui.fitFrame(t.frameId), testId: "toolbox-frame-fit" });
+      items.push({ label: "Select its cards", disabled: collapsed || !view.cardIds.length, act: () => ui.selectFrameCards(t.frameId), testId: "toolbox-frame-select-cards" });
       items.push({ label: "Zoom to frame", act: () => ui.zoomToFrame(t.frameId), testId: "toolbox-frame-zoom" });
       if (editable) {
         items.push({ sep: true });
         items.push({ label: "Delete frame (keeps its cards)", kbd: "Del", danger: true, act: () => ui.deleteFrame(t.frameId), testId: "toolbox-frame-delete" });
+      }
+      return items;
+    }
+    if (t.kind === "bundle") {
+      // a bundle of lines at a collapsed frame (slice 2c, prototype ctxFor “bundle”)
+      const b = ui.bundleView(t.key);
+      if (!b) return items;
+      items.push({ head: `${b.ids.length} bundled ${b.t === "rel" ? "relationships" : "mappings"}` });
+      items.push({ label: "Show what is inside", act: () => ui.select({ t: "bundle", id: b.key }), testId: "toolbox-bundle-show" });
+      // every role: reviewers and readers expand in their own tab only (item 11)
+      for (const e of [b.a, b.z]) {
+        if (!("frameId" in e)) continue;
+        const name = ui.frameView(e.frameId)?.frame.name ?? "?";
+        items.push({ label: `Expand ${name}`, act: () => ui.setFrameCollapsed(e.frameId, false), testId: "toolbox-bundle-expand" });
       }
       return items;
     }

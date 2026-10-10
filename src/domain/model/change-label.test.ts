@@ -79,6 +79,15 @@ describe("change labels for frames (slice 2b)", () => {
     );
   });
 
+  it("names collapsing and expanding, one frame or all (slice 2c)", () => {
+    expect(changeLabel(events([update("frame", frame(), { collapsed: true })]))).toBe("Collapse frame");
+    expect(changeLabel(events([update("frame", frame(ids.frameA, { collapsed: true }), { collapsed: false })]))).toBe("Expand frame");
+    expect(changeLabel(events([update("frame", frame(), { collapsed: true }), update("frame", frame(ids.frameB), { collapsed: true })]))).toBe("Collapse all frames");
+    expect(
+      changeLabel(events([update("frame", frame(ids.frameA, { collapsed: true }), { collapsed: false }), update("frame", frame(ids.frameB, { collapsed: true }), { collapsed: false })])),
+    ).toBe("Expand all frames");
+  });
+
   it("finds the canvas of a frame step", () => {
     expect(changeCanvasId(events([update("frame", frame(), { name: "Orders" })]))).toBe(ids.canvas1);
   });

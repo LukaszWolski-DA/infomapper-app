@@ -24,6 +24,8 @@ import {
   moveOnCanvas,
   putCardsInNewFrame,
   resizeFrame,
+  setAllFramesCollapsed,
+  setFrameCollapsed,
   updateFrame,
 } from "./frame";
 import { revertChangeGroup, type WorkspaceRows } from "./undo";
@@ -484,6 +486,106 @@ describe("frame writes and roles (item 19)", () => {
   });
 });
 
+// ---- collapsed frames (slice 2c, D-07) ----
+
+describe("setFrameCollapsed", () => {
+  const set = (collapsed: boolean, f: Frame = frame(frameA), role: "modeler" | "reviewer" | "reader" = "modeler", ws = {}) =>
+    setFrameCollapsed(makeCtx(), access(role, ws), { frame: f }, { frameId: frameA, expectedVersion: f.version, collapsed });
+
+  it("collapses a frame and expands it again; nothing else is written", () => {
+    const collapsed = ok(set(true));
+    expect(collapsed.writeSet.writes).toHaveLength(1);
+    expect(collapsed.value.frame).toMatchObject({ collapsed: true, version: 2, x: 0, y: 0, width: 800, height: 600 });
+    expect(collapsed.writeSet.events[0]).toMatchObject({ object_type: "frame", operation: "update" });
+    expect(ok(set(false, frame(frameA, { collapsed: true }))).value.frame).toMatchObject({ collapsed: false });
+  });
+
+  it("refuses nothing to change, a stale version, a deleted frame, reviewers, readers and an archived workspace", () => {
+    expect(set(false)).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(setFrameCollapsed(makeCtx(), access("modeler"), { frame: frame(frameA) }, { frameId: frameA, expectedVersion: 7, collapsed: true })).toMatchObject(refusedAsStale);
+    expect(set(true, frame(frameA, { deleted_at: NOW }))).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(set(true, frame(frameA), "reviewer")).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(set(true, frame(frameA), "reader")).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(set(true, frame(frameA), "modeler", archived)).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
+
+describe("setAllFramesCollapsed", () => {
+  const fA = frame(frameA), fB = frame(frameB, { collapsed: true, x: 1000 });
+  const gone = frame("01900000-0000-7000-8000-00000000f0ff", { deleted_at: NOW });
+  const state = { canvas: canvas(), frames: [fA, fB, gone], items: [] };
+  const all = (collapsed: boolean, frames = [fref(fA), fref(fB)], role: "modeler" | "reviewer" = "modeler") =>
+    setAllFramesCollapsed(makeCtx(), access(role), state, { canvasId: canvas1, frames, collapsed });
+
+  it("collapses every live frame of the canvas in one change group, leaving those already collapsed", () => {
+    const r = ok(all(true));
+    expect(r.value.frames).toBe(1);
+    expect(written(r.writeSet)[`frame:${frameA}`]).toMatchObject({ collapsed: true });
+    expect(written(r.writeSet)[`frame:${frameB}`]).toBeUndefined();
+    const expanded = ok(all(false));
+    expect(expanded.value.frames).toBe(1);
+    expect(written(expanded.writeSet)[`frame:${frameB}`]).toMatchObject({ collapsed: false });
+  });
+
+  it("needs every frame it changes at the version the user saw, and refuses reviewers", () => {
+    expect(all(true, [fref(fB)])).toMatchObject(refusedAsStale);
+    expect(all(true, undefined, "reviewer")).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(setAllFramesCollapsed(makeCtx(), access("modeler"), { ...state, frames: [fB] }, { canvasId: canvas1, frames: [fref(fB)], collapsed: true })).toMatchObject({
+      ok: false,
+      error: { message: "Nothing to change." },
+    });
+  });
+});
+
+describe("collapsed frames and the other frame commands (slice 2c)", () => {
+  // a collapsed concept frame (Sales) with one member; its block is 280 × blockHeight(1) = 118 at (0, 0)
+  const sales = frame(frameA, { kind: "concept", concept_id: conceptSales, name: "Sales", color: null, x: 0, y: 0, width: 800, height: 386, collapsed: true });
+  const member = orderCard({ x: 100, y: 100, frame_id: frameA });
+  const loose = customerCard({ x: 2000, y: 0 });
+  const state = { canvas: canvas(), frames: [sales], items: [member, loose], entities: model.entities, concepts: model.concepts };
+  const drop = (at: { x: number; y: number }, extra: object = {}) =>
+    moveOnCanvas(makeCtx(), access("modeler"), state, { canvasId: canvas1, frames: [fref(sales)], items: [{ ...sized(loose), ...at }], ...extra });
+
+  it("a drag drop on the block files the card at the frame's bottom (snapped), grows the frame and asks the concept question", () => {
+    const r = ok(drop({ x: 20, y: 10 }, { dragDrop: true }));
+    const rows = written(r.writeSet);
+    expect(rows[`canvas_item:${itemCustomer}`]).toMatchObject({ x: 32, y: 376, frame_id: frameA }); // 386 − 8 = 378 → 376
+    expect(rows[`frame:${frameA}`]).toMatchObject({ height: 376 + 200 + 24, collapsed: true });
+    expect(r.value.questions).toEqual([{ cardId: itemCustomer, entityId: customer, conceptId: conceptSales }]);
+  });
+
+  it("without a drag drop (nudge, align, line up) a card on the block does not join, and the frame's hidden area takes nothing", () => {
+    expect(written(ok(drop({ x: 20, y: 10 })).writeSet)[`canvas_item:${itemCustomer}`]).toMatchObject({ x: 20, y: 10, frame_id: null });
+    expect(written(ok(drop({ x: 400, y: 200 }, { dragDrop: true })).writeSet)[`canvas_item:${itemCustomer}`]).toMatchObject({ x: 400, frame_id: null });
+  });
+
+  it("moving the collapsed frame carries its hidden cards", () => {
+    const r = ok(moveOnCanvas(makeCtx(), access("modeler"), state, { canvasId: canvas1, frames: [{ ...fref(sales), x: 80, y: 40 }], items: [ref(member)] }));
+    expect(written(r.writeSet)[`canvas_item:${itemOrder}`]).toMatchObject({ x: 180, y: 140, frame_id: frameA });
+  });
+
+  it("resizing and fitting are refused while the frame is collapsed", () => {
+    const msg = { ok: false, error: { code: "invalid", message: "Expand the frame first." } };
+    expect(resizeFrame(makeCtx(), access("modeler"), state, { frameId: frameA, expectedVersion: 1, width: 900, height: 400, cards: [ref(member), ref(loose)] })).toMatchObject(msg);
+    expect(fitFrameToContent(makeCtx(), access("modeler"), state, { frameId: frameA, expectedVersion: 1, cards: [sized(member), sized(loose)] })).toMatchObject(msg);
+  });
+
+  it("“Arrange into frames” rebuilds concept and source frames expanded; a collapsed free frame keeps its state (assumption)", () => {
+    const freeCollapsed = frame(frameB, { name: "Notes", x: 5000, y: 5000, collapsed: true });
+    const r = ok(
+      arrangeCanvasIntoFrames(makeCtx(), access("modeler"), { ...state, frames: [sales, freeCollapsed], ...model }, {
+        canvasId: canvas1,
+        frames: [fref(sales), fref(freeCollapsed)],
+        cards: [sized(member), sized(loose)],
+      }),
+    );
+    const built = r.writeSet.writes.filter((w) => w.kind === "insert" && w.table === "frame").map((w) => (w.kind === "insert" ? (w.row as Frame) : null)!);
+    expect(built.length).toBeGreaterThan(0);
+    expect(built.every((f) => f.collapsed === false)).toBe(true);
+    expect(written(r.writeSet)[`frame:${frameB}`]).toBeUndefined();
+  });
+});
+
 // ---- undo (AD-13): one step restores a frame and its cards together ----
 
 type Rows = { -readonly [T in keyof WorkspaceRows]: WorkspaceRows[T][number][] };
@@ -527,6 +629,14 @@ const undo = (rows: Rows, ws: WriteSet) => {
 };
 
 describe("undo of frame steps", () => {
+  it("one undo step expands a collapsed frame again (slice 2c)", () => {
+    const fA = frame(frameA);
+    const before = rowsOf([], [fA]);
+    const collapsed = ok(setFrameCollapsed(makeCtx(), access("modeler"), { frame: fA }, { frameId: frameA, expectedVersion: 1, collapsed: true }));
+    const after = undo(apply(before, collapsed.writeSet), collapsed.writeSet);
+    expect(after.frame[0]).toMatchObject({ collapsed: false });
+  });
+
   it("takes a drawn frame away and frees the cards it took", () => {
     const before = rowsOf([customerCard()], []);
     const created = ok(createFrame(makeCtx(), access("modeler"), { canvas: canvas(), frames: [], items: before.canvas_item }, { canvasId: canvas1, x: 0, y: 0, width: 800, height: 600, cards: [sized(customerCard())] }));

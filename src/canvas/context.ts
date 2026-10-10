@@ -1,10 +1,11 @@
 "use client";
 
-import { createContext } from "react";
+import { createContext, type PointerEvent as ReactPointerEvent } from "react";
 import type { Uuid } from "@/domain/ids";
 import type { ArrangeMode } from "./arrange";
 import type { FrameData, FrameStats } from "./frame-data";
 import type { Selection } from "./line-data";
+import type { Bundle } from "./line-geometry";
 
 /** What the card nodes may do and see; kept in a context so node data stays plain and memo-friendly. */
 export interface CanvasCardsApi {
@@ -20,6 +21,12 @@ export interface CanvasCardsApi {
   fitWidth: (cardId: string) => void;
   /** Shift+click on a card: in or out of the selection (slice 2a). */
   toggleCard: (cardId: string) => void;
+  /** Collapsed frames (slice 2c): the block's header is pressed (the frame's own press: move, select, Shift+click). */
+  framePress: (e: ReactPointerEvent, frameId: string) => void;
+  /** Collapse or expand a frame. */
+  setFrameCollapsed: (frameId: string, collapsed: boolean) => void;
+  /** A card row of a block: expand the frame and select that card. */
+  openMember: (frameId: string, cardId: string) => void;
 }
 
 const noop = () => {};
@@ -32,11 +39,14 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
   startRelate: noop,
   fitWidth: noop,
   toggleCard: noop,
+  framePress: noop,
+  setFrameCollapsed: noop,
+  openMember: noop,
 });
 
 /**
  * Measurement-only switches (slice 2a diagnosis, AD-31): only the measurement-only production build passes them, from
- * `?diag=nolines`, `?diag=blocks`, `?diag=noframes` or `?diag=nolabels`. Users never see them.
+ * `?diag=nolines`, `?diag=blocks`, `?diag=noframes`, `?diag=nolabels` or `?diag=collapsed`. Users never see them.
  */
 export interface Diagnosis {
   /** No line layer at all. */
@@ -47,6 +57,8 @@ export interface Diagnosis {
   noFrames?: boolean;
   /** Frames without their names and chips (slice 2b, S2B-14). */
   noLabels?: boolean;
+  /** Every frame shown collapsed, nothing saved (slice 2c, S2C-12). */
+  collapsed?: boolean;
 }
 export const DiagnosisCtx = createContext<Diagnosis>({});
 
@@ -123,6 +135,15 @@ export interface CanvasHandle {
   zoomToFrame: (frameId: Uuid) => void;
   /** Selects the frame's cards (toolbox “Select its cards”). */
   selectFrameCards: (frameId: Uuid) => void;
+  /**
+   * Collapses a frame into one block or expands it (slice 2c, D-07). Editors save it; reviewers and readers change only
+   * what their own tab shows (item 11).
+   */
+  setFrameCollapsed: (frameId: Uuid, collapsed: boolean) => void;
+  /** “Collapse all” / “Expand all” (canvas overview), saved or in this tab only, as one frame. */
+  setAllFramesCollapsed: (collapsed: boolean) => void;
+  /** A bundle of lines at a collapsed frame as the canvas draws it now (slice 2c, the bundle panel). */
+  bundleView: (key: string) => Bundle | null;
 }
 
 /** A card in a frame, for the frame panel. */
@@ -173,7 +194,9 @@ export type ToolboxTarget =
   | { kind: "map"; mappingId: Uuid }
   | { kind: "rel"; relationshipId: Uuid }
   /** A frame's name, handle or an empty spot inside it (slice 2b). */
-  | { kind: "frame"; frameId: Uuid };
+  | { kind: "frame"; frameId: Uuid }
+  /** A bundle of lines at a collapsed frame (slice 2c). */
+  | { kind: "bundle"; key: string };
 
 export interface ToolboxRequest {
   target: ToolboxTarget;
@@ -283,6 +306,9 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   fitFrame: noop,
   zoomToFrame: noop,
   selectFrameCards: noop,
+  setFrameCollapsed: noop,
+  setAllFramesCollapsed: noop,
+  bundleView: () => null,
   registerCanvas: noop,
   mode: null,
   setMode: noop,

@@ -7,6 +7,8 @@ import {
   moveOnCanvasAction,
   putInNewFrameAction,
   resizeFrameAction,
+  setAllFramesCollapsedAction,
+  setFrameCollapsedAction,
   updateFrameAction,
 } from "@/app/_actions/frame";
 import { saveCanvasLookAction } from "@/app/_actions/canvas";
@@ -167,9 +169,12 @@ export default async function CanvasPage({
                 deleteFrame: deleteFrameAction.bind(null, ws),
                 putInNewFrame: putInNewFrameAction.bind(null, ws, canvasId),
                 arrangeIntoFrames: arrangeIntoFramesAction.bind(null, ws, canvasId),
+                setFrameCollapsed: setFrameCollapsedAction.bind(null, ws),
+                setAllFramesCollapsed: setAllFramesCollapsedAction.bind(null, ws, canvasId),
               }}
+              entityConcepts={Object.fromEntries(model.entities.map((e) => [e.id, e.concept_id]))}
               focusCardId={focusCardId}
-              diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks"), noFrames: diag.includes("noframes"), noLabels: diag.includes("nolabels") } : undefined}
+              diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks"), noFrames: diag.includes("noframes"), noLabels: diag.includes("nolabels"), collapsed: diag.includes("collapsed") } : undefined}
             />
           </AppShell>
         </UndoProvider>

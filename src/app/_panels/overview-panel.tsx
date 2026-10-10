@@ -3,7 +3,7 @@
 // The right panel when nothing is selected (prototype insOverview, the parts of slice 1a): what is on this canvas,
 // mapping coverage per entity, and the mappings with a type problem to look at. Slice 2a: the canvas's look
 // (background and grid) for those who may change it. Slice 2b: the frames on this canvas, each a link, and “Arrange
-// into frames by concept and system”.
+// into frames by concept and system”. Slice 2c: “Collapse all” and “Expand all” when the canvas has frames.
 
 import { useContext } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
@@ -100,11 +100,24 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
             No frames yet. Draw one with the Frame tool (<kbd>A</kbd>), or let the canvas arrange itself.
           </p>
         )}
-        {p.editable && (
+        {(frames.length > 0 || p.editable) && (
           <Actions>
-            <button type="button" className={smallButtonClass} onClick={() => ui.arrangeIntoFrames()} data-testid="button-arrange-frames">
-              Arrange into frames by concept and system
-            </button>
+            {/* slice 2c, item 8: every role (reviewers and readers in their own tab only, item 11) */}
+            {frames.length > 0 && (
+              <>
+                <button type="button" className={smallButtonClass} onClick={() => ui.setAllFramesCollapsed(true)} data-testid="button-frames-collapse-all">
+                  Collapse all
+                </button>
+                <button type="button" className={smallButtonClass} onClick={() => ui.setAllFramesCollapsed(false)} data-testid="button-frames-expand-all">
+                  Expand all
+                </button>
+              </>
+            )}
+            {p.editable && (
+              <button type="button" className={smallButtonClass} onClick={() => ui.arrangeIntoFrames()} data-testid="button-arrange-frames">
+                Arrange into frames by concept and system
+              </button>
+            )}
           </Actions>
         )}
       </Fold>
