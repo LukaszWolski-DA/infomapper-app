@@ -372,7 +372,7 @@ export interface MergeMappingsState {
   mappings: readonly Mapping[];
   /** Their inputs. */
   inputs: readonly MappingInput[];
-  /** The workspace's label links: those on the mappings that go are soft-deleted with them (slice 3a, as the prototype drops them). */
+  /** The workspace's label links: those on the mappings that go move to the mapping that stays (slice 3a). */
   labelLinks?: readonly LabelLink[];
 }
 
@@ -380,8 +380,9 @@ export interface MergeMappingsState {
  * “Merge mappings”: mappings of one attribute become one transform. The first selected mapping keeps its id and
  * note and receives all inputs in order (its own first, then each other mapping's, in the order selected); a column
  * that is already an input is not added twice. The others are deleted. The result is a transform with the given
- * rule (required) and status “review”, whatever the statuses were; the labels of the deleted ones go with them (as
- * in the prototype). One change group.
+ * rule (required) and status “review”, whatever the statuses were. The labels of the deleted ones move to the
+ * mapping that stays, without a second link for a label it already has (slice 3a, Łukasz's decision after step 1;
+ * the prototype drops them). One change group.
  */
 export function mergeMappings(
   ctx: CommandContext,
@@ -424,6 +425,14 @@ export function mergeMappings(
   const shape = checkMappingShape(row.kind, row.rule_expression, columns.size);
   if (shape) return fail(shape);
   writes.push(...others.map((m) => softDelete(ctx, "mapping", m)));
-  writes.push(...softDeleteLinks(ctx, linksOnItems(state.labelLinks, others.map((m) => ({ kind: "mapping" as const, id: m.id })))));
+  const kept = new Set(linksOnItems(state.labelLinks, [{ kind: "mapping", id: target.id }]).map((k) => k.label_id));
+  for (const k of linksOnItems(state.labelLinks, others.map((m) => ({ kind: "mapping" as const, id: m.id })))) {
+    if (kept.has(k.label_id)) {
+      writes.push(softDelete(ctx, "label_link", k));
+    } else {
+      kept.add(k.label_id);
+      writes.push({ kind: "update", table: "label_link", before: k, row: nextVersion(ctx, k, { mapping_id: target.id }) });
+    }
+  }
   return done(ctx, access, { mapping: row }, writes);
 }

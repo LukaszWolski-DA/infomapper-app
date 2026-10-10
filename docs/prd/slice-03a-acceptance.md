@@ -53,8 +53,9 @@ newest release, with `@boundaries/elements` 3.1.1 pinning `handlebars` 4.7.9. No
    table deleted) or a pinned frame is deleted (also by “Arrange into frames”), the note stays as a free note at its
    place and in no frame, as the prototype's `renderNotes`. Only “Unpin (make it a free note)” puts it into the frame
    it is in, as the prototype's `unpinNote`. Free notes in a deleted frame stay where they are, in no frame.
-4. **Merging mappings drops the labels of the mappings that go** (soft-deleted in the merge's change group), as the
-   prototype drops links to missing items. The kept mapping keeps its own labels.
+4. **Merging mappings moves the labels of the mappings that go to the mapping that stays** (Łukasz's decision after
+   step 1; neither the PRD nor the prototype, which drops them): the union of their labels, no second link for a label
+   it already has (such a link is soft-deleted), in the merge's change group, one undo step.
 5. **Deleting a canvas soft-deletes its notes** in the same change group. No label link changes: labels mark model
    items, not canvases.
 6. **Removing a label from its last item keeps the label** (as in the prototype); it shows “Not used anywhere yet.”

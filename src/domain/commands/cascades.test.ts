@@ -32,6 +32,7 @@ import { removeCanvasItems } from "./canvas-item";
 import { arrangeCanvasIntoFrames, deleteFrame } from "./frame";
 import { deleteMapping, mergeMappings } from "./mapping";
 import { deleteSourceTable } from "./source";
+import { isUndoable } from "./undo";
 
 const { canvas1, frameA, itemCustomer, itemCrmCustomer, noteFree, notePinned, linkCustomer, linkEmail, linkMapping, linkTable } = ids;
 const modeler = access("modeler");
@@ -61,19 +62,41 @@ describe("deleting model items takes their label links with them (D-47)", () => 
     expect(changeLabel(ws.events)).toBe("Delete mapping");
   });
 
-  it("a merge: the links on the mappings that go, as the prototype drops them; the kept mapping keeps its own", () => {
+  it("a merge: the labels of the mappings that go move to the one that stays, without a second link for the same label (Łukasz, after step 1)", () => {
     const other = mapping({ id: secondMapping });
+    const third = "01900000-0000-7000-8000-00000000a003";
     const input2 = mappingInput("01900000-0000-7000-8000-00000000b002", { mapping_id: secondMapping, source_column_id: ids.colFirstName });
-    const onOther = labelLink("01900000-0000-7000-8000-00000000a206", { entity_id: null, mapping_id: secondMapping });
+    const input3 = mappingInput("01900000-0000-7000-8000-00000000b003", { mapping_id: third, source_column_id: ids.colCustId });
+    // CR-23 is on the kept mapping and on the second; JIRA-481 on the second and the third
+    const cr23OnSecond = labelLink("01900000-0000-7000-8000-00000000a206", { entity_id: null, mapping_id: secondMapping });
+    const jiraOnSecond = labelLink("01900000-0000-7000-8000-00000000a207", { entity_id: null, label_id: ids.labelJira, mapping_id: secondMapping });
+    const jiraOnThird = labelLink("01900000-0000-7000-8000-00000000a208", { entity_id: null, label_id: ids.labelJira, mapping_id: third });
     const ws = ok(
       mergeMappings(
         makeCtx(),
         modeler,
-        { mappings: [mapping(), other], inputs: [mappingInput(), input2], labelLinks: [...links, onOther] },
-        { mappings: [{ mappingId: ids.mapEmail, expectedVersion: 1 }, { mappingId: secondMapping, expectedVersion: 1 }], ruleExpression: "coalesce(a, b)" },
+        {
+          mappings: [mapping(), other, mapping({ id: third })],
+          inputs: [mappingInput(), input2, input3],
+          labelLinks: [...links, cr23OnSecond, jiraOnSecond, jiraOnThird],
+        },
+        {
+          mappings: [
+            { mappingId: ids.mapEmail, expectedVersion: 1 },
+            { mappingId: secondMapping, expectedVersion: 1 },
+            { mappingId: third, expectedVersion: 1 },
+          ],
+          ruleExpression: "coalesce(a, b, c)",
+        },
       ),
     );
-    expect(rowsOf(ws, "label_link")).toMatchObject([{ id: onOther.id, deleted_at: NOW }]);
+    expect(rowsOf(ws, "label_link")).toMatchObject([
+      { id: cr23OnSecond.id, deleted_at: NOW },
+      { id: jiraOnSecond.id, mapping_id: ids.mapEmail, deleted_at: null, version: 2 },
+      { id: jiraOnThird.id, deleted_at: NOW },
+    ]);
+    expect(new Set(ws.events.map((e) => e.change_group_id)).size).toBe(1);
+    expect(isUndoable(ws.events)).toBe(true);
     expect(changeLabel(ws.events)).toBe("Merge mappings");
   });
 
