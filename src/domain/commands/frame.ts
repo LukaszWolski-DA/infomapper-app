@@ -27,9 +27,10 @@ import {
   type Rect,
 } from "../model/frames";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
-import { FRAME_KINDS, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type SourceSystem, type SourceTable } from "../types";
+import { FRAME_KINDS, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type Note, type SourceSystem, type SourceTable } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { GRID, widthSchema } from "./canvas-item";
+import { releaseNotes } from "./note";
 import { begin, current, done, isLive, nothingToChange } from "./shared";
 
 // ---- input pieces ----
@@ -68,6 +69,8 @@ export interface FrameCanvasState {
   canvas: Canvas | null;
   frames: readonly Frame[];
   items: readonly CanvasItem[];
+  /** The canvas's notes (slice 3a): notes on a deleted frame become free notes, free notes in it leave it. */
+  notes?: readonly Note[];
 }
 
 /** The model rows a command needs to tell what cards show and to name frames. */
@@ -602,7 +605,10 @@ export function setAllFramesCollapsed(
 const deleteInput = z.object({ frameId: uuidSchema, expectedVersion: versionSchema, cards: cardRefs }).strict();
 export type DeleteFrameInput = z.input<typeof deleteInput>;
 
-/** Deletes a frame; its cards stay where they are and belong to no frame. `cards` are its cards as the user read them. */
+/**
+ * Deletes a frame; its cards stay where they are and belong to no frame. `cards` are its cards as the user read them.
+ * Notes pinned to it become free notes at their place; free notes in it stay where they are, in no frame (slice 3a).
+ */
 export function deleteFrame(
   ctx: CommandContext,
   access: WorkspaceAccess,
@@ -627,7 +633,8 @@ export function deleteFrame(
   }
   const committed = commit(ctx, draft, seen([{ frameId, expectedVersion }], cards));
   if (!committed.ok) return fail(committed.error);
-  return done(ctx, access, { name: got.row.name, released }, committed.writes);
+  const notes = releaseNotes(ctx, state.notes, { items: [...draft.originalItems.values()], frames: [...draft.originalFrames.values()] }, { frameIds: [frameId] });
+  return done(ctx, access, { name: got.row.name, released }, [...committed.writes, ...notes]);
 }
 
 // ---- put cards in a new frame (group toolbox, selection panel, card panel) ----
@@ -706,6 +713,7 @@ const byName = <R extends { name: string }>(a: R, b: R) => a.name.localeCompare(
  * and built again: the tables grouped by system on the left, the entities grouped by concept on the right, in the left
  * panel's order (systems by name, tables by `database.schema` group then name; concepts in panel order, entities by
  * name). Every card ends up in its new frame, also cards that were in a free frame. `cards` must be every card of the canvas with its height; `frames` every frame.
+ * Notes on the deleted frames become free notes at their place, and free notes in them leave them (slice 3a).
  */
 export function arrangeCanvasIntoFrames(
   ctx: CommandContext,
@@ -761,7 +769,8 @@ export function arrangeCanvasIntoFrames(
   const layout = arrangeIntoFrames(systemGroups, conceptGroups);
   if (!layout.frames.length) return fail(domainError("invalid", "There is nothing on this canvas to arrange."));
 
-  for (const f of liveFrames(draft)) if (f.kind !== "free") f.deleted_at = ctx.now;
+  const rebuilt = liveFrames(draft).filter((f) => f.kind !== "free");
+  for (const f of rebuilt) f.deleted_at = ctx.now;
   for (const card of placed) card.frame_id = null;
   const names = new Map([...systemGroups, ...conceptGroups].map((g) => [g.refId, g.name]));
   for (const f of layout.frames) {
@@ -778,11 +787,17 @@ export function arrangeCanvasIntoFrames(
 
   const committed = commit(ctx, draft, seen(frames, cards));
   if (!committed.ok) return fail(committed.error);
+  const notes = releaseNotes(
+    ctx,
+    state.notes,
+    { items: [...draft.originalItems.values()], frames: [...draft.originalFrames.values()] },
+    { frameIds: rebuilt.map((f) => f.id) },
+  );
   const value = {
     frames: layout.frames.length,
     versions: committed.versions,
     built: draft.added,
     cards: placed.map((c) => ({ id: c.id, x: c.x, y: c.y, frameId: c.frame_id })),
   };
-  return done(ctx, access, value, committed.writes);
+  return done(ctx, access, value, [...committed.writes, ...notes]);
 }

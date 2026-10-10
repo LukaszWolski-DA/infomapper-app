@@ -43,6 +43,19 @@ export function createLocalDataStore(file: string): DataStore {
     );
   };
 
+  /** Live label links whose label and item are live too (the domain deletes links with their items; this is a guard). */
+  const liveLabelLinks = (db: Readonly<DevDb>, workspaceId: Uuid) => {
+    const ids = (rows: readonly { id: Uuid; workspace_id: Uuid; deleted_at: string | null }[]) =>
+      new Set(rows.filter((r) => r.deleted_at === null && r.workspace_id === workspaceId).map((r) => r.id));
+    const labels = ids(db.label);
+    const targets = [ids(db.entity), ids(db.attribute), ids(db.mapping), ids(db.source_table), ids(db.source_column)];
+    return live(db.label_link).filter((k) => {
+      if (k.workspace_id !== workspaceId || !labels.has(k.label_id)) return false;
+      const target = [k.entity_id, k.attribute_id, k.mapping_id, k.source_table_id, k.source_column_id];
+      return target.some((id, i) => id !== null && targets[i]!.has(id));
+    });
+  };
+
   /** The change groups in the workspace's log: a history step outside it belongs to data that was replaced. */
   const groupsOf = async (workspaceId: Uuid) =>
     new Set((await load()).change_event.filter((e) => e.workspace_id === workspaceId).map((e) => e.change_group_id));
@@ -144,6 +157,31 @@ export function createLocalDataStore(file: string): DataStore {
       list: async (workspaceId) => live((await load()).frame).filter((f) => f.workspace_id === workspaceId),
       listOfCanvas: async (workspaceId, canvasId) =>
         live((await load()).frame).filter((f) => f.workspace_id === workspaceId && f.canvas_id === canvasId),
+    },
+
+    labels: {
+      list: async (workspaceId) => live((await load()).label).filter((l) => l.workspace_id === workspaceId),
+      get: async (workspaceId, labelId) =>
+        live((await load()).label).find((l) => l.workspace_id === workspaceId && l.id === labelId) ?? null,
+      listLinks: async (workspaceId) => liveLabelLinks(await load(), workspaceId),
+      getLink: async (workspaceId, labelLinkId) => liveLabelLinks(await load(), workspaceId).find((k) => k.id === labelLinkId) ?? null,
+      listPins: async (workspaceId) => {
+        const db = await load();
+        const labels = new Set(live(db.label).filter((l) => l.workspace_id === workspaceId).map((l) => l.id));
+        const projects = new Set(live(db.project).filter((p) => p.workspace_id === workspaceId).map((p) => p.id));
+        return db.project_pinned_label.filter((p) => p.workspace_id === workspaceId && labels.has(p.label_id) && projects.has(p.project_id));
+      },
+    },
+
+    notes: {
+      list: async (workspaceId) => {
+        const db = await load();
+        const canvases = new Set(live(db.canvas).filter((c) => c.workspace_id === workspaceId).map((c) => c.id));
+        return live(db.note).filter((n) => n.workspace_id === workspaceId && canvases.has(n.canvas_id));
+      },
+      listOfCanvas: async (workspaceId, canvasId) =>
+        live((await load()).note).filter((n) => n.workspace_id === workspaceId && n.canvas_id === canvasId),
+      get: async (workspaceId, noteId) => live((await load()).note).find((n) => n.workspace_id === workspaceId && n.id === noteId) ?? null,
     },
 
     changeEvents: {

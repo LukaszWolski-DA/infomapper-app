@@ -18,6 +18,10 @@ const NOUN: Record<string, string> = {
   mapping_input: "mapping input",
   canvas_item: "card",
   frame: "frame",
+  label: "label",
+  label_link: "label",
+  project_pinned_label: "label pin",
+  note: "note",
 };
 
 /** The table that names a group: the thing the person acted on, not what came along (cascades, a new card). */
@@ -36,6 +40,10 @@ const PRIORITY = [
   "project_canvas",
   "frame",
   "canvas_item",
+  "label",
+  "label_link",
+  "project_pinned_label",
+  "note",
 ];
 
 const BOOKKEEPING = new Set(["version", "updated_at", "updated_by"]);
@@ -66,7 +74,8 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
     if (cards.every((e) => only(e, ["row_filter"]))) return "Filter card rows";
   }
   if (cards.length === events.length && cards.every((e) => e.operation === "create")) return cards.length > 1 ? `Place ${cards.length} cards` : "Place card";
-  if (cards.length === events.length && cards.length > 1 && cards.every((e) => e.operation === "delete")) return `Remove ${cards.length} cards`;
+  // Removed cards free the notes pinned to them in the same group (slice 3a).
+  if (cards.length > 1 && cards.length + of("note").length === events.length && cards.every((e) => e.operation === "delete")) return `Remove ${cards.length} cards`;
 
   // Frames (slice 2b): moved with their cards, cards dropped into frames (which may grow), resized, arranged.
   const frames = of("frame");
@@ -87,6 +96,32 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
     return cards.length > 1 ? "Move cards" : "Move card";
   }
   if (frames.filter((e) => e.operation === "create").length > 1) return "Arrange into frames";
+
+  // Labels (slice 3a): put on or taken off an item, with a new label or not.
+  const links = of("label_link");
+  const labels = of("label");
+  if (links.length === 1 && labels.length + links.length === events.length) {
+    if (links[0]!.operation === "create") return "Add label";
+    if (links[0]!.operation === "delete" && !labels.length) return "Remove label";
+  }
+  if (labels.length === 1 && labels[0]!.operation === "update" && only(labels[0]!, ["name", "name_key"])) return "Rename label";
+
+  // Notes (slice 3a): one note changed by itself.
+  const notes = of("note");
+  if (notes.length === 1 && notes.length === events.length) {
+    const e = notes[0]!;
+    if (e.operation === "create") return "Add note";
+    if (e.operation === "delete") return "Delete note";
+    if (e.operation === "update") {
+      if (only(e, ["status", "resolved_at", "resolved_by"])) return e.after_image?.status === "resolved" ? "Resolve note" : "Reopen note";
+      if (only(e, ["body_html", "body_text"])) return "Edit note";
+      if (only(e, ["color"])) return "Change note colour";
+      if (only(e, ["width"])) return "Resize note";
+      if (only(e, ["x", "y", "frame_id"])) return "Move note";
+      if (e.after_image?.pin_canvas_item_id || e.after_image?.pin_frame_id) return "Pin note";
+      return "Unpin note";
+    }
+  }
 
   // A new canvas that comes with cards is a duplicated layout (slice 2a).
   if (of("canvas").some((e) => e.operation === "create") && cards.some((e) => e.operation === "create")) return "Duplicate canvas";
@@ -119,11 +154,11 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
   }
 }
 
-/** The canvas a change group's cards and frames are on, when they are all on one; null for a change of the model only. */
+/** The canvas a change group's cards, frames and notes are on, when they are all on one; null for a change of the model only. */
 export function changeCanvasId(events: readonly ChangeEvent[]): string | null {
   const ids = new Set(
     events
-      .filter((e) => e.object_type === "canvas_item" || e.object_type === "frame")
+      .filter((e) => e.object_type === "canvas_item" || e.object_type === "frame" || e.object_type === "note")
       .map((e) => String((e.after_image ?? e.before_image)?.canvas_id ?? "")),
   );
   return ids.size === 1 ? [...ids][0]! || null : null;

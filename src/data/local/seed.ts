@@ -12,6 +12,7 @@ import {
 } from "@/domain/types";
 import { emptyDb, findViolation, type DevDb } from "./schema";
 import { addDemoModel, DEMO_LAYOUT } from "./seed-model";
+import { addDemoWorkingLayer } from "./seed-working-layer";
 
 /**
  * Fixed UUID v7 ids for the seed rows, so they stay the same after "npm run reset-dev-data".
@@ -146,6 +147,13 @@ export function buildSeed(now: Date = new Date()): DevDb {
       { canvasId: SEED_IDS.canvasCustomerOrders, layout: DEMO_LAYOUT.customerOrders },
       { canvasId: SEED_IDS.canvasOrderLines, layout: DEMO_LAYOUT.orderLines },
     ],
+  });
+  addDemoWorkingLayer(db, {
+    workspaceId: retailDwh.id,
+    canvasId: SEED_IDS.canvasCustomerOrders,
+    at,
+    labelAuthorId: users.anna.id,
+    users: { owner: users.lukasz.id, modeler: users.anna.id, reviewer: users.piotr.id },
   });
 
   const bankX = workspace(

@@ -606,6 +606,10 @@ function rowsOf(items: CanvasItem[], frames: Frame[], entities: Entity[] = model
     mapping_input: [],
     canvas_item: items,
     frame: frames,
+    label: [],
+    label_link: [],
+    project_pinned_label: [],
+    note: [],
   };
 }
 

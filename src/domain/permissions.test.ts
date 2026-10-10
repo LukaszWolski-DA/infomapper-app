@@ -9,13 +9,14 @@ const expected: Record<WorkspaceRole, WorkspaceAction[]> = {
   owner: [...WORKSPACE_ACTIONS].filter((a) => a !== "workspace.unarchive"),
   admin: [
     "workspace.view", "workspace.edit_settings", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects",
-    "canvas.edit_items", "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status",
+    "canvas.edit_items", "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
   ],
   modeler: [
     "workspace.view", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects", "canvas.edit_items",
-    "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status",
+    "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
   ],
-  reviewer: ["workspace.view", "mapping.set_status"],
+  // Slice 3a: reviewers work on notes as modelers do (Łukasz's step 0 answer 1); labels are for editors (answer 2).
+  reviewer: ["workspace.view", "mapping.set_status", "note.edit"],
   reader: ["workspace.view"],
 };
 
@@ -35,6 +36,8 @@ describe("role permissions (AD-05)", () => {
       message: "As a reviewer you cannot create projects.",
     });
     expect(checkPermission(access("admin"), "workspace.archive")?.message).toBe("As an admin you cannot archive this workspace.");
+    expect(checkPermission(access("reviewer"), "label.edit")?.message).toBe("As a reviewer you cannot change labels.");
+    expect(checkPermission(access("reader"), "note.edit")?.message).toBe("As a reader you cannot change notes.");
   });
 
   it("refuses everything to non-members", () => {

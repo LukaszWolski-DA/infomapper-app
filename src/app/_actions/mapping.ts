@@ -111,8 +111,9 @@ export async function setMappingStatusAction(workspaceId: string, input: SetMapp
 }
 
 export async function deleteMappingAction(workspaceId: string, input: { mappingId: string; expectedVersion: number }): Promise<ActionResult<null>> {
-  return mappingCommand(workspaceId, (ctx, access, model) => {
-    const result = deleteMapping(ctx, access, mappingState(model, input?.mappingId), input);
+  return mappingCommand(workspaceId, async (ctx, access, model, store) => {
+    const labelLinks = await store.labels.listLinks(access.workspace.id);
+    const result = deleteMapping(ctx, access, { ...mappingState(model, input?.mappingId), labelLinks }, input);
     return result.ok ? { ...result, value: null } : result;
   });
 }
@@ -130,12 +131,13 @@ export async function splitMappingAction(
 
 /** “Merge mappings” (D-49): mappings of one attribute become one transformation with the given rule. */
 export async function mergeMappingsAction(workspaceId: string, input: MergeMappingsInput): Promise<ActionResult<{ mappingId: Uuid }>> {
-  return mappingCommand(workspaceId, (ctx, access, model) => {
+  return mappingCommand(workspaceId, async (ctx, access, model, store) => {
     const ids = new Set(Array.isArray(input?.mappings) ? input.mappings.map((m) => m?.mappingId) : []);
+    const labelLinks = await store.labels.listLinks(access.workspace.id);
     const result = mergeMappings(
       ctx,
       access,
-      { mappings: model.mappings.filter((m) => ids.has(m.id)), inputs: model.mappingInputs.filter((i) => ids.has(i.mapping_id)) },
+      { mappings: model.mappings.filter((m) => ids.has(m.id)), inputs: model.mappingInputs.filter((i) => ids.has(i.mapping_id)), labelLinks },
       input,
     );
     return result.ok ? { ...result, value: { mappingId: result.value.mapping.id } } : result;
