@@ -214,7 +214,7 @@ export function useCanvasHost({
       });
       items.push({ label: view.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !view.collapsed }) });
       items.push({ label: "Fit width to names", act: () => ui.fitWidth(card.id) });
-      if (canNote) items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }), testId: "toolbox-note-add" });
+      if (canNote) items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });
       if (!ui.cardFrame(card.id)) {
         items.push({ label: `Put in a new ${isEnt ? "concept" : "source system"} frame`, act: () => ui.putInNewFrame([card.id], true) });
       }
@@ -222,7 +222,7 @@ export function useCanvasHost({
       items.push({ label: "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
       if (isEnt) items.push({ label: "Delete from model…", danger: true, act: () => setDeleting(card.targetId) });
     } else if (canNote) {
-      items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }), testId: "toolbox-note-add" });
+      items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });
     }
     return items;
   };
@@ -278,7 +278,7 @@ export function useCanvasHost({
         items.push({ label: "New entity here", kbd: "E", act: () => void createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }) });
       }
       // a note here: its corner up-left of the click, as the prototype's “Add a note here”
-      if (canNote) items.push({ label: "Add a note here", act: () => ui.newNote({ at: { x: req.at.x - 110, y: req.at.y - 20 } }), testId: "toolbox-note-here" });
+      if (canNote) items.push({ label: "Add a note here", act: () => ui.newNote({ at: { x: req.at.x - 110, y: req.at.y - 20 } }) });
       if (editable) items.push({ label: "New frame here", kbd: "A", act: () => ui.createFrameAt(req.at) });
       // every role: these only change what is selected or how the view moves (slice 2a)
       items.push({ label: "Select all", kbd: "Ctrl A", act: () => ui.selectAll() });
@@ -391,7 +391,7 @@ export function useCanvasHost({
       if (editable && !collapsed) items.push({ label: "Fit frame to its content", act: () => ui.fitFrame(t.frameId), testId: "toolbox-frame-fit" });
       items.push({ label: "Select its cards", disabled: collapsed || !view.cardIds.length, act: () => ui.selectFrameCards(t.frameId), testId: "toolbox-frame-select-cards" });
       items.push({ label: "Zoom to frame", act: () => ui.zoomToFrame(t.frameId), testId: "toolbox-frame-zoom" });
-      if (canNote) items.push({ label: "Add a note to this frame", act: () => ui.newNote({ frameId: t.frameId }), testId: "toolbox-note-frame" });
+      if (canNote) items.push({ label: "Add a note to this frame", act: () => ui.newNote({ frameId: t.frameId }) });
       if (editable) {
         items.push({ sep: true });
         items.push({ label: "Delete frame (keeps its cards)", kbd: "Del", danger: true, act: () => ui.deleteFrame(t.frameId), testId: "toolbox-frame-delete" });
@@ -419,19 +419,18 @@ export function useCanvasHost({
       const n = view.note;
       items.push({ head: view.pinnedTo ? `Note on ${view.pinnedTo.name}` : "Note" });
       if (!canNote) return items;
-      items.push({ label: "Edit text", kbd: "Dbl-click", act: () => ui.editNote(n.id), testId: "toolbox-note-edit" });
+      items.push({ label: "Edit text", kbd: "Dbl-click", act: () => ui.editNote(n.id) });
       items.push({
         label: n.status === "resolved" ? "Reopen" : "Mark as resolved",
         act: () => ui.updateNote(n.id, { status: n.status === "resolved" ? "open" : "resolved" }),
-        testId: "toolbox-note-resolve",
       });
       items.push({
         seg: "Colour",
         options: NOTE_COLORS.map((c) => ({ label: c.charAt(0).toUpperCase() + c.slice(1), on: n.color === c, act: () => ui.updateNote(n.id, { color: c }) })),
       });
-      if (view.pinnedTo) items.push({ label: "Unpin (make it a free note)", act: () => ui.unpinNote(n.id), testId: "toolbox-note-unpin" });
+      if (view.pinnedTo) items.push({ label: "Unpin (make it a free note)", act: () => ui.unpinNote(n.id) });
       items.push({ sep: true });
-      items.push({ label: "Delete note", kbd: "Del", danger: true, act: () => ui.deleteNote(n.id), testId: "toolbox-note-delete" });
+      items.push({ label: "Delete note", kbd: "Del", danger: true, act: () => ui.deleteNote(n.id) });
       return items;
     }
     const card = cardById.get(t.cardId);

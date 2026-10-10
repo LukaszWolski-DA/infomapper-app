@@ -1,7 +1,8 @@
 // The demo working layer (slice 3a): two labels and three notes in “Retail Co – DWH”, on the model and the cards that
 // `addDemoModel` seeds. CR-23 marks Customer, two of its attributes and the second e-mail mapping (as in the
 // prototype's seed); JIRA-481 marks the CRM table customers and its column email_addr. On “Customer & orders”: a free
-// note, a note pinned to Customer, and a resolved note pinned to web_users.
+// note and two notes pinned to the table order_line, one of them resolved. The notes keep clear of the empty spots
+// earlier end-to-end tests place and drop cards on (slice 3a, step 3), far right of the cards.
 
 import type { Uuid } from "@/domain/ids";
 import { labelKey, targetColumns, type LabelTarget } from "@/domain/model/labels";
@@ -92,18 +93,19 @@ export function addDemoWorkingLayer(db: DevDb, o: DemoWorkingLayerOptions): void
       y: 200,
       pin_canvas_item_id: null,
     }),
-    // 280 = the card's default width (256) + 24, as a note pinned from the Note tool.
-    note("customer", o.users.reviewer, "Is customer_number the business key in both CRM and the web shop? Confirm with the data owner.", "yellow", {
+    // 280 = the card's default width (256) + 24, as a note pinned from the Note tool
+    note("orderline", o.users.reviewer, "Which order statuses count as confirmed? Ask the ERP team before mapping status_code.", "yellow", {
       x: 280,
       y: 0,
-      pin_canvas_item_id: card("entity:customer"),
+      pin_canvas_item_id: card("table:ordline"),
     }),
+    // below the other one on order_line
     note(
-      "webusers",
+      "orderline-disc",
       o.users.modeler,
-      "web_users.email is the second source for e-mail. Priority agreed with the data owner: CRM first.",
+      "order_line.disc is a percentage, not an amount. Confirmed with the ERP team.",
       "green",
-      { x: 280, y: 0, pin_canvas_item_id: card("table:webusers") },
+      { x: 280, y: 160, pin_canvas_item_id: card("table:ordline") },
       o.users.owner,
     ),
   );

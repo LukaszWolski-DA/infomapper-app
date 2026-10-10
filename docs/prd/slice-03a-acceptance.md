@@ -68,7 +68,9 @@ newest release, with `@boundaries/elements` 3.1.1 pinning `handlebars` 4.7.9. No
 9. **Demo data:** in “Retail Co – DWH”, CR-23 marks Customer, `email`, `segment_code` and the mapping
    `web_users.email → Customer.email` (as the prototype's seed), and JIRA-481 marks `customers` and
    `customers.email_addr`. Anna made both. On “Customer & orders” there are three notes: a free one by Łukasz
-   (blue), one by Piotr pinned to Customer, and one by Anna pinned to `web_users`, which Łukasz resolved. No label is
+   (blue), and two pinned to the table `order_line`, one by Piotr, one by Anna which Łukasz resolved (step 3: on the
+   canvas's far right, away from the empty spots earlier end-to-end tests use; first pinned to Customer and
+   `web_users`). No label is
    pinned to a project (the prototype pins CR-23 and JIRA-481; S3A-05 starts from no pins).
 
 ### Step 2 (labels)
@@ -100,6 +102,34 @@ newest release, with `@boundaries/elements` 3.1.1 pinning `handlebars` 4.7.9. No
 Open question from step 2: the prototype also marks a labeled entity's card header (`lmark("entity", …)`); PRD item 3
 lists rows, table headers and mapping lines only, so entity headers have no mark for now.
 
+### Step 3 (notes on the canvas)
+
+1. **A new note is a draft on the canvas** until its text is written: Ctrl+Enter or a click outside saves it (one
+   undo step), Esc or an empty text drops it (nothing saved, no undo step). While it is a draft the right panel says
+   “A new note: write it on the canvas …”; its toolbox has no actions.
+2. **Where new notes go:** the Note tool puts a free note's corner 16 px left and 13 px up of the click, “Add a note
+   here” 110 px left and 20 px up (both as the prototype), snapped to 8 px; a pinned note goes 24 px to the right of its
+   card, frame or block, at the top (step 1). A click on a frame's empty area with the Note tool makes a free note
+   there, which joins the frame; only the frame's name strip or its collapsed block pins the note to the frame.
+3. **Dragging:** a note is dragged anywhere on it except its ✓ and its right edge; a click without moving selects it,
+   a double-click edits it. Shift+click and notes in a selection of several come with step 4 (item 13).
+4. **A free note in a frame moves with the frame** on the server in the frame move's change group (`moveOnCanvas`
+   carries the frame's free notes, one undo step), and on the canvas at once. Growing a frame to take a dropped card,
+   resizing it or fitting it to its content does not move or claim notes (as the prototype: notes join a frame only
+   when dropped).
+5. **The note's body** shows its whole text, wrapped (the prototype shows all of it). Below 40 % zoom a note draws its
+   header and a plain block of its last measured height.
+6. **Looks without opacity (AD-24 rule 4):** a resolved note's paper is mixed with the surface and its text is the
+   quieter ink; the tether is the quiet ink mixed with transparent. The pin name in the header gets its clip only
+   when it may not fit. Colours follow the prototype's light and dark papers.
+7. **The tether** joins the points of the note and its element nearest to each other's centre, with a dot on the
+   element, and is left out when the note lies on its element (prototype `tethers`).
+8. **Who may do what:** the Note tool (button and N), the note toolbox's actions, dragging, resizing, ✓ and the
+   panel's fields are for editors and reviewers; readers see notes and their panel read-only, and their toolbox shows
+   only its heading.
+9. **Not yet:** the card's and frame's “Notes” panel section with its “Add a note” (item 12, step 4), the note count on
+   card headers and blocks (step 4), Fit everything counting notes (item 14, step 4).
+
 ## Changes to earlier tests
 
 - `src/domain/permissions.test.ts`: the role matrix gains `label.edit` (owner, admin, modeler) and `note.edit` (owner,
@@ -108,3 +138,5 @@ lists rows, table headers and mapping lines only, so entity headers have no mark
   the domain (step 1).
 - `src/domain/commands/undo.test.ts` and `frame.test.ts`: their row sets include the four new undoable tables (step 1).
 - `src/canvas/canvas.test.ts` and `lines.test.ts`: the expected card rows and mapping lines have `labels: null` (step 2).
+- `src/domain/commands/frame.test.ts`: a new test that a moved frame carries its free notes (step 3); no earlier test
+  changed in step 3.

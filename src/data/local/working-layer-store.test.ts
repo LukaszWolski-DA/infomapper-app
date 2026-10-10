@@ -41,6 +41,15 @@ const CANVAS = SEED_IDS.canvasCustomerOrders;
 const id = (key: string) => seedId(RETAIL, key);
 const ctxFor = (actorId: string): CommandContext => ({ actorId, now: new Date().toISOString(), newId: () => uuidv7() });
 
+async function canvasState() {
+  return {
+    canvas: await store.canvases.get(RETAIL, CANVAS),
+    items: await store.canvasItems.listOfCanvas(RETAIL, CANVAS),
+    frames: await store.frames.listOfCanvas(RETAIL, CANVAS),
+    notes: await store.notes.listOfCanvas(RETAIL, CANVAS),
+  };
+}
+
 async function accessAs(userId: string): Promise<WorkspaceAccess> {
   return { workspace: (await store.workspaces.get(RETAIL))!, member: await store.workspaces.getMember(RETAIL, userId) };
 }
@@ -61,11 +70,11 @@ describe("demo data (slice 3a, step 1)", () => {
     expect(await store.labels.listPins(RETAIL)).toEqual([]);
   });
 
-  it("has three notes on “Customer & orders”: a free one, one pinned to Customer, a resolved one", async () => {
+  it("has three notes on “Customer & orders”: a free one, one pinned to order_line, a resolved one", async () => {
     const notes = await store.notes.listOfCanvas(RETAIL, CANVAS);
     expect(notes).toHaveLength(3);
     expect(notes.filter((n) => !n.pin_canvas_item_id && !n.pin_frame_id)).toHaveLength(1);
-    expect(notes.find((n) => n.pin_canvas_item_id === id(`card:${CANVAS}:entity:customer`))).toMatchObject({ status: "open", created_by: SEED_IDS.userPiotr });
+    expect(notes.find((n) => n.pin_canvas_item_id === id(`card:${CANVAS}:table:ordline`))).toMatchObject({ status: "open", created_by: SEED_IDS.userPiotr });
     expect(notes.filter((n) => n.status === "resolved")).toMatchObject([{ resolved_by: SEED_IDS.userLukasz }]);
     expect(await store.notes.listOfCanvas(RETAIL, SEED_IDS.canvasOrderLines)).toEqual([]);
     // the other workspaces have none
@@ -162,6 +171,11 @@ describe("commands end to end", () => {
   it("deleting Customer soft-deletes the label links on it, its attributes and mappings, and frees its note (S3A-12)", async () => {
     const lukasz = SEED_IDS.userLukasz;
     const access = await accessAs(lukasz);
+    // a note pinned to Customer's card at (496, 40), to the right of it: (280, 0)
+    const pinned = createNote(ctxFor(lukasz), access, await canvasState(), { canvasId: CANVAS, text: "Ask about the key", pin: { canvasItemId: id(`card:${CANVAS}:entity:customer`) } });
+    if (!pinned.ok) throw new Error(pinned.error.message);
+    expect(await store.apply(pinned.writeSet)).toEqual({ ok: true });
+    const noteId = pinned.value.note.id;
     const model = await store.model.load(RETAIL);
     const [canvasItems, labelLinks, notes] = await Promise.all([store.canvasItems.list(RETAIL), store.labels.listLinks(RETAIL), store.notes.list(RETAIL)]);
     const customer = model.entities.find((e) => e.name === "Customer")!;
@@ -171,15 +185,14 @@ describe("commands end to end", () => {
     // CR-23 marked nothing else; JIRA-481 marks a table and a column, which stay
     expect((await store.labels.listLinks(RETAIL)).map((k) => k.source_table_id ?? k.source_column_id)).toEqual([id("table:customers"), id("column:customers.email_addr")]);
     expect((await store.labels.list(RETAIL)).map((l) => l.name).sort()).toEqual(["CR-23", "JIRA-481"]);
-    const freed = (await store.notes.listOfCanvas(RETAIL, CANVAS)).find((n) => n.id === id("note:customer"))!;
-    // Customer's card at (496, 40) + offset (280, 0)
+    const freed = (await store.notes.listOfCanvas(RETAIL, CANVAS)).find((n) => n.id === noteId)!;
     expect(freed).toMatchObject({ pin_canvas_item_id: null, x: 776, y: 40, frame_id: null });
 
     const undone = revertChangeGroup(ctxFor(lukasz), access, { events: r.writeSet.events, rows: await store.model.loadForUndo(RETAIL) }, "undo");
     if (!undone.ok) throw new Error(undone.error.message);
     expect(await store.apply(undone.writeSet)).toEqual({ ok: true });
     expect(await store.labels.listLinks(RETAIL)).toHaveLength(6);
-    expect((await store.notes.get(RETAIL, id("note:customer")))!.pin_canvas_item_id).toBe(id(`card:${CANVAS}:entity:customer`));
+    expect((await store.notes.get(RETAIL, noteId))!.pin_canvas_item_id).toBe(id(`card:${CANVAS}:entity:customer`));
   });
 
   it("creates a note as a reviewer and refuses a write that puts a note on another canvas's card", async () => {

@@ -513,7 +513,9 @@ export function ModelCanvas({
     return { x: -tx / z, y: -ty / z, w: w / z, h: h / z };
   }, [storeApi]);
 
-  /** What a new card must not cover: the cards drawn and the blocks of collapsed frames (slice 2c, item 9). */
+  /** The notes drawn now, as rectangles (slice 3a): a new card does not go under one (prototype freeSpot). */
+  const noteRectsRef = useRef<Rect[]>([]);
+  /** What a new card must not cover: the cards drawn, the blocks of collapsed frames (slice 2c, item 9) and the notes. */
   const occupied = useCallback(
     (): Rect[] => [
       ...cardsNow().map((c) => {
@@ -521,6 +523,7 @@ export function ModelCanvas({
         return { x: n.position.x, y: n.position.y, w: cardWidth(c), h: cardHeight(c) };
       }),
       ...frameRectsNow().filter(({ f }) => f.collapsed).map(({ r }) => r),
+      ...noteRectsRef.current,
     ],
     [rf, cardsNow, frameRectsNow],
   );
@@ -928,6 +931,9 @@ export function ModelCanvas({
     }
     return out;
   }, [shownNotes, nodes, frameRects]);
+  useEffect(() => {
+    noteRectsRef.current = shownNotes.map((s) => ({ x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80 }));
+  }, [shownNotes]);
   // the note panel reads the notes through the canvas: it draws again when a note changes, not when one moves
   const notesKey = useMemo(
     () => noteList.map((n) => `${n.id}:${n.version}:${n.status}:${n.color}:${n.pinCardId ?? ""}:${n.pinFrameId ?? ""}:${n.frameId ?? ""}:${n.text.length}:${n.text.slice(0, 40)}`).join(","),
