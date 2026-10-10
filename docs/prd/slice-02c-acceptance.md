@@ -1,6 +1,6 @@
 # Slice 2c – Acceptance
 
-Status: **waiting for Łukasz's acceptance**. Branch `slice/02c-collapsed-frames`, pull request #8 (draft, not merged).
+Status: **accepted by Łukasz on 10 October 2026**. Branch `slice/02c-collapsed-frames`, pull request #8.
 
 ## Criteria
 
