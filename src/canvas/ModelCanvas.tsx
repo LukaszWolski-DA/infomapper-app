@@ -144,8 +144,9 @@ export interface ModelCanvasProps {
   focusNoteId?: string | null;
   /** Measurement-only switches (only the measurement-only production build passes them). */
   diagnosis?: Diagnosis;
-  /** The canvas's notes and their writes (slice 3a). */
+  /** The canvas's notes and their writes (slice 3a); when the page read them (server time, step 5). */
   notes?: NoteData[];
+  notesReadAt?: string | null;
   noteWrites?: NoteWrites;
   /** May write notes: editors and reviewers, not archived (Łukasz's step 0 answer 1). */
   canNote?: boolean;
@@ -208,6 +209,7 @@ export function ModelCanvas({
   focusNoteId,
   diagnosis = NO_DIAGNOSIS,
   notes: initialNotes = NO_NOTES,
+  notesReadAt = null,
   noteWrites,
   canNote = false,
   userName = "",
@@ -805,6 +807,7 @@ export function ModelCanvas({
   const noteState = useNotes({
     canNote,
     initialNotes,
+    notesReadAt,
     versions,
     pending,
     enqueue,

@@ -137,3 +137,33 @@ export function frameNoteCounts(notes: readonly Pick<NoteData, "pinCardId" | "pi
 /** A map of counts as one string, so a memo changes only when a count does (not when a note moves). */
 export const countsKey = (counts: ReadonlyMap<Uuid, number>): string => [...counts].map(([id, n]) => `${id}=${n}`).sort().join(",");
 export const countsOf = (key: string): Map<Uuid, number> => new Map(key ? key.split(",").map((s) => [s.slice(0, s.indexOf("=")), Number(s.slice(s.indexOf("=") + 1))]) : []);
+
+/**
+ * The notes after a fresh page from the server (slice 3a, step 5). A page rendered while the user was writing may come
+ * back with notes older than what the canvas shows: a refresh started by one write (a label's, say) can read the notes
+ * before a note created or changed a moment later and arrive after it. So:
+ * - a note with writes still on their way keeps what the canvas shows;
+ * - a note the canvas has at a higher version than the page keeps the canvas's (versions only grow, an undo too);
+ * - a note deleted here stays gone while the page has it at the version it had when deleted (an undo of the delete
+ *   brings it back at a higher version);
+ * - a note the page does not have stays when it was created after the page read the notes (`readAt`, server time);
+ *   one created before was deleted meanwhile (an undo of its creation) and goes.
+ */
+export function mergeServerNotes(
+  local: readonly NoteData[],
+  server: readonly NoteData[],
+  readAt: string | null,
+  pendingOf: (id: Uuid) => number,
+  deletedHere: ReadonlyMap<Uuid, number>,
+): NoteData[] {
+  const mine = new Map(local.map((n) => [n.id, n]));
+  const out: NoteData[] = [];
+  for (const n of server) {
+    const here = mine.get(n.id);
+    if (deletedHere.has(n.id) && n.version <= deletedHere.get(n.id)!) continue;
+    out.push(here && (pendingOf(n.id) > 0 || here.version > n.version) ? here : n);
+  }
+  const fromServer = new Set(server.map((n) => n.id));
+  for (const n of local) if (!fromServer.has(n.id) && readAt !== null && n.createdAt > readAt) out.push(n);
+  return out;
+}

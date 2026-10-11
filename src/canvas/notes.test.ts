@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { frame, ids, note } from "@/domain/__fixtures__/domain";
-import { buildNotes, countsKey, countsOf, firstLine, frameNoteCounts, noteAt, noteDate, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
+import { buildNotes, countsKey, countsOf, firstLine, mergeServerNotes, frameNoteCounts, noteAt, noteDate, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
 
 const { itemCustomer, frameA, noteFree, notePinned } = ids;
 const names = (id: string) => (id === ids.actor ? "Łukasz" : "Piotr Wiśniewski");
@@ -107,5 +107,34 @@ describe("notes elsewhere (item 12, S3A-09)", () => {
   it("shows a note's first line with text, or nothing for an empty note", () => {
     expect(firstLine("\n  Ask the ERP team  \nabout status")).toBe("Ask the ERP team");
     expect(firstLine(" \n ")).toBe("");
+  });
+});
+
+describe("a fresh page that is older than the canvas (step 5)", () => {
+  const n = (id: string, version: number, createdAt = "2026-10-11T10:00:00.000Z") =>
+    ({ ...buildNotes([note(noteFree)], [], names)[0]!, id, version, createdAt, text: `v${version}` }) as NoteData;
+  const none = () => 0;
+  const READ = "2026-10-11T12:00:00.000Z";
+
+  it("takes the page's notes when they are as new or newer", () => {
+    expect(mergeServerNotes([n("a", 1)], [n("a", 2)], READ, none, new Map()).map((x) => x.text)).toEqual(["v2"]);
+  });
+
+  it("keeps what the canvas shows when the page has an older version, or writes are on their way", () => {
+    expect(mergeServerNotes([n("a", 3)], [n("a", 2)], READ, none, new Map()).map((x) => x.text)).toEqual(["v3"]);
+    const mine = { ...n("a", 1), text: "being saved" };
+    expect(mergeServerNotes([mine], [n("a", 1)], READ, () => 1, new Map())[0]).toBe(mine);
+  });
+
+  it("keeps a note created after the page read the notes, drops one created before (deleted meanwhile)", () => {
+    const late = n("b", 1, "2026-10-11T12:00:01.000Z"), early = n("c", 1, "2026-10-11T11:59:59.000Z");
+    expect(mergeServerNotes([n("a", 1), late, early], [n("a", 1)], READ, none, new Map()).map((x) => x.id)).toEqual(["a", "b"]);
+    expect(mergeServerNotes([late], [], null, none, new Map())).toEqual([]);
+  });
+
+  it("keeps a note deleted here out while the page has it at that version; an undo brings it back at a higher one", () => {
+    const deleted = new Map([["a", 2]]);
+    expect(mergeServerNotes([], [n("a", 2)], READ, none, deleted)).toEqual([]);
+    expect(mergeServerNotes([], [n("a", 3)], READ, none, deleted).map((x) => x.version)).toEqual([3]);
   });
 });
