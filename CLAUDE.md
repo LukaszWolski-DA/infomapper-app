@@ -107,7 +107,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 ```
 npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet)
 npm run reset-dev-data   # replace .data/dev-db.json with fresh demo data
-npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards) to .data/dev-db.json
+npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards, labels and notes) to .data/dev-db.json
 npm run dev              # local app on http://localhost:3000; sign in at /sign-in by picking a test user
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
 npm run measure:build    # measurement-only production build in .next-measure (AD-31)
@@ -124,6 +124,8 @@ npm run measure:canvas                                        # every canvas fig
 npm run measure:canvas -- --rounds 1 --against slice-02p     # one quick round against slice 2p (slice 2b, S2B-14)
 npm run measure:canvas -- --quick --rounds 1 --against slice-02b                            # S2C-12, frames expanded
 npm run measure:canvas -- --quick --rounds 1 --against slice-02b --branch-diag collapsed    # S2C-12, all frames collapsed
+npm run measure:canvas -- --quick --rounds 1 --against slice-02c                            # S3A-14, labels and notes on
+npm run measure:canvas -- --quick --rounds 1 --against slice-02c --branch-diag collapsed    # S3A-14, all frames collapsed
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
 DIAG=nolines MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # diagnosis: no line layer (or DIAG=blocks)
@@ -143,10 +145,14 @@ DIAG=collapsed MEASURE=1 MEASURE_BUILD=production npx playwright test <spec> # e
   the top). Slice 2c's add rectangles around the seed's cards (`AROUND`; the e2e data file between tests is not the
   seed, so read positions from the seed), collapsing as test data (`collapse`, `collapsedFrame`), blocks and bundles on
   the page (`blockEl`, `blockHeadPoint`, `bundles`, `bundleWithCount`, `relBundle`, `mappingLines`), a mapping by its
-  column and attribute (`mappingId`) and `removeCard`. The undo history lives in the server's memory and is empty again
-  after each reseed.
+  column and attribute (`mappingId`) and `removeCard`. Slice 3a's add the demo working layer from the data file
+  (`loadLabels`, `loadLinks`, `loadPins`, `loadNotes`, `noteWithText`, `rawDb` with deleted rows), the demo notes' texts
+  (`DEMO_NOTES`), the Labels field (`labelsField`, `typeLabel`, `chipNames`), a note on the page (`noteEl`, `notePoint`),
+  `removeLabel` as test data and `undo`. The undo history lives in the server's memory and is empty again after each
+  reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
-  nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed. Keep it when changing
+  nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
+  with notes below 40 % zoom (a note measured while drawn plain once grew on every round). Keep it when changing
   `ModelCanvas.tsx`; a render loop once cost a collapsed canvas a third of its frames.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
