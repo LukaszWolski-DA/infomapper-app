@@ -35,10 +35,6 @@ const ICON = {
 };
 
 /**
- * The tag mark of working labels (prototype lmark): a small outline tag, the label names as its tooltip (slice 3a). An
- * <i>, so the header's `span:nth-child(2)` rules (the concept text, its clip) never apply to it.
- */
-/**
  * The notes pinned to the card that are shown (prototype noteMark; resolved ones count while they are shown, Łukasz's
  * decision after step 4): a note icon, with their number when more than one; at every
  * zoom, like the rest of the header (slice 3a, item 12).
@@ -53,14 +49,13 @@ const NoteMark = ({ n }: { n: number }) => (
   </i>
 );
 
-const LabelMark = ({ labels }: { labels: string }) => (
-  <i className="lmark" title={`Working labels: ${labels}`} data-testid="mark-label">
-    <svg viewBox="0 0 16 16" aria-hidden>
-      <path d="M8.5 2.5h5v5l-6 6-5-5z" />
-      <circle cx="11" cy="5" r="0.9" />
-    </svg>
-  </i>
-);
+/**
+ * The tag mark of working labels (prototype lmark): a small outline tag, the label names as its tooltip (slice 3a). An
+ * <i>, so the header's `span:nth-child(2)` rules (the concept text, its clip) never apply to it. One element: the tag is
+ * a CSS mask (canvas.css), not an inline SVG, because every element in the viewport costs paint and layerize time on
+ * each pan and zoom frame (slice 3a, S3A-14).
+ */
+const LabelMark = ({ labels }: { labels: string }) => <i className="lmark" title={`Working labels: ${labels}`} data-testid="mark-label" />;
 
 function keyTitle(r: CardRow) {
   if (r.pk && r.fk) return "Primary key and foreign key";

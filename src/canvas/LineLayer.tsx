@@ -25,12 +25,21 @@ interface LineProps {
   onSelect: () => void;
 }
 
-/** The tag of a labeled mapping (prototype lineTag): drawn with the line, left out below 40 % zoom like the end dots. */
+/** The tag outline (16 × 16 icon, scaled to 0.62) at its place on the line: absolute points, so no transform per tag. */
+const TAG = [[8.5, 2.5], [13.5, 2.5], [13.5, 7.5], [7.5, 13.5], [2.5, 8.5]] as const;
+const tagPath = (x: number, y: number) =>
+  `${TAG.map(([px, py], i) => `${i ? "L" : "M"}${+(x - 5 + px * 0.62).toFixed(2)} ${+(y - 5 + py * 0.62).toFixed(2)}`).join("")}Z`;
+
+/**
+ * The tag of a labeled mapping (prototype lineTag): drawn with the line, left out below 40 % zoom like the end dots. Two
+ * elements and no group (slice 3a, S3A-14: every element in the viewport costs paint and layerize time on each pan and
+ * zoom frame).
+ */
 const LineTag = ({ x, y }: { x: number; y: number }) => (
-  <g className="ltag" data-testid="mark-label-line">
-    <circle cx={x} cy={y} r={7} />
-    <path transform={`translate(${x - 5},${y - 5}) scale(0.62)`} d="M8.5 2.5h5v5l-6 6-5-5z" />
-  </g>
+  <>
+    <circle className="ltag" cx={x} cy={y} r={7} data-testid="mark-label-line" />
+    <path className="ltag" d={tagPath(x, y)} />
+  </>
 );
 
 const MapPath = memo(
