@@ -44,16 +44,17 @@ Behaviour reference: `docs/prototype/infomapper-model-prototype.html`. Data refe
 - **D-09** Labels are assigned by hand first; automatic labeling is an option.
 - **D-10** A live label canvas shows only labeled elements, with context cards for partly labeled ones.
 - **D-11** Adding or removing a card on a live canvas changes the label, always after confirmation.
-- **D-20** Notes belong to the canvas and the working layer. Free notes join the frame they are dropped in; pinned notes follow their card or frame with a dashed tether.
-- **D-21** Notes are open or resolved; resolved ones can be hidden; an empty new note disappears.
-- **D-24** Labels extend to mappings, tables and columns; the active context comes after that, as an option.
+- **D-20** Notes belong to the canvas and the working layer. Free notes join the frame they are dropped in; pinned notes follow their card or frame with a dashed tether. Duplicate layout copies no notes. A note joins a frame only when dropped in it (drawing, resizing or fitting a frame never moves or claims notes). A note whose card or frame leaves the canvas stays as a free note at its place, in no frame.
+- **D-21** Notes are open or resolved; resolved ones can be hidden, a preference kept per person in their browser only (not on the server, not an undo step); an empty new note disappears. Every note change is one undo step; anyone who may write notes edits any note, and its panel names who wrote it.
+- **D-24** Labels extend to mappings, tables and columns; the active context comes after that, as an option. Merging mappings keeps the labels of the merged ones on the mapping that stays.
 - **D-25** Live canvases include tables (fully labeled ones whole, others as context) and fade unlabeled mappings.
 - **D-26** An active working context labels every model change (entities, attributes, mappings; relationships through their entities), not layout changes, in the same undo step. It stays on after reload until switched off.
+- **D-53** A count of notes (a card's header, a collapsed frame's block) shows the notes you would see: open ones, and resolved ones while they are shown. Notes take part in the selection: a lassoed frame stands for its free notes, Ctrl+A takes the free notes outside frames, and a pinned note moves with its card or frame, never twice.
 
 ### Projects and navigation
 - **D-27** One shared model per workspace; projects organise canvases and context. Isolation between clients comes from workspaces.
 - **D-28** A canvas can belong to several projects. Removing a shared canvas only takes it out of the current project; deleting a project deletes only canvases no other project uses.
-- **D-29** Opening a project shows its home screen: canvas tiles with thumbnails, stats, labels (pinnable), open notes, requirements.
+- **D-29** Opening a project shows its home screen: canvas tiles with thumbnails, stats, labels (pinnable), open notes, requirements. Pinning a label to a project is saved with its change event but is not an undo step (no undo outside canvases yet). Roles without label rights see a pinned label's plain ★, not the pin control.
 - **D-35** Left panel groups fold (count, sticky headers, remembered, search opens matches); “Only on this canvas”. Inspector sections fold (remembered per title); page actions always visible; lists over 20 items get a filter and “Show all”.
 - **D-38** Navigation history covers workspace, project, canvas, home screens and selection (not panning): Alt+←/→, mouse back/forward, clickable breadcrumbs.
 - **D-39** A view-state bar shows everything that hides or fades items (lens, Focus, layer, filters, collapsed cards and frames, hidden notes, active tool), each removable, plus “Show all”.
@@ -83,7 +84,7 @@ Behaviour reference: `docs/prototype/infomapper-model-prototype.html`. Data refe
 - **AD-02** Workspaces share nothing live; patterns are copied. An organization library comes later.
 - **AD-03** Model versions are named baselines (frozen snapshots) to compare with and to generate documents from. No model branches.
 - **AD-04** Sign-in with e-mail and password (Supabase Auth) to start; Microsoft/Google/SSO later.
-- **AD-05** Five roles per workspace: owner, admin, modeler, reviewer (read, comment, notes, approve), reader.
+- **AD-05** Five roles per workspace: owner, admin, modeler, reviewer (read, comment, notes, approve), reader. Reviewers write, resolve, move, pin and delete any note as modelers do; working labels are changed by owners, admins and modelers only; readers read notes and labels.
 - **AD-06** Four-eyes approval (the author cannot approve their own change) is a workspace setting, off by default. Every approval is logged.
 - **AD-07** After sign-in the user lands on the workspace home. The top bar shows Organization / Workspace / Project.
 - **AD-08** Optional Data Vault 2.0 mode per workspace: hints only (hub, business key, satellites by source), nothing enforced.

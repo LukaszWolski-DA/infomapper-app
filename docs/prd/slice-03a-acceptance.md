@@ -108,9 +108,10 @@ And the definition of done: label the Customer mappings of a change request on C
 walk its items, write three notes (one free in a frame, one pinned to a card, one on a frame), resolve one, hide resolved
 notes, collapse the frame with notes, duplicate the layout, and undo the label's deletion.
 
-## Proposed changes to `docs/decisions.md` (waiting for Łukasz)
+## Changes to `docs/decisions.md`
 
-Not applied: they go into `docs/decisions.md` in this pull request once Łukasz approves the text.
+Proposed in step 5; **approved by Łukasz on 11 October 2026** with two changes (D-21 and D-29 as below) and
+applied in this pull request. The proposals as first written:
 
 1. **AD-05**, replace: “Five roles per workspace: owner, admin, modeler, reviewer (read, comment, notes, approve),
    reader.” with: “Five roles per workspace: owner, admin, modeler, reviewer (read, comment, notes, approve), reader.
@@ -130,6 +131,12 @@ Not applied: they go into `docs/decisions.md` in this pull request once Łukasz 
 5. **D-24**, append: “Merging mappings keeps the labels of the merged ones on the mapping that stays.”
 6. **D-29**, append: “Pinning a label to a project is saved with its change event but is not an undo step (no undo
    outside canvases yet).”
+
+As applied: AD-05, D-20, D-53 and D-24 as proposed; D-21: “Notes are open or resolved; resolved ones can be hidden, a
+preference kept per person in their browser only (not on the server, not an undo step); an empty new note disappears.
+Every note change is one undo step; anyone who may write notes edits any note, and its panel names who wrote it.”; D-29:
+the proposal plus “Roles without label rights see a pinned label's plain ★, not the pin control.” The late-page race for
+frames and cards (step 5, item 4) is in `docs/known-limitations.md` (Łukasz: not fixed in this slice).
 
 ## Assumptions and decisions
 

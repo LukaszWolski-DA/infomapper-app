@@ -15,6 +15,19 @@ moment can therefore both pass the check and leave a canvas or project without i
 - **The database slice (last, AD-31):** check this rule in the same transaction as the write (e.g. lock the project's and the canvas's
   `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed.
 
+### A late fresh page could show older frames or cards (slice 3a, step 5)
+
+After a write, the canvas takes the server's fresh page and keeps only what still has writes on their way. Slice 3a's
+step 5 found that for notes a page re-rendered by an earlier write can read the data before a later write and arrive
+after it, so the canvas showed older notes (a note created meanwhile vanished until a reload); notes now keep what is
+newer than the page (`mergeServerNotes`, the page's `notesReadAt`). Frames and cards take the fresh page the same way
+and could show the same effect.
+
+- **Possible, not observed:** no test or manual check has shown it for frames or cards; one person at a time makes it
+  unlikely.
+- **To check before the database slice (last, AD-31):** several people working at once make it more likely; the notes
+  fix shows the pattern (when the page read the data, versions only growing, deletions made here).
+
 ## Canvas performance (slice 1a)
 
 ### S1A-14 is only partly met, and measured on the dev server
