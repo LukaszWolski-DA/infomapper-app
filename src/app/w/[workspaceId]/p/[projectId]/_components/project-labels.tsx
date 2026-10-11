@@ -40,7 +40,7 @@ export function ProjectLabels({ workspaceId, projectId, labels, editable }: { wo
             </button>
           ) : (
             // without label rights the star is not offered: a pinned label keeps a plain marker, the others an empty slot
-            <span className="w-5 text-center text-[15px] leading-none text-im-review-strong" title={l.pinned ? "Pinned to this project" : undefined} data-testid={l.pinned ? "mark-label-pinned" : undefined}>
+            <span className="w-5 cursor-default select-none text-center text-[15px] leading-none text-im-review-strong" title={l.pinned ? "Pinned to this project" : undefined} data-testid={l.pinned ? "mark-label-pinned" : undefined}>
               {l.pinned ? "★" : ""}
             </span>
           )}

@@ -98,7 +98,9 @@ newest release, with `@boundaries/elements` 3.1.1 pinning `handlebars` 4.7.9. No
    star is shown to everyone, active only for those who may change labels; a pinned star uses the palette's amber
    (`im-review-strong`), the nearest to the prototype's. *Changed after step 3 (Łukasz):* the star is offered only to
    roles with label rights, as the app hides other actions a role can't take; for the others a pinned label keeps a
-   plain, non-clickable ★ (“Pinned to this project”) and an unpinned one an empty slot.
+   plain, non-clickable ★ (“Pinned to this project”) and an unpinned one an empty slot. Łukasz's decision (11 October,
+   after checking `46ac76f`): the plain ★ stays; it shows state, not an action, so it has no hover effect and no
+   pointer cursor.
 
 **Accepted by Łukasz on 10 October 2026** after his manual check of step 2 (all steps, as Łukasz, Piotr and a reader).
 Open question from step 2, answered after step 3 (Łukasz): a labeled entity's card header shows the tag mark too, at
