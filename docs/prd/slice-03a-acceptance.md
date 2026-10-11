@@ -1,7 +1,135 @@
 # Slice 3a – Acceptance
 
-Status: **in progress**. Branch `slice/03a-labels-and-notes`. Criteria, results, the measurement round and the manual
-checklist follow at step 5; the decisions are recorded here as they are taken.
+Status: **step 5 done, waiting for the confirming measurement round and Łukasz's acceptance**. Branch
+`slice/03a-labels-and-notes`, pull request #9 (draft). Steps 0 to 4 were accepted one by one (below).
+
+## Criteria
+
+Each criterion has its Playwright test in `e2e/slice-03a/`, named after its id; every test starts from a freshly seeded
+data file (the demo labels CR-23 and JIRA-481 and the three demo notes on Customer & orders) and does not depend on
+another. Data a test starts from is made through the domain (`removeLabel`, frames with `makeFrame`, notes moved or
+resolved with the note commands); what the criterion checks goes through the page with the real mouse and keyboard and
+is read back from the data file.
+
+| ID | Test | Result |
+| --- | --- | --- |
+| S3A-01 | `S3A-01.spec.ts`: with CR-23 gone, “cr 23” on Customer offers “Create “cr-23”” first; Enter creates and assigns it and the input keeps the focus; one undo takes label and link away; “CR” on `email` offers “Create “CR”” and below it cr-23 with “1 item”; picking it adds the link; × removes it, one undo puts it back | passes |
+| S3A-02 | `S3A-02.spec.ts`: JIRA-900 on Sales Order (entity), its first attribute, order_header (table), its first column and a mapping (chosen by its line), typed as “JIRA-900”, “jira-900” and “Jira-900”: one label, five links, one in each target column | passes |
+| S3A-03 | `S3A-03.spec.ts`: at 45 % the tag marks on `email`, `segment_code` (“Working labels: CR-23”), `customers.email_addr` (JIRA-481), the headers of Customer and customers, none on unlabeled rows and cards, one line tag with “Labels: CR-23”, no opacity; at 30 % no row marks and no line tag, the two header marks stay | passes |
+| S3A-04 | `S3A-04.spec.ts`: CR-23's panel: “Marks 1 entity, 2 attributes, 1 mapping. …”, the items by kind as links (one opens the attribute); renaming to “jira-481” is refused (“Another label is already called “JIRA-481”.”) and the field shows CR-23 again; renaming to CR-24 works; “Delete label” soft-deletes label and links, the model is unchanged, Undo in the toast brings label and all four links back | passes |
+| S3A-05 | `S3A-05.spec.ts`: Order management's home lists CR-23, JIRA-481 by items; pinning JIRA-481 puts it first, also after a reload; unpinning and pinning again; with its links taken off (domain) it stays listed, pinned, “0 items”; “2 open notes”, the list with canvas names and “, on order_line”; a click opens Customer & orders with the note selected (`?note=`); with both notes resolved: “0 open notes” and “No open notes on this project’s canvases.” | passes |
+| S3A-06 | `S3A-06.spec.ts`: Esc and an empty note left by a click leave no note and Undo disabled; the Note tool (N and the button) makes a free note (yellow, 220 px, open) and notes pinned to Sales Order, a collapsed frame's block and a frame's name; “Add a note here”, “Add a note to this”, “Add a note to this frame” and the card panel's “Add a note” make notes too (8 in all) | passes |
+| S3A-07 | `S3A-07.spec.ts`: on the demo's free note: text edited in place (Ctrl+Enter), undone; Esc cancels; width 220 → 320 by its edge, undone; colour pink by the toolbox and green by the panel, each undone; resolved by its ✓, the toolbox and the panel, reopened by the toolbox, each one undo step | passes |
+| S3A-08 | `S3A-08.spec.ts`: the free note dropped in a frame joins it, moves with the frame by the same amount and is hidden while the frame is collapsed; order_line's pinned note follows the card while the mouse is down, with a dashed tether, its offset unchanged; “Unpin” keeps it in place as a free note; order_line taken off the canvas turns its other note into a free note at its place | passes |
+| S3A-09 | `S3A-09.spec.ts`: order_line's header “2 notes pinned here”; its panel lists both (open, resolved); the frame panel lists its note; the collapsed block shows “2 notes”; the overview lists the three open notes; unticking “Show resolved notes” hides the resolved note and the header shows 1, Undo unchanged; after a reload still hidden; Piotr still sees it | passes |
+| S3A-10 | `S3A-10.spec.ts`: click and Shift+click on notes and a card; a lasso around the free note; Ctrl+A takes the free note in no frame, not the pinned ones; a group of order_line, its pinned note and the free note dragged by the card: the free note moves by the card's amount, the pinned note's offset and version stay; two arrow presses, one undo; with the free note in a frame, a lasso around the frame catches the frame, not the note, and Ctrl+A leaves the note out; Delete removes a selected note | passes |
+| S3A-11 | `S3A-11.spec.ts`: Duplicate layout: the toast, the copy with all cards and no note (page and data), the original's three notes exactly as before | passes |
+| S3A-12 | `S3A-12.spec.ts`: deleting Customer soft-deletes CR-23's four links (Customer, email, segment_code, the mapping) with change events in the entity's change group; the label stays; Ctrl+Z brings the entity and the four links back | passes |
+| S3A-13 | `S3A-13.spec.ts`: Łukasz uses every label and note write once (their action ids); Piotr sees labels read-only (no input, no ×, read-only name, no delete, no pin stars) and writes a note; his direct label calls are refused (“As a reviewer you cannot change labels.”) and change nothing; Kasia has no Note tool, no ✓, no edge, no toolbox on a note, a read-only note panel, no “Add a note”, no Labels input; her drag and Delete change nothing; all twelve direct calls are refused (“As a reader you cannot change labels.” / “… notes.”) and change nothing | passes |
+| S3A-14 | two quick `measure:canvas` rounds on “Performance test” against `slice-02c` (below); `S3A-14.spec.ts` checks the data part (24 notes, half pinned, labels on 50 rows and 30 mappings, drawn on the canvas) and `S3A-14-idle.spec.ts` (2 tests) guards the canvas while idle with notes below 40 %, frames expanded and collapsed | after step 4: within the bar (expanded −5.6 % at 100 %, +0.3 % at the overview; collapsed +16.3 %); the step 5 round confirms (to come) |
+| S3A-15 | CI (lint, typecheck, unit tests, the schema check with `label`, `label_link`, `note`, `project_pinned_label`), three full e2e runs in a row | passes: CI and the schema check green on 7fa2438; lint, typecheck, 765 unit tests; three full runs in a row on 7fa2438, 124 of 124 each (below) |
+
+### Three full runs in a row
+
+`npm run e2e` with no dev server running. The rule: three passing runs in a row, and after any test change the three
+start again.
+
+| Set | Commit | Runs | What happened |
+| --- | --- | --- | --- |
+| 1 (11 October, 16:05–17:13) | 5139ba6 | 3 | Runs 1 and 3 failed S3A-13 (the owner's note vanished from the page; fixed in 7fa2438, step 5 item 4), run 2 passed 124/124 (24.1, 20.6, 23.6 min). Code changed: the sets start again. |
+| 2 (11 October, 17:21–18:22) | 7fa2438 | 3 | Three in a row: 124/124 each (20.2, 20.4, 20.2 min). “The destination stream closed early” 15, 11 and 15 times (known noise, also on `main`). |
+
+## Manual checklist (Łukasz)
+
+Fresh demo data, then the app on the preview data file:
+
+PowerShell:
+
+```powershell
+$env:INFOMAPPER_DEV_DB=".data/preview-db.json"; npm run reset-dev-data; npm run seed:large; npm run dev
+```
+
+bash:
+
+```bash
+export INFOMAPPER_DEV_DB=.data/preview-db.json && npm run reset-dev-data && npm run seed:large && npm run dev
+```
+
+Open http://localhost:3000/sign-in, pick Łukasz, open Retail Co – DWH › Customer 360 › Customer & orders, unless a step
+says otherwise.
+
+- [ ] **S3A-01** Select Customer. In its panel's Labels field type `cr 23`: the list shows “Create “cr-23”” first (the
+  demo CR-23 is there too, so here it offers CR-23 instead: open the CR-23 chip, “Delete label”, then type `cr 23`
+  again). Press Enter: the chip cr-23 appears and the cursor stays in the field. Ctrl+Z (outside the field): it is
+  gone; Enter again. Click the `email` row: type `CR`: “Create “CR”” first, then cr-23 with “1 item”; pick cr-23.
+  Click its ×: gone; Ctrl+Z: back.
+- [ ] **S3A-02** Select Sales Order and type `JIRA-900`, Enter. Then click one of its attribute rows, the table
+  order_header, one of its columns and a mapping line, and type `jira-900` (or `Jira-900`) in each: the list offers the
+  existing JIRA-900, never “Create”. Open the label: “Marks 1 entity, 1 attribute, 1 table, 1 column, 1 mapping.”
+- [ ] **S3A-03** At about 50 % zoom: the tag mark on the rows `email`, `segment_code` and `customers.email_addr`, on the
+  headers of Customer and customers, and a tag on one mapping line; hover each for “Working labels: …” or “Labels: …”.
+  Zoom out below 40 %: the row marks and the line tag go, the header marks stay.
+- [ ] **S3A-04** Open CR-23 from Customer's chip: the sentence, then Entities, Attributes, Mappings; click an item to
+  open it. Rename CR-23 to `jira-481`: refused, the name stays; rename to `CR-24`: saved. “Delete label”: the toast
+  “Deleted the label CR-24.”, the marks are gone, nothing else changed; Undo in the toast: all back.
+- [ ] **S3A-05** Open the project Order management (Home): Labels in this project lists CR-23 and JIRA-481; click the ☆ of
+  JIRA-481: it goes first with ★; reload: still first; click ★: back in place. “2 open notes” and the list “Open notes”;
+  click “Which order statuses …”: Customer & orders opens with that note selected. Resolve both open notes, go Home:
+  “No open notes on this project’s canvases.”
+- [ ] **S3A-06** Press N, press Esc on the new note: nothing stays, Undo unchanged. N, click the empty canvas, type,
+  Ctrl+Enter: a yellow note. N on a card: a note to its right with a dashed tether. Draw a frame (A), N on its name: a
+  note on the frame; collapse it, N on the block: a note on the block. Right-click the empty canvas, a card and a frame:
+  “Add a note here”, “Add a note to this”, “Add a note to this frame”; select a card: “Add a note” in its Notes section.
+- [ ] **S3A-07** Double-click a note, change the text, Ctrl+Enter; double-click again, type, Esc (nothing changes). Drag
+  its right edge. Right-click it: Colour; select it: Colour in the panel. Its ✓, “Mark as resolved” / “Reopen” in the
+  toolbox, Status in the panel. After each change Ctrl+Z undoes exactly that change.
+- [ ] **S3A-08** Drag the blue free note into a frame, drag the frame: the note moves with it; collapse the frame: the
+  note is hidden; expand it. Drag order_line: its notes follow, with their tethers. Right-click a pinned note, “Unpin
+  (make it a free note)”: it stays where it is. Select order_line, “Remove from this canvas”: its other note stays as a
+  free note.
+- [ ] **S3A-09** order_line's header shows a note icon with 2 (its open and resolved notes); its panel's Notes lists
+  both. A frame's panel lists the notes pinned to it; collapsed, its block shows “N notes”. Press Esc: the overview's
+  “Notes on this canvas” lists the open notes. Untick “Show resolved notes on the canvas”: the resolved note goes, the
+  header shows 1, Undo unchanged; reload: still hidden; sign in as Piotr: he sees it.
+- [ ] **S3A-10** Click a note; Shift+click a card and another note (“N selected”); lasso around a free note; Ctrl+A (free
+  notes outside frames are in, pinned ones not); drag the group by a card or a note; arrow keys, then one Ctrl+Z; a
+  pinned note whose card is in the group moves once. A free note in a frame: a lasso around the whole frame selects the
+  frame only. Select a note, Delete: “Note deleted” with Undo.
+- [ ] **S3A-11** Canvas tab menu (⋯) › “Duplicate layout”: the toast “Duplicated Customer & orders. Only the layout is
+  copied; the model is shared.”; the copy has no notes; back on the original, the notes are as before.
+- [ ] **S3A-12** Select Customer, “Delete entity”, confirm. Ctrl+Z: Customer is back and the CR-23 marks on it, `email`,
+  `segment_code` and the mapping line are back too (CR-23's panel says “Marks 1 entity, 2 attributes, 1 mapping.”).
+- [ ] **S3A-13** As Piotr: labels show as chips without × or input, the label panel is read-only, the project home has
+  no pin stars (a pinned label shows a plain ★); notes: the Note tool works, he edits, resolves, moves and deletes
+  notes. As Kasia: no Note tool, notes cannot be moved, edited or resolved, a right-click on a note opens nothing, the
+  note panel is read-only, no “Add a note”, labels read-only.
+
+And the definition of done: label the Customer mappings of a change request on Customer & orders, open the label and
+walk its items, write three notes (one free in a frame, one pinned to a card, one on a frame), resolve one, hide resolved
+notes, collapse the frame with notes, duplicate the layout, and undo the label's deletion.
+
+## Proposed changes to `docs/decisions.md` (waiting for Łukasz)
+
+Not applied: they go into `docs/decisions.md` in this pull request once Łukasz approves the text.
+
+1. **AD-05**, replace: “Five roles per workspace: owner, admin, modeler, reviewer (read, comment, notes, approve),
+   reader.” with: “Five roles per workspace: owner, admin, modeler, reviewer (read, comment, notes, approve), reader.
+   Reviewers write, resolve, move, pin and delete any note as modelers do; working labels are changed by owners, admins
+   and modelers only; readers read notes and labels.”
+2. **D-20**, append: “Duplicate layout copies no notes. A note joins a frame only when dropped in it (drawing,
+   resizing or fitting a frame never moves or claims notes). A note whose card or frame leaves the canvas stays as a
+   free note at its place, in no frame.”
+3. **D-21**, replace: “Notes are open or resolved; resolved ones can be hidden; an empty new note disappears.” with:
+   “Notes are open or resolved; resolved ones can be hidden, a preference of each person in their browser (not saved,
+   not an undo step); an empty new note disappears. Every note change is one undo step; anyone who may write notes
+   edits any note, and its panel names who wrote it.”
+4. **D-53** (new, under Working layer): “A count of notes (a card's header, a collapsed frame's block) shows the notes
+   you would see: open ones, and resolved ones while they are shown. Notes take part in the selection: a lassoed frame
+   stands for its free notes, Ctrl+A takes the free notes outside frames, and a pinned note moves with its card or
+   frame, never twice.”
+5. **D-24**, append: “Merging mappings keeps the labels of the merged ones on the mapping that stays.”
+6. **D-29**, append: “Pinning a label to a project is saved with its change event but is not an undo step (no undo
+   outside canvases yet).”
 
 ## Assumptions and decisions
 
@@ -130,8 +258,9 @@ every zoom like a table header (prototype `lmark("entity", …)`); PRD item 3 no
 7. **The tether** joins the points of the note and its element nearest to each other's centre, with a dot on the
    element, and is left out when the note lies on its element (prototype `tethers`).
 8. **Who may do what:** the Note tool (button and N), the note toolbox's actions, dragging, resizing, ✓ and the
-   panel's fields are for editors and reviewers; readers see notes and their panel read-only, and their toolbox shows
-   only its heading.
+   panel's fields are for editors and reviewers; readers see notes and their panel read-only, and a right-click on a
+   note opens no toolbox for them (a toolbox that offers nothing is not opened, as elsewhere in the app; corrected in
+   step 5, the first text said “only its heading”).
 9. **A new card is not placed under a note:** the free spots for cards placed from the left panel or the panels avoid
    the notes drawn, as the prototype's `freeSpot` does.
 10. **Not yet:** the card's and frame's “Notes” panel section with its “Add a note” (item 12, step 4), the note count on
@@ -210,6 +339,27 @@ rights (step 2, item 6).
 **Assumptions 5, 7 and 13 and the changes to S2A-02, S2B-08 and S2C-08 accepted by Łukasz on 11 October 2026.**
 
 **Step 4 accepted by Łukasz on 11 October 2026** after his manual check, including the count rule (items 2 and 3).
+
+### Step 5 (acceptance tests and wrap-up)
+
+1. **Texts the tests read:** a refused rename names the label as it is stored (“Another label is already called
+   “JIRA-481”.” for a typed `jira-481`); the project home writes “this project’s” with a typographic apostrophe, like
+   the rest of the app (the PRD has a straight one).
+2. **A correction to step 3, item 8:** for readers a right-click on a note opens no toolbox: the app never opens a
+   toolbox that offers nothing. The earlier text said “only its heading”.
+3. **S3A-14 in the e2e suite:** the round itself is `measure:canvas`; `S3A-14.spec.ts` checks the data part (what
+   `seed:large` adds is on the canvas) and `S3A-14-idle.spec.ts` is the idle guard from step 4. S3A-15 is the CI and
+   the three runs, with no spec of its own.
+4. **Fixed: a late fresh page hid notes written meanwhile.** The first set of full runs failed S3A-13 twice: a note
+   created right after a label write was saved but vanished from the canvas until a reload. The label write's
+   re-rendered page had read the notes before the note existed and arrived after it, and the canvas took the page's
+   notes as they were. The page now passes the time it read the notes (`notesReadAt`), and the canvas keeps notes
+   created after that, its own newer versions and its own deletions (`mergeServerNotes` in `note-data.ts`, with unit
+   tests); an undo still wins, because it writes a newer version or removes a note created before the page's read.
+   Frames and cards have the same kind of merge already for writes on their way; they were not changed.
+5. **Test views:** the tests that work on the right of Customer & orders (the demo notes, order_line) open it at 50 or
+   60 %, scrolled right, so every note they touch is above the status bar; a frame's name at the top of the canvas
+   needs slice 2b's `FRAMED` view.
 
 ## S3A-14: rounds against slice 2c
 
