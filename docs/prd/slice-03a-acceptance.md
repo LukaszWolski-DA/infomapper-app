@@ -209,6 +209,51 @@ rights (step 2, item 6).
 
 **Assumptions 5, 7 and 13 and the changes to S2A-02, S2B-08 and S2C-08 accepted by Łukasz on 11 October 2026.**
 
+**Step 4 accepted by Łukasz on 11 October 2026** after his manual check, including the count rule (items 2 and 3).
+
+## S3A-14: rounds against slice 2c
+
+Each sitting is one quick round (`--quick`: pan and zoom, C-08, C-10 and the lasso marks) of `npm run measure:canvas` in
+the production measurement build, headed Chrome, 1536 × 864, on the development laptop (the reference machine, AD-24),
+this branch against `slice-02c` (`10907f4`) in `../infomapper-ab-main`; mains power, “Best performance”, the machine quiet
+before each side (each sitting's `sitting.json`). Łukasz prepared the laptop. **The `slice-02c` side runs “Performance
+test” without labels and notes** (its `seed:large` has none), so the comparison includes the cost of that content (24
+notes, labels on 50 rows, 30 mappings and 10 headers), as S3A-14 intends.
+
+### After step 4 (11 October, 12:56 and 13:06, at `ed7befe`)
+
+Frames expanded, sitting `.data/measure/2026-10-11-12-56`:
+
+| Figure | Bar | slice-02c | This branch | Change | Result |
+| --- | --- | --- | --- | --- | --- |
+| Pan and zoom at the overview | ≥ 50 fps, ≥ −5 % vs reference | 59.5 | 59.7 | +0.3 % | met |
+| – frames over 50 ms | ≤ 0 | 0 | 0 | – | met |
+| Pan and zoom at 100 %, dense area | ≥ 50 fps, ≥ −5 % vs reference | 52.1 | 49.2 | −5.6 % | not met (tool's bar); within S3A-14's “about 10 %” |
+| – frames over 50 ms | ≤ 0 | 4 | 9 | – | not met (slice 2c misses it too) |
+| Initial render (C-08), median of 5 | ≤ 1500 ms | 1425 | 1485 | +4.2 % | met |
+| Hover to the next frame (C-10), median of 40 | ≤ 100 ms | 136 | 119 | −12.6 % | not met (as before) |
+| Marks after a lasso, median of 20 | ≤ 100 ms | 68 | 28 | −59.6 % | met |
+
+All frames collapsed (`--branch-diag collapsed`, this branch's side only), sitting `.data/measure/2026-10-11-13-06`:
+
+| Figure | Bar | slice-02c | This branch (collapsed) | Change | Result |
+| --- | --- | --- | --- | --- | --- |
+| Pan and zoom at the overview | ≥ 50 fps, ≥ −5 % vs reference | 59.2 | 60.0 | +1.4 % | met |
+| – frames over 50 ms | ≤ 0 | 0 | 0 | – | met |
+| Pan and zoom at 100 %, dense area | ≥ 50 fps, ≥ −5 % vs reference | 51.5 | 59.9 | +16.3 % | met |
+| – frames over 50 ms | ≤ 0 | 9 | 0 | – | met |
+| Initial render, hover, lasso marks | – | 1425 ms, 136 ms, 95 ms | – | – | not applicable |
+
+**Reading.** Expanded, the overview is level with `slice-02c` and with slice 2c's accepted figure (59.7). At 100 % the
+branch is 5.6 % below (49.2 against 52.1 fps; slice 2c's accepted figure was 52.0) with 9 long frames against 4: inside
+S3A-14's “no more than about 10 % below”, just past the tool's 5 %. One round cannot tell whether it is real; the same
+reference build had 4 long frames in the first sitting and 9 in the second. The initial render, 1485 ms, is just under
+1500 ms. Collapsed, the branch matches slice 2c's accepted figures (60.0 and 60.0 fps, no long frame): notes and labels
+on blocks cost nothing measurable. The lasso marks (28 against 68 ms) are faster with nothing in step 4 to explain it;
+read as the noise of one round. The S2C-12 guard and the new idle guard (item 15) passed in the full e2e runs.
+**Łukasz:** no extra round now; the step 5 round confirms. If, frames expanded, 100 % is again 5 % or more below
+`slice-02c` with clearly more long frames, or C-08 is over 1500 ms, the cause is found before merging.
+
 ## Changes to earlier tests
 
 - `src/domain/permissions.test.ts`: the role matrix gains `label.edit` (owner, admin, modeler) and `note.edit` (owner,

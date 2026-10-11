@@ -1,7 +1,8 @@
 # Slice 2p – Acceptance
 
 Status: **closed without changing the renderer** (Łukasz, 8 October 2026): steps 0, 1 and 1b done; steps 2–4 dropped or
-deferred; waiting for Łukasz's acceptance of the closing. Branch `slice/02p-canvas-performance`, pull request #6.
+deferred. The closing was accepted and merged on 8 October 2026 (pull request #6, merge `cc8005a`, tag `slice-02p`).
+Branch `slice/02p-canvas-performance`.
 
 ## Decisions during the slice
 
