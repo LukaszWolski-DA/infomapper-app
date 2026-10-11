@@ -29,8 +29,8 @@
 // tether is drawn by the line layer. N (or the toolbar) is the Note tool; Delete removes a selected note. Reviewers
 // write notes too (`canNote`); the free notes of a moved frame move with it (`noteAt`, moveOnCanvas on the server).
 // Step 4: notes take part in the selection (`note:` keys: click, Shift+click, lasso, Ctrl+A for free notes in no frame,
-// group drag and nudge, each note moved once); a card's header shows its open pinned notes and a collapsed block its
-// notes; Fit everything counts the notes shown; resolved notes are hidden when the person chose so (`hideResolved`);
+// group drag and nudge, each note moved once); a card's header and a collapsed block show the number of their notes
+// shown (open, and resolved unless hidden); Fit everything counts the notes shown; resolved notes are hidden when the person chose so (`hideResolved`);
 // `focusNoteId` selects a note on arrival (the project home's open notes).
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
@@ -91,7 +91,7 @@ import LineLayer from "./LineLayer";
 import { bundleLines, type Bundle } from "./line-geometry";
 import { Overview } from "./Overview";
 import NoteLayer, { type ShownNote } from "./NoteLayer";
-import { countsKey, countsOf, frameNoteCounts, noteAt, noteShown, openPinnedCounts, placesOf, tether, type NoteData } from "./note-data";
+import { countsKey, countsOf, frameNoteCounts, noteAt, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
 import { DRAFT_NOTE, NO_NOTE_WRITES, useNotes, type NoteMover, type NoteWrites } from "./useNotes";
 
 const nodeTypes = { card: CardNode, block: BlockNode };
@@ -156,13 +156,13 @@ export interface ModelCanvasProps {
 type PlaceSpot = { x: number; y: number; height: number };
 type FrameRef = { frameId: string; expectedVersion: number };
 
-const toNode = (card: CardData, editable: boolean, openNotes?: number): CardNodeT => ({
+const toNode = (card: CardData, editable: boolean, pinnedNotes?: number): CardNodeT => ({
   id: card.id,
   type: "card",
   position: { x: card.x, y: card.y },
   width: cardWidth(card),
   height: cardHeight(card),
-  data: openNotes ? { card, openNotes } : { card },
+  data: pinnedNotes ? { card, pinnedNotes } : { card },
   draggable: editable,
   dragHandle: ".c-head",
   selectable: false,
@@ -462,10 +462,10 @@ export function ModelCanvas({
       const local = new Map(ns.map((n) => [n.id, n]));
       return initialCards.map((c) => {
         const mine = local.get(c.id);
-        // the number of open notes stays as the notes last gave it (slice 3a)
-        if (!mine || (!(pending.current.get(c.id) ?? 0) && !mine.dragging)) return toNode(c, editable, mine?.data.openNotes);
+        // the number of notes stays as the notes last gave it (slice 3a)
+        if (!mine || (!(pending.current.get(c.id) ?? 0) && !mine.dragging)) return toNode(c, editable, mine?.data.pinnedNotes);
         const { x, y, collapsed, rowFilter, width, frameId } = mine.data.card;
-        return { ...toNode({ ...c, x, y, collapsed, rowFilter, width, frameId }, editable, mine.data.openNotes), position: mine.position, dragging: mine.dragging };
+        return { ...toNode({ ...c, x, y, collapsed, rowFilter, width, frameId }, editable, mine.data.pinnedNotes), position: mine.position, dragging: mine.dragging };
       });
     });
     for (const c of initialCards) if (!(pending.current.get(c.id) ?? 0)) versions.current.set(c.id, c.version);
@@ -845,8 +845,8 @@ export function ModelCanvas({
   const collapsedIds = useMemo(() => new Set(frames.filter((f) => f.collapsed).map((f) => f.id)), [frames]);
   // the numbers of notes (slice 3a, item 12), as strings first: a note that only moves changes none of them
   const savedNotes = useMemo(() => noteState.notes.filter((n) => n.id !== DRAFT_NOTE), [noteState.notes]);
-  const openPinnedKey = useMemo(() => countsKey(openPinnedCounts(savedNotes)), [savedNotes]);
-  const openPinned = useMemo(() => countsOf(openPinnedKey), [openPinnedKey]);
+  const cardNotesKey = useMemo(() => countsKey(cardNoteCounts(savedNotes, ui.hideResolved)), [savedNotes, ui.hideResolved]);
+  const cardNotes = useMemo(() => countsOf(cardNotesKey), [cardNotesKey]);
   const frameNotesKey = useMemo(() => countsKey(frameNoteCounts(savedNotes, ui.hideResolved)), [savedNotes, ui.hideResolved]);
   const frameNotes = useMemo(() => countsOf(frameNotesKey), [frameNotesKey]);
   const counts = useMemo(() => memberCounts(cardData), [cardData]);
@@ -886,21 +886,21 @@ export function ModelCanvas({
         };
       });
   }, [collapsedIds, frames, cardData, frameRects, conceptColors, selection, selectedFrameId, frameNotes]);
-  // A card with open pinned notes has their number in its data (slice 3a): changed only when a number changes, so no
+  // A card with pinned notes shown has their number in its data (slice 3a): changed only when a number changes, so no
   // other card draws again.
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the numbers follow the notes, which live beside the cards
     setNodes((ns) => {
       let changed = false;
       const next = ns.map((n) => {
-        const count = openPinned.get(n.id) ?? 0;
-        if ((n.data.openNotes ?? 0) === count) return n;
+        const count = cardNotes.get(n.id) ?? 0;
+        if ((n.data.pinnedNotes ?? 0) === count) return n;
         changed = true;
-        return { ...n, data: count ? { ...n.data, openNotes: count } : { card: n.data.card } };
+        return { ...n, data: count ? { ...n.data, pinnedNotes: count } : { card: n.data.card } };
       });
       return changed ? next : ns;
     });
-  }, [openPinned]);
+  }, [cardNotes]);
   /** The nodes React Flow draws: the cards, those of a collapsed frame hidden, and the blocks. */
   const flowNodes = useMemo(() => {
     const cards = collapsedIds.size

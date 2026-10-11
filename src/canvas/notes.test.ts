@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 import { frame, ids, note } from "@/domain/__fixtures__/domain";
-import { buildNotes, countsKey, countsOf, firstLine, frameNoteCounts, noteAt, noteDate, noteShown, openPinnedCounts, placesOf, tether, type NoteData } from "./note-data";
+import { buildNotes, countsKey, countsOf, firstLine, frameNoteCounts, noteAt, noteDate, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
 
 const { itemCustomer, frameA, noteFree, notePinned } = ids;
 const names = (id: string) => (id === ids.actor ? "Łukasz" : "Piotr Wiśniewski");
@@ -75,9 +75,13 @@ describe("noteDate", () => {
 describe("notes elsewhere (item 12, S3A-09)", () => {
   const n = (over: Partial<NoteData>) => ({ pinCardId: null, pinFrameId: null, frameId: null, status: "open" as const, ...over });
 
-  it("counts the open notes pinned to each card, not resolved or free ones", () => {
-    const counts = openPinnedCounts([n({ pinCardId: "c1" }), n({ pinCardId: "c1" }), n({ pinCardId: "c1", status: "resolved" }), n({ pinCardId: "c2" }), n({ frameId: "F1" })]);
-    expect([...counts]).toEqual([
+  it("counts the notes pinned to each card that are shown: resolved ones only while shown, never free ones", () => {
+    const notes = [n({ pinCardId: "c1" }), n({ pinCardId: "c1" }), n({ pinCardId: "c1", status: "resolved" }), n({ pinCardId: "c2" }), n({ frameId: "F1" })];
+    expect([...cardNoteCounts(notes)]).toEqual([
+      ["c1", 3],
+      ["c2", 1],
+    ]);
+    expect([...cardNoteCounts(notes, true)]).toEqual([
       ["c1", 2],
       ["c2", 1],
     ]);

@@ -150,13 +150,15 @@ rights (step 2, item 6).
    touch no card, frame name or other note, so the measuring tests' clicks, drags and lassos are not caught by a note.
    `seed:large` still adds nothing to a file that has “Performance test” already: `npm run reset-dev-data` first. The
    measuring tests seed a fresh file, so they get the notes.
-2. **A card's header** shows its open pinned notes (prototype `noteMark`): a note icon, the number from two on, the
-   tooltip “N open notes pinned here”; at every zoom, like the rest of the header; it takes room when deciding whether
-   the first line needs clipping. Resolved notes do not count.
+2. **A card's header** shows the number of its pinned notes that are shown: a note icon, the number from two on, the
+   tooltip “N notes pinned here”; at every zoom, like the rest of the header; it takes room when deciding whether the
+   first line needs clipping. Open notes count, resolved ones only while “Show resolved notes on the canvas” is on.
+   *Łukasz's decision after step 4*, unlike the prototype's `noteMark` (open notes only): one rule everywhere, a count
+   shows the notes you'd see.
 3. **A collapsed block's “N notes”** counts the notes pinned to the frame and the free notes in it that are shown: the
    open ones, and the resolved ones only while “Show resolved notes on the canvas” is on, as the block's last chip.
    *Łukasz's decision after step 4*, unlike the prototype's `blockCard`, which counts resolved notes always; it keeps
-   the block's number in line with what the canvas shows and with the card header's count (open notes).
+   the block's number in line with what the canvas shows and with the card header's count (item 2, the same rule).
 4. **The “Notes” section** (prototype `notesHere`) is in the entity and table panels before “On canvases”, and in the
    frame panel before “In this frame”. It lists the notes pinned to that card or frame (first line or “Empty note”,
    “open” or “resolved”); “Add a note” pins a new note there. Readers get the section only when there are notes, and no

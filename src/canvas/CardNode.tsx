@@ -12,8 +12,8 @@ import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
 import { splitName } from "./names";
 import { lineNeedsClip } from "./text-fit";
 
-/** `openNotes`: the open notes pinned to the card (slice 3a), given by the canvas only when there are some. */
-export type CardNodeT = Node<{ card: CardData; openNotes?: number }, "card">;
+/** `pinnedNotes`: the notes pinned to the card that are shown (slice 3a), given by the canvas only when there are some. */
+export type CardNodeT = Node<{ card: CardData; pinnedNotes?: number }, "card">;
 
 /** A card node, not a collapsed frame's block (slice 2c): React Flow holds both kinds. */
 export const isCardNode = (n: Node): n is CardNodeT => n.type === "card";
@@ -39,11 +39,12 @@ const ICON = {
  * <i>, so the header's `span:nth-child(2)` rules (the concept text, its clip) never apply to it.
  */
 /**
- * The open notes pinned to the card (prototype noteMark): a note icon, with their number when more than one; at every
+ * The notes pinned to the card that are shown (prototype noteMark; resolved ones count while they are shown, Łukasz's
+ * decision after step 4): a note icon, with their number when more than one; at every
  * zoom, like the rest of the header (slice 3a, item 12).
  */
 const NoteMark = ({ n }: { n: number }) => (
-  <i className="nmark" title={`${n} open note${n > 1 ? "s" : ""} pinned here`} data-testid="mark-notes" data-count={n}>
+  <i className="nmark" title={`${n} note${n > 1 ? "s" : ""} pinned here`} data-testid="mark-notes" data-count={n}>
     <svg viewBox="0 0 16 16" aria-hidden>
       <path d="M3 2.5h10v7.5l-3.5 3.5H3z" />
       <path d="M13 10H9.5v3.5" />
@@ -104,7 +105,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
 }
 
 function CardNode({ data }: NodeProps<CardNodeT>) {
-  const { card, openNotes = 0 } = data;
+  const { card, pinnedNotes = 0 } = data;
   const ctx = useContext(CanvasCardsCtx);
   const blocks = !!useContext(DiagnosisCtx).blocks;
   const lod = useStore((s) => blocks || s.transform[2] < LOD_ZOOM);
@@ -117,7 +118,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   const cardSelected = sel?.t === "card" && sel.id === card.id;
   const selectedRow = sel?.t === "row" && sel.cardId === card.id ? sel.id : null;
   // the open-notes mark takes room in the first line too (slice 3a): checked only on cards that have one
-  const clipLine1 = card.clipLine1 || (openNotes > 0 && lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, card.width ?? undefined, !!card.labels, openNotes));
+  const clipLine1 = card.clipLine1 || (pinnedNotes > 0 && lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, card.width ?? undefined, !!card.labels, pinnedNotes));
 
   // A click on a row selects the row, anywhere else on the card the card; the card tools do their own thing.
   // Shift+click anywhere on the card puts the card in or out of a selection of several (slice 2a).
@@ -154,7 +155,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
             <span className="path">{card.line1}</span>
           )}
           {card.labels && <LabelMark labels={card.labels} />}
-          {openNotes > 0 && <NoteMark n={openNotes} />}
+          {pinnedNotes > 0 && <NoteMark n={pinnedNotes} />}
           {ctx.editable && (
             <span className="c-tools nodrag">
               {isEnt && (

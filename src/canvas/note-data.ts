@@ -108,10 +108,14 @@ export function tether(note: Rect, target: Rect): { x1: number; y1: number; x2: 
 /** A note's first line for the lists (prototype firstLine); empty for an empty note (“Empty note”). */
 export const firstLine = (text: string): string => text.split("\n").find((l) => l.trim())?.trim() ?? "";
 
-/** The open notes pinned to each card (prototype noteMark): the number on the card's header. */
-export function openPinnedCounts(notes: readonly Pick<NoteData, "pinCardId" | "status">[]): Map<Uuid, number> {
+/**
+ * The notes pinned to each card that are shown, for the number on its header: open ones, and resolved ones unless
+ * resolved notes are hidden (Łukasz's decision after step 4: a count shows the notes you'd see; the prototype's
+ * noteMark counts open ones only).
+ */
+export function cardNoteCounts(notes: readonly Pick<NoteData, "pinCardId" | "status">[], hideResolved = false): Map<Uuid, number> {
   const counts = new Map<Uuid, number>();
-  for (const n of notes) if (n.pinCardId && n.status === "open") counts.set(n.pinCardId, (counts.get(n.pinCardId) ?? 0) + 1);
+  for (const n of notes) if (n.pinCardId && !(hideResolved && n.status === "resolved")) counts.set(n.pinCardId, (counts.get(n.pinCardId) ?? 0) + 1);
   return counts;
 }
 
