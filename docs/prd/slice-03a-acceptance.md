@@ -70,7 +70,8 @@ newest release, with `@boundaries/elements` 3.1.1 pinning `handlebars` 4.7.9. No
    `customers.email_addr`. Anna made both. On “Customer & orders” there are three notes: a free one by Łukasz
    (blue), and two pinned to the table `order_line`, one by Piotr, one by Anna which Łukasz resolved (step 3: on the
    canvas's far right, away from the empty spots earlier end-to-end tests use; first pinned to Customer and
-   `web_users`). No label is
+   `web_users`; step 4: below `order_line` instead of to its right, so Fit everything, which counts notes, keeps the
+   first view of the earlier tests above 40 % zoom). No label is
    pinned to a project (the prototype pins CR-23 and JIRA-481; S3A-05 starts from no pins).
 
 ### Step 2 (labels)
@@ -136,6 +137,65 @@ every zoom like a table header (prototype `lmark("entity", …)`); PRD item 3 no
 10. **Not yet:** the card's and frame's “Notes” panel section with its “Add a note” (item 12, step 4), the note count on
    card headers and blocks (step 4), Fit everything counting notes (item 14, step 4).
 
+**Accepted by Łukasz on 11 October 2026** after his manual check of step 3, with two follow-ups to step 2 (both in
+`46ac76f`, then `f5acb59`): the tag mark on a labeled entity's card header, and the pin star only for roles with label
+rights (step 2, item 6).
+
+### Step 4 (notes elsewhere, selection, permissions)
+
+1. **`seed:large` adds a working layer to “Performance test”** (the data part of S3A-14, done first): five labels
+   `PERF-1` to `PERF-5` on 25 attributes, 25 columns and 30 mappings (every tenth) and on five entity and five table
+   headers; 24 notes, 12 pinned (one card in each of the 8 frames, and the first 4 frames above their name) and 12 free
+   (6 inside frames, 6 between the frames and the cards in no frame), every fourth resolved. The notes lie on spots that
+   touch no card, frame name or other note, so the measuring tests' clicks, drags and lassos are not caught by a note.
+   `seed:large` still adds nothing to a file that has “Performance test” already: `npm run reset-dev-data` first. The
+   measuring tests seed a fresh file, so they get the notes.
+2. **A card's header** shows its open pinned notes (prototype `noteMark`): a note icon, the number from two on, the
+   tooltip “N open notes pinned here”; at every zoom, like the rest of the header; it takes room when deciding whether
+   the first line needs clipping. Resolved notes do not count.
+3. **A collapsed block's “N notes”** counts the notes pinned to the frame and the free notes in it, open or resolved
+   (prototype `blockCard`), as the block's last chip.
+4. **The “Notes” section** (prototype `notesHere`) is in the entity and table panels before “On canvases”, and in the
+   frame panel before “In this frame”. It lists the notes pinned to that card or frame (first line or “Empty note”,
+   “open” or “resolved”); “Add a note” pins a new note there. Readers get the section only when there are notes, and no
+   “Add a note”.
+5. **A note link in a panel** (the Notes section, the canvas overview) selects the note and, when it is shown but out of
+   view, brings it into view at the same zoom (the prototype only selects it; a link that changes nothing visible
+   seemed wrong).
+6. **“Notes on this canvas”** is a folding section of the canvas overview, before the frames (the prototype's order),
+   with the number of open notes; “Show resolved notes on the canvas” is offered when the canvas has notes, as in the
+   prototype. Hiding resolved notes is kept in this browser per person (`infomapper:notes:hide-resolved:<user id>`) and
+   holds for every canvas (the prototype's `V.hideResolved` is not per canvas either). A hidden note leaves a selection
+   of several; a note selected alone stays selected.
+7. **The project home** shows “N open notes” after the mapped attributes (the prototype's order) and “Open notes” after
+   the labels: canvas by canvas in tab order, oldest first, each with its canvas's name and “, on {card or frame}”. A
+   click opens the canvas with `?note=<id>`: the note is selected and centred at 100 % (the prototype fits a box around
+   it); a note in a collapsed frame is selected without moving the view.
+8. **Notes in the selection (item 13):** a click selects a note; Shift+click puts it in or out of a selection; a lasso
+   catches a note fully inside it unless its frame is caught (a pinned note has no frame, so it is caught on its own, as
+   in the prototype); Ctrl+A takes the free notes shown in no frame. A selection moves by dragging any of its cards,
+   frames or notes, and by the arrow keys; a free note in a moving frame goes with its frame, a pinned note with its
+   card or frame (also a card carried by its frame), so nothing moves twice. A note selected alone moves with the arrow
+   keys too (prototype `nudge`). Align, stack, line up, fit widths, “Put in a new frame” and “Remove from this canvas”
+   leave notes alone; the selection panel counts and lists them (“2 tables, 1 note.”).
+9. **One change group, one undo step:** a selection with cards or frames is saved by `moveOnCanvas`, which now takes
+   the selected notes too (they need note rights; a free one joins the frame it lands in, among the frames after the
+   move); notes alone by a new command, `moveNotes`. Undo labels: “Move notes”, and “Move selection” for notes with cards
+   or frames.
+10. **Who may move what:** reviewers move only the notes of a selection (cards and frames stay where they are); readers
+   move nothing. A right-click on a note of a selection opens the group's toolbox; Delete with several items selected
+   does nothing, as in the prototype (it deletes a single selected note).
+11. **Fit everything** (F, and the first view of a canvas without a remembered view) counts the notes shown.
+12. **Fixed from step 3:** below 40 % zoom a note's plain body took its height from the note's last measure, its bottom
+   margin added 8 px, and the note was measured again: every note grew by 8 px about once a second and the canvas
+   re-rendered while idle. A note is no longer measured while it draws its plain body, which now keeps the measured
+   height.
+13. **The demo's pinned notes moved below `order_line`** (step 1, item 9): to its right they widened what Fit
+   everything takes in, and the first view of “Customer & orders” fell below 40 % zoom, where rows are not drawn (the
+   first step 4 run failed seven slice 1a tests on that).
+14. **Not built:** the prototype's miniature (`renderMini`) draws notes; the PRD does not list it, so the Overview's
+   miniature shows none. Question for Łukasz.
+
 ## Changes to earlier tests
 
 - `src/domain/permissions.test.ts`: the role matrix gains `label.edit` (owner, admin, modeler) and `note.edit` (owner,
@@ -151,3 +211,11 @@ every zoom like a table header (prototype `lmark("entity", …)`); PRD item 3 no
   to frame”, for editors and reviewers (step 3).
 - The first step 3 run also failed S1B-06 and S2B-02 because demo notes lay on the empty spots those tests use; the
   demo notes moved (step 1, item 9), the tests did not change.
+- `src/canvas/labels.test.ts`: a labeled entity's header has the tag mark now (step 2 follow-up).
+- `src/data/local/model-store.test.ts`: `seed:large` also checks the labels and notes it adds (step 4).
+- `src/canvas/selection.test.ts`: the units a selection moves have a `notes` list (step 4).
+- `e2e/slice-02a/S2A-02.spec.ts` and `e2e/slice-02b/S2B-08.spec.ts`: Ctrl+A also selects the demo's free note in no
+  frame (item 13), so the counts, kinds and names include it (step 4).
+- `e2e/slice-02c/S2C-08.spec.ts` (Fit everything with all cards in one collapsed frame): Fit everything also takes in
+  the demo's free note outside the frame (item 14), so the test checks that the block and the note are both in the
+  view instead of the block being in the middle (step 4).
