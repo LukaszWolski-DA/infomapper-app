@@ -117,7 +117,12 @@ mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md]
   and path, no group, no transform): 210 fewer elements in that view (21,012 → 20,802 on the dev server). **Fewer
   elements per note, partly done:** the note icon is a CSS mask, the spacer before the ✓ is a margin, a tether has no
   group: a note has 7–8 elements at 100 % instead of 11–12, 6 below 40 % instead of 10, a tether 2 instead of 3; 108
-  fewer in that view (20,802 → 20,694; at 30 %: 6,005 → 5,897).
+  fewer in that view (20,802 → 20,694; at 30 %: 6,005 → 5,897). The balanced sitting after it (`2026-10-11-18-41`)
+  still had 100 % at −5.3 % (49.7 against 52.5 fps, 9 long frames against 4), accepted by Łukasz as within S3A-14's bar.
+  Traces after it: Layerize per frame fell a little (branch 10.48 → 10.12 ms, gap to `slice-02c` +1.22 → +0.80 ms),
+  about what the element count predicts but inside the run-to-run spread (0.4–0.7 ms); the remaining excess is about
+  +0.8 ms Layerize, +0.1 ms layout, +0.15 ms script per frame. So the element-count attribution is consistent with the
+  traces but not proven; the performance review starts from these traces (`.data/measure/diag-3a`, `diag-3a-after`).
 - **What has to happen later (performance review before the database slice, AD-31):** measure a separate compositing
   layer for the notes (option c: their paint and Layerize no longer part of the cards'; it touches AD-24's rules on
   layers and may cost GPU memory or raster time) and, if still needed, fewer elements per note beyond slice 3a's (body,

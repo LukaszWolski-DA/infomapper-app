@@ -531,6 +531,35 @@ initial render is slower on both sides; the branch is +0.7 %. Collapsed is uncha
     147 ms; lasso marks 26 against 105 ms. The branch is about 1 fps faster at 100 % than in sitting `16-56` (48.6), but
     the reference is faster too (51.0 → 52.5), and the gap did not close: Łukasz's condition holds again (5 % or more
     below with clearly more long frames). The collapsed sitting and the full runs were not started; reported to Łukasz.
+13. **Łukasz's decision (11 October):** the −5.3 % at 100 %, frames expanded (sitting `2026-10-11-18-41`: 49.7 against
+    52.5 fps, 9 long frames against 4; overview −0.1 %; C-08 1475 ms), is **accepted for this slice: it is within
+    S3A-14's bar** (“no more than about 10 % below `slice-02c`”).
+14. **Chrome traces after the reduction** (11 October, measurement builds at `ac5c739` and `slice-02c`, 6 s of S1A-14's
+    100 % pan and zoom, headed Chrome, 1536 × 864; two pairs in the order reference, branch, branch, reference; traces
+    and logs in `.data/measure/diag-3a-after`; the temporary spec was not committed). Milliseconds per main-thread frame
+    on the renderer's main thread, read the same way from the earlier traces (`diag-3a`):
+
+    | Run | Elements | Frames in 6 s | Layerize | Paint | PrePaint | Style | Layout | Script |
+    | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+    | Before: `slice-02c`, 2 runs | 18,913 | 288, 290 | 9.21, 9.30 | 4.52, 4.52 | 0.70, 0.70 | 1.40, 1.32 | 1.08, 1.06 | 1.56, 1.44 |
+    | Before: branch at `ae4d995`, 2 runs | 19,613 | 266, 275 | 10.60, 10.35 | 4.68, 4.66 | 0.70, 0.73 | 1.36, 1.36 | 1.20, 1.10 | 1.94, 1.59 |
+    | Before: branch, notes and marks off | 18,915 | 282, 276 | 9.35, 9.64 | 4.74, 4.89 | 0.73, 0.74 | 1.41, 1.50 | 1.16, 1.15 | 1.70, 1.58 |
+    | After: `slice-02c`, 2 runs | 20,226 | 271, 291 | 9.52, 9.12 | 5.15, 4.12 | 0.71, 0.74 | 1.46, 1.49 | 1.17, 1.13 | 1.58, 1.37 |
+    | After: branch at `ac5c739`, 2 runs | 20,679 | 278, 266 | 9.78, 10.46 | 4.30, 4.80 | 0.78, 0.77 | 1.43, 1.39 | 1.24, 1.28 | 1.61, 1.66 |
+
+    (Elements are counted 2 s after the canvas is ready, so the new counts are higher on both sides than the earlier
+    ones; the difference between the sides is what compares: about 700 before, 453 after. Script is `FunctionCall`
+    and `EvaluateScript`.)
+
+    **Did Layerize drop? A little, not clearly.** The branch's mean went from 10.48 to 10.12 ms (−0.36 ms, −3 %), and its
+    gap to `slice-02c` from +1.22 ms (+13 %) to +0.80 ms (+9 %); but the two new branch runs alone differ by 0.68 ms and
+    the two reference runs by 0.40 ms, so the drop is inside the spread. It is about the size the attribution predicts
+    (318 of about 700 extra elements removed, so about 0.55 ms of the 1.22 ms). Frames in 6 s: the branch 272 on average
+    against 281 (−3 %; before 270.5 against 289, −6 %), but one reference run (271) was slow. **Where the remaining time
+    goes, as far as the traces show it:** Layerize about +0.8 ms per frame, layout about +0.1 ms, script about +0.15 ms;
+    paint, prepaint and style are level within their spread. About 1 ms per frame of 20 ms is about 5 %, the size of the
+    gap in the sittings. *Inference:* the rest of the gap is still mostly Layerize over the about 450 elements the notes
+    and marks still add; the traces do not contradict the element-count attribution, nor prove it.
 
 ## Changes to earlier tests
 
