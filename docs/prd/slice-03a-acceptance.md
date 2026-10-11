@@ -1,7 +1,8 @@
 # Slice 3a – Acceptance
 
-Status: **step 5 done; option (b) and the note reduction done, S3A-14 accepted at −5.3 % (Łukasz), three full runs passed on 04d4f70; waiting for Łukasz's manual acceptance**. Branch
-`slice/03a-labels-and-notes`, pull request #9 (draft). Steps 0 to 4 were accepted one by one (below).
+Status: **accepted by Łukasz on 11 October 2026** (manual checklist S3A-01 to S3A-13 all OK; S3A-14 accepted at −5.3 %;
+three full runs passed on 04d4f70). Branch `slice/03a-labels-and-notes`, pull request #9, merged into `main`, tag
+`slice-03a`. Steps 0 to 4 were accepted one by one (below).
 
 ## Criteria
 
@@ -41,6 +42,8 @@ start again.
 | 3 (11 October, 21:36–22:36) | 04d4f70 (code as ac5c739) | 3 | Three in a row: 124/124 each (19.8, 20.0, 20.3 min). “The destination stream closed early” 16, 13 and 16 times (known noise). No dev server running. |
 
 ## Manual checklist (Łukasz)
+
+**Result (11 October 2026):** S3A-01 to S3A-13 all OK (Łukasz).
 
 Fresh demo data, then the app on the preview data file:
 
