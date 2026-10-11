@@ -11,7 +11,7 @@
 // Slice 2c (D-07): lines touching a collapsed frame come as bundles (`bundleLines`), drawn in the same layer: a group of
 // one mapping as that mapping, two or more as one line with a count, relationships with “N relationship(s)”.
 
-import { memo, useContext, useState, type ReactNode } from "react";
+import { Fragment, memo, useContext, useState, type ReactNode } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type Notation } from "./context";
@@ -328,10 +328,11 @@ function LineLayer({
         <g>{bundled}</g>
         <g>
           {tethers.map((t) => (
-            <g key={t.id} className="tether" data-testid="tether" data-tether={t.id}>
-              <path d={`M${t.x1},${t.y1} L${t.x2},${t.y2}`} />
-              <circle cx={t.x2} cy={t.y2} r={2.5} />
-            </g>
+            // no group per tether: two elements (slice 3a, S3A-14)
+            <Fragment key={t.id}>
+              <path className="tether" d={`M${t.x1},${t.y1} L${t.x2},${t.y2}`} data-testid="tether" data-tether={t.id} />
+              <circle className="tether" cx={t.x2} cy={t.y2} r={2.5} />
+            </Fragment>
           ))}
         </g>
       </svg>

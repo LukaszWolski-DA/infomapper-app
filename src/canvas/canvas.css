@@ -297,12 +297,16 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .nt.sel { box-shadow: 0 0 0 2px var(--im-logical), 0 8px 18px -8px var(--im-shadow) }
 .im-canvas .nt.resolved { background: color-mix(in srgb, var(--np) 45%, var(--im-surface)); color: var(--im-ink-2) }
 .im-canvas .nt-head { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 4px 0 9px; font-size: 11px; color: var(--im-ink-2) }
-.im-canvas .nt-head svg { width: 12px; height: 12px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linejoin: round; flex: none }
-.im-canvas .nt-head .pin { white-space: nowrap; min-width: 0 }
+/* the note icon (16 × 16, stroke 1.5, as the prototype's SVG) is a mask over the text colour, not three elements */
+.im-canvas .nt-head::before {
+  content: ""; width: 12px; height: 12px; flex: none; background-color: currentColor;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='M3 2.5h10v7.5l-3.5 3.5H3z'/%3E%3Cpath d='M13 10H9.5v3.5'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+}
+/* the right margin stands for the gap the spacer had; the ✓ is pushed to the right by its own margin */
+.im-canvas .nt-head .pin { white-space: nowrap; min-width: 0; margin-right: 6px }
 /* the clip only when the name may not fit (AD-24 rule 4, as `text-fit.ts` for cards) */
 .im-canvas .nt-head .pin.clip { overflow: hidden; text-overflow: ellipsis }
-.im-canvas .nt-head .sp { flex: 1 }
-.im-canvas .nt-head .ib { background: transparent; font-size: 12px }
+.im-canvas .nt-head .ib { background: transparent; font-size: 12px; margin-left: auto }
 .im-canvas .nt-body { padding: 0 10px 4px; white-space: pre-wrap; word-break: break-word; min-height: 20px }
 .im-canvas .nt-body.empty { color: var(--im-ink-3); font-style: italic }
 .im-canvas .nt-lod { margin: 0 10px 8px; border-radius: 3px; background: color-mix(in srgb, var(--npe) 55%, var(--np)) }
@@ -313,8 +317,8 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .nt-foot .ok { color: var(--im-map); font-weight: 600 }
 .im-canvas .nt-rs { position: absolute; right: -5px; top: 20%; bottom: 20%; width: 10px; cursor: ew-resize }
 /* the tether of a pinned note (prototype .tether), in the line layer; a quieter ink instead of opacity */
-.im-canvas .tether path { stroke: color-mix(in srgb, var(--im-ink-3) 75%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; fill: none }
-.im-canvas .tether circle { fill: color-mix(in srgb, var(--im-ink-3) 75%, transparent) }
+.im-canvas path.tether { stroke: color-mix(in srgb, var(--im-ink-3) 75%, transparent); stroke-width: 1.2; stroke-dasharray: 3 3; fill: none }
+.im-canvas circle.tether { fill: color-mix(in srgb, var(--im-ink-3) 75%, transparent) }
 .im-canvas.tool-note, .im-canvas.tool-note * { cursor: copy !important }
 /* the note panel's colour swatches (prototype .nswatch) */
 .nsw { width: 26px; height: 20px; border-radius: 4px 4px 9px 4px; background: var(--np); box-shadow: 0 0 0 1px var(--npe); cursor: pointer }

@@ -114,11 +114,14 @@ mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md]
   9.3–9.6 ms, about −3 % frames instead of −6 %). One balanced sitting with both switched off (`2026-10-11-17-14`)
   contradicted it (−6.2 %, C-08 1549 ms).
 - **Done in slice 3a (option b, Łukasz):** a label mark is one element (its tag a CSS mask) and a line tag two (circle
-  and path, no group, no transform): 210 fewer elements in that view (21,012 → 20,802 on the dev server).
+  and path, no group, no transform): 210 fewer elements in that view (21,012 → 20,802 on the dev server). **Fewer
+  elements per note, partly done:** the note icon is a CSS mask, the spacer before the ✓ is a margin, a tether has no
+  group: a note has 7–8 elements at 100 % instead of 11–12, 6 below 40 % instead of 10, a tether 2 instead of 3; 108
+  fewer in that view (20,802 → 20,694; at 30 %: 6,005 → 5,897).
 - **What has to happen later (performance review before the database slice, AD-31):** measure a separate compositing
   layer for the notes (option c: their paint and Layerize no longer part of the cards'; it touches AD-24's rules on
-  layers and may cost GPU memory or raster time) and fewer elements per note (a note has 11–12 at 100 %, a pinned one 3
-  more for its tether), together with the “partly met” items above (C-09, C-10, dragging, lasso marks).
+  layers and may cost GPU memory or raster time) and, if still needed, fewer elements per note beyond slice 3a's (body,
+  footer and resize edge remain), together with the “partly met” items above (C-09, C-10, dragging, lasso marks).
 
 ## Undo history (slice 1b)
 

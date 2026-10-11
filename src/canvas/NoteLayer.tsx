@@ -37,13 +37,6 @@ interface Props {
   onHeight: (id: Uuid, h: number) => void;
 }
 
-const NoteIcon = () => (
-  <svg viewBox="0 0 16 16" aria-hidden>
-    <path d="M3 2.5h10v7.5l-3.5 3.5H3z" />
-    <path d="M13 10H9.5v3.5" />
-  </svg>
-);
-
 function NoteLayer({ notes, selectedId, editingId, canNote, onPointerDown, onToggleStatus, onEdit, onCommit, onCancel, onHeight }: Props) {
   const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
   return (
@@ -126,13 +119,13 @@ const NoteBox = memo(function NoteBox({
         onEdit(n.id);
       }}
     >
+      {/* the note icon is the header's ::before (a CSS mask) and the ✓ is pushed right by its margin, not a spacer: fewer
+          elements per note, which every pan and zoom frame paints and layerizes (slice 3a, S3A-14) */}
       <div className="nt-head">
-        <NoteIcon />
         {/* 11 px text at about 6.5 px a character, beside the icon, the gaps and the ✓ */}
         <span className={`pin${pinName && (pinName.length + 3) * 6.5 > n.width - 64 ? " clip" : ""}`} data-testid="note-pin">
           {pinName ? `on ${pinName}` : "Note"}
         </span>
-        <span className="sp" />
         {canNote && (
           <button
             type="button"

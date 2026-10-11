@@ -59,7 +59,7 @@ test("S3A-08: a free note dropped in a frame moves with it and is hidden while i
   const pinned = noteEl(page, DEMO_NOTES.pinned);
   const tether = page.locator(`[data-testid="tether"]`).first();
   await expect(tether).toHaveCount(1);
-  expect(await tether.locator("path").evaluate((e) => getComputedStyle(e).strokeDasharray)).not.toBe("none");
+  expect(await tether.evaluate((e) => getComputedStyle(e).strokeDasharray)).not.toBe("none");
   const n0 = await box(pinned), c0 = await box(card(page, "order_line"));
   const at = await headPoint(page, "order_line");
   await page.mouse.move(at.x, at.y);

@@ -501,8 +501,27 @@ initial render is slower on both sides; the branch is +0.7 %. Collapsed is uncha
    plus 3 in the line layer for its tether (group, path, dot); readers 2 fewer (no ✓, no edge). 24 notes are 270
    elements at 100 %. A cheap reduction exists: the icon as a CSS mask like the label mark (−3), the spacer replaced by
    `margin-left: auto` on the ✓ (−1), the tether without its group (−1): about 5 fewer per note, about 120 in that view,
-   a little over half of what option (b) took away. Not done in this slice (Łukasz).
-10. **The measurement switches** (`nonotes`, `nolabelmarks`, ae4d995) stay: like slice 2a's, the page honours `?diag=`
+   a little over half of what option (b) took away.
+10. **The cheap note reduction, done (Łukasz, 11 October, before the sitting).** The note icon is the header's
+    `::before` with a CSS mask (the same 16 × 16 outline, stroke 1.5); the spacer before the ✓ is gone (the ✓ has
+    `margin-left: auto`, the name a 6 px right margin standing for the spacer's gap, so the name clips at the same
+    width); a tether is its path and dot, no group (`data-testid="tether"` is on the path). Rendered side by side
+    (old and new markup, the same rules, Chromium at 1× and 2×): the same layout; only the icon's antialiasing differs
+    by at most 2 of 255. Elements, “Performance test” at S1A-14's 100 % view (dev server, 1536 × 864):
+
+    | | Before | After |
+    | --- | --- | --- |
+    | Open note, 100 % (free or pinned) | 11 | 7 |
+    | Resolved note, 100 % | 12 | 8 |
+    | Any note below 40 % | 10 | 6 |
+    | Tether of a pinned note (line layer) | 3 | 2 |
+    | Readers (no ✓, no edge) | 2 fewer | 2 fewer |
+    | 24 notes and 12 tethers, 100 % | 306 | 198 |
+    | Whole page, 100 % | 20,802 | 20,694 |
+    | Whole page, 30 % | 6,005 | 5,897 |
+
+    With option (b), 318 fewer elements at 100 % than before (21,012 → 20,694).
+11. **The measurement switches** (`nonotes`, `nolabelmarks`, ae4d995) stay: like slice 2a's, the page honours `?diag=`
     only when `isMeasurementBuild()` is true (a production build with `INFOMAPPER_MEASURE=1`); a dev server or a normal
     production build ignores them. CLAUDE.md now says so.
 
@@ -523,6 +542,8 @@ initial render is slower on both sides; the branch is +0.7 %. Collapsed is uncha
   demo notes moved (step 1, item 9), the tests did not change.
 - `src/canvas/labels.test.ts`: a labeled entity's header has the tag mark now (step 2 follow-up).
 - `src/data/local/model-store.test.ts`: `seed:large` also checks the labels and notes it adds (step 4).
+- `e2e/slice-03a/S3A-08.spec.ts`: the tether's test id is on its path now (no group), so the dash is read from the
+  tether itself (the cheap note reduction).
 - `src/canvas/selection.test.ts`: the units a selection moves have a `notes` list (step 4).
 - `e2e/slice-02a/S2A-02.spec.ts` and `e2e/slice-02b/S2B-08.spec.ts`: Ctrl+A also selects the demo's free note in no
   frame (item 13), so the counts, kinds and names include it (step 4).
