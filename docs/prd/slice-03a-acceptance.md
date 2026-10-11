@@ -459,6 +459,33 @@ initial render is slower on both sides; the branch is +0.7 %. Collapsed is uncha
    `--branch-diag nonotes,nolabelmarks`. If the branch is level with `slice-02c` in balanced rounds, the gap was the
    order; if it stays 5 % below with both switches on, the cost is in code shared by every view (to look for next with
    Chrome traces, as in slice 2c); if it closes only with the switches, it is the content after all.
+5. **Balanced sittings (Łukasz's go, 11 October, two rounds each, at `ae4d995`).** As it is, sitting
+   `.data/measure/2026-10-11-16-56`: overview 59.4 against 59.7 (−0.5 %), 100 % 48.6 against 51.0 (−4.8 %) with 10
+   long frames against 6, C-08 1474 against 1440 ms (+2.4 %), C-10 120 against 148 ms, lasso marks 28 against 76 ms.
+   With `--branch-diag nonotes,nolabelmarks`, sitting `.data/measure/2026-10-11-17-14`: overview +0.4 %, 100 % 48.0
+   against 51.1 (−6.2 %) with 9 long frames against 9, C-08 1549 against 1384 ms. The order is not the cause; the
+   sitting with both switches did not close the gap either.
+6. **Chrome traces of 6 s of S1A-14's 100 % pan and zoom** (measurement builds, this branch and `slice-02c` in turns;
+   traces and logs in `.data/measure/diag-3a`; a temporary spec, not committed): every frame runs the whole paint
+   lifecycle (about 13 ms) and Layerize (about 9–11 ms) over everything in the viewport, so their cost follows the
+   number of elements there. As it is, the branch has 19,613 elements against 18,913 (24 notes of about 12 elements
+   each; about 60 label marks of 4 elements and 30 line tags of 3, with their titles: about 700 in all); Layerize takes
+   10.4–10.6 ms per frame against 9.2 ms (+13 %), and the branch draws 264–274 frames in 6 s against 287–290 (about
+   −6 %). With both switches the branch has 18,915 elements, Layerize 9.3–9.6 ms against 9.3 ms, and 276–282 frames
+   against 290 (about −3 %, close to the spread between runs).
+7. **Reading.** The cost is the content slice 3a puts on the canvas: notes and label marks are more elements in a
+   viewport that is painted and layerized whole on every pan and zoom frame (the same mechanism as slice 2c's frame
+   labels). What remains with both switches (about −3 % in the traces, −6.2 % in one balanced sitting) is within the
+   spread these figures have shown. S3A-14's bar is “no more than about 10 % below `slice-02c`”: −4.8 % in a balanced
+   sitting meets it; Łukasz's extra condition (5 % or more below with clearly more long frames) is at its edge
+   (−4.8 %, 10 against 6). Options, for Łukasz to choose:
+   - **(a) Accept** as it is: within S3A-14's bar; recorded here and in `docs/known-limitations.md`.
+   - **(b) Fewer elements per mark:** a label mark as one element (its tag icon a CSS mask on the `<i>` instead of an
+     inline SVG of three elements), a line tag as one path: about 270 fewer elements, the same look. Then a balanced
+     sitting again.
+   - **(c) The notes in their own composited layer** (the note layer promoted, so the cards' paint and Layerize no
+     longer include them): to be measured; it may cost GPU memory or raster time instead, and touches AD-24's rules on
+     layers.
 
 ## Changes to earlier tests
 
