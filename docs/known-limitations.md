@@ -102,6 +102,24 @@ initial render.
   what the overlays themselves cost, under 35 ms for the marks). The card rows need a decision on the card's look
   (fewer elements per row, or detail by zoom between 40 % and 100 %), measured with `DIAG=blocks` as the upper limit.
 
+### Frame cost grows with the number of elements in the viewport (slice 3a)
+
+On every pan and zoom frame Chrome repaints and re-layers the whole viewport of the canvas; Layerize is the main cost
+(about 9–11 ms of a frame at 100 % in “Performance test”), and both follow the number of elements there. Slice 3a's notes
+and label marks add about 700 elements (19,613 against 18,913 in the measurement build) and cost about 3–5 % of pan and
+zoom at 100 % (balanced sitting `2026-10-11-16-56`: 48.6 against 51.0 fps, 10 long frames against 6). It is the same
+mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md](prd/slice-03a-acceptance.md#looking-for-the-cause-11-october-after-the-confirming-rounds).
+
+- **The attribution rests on Chrome traces** (Layerize 10.4–10.6 against 9.2 ms; with notes and marks switched off
+  9.3–9.6 ms, about −3 % frames instead of −6 %). One balanced sitting with both switched off (`2026-10-11-17-14`)
+  contradicted it (−6.2 %, C-08 1549 ms).
+- **Done in slice 3a (option b, Łukasz):** a label mark is one element (its tag a CSS mask) and a line tag two (circle
+  and path, no group, no transform): 210 fewer elements in that view (21,012 → 20,802 on the dev server).
+- **What has to happen later (performance review before the database slice, AD-31):** measure a separate compositing
+  layer for the notes (option c: their paint and Layerize no longer part of the cards'; it touches AD-24's rules on
+  layers and may cost GPU memory or raster time) and fewer elements per note (a note has 11–12 at 100 %, a pinned one 3
+  more for its tether), together with the “partly met” items above (C-09, C-10, dragging, lasso marks).
+
 ## Undo history (slice 1b)
 
 ### The undo history lives in server memory

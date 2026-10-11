@@ -160,7 +160,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only
   with `INFOMAPPER_MEASURE=1`, on 127.0.0.1; a normal production build still refuses the local adapter). Keep the AD-24
   CSS rules, including no `overflow: hidden` on repeated card elements unless the text may not fit
-  (`src/canvas/text-fit.ts`).
+  (`src/canvas/text-fit.ts`). The `DIAG` switches (`?diag=nolines`, `blocks`, `noframes`, `nolabels`, `collapsed`,
+  `nonotes`, `nolabelmarks`) work only in that measurement build (`isMeasurementBuild()`, `INFOMAPPER_MEASURE=1`); a dev
+  or normal production run ignores them. Every element in the viewport costs paint and layerize time on each pan and
+  zoom frame: keep repeated marks to one element (slice 3a's label marks are CSS masks).
 - e2e servers use their own build folders (`.next-e2e`, `.next-e2e-restart`) via `NEXT_DIST_DIR`, because Next.js
   refuses a second dev server on the same folder. Next.js adds them to `tsconfig.json`'s `include`; keep that.
   They run without Turbopack's dev cache and start empty each run (`scripts/clean-e2e-build.ts`); the global setup

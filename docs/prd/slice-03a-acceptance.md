@@ -1,6 +1,6 @@
 # Slice 3a – Acceptance
 
-Status: **step 5 done, waiting for the confirming measurement round and Łukasz's acceptance**. Branch
+Status: **step 5 done; option (b) of the measurement diagnosis done, waiting for its balanced sitting, three full runs and Łukasz's acceptance**. Branch
 `slice/03a-labels-and-notes`, pull request #9 (draft). Steps 0 to 4 were accepted one by one (below).
 
 ## Criteria
@@ -486,6 +486,25 @@ initial render is slower on both sides; the branch is +0.7 %. Collapsed is uncha
    - **(c) The notes in their own composited layer** (the note layer promoted, so the cards' paint and Layerize no
      longer include them): to be measured; it may cost GPU memory or raster time instead, and touches AD-24's rules on
      layers.
+
+8. **Option (b), Łukasz's decision (11 October).** A label mark is one element: an `<i>` whose tag is a CSS mask over
+   the text colour (the same 16 × 16 outline, stroke 1.6), instead of an `<i>` with an SVG, a path and a circle. A line
+   tag is two elements, its circle and its path, with no group and no transform (the path's points are computed at its
+   place, its stroke 0.806 so it looks as the scaled 1.3 did). One path for the whole tag is not possible with the same
+   look: the circle is dashed in one colour and filled, the tag solid in another. Look, tooltips and zoom rules are
+   unchanged (rendered side by side at 8×: the same pixels; S3A-03 and S3A-14 pass). Elements in the document at
+   S1A-14's 100 % view of “Performance test” (dev server, 1536 × 864): **21,012 before, 20,802 after** (label marks 240 →
+   60, line tags 90 → 60); at 30 %: 6,035 → 6,005 (header marks only). The measurement build counted 19,613 before.
+9. **Notes, reported, not changed.** Elements of one note at 100 % for those who may write notes: 11 (box, header, its
+   SVG icon with two paths, the “Note” / “on …” text, a spacer, the ✓ button, body, footer, the resize edge); resolved
+   12 (the footer's “resolved”); below 40 % 10 (a plain block instead of body and footer); a pinned note has the same
+   plus 3 in the line layer for its tether (group, path, dot); readers 2 fewer (no ✓, no edge). 24 notes are 270
+   elements at 100 %. A cheap reduction exists: the icon as a CSS mask like the label mark (−3), the spacer replaced by
+   `margin-left: auto` on the ✓ (−1), the tether without its group (−1): about 5 fewer per note, about 120 in that view,
+   a little over half of what option (b) took away. Not done in this slice (Łukasz).
+10. **The measurement switches** (`nonotes`, `nolabelmarks`, ae4d995) stay: like slice 2a's, the page honours `?diag=`
+    only when `isMeasurementBuild()` is true (a production build with `INFOMAPPER_MEASURE=1`); a dev server or a normal
+    production build ignores them. CLAUDE.md now says so.
 
 ## Changes to earlier tests
 
