@@ -34,14 +34,15 @@ test("S2A-02: Shift+click adds and removes cards; Ctrl+A selects every card on t
   await expect(page.getByTestId("panel-source-table")).toBeVisible();
   await expect(marks).toHaveCount(0);
 
-  // Ctrl+A outside text fields selects all 7 cards
+  // Ctrl+A outside text fields selects all 7 cards, and since slice 3a the demo's free note in no frame
   const spot = await emptySpot(page);
   await page.mouse.click(spot.x, spot.y);
   await page.keyboard.press("Control+a");
   await expect(marks).toHaveCount(7);
-  await expect(page.getByTestId("label-selection")).toHaveText("7 selected");
-  await expect(page.getByTestId("selection-kinds")).toHaveText("3 entities, 4 tables.");
-  expect(await selectedNames(page)).toEqual(["Customer", "Order Line", "Sales Order", "customers", "order_header", "order_line", "web_users"]);
+  await expect(page.getByTestId("mark-selected-note")).toHaveCount(1);
+  await expect(page.getByTestId("label-selection")).toHaveText("8 selected");
+  await expect(page.getByTestId("selection-kinds")).toHaveText("3 entities, 4 tables, 1 note.");
+  expect(await selectedNames(page)).toEqual(["Customer", "Order Line", "Order lines come from ERP once a night. Check the load window before the go-live.", "Sales Order", "customers", "order_header", "order_line", "web_users"]);
 
   // Esc clears
   await page.keyboard.press("Escape");
