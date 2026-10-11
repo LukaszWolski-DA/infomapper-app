@@ -9,12 +9,14 @@ import {
   frame,
   ids,
   makeCtx,
+  note,
   NOW,
   sourceSystem,
   sourceTable,
 } from "../__fixtures__/domain";
 import type { CommandResult, WriteSet } from "../changes";
 import { STALE_VERSION_MESSAGE } from "../errors";
+import { changeLabel } from "../model/change-label";
 import type { CanvasItem, Entity, Frame } from "../types";
 import {
   arrangeCanvasIntoFrames,
@@ -190,6 +192,24 @@ describe("moveOnCanvas: frames (D-14)", () => {
     expect(move({ frames: [{ ...fref(fA), x: 8, y: 0 }] })).toMatchObject(refusedAsStale);
     expect(move({ frames: [{ ...fref(fA), x: 8, y: 0 }], items: [{ ...ref(inA), expectedVersion: 3 }] })).toMatchObject(refusedAsStale);
     expect(move({ frames: [{ ...fref(fA), expectedVersion: 4, x: 8, y: 0 }], items: [ref(inA)] })).toMatchObject(refusedAsStale);
+  });
+
+  it("moves the free notes in a moved frame with it, not pinned notes or notes in other frames (slice 3a, item 9)", () => {
+    const inFrame = note(ids.noteFree, { x: 100, y: 100, frame_id: frameA });
+    const elsewhere = note("01900000-0000-7000-8000-00000000d003", { x: 2000, y: 100, frame_id: frameB });
+    const pinned = note(ids.notePinned);
+    const r = moveOnCanvas(
+      makeCtx(),
+      access("modeler"),
+      { ...state, notes: [inFrame, elsewhere, pinned], entities: model.entities, concepts: model.concepts },
+      { canvasId: canvas1, frames: [{ ...fref(fA), x: 16, y: 8 }], items: [ref(inA)] },
+    );
+    const rows = written(ok(r).writeSet);
+    expect(rows[`note:${ids.noteFree}`]).toMatchObject({ x: 116, y: 108, frame_id: frameA, version: 2 });
+    expect(rows[`note:${elsewhere.id}`]).toBeUndefined();
+    expect(rows[`note:${ids.notePinned}`]).toBeUndefined();
+    expect(ok(r).value.versions[ids.noteFree]).toBe(2);
+    expect(changeLabel(ok(r).writeSet.events)).toBe("Move frame");
   });
 
   it("refuses unknown frames and cards, and nothing to change", () => {
@@ -606,6 +626,10 @@ function rowsOf(items: CanvasItem[], frames: Frame[], entities: Entity[] = model
     mapping_input: [],
     canvas_item: items,
     frame: frames,
+    label: [],
+    label_link: [],
+    project_pinned_label: [],
+    note: [],
   };
 }
 

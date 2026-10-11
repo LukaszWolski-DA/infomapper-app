@@ -12,7 +12,7 @@
 //   end it. Right drag, the middle button and Space still pan as before. It is not saved.
 // - Frame tool (A, slice 2b): its presses are the canvas's (`useFrames`); here only on and off. A right-click on a
 //   frame's name, handle or an empty spot inside it opens the frame's toolbox, or the group's when the frame is part of
-//   a selection of several (step 4); on a card or line inside a frame, theirs.
+//   a selection of several (step 4); on a card or line inside a frame, theirs. Slice 3a: on a note, the note's toolbox.
 // The page does the writes and draws the toolbox (CanvasHost); this file only reads gestures.
 
 import { memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
@@ -32,6 +32,7 @@ export const ENTITY_TOOL_HINT = "Click on the canvas where the new entity should
 export const HAND_TOOL_HINT = "Hand tool: drag anywhere to move the canvas. V or Esc returns to selecting.";
 export const FRAME_TOOL_HINT = "Drag on the canvas to draw a frame. Esc cancels.";
 export const RELATE_HINT = "Now click the entity to relate to. Esc cancels.";
+export const NOTE_TOOL_HINT = "Click on the canvas for a note there, or on a card or a frame’s name to pin it. Esc cancels.";
 
 const entityCardAt = (el: Element | null) => el?.closest<HTMLElement>(".card.ent[data-card]")?.dataset.card ?? null;
 
@@ -156,7 +157,8 @@ export function useCanvasModes(editable: boolean) {
         relatePress.current = { cardId: relateButton.dataset.relate!, sx: e.clientX, sy: e.clientY, dragging: false };
         return;
       }
-      if (!mode || mode.kind === "frame") return;
+      // the Frame and Note tools take their presses on the canvas itself (`useFrames`, `useNotes`)
+      if (!mode || mode.kind === "frame" || mode.kind === "note") return;
       if ((e.target as HTMLElement).closest(".overview, .react-flow__panel")) return;
       e.preventDefault();
       e.stopPropagation();
@@ -203,14 +205,19 @@ export function useCanvasModes(editable: boolean) {
       if (mode && mode.kind !== "hand") setMode(null);
       const el = e.target as HTMLElement;
       if (el.closest(".overview, .react-flow__panel")) return;
-      const mappingId = el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
+      // a note lies above everything else (slice 3a)
+      const noteId = el.closest<HTMLElement>("[data-note]")?.dataset.note;
+      const mappingId = noteId ? undefined : el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
       const relationshipId = el.closest<SVGElement>("[data-relationship]")?.dataset.relationship;
       const bundleKey = el.closest<SVGElement>("[data-bundle]")?.dataset.bundle;
-      const cardId = el.closest<HTMLElement>("[data-card]")?.dataset.card;
+      const cardId = noteId ? undefined : el.closest<HTMLElement>("[data-card]")?.dataset.card;
       const rowId = cardId ? el.closest<HTMLElement>(".row[data-row]")?.dataset.row : undefined;
-      const frameId = cardId ? undefined : el.closest<HTMLElement>("[data-frame]")?.dataset.frame;
+      const frameId = cardId || noteId ? undefined : el.closest<HTMLElement>("[data-frame]")?.dataset.frame;
       let target: ToolboxTarget;
-      if (mappingId) {
+      if (noteId) {
+        target = { kind: "note", noteId };
+        select({ t: "note", id: noteId });
+      } else if (mappingId) {
         target = { kind: "map", mappingId };
         select({ t: "map", id: mappingId });
       } else if (bundleKey) {

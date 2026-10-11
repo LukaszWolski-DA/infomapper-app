@@ -113,7 +113,9 @@ export async function removeCardAction(
     if (!workspace) return NOT_FOUND;
     const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
     const id = typeof input?.canvasItemId === "string" ? input.canvasItemId : "";
-    return removeFromCanvas(ctx, access, { item: await store.canvasItems.get(workspace.id, id) }, input);
+    const item = await store.canvasItems.get(workspace.id, id);
+    const notes = item ? await store.notes.listOfCanvas(workspace.id, item.canvas_id) : [];
+    return removeFromCanvas(ctx, access, { item, notes }, input);
   });
   if (result.ok) revalidatePath("/", "layout");
   return result;
@@ -130,8 +132,12 @@ function onCanvasCards<T>(workspaceId: string, canvasId: string, command: GroupC
     if (!workspace) return NOT_FOUND;
     const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
     const cid = typeof canvasId === "string" ? canvasId : "";
-    const [canvas, items] = await Promise.all([store.canvases.get(workspace.id, cid), store.canvasItems.listOfCanvas(workspace.id, cid)]);
-    return command(ctx, access, { canvas, items }, { ...input, canvasId });
+    const [canvas, items, notes] = await Promise.all([
+      store.canvases.get(workspace.id, cid),
+      store.canvasItems.listOfCanvas(workspace.id, cid),
+      store.notes.listOfCanvas(workspace.id, cid),
+    ]);
+    return command(ctx, access, { canvas, items, notes }, { ...input, canvasId });
   });
 }
 

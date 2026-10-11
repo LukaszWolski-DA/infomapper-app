@@ -66,14 +66,15 @@ test("S1B-14: a reviewer gets no drag, relate, tool or reorder actions, and can 
   await expect(page.getByTestId("attribute-order-item")).toHaveCount(0);
   await expect(page.getByTestId("button-feed-all")).toHaveCount(0);
   // the toolbox has no editing actions: on the canvas only what selects or moves the view (slice 2a adds “Select all”
-  // and the Hand tool for every role), on a card nothing to change
-  expect(await toolboxAt(page, await emptySpot(page))).toEqual(["Select all", "Fit everything on screen", "Hand tool"]);
+  // and the Hand tool for every role), on a card nothing to change; slice 3a: a reviewer writes notes (Łukasz's step 0
+  // answer 1), so “Add a note here” and, on a card, “Add a note to this”
+  expect(await toolboxAt(page, await emptySpot(page))).toEqual(["Add a note here", "Select all", "Fit everything on screen", "Hand tool"]);
   await expect(page.getByTestId("input-toolbox-search")).toHaveCount(0);
   await closeToolbox(page);
   const head = (await card(page, "Customer").locator(".c-head").boundingBox())!;
-  await page.mouse.click(head.x + 20, head.y + 10, { button: "right" });
-  await expect(page.getByTestId("panel-entity")).toBeVisible(); // selected, but no toolbox: nothing to offer
-  await expect(page.getByTestId("menu-toolbox")).toHaveCount(0);
+  expect(await toolboxAt(page, { x: head.x + 20, y: head.y + 10 })).toEqual(["Add a note to this"]);
+  await expect(page.getByTestId("panel-entity")).toBeVisible(); // selected; nothing of the model to change
+  await closeToolbox(page);
   expect(await loadModel()).toEqual(before);
   expect(await loadItems()).toEqual(itemsBefore);
 

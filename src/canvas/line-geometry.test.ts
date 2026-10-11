@@ -16,6 +16,7 @@ const map = (id: string, from: { cardId: string; columnId: string }[], to: { car
   inputCount: from.length,
   attributeId: to.attributeId,
   cardId: to.cardId,
+  labels: null,
   ...over,
 });
 const rel = (id: string, fromCardId: string, toCardId: string): RelLineData => ({ id, fromCardId, toCardId, label: null, fromMin: 1, fromMax: "1", toMin: 0, toMax: "n", offset: 0 });

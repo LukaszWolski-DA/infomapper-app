@@ -23,6 +23,7 @@ const monoWidth = (text: string, px: number) => text.length * 0.6 * px;
 const ROW_PAD = 22; // .row: 12 px left, 10 px right
 const GAP = 6;
 const TAG = 26; // a PII or BK badge
+const MARK = 11; // the tag mark of a working label (slice 3a)
 const SAFETY = 6;
 
 export interface RowText {
@@ -33,12 +34,14 @@ export interface RowText {
   pii: boolean;
   bk: boolean;
   mappings: number;
+  /** Working labels on the row: the tag mark takes room (slice 3a). */
+  labels?: string | null;
 }
 
 /** Whether a row's name may not fit beside its key, badges, type and mapped dot (prototype .row layout). */
 export function rowNeedsClip(row: RowText, kind: "ent" | "src", dualKeys: boolean, width: number = CARD_W): boolean {
   const key = dualKeys ? 34 : 18;
-  const tags = (row.pii ? TAG + GAP : 0) + (row.bk ? TAG + GAP : 0);
+  const tags = (row.pii ? TAG + GAP : 0) + (row.bk ? TAG + GAP : 0) + (row.labels ? MARK + GAP : 0);
   const type = kind === "src" ? monoWidth(row.type, 10.5) : sansWidth(row.type, 11);
   const dot = row.mappings > 1 ? 16 + 2 * 4 + String(row.mappings).length * 6 : 10;
   const available = width - ROW_PAD - key - GAP - tags - GAP - type - GAP - dot - SAFETY;
@@ -52,12 +55,12 @@ export function titleNeedsClip(name: string, kind: "ent" | "src", coverage: stri
   return (kind === "src" ? monoWidth(name, 13.5) : sansWidth(name, 14) * 1.05) > available;
 }
 
-/** Whether a card's first line (stereotype and concept, or the source path) may not fit beside the card tools. */
-export function lineNeedsClip(parts: string[], kind: "ent" | "src", width: number = CARD_W): boolean {
+/** Whether a card's first line (stereotype and concept, or the source path, with a label mark) may not fit beside the card tools. */
+export function lineNeedsClip(parts: string[], kind: "ent" | "src", width: number = CARD_W, mark = false): boolean {
   // filter button with its longest label, collapse button, and on entities the relate button (slice 1b)
   const tools = 64 + 20 + 1 + (kind === "ent" ? 21 : 0);
   const text = kind === "src" ? monoWidth(parts.join(""), 11) : parts.reduce((w, p) => w + sansWidth(p, 11), 0) + 6 * (parts.length - 1);
-  return text > width - 14 - 8 - 6 - tools - SAFETY;
+  return text + (mark ? MARK + 6 : 0) > width - 14 - 8 - 6 - tools - SAFETY;
 }
 
 /**

@@ -211,7 +211,8 @@ export function curve(a: End, b: End) {
   const p3 = { x: ltr ? b.x : b.x + b.w, y: b.y };
   const k = Math.max(60, Math.abs(p3.x - p0.x) * 0.45);
   const p1 = { x: p0.x + sn * k, y: p0.y }, p2 = { x: p3.x - sn * k, y: p3.y };
-  return { d: `M${p0.x},${p0.y} C${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`, mid: bez(p0, p1, p2, p3, 0.5), p0, p3 };
+  // q: where a labeled mapping shows its tag (prototype curve q, slice 3a)
+  return { d: `M${p0.x},${p0.y} C${p1.x},${p1.y} ${p2.x},${p2.y} ${p3.x},${p3.y}`, mid: bez(p0, p1, p2, p3, 0.5), q: bez(p0, p1, p2, p3, 0.27), p0, p3 };
 }
 
 /** Distance of the ƒ node from the attribute's card edge (D-49). */

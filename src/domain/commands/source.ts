@@ -13,13 +13,17 @@ import {
   type Attribute,
   type CanvasItem,
   type Entity,
+  type LabelLink,
   type Mapping,
   type MappingInput,
+  type Note,
   type SourceColumn,
   type SourceSystem,
   type SourceTable,
 } from "../types";
 import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
+import { linksOnItems, softDeleteLinks } from "./label";
+import { releaseNotes } from "./note";
 import { begin, current, done, isLive, nothingToChange, softDelete } from "./shared";
 
 const createSourceTableInput = z
@@ -160,11 +164,15 @@ export interface DeleteSourceTableState {
   mappingInputs: readonly MappingInput[];
   attributes: readonly Attribute[];
   entities: readonly Entity[];
+  /** The workspace's label links and notes (slice 3a). */
+  labelLinks?: readonly LabelLink[];
+  notes?: readonly Note[];
 }
 
 /**
  * Deletes a source table with its columns and its cards, only when no mapping reads any of its columns; otherwise
- * refuses and lists those mappings. The source system stays.
+ * refuses and lists those mappings. The source system stays. Slice 3a: the label links on the table and its columns
+ * go with them; notes pinned to its cards become free notes at their place.
  */
 export function deleteSourceTable(
   ctx: CommandContext,
@@ -200,11 +208,12 @@ export function deleteSourceTable(
     return fail(domainError("conflict", `Remove its mappings first. ${list.join("; ")}.`, { mappings: list.join("\n") }));
   }
 
+  const cards = state.canvasItems.filter((c) => isLive(c, workspaceId) && c.source_table_id === table.id);
   return done(ctx, access, { columns: columns.length }, [
-    ...state.canvasItems
-      .filter((c) => isLive(c, workspaceId) && c.source_table_id === table.id)
-      .map((c) => softDelete(ctx, "canvas_item", c)),
+    ...cards.map((c) => softDelete(ctx, "canvas_item", c)),
     ...columns.map((c) => softDelete(ctx, "source_column", c)),
     softDelete(ctx, "source_table", table),
+    ...softDeleteLinks(ctx, linksOnItems(state.labelLinks, [{ kind: "source_table", id: table.id }, ...columns.map((c) => ({ kind: "source_column" as const, id: c.id }))])),
+    ...releaseNotes(ctx, state.notes, { items: cards, frames: [] }, { cardIds: cards.map((c) => c.id) }),
   ]);
 }

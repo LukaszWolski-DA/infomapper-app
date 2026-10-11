@@ -3,7 +3,7 @@
 
 import type { DomainError } from "./errors";
 import type { Uuid } from "./ids";
-import type { ChangeEvent, ChangeOperation, RowImage, Timestamp, WritableRows, WritableTable } from "./types";
+import type { ChangeEvent, ChangeOperation, LinkTable, RowImage, Timestamp, WritableRows, WritableTable } from "./types";
 
 /** Supplied by the caller so commands stay pure: who acts, the clock and the id generator. */
 export interface CommandContext {
@@ -15,12 +15,13 @@ export interface CommandContext {
 type InsertOf<T extends WritableTable> = { kind: "insert"; table: T; row: WritableRows[T] };
 /** `before` is the row as the command read it; the adapter refuses the write if the stored row differs in version. */
 type UpdateOf<T extends WritableTable> = { kind: "update"; table: T; before: WritableRows[T]; row: WritableRows[T] };
+type RemoveOf<T extends LinkTable> = { kind: "remove"; table: T; before: WritableRows[T] };
 
 export type Write =
   | { [T in WritableTable]: InsertOf<T> }[WritableTable]
   | { [T in WritableTable]: UpdateOf<T> }[WritableTable]
-  /** Link rows without deleted_at (project_canvas) are removed, not soft-deleted. */
-  | { kind: "remove"; table: "project_canvas"; before: WritableRows["project_canvas"] };
+  /** Link rows without deleted_at (project_canvas, project_pinned_label) are removed, not soft-deleted. */
+  | { [T in LinkTable]: RemoveOf<T> }[LinkTable];
 
 export interface WriteSet {
   changeGroupId: Uuid;
@@ -36,12 +37,15 @@ export const fail = (error: DomainError): { ok: false; error: DomainError } => (
 
 /**
  * The object a change event is about. Tables with an `id` use it; link tables without one use the
- * key that names the moved thing: the canvas for project_canvas, the user for workspace_member.
+ * key that names the moved thing: the canvas for project_canvas, the label for project_pinned_label, the user for
+ * workspace_member.
  */
 function objectId(write: Write): Uuid {
   switch (write.table) {
     case "project_canvas":
       return write.kind === "insert" ? write.row.canvas_id : write.before.canvas_id;
+    case "project_pinned_label":
+      return write.kind === "insert" ? write.row.label_id : write.before.label_id;
     case "workspace_member":
       return write.kind === "insert" ? write.row.user_id : write.before.user_id;
     default:

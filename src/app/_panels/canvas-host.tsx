@@ -13,6 +13,8 @@
 // - Frames (slice 2b): “New frame here” on the empty canvas; a frame's toolbox (Rename…, Fit frame to its content,
 //   Select its cards, Zoom to frame, Delete frame); a new frame's name is ready to type in the panel. Slice 2c:
 //   “Collapse into one block” or “Expand”; a collapsed frame offers no fit and “Select its cards” is disabled.
+// - Notes (slice 3a): “Add a note here”, “Add a note to this”, “Add a note to this frame”, and a note's own toolbox
+//   (Edit text, Mark as resolved / Reopen, Colour, Unpin, Delete note), for editors and reviewers (`canNote`).
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
@@ -24,7 +26,7 @@ import { FILTER_LABEL, FILTER_ORDER } from "@/canvas/CardNode";
 import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
 import { isFrameKey } from "@/canvas/selection";
 import type { Uuid } from "@/domain/ids";
-import type { MappingStatus } from "@/domain/types";
+import { NOTE_COLORS, type MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
@@ -61,6 +63,7 @@ export function useCanvasHost({
   canvasId,
   editable,
   canSetStatus,
+  canNote,
   cards,
 }: {
   ix: ModelIndex;
@@ -68,6 +71,8 @@ export function useCanvasHost({
   canvasId: string;
   editable: boolean;
   canSetStatus: boolean;
+  /** May write notes (slice 3a): editors and reviewers. */
+  canNote: boolean;
   cards: readonly HostCard[];
 }) {
   const ui = useContext(CanvasUiCtx);
@@ -209,12 +214,15 @@ export function useCanvasHost({
       });
       items.push({ label: view.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !view.collapsed }) });
       items.push({ label: "Fit width to names", act: () => ui.fitWidth(card.id) });
+      if (canNote) items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });
       if (!ui.cardFrame(card.id)) {
         items.push({ label: `Put in a new ${isEnt ? "concept" : "source system"} frame`, act: () => ui.putInNewFrame([card.id], true) });
       }
       items.push({ sep: true });
       items.push({ label: "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
       if (isEnt) items.push({ label: "Delete from model…", danger: true, act: () => setDeleting(card.targetId) });
+    } else if (canNote) {
+      items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });
     }
     return items;
   };
@@ -268,8 +276,10 @@ export function useCanvasHost({
       if (editable) {
         items.push({ search });
         items.push({ label: "New entity here", kbd: "E", act: () => void createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }) });
-        items.push({ label: "New frame here", kbd: "A", act: () => ui.createFrameAt(req.at) });
       }
+      // a note here: its corner up-left of the click, as the prototype's “Add a note here”
+      if (canNote) items.push({ label: "Add a note here", act: () => ui.newNote({ at: { x: req.at.x - 110, y: req.at.y - 20 } }) });
+      if (editable) items.push({ label: "New frame here", kbd: "A", act: () => ui.createFrameAt(req.at) });
       // every role: these only change what is selected or how the view moves (slice 2a)
       items.push({ label: "Select all", kbd: "Ctrl A", act: () => ui.selectAll() });
       items.push({ label: "Fit everything on screen", kbd: "F", act: () => ui.fit() });
@@ -381,6 +391,7 @@ export function useCanvasHost({
       if (editable && !collapsed) items.push({ label: "Fit frame to its content", act: () => ui.fitFrame(t.frameId), testId: "toolbox-frame-fit" });
       items.push({ label: "Select its cards", disabled: collapsed || !view.cardIds.length, act: () => ui.selectFrameCards(t.frameId), testId: "toolbox-frame-select-cards" });
       items.push({ label: "Zoom to frame", act: () => ui.zoomToFrame(t.frameId), testId: "toolbox-frame-zoom" });
+      if (canNote) items.push({ label: "Add a note to this frame", act: () => ui.newNote({ frameId: t.frameId }) });
       if (editable) {
         items.push({ sep: true });
         items.push({ label: "Delete frame (keeps its cards)", kbd: "Del", danger: true, act: () => ui.deleteFrame(t.frameId), testId: "toolbox-frame-delete" });
@@ -399,6 +410,27 @@ export function useCanvasHost({
         const name = ui.frameView(e.frameId)?.frame.name ?? "?";
         items.push({ label: `Expand ${name}`, act: () => ui.setFrameCollapsed(e.frameId, false), testId: "toolbox-bundle-expand" });
       }
+      return items;
+    }
+    if (t.kind === "note") {
+      // a note's toolbox (item 10, prototype ctxFor “note”); the prototype's “Edit with formatting…” comes with slice 4
+      const view = ui.noteView(t.noteId);
+      if (!view || view.draft) return items;
+      const n = view.note;
+      items.push({ head: view.pinnedTo ? `Note on ${view.pinnedTo.name}` : "Note" });
+      if (!canNote) return items;
+      items.push({ label: "Edit text", kbd: "Dbl-click", act: () => ui.editNote(n.id) });
+      items.push({
+        label: n.status === "resolved" ? "Reopen" : "Mark as resolved",
+        act: () => ui.updateNote(n.id, { status: n.status === "resolved" ? "open" : "resolved" }),
+      });
+      items.push({
+        seg: "Colour",
+        options: NOTE_COLORS.map((c) => ({ label: c.charAt(0).toUpperCase() + c.slice(1), on: n.color === c, act: () => ui.updateNote(n.id, { color: c }) })),
+      });
+      if (view.pinnedTo) items.push({ label: "Unpin (make it a free note)", act: () => ui.unpinNote(n.id) });
+      items.push({ sep: true });
+      items.push({ label: "Delete note", kbd: "Del", danger: true, act: () => ui.deleteNote(n.id) });
       return items;
     }
     const card = cardById.get(t.cardId);

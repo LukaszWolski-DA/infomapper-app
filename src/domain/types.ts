@@ -1,4 +1,4 @@
-// Row types for the tables built so far (slices 0 to 2b). Names and columns mirror docs/data-model-v2.md and
+// Row types for the tables built so far (slices 0 to 3a). Names and columns mirror docs/data-model-v2.md and
 // supabase/migrations/20261002000000_initial_schema.sql, so the Supabase adapter can map them one to one.
 // Timestamps are ISO 8601 strings (timestamptz).
 
@@ -306,6 +306,61 @@ export interface Frame extends StandardColumns {
   collapsed: boolean;
 }
 
+// ---- Working layer (data model section 8, slice 3a) ----
+
+/**
+ * A working label such as `CR-23` (D-08): kept apart from the model's own tags. `name_key` is the lower-case copy the
+ * server writes; it carries the case-insensitive unique name per workspace.
+ */
+export interface Label extends StandardColumns {
+  name: string;
+  name_key: string;
+}
+
+/** One label on one item (AD-15): exactly one of the five targets is set. */
+export interface LabelLink extends StandardColumns {
+  label_id: Uuid;
+  entity_id: Uuid | null;
+  attribute_id: Uuid | null;
+  mapping_id: Uuid | null;
+  source_table_id: Uuid | null;
+  source_column_id: Uuid | null;
+}
+
+/** A label pinned to a project's home (D-29). A link row: removed, not soft-deleted. */
+export interface ProjectPinnedLabel {
+  project_id: Uuid;
+  label_id: Uuid;
+  workspace_id: Uuid;
+}
+
+export const NOTE_COLORS = ["yellow", "blue", "green", "pink", "grey"] as const;
+export type NoteColor = (typeof NOTE_COLORS)[number];
+
+export const NOTE_STATUSES = ["open", "resolved"] as const;
+export type NoteStatus = (typeof NOTE_STATUSES)[number];
+
+/**
+ * A note on a canvas (D-20, D-21). Free: `x`, `y` are its place on the canvas and `frame_id` the frame it was dropped
+ * in. Pinned to a card (`pin_canvas_item_id`) or a frame (`pin_frame_id`), at most one: `x`, `y` are its offset from
+ * that element, and it is in no frame.
+ */
+export interface Note extends StandardColumns {
+  canvas_id: Uuid;
+  body_html: string | null;
+  body_text: string | null;
+  color: NoteColor;
+  status: NoteStatus;
+  resolved_at: Timestamp | null;
+  resolved_by: Uuid | null;
+  width: number;
+  pin_canvas_item_id: Uuid | null;
+  pin_frame_id: Uuid | null;
+  x: number;
+  y: number;
+  frame_id: Uuid | null;
+}
+
 // ---- History ----
 
 export type RowImage = Record<string, unknown>;
@@ -342,5 +397,13 @@ export interface WritableRows {
   mapping_input: MappingInput;
   canvas_item: CanvasItem;
   frame: Frame;
+  label: Label;
+  label_link: LabelLink;
+  project_pinned_label: ProjectPinnedLabel;
+  note: Note;
 }
 export type WritableTable = keyof WritableRows;
+
+/** Link tables without an id or `deleted_at`: their rows are removed, not soft-deleted (data model, change_event). */
+export const LINK_TABLES = ["project_canvas", "project_pinned_label"] as const;
+export type LinkTable = (typeof LINK_TABLES)[number];

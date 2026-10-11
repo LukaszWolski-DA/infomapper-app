@@ -13,10 +13,14 @@ import type {
   CanvasItem,
   ChangeEvent,
   Frame,
+  Label,
+  LabelLink,
+  Note,
   Organization,
   OrganizationMember,
   Project,
   ProjectCanvas,
+  ProjectPinnedLabel,
   Workspace,
   WorkspaceMember,
   WorkspaceModel,
@@ -80,6 +84,25 @@ export interface FrameRepository {
   listOfCanvas(workspaceId: Uuid, canvasId: Uuid): Promise<Frame[]>;
 }
 
+/** Working labels (slice 3a): the workspace's labels, what they mark, and the labels pinned to its projects. */
+export interface LabelRepository {
+  list(workspaceId: Uuid): Promise<Label[]>;
+  get(workspaceId: Uuid, labelId: Uuid): Promise<Label | null>;
+  /** Links whose label and item are both live. */
+  listLinks(workspaceId: Uuid): Promise<LabelLink[]>;
+  getLink(workspaceId: Uuid, labelLinkId: Uuid): Promise<LabelLink | null>;
+  /** Pins of live labels to live projects. */
+  listPins(workspaceId: Uuid): Promise<ProjectPinnedLabel[]>;
+}
+
+/** Notes on canvases (slice 3a). */
+export interface NoteRepository {
+  /** Notes on every live canvas of the workspace (the project home, deleting an entity from every canvas). */
+  list(workspaceId: Uuid): Promise<Note[]>;
+  listOfCanvas(workspaceId: Uuid, canvasId: Uuid): Promise<Note[]>;
+  get(workspaceId: Uuid, noteId: Uuid): Promise<Note | null>;
+}
+
 export interface ChangeEventRepository {
   /** The change log of a workspace, oldest first. */
   list(workspaceId: Uuid): Promise<ChangeEvent[]>;
@@ -108,6 +131,8 @@ export interface DataStore {
   model: ModelRepository;
   canvasItems: CanvasItemRepository;
   frames: FrameRepository;
+  labels: LabelRepository;
+  notes: NoteRepository;
   changeEvents: ChangeEventRepository;
   undoHistory: UndoHistoryRepository;
   /**

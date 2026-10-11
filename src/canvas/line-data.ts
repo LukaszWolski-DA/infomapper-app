@@ -4,7 +4,7 @@
 import type { Uuid } from "@/domain/ids";
 import { checkMappingTypes } from "@/domain/model/type-check";
 import type { CardinalityMax, CardinalityMin, MappingKind, MappingStatus, WorkspaceModel } from "@/domain/types";
-import type { CardData } from "./card-data";
+import type { CardData, LabelNames } from "./card-data";
 import type { SelectionKey } from "./selection";
 
 export interface MapLineData {
@@ -23,6 +23,8 @@ export interface MapLineData {
   attributeId: Uuid;
   /** The entity card of the attribute. */
   cardId: Uuid;
+  /** Working labels on the mapping (“CR-23, JIRA-481”): the line's tag and tooltip (slice 3a); null without. */
+  labels: string | null;
 }
 
 export interface RelLineData {
@@ -44,7 +46,7 @@ export interface CanvasLines {
 }
 
 /** Mapping lines need the attribute's card and at least one input card; relationships need both entity cards. */
-export function buildLines(model: WorkspaceModel, cards: readonly CardData[]): CanvasLines {
+export function buildLines(model: WorkspaceModel, cards: readonly CardData[], labelNames?: LabelNames): CanvasLines {
   const entityCard = new Map(cards.filter((c) => c.kind === "ent").map((c) => [c.targetId, c.id]));
   const tableCard = new Map(cards.filter((c) => c.kind === "src").map((c) => [c.targetId, c.id]));
   const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
@@ -75,6 +77,7 @@ export function buildLines(model: WorkspaceModel, cards: readonly CardData[]): C
       inputCount: columns.length,
       attributeId: attribute.id,
       cardId,
+      labels: labelNames?.get(`mapping:${m.id}`)?.join(", ") || null,
     });
   }
 
@@ -113,6 +116,10 @@ export type Selection =
   | { t: "frame"; id: Uuid }
   /** A bundle of lines at a collapsed frame (slice 2c): its key, see `bundleLines`. */
   | { t: "bundle"; id: string }
+  /** A working label (slice 3a): its panel, opened from a label chip or the project home. Nothing on the canvas is selected. */
+  | { t: "label"; id: Uuid }
+  /** A note on the canvas (slice 3a). */
+  | { t: "note"; id: Uuid }
   | null;
 
 export interface Related {
@@ -126,7 +133,7 @@ export interface Related {
  */
 export function relatedLines(sel: Selection, lines: CanvasLines): Related | null {
   // a bundle's lines are known to the canvas, which emphasises them itself (slice 2c)
-  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame" || sel.t === "bundle") return null;
+  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame" || sel.t === "bundle" || sel.t === "label" || sel.t === "note") return null;
   const maps = new Set<Uuid>(), rels = new Set<Uuid>();
   switch (sel.t) {
     case "map":
