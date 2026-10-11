@@ -85,12 +85,18 @@ const NoteBox = memo(function NoteBox({
 }: Omit<Props, "notes" | "selectedId" | "editingId"> & { shown: ShownNote; selected: boolean; editing: boolean; lod: boolean }) {
   const el = useRef<HTMLDivElement>(null);
   const resolved = n.status === "resolved";
-  // its height is measured (it depends on the text) for the tether and the plain body below 40 %
+  // its height is measured (it depends on the text) for the tether and the plain body below 40 %; not while it draws
+  // that plain body, whose height comes from the measure (measuring it then made the note grow on every round, step 4)
   const height = useRef(0);
+  const plain = useRef(lod);
+  useLayoutEffect(() => {
+    plain.current = lod && !editing;
+  });
   useLayoutEffect(() => {
     const box = el.current;
     if (!box) return;
     const report = () => {
+      if (plain.current) return;
       const h = box.offsetHeight;
       if (h && h !== height.current) {
         height.current = h;
@@ -143,7 +149,8 @@ const NoteBox = memo(function NoteBox({
       {editing ? (
         <NoteEditor text={n.text} onCommit={(t) => onCommit(n.id, t)} onCancel={() => onCancel(n.id)} />
       ) : lod ? (
-        <div className="nt-lod" style={{ height: Math.max(20, (measured ?? 80) - 26) }} />
+        // the header (26) and the plain body with its bottom margin (8) keep the note as high as it was measured
+        <div className="nt-lod" style={{ height: Math.max(20, (measured ?? 80) - 34) }} />
       ) : (
         <>
           <div className={`nt-body${n.text ? "" : " empty"}`} data-testid="note-text">
