@@ -75,7 +75,10 @@ export default async function CanvasPage({
     store.notes.listOfCanvas(ws, canvasId),
     store.users.list(),
   ]);
-  const labelNames = labelNamesByItem(labels, labelLinks);
+  // measurement-only switches (slice 2a diagnosis): only in the measurement-only production build (AD-31); slice 3a:
+  // `nolabelmarks` draws no label mark (rows, headers, lines), `nonotes` no note
+  const diag = isMeasurementBuild() && typeof query.diag === "string" ? query.diag.split(",") : [];
+  const labelNames = diag.includes("nolabelmarks") ? new Map<string, string[]>() : labelNamesByItem(labels, labelLinks);
   const frames = buildFrames(frameRows.filter((f) => f.canvas_id === canvasId));
   const conceptFrames: Record<string, number> = {};
   for (const f of frameRows) if (f.concept_id && canvases.some((c) => c.id === f.canvas_id)) conceptFrames[f.concept_id] = (conceptFrames[f.concept_id] ?? 0) + 1;
@@ -93,9 +96,7 @@ export default async function CanvasPage({
   // notes: editors and reviewers write them (Łukasz's step 0 answer 1); readers and an archived workspace only read
   const canNote = shell.standing !== "none";
   const userName = (id: string) => users.find((u) => u.id === id)?.display_name ?? "someone";
-  const notes = buildNotes(noteRows, frameRows.filter((f) => f.canvas_id === canvasId), userName);
-  // measurement-only switches (slice 2a diagnosis): only in the measurement-only production build (AD-31)
-  const diag = isMeasurementBuild() && typeof query.diag === "string" ? query.diag.split(",") : [];
+  const notes = diag.includes("nonotes") ? [] : buildNotes(noteRows, frameRows.filter((f) => f.canvas_id === canvasId), userName);
   const focus = typeof query.card === "string" ? /^(entity|source):(.+)$/.exec(query.card) : null;
   const focusCardId = focus ? (cards.find((c) => c.kind === (focus[1] === "entity" ? "ent" : "src") && c.targetId === focus[2])?.id ?? null) : null;
   const focusLabelId = typeof query.label === "string" && labels.some((l) => l.id === query.label) ? query.label : null;

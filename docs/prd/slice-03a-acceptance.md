@@ -411,6 +411,55 @@ read as the noise of one round. The S2C-12 guard and the new idle guard (item 15
 **Łukasz:** no extra round now; the step 5 round confirms. If, frames expanded, 100 % is again 5 % or more below
 `slice-02c` with clearly more long frames, or C-08 is over 1500 ms, the cause is found before merging.
 
+### Step 5 confirmation (11 October, 16:28 and 16:37, at `45eb772`)
+
+Frames expanded, sitting `.data/measure/2026-10-11-16-28`:
+
+| Figure | Bar | slice-02c | This branch | Change | Result |
+| --- | --- | --- | --- | --- | --- |
+| Pan and zoom at the overview | ≥ 50 fps, ≥ −5 % vs reference | 59.3 | 59.6 | +0.5 % | met |
+| – frames over 50 ms | ≤ 0 | 0 | 0 | – | met |
+| Pan and zoom at 100 %, dense area | ≥ 50 fps, ≥ −5 % vs reference | 51.7 | 49.1 | −5.0 % | not met |
+| – frames over 50 ms | ≤ 0 | 4 | 12 | – | not met |
+| Initial render (C-08), median of 5 | ≤ 1500 ms | 1502 | 1512 | +0.7 % | not met (slice-02c too) |
+| Hover to the next frame (C-10), median of 40 | ≤ 100 ms | 146 | 120 | −17.6 % | not met (as before) |
+| Marks after a lasso, median of 20 | ≤ 100 ms | 89 | 34 | −62.2 % | met |
+
+All frames collapsed (`--branch-diag collapsed`), sitting `.data/measure/2026-10-11-16-37`:
+
+| Figure | Bar | slice-02c | This branch (collapsed) | Change | Result |
+| --- | --- | --- | --- | --- | --- |
+| Pan and zoom at the overview | ≥ 50 fps, ≥ −5 % vs reference | 59.5 | 59.9 | +0.7 % | met |
+| – frames over 50 ms | ≤ 0 | 0 | 0 | – | met |
+| Pan and zoom at 100 %, dense area | ≥ 50 fps, ≥ −5 % vs reference | 51.4 | 60.0 | +16.7 % | met |
+| – frames over 50 ms | ≤ 0 | 7 | 0 | – | met |
+| Initial render, hover, lasso marks | – | 1428 ms, 145 ms, 94 ms | – | – | not applicable |
+
+**Reading.** Expanded, 100 % is again 5 % below `slice-02c` (−5.0 %, after −5.6 % in step 4) with clearly more long
+frames (12 against 4, after 9 against 4): Łukasz's condition holds, so the cause is looked for before merging (below).
+C-08 is 1512 ms, over 1500 ms, but `slice-02c` took 1502 ms in the same sitting (1425 ms in step 4's), so this sitting's
+initial render is slower on both sides; the branch is +0.7 %. Collapsed is unchanged from step 4 and slice 2c.
+
+### Looking for the cause (11 October, after the confirming rounds)
+
+1. **Nothing re-renders while panning and zooming** on “Performance test” at 100 % (dev server, `__imCanvasCommits`
+   unchanged by wheel pans and Ctrl+wheel zooms): the cost is in drawing, not in React.
+2. **The notes and the label marks are not the cost.** Two measurement-only switches were added (`DIAG=nonotes`: the
+   page passes no notes; `DIAG=nolabelmarks`: no label names, so no mark on rows, headers or lines), and S1A-14 was
+   measured four times in the measurement build on this branch (`.data/measure/diag-3a`, run logs): 100 % at 48.5 fps
+   with 10 long frames as it is, 49.0 / 9 without notes, 46.7 / 5 without label marks, 48.1 / 11 without both. With
+   neither, the branch is no faster, so what slice 3a draws there does not explain the gap.
+3. **The rounds are not balanced.** A one-round sitting measures `slice-02c` first and this branch second
+   (`measure-canvas.ts`: odd rounds start with the reference). In this sitting the laptop got slower as it went: C-08
+   was 1502 ms on the reference, 1512 ms on the branch, then 1701 and 1761 ms in the diagnosis runs that followed. A
+   slowing machine puts the branch side behind; the four diagnosis runs were sequential, so they share that drift and
+   are not an A/B against `slice-02c`.
+4. **Next (needs a prepared laptop and Łukasz's go):** two rounds per sitting, so each side runs first once:
+   `npm run measure:canvas -- --quick --rounds 2 --against slice-02c`, and the same with
+   `--branch-diag nonotes,nolabelmarks`. If the branch is level with `slice-02c` in balanced rounds, the gap was the
+   order; if it stays 5 % below with both switches on, the cost is in code shared by every view (to look for next with
+   Chrome traces, as in slice 2c); if it closes only with the switches, it is the content after all.
+
 ## Changes to earlier tests
 
 - `src/domain/permissions.test.ts`: the role matrix gains `label.edit` (owner, admin, modeler) and `note.edit` (owner,

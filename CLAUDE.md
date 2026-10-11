@@ -130,6 +130,7 @@ npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and z
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
 DIAG=nolines MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # diagnosis: no line layer (or DIAG=blocks)
 DIAG=collapsed MEASURE=1 MEASURE_BUILD=production npx playwright test <spec> # every frame shown collapsed (slice 2c)
+DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test <spec> # no notes, no label marks (slice 3a)
 ```
 
 - e2e tests import `test`/`expect` from `e2e/slice-XX/fixtures.ts` (fresh seed per test); shared steps are in

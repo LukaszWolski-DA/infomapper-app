@@ -15,7 +15,8 @@ export const MEASURE = !!process.env.MEASURE;
 /**
  * Slice 2a's diagnosis: `DIAG=nolines` (no line layer) or `DIAG=blocks` (every card as its below-40 % block); slice
  * 2b's: `DIAG=noframes` (no frame layer) or `DIAG=nolabels` (frames without names and chips); slice 2c's:
- * `DIAG=collapsed` (every frame shown collapsed, nothing saved; S2C-12). Passed to the canvas as
+ * `DIAG=collapsed` (every frame shown collapsed, nothing saved; S2C-12); slice 3a's: `DIAG=nonotes` (no notes) or
+ * `DIAG=nolabelmarks` (no label marks on rows, headers and lines). Passed to the canvas as
  * `?diag=`. Only the measurement-only production build honours it (MEASURE_BUILD=production).
  */
 export const DIAG = process.env.DIAG ?? "";
