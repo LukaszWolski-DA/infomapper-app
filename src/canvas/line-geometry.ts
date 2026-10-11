@@ -17,6 +17,8 @@ export interface MapGeom {
   dots: [number, number][];
   chip: { x: number; y: number; text: string } | null;
   part: boolean;
+  /** Where the tag of a labeled mapping goes: a quarter along the (first input's) curve (slice 3a). */
+  tag: { x: number; y: number };
 }
 
 export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): MapGeom | null {
@@ -38,6 +40,7 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
       dots: [...curves.map((c) => [c.p0.x, c.p0.y] as [number, number]), [f.to.x, f.to.y]],
       chip: { x: f.node.x, y: f.node.y, text: "ƒ" },
       part,
+      tag: curves[0]!.q,
     };
   }
   const g = curve(inputs[0]!, attr);
@@ -50,6 +53,7 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
     ],
     chip: text ? { x: g.mid.x, y: g.mid.y, text } : null,
     part,
+    tag: g.q,
   };
 }
 
@@ -197,6 +201,7 @@ export function bundleGeom(
         ],
         chip: text ? { x: g.mid.x, y: g.mid.y, text } : null,
         part: a.hidden || z.hidden,
+        tag: g.q,
       },
     };
   }

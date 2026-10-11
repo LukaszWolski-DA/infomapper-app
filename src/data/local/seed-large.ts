@@ -1,6 +1,7 @@
 // npm run seed:large: adds the workspace “Performance test” for Łukasz with the canvas spike's data set
 // (100 cards: 60 source tables and 40 entities, one more entity with 200 attributes, 300 mappings, 40 relationships),
-// all on one canvas at the spike's positions, with its 8 frames as free frames (slice 2b). For the performance checks.
+// all on one canvas at the spike's positions, with its 8 frames as free frames (slice 2b), and since slice 3a labels and
+// notes (seed-large-working-layer.ts). For the performance checks.
 
 import type { Uuid } from "@/domain/ids";
 import { CONCEPT_PALETTE } from "@/domain/model/concept-colors";
@@ -8,6 +9,7 @@ import { parseColumnLines } from "@/domain/model/column-lines";
 import { DEFAULT_CANVAS_LOOK, type LogicalType, type MappingStatus, type Stereotype } from "@/domain/types";
 import { ATTR_TYPES, ENT_COLORS, FRAME_NAMES, generate, STEREOS } from "./large-generator";
 import { findViolation, type DevDb } from "./schema";
+import { addLargeWorkingLayer } from "./seed-large-working-layer";
 import { SEED_IDS } from "./seed";
 import { seedId } from "./seed-model";
 
@@ -210,6 +212,9 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
       description: null,
     });
   }
+
+  // labels and notes on the canvas (slice 3a, S3A-14)
+  addLargeWorkingLayer({ db, data, workspaceId: ws, canvasId: LARGE_IDS.canvas, by, at, id });
 
   const violation = findViolation(db);
   if (violation) throw new Error(`Generated data breaks a rule: ${violation.table}: ${violation.detail}`);

@@ -12,6 +12,7 @@ import { createFrame } from "@/domain/commands/frame";
 import { addMappingInput, setMappingStatus } from "@/domain/commands/mapping";
 import { uuidv7 } from "@/domain/ids";
 import { frameOfCard } from "@/domain/model/frames";
+import { noteFrameAt } from "@/domain/model/notes";
 import { entityImpact } from "@/domain/model/impact";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 import { checkMappingTypes } from "@/domain/model/type-check";
@@ -501,6 +502,18 @@ describe("seed:large (S1A-14)", () => {
     expect(frames.every((f) => f.kind === "free")).toBe(true);
     for (const c of cards) expect(c.frame_id).toBe(frameOfCard(frames, { x: c.x, y: c.y, width: c.width ?? 256 })?.id ?? null);
     expect(cards.filter((c) => c.frame_id).length).toBeGreaterThanOrEqual(8 * 6);
+    // Labels and notes (slice 3a, S3A-14): labels on 50 rows and 30 mappings, at least 20 notes, half of them pinned.
+    const wl = await readDb(file);
+    const links = wl.label_link.filter((l) => l.workspace_id === ws);
+    expect(links.filter((l) => l.attribute_id || l.source_column_id)).toHaveLength(50);
+    expect(links.filter((l) => l.mapping_id)).toHaveLength(30);
+    const notes = wl.note.filter((n) => n.canvas_id === LARGE_IDS.canvas);
+    expect(notes.length).toBeGreaterThanOrEqual(20);
+    expect(notes.filter((n) => n.pin_canvas_item_id || n.pin_frame_id).length).toBe(notes.length / 2);
+    expect(notes.filter((n) => n.frame_id).length).toBeGreaterThan(0);
+    expect(notes.some((n) => n.status === "resolved")).toBe(true);
+    // free notes belong to the frame the drop rule gives
+    for (const n of notes.filter((n) => !n.pin_canvas_item_id && !n.pin_frame_id)) expect(n.frame_id).toBe(noteFrameAt(frames, n));
     // The demo workspaces are untouched.
     expect((await store.model.load(RETAIL)).entities).toHaveLength(6);
   });

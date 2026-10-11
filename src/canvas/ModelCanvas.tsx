@@ -25,6 +25,13 @@
 // React Flow's store, hidden, with their places kept. The block stands for the frame (selection key frame:<id>). A card
 // dragged onto a block, from the canvas or the left panel, is filed into the frame. Lines touching a collapsed frame are
 // bundled per pair of ends (`bundleLines`), drawn by the line layer; a bundle can be selected (its panel, its toolbox).
+// Slice 3a: notes in their own layer above the cards (`NoteLayer`, `useNotes`), placed from data; a pinned note's dashed
+// tether is drawn by the line layer. N (or the toolbar) is the Note tool; Delete removes a selected note. Reviewers
+// write notes too (`canNote`); the free notes of a moved frame move with it (`noteAt`, moveOnCanvas on the server).
+// Step 4: notes take part in the selection (`note:` keys: click, Shift+click, lasso, Ctrl+A for free notes in no frame,
+// group drag and nudge, each note moved once); a card's header and a collapsed block show the number of their notes
+// shown (open, and resolved unless hidden); Fit everything counts the notes shown; resolved notes are hidden when the person chose so (`hideResolved`);
+// `focusNoteId` selects a note on arrival (the project home's open notes).
 
 import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
@@ -43,7 +50,7 @@ import { useToast } from "@/ui/components/toast";
 import { withClips, type CardData } from "./card-data";
 import CardNode, { cardNodesOf, FILTER_ORDER, type CardNodeT } from "./CardNode";
 import BlockNode, { blockNodeId, type BlockNodeT } from "./BlockNode";
-import { RelateLine, useCanvasModes } from "./CanvasModes";
+import { NOTE_TOOL_HINT, RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
 import { NUDGE, useGroupActions, type GroupWrites } from "./GroupActions";
@@ -55,10 +62,10 @@ import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
-import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
+import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
-import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis } from "./context";
+import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis, type NoteListItem } from "./context";
 import {
   besideAnchor,
   besideSpots,
@@ -83,11 +90,15 @@ import { viewKey } from "./views";
 import LineLayer from "./LineLayer";
 import { bundleLines, type Bundle } from "./line-geometry";
 import { Overview } from "./Overview";
+import NoteLayer, { type ShownNote } from "./NoteLayer";
+import { countsKey, countsOf, frameNoteCounts, noteAt, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
+import { DRAFT_NOTE, NO_NOTE_WRITES, useNotes, type NoteMover, type NoteWrites } from "./useNotes";
 
 const nodeTypes = { card: CardNode, block: BlockNode };
 const NO_DIAGNOSIS: Diagnosis = {};
 const NO_FRAMES: FrameData[] = [];
 const NO_CONCEPTS: Record<string, string> = {};
+const NO_NOTES: NoteData[] = [];
 
 /** How far the grid layer reaches past the pane: the largest grid step (Lines at the highest zoom). Also in canvas.css. */
 const GRID_BLEED = 32 * MAX_ZOOM;
@@ -127,20 +138,32 @@ export interface ModelCanvasProps {
   /** A card to select and bring into view once the canvas is ready (“On canvases”, slice 2a); then the address
    * loses its query, so a reload keeps the remembered view. */
   focusCardId?: string | null;
+  /** A working label asked for on arrival (the project home's labels, slice 3a): its panel opens. */
+  focusLabelId?: string | null;
+  /** A note asked for on arrival (the project home's open notes, slice 3a): selected and in view. */
+  focusNoteId?: string | null;
   /** Measurement-only switches (only the measurement-only production build passes them). */
   diagnosis?: Diagnosis;
+  /** The canvas's notes and their writes (slice 3a); when the page read them (server time, step 5). */
+  notes?: NoteData[];
+  notesReadAt?: string | null;
+  noteWrites?: NoteWrites;
+  /** May write notes: editors and reviewers, not archived (Łukasz's step 0 answer 1). */
+  canNote?: boolean;
+  /** The signed-in person's name (a new note's “by”). */
+  userName?: string;
 }
 
 type PlaceSpot = { x: number; y: number; height: number };
 type FrameRef = { frameId: string; expectedVersion: number };
 
-const toNode = (card: CardData, editable: boolean): CardNodeT => ({
+const toNode = (card: CardData, editable: boolean, pinnedNotes?: number): CardNodeT => ({
   id: card.id,
   type: "card",
   position: { x: card.x, y: card.y },
   width: cardWidth(card),
   height: cardHeight(card),
-  data: { card },
+  data: pinnedNotes ? { card, pinnedNotes } : { card },
   draggable: editable,
   dragHandle: ".c-head",
   selectable: false,
@@ -182,7 +205,14 @@ export function ModelCanvas({
   frameWrites,
   entityConcepts = NO_CONCEPTS,
   focusCardId,
+  focusLabelId,
+  focusNoteId,
   diagnosis = NO_DIAGNOSIS,
+  notes: initialNotes = NO_NOTES,
+  notesReadAt = null,
+  noteWrites,
+  canNote = false,
+  userName = "",
 }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
   const look = useCanvasLook()?.look;
@@ -225,6 +255,11 @@ export function ModelCanvas({
   const storeApi = useStoreApi();
   /** Everything on the canvas: the cards and the frames with their labels (slice 2b). */
   const framesNowRef = useRef<() => readonly FrameData[]>(() => initialFrames);
+  /**
+   * The notes drawn now (slice 3a): their rectangles, and for the selection a free note's frame or what a pinned note
+   * hangs on. A new card does not go under one (prototype freeSpot); Fit everything counts them.
+   */
+  const noteBoxesRef = useRef<{ id: string; rect: Rect; frameId: string | null; pinnedTo: string | null }[]>([]);
   /** The cards drawn now: not those of a collapsed frame (slice 2c). */
   const cardsNow = useCallback(() => {
     const collapsed = new Set(framesNowRef.current().filter((f) => f.collapsed).map((f) => f.id));
@@ -237,7 +272,12 @@ export function ModelCanvas({
   }, [rf]);
   const fitView = useCallback(
     (w: number, h: number) => {
-      const boxes = [contentBounds(cardsNow()), ...frameRectsNow().map(({ f, r }) => (f.collapsed ? r : { x: r.x, y: r.y - 30, w: r.w, h: r.h + 30 }))].filter((r) => r !== null);
+      // the notes shown count too (slice 3a, item 14; prototype contentBounds)
+      const boxes = [
+        contentBounds(cardsNow()),
+        ...frameRectsNow().map(({ f, r }) => (f.collapsed ? r : { x: r.x, y: r.y - 30, w: r.w, h: r.h + 30 })),
+        ...noteBoxesRef.current.map((b) => b.rect),
+      ].filter((r) => r !== null);
       const bounds = boxes.length
         ? (() => {
             const x0 = Math.min(...boxes.map((r) => r.x)), y0 = Math.min(...boxes.map((r) => r.y));
@@ -253,13 +293,6 @@ export function ModelCanvas({
     const { width: w, height: h } = storeApi.getState();
     void rf.setViewport(fitView(w, h), { duration: 250 });
   }, [rf, storeApi, fitView]);
-
-  useEffect(() => {
-    if (ready || width === 0 || height === 0) return;
-    void rf.setViewport(readView(canvasId) ?? fitView(width, height));
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the view can only be set once the pane has a size
-    setReady(true);
-  }, [ready, width, height, canvasId, rf, fitView]);
 
   const onMoveEnd = useCallback(
     (_: unknown, v: Viewport) => writePreference(viewKey(canvasId), JSON.stringify(v)),
@@ -302,6 +335,8 @@ export function ModelCanvas({
         frameId: card.frameId,
         hidden: !!card.frameId && !!framesNowRef.current().find((f) => f.id === card.frameId)?.collapsed,
       })),
+      // the notes shown, not a new one being written (slice 3a, item 13)
+      ...noteBoxesRef.current.filter((b) => b.id !== DRAFT_NOTE).map((b) => ({ id: b.id, key: noteKey(b.id), rect: b.rect, frameId: b.frameId, pinnedTo: b.pinnedTo })),
     ],
     [rf, frameRectsNow],
   );
@@ -322,6 +357,16 @@ export function ModelCanvas({
   // ---- keyboard: F fits, M toggles the Overview, E the Entity tool; Esc ends a tool, else clears the selection ----
   const { toggleEntityTool, toggleHandTool, toggleFrameTool } = modes;
   const deleteFrameRef = useRef<(id: string) => void>(() => {});
+  const deleteNoteRef = useRef<(id: string) => void>(() => {});
+  /** N, the toolbar button: the Note tool on or off (editors and reviewers, slice 3a). */
+  const toggleNoteTool = useCallback(() => {
+    if (!canNote) return;
+    if (ui.mode?.kind === "note") ui.setMode(null);
+    else {
+      ui.setMode({ kind: "note" });
+      toast(NOTE_TOOL_HINT);
+    }
+  }, [canNote, ui, toast]);
   /** Space held: a left drag pans (React Flow), so it must not start a lasso. */
   const spaceDown = useRef(false);
   useEffect(() => {
@@ -354,12 +399,18 @@ export function ModelCanvas({
         deleteFrameRef.current(selection.id);
         return;
       }
+      if ((e.key === "Delete" || e.key === "Backspace") && canNote && selection?.t === "note") {
+        e.preventDefault();
+        deleteNoteRef.current(selection.id);
+        return;
+      }
       const k = e.key.toLowerCase();
       if (k === "f") fit();
       else if (k === "m") ui.toggleOverview();
       else if (k === "e") toggleEntityTool();
       else if (k === "h") toggleHandTool();
       else if (k === "a") toggleFrameTool();
+      else if (k === "n") toggleNoteTool();
       else if (k === "v" && ui.mode?.kind === "hand") ui.setMode(null);
       else if (k === "escape") {
         if (ui.mode) ui.setMode(null);
@@ -378,7 +429,7 @@ export function ModelCanvas({
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [fit, ui, select, toggleEntityTool, toggleHandTool, toggleFrameTool, selectAll, editable, selection, rf]);
+  }, [fit, ui, select, toggleEntityTool, toggleHandTool, toggleFrameTool, toggleNoteTool, selectAll, editable, canNote, selection, rf]);
 
   // ---- card changes: applied at once, saved in order, undone on refusal ----
   const queue = useRef(new Map<string, Promise<void>>());
@@ -413,9 +464,10 @@ export function ModelCanvas({
       const local = new Map(ns.map((n) => [n.id, n]));
       return initialCards.map((c) => {
         const mine = local.get(c.id);
-        if (!mine || (!(pending.current.get(c.id) ?? 0) && !mine.dragging)) return toNode(c, editable);
+        // the number of notes stays as the notes last gave it (slice 3a)
+        if (!mine || (!(pending.current.get(c.id) ?? 0) && !mine.dragging)) return toNode(c, editable, mine?.data.pinnedNotes);
         const { x, y, collapsed, rowFilter, width, frameId } = mine.data.card;
-        return { ...toNode({ ...c, x, y, collapsed, rowFilter, width, frameId }, editable), position: mine.position, dragging: mine.dragging };
+        return { ...toNode({ ...c, x, y, collapsed, rowFilter, width, frameId }, editable, mine.data.pinnedNotes), position: mine.position, dragging: mine.dragging };
       });
     });
     for (const c of initialCards) if (!(pending.current.get(c.id) ?? 0)) versions.current.set(c.id, c.version);
@@ -427,7 +479,7 @@ export function ModelCanvas({
         if (n.id !== id) return n;
         const merged = { ...n.data.card, ...patch };
         const card = patch.width !== undefined ? withClips(merged) : merged;
-        return { ...n, position: { x: card.x, y: card.y }, width: cardWidth(card), height: cardHeight(card), data: { card } };
+        return { ...n, position: { x: card.x, y: card.y }, width: cardWidth(card), height: cardHeight(card), data: { ...n.data, card } };
       }),
     );
   }, []);
@@ -476,7 +528,7 @@ export function ModelCanvas({
     return { x: -tx / z, y: -ty / z, w: w / z, h: h / z };
   }, [storeApi]);
 
-  /** What a new card must not cover: the cards drawn and the blocks of collapsed frames (slice 2c, item 9). */
+  /** What a new card must not cover: the cards drawn, the blocks of collapsed frames (slice 2c, item 9) and the notes. */
   const occupied = useCallback(
     (): Rect[] => [
       ...cardsNow().map((c) => {
@@ -484,6 +536,7 @@ export function ModelCanvas({
         return { x: n.position.x, y: n.position.y, w: cardWidth(c), h: cardHeight(c) };
       }),
       ...frameRectsNow().filter(({ f }) => f.collapsed).map(({ r }) => r),
+      ...noteBoxesRef.current.map((b) => b.rect),
     ],
     [rf, cardsNow, frameRectsNow],
   );
@@ -521,6 +574,13 @@ export function ModelCanvas({
     }
     window.history.replaceState(null, "", window.location.pathname);
   }, [ready, focusCardId, rf, select, centerOn]);
+  const focusedLabel = useRef(false);
+  useEffect(() => {
+    if (!ready || !focusLabelId || focusedLabel.current) return;
+    focusedLabel.current = true;
+    select({ t: "label", id: focusLabelId });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [ready, focusLabelId, select]);
 
   const cardOf = useCallback(
     (t: CardTarget) =>
@@ -690,6 +750,8 @@ export function ModelCanvas({
     [],
   );
   const onFrameCreated = useCallback((id: string) => ui.host()?.frameCreated(id), [ui]);
+  /** The notes, for the frames and the selection that move them (slice 3a); set once the notes are there. */
+  const noteMoverRef = useRef<NoteMover | null>(null);
   const frameState = useFrames({
     editable,
     showAllCollapsed: diagnosis.collapsed,
@@ -710,13 +772,65 @@ export function ModelCanvas({
     conceptName,
     ask,
     groupOf: (frameId) => (selection?.t === "multi" && selection.keys.includes(frameKey(frameId)) ? unitsOf(selection.keys, boxes()) : null),
+    notes: noteMoverRef,
   });
   const { frames, saveLayout, arrangeIntoFrames } = frameState;
+
+  // ---- notes (slice 3a) ----
+  /** The cards and frames as the canvas shows them now, for where notes go (a dragged card at its node's place). */
+  const placesNow = useCallback(
+    () => placesOf(cardNodesOf(rf).map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, width: n.data.card.width, frameId: n.data.card.frameId })), framesNowRef.current()),
+    [rf],
+  );
+  const nameOf = useCallback(
+    (kind: "card" | "frame", id: string) =>
+      kind === "card" ? ((rf.getNode(id) as CardNodeT | undefined)?.data.card.name ?? "") : (framesNowRef.current().find((f) => f.id === id)?.name ?? ""),
+    [rf],
+  );
+  const noteTargets = useCallback(
+    () => [
+      ...cardsNow().map((c) => ({ kind: "card" as const, id: c.id, label: c.name })),
+      ...framesNowRef.current().map((f) => ({ kind: "frame" as const, id: f.id, label: `Frame: ${f.name}` })),
+    ],
+    [cardsNow],
+  );
+  const endNoteTool = useCallback(() => ui.setMode(null), [ui]);
+  /** Shift+click on a note: in or out of the selection of several (slice 3a, item 13). */
+  const toggleNote = useCallback((id: string) => select(toggleItem(selection, noteKey(id), boxes())), [select, selection, boxes]);
+  /** A note of a selection of several pressed: the selection's drag (set once the group's actions are there). */
+  const groupDragRef = useRef<(e: React.PointerEvent, onClick: () => void) => boolean>(() => false);
+  const noteGroupDrag = useCallback(
+    (e: React.PointerEvent, id: string) =>
+      selection?.t === "multi" && selection.keys.includes(noteKey(id)) ? groupDragRef.current(e, () => select({ t: "note", id })) : false,
+    [selection, select],
+  );
+  const noteState = useNotes({
+    canNote,
+    initialNotes,
+    notesReadAt,
+    versions,
+    pending,
+    enqueue,
+    enqueueGroup,
+    select,
+    undo: ui.undo,
+    writes: noteWrites ?? NO_NOTE_WRITES,
+    placesNow,
+    nameOf,
+    targets: noteTargets,
+    noteTool: ui.mode?.kind === "note",
+    endNoteTool,
+    userName,
+    toggleInSelection: toggleNote,
+    groupDrag: noteGroupDrag,
+  });
   useEffect(() => {
     askRef.current = ask;
     saveLayoutRef.current = saveLayout;
     deleteFrameRef.current = frameState.deleteFrame;
+    deleteNoteRef.current = noteState.remove;
     framesNowRef.current = frameState.framesNow;
+    noteMoverRef.current = { noteOf: noteState.noteOf, show: noteState.show };
   });
   const cardData = useMemo(() => nodes.map((n) => n.data.card), [nodes]);
   // The panels that show frames draw again when frames, their cards or the cards' numbers change; not on a move.
@@ -728,22 +842,16 @@ export function ModelCanvas({
       ]),
     [frames, cardData],
   );
-  // Cards and frames that left the canvas (removed, deleted, undone) leave the selection too, and so do the cards of a
-  // frame that was collapsed (slice 2c, prototype pruneMulti); checked when the set of cards or frames or the collapsed
-  // frames change, not on every frame of a drag.
-  const itemIds = useMemo(
-    () => [...frames.map((f) => `${f.id}${f.collapsed ? "c" : ""}`), ...nodes.map((n) => n.id)].join(","),
-    [frames, nodes],
-  );
-  useEffect(() => {
-    if (selection?.t !== "multi") return;
-    const next = fromKeys(selection.keys, boxes().filter((b) => !b.hidden));
-    if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
-  }, [itemIds, selection, select, boxes]);
   const selectedFrameId = selection?.t === "frame" ? selection.id : null;
 
   // ---- collapsed frames (slice 2c, D-07): their cards hidden, a block standing for each ----
   const collapsedIds = useMemo(() => new Set(frames.filter((f) => f.collapsed).map((f) => f.id)), [frames]);
+  // the numbers of notes (slice 3a, item 12), as strings first: a note that only moves changes none of them
+  const savedNotes = useMemo(() => noteState.notes.filter((n) => n.id !== DRAFT_NOTE), [noteState.notes]);
+  const cardNotesKey = useMemo(() => countsKey(cardNoteCounts(savedNotes, ui.hideResolved)), [savedNotes, ui.hideResolved]);
+  const cardNotes = useMemo(() => countsOf(cardNotesKey), [cardNotesKey]);
+  const frameNotesKey = useMemo(() => countsKey(frameNoteCounts(savedNotes, ui.hideResolved)), [savedNotes, ui.hideResolved]);
+  const frameNotes = useMemo(() => countsOf(frameNotesKey), [frameNotesKey]);
   const counts = useMemo(() => memberCounts(cardData), [cardData]);
   /** What stands for each frame on the canvas: the frame, or its block (selection marks, slice 2c). */
   const frameRects = useMemo(() => new Map(frames.map((f) => [f.id, frameShape(f, counts)])), [frames, counts]);
@@ -767,8 +875,11 @@ export function ModelCanvas({
             frame: f,
             color: frameColor(f, (id) => conceptColors[id]),
             members: members.map((c) => ({ id: c.id, kind: c.kind, name: c.name, mapped: c.mapped, total: c.rows.length })),
-            // the block's footer: mapped, used, type and drafts; not “misplaced” (prototype blockCard)
-            chips: frameChips(frameStats(f, members), f.kind).filter((c) => c.tone !== "misplaced"),
+            // the block's footer: mapped, used, type and drafts; not “misplaced”; its notes (prototype blockCard)
+            chips: [
+              ...frameChips(frameStats(f, members), f.kind).filter((c) => c.tone !== "misplaced"),
+              ...(frameNotes.get(f.id) ? [{ text: `${frameNotes.get(f.id)} note${frameNotes.get(f.id)! > 1 ? "s" : ""}`, title: "Notes pinned to the frame or inside it that are shown" }] : []),
+            ],
             selected: selectedFrameId === f.id || !!selectedKeys?.has(frameKey(f.id)),
           },
           draggable: false,
@@ -777,7 +888,22 @@ export function ModelCanvas({
           style: { pointerEvents: "all" as const },
         };
       });
-  }, [collapsedIds, frames, cardData, frameRects, conceptColors, selection, selectedFrameId]);
+  }, [collapsedIds, frames, cardData, frameRects, conceptColors, selection, selectedFrameId, frameNotes]);
+  // A card with pinned notes shown has their number in its data (slice 3a): changed only when a number changes, so no
+  // other card draws again.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the numbers follow the notes, which live beside the cards
+    setNodes((ns) => {
+      let changed = false;
+      const next = ns.map((n) => {
+        const count = cardNotes.get(n.id) ?? 0;
+        if ((n.data.pinnedNotes ?? 0) === count) return n;
+        changed = true;
+        return { ...n, data: count ? { ...n.data, pinnedNotes: count } : { card: n.data.card } };
+      });
+      return changed ? next : ns;
+    });
+  }, [cardNotes]);
   /** The nodes React Flow draws: the cards, those of a collapsed frame hidden, and the blocks. */
   const flowNodes = useMemo(() => {
     const cards = collapsedIds.size
@@ -814,8 +940,91 @@ export function ModelCanvas({
   useEffect(() => {
     bundlesRef.current = bundled?.bundles ?? [];
   });
+  // ---- notes as drawn now: where each shows (a pinned one follows its card or frame while it moves), and the tethers ----
+  const { notes: noteList, heights: noteHeights, notesNow } = noteState;
+  const shownPlaces = useMemo(
+    () => placesOf(nodes.map((n) => ({ id: n.id, x: n.position.x, y: n.position.y, width: n.data.card.width, frameId: n.data.card.frameId })), frames),
+    [nodes, frames],
+  );
+  const shownNotes = useMemo((): ShownNote[] => {
+    const cardName = new Map(nodes.map((n) => [n.id, n.data.card.name]));
+    const frameName = new Map(frames.map((f) => [f.id, f.name]));
+    return noteList
+      .filter((n) => noteShown(n, shownPlaces, ui.hideResolved))
+      .map((n) => ({
+        note: n,
+        ...noteAt(n, shownPlaces),
+        pinName: n.pinCardId ? (cardName.get(n.pinCardId) ?? "?") : n.pinFrameId ? (frameName.get(n.pinFrameId) ?? "?") : null,
+        height: noteHeights.get(n.id),
+      }));
+  }, [noteList, shownPlaces, nodes, frames, noteHeights, ui.hideResolved]);
+  const tethers = useMemo(() => {
+    const out: { id: string; x1: number; y1: number; x2: number; y2: number }[] = [];
+    for (const s of shownNotes) {
+      const n = s.note;
+      let target: Rect | null = null;
+      if (n.pinCardId) {
+        const node = nodes.find((x) => x.id === n.pinCardId);
+        if (node) target = { x: node.position.x, y: node.position.y, w: cardWidth(node.data.card), h: cardHeight(node.data.card) };
+      } else if (n.pinFrameId) target = frameRects.get(n.pinFrameId) ?? null;
+      if (!target) continue;
+      const t = tether({ x: s.x, y: s.y, w: n.width, h: s.height ?? 80 }, target);
+      if (t) out.push({ id: n.id, ...t });
+    }
+    return out;
+  }, [shownNotes, nodes, frameRects]);
+  useEffect(() => {
+    noteBoxesRef.current = shownNotes.map((s) => ({
+      id: s.note.id,
+      rect: { x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80 },
+      frameId: s.note.pinCardId || s.note.pinFrameId ? null : s.note.frameId,
+      pinnedTo: s.note.pinCardId ?? s.note.pinFrameId,
+    }));
+  }, [shownNotes]);
+  /** The notes as the selection marks them. */
+  const noteRects = useMemo(() => new Map(shownNotes.map((s) => [s.note.id, { x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80 }])), [shownNotes]);
+
+  useEffect(() => {
+    if (ready || width === 0 || height === 0) return;
+    void rf.setViewport(readView(canvasId) ?? fitView(width, height));
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the view can only be set once the pane has a size
+    setReady(true);
+  }, [ready, width, height, canvasId, rf, fitView]);
+
+  // Cards, frames and notes that left the canvas (removed, deleted, undone, hidden) leave the selection too, and so do
+  // the cards of a frame that was collapsed (slice 2c, prototype pruneMulti); checked when the set of cards, frames or
+  // notes shown or the collapsed frames change, not on every frame of a drag.
+  const itemIds = useMemo(
+    () => [...frames.map((f) => `${f.id}${f.collapsed ? "c" : ""}`), ...nodes.map((n) => n.id), ...shownNotes.map((s) => s.note.id)].join(","),
+    [frames, nodes, shownNotes],
+  );
+  useEffect(() => {
+    if (selection?.t !== "multi") return;
+    const next = fromKeys(selection.keys, boxes().filter((b) => !b.hidden));
+    if (next?.t !== "multi" || next.keys.length !== selection.keys.length) select(next);
+  }, [itemIds, selection, select, boxes]);
+
+  // A note asked for on arrival (the project home): selected and in view, at 100 % (prototype data-hnote).
+  const focusedNote = useRef(false);
+  useEffect(() => {
+    if (!ready || !focusNoteId || focusedNote.current) return;
+    focusedNote.current = true;
+    if (noteList.some((n) => n.id === focusNoteId)) {
+      select({ t: "note", id: focusNoteId });
+      const r = noteBoxesRef.current.find((b) => b.id === focusNoteId)?.rect;
+      const { width: w, height: h } = storeApi.getState();
+      if (r) void rf.setViewport({ x: w / 2 - (r.x + r.w / 2), y: h / 2 - (r.y + r.h / 2), zoom: 1 });
+    }
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [ready, focusNoteId, noteList, select, rf, storeApi]);
+  // the note panel reads the notes through the canvas: it draws again when a note changes, not when one moves
+  const notesKey = useMemo(
+    () => noteList.map((n) => `${n.id}:${n.version}:${n.status}:${n.color}:${n.pinCardId ?? ""}:${n.pinFrameId ?? ""}:${n.frameId ?? ""}:${n.text.length}:${n.text.slice(0, 40)}`).join(","),
+    [noteList],
+  );
+
   const { publishLayout } = ui;
-  useEffect(() => publishLayout(`${layoutKey}|${bundleKey}`), [publishLayout, layoutKey, bundleKey]);
+  useEffect(() => publishLayout(`${layoutKey}|${bundleKey}|${notesKey}`), [publishLayout, layoutKey, bundleKey, notesKey]);
 
   /** A card row of a block: expand the frame, then select the card and bring it into view. */
   const openMember = useCallback(
@@ -867,6 +1076,12 @@ export function ModelCanvas({
     framesNow: frameState.framesNow,
     patchFrames: frameState.patchFrames,
     frameRect: (f) => frameShape(f, memberCounts(cardNodesOf(rf).map((n) => n.data.card))),
+    canNote,
+    notes: noteMoverRef,
+    saveNoteMoves: noteState.saveMoves,
+  });
+  useEffect(() => {
+    groupDragRef.current = group.startDrag;
   });
 
   // Arrow keys nudge the selected cards by 8 px, with Shift by 32 px (outside text fields).
@@ -917,6 +1132,29 @@ export function ModelCanvas({
       setFrameCollapsed: frameState.setCollapsed,
       setAllFramesCollapsed: frameState.setAllCollapsed,
       bundleView: (key) => bundlesRef.current.find((b) => b.key === key) ?? null,
+      noteView: noteState.noteView,
+      newNote: noteState.newNote,
+      editNote: noteState.edit,
+      updateNote: noteState.update,
+      pinNote: noteState.pin,
+      unpinNote: noteState.unpin,
+      deleteNote: noteState.remove,
+      notesView: (): NoteListItem[] =>
+        notesNow()
+          .filter((n) => n.id !== DRAFT_NOTE)
+          .map((n) => ({
+            id: n.id,
+            text: n.text,
+            status: n.status,
+            pinCardId: n.pinCardId,
+            pinFrameId: n.pinFrameId,
+            pinName: n.pinCardId ? nameOf("card", n.pinCardId) : n.pinFrameId ? nameOf("frame", n.pinFrameId) : null,
+          })),
+      showNote: (id) => {
+        select({ t: "note", id });
+        const r = noteBoxesRef.current.find((b) => b.id === id)?.rect;
+        if (r && !inside(viewRect(), r)) centerOnRect(r);
+      },
       framesView: frameState.framesView,
       cardFrame: frameState.cardFrame,
       frameAt: frameState.frameAt,
@@ -934,7 +1172,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -1021,8 +1259,16 @@ export function ModelCanvas({
     [saveLayout, onGroupDragStop],
   );
 
+  const toggleNoteStatus = useCallback(
+    (id: string) => {
+      const n = noteState.noteView(id)?.note;
+      if (n) noteState.update(id, { status: n.status === "resolved" ? "open" : "resolved" });
+    },
+    [noteState],
+  );
+
   // ---- hover (C-10): a row of a card or a mapping line; nothing while dragging or with a tool on ----
-  const busy = !!draft || !!ui.mode || resize.resizing || !!lasso.lasso || frameState.busy;
+  const busy = !!draft || !!ui.mode || resize.resizing || !!lasso.lasso || frameState.busy || noteState.dragging;
   const onHoverOver = useCallback((e: React.PointerEvent) => {
     if (e.buttons) return;
     const el = e.target as Element;
@@ -1038,7 +1284,7 @@ export function ModelCanvas({
     <CanvasCardsCtx.Provider value={cardsApi}>
       <div
         ref={rootRef}
-        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${ui.mode?.kind === "hand" ? " tool-hand" : ""}${ui.mode?.kind === "frame" ? " tool-frame" : ""}${modes.panning ? " panning" : ""}${resize.resizing ? " resizing" : ""}${dragging || frameState.busy ? " node-dragging" : ""}`}
+        className={`im-canvas${ui.mode?.kind === "entity" ? " tool-entity" : ""}${ui.mode?.kind === "relate" ? " relating" : ""}${ui.mode?.kind === "hand" ? " tool-hand" : ""}${ui.mode?.kind === "frame" ? " tool-frame" : ""}${ui.mode?.kind === "note" ? " tool-note" : ""}${modes.panning ? " panning" : ""}${resize.resizing ? " resizing" : ""}${dragging || frameState.busy ? " node-dragging" : ""}`}
         data-testid="area-canvas"
         data-grid={grid}
         data-layer={layer}
@@ -1053,6 +1299,7 @@ export function ModelCanvas({
           onPointerDown(e);
         }}
         onPointerDownCapture={(e) => {
+          if (noteState.onNoteToolPointerDown(e)) return;
           if (frameState.onFrameToolPointerDown(e)) return;
           if (!resize.onPointerDown(e)) modes.onPointerDownCapture(e);
         }}
@@ -1112,11 +1359,24 @@ export function ModelCanvas({
               related={bundleRelated ?? related}
               hover={busy ? null : hoverRelated}
               onSelect={select}
+              tethers={tethers}
             />
           )}
+          <NoteLayer
+            notes={shownNotes}
+            selectedId={selection?.t === "note" ? selection.id : null}
+            editingId={noteState.editing}
+            canNote={canNote}
+            onPointerDown={noteState.onNotePointerDown}
+            onToggleStatus={toggleNoteStatus}
+            onEdit={noteState.edit}
+            onCommit={noteState.commit}
+            onCancel={noteState.cancel}
+            onHeight={noteState.onHeight}
+          />
           <Overview lines={lines} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
-          <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} frameRects={frameRects} />
+          <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} frameRects={frameRects} noteRects={noteRects} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>

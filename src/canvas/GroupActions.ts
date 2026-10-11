@@ -8,9 +8,13 @@
 // the selection stand for their cards (D-17, prototype movingItems): a group drag, a nudge, align, stack and line up move
 // each selected frame with its cards and each other selected card on its own, every card once; fit widths, remove and
 // “Add sources” act on the selected cards only.
+// Slice 3a (item 13; prototype movingItems, startGroupDrag, nudge): selected notes move with the group, each once (a
+// free note in a moving frame goes with its frame, a pinned note with its card or frame), in the same change. A note of
+// the selection pressed and dragged moves the whole selection (`startDrag`). Reviewers move only the notes of a
+// selection (they may not move cards or frames); readers nothing. Align, stack, line up and fit widths leave notes alone.
 
-import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type SetStateAction } from "react";
-import { useReactFlow, type NodeChange } from "@xyflow/react";
+import { useCallback, useEffect, useRef, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
+import { applyNodeChanges, useReactFlow, type NodeChange } from "@xyflow/react";
 import { useToast } from "@/ui/components/toast";
 import { ARRANGED, arrange, type ArrangeMode } from "./arrange";
 import type { CardData } from "./card-data";
@@ -19,9 +23,11 @@ import { cardNodesOf, type CardNodeT } from "./CardNode";
 import type { CardTarget, UndoHooks } from "./context";
 import type { SaveLayoutOptions } from "./useFrames";
 import type { LayoutChange } from "./layout-plan";
-import { besideSpots, CARD_W, cardHeight, cardWidth, inside, newCardHeight, type Pt, type Rect } from "./geometry";
+import { besideSpots, CARD_W, cardHeight, cardWidth, inside, newCardHeight, snap8, type Pt, type Rect } from "./geometry";
 import type { Selection } from "./line-data";
-import { selectedCardIds, selectedKeys, unitsOf, type ItemBox } from "./selection";
+import type { NoteData } from "./note-data";
+import { isNoteKey, selectedCardIds, selectedKeys, unitsOf, type ItemBox } from "./selection";
+import type { NoteMove, NoteMover } from "./useNotes";
 import { fitWidth as fitWidthOf } from "./text-fit";
 
 /** What a canvas write returns: the value, or the domain's message for a toast. */
@@ -37,6 +43,8 @@ export const NUDGE = { step: 8, big: 32 } as const;
 /** The nudges are saved together once the keys have been still this long. */
 const NUDGE_SAVE_MS = 400;
 const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
+/** A press that moved less than this is a click. */
+const CLICK_SLOP = 4;
 
 interface Options extends GroupWrites {
   editable: boolean;
@@ -60,6 +68,11 @@ interface Options extends GroupWrites {
   patchFrames: (patch: ReadonlyMap<string, Partial<FrameData>>) => void;
   /** What stands for a frame: the frame, or its block when collapsed (slice 2c: align, stack, line up use its size). */
   frameRect: (f: FrameData) => Rect;
+  /** May move notes (editors and reviewers, slice 3a). */
+  canNote: boolean;
+  /** The canvas's notes; and a save of notes moved without cards or frames (one change). */
+  notes: MutableRefObject<NoteMover | null>;
+  saveNoteMoves: (moves: readonly NoteMove[]) => void;
 }
 
 type Move = { id: string; from: Pt; to: Pt };
@@ -71,7 +84,7 @@ export function useGroupActions(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
   const { editable, selection, select, setNodes, patchCard, enqueueGroup, versions, pending, undo, occupied, viewRect } = o;
-  const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames, frameRect } = o;
+  const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames, frameRect, canNote, notes: noteMover, saveNoteMoves } = o;
 
   /** The selected cards themselves on this canvas (not frames): several, or the one selected card. */
   const selectedNodes = useCallback((): CardNodeT[] => {
@@ -80,10 +93,14 @@ export function useGroupActions(o: Options) {
     return cardNodesOf(rf).filter((n) => ids.has(n.id));
   }, [rf, selection, items]);
 
-  /** What the selection moves: selected frames with their cards, and the other selected cards (slice 2b). */
+  /**
+   * What the selection moves: selected frames with their cards, the other selected cards (slice 2b) and the selected
+   * notes that move by themselves (slice 3a). Reviewers move only notes, readers nothing.
+   */
   const moving = useCallback(() => {
     const all = items();
-    const u = unitsOf(selectedKeys(selection, all), all);
+    const keys = selectedKeys(selection, all);
+    const u = unitsOf(editable ? keys : canNote ? keys.filter(isNoteKey) : [], all);
     const byId = new Map(cardNodesOf(rf).map((n) => [n.id, n]));
     const frames = new Map(framesNow().map((f) => [f.id, f]));
     // a card hidden in a collapsed frame does not move on its own, even when selected from a panel (slice 2c)
@@ -92,30 +109,55 @@ export function useGroupActions(o: Options) {
       frames: u.frames.map((id) => frames.get(id)).filter((f): f is FrameData => !!f),
       cards: u.cards.filter((id) => !hidden.has(id)).map((id) => byId.get(id)).filter((n): n is CardNodeT => !!n),
       members: u.members.map((id) => byId.get(id)).filter((n): n is CardNodeT => !!n),
+      notes: canNote ? u.notes.map((id) => noteMover.current?.noteOf(id)).filter((n): n is NoteData => !!n) : [],
     };
-  }, [items, selection, rf, framesNow]);
+  }, [items, selection, rf, framesNow, editable, canNote, noteMover]);
 
   /**
    * New positions on screen at once, saved in one change with the cards' frames; a refusal puts everything back.
    * Frames carry their cards; `carried` holds where every moving card was before (shown moved already).
    */
   const saveMoves = useCallback(
-    (moves: { frames: Move[]; cards: Move[]; carried?: ReadonlyMap<string, Pt> }, options: { onGrid?: boolean; ask?: boolean; saved?: () => void } = {}) => {
-      if (!moves.frames.length && !moves.cards.length) return;
+    (
+      moves: { frames: Move[]; cards: Move[]; carried?: ReadonlyMap<string, Pt>; notes?: NoteMove[] },
+      options: { onGrid?: boolean; ask?: boolean; saved?: () => void } = {},
+    ) => {
+      const notes = moves.notes ?? [];
+      if (!moves.frames.length && !moves.cards.length) {
+        // notes alone (slice 3a): their own change, which reviewers may make too
+        if (notes.length) saveNoteMoves(notes);
+        return;
+      }
       saveLayout(
-        { frames: moves.frames.map((m) => ({ id: m.id, ...m.to })), cards: moves.cards.map((m) => ({ id: m.id, ...m.to })) },
+        {
+          frames: moves.frames.map((m) => ({ id: m.id, ...m.to })),
+          cards: moves.cards.map((m) => ({ id: m.id, ...m.to })),
+          notes: notes.map((m) => ({ id: m.id, ...m.to })),
+        },
         {
           ...options,
           from: new Map([...(moves.carried ?? []), ...moves.cards.map((m) => [m.id, m.from] as const)]),
           framesFrom: new Map(moves.frames.map((m) => [m.id, m.from])),
+          notesFrom: new Map(notes.map((m) => [m.id, m.from])),
         },
       );
     },
-    [saveLayout],
+    [saveLayout, saveNoteMoves],
   );
 
+  /** Shows the selection's notes moved by (dx, dy) from where they started (not saved). */
+  const showNotes = useCallback(
+    (starts: ReadonlyMap<string, Pt>, dx: number, dy: number) => {
+      if (starts.size) noteMover.current?.show(new Map([...starts].map(([id, s]) => [id, { x: s.x + dx, y: s.y + dy }])));
+    },
+    [noteMover],
+  );
+  const notesAt = (list: readonly NoteData[]) => new Map(list.map((n) => [n.id, { x: n.x, y: n.y }]));
+  const noteMoves = (starts: ReadonlyMap<string, Pt>, dx: number, dy: number): NoteMove[] =>
+    [...starts].map(([id, from]) => ({ id, from, to: { x: from.x + dx, y: from.y + dy } }));
+
   // ---- group drag: the dragged card leads, the others and the selected frames follow by the same amount ----
-  const drag = useRef<{ lead: string; start: Map<string, Pt>; loose: Set<string>; frames: Map<string, Pt>; dx: number; dy: number } | null>(null);
+  const drag = useRef<{ lead: string; start: Map<string, Pt>; loose: Set<string>; frames: Map<string, Pt>; notes: Map<string, Pt>; dx: number; dy: number } | null>(null);
 
   const onNodeDragStart = useCallback(
     (node: CardNodeT) => {
@@ -128,6 +170,7 @@ export function useGroupActions(o: Options) {
         start: new Map([...m.cards, ...m.members].map((n) => [n.id, { ...n.position }])),
         loose: new Set(m.cards.map((n) => n.id)),
         frames: new Map(m.frames.map((f) => [f.id, { x: f.x, y: f.y }])),
+        notes: notesAt(m.notes),
         dx: 0,
         dy: 0,
       };
@@ -147,11 +190,12 @@ export function useGroupActions(o: Options) {
       const rest: NodeChange<CardNodeT>[] = [];
       for (const [id, s] of g.start) if (id !== g.lead) rest.push({ type: "position", id, position: { x: s.x + dx, y: s.y + dy }, dragging: lead.dragging });
       if (g.frames.size && (dx !== g.dx || dy !== g.dy)) patchFrames(new Map([...g.frames].map(([id, s]) => [id, { x: s.x + dx, y: s.y + dy }])));
+      if (dx !== g.dx || dy !== g.dy) showNotes(g.notes, dx, dy);
       g.dx = dx;
       g.dy = dy;
       return [...changes, ...rest];
     },
-    [patchFrames],
+    [patchFrames, showNotes],
   );
 
   /** The drag ends: one change for the whole group. Returns false when it was not a group drag. */
@@ -164,6 +208,7 @@ export function useGroupActions(o: Options) {
     const dx = leadNode ? Math.round(leadNode.position.x) - s0.x : 0, dy = leadNode ? Math.round(leadNode.position.y) - s0.y : 0;
     if (dx === 0 && dy === 0) {
       if (g.frames.size) patchFrames(g.frames);
+      showNotes(g.notes, 0, 0);
       return true;
     }
     // The release is not a click on the lead card (that would select only it).
@@ -177,11 +222,80 @@ export function useGroupActions(o: Options) {
         frames: [...g.frames].map(([id, from]) => ({ id, from, to: by(from) })),
         cards: [...g.loose].map((id) => ({ id, from: g.start.get(id)!, to: by(g.start.get(id)!) })),
         carried: g.start,
+        notes: noteMoves(g.notes, dx, dy),
       },
       { ask: true },
     );
     return true;
-  }, [rf, saveMoves, patchFrames]);
+  }, [rf, saveMoves, patchFrames, showNotes]);
+
+  /**
+   * A note of the selection pressed (slice 3a): the whole selection follows the pointer, snapped to 8 px, one update per
+   * frame, and is saved in one change on release; a press without moving is a click (`onClick`). False when the
+   * selection holds nothing this person may move.
+   */
+  const startDrag = useCallback(
+    (e: ReactPointerEvent, onClick: () => void): boolean => {
+      const m = moving();
+      if (!m.cards.length && !m.frames.length && !m.notes.length) return false;
+      e.preventDefault();
+      const zoom = rf.getViewport().zoom;
+      const sx = e.clientX, sy = e.clientY;
+      const start = new Map([...m.cards, ...m.members].map((n) => [n.id, { ...n.position }]));
+      const loose = new Set(m.cards.map((n) => n.id));
+      const frames = new Map(m.frames.map((f) => [f.id, { x: f.x, y: f.y }]));
+      const notes = notesAt(m.notes);
+      let dx = 0, dy = 0, moved = false;
+      let raf: number | null = null;
+      const show = () => {
+        raf = null;
+        if (start.size) setNodes((ns) => applyNodeChanges([...start].map(([id, p]) => ({ type: "position" as const, id, position: { x: p.x + dx, y: p.y + dy } })), ns));
+        if (frames.size) patchFrames(new Map([...frames].map(([id, p]) => [id, { x: p.x + dx, y: p.y + dy }])));
+        showNotes(notes, dx, dy);
+      };
+      const move = (ev: PointerEvent) => {
+        if (!moved && Math.hypot(ev.clientX - sx, ev.clientY - sy) < CLICK_SLOP) return;
+        moved = true;
+        const ndx = snap8((ev.clientX - sx) / zoom), ndy = snap8((ev.clientY - sy) / zoom);
+        if (ndx === dx && ndy === dy) return;
+        dx = ndx;
+        dy = ndy;
+        if (raf === null) raf = requestAnimationFrame(show);
+      };
+      const up = () => {
+        window.removeEventListener("pointermove", move);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", up);
+        if (raf !== null) cancelAnimationFrame(raf);
+        if (!moved) {
+          onClick();
+          return;
+        }
+        const swallow = (c: MouseEvent) => c.stopPropagation();
+        window.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+        if (dx === 0 && dy === 0) {
+          show();
+          return;
+        }
+        const by = (from: Pt): Pt => ({ x: from.x + dx, y: from.y + dy });
+        saveMoves(
+          {
+            frames: [...frames].map(([id, from]) => ({ id, from, to: by(from) })),
+            cards: [...loose].map((id) => ({ id, from: start.get(id)!, to: by(start.get(id)!) })),
+            carried: start,
+            notes: noteMoves(notes, dx, dy),
+          },
+          loose.size ? { ask: true } : {},
+        );
+      };
+      window.addEventListener("pointermove", move);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", up);
+      return true;
+    },
+    [moving, rf, setNodes, patchFrames, showNotes, saveMoves],
+  );
 
   // ---- nudge: the selection moves at once, the moves are saved together after the keys are still ----
   const nudging = useRef<{
@@ -190,6 +304,8 @@ export function useGroupActions(o: Options) {
     loose: Set<string>;
     frames: Map<string, Pt>;
     framesAt: Map<string, Pt>;
+    notes: Map<string, Pt>;
+    notesAt: Map<string, Pt>;
     timer: ReturnType<typeof setTimeout> | null;
   } | null>(null);
 
@@ -197,20 +313,21 @@ export function useGroupActions(o: Options) {
     const n = nudging.current;
     nudging.current = null;
     if (!n) return;
-    for (const id of [...n.from.keys(), ...n.frames.keys()]) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
+    for (const id of [...n.from.keys(), ...n.frames.keys(), ...n.notes.keys()]) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
     saveMoves({
       frames: changedOnly([...n.frames].map(([id, from]) => ({ id, from, to: n.framesAt.get(id)! }))),
       cards: changedOnly([...n.loose].map((id) => ({ id, from: n.from.get(id)!, to: n.at.get(id)! }))),
       carried: n.from,
+      notes: changedOnly([...n.notes].map(([id, from]) => ({ id, from, to: n.notesAt.get(id)! }))),
     });
   }, [pending, saveMoves]);
 
   const nudge = useCallback(
     (dx: number, dy: number): boolean => {
-      if (!editable) return false;
+      if (!editable && !canNote) return false;
       const m = moving();
-      if (!m.cards.length && !m.frames.length) return false;
-      const n = (nudging.current ??= { from: new Map(), at: new Map(), loose: new Set(), frames: new Map(), framesAt: new Map(), timer: null });
+      if (!m.cards.length && !m.frames.length && !m.notes.length) return false;
+      const n = (nudging.current ??= { from: new Map(), at: new Map(), loose: new Set(), frames: new Map(), framesAt: new Map(), notes: new Map(), notesAt: new Map(), timer: null });
       // a fresh page from the server must not put them back before they are saved
       const hold = (id: string) => pending.current.set(id, (pending.current.get(id) ?? 0) + 1);
       for (const node of [...m.cards, ...m.members]) {
@@ -238,11 +355,24 @@ export function useGroupActions(o: Options) {
         framesTo.set(f.id, to);
       }
       patchFrames(framesTo);
+      const notesTo = new Map<string, Pt>();
+      for (const note of m.notes) {
+        if (!n.notes.has(note.id)) {
+          n.notes.set(note.id, { x: note.x, y: note.y });
+          n.notesAt.set(note.id, { x: note.x, y: note.y });
+          hold(note.id);
+        }
+        const p = n.notesAt.get(note.id)!;
+        const to = { x: p.x + dx, y: p.y + dy };
+        n.notesAt.set(note.id, to);
+        notesTo.set(note.id, to);
+      }
+      if (notesTo.size) noteMover.current?.show(notesTo);
       if (n.timer) clearTimeout(n.timer);
       n.timer = setTimeout(flushNudge, NUDGE_SAVE_MS);
       return true;
     },
-    [editable, moving, pending, patchCard, patchFrames, flushNudge],
+    [editable, canNote, moving, pending, patchCard, patchFrames, flushNudge, noteMover],
   );
 
   // Leaving the canvas saves what was nudged at once.
@@ -388,6 +518,7 @@ export function useGroupActions(o: Options) {
     onNodeDragStart,
     withGroup,
     onGroupDragStop,
+    startDrag,
     nudge,
     arrangeSelection,
     fitSelectionWidths,

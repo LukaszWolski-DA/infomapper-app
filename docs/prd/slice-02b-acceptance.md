@@ -1,6 +1,7 @@
 # Slice 2b – Acceptance
 
-Status: **waiting for Łukasz's acceptance**. Branch `slice/02b-frames`, pull request #7 (draft, not merged).
+Status: **accepted by Łukasz and merged** on 9 October 2026 (pull request #7, merge `2e95478`, tag `slice-02b`). Branch
+`slice/02b-frames`.
 
 ## Criteria
 

@@ -11,7 +11,7 @@
 // Slice 2c (D-07): lines touching a collapsed frame come as bundles (`bundleLines`), drawn in the same layer: a group of
 // one mapping as that mapping, two or more as one line with a count, relationships with “N relationship(s)”.
 
-import { memo, useContext, useState, type ReactNode } from "react";
+import { Fragment, memo, useContext, useState, type ReactNode } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type Notation } from "./context";
@@ -25,10 +25,28 @@ interface LineProps {
   onSelect: () => void;
 }
 
+/** The tag outline (16 × 16 icon, scaled to 0.62) at its place on the line: absolute points, so no transform per tag. */
+const TAG = [[8.5, 2.5], [13.5, 2.5], [13.5, 7.5], [7.5, 13.5], [2.5, 8.5]] as const;
+const tagPath = (x: number, y: number) =>
+  `${TAG.map(([px, py], i) => `${i ? "L" : "M"}${+(x - 5 + px * 0.62).toFixed(2)} ${+(y - 5 + py * 0.62).toFixed(2)}`).join("")}Z`;
+
+/**
+ * The tag of a labeled mapping (prototype lineTag): drawn with the line, left out below 40 % zoom like the end dots. Two
+ * elements and no group (slice 3a, S3A-14: every element in the viewport costs paint and layerize time on each pan and
+ * zoom frame).
+ */
+const LineTag = ({ x, y }: { x: number; y: number }) => (
+  <>
+    <circle className="ltag" cx={x} cy={y} r={7} data-testid="mark-label-line" />
+    <path className="ltag" d={tagPath(x, y)} />
+  </>
+);
+
 const MapPath = memo(
-  function MapPath({ id, geom, dots, className, onSelect }: LineProps & { id: string; geom: MapGeom; dots: boolean }) {
+  function MapPath({ id, geom, dots, labels, className, onSelect }: LineProps & { id: string; geom: MapGeom; dots: boolean; labels: string | null }) {
     return (
-      <g className={className} data-testid="line-mapping" data-mapping={id} onClick={onSelect}>
+      <g className={className} data-testid="line-mapping" data-mapping={id} data-labels={labels ?? undefined} onClick={onSelect}>
+        {labels && <title>{`Labels: ${labels}`}</title>}
         {geom.paths.map((d, i) => (
           <path key={`h${i}`} className="hit" d={d} />
         ))}
@@ -44,6 +62,7 @@ const MapPath = memo(
             </text>
           </g>
         )}
+        {labels && dots && <LineTag x={geom.tag.x} y={geom.tag.y} />}
       </g>
     );
   },
@@ -141,6 +160,7 @@ const placedSig = (p: Placed) => `${p.x},${p.y},${p.card.width ?? ""},${p.card.c
 const NO_BUNDLES: Bundle[] = [];
 const NO_BLOCKS = new Map<string, Rect>();
 const NO_MAPS = new Map<string, MapLineData>();
+const NO_TETHERS: readonly { id: string; x1: number; y1: number; x2: number; y2: number }[] = [];
 
 function LineLayer({
   lines,
@@ -151,6 +171,7 @@ function LineLayer({
   related,
   hover,
   onSelect,
+  tethers = NO_TETHERS,
 }: {
   /** The lines drawn on their own: those touching no collapsed frame. */
   lines: CanvasLines;
@@ -165,6 +186,8 @@ function LineLayer({
   /** The lines of the hovered row or line, drawn above the veil; null when nothing is hovered. */
   hover: Related | null;
   onSelect: (sel: Selection) => void;
+  /** The dashed tethers of pinned notes (slice 3a, D-20), drawn here as part of the one line layer (AD-24 rule 3). */
+  tethers?: readonly { id: string; x1: number; y1: number; x2: number; y2: number }[];
 }) {
   // Re-render on any node change (drag, collapse, filter); panning and zooming leave the nodes alone.
   useStore((s) => s.nodes);
@@ -231,10 +254,11 @@ function LineLayer({
       return (
         <MapPath
           key={l.id}
-          sig={`${geom.paths.join("")}|${dots}|${className}|${geom.chip?.text ?? ""}`}
+          sig={`${geom.paths.join("")}|${dots}|${className}|${geom.chip?.text ?? ""}|${l.labels ?? ""}`}
           id={l.id}
           geom={geom}
           dots={dots}
+          labels={l.labels}
           className={className}
           onSelect={() => onSelect({ t: "map", id: l.id })}
         />
@@ -271,10 +295,11 @@ function LineLayer({
         return (
           <MapPath
             key={b.key}
-            sig={`${geom.geom.paths.join("")}|${dots}|${className}|${geom.geom.chip?.text ?? ""}`}
+            sig={`${geom.geom.paths.join("")}|${dots}|${className}|${geom.geom.chip?.text ?? ""}|${l.labels ?? ""}`}
             id={l.id}
             geom={geom.geom}
             dots={dots}
+            labels={l.labels}
             className={className}
             onSelect={() => onSelect({ t: "map", id: l.id })}
           />
@@ -301,6 +326,15 @@ function LineLayer({
         <g>{rels}</g>
         <g>{maps}</g>
         <g>{bundled}</g>
+        <g>
+          {tethers.map((t) => (
+            // no group per tether: two elements (slice 3a, S3A-14)
+            <Fragment key={t.id}>
+              <path className="tether" d={`M${t.x1},${t.y1} L${t.x2},${t.y2}`} data-testid="tether" data-tether={t.id} />
+              <circle className="tether" cx={t.x2} cy={t.y2} r={2.5} />
+            </Fragment>
+          ))}
+        </g>
       </svg>
       {hover && (
         <svg className="line-layer hover-lines" width={1} height={1} data-testid="layer-hover-lines">
@@ -310,7 +344,7 @@ function LineLayer({
               const geom = mapGeom(l, lookup);
               if (!geom) return null;
               const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${l.inputCount > 1 ? " combined" : ""} hl`;
-              return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} className={className} onSelect={() => {}} />;
+              return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={() => {}} />;
             })}
           {bundles
             .filter((b) => b.t === "map" && b.ids.some((id) => hover.maps.has(id)))
@@ -319,7 +353,7 @@ function LineLayer({
               if (!geom || geom.kind === "rel") return null;
               if (geom.kind === "single") {
                 const l = geom.line;
-                return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} className={`lnk map ${l.status}${l.warn ? " warn" : ""} hl`} onSelect={() => {}} />;
+                return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={`lnk map ${l.status}${l.warn ? " warn" : ""} hl`} onSelect={() => {}} />;
               }
               const className = `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""} hl`;
               return <BundlePath key={b.key} sig="" bundleKey={b.key} geom={geom} className={className} onSelect={() => {}} />;

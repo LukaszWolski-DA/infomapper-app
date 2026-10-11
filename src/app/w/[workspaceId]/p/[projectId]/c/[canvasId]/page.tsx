@@ -12,6 +12,7 @@ import {
   updateFrameAction,
 } from "@/app/_actions/frame";
 import { saveCanvasLookAction } from "@/app/_actions/canvas";
+import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
 import { AppShell } from "@/app/_components/app-shell";
 import { MovedNotice } from "@/app/_components/moved-notice";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
@@ -27,6 +28,8 @@ import { buildCards } from "@/canvas/card-data";
 import { buildFrames, conceptsOf } from "@/canvas/frame-data";
 import { FrameToolButton } from "@/canvas/FrameToolButton";
 import { buildLines } from "@/canvas/line-data";
+import { buildNotes } from "@/canvas/note-data";
+import { NoteToolButton } from "@/canvas/NoteToolButton";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
 import { EntityToolButton } from "@/canvas/EntityToolButton";
 import { HandToolButton } from "@/canvas/HandToolButton";
@@ -37,12 +40,15 @@ import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
 import { isMeasurementBuild } from "@/data/local/measure-mode";
+import { labelNamesByItem } from "@/domain/model/labels";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 
 // Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a); the Entity
 // tool and Undo and Redo in the top bar (slice 1b); the Hand tool, a selection of several cards, the canvas's look and
-// layer mode, and “On canvases” in the panels (slice 2a); frames and the Frame tool (slice 2b). `?card=entity:<id>` or `?card=source:<id>` selects that card
-// and shows it on arrival; `?moved=1` says that the address you opened is no longer in this project.
+// layer mode, and “On canvases” in the panels (slice 2a); frames and the Frame tool (slice 2b); working labels: their
+// marks on the canvas, the Labels field and the label panel, notes on the canvas (slice 3a). `?card=entity:<id>` or `?card=source:<id>` selects that card
+// and shows it on arrival, `?label=<id>` opens that label's panel, `?note=<id>` selects that note (the project home's open
+// notes); `?moved=1` says that the address you opened is no longer in this project.
 export default async function CanvasPage({
   params,
   searchParams,
@@ -54,7 +60,9 @@ export default async function CanvasPage({
   const view = await loadProjectView(shell);
   const store = getDataStore();
   const ws = shell.workspace.id;
-  const [model, allItems, canvases, workspace, history, projects, frameRows] = await Promise.all([
+  // when the notes are read: a page that arrives late must not hide a note created after it (slice 3a, step 5)
+  const notesReadAt = new Date().toISOString();
+  const [model, allItems, canvases, workspace, history, projects, frameRows, labels, labelLinks, noteRows, users] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.canvases.list(ws),
@@ -62,7 +70,15 @@ export default async function CanvasPage({
     store.undoHistory.get(ws, shell.user.id),
     store.projects.list(ws),
     store.frames.list(ws),
+    store.labels.list(ws),
+    store.labels.listLinks(ws),
+    store.notes.listOfCanvas(ws, canvasId),
+    store.users.list(),
   ]);
+  // measurement-only switches (slice 2a diagnosis): only in the measurement-only production build (AD-31); slice 3a:
+  // `nolabelmarks` draws no label mark (rows, headers, lines), `nonotes` no note
+  const diag = isMeasurementBuild() && typeof query.diag === "string" ? query.diag.split(",") : [];
+  const labelNames = diag.includes("nolabelmarks") ? new Map<string, string[]>() : labelNamesByItem(labels, labelLinks);
   const frames = buildFrames(frameRows.filter((f) => f.canvas_id === canvasId));
   const conceptFrames: Record<string, number> = {};
   for (const f of frameRows) if (f.concept_id && canvases.some((c) => c.id === f.canvas_id)) conceptFrames[f.concept_id] = (conceptFrames[f.concept_id] ?? 0) + 1;
@@ -74,13 +90,17 @@ export default async function CanvasPage({
   const contentAuthors = Object.fromEntries(model.mappings.map((m) => [m.id, fourEyes ? lastContentEditor(m, events) : ""]).filter(([, u]) => u));
   const liveCanvases = new Set(canvases.map((c) => c.id));
   const items = allItems.filter((i) => liveCanvases.has(i.canvas_id));
-  const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId));
+  const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId), labelNames);
   const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id));
   const editable = shell.standing === "full";
-  // measurement-only switches (slice 2a diagnosis): only in the measurement-only production build (AD-31)
-  const diag = isMeasurementBuild() && typeof query.diag === "string" ? query.diag.split(",") : [];
+  // notes: editors and reviewers write them (Łukasz's step 0 answer 1); readers and an archived workspace only read
+  const canNote = shell.standing !== "none";
+  const userName = (id: string) => users.find((u) => u.id === id)?.display_name ?? "someone";
+  const notes = diag.includes("nonotes") ? [] : buildNotes(noteRows, frameRows.filter((f) => f.canvas_id === canvasId), userName);
   const focus = typeof query.card === "string" ? /^(entity|source):(.+)$/.exec(query.card) : null;
   const focusCardId = focus ? (cards.find((c) => c.kind === (focus[1] === "entity" ? "ent" : "src") && c.targetId === focus[2])?.id ?? null) : null;
+  const focusLabelId = typeof query.label === "string" && labels.some((l) => l.id === query.label) ? query.label : null;
+  const focusNoteId = typeof query.note === "string" && noteRows.some((n) => n.id === query.note) ? query.note : null;
 
   // “On canvases” (slice 2a): every canvas of the workspace and where it opens, and the canvases each element is on.
   // A canvas outside this project opens in the first project that has it (assumption 4).
@@ -106,7 +126,7 @@ export default async function CanvasPage({
   }
 
   return (
-    <CanvasProvider>
+    <CanvasProvider userId={shell.user.id}>
       <CanvasLookProvider
         key={canvasId}
         canvasId={canvasId}
@@ -123,7 +143,7 @@ export default async function CanvasPage({
               view,
               currentCanvasId: canvasId,
               renameOnOpen,
-              tools: <CanvasTools editable={editable} />,
+              tools: <CanvasTools editable={editable} canNote={canNote} />,
               left: <LeftPanel workspaceId={ws} canvasId={canvasId} tree={tree} editable={editable} conceptFrames={conceptFrames} />,
               right: (
                 <Inspector
@@ -136,11 +156,14 @@ export default async function CanvasPage({
                   tree={tree}
                   editable={editable}
                   canSetStatus={shell.standing !== "none"}
+                  canNote={canNote}
                   userId={shell.user.id}
                   fourEyes={fourEyes}
                   contentAuthors={contentAuthors}
                   places={places}
                   canvasesOf={canvasesOf}
+                  labels={labels}
+                  labelLinks={labelLinks}
                 />
               ),
               status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} />,
@@ -151,7 +174,7 @@ export default async function CanvasPage({
               key={canvasId}
               canvasId={canvasId}
               cards={cards}
-              lines={buildLines(model, cards)}
+              lines={buildLines(model, cards, labelNames)}
               editable={editable}
               saveCard={updateCardAction.bind(null, ws)}
               placeCard={placeCardAction.bind(null, ws, canvasId)}
@@ -174,6 +197,21 @@ export default async function CanvasPage({
               }}
               entityConcepts={Object.fromEntries(model.entities.map((e) => [e.id, e.concept_id]))}
               focusCardId={focusCardId}
+              focusLabelId={focusLabelId}
+              focusNoteId={focusNoteId}
+              notes={notes}
+              notesReadAt={notesReadAt}
+              canNote={canNote}
+              userName={shell.user.name}
+              noteWrites={{
+                createNote: createNoteAction.bind(null, ws, canvasId),
+                updateNote: updateNoteAction.bind(null, ws),
+                moveNote: moveNoteAction.bind(null, ws),
+                pinNote: pinNoteAction.bind(null, ws),
+                unpinNote: unpinNoteAction.bind(null, ws),
+                deleteNote: deleteNoteAction.bind(null, ws),
+                moveNotes: moveNotesAction.bind(null, ws, canvasId),
+              }}
               diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks"), noFrames: diag.includes("noframes"), noLabels: diag.includes("nolabels"), collapsed: diag.includes("collapsed") } : undefined}
             />
           </AppShell>
@@ -184,11 +222,12 @@ export default async function CanvasPage({
   );
 }
 
-const CanvasTools = ({ editable }: { editable: boolean }) => (
+const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolean }) => (
   <>
     <LayerSwitch />
     {editable && <EntityToolButton />}
     {editable && <FrameToolButton />}
+    {canNote && <NoteToolButton />}
     <HandToolButton />
     <NotationSwitch />
     <UndoButtons />

@@ -7,10 +7,12 @@ import type { Uuid } from "../ids";
 import { entityCascade, type EntityRows } from "../model/impact";
 import { plainTextPair } from "../model/plain-text";
 import type { WorkspaceAccess } from "../permissions";
-import { STEREOTYPES, type Canvas, type CanvasItem, type Concept, type Entity, type Frame } from "../types";
+import { STEREOTYPES, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type LabelLink, type Note } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, isLive, nothingToChange, plainTextSchema, softDelete } from "./shared";
 import { cardHeightSchema, frameRefsSchema, joinFrames, newCanvasItem, positionSchema } from "./canvas-item";
+import { linksOnItems, softDeleteLinks } from "./label";
+import { releaseNotes } from "./note";
 
 const DEFAULT_ENTITY_NAME = "New entity";
 
@@ -154,11 +156,18 @@ export function updateEntity(
 const deleteEntityInput = z.object({ entityId: uuidSchema, expectedVersion: versionSchema }).strict();
 export type DeleteEntityInput = z.input<typeof deleteEntityInput>;
 
-export type DeleteEntityState = Omit<EntityRows, "entity"> & { entity: Entity | null };
+export type DeleteEntityState = Omit<EntityRows, "entity"> & {
+  entity: Entity | null;
+  /** The workspace's label links and notes (slice 3a): links on what is deleted go with it, pinned notes become free. */
+  labelLinks?: readonly LabelLink[];
+  notes?: readonly Note[];
+};
 
 /**
  * Deletes an entity from the model: its attributes, their mappings and inputs, its relationships and its cards on
- * every canvas are soft-deleted with it, in one change group. The panel shows `entityImpact` first.
+ * every canvas are soft-deleted with it, in one change group. The panel shows `entityImpact` first. Slice 3a: the label
+ * links on the entity, its attributes and their mappings are soft-deleted too (D-47), and notes pinned to its cards
+ * become free notes at their place.
  */
 export function deleteEntity(
   ctx: CommandContext,
@@ -180,6 +189,15 @@ export function deleteEntity(
     ...cascade.relationships.map((r) => softDelete(ctx, "relationship", r)),
     ...cascade.canvasItems.map((r) => softDelete(ctx, "canvas_item", r)),
     softDelete(ctx, "entity", entity),
+    ...softDeleteLinks(
+      ctx,
+      linksOnItems(state.labelLinks, [
+        { kind: "entity", id: entity.id },
+        ...cascade.attributes.map((a) => ({ kind: "attribute" as const, id: a.id })),
+        ...cascade.mappings.map((m) => ({ kind: "mapping" as const, id: m.id })),
+      ]),
+    ),
+    ...releaseNotes(ctx, state.notes, { items: cascade.canvasItems, frames: [] }, { cardIds: cascade.canvasItems.map((c) => c.id) }),
   ];
   return done(
     ctx,

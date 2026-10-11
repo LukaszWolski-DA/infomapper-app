@@ -2,7 +2,8 @@
 // placed or removed at once, each as one change group (slices 1b, 2a). Layout belongs to the canvas, not the model
 // (D-04): removing a card leaves the entity and its mappings alone (D-02). Where cards are and how wide they are is
 // changed by `moveOnCanvas` in `frame.ts`, which also decides their frames (slice 2b); a placed card joins the frame
-// it lands in by the same rule (D-05).
+// it lands in by the same rule (D-05). Slice 3a: notes pinned to a card that leaves the canvas become free notes at
+// their place, in the same change group.
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
@@ -10,8 +11,9 @@ import { domainError, notFound, staleVersion, type DomainError } from "../errors
 import type { Uuid } from "../ids";
 import { cardWidthOf, dropCards } from "../model/frames";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
-import type { Canvas, CanvasItem, Entity, Frame, SourceTable } from "../types";
+import type { Canvas, CanvasItem, Entity, Frame, Note, SourceTable } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
+import { releaseNotes } from "./note";
 import { begin, current, done, isLive, nothingToChange, softDelete } from "./shared";
 
 /** Canvas coordinates: finite and within a generous board. */
@@ -292,18 +294,24 @@ export function updateCanvasItem(
 const removeInput = z.object({ canvasItemId: uuidSchema, expectedVersion: versionSchema }).strict();
 export type RemoveFromCanvasInput = z.input<typeof removeInput>;
 
-/** Takes a card off this canvas. The element stays in the model, with its mappings and on other canvases (D-02). */
+/**
+ * Takes a card off this canvas. The element stays in the model, with its mappings and on other canvases (D-02). Notes
+ * pinned to the card become free notes at their place (`notes`: the canvas's notes).
+ */
 export function removeFromCanvas(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: { item: CanvasItem | null },
+  state: { item: CanvasItem | null; notes?: readonly Note[] },
   input: unknown,
 ): CommandResult {
   const parsed = begin(access, "canvas.edit_items", removeInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const got = current(state.item, access, parsed.data.canvasItemId, parsed.data.expectedVersion, "card");
   if (!got.ok) return fail(got.error);
-  return done(ctx, access, undefined, [softDelete(ctx, "canvas_item", got.row)]);
+  return done(ctx, access, undefined, [
+    softDelete(ctx, "canvas_item", got.row),
+    ...releaseNotes(ctx, state.notes, { items: [got.row], frames: [] }, { cardIds: [got.row.id] }),
+  ]);
 }
 
 // ---- several cards at once (slice 2a): remove ----
@@ -317,6 +325,8 @@ export interface CanvasItemsState {
   canvas: Canvas | null;
   /** The canvas's cards (deleted ones may be included; they are refused). */
   items: readonly CanvasItem[];
+  /** The canvas's notes: notes pinned to a removed card become free (slice 3a). */
+  notes?: readonly Note[];
 }
 
 const removeItemsInput = z
@@ -346,10 +356,8 @@ export function removeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, 
     if (row.version !== expectedVersion) return fail(staleVersion());
     rows.push(row);
   }
-  return done(
-    ctx,
-    access,
-    { removed: rows.length },
-    rows.map((row) => softDelete(ctx, "canvas_item", row)),
-  );
+  return done(ctx, access, { removed: rows.length }, [
+    ...rows.map((row) => softDelete(ctx, "canvas_item", row)),
+    ...releaseNotes(ctx, state.notes, { items: rows, frames: [] }, { cardIds: rows.map((r) => r.id) }),
+  ]);
 }

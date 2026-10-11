@@ -45,3 +45,10 @@ block files the new entity into the frame like a drop, and takes the concept of 
 Labels on requirements: `label_link` gets a `requirement_id` target (a new migration, with the “exactly one target”
 check extended to it), and the requirement panel gets a Labels field. D-33 keeps labels and requirements separate today;
 decide with the requirements slice (4).
+
+## Notes in the Overview miniature (slice 3a, step 4)
+
+The prototype's miniature (`renderMini`) draws the notes as small rectangles in their paper colour; the Overview in
+the bottom-right corner shows none (slice 3a PRD, not listed; Łukasz after step 4). A candidate for slice 3b or the
+minimap slice. It needs its own measurement: the miniature is drawn once per change of the cards (S1A-14), and notes
+would add to what it draws and to when it draws again.

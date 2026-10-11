@@ -9,11 +9,15 @@ import {
   entity,
   frame,
   ids,
+  label,
+  labelLink,
   link,
   makeCtx,
   mapping,
   mappingInput,
+  note,
   NOW,
+  pin,
   project,
   relationship,
   sourceColumn,
@@ -27,7 +31,10 @@ import { createAttributeFromColumn, deleteAttribute, reorderAttribute } from "./
 import { deleteCanvas, duplicateCanvas, renameCanvas, setCanvasLook } from "./canvas";
 import { removeFromCanvas } from "./canvas-item";
 import { moveOnCanvas } from "./frame";
-import { updateEntity } from "./entity";
+import { deleteEntity, updateEntity } from "./entity";
+import { addLabel, deleteLabel, removeLabel, setLabelPinned } from "./label";
+import { createNote, updateNote } from "./note";
+import { changeLabel } from "../model/change-label";
 import { deleteMapping, mergeMappings, setMappingStatus } from "./mapping";
 import { createRelationship, deleteRelationship } from "./relationship";
 import {
@@ -61,11 +68,19 @@ function seed(): Rows {
     mapping_input: [mappingInput()],
     canvas_item: [canvasItem(ids.itemCustomer), canvasItem(ids.itemCrmCustomer)],
     frame: [],
+    label: [],
+    label_link: [],
+    project_pinned_label: [],
+    note: [],
   };
 }
 
 const keyOf = (table: UndoableTable, row: Record<string, unknown>) =>
-  table === "project_canvas" ? `${String(row.project_id)}|${String(row.canvas_id)}` : String(row.id);
+  table === "project_canvas"
+    ? `${String(row.project_id)}|${String(row.canvas_id)}`
+    : table === "project_pinned_label"
+      ? `${String(row.project_id)}|${String(row.label_id)}`
+      : String(row.id);
 
 /** Applies a write set the way the adapter does (without its checks). */
 function apply(rows: Rows, writeSet: WriteSet): Rows {
@@ -518,5 +533,133 @@ describe("“changed afterwards” compares content, not version (slice 2a fix o
     if (!undone.ok) throw new Error(undone.error.message);
     // the adapter refuses the write if the stored row is no longer at this version (AD-12)
     expect(undone.writeSet.writes).toMatchObject([{ kind: "update", table: "entity", before: { version: current }, row: { version: current + 1 } }]);
+  });
+});
+
+describe("the working layer (slice 3a)", () => {
+  /** The fixtures' rows with CR-23 on Customer, its e-mail attribute and the e-mail mapping, pinned to project A; a note pinned to the Customer card. */
+  const withWorkingLayer = (): Rows => ({
+    ...seed(),
+    label: [label(ids.labelCr23)],
+    label_link: [labelLink(ids.linkCustomer), labelLink(ids.linkEmail), labelLink(ids.linkMapping)],
+    project_pinned_label: [pin(ids.projectA, ids.labelCr23)],
+    note: [note(ids.notePinned)],
+  });
+
+  it("deleting an entity soft-deletes its label links and frees its pinned notes in the same group; one undo brings all back (S3A-12)", () => {
+    const rows = withWorkingLayer();
+    const { done, afterDo, undone, afterUndo } = doAndUndo(rows, (r) =>
+      ok(
+        deleteEntity(
+          ctx,
+          modeler,
+          {
+            entity: find(r, "entity", ids.customer) as never,
+            attributes: r.attribute,
+            mappings: r.mapping,
+            mappingInputs: r.mapping_input,
+            relationships: r.relationship,
+            canvasItems: r.canvas_item,
+            labelLinks: r.label_link,
+            notes: r.note,
+          },
+          { entityId: ids.customer, expectedVersion: 1 },
+        ),
+      ),
+    );
+    expect(new Set(done.events.map((e) => e.change_group_id)).size).toBe(1);
+    expect(afterDo.label_link.every((k) => k.deleted_at === NOW)).toBe(true);
+    // the note was pinned to Customer's card (400, 120) at (280, 0): now free at (680, 120)
+    expect(find(afterDo, "note", ids.notePinned)).toMatchObject({ pin_canvas_item_id: null, x: 680, y: 120, deleted_at: null });
+    expect(find(afterDo, "label", ids.labelCr23)).toMatchObject({ deleted_at: null });
+    expect(changeLabel(done.events)).toBe("Delete entity");
+    if (!undone.ok) throw new Error(undone.error.message);
+    expect(content(afterUndo)).toEqual(content(rows));
+  });
+
+  it("deleting a label and undoing it brings back the label, its links and its project pins", () => {
+    const rows = withWorkingLayer();
+    const { done, afterDo, undone, afterUndo } = doAndUndo(rows, (r) =>
+      ok(deleteLabel(ctx, modeler, { label: find(r, "label", ids.labelCr23) as never, links: r.label_link, pins: r.project_pinned_label }, { labelId: ids.labelCr23, expectedVersion: 1 })),
+    );
+    expect(afterDo.project_pinned_label).toEqual([]);
+    expect(isUndoable(done.events)).toBe(true);
+    if (!undone.ok) throw new Error(undone.error.message);
+    expect(undone.writeSet.writes.filter((w) => w.table === "project_pinned_label")).toMatchObject([{ kind: "insert", row: pin(ids.projectA, ids.labelCr23) }]);
+    expect(content(afterUndo)).toEqual(content(rows));
+  });
+
+  it("adding a new label is undone by removing both the link and the label, and redone", () => {
+    const rows = withWorkingLayer();
+    const { done, undone, afterUndo } = doAndUndo(rows, (r) =>
+      ok(
+        addLabel(
+          ctx,
+          modeler,
+          { entities: r.entity, attributes: r.attribute, mappings: r.mapping, sourceTables: r.source_table, sourceColumns: r.source_column, labels: r.label, links: r.label_link },
+          { target: { kind: "source_table", id: ids.crmCustomer }, name: "JIRA-9" },
+        ),
+      ),
+    );
+    if (!undone.ok) throw new Error(undone.error.message);
+    const labelId = insertedId(done);
+    expect(find(afterUndo, "label", labelId)).toMatchObject({ deleted_at: NOW });
+    expect(afterUndo.label_link.filter((k) => k.deleted_at === null)).toHaveLength(3);
+    const redone = revertChangeGroup(makeCtx(), modeler, { events: undone.writeSet.events, rows: afterUndo }, "redo");
+    expect(redone.ok).toBe(true);
+  });
+
+  it("removing a card frees its pinned note; undo pins it again", () => {
+    const rows = withWorkingLayer();
+    const { afterDo, undone, afterUndo } = doAndUndo(rows, (r) =>
+      ok(removeFromCanvas(ctx, modeler, { item: find(r, "canvas_item", ids.itemCustomer) as never, notes: r.note }, { canvasItemId: ids.itemCustomer, expectedVersion: 1 })),
+    );
+    expect(find(afterDo, "note", ids.notePinned)).toMatchObject({ pin_canvas_item_id: null, x: 680, y: 120 });
+    if (!undone.ok) throw new Error(undone.error.message);
+    expect(find(afterUndo, "note", ids.notePinned)).toMatchObject({ pin_canvas_item_id: ids.itemCustomer, x: 280, y: 0 });
+  });
+
+  it("lets a reviewer undo their own note change; a reader may not", () => {
+    const rows = withWorkingLayer();
+    const state = (r: Rows) => ({ canvas: find(r, "canvas", ids.canvas1) as never, items: r.canvas_item, frames: r.frame, notes: r.note });
+    const { undone, afterUndo } = doAndUndo(
+      rows,
+      (r) => ok(updateNote(ctx, as("reviewer"), state(r), { noteId: ids.notePinned, expectedVersion: 1, status: "resolved" })),
+      as("reviewer"),
+    );
+    if (!undone.ok) throw new Error(undone.error.message);
+    expect(find(afterUndo, "note", ids.notePinned)).toMatchObject({ status: "open", resolved_at: null, resolved_by: null });
+    const created = ok(createNote(ctx, as("reviewer"), state(rows), { canvasId: ids.canvas1, text: "A question", x: 0, y: 0 }));
+    expect(revertChangeGroup(makeCtx(), as("reader"), { events: created.events, rows: apply(rows, created) }, "undo")).toMatchObject({ ok: false, error: { code: "forbidden" } });
+  });
+
+  it("does not undo pinning a label to a project", () => {
+    const rows = withWorkingLayer();
+    const pinned = ok(
+      setLabelPinned(
+        ctx,
+        modeler,
+        { project: find(rows, "project", ids.projectB) as never, label: find(rows, "label", ids.labelCr23) as never, pins: rows.project_pinned_label },
+        { projectId: ids.projectB, labelId: ids.labelCr23, pinned: true },
+      ),
+    );
+    expect(revertChangeGroup(makeCtx(), modeler, { events: pinned.events, rows: apply(rows, pinned) }, "undo")).toMatchObject({
+      ok: false,
+      error: { code: "invalid", message: NOT_UNDOABLE_MESSAGE },
+    });
+  });
+
+  it("refuses to undo putting a card on a canvas once a note is pinned to it, and to bring back a link whose label was deleted", () => {
+    const rows = withWorkingLayer();
+    const cardId = "01900000-0000-7000-8000-00000000c003";
+    const added = buildWriteSet(ctx, ids.ws, [{ kind: "insert", table: "canvas_item", row: canvasItem(ids.itemCrmCustomer, { id: cardId }) }]);
+    const afterAdd = apply({ ...rows, canvas_item: rows.canvas_item.filter((c) => c.id !== ids.itemCrmCustomer) }, added);
+    const withNote = { ...afterAdd, note: [...afterAdd.note, note("01900000-0000-7000-8000-00000000d009", { pin_canvas_item_id: cardId, x: 280, y: 0 })] };
+    expect(revertChangeGroup(makeCtx(), modeler, { events: added.events, rows: withNote }, "undo")).toMatchObject({ ok: false, error: { message: UNDO_REFUSED_MESSAGE } });
+
+    const removed = ok(removeLabel(ctx, modeler, { link: find(rows, "label_link", ids.linkEmail) as never }, { labelLinkId: ids.linkEmail, expectedVersion: 1 }));
+    const afterRemove = apply(rows, removed);
+    const labelGone = { ...afterRemove, label: afterRemove.label.map((l) => ({ ...l, deleted_at: NOW })) };
+    expect(revertChangeGroup(makeCtx(), modeler, { events: removed.events, rows: labelGone }, "undo")).toMatchObject({ ok: false, error: { message: UNDO_REFUSED_MESSAGE } });
   });
 });

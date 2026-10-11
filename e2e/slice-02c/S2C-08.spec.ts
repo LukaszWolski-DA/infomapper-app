@@ -64,15 +64,15 @@ test("S2C-08: Fit everything shows the block; the Overview draws the block, not 
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), { x: 600, y: 400, zoom: 0.3 });
 
-  // F: the block fits in the view, in its middle
+  // F: the block fits in the view; since slice 3a Fit everything also takes in the notes shown, here the demo's free
+  // note outside the frame (its pinned notes are hidden with order_line), so both are in the view
   await key(page, "f");
   const pane = await box(page.locator(".react-flow__pane"));
-  await expect
-    .poll(async () => {
-      const b = await box(blockEl(page, "Everything"));
-      return b.x >= pane.x && b.y >= pane.y && b.x + b.width <= pane.x + pane.width && b.y + b.height <= pane.y + pane.height && Math.abs(b.x + b.width / 2 - (pane.x + pane.width / 2)) < 60;
-    })
-    .toBe(true);
+  const inView = (b: { x: number; y: number; width: number; height: number }) =>
+    b.x >= pane.x && b.y >= pane.y && b.x + b.width <= pane.x + pane.width && b.y + b.height <= pane.y + pane.height;
+  await expect.poll(async () => inView(await box(blockEl(page, "Everything")))).toBe(true);
+  await expect(page.getByTestId("note")).toHaveCount(1);
+  await expect.poll(async () => inView(await box(page.getByTestId("note")))).toBe(true);
 
   // the Overview: one block, no cards
   const overview = page.getByTestId("panel-overview");

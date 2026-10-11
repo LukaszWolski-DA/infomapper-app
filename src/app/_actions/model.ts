@@ -124,14 +124,18 @@ export async function entityImpactAction(workspaceId: string, entityId: string):
   return { ok: true, value: entityImpact(rows, { canvases, projects, projectCanvases }) };
 }
 
-/** Deletes an entity with its attributes, mappings, relationships and cards, in one change group (D-47). */
+/**
+ * Deletes an entity with its attributes, mappings, relationships, cards and the label links on them, in one change
+ * group (D-47); notes pinned to its cards become free notes (slice 3a).
+ */
 export async function deleteEntityAction(
   workspaceId: string,
   input: { entityId: string; expectedVersion: number },
 ): Promise<ActionResult<{ attributes: number; mappings: number; relationships: number }>> {
   return modelCommand(workspaceId, async (ctx, access, model, store) => {
-    const canvasItems = await store.canvasItems.list(access.workspace.id);
-    return deleteEntity(ctx, access, { ...model, entity: byId(model.entities, input?.entityId), canvasItems }, input);
+    const ws = access.workspace.id;
+    const [canvasItems, labelLinks, notes] = await Promise.all([store.canvasItems.list(ws), store.labels.listLinks(ws), store.notes.list(ws)]);
+    return deleteEntity(ctx, access, { ...model, entity: byId(model.entities, input?.entityId), canvasItems, labelLinks, notes }, input);
   });
 }
 
@@ -176,14 +180,15 @@ export async function reorderAttributeAction(
   );
 }
 
-/** Deletes an attribute with its mappings and their inputs. */
+/** Deletes an attribute with its mappings, their inputs and the label links on them. */
 export async function deleteAttributeAction(
   workspaceId: string,
   input: { attributeId: string; expectedVersion: number },
 ): Promise<ActionResult<{ mappings: number }>> {
-  return modelCommand(workspaceId, (ctx, access, { attributes, mappings, mappingInputs }) =>
-    deleteAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), mappings, mappingInputs }, input),
-  );
+  return modelCommand(workspaceId, async (ctx, access, { attributes, mappings, mappingInputs }, store) => {
+    const labelLinks = await store.labels.listLinks(access.workspace.id);
+    return deleteAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), mappings, mappingInputs, labelLinks }, input);
+  });
 }
 
 // ---- relationships ----
@@ -244,13 +249,14 @@ export async function updateSourceColumnAction(workspaceId: string, input: Updat
   });
 }
 
-/** Deletes a table with its columns and cards; refused while a mapping reads one of its columns. */
+/** Deletes a table with its columns, cards and label links; refused while a mapping reads one of its columns. */
 export async function deleteSourceTableAction(
   workspaceId: string,
   input: { sourceTableId: string; expectedVersion: number },
 ): Promise<ActionResult<{ columns: number }>> {
   return modelCommand(workspaceId, async (ctx, access, model, store) => {
-    const canvasItems = await store.canvasItems.list(access.workspace.id);
+    const ws = access.workspace.id;
+    const [canvasItems, labelLinks, notes] = await Promise.all([store.canvasItems.list(ws), store.labels.listLinks(ws), store.notes.list(ws)]);
     const table = byId(model.sourceTables, input?.sourceTableId);
     return deleteSourceTable(
       ctx,
@@ -263,6 +269,8 @@ export async function deleteSourceTableAction(
         mappingInputs: model.mappingInputs,
         attributes: model.attributes,
         entities: model.entities,
+        labelLinks,
+        notes,
       },
       input,
     );

@@ -10,8 +10,10 @@ import { visibleRows, type CardData, type CardRow } from "./card-data";
 import { CanvasCardsCtx, DiagnosisCtx } from "./context";
 import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
 import { splitName } from "./names";
+import { lineNeedsClip } from "./text-fit";
 
-export type CardNodeT = Node<{ card: CardData }, "card">;
+/** `pinnedNotes`: the notes pinned to the card that are shown (slice 3a), given by the canvas only when there are some. */
+export type CardNodeT = Node<{ card: CardData; pinnedNotes?: number }, "card">;
 
 /** A card node, not a collapsed frame's block (slice 2c): React Flow holds both kinds. */
 export const isCardNode = (n: Node): n is CardNodeT => n.type === "card";
@@ -31,6 +33,29 @@ const ICON = {
   up: "M4.5 10l3.5-3.5 3.5 3.5",
   down: "M4.5 6.5L8 10l3.5-3.5",
 };
+
+/**
+ * The notes pinned to the card that are shown (prototype noteMark; resolved ones count while they are shown, Łukasz's
+ * decision after step 4): a note icon, with their number when more than one; at every
+ * zoom, like the rest of the header (slice 3a, item 12).
+ */
+const NoteMark = ({ n }: { n: number }) => (
+  <i className="nmark" title={`${n} note${n > 1 ? "s" : ""} pinned here`} data-testid="mark-notes" data-count={n}>
+    <svg viewBox="0 0 16 16" aria-hidden>
+      <path d="M3 2.5h10v7.5l-3.5 3.5H3z" />
+      <path d="M13 10H9.5v3.5" />
+    </svg>
+    {n > 1 ? n : ""}
+  </i>
+);
+
+/**
+ * The tag mark of working labels (prototype lmark): a small outline tag, the label names as its tooltip (slice 3a). An
+ * <i>, so the header's `span:nth-child(2)` rules (the concept text, its clip) never apply to it. One element: the tag is
+ * a CSS mask (canvas.css), not an inline SVG, because every element in the viewport costs paint and layerize time on
+ * each pan and zoom frame (slice 3a, S3A-14).
+ */
+const LabelMark = ({ labels }: { labels: string }) => <i className="lmark" title={`Working labels: ${labels}`} data-testid="mark-label" />;
 
 function keyTitle(r: CardRow) {
   if (r.pk && r.fk) return "Primary key and foreign key";
@@ -65,6 +90,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
           BK
         </span>
       )}
+      {row.labels && <LabelMark labels={row.labels} />}
       <span className="dt">{row.type}</span>
       <span className={`st${status}${row.mappings > 1 ? " n" : ""}`} data-testid="dot-mapped" title={row.title}>
         {row.mappings > 1 ? row.mappings : ""}
@@ -74,7 +100,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
 }
 
 function CardNode({ data }: NodeProps<CardNodeT>) {
-  const { card } = data;
+  const { card, pinnedNotes = 0 } = data;
   const ctx = useContext(CanvasCardsCtx);
   const blocks = !!useContext(DiagnosisCtx).blocks;
   const lod = useStore((s) => blocks || s.transform[2] < LOD_ZOOM);
@@ -86,6 +112,8 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   const sel = ctx.selection;
   const cardSelected = sel?.t === "card" && sel.id === card.id;
   const selectedRow = sel?.t === "row" && sel.cardId === card.id ? sel.id : null;
+  // the open-notes mark takes room in the first line too (slice 3a): checked only on cards that have one
+  const clipLine1 = card.clipLine1 || (pinnedNotes > 0 && lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, card.width ?? undefined, !!card.labels, pinnedNotes));
 
   // A click on a row selects the row, anywhere else on the card the card; the card tools do their own thing.
   // Shift+click anywhere on the card puts the card in or out of a selection of several (slice 2a).
@@ -103,7 +131,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   return (
     <div
       onClick={onClick}
-      className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${card.clipName ? " clip-name" : ""}${card.clipLine1 ? " clip-l1" : ""}`}
+      className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${card.clipName ? " clip-name" : ""}${clipLine1 ? " clip-l1" : ""}`}
       style={isEnt ? ({ "--cc": card.color ?? "#888899" } as React.CSSProperties) : undefined}
       data-testid={isEnt ? "card-entity" : "card-source"}
       data-card={card.id}
@@ -121,6 +149,8 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
           ) : (
             <span className="path">{card.line1}</span>
           )}
+          {card.labels && <LabelMark labels={card.labels} />}
+          {pinnedNotes > 0 && <NoteMark n={pinnedNotes} />}
           {ctx.editable && (
             <span className="c-tools nodrag">
               {isEnt && (

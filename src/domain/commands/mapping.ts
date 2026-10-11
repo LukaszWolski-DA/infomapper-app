@@ -11,8 +11,9 @@ import type { Uuid } from "../ids";
 import { afterContentChange, checkFourEyes, checkMappingShape } from "../model/mapping-rules";
 import { plainTextPair } from "../model/plain-text";
 import type { WorkspaceAccess } from "../permissions";
-import { MAPPING_KINDS, MAPPING_STATUSES, type Attribute, type Mapping, type MappingInput, type SourceColumn } from "../types";
+import { MAPPING_KINDS, MAPPING_STATUSES, type Attribute, type LabelLink, type Mapping, type MappingInput, type SourceColumn } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
+import { linksOnItems, softDeleteLinks } from "./label";
 import { begin, current, done, found, isLive, nextSortOrder, nothingToChange, plainTextSchema, softDelete } from "./shared";
 
 const ruleSchema = z
@@ -34,6 +35,8 @@ export interface MappingState {
   mapping: Mapping | null;
   /** The mapping's inputs (others are ignored). */
   inputs: readonly MappingInput[];
+  /** The workspace's label links: those on a deleted mapping go with it (slice 3a). */
+  labelLinks?: readonly LabelLink[];
 }
 
 // ---- create ----
@@ -288,7 +291,7 @@ export function setMappingStatus(
 const deleteMappingInput = z.object(ref).strict();
 export type DeleteMappingInput = z.input<typeof deleteMappingInput>;
 
-/** Deletes a mapping and its inputs. */
+/** Deletes a mapping, its inputs and the label links on it. */
 export function deleteMapping(ctx: CommandContext, access: WorkspaceAccess, state: MappingState, input: unknown): CommandResult {
   const parsed = begin(access, "model.edit", deleteMappingInput, input);
   if (!parsed.ok) return fail(parsed.error);
@@ -298,6 +301,7 @@ export function deleteMapping(ctx: CommandContext, access: WorkspaceAccess, stat
   return done(ctx, access, undefined, [
     ...inputs.map((i) => softDelete(ctx, "mapping_input", i)),
     softDelete(ctx, "mapping", got.row),
+    ...softDeleteLinks(ctx, linksOnItems(state.labelLinks, [{ kind: "mapping", id: got.row.id }])),
   ]);
 }
 
@@ -368,13 +372,17 @@ export interface MergeMappingsState {
   mappings: readonly Mapping[];
   /** Their inputs. */
   inputs: readonly MappingInput[];
+  /** The workspace's label links: those on the mappings that go move to the mapping that stays (slice 3a). */
+  labelLinks?: readonly LabelLink[];
 }
 
 /**
  * “Merge mappings”: mappings of one attribute become one transform. The first selected mapping keeps its id and
  * note and receives all inputs in order (its own first, then each other mapping's, in the order selected); a column
  * that is already an input is not added twice. The others are deleted. The result is a transform with the given
- * rule (required) and status “review”, whatever the statuses were. One change group.
+ * rule (required) and status “review”, whatever the statuses were. The labels of the deleted ones move to the
+ * mapping that stays, without a second link for a label it already has (slice 3a, Łukasz's decision after step 1;
+ * the prototype drops them). One change group.
  */
 export function mergeMappings(
   ctx: CommandContext,
@@ -417,5 +425,14 @@ export function mergeMappings(
   const shape = checkMappingShape(row.kind, row.rule_expression, columns.size);
   if (shape) return fail(shape);
   writes.push(...others.map((m) => softDelete(ctx, "mapping", m)));
+  const kept = new Set(linksOnItems(state.labelLinks, [{ kind: "mapping", id: target.id }]).map((k) => k.label_id));
+  for (const k of linksOnItems(state.labelLinks, others.map((m) => ({ kind: "mapping" as const, id: m.id })))) {
+    if (kept.has(k.label_id)) {
+      writes.push(softDelete(ctx, "label_link", k));
+    } else {
+      kept.add(k.label_id);
+      writes.push({ kind: "update", table: "label_link", before: k, row: nextVersion(ctx, k, { mapping_id: target.id }) });
+    }
+  }
   return done(ctx, access, { mapping: row }, writes);
 }

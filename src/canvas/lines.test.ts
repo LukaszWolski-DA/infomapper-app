@@ -47,7 +47,7 @@ const lines = buildLines(model, cards);
 describe("buildLines", () => {
   it("draws a mapping from each input on the canvas to the attribute's card", () => {
     expect(lines.mappings).toEqual([
-      { id: ids.mapEmail, status: "approved", kind: "direct", ruled: false, warn: false, inputs: [{ columnId: ids.colEmail, cardId: ids.itemCrmCustomer }], inputCount: 1, attributeId: ids.email, cardId: ids.itemCustomer },
+      { id: ids.mapEmail, status: "approved", kind: "direct", ruled: false, warn: false, inputs: [{ columnId: ids.colEmail, cardId: ids.itemCrmCustomer }], inputCount: 1, attributeId: ids.email, cardId: ids.itemCustomer, labels: null },
       {
         id: combined.id,
         status: "review",
@@ -62,6 +62,7 @@ describe("buildLines", () => {
         inputCount: 2,
         attributeId: ids.customerId,
         cardId: ids.itemCustomer,
+        labels: null,
       },
     ]);
   });

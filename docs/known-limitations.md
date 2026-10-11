@@ -15,6 +15,19 @@ moment can therefore both pass the check and leave a canvas or project without i
 - **The database slice (last, AD-31):** check this rule in the same transaction as the write (e.g. lock the project's and the canvas's
   `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed.
 
+### A late fresh page could show older frames or cards (slice 3a, step 5)
+
+After a write, the canvas takes the server's fresh page and keeps only what still has writes on their way. Slice 3a's
+step 5 found that for notes a page re-rendered by an earlier write can read the data before a later write and arrive
+after it, so the canvas showed older notes (a note created meanwhile vanished until a reload); notes now keep what is
+newer than the page (`mergeServerNotes`, the page's `notesReadAt`). Frames and cards take the fresh page the same way
+and could show the same effect.
+
+- **Possible, not observed:** no test or manual check has shown it for frames or cards; one person at a time makes it
+  unlikely.
+- **To check before the database slice (last, AD-31):** several people working at once make it more likely; the notes
+  fix shows the pattern (when the page read the data, versions only growing, deletions made here).
+
 ## Canvas performance (slice 1a)
 
 ### S1A-14 is only partly met, and measured on the dev server
@@ -89,6 +102,32 @@ initial render.
   what the overlays themselves cost, under 35 ms for the marks). The card rows need a decision on the card's look
   (fewer elements per row, or detail by zoom between 40 % and 100 %), measured with `DIAG=blocks` as the upper limit.
 
+### Frame cost grows with the number of elements in the viewport (slice 3a)
+
+On every pan and zoom frame Chrome repaints and re-layers the whole viewport of the canvas; Layerize is the main cost
+(about 9–11 ms of a frame at 100 % in “Performance test”), and both follow the number of elements there. Slice 3a's notes
+and label marks add about 700 elements (19,613 against 18,913 in the measurement build) and cost about 3–5 % of pan and
+zoom at 100 % (balanced sitting `2026-10-11-16-56`: 48.6 against 51.0 fps, 10 long frames against 6). It is the same
+mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md](prd/slice-03a-acceptance.md#looking-for-the-cause-11-october-after-the-confirming-rounds).
+
+- **The attribution rests on Chrome traces** (Layerize 10.4–10.6 against 9.2 ms; with notes and marks switched off
+  9.3–9.6 ms, about −3 % frames instead of −6 %). One balanced sitting with both switched off (`2026-10-11-17-14`)
+  contradicted it (−6.2 %, C-08 1549 ms).
+- **Done in slice 3a (option b, Łukasz):** a label mark is one element (its tag a CSS mask) and a line tag two (circle
+  and path, no group, no transform): 210 fewer elements in that view (21,012 → 20,802 on the dev server). **Fewer
+  elements per note, partly done:** the note icon is a CSS mask, the spacer before the ✓ is a margin, a tether has no
+  group: a note has 7–8 elements at 100 % instead of 11–12, 6 below 40 % instead of 10, a tether 2 instead of 3; 108
+  fewer in that view (20,802 → 20,694; at 30 %: 6,005 → 5,897). The balanced sitting after it (`2026-10-11-18-41`)
+  still had 100 % at −5.3 % (49.7 against 52.5 fps, 9 long frames against 4), accepted by Łukasz as within S3A-14's bar.
+  Traces after it: Layerize per frame fell a little (branch 10.48 → 10.12 ms, gap to `slice-02c` +1.22 → +0.80 ms),
+  about what the element count predicts but inside the run-to-run spread (0.4–0.7 ms); the remaining excess is about
+  +0.8 ms Layerize, +0.1 ms layout, +0.15 ms script per frame. So the element-count attribution is consistent with the
+  traces but not proven; the performance review starts from these traces (`.data/measure/diag-3a`, `diag-3a-after`).
+- **What has to happen later (performance review before the database slice, AD-31):** measure a separate compositing
+  layer for the notes (option c: their paint and Layerize no longer part of the cards'; it touches AD-24's rules on
+  layers and may cost GPU memory or raster time) and, if still needed, fewer elements per note beyond slice 3a's (body,
+  footer and resize edge remain), together with the “partly met” items above (C-09, C-10, dragging, lasso marks).
+
 ## Undo history (slice 1b)
 
 ### The undo history lives in server memory
@@ -100,6 +139,17 @@ the demo data is replaced: steps whose change group is no longer in the change l
 - **Accepted** for the local adapter: one development server, one user at a time in practice.
 - **The database slice (last, AD-31):** decide whether the history must survive a restart (and several server instances). If it must,
   keep it in the database next to `change_event`.
+
+### No undo outside canvases (slice 3a, step 0)
+
+Undo and redo (the top bar's buttons, Ctrl+Z, Ctrl+Shift+Z) exist only on canvas pages (slice 1b, assumption 8).
+Changes made on the project and workspace home pages (projects, canvases) are in the undo history, but can only be
+undone from a canvas. Pinning a label to a project and unpinning it (project home, slice 3a) write a change group with
+their change events but are not undo steps at all. Deleting a label is an undo step, and its undo brings its project pins
+back with it.
+
+- **Accepted** by Łukasz in slice 3a, step 0.
+- **Later:** undo on the home pages (`docs/ideas.md`, “Undo and redo on the project and workspace home pages”).
 
 ## Dependencies (slice 2a, step 0)
 
@@ -169,6 +219,18 @@ fails on it, and the browser behaves as it should.
 
 - **Accepted:** it is the dev server noting that the browser left a page early.
 - **Later:** look again if it shows up outside fast navigation, or in a production build.
+
+**Counted again on 10 October 2026 (slice 3a, after step 1).** It is now far more frequent than once in three runs:
+one full run on `main` at 717f42d printed it 9 times (108 passed), one on 1db6f1e (slice 3a, step 1) 11 times (108
+passed); step 1 does not cause it. It is printed right after these specs finish (so at the end of that spec or the start
+of the next): in both runs S0-11, S1B-03 (line 45), S1B-04, S2B-02, S2C-01 (both tests), S2C-04 (line 20) and S2C-07
+(line 66); only on main S2A-03; only on 1db6f1e S2C-06, S2C-07 (line 51) and S2C-08 (line 52). No test fails because
+of it.
+
+- **Cause, inferred, not traced:** these specs write and then end or navigate at once, so the page is probably still
+  loading its refresh after the write when the test closes it or leaves it.
+- **What has to happen later (not in slice 3a):** make tests that write and then end or navigate wait until the page
+  has finished its refresh, and check whether the message goes away.
 
 ### e2e dev servers run without Turbopack's file-system cache
 

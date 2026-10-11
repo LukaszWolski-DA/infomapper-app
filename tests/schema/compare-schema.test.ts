@@ -84,6 +84,7 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
       [
         "app_user", "attribute", "canvas", "canvas_item", "change_event", "concept", "entity", "frame", "mapping", "mapping_input",
         "organization", "organization_member", "project", "project_canvas", "relationship", "source_column",
+        "label", "label_link", "project_pinned_label", "note",
         "source_system", "source_table", "workspace", "workspace_member",
       ].sort(),
     );

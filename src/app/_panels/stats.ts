@@ -2,7 +2,7 @@
 // bar and the overview of a canvas, the project home, the workspace home and the canvas tabs. Pure TypeScript.
 
 import type { Uuid } from "@/domain/ids";
-import type { CanvasItem, Entity, WorkspaceModel } from "@/domain/types";
+import type { CanvasItem, Entity, Frame, Note, WorkspaceModel } from "@/domain/types";
 import { indexModel, typeCheckOf, type ModelIndex } from "./model-index";
 
 const isMapped = (ix: ModelIndex, attributeId: Uuid) => (ix.mappingsOf.get(attributeId) ?? []).length > 0;
@@ -94,4 +94,42 @@ export function cardsPerCanvas(items: readonly CanvasItem[]): Map<Uuid, number> 
   const n = new Map<Uuid, number>();
   for (const i of items) if (i.entity_id || i.source_table_id) n.set(i.canvas_id, (n.get(i.canvas_id) ?? 0) + 1);
   return n;
+}
+
+/** An open note on the project home (slice 3a, item 12): its text, its canvas, and what it is pinned to. */
+export interface ProjectNote {
+  id: Uuid;
+  text: string;
+  canvasId: Uuid;
+  canvasName: string;
+  /** The card's element or the frame it is pinned to, by name; null for a free note. */
+  pinName: string | null;
+}
+
+/**
+ * The open notes on a project's canvases (prototype renderHome): canvas by canvas in the project's tab order, each
+ * canvas's notes in the order they were written.
+ */
+export function projectOpenNotes(
+  notes: readonly Note[],
+  canvases: readonly { id: Uuid; name: string }[],
+  items: readonly CanvasItem[],
+  frames: readonly Frame[],
+  model: Pick<WorkspaceModel, "entities" | "sourceTables">,
+): ProjectNote[] {
+  const order = new Map(canvases.map((c, i) => [c.id, i]));
+  const itemById = new Map(items.map((i) => [i.id, i]));
+  const frameName = new Map(frames.map((f) => [f.id, f.name]));
+  const entityName = new Map(model.entities.map((e) => [e.id, e.name]));
+  const tableName = new Map(model.sourceTables.map((t) => [t.id, t.name]));
+  const pinName = (n: Note): string | null => {
+    if (n.pin_frame_id) return frameName.get(n.pin_frame_id) ?? null;
+    const card = n.pin_canvas_item_id ? itemById.get(n.pin_canvas_item_id) : undefined;
+    if (!card) return null;
+    return (card.entity_id ? entityName.get(card.entity_id) : card.source_table_id ? tableName.get(card.source_table_id) : undefined) ?? null;
+  };
+  return notes
+    .filter((n) => n.deleted_at === null && n.status === "open" && order.has(n.canvas_id))
+    .sort((a, b) => order.get(a.canvas_id)! - order.get(b.canvas_id)! || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
+    .map((n) => ({ id: n.id, text: n.body_text ?? "", canvasId: n.canvas_id, canvasName: canvases[order.get(n.canvas_id)!]!.name, pinName: pinName(n) }));
 }

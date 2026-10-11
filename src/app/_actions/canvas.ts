@@ -135,13 +135,14 @@ export async function deleteCanvasAction(input: { workspaceId: string; projectId
     const access = await loadAccess(store, input?.workspaceId, user.id);
     if (!access) return NOT_FOUND;
     const ws = access.workspace.id, canvasId = str(input?.canvasId);
-    const [state, items, frames] = await Promise.all([
+    const [state, items, frames, notes] = await Promise.all([
       membershipState(store, ws, canvasId, str(input?.projectId)),
       store.canvasItems.listOfCanvas(ws, canvasId),
       store.frames.listOfCanvas(ws, canvasId),
+      store.notes.listOfCanvas(ws, canvasId),
     ]);
     next = state.projectLinks.find((l) => l.canvas_id !== canvasId)?.canvas_id;
-    return deleteCanvas(ctx, access, { ...state, items, frames }, {
+    return deleteCanvas(ctx, access, { ...state, items, frames, notes }, {
       projectId: input?.projectId,
       canvasId: input?.canvasId,
       expectedVersion: input?.expectedVersion,

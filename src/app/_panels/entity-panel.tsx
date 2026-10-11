@@ -16,8 +16,10 @@ import { useToast } from "@/ui/components/toast";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
 import { Actions, buttonClass, dangerClass, Field, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextArea, TextField } from "./fields";
 import { usePanel } from "./inspector";
+import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
 import { CardFrame } from "./card-frame";
+import { NotesHere } from "./notes-here";
 import { useMoveAttribute } from "./move-attribute";
 import { feedingSources, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -116,6 +118,8 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
           data-testid="input-entity-definition"
         />
       </Field>
+
+      <ItemLabels target={{ kind: "entity", id: e.id }} />
 
       <Fold title="Attributes and their sources" count={attributes.length}>
         {attributes.length ? (
@@ -245,6 +249,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         </Fold>
       )}
 
+      <NotesHere pin={{ cardId }} />
       <OnCanvases kind="entity" targetId={e.id} cardId={cardId} />
       <CardFrame cardId={cardId} kind="ent" />
 

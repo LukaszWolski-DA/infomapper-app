@@ -1,0 +1,169 @@
+// What the canvas draws for its notes (slice 3a, D-20, D-21), as plain serialisable data built on the server, and where
+// each note shows now (prototype notePos, noteVisible, tethers). Pure TypeScript, tested without a browser.
+// A free note in a frame keeps the frame's place as it was when the note's own place was read (`anchor`): while the
+// frame is dragged, or after a frame move saved without a fresh page, the note shows moved by the same amount, as the
+// server stores it (moveOnCanvas carries the frame's free notes).
+
+import type { Uuid } from "@/domain/ids";
+import { notePlaces, notePosition, noteVisible, type NotePlaces } from "@/domain/model/notes";
+import type { Frame, Note, NoteColor, NoteStatus } from "@/domain/types";
+import type { Rect } from "./geometry";
+
+export interface NoteData {
+  id: Uuid;
+  version: number;
+  /** Plain text (AD-30); empty for an emptied note. */
+  text: string;
+  color: NoteColor;
+  status: NoteStatus;
+  width: number;
+  pinCardId: Uuid | null;
+  pinFrameId: Uuid | null;
+  /** Free: its place on the canvas. Pinned: its offset from the card or frame. */
+  x: number;
+  y: number;
+  frameId: Uuid | null;
+  /** Where its frame was when `x` and `y` were read (free notes in a frame); see the file's comment. */
+  anchor: { x: number; y: number } | null;
+  /** ISO timestamp, and who created it (“Created {date} by {name}.”, Łukasz's step 0 answer 4). */
+  createdAt: string;
+  createdBy: string;
+}
+
+/** The notes of one canvas for the client; `userName` names the creator. */
+export function buildNotes(notes: readonly Note[], frames: readonly Pick<Frame, "id" | "x" | "y">[], userName: (id: Uuid) => string): NoteData[] {
+  const frameById = new Map(frames.map((f) => [f.id, f]));
+  return notes.map((n) => {
+    const f = n.frame_id ? frameById.get(n.frame_id) : undefined;
+    return {
+      id: n.id,
+      version: n.version,
+      text: n.body_text ?? "",
+      color: n.color,
+      status: n.status,
+      width: n.width,
+      pinCardId: n.pin_canvas_item_id,
+      pinFrameId: n.pin_frame_id,
+      x: n.x,
+      y: n.y,
+      frameId: n.frame_id,
+      anchor: f ? { x: f.x, y: f.y } : null,
+      createdAt: n.created_at,
+      createdBy: userName(n.created_by),
+    };
+  });
+}
+
+/** The note's columns as the domain's note rules read them. */
+const asRow = (n: NoteData) => ({
+  x: n.x,
+  y: n.y,
+  pin_canvas_item_id: n.pinCardId,
+  pin_frame_id: n.pinFrameId,
+  frame_id: n.frameId,
+  status: n.status,
+});
+
+/** A card as placed now (its node's position during a drag) and a frame as shown now. */
+export type PlacedCard = { id: Uuid; x: number; y: number; width: number | null; frameId: Uuid | null };
+export type ShownFrame = { id: Uuid; x: number; y: number; width: number; height: number; collapsed: boolean };
+
+export function placesOf(cards: readonly PlacedCard[], frames: readonly ShownFrame[]): NotePlaces {
+  return notePlaces(
+    cards.map((c) => ({ id: c.id, x: c.x, y: c.y, width: c.width, frame_id: c.frameId })),
+    frames,
+  );
+}
+
+/** Where a note is drawn now: a pinned one at its element plus its offset, a free one in a frame moved with that frame. */
+export function noteAt(n: NoteData, places: NotePlaces): { x: number; y: number } {
+  if (n.pinCardId || n.pinFrameId) return notePosition(asRow(n), places);
+  const f = n.frameId ? places.frames.get(n.frameId) : undefined;
+  return f && n.anchor ? { x: n.x + f.x - n.anchor.x, y: n.y + f.y - n.anchor.y } : { x: n.x, y: n.y };
+}
+
+/** Whether a note is drawn now (resolved ones hidden only when the user hides them, step 4). */
+export const noteShown = (n: NoteData, places: NotePlaces, hideResolved = false): boolean => noteVisible(asRow(n), places, hideResolved);
+
+/** “10 Oct 2026”, as the prototype's fmtDate. */
+export const noteDate = (iso: string): string => {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+};
+
+/**
+ * The dashed tether from a pinned note to its card or frame (prototype tethers): between the points of each rectangle
+ * nearest to the other's centre, with a dot on the element; none when they touch (under 6 px).
+ */
+export function tether(note: Rect, target: Rect): { x1: number; y1: number; x2: number; y2: number } | null {
+  const clamp = (v: number, a: number, b: number) => Math.min(Math.max(v, a), b);
+  const nc = { x: note.x + note.w / 2, y: note.y + note.h / 2 };
+  const rc = { x: target.x + target.w / 2, y: target.y + target.h / 2 };
+  const onTarget = { x: clamp(nc.x, target.x, target.x + target.w), y: clamp(nc.y, target.y, target.y + target.h) };
+  const onNote = { x: clamp(rc.x, note.x, note.x + note.w), y: clamp(rc.y, note.y, note.y + note.h) };
+  if (Math.hypot(onTarget.x - onNote.x, onTarget.y - onNote.y) < 6) return null;
+  return { x1: onNote.x, y1: onNote.y, x2: onTarget.x, y2: onTarget.y };
+}
+
+/** A note's first line for the lists (prototype firstLine); empty for an empty note (“Empty note”). */
+export const firstLine = (text: string): string => text.split("\n").find((l) => l.trim())?.trim() ?? "";
+
+/**
+ * The notes pinned to each card that are shown, for the number on its header: open ones, and resolved ones unless
+ * resolved notes are hidden (Łukasz's decision after step 4: a count shows the notes you'd see; the prototype's
+ * noteMark counts open ones only).
+ */
+export function cardNoteCounts(notes: readonly Pick<NoteData, "pinCardId" | "status">[], hideResolved = false): Map<Uuid, number> {
+  const counts = new Map<Uuid, number>();
+  for (const n of notes) if (n.pinCardId && !(hideResolved && n.status === "resolved")) counts.set(n.pinCardId, (counts.get(n.pinCardId) ?? 0) + 1);
+  return counts;
+}
+
+/**
+ * The notes of each frame for its collapsed block's “N notes” chip: those pinned to the frame and the free notes in it
+ * that are shown, open ones and resolved ones unless resolved notes are hidden (Łukasz's decision after step 4; the
+ * prototype's blockCard counts resolved ones always).
+ */
+export function frameNoteCounts(notes: readonly Pick<NoteData, "pinCardId" | "pinFrameId" | "frameId" | "status">[], hideResolved = false): Map<Uuid, number> {
+  const counts = new Map<Uuid, number>();
+  for (const n of notes) {
+    if (hideResolved && n.status === "resolved") continue;
+    const frameId = n.pinFrameId ?? (n.pinCardId ? null : n.frameId);
+    if (frameId) counts.set(frameId, (counts.get(frameId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** A map of counts as one string, so a memo changes only when a count does (not when a note moves). */
+export const countsKey = (counts: ReadonlyMap<Uuid, number>): string => [...counts].map(([id, n]) => `${id}=${n}`).sort().join(",");
+export const countsOf = (key: string): Map<Uuid, number> => new Map(key ? key.split(",").map((s) => [s.slice(0, s.indexOf("=")), Number(s.slice(s.indexOf("=") + 1))]) : []);
+
+/**
+ * The notes after a fresh page from the server (slice 3a, step 5). A page rendered while the user was writing may come
+ * back with notes older than what the canvas shows: a refresh started by one write (a label's, say) can read the notes
+ * before a note created or changed a moment later and arrive after it. So:
+ * - a note with writes still on their way keeps what the canvas shows;
+ * - a note the canvas has at a higher version than the page keeps the canvas's (versions only grow, an undo too);
+ * - a note deleted here stays gone while the page has it at the version it had when deleted (an undo of the delete
+ *   brings it back at a higher version);
+ * - a note the page does not have stays when it was created after the page read the notes (`readAt`, server time);
+ *   one created before was deleted meanwhile (an undo of its creation) and goes.
+ */
+export function mergeServerNotes(
+  local: readonly NoteData[],
+  server: readonly NoteData[],
+  readAt: string | null,
+  pendingOf: (id: Uuid) => number,
+  deletedHere: ReadonlyMap<Uuid, number>,
+): NoteData[] {
+  const mine = new Map(local.map((n) => [n.id, n]));
+  const out: NoteData[] = [];
+  for (const n of server) {
+    const here = mine.get(n.id);
+    if (deletedHere.has(n.id) && n.version <= deletedHere.get(n.id)!) continue;
+    out.push(here && (pendingOf(n.id) > 0 || here.version > n.version) ? here : n);
+  }
+  const fromServer = new Set(server.map((n) => n.id));
+  for (const n of local) if (!fromServer.has(n.id) && readAt !== null && n.createdAt > readAt) out.push(n);
+  return out;
+}

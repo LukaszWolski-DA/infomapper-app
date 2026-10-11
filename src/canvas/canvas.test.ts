@@ -62,8 +62,8 @@ describe("buildCards", () => {
       version: 1,
     });
     expect(card("Customer").rows).toEqual([
-      { id: ids.customerId, name: "customer_id", type: "Integer", pk: true, fk: false, pii: false, bk: false, mappings: 1, warn: true, title: "from customer.first_name", clip: false },
-      { id: ids.email, name: "email", type: "String(100)", pk: false, fk: false, pii: true, bk: true, mappings: 1, warn: false, title: "from customer.email", clip: false },
+      { id: ids.customerId, name: "customer_id", type: "Integer", pk: true, fk: false, pii: false, bk: false, mappings: 1, warn: true, title: "from customer.first_name", clip: false, labels: null },
+      { id: ids.email, name: "email", type: "String(100)", pk: false, fk: false, pii: true, bk: true, mappings: 1, warn: false, title: "from customer.email", clip: false, labels: null },
     ]);
   });
 

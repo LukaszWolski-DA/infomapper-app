@@ -34,12 +34,13 @@ async function accessOf(store: DataStore, workspaceId: unknown, userId: string):
 }
 
 async function canvasState(store: DataStore, workspaceId: string, canvasId: string): Promise<FrameCanvasState> {
-  const [canvas, frames, items] = await Promise.all([
+  const [canvas, frames, items, notes] = await Promise.all([
     store.canvases.get(workspaceId, canvasId),
     store.frames.listOfCanvas(workspaceId, canvasId),
     store.canvasItems.listOfCanvas(workspaceId, canvasId),
+    store.notes.listOfCanvas(workspaceId, canvasId),
   ]);
-  return { canvas, frames, items };
+  return { canvas, frames, items, notes };
 }
 
 /** Runs a frame command on one canvas; `canvasOf` finds the canvas when the input names a frame, not a canvas. */
@@ -98,6 +99,8 @@ export interface MoveOnCanvasActionInput {
   onGrid?: boolean;
   moveToConcepts?: boolean;
   dragDrop?: boolean;
+  /** Selected notes moved with the cards and frames (slice 3a). */
+  notes?: { noteId: string; expectedVersion: number; x: number; y: number }[];
 }
 
 /** Drags, drops, nudges, align/stack/line up, card resize and fit widths: positions, widths and frames in one change. */

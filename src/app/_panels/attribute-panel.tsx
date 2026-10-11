@@ -33,6 +33,7 @@ import {
   TypeDot,
 } from "./fields";
 import { usePanel } from "./inspector";
+import { ItemLabels } from "./item-labels";
 import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, businessKeyHint, columnLabel, columnOptions, inputColumns, inputsLabel, typeCheckOf } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -215,6 +216,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
           onSave={(text) => void save({ definition: text.trim() ? text : null })}
         />
       </Field>
+      <ItemLabels target={{ kind: "attribute", id: a.id }} />
 
       <Fold title="Comes from" count={mappings.length}>
         {mappings.length ? (

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitWidth, lineNeedsClip, rowNeedsClip, titleNeedsClip } from "./text-fit";
+import { fitWidth, lineNeedsClip, rowNeedsClip, titleNeedsClip, noteMarkWidth } from "./text-fit";
 
 const row = { name: "email", type: "String(100)", pk: false, fk: false, pii: false, bk: false, mappings: 1 };
 
@@ -46,5 +46,18 @@ describe("fit width to names (slice 1b, D-37)", () => {
 
   it("stays within 200–600 px", () => {
     expect(fitWidth(card(["x".repeat(200)]))).toBe(600);
+  });
+});
+
+describe("the open-notes mark in a card's header (slice 3a, item 12)", () => {
+  it("takes room: the longest first line that fits without it does not fit with it", () => {
+    let path = "CRM / a";
+    while (!lineNeedsClip([path + "a"], "src")) path += "a";
+    expect(lineNeedsClip([path], "src")).toBe(false);
+    expect(lineNeedsClip([path], "src", undefined, false, 1)).toBe(true);
+    // the number shows from two notes on, and takes more room
+    expect(noteMarkWidth(0)).toBe(0);
+    expect(noteMarkWidth(2)).toBeGreaterThan(noteMarkWidth(1));
+    expect(noteMarkWidth(12)).toBeGreaterThan(noteMarkWidth(2));
   });
 });

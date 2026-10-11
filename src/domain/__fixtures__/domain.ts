@@ -11,12 +11,16 @@ import {
   type Concept,
   type Entity,
   type Frame,
+  type Label,
+  type LabelLink,
   type Mapping,
   type MappingInput,
+  type Note,
   type Organization,
   type OrganizationMember,
   type Project,
   type ProjectCanvas,
+  type ProjectPinnedLabel,
   type Relationship,
   type SourceColumn,
   type SourceSystem,
@@ -60,6 +64,15 @@ export const ids = {
   // frames (slice 2b)
   frameA: "01900000-0000-7000-8000-00000000f001",
   frameB: "01900000-0000-7000-8000-00000000f002",
+  // working layer (slice 3a)
+  labelCr23: "01900000-0000-7000-8000-00000000a101",
+  labelJira: "01900000-0000-7000-8000-00000000a102",
+  linkCustomer: "01900000-0000-7000-8000-00000000a201",
+  linkEmail: "01900000-0000-7000-8000-00000000a202",
+  linkMapping: "01900000-0000-7000-8000-00000000a203",
+  linkTable: "01900000-0000-7000-8000-00000000a204",
+  noteFree: "01900000-0000-7000-8000-00000000d001",
+  notePinned: "01900000-0000-7000-8000-00000000d002",
 } as const;
 
 /** A context whose ids count up predictably: 01900000-0000-7000-8000-9000000000NN. */
@@ -329,5 +342,52 @@ export const changeEvent = (over: Partial<ChangeEvent> = {}): ChangeEvent => ({
   before_image: null,
   after_image: null,
   context_label_id: null,
+  ...over,
+});
+
+// ---- Working layer (slice 3a) ----
+
+export const label = (id: string = ids.labelCr23, over: Partial<Label> = {}): Label => {
+  const name = over.name ?? (id === ids.labelJira ? "JIRA-481" : "CR-23");
+  return { id, ...ws, name, name_key: name.toLowerCase(), ...over };
+};
+
+/** A label link: CR-23 on Customer unless said otherwise. */
+export const labelLink = (id: string = ids.linkCustomer, over: Partial<LabelLink> = {}): LabelLink => {
+  const none = { entity_id: null, attribute_id: null, mapping_id: null, source_table_id: null, source_column_id: null };
+  const target: Partial<LabelLink> =
+    id === ids.linkEmail
+      ? { attribute_id: ids.email }
+      : id === ids.linkMapping
+        ? { mapping_id: ids.mapEmail }
+        : id === ids.linkTable
+          ? { label_id: ids.labelJira, source_table_id: ids.crmCustomer }
+          : { entity_id: ids.customer };
+  return { id, ...ws, label_id: ids.labelCr23, ...none, ...target, ...over };
+};
+
+export const pin = (projectId: string = ids.projectA, labelId: string = ids.labelCr23): ProjectPinnedLabel => ({
+  project_id: projectId,
+  label_id: labelId,
+  workspace_id: ids.ws,
+});
+
+/** A note on canvas 1: a free one at (1000, 900), or one pinned to the Customer card at offset (280, 0). */
+export const note = (id: string = ids.noteFree, over: Partial<Note> = {}): Note => ({
+  id,
+  ...ws,
+  canvas_id: ids.canvas1,
+  body_html: "<p>Check the e-mail source</p>",
+  body_text: "Check the e-mail source",
+  color: "yellow",
+  status: "open",
+  resolved_at: null,
+  resolved_by: null,
+  width: 220,
+  pin_canvas_item_id: id === ids.notePinned ? ids.itemCustomer : null,
+  pin_frame_id: null,
+  x: id === ids.notePinned ? 280 : 1000,
+  y: id === ids.notePinned ? 0 : 900,
+  frame_id: null,
   ...over,
 });

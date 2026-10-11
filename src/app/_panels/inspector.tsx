@@ -1,17 +1,19 @@
 "use client";
 
 // The right panel (prototype #ins): shows and edits what is selected on the canvas: an entity, attribute, mapping,
-// relationship, source table or column, a frame (slice 2b), a bundle of lines (slice 2c); with nothing selected, an
-// overview of this canvas.
+// relationship, source table or column, a frame (slice 2b), a bundle of lines (slice 2c), a working label or a note (slice 3a);
+// with nothing selected, an overview of this canvas.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
-import type { WorkspaceModel } from "@/domain/types";
+import type { Label, LabelLink, WorkspaceModel } from "@/domain/types";
 import { AttributePanel } from "./attribute-panel";
 import { BundlePanel } from "./bundle-panel";
 import { EntityPanel } from "./entity-panel";
 import { FramePanel } from "./frame-panel";
+import { LabelPanel } from "./label-panel";
+import { NotePanel } from "./note-panel";
 import { useCanvasHost, type HostCard } from "./canvas-host";
 import type { PendingInput } from "./map-column";
 import { MappingPanel } from "./mapping-panel";
@@ -37,6 +39,8 @@ export interface InspectorProps {
   editable: boolean;
   /** May set a mapping's status (also reviewers). */
   canSetStatus: boolean;
+  /** May write notes (slice 3a): editors and reviewers, not archived. */
+  canNote: boolean;
   userId: Uuid;
   fourEyes: boolean;
   /** Who last changed each mapping's inputs, kind or rule (AD-06); only filled when four-eyes is on. */
@@ -45,6 +49,9 @@ export interface InspectorProps {
   places: CanvasPlace[];
   /** The canvases each entity or source table has a card on. */
   canvasesOf: Record<Uuid, Uuid[]>;
+  /** The workspace's working labels and what they mark (slice 3a). */
+  labels: Label[];
+  labelLinks: LabelLink[];
 }
 
 export interface CanvasPlace {
@@ -69,6 +76,10 @@ export interface PanelContext extends Omit<InspectorProps, "model" | "cards" | "
   goMapping: (mappingId: Uuid) => void;
   /** Selects a column row when its table is on this canvas. */
   goColumn: (columnId: Uuid) => void;
+  /** Selects a source table's card when it is on this canvas. */
+  goTable: (tableId: Uuid) => void;
+  /** Opens a working label's panel (slice 3a). */
+  goLabel: (labelId: Uuid) => void;
   entitiesHere: ReadonlySet<Uuid>;
   /** Maps a column to an attribute (D-48): directly, or after the choice shown at `at` (screen coordinates). */
   mapColumn: (columnId: Uuid, attributeId: Uuid, at: { x: number; y: number }) => void;
@@ -87,7 +98,7 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     const cardByTarget = new Map(cards.map((c) => [c.targetId, c.id]));
     return (id: Uuid) => cardByTarget.get(id) ?? null;
   }, [cards]);
-  const host = useCanvasHost({ ix, workspaceId: rest.workspaceId, canvasId: rest.canvasId, editable: rest.editable, canSetStatus: rest.canSetStatus, cards });
+  const host = useCanvasHost({ ix, workspaceId: rest.workspaceId, canvasId: rest.canvasId, editable: rest.editable, canSetStatus: rest.canSetStatus, canNote: rest.canNote, cards });
   const { mapColumn, pendingInput, clearPendingInput } = host;
 
   const panel = useMemo<PanelContext>(() => {
@@ -119,6 +130,13 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
         const card = cardOf(ix.column.get(columnId)?.source_table_id ?? "");
         if (card) ui.select({ t: "row", cardId: card, id: columnId });
       },
+      goTable: (tableId) => {
+        const card = cardOf(tableId);
+        if (!card) return;
+        ui.select({ t: "card", id: card });
+        ui.centerOn(card);
+      },
+      goLabel: (labelId) => ui.select({ t: "label", id: labelId }),
     };
   }, [cards, tree, rest, ix, ui, cardOf, mapColumn, pendingInput, clearPendingInput]);
 
@@ -150,6 +168,10 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     // a bundle of lines at a collapsed frame (slice 2c); a relationship end that is a card is named by its entity
     const entityName = (cardId: Uuid) => ix.entity.get(cards.find((c) => c.id === cardId)?.targetId ?? "")?.name ?? "?";
     body = <BundlePanel key={sel.id} bundle={ui.bundleView(sel.id)!} entityName={entityName} />;
+  } else if (sel?.t === "note" && ui.noteView(sel.id)) {
+    body = <NotePanel key={sel.id} noteId={sel.id} />;
+  } else if (sel?.t === "label" && rest.labels.some((l) => l.id === sel.id)) {
+    body = <LabelPanel key={sel.id} label={rest.labels.find((l) => l.id === sel.id)!} />;
   } else if (sel?.t === "rel" && ix.model.relationships.some((r) => r.id === sel.id)) {
     body = <RelationshipPanel key={sel.id} relationship={ix.model.relationships.find((r) => r.id === sel.id)!} />;
   }

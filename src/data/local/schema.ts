@@ -1,6 +1,7 @@
 // The shape of .data/dev-db.json and the rules the database would enforce on it: primary keys, unique indexes,
 // foreign keys and CHECK constraints, mirroring supabase/migrations/20261002000000_initial_schema.sql
-// for the tables built so far, plus the one rule the SQL cannot express: a card's frame is on the card's canvas.
+// for the tables built so far, plus the rules the SQL cannot express: a card's frame is on the card's canvas, and a
+// note's card, frames and canvas are one canvas (slice 3a).
 
 import type {
   AppUser,
@@ -11,12 +12,16 @@ import type {
   Concept,
   Entity,
   Frame,
+  Label,
+  LabelLink,
   Mapping,
   MappingInput,
+  Note,
   Organization,
   OrganizationMember,
   Project,
   ProjectCanvas,
+  ProjectPinnedLabel,
   Relationship,
   SourceColumn,
   SourceSystem,
@@ -33,6 +38,8 @@ import {
   LOGICAL_TYPES,
   MAPPING_KINDS,
   MAPPING_STATUSES,
+  NOTE_COLORS,
+  NOTE_STATUSES,
   ORGANIZATION_ROLES,
   ROW_FILTERS,
   SOURCE_OBJECT_TYPES,
@@ -41,10 +48,11 @@ import {
 } from "@/domain/types";
 
 /**
- * 2 = slice 1a (model tables), 3 = slice 2b (frames). A format-2 file is read as format 3 with no frames (it is
- * written back as 3 with the next write); an older file is refused with a hint to run "npm run reset-dev-data".
+ * 2 = slice 1a (model tables), 3 = slice 2b (frames), 4 = slice 3a (labels, label links, project pins, notes). A
+ * format-2 or format-3 file is read as format 4 with the missing tables empty (it is written back as 4 with the next
+ * write); an older file is refused with a hint to run "npm run reset-dev-data".
  */
-export const DEV_DB_FORMAT = 3;
+export const DEV_DB_FORMAT = 4;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -67,6 +75,10 @@ export interface DevDb {
   mapping_input: MappingInput[];
   canvas_item: CanvasItem[];
   frame: Frame[];
+  label: Label[];
+  label_link: LabelLink[];
+  project_pinned_label: ProjectPinnedLabel[];
+  note: Note[];
   change_event: ChangeEvent[];
 }
 
@@ -94,6 +106,10 @@ export const emptyDb = (): DevDb => ({
   mapping_input: [],
   canvas_item: [],
   frame: [],
+  label: [],
+  label_link: [],
+  project_pinned_label: [],
+  note: [],
   change_event: [],
 });
 
@@ -246,6 +262,52 @@ export const RULES: Record<DevTable, TableRules> = {
       { name: "frame_size_ck", test: (r) => (r.width as number) > 0 && (r.height as number) > 0 },
     ],
   },
+  label: {
+    key: ["id"],
+    foreignKeys: model,
+    unique: [{ columns: ["workspace_id", "name_key"], live: true }],
+    checks: [{ name: "label_name_key_ck", test: (r) => r.name_key === String(r.name).toLowerCase() }],
+  },
+  label_link: {
+    key: ["id"],
+    foreignKeys: {
+      ...model,
+      label_id: "label",
+      entity_id: "entity",
+      attribute_id: "attribute",
+      mapping_id: "mapping",
+      source_table_id: "source_table",
+      source_column_id: "source_column",
+    },
+    checks: [
+      {
+        name: "label_link_one_target_ck",
+        test: (r) => [r.entity_id, r.attribute_id, r.mapping_id, r.source_table_id, r.source_column_id].filter(isSet).length === 1,
+      },
+    ],
+  },
+  project_pinned_label: {
+    key: ["project_id", "label_id"],
+    foreignKeys: { project_id: "project", label_id: "label", workspace_id: "workspace" },
+  },
+  note: {
+    key: ["id"],
+    foreignKeys: {
+      ...model,
+      canvas_id: "canvas",
+      resolved_by: "app_user",
+      pin_canvas_item_id: "canvas_item",
+      pin_frame_id: "frame",
+      frame_id: "frame",
+    },
+    checks: [
+      { name: "note_color_ck", test: oneOf(NOTE_COLORS, "color") },
+      { name: "note_status_ck", test: oneOf(NOTE_STATUSES, "status") },
+      { name: "note_one_pin_ck", test: (r) => !isSet(r.pin_canvas_item_id) || !isSet(r.pin_frame_id) },
+      { name: "note_pinned_not_in_frame_ck", test: (r) => (!isSet(r.pin_canvas_item_id) && !isSet(r.pin_frame_id)) || !isSet(r.frame_id) },
+      { name: "note_width_ck", test: (r) => Number.isInteger(r.width) && (r.width as number) >= 160 && (r.width as number) <= 520 },
+    ],
+  },
   change_event: {
     key: ["id"],
     foreignKeys: { workspace_id: "workspace", user_id: "app_user" },
@@ -320,6 +382,15 @@ function crossTableViolation(db: DevDb): IntegrityViolation | null {
     if (item.frame_id !== null && frameCanvas.get(item.frame_id) !== item.canvas_id) {
       return { kind: "check", table: "canvas_item", detail: `canvas_item_frame_on_canvas failed for ${item.id}` };
     }
+  }
+  // A note is on the canvas of the card or frame it is pinned to and of the frame it belongs to (slice 3a).
+  const itemCanvas = new Map(db.canvas_item.map((i) => [i.id, i.canvas_id]));
+  for (const note of db.note) {
+    const onCanvas =
+      (note.pin_canvas_item_id === null || itemCanvas.get(note.pin_canvas_item_id) === note.canvas_id) &&
+      (note.pin_frame_id === null || frameCanvas.get(note.pin_frame_id) === note.canvas_id) &&
+      (note.frame_id === null || frameCanvas.get(note.frame_id) === note.canvas_id);
+    if (!onCanvas) return { kind: "check", table: "note", detail: `note_on_one_canvas failed for ${note.id}` };
   }
   return null;
 }

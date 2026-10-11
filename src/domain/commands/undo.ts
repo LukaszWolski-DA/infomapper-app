@@ -8,20 +8,23 @@
 // steps themselves come from the person's own history (`model/undo-history.ts`).
 // A canvas's look and layer mode are outside undo (D-12, slice 2a): a later change of only `canvas.look` does not
 // count as “changed afterwards”, and a canvas row that is written back keeps its current look.
+// Slice 3a: labels, label links and notes are undo steps (Łukasz's step 0 answer 3); pinning a label to a project is
+// written with its change events but is not an undo step (step 0 answer 3), while the pins that go with a deleted label
+// come back when its deletion is undone.
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { checkPermission, type WorkspaceAccess, type WorkspaceAction } from "../permissions";
-import type { ChangeEvent, RowImage, WritableRows } from "../types";
+import { LINK_TABLES, type ChangeEvent, type LinkTable, type RowImage, type WritableRows } from "../types";
 
 export const UNDO_REFUSED_MESSAGE = "This can't be undone because it was changed afterwards.";
 export const REDO_REFUSED_MESSAGE = "This can't be redone because it was changed afterwards.";
 export const NOT_UNDOABLE_MESSAGE = "This change can't be undone.";
 
 /**
- * The tables in the undo history: the model and the layout. Workspace settings and people are outside it, as in the
- * prototype, and so is a canvas's look (D-12).
+ * The tables in the undo history: the model, the layout and the working layer (slice 3a). Workspace settings and people
+ * are outside it, as in the prototype, and so is a canvas's look (D-12).
  */
 export const UNDOABLE_TABLES = [
   "project",
@@ -38,6 +41,10 @@ export const UNDOABLE_TABLES = [
   "mapping_input",
   "canvas_item",
   "frame",
+  "label",
+  "label_link",
+  "project_pinned_label",
+  "note",
 ] as const;
 export type UndoableTable = (typeof UNDOABLE_TABLES)[number];
 
@@ -58,21 +65,41 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   mapping_input: [["mapping_id", "mapping"], ["source_column_id", "source_column"]],
   canvas_item: [["canvas_id", "canvas"], ["entity_id", "entity"], ["source_table_id", "source_table"], ["frame_id", "frame"]],
   frame: [["canvas_id", "canvas"], ["concept_id", "concept"], ["source_system_id", "source_system"]],
+  label_link: [
+    ["label_id", "label"],
+    ["entity_id", "entity"],
+    ["attribute_id", "attribute"],
+    ["mapping_id", "mapping"],
+    ["source_table_id", "source_table"],
+    ["source_column_id", "source_column"],
+  ],
+  project_pinned_label: [["project_id", "project"], ["label_id", "label"]],
+  note: [["canvas_id", "canvas"], ["pin_canvas_item_id", "canvas_item"], ["pin_frame_id", "frame"], ["frame_id", "frame"]],
 };
 
 const isUndoableTable = (table: string): table is UndoableTable => (UNDOABLE_TABLES as readonly string[]).includes(table);
 
-/** project_canvas has no id or version: its key is the pair, and it is removed rather than soft-deleted. */
+const isLinkTable = (table: string): table is LinkTable => (LINK_TABLES as readonly string[]).includes(table);
+
+/** Link tables have no id or version: the key is the pair, and a row is removed rather than soft-deleted. */
 const keyOf = (table: UndoableTable, row: AnyRow): string =>
-  table === "project_canvas" ? `${String(row.project_id)}|${String(row.canvas_id)}` : String(row.id);
+  table === "project_canvas"
+    ? `${String(row.project_id)}|${String(row.canvas_id)}`
+    : table === "project_pinned_label"
+      ? `${String(row.project_id)}|${String(row.label_id)}`
+      : String(row.id);
 
 const isLiveRow = (table: UndoableTable, row: AnyRow | undefined): boolean =>
-  !!row && (table === "project_canvas" || row.deleted_at === null);
+  !!row && (isLinkTable(table) || row.deleted_at === null);
 
-/** A change group can be undone when every row it wrote is in the undo history's tables and no canvas look changed. */
+/**
+ * A change group can be undone when every row it wrote is in the undo history's tables and no canvas look changed.
+ * Pinning or unpinning a label on a project alone is not an undo step (slice 3a).
+ */
 export function isUndoable(events: readonly ChangeEvent[]): boolean {
   return (
     events.length > 0 &&
+    !events.every((e) => e.object_type === "project_pinned_label") &&
     events.every(
       (e) =>
         isUndoableTable(e.object_type) &&
@@ -101,6 +128,12 @@ function actionFor(e: ChangeEvent): WorkspaceAction {
       return "canvas.edit_projects";
     case "project":
       return "project.create";
+    case "label":
+    case "label_link":
+    case "project_pinned_label":
+      return "label.edit";
+    case "note":
+      return "note.edit";
     case "canvas":
       return e.operation === "create" ? "canvas.create" : e.operation === "update" ? "canvas.rename" : "canvas.delete";
     default:
@@ -145,7 +178,7 @@ export function revertChangeGroup(
   // The rows as they are now, then as they will be after the revert.
   const now = new Map<UndoableTable, Map<string, AnyRow>>();
   for (const table of UNDOABLE_TABLES) {
-    const rows = (state.rows[table] as readonly unknown[] as readonly AnyRow[]).filter((r) => table === "project_canvas" || r.workspace_id === workspaceId);
+    const rows = (state.rows[table] as readonly unknown[] as readonly AnyRow[]).filter((r) => r.workspace_id === workspaceId);
     now.set(table, new Map(rows.map((r) => [keyOf(table, r), r])));
   }
   const after = new Map([...now].map(([t, rows]) => [t, new Map(rows)]));
@@ -160,17 +193,17 @@ export function revertChangeGroup(
     const current = rows.get(key);
     touched.push({ table, key, wasLive: isLiveRow(table, now.get(table)!.get(key)) });
 
-    if (table === "project_canvas") {
+    if (isLinkTable(table)) {
       if (e.after_image) {
         // The link was added: it must still be there as it was, and goes again.
         if (!current || !sameValue(current, e.after_image)) return fail(refused());
-        writes.push({ kind: "remove", table, before: current as unknown as WritableRows["project_canvas"] });
+        writes.push({ kind: "remove", table, before: current } as unknown as Write);
         rows.delete(key);
       } else {
         // The link was removed: it must still be absent, and comes back.
         if (current) return fail(refused());
         const row = structuredClone(e.before_image!);
-        writes.push({ kind: "insert", table, row: row as unknown as WritableRows["project_canvas"] });
+        writes.push({ kind: "insert", table, row } as unknown as Write);
         rows.set(key, row);
       }
       continue;
@@ -229,6 +262,7 @@ function consistent(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: read
         if (live("project", projectId) && !links.some((l) => l.project_id === projectId)) return false;
         continue;
       }
+      if (isLinkTable(table)) continue;
       for (const [childTable, refs] of Object.entries(PARENTS) as [UndoableTable, readonly (readonly [string, UndoableTable])[]][]) {
         for (const [column, parent] of refs) {
           if (parent !== table) continue;

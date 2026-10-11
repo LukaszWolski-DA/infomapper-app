@@ -5,33 +5,42 @@
 // Slice 2b (D-16, D-17; prototype lassoHits, selectAll, movingItems): a frame stands for its cards. A lasso that
 // catches a frame does not also select its cards; Ctrl+A selects every frame and the cards in no frame; a selection
 // moves and arranges as units, each selected frame with its cards and each other selected card on its own.
+// Slice 3a (item 13; prototype lassoHits, selectAll, movingItems): notes too, `note:<id>`. A lasso catches a note fully
+// inside it unless its frame is caught as well; Ctrl+A takes the free notes in no frame; a note moves with a selection
+// unless its frame (a free note) or its card or frame (a pinned note) moves anyway, so nothing moves twice.
 
 import type { CardData } from "./card-data";
 import type { Rect } from "./geometry";
 import type { Selection } from "./line-data";
 
-export type SelectionKey = `entity:${string}` | `source:${string}` | `frame:${string}`;
+export type SelectionKey = `entity:${string}` | `source:${string}` | `frame:${string}` | `note:${string}`;
 
 export const cardKey = (card: Pick<CardData, "kind" | "targetId">): SelectionKey =>
   card.kind === "ent" ? `entity:${card.targetId}` : `source:${card.targetId}`;
 export const frameKey = (frameId: string): SelectionKey => `frame:${frameId}`;
 export const isFrameKey = (key: string): key is `frame:${string}` => key.startsWith("frame:");
+export const noteKey = (noteId: string): SelectionKey => `note:${noteId}`;
+export const isNoteKey = (key: string): key is `note:${string}` => key.startsWith("note:");
+/** A card's key: an entity or a source table. */
+export const isCardKey = (key: string): boolean => !isFrameKey(key) && !isNoteKey(key);
 
-/** A card or a frame on this canvas: its id, key and rectangle on the board; a card also names its frame. */
+/** A card, frame or note on this canvas: its id, key and rectangle on the board; a card or free note names its frame. */
 export interface ItemBox {
   id: string;
   key: SelectionKey;
   rect: Rect;
-  /** A card's frame (none for a frame, or a card in no frame). */
+  /** A card's or a free note's frame (none for a frame, or a card or note in no frame). */
   frameId?: string | null;
   /** A card hidden in a collapsed frame (slice 2c): a lasso does not catch it. */
   hidden?: boolean;
+  /** A pinned note: the card (its id) or frame it is pinned to (slice 3a). */
+  pinnedTo?: string | null;
 }
 
 /** The keys a selection holds: several items, one card or frame, or none (a row or a line is not such a selection). */
 export function selectedKeys(sel: Selection, items: readonly ItemBox[]): SelectionKey[] {
   if (sel?.t === "multi") return [...sel.keys];
-  if (sel?.t === "card" || sel?.t === "frame") {
+  if (sel?.t === "card" || sel?.t === "frame" || sel?.t === "note") {
     const item = items.find((c) => c.id === sel.id);
     return item ? [item.key] : [];
   }
@@ -43,7 +52,7 @@ export function fromKeys(keys: Iterable<SelectionKey>, items: readonly ItemBox[]
   const here = new Map(items.map((c) => [c.key, c.id]));
   const kept = [...new Set(keys)].filter((k) => here.has(k));
   if (kept.length === 0) return null;
-  if (kept.length === 1) return { t: isFrameKey(kept[0]!) ? "frame" : "card", id: here.get(kept[0]!)! };
+  if (kept.length === 1) return { t: isFrameKey(kept[0]!) ? "frame" : isNoteKey(kept[0]!) ? "note" : "card", id: here.get(kept[0]!)! };
   return { t: "multi", keys: kept };
 }
 
@@ -58,7 +67,7 @@ export function toggleItem(sel: Selection, key: SelectionKey, items: readonly It
 
 /** Shift+click on a card. */
 export function toggleCard(sel: Selection, cardId: string, items: readonly ItemBox[]): Selection {
-  const card = items.find((c) => c.id === cardId && !isFrameKey(c.key));
+  const card = items.find((c) => c.id === cardId && isCardKey(c.key));
   return card ? toggleItem(sel, card.key, items) : sel;
 }
 
@@ -74,13 +83,16 @@ const within = (r: Rect, lasso: Rect) => r.x >= lasso.x && r.y >= lasso.y && r.x
 
 /**
  * The items fully inside the lasso (D-16); one only partly inside is not caught. A caught frame stands for its cards
- * (D-17): they are not caught separately. Frames come first, then cards, each in the order given.
+ * and its free notes (D-17): they are not caught separately. Frames come first, then cards, then notes, each in the
+ * order given.
  */
 export function lassoHits(items: readonly ItemBox[], lasso: Rect): SelectionKey[] {
   const frames = items.filter((i) => isFrameKey(i.key) && within(i.rect, lasso));
   const caught = new Set(frames.map((f) => f.id));
-  const cards = items.filter((i) => !isFrameKey(i.key) && !i.hidden && !(i.frameId && caught.has(i.frameId)) && within(i.rect, lasso));
-  return [...frames, ...cards].map((i) => i.key);
+  const loose = (i: ItemBox) => !i.hidden && !(i.frameId && caught.has(i.frameId)) && within(i.rect, lasso);
+  const cards = items.filter((i) => isCardKey(i.key) && loose(i));
+  const notes = items.filter((i) => isNoteKey(i.key) && loose(i));
+  return [...frames, ...cards, ...notes].map((i) => i.key);
 }
 
 /** After a lasso: its hits, added to the selection so far when Shift was held at the start. */
@@ -88,10 +100,11 @@ export function afterLasso(sel: Selection, hits: readonly SelectionKey[], add: b
   return fromKeys(add ? [...selectedKeys(sel, items), ...hits] : hits, items);
 }
 
-/** Ctrl+A: every frame and every card that is in no frame (prototype selectAll). */
+/** Ctrl+A: every frame, every card in no frame, and the free notes shown in no frame (prototype selectAll). */
 export const allKeys = (items: readonly ItemBox[]): SelectionKey[] => [
   ...items.filter((i) => isFrameKey(i.key)).map((i) => i.key),
-  ...items.filter((i) => !isFrameKey(i.key) && !i.frameId).map((i) => i.key),
+  ...items.filter((i) => isCardKey(i.key) && !i.frameId).map((i) => i.key),
+  ...items.filter((i) => isNoteKey(i.key) && !i.frameId && !i.pinnedTo && !i.hidden).map((i) => i.key),
 ];
 
 /** What a selection moves and arranges (prototype movingItems): each part named by its id. */
@@ -102,6 +115,11 @@ export interface Units {
   cards: string[];
   /** The cards of the selected frames: they move with their frame (once, even when also selected). */
   members: string[];
+  /**
+   * Selected notes that move by themselves (slice 3a): not a free note whose frame moves (the frame carries it), not a
+   * pinned note whose card or frame moves (it follows).
+   */
+  notes: string[];
 }
 
 export function unitsOf(keys: readonly SelectionKey[], items: readonly ItemBox[]): Units {
@@ -109,16 +127,20 @@ export function unitsOf(keys: readonly SelectionKey[], items: readonly ItemBox[]
   const chosen = keys.map((k) => byKey.get(k)).filter((i): i is ItemBox => !!i);
   const frames = chosen.filter((i) => isFrameKey(i.key)).map((i) => i.id);
   const inFrames = new Set(frames);
-  const members = items.filter((i) => !isFrameKey(i.key) && i.frameId && inFrames.has(i.frameId)).map((i) => i.id);
+  const members = items.filter((i) => isCardKey(i.key) && i.frameId && inFrames.has(i.frameId)).map((i) => i.id);
   const carried = new Set(members);
-  const cards = chosen.filter((i) => !isFrameKey(i.key) && !carried.has(i.id)).map((i) => i.id);
-  return { frames, cards, members };
+  const cards = chosen.filter((i) => isCardKey(i.key) && !carried.has(i.id)).map((i) => i.id);
+  const moving = new Set([...frames, ...members, ...cards]);
+  const notes = chosen
+    .filter((i) => isNoteKey(i.key) && !(i.pinnedTo ? moving.has(i.pinnedTo) : i.frameId && inFrames.has(i.frameId)))
+    .map((i) => i.id);
+  return { frames, cards, members, notes };
 }
 
 /** The selected cards themselves, not frames (fit widths, remove, put in a new frame act on these). */
 export const selectedCardIds = (keys: readonly SelectionKey[], items: readonly ItemBox[]): string[] => {
   const byKey = new Map(items.map((i) => [i.key, i]));
-  return keys.filter((k) => !isFrameKey(k)).map((k) => byKey.get(k)?.id).filter((id): id is string => !!id);
+  return keys.filter(isCardKey).map((k) => byKey.get(k)?.id).filter((id): id is string => !!id);
 };
 
 /** The box drawn around several selected items: their bounds, 12 px out (prototype #selbox). */

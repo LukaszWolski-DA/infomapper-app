@@ -29,6 +29,7 @@ import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
 import { Actions, buttonClass, dangerClass, Field, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
+import { ItemLabels } from "./item-labels";
 import { usePanels } from "./panels-context";
 import { columnLabel, columnOptions, inputsLabel, typeCheckOf } from "./model-index";
 
@@ -369,6 +370,8 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
           />
         </Fold>
       )}
+
+      <ItemLabels target={{ kind: "mapping", id: m.id }} />
 
       {merging && (
         <Fold title="Merge mappings" count={others.length}>

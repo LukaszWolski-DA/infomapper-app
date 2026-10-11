@@ -9,12 +9,14 @@ import {
   frame,
   ids,
   makeCtx,
+  note,
   NOW,
   sourceSystem,
   sourceTable,
 } from "../__fixtures__/domain";
 import type { CommandResult, WriteSet } from "../changes";
 import { STALE_VERSION_MESSAGE } from "../errors";
+import { changeLabel } from "../model/change-label";
 import type { CanvasItem, Entity, Frame } from "../types";
 import {
   arrangeCanvasIntoFrames,
@@ -190,6 +192,51 @@ describe("moveOnCanvas: frames (D-14)", () => {
     expect(move({ frames: [{ ...fref(fA), x: 8, y: 0 }] })).toMatchObject(refusedAsStale);
     expect(move({ frames: [{ ...fref(fA), x: 8, y: 0 }], items: [{ ...ref(inA), expectedVersion: 3 }] })).toMatchObject(refusedAsStale);
     expect(move({ frames: [{ ...fref(fA), expectedVersion: 4, x: 8, y: 0 }], items: [ref(inA)] })).toMatchObject(refusedAsStale);
+  });
+
+  it("moves the free notes in a moved frame with it, not pinned notes or notes in other frames (slice 3a, item 9)", () => {
+    const inFrame = note(ids.noteFree, { x: 100, y: 100, frame_id: frameA });
+    const elsewhere = note("01900000-0000-7000-8000-00000000d003", { x: 2000, y: 100, frame_id: frameB });
+    const pinned = note(ids.notePinned);
+    const r = moveOnCanvas(
+      makeCtx(),
+      access("modeler"),
+      { ...state, notes: [inFrame, elsewhere, pinned], entities: model.entities, concepts: model.concepts },
+      { canvasId: canvas1, frames: [{ ...fref(fA), x: 16, y: 8 }], items: [ref(inA)] },
+    );
+    const rows = written(ok(r).writeSet);
+    expect(rows[`note:${ids.noteFree}`]).toMatchObject({ x: 116, y: 108, frame_id: frameA, version: 2 });
+    expect(rows[`note:${elsewhere.id}`]).toBeUndefined();
+    expect(rows[`note:${ids.notePinned}`]).toBeUndefined();
+    expect(ok(r).value.versions[ids.noteFree]).toBe(2);
+    expect(changeLabel(ok(r).writeSet.events)).toBe("Move frame");
+  });
+
+  it("moves selected notes in the same change group: free ones join the frame they land in, pinned ones keep their pin (slice 3a, item 13)", () => {
+    const inFrame = note(ids.noteFree, { x: 100, y: 100, frame_id: frameA });
+    const outside = note("01900000-0000-7000-8000-00000000d003", { x: 3000, y: 3000 });
+    const pinned = note(ids.notePinned);
+    const notes = [inFrame, outside, pinned];
+    const nref = (n: typeof inFrame, x: number, y: number) => ({ noteId: n.id, expectedVersion: n.version, x, y });
+    const run = (input: object, role: "modeler" | "reviewer" = "modeler", s: object = {}) =>
+      moveOnCanvas(makeCtx(), access(role), { ...state, notes, entities: model.entities, concepts: model.concepts, ...s }, { canvasId: canvas1, frames: [], items: [], ...input });
+    // the frame moves by (16, 8); the note in it is named too: it takes the place it was given, once
+    const r = ok(run({ frames: [{ ...fref(fA), x: 16, y: 8 }], items: [ref(inA)], notes: [nref(inFrame, 500, 500), nref(outside, 40, 40), nref(pinned, 300, 24)] }));
+    const rows = written(r.writeSet);
+    expect(rows[`note:${inFrame.id}`]).toMatchObject({ x: 500, y: 500, frame_id: frameA, version: 2 });
+    // (40 + 20, 40 + 13) lies in the frame where it is after the move
+    expect(rows[`note:${outside.id}`]).toMatchObject({ x: 40, y: 40, frame_id: frameA });
+    expect(rows[`note:${pinned.id}`]).toMatchObject({ x: 300, y: 24, pin_canvas_item_id: itemCustomer, frame_id: null });
+    expect(r.value.versions[outside.id]).toBe(2);
+    expect(r.writeSet.events.every((e) => e.change_group_id === r.writeSet.events[0]!.change_group_id)).toBe(true);
+    expect(changeLabel(r.writeSet.events)).toBe("Move selection");
+    // a free note dragged out of its frame leaves it
+    expect(written(ok(run({ items: [ref(inA)], notes: [nref(inFrame, 3000, 100)] })).writeSet)[`note:${inFrame.id}`]).toMatchObject({ frame_id: null });
+    // a note read at another version refuses the whole change; a note of another canvas is not found
+    expect(run({ items: [ref(inA)], notes: [{ ...nref(outside, 0, 0), expectedVersion: 3 }] })).toMatchObject(refusedAsStale);
+    expect(run({ items: [ref(inA)], notes: [nref(outside, 0, 0)] }, "modeler", { notes: [{ ...outside, canvas_id: ids.canvas2 }] })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    // reviewers move notes, not cards or frames: this command is refused to them
+    expect(run({ frames: [{ ...fref(fA), x: 16, y: 8 }], items: [ref(inA)], notes: [nref(outside, 40, 40)] }, "reviewer")).toMatchObject({ ok: false, error: { code: "forbidden" } });
   });
 
   it("refuses unknown frames and cards, and nothing to change", () => {
@@ -606,6 +653,10 @@ function rowsOf(items: CanvasItem[], frames: Frame[], entities: Entity[] = model
     mapping_input: [],
     canvas_item: items,
     frame: frames,
+    label: [],
+    label_link: [],
+    project_pinned_label: [],
+    note: [],
   };
 }
 

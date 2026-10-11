@@ -1,5 +1,5 @@
 // What each workspace role may do (AD-05), the archive (AD-09) and guests (AD-01).
-// Actions of slices 0 to 2a; later slices add theirs.
+// Actions of slices 0 to 3a; later slices add theirs.
 
 import { ARCHIVED_MESSAGE, domainError, notFound, type DomainError } from "./errors";
 import type { Uuid } from "./ids";
@@ -19,13 +19,18 @@ export const WORKSPACE_ACTIONS = [
   "canvas.delete",
   "model.edit",
   "mapping.set_status",
+  "label.edit",
+  "note.edit",
 ] as const;
 export type WorkspaceAction = (typeof WORKSPACE_ACTIONS)[number];
 
 const EDITORS: readonly WorkspaceRole[] = ["owner", "admin", "modeler"];
 const ALL_ROLES: readonly WorkspaceRole[] = ["owner", "admin", "modeler", "reviewer", "reader"];
 
-/** Roles allowed to perform each action. Reviewers may only change a mapping's status (approve); readers nothing. */
+/**
+ * Roles allowed to perform each action. Reviewers may change a mapping's status (approve) and work on notes as modelers
+ * do (AD-05; slice 3a, Łukasz's answer 1); labels are for modelers, admins and owners (answer 2); readers change nothing.
+ */
 export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]> = {
   "workspace.view": ALL_ROLES,
   "workspace.edit_settings": ["owner", "admin"],
@@ -40,6 +45,8 @@ export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]>
   "canvas.delete": EDITORS,
   "model.edit": EDITORS,
   "mapping.set_status": ["owner", "admin", "modeler", "reviewer"],
+  "label.edit": EDITORS,
+  "note.edit": ["owner", "admin", "modeler", "reviewer"],
 };
 
 /** Actions that remain possible while the workspace is archived (AD-09). */
@@ -59,6 +66,8 @@ const ACTION_TEXT: Record<WorkspaceAction, string> = {
   "canvas.delete": "delete canvases",
   "model.edit": "edit the model",
   "mapping.set_status": "change the status of a mapping",
+  "label.edit": "change labels",
+  "note.edit": "change notes",
 };
 
 /** The acting user's standing in one workspace, as loaded by the caller. */
