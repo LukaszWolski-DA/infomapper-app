@@ -525,6 +525,13 @@ initial render is slower on both sides; the branch is +0.7 %. Collapsed is uncha
     only when `isMeasurementBuild()` is true (a production build with `INFOMAPPER_MEASURE=1`); a dev server or a normal
     production build ignores them. CLAUDE.md now says so.
 
+12. **Balanced sitting after options (b) and the note reduction (11 October, two rounds, at `ac5c739`), frames
+    expanded,** sitting `.data/measure/2026-10-11-18-41`: overview 59.5 against 59.5 (−0.1 %); **100 % 49.7 (49.1–50.2)
+    against 52.5 (52.0–52.9), −5.3 %, 9 long frames against 4**; C-08 1475 against 1466 ms (+0.6 %); C-10 120 against
+    147 ms; lasso marks 26 against 105 ms. The branch is about 1 fps faster at 100 % than in sitting `16-56` (48.6), but
+    the reference is faster too (51.0 → 52.5), and the gap did not close: Łukasz's condition holds again (5 % or more
+    below with clearly more long frames). The collapsed sitting and the full runs were not started; reported to Łukasz.
+
 ## Changes to earlier tests
 
 - `src/domain/permissions.test.ts`: the role matrix gains `label.edit` (owner, admin, modeler) and `note.edit` (owner,
