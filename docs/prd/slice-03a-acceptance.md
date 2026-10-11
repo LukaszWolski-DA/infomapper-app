@@ -1,6 +1,6 @@
 # Slice 3a – Acceptance
 
-Status: **step 5 done; option (b) of the measurement diagnosis done, waiting for its balanced sitting, three full runs and Łukasz's acceptance**. Branch
+Status: **step 5 done; option (b) and the note reduction done, S3A-14 accepted at −5.3 % (Łukasz), three full runs passed on 04d4f70; waiting for Łukasz's manual acceptance**. Branch
 `slice/03a-labels-and-notes`, pull request #9 (draft). Steps 0 to 4 were accepted one by one (below).
 
 ## Criteria
@@ -26,8 +26,8 @@ is read back from the data file.
 | S3A-11 | `S3A-11.spec.ts`: Duplicate layout: the toast, the copy with all cards and no note (page and data), the original's three notes exactly as before | passes |
 | S3A-12 | `S3A-12.spec.ts`: deleting Customer soft-deletes CR-23's four links (Customer, email, segment_code, the mapping) with change events in the entity's change group; the label stays; Ctrl+Z brings the entity and the four links back | passes |
 | S3A-13 | `S3A-13.spec.ts`: Łukasz uses every label and note write once (their action ids); Piotr sees labels read-only (no input, no ×, read-only name, no delete, no pin stars) and writes a note; his direct label calls are refused (“As a reviewer you cannot change labels.”) and change nothing; Kasia has no Note tool, no ✓, no edge, no toolbox on a note, a read-only note panel, no “Add a note”, no Labels input; her drag and Delete change nothing; all twelve direct calls are refused (“As a reader you cannot change labels.” / “… notes.”) and change nothing | passes |
-| S3A-14 | two quick `measure:canvas` rounds on “Performance test” against `slice-02c` (below); `S3A-14.spec.ts` checks the data part (24 notes, half pinned, labels on 50 rows and 30 mappings, drawn on the canvas) and `S3A-14-idle.spec.ts` (2 tests) guards the canvas while idle with notes below 40 %, frames expanded and collapsed | after step 4: within the bar (expanded −5.6 % at 100 %, +0.3 % at the overview; collapsed +16.3 %); the step 5 round confirms (to come) |
-| S3A-15 | CI (lint, typecheck, unit tests, the schema check with `label`, `label_link`, `note`, `project_pinned_label`), three full e2e runs in a row | passes: CI and the schema check green on 7fa2438; lint, typecheck, 765 unit tests; three full runs in a row on 7fa2438, 124 of 124 each (below) |
+| S3A-14 | two quick `measure:canvas` rounds on “Performance test” against `slice-02c` (below); `S3A-14.spec.ts` checks the data part (24 notes, half pinned, labels on 50 rows and 30 mappings, drawn on the canvas) and `S3A-14-idle.spec.ts` (2 tests) guards the canvas while idle with notes below 40 %, frames expanded and collapsed | met, Łukasz's decision: balanced sitting at `ac5c739`, expanded −5.3 % at 100 % (49.7 against 52.5 fps), −0.1 % at the overview, C-08 1475 ms; collapsed +18.7 % at 100 %, +1.4 % at the overview (below) |
+| S3A-15 | CI (lint, typecheck, unit tests, the schema check with `label`, `label_link`, `note`, `project_pinned_label`), three full e2e runs in a row | passes: CI and the schema check green on 7fa2438; lint, typecheck, 765 unit tests; three full runs in a row on 04d4f70, 124 of 124 each (below) |
 
 ### Three full runs in a row
 
@@ -37,7 +37,8 @@ start again.
 | Set | Commit | Runs | What happened |
 | --- | --- | --- | --- |
 | 1 (11 October, 16:05–17:13) | 5139ba6 | 3 | Runs 1 and 3 failed S3A-13 (the owner's note vanished from the page; fixed in 7fa2438, step 5 item 4), run 2 passed 124/124 (24.1, 20.6, 23.6 min). Code changed: the sets start again. |
-| 2 (11 October, 17:21–18:22) | 7fa2438 | 3 | Three in a row: 124/124 each (20.2, 20.4, 20.2 min). “The destination stream closed early” 15, 11 and 15 times (known noise, also on `main`). |
+| 2 (11 October, 17:21–18:22) | 7fa2438 | 3 | Three in a row: 124/124 each (20.2, 20.4, 20.2 min). “The destination stream closed early” 15, 11 and 15 times (known noise, also on `main`). Code changed afterwards (ae4d995, option b, the note reduction): the sets start again. |
+| 3 (11 October, 21:36–22:36) | 04d4f70 (code as ac5c739) | 3 | Three in a row: 124/124 each (19.8, 20.0, 20.3 min). “The destination stream closed early” 16, 13 and 16 times (known noise). No dev server running. |
 
 ## Manual checklist (Łukasz)
 
@@ -560,6 +561,9 @@ initial render is slower on both sides; the branch is +0.7 %. Collapsed is uncha
     paint, prepaint and style are level within their spread. About 1 ms per frame of 20 ms is about 5 %, the size of the
     gap in the sittings. *Inference:* the rest of the gap is still mostly Layerize over the about 450 elements the notes
     and marks still add; the traces do not contradict the element-count attribution, nor prove it.
+15. **Balanced sitting, all frames collapsed** (`--branch-diag collapsed`, two rounds, at `04d4f70`, code as `ac5c739`),
+    sitting `.data/measure/2026-10-11-19-21`: overview 60.0 against 59.1 (+1.4 %), no long frames; 100 % 59.8 against
+    50.4 (+18.7 %), 0 long frames against 6. Collapsed matches slice 2c's figures, as in every earlier sitting.
 
 ## Changes to earlier tests
 
