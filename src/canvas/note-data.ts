@@ -116,12 +116,14 @@ export function openPinnedCounts(notes: readonly Pick<NoteData, "pinCardId" | "s
 }
 
 /**
- * The notes of each frame for its collapsed block's “N notes” chip (prototype blockCard): those pinned to the frame and
- * the free notes in it, open or resolved.
+ * The notes of each frame for its collapsed block's “N notes” chip: those pinned to the frame and the free notes in it
+ * that are shown, open ones and resolved ones unless resolved notes are hidden (Łukasz's decision after step 4; the
+ * prototype's blockCard counts resolved ones always).
  */
-export function frameNoteCounts(notes: readonly Pick<NoteData, "pinCardId" | "pinFrameId" | "frameId">[]): Map<Uuid, number> {
+export function frameNoteCounts(notes: readonly Pick<NoteData, "pinCardId" | "pinFrameId" | "frameId" | "status">[], hideResolved = false): Map<Uuid, number> {
   const counts = new Map<Uuid, number>();
   for (const n of notes) {
+    if (hideResolved && n.status === "resolved") continue;
     const frameId = n.pinFrameId ?? (n.pinCardId ? null : n.frameId);
     if (frameId) counts.set(frameId, (counts.get(frameId) ?? 0) + 1);
   }

@@ -83,11 +83,14 @@ describe("notes elsewhere (item 12, S3A-09)", () => {
     ]);
   });
 
-  it("counts a frame's notes for its block: pinned to it or free in it, open or resolved", () => {
-    const counts = frameNoteCounts([n({ pinFrameId: "F1" }), n({ frameId: "F1", status: "resolved" }), n({ pinCardId: "c1" }), n({ frameId: "F2" }), n({})]);
+  it("counts a frame's notes for its block: pinned to it or free in it, resolved ones only while they are shown", () => {
+    const notes = [n({ pinFrameId: "F1" }), n({ frameId: "F1", status: "resolved" }), n({ pinCardId: "c1" }), n({ frameId: "F2" }), n({})];
+    const counts = frameNoteCounts(notes);
     expect(counts.get("F1")).toBe(2);
     expect(counts.get("F2")).toBe(1);
     expect(counts.size).toBe(2);
+    expect(frameNoteCounts(notes, true).get("F1")).toBe(1);
+    expect(frameNoteCounts([n({ pinFrameId: "F1", status: "resolved" })], true).size).toBe(0);
   });
 
   it("keys the counts so a memo changes only when a number does", () => {

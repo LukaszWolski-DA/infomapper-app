@@ -847,7 +847,7 @@ export function ModelCanvas({
   const savedNotes = useMemo(() => noteState.notes.filter((n) => n.id !== DRAFT_NOTE), [noteState.notes]);
   const openPinnedKey = useMemo(() => countsKey(openPinnedCounts(savedNotes)), [savedNotes]);
   const openPinned = useMemo(() => countsOf(openPinnedKey), [openPinnedKey]);
-  const frameNotesKey = useMemo(() => countsKey(frameNoteCounts(savedNotes)), [savedNotes]);
+  const frameNotesKey = useMemo(() => countsKey(frameNoteCounts(savedNotes, ui.hideResolved)), [savedNotes, ui.hideResolved]);
   const frameNotes = useMemo(() => countsOf(frameNotesKey), [frameNotesKey]);
   const counts = useMemo(() => memberCounts(cardData), [cardData]);
   /** What stands for each frame on the canvas: the frame, or its block (selection marks, slice 2c). */
@@ -875,7 +875,7 @@ export function ModelCanvas({
             // the block's footer: mapped, used, type and drafts; not “misplaced”; its notes (prototype blockCard)
             chips: [
               ...frameChips(frameStats(f, members), f.kind).filter((c) => c.tone !== "misplaced"),
-              ...(frameNotes.get(f.id) ? [{ text: `${frameNotes.get(f.id)} note${frameNotes.get(f.id)! > 1 ? "s" : ""}`, title: "Notes pinned to the frame or inside it" }] : []),
+              ...(frameNotes.get(f.id) ? [{ text: `${frameNotes.get(f.id)} note${frameNotes.get(f.id)! > 1 ? "s" : ""}`, title: "Notes pinned to the frame or inside it that are shown" }] : []),
             ],
             selected: selectedFrameId === f.id || !!selectedKeys?.has(frameKey(f.id)),
           },
