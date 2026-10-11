@@ -75,7 +75,7 @@ export interface GenDataSet {
   frames: GenFrame[];
 }
 
-const cardHeight = (rows: number) => HEAD_H + BODY_PAD * 2 + Math.max(1, rows) * ROW_H;
+export const cardHeight = (rows: number) => HEAD_H + BODY_PAD * 2 + Math.max(1, rows) * ROW_H;
 
 /* ---------- seeded RNG (mulberry32) ---------- */
 function rng(seed: number) {

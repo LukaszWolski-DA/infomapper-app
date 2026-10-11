@@ -193,12 +193,15 @@ Items 2, 3, 4 and 5.
 Items 7, 8, 9, 10 and 11.
 
 ### Step 4 – Notes elsewhere, selection, permissions
-Items 12, 13, 14 and 15.
+First the data part of S3A-14: `seed:large` adds labels and notes to “Performance test” (at least 20 notes, half
+pinned; labels on 50 rows and 30 mappings), so the quick `measure:canvas` round after this step runs with them on the
+canvas. Then items 12, 13, 14 and 15. After the step report, one quick round against `slice-02c`, run when Łukasz has
+prepared the laptop.
 
 ### Step 5 – Acceptance tests and wrap-up
 Playwright tests for every criterion (`e2e/slice-03a/`), independent of each other; three full e2e runs in a row with
-no dev server running (after a test change, start the three again); one quick `measure:canvas` round against
-`slice-02c` (S3A-14). Write `docs/prd/slice-03a-acceptance.md` (results, the round, manual checklist S3A-01 to
+no dev server running (after a test change, start the three again); the `measure:canvas` round against `slice-02c`
+(S3A-14) again if the canvas changed after step 4's round. Write `docs/prd/slice-03a-acceptance.md` (results, the round, manual checklist S3A-01 to
 S3A-13, assumptions, changes to earlier tests). Update README and CLAUDE.md commands.
 
 ## Acceptance criteria
