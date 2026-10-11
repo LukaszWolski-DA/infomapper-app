@@ -30,7 +30,7 @@ import { checkPermission, type WorkspaceAccess } from "../permissions";
 import { FRAME_KINDS, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type Note, type SourceSystem, type SourceTable } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { GRID, widthSchema } from "./canvas-item";
-import { carryNotes, releaseNotes } from "./note";
+import { carryNotes, movedNotesSchema, placeNotes, releaseNotes } from "./note";
 import { begin, current, done, isLive, nothingToChange } from "./shared";
 
 // ---- input pieces ----
@@ -360,6 +360,8 @@ const moveInput = z
     moveToConcepts: z.boolean().optional(),
     /** A drag drop (slice 2c): only then may a card join a collapsed frame, by landing on its block. */
     dragDrop: z.boolean().optional(),
+    /** Selected notes moved with the cards and frames (slice 3a, item 13): free notes to a new place, pinned ones to a new offset. */
+    notes: movedNotesSchema.optional(),
   })
   .strict()
   .refine(
@@ -413,7 +415,8 @@ export interface MoveState extends FrameCanvasState {
  * the middle of its header, or none, and that frame grows to hold it (D-05, D-23). Entities that joined a concept
  * frame of another concept are the questions; only a drag drop asks them, and with `moveToConcepts` the entities move
  * to the frame's concept in the model, in the same change group, so one undo puts both back. Slice 3a: the free notes
- * in a moved frame move with it (`state.notes`).
+ * in a moved frame move with it (`state.notes`), and selected notes named in `notes` get their new place or offset in
+ * the same change group (they need note rights; a free one joins the frame it lands in).
  */
 export function moveOnCanvas(
   ctx: CommandContext,
@@ -461,9 +464,19 @@ export function moveOnCanvas(
 
   const committed = commit(ctx, draft, seen(parsed.data.frames, parsed.data.items));
   if (!committed.ok) return fail(committed.error);
-  const carried = carryNotes(ctx, (state.notes ?? []).filter((n) => n.canvas_id === draft.canvasId), shifts);
-  const writes = [...committed.writes, ...carried.writes];
-  Object.assign(committed.versions, carried.versions);
+  const canvasNotes = (state.notes ?? []).filter((n) => isLive(n, access.workspace.id) && n.canvas_id === draft.canvasId);
+  const moves = parsed.data.notes ?? [];
+  if (moves.length) {
+    const denied = checkPermission(access, "note.edit");
+    if (denied) return fail(denied);
+  }
+  // selected notes land among the frames as they are after the change (moved, grown)
+  const after = frameBoxes(draft);
+  const placed = placeNotes(ctx, new Map(canvasNotes.map((n) => [n.id, n])), moves, after, new Map(after.map((b) => [b.id, b.members ?? 0])));
+  if (!placed.ok) return fail(placed.error);
+  const carried = carryNotes(ctx, canvasNotes, shifts, new Set(moves.map((m) => m.noteId)));
+  const writes = [...committed.writes, ...carried.writes, ...placed.writes];
+  Object.assign(committed.versions, carried.versions, placed.versions);
   let movedToConcepts = 0;
   if (parsed.data.moveToConcepts && questions.length) {
     const denied = checkPermission(access, "model.edit");

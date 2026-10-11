@@ -21,6 +21,8 @@
 //   state until they leave or reload the canvas; every other frame shows the saved state. Nothing is saved or undone.
 // - Slice 2b step 4: a frame that is part of a selection of several, dragged by its name or an empty spot, moves the
 //   whole selection: every selected frame with its cards and every other selected card (D-17, prototype startGroupDrag).
+//   Slice 3a step 4: and the selected notes that move by themselves; `saveLayout` saves them in the same change (a free
+//   note joins the frame it lands in, with the frames as they are after the change).
 
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type MutableRefObject, type PointerEvent as ReactPointerEvent, type SetStateAction } from "react";
 import { applyNodeChanges, useReactFlow, type NodeChange } from "@xyflow/react";
@@ -37,6 +39,7 @@ import {
   NEW_FRAME_SIZE,
   type FrameBox,
 } from "@/domain/model/frames";
+import { noteFrameAt } from "@/domain/model/notes";
 import type { Frame } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import type { CardData } from "./card-data";
@@ -47,7 +50,9 @@ import type { FramePart } from "./FrameLayer";
 import { cardHeight, cardWidth, snap8, type Pt, type Rect } from "./geometry";
 import { planLayout, planReframe, type LayoutChange, type PlanCard } from "./layout-plan";
 import type { Selection } from "./line-data";
+import type { NoteData } from "./note-data";
 import { rectBetween } from "./selection";
+import type { NoteMover } from "./useNotes";
 
 type WriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
 type Versions = { versions: Record<string, number> };
@@ -63,6 +68,8 @@ export interface FrameWrites {
     moveToConcepts?: boolean;
     /** A drag drop: only then may a card join a collapsed frame, by landing on its block (slice 2c). */
     dragDrop?: boolean;
+    /** Selected notes moved with the cards and frames (slice 3a). */
+    notes?: { noteId: Uuid; expectedVersion: number; x: number; y: number }[];
   }) => Promise<WriteResult<Versions & { movedToConcepts: number }>>;
   /** Collapses a frame into one block or expands it (slice 2c, D-07). */
   setFrameCollapsed: (input: { frameId: Uuid; expectedVersion: number; collapsed: boolean }) => Promise<WriteResult<{ frame: Frame }>>;
@@ -89,6 +96,8 @@ export interface SaveLayoutOptions {
   from?: ReadonlyMap<Uuid, Pt>;
   /** Where frames were before, when the canvas already shows them moved (a frame drag). */
   framesFrom?: ReadonlyMap<Uuid, Pt>;
+  /** Where moved notes were before (place or offset), when the canvas already shows them moved (slice 3a). */
+  notesFrom?: ReadonlyMap<Uuid, Pt>;
   /** Runs once saved. */
   saved?: () => void;
   /** A drag drop (single card or group): entities that land in a concept frame of another concept are asked about. */
@@ -122,7 +131,9 @@ interface Options {
   /** Shows the drop's question; resolves with the answer (true: move them in the model). */
   ask: (question: ConceptAsk) => Promise<boolean>;
   /** When this frame is part of a selection of several: what the selection moves (`unitsOf`), else null. */
-  groupOf: (frameId: Uuid) => { frames: Uuid[]; cards: Uuid[]; members: Uuid[] } | null;
+  groupOf: (frameId: Uuid) => { frames: Uuid[]; cards: Uuid[]; members: Uuid[]; notes: Uuid[] } | null;
+  /** The canvas's notes, to move selected ones with the rest (slice 3a); set once the notes are there. */
+  notes: MutableRefObject<NoteMover | null>;
 }
 
 const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
@@ -149,7 +160,7 @@ const boxOf = (f: FrameData, counts: ReadonlyMap<Uuid, number>): FrameBox => ({
 export function useFrames(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
-  const { editable, setNodes, patchCard, enqueueGroup, versions, pending, select, undo, writes, spaceDown } = o;
+  const { editable, setNodes, patchCard, enqueueGroup, versions, pending, select, undo, writes, spaceDown, notes: noteMover } = o;
   /** The frames as saved (and as an editor changes them). */
   const [saved, setFrames] = useState<FrameData[]>(() => [...o.initialFrames]);
   /** Reviewers and readers: the frames collapsed or expanded in this tab only (item 11), by frame id. */
@@ -247,6 +258,22 @@ export function useFrames(o: Options) {
       }
       patchFrames(framesNext);
 
+      // selected notes (slice 3a): a free one joins the frame it lands in, among the frames after the change
+      const mover = noteMover.current;
+      const noteMoves = (change.notes ?? []).filter((m) => mover?.noteOf(m.id));
+      const notesNext = new Map<Uuid, Partial<NoteData>>();
+      const notesBack = new Map<Uuid, Partial<NoteData>>();
+      const planMembers = new Map(plan.frames.map((f) => [f.id, f.members ?? 0]));
+      for (const m of noteMoves) {
+        const n = mover!.noteOf(m.id)!;
+        const free = !n.pinCardId && !n.pinFrameId;
+        const frameId = free ? noteFrameAt(plan.frames, m, planMembers) : null;
+        const f = frameId ? plan.frames.find((x) => x.id === frameId) : undefined;
+        notesNext.set(m.id, { x: m.x, y: m.y, ...(free ? { frameId, anchor: f ? { x: f.x, y: f.y } : null } : {}) });
+        notesBack.set(m.id, { ...(opts.notesFrom?.get(m.id) ?? { x: n.x, y: n.y }), frameId: n.frameId, anchor: n.anchor });
+      }
+      mover?.show(notesNext);
+
       const moved = new Map((change.frames ?? []).map((f) => [f.id, f]));
       const touched = [...plan.carried, ...plan.changed];
 
@@ -277,11 +304,11 @@ export function useFrames(o: Options) {
         : null;
       // asked at once, while the write waits in the queue (the drop is already on the screen)
       const answer = question ? askRef.current(question) : Promise.resolve(false);
-      if (!touched.length && !moved.size) return;
+      if (!touched.length && !moved.size && !noteMoves.length) return;
       const widths = new Map((change.cards ?? []).filter((c) => c.width !== undefined).map((c) => [c.id, c.width]));
       const positions = new Map((change.cards ?? []).filter((c) => c.x !== undefined).map((c) => [c.id, c]));
       const frameIds = framesBefore.map((f) => f.id);
-      enqueueGroup([...frameIds, ...touched], async () => {
+      enqueueGroup([...frameIds, ...touched, ...noteMoves.map((m) => m.id)], async () => {
         const moveToConcepts = await answer;
         let result: WriteResult<Versions & { movedToConcepts: number }>;
         try {
@@ -301,6 +328,7 @@ export function useFrames(o: Options) {
             ...(opts.onGrid ? { onGrid: true } : {}),
             ...(moveToConcepts ? { moveToConcepts: true } : {}),
             ...(opts.ask ? { dragDrop: true } : {}),
+            ...(noteMoves.length ? { notes: noteMoves.map((m) => ({ noteId: m.id, expectedVersion: ver(m.id), x: m.x, y: m.y })) } : {}),
           });
         } catch {
           result = FAILED;
@@ -319,11 +347,12 @@ export function useFrames(o: Options) {
         } else {
           for (const [id, back] of cardsBack) patchCard(id, back);
           patchFrames(framesBack);
+          noteMover.current?.show(notesBack);
           toast(result.message, "refusal");
         }
       });
     },
-    [planCards, boxes, rf, patchCard, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast],
+    [planCards, boxes, rf, patchCard, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast, noteMover],
   );
 
   // ---- dragging a frame, resizing it ----
@@ -339,6 +368,8 @@ export function useFrames(o: Options) {
         /** Every card that moves and where it started; `loose` are those not carried by a moving frame. */
         members: Map<Uuid, Pt>;
         loose: Set<Uuid>;
+        /** Selected notes that move by themselves, and where each started (place or offset, slice 3a). */
+        notes: Map<Uuid, Pt>;
         dx: number;
         dy: number;
         moved: boolean;
@@ -376,9 +407,15 @@ export function useFrames(o: Options) {
           .filter((n) => loose.has(n.id) || (n.data.card.frameId !== null && frameIds.has(n.data.card.frameId)))
           .map((n) => [n.id, { ...n.position }]),
       );
-      press.current = { kind: "move", frameId, sx: e.clientX, sy: e.clientY, zoom, frames, members, loose, dx: 0, dy: 0, moved: false };
+      const notes = new Map(
+        (group?.notes ?? []).flatMap((id) => {
+          const n = noteMover.current?.noteOf(id);
+          return n ? [[id, { x: n.x, y: n.y }] as const] : [];
+        }),
+      );
+      press.current = { kind: "move", frameId, sx: e.clientX, sy: e.clientY, zoom, frames, members, loose, notes, dx: 0, dy: 0, moved: false };
     },
-    [editable, rf, nodes, spaceDown],
+    [editable, rf, nodes, spaceDown, noteMover],
   );
 
   // Window listeners subscribe once and read the latest callbacks: re-subscribing in the middle of a pointerup would
@@ -429,6 +466,7 @@ export function useFrames(o: Options) {
         // not marked as dragging: a card marked so would ignore the server's next version of it (ModelCanvas)
         const changes: NodeChange<CardNodeT>[] = [...q.members].map(([id, s]) => ({ type: "position", id, position: { x: s.x + q.dx, y: s.y + q.dy } }));
         if (changes.length) setNodes((ns) => applyNodeChanges(changes, ns));
+        if (q.notes.size) noteMover.current?.show(new Map([...q.notes].map(([id, s]) => [id, { x: s.x + q.dx, y: s.y + q.dy }])));
       });
     };
     const up = () => {
@@ -456,6 +494,7 @@ export function useFrames(o: Options) {
         // put the members back exactly (a move below one grid step), then a click selects the frame
         if (p.moved) setNodes((ns) => applyNodeChanges([...p.members].map(([id, s]) => ({ type: "position", id, position: s, dragging: false })), ns));
         if (p.moved) patchFrames(p.frames);
+        if (p.moved) noteMover.current?.show(p.notes);
         else select({ t: "frame", id: p.frameId });
         return;
       }
@@ -465,9 +504,10 @@ export function useFrames(o: Options) {
         {
           frames: [...p.frames].map(([id, s]) => ({ id, ...by(s) })),
           cards: [...p.loose].map((id) => ({ id, ...by(p.members.get(id)!) })),
+          notes: [...p.notes].map(([id, s]) => ({ id, ...by(s) })),
         },
         // a group with cards of its own is a drag drop: they may be asked about (D-05)
-        { framesFrom: p.frames, from: p.members, ...(p.loose.size ? { ask: true } : {}) },
+        { framesFrom: p.frames, from: p.members, notesFrom: p.notes, ...(p.loose.size ? { ask: true } : {}) },
       );
     };
     window.addEventListener("pointermove", move);
@@ -478,7 +518,7 @@ export function useFrames(o: Options) {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, [setNodes]);
+  }, [setNodes, noteMover]);
 
   /** A frame given a new size: saved with the cards that join or leave it (D-06). */
   const resize = useCallback(

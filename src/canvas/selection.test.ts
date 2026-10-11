@@ -115,10 +115,58 @@ describe("frames in the selection (slice 2b, D-16, D-17)", () => {
       frames: ["F1"],
       cards: ["c3", "c4"],
       members: ["c1", "c2"],
+      notes: [],
     });
   });
 
   it("the selected cards themselves, for fit widths, remove and put in a new frame", () => {
     expect(selectedCardIds(["frame:F1", "entity:order", "source:customers"], items)).toEqual(["c2", "c3"]);
+  });
+});
+
+describe("notes in the selection (slice 3a, item 13, S3A-10)", () => {
+  // frame F1 holds c1 and the free note n1; n2 is free in no frame; n3 is pinned to c3 (in no frame); n4 to F1;
+  // n5 is pinned to c1 (in F1); n6 is free in no frame but hidden (resolved, hidden by the user)
+  const items: ItemBox[] = [
+    { id: "F1", key: "frame:F1", rect: { x: -40, y: -40, w: 760, h: 300 } },
+    { id: "c1", key: "entity:customer", rect: { x: 0, y: 0, w: 256, h: 200 }, frameId: "F1" },
+    { id: "c3", key: "source:customers", rect: { x: 0, y: 400, w: 280, h: 300 }, frameId: null },
+    { id: "n1", key: "note:n1", rect: { x: 400, y: 20, w: 220, h: 90 }, frameId: "F1" },
+    { id: "n2", key: "note:n2", rect: { x: 900, y: 400, w: 220, h: 90 }, frameId: null },
+    { id: "n3", key: "note:n3", rect: { x: 304, y: 400, w: 220, h: 90 }, frameId: null, pinnedTo: "c3" },
+    { id: "n4", key: "note:n4", rect: { x: 744, y: -40, w: 220, h: 90 }, frameId: null, pinnedTo: "F1" },
+    { id: "n5", key: "note:n5", rect: { x: 280, y: 120, w: 220, h: 90 }, frameId: null, pinnedTo: "c1" },
+  ];
+
+  it("one note key is the single note selection, and reads back; Shift+click adds a note and takes it out", () => {
+    expect(fromKeys(["note:n2"], items)).toEqual({ t: "note", id: "n2" });
+    expect(selectedKeys({ t: "note", id: "n2" }, items)).toEqual(["note:n2"]);
+    const two = toggleItem({ t: "note", id: "n2" }, "entity:customer", items);
+    expect(two).toEqual({ t: "multi", keys: ["note:n2", "entity:customer"] });
+    expect(toggleItem(two, "note:n2", items)).toEqual({ t: "card", id: "c1" });
+    expect(toggleItem({ t: "card", id: "c3" }, "note:n3", items)).toEqual({ t: "multi", keys: ["source:customers", "note:n3"] });
+  });
+
+  it("a lasso catches a note fully inside it, not when its frame is caught too, nor a hidden one", () => {
+    // around n1 only (F1 not whole): the note
+    expect(lassoHits(items, { x: 390, y: 10, w: 240, h: 110 })).toEqual(["note:n1"]);
+    // around all of F1: the frame stands for n1; the pinned notes inside are caught on their own
+    expect(lassoHits(items, { x: -50, y: -50, w: 800, h: 320 })).toEqual(["frame:F1", "note:n5"]);
+    expect(lassoHits([...items, { id: "n6", key: "note:n6", rect: { x: 900, y: 600, w: 220, h: 90 }, hidden: true }], { x: 890, y: 390, w: 240, h: 320 })).toEqual(["note:n2"]);
+  });
+
+  it("Ctrl+A also selects the free notes in no frame, not pinned ones or notes in frames", () => {
+    expect(allKeys(items)).toEqual(["frame:F1", "source:customers", "note:n2"]);
+  });
+
+  it("units: a note moves once; a free note with its frame, a pinned note with its card or frame", () => {
+    const keys = ["frame:F1", "source:customers", "note:n1", "note:n2", "note:n3", "note:n4", "note:n5"] as const;
+    expect(unitsOf([...keys], items)).toEqual({ frames: ["F1"], cards: ["c3"], members: ["c1"], notes: ["n2"] });
+    // nothing else moves: every note moves by itself
+    expect(unitsOf(["note:n1", "note:n3", "note:n5"], items).notes).toEqual(["n1", "n3", "n5"]);
+  });
+
+  it("notes are not cards: fit widths, remove and put in a new frame leave them out", () => {
+    expect(selectedCardIds(["note:n2", "source:customers", "frame:F1"], items)).toEqual(["c3"]);
   });
 });

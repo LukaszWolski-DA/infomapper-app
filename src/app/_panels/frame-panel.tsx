@@ -16,6 +16,7 @@ import type { FrameKind } from "@/domain/types";
 import { Actions, buttonClass, dangerClass, Field, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextField } from "./fields";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
+import { NotesHere } from "./notes-here";
 
 const KINDS = [
   ["free", "Free area"],
@@ -166,6 +167,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
         {EXPLAIN[f.kind]}
       </p>
 
+      <NotesHere pin={{ frameId: f.id }} />
       <Section>In this frame</Section>
       {members.length ? (
         <List testId="list-frame-cards">

@@ -22,6 +22,8 @@ export interface LayoutChange {
   frames?: readonly { id: Uuid; x: number; y: number }[];
   /** Cards with a new position, width, or both. */
   cards?: readonly { id: Uuid; x?: number; y?: number; width?: number | null }[];
+  /** Selected notes with a new place (free) or offset (pinned), slice 3a; they do not change cards or frames. */
+  notes?: readonly { id: Uuid; x: number; y: number }[];
 }
 
 export interface LayoutPlan {

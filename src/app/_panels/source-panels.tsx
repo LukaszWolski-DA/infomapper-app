@@ -18,6 +18,7 @@ import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
 import { CardFrame } from "./card-frame";
+import { NotesHere } from "./notes-here";
 import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tablePath, typeCheckOf } from "./model-index";
 
 export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; cardId: Uuid }) {
@@ -111,6 +112,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
         )}
       </Fold>
 
+      <NotesHere pin={{ cardId }} />
       <OnCanvases kind="source" targetId={t.id} cardId={cardId} />
       <CardFrame cardId={cardId} kind="src" />
 

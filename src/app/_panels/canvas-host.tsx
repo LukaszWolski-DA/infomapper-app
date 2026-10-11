@@ -24,7 +24,7 @@ import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
 import { newCardHeight } from "@/canvas/geometry";
 import { FILTER_LABEL, FILTER_ORDER } from "@/canvas/CardNode";
 import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
-import { isFrameKey } from "@/canvas/selection";
+import { isCardKey } from "@/canvas/selection";
 import type { Uuid } from "@/domain/ids";
 import { NOTE_COLORS, type MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
@@ -353,8 +353,9 @@ export function useCanvasHost({
       // a group (slice 2a; prototype ctxFor “a group”): reviewers and readers only clear it
       const sel = ui.selection;
       const keys = sel?.t === "multi" ? sel.keys : [];
-      // frames stand for their cards (slice 2b): fit widths, put in a new frame and remove act on the selected cards
-      const cardKeys = keys.filter((k) => !isFrameKey(k));
+      // frames stand for their cards (slice 2b): fit widths, put in a new frame and remove act on the selected cards,
+      // not on notes (slice 3a)
+      const cardKeys = keys.filter(isCardKey);
       items.push({ head: `${keys.length} items selected` });
       if (editable) {
         items.push({ label: "Align left", act: () => ui.arrangeSelection("left") });

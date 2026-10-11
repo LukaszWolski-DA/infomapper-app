@@ -3,7 +3,7 @@ import { access, archived, canvas, canvasItem, frame, ids, makeCtx, note, NOW } 
 import { STALE_VERSION_MESSAGE } from "../errors";
 import { changeLabel } from "../model/change-label";
 import type { WorkspaceRole } from "../types";
-import { createNote, deleteNote, EMPTY_NOTE_MESSAGE, moveNote, pinNote, releaseNotes, unpinNote, updateNote } from "./note";
+import { createNote, deleteNote, EMPTY_NOTE_MESSAGE, moveNote, moveNotes, pinNote, releaseNotes, unpinNote, updateNote } from "./note";
 import { isUndoable } from "./undo";
 
 const { canvas1, canvas2, frameA, frameB, itemCustomer, itemCrmCustomer, noteFree, notePinned, actor } = ids;
@@ -209,5 +209,36 @@ describe("releaseNotes (when cards leave and frames go)", () => {
     expect(releaseNotes(makeCtx(), [note(notePinned, { deleted_at: NOW })], before, { cardIds: [itemCustomer] })).toEqual([]);
     expect(releaseNotes(makeCtx(), notes, before, { cardIds: [itemCrmCustomer] })).toEqual([]);
     expect(releaseNotes(makeCtx(), undefined, before, { cardIds: [itemCustomer] })).toEqual([]);
+  });
+});
+
+describe("moveNotes (S3A-10: notes in a selection)", () => {
+  const free = note(noteFree);
+  const pinned = note(notePinned);
+  const ref = (n: typeof free, x: number, y: number) => ({ noteId: n.id, expectedVersion: n.version, x, y });
+  const move = (notes: object[], role: WorkspaceRole = "reviewer", s: Partial<State> = {}) => moveNotes(makeCtx(), access(role), { ...state, ...s }, { canvasId: canvas1, notes });
+
+  it("moves several notes in one change group, one undo step, for reviewers too", () => {
+    const r = move([ref(free, 2008, 16), ref(pinned, 296, 40)]);
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const rows = Object.fromEntries(r.writeSet.writes.flatMap((w) => (w.kind === "remove" ? [] : [[(w.row as { id: string }).id, w.row]])));
+    // the free note lands in frame B; the pinned one gets a new offset and keeps its pin
+    expect(rows[noteFree]).toMatchObject({ x: 2008, y: 16, frame_id: frameB, version: 2 });
+    expect(rows[notePinned]).toMatchObject({ x: 296, y: 40, pin_canvas_item_id: itemCustomer, frame_id: null });
+    expect(r.value.versions).toEqual({ [noteFree]: 2, [notePinned]: 2 });
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+    expect(changeLabel(r.writeSet.events)).toBe("Move notes");
+    expect(isUndoable(r.writeSet.events)).toBe(true);
+  });
+
+  it("refuses readers, an archived workspace, stale versions, notes of other canvases, a note twice and nothing to change", () => {
+    expect(move([ref(free, 0, 0)], "reader")).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(moveNotes(makeCtx(), access("modeler", archived), state, { canvasId: canvas1, notes: [ref(free, 0, 0)] })).toMatchObject({ ok: false, error: { code: "archived" } });
+    expect(move([{ ...ref(free, 0, 0), expectedVersion: 2 }])).toMatchObject({ ok: false, error: { message: STALE_VERSION_MESSAGE } });
+    expect(move([ref(free, 0, 0)], "modeler", { notes: [note(noteFree, { canvas_id: canvas2 })] })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(move([ref(free, 0, 0), ref(free, 8, 8)])).toMatchObject({ ok: false, error: { code: "invalid" } });
+    expect(move([])).toMatchObject({ ok: false, error: { code: "invalid" } });
+    expect(move([ref(free, free.x, free.y)])).toMatchObject({ ok: false, error: { code: "invalid", message: "Nothing to change." } });
   });
 });

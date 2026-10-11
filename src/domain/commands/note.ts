@@ -6,9 +6,9 @@
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
-import { domainError, notFound, type DomainError } from "../errors";
+import { domainError, notFound, staleVersion, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
-import { freedAtPlace, isPinned, noteFrameAt, notePlaces, notePosition, NOTE_WIDTH, pinOffset, pinTargetRect, type NotePlaces } from "../model/notes";
+import { freedAtPlace, isPinned, noteFrameAt, notePlaces, notePosition, NOTE_WIDTH, pinOffset, pinTargetRect, type FramePlace, type NotePlaces } from "../model/notes";
 import { plainTextPair } from "../model/plain-text";
 import type { WorkspaceAccess } from "../permissions";
 import { NOTE_COLORS, NOTE_STATUSES, type Canvas, type CanvasItem, type Frame, type Note } from "../types";
@@ -179,6 +179,61 @@ export function moveNote(ctx: CommandContext, access: WorkspaceAccess, state: No
   return done(ctx, access, { note: row }, [{ kind: "update", table: "note", before, row }]);
 }
 
+// ---- several notes at once (a selection's drag and nudge, slice 3a item 13) ----
+
+const movedNote = z.object({ noteId: uuidSchema, expectedVersion: versionSchema, x: coordinate, y: coordinate }).strict();
+/** Notes with a new place (free) or offset (pinned), each at the version the user read. */
+export const movedNotesSchema = z
+  .array(movedNote)
+  .max(500)
+  .refine((l) => new Set(l.map((n) => n.noteId)).size === l.length, "A note is listed twice.");
+export type MovedNote = z.output<typeof movedNote>;
+
+/**
+ * The writes for notes given a new place or offset (`moveNote` for several): a free note joins the frame it lands in
+ * among `frames` (the frames as they are after the change) or leaves its frame; a pinned note keeps its pin. A note
+ * that is not live on the canvas is not found; one read at another version refuses the whole change (stale).
+ */
+export function placeNotes(
+  ctx: CommandContext,
+  notes: ReadonlyMap<Uuid, Note>,
+  moves: readonly MovedNote[],
+  frames: readonly FramePlace[],
+  members?: ReadonlyMap<Uuid, number>,
+): { ok: true; writes: Write[]; versions: Record<Uuid, number> } | { ok: false; error: DomainError } {
+  const writes: Write[] = [];
+  const versions: Record<Uuid, number> = {};
+  for (const m of moves) {
+    const before = notes.get(m.noteId);
+    if (!before) return { ok: false, error: notFound("note") };
+    if (before.version !== m.expectedVersion) return { ok: false, error: staleVersion() };
+    const frame_id = isPinned(before) ? null : noteFrameAt(frames, { x: m.x, y: m.y }, members);
+    if (before.x === m.x && before.y === m.y && before.frame_id === frame_id) continue;
+    const row = nextVersion(ctx, before, { x: m.x, y: m.y, frame_id });
+    writes.push({ kind: "update", table: "note", before, row });
+    versions[row.id] = row.version;
+  }
+  return { ok: true, writes, versions };
+}
+
+const moveManyInput = z.object({ canvasId: uuidSchema, notes: movedNotesSchema.refine((l) => l.length > 0, "Name a note to move.") }).strict();
+export type MoveNotesInput = z.input<typeof moveManyInput>;
+
+/**
+ * Moves several notes of a canvas in one change group, one undo step (a selection of notes dragged or nudged; with
+ * cards or frames in it, `moveOnCanvas` moves them all). Reviewers may do it too: it needs note rights only.
+ */
+export function moveNotes(ctx: CommandContext, access: WorkspaceAccess, state: NoteCanvasState, input: unknown): CommandResult<{ versions: Record<Uuid, number> }> {
+  const parsed = begin(access, "note.edit", moveManyInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const opened = openCanvas(access, state, parsed.data.canvasId);
+  if (!opened.ok) return fail(opened.error);
+  const placed = placeNotes(ctx, opened.notes, parsed.data.notes, opened.frames, opened.places.members);
+  if (!placed.ok) return fail(placed.error);
+  if (!placed.writes.length) return fail(nothingToChange());
+  return done(ctx, access, { versions: placed.versions }, placed.writes);
+}
+
 // ---- pin and unpin ----
 
 const pinInput = z.object({ noteId: uuidSchema, expectedVersion: versionSchema, pin: pinSchema }).strict();
@@ -246,10 +301,13 @@ export function carryNotes(
   ctx: CommandContext,
   notes: readonly Note[] | undefined,
   shifts: ReadonlyMap<Uuid, { dx: number; dy: number }>,
+  /** Notes the change places itself (a selected note): not carried as well. */
+  placed: ReadonlySet<Uuid> = new Set(),
 ): { writes: Write[]; versions: Record<Uuid, number> } {
   const writes: Write[] = [];
   const versions: Record<Uuid, number> = {};
   for (const note of notes ?? []) {
+    if (placed.has(note.id)) continue;
     const d = note.deleted_at === null && !isPinned(note) && note.frame_id ? shifts.get(note.frame_id) : undefined;
     if (!d || (!d.dx && !d.dy)) continue;
     const row = nextVersion(ctx, note, { x: note.x + d.dx, y: note.y + d.dy });

@@ -157,6 +157,22 @@ export interface CanvasHandle {
   unpinNote: (noteId: Uuid) => void;
   /** Deletes a note; the toast offers Undo. */
   deleteNote: (noteId: Uuid) => void;
+  /** Every saved note of this canvas as the canvas has it now, with what it is pinned to (slice 3a, step 4: panels). */
+  notesView: () => NoteListItem[];
+  /** Selects a note and brings it into view when it is shown and outside the view (a panel's link). */
+  showNote: (noteId: Uuid) => void;
+}
+
+/** A note as the panels list it (the card and frame panels, the canvas overview). */
+export interface NoteListItem {
+  id: Uuid;
+  /** Its text; the lists show the first line, or “Empty note”. */
+  text: string;
+  status: NoteData["status"];
+  pinCardId: Uuid | null;
+  pinFrameId: Uuid | null;
+  /** The card or frame it is pinned to, by name; null for a free note. */
+  pinName: string | null;
 }
 
 /** What the note panel and toolbox may change (slice 3a, items 10 and 11). */
@@ -304,6 +320,12 @@ export interface CanvasUiApi extends CanvasHandle {
    */
   layoutKey: string;
   publishLayout: (key: string) => void;
+  /**
+   * Resolved notes hidden on the canvas (slice 3a, item 12): a preference of this person in this browser (data model
+   * section 12), for every canvas; not saved on the server and not an undo step.
+   */
+  hideResolved: boolean;
+  setHideResolved: (hide: boolean) => void;
 }
 
 export const CanvasUiCtx = createContext<CanvasUiApi>({
@@ -352,6 +374,8 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   pinNote: noop,
   unpinNote: noop,
   deleteNote: noop,
+  notesView: () => [],
+  showNote: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,
@@ -363,6 +387,8 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   registerUndo: noop,
   layoutKey: "",
   publishLayout: noop,
+  hideResolved: false,
+  setHideResolved: noop,
 });
 
 /** Drag data of a left-panel item dropped onto the canvas: JSON `{ target: CardTarget, rows: number }`. */

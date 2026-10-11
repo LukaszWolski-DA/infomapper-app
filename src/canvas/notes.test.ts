@@ -1,8 +1,9 @@
 // Slice 3a, step 3: notes on the canvas as plain data — what the client gets, where each note shows, the tethers.
+// Step 4: the numbers on card headers and collapsed blocks, and the first line the lists show.
 
 import { describe, expect, it } from "vitest";
 import { frame, ids, note } from "@/domain/__fixtures__/domain";
-import { buildNotes, noteAt, noteDate, noteShown, placesOf, tether, type NoteData } from "./note-data";
+import { buildNotes, countsKey, countsOf, firstLine, frameNoteCounts, noteAt, noteDate, noteShown, openPinnedCounts, placesOf, tether, type NoteData } from "./note-data";
 
 const { itemCustomer, frameA, noteFree, notePinned } = ids;
 const names = (id: string) => (id === ids.actor ? "Łukasz" : "Piotr Wiśniewski");
@@ -68,5 +69,36 @@ describe("the tether of a pinned note (prototype tethers)", () => {
 describe("noteDate", () => {
   it("reads like the prototype's dates", () => {
     expect(noteDate("2026-10-10T12:00:00.000Z")).toBe("10 Oct 2026");
+  });
+});
+
+describe("notes elsewhere (item 12, S3A-09)", () => {
+  const n = (over: Partial<NoteData>) => ({ pinCardId: null, pinFrameId: null, frameId: null, status: "open" as const, ...over });
+
+  it("counts the open notes pinned to each card, not resolved or free ones", () => {
+    const counts = openPinnedCounts([n({ pinCardId: "c1" }), n({ pinCardId: "c1" }), n({ pinCardId: "c1", status: "resolved" }), n({ pinCardId: "c2" }), n({ frameId: "F1" })]);
+    expect([...counts]).toEqual([
+      ["c1", 2],
+      ["c2", 1],
+    ]);
+  });
+
+  it("counts a frame's notes for its block: pinned to it or free in it, open or resolved", () => {
+    const counts = frameNoteCounts([n({ pinFrameId: "F1" }), n({ frameId: "F1", status: "resolved" }), n({ pinCardId: "c1" }), n({ frameId: "F2" }), n({})]);
+    expect(counts.get("F1")).toBe(2);
+    expect(counts.get("F2")).toBe(1);
+    expect(counts.size).toBe(2);
+  });
+
+  it("keys the counts so a memo changes only when a number does", () => {
+    const a = new Map([["c2", 1], ["c1", 3]]);
+    expect(countsKey(a)).toBe(countsKey(new Map([["c1", 3], ["c2", 1]])));
+    expect(countsOf(countsKey(a))).toEqual(new Map([["c1", 3], ["c2", 1]]));
+    expect(countsOf("").size).toBe(0);
+  });
+
+  it("shows a note's first line with text, or nothing for an empty note", () => {
+    expect(firstLine("\n  Ask the ERP team  \nabout status")).toBe("Ask the ERP team");
+    expect(firstLine(" \n ")).toBe("");
   });
 });

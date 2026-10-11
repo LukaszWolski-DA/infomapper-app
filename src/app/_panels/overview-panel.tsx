@@ -3,11 +3,14 @@
 // The right panel when nothing is selected (prototype insOverview, the parts of slice 1a): what is on this canvas,
 // mapping coverage per entity, and the mappings with a type problem to look at. Slice 2a: the canvas's look
 // (background and grid) for those who may change it. Slice 2b: the frames on this canvas, each a link, and “Arrange
-// into frames by concept and system”. Slice 2c: “Collapse all” and “Expand all” when the canvas has frames.
+// into frames by concept and system”. Slice 2c: “Collapse all” and “Expand all” when the canvas has frames. Slice 3a:
+// “Notes on this canvas” (prototype insOverview): the open notes as links, “All N notes are resolved.” or how to make
+// one, and “Show resolved notes on the canvas”, this person's preference in this browser (not saved, no undo step).
 
 import { useContext } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import { frameColor } from "@/canvas/frame-data";
+import { firstLine } from "@/canvas/note-data";
 import { LookControls, useCanvasLook } from "@/canvas/look";
 import { Actions, Fold, Hint, Kind, Li, LongList, smallButtonClass, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
@@ -23,6 +26,8 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
   const cov = coverage(p.ix, entityIds);
   const problems = p.ix.model.mappings.filter((m) => !typeCheckOf(p.ix, m).ok);
   const ents = cov.length;
+  const notes = ui.notesView();
+  const openNotes = notes.filter((n) => n.status === "open");
   return (
     <div data-testid="inspector-overview">
       <Kind>Nothing selected</Kind>
@@ -67,6 +72,41 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
           />
         </Fold>
       )}
+      <Fold title="Notes on this canvas" count={openNotes.length} testId="section-canvas-notes">
+        {notes.length ? (
+          <>
+            {openNotes.length ? (
+              <LongList
+                items={openNotes}
+                testId="list-canvas-notes"
+                text={(n) => firstLine(n.text)}
+                render={(n) => (
+                  <Li key={n.id} testId="canvas-note-link" onClick={() => ui.showNote(n.id)} meta={n.pinName ?? ""}>
+                    {firstLine(n.text) || "Empty note"}
+                  </Li>
+                )}
+              />
+            ) : (
+              <p className="text-im-ink-2" data-testid="text-notes-resolved">
+                All {notes.length} notes are resolved.
+              </p>
+            )}
+            <label className="mt-2 flex items-center gap-2 text-xs text-im-ink-2">
+              <input
+                type="checkbox"
+                checked={!ui.hideResolved}
+                onChange={(e) => ui.setHideResolved(!e.target.checked)}
+                data-testid="checkbox-show-resolved"
+              />
+              Show resolved notes on the canvas
+            </label>
+          </>
+        ) : (
+          <p className="text-im-ink-2" data-testid="text-no-notes">
+            No notes yet. Use the Note tool (<kbd>N</kbd>) or right-click the canvas or a card.
+          </p>
+        )}
+      </Fold>
       <Fold title="Frames on this canvas" count={frames.length} testId="section-frames">
         {frames.length ? (
           <LongList

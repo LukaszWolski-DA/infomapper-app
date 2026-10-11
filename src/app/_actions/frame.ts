@@ -99,6 +99,8 @@ export interface MoveOnCanvasActionInput {
   onGrid?: boolean;
   moveToConcepts?: boolean;
   dragDrop?: boolean;
+  /** Selected notes moved with the cards and frames (slice 3a). */
+  notes?: { noteId: string; expectedVersion: number; x: number; y: number }[];
 }
 
 /** Drags, drops, nudges, align/stack/line up, card resize and fit widths: positions, widths and frames in one change. */

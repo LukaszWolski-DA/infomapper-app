@@ -3,7 +3,8 @@
 // Wraps the canvas page so the canvas, the panels and the tools in the top bar share one React Flow instance and one
 // selection.
 // Per-browser view preferences (whether the Overview is open, the notation) stay in the browser (data model
-// section 12). The notation is one setting for every canvas (D-22).
+// section 12). The notation is one setting for every canvas (D-22). Slice 3a: whether resolved notes are hidden, per
+// person (`userId`) in this browser, for every canvas.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ReactFlowProvider } from "@xyflow/react";
@@ -12,6 +13,8 @@ import type { Selection } from "./line-data";
 
 const OVERVIEW_KEY = "infomapper:overview";
 const NOTATION_KEY = "infomapper:notation";
+/** Resolved notes hidden on the canvas, per person in this browser (slice 3a). */
+export const hideResolvedKey = (userId: string) => `infomapper:notes:hide-resolved:${userId}`;
 
 export function readPreference(key: string): string | null {
   try {
@@ -29,8 +32,9 @@ export function writePreference(key: string, value: string): void {
   }
 }
 
-export function CanvasProvider({ children }: { children: ReactNode }) {
+export function CanvasProvider({ children, userId = "" }: { children: ReactNode; userId?: string }) {
   const [overviewOpen, setOverviewOpen] = useState(true);
+  const [hideResolved, setHideResolvedState] = useState(false);
   const [notation, setNotationState] = useState<Notation>("ie");
   const [selection, select] = useState<Selection>(null);
   const handle = useRef<CanvasHandle | null>(null);
@@ -51,6 +55,17 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
     if (readPreference(OVERVIEW_KEY) === "closed") setOverviewOpen(false);
     if (readPreference(NOTATION_KEY) === "uml") setNotationState("uml");
   }, []);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- read once after mount: localStorage is not available on the server
+    setHideResolvedState(readPreference(hideResolvedKey(userId)) === "1");
+  }, [userId]);
+  const setHideResolved = useCallback(
+    (hide: boolean) => {
+      writePreference(hideResolvedKey(userId), hide ? "1" : "0");
+      setHideResolvedState(hide);
+    },
+    [userId],
+  );
 
   const setNotation = useCallback((n: Notation) => {
     writePreference(NOTATION_KEY, n);
@@ -114,6 +129,8 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       pinNote: (noteId, pin) => handle.current?.pinNote(noteId, pin),
       unpinNote: (noteId) => handle.current?.unpinNote(noteId),
       deleteNote: (noteId) => handle.current?.deleteNote(noteId),
+      notesView: () => handle.current?.notesView() ?? [],
+      showNote: (noteId) => handle.current?.showNote(noteId),
       flash,
       flashRow,
       mode,
@@ -128,8 +145,10 @@ export function CanvasProvider({ children }: { children: ReactNode }) {
       },
       layoutKey,
       publishLayout: setLayoutKey,
+      hideResolved,
+      setHideResolved,
     }),
-    [overviewOpen, toggleOverview, notation, setNotation, selection, mode, flash, flashRow, layoutKey],
+    [overviewOpen, toggleOverview, notation, setNotation, selection, mode, flash, flashRow, layoutKey, hideResolved, setHideResolved],
   );
 
   return (

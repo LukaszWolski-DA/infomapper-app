@@ -2,7 +2,9 @@
 // `addDemoModel` seeds. CR-23 marks Customer, two of its attributes and the second e-mail mapping (as in the
 // prototype's seed); JIRA-481 marks the CRM table customers and its column email_addr. On “Customer & orders”: a free
 // note and two notes pinned to the table order_line, one of them resolved. The notes keep clear of the empty spots
-// earlier end-to-end tests place and drop cards on (slice 3a, step 3), far right of the cards.
+// earlier end-to-end tests place and drop cards on (slice 3a, step 3), at the right of the canvas; the pinned ones lie
+// below order_line, inside the cards' width, so Fit everything, which counts notes (step 4), keeps the first view at
+// the zoom the earlier tests expect.
 
 import type { Uuid } from "@/domain/ids";
 import { labelKey, targetColumns, type LabelTarget } from "@/domain/model/labels";
@@ -93,10 +95,10 @@ export function addDemoWorkingLayer(db: DevDb, o: DemoWorkingLayerOptions): void
       y: 200,
       pin_canvas_item_id: null,
     }),
-    // 280 = the card's default width (256) + 24, as a note pinned from the Note tool
+    // below order_line (its 6 rows: 222 px high) + 24
     note("orderline", o.users.reviewer, "Which order statuses count as confirmed? Ask the ERP team before mapping status_code.", "yellow", {
-      x: 280,
-      y: 0,
+      x: 0,
+      y: 248,
       pin_canvas_item_id: card("table:ordline"),
     }),
     // below the other one on order_line
@@ -105,7 +107,7 @@ export function addDemoWorkingLayer(db: DevDb, o: DemoWorkingLayerOptions): void
       o.users.modeler,
       "order_line.disc is a percentage, not an amount. Confirmed with the ERP team.",
       "green",
-      { x: 280, y: 160, pin_canvas_item_id: card("table:ordline") },
+      { x: 0, y: 384, pin_canvas_item_id: card("table:ordline") },
       o.users.owner,
     ),
   );

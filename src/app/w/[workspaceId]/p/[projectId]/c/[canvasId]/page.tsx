@@ -12,7 +12,7 @@ import {
   updateFrameAction,
 } from "@/app/_actions/frame";
 import { saveCanvasLookAction } from "@/app/_actions/canvas";
-import { createNoteAction, deleteNoteAction, moveNoteAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
+import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
 import { AppShell } from "@/app/_components/app-shell";
 import { MovedNotice } from "@/app/_components/moved-notice";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
@@ -47,7 +47,8 @@ import { lastContentEditor } from "@/domain/model/mapping-rules";
 // tool and Undo and Redo in the top bar (slice 1b); the Hand tool, a selection of several cards, the canvas's look and
 // layer mode, and “On canvases” in the panels (slice 2a); frames and the Frame tool (slice 2b); working labels: their
 // marks on the canvas, the Labels field and the label panel, notes on the canvas (slice 3a). `?card=entity:<id>` or `?card=source:<id>` selects that card
-// and shows it on arrival, `?label=<id>` opens that label's panel; `?moved=1` says that the address you opened is no longer in this project.
+// and shows it on arrival, `?label=<id>` opens that label's panel, `?note=<id>` selects that note (the project home's open
+// notes); `?moved=1` says that the address you opened is no longer in this project.
 export default async function CanvasPage({
   params,
   searchParams,
@@ -96,6 +97,7 @@ export default async function CanvasPage({
   const focus = typeof query.card === "string" ? /^(entity|source):(.+)$/.exec(query.card) : null;
   const focusCardId = focus ? (cards.find((c) => c.kind === (focus[1] === "entity" ? "ent" : "src") && c.targetId === focus[2])?.id ?? null) : null;
   const focusLabelId = typeof query.label === "string" && labels.some((l) => l.id === query.label) ? query.label : null;
+  const focusNoteId = typeof query.note === "string" && noteRows.some((n) => n.id === query.note) ? query.note : null;
 
   // “On canvases” (slice 2a): every canvas of the workspace and where it opens, and the canvases each element is on.
   // A canvas outside this project opens in the first project that has it (assumption 4).
@@ -121,7 +123,7 @@ export default async function CanvasPage({
   }
 
   return (
-    <CanvasProvider>
+    <CanvasProvider userId={shell.user.id}>
       <CanvasLookProvider
         key={canvasId}
         canvasId={canvasId}
@@ -193,6 +195,7 @@ export default async function CanvasPage({
               entityConcepts={Object.fromEntries(model.entities.map((e) => [e.id, e.concept_id]))}
               focusCardId={focusCardId}
               focusLabelId={focusLabelId}
+              focusNoteId={focusNoteId}
               notes={notes}
               canNote={canNote}
               userName={shell.user.name}
@@ -203,6 +206,7 @@ export default async function CanvasPage({
                 pinNote: pinNoteAction.bind(null, ws),
                 unpinNote: unpinNoteAction.bind(null, ws),
                 deleteNote: deleteNoteAction.bind(null, ws),
+                moveNotes: moveNotesAction.bind(null, ws, canvasId),
               }}
               diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks"), noFrames: diag.includes("noframes"), noLabels: diag.includes("nolabels"), collapsed: diag.includes("collapsed") } : undefined}
             />

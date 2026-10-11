@@ -4,9 +4,12 @@ import {
   canvasItem,
   concept,
   entity,
+  frame,
   ids,
   mapping,
   mappingInput,
+  note,
+  NOW,
   relationship,
   sourceColumn,
   sourceSystem,
@@ -14,7 +17,7 @@ import {
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
 import { indexModel } from "./model-index";
-import { canvasStatus, cardsPerCanvas, coverage, projectStats, workspaceStats } from "./stats";
+import { canvasStatus, cardsPerCanvas, coverage, projectOpenNotes, projectStats, workspaceStats } from "./stats";
 
 // Customer (customer_id, email): email ← email (approved, fits); customer_id ← first_name (draft, a type problem).
 // Sales Order has no attributes and is only on canvas 2.
@@ -64,5 +67,37 @@ describe("counts around the model", () => {
 
   it("counts the cards of each canvas", () => {
     expect(Object.fromEntries(cardsPerCanvas(items))).toEqual({ [ids.canvas1]: 2, [ids.canvas2]: 1 });
+  });
+});
+
+describe("open notes on the project home (slice 3a, item 12, S3A-05)", () => {
+  const canvases = [
+    { id: ids.canvas2, name: "Second" },
+    { id: ids.canvas1, name: "Customer & orders" },
+  ];
+  const items = [canvasItem(ids.itemCustomer)];
+  const frames = [frame(ids.frameA, { name: "Sales" })];
+  const n2 = "01900000-0000-7000-8000-00000000d003";
+  const n3 = "01900000-0000-7000-8000-00000000d004";
+  const n4 = "01900000-0000-7000-8000-00000000d005";
+  const notes = [
+    note(ids.noteFree, { created_at: "2026-10-02T00:00:00.000Z" }),
+    note(ids.notePinned, { created_at: "2026-10-01T00:00:00.000Z", body_text: "" }),
+    note(n2, { canvas_id: ids.canvas2, pin_canvas_item_id: null, pin_frame_id: ids.frameA }),
+    note(n3, { status: "resolved" }),
+    note(n4, { deleted_at: NOW }),
+    note("01900000-0000-7000-8000-00000000d006", { canvas_id: "01900000-0000-7000-8000-0000000000ff" }),
+  ];
+
+  it("lists the open notes canvas by canvas in tab order, oldest first, with what each is pinned to", () => {
+    expect(projectOpenNotes(notes, canvases, items, frames, model)).toEqual([
+      { id: n2, text: "Check the e-mail source", canvasId: ids.canvas2, canvasName: "Second", pinName: "Sales" },
+      { id: ids.notePinned, text: "", canvasId: ids.canvas1, canvasName: "Customer & orders", pinName: "Customer" },
+      { id: ids.noteFree, text: "Check the e-mail source", canvasId: ids.canvas1, canvasName: "Customer & orders", pinName: null },
+    ]);
+  });
+
+  it("is empty when no canvas of the project has an open note", () => {
+    expect(projectOpenNotes([note(n3, { status: "resolved" })], canvases, items, frames, model)).toEqual([]);
   });
 });

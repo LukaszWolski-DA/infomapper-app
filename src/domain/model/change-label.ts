@@ -130,6 +130,19 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
     }
   }
 
+  // Several notes moved together, alone or with cards and frames (a selection dragged or nudged, slice 3a item 13).
+  const movedTogether = [...frames, ...cards, ...notes];
+  if (
+    notes.length &&
+    movedTogether.length > 1 &&
+    movedTogether.length === events.length &&
+    movedTogether.every((e) => e.operation === "update") &&
+    frames.every((e) => only(e, ["x", "y", "width", "height"])) &&
+    [...cards, ...notes].every((e) => only(e, ["x", "y", "frame_id"]))
+  ) {
+    return notes.length === events.length ? "Move notes" : "Move selection";
+  }
+
   // A new canvas that comes with cards is a duplicated layout (slice 2a).
   if (of("canvas").some((e) => e.operation === "create") && cards.some((e) => e.operation === "create")) return "Duplicate canvas";
 

@@ -11,6 +11,9 @@
 //   frame it is dropped in (x + 20, y + 13); a pinned note to a new offset from its card or frame. Its right edge
 //   changes its width in steps of 8 between 160 and 520 px. A click without moving selects it; a double-click edits it.
 // - Reviewers work on notes as modelers do; readers only select them (Łukasz's step 0 answer 1).
+// - Step 4 (item 13): Shift+click puts a note in or out of a selection of several; pressing a note that is part of
+//   such a selection drags the whole selection (`groupDrag`); several notes moved together are saved in one change
+//   (`saveMoves`), or with the cards and frames of the selection through `saveLayout`.
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
 import { useReactFlow } from "@xyflow/react";
@@ -33,6 +36,8 @@ export interface NoteWrites {
   pinNote: (input: { noteId: Uuid; expectedVersion: number; pin: Pin }) => NoteResult;
   unpinNote: (input: { noteId: Uuid; expectedVersion: number }) => NoteResult;
   deleteNote: (input: { noteId: Uuid; expectedVersion: number }) => Promise<WriteResult<unknown>>;
+  /** Several notes of a selection moved together (one change). */
+  moveNotes: (input: { notes: { noteId: Uuid; expectedVersion: number; x: number; y: number }[] }) => Promise<WriteResult<{ versions: Record<string, number> }>>;
 }
 
 const READ_ONLY = () => Promise.resolve({ ok: false as const, message: "Notes cannot be changed here." });
@@ -44,7 +49,18 @@ export const NO_NOTE_WRITES: NoteWrites = {
   pinNote: READ_ONLY,
   unpinNote: READ_ONLY,
   deleteNote: READ_ONLY,
+  moveNotes: READ_ONLY,
 };
+
+/** A note moved with a selection: its place (free) or offset (pinned), before and after. */
+export type NoteMove = { id: Uuid; from: { x: number; y: number }; to: { x: number; y: number } };
+
+/** What the frames and the selection need of the notes while they move them (slice 3a, step 4). */
+export interface NoteMover {
+  noteOf: (id: Uuid) => NoteData | null;
+  /** Shows notes at once with these changes (not saved). */
+  show: (patches: ReadonlyMap<Uuid, Partial<NoteData>>) => void;
+}
 
 /** The id of the new note being written (never saved under it). */
 export const DRAFT_NOTE = "note:draft";
@@ -68,6 +84,7 @@ interface Options {
   versions: MutableRefObject<Map<string, number>>;
   pending: MutableRefObject<Map<string, number>>;
   enqueue: (id: string, write: () => Promise<void>) => void;
+  enqueueGroup: (ids: readonly string[], write: () => Promise<void>) => void;
   select: (sel: Selection) => void;
   undo: () => UndoHooks | null;
   writes: NoteWrites;
@@ -81,12 +98,16 @@ interface Options {
   endNoteTool: () => void;
   /** Who is writing (a draft's “Created … by …”). */
   userName: string;
+  /** Shift+click on a note: in or out of the selection of several. */
+  toggleInSelection: (id: Uuid) => void;
+  /** A press on a note that is part of a selection of several: the selection's drag starts (true), or not. */
+  groupDrag: (e: ReactPointerEvent, id: Uuid) => boolean;
 }
 
 export function useNotes(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
-  const { canNote, versions, pending, enqueue, select, undo, writes } = o;
+  const { canNote, versions, pending, enqueue, enqueueGroup, select, undo, writes } = o;
   const [saved, setNotes] = useState<NoteData[]>(() => [...o.initialNotes]);
   const [draft, setDraft] = useState<NoteData | null>(null);
   const [editing, setEditing] = useState<Uuid | null>(null);
@@ -97,11 +118,13 @@ export function useNotes(o: Options) {
   const placesRef = useRef(o.placesNow);
   const namesRef = useRef(o.nameOf);
   const targetsRef = useRef(o.targets);
+  const selectionRef = useRef({ toggle: o.toggleInSelection, groupDrag: o.groupDrag });
   useEffect(() => {
     notesRef.current = notes;
     placesRef.current = o.placesNow;
     namesRef.current = o.nameOf;
     targetsRef.current = o.targets;
+    selectionRef.current = { toggle: o.toggleInSelection, groupDrag: o.groupDrag };
   });
 
   // ---- fresh notes from the server (after an undo, a removed card, a deleted frame): take them, except what is saving ----
@@ -119,6 +142,11 @@ export function useNotes(o: Options) {
   const patch = useCallback((id: Uuid, p: Partial<NoteData>) => {
     if (id === DRAFT_NOTE) setDraft((d) => (d ? { ...d, ...p } : d));
     else setNotes((ns) => ns.map((n) => (n.id === id ? { ...n, ...p } : n)));
+  }, []);
+  /** Several notes changed at once, in one update (a selection's drag frame). */
+  const show = useCallback((patches: ReadonlyMap<Uuid, Partial<NoteData>>) => {
+    if (!patches.size) return;
+    setNotes((ns) => ns.map((n) => (patches.has(n.id) ? { ...n, ...patches.get(n.id) } : n)));
   }, []);
 
   /** Saves one change of a note after its earlier ones; a refusal puts `back` and shows the domain's message. */
@@ -153,6 +181,46 @@ export function useNotes(o: Options) {
     const f = frameId ? places.frames.get(frameId) : undefined;
     return { frameId, anchor: f ? { x: f.x, y: f.y } : null };
   }, []);
+
+  /**
+   * Notes of a selection moved together, without cards or frames (shown moved already): free ones join the frame they
+   * land in; saved in one change, one undo step; a refusal puts them back.
+   */
+  const saveMoves = useCallback(
+    (moves: readonly NoteMove[]) => {
+      const changed = moves.filter((m) => m.to.x !== m.from.x || m.to.y !== m.from.y);
+      if (!canNote || !changed.length) return;
+      const next = new Map<Uuid, Partial<NoteData>>();
+      const back = new Map<Uuid, Partial<NoteData>>();
+      for (const m of changed) {
+        const n = noteOf(m.id);
+        if (!n) continue;
+        const free = !n.pinCardId && !n.pinFrameId;
+        next.set(m.id, { ...m.to, ...(free ? frameFor(m.to) : {}) });
+        back.set(m.id, { ...m.from, frameId: n.frameId, anchor: n.anchor });
+      }
+      show(next);
+      const ids = [...next.keys()];
+      enqueueGroup(ids, async () => {
+        let result: WriteResult<{ versions: Record<string, number> }>;
+        try {
+          result = await writes.moveNotes({
+            notes: changed.filter((m) => next.has(m.id)).map((m) => ({ noteId: m.id, expectedVersion: versions.current.get(m.id) ?? noteOf(m.id)?.version ?? 1, ...m.to })),
+          });
+        } catch {
+          result = FAILED;
+        }
+        if (!result.ok) {
+          show(back);
+          toast(result.message, "refusal");
+          return;
+        }
+        for (const [id, v] of Object.entries(result.value.versions)) versions.current.set(id, v);
+        undo()?.noteSaved();
+      });
+    },
+    [canNote, noteOf, frameFor, show, enqueueGroup, writes, versions, toast, undo],
+  );
 
   // ---- a new note ----
   const newNote = useCallback(
@@ -352,6 +420,13 @@ export function useNotes(o: Options) {
       const n = noteOf(id);
       if (!n) return;
       if ((e.target as HTMLElement).closest("textarea, button")) return;
+      // Shift+click: in or out of a selection of several (D-16); a note of such a selection drags all of it (D-17)
+      if (e.shiftKey && id !== DRAFT_NOTE) {
+        e.preventDefault();
+        selectionRef.current.toggle(id);
+        return;
+      }
+      if (part === "body" && id !== DRAFT_NOTE && selectionRef.current.groupDrag(e, id)) return;
       if (!canNote || id === DRAFT_NOTE) {
         select({ t: "note", id });
         return;
@@ -420,8 +495,15 @@ export function useNotes(o: Options) {
     };
   }, []);
 
+  /** The notes as the canvas has them now (read in handlers, e.g. Fit everything). */
+  const notesNow = useCallback(() => notesRef.current, []);
+
   return {
     notes,
+    notesNow,
+    noteOf,
+    show,
+    saveMoves,
     editing,
     heights,
     dragging,

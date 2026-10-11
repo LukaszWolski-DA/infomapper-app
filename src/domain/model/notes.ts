@@ -15,7 +15,8 @@ export const NOTE_PIN_GAP = 24;
 export const NOTE_FRAME_POINT = { x: 20, y: 13 } as const;
 
 type CardPlace = Pick<CanvasItem, "id" | "x" | "y" | "width" | "frame_id">;
-type FramePlace = Pick<Frame, "id" | "x" | "y" | "width" | "height" | "collapsed">;
+/** A frame as the note rules read it; a collapsed one by its block (`collapsed` may be left out: not collapsed). */
+export type FramePlace = Pick<Frame, "id" | "x" | "y" | "width" | "height"> & { collapsed?: boolean };
 
 /** The canvas's cards and frames by id, as the note rules read them. A collapsed frame's block needs its card count. */
 export interface NotePlaces {

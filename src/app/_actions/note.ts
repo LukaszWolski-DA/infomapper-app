@@ -1,13 +1,14 @@
 "use server";
 
-// Notes on a canvas (slice 3a): create, change the text, colour, status or width, move, pin, unpin, delete. Each runs
+// Notes on a canvas (slice 3a): create, change the text, colour, status or width, move (one, or several together), pin,
+// unpin, delete. Each runs
 // one domain command on the canvas as it is stored now and returns the note as the canvas draws it; the canvas shows
 // the change at once and needs no fresh page (the note panel reads the canvas). Reviewers may do all of this (Łukasz,
 // step 0 answer 1); readers only read.
 
 import type { DataStore } from "@/data";
 import type { CommandContext, CommandResult } from "@/domain/changes";
-import { createNote, deleteNote, moveNote, pinNote, unpinNote, updateNote, type NoteCanvasState } from "@/domain/commands/note";
+import { createNote, deleteNote, moveNote, moveNotes, pinNote, unpinNote, updateNote, type NoteCanvasState } from "@/domain/commands/note";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { Note } from "@/domain/types";
@@ -62,6 +63,16 @@ export async function updateNoteAction(workspaceId: string, input: { noteId: str
 
 export async function moveNoteAction(workspaceId: string, input: { noteId: string; expectedVersion: number; x: number; y: number }) {
   return noteCommand(workspaceId, ofNote(input?.noteId), (ctx, access, state) => moveNote(ctx, access, state, input));
+}
+
+/** Several notes of a selection moved together (slice 3a, item 13): one change group; the canvas already shows them. */
+export async function moveNotesAction(workspaceId: string, canvasId: string, input: { notes: { noteId: string; expectedVersion: number; x: number; y: number }[] }) {
+  return runCommand(async (ctx, store, user) => {
+    const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
+    if (!workspace) return NOT_FOUND;
+    const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
+    return moveNotes(ctx, access, await canvasOf(store, workspace.id, str(canvasId)), { ...input, canvasId });
+  });
 }
 
 export async function pinNoteAction(workspaceId: string, input: { noteId: string; expectedVersion: number; pin: { canvasItemId?: string; frameId?: string } }) {

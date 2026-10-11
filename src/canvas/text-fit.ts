@@ -55,12 +55,18 @@ export function titleNeedsClip(name: string, kind: "ent" | "src", coverage: stri
   return (kind === "src" ? monoWidth(name, 13.5) : sansWidth(name, 14) * 1.05) > available;
 }
 
-/** Whether a card's first line (stereotype and concept, or the source path, with a label mark) may not fit beside the card tools. */
-export function lineNeedsClip(parts: string[], kind: "ent" | "src", width: number = CARD_W, mark = false): boolean {
+/** The width of the open-notes mark in a card's header (slice 3a): the icon, and the number when more than one. */
+export const noteMarkWidth = (notes: number): number => (notes > 0 ? MARK + (notes > 1 ? 2 + 6 * String(notes).length : 0) + 6 : 0);
+
+/**
+ * Whether a card's first line (stereotype and concept, or the source path, with a label mark and the open-notes mark)
+ * may not fit beside the card tools.
+ */
+export function lineNeedsClip(parts: string[], kind: "ent" | "src", width: number = CARD_W, mark = false, notes = 0): boolean {
   // filter button with its longest label, collapse button, and on entities the relate button (slice 1b)
   const tools = 64 + 20 + 1 + (kind === "ent" ? 21 : 0);
   const text = kind === "src" ? monoWidth(parts.join(""), 11) : parts.reduce((w, p) => w + sansWidth(p, 11), 0) + 6 * (parts.length - 1);
-  return text + (mark ? MARK + 6 : 0) > width - 14 - 8 - 6 - tools - SAFETY;
+  return text + (mark ? MARK + 6 : 0) + noteMarkWidth(notes) > width - 14 - 8 - 6 - tools - SAFETY;
 }
 
 /**

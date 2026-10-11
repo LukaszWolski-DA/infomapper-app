@@ -104,3 +104,30 @@ export function tether(note: Rect, target: Rect): { x1: number; y1: number; x2: 
   if (Math.hypot(onTarget.x - onNote.x, onTarget.y - onNote.y) < 6) return null;
   return { x1: onNote.x, y1: onNote.y, x2: onTarget.x, y2: onTarget.y };
 }
+
+/** A note's first line for the lists (prototype firstLine); empty for an empty note (“Empty note”). */
+export const firstLine = (text: string): string => text.split("\n").find((l) => l.trim())?.trim() ?? "";
+
+/** The open notes pinned to each card (prototype noteMark): the number on the card's header. */
+export function openPinnedCounts(notes: readonly Pick<NoteData, "pinCardId" | "status">[]): Map<Uuid, number> {
+  const counts = new Map<Uuid, number>();
+  for (const n of notes) if (n.pinCardId && n.status === "open") counts.set(n.pinCardId, (counts.get(n.pinCardId) ?? 0) + 1);
+  return counts;
+}
+
+/**
+ * The notes of each frame for its collapsed block's “N notes” chip (prototype blockCard): those pinned to the frame and
+ * the free notes in it, open or resolved.
+ */
+export function frameNoteCounts(notes: readonly Pick<NoteData, "pinCardId" | "pinFrameId" | "frameId">[]): Map<Uuid, number> {
+  const counts = new Map<Uuid, number>();
+  for (const n of notes) {
+    const frameId = n.pinFrameId ?? (n.pinCardId ? null : n.frameId);
+    if (frameId) counts.set(frameId, (counts.get(frameId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/** A map of counts as one string, so a memo changes only when a count does (not when a note moves). */
+export const countsKey = (counts: ReadonlyMap<Uuid, number>): string => [...counts].map(([id, n]) => `${id}=${n}`).sort().join(",");
+export const countsOf = (key: string): Map<Uuid, number> => new Map(key ? key.split(",").map((s) => [s.slice(0, s.indexOf("=")), Number(s.slice(s.indexOf("=") + 1))]) : []);

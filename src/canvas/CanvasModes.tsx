@@ -20,7 +20,7 @@ import { EdgeLabelRenderer, useReactFlow, useStore } from "@xyflow/react";
 import { useToast } from "@/ui/components/toast";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type ToolboxTarget } from "./context";
-import { cardKey, frameKey } from "./selection";
+import { cardKey, frameKey, noteKey } from "./selection";
 import { cardWidth, HEAD_H, type Pt } from "./geometry";
 
 /** A right-click that moved more than this is a pan, not a toolbox. */
@@ -214,7 +214,10 @@ export function useCanvasModes(editable: boolean) {
       const rowId = cardId ? el.closest<HTMLElement>(".row[data-row]")?.dataset.row : undefined;
       const frameId = cardId || noteId ? undefined : el.closest<HTMLElement>("[data-frame]")?.dataset.frame;
       let target: ToolboxTarget;
-      if (noteId) {
+      if (noteId && ui.selection?.t === "multi" && ui.selection.keys.includes(noteKey(noteId))) {
+        // a note that is part of a selection of several: the group's toolbox (slice 3a, prototype ctxFor)
+        target = { kind: "selection" };
+      } else if (noteId) {
         target = { kind: "note", noteId };
         select({ t: "note", id: noteId });
       } else if (mappingId) {

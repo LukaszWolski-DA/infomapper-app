@@ -19,6 +19,7 @@ import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
 import { CardFrame } from "./card-frame";
+import { NotesHere } from "./notes-here";
 import { useMoveAttribute } from "./move-attribute";
 import { feedingSources, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -248,6 +249,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         </Fold>
       )}
 
+      <NotesHere pin={{ cardId }} />
       <OnCanvases kind="entity" targetId={e.id} cardId={cardId} />
       <CardFrame cardId={cardId} kind="ent" />
 

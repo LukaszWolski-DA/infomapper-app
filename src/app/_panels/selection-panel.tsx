@@ -5,11 +5,13 @@
 // readers only clear the selection.
 // Slice 2b: frames in the selection are counted (“3 entities, 2 frames”, the prototype's order) and listed (a link selects the frame); they
 // stand for their cards, so “Put in a new frame” and “Remove from this canvas” act on the selected cards only and are
-// offered only when there are some.
+// offered only when there are some. Slice 3a: notes in the selection are counted and listed too (their first line; a
+// link selects the note); the group's actions leave them alone.
 
 import { useContext } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
-import { isFrameKey, type SelectionKey } from "@/canvas/selection";
+import { firstLine } from "@/canvas/note-data";
+import { isCardKey, isFrameKey, isNoteKey, type SelectionKey } from "@/canvas/selection";
 import { Actions, buttonClass, dangerClass, Hint, Kind, Li, List, Section } from "./fields";
 import { usePanel } from "./inspector";
 import { feedingSourceCards } from "./model-index";
@@ -23,11 +25,13 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
   const entities = keys.filter((k) => k.startsWith("entity:")).map(idOf);
   const tables = keys.filter((k) => k.startsWith("source:")).map(idOf);
   const frames = keys.filter(isFrameKey).map(idOf);
-  const cardKeys = keys.filter((k) => !isFrameKey(k));
+  const notes = keys.filter(isNoteKey).map(idOf);
+  const cardKeys = keys.filter(isCardKey);
   const counts = [
     entities.length && plural(entities.length, "entity", "entities"),
     tables.length && plural(tables.length, "table", "tables"),
     frames.length && plural(frames.length, "frame", "frames"),
+    notes.length && plural(notes.length, "note", "notes"),
   ].filter(Boolean);
   const open = (targetId: string) => {
     const card = p.cardOf(targetId);
@@ -72,6 +76,14 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
       <List testId="list-selection">
         {keys.map((k) => {
           const id = idOf(k);
+          if (isNoteKey(k)) {
+            const text = ui.noteView(id)?.note.text ?? "";
+            return (
+              <Li key={k} meta="note" onClick={() => ui.select({ t: "note", id })} testId="selection-item">
+                <span className="truncate">{firstLine(text) || "Empty note"}</span>
+              </Li>
+            );
+          }
           if (isFrameKey(k)) {
             return (
               <Li key={k} meta="frame" onClick={() => ui.select({ t: "frame", id })} testId="selection-item">

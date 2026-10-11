@@ -73,6 +73,9 @@
 /* working labels (slice 3a, prototype .lmark): a tag mark in rows and the table header, never a model tag (D-08) */
 .im-canvas .lmark { display: inline-flex; align-items: center; color: var(--im-ink-3); flex: none; font-style: normal }
 .im-canvas .lmark svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round }
+/* open notes pinned to a card (slice 3a, prototype .nmark): a note icon in the header, with the number when more than one */
+.im-canvas .nmark { display: inline-flex; align-items: center; gap: 2px; color: var(--im-ink-3); font-size: 10px; font-style: normal; flex: none }
+.im-canvas .nmark svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round }
 .im-canvas .src .dt { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 10.5px }
 .im-canvas .st { flex: none; display: inline-grid; place-items: center; width: 10px; height: 10px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--im-ink-3);
   font-size: 9px; font-weight: 600; color: var(--im-surface) }

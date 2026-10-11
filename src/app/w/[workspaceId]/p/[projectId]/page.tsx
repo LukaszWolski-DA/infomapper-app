@@ -1,13 +1,14 @@
 import { AppShell } from "@/app/_components/app-shell";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { loadShell } from "@/app/_lib/shell";
-import { projectStats } from "@/app/_panels/stats";
+import { projectOpenNotes, projectStats } from "@/app/_panels/stats";
 import { canvasHref } from "@/app/_lib/paths";
 import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { projectLabels, type ProjectLabelContext } from "@/domain/model/labels";
 import type { CanvasItem, WorkspaceModel } from "@/domain/types";
 import { ProjectLabels } from "./_components/project-labels";
+import { ProjectNotes } from "./_components/project-notes";
 import { CanvasTiles } from "./_components/project-tiles";
 
 /** What `projectLabels` needs to know about the cards on some canvases. */
@@ -23,8 +24,8 @@ function labelContext(model: WorkspaceModel, items: readonly CanvasItem[]): Proj
   };
 }
 
-// Project home (D-29): the project's canvases as tiles; the labels used on them and pinned to the project (slice 3a).
-// Requirements and open notes come with those slices.
+// Project home (D-29): the project's canvases as tiles; the labels used on them and pinned to the project, and the
+// number and list of their open notes (slice 3a). Requirements come with their slice.
 export default async function ProjectHomePage({ params }: PageProps<"/w/[workspaceId]/p/[projectId]">) {
   const { workspaceId, projectId } = await params;
   const shell = await loadShell({ workspaceId, projectId });
@@ -32,12 +33,14 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   const n = view.canvases.length;
   const store = getDataStore();
   const ws = shell.workspace.id;
-  const [model, items, labels, links, pins] = await Promise.all([
+  const [model, items, labels, links, pins, notes, frames] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.labels.list(ws),
     store.labels.listLinks(ws),
     store.labels.listPins(ws),
+    store.notes.list(ws),
+    store.frames.list(ws),
   ]);
   const st = projectStats(model, items, view.canvases.map((c) => c.id));
 
@@ -50,6 +53,12 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
     const canvasId = usedOn.find((c) => c.labels.has(label.id))?.id ?? view.canvases[0]!.id;
     return { id: label.id, name: label.name, items: count, pinned: isPinned, href: `${canvasHref(ws, view.project.id, canvasId)}?label=${label.id}` };
   });
+
+  // Open notes: canvas by canvas in tab order; each opens its canvas with the note selected (S3A-05)
+  const openNotes = projectOpenNotes(notes, view.canvases, items, frames, model).map((n) => ({
+    ...n,
+    href: `${canvasHref(ws, view.project.id, n.canvasId)}?note=${n.id}`,
+  }));
 
   return (
     <AppShell shell={shell} project={{ view, currentCanvasId: null }}>
@@ -71,11 +80,16 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
             <span>
               <b>{st.mapped}</b> of <b>{st.attributes}</b> attributes mapped
             </span>
+            <span data-testid="stat-open-notes">
+              <b>{openNotes.length}</b> open note{openNotes.length === 1 ? "" : "s"}
+            </span>
           </div>
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Canvases</h3>
           <CanvasTiles view={view} />
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Labels in this project</h3>
           <ProjectLabels workspaceId={ws} projectId={view.project.id} labels={projectLabelRows} editable={shell.standing === "full"} />
+          <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Open notes</h3>
+          <ProjectNotes notes={openNotes} />
         </div>
       </div>
     </AppShell>
