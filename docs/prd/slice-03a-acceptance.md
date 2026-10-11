@@ -153,8 +153,10 @@ rights (step 2, item 6).
 2. **A card's header** shows its open pinned notes (prototype `noteMark`): a note icon, the number from two on, the
    tooltip “N open notes pinned here”; at every zoom, like the rest of the header; it takes room when deciding whether
    the first line needs clipping. Resolved notes do not count.
-3. **A collapsed block's “N notes”** counts the notes pinned to the frame and the free notes in it, open or resolved
-   (prototype `blockCard`), as the block's last chip.
+3. **A collapsed block's “N notes”** counts the notes pinned to the frame and the free notes in it that are shown: the
+   open ones, and the resolved ones only while “Show resolved notes on the canvas” is on, as the block's last chip.
+   *Łukasz's decision after step 4*, unlike the prototype's `blockCard`, which counts resolved notes always; it keeps
+   the block's number in line with what the canvas shows and with the card header's count (open notes).
 4. **The “Notes” section** (prototype `notesHere`) is in the entity and table panels before “On canvases”, and in the
    frame panel before “In this frame”. It lists the notes pinned to that card or frame (first line or “Empty note”,
    “open” or “resolved”); “Add a note” pins a new note there. Readers get the section only when there are notes, and no
@@ -194,7 +196,16 @@ rights (step 2, item 6).
    everything takes in, and the first view of “Customer & orders” fell below 40 % zoom, where rows are not drawn (the
    first step 4 run failed seven slice 1a tests on that).
 14. **Not built:** the prototype's miniature (`renderMini`) draws notes; the PRD does not list it, so the Overview's
-   miniature shows none. Question for Łukasz.
+   miniature shows none. Łukasz after step 4: not in this slice; in `docs/ideas.md` (slice 3b or the minimap slice,
+   with its own measurement).
+15. **A guard for the idle growth** (item 12 above): `e2e/slice-03a/S3A-14-idle.spec.ts` opens Customer & orders at
+   30 % zoom with the demo's notes, once with a frame expanded and once with two frames collapsed, and checks that the
+   canvas commits nothing and no note changes its size during three idle seconds (it fails on step 3's code). S2C-12
+   did not catch the growth: it was written in slice 2c, before there were notes, and it opens and zooms at or above
+   45 % (`FRAMED`, then zooming in), where notes draw their whole body and are measured normally; the growth only
+   happens below 40 %, where a note draws its plain body.
+
+**Assumptions 5, 7 and 13 and the changes to S2A-02, S2B-08 and S2C-08 accepted by Łukasz on 11 October 2026.**
 
 ## Changes to earlier tests
 
