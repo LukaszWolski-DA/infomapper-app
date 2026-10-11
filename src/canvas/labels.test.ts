@@ -1,4 +1,4 @@
-// Slice 3a, step 2: working labels on the canvas (marks on rows, table headers and mapping lines) and the label rules
+// Slice 3a, step 2: working labels on the canvas (marks on rows, entity and table headers and mapping lines) and the label rules
 // the panels and the project home use.
 
 import { describe, expect, it } from "vitest";
@@ -57,12 +57,14 @@ describe("marks on the canvas (S3A-03)", () => {
   const ent = cards.find((c) => c.kind === "ent")!;
   const src = cards.find((c) => c.kind === "src")!;
 
-  it("puts the label names on labeled attribute and column rows and on a labeled table's header, not on entity headers", () => {
+  it("puts the label names on labeled attribute and column rows and on labeled entity and table headers", () => {
     expect(ent.rows.map((r) => r.labels)).toEqual([null, "CR-23, JIRA-481"]);
     expect(src.rows.map((r) => r.labels)).toEqual([null, "JIRA-481"]);
     expect(src.labels).toBe("JIRA-481");
-    expect(ent.labels).toBeNull();
-    expect(buildCards(model, [canvasItem(ids.itemCustomer)]).find((c) => c.kind === "ent")!.rows.every((r) => r.labels === null)).toBe(true);
+    expect(ent.labels).toBe("CR-23");
+    const plain = buildCards(model, [canvasItem(ids.itemCustomer)]).find((c) => c.kind === "ent")!;
+    expect(plain.labels).toBeNull();
+    expect(plain.rows.every((r) => r.labels === null)).toBe(true);
   });
 
   it("puts them on a labeled mapping line", () => {

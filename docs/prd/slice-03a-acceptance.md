@@ -96,11 +96,13 @@ newest release, with `@boundaries/elements` 3.1.1 pinning `handlebars` 4.7.9. No
 6. **Opening a label from the project home** opens the first canvas of the project (tab order) on which it marks
    something, with its panel (`?label=<id>`); a pinned label that marks nothing there opens on the first canvas. The
    star is shown to everyone, active only for those who may change labels; a pinned star uses the palette's amber
-   (`im-review-strong`), the nearest to the prototype's.
+   (`im-review-strong`), the nearest to the prototype's. *Changed after step 3 (Łukasz):* the star is offered only to
+   roles with label rights, as the app hides other actions a role can't take; for the others a pinned label keeps a
+   plain, non-clickable ★ (“Pinned to this project”) and an unpinned one an empty slot.
 
 **Accepted by Łukasz on 10 October 2026** after his manual check of step 2 (all steps, as Łukasz, Piotr and a reader).
-Open question from step 2: the prototype also marks a labeled entity's card header (`lmark("entity", …)`); PRD item 3
-lists rows, table headers and mapping lines only, so entity headers have no mark for now.
+Open question from step 2, answered after step 3 (Łukasz): a labeled entity's card header shows the tag mark too, at
+every zoom like a table header (prototype `lmark("entity", …)`); PRD item 3 now says so.
 
 ### Step 3 (notes on the canvas)
 

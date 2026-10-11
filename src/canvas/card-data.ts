@@ -65,7 +65,7 @@ export interface CardData {
   subject: CardSubject;
   /** The mappings that read or fill the card's rows, for a frame's “type” and “drafts” chips (each counted once). */
   links: { id: Uuid; warn: boolean; draft: boolean }[];
-  /** Working labels on a source table, for the tag mark in its header (slice 3a); null on entities and unlabeled tables. */
+  /** Working labels on the entity or source table, for the tag mark in its header at every zoom (slice 3a); null when unlabeled. */
   labels: string | null;
 }
 
@@ -159,7 +159,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
         mapped: rows.filter((r) => r.mappings > 0).length,
         subject: { entityConceptId: entity.concept_id },
         links: links(rows),
-        labels: null,
+        labels: labelsOf(`entity:${entity.id}`),
       });
     } else if (item.source_table_id) {
       const table = tableById.get(item.source_table_id);

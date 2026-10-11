@@ -46,10 +46,11 @@ that labels changes automatically (D-26) and live label canvases (D-10, D-11, D-
    items they mark, then by name, at most 8, each with “N items”; ↑/↓ and Enter pick; the input keeps focus after
    adding or removing. Names are normalised as in the prototype (trimmed, commas removed, spaces become hyphens, at
    most 60 characters). Hint: “Working labels for tickets and change requests. Kept apart from the model definition.”
-3. **Marks.** A small tag mark on a labeled attribute row, column row and table header, and on a labeled mapping
-   line (prototype `lmark`, `lineTag`), with the label names as a tooltip. Marks follow AD-24 (no opacity on
-   repeated elements; nothing zoom-dependent on the canvas root) and are left out below 40 % zoom like other row
-   details.
+3. **Marks.** A small tag mark on a labeled attribute row, column row, entity header and table header, and on a
+   labeled mapping line (prototype `lmark`, `lineTag`), with the label names as a tooltip. Marks follow AD-24 (no
+   opacity on repeated elements; nothing zoom-dependent on the canvas root); row and line marks are left out below
+   40 % zoom like other row details, header marks stay at every zoom like the rest of the header (Łukasz, after
+   step 3).
 4. **The label panel.** Opening a label (its chip) shows “Working label”, its name (editable; renaming keeps the
    unique rule), “Marks 2 entities, 3 attributes, 1 mapping.” or “Not used anywhere yet.”, the sentence “Labels belong
    to your working context, not to the model.”, the marked items grouped by kind (Entities, Attributes, Mappings,
@@ -206,7 +207,7 @@ S3A-13, assumptions, changes to earlier tests). Update README and CLAUDE.md comm
 | --- | --- |
 | S3A-01 | Typing `cr 23` in Customer's Labels field offers “Create “cr-23”” first; Enter creates and assigns it; typing `CR` on an attribute suggests the existing label with its item count; × removes it; each is one undo step. |
 | S3A-02 | Labels can be assigned to an entity, attribute, mapping, source table and source column; a second label with the same name in another case is not created (the existing one is used). |
-| S3A-03 | Labeled attribute rows, column rows, table headers and mapping lines show the tag mark with the label names as a tooltip; below 40 % zoom the row marks are not drawn. |
+| S3A-03 | Labeled attribute rows, column rows, entity and table headers and mapping lines show the tag mark with the label names as a tooltip; below 40 % zoom the row marks are not drawn. |
 | S3A-04 | The label panel lists everything the label marks by kind as links; renaming works and refuses a name another label has; “Delete label” takes it off every item, the model is untouched, Undo in the toast restores it with all its links. |
 | S3A-05 | The project home lists the labels used on its canvases; pinning one puts it first and survives a reload; unpinning works; a pinned label stays listed when no canvas uses it. It shows the number of open notes and the list “Open notes” (first line or “Empty note”, the canvas's name); a click opens that canvas with the note selected; without open notes it shows “No open notes on this project's canvases.” |
 | S3A-06 | The Note tool (N) makes a free note on the empty canvas and a pinned note on a card, a frame's name and a collapsed block; an empty new note disappears without an undo step; the toolbox and panel entries create notes too. |
