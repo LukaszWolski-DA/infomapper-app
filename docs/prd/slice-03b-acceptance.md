@@ -268,7 +268,7 @@ run): 10 s of S1A-14's pan and zoom at 100 % on PERF-2's live canvas (centred on
 `test-results/S3B-15-live.json`. A smoke run on the unprepared laptop worked (22 cards; 57.5 against 40.4 fps, not to be
 read).
 
-Checks: lint, typecheck, unit tests; the full e2e run below.
+Checks: lint, typecheck, 820 unit tests, one full e2e run 126/126 (24.3 min, the known noise 14 times).
 
 ## Changes to earlier tests
 
