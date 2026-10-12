@@ -1,7 +1,7 @@
 # Slice 3b – Acceptance
 
-Status: **step 1 done, waiting for Łukasz**. Branch `slice/03b-context-and-live-canvases`. Steps are reported one by one
-(below); criteria, runs and the manual checklist come in step 5.
+Status: **step 2 done, waiting for Łukasz**. Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
+reported one by one (below); criteria, runs and the manual checklist come in step 5.
 
 ## Step 0 (12 October)
 
@@ -90,6 +90,49 @@ closed early” 16 times, known noise).
 11. **The race fix** keeps the model's content on cards as the page has it and only the layout (place, width, collapse,
     row filter, frame) as the canvas has it, when the canvas is newer. A frame created here uses the browser's clock
     for `createdAt` until the page brings the server's (the create refreshes the page).
+
+## Before step 2: undo and redo with the context on (Łukasz, after step 1)
+
+Undo and redo already linked nothing: the undo action called the live step without a context, and a revert only
+inserts link rows (`project_canvas`, `project_pinned_label`, `workspace_member`), never cards. To keep it so once every
+write carries the context, `completeLiveWrites` got an explicit `revert` mode (only the sync), used by the undo action.
+Tests through the local adapter (`live-store.test.ts`): an attribute created with CR-23 on, undone (attribute and its
+CR-23 link gone, no other label change, no context on the undo's events) and redone (both back, nothing more); a card
+move on CR-23's live canvas with the context on, undone (no label change).
+
+## Step 2 (active working context, 12 October)
+
+What was built: the switch left of Undo (“No working context” with the tag icon, or a dot and “Working on {name}”,
+`aria-pressed`) with its menu (heading, help text, “Find or create a label, e.g. CR-23”, at most 8 labels, the active
+one first then by items marked, “active” or “N items”, “Create “{name}”” first when no label has the typed name,
+“Stop working on {name}”; Enter picks the first entry, Esc closes); the two toasts; the status bar's “Working on
+{name}, items labeled N”; the server side (`runCommand` reads the context and the live step labels and records it); a
+deleted label switches the context off with its toast; `createLabel` for “Create”. Owners, admins and modelers only.
+
+Checks: lint, typecheck, 817 unit tests, one full e2e run 124/124 (19.6 min; “The destination stream closed early” 13
+times). Browser check on the preview data: “cr-99…” created from the menu, the Entity tool's new entity labeled in the
+same step (chip, header mark, status 1), one undo took both away (events of the create carry the context, the undo's
+none), the context stayed on after a reload, deleting the label switched it off with the toast, Piotr (reviewer) has no
+switch.
+
+### Assumptions
+
+12. **Where the context is kept (Q1).** A cookie per person and workspace (`im-ctx.{user}.{workspace}`, the label id and
+    its name), written only by the browser, so every server action carries it without each call passing it; the server
+    reads it in `runCommand` (`src/ui/working-context-cookie.ts`). It stays a browser preference: never written by the
+    server, not in the data. Undo and redo ignore it.
+13. **Which writes it covers.** Every write through `runCommand` while it is on, on every page of the workspace (the
+    switch itself is on canvas pages, next to Undo, as in the prototype). A layout-only write with the context on loads
+    only the labels (to check the context and record it), not the whole live state.
+14. **A deleted context label.** The refused write (`CONTEXT_LABEL_GONE`) refreshes the page; the browser sees the label
+    gone from the fresh page and switches the context off with “The working context {name} was deleted, so it is off
+    now.” Deleting the context's own label is not refused (the label is checked as it was when the action started).
+    The toasts share one place, so that toast replaces “Deleted the label {name}.” and its Undo link (Ctrl+Z still
+    undoes it).
+15. **Roles.** Only owners, admins and modelers get the switch (they change labels, AD-05); a reviewer's or reader's
+    stale cookie is cleared by the page. An archived workspace has no switch.
+16. **The menu.** Opens in a portal under the button (the top bar would clip it). “Create “{name}”” creates the label
+    (one undo step) and turns the context on.
 
 ## Changes to earlier tests
 
