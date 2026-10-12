@@ -11,8 +11,8 @@ export interface WorkingContextApi {
   active: CountedLabel | null;
   /** The workspace's labels with how many items each marks. */
   labels: readonly CountedLabel[];
-  /** Turns the context on for a label, or off (null). */
-  set: (labelId: string | null) => void;
+  /** Turns the context on for a label, or off (null); `silent`: without its toast (another toast says it). */
+  set: (labelId: string | null, options?: { silent?: boolean }) => void;
   /** Creates a label and turns the context on for it. */
   create: (name: string) => void;
 }

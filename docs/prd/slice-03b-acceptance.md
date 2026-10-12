@@ -117,18 +117,26 @@ switch.
 
 ### Assumptions
 
-12. **Where the context is kept (Q1).** A cookie per person and workspace (`im-ctx.{user}.{workspace}`, the label id and
-    its name), written only by the browser, so every server action carries it without each call passing it; the server
-    reads it in `runCommand` (`src/ui/working-context-cookie.ts`). It stays a browser preference: never written by the
-    server, not in the data. Undo and redo ignore it.
-13. **Which writes it covers.** Every write through `runCommand` while it is on, on every page of the workspace (the
-    switch itself is on canvas pages, next to Undo, as in the prototype). A layout-only write with the context on loads
-    only the labels (to check the context and record it), not the whole live state.
-14. **A deleted context label.** The refused write (`CONTEXT_LABEL_GONE`) refreshes the page; the browser sees the label
-    gone from the fresh page and switches the context off with “The working context {name} was deleted, so it is off
-    now.” Deleting the context's own label is not refused (the label is checked as it was when the action started).
-    The toasts share one place, so that toast replaces “Deleted the label {name}.” and its Undo link (Ctrl+Z still
-    undoes it).
+12. **Where the context is kept (Q1).** A cookie per person and workspace: its name holds both ids
+    (`im-ctx.{user id}.{workspace id}`, path `/`), its value the label id and its name. Two workspaces in one browser
+    (or two test users) keep separate contexts, because the server reads only the cookie named after the signed-in
+    person and the workspace of the write. Written only by the browser, so every server action carries it without each
+    call passing it; read in `runCommand` (`src/ui/working-context-cookie.ts`). Never written by the server, not in the
+    data. Undo and redo ignore it.
+13. **Which writes it covers, and the switch on canvas pages only.** Every write through `runCommand` while it is on. No
+    write outside canvas pages creates or changes entities, attributes, mappings or relationships (Łukasz's question
+    after step 2): the workspace home creates workspaces and projects and changes settings, the project home creates,
+    renames, adds, removes, duplicates and deletes canvases and pins labels; the model is edited only in the canvas
+    page's panels and canvas. So the switch stays on canvas pages, next to Undo, as in the prototype. A layout-only
+    write with the context on loads only the labels (to check the context and record it), not the whole live state.
+14. **A deleted context label** (changed after step 2). Only a write the context would label is refused
+    (`CONTEXT_LABEL_GONE`, or the role may not label); any other write is saved without the context, so pages without
+    the switch (the homes) never get stuck. The refused write refreshes the page; the browser sees the label gone and
+    switches the context off with “The working context {name} was deleted, so it is off now.” Deleting the context's
+    own label in its panel switches the context off first, quietly, and shows one toast: “Deleted the label {name}; the
+    working context is off.” with Undo; Undo (the button or Ctrl+Z) brings the label back, the context stays off.
+    Checked in the browser; the app types the menu's search once (the doubled “cr-99cr-99” of step 2 was my browser
+    tool typing a second time after a screenshot taken before the menu had rendered).
 15. **Roles.** Only owners, admins and modelers get the switch (they change labels, AD-05); a reviewer's or reader's
     stale cookie is cleared by the page. An archived workspace has no switch.
 16. **The menu.** Opens in a portal under the button (the top bar would clip it). “Create “{name}”” creates the label

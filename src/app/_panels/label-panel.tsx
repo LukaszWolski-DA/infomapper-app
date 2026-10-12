@@ -9,6 +9,7 @@ import { useContext, useState } from "react";
 import { deleteLabelAction, renameLabelAction } from "@/app/_actions/label";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
+import { useWorkingContext } from "@/ui/working-context";
 import type { Uuid } from "@/domain/ids";
 import { targetOf, type LabelTargetKind } from "@/domain/model/labels";
 import type { Label } from "@/domain/types";
@@ -31,6 +32,7 @@ export function LabelPanel({ label }: { label: Label }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
   const { run, pending } = useAction();
+  const workingContext = useWorkingContext();
   /** A refused rename shows the stored name again. */
   const [reset, setReset] = useState(0);
   const ix = p.ix;
@@ -66,8 +68,17 @@ export function LabelPanel({ label }: { label: Label }) {
   }
 
   async function remove() {
-    const r = await run(() => deleteLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: label.version }), (v) => `Deleted the label ${v.name}.`, { undoable: true });
+    // the active context's label: the context goes off first, quietly, and one toast says both, with Undo (slice 3b,
+    // after step 2); the undo brings the label back, not the context
+    const wasContext = workingContext?.active?.id === label.id;
+    if (wasContext) workingContext!.set(null, { silent: true });
+    const r = await run(
+      () => deleteLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: label.version }),
+      (v) => (wasContext ? `Deleted the label ${v.name}; the working context is off.` : `Deleted the label ${v.name}.`),
+      { undoable: true },
+    );
     if (r.ok) ui.select(null);
+    else if (wasContext) workingContext!.set(label.id, { silent: true });
   }
 
   const section = (k: LabelTargetKind, title: string) =>

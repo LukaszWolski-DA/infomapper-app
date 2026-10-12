@@ -83,6 +83,15 @@ describe("completeLiveWrites: the active working context (D-26)", () => {
     expect(r.ok && r.value.labeled).toBe(0);
   });
 
+  it("saves an action it would not label without the context when the label is gone or the role may not label (no dead end)", () => {
+    const moved = ws([{ kind: "update", table: "canvas_item", before: canvasItem(), row: { ...canvasItem(), x: 999, version: 2 } }]);
+    const gone = state({ labels: [label(), label(ids.labelJira, { deleted_at: "2026-10-12T09:00:00.000Z" })] });
+    for (const [s, who] of [[gone, owner], [state(), access("reviewer")]] as const) {
+      const r = completeLiveWrites(makeCtx(), who, s, moved, { contextLabelId: ids.labelJira });
+      expect(r.ok && r.writeSet.events.every((e) => e.context_label_id === null)).toBe(true);
+    }
+  });
+
   it("lets the person delete the context's own label (checked as it was when the action started)", () => {
     const del = deleteLabel(makeCtx(), owner, { label: label(ids.labelJira), links: [], pins: [] }, { labelId: ids.labelJira, expectedVersion: 1 });
     expect(del.ok).toBe(true);

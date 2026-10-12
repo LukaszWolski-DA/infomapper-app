@@ -198,8 +198,10 @@ export function touchesLiveCanvases(writes: readonly Write[]): boolean {
 
 /**
  * Completes one action's write set (see the file's comment): the context's labels, the labels of cards placed on live
- * canvases, and the sync of every live canvas, in the same change group. Refused when the context's label is gone or
- * the person may not change labels. Without a context and with nothing that touches labels, the model or the canvases,
+ * canvases, and the sync of every live canvas, in the same change group. An action the context would label is refused
+ * when the context's label is gone or the person may not change labels; any other action is saved without the context
+ * (there is nothing to label, and pages without the switch must not get stuck). Without a context and with nothing that
+ * touches labels, the model or the canvases,
  * the write set comes back as it was. `revert` (undo and redo): only the sync; an undo or redo puts back what the step
  * changed, label links included, and never links the active context or labels a card it brings back.
  */
@@ -212,7 +214,7 @@ export function completeLiveWrites(
 ): CommandResult<LiveOutcome> {
   const ws = access.workspace.id;
   const revert = options.revert === true;
-  const contextLabelId = revert ? null : (options.contextLabelId ?? null);
+  let contextLabelId = revert ? null : (options.contextLabelId ?? null);
   const touches = touchesLiveCanvases(writeSet.writes);
   if (!contextLabelId && !touches) return { ok: true, value: { labeled: 0, canvases: [] }, writeSet };
 
@@ -228,16 +230,22 @@ export function completeLiveWrites(
 
   // 1. the active working context
   let labeled = 0;
+  const targets = contextLabelId ? contextTargets(writeSet.writes, writeSet.mainTargets) : [];
   if (contextLabelId) {
     const denied = checkPermission(access, "label.edit");
-    if (denied) return fail(denied);
     // the label must exist when the action starts (deleting the context's own label is an action like any other)
-    if (!isLive(state.labels.find((l) => l.id === contextLabelId), ws)) return fail(domainError("not_found", CONTEXT_LABEL_GONE));
-    const stillThere = isLive(after.labels.find((l) => l.id === contextLabelId), ws);
-    for (const target of stillThere ? contextTargets(writeSet.writes, writeSet.mainTargets) : []) {
+    const gone = !isLive(state.labels.find((l) => l.id === contextLabelId), ws);
+    if (!targets.length && (denied || gone)) contextLabelId = null;
+    else if (denied) return fail(denied);
+    else if (gone) return fail(domainError("not_found", CONTEXT_LABEL_GONE));
+  }
+  if (contextLabelId) {
+    const labelId = contextLabelId;
+    const stillThere = isLive(after.labels.find((l) => l.id === labelId), ws);
+    for (const target of stillThere ? targets : []) {
       const rows = after[FIELD[target.kind]] as readonly { id: Uuid; workspace_id: Uuid; deleted_at: string | null }[];
-      if (!isLive(rows.find((r) => r.id === target.id), ws) || linkedTo(contextLabelId, target)) continue;
-      link(contextLabelId, target);
+      if (!isLive(rows.find((r) => r.id === target.id), ws) || linkedTo(labelId, target)) continue;
+      link(labelId, target);
       labeled++;
     }
   }
