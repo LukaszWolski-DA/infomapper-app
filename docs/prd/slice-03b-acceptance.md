@@ -1,6 +1,6 @@
 # Slice 3b – Acceptance
 
-Status: **step 3 done, waiting for Łukasz** (the S3B-15 element count and quick round after his OK). Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
+Status: **step 3 done; S3B-15 (a) met; the quick round was disturbed, waiting for Łukasz**. Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
 reported one by one (below); criteria, runs and the manual checklist come in step 5.
 
 ## Step 0 (12 October)
@@ -206,6 +206,38 @@ Code review of every way to the workspace home:
 
 No plausible path from a removal was found. Most likely the browser tool caused it (the request was `/` itself, which
 only a sign-in or a typed address asks for). Kept in view in the step 5 runs.
+
+### After step 3: S3B-15 (a) and the quick round (12 October, at `35bd0f3`)
+
+**S3B-15 (a), elements** (measurement build of the branch, the same spec as the baseline; `.data/measure/s3b15-step3/branch.json`):
+
+| View | Viewport: `slice-03a` | Viewport: branch | Whole page: `slice-03a` | Whole page: branch |
+| --- | --- | --- | --- | --- |
+| 100 %, frames expanded | 19,295 | 19,295 | 20,679 | 20,697 |
+| 30 %, frames expanded | 4,498 | 4,498 | 5,882 | 5,900 |
+| 100 %, frames collapsed | 4,905 | 4,905 | 6,209 | 6,227 |
+| 30 %, frames collapsed | 1,463 | 1,463 | 2,767 | 2,785 |
+
+The viewport counts are equal: met. The whole page has 18 more elements in each view, PERF-2's tab in the tab bar.
+
+**Quick round** (`npm run measure:canvas -- --quick --rounds 1 --against slice-03a`, sitting `.data/measure/2026-10-12-19-53`):
+
+| Figure | Bar | slice-03a | This branch | Change |
+| --- | --- | --- | --- | --- |
+| Pan and zoom at the overview | ≥ 50 fps | 56.4 | 59.1 | +4.8 % |
+| – frames over 50 ms | 0 | 0 | 0 | – |
+| Pan and zoom at 100 %, dense area | ≥ 50 fps | 40.7 | 32.4 | −20.4 % |
+| – frames over 50 ms | 0 | 9 | 15 | – |
+| Initial render (C-08), median of 5 | ≤ 1500 ms | 2115 | 1919 | −9.3 % |
+| Hover (C-10), median of 40 | ≤ 100 ms | 143 | 116 | −18.8 % |
+| Lasso marks, median of 20 | ≤ 100 ms | 31 | 46 | +46.2 % |
+
+**Reading: disturbed, not usable.** `slice-03a` itself is far below every earlier sitting (100 %: 40.7 against
+48.6–52.5; C-08: 2115 against 1384–1512 ms), so the laptop was slower in this sitting; a one-round sitting measures the
+reference first and the branch second, so a machine that slows down puts the branch behind (slice 3a's lesson). My
+browser pane still held a tab (hidden, its server stopped); closed now. The element counts in the viewport are equal,
+and the code a normal canvas runs while panning did not change in this slice; still, the round says nothing either way.
+Reported to Łukasz before going on.
 
 ## Changes to earlier tests
 
