@@ -134,6 +134,17 @@ mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md]
   layers and may cost GPU memory or raster time) and, if still needed, fewer elements per note beyond slice 3a's (body,
   footer and resize edge remain), together with the “partly met” items above (C-09, C-10, dragging, lasso marks).
 
+### Live canvases without the view-state bar (slice 3b)
+
+The prototype shows a live canvas's “Live: {name}” as the first chip of the view-state bar (not removable, not part of
+“Show all”), and a live canvas's Labeled row filter is not counted as “filtered” there and is left by “Show all”. The
+application has no view-state bar yet (D-39), so neither exists; a live canvas shows its tag icon on the tab and the
+tile and its box in the overview.
+
+- **Accepted** by Łukasz after slice 3b's step 3.
+- **Later:** with the view-state bar (slice 6, D-39): the “Live: {name}” chip, and the Labeled filter neither counted as
+  “filtered” nor reset by “Show all”.
+
 ## Undo history (slice 1b)
 
 ### The undo history lives in server memory

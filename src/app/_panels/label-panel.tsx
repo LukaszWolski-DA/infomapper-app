@@ -78,7 +78,7 @@ export function LabelPanel({ label }: { label: Label }) {
     const r = await run(
       () => deleteLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: label.version }),
       // a live canvas became a normal canvas in the same step (slice 3b, PRD item 13)
-      (v) => `${wasContext ? `Deleted the label ${v.name}; the working context is off.` : `Deleted the label ${v.name}.`}${v.hadLiveCanvas ? " Its live canvas, if any, became a normal canvas." : ""}`,
+      (v) => `${wasContext ? `Deleted the label ${v.name}; the working context is off.` : `Deleted the label ${v.name}.`}${v.hadLiveCanvas ? " Its live canvas became a normal canvas." : ""}`,
       { undoable: true },
     );
     if (r.ok) ui.select(null);

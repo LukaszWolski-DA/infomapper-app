@@ -167,9 +167,9 @@ the same steps (no error in the console or the server log; likely my browser too
 
 ### Assumptions
 
-17. **No view-state bar yet.** The PRD's “Live: {name}” chip in the view-state bar and “not counted as filtered / Show
-    all leaves it” (items 8, 9) need the view-state bar (D-39), which earlier PRDs put in slice 6; it does not exist.
-    Not built; question for Łukasz.
+17. **No view-state bar yet** (Łukasz after step 3). The “Live: {name}” chip and “the Labeled filter is not counted as
+    filtered, Show all leaves it” (items 8, 9) belong to the view-state bar slice (slice 6, D-39); the PRD, S3B-08,
+    S3B-09 and `docs/known-limitations.md` say so.
 18. **Who may open.** Anyone who sees the workspace may go to a live canvas the project has; adding it to this project
     needs “change a canvas's projects”, making one “create canvases” (owners, admins, modelers). The label panel's and
     the home's buttons show only what the person may do.
@@ -184,6 +184,28 @@ the same steps (no error in the console or the server log; likely my browser too
     through the sync”); the card is selected only by a drop.
 22. **The S3B-15 count spec** compares the viewport counts with the baseline; the whole page differs by the second tab
     `seed:large` now has (PERF-2's live canvas).
+
+### After step 3: the jump to the workspace home (review, 12 October)
+
+Observed once in the browser after a removal on a live canvas; not seen again, neither in my second try nor in Łukasz's
+manual tests on the preview data (removals by Delete, toolbox and panel, direct and context cards, a fast add then
+remove, a live canvas emptied card by card, with undo). The server log showed `GET /` (307) and then the workspace home.
+
+Code review of every way to the workspace home:
+
+| Where | What | When | Could a removal on a live canvas cause it? |
+| --- | --- | --- | --- |
+| `src/app/page.tsx` | `redirect(workspaceHref(…))` | a visit of `/`: the last workspace (cookie), else the first | only if something goes to `/`; nothing in the app links or pushes to `/` |
+| `src/app/_actions/session.ts` | `redirect("/")` | after signing in as a test user | no (only the sign-in page calls it) |
+| `src/app/_lib/session.ts`, `src/proxy.ts` | redirect to `/sign-in` | no session | no, and it goes to the sign-in page, not the home |
+| `src/app/_lib/shell.ts` | `notFound()` | unknown workspace, not a member, unknown project, canvas not found | a 404 page, never a redirect; the removal and its sync change cards and label links only, never the canvas, its project link or the project |
+| `src/app/_lib/shell.ts` | redirect to a canvas of the project (`?moved=1`, or the next canvas after one's own action) | the canvas is not in the project | no: the live canvas keeps its project link (removing a card never removes it) |
+| top bar and breadcrumbs | links to the workspace home (“Workspace home”, the workspace and organization crumbs) | a click | only by a click |
+| client router pushes | canvas pages only (tabs, canvas menu, “On canvases”, open live canvas, new project or canvas) | after the person's action | no push goes to `/` or a workspace home |
+| error boundaries | none (`error.tsx`, `not-found.tsx`, `global-error.tsx` do not exist) | – | – |
+
+No plausible path from a removal was found. Most likely the browser tool caused it (the request was `/` itself, which
+only a sign-in or a typed address asks for). Kept in view in the step 5 runs.
 
 ## Changes to earlier tests
 

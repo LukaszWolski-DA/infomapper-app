@@ -82,16 +82,16 @@ tables that are only partly labeled, and adding or removing a card there changes
      no “Newly labeled” frame; the prototype's frame is recorded in `docs/ideas.md` as a deviation to revisit).
    On the open canvas the toast reads “Added from {name}: {items}.” and/or “No longer labeled: {items}.” Layout the
    person made is never rearranged.
-8. **Looking live.** The canvas tab has the tag icon (“Live canvas: shows everything labeled {name}”); the
-   view-state bar starts with the information chip “Live: {name}” (not removable, not part of “Show all”); the canvas
+8. **Looking live.** The canvas tab has the tag icon (“Live canvas: shows everything labeled {name}”); the canvas
    overview starts with the dashed box “This is the live canvas for {name}. Everything labeled {name} appears here by
    itself. Adding an entity here adds the label; removing one takes the label off.” with “Open label”; the project
-   home's canvas tile shows the tag icon.
+   home's canvas tile shows the tag icon. (The view-state bar's information chip “Live: {name}”, not removable and not
+   part of “Show all”, comes with the view-state bar, slice 6, D-39: Łukasz after step 3.)
 9. **Context cards and rows.** A context card has a dashed outline and a light header, the entity's line reads
    “context only” instead of “in {concept}”, with the tooltip “Context: the entity itself is not labeled {name}, only
    some of its attributes are” (tables: “…only some of its columns or mappings are”). Relevant rows have a bold name.
-   The `labeled` row filter (“Labeled”) is offered on live canvases only, for entity cards, as in the prototype; it is
-   not counted as “filtered” in the view-state bar and “Show all” leaves it. Mappings that do not carry L are drawn
+   The `labeled` row filter (“Labeled”) is offered on live canvases only, for entity cards, as in the prototype (that
+   it is not counted as “filtered” and “Show all” leaves it belongs to the view-state bar, slice 6, D-39). Mappings that do not carry L are drawn
    faded **by colour** (not opacity), their end dots too.
 10. **Adding a card** (D-11, `liveAdd`). Dropping an entity or table from the left panel, clicking it there, or
     adding it from a panel's feeding sources asks “Label {name} with {label}? It then appears on this live canvas.”
@@ -110,7 +110,9 @@ tables that are only partly labeled, and adding or removing a card there changes
 13. **Label rename and delete.** Renaming L renames its live canvas when the canvas still has L's old name. Deleting
     L turns its live canvas into a normal canvas in the same change group (Q5: `live_label_id` and `live_level` are
     cleared and `labeled` row filters become `all`) and the toast reads “Deleted the label {name}.
-    Its live canvas, if any, became a normal canvas.” Undo brings both back.
+    Its live canvas became a normal canvas.” (“Deleted the label {name}; the working context is off. Its live canvas
+    became a normal canvas.” when it was the active context; without a live canvas the toast has no second sentence.)
+    Undo brings both back.
 14. **Duplicate layout** of a live canvas makes a normal canvas from the start (Q6: no `live_label_id`, no
     `live_level`, `labeled` row filters copied as `all`); the original stays live.
 
@@ -239,8 +241,8 @@ after Łukasz approves them, in this pull request. Update README and CLAUDE.md c
 | S3B-05 | “Open as live canvas” on CR-23 (label panel and project home) makes one canvas named CR-23 with Customer full, the entities and tables of CR-23's attributes, columns and mappings as context cards with the `labeled` filter, arranged into frames; opening again goes to it; from another project it is added there first. |
 | S3B-06 | With the live canvas open, labeling an attribute of an entity not on it (panel) adds that entity as context to the right of the existing content with the toast; removing the last label of a context card takes it off; a context entity labeled directly becomes full and its filter `all`; all in the change's undo step. |
 | S3B-07 | Labeling made on another canvas (and by the active context) changes the live canvas too; opening it afterwards shows the change without a toast. |
-| S3B-08 | The tab icon, “Live: CR-23” in the view-state bar (kept by “Show all”), the overview box with “Open label” and the tile icon on the project home are shown; on a normal canvas none of them. |
-| S3B-09 | Context cards have the dashed outline and “context only”, relevant rows are bold, unlabeled mappings are faded by colour without opacity; the `labeled` filter is offered only on live canvases and not counted as “filtered”. |
+| S3B-08 | The tab icon, the overview box with “Open label” and the tile icon on the project home are shown; on a normal canvas none of them. |
+| S3B-09 | Context cards have the dashed outline and “context only”, relevant rows are bold, unlabeled mappings are faded by colour without opacity; the `labeled` filter is offered only on live canvases. |
 | S3B-10 | Dropping an entity on the live canvas asks, “Add CR-23” labels and places it where dropped; “Cancel” changes nothing; the Entity tool labels without asking; bulk adds are refused with the prototype's toast. |
 | S3B-11 | Removing a directly labeled card that also has labeled rows asks the first question and keeps it as context; removing a context card asks the second and unlabels its rows and mappings; each is one undo step. |
 | S3B-12 | Renaming CR-23 renames its live canvas; deleting it makes the canvas normal as answered in question 5 (no `live_label_id`, no `live_level`, `labeled` filters become `all`), with the toast; Undo brings back label, links and live canvas. Duplicate layout of the live canvas gives a normal canvas (question 6). |
