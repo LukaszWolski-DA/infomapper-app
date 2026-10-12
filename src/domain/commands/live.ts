@@ -231,8 +231,10 @@ export function completeLiveWrites(
   if (contextLabelId) {
     const denied = checkPermission(access, "label.edit");
     if (denied) return fail(denied);
-    if (!isLive(after.labels.find((l) => l.id === contextLabelId), ws)) return fail(domainError("not_found", CONTEXT_LABEL_GONE));
-    for (const target of contextTargets(writeSet.writes, writeSet.mainTargets)) {
+    // the label must exist when the action starts (deleting the context's own label is an action like any other)
+    if (!isLive(state.labels.find((l) => l.id === contextLabelId), ws)) return fail(domainError("not_found", CONTEXT_LABEL_GONE));
+    const stillThere = isLive(after.labels.find((l) => l.id === contextLabelId), ws);
+    for (const target of stillThere ? contextTargets(writeSet.writes, writeSet.mainTargets) : []) {
       const rows = after[FIELD[target.kind]] as readonly { id: Uuid; workspace_id: Uuid; deleted_at: string | null }[];
       if (!isLive(rows.find((r) => r.id === target.id), ws) || linkedTo(contextLabelId, target)) continue;
       link(contextLabelId, target);

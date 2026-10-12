@@ -109,6 +109,23 @@ export function addLabel(
   return done(ctx, access, { labelId: label.id, labelLinkId: link.id, created, name: label.name }, writes);
 }
 
+// ---- create a label on its own (the working context's “Create “{name}””, slice 3b) ----
+
+const createInput = z.object({ name: labelNameSchema }).strict();
+export type CreateLabelInput = z.input<typeof createInput>;
+
+/** Creates a label that marks nothing yet; a name another label has in any case is refused. */
+export function createLabel(ctx: CommandContext, access: WorkspaceAccess, state: { labels: readonly Label[] }, input: unknown): CommandResult<{ label: Label }> {
+  const parsed = begin(access, "label.edit", createInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const ws = access.workspace.id;
+  const { name } = parsed.data;
+  const other = labelNamed(state.labels.filter((l) => isLive(l, ws)), name);
+  if (other) return fail(domainError("conflict", takenNameMessage(other.name)));
+  const label: Label = { ...newRowColumns(ctx), workspace_id: ws, name, name_key: labelKey(name) };
+  return done(ctx, access, { label }, [{ kind: "insert", table: "label", row: label }]);
+}
+
 // ---- take a label off an item ----
 
 const removeInput = z.object({ labelLinkId: uuidSchema, expectedVersion: versionSchema }).strict();

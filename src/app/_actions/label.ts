@@ -7,7 +7,7 @@
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";
 import type { CommandContext, CommandResult } from "@/domain/changes";
-import { addLabel, deleteLabel, removeLabel, renameLabel, setLabelPinned, type AddLabelInput } from "@/domain/commands/label";
+import { addLabel, createLabel, deleteLabel, removeLabel, renameLabel, setLabelPinned, type AddLabelInput } from "@/domain/commands/label";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 
@@ -34,6 +34,14 @@ export async function addLabelAction(workspaceId: string, input: AddLabelInput):
     const [model, labels, links] = await Promise.all([store.model.load(ws), store.labels.list(ws), store.labels.listLinks(ws)]);
     const r = addLabel(ctx, access, { ...model, labels, links }, input);
     return r.ok ? { ...r, value: { labelId: r.value.labelId, name: r.value.name, created: r.value.created } } : r;
+  });
+}
+
+/** Creates a label that marks nothing yet (the working context's “Create “{name}””, slice 3b). */
+export async function createLabelAction(workspaceId: string, input: { name: string }): Promise<ActionResult<{ labelId: string; name: string }>> {
+  return labelCommand(workspaceId, async (ctx, access, store) => {
+    const r = createLabel(ctx, access, { labels: await store.labels.list(access.workspace.id) }, input);
+    return r.ok ? { ...r, value: { labelId: r.value.label.id, name: r.value.label.name } } : r;
   });
 }
 

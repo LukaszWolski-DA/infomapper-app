@@ -16,6 +16,7 @@ import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pi
 import { AppShell } from "@/app/_components/app-shell";
 import { MovedNotice } from "@/app/_components/moved-notice";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
+import { WorkingContextButton, WorkingContextProvider } from "@/app/_components/working-context";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { canvasHref } from "@/app/_lib/paths";
 import { loadShell } from "@/app/_lib/shell";
@@ -40,7 +41,9 @@ import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
 import { isMeasurementBuild } from "@/data/local/measure-mode";
-import { labelNamesByItem } from "@/domain/model/labels";
+import { labelItemCounts, labelNamesByItem } from "@/domain/model/labels";
+import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
+import { cookies } from "next/headers";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 
 // Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a); the Entity
@@ -94,6 +97,11 @@ export default async function CanvasPage({
   const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId), labelNames);
   const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id));
   const editable = shell.standing === "full";
+  // the working context (slice 3b): for those who change labels (AD-05: the same roles as model editors), from this
+  // person's browser; the labels with how many items each marks, for its menu and the status bar
+  const itemCounts = labelItemCounts(labelLinks);
+  const countedLabels = labels.filter((l) => l.deleted_at === null).map((l) => ({ id: l.id, name: l.name, items: itemCounts.get(l.id) ?? 0 }));
+  const contextCookie = parseContextCookie((await cookies()).get(contextCookieName(shell.user.id, ws))?.value);
   // notes: editors and reviewers write them (Łukasz's step 0 answer 1); readers and an archived workspace only read
   const canNote = shell.standing !== "none";
   const userName = (id: string) => users.find((u) => u.id === id)?.display_name ?? "someone";
@@ -138,6 +146,7 @@ export default async function CanvasPage({
       >
       <PanelsProvider>
         <UndoProvider workspaceId={ws} projectId={projectId} canvasId={canvasId} state={undoState}>
+          <WorkingContextProvider workspaceId={ws} userId={shell.user.id} labels={countedLabels} initial={contextCookie} canLabel={editable}>
           <AppShell
             shell={shell}
             project={{
@@ -216,6 +225,7 @@ export default async function CanvasPage({
               diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks"), noFrames: diag.includes("noframes"), noLabels: diag.includes("nolabels"), collapsed: diag.includes("collapsed") } : undefined}
             />
           </AppShell>
+          </WorkingContextProvider>
         </UndoProvider>
       </PanelsProvider>
       </CanvasLookProvider>
@@ -231,6 +241,7 @@ const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolea
     {canNote && <NoteToolButton />}
     <HandToolButton />
     <NotationSwitch />
+    <WorkingContextButton />
     <UndoButtons />
     <ZoomControls />
   </>

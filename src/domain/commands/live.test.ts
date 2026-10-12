@@ -83,6 +83,14 @@ describe("completeLiveWrites: the active working context (D-26)", () => {
     expect(r.ok && r.value.labeled).toBe(0);
   });
 
+  it("lets the person delete the context's own label (checked as it was when the action started)", () => {
+    const del = deleteLabel(makeCtx(), owner, { label: label(ids.labelJira), links: [], pins: [] }, { labelId: ids.labelJira, expectedVersion: 1 });
+    expect(del.ok).toBe(true);
+    if (!del.ok) return;
+    const r = completeLiveWrites(makeCtx(), owner, state(), del.writeSet, { contextLabelId: ids.labelJira });
+    expect(r.ok && r.writeSet.writes.filter((w) => w.kind === "insert" && w.table === "label_link")).toEqual([]);
+  });
+
   it("labels only the moved attribute when attributes are renumbered (Q2)", () => {
     const s = state({ attributes: [attribute(ids.customerId, { sort_order: 0 }), attribute(ids.email, { sort_order: 1 })] });
     const moved = reorderAttribute(makeCtx(), owner, { attribute: s.attributes[1]!, attributes: s.attributes }, { attributeId: ids.email, expectedVersion: 1, position: 0 });
