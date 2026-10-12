@@ -15,18 +15,24 @@ moment can therefore both pass the check and leave a canvas or project without i
 - **The database slice (last, AD-31):** check this rule in the same transaction as the write (e.g. lock the project's and the canvas's
   `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed.
 
-### A late fresh page could show older frames or cards (slice 3a, step 5)
+### A late fresh page could show an older state (slice 3a step 5; fixed for notes, frames and cards in slice 3b)
 
-After a write, the canvas takes the server's fresh page and keeps only what still has writes on their way. Slice 3a's
-step 5 found that for notes a page re-rendered by an earlier write can read the data before a later write and arrive
-after it, so the canvas showed older notes (a note created meanwhile vanished until a reload); notes now keep what is
-newer than the page (`mergeServerNotes`, the page's `notesReadAt`). Frames and cards take the fresh page the same way
-and could show the same effect.
+After a write the canvas takes the server's fresh page. A page started by one write can read the data before a later
+write lands and arrive after it. Slice 3a found it for notes (a note created meanwhile vanished); slice 3b's step 0
+found the same for frames and cards: moves and resizes do not refresh the page, so a card or frame moved just after a
+label write jumped back to its old place and the canvas sent the old version with its next move, which was refused.
+Since slice 3b, step 1, notes, frames and cards take a fresh page through one rule (`mergeFresh` in
+`src/canvas/fresh.ts`): what still has writes on its way or is newer here stays, rows deleted here stay gone, rows
+created after the page read the data (`readAt`) stay, and the versions the canvas sends only grow.
 
-- **Possible, not observed:** no test or manual check has shown it for frames or cards; one person at a time makes it
-  unlikely.
-- **To check before the database slice (last, AD-31):** several people working at once make it more likely; the notes
-  fix shows the pattern (when the page read the data, versions only growing, deletions made here).
+- **What is left:** the model's content on cards (names, rows, label marks) and everything else on the page is taken
+  as it comes. A late page can show it older for a moment; a newer page follows, because every model write refreshes
+  the page.
+- **Candidate for the database slice (last, AD-31): a store revision.** Each page and each write result would carry the
+  store's revision (a number that grows with every change group), and the canvas would ignore a page older than the
+  newest revision it has seen. That covers everything on the page in one place, not only rows with a version, and
+  several people working at once make late pages more likely. Not built now: the local adapter has one person at a
+  time, and the per-row rule above covers what can stay wrong.
 
 ## Canvas performance (slice 1a)
 

@@ -23,6 +23,8 @@ export interface FrameData {
   height: number;
   /** Drawn as one block (D-07, slice 2c); the frame keeps its size and its cards their places. */
   collapsed: boolean;
+  /** When it was created (server time; a late fresh page keeps a frame created after it read the data, `mergeFresh`). */
+  createdAt: string;
 }
 
 /** How many cards each frame holds, from the cards as the canvas has them now. */
@@ -61,6 +63,7 @@ export function buildFrames(frames: readonly Frame[]): FrameData[] {
       width: f.width,
       height: f.height,
       collapsed: f.collapsed,
+      createdAt: f.created_at,
     }))
     .sort((a, b) => b.width * b.height - a.width * a.height || a.id.localeCompare(b.id));
 }

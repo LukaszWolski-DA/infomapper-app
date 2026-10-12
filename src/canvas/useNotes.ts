@@ -22,7 +22,8 @@ import { noteFrameAt, NOTE_WIDTH, pinOffset, pinTargetRect, type NotePlaces } fr
 import { useToast } from "@/ui/components/toast";
 import type { NotePatch, NoteView, UndoHooks } from "./context";
 import type { Selection } from "./line-data";
-import { mergeServerNotes, noteAt, type NoteData } from "./note-data";
+import { grownVersions, mergeFresh } from "./fresh";
+import { noteAt, type NoteData } from "./note-data";
 
 type WriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
 type NoteResult = Promise<WriteResult<{ note: NoteData }>>;
@@ -81,8 +82,8 @@ interface Options {
   /** May write notes: owner, admin, modeler and reviewer, not archived. */
   canNote: boolean;
   initialNotes: readonly NoteData[];
-  /** When the page read `initialNotes` (server time): a fresh page may be older than a note created meanwhile. */
-  notesReadAt: string | null;
+  /** When the page read `initialNotes` (server time): a fresh page may be older than the canvas (`mergeFresh`). */
+  readAt: string | null;
   versions: MutableRefObject<Map<string, number>>;
   pending: MutableRefObject<Map<string, number>>;
   enqueue: (id: string, write: () => Promise<void>) => void;
@@ -130,16 +131,15 @@ export function useNotes(o: Options) {
   });
 
   // ---- fresh notes from the server (after an undo, a removed card, a deleted frame): take them, except what is saving
-  // or newer here (a page rendered while the user wrote may be older than the canvas: `mergeServerNotes`) ----
-  const { initialNotes, notesReadAt } = o;
+  // or newer here (a page rendered while the user wrote may be older than the canvas: `mergeFresh`) ----
+  const { initialNotes, readAt } = o;
   /** Notes deleted here, at the version they had then. */
   const deletedHere = useRef(new Map<Uuid, number>());
   useEffect(() => {
-    setNotes((ns) => mergeServerNotes(ns, initialNotes, notesReadAt, (id) => pending.current.get(id) ?? 0, deletedHere.current));
-    for (const n of initialNotes) {
-      if (!(pending.current.get(n.id) ?? 0) && n.version >= (versions.current.get(n.id) ?? 0)) versions.current.set(n.id, n.version);
-    }
-  }, [initialNotes, notesReadAt, pending, versions]);
+    const pendingOf = (id: Uuid) => pending.current.get(id) ?? 0;
+    setNotes((ns) => mergeFresh(ns, initialNotes, { readAt, pendingOf, deletedHere: deletedHere.current }));
+    for (const [id, v] of grownVersions(initialNotes, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
+  }, [initialNotes, readAt, pending, versions]);
 
   const noteOf = useCallback((id: Uuid) => notesRef.current.find((n) => n.id === id) ?? null, []);
   const patch = useCallback((id: Uuid, p: Partial<NoteData>) => {

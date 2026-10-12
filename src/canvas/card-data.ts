@@ -67,6 +67,8 @@ export interface CardData {
   links: { id: Uuid; warn: boolean; draft: boolean }[];
   /** Working labels on the entity or source table, for the tag mark in its header at every zoom (slice 3a); null when unlabeled. */
   labels: string | null;
+  /** When the card was placed (server time; a late fresh page keeps a card placed after it read the data, `mergeFresh`). */
+  createdAt: string;
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -126,6 +128,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
       collapsed: item.collapsed,
       rowFilter: item.row_filter === "labeled" ? "all" : item.row_filter,
       frameId: item.frame_id,
+      createdAt: item.created_at,
     } as const;
     /** The distinct mappings of the given rows. */
     const links = (rows: readonly CardRow[]) => [...new Map(rows.flatMap((r) => linksOf.get(r.id) ?? []).map((l) => [l.id, l])).values()];

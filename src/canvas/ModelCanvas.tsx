@@ -46,6 +46,7 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./canvas.css";
+import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
 import { withClips, type CardData } from "./card-data";
 import CardNode, { cardNodesOf, FILTER_ORDER, type CardNodeT } from "./CardNode";
@@ -91,6 +92,7 @@ import LineLayer from "./LineLayer";
 import { bundleLines, type Bundle } from "./line-geometry";
 import { Overview } from "./Overview";
 import NoteLayer, { type ShownNote } from "./NoteLayer";
+import { grownVersions, mergeFresh } from "./fresh";
 import { countsKey, countsOf, frameNoteCounts, noteAt, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
 import { DRAFT_NOTE, NO_NOTE_WRITES, useNotes, type NoteMover, type NoteWrites } from "./useNotes";
 
@@ -144,9 +146,10 @@ export interface ModelCanvasProps {
   focusNoteId?: string | null;
   /** Measurement-only switches (only the measurement-only production build passes them). */
   diagnosis?: Diagnosis;
-  /** The canvas's notes and their writes (slice 3a); when the page read them (server time, step 5). */
+  /** The canvas's notes and their writes (slice 3a). */
   notes?: NoteData[];
-  notesReadAt?: string | null;
+  /** When the page read the data (server time): a fresh page may be older than the canvas (`mergeFresh`). */
+  readAt?: string | null;
   noteWrites?: NoteWrites;
   /** May write notes: editors and reviewers, not archived (Łukasz's step 0 answer 1). */
   canNote?: boolean;
@@ -209,7 +212,7 @@ export function ModelCanvas({
   focusNoteId,
   diagnosis = NO_DIAGNOSIS,
   notes: initialNotes = NO_NOTES,
-  notesReadAt = null,
+  readAt = null,
   noteWrites,
   canNote = false,
   userName = "",
@@ -457,21 +460,38 @@ export function ModelCanvas({
     for (const id of ids) queue.current.set(id, next);
   }, []);
 
-  // ---- fresh cards from the server (after a place, remove or rename): take them, except what is still saving ----
+  /** Cards removed here, at the version they had then (a late fresh page must not put them back; `mergeFresh`). */
+  const removedHere = useRef(new Map<Uuid, number>());
+  // ---- fresh cards from the server (after a place, remove or rename): take them, except the layout of what is still
+  // saving, being dragged or newer here (a page started by an earlier write may arrive after a later move: `mergeFresh`) ----
   useEffect(() => {
+    const pendingOf = (id: Uuid) => pending.current.get(id) ?? 0;
     // The server's cards arrive as props after each write.
     setNodes((ns) => {
       const local = new Map(ns.map((n) => [n.id, n]));
-      return initialCards.map((c) => {
+      const merged = mergeFresh(
+        ns.map((n) => n.data.card),
+        initialCards,
+        {
+          readAt,
+          pendingOf: (id) => pendingOf(id) + (local.get(id)?.dragging ? 1 : 0),
+          deletedHere: removedHere.current,
+          versionOf: (c) => Math.max(c.version, versions.current.get(c.id) ?? 0),
+          // the model's content from the page, the layout as the canvas has it
+          keep: (here, page) => ({ ...page, x: here.x, y: here.y, collapsed: here.collapsed, rowFilter: here.rowFilter, width: here.width, frameId: here.frameId }),
+        },
+      );
+      const page = new Set(initialCards);
+      return merged.map((c) => {
         const mine = local.get(c.id);
         // the number of notes stays as the notes last gave it (slice 3a)
-        if (!mine || (!(pending.current.get(c.id) ?? 0) && !mine.dragging)) return toNode(c, editable, mine?.data.pinnedNotes);
-        const { x, y, collapsed, rowFilter, width, frameId } = mine.data.card;
-        return { ...toNode({ ...c, x, y, collapsed, rowFilter, width, frameId }, editable, mine.data.pinnedNotes), position: mine.position, dragging: mine.dragging };
+        if (!mine || page.has(c)) return toNode(c, editable, mine?.data.pinnedNotes);
+        if (c === mine.data.card) return mine;
+        return { ...toNode(c, editable, mine.data.pinnedNotes), position: mine.position, dragging: mine.dragging };
       });
     });
-    for (const c of initialCards) if (!(pending.current.get(c.id) ?? 0)) versions.current.set(c.id, c.version);
-  }, [initialCards, editable]);
+    for (const [id, v] of grownVersions(initialCards, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
+  }, [initialCards, editable, readAt]);
 
   const patchCard = useCallback((id: string, patch: CardPatch) => {
     setNodes((ns) =>
@@ -673,6 +693,7 @@ export function ModelCanvas({
           toast(result.message, "refusal");
           return;
         }
+        removedHere.current.set(cardId, versions.current.get(cardId) ?? 1);
         setNodes((ns) => ns.filter((n) => n.id !== cardId));
         select(null);
         const undo = ui.undo();
@@ -756,6 +777,7 @@ export function ModelCanvas({
     editable,
     showAllCollapsed: diagnosis.collapsed,
     initialFrames,
+    readAt,
     setNodes,
     patchCard,
     enqueueGroup,
@@ -807,7 +829,7 @@ export function ModelCanvas({
   const noteState = useNotes({
     canNote,
     initialNotes,
-    notesReadAt,
+    readAt,
     versions,
     pending,
     enqueue,
@@ -1066,6 +1088,7 @@ export function ModelCanvas({
     enqueueGroup,
     versions,
     pending,
+    removedHere,
     occupied,
     viewRect,
     undo: ui.undo,

@@ -60,8 +60,9 @@ export default async function CanvasPage({
   const view = await loadProjectView(shell);
   const store = getDataStore();
   const ws = shell.workspace.id;
-  // when the notes are read: a page that arrives late must not hide a note created after it (slice 3a, step 5)
-  const notesReadAt = new Date().toISOString();
+  // when the data is read: a page that arrives late must not put back an older state, nor hide a card, frame or note
+  // created after it (slice 3a step 5, slice 3b step 1: `mergeFresh`)
+  const readAt = new Date().toISOString();
   const [model, allItems, canvases, workspace, history, projects, frameRows, labels, labelLinks, noteRows, users] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
@@ -200,7 +201,7 @@ export default async function CanvasPage({
               focusLabelId={focusLabelId}
               focusNoteId={focusNoteId}
               notes={notes}
-              notesReadAt={notesReadAt}
+              readAt={readAt}
               canNote={canNote}
               userName={shell.user.name}
               noteWrites={{
