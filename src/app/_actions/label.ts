@@ -46,7 +46,9 @@ export async function removeLabelAction(workspaceId: string, input: { labelLinkI
 
 export async function renameLabelAction(workspaceId: string, input: { labelId: string; expectedVersion: number; name: string }): Promise<ActionResult<{ name: string }>> {
   return labelCommand(workspaceId, async (ctx, access, store) => {
-    const r = renameLabel(ctx, access, { labels: await store.labels.list(access.workspace.id) }, input);
+    const ws = access.workspace.id;
+    const [labels, canvases] = await Promise.all([store.labels.list(ws), store.canvases.list(ws)]);
+    const r = renameLabel(ctx, access, { labels, canvases }, input);
     return r.ok ? { ...r, value: { name: r.value.label.name } } : r;
   });
 }
@@ -55,8 +57,14 @@ export async function renameLabelAction(workspaceId: string, input: { labelId: s
 export async function deleteLabelAction(workspaceId: string, input: { labelId: string; expectedVersion: number }): Promise<ActionResult<{ name: string }>> {
   return labelCommand(workspaceId, async (ctx, access, store) => {
     const ws = access.workspace.id;
-    const [label, links, pins] = await Promise.all([store.labels.get(ws, str(input?.labelId)), store.labels.listLinks(ws), store.labels.listPins(ws)]);
-    const r = deleteLabel(ctx, access, { label, links, pins }, input);
+    const [label, links, pins, canvases, canvasItems] = await Promise.all([
+      store.labels.get(ws, str(input?.labelId)),
+      store.labels.listLinks(ws),
+      store.labels.listPins(ws),
+      store.canvases.list(ws),
+      store.canvasItems.list(ws),
+    ]);
+    const r = deleteLabel(ctx, access, { label, links, pins, canvases, canvasItems }, input);
     return r.ok ? { ...r, value: { name: r.value.name } } : r;
   });
 }

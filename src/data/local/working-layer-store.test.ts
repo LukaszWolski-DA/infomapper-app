@@ -162,7 +162,7 @@ describe("commands end to end", () => {
 
     const deleted = deleteLabel(ctxFor(anna), access, { label: cr23, links: await store.labels.listLinks(RETAIL), pins: await store.labels.listPins(RETAIL) }, { labelId: cr23.id, expectedVersion: 1 });
     if (!deleted.ok) throw new Error(deleted.error.message);
-    expect(deleted.value).toEqual({ name: "CR-23", items: 5 });
+    expect(deleted.value).toEqual({ name: "CR-23", items: 5, liveCanvasId: null });
     expect(await store.apply(deleted.writeSet)).toEqual({ ok: true });
     expect((await store.labels.list(RETAIL)).map((l) => l.name)).toEqual(["JIRA-481"]);
     expect(await store.labels.listLinks(RETAIL)).toHaveLength(2);

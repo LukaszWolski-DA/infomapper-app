@@ -12,7 +12,7 @@ const colOther = "01900000-0000-7000-8000-00000000e002";
 const mapCombined = "01900000-0000-7000-8000-00000000e003";
 
 /** Customer (customer_id, email), Sales Order (order_id); crm.customer (cust_id, email, first_name), a second table. */
-const base = (links: LiveModel["links"]): LiveModel => ({
+const base = <K extends LiveModel["links"][number]>(links: K[]): Omit<LiveModel, "links"> & { links: K[] } => ({
   attributes: [attribute(ids.customerId), attribute(ids.email), attribute(ids.orderId)],
   sourceColumns: [sourceColumn(ids.colCustId), sourceColumn(ids.colEmail), sourceColumn(ids.colFirstName), sourceColumn(colOther, { source_table_id: other })],
   mappings: [mapping(), mapping({ id: mapCombined, attribute_id: ids.orderId })],

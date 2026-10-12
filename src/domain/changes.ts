@@ -27,6 +27,11 @@ export interface WriteSet {
   changeGroupId: Uuid;
   writes: Write[];
   events: ChangeEvent[];
+  /**
+   * What the action was about when its writes say more (slice 3b, Q2): moving an attribute renumbers its neighbours,
+   * but only the moved attribute gets the active context's label.
+   */
+  mainTargets?: { kind: "entity" | "attribute" | "mapping"; id: Uuid }[];
 }
 
 export type CommandResult<T = undefined> =

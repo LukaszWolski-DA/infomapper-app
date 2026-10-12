@@ -308,5 +308,8 @@ export function reorderAttribute(
   list.forEach((a, index) => {
     if (a.sort_order !== index) writes.push({ kind: "update", table: "attribute", before: a, row: nextVersion(ctx, a, { sort_order: index }) });
   });
-  return done(ctx, access, { position: to }, writes);
+  const result = done(ctx, access, { position: to }, writes);
+  // the active context labels the moved attribute only, not those renumbered around it (slice 3b, Q2)
+  if (result.ok) result.writeSet.mainTargets = [{ kind: "attribute", id: moved.id }];
+  return result;
 }

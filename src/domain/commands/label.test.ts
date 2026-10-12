@@ -148,7 +148,7 @@ describe("deleteLabel (S3A-04)", () => {
   it("takes the label off every item and every project home, in one change group", () => {
     const r = deleteLabel(makeCtx(), access("modeler"), state, { labelId: labelCr23, expectedVersion: 1 });
     if (!r.ok) throw new Error(r.error.message);
-    expect(r.value).toEqual({ name: "CR-23", items: 2 });
+    expect(r.value).toEqual({ name: "CR-23", items: 2, liveCanvasId: null });
     expect(r.writeSet.writes.map((w) => `${w.kind} ${w.table}`)).toEqual([
       "update label_link",
       "update label_link",

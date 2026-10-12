@@ -9,7 +9,7 @@ import { domainError, notFound } from "../errors";
 import type { Uuid } from "../ids";
 import { labelKey, labelNamed, LABEL_TARGET_KINDS, marks, normalizeLabelName, targetColumns, type LabelTarget, type LabelTargetKind } from "../model/labels";
 import type { WorkspaceAccess } from "../permissions";
-import type { Attribute, Entity, Label, LabelLink, Mapping, Project, ProjectPinnedLabel, SourceColumn, SourceTable } from "../types";
+import type { Attribute, Canvas, CanvasItem, Entity, Label, LabelLink, Mapping, Project, ProjectPinnedLabel, SourceColumn, SourceTable } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, found, isLive, softDelete } from "./shared";
 
@@ -128,13 +128,16 @@ export function removeLabel(ctx: CommandContext, access: WorkspaceAccess, state:
 const renameInput = z.object({ labelId: uuidSchema, expectedVersion: versionSchema, name: labelNameSchema }).strict();
 export type RenameLabelInput = z.input<typeof renameInput>;
 
-/** Renames a label; the name stays unique in any case (another case of its own name is fine). */
+/**
+ * Renames a label; the name stays unique in any case (another case of its own name is fine). Its live canvas is renamed
+ * too while it still has the label's old name (slice 3b, PRD item 13).
+ */
 export function renameLabel(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: { labels: readonly Label[] },
+  state: { labels: readonly Label[]; canvases?: readonly Canvas[] },
   input: unknown,
-): CommandResult<{ label: Label }> {
+): CommandResult<{ label: Label; canvasRenamed: boolean }> {
   const parsed = begin(access, "label.edit", renameInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { labelId, expectedVersion, name } = parsed.data;
@@ -145,7 +148,10 @@ export function renameLabel(
   const other = labelNamed(state.labels.filter((l) => l.id !== labelId && isLive(l, access.workspace.id)), name);
   if (other) return fail(domainError("conflict", takenNameMessage(other.name)));
   const row = nextVersion(ctx, before, { name, name_key: labelKey(name) });
-  return done(ctx, access, { label: row }, [{ kind: "update", table: "label", before, row }]);
+  const writes: Write[] = [{ kind: "update", table: "label", before, row }];
+  const live = state.canvases?.find((c) => isLive(c, access.workspace.id) && c.live_label_id === labelId && c.name === before.name);
+  if (live) writes.push({ kind: "update", table: "canvas", before: live, row: nextVersion(ctx, live, { name }) });
+  return done(ctx, access, { label: row, canvasRenamed: !!live }, writes);
 }
 
 // ---- delete ----
@@ -158,10 +164,17 @@ export interface DeleteLabelState {
   /** The label's links and project pins (others are ignored). */
   links: readonly LabelLink[];
   pins: readonly ProjectPinnedLabel[];
+  /** The workspace's canvases and the cards of the label's live canvas, if any (slice 3b). */
+  canvases?: readonly Canvas[];
+  canvasItems?: readonly CanvasItem[];
 }
 
-/** Deletes a label: it comes off every item and every project home, in one change group. The model is untouched. */
-export function deleteLabel(ctx: CommandContext, access: WorkspaceAccess, state: DeleteLabelState, input: unknown): CommandResult<{ name: string; items: number }> {
+/**
+ * Deletes a label: it comes off every item and every project home, in one change group. The model is untouched. Its
+ * live canvas becomes a normal canvas in the same change group: no live label, no live levels, `labeled` filters as
+ * `all` (slice 3b, Q5).
+ */
+export function deleteLabel(ctx: CommandContext, access: WorkspaceAccess, state: DeleteLabelState, input: unknown): CommandResult<{ name: string; items: number; liveCanvasId: Uuid | null }> {
   const parsed = begin(access, "label.edit", deleteInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const got = current(state.label, access, parsed.data.labelId, parsed.data.expectedVersion, "label");
@@ -170,9 +183,19 @@ export function deleteLabel(ctx: CommandContext, access: WorkspaceAccess, state:
   const ws = access.workspace.id;
   const links = state.links.filter((k) => isLive(k, ws) && k.label_id === label.id);
   const pins = state.pins.filter((p) => p.workspace_id === ws && p.label_id === label.id);
-  return done(ctx, access, { name: label.name, items: links.length }, [
+  const live = state.canvases?.find((c) => isLive(c, ws) && c.live_label_id === label.id) ?? null;
+  const normal: Write[] = live
+    ? [
+        { kind: "update", table: "canvas", before: live, row: nextVersion(ctx, live, { live_label_id: null }) },
+        ...(state.canvasItems ?? [])
+          .filter((i) => isLive(i, ws) && i.canvas_id === live.id && (i.live_level !== null || i.row_filter === "labeled"))
+          .map((i): Write => ({ kind: "update", table: "canvas_item", before: i, row: nextVersion(ctx, i, { live_level: null, row_filter: i.row_filter === "labeled" ? "all" : i.row_filter }) })),
+      ]
+    : [];
+  return done(ctx, access, { name: label.name, items: links.length, liveCanvasId: live?.id ?? null }, [
     ...links.map((k) => softDelete(ctx, "label_link", k)),
     ...pins.map((p): Write => ({ kind: "remove", table: "project_pinned_label", before: p })),
+    ...normal,
     softDelete(ctx, "label", label),
   ]);
 }

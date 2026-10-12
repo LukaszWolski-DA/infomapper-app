@@ -11,6 +11,13 @@ import type { Attribute, CanvasItem, LabelLink, LiveLevel, Mapping, MappingInput
 import { cardHeightFor } from "./card-size";
 import type { LabelTarget } from "./labels";
 
+/** The refusal when the active context's label is gone (the client switches the context off, PRD item 3). */
+export const CONTEXT_LABEL_GONE = "The label of your working context was deleted, so the change was not saved.";
+/** Bulk adds on a live canvas (PRD item 12, prototype toast). */
+export const LIVE_ONE_AT_A_TIME = "On a live canvas, add cards one at a time: each one gets the label first.";
+/** A plain “Remove from this canvas” on a live canvas (PRD item 11: removing a card takes its label off). */
+export const LIVE_REMOVE_UNLABELS = "On a live canvas, removing a card takes its label off: use “Remove from this canvas (unlabel)…”.";
+
 /** The model rows membership reads (live rows of one workspace; deleted ones are skipped by the caller). */
 export interface LiveModel {
   attributes: readonly Pick<Attribute, "id" | "entity_id">[];

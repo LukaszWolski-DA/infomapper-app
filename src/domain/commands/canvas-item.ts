@@ -10,6 +10,7 @@ import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResu
 import { domainError, notFound, staleVersion, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { cardWidthOf, dropCards } from "../model/frames";
+import { LIVE_ONE_AT_A_TIME, LIVE_REMOVE_UNLABELS } from "../model/live";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
 import type { Canvas, CanvasItem, Entity, Frame, Note, SourceTable } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
@@ -33,8 +34,9 @@ export const widthSchema = z
 /** The step of the canvas grid: arranged positions lie on it (D-37). */
 export const GRID = 8;
 
-/** Row filters offered in slice 1a (`labeled` comes with labels). */
+/** Row filters offered on every canvas; `labeled` only on live canvases (slice 3b). */
 export const CARD_ROW_FILTERS = ["all", "mapped", "unmapped", "keys"] as const;
+const SAVED_ROW_FILTERS = [...CARD_ROW_FILTERS, "labeled"] as const;
 
 export function newCanvasItem(
   ctx: CommandContext,
@@ -229,6 +231,7 @@ export function placeManyOnCanvas(
   const { canvasId, cards } = parsed.data;
   const workspaceId = access.workspace.id;
   if (!isLive(state.canvas, workspaceId) || state.canvas.id !== canvasId) return fail(notFound("canvas"));
+  if (state.canvas.live_label_id) return fail(domainError("invalid", LIVE_ONE_AT_A_TIME));
 
   const here = new Set(
     state.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvasId).map((i) => i.entity_id ?? i.source_table_id),
@@ -261,16 +264,19 @@ const updateItemInput = z
     canvasItemId: uuidSchema,
     expectedVersion: versionSchema,
     collapsed: z.boolean().optional(),
-    rowFilter: z.enum(CARD_ROW_FILTERS).optional(),
+    rowFilter: z.enum(SAVED_ROW_FILTERS).optional(),
   })
   .strict();
 export type UpdateCanvasItemInput = z.input<typeof updateItemInput>;
 
-/** Saves whether a card is collapsed and its row filter (per canvas). Position and width: `moveOnCanvas`. */
+/**
+ * Saves whether a card is collapsed and its row filter (per canvas). Position and width: `moveOnCanvas`. The `labeled`
+ * filter (the rows that carry the label) exists only on live canvases (`canvas`: the card's canvas; slice 3b).
+ */
 export function updateCanvasItem(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: { item: CanvasItem | null },
+  state: { item: CanvasItem | null; canvas?: Canvas | null },
   input: unknown,
 ): CommandResult<{ item: CanvasItem }> {
   const parsed = begin(access, "canvas.edit_items", updateItemInput, input);
@@ -283,6 +289,9 @@ export function updateCanvasItem(
   const patch: Partial<CanvasItem> = {};
   if (collapsed !== undefined && collapsed !== before.collapsed) patch.collapsed = collapsed;
   if (rowFilter !== undefined && rowFilter !== before.row_filter) patch.row_filter = rowFilter;
+  if (patch.row_filter === "labeled" && !(state.canvas?.id === before.canvas_id && state.canvas.live_label_id)) {
+    return fail(domainError("invalid", "The Labeled filter is only on live canvases."));
+  }
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
 
   const row = nextVersion(ctx, before, patch);
@@ -301,13 +310,15 @@ export type RemoveFromCanvasInput = z.input<typeof removeInput>;
 export function removeFromCanvas(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: { item: CanvasItem | null; notes?: readonly Note[] },
+  state: { item: CanvasItem | null; notes?: readonly Note[]; canvas?: Canvas | null },
   input: unknown,
 ): CommandResult {
   const parsed = begin(access, "canvas.edit_items", removeInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const got = current(state.item, access, parsed.data.canvasItemId, parsed.data.expectedVersion, "card");
   if (!got.ok) return fail(got.error);
+  // on a live canvas, removing a card takes its label off (`removeFromLiveCanvas`, slice 3b)
+  if (state.canvas?.id === got.row.canvas_id && state.canvas.live_label_id) return fail(domainError("invalid", LIVE_REMOVE_UNLABELS));
   return done(ctx, access, undefined, [
     softDelete(ctx, "canvas_item", got.row),
     ...releaseNotes(ctx, state.notes, { items: [got.row], frames: [] }, { cardIds: [got.row.id] }),
@@ -348,6 +359,7 @@ export function removeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, 
   const { canvasId, items } = parsed.data;
   const workspaceId = access.workspace.id;
   if (!isLive(state.canvas, workspaceId) || state.canvas.id !== canvasId) return fail(notFound("canvas"));
+  if (state.canvas.live_label_id) return fail(domainError("invalid", LIVE_REMOVE_UNLABELS));
   const byId = new Map(state.items.map((i) => [i.id, i]));
   const rows: CanvasItem[] = [];
   for (const { canvasItemId, expectedVersion } of items) {

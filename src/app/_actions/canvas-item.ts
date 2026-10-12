@@ -33,7 +33,10 @@ export async function updateCardAction(workspaceId: string, change: CardChangeIn
     if (!workspace) return NOT_FOUND;
     const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
     const id = typeof change?.canvasItemId === "string" ? change.canvasItemId : "";
-    const result = updateCanvasItem(ctx, access, { item: await store.canvasItems.get(workspace.id, id) }, change);
+    const item = await store.canvasItems.get(workspace.id, id);
+    // the labeled filter only on live canvases (slice 3b)
+    const canvas = item && change?.rowFilter === "labeled" ? await store.canvases.get(workspace.id, item.canvas_id) : null;
+    const result = updateCanvasItem(ctx, access, { item, canvas }, change);
     return result.ok ? { ...result, value: { version: result.value.item.version } } : result;
   });
 }
@@ -115,7 +118,8 @@ export async function removeCardAction(
     const id = typeof input?.canvasItemId === "string" ? input.canvasItemId : "";
     const item = await store.canvasItems.get(workspace.id, id);
     const notes = item ? await store.notes.listOfCanvas(workspace.id, item.canvas_id) : [];
-    return removeFromCanvas(ctx, access, { item, notes }, input);
+    const canvas = item ? await store.canvases.get(workspace.id, item.canvas_id) : null;
+    return removeFromCanvas(ctx, access, { item, notes, canvas }, input);
   });
   if (result.ok) revalidatePath("/", "layout");
   return result;
