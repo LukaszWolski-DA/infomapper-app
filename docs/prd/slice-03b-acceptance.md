@@ -1,6 +1,6 @@
 # Slice 3b – Acceptance
 
-Status: **step 3 done; S3B-15 (a) met; the quick round was disturbed, waiting for Łukasz**. Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
+Status: **step 4 done, waiting for Łukasz** (the balanced sitting covering steps 3 and 4 after his OK). Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
 reported one by one (below); criteria, runs and the manual checklist come in step 5.
 
 ## Step 0 (12 October)
@@ -239,6 +239,37 @@ browser pane still held a tab (hidden, its server stopped); closed now. The elem
 and the code a normal canvas runs while panning did not change in this slice; still, the round says nothing either way.
 Reported to Łukasz before going on.
 
+## Step 4 (miniature and permissions, 12 October)
+
+**Item 15, notes in the miniature.** The Overview draws each note the canvas shows (not hidden resolved ones, not those
+in a collapsed frame) as a rounded rectangle in its paper colour (prototype `NOTE_MINI`), under the cards: one element
+per visible note, outside the canvas viewport. The miniature's data stays stable while panning and zooming (the notes
+come from the canvas's shown notes, which only change when a note or what it is pinned to changes); while anything is
+dragged it keeps the notes as they were, and it takes them again only when they look different, so a note's drag
+redraws it once, on the drop (the save's new version alone does not). In development each commit of the miniature is
+counted in `window.__imMiniatureCommits`.
+
+**The check** (`e2e/slice-03b/S3B-13.spec.ts`, two tests, written now as S3B-13's test): on Customer & orders the
+miniature draws exactly the notes the canvas shows, by colour; unticking “Show resolved notes” takes the resolved one
+out; six wheel pans and eight Ctrl+wheel zoom steps leave the commit count unchanged; a note dragged with the real
+mouse leaves it unchanged during the drag and raises it by exactly one after the drop; a free note in a collapsed frame
+is not drawn. Both pass.
+
+**Item 16, permissions.** Already in place from steps 1 and 3 (domain refusals: making a live canvas needs “create
+canvases”, adding it to a project “change a canvas's projects”, labeling and unlabeling “change labels”, placing a
+card “change what is on a canvas”; reviewers and readers may go to a live canvas the project has; the label panel and
+the home show only what the person may do). Added now: on a live canvas a reviewer's or reader's click in the left
+panel, drop or Delete opens no question (the canvas offers no add or remove there). The step 5 test S3B-14 checks it
+end to end.
+
+**S3B-15 (c), a measuring spec** (`e2e/slice-03b/S3B-15-live.spec.ts`, measurement build only, left out of the normal
+run): 10 s of S1A-14's pan and zoom at 100 % on PERF-2's live canvas (centred on its content) and on “Performance test”
+(S1A-14's dense area), in turns (Performance test, live, live, Performance test), medians to
+`test-results/S3B-15-live.json`. A smoke run on the unprepared laptop worked (22 cards; 57.5 against 40.4 fps, not to be
+read).
+
+Checks: lint, typecheck, unit tests; the full e2e run below.
+
 ## Changes to earlier tests
 
 - `src/canvas/notes.test.ts`: the tests of `mergeServerNotes` moved to `src/canvas/fresh.test.ts` (`mergeFresh`), unchanged
@@ -249,3 +280,4 @@ Reported to Łukasz before going on.
 - `src/canvas/canvas.test.ts`: “shows a stored 'labeled' filter as All until labels exist” is now “… outside a live
   canvas” (step 3).
 - `e2e/slice-03b/S3B-15-elements.spec.ts`: compares only the viewport counts with the baseline (step 3).
+- `playwright.config.ts`: the normal run also leaves out `S3B-15-live.spec.ts` (step 4).

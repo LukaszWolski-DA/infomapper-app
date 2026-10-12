@@ -91,7 +91,7 @@ import { useCanvasLook } from "./look";
 import { viewKey } from "./views";
 import LineLayer from "./LineLayer";
 import { bundleLines, type Bundle } from "./line-geometry";
-import { Overview } from "./Overview";
+import { Overview, type MiniNote } from "./Overview";
 import NoteLayer, { type ShownNote } from "./NoteLayer";
 import { grownVersions, mergeFresh } from "./fresh";
 import { countsKey, countsOf, frameNoteCounts, noteAt, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
@@ -683,7 +683,9 @@ export function ModelCanvas({
         centerOn(here.id);
         return;
       }
-      // on a live canvas, adding a card labels its element, after the question (D-11, PRD item 10)
+      // on a live canvas, adding a card labels its element, after the question (D-11, PRD item 10); reviewers and
+      // readers get no add there (PRD item 16)
+      if (live && !editable) return;
       const liveName = live ? (dropped?.name ?? live.names[isEntity(target) ? target.entityId : target.sourceTableId] ?? "it") : "";
       if (live) {
         const yes = await askRef.current({ message: `Label ${liveName} with ${live.labelName}? It then appears on this live canvas.`, yes: `Add ${live.labelName}`, no: "Cancel" }, "live");
@@ -746,7 +748,7 @@ export function ModelCanvas({
       if (!inside(viewRect(), box)) centerOnRect(box);
       if (clicked) toast(`Added 1 ${isEntity(target) ? "entity" : "source table"} to the canvas.`);
     },
-    [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect, frameRefs, rf, entityConcepts, concepts, live, ui],
+    [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect, frameRefs, rf, entityConcepts, concepts, live, ui, editable],
   );
 
   const place = useCallback(
@@ -761,7 +763,7 @@ export function ModelCanvas({
   const removeLive = useCallback(
     async (cardId: string) => {
       const card = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
-      if (!live || !card?.liveRemove) return;
+      if (!live || !editable || !card?.liveRemove) return;
       const L = live.labelName;
       const { direct, what, others } = card.liveRemove;
       const verb = others === 1 ? "carries" : "carry";
@@ -786,7 +788,7 @@ export function ModelCanvas({
         toast(mode === "direct" ? `${name} is no longer labeled ${label}.` : `Label ${label} removed from ${result.value.what} of ${name}.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
       });
     },
-    [live, rf, enqueue, toast, ui],
+    [live, editable, rf, enqueue, toast, ui],
   );
 
   const remove = useCallback(
@@ -1121,6 +1123,11 @@ export function ModelCanvas({
       pinnedTo: s.note.pinCardId ?? s.note.pinFrameId,
     }));
   }, [shownNotes]);
+  /** The notes as the Overview's miniature draws them (slice 3b). */
+  const miniNotes = useMemo<MiniNote[]>(
+    () => shownNotes.map((s) => ({ id: s.note.id, x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80, color: s.note.color })),
+    [shownNotes],
+  );
   /** The notes as the selection marks them. */
   const noteRects = useMemo(() => new Map(shownNotes.map((s) => [s.note.id, { x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80 }])), [shownNotes]);
 
@@ -1518,7 +1525,7 @@ export function ModelCanvas({
             onCancel={noteState.cancel}
             onHeight={noteState.onHeight}
           />
-          <Overview lines={lines} />
+          <Overview lines={lines} notes={miniNotes} notesDragging={noteState.dragging} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
           <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} frameRects={frameRects} noteRects={noteRects} />
           {draft && <DraftLine draft={draft} />}

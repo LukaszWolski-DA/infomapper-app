@@ -5,8 +5,8 @@ const baseURL = E2E_BASE;
 
 export default defineConfig({
   testDir: "e2e",
-  // element counts (S3B-15 a) only mean something in the measurement build; the normal run leaves them out
-  testIgnore: E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts"],
+  // element counts and the live canvas's pan and zoom (S3B-15 a, c) only mean something in the measurement build
+  testIgnore: E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts"],
   // The dev server compiles pages on first use, which can take a while.
   timeout: 60_000,
   expect: { timeout: 15_000 },

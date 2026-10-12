@@ -8,6 +8,11 @@
 // whole miniature on every frame cost a third of each frame). While cards are dragged it keeps the cards where they
 // were and takes their new places on release, as the prototype's miniature does (slice 2a step 3b).
 // Slice 2c: a collapsed frame's block is drawn instead of its hidden cards, and their lines go to the block.
+// Slice 3b: the notes shown on the canvas (not hidden resolved ones, not those in a collapsed frame) as small rounded
+// rectangles in their paper colour, under the cards (prototype renderMini, NOTE_MINI). Like the cards they keep their
+// places while anything is dragged, and the miniature takes them again only when they look different, so a note's
+// drag redraws it once, on the drop. In development each commit of the miniature is counted in
+// `window.__imMiniatureCommits` (S3B-13 checks that panning and zooming do not redraw it).
 
 import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, useReactFlow, useStore, type Node } from "@xyflow/react";
@@ -16,10 +21,29 @@ import { isCardNode, type CardNodeT } from "./CardNode";
 import { CanvasUiCtx } from "./context";
 import { cardHeight, cardWidth, type Rect } from "./geometry";
 import type { CanvasLines } from "./line-data";
+import type { NoteColor } from "@/domain/types";
+
+const NO_NOTES: readonly MiniNote[] = [];
 
 const W = 216, H = 140;
 
-export function Overview({ lines }: { lines: CanvasLines }) {
+/** A note as the miniature draws it. */
+export interface MiniNote {
+  id: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  color: NoteColor;
+}
+
+/** The notes' paper colours in the miniature (prototype NOTE_MINI). */
+const NOTE_MINI: Record<NoteColor, string> = { yellow: "#E9C94F", blue: "#7FA9E0", green: "#7CC197", pink: "#E59BB6", grey: "#A9B0BA" };
+
+const sameNotes = (a: readonly MiniNote[], b: readonly MiniNote[]) =>
+  a.length === b.length && a.every((n, i) => n.id === b[i]!.id && n.x === b[i]!.x && n.y === b[i]!.y && n.w === b[i]!.w && n.h === b[i]!.h && n.color === b[i]!.color);
+
+export function Overview({ lines, notes = NO_NOTES, notesDragging = false }: { lines: CanvasLines; notes?: readonly MiniNote[]; notesDragging?: boolean }) {
   const ui = useContext(CanvasUiCtx);
   const rf = useReactFlow();
   const current = useStore((s) => s.nodes) as Node[];
@@ -31,6 +55,13 @@ export function Overview({ lines }: { lines: CanvasLines }) {
     if (!dragging) setSettled(current);
   }, [current, dragging]);
   const nodes = dragging ? settled : current;
+  /** The notes as last drawn: kept while anything is dragged, taken again only when they look different. */
+  const [miniNotes, setMiniNotes] = useState(notes);
+  const busy = dragging || notesDragging;
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the notes as drawn change only after a drag and only when they differ
+    if (!busy && !sameNotes(miniNotes, notes)) setMiniNotes(notes);
+  }, [notes, busy, miniNotes]);
   const [tx, ty, zoom] = useStore((s) => s.transform);
   const width = useStore((s) => s.width);
   const height = useStore((s) => s.height);
@@ -56,14 +87,14 @@ export function Overview({ lines }: { lines: CanvasLines }) {
   const blockOf = useMemo(() => new Map(nodes.filter((n) => n.hidden && isCardNode(n)).map((n) => [n.id, blockNodeId((n as CardNodeT).data.card.frameId ?? "")])), [nodes]);
   const content = useMemo(() => {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
-    for (const r of rects.values()) {
+    for (const r of [...rects.values(), ...miniNotes]) {
       x0 = Math.min(x0, r.x);
       y0 = Math.min(y0, r.y);
       x1 = Math.max(x1, r.x + r.w);
       y1 = Math.max(y1, r.y + r.h);
     }
     return { x0, y0, x1, y1 };
-  }, [rects]);
+  }, [rects, miniNotes]);
   const x0 = Math.min(content.x0, view.x), y0 = Math.min(content.y0, view.y);
   const x1 = Math.max(content.x1, view.x + view.w), y1 = Math.max(content.y1, view.y + view.h);
   const pad = Math.max(x1 - x0, y1 - y0) * 0.05;
@@ -119,7 +150,7 @@ export function Overview({ lines }: { lines: CanvasLines }) {
       {ui.overviewOpen && (
         <div className="overview-box">
           <svg className="overview-svg" width={W} height={H} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden>
-            <Miniature nodes={shown} rects={rects} blockOf={blockOf} lines={lines} />
+            <Miniature nodes={shown} rects={rects} blockOf={blockOf} lines={lines} notes={miniNotes} />
           </svg>
           <svg
             ref={svgRef}
@@ -149,12 +180,21 @@ const Miniature = memo(function Miniature({
   rects,
   blockOf,
   lines,
+  notes,
 }: {
   nodes: (CardNodeT | BlockNodeT)[];
   rects: Map<string, Rect>;
   blockOf: Map<string, string>;
   lines: CanvasLines;
+  notes: readonly MiniNote[];
 }) {
+  // Development only (slice 3b, S3B-13): every commit of the miniature is counted
+  useEffect(() => {
+    if (process.env.NODE_ENV !== "production") {
+      const w = window as unknown as { __imMiniatureCommits?: number };
+      w.__imMiniatureCommits = (w.__imMiniatureCommits ?? 0) + 1;
+    }
+  });
   const centre = (id: string) => {
     const r = rects.get(id) ?? rects.get(blockOf.get(id) ?? "");
     return r ? { x: r.x + r.w / 2, y: r.y + r.h / 2 } : null;
@@ -172,6 +212,9 @@ const Miniature = memo(function Miniature({
         const a = centre(r.fromCardId), z = centre(r.toCardId);
         return a && z ? <line key={r.id} className="mr" x1={a.x} y1={a.y} x2={z.x} y2={z.y} /> : null;
       })}
+      {notes.map((n) => (
+        <rect key={n.id} className="mn" x={n.x} y={n.y} width={n.w} height={n.h} rx={6} style={{ fill: NOTE_MINI[n.color] }} data-testid="mini-note" data-color={n.color} />
+      ))}
       {nodes.map((n) => {
         const r = rects.get(n.id)!;
         if (!isCardNode(n)) return <rect key={n.id} className="mb" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: n.data.color }} />;
