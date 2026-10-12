@@ -72,8 +72,9 @@ export async function undoAction(
     const ctx: CommandContext = { actorId: user.id, now: new Date().toISOString(), newId: () => uuidv7() };
     const reverted = revertChangeGroup(ctx, access, { events: step.events, rows: await store.model.loadForUndo(workspace.id) }, mode);
     if (!reverted.ok) return reverted.error.code === "conflict" ? drop() : { ok: false, code: reverted.error.code, message: reverted.error.message };
-    // live canvases follow what the undo changed in labels and the model (slice 3b), in the same change group
-    const result = await withLiveCanvases(ctx, store, user, reverted.writeSet);
+    // live canvases follow what the undo changed in labels and the model (slice 3b), in the same change group; an undo
+    // or redo never links the working context or labels a card it brings back (`revert`)
+    const result = await withLiveCanvases(ctx, store, user, reverted.writeSet, { revert: true });
     if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message };
     const applied = await store.apply(result.writeSet);
     if (!applied.ok) {

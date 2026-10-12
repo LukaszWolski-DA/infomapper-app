@@ -46,13 +46,19 @@ export async function runCommand<T>(
 }
 
 /** The live canvas rules for a write set, when it can change what labels mark or what a live canvas holds (slice 3b). */
-export async function withLiveCanvases(ctx: CommandContext, store: DataStore, user: AppUser, writeSet: WriteSet): Promise<CommandResult<LiveOutcome>> {
+export async function withLiveCanvases(
+  ctx: CommandContext,
+  store: DataStore,
+  user: AppUser,
+  writeSet: WriteSet,
+  options: { revert?: boolean } = {},
+): Promise<CommandResult<LiveOutcome>> {
   const workspaceId = writeSet.events[0]?.workspace_id;
   if (!workspaceId || !touchesLiveCanvases(writeSet.writes)) return { ok: true, value: { labeled: 0, canvases: [] }, writeSet };
   const workspace = await store.workspaces.get(workspaceId);
   if (!workspace) return { ok: true, value: { labeled: 0, canvases: [] }, writeSet };
   const access = { workspace, member: await store.workspaces.getMember(workspaceId, user.id) };
-  return completeLiveWrites(ctx, access, await loadLiveState(store, workspaceId), writeSet);
+  return completeLiveWrites(ctx, access, await loadLiveState(store, workspaceId), writeSet, options);
 }
 
 /** A change of the model or the layout can be undone; settings, people and a canvas's look cannot. */

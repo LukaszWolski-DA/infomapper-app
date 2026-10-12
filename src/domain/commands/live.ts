@@ -1,7 +1,7 @@
 // Live label canvases (D-10, D-11, D-25) and the active working context (D-26), slice 3b.
 //
 // `completeLiveWrites` is the one step every write passes through after its command (run by the server's write
-// pipeline, and by undo): in the same change group it
+// pipeline, and by undo and redo, which only do step 3): in the same change group it
 //   1. links the active context's label to what the action created or changed (`contextTargets`), and writes the label
 //      into every change event (`context_label_id`);
 //   2. labels the element of a card placed on a live canvas (a drop, a click in the left panel, the Entity tool: D-11's
@@ -200,17 +200,19 @@ export function touchesLiveCanvases(writes: readonly Write[]): boolean {
  * Completes one action's write set (see the file's comment): the context's labels, the labels of cards placed on live
  * canvases, and the sync of every live canvas, in the same change group. Refused when the context's label is gone or
  * the person may not change labels. Without a context and with nothing that touches labels, the model or the canvases,
- * the write set comes back as it was.
+ * the write set comes back as it was. `revert` (undo and redo): only the sync; an undo or redo puts back what the step
+ * changed, label links included, and never links the active context or labels a card it brings back.
  */
 export function completeLiveWrites(
   ctx: CommandContext,
   access: WorkspaceAccess,
   state: LiveWriteState,
   writeSet: WriteSet,
-  options: { contextLabelId?: Uuid | null } = {},
+  options: { contextLabelId?: Uuid | null; revert?: boolean } = {},
 ): CommandResult<LiveOutcome> {
   const ws = access.workspace.id;
-  const contextLabelId = options.contextLabelId ?? null;
+  const revert = options.revert === true;
+  const contextLabelId = revert ? null : (options.contextLabelId ?? null);
   const touches = touchesLiveCanvases(writeSet.writes);
   if (!contextLabelId && !touches) return { ok: true, value: { labeled: 0, canvases: [] }, writeSet };
 
@@ -240,7 +242,7 @@ export function completeLiveWrites(
 
   // 2. a card placed on a live canvas labels its element (cards the live rules make carry their level already)
   const liveLabelOf = (canvasId: Uuid) => after.canvases.find((c) => c.id === canvasId && isLive(c, ws))?.live_label_id ?? null;
-  for (const w of writeSet.writes) {
+  for (const w of revert ? [] : writeSet.writes) {
     if (w.kind !== "insert" || w.table !== "canvas_item" || w.row.live_level !== null) continue;
     const labelId = liveLabelOf(w.row.canvas_id);
     if (!labelId) continue;
