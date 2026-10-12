@@ -2,6 +2,7 @@
 // passed to the client canvas. Pure TypeScript, so it is tested without a browser.
 
 import type { Uuid } from "@/domain/ids";
+import { rowShown } from "@/domain/model/card-size";
 import type { CardSubject } from "@/domain/model/frames";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
 import type { CanvasItem, RowFilter, WorkspaceModel } from "@/domain/types";
@@ -215,14 +216,5 @@ export function withClips(card: Omit<CardData, "clipName" | "clipLine1">): CardD
 /** The rows a card shows under its filter (prototype rowsOf); a collapsed card shows none. */
 export function visibleRows(card: Pick<CardData, "rows" | "collapsed" | "rowFilter">): CardRow[] {
   if (card.collapsed) return [];
-  switch (card.rowFilter) {
-    case "mapped":
-      return card.rows.filter((r) => r.mappings > 0);
-    case "unmapped":
-      return card.rows.filter((r) => r.mappings === 0);
-    case "keys":
-      return card.rows.filter((r) => r.pk || r.fk || r.bk);
-    default:
-      return card.rows;
-  }
+  return card.rowFilter === "all" ? card.rows : card.rows.filter((r) => rowShown(r, card.rowFilter));
 }
