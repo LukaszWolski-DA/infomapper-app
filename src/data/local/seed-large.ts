@@ -1,8 +1,10 @@
 // npm run seed:large: adds the workspace “Performance test” for Łukasz with the canvas spike's data set
 // (100 cards: 60 source tables and 40 entities, one more entity with 200 attributes, 300 mappings, 40 relationships),
 // all on one canvas at the spike's positions, with its 8 frames as free frames (slice 2b), and since slice 3a labels and
-// notes (seed-large-working-layer.ts). For the performance checks.
+// notes (seed-large-working-layer.ts), and since slice 3b the live canvas of PERF-1 (made by the domain's own
+// `openLiveCanvas`, so it is what “Open as live canvas” would make). For the performance checks.
 
+import { openLiveCanvas } from "@/domain/commands/live";
 import type { Uuid } from "@/domain/ids";
 import { CONCEPT_PALETTE } from "@/domain/model/concept-colors";
 import { parseColumnLines } from "@/domain/model/column-lines";
@@ -215,8 +217,52 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
 
   // labels and notes on the canvas (slice 3a, S3A-14)
   addLargeWorkingLayer({ db, data, workspaceId: ws, canvasId: LARGE_IDS.canvas, by, at, id });
+  // the live canvas of PERF-1 (slice 3b, S3B-15 c), the second tab of the project
+  addLiveCanvas(db, at);
 
   const violation = findViolation(db);
   if (violation) throw new Error(`Generated data breaks a rule: ${violation.table}: ${violation.detail}`);
   return true;
+}
+
+/** The label whose live canvas “Performance test” has (the first of its five labels). */
+export const LARGE_LIVE_LABEL = "PERF-1";
+
+/** Opens PERF-1's live canvas with the domain's command and writes its rows; ids from the seed's keys (`live:N`). */
+function addLiveCanvas(db: DevDb, at: string): void {
+  const ws = LARGE_IDS.workspace;
+  const live = (rows: readonly { workspace_id: Uuid }[]) => rows.filter((r) => r.workspace_id === ws);
+  let n = 0;
+  const ctx = { actorId: SEED_IDS.userLukasz, now: at, newId: () => seedId(ws, `live:${n++}`) };
+  const workspace = db.workspace.find((w) => w.id === ws)!;
+  const access = { workspace, member: db.workspace_member.find((m) => m.workspace_id === ws && m.user_id === SEED_IDS.userLukasz)! };
+  const label = db.label.find((l) => l.workspace_id === ws && l.name === LARGE_LIVE_LABEL)!;
+  const opened = openLiveCanvas(
+    ctx,
+    access,
+    {
+      entities: live(db.entity) as DevDb["entity"],
+      attributes: live(db.attribute) as DevDb["attribute"],
+      sourceTables: live(db.source_table) as DevDb["source_table"],
+      sourceColumns: live(db.source_column) as DevDb["source_column"],
+      mappings: live(db.mapping) as DevDb["mapping"],
+      mappingInputs: live(db.mapping_input) as DevDb["mapping_input"],
+      concepts: live(db.concept) as DevDb["concept"],
+      sourceSystems: live(db.source_system) as DevDb["source_system"],
+      labels: live(db.label) as DevDb["label"],
+      labelLinks: live(db.label_link) as DevDb["label_link"],
+      canvases: live(db.canvas) as DevDb["canvas"],
+      canvasItems: live(db.canvas_item) as DevDb["canvas_item"],
+      frames: live(db.frame) as DevDb["frame"],
+      notes: live(db.note) as DevDb["note"],
+      project: db.project.find((p) => p.id === LARGE_IDS.project)!,
+      projectLinks: live(db.project_canvas) as DevDb["project_canvas"],
+    },
+    { labelId: label.id, projectId: LARGE_IDS.project },
+  );
+  if (!opened.ok) throw new Error(`The live canvas of ${LARGE_LIVE_LABEL}: ${opened.error.message}`);
+  for (const w of opened.writeSet.writes) {
+    if (w.kind !== "insert") continue;
+    (db[w.table as keyof DevDb] as unknown[]).push(w.row);
+  }
 }

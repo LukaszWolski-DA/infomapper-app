@@ -238,10 +238,10 @@ export function completeLiveWrites(
     }
   }
 
-  // 2. a card placed on a live canvas labels its element
+  // 2. a card placed on a live canvas labels its element (cards the live rules make carry their level already)
   const liveLabelOf = (canvasId: Uuid) => after.canvases.find((c) => c.id === canvasId && isLive(c, ws))?.live_label_id ?? null;
   for (const w of writeSet.writes) {
-    if (w.kind !== "insert" || w.table !== "canvas_item") continue;
+    if (w.kind !== "insert" || w.table !== "canvas_item" || w.row.live_level !== null) continue;
     const labelId = liveLabelOf(w.row.canvas_id);
     if (!labelId) continue;
     const denied = checkPermission(access, "label.edit");

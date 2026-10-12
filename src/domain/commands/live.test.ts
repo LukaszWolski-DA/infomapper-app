@@ -138,6 +138,14 @@ describe("completeLiveWrites: live canvases follow their label (PRD item 7)", ()
     expect(completeLiveWrites(makeCtx(), access("reviewer"), state(), ws([{ kind: "insert", table: "canvas_item", row: placed }]))).toMatchObject({ ok: false });
   });
 
+  it("leaves the cards of a newly opened live canvas as the opening made them (they carry their level)", () => {
+    const opened = canvasItem("01900000-0000-7000-8000-00000000c103", { canvas_id: LIVE, entity_id: null, source_table_id: ids.crmCustomer, live_level: "context", row_filter: "labeled" });
+    const s = state({ labelLinks: [labelLink(ids.linkCustomer), labelLink(ids.linkMapping)] });
+    const r = completeLiveWrites(makeCtx(), owner, s, ws([{ kind: "insert", table: "canvas_item", row: opened }]));
+    expect(r.ok && r.writeSet.writes.filter((w) => w.table === "label_link")).toEqual([]);
+    expect(r.ok && liveItems(afterWrites(s, r.writeSet.writes)).find((i) => i.id === opened.id)).toMatchObject({ live_level: "context", row_filter: "labeled" });
+  });
+
   it("knows which writes can matter (the pipeline loads the live state only then)", () => {
     const upd = (table: Write["table"], before: object, patch: object) => ({ kind: "update", table, before, row: { ...before, ...patch } }) as Write;
     expect(touchesLiveCanvases([upd("canvas_item", canvasItem(), { x: 1 })])).toBe(false);

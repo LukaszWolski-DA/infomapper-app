@@ -22,7 +22,8 @@ import type { DataStore, WorkspaceModel } from "../ports";
 import { seedDevData, seedLargeData } from "./dev-data";
 import { readDb } from "./file";
 import { buildSeed, SEED_IDS } from "./seed";
-import { LARGE_IDS } from "./seed-large";
+import { LARGE_IDS, LARGE_LIVE_LABEL } from "./seed-large";
+import { liveMembership } from "@/domain/model/live";
 import { seedId } from "./seed-model";
 import { createLocalDataStore } from "./store";
 
@@ -514,6 +515,19 @@ describe("seed:large (S1A-14)", () => {
     expect(notes.some((n) => n.status === "resolved")).toBe(true);
     // free notes belong to the frame the drop rule gives
     for (const n of notes.filter((n) => !n.pin_canvas_item_id && !n.pin_frame_id)) expect(n.frame_id).toBe(noteFrameAt(frames, n));
+    // The live canvas of PERF-1 (slice 3b, S3B-15 c): the project's second tab, exactly what PERF-1 marks, in frames.
+    const perf1 = wl.label.find((l) => l.workspace_id === ws && l.name === LARGE_LIVE_LABEL)!;
+    const liveCanvas = wl.canvas.find((c) => c.live_label_id === perf1.id)!;
+    expect(liveCanvas.name).toBe("PERF-1");
+    expect((await store.canvases.listLinksOfProject(ws, LARGE_IDS.project)).map((l) => l.canvas_id)).toEqual([LARGE_IDS.canvas, liveCanvas.id]);
+    const liveCards = await store.canvasItems.listOfCanvas(ws, liveCanvas.id);
+    const membership = liveMembership(perf1.id, { ...m, links });
+    expect(liveCards).toHaveLength(membership.entities.size + membership.tables.size);
+    for (const c of liveCards) {
+      const level = c.entity_id ? membership.entities.get(c.entity_id) : membership.tables.get(c.source_table_id!);
+      expect([c.live_level, c.row_filter]).toEqual([level, level === "full" ? "all" : "labeled"]);
+      expect(c.frame_id).not.toBeNull();
+    }
     // The demo workspaces are untouched.
     expect((await store.model.load(RETAIL)).entities).toHaveLength(6);
   });
