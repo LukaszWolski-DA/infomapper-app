@@ -158,7 +158,7 @@ the prototype's toast and “Show its sources”, “Add sources of selected ent
 offered; the sync's “Added from {label}: …. No longer labeled: ….” on the open live canvas only; deleting a label with
 a live canvas adds “Its live canvas, if any, became a normal canvas.”
 
-Checks: lint, typecheck, 821 unit tests, one full e2e run 124/124 (22.5 min, the known noise 14 times). Browser check on
+Checks: lint, typecheck, 820 unit tests, one full e2e run 124/124 (22.5 min, the known noise 14 times). Browser check on
 the preview data: CR-23's live canvas opened from its panel (WEB and Customer frames, web_users as a context card with
 the Labeled filter and the tooltip, Customer full, its mapping not faded, `email` and `segment_code` bold), Customer
 Address added by a click (question, label, placed to the right of the frames), taken off with Delete (question, label
