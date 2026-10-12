@@ -1,8 +1,9 @@
 // npm run seed:large: adds the workspace “Performance test” for Łukasz with the canvas spike's data set
 // (100 cards: 60 source tables and 40 entities, one more entity with 200 attributes, 300 mappings, 40 relationships),
 // all on one canvas at the spike's positions, with its 8 frames as free frames (slice 2b), and since slice 3a labels and
-// notes (seed-large-working-layer.ts), and since slice 3b the live canvas of PERF-1 (made by the domain's own
-// `openLiveCanvas`, so it is what “Open as live canvas” would make). For the performance checks.
+// notes (seed-large-working-layer.ts), and since slice 3b the live canvas of PERF-2, the label with the largest
+// footprint (made by the domain's own `openLiveCanvas`, so it is what “Open as live canvas” would make). For the
+// performance checks.
 
 import { openLiveCanvas } from "@/domain/commands/live";
 import type { Uuid } from "@/domain/ids";
@@ -217,7 +218,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
 
   // labels and notes on the canvas (slice 3a, S3A-14)
   addLargeWorkingLayer({ db, data, workspaceId: ws, canvasId: LARGE_IDS.canvas, by, at, id });
-  // the live canvas of PERF-1 (slice 3b, S3B-15 c), the second tab of the project
+  // the live canvas of PERF-2 (slice 3b, S3B-15 c), the second tab of the project
   addLiveCanvas(db, at);
 
   const violation = findViolation(db);
@@ -225,10 +226,13 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
   return true;
 }
 
-/** The label whose live canvas “Performance test” has (the first of its five labels). */
-export const LARGE_LIVE_LABEL = "PERF-1";
+/**
+ * The label whose live canvas “Performance test” has: the one of its five with the largest footprint (22 cards, 1 full
+ * entity and table, 10 context entities and 10 context tables, 22 relevant rows; Łukasz after step 1).
+ */
+export const LARGE_LIVE_LABEL = "PERF-2";
 
-/** Opens PERF-1's live canvas with the domain's command and writes its rows; ids from the seed's keys (`live:N`). */
+/** Opens that label's live canvas with the domain's command and writes its rows; ids from the seed's keys (`live:N`). */
 function addLiveCanvas(db: DevDb, at: string): void {
   const ws = LARGE_IDS.workspace;
   const live = (rows: readonly { workspace_id: Uuid }[]) => rows.filter((r) => r.workspace_id === ws);

@@ -28,7 +28,7 @@ around the same point, 2 s after the canvas is ready. Counts in `.data/measure/s
 | 30 %, frames collapsed | 2,767 | 1,463 |
 
 S3B-15 (a) compares the viewport column. The whole page also counts the tab bar, and `seed:large` gives “Performance
-test” a second tab from step 1 on (PERF-1's live canvas), so the page column will differ by that tab's elements.
+test” a second tab from step 1 on (PERF-2's live canvas), so the page column will differ by that tab's elements.
 
 ## Step 1 (domain and data, 12 October)
 
@@ -38,7 +38,7 @@ What was built: the late refresh race fixed (`mergeFresh` in `src/canvas/fresh.t
 `label`, one live canvas per label, live levels only on live canvases); the pure rules (`src/domain/model/live.ts`:
 `liveMembership`, `syncLiveCanvas`, `liveRemoveQuestion`, `contextTargets`); the commands (`src/domain/commands/live.ts`:
 `openLiveCanvas`, `removeFromLiveCanvas`, and `completeLiveWrites`, the step every write passes through); the live rules in
-label rename and delete, duplicate layout and the card commands; PERF-1's live canvas in `seed:large`.
+label rename and delete, duplicate layout and the card commands; PERF-2's live canvas in `seed:large`.
 
 Checks: lint, typecheck, 809 unit tests (765 before), one full e2e run 124/124 (20.6 min; “The destination stream
 closed early” 16 times, known noise).
@@ -73,9 +73,20 @@ closed early” 16 times, known noise).
    empty live canvas. When it exists in another project it is linked to this one (`canvas.edit_projects`).
 9. **The `labeled` filter** is saved only on a live canvas (`updateCanvasItem` refuses it elsewhere). The sync gives it to
    context cards of tables too (as the prototype); the toolbox offers it for entity cards only (step 3).
-10. **`seed:large`'s live canvas is PERF-1's.** “Performance test” spreads its labels over five labels (PERF-1 to PERF-5,
-    round robin over 50 rows, 30 mappings and 10 headers), not one; PERF-1's live canvas is made by `openLiveCanvas`
-    itself (to be confirmed by Łukasz).
+10. **`seed:large`'s live canvas is PERF-2's.** “Performance test” spreads its labels over five labels (PERF-1 to PERF-5,
+    round robin over 50 rows, 30 mappings and 10 headers), not one. Łukasz after step 1: the label with the largest
+    footprint, without changing which items carry labels (so the S3B-15 (a) baseline stays comparable). Footprints (each
+    label: 10 labeled rows, 6 labeled mappings, 1 full entity, 1 full table):
+
+    | Label | Context entities | Context tables | Cards | Relevant rows |
+    | --- | --- | --- | --- | --- |
+    | PERF-1 | 9 | 9 | 20 | 21 |
+    | **PERF-2** | 10 | 10 | **22** | **22** |
+    | PERF-3 | 9 | 10 | 21 | 22 |
+    | PERF-4 | 7 | 10 | 19 | 22 |
+    | PERF-5 | 10 | 8 | 20 | 22 |
+
+    Its live canvas is made by `openLiveCanvas` itself.
 11. **The race fix** keeps the model's content on cards as the page has it and only the layout (place, width, collapse,
     row filter, frame) as the canvas has it, when the canvas is newer. A frame created here uses the browser's clock
     for `createdAt` until the page brings the server's (the create refreshes the page).
@@ -86,4 +97,4 @@ closed early” 16 times, known noise).
   in what they check (step 1).
 - `src/domain/commands/label.test.ts` and `src/data/local/working-layer-store.test.ts`: `deleteLabel`'s result also names
   the live canvas it made normal (`liveCanvasId: null` there) (step 1).
-- `src/data/local/model-store.test.ts`: `seed:large` also checks PERF-1's live canvas (step 1).
+- `src/data/local/model-store.test.ts`: `seed:large` also checks PERF-2's live canvas (step 1).
