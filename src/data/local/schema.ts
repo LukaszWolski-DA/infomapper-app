@@ -166,7 +166,12 @@ export const RULES: Record<DevTable, TableRules> = {
     checks: [{ name: "workspace_member_role_ck", test: oneOf(WORKSPACE_ROLES, "role") }],
   },
   project: { key: ["id"], foreignKeys: { workspace_id: "workspace", ...audit } },
-  canvas: { key: ["id"], foreignKeys: { workspace_id: "workspace", ...audit } },
+  canvas: {
+    key: ["id"],
+    foreignKeys: { workspace_id: "workspace", live_label_id: "label", ...audit },
+    // at most one live canvas per label (canvas_live_label_uq, slice 3b)
+    unique: [{ columns: ["live_label_id"], live: true, where: (r) => isSet(r.live_label_id) }],
+  },
   project_canvas: {
     key: ["project_id", "canvas_id"],
     foreignKeys: { project_id: "project", canvas_id: "canvas", workspace_id: "workspace", added_by: "app_user" },
@@ -310,7 +315,7 @@ export const RULES: Record<DevTable, TableRules> = {
   },
   change_event: {
     key: ["id"],
-    foreignKeys: { workspace_id: "workspace", user_id: "app_user" },
+    foreignKeys: { workspace_id: "workspace", user_id: "app_user", context_label_id: "label" },
     checks: [
       { name: "change_event_operation_ck", test: oneOf(CHANGE_OPERATIONS, "operation") },
       {
@@ -391,6 +396,13 @@ function crossTableViolation(db: DevDb): IntegrityViolation | null {
       (note.pin_frame_id === null || frameCanvas.get(note.pin_frame_id) === note.canvas_id) &&
       (note.frame_id === null || frameCanvas.get(note.frame_id) === note.canvas_id);
     if (!onCanvas) return { kind: "check", table: "note", detail: `note_on_one_canvas failed for ${note.id}` };
+  }
+  // A card has a live level only on a live canvas (data model, canvas_item; slice 3b).
+  const liveCanvas = new Set(db.canvas.filter((c) => c.live_label_id !== null).map((c) => c.id));
+  for (const item of db.canvas_item) {
+    if (item.live_level !== null && item.deleted_at === null && !liveCanvas.has(item.canvas_id)) {
+      return { kind: "check", table: "canvas_item", detail: `canvas_item_live_level_on_live_canvas failed for ${item.id}` };
+    }
   }
   return null;
 }

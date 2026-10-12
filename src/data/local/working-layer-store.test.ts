@@ -121,6 +121,26 @@ describe("the data model's rules", () => {
     const pinned = db.note.find((n) => n.pin_canvas_item_id)!;
     expect(findViolation({ ...db, note: [{ ...pinned, canvas_id: SEED_IDS.canvasOrderLines }] })).toMatchObject({ table: "note", detail: expect.stringContaining("note_on_one_canvas") });
   });
+
+  it("checks live canvases as the database would (slice 3b): a known label, one live canvas per label, live levels only there, a known context label", () => {
+    const db = seed();
+    const label = db.label[0]!;
+    const [a, b] = db.canvas as [(typeof db.canvas)[number], (typeof db.canvas)[number]];
+    const live = (patch: object) => ({ ...db, canvas: db.canvas.map((c) => (c.id === a.id ? { ...c, ...patch } : c)) });
+    expect(findViolation(live({ live_label_id: label.id }))).toBeNull();
+    expect(findViolation(live({ live_label_id: uuidv7() }))).toMatchObject({ kind: "foreign_key", table: "canvas" });
+    const two = { ...db, canvas: db.canvas.map((c) => (c.id === a.id || c.id === b.id ? { ...c, live_label_id: label.id } : c)) };
+    expect(findViolation(two)).toMatchObject({ kind: "unique", table: "canvas" });
+    // a deleted live canvas does not count (partial index among non-deleted rows)
+    expect(findViolation({ ...two, canvas: two.canvas.map((c) => (c.id === b.id ? { ...c, deleted_at: c.updated_at } : c)) })).toBeNull();
+    const item = db.canvas_item.find((i) => i.canvas_id === a.id)!;
+    const leveled = (base: typeof db) => ({ ...base, canvas_item: base.canvas_item.map((i) => (i.id === item.id ? { ...i, live_level: "context" as const } : i)) });
+    expect(findViolation(leveled(db))).toMatchObject({ table: "canvas_item", detail: expect.stringContaining("canvas_item_live_level_on_live_canvas") });
+    expect(findViolation(leveled(live({ live_label_id: label.id })))).toBeNull();
+    const event = buildWriteSet(ctxFor(SEED_IDS.userAnna), RETAIL, [{ kind: "update", table: "label", before: label, row: label }]).events[0]!;
+    expect(findViolation({ ...db, change_event: [{ ...event, context_label_id: uuidv7() }] })).toMatchObject({ kind: "foreign_key", table: "change_event" });
+    expect(findViolation({ ...db, change_event: [{ ...event, context_label_id: label.id }] })).toBeNull();
+  });
 });
 
 describe("commands end to end", () => {
