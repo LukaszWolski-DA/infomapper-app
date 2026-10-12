@@ -78,8 +78,8 @@ tables that are only partly labeled, and adding or removing a card there changes
    - an item no longer required leaves the canvas;
    - an item that changes between full and context gets `live_level` updated and its row filter switched (`labeled`
      → `all` when it becomes full, `all` → `labeled` when it becomes context; other filters stay);
-   - a newly required item lands in the **“Newly labeled” frame** (grey free frame, made to the right of the content
-     when missing, one card under another, the frame grown to fit), and the frame is removed when it holds no card.
+   - a newly required item lands **to the right of the existing content**, one card under another, in no frame (Q3:
+     no “Newly labeled” frame; the prototype's frame is recorded in `docs/ideas.md` as a deviation to revisit).
    On the open canvas the toast reads “Added from {name}: {items}.” and/or “No longer labeled: {items}.” Layout the
    person made is never rearranged.
 8. **Looking live.** The canvas tab has the tag icon (“Live canvas: shows everything labeled {name}”); the
@@ -108,9 +108,11 @@ tables that are only partly labeled, and adding or removing a card there changes
     entities”, “Show its sources”, “Add the N missing”) is hidden or answers “On a live canvas, add cards one at a
     time: each one gets the label first.”; “Remove from this canvas” for a multi-selection is not offered.
 13. **Label rename and delete.** Renaming L renames its live canvas when the canvas still has L's old name. Deleting
-    L turns its live canvas into a normal canvas (see the questions) and the toast reads “Deleted the label {name}.
+    L turns its live canvas into a normal canvas in the same change group (Q5: `live_label_id` and `live_level` are
+    cleared and `labeled` row filters become `all`) and the toast reads “Deleted the label {name}.
     Its live canvas, if any, became a normal canvas.” Undo brings both back.
-14. **Duplicate layout** of a live canvas makes a normal canvas (see the questions).
+14. **Duplicate layout** of a live canvas makes a normal canvas from the start (Q6: no `live_label_id`, no
+    `live_level`, `labeled` row filters copied as `all`); the original stays live.
 
 ### Overview miniature
 
@@ -132,7 +134,17 @@ Automatic labeling of source tables, columns and concepts · labeling deletions 
 canvases per label · notes on the frame label or in the frame block beyond slice 3a · undo on the project home
 (`docs/ideas.md`) · the performance review before the database slice (AD-31).
 
-## Questions before Step 1 (Łukasz answers; proposed answers given)
+## Questions before Step 1 (answered by Łukasz on 12 October, after step 0)
+
+Answers: **Q1** as proposed. **Q2** only the moved attribute is labeled: the reorder command names its main target; the
+context rule labels main targets and created or changed items, and skips rows whose only change is `sort_order`. **Q3**
+no migration and no “Newly labeled” frame: newly required cards land to the right of the existing content, one under
+another, and the toast lists them (the prototype's frame goes to `docs/ideas.md`). **Q4** no migration
+(`canvas_live_label_uq` exists already): a domain rule and the local adapter's check. **Q5** as proposed, without the
+frame part. **Q6** and **Q7** as proposed. Also in step 1: the late refresh race fixed for notes, frames and cards
+(`mergeFresh`); the local adapter's foreign keys from `canvas.live_label_id` and `change_event.context_label_id` to
+`label`; the card height as one function in `domain/model`.
+
 
 1. **Where the active context lives.** The prototype keeps it in the browser (`V.ctxLabel`). Proposed: a per-person,
    per-workspace preference in the browser, like hiding resolved notes (data model, section 12); each write sends it,
@@ -156,7 +168,7 @@ canvases per label · notes on the frame label or in the frame block beyond slic
 ## Rules for the domain and data
 
 - Pure functions with unit tests: `liveMembership(label)` (full, context, relevant rows), `syncLiveCanvas(canvas)`
-  (leave, change level, add to the “Newly labeled” frame, remove an empty one; returns the canvas changes),
+  (leave, change level, add to the right of the content; returns the canvas changes),
   `contextTargets(changeSet)` (what an action created or changed that the context labels), the live remove question
   (direct, via rows, via mappings, with counts).
 - Commands: open live canvas; add card to live canvas (labels it); remove card from live canvas (unlabels the direct
@@ -174,7 +186,7 @@ canvases per label · notes on the frame label or in the frame block beyond slic
   cards use classes on the existing card element (outline, header background), **no new elements per card or row**;
   the relevant-row style is a class on the existing row; nothing zoom-dependent on the canvas root.
 - Element budget: a normal canvas has exactly as many elements in the viewport as at `slice-03a`; on a live canvas a
-  context card has no more elements than a normal card with the same rows; the “Newly labeled” frame is a normal
+  context card has no more elements than a normal card with the same rows; newly required cards are normal cards in no
   frame. The miniature adds one element per visible note, outside the canvas viewport.
 - The `window.__imCanvasCommits` guard, S2C-12 and S3A-14's idle test stay quiet, also on a live canvas.
 - Every sync is computed in the domain and written once; the canvas never re-derives membership while rendering.
@@ -225,13 +237,13 @@ after Łukasz approves them, in this pull request. Update README and CLAUDE.md c
 | S3B-03 | With CR-23 on: moving a card, resizing it, collapsing a frame, writing a note, deleting an attribute and moving an attribute (as answered in question 2) add no label beyond what the answers say. |
 | S3B-04 | A reviewer and a reader see no context switch; a write sent with a context by a reviewer is refused and changes nothing; a deleted label switches the context off with its toast. |
 | S3B-05 | “Open as live canvas” on CR-23 (label panel and project home) makes one canvas named CR-23 with Customer full, the entities and tables of CR-23's attributes, columns and mappings as context cards with the `labeled` filter, arranged into frames; opening again goes to it; from another project it is added there first. |
-| S3B-06 | With the live canvas open, labeling an attribute of an entity not on it (panel) adds that entity as context to the “Newly labeled” frame with the toast; removing the last label of a context card takes it off; a context entity labeled directly becomes full and its filter `all`; all in the change's undo step. |
+| S3B-06 | With the live canvas open, labeling an attribute of an entity not on it (panel) adds that entity as context to the right of the existing content with the toast; removing the last label of a context card takes it off; a context entity labeled directly becomes full and its filter `all`; all in the change's undo step. |
 | S3B-07 | Labeling made on another canvas (and by the active context) changes the live canvas too; opening it afterwards shows the change without a toast. |
 | S3B-08 | The tab icon, “Live: CR-23” in the view-state bar (kept by “Show all”), the overview box with “Open label” and the tile icon on the project home are shown; on a normal canvas none of them. |
 | S3B-09 | Context cards have the dashed outline and “context only”, relevant rows are bold, unlabeled mappings are faded by colour without opacity; the `labeled` filter is offered only on live canvases and not counted as “filtered”. |
 | S3B-10 | Dropping an entity on the live canvas asks, “Add CR-23” labels and places it where dropped; “Cancel” changes nothing; the Entity tool labels without asking; bulk adds are refused with the prototype's toast. |
 | S3B-11 | Removing a directly labeled card that also has labeled rows asks the first question and keeps it as context; removing a context card asks the second and unlabels its rows and mappings; each is one undo step. |
-| S3B-12 | Renaming CR-23 renames its live canvas; deleting it makes the canvas normal as answered in question 5, with the toast; Undo brings back label, links and live canvas. Duplicate layout of the live canvas gives a normal canvas (question 6). |
+| S3B-12 | Renaming CR-23 renames its live canvas; deleting it makes the canvas normal as answered in question 5 (no `live_label_id`, no `live_level`, `labeled` filters become `all`), with the toast; Undo brings back label, links and live canvas. Duplicate layout of the live canvas gives a normal canvas (question 6). |
 | S3B-13 | The miniature draws visible notes in their colours; hidden resolved notes and notes in a collapsed frame are not drawn; panning and zooming do not redraw it; dragging a note redraws it once, on drop. |
 | S3B-14 | As Piotr (reviewer) and as a reader: they can go to an existing live canvas and see it, cannot open a new one, add, remove or unlabel; direct calls are refused and change nothing. |
 | S3B-15 | Performance, in the measurement build on the reference machine (AD-24): (a) the element count in the viewport of “Performance test” at 100 % and 30 %, frames expanded and collapsed, equals `slice-03a`'s; (b) a balanced sitting against `slice-03a` (two rounds, each side first once), frames expanded and collapsed: pan and zoom at 100 % no more than 3 % below `slice-03a`; (c) on the live canvas from `seed:large` at 100 %, pan and zoom at least as fast as “Performance test” in the same sitting; (d) S2C-12, S3A-14's idle test and a new idle test on the live canvas stay quiet. |
@@ -241,5 +253,5 @@ after Łukasz approves them, in this pull request. Update README and CLAUDE.md c
 
 All criteria pass, steps were reported one by one, assumptions are listed, and Łukasz has worked on CR-23 with the
 context on (a new entity, an attribute, a mapping, a relationship), opened its live canvas, seen a change from another
-canvas arrive in the “Newly labeled” frame, added and removed a card with the questions, deleted and restored the
+canvas arrive to the right of its content, added and removed a card with the questions, deleted and restored the
 label, and seen notes in the miniature, then accepted the slice.
