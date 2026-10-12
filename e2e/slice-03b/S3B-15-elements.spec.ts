@@ -3,7 +3,7 @@
 // every element in the viewport costs paint and layerize time on each pan and zoom frame (slice 3a). Measurement build
 // only (MEASURE_BUILD=production, after `npm run measure:build`); the normal e2e run leaves this file out
 // (playwright.config.ts). The counts go to test-results/S3B-15-elements.json; with ELEMENTS_BASELINE=<that file from
-// the previous tag> every count must equal the baseline's.
+// the previous tag> every viewport count must equal the baseline's.
 import fs from "node:fs";
 import path from "node:path";
 import { LARGE_IDS } from "../../src/data/local/seed-large";
@@ -47,6 +47,11 @@ test("S3B-15 (a): elements in the viewport of “Performance test” at 100 % an
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(counts, null, 2));
   console.log("S3B-15 elements " + JSON.stringify(counts));
+  // S3B-15 (a) compares the viewport: the whole page also counts the tab bar (seed:large has a second tab since slice 3b)
   const baseline = process.env.ELEMENTS_BASELINE;
-  if (baseline) expect(counts).toEqual(JSON.parse(fs.readFileSync(baseline, "utf8")));
+  if (baseline) {
+    const before = JSON.parse(fs.readFileSync(baseline, "utf8")) as typeof counts;
+    const viewport = (c: typeof counts) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.viewport]));
+    expect(viewport(counts)).toEqual(viewport(before));
+  }
 });

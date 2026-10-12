@@ -1,6 +1,6 @@
 # Slice 3b – Acceptance
 
-Status: **step 2 done, waiting for Łukasz**. Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
+Status: **step 3 done, waiting for Łukasz** (the S3B-15 element count and quick round after his OK). Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
 reported one by one (below); criteria, runs and the manual checklist come in step 5.
 
 ## Step 0 (12 October)
@@ -142,6 +142,49 @@ switch.
 16. **The menu.** Opens in a portal under the button (the top bar would clip it). “Create “{name}”” creates the label
     (one undo step) and turns the context on.
 
+## Step 3 (live canvases, 12 October)
+
+What was built (PRD items 5–14): “Open as live canvas” / “Go to its live canvas” in the label panel and “Open as live
+canvas” / “Open live canvas” on the project home's label list, with the prototype's toasts (made, or added to this
+project); the tag icon with “Live canvas: shows everything labeled {name}” on the canvas tab and the project tile; the
+overview's dashed box with “Open label”; context cards (a class on the card: dashed outline, light header, “context
+only”, the tooltip), relevant rows bold (a class on the row), the Labeled filter for a live canvas's entity cards (card
+button and the toolbox's Rows), mappings that do not carry the label faded by colour (`color-mix`, no opacity); adding
+a card asks “Label {name} with {label}? …” (a drop places it where dropped, a click in the left panel or a single
+feeding source labels the element and the sync places it to the right; toast “{name} is now labeled {label}.” with
+Undo), the Entity tool labels at once (toast “…, labeled {name}”); “Remove from this canvas (unlabel)…” (toolbox,
+panel, Delete) asks the direct or context question and unlabels (toasts as the prototype, with Undo); bulk adds answer
+the prototype's toast and “Show its sources”, “Add sources of selected entities” and removing several cards are not
+offered; the sync's “Added from {label}: …. No longer labeled: ….” on the open live canvas only; deleting a label with
+a live canvas adds “Its live canvas, if any, became a normal canvas.”
+
+Checks: lint, typecheck, 821 unit tests, one full e2e run 124/124 (22.5 min, the known noise 14 times). Browser check on
+the preview data: CR-23's live canvas opened from its panel (WEB and Customer frames, web_users as a context card with
+the Labeled filter and the tooltip, Customer full, its mapping not faded, `email` and `segment_code` bold), Customer
+Address added by a click (question, label, placed to the right of the frames), taken off with Delete (question, label
+off, card gone). Once, after a removal, the tab went to the workspace home; it did not happen again in a second try with
+the same steps (no error in the console or the server log; likely my browser tool), to watch in the step 5 tests.
+
+### Assumptions
+
+17. **No view-state bar yet.** The PRD's “Live: {name}” chip in the view-state bar and “not counted as filtered / Show
+    all leaves it” (items 8, 9) need the view-state bar (D-39), which earlier PRDs put in slice 6; it does not exist.
+    Not built; question for Łukasz.
+18. **Who may open.** Anyone who sees the workspace may go to a live canvas the project has; adding it to this project
+    needs “change a canvas's projects”, making one “create canvases” (owners, admins, modelers). The label panel's and
+    the home's buttons show only what the person may do.
+19. **The remove question is the page's.** For each card of a live canvas the page computes once (domain:
+    `liveRemoveQuestion`) whether the label is on the element and what of it carries the label; the canvas only shows
+    it. The answer runs `removeFromLiveCanvas` on the data as it is then.
+20. **The sync's toast** comes from the server's memory of what this person's writes changed on live canvases in the
+    last minute (`src/app/_lib/live-notices.ts`, like the undo history); the open live canvas shows notices newer than
+    those it found when it opened, so a canvas opened later shows none (S3B-07). Right after the person's own add or
+    remove on that canvas it is left out (that action has its own toast).
+21. **Placement of a click-add** is the sync's (to the right of the content), as the PRD says (“where dropped, else
+    through the sync”); the card is selected only by a drop.
+22. **The S3B-15 count spec** compares the viewport counts with the baseline; the whole page differs by the second tab
+    `seed:large` now has (PERF-2's live canvas).
+
 ## Changes to earlier tests
 
 - `src/canvas/notes.test.ts`: the tests of `mergeServerNotes` moved to `src/canvas/fresh.test.ts` (`mergeFresh`), unchanged
@@ -149,3 +192,6 @@ switch.
 - `src/domain/commands/label.test.ts` and `src/data/local/working-layer-store.test.ts`: `deleteLabel`'s result also names
   the live canvas it made normal (`liveCanvasId: null` there) (step 1).
 - `src/data/local/model-store.test.ts`: `seed:large` also checks PERF-2's live canvas (step 1).
+- `src/canvas/canvas.test.ts`: “shows a stored 'labeled' filter as All until labels exist” is now “… outside a live
+  canvas” (step 3).
+- `e2e/slice-03b/S3B-15-elements.spec.ts`: compares only the viewport counts with the baseline (step 3).
