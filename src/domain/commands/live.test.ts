@@ -205,9 +205,12 @@ describe("openLiveCanvas (PRD item 6)", () => {
     expect(added.ok && added.writeSet.writes).toMatchObject([{ kind: "insert", table: "project_canvas", row: { project_id: ids.projectA, canvas_id: LIVE } }]);
   });
 
-  it("is for owners, admins and modelers", () => {
+  it("makes a new one for owners, admins and modelers only; everyone may go to the one this project has (item 16)", () => {
     expect(open(jira, "reviewer")).toMatchObject({ ok: false, error: { code: "forbidden" } });
     expect(open(jira, "reader")).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    const existing = state({ canvases: [canvas(), canvas(LIVE, { name: "JIRA-481", live_label_id: ids.labelJira })] });
+    expect(open(existing, "reader", [link(ids.projectA, LIVE)])).toMatchObject({ ok: true, value: { canvasId: LIVE, created: false } });
+    expect(open(existing, "reviewer", [link(ids.projectB, LIVE)])).toMatchObject({ ok: false, error: { code: "forbidden" } });
   });
 });
 

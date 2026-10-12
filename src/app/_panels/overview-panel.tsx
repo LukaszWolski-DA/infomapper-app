@@ -30,6 +30,18 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
   const openNotes = notes.filter((n) => n.status === "open");
   return (
     <div data-testid="inspector-overview">
+      {p.live && (
+        // a live canvas says what it is (prototype insOverview, slice 3b PRD item 8)
+        <div className="mb-3.5 rounded-lg border border-dashed border-im-ink-3 bg-im-hover px-3 py-2.5 text-im-ink-2" data-testid="box-live-canvas">
+          This is the live canvas for <b className="font-semibold text-im-ink">{p.live.labelName}</b>. Everything labeled {p.live.labelName} appears here by itself.
+          Adding an entity here adds the label; removing one takes the label off.
+          <div className="mt-2">
+            <button type="button" className={smallButtonClass} onClick={() => p.goLabel(p.live!.labelId)} data-testid="button-live-open-label">
+              Open label
+            </button>
+          </div>
+        </div>
+      )}
       <Kind>Nothing selected</Kind>
       <h2 className="text-base font-semibold">Model workspace</h2>
       <Hint>

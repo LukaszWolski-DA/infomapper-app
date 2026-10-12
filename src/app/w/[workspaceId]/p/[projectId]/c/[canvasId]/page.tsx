@@ -12,6 +12,8 @@ import {
   updateFrameAction,
 } from "@/app/_actions/frame";
 import { saveCanvasLookAction } from "@/app/_actions/canvas";
+import { labelForLiveCanvasAction, removeFromLiveCanvasAction } from "@/app/_actions/live";
+import { liveNoticesFor } from "@/app/_lib/live-notices";
 import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
 import { AppShell } from "@/app/_components/app-shell";
 import { MovedNotice } from "@/app/_components/moved-notice";
@@ -42,6 +44,7 @@ import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
 import { isMeasurementBuild } from "@/data/local/measure-mode";
 import { labelItemCounts, labelNamesByItem } from "@/domain/model/labels";
+import { liveMembership, liveRemoveQuestion, liveRemoveWhat } from "@/domain/model/live";
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
 import { cookies } from "next/headers";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
@@ -94,7 +97,23 @@ export default async function CanvasPage({
   const contentAuthors = Object.fromEntries(model.mappings.map((m) => [m.id, fourEyes ? lastContentEditor(m, events) : ""]).filter(([, u]) => u));
   const liveCanvases = new Set(canvases.map((c) => c.id));
   const items = allItems.filter((i) => liveCanvases.has(i.canvas_id));
-  const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId), labelNames);
+  // a live canvas (slice 3b): its label, what that label makes relevant (computed once here, never while rendering),
+  // and the mappings that carry it (the others are drawn faded)
+  const liveLabel = canvas.live_label_id ? (labels.find((l) => l.id === canvas.live_label_id && l.deleted_at === null) ?? null) : null;
+  const liveLinks = liveLabel ? labelLinks.filter((k) => k.deleted_at === null) : [];
+  const membership = liveLabel ? liveMembership(liveLabel.id, { ...model, links: liveLinks }) : null;
+  const liveMappings = liveLabel ? new Set(liveLinks.filter((k) => k.label_id === liveLabel.id && k.mapping_id).map((k) => k.mapping_id!)) : null;
+  const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId), labelNames,     liveLabel && membership
+      ? {
+          labelName: liveLabel.name,
+          relevantRows: membership.relevantRows,
+          removeOf: (target) => {
+            const q = liveRemoveQuestion(liveLabel.id, target, { ...model, links: liveLinks });
+            return { direct: !!q.direct, what: liveRemoveWhat(q, target.kind), others: q.viaRows.length + q.viaMappings.length };
+          },
+        }
+      : null,
+  );
   const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id));
   const editable = shell.standing === "full";
   // the working context (slice 3b): for those who change labels (AD-05: the same roles as model editors), from this
@@ -162,7 +181,7 @@ export default async function CanvasPage({
                   canvasName={shell.canvas?.name ?? ""}
                   canvasCount={canvases.length}
                   model={model}
-                  cards={cards.map((c) => ({ id: c.id, kind: c.kind, targetId: c.targetId, collapsed: c.collapsed, rowFilter: c.rowFilter }))}
+                  cards={cards.map((c) => ({ id: c.id, kind: c.kind, targetId: c.targetId, collapsed: c.collapsed, rowFilter: c.rowFilter, liveLevel: c.liveLevel }))}
                   tree={tree}
                   editable={editable}
                   canSetStatus={shell.standing !== "none"}
@@ -174,6 +193,10 @@ export default async function CanvasPage({
                   canvasesOf={canvasesOf}
                   labels={labels}
                   labelLinks={labelLinks}
+                  projectId={projectId}
+                  liveCanvases={Object.fromEntries(canvases.filter((c) => c.live_label_id && c.deleted_at === null).map((c) => [c.live_label_id!, c.id]))}
+                  live={liveLabel ? { labelId: liveLabel.id, labelName: liveLabel.name } : null}
+                  canCreateCanvas={editable}
                 />
               ),
               status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} />,
@@ -184,7 +207,7 @@ export default async function CanvasPage({
               key={canvasId}
               canvasId={canvasId}
               cards={cards}
-              lines={buildLines(model, cards, labelNames)}
+              lines={buildLines(model, cards, labelNames, liveMappings)}
               editable={editable}
               saveCard={updateCardAction.bind(null, ws)}
               placeCard={placeCardAction.bind(null, ws, canvasId)}
@@ -223,6 +246,18 @@ export default async function CanvasPage({
                 moveNotes: moveNotesAction.bind(null, ws, canvasId),
               }}
               diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks"), noFrames: diag.includes("noframes"), noLabels: diag.includes("nolabels"), collapsed: diag.includes("collapsed") } : undefined}
+              live={
+                liveLabel
+                  ? {
+                      labelId: liveLabel.id,
+                      labelName: liveLabel.name,
+                      names: Object.fromEntries([...model.entities, ...model.sourceTables].map((r) => [r.id, r.name])),
+                      labelElement: labelForLiveCanvasAction.bind(null, ws, liveLabel.id),
+                      removeCard: removeFromLiveCanvasAction.bind(null, ws),
+                      notices: liveNoticesFor(shell.user.id, canvasId),
+                    }
+                  : null
+              }
             />
           </AppShell>
           </WorkingContextProvider>

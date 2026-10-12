@@ -58,12 +58,13 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
             Put in a new frame
           </button>
         )}
-        {p.editable && entities.length > 0 && (
+        {p.editable && !p.live && entities.length > 0 && (
           <button type="button" className={buttonClass} data-testid="button-selection-sources" onClick={() => ui.placeSourcesOfSelection((id) => feedingSourceCards(p.ix, id))}>
             Add sources of selected entities
           </button>
         )}
-        {p.editable && cardKeys.length > 0 && (
+        {/* a live canvas removes one card at a time, each with its question (PRD item 12) */}
+        {p.editable && !p.live && cardKeys.length > 0 && (
           <button type="button" className={dangerClass} data-testid="button-selection-remove" onClick={() => ui.removeSelection()}>
             Remove from this canvas
           </button>

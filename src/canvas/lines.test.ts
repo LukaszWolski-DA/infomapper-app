@@ -45,6 +45,12 @@ const cards = buildCards(model, items);
 const lines = buildLines(model, cards);
 
 describe("buildLines", () => {
+  it("on a live canvas fades the mappings that do not carry its label (slice 3b, D-25)", () => {
+    expect(buildLines(model, cards, undefined, new Set()).mappings.every((m) => m.faded)).toBe(true);
+    expect(buildLines(model, cards, undefined, new Set(model.mappings.map((m) => m.id))).mappings.some((m) => m.faded)).toBe(false);
+    expect(buildLines(model, cards).mappings.some((m) => "faded" in m)).toBe(false);
+  });
+
   it("draws a mapping from each input on the canvas to the attribute's card", () => {
     expect(lines.mappings).toEqual([
       { id: ids.mapEmail, status: "approved", kind: "direct", ruled: false, warn: false, inputs: [{ columnId: ids.colEmail, cardId: ids.itemCrmCustomer }], inputCount: 1, attributeId: ids.email, cardId: ids.itemCustomer, labels: null },

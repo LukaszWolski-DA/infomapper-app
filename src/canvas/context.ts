@@ -222,7 +222,8 @@ export interface FramePatch {
   color?: string;
 }
 
-export type RowFilter = "all" | "mapped" | "unmapped" | "keys";
+/** A card's row filter; `labeled` only on a live canvas (slice 3b). */
+export type RowFilter = "all" | "labeled" | "mapped" | "unmapped" | "keys";
 
 /**
  * A source column row dropped on an entity card (slice 1b, D-48): on one of its attribute rows, or anywhere else on

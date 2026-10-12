@@ -33,7 +33,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   const n = view.canvases.length;
   const store = getDataStore();
   const ws = shell.workspace.id;
-  const [model, items, labels, links, pins, notes, frames] = await Promise.all([
+  const [model, items, labels, links, pins, notes, frames, allCanvases] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.labels.list(ws),
@@ -41,7 +41,10 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
     store.labels.listPins(ws),
     store.notes.list(ws),
     store.frames.list(ws),
+    store.canvases.list(ws),
   ]);
+  // labels with a live canvas (slice 3b): “Open live canvas” instead of “Open as live canvas”
+  const withLive = new Set(allCanvases.filter((c) => c.deleted_at === null && c.live_label_id).map((c) => c.live_label_id!));
   const st = projectStats(model, items, view.canvases.map((c) => c.id));
 
   // Labels: pinned first, then by items; each opens on the first canvas (tab order) where it marks something.
@@ -51,7 +54,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   const usedOn = view.canvases.map((c) => ({ id: c.id, labels: new Set(projectLabels(labels, links, new Set(), labelContext(model, itemsOf([c.id]))).map((r) => r.label.id)) }));
   const projectLabelRows = rows.map(({ label, items: count, pinned: isPinned }) => {
     const canvasId = usedOn.find((c) => c.labels.has(label.id))?.id ?? view.canvases[0]!.id;
-    return { id: label.id, name: label.name, items: count, pinned: isPinned, href: `${canvasHref(ws, view.project.id, canvasId)}?label=${label.id}` };
+    return { id: label.id, name: label.name, items: count, pinned: isPinned, live: withLive.has(label.id), href: `${canvasHref(ws, view.project.id, canvasId)}?label=${label.id}` };
   });
 
   // Open notes: canvas by canvas in tab order; each opens its canvas with the note selected (S3A-05)

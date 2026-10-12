@@ -339,6 +339,8 @@ export interface OpenLiveCanvasState extends LiveWriteState {
  * Opens label L's live canvas: the one it has (added to this project when it is not in it yet), or a new canvas named
  * after L in this project, with L's full elements (row filter `all`) and context elements (`labeled`) arranged into
  * frames by concept and system (slice 2b's rule, heights from the domain). A label has at most one live canvas.
+ * Anyone who sees the workspace may go to a live canvas this project has; adding it to the project needs the right to
+ * change a canvas's projects, making it the right to create canvases (PRD item 16).
  */
 export function openLiveCanvas(
   ctx: CommandContext,
@@ -346,7 +348,7 @@ export function openLiveCanvas(
   state: OpenLiveCanvasState,
   input: unknown,
 ): CommandResult<{ canvasId: Uuid; name: string; created: boolean; addedToProject: boolean }> {
-  const parsed = begin(access, "canvas.create", openInput, input);
+  const parsed = begin(access, "workspace.view", openInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { labelId, projectId } = parsed.data;
   const ws = access.workspace.id;
@@ -374,6 +376,8 @@ export function openLiveCanvas(
     ]);
   }
 
+  const denied = checkPermission(access, "canvas.create");
+  if (denied) return fail(denied);
   const canvas: Canvas = { ...newRowColumns(ctx), workspace_id: ws, name: label.name, live_label_id: labelId, look: { ...DEFAULT_CANVAS_LOOK } };
   const membership = liveMembership(labelId, liveModelOf(state, ws));
   const items: CanvasItem[] = [

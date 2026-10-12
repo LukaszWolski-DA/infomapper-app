@@ -62,7 +62,7 @@ export async function renameLabelAction(workspaceId: string, input: { labelId: s
 }
 
 /** Deletes a label with its links and project pins (one undo step); the model is untouched. */
-export async function deleteLabelAction(workspaceId: string, input: { labelId: string; expectedVersion: number }): Promise<ActionResult<{ name: string }>> {
+export async function deleteLabelAction(workspaceId: string, input: { labelId: string; expectedVersion: number }): Promise<ActionResult<{ name: string; hadLiveCanvas: boolean }>> {
   return labelCommand(workspaceId, async (ctx, access, store) => {
     const ws = access.workspace.id;
     const [label, links, pins, canvases, canvasItems] = await Promise.all([
@@ -73,7 +73,7 @@ export async function deleteLabelAction(workspaceId: string, input: { labelId: s
       store.canvasItems.list(ws),
     ]);
     const r = deleteLabel(ctx, access, { label, links, pins, canvases, canvasItems }, input);
-    return r.ok ? { ...r, value: { name: r.value.name } } : r;
+    return r.ok ? { ...r, value: { name: r.value.name, hadLiveCanvas: r.value.liveCanvasId !== null } } : r;
   });
 }
 

@@ -22,7 +22,7 @@ import { createEntityAction, createRelationshipAction, deleteAttributeAction, de
 import { useAction } from "@/app/_components/use-action";
 import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
 import { newCardHeight } from "@/canvas/geometry";
-import { FILTER_LABEL, FILTER_ORDER } from "@/canvas/CardNode";
+import { FILTER_LABEL, filtersOf } from "@/canvas/CardNode";
 import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
 import { isCardKey } from "@/canvas/selection";
 import type { Uuid } from "@/domain/ids";
@@ -43,6 +43,8 @@ export interface HostCard {
   targetId: Uuid;
   collapsed: boolean;
   rowFilter: RowFilter;
+  /** On a live canvas (slice 3b). */
+  liveLevel: "full" | "context" | null;
 }
 
 const snap8 = (v: number) => Math.round(v / 8) * 8;
@@ -65,6 +67,7 @@ export function useCanvasHost({
   canSetStatus,
   canNote,
   cards,
+  live = null,
 }: {
   ix: ModelIndex;
   workspaceId: string;
@@ -74,6 +77,8 @@ export function useCanvasHost({
   /** May write notes (slice 3a): editors and reviewers. */
   canNote: boolean;
   cards: readonly HostCard[];
+  /** This canvas's label when it is a live canvas (slice 3b). */
+  live?: { labelId: Uuid; labelName: string } | null;
 }) {
   const ui = useContext(CanvasUiCtx);
   const panels = usePanels();
@@ -112,13 +117,14 @@ export function useCanvasHost({
       panels.setLastConcept(concept.id);
       const cardId = result.value.canvasItemId;
       if (cardId) ui.select({ t: "card", id: cardId });
-      if (name) toast(`Created ${result.value.name} in ${concept.name}.`);
+      if (name) toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}.`);
       else {
-        toast(`Created ${result.value.name} in ${concept.name}. Type its name now; change the concept in the panel.`);
+        // on a live canvas the new entity is labeled at once, without a question (PRD item 10)
+        toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}. Type its name now; change the concept in the panel.`);
         if (cardId) panels.setNameFocus(cardId);
       }
     },
-    [editable, ix, panels, toast, run, workspaceId, canvasId, ui],
+    [editable, ix, panels, toast, run, workspaceId, canvasId, ui, live],
   );
 
   const relate = useCallback(
@@ -182,7 +188,8 @@ export function useCanvasHost({
     const isEnt = card.kind === "ent";
     // What the canvas shows now: a collapse or filter is saved without a fresh page.
     const view = ui.cardView(card.id) ?? card;
-    if (editable) {
+    // a live canvas adds cards one at a time (PRD item 12): no “Show its sources”
+    if (editable && !live) {
       // Feeding sources (left) or fed entities (right), placed beside the card (B-08).
       const missing = isEnt
         ? feedingSources(ix, card.targetId)
@@ -210,7 +217,7 @@ export function useCanvasHost({
     if (editable) {
       items.push({
         seg: "Rows",
-        options: FILTER_ORDER.map((f) => ({ label: FILTER_LABEL[f], on: view.rowFilter === f, act: () => ui.setCardView(card.id, { rowFilter: f }) })),
+        options: filtersOf(card).map((f) => ({ label: FILTER_LABEL[f], on: view.rowFilter === f, act: () => ui.setCardView(card.id, { rowFilter: f }) })),
       });
       items.push({ label: view.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !view.collapsed }) });
       items.push({ label: "Fit width to names", act: () => ui.fitWidth(card.id) });
@@ -219,7 +226,8 @@ export function useCanvasHost({
         items.push({ label: `Put in a new ${isEnt ? "concept" : "source system"} frame`, act: () => ui.putInNewFrame([card.id], true) });
       }
       items.push({ sep: true });
-      items.push({ label: "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
+      // on a live canvas removing a card takes its label off, after the question (PRD item 11)
+      items.push({ label: live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
       if (isEnt) items.push({ label: "Delete from model…", danger: true, act: () => setDeleting(card.targetId) });
     } else if (canNote) {
       items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });
@@ -370,10 +378,11 @@ export function useCanvasHost({
             act: () => ui.putInNewFrame(cardKeys.map((k) => cardOf(k.slice(k.indexOf(":") + 1))).filter((id): id is Uuid => !!id), false),
           });
         }
-        if (keys.some((k) => k.startsWith("entity:"))) {
+        // a live canvas adds and removes one card at a time (PRD item 12): no bulk add, no removal of several
+        if (keys.some((k) => k.startsWith("entity:")) && !live) {
           items.push({ label: "Add sources of selected entities", act: () => ui.placeSourcesOfSelection((id) => feedingSourceCards(ix, id)) });
         }
-        if (cardKeys.length) items.push({ label: "Remove from this canvas", danger: true, act: () => ui.removeSelection() });
+        if (cardKeys.length && !live) items.push({ label: "Remove from this canvas", danger: true, act: () => ui.removeSelection() });
       }
       items.push({ sep: true });
       items.push({ label: "Clear selection", kbd: "Esc", act: () => ui.select(null) });

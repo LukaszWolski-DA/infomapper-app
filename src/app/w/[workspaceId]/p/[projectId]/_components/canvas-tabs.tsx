@@ -10,6 +10,7 @@ import { renameCanvasAction } from "@/app/_actions/canvas";
 import { useAction } from "@/app/_components/use-action";
 import { canvasHref, projectHref } from "@/app/_lib/paths";
 import type { ProjectView } from "@/app/_lib/project-view";
+import { TagIcon } from "@/app/_panels/labels-field";
 import { cn } from "@/ui/lib/utils";
 import { CanvasMenu, DotsIcon, useNewCanvas } from "./canvas-menu";
 
@@ -103,9 +104,16 @@ export function CanvasTabs({
                 className="h-6 w-[180px] rounded border border-im-logical bg-im-surface px-1.5 font-medium"
               />
             ) : (
-              <span className="max-w-[200px] truncate" data-testid="tab-canvas-name">
-                {canvas.name}
-              </span>
+              <>
+                {canvas.liveLabel && (
+                  <span className="inline-flex text-im-ink-3" title={`Live canvas: shows everything labeled ${canvas.liveLabel}`} data-testid="tab-canvas-live">
+                    <TagIcon />
+                  </span>
+                )}
+                <span className="max-w-[200px] truncate" data-testid="tab-canvas-name">
+                  {canvas.name}
+                </span>
+              </>
             )}
             <span className="text-[10.5px] font-normal tabular-nums text-im-ink-3" data-testid="tab-canvas-count">
               {canvas.cards}

@@ -12,6 +12,7 @@ import { changeLabel } from "@/domain/model/change-label";
 import { recordChange } from "@/domain/model/undo-history";
 import type { AppUser } from "@/domain/types";
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
+import { recordLiveNotices } from "./live-notices";
 import { loadLiveState } from "./live-state";
 import { getSessionUser } from "./session";
 
@@ -47,6 +48,7 @@ export async function runCommand<T>(
     const applied = await store.apply(completed.writeSet);
     if (!applied.ok) return { ok: false, code: applied.error.code, message: applied.error.message };
     await remember(store, user.id, completed.writeSet);
+    if (completed.value.canvases.length) recordLiveNotices(user.id, completed.value);
     return { ok: true, value: result.value, ...(completed.value.canvases.length || completed.value.labeled ? { live: completed.value } : {}) };
   } catch (e) {
     // No row content in the log (personal data, rich text): only what kind of error it was.

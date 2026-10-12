@@ -5,7 +5,7 @@ import type { Uuid } from "@/domain/ids";
 import { rowShown } from "@/domain/model/card-size";
 import type { CardSubject } from "@/domain/model/frames";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
-import type { CanvasItem, RowFilter, WorkspaceModel } from "@/domain/types";
+import type { CanvasItem, LiveLevel, RowFilter, WorkspaceModel } from "@/domain/types";
 import { lineNeedsClip, rowNeedsClip, titleNeedsClip } from "./text-fit";
 
 export type CardKind = "ent" | "src";
@@ -32,6 +32,8 @@ export interface CardRow {
   clip: boolean;
   /** Working labels on the attribute or column, as the tag mark's tooltip (“CR-23, JIRA-481”); null without (slice 3a). */
   labels: string | null;
+  /** On a live canvas: the row carries the canvas's label, or one of its mappings does (bold, the Labeled filter; slice 3b). */
+  relevant?: boolean;
 }
 
 export interface CardData {
@@ -59,7 +61,14 @@ export interface CardData {
   /** null = default width (D-37). */
   width: number | null;
   collapsed: boolean;
-  rowFilter: Exclude<RowFilter, "labeled">;
+  /** `labeled` only on a live canvas (slice 3b); elsewhere a stored `labeled` shows as `all`. */
+  rowFilter: RowFilter;
+  /** On a live canvas: full when the label is on the element, context when only on its rows or mappings (slice 3b). */
+  liveLevel: LiveLevel | null;
+  /** A context card's tooltip (“Context: the entity itself is not labeled CR-23, …”); null otherwise. */
+  liveTitle: string | null;
+  /** On a live canvas: what taking the card off unlabels, for its question (PRD item 11); computed once by the page. */
+  liveRemove?: LiveRemove;
   /** The frame the card belongs to on this canvas (slice 2b, D-05). */
   frameId: Uuid | null;
   /** An entity of a concept or a table of a system: what a concept or source frame checks (misplaced cards). */
@@ -78,8 +87,25 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 export type LabelNames = ReadonlyMap<string, readonly string[]>;
 const NO_LABELS: LabelNames = new Map();
 
+/** What taking a card off a live canvas unlabels: the element itself, or `what` (“2 attributes and 1 mapping”) of it. */
+export interface LiveRemove {
+  direct: boolean;
+  /** Rows and mappings of it that carry the label, as words, and how many. */
+  what: string;
+  others: number;
+}
+
+/** What a live canvas adds to its cards (slice 3b): the rows its label makes relevant (computed once by the page). */
+export interface LiveCards {
+  /** Each card's remove question (by element). */
+  removeOf: (target: { kind: "entity" | "source_table"; id: Uuid }) => LiveRemove;
+  /** The live canvas's label, for a context card's tooltip. */
+  labelName: string;
+  relevantRows: ReadonlySet<Uuid>;
+}
+
 /** The cards of one canvas, in drawing order (sources first, as in the prototype). */
-export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], labelNames: LabelNames = NO_LABELS): CardData[] {
+export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], labelNames: LabelNames = NO_LABELS, live: LiveCards | null = null): CardData[] {
   const labelsOf = (key: string) => labelNames.get(key)?.join(", ") || null;
   const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
   const columnById = new Map(model.sourceColumns.map((c) => [c.id, c]));
@@ -127,7 +153,9 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
       y: item.y,
       width: item.width,
       collapsed: item.collapsed,
-      rowFilter: item.row_filter === "labeled" ? "all" : item.row_filter,
+      rowFilter: item.row_filter === "labeled" && !live ? "all" : item.row_filter,
+      liveLevel: live ? item.live_level : null,
+      liveTitle: null,
       frameId: item.frame_id,
       createdAt: item.created_at,
     } as const;
@@ -150,6 +178,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
           ...rowState(a.id, "Not mapped yet"),
           clip: false,
           labels: labelsOf(`attribute:${a.id}`),
+          ...(live ? { relevant: live.relevantRows.has(a.id) } : {}),
         }));
       cards.push({
         ...base,
@@ -157,7 +186,10 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
         targetId: entity.id,
         name: entity.name,
         line1: cap(entity.stereotype),
-        line1b: `in ${concept?.name ?? "–"}`,
+        // a context card says why it is here (prototype entCard, slice 3b)
+        line1b: live && item.live_level === "context" ? "context only" : `in ${concept?.name ?? "–"}`,
+        liveTitle: live && item.live_level === "context" ? `Context: the entity itself is not labeled ${live.labelName}, only some of its attributes are` : null,
+        ...(live ? { liveRemove: live.removeOf({ kind: "entity", id: entity.id }) } : {}),
         color: concept?.color ?? null,
         rows,
         mapped: rows.filter((r) => r.mappings > 0).length,
@@ -181,6 +213,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
           ...rowState(c.id, "Not used yet"),
           clip: false,
           labels: labelsOf(`source_column:${c.id}`),
+          ...(live ? { relevant: live.relevantRows.has(c.id) } : {}),
         }));
       cards.push({
         ...base,
@@ -189,6 +222,8 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
         name: table.name,
         line1: `${systemById.get(table.source_system_id)?.name ?? "?"} / ${table.database_name}.${table.schema_name}`,
         line1b: "",
+        liveTitle: live && item.live_level === "context" ? `Context: the table itself is not labeled ${live.labelName}, only some of its columns or mappings are` : null,
+        ...(live ? { liveRemove: live.removeOf({ kind: "source_table", id: table.id }) } : {}),
         color: null,
         rows,
         mapped: rows.filter((r) => r.mappings > 0).length,
