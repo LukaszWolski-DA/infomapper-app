@@ -1,7 +1,7 @@
 # Slice 4a – Acceptance
 
-Status: **step 1 done; waiting for Łukasz** (one question below). Branch `slice/04a-requirements`, from `main` at the
-tag `slice-03b` (`a10899c`), pull request #11 (draft).
+Status: **step 2 done; waiting for Łukasz**. Branch `slice/04a-requirements`, from `main` at the tag `slice-03b`
+(`a10899c`), pull request #11 (draft).
 
 ## Łukasz's answers to step 0 (13 October)
 
@@ -274,3 +274,85 @@ disagree; the unit tests show the composite case with a rule (covered) and witho
     (`runCommand`'s `freshOnStale`, `src/app/_lib/fresh-retry.ts`; `fresh-retry.test.ts` runs two creates read at the
     same moment against the local adapter: REQ-106 and REQ-107, counter 108). A settings dialog open at that moment is
     refused as stale (Łukasz: fine).
+
+## Step 2 (rich-text editor, 13 October)
+
+PRD items 16–19. Commits `db9d0dd` (Tiptap), `2cdd5d3` (editor, definitions).
+
+- **Dependencies:** `@tiptap/core`, `@tiptap/pm`, `@tiptap/react`, `@tiptap/starter-kit`, `@tiptap/extensions`,
+  `@tiptap/extension-superscript`, `@tiptap/extension-subscript`, all pinned to **3.31.3** (4 September 2026).
+  `fast-equals`, which `@tiptap/react` asks for as `^5.3.3`, resolved to 5.4.4 (8 October, younger than 14 days); an
+  `overrides` entry keeps it at 5.4.3 (20 September) under `@tiptap/react` only. `npm audit` unchanged (the 12 findings
+  in `braces` and `handlebars`).
+- **Editor** (`src/ui/rich-text/`): `extensions.ts` (the schema: StarterKit without code, code block, blockquote,
+  horizontal rule, strike and underline, headings h4 only, links http/https/mailto opened in a new tab; superscript,
+  subscript; a colour mark that renders `<span class="tc-…">`; the template hint as a paragraph attribute shown by the
+  placeholder decoration); `rich-text-editor.tsx` (toolbar as the prototype: Bold, Italic, the four colours, Clear
+  formatting, Link with the inline URL field, bulleted and numbered list, superscript, subscript, “Insert template” on
+  the right for requirement descriptions; footer “Ctrl + Enter saves, Esc cancels”, Cancel, Save; the unsaved-changes
+  warning; an empty description opens with its kind's template and the cursor in the first empty section);
+  `rich-text-dialog.tsx` (the dialog: subtitle and title, the editor loaded with `React.lazy` the first time a dialog
+  opens; every key event stops at the dialog, so Delete, Ctrl+Z, arrows, Space, E and H never reach the canvas or the
+  app's undo; a click outside counts as Cancel, as in the prototype); `rich-text-field.tsx` (the panel field: the text
+  formatted and shortened, “Edit”, “Show more” only when cut, a click opens the editor; empty shows the hint; without
+  edit rights no “Edit” and a click opens nothing; Save toasts “Saved.”).
+- **Templates** (`src/domain/model/requirement-templates.ts`): the prototype's `RTEMPLATES` per kind and `templateHtml`.
+  The requirement panel that uses them comes in step 3.
+- **Definitions:** `updateEntity` and `updateAttribute` take rich text and sanitize it (`sanitizeRich`); the entity and
+  attribute panels use the field (“What this entity means for the business. Click to write it.”, “… this attribute …”,
+  dialog subtitle “Entity definition” / “Attribute definition”, title the entity's name / `Entity.attribute`). Plain
+  definitions stored before were already kept as paragraphs (`plainTextPair`), so they open as their paragraphs. Notes
+  stay plain text.
+- **Tests:** `npm test` 907 in 62 files (899 before; `requirement-templates.test.ts`, the two definition tests now send
+  rich text); lint and typecheck pass.
+- **End-to-end:** the full suite once on `2cdd5d3`, no dev server running: 141 passed (32.8 min), no retries.
+
+### Bundle sizes (`next build`, Turbopack)
+
+Next 16 no longer prints first-load sizes, so they are summed from the build's manifests: the root chunks plus the
+canvas route's entry chunks (`page_client-reference-manifest.js`), raw and gzip (level 9).
+
+| | Canvas page first-load JS | Editor chunk (loaded on first open) |
+| --- | --- | --- |
+| Before (`de241a0`) | 1,059.7 KiB raw, 321.7 KiB gzip (8 files) | – |
+| After (`2cdd5d3`) | 1,063.2 KiB raw, 322.9 KiB gzip (8 files) | 386.5 KiB raw, 120.6 KiB gzip (one chunk) |
+
+The first load grows by 3.5 KiB (1.2 KiB gzip): the field and the dialog shell. No first-load chunk contains
+ProseMirror or Tiptap, and no browser chunk contains the server's HTML parser.
+
+### Checked in the browser (dev server, fresh seed)
+
+As Łukasz on “Customer & orders”, Customer's definition: the editor opens with the stored paragraph and the cursor at
+the end; typing E, H, Space, arrows, Delete and Ctrl+Z in it leaves the canvas alone (tool, cards and selection
+unchanged; Ctrl+Z undoes inside the editor); bold, a colour and a link (“example.com/crm” → `https://example.com/crm`)
+save with Ctrl+Enter and the toast “Saved.”; one Ctrl+Z on the page brings the previous text back (“Undone: Change
+entity”); Esc with changes shows the warning, the second Esc discards. A paste of Word-like HTML (an h1, inline styles,
+underline, strike, a table, an image, a `javascript:` link, a blockquote, `pre`) keeps only bold, the list and the safe
+link, the rest as plain text. As Piotr: the definition shows formatted, no “Edit”, a click opens nothing. No console
+errors.
+
+### Changes to earlier tests
+
+- No earlier end-to-end test types a definition (none uses the old definition textarea), so none changed.
+- Unit tests: `entity.test.ts` and `attribute.test.ts` send rich text for the definition and check the sanitized result.
+
+### Assumptions (step 2)
+
+1. **The panel shows the stored HTML as the server sanitized it**, without sanitizing it again in the browser, so the
+   HTML parser stays out of the browser bundle (AD-17 puts the sanitizing on the server).
+2. **Ctrl+Z inside the editor** undoes in the editor (its own history); outside, the app's undo takes the whole save as
+   one step.
+3. **Save with nothing changed** closes the dialog, no write and no toast (wording table, step 0).
+4. **A click outside the dialog** counts as Cancel (warning first when there are changes), as in the prototype.
+5. **Lists** are stored as `<li><p>…</p></li>` (Tiptap's list items hold paragraphs); the sanitizer keeps it and the
+   panel shows it as the prototype's lists.
+6. **Text colours in dark mode** follow `prefers-color-scheme`, as the rest of the app (the prototype also has a manual
+   theme switch the app does not have).
+7. **The undo toast** names a definition save as the generic “Change entity” / “Change attribute”.
+
+### Not matched from the prototype's editor
+
+- **Clear formatting** also removes a link in the selection; the prototype's `removeFormat` keeps links.
+- **A line break typed at the very end of a paragraph** (Shift+Enter) is stored as typed (`<br>` before `</p>`); the
+  prototype's `finalizeRich` keeps it too, but its browser editor rarely produced it.
+- **The prototype's `<font color>`** from `execCommand` is not read on paste (the app never stored it).
