@@ -196,6 +196,9 @@ delete actions), `c06e65f` (data model).
 - **Tests.** `npm test`: 899 tests in 60 files (820 before): `model/requirements.test.ts` (19), `model/rich-text.test.ts`
   (11), `commands/requirement.test.ts` (26), `data/local/requirement-store.test.ts` (11), and additions to
   `permissions.test.ts`, `change-label.test.ts`, the schema test. `npm run lint` and `npm run typecheck` pass.
+- **End-to-end.** The seed and the delete actions change under every earlier test (requirements in the demo data,
+  requirement links deleted with their elements), so the full suite ran once on `c06e65f`, no dev server running:
+  141 passed (26.1 min), no retries.
 
 ### The seed's coverage (the end-to-end tests use these figures)
 
