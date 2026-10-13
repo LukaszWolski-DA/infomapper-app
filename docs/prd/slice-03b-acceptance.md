@@ -37,7 +37,9 @@ start again.
 
 | Set | Commit | Runs | What happened |
 | --- | --- | --- | --- |
-| 1 | (filled in after the runs) | | |
+| 1 | `3992e3f` | 3 of 3 passed: 141 tests each (113 files), 24.9, 24.9 and 25.1 min; no retries, no flaky test | The server's known “destination stream closed early” lines (23, 22, 16) |
+
+Before the runs: `npm run lint`, `npm run typecheck` and `npm test` (820 tests in 56 files) pass.
 
 ## Manual checklist (Łukasz)
 
