@@ -39,7 +39,7 @@ export const usesSeverity = (kind: RequirementKind): boolean => kind === "dq_rul
 export const keyTakenMessage = (key: string): string => `${key} is already used by another requirement.`;
 /** Choosing `parentKey` as the parent of `requirementKey`, which `parentKey` is already part of (at any depth). */
 export const cycleMessage = (requirementKey: string, parentKey: string): string =>
-  `${parentKey} is part of ${requirementKey} already, so it cannot contain it.`;
+  `${parentKey} is already part of ${requirementKey}, so ${requirementKey} cannot be part of it.`;
 export const OWN_PARENT_MESSAGE = "A requirement cannot be part of itself.";
 export const restoreKeyTakenMessage = (key: string): string => `${key} is used by another requirement now, so the deleted one cannot come back.`;
 export const fourEyesRequirementMessage = (key: string): string => `You changed ${key} last, so someone else has to agree it.`;

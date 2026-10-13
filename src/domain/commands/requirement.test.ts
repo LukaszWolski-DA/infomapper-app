@@ -27,7 +27,7 @@ import type { Requirement, RequirementLink, WorkspaceRole } from "../types";
 import { deleteAttribute } from "./attribute";
 import { deleteEntity } from "./entity";
 import { completeLiveWrites, type LiveWriteState } from "./live";
-import { deleteMapping, mergeMappings } from "./mapping";
+import { deleteMapping, mergeMappings, splitMapping } from "./mapping";
 import {
   ALREADY_LINKED_MESSAGE,
   ALREADY_UNLINKED_MESSAGE,
@@ -120,7 +120,7 @@ describe("change one field (PRD items 2, 4, 5, 11)", () => {
   it("“Part of” never makes a cycle, at any depth", () => {
     const chain = [...reqs, requirement(ids.req104, { parent_id: ids.req103 })];
     const r = updateRequirement(makeCtx(), owner, { requirements: chain }, { requirementId: ids.req101, expectedVersion: 1, field: "parent_id", value: ids.req104 });
-    expect(r).toMatchObject({ ok: false, error: { code: "conflict", message: "REQ-104 is part of REQ-101 already, so it cannot contain it." } });
+    expect(r).toMatchObject({ ok: false, error: { code: "conflict", message: "REQ-104 is already part of REQ-101, so REQ-101 cannot be part of it." } });
     expect(refusal(updateRequirement(makeCtx(), owner, { requirements: chain }, { requirementId: ids.req101, expectedVersion: 1, field: "parent_id", value: ids.req101 }))).toBe(
       "A requirement cannot be part of itself.",
     );
@@ -351,6 +351,16 @@ describe("links of deleted model elements", () => {
       ),
     );
     check(r.writeSet, ["01900000-0000-7000-8000-00000000e204", "01900000-0000-7000-8000-00000000e205"]);
+  });
+
+  it("splitting a mapping writes no requirement link: its links stay on the mapping that keeps its id", () => {
+    const combined = mapping({ kind: "transform", rule_expression: "a || b" });
+    const inputs = [mappingInput(), mappingInput("01900000-0000-7000-8000-00000000b002", { source_column_id: ids.colFirstName, sort_order: 1 })];
+    const r = ok(splitMapping(makeCtx(), owner, { mapping: combined, inputs, requirementLinks: links }, { mappingId: ids.mapEmail, expectedVersion: 1 }));
+    expect(r.value.mapping.id).toBe(ids.mapEmail);
+    expect(r.writeSet.writes.some((w) => w.table === "requirement_link")).toBe(false);
+    const after = applied(rows(), r.writeSet);
+    expect(live(after.requirement_link).find((k) => k.id === ids.reqLink3)).toMatchObject({ mapping_id: ids.mapEmail });
   });
 
   it("merging mappings moves the deleted mappings' links to the mapping that stays, without a second link", () => {

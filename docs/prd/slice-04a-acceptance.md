@@ -163,6 +163,12 @@ The viewport counts equal slice 3a's and slice 3b's step 3. The whole page has 2
 step 4's notes in the Overview's miniature, outside the viewport. At step 5 the same spec runs on this branch with
 `ELEMENTS_BASELINE=.data/measure/s4a14-baseline/slice-03b.json`; every viewport count must be identical.
 
+## Łukasz's answers after step 1 (13 October)
+
+Step 1 accepted. Item 7: option 1, coverage follows `checkMappingTypes`; PRD item 7 and S4A-08 updated (`2146100`). The
+cycle message reworded (assumption 3); the key counter under two creates (assumption 14); splitting a mapping
+(assumption 13).
+
 ## Step 1 (domain and data, 13 October)
 
 PRD items 1–15, no screens. Commits `b97d022` (dependency), `46cde25` (domain), `5a42186` (adapter, migration, seed,
@@ -218,7 +224,7 @@ too), so REQ-101's scope is 8; `birth_date` (from `dob`) and `created_at` (a tra
 Order Line's `quantity`, `unit_price` and `discount_pct` have no mapping in the seed (only `product_id` does), so REQ-104
 is 1 / 4.
 
-### Question for Łukasz
+### Question for Łukasz (answered: option 1)
 
 **A type conflict on one input of an approved composite mapping (item 7, S4A-08, your test list).** The app's type
 check (`checkMappingTypes`, `src/domain/model/type-check.ts:131`, the mapping panel's) treats a transformation with a
@@ -242,9 +248,9 @@ disagree; the unit tests show the composite case with a rule (covered) and witho
    version, so a workspace settings change open at the same moment is refused as stale.
 2. **Undoing a key change back to a key someone took meanwhile** is refused with “REQ-104 is already used by another
    requirement.”; bringing back a deleted one with item 9's message.
-3. **Cycle message:** the PRD's sentence with the roles as they are: choosing REQ-104 as the parent of REQ-101, which
-   REQ-104 is already part of, says “REQ-104 is part of REQ-101 already, so it cannot contain it.” Choosing itself:
-   “A requirement cannot be part of itself.” (not in the PRD).
+3. **Cycle message** (Łukasz, after step 1): choosing REQ-104 as the parent of REQ-101, which REQ-104 is already part
+   of, says “REQ-104 is already part of REQ-101, so REQ-101 cannot be part of it.” Choosing itself: “A requirement
+   cannot be part of itself.”
 4. **Merging mappings** moves the requirement links of the mappings that go to the one that stays, without a second link
    (as labels, D-24); the PRD does not say.
 5. **Demo requirements only in “Retail Co – DWH”.** “Sales analytics” has the same model but no requirements.
@@ -261,3 +267,10 @@ disagree; the unit tests show the composite case with a rule (covered) and witho
 11. **The entity delete dialog's requirements row** (item 10, Q5) comes with the panels in step 3; step 1 has the scope
     function it needs.
 12. **Columns** are deleted only with their table today, so a column's links go with its table's delete.
+13. **Splitting a mapping** writes no requirement link: the links stay on the mapping that keeps its id; the new direct
+    mappings get none (Łukasz confirmed; `requirement.test.ts`).
+14. **Two creates at the same moment** both succeed with different keys: the browser sends no workspace version for a
+    create, so a create whose counter write comes back stale is built again from fresh data, at most three times
+    (`runCommand`'s `freshOnStale`, `src/app/_lib/fresh-retry.ts`; `fresh-retry.test.ts` runs two creates read at the
+    same moment against the local adapter: REQ-106 and REQ-107, counter 108). A settings dialog open at that moment is
+    refused as stale (Łukasz: fine).

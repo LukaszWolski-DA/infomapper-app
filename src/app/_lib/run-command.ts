@@ -12,6 +12,7 @@ import { changeLabel } from "@/domain/model/change-label";
 import { recordChange } from "@/domain/model/undo-history";
 import type { AppUser } from "@/domain/types";
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
+import { retryWhenStale } from "./fresh-retry";
 import { recordLiveNotices } from "./live-notices";
 import { loadLiveState } from "./live-state";
 import { getSessionUser } from "./session";
@@ -25,16 +26,18 @@ export type ActionResult<T = undefined> =
  * Runs one write (AD-23): the signed-in user, a fresh context, the domain command, then the live canvas rules (slice
  * 3b: what labels mark and what live canvases hold, in the same change group; `completeLiveWrites`), then the adapter
  * applies the rows and change events together, and the change group goes into the person's undo history (slice 1b).
- * Refusals come back with the domain's message.
+ * Refusals come back with the domain's message. With `freshOnStale`, a write refused as stale is built again from fresh
+ * data (slice 4a: the requirement key counter, `fresh-retry.ts`).
  */
 export async function runCommand<T>(
   build: (ctx: CommandContext, store: DataStore, user: AppUser) => Promise<CommandResult<T>>,
+  options: { freshOnStale?: boolean } = {},
 ): Promise<ActionResult<T>> {
   const user = await getSessionUser();
   if (!user) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
   const store = getDataStore();
-  const ctx: CommandContext = { actorId: user.id, now: new Date().toISOString(), newId: () => uuidv7() };
-  try {
+  const once = async (): Promise<ActionResult<T>> => {
+    const ctx: CommandContext = { actorId: user.id, now: new Date().toISOString(), newId: () => uuidv7() };
     const result = await build(ctx, store, user);
     if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message };
     const workspaceId = result.writeSet.events[0]?.workspace_id;
@@ -50,6 +53,9 @@ export async function runCommand<T>(
     await remember(store, user.id, completed.writeSet);
     if (completed.value.canvases.length) recordLiveNotices(user.id, completed.value);
     return { ok: true, value: result.value, ...(completed.value.canvases.length || completed.value.labeled ? { live: completed.value } : {}) };
+  };
+  try {
+    return options.freshOnStale ? await retryWhenStale(once, (r) => !r.ok && r.code === "stale_version") : await once();
   } catch (e) {
     // No row content in the log (personal data, rich text): only what kind of error it was.
     console.error("Write failed:", e instanceof Error ? `${e.name}: ${e.message}` : "unknown error");
