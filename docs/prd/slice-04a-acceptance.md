@@ -145,18 +145,20 @@ size (not measured yet: the packages are not installed in step 0).
 - **The context (item 14)**: requirement and requirement link objects are not label targets, so
   `completeLiveWrites` labels nothing for them; their events record the context like layout writes do today.
 
-### S4A-14 baseline (not run yet)
+### S4A-14 baseline: elements on `slice-03b` (13 October)
 
-The element counts on `slice-03b` with `S3B-15-elements.spec.ts` in the measurement build. Proposed commands, after
-Łukasz has prepared the laptop, in `../infomapper-ab-main` (now at `slice-03a`, `8a52155`) as for S3B-15 (a); the tag
-has the spec itself:
+`e2e/slice-03b/S3B-15-elements.spec.ts` in the measurement build of `slice-03b` (`a10899c`) in `../infomapper-ab-main`
+(`npm ci`, `npm run measure:build`, then `MEASURE=1 MEASURE_BUILD=production npx playwright test
+e2e/slice-03b/S3B-15-elements.spec.ts`), no other server running. Counts in
+`.data/measure/s4a14-baseline/slice-03b.json`.
 
-```bash
-git -C ../infomapper-ab-main checkout --detach slice-03b
-cd ../infomapper-ab-main && npm ci && npm run measure:build
-MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts
-mkdir -p ../infomapper-app/.data/measure/s4a14-baseline && cp test-results/S3B-15-elements.json ../infomapper-app/.data/measure/s4a14-baseline/slice-03b.json
-```
+| View | Whole page | `.react-flow__viewport` |
+| --- | --- | --- |
+| 100 %, frames expanded | 20,721 | 19,295 |
+| 30 %, frames expanded | 5,924 | 4,498 |
+| 100 %, frames collapsed | 6,237 | 4,905 |
+| 30 %, frames collapsed | 2,795 | 1,463 |
 
-At step 5 the same spec runs on this branch with `ELEMENTS_BASELINE=.data/measure/s4a14-baseline/slice-03b.json`;
-it must report identical counts.
+The viewport counts equal slice 3a's and slice 3b's step 3. The whole page has 24 / 10 more elements than at 3b's step 3:
+step 4's notes in the Overview's miniature, outside the viewport. At step 5 the same spec runs on this branch with
+`ELEMENTS_BASELINE=.data/measure/s4a14-baseline/slice-03b.json`; every viewport count must be identical.
