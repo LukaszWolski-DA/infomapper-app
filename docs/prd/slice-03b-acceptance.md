@@ -1,7 +1,8 @@
 # Slice 3b – Acceptance
 
-Status: **step 5 done, waiting for Łukasz's manual acceptance**. Branch `slice/03b-context-and-live-canvases`, pull
-request #10 (draft). Steps 0 to 4 were accepted one by one (below).
+Status: **accepted by Łukasz on 13 October 2026** (manual acceptance passed, no notes; three full runs passed on
+3992e3f). Branch `slice/03b-context-and-live-canvases`, pull request #10, merged into `main`, tag `slice-03b`. Steps 0
+to 4 were accepted one by one (below).
 
 ## Criteria
 
@@ -42,6 +43,10 @@ start again.
 Before the runs: `npm run lint`, `npm run typecheck` and `npm test` (820 tests in 56 files) pass.
 
 ## Manual checklist (Łukasz)
+
+**Result (13 October 2026):** passed, no notes (Łukasz): the context on and off, labeling with undo, opening the live
+canvas, a change from another canvas arriving, adding and removing cards with the questions, deleting and restoring the
+label, notes in the miniature, and the reviewer and reader roles.
 
 Fresh demo data, then the app on the preview data file:
 
@@ -85,7 +90,10 @@ it is there, to the right of the content. On the live canvas drag Order Line fro
 right-click it and “Remove from this canvas (unlabel)…”. Open CR-23's panel, “Delete label” (one toast: deleted, the
 context off, the live canvas normal), Undo. Finally look at the notes in the Overview of Customer & orders.
 
-## Proposed changes to `docs/decisions.md` (not applied; for Łukasz to approve)
+## Changes to `docs/decisions.md` (approved by Łukasz, applied in f72a4eb)
+
+Applied as proposed below, except: D-25 keeps its sentence and the look follows it; D-26 also says that deletions are
+not labeled and that source tables, columns and concepts are not labeled by the context.
 
 - **D-10** (append): “A label has at most one live canvas. Opening it makes a canvas named after the label in the
   current project, its elements arranged into frames by concept and system; elements that become labeled later land to
