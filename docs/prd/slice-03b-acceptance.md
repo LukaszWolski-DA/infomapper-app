@@ -1,6 +1,6 @@
 # Slice 3b – Acceptance
 
-Status: **step 4 done, waiting for Łukasz** (the balanced sitting covering steps 3 and 4 after his OK). Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
+Status: **step 4 done; the balanced sitting met S3B-15 (b) and (c); waiting for Łukasz** (step 5 next). Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
 reported one by one (below); criteria, runs and the manual checklist come in step 5.
 
 ## Step 0 (12 October)
@@ -269,6 +269,46 @@ run): 10 s of S1A-14's pan and zoom at 100 % on PERF-2's live canvas (centred on
 read).
 
 Checks: lint, typecheck, 820 unit tests, one full e2e run 126/126 (24.3 min, the known noise 14 times).
+
+## S3B-15 (b) and (c): the balanced sitting after step 4 (13 October, at `f15fe1c`)
+
+Łukasz prepared the laptop (restarted, idle 10 minutes, mains power, Best performance, Windows Update and OneDrive
+paused, Settings and Task Manager closed, idle CPU checked). Production measurement builds, headed Chrome, 1536 × 864;
+`slice-03a` (`8a52155`) in `../infomapper-ab-main`; two rounds per sitting, each side first once.
+
+**Frames expanded**, sitting `.data/measure/2026-10-13-05-39`:
+
+| Figure | Bar | slice-03a | This branch | Change | Result |
+| --- | --- | --- | --- | --- | --- |
+| Pan and zoom at the overview | ≥ 50 fps | 53.6 (48.6–58.6) | 59.3 (59.0–59.5) | +10.5 % | met |
+| – frames over 50 ms | 0 | 1 | 0 | – | met |
+| Pan and zoom at 100 %, dense area | S3B-15 (b): no more than 3 % below | 44.0 (39.8–48.2) | 49.3 (48.8–49.7) | +11.9 % | met |
+| – frames over 50 ms | 0 | 12 | 9 | – | not met (as before) |
+| Initial render (C-08), median of 5 | ≤ 1500 ms | 1536 | 1510 | −1.7 % | not met (both sides, as before) |
+| Hover (C-10), median of 40 | ≤ 100 ms | 118 | 117 | −0.6 % | not met (as before) |
+| Lasso marks, median of 20 | ≤ 100 ms | 27 | 27 | +1.1 % | met |
+
+By round (100 %, fps / frames over 50 ms): round 1 `slice-03a` 39.8 / 12, branch 48.8 / 9; round 2 branch 49.7 / 9,
+`slice-03a` 48.2 / 12. `slice-03a`'s first run was the first side of the sitting, right after the builds, and was slow
+at the overview too (48.6 against 58.6 in its second run): a warm-up. Read with its second run only, the branch is
+level with `slice-03a` or slightly faster (+1 to +3 %), not 12 %; either way S3B-15 (b) is met.
+
+**All frames collapsed** (`--branch-diag collapsed`), sitting `.data/measure/2026-10-13-05-57`:
+
+| Figure | slice-03a (expanded) | This branch (collapsed) | Change |
+| --- | --- | --- | --- |
+| Pan and zoom at the overview | 59.3 | 60.0 | +1.2 % |
+| Pan and zoom at 100 % | 48.7 (9 long frames) | 60.0 (0) | +23.3 % |
+
+Collapsed matches slice 2c and 3a: met.
+
+**S3B-15 (c), PERF-2's live canvas** (`e2e/slice-03b/S3B-15-live.spec.ts`, the branch's build of the expanded sitting,
+`.data/measure/s3b15-live/2026-10-13.json`): in turns, Performance test 49.5 fps (5 frames over 50 ms), live 59.4 (0),
+live 59.3 (0), Performance test 46.9 (5). Medians: **live 59.3 against Performance test 48.2 fps**: met (the live
+canvas has 22 cards).
+
+**S3B-15 (d)**: S2C-12, S3A-14's idle test and the miniature's check (S3B-13) passed in the full runs; the idle test on
+a live canvas comes with step 5.
 
 ## Changes to earlier tests
 
