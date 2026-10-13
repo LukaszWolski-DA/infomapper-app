@@ -7,11 +7,12 @@ import type { Uuid } from "../ids";
 import { entityCascade, type EntityRows } from "../model/impact";
 import { plainTextPair } from "../model/plain-text";
 import type { WorkspaceAccess } from "../permissions";
-import { STEREOTYPES, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type LabelLink, type Note } from "../types";
+import { STEREOTYPES, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type LabelLink, type Note, type RequirementLink } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, isLive, nothingToChange, plainTextSchema, softDelete } from "./shared";
 import { cardHeightSchema, frameRefsSchema, joinFrames, newCanvasItem, positionSchema } from "./canvas-item";
 import { linksOnItems, softDeleteLinks } from "./label";
+import { softDeleteRequirementLinks } from "./requirement";
 import { releaseNotes } from "./note";
 
 const DEFAULT_ENTITY_NAME = "New entity";
@@ -161,6 +162,8 @@ export type DeleteEntityState = Omit<EntityRows, "entity"> & {
   /** The workspace's label links and notes (slice 3a): links on what is deleted go with it, pinned notes become free. */
   labelLinks?: readonly LabelLink[];
   notes?: readonly Note[];
+  /** The workspace's requirement links (slice 4a): those on what is deleted go with it. */
+  requirementLinks?: readonly RequirementLink[];
 };
 
 /**
@@ -197,6 +200,11 @@ export function deleteEntity(
         ...cascade.mappings.map((m) => ({ kind: "mapping" as const, id: m.id })),
       ]),
     ),
+    ...softDeleteRequirementLinks(ctx, state.requirementLinks, [
+      { kind: "entity", id: entity.id },
+      ...cascade.attributes.map((a) => ({ kind: "attribute" as const, id: a.id })),
+      ...cascade.mappings.map((m) => ({ kind: "mapping" as const, id: m.id })),
+    ]),
     ...releaseNotes(ctx, state.notes, { items: cascade.canvasItems, frames: [] }, { cardIds: cascade.canvasItems.map((c) => c.id) }),
   ];
   return done(

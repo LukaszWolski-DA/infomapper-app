@@ -14,6 +14,7 @@ import {
   type CanvasItem,
   type Entity,
   type LabelLink,
+  type RequirementLink,
   type Mapping,
   type MappingInput,
   type Note,
@@ -23,6 +24,7 @@ import {
 } from "../types";
 import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
 import { linksOnItems, softDeleteLinks } from "./label";
+import { softDeleteRequirementLinks } from "./requirement";
 import { releaseNotes } from "./note";
 import { begin, current, done, isLive, nothingToChange, softDelete } from "./shared";
 
@@ -167,6 +169,8 @@ export interface DeleteSourceTableState {
   /** The workspace's label links and notes (slice 3a). */
   labelLinks?: readonly LabelLink[];
   notes?: readonly Note[];
+  /** The workspace's requirement links (slice 4a): those on the table and its columns go with them. */
+  requirementLinks?: readonly RequirementLink[];
 }
 
 /**
@@ -214,6 +218,7 @@ export function deleteSourceTable(
     ...columns.map((c) => softDelete(ctx, "source_column", c)),
     softDelete(ctx, "source_table", table),
     ...softDeleteLinks(ctx, linksOnItems(state.labelLinks, [{ kind: "source_table", id: table.id }, ...columns.map((c) => ({ kind: "source_column" as const, id: c.id }))])),
+    ...softDeleteRequirementLinks(ctx, state.requirementLinks, [{ kind: "source_table", id: table.id }, ...columns.map((c) => ({ kind: "source_column" as const, id: c.id }))]),
     ...releaseNotes(ctx, state.notes, { items: cards, frames: [] }, { cardIds: cards.map((c) => c.id) }),
   ]);
 }

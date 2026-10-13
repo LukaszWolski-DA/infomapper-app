@@ -22,6 +22,8 @@ import {
   type ProjectCanvas,
   type ProjectPinnedLabel,
   type Relationship,
+  type Requirement,
+  type RequirementLink,
   type SourceColumn,
   type SourceSystem,
   type SourceTable,
@@ -73,6 +75,14 @@ export const ids = {
   linkTable: "01900000-0000-7000-8000-00000000a204",
   noteFree: "01900000-0000-7000-8000-00000000d001",
   notePinned: "01900000-0000-7000-8000-00000000d002",
+  // requirements (slice 4a)
+  req101: "01900000-0000-7000-8000-00000000e101",
+  req102: "01900000-0000-7000-8000-00000000e102",
+  req103: "01900000-0000-7000-8000-00000000e103",
+  req104: "01900000-0000-7000-8000-00000000e104",
+  reqLink1: "01900000-0000-7000-8000-00000000e201",
+  reqLink2: "01900000-0000-7000-8000-00000000e202",
+  reqLink3: "01900000-0000-7000-8000-00000000e203",
 } as const;
 
 /** A context whose ids count up predictably: 01900000-0000-7000-8000-9000000000NN. */
@@ -389,5 +399,41 @@ export const note = (id: string = ids.noteFree, over: Partial<Note> = {}): Note 
   x: id === ids.notePinned ? 280 : 1000,
   y: id === ids.notePinned ? 0 : 900,
   frame_id: null,
+  ...over,
+});
+
+// ---- Requirements (slice 4a) ----
+
+const REQ_KEYS: Record<string, string> = { [ids.req101]: "REQ-101", [ids.req102]: "REQ-102", [ids.req103]: "REQ-103", [ids.req104]: "REQ-104" };
+
+/** A Data requirement in Draft, its key from its id (REQ-101 to REQ-104). */
+export const requirement = (id: string = ids.req101, over: Partial<Requirement> = {}): Requirement => ({
+  id,
+  ...ws,
+  key: REQ_KEYS[id] ?? "REQ-199",
+  kind: "data",
+  name: "Contact data",
+  description_html: null,
+  description_text: null,
+  expression: null,
+  severity: null,
+  status: "draft",
+  priority: "should",
+  owner_name: null,
+  external_ref: null,
+  parent_id: null,
+  ...over,
+});
+
+/** A link of REQ-101 to the attribute email unless said otherwise. */
+export const requirementLink = (id: string = ids.reqLink1, over: Partial<RequirementLink> = {}): RequirementLink => ({
+  id,
+  ...ws,
+  requirement_id: ids.req101,
+  entity_id: null,
+  attribute_id: ids.email,
+  mapping_id: null,
+  source_table_id: null,
+  source_column_id: null,
   ...over,
 });

@@ -72,6 +72,8 @@ function seed(): Rows {
     label_link: [],
     project_pinned_label: [],
     note: [],
+    requirement: [],
+    requirement_link: [],
   };
 }
 

@@ -1,5 +1,5 @@
 // What each workspace role may do (AD-05), the archive (AD-09) and guests (AD-01).
-// Actions of slices 0 to 3a; later slices add theirs.
+// Actions of slices 0 to 4a; later slices add theirs.
 
 import { ARCHIVED_MESSAGE, domainError, notFound, type DomainError } from "./errors";
 import type { Uuid } from "./ids";
@@ -21,6 +21,8 @@ export const WORKSPACE_ACTIONS = [
   "mapping.set_status",
   "label.edit",
   "note.edit",
+  "requirement.edit",
+  "requirement.set_status",
 ] as const;
 export type WorkspaceAction = (typeof WORKSPACE_ACTIONS)[number];
 
@@ -29,7 +31,8 @@ const ALL_ROLES: readonly WorkspaceRole[] = ["owner", "admin", "modeler", "revie
 
 /**
  * Roles allowed to perform each action. Reviewers may change a mapping's status (approve) and work on notes as modelers
- * do (AD-05; slice 3a, Łukasz's answer 1); labels are for modelers, admins and owners (answer 2); readers change nothing.
+ * do (AD-05; slice 3a, Łukasz's answer 1); labels are for modelers, admins and owners (answer 2); reviewers change a
+ * requirement's status only (AD-05, slice 4a); readers change nothing.
  */
 export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]> = {
   "workspace.view": ALL_ROLES,
@@ -47,6 +50,8 @@ export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]>
   "mapping.set_status": ["owner", "admin", "modeler", "reviewer"],
   "label.edit": EDITORS,
   "note.edit": ["owner", "admin", "modeler", "reviewer"],
+  "requirement.edit": EDITORS,
+  "requirement.set_status": ["owner", "admin", "modeler", "reviewer"],
 };
 
 /** Actions that remain possible while the workspace is archived (AD-09). */
@@ -68,7 +73,12 @@ const ACTION_TEXT: Record<WorkspaceAction, string> = {
   "mapping.set_status": "change the status of a mapping",
   "label.edit": "change labels",
   "note.edit": "change notes",
+  "requirement.edit": "change requirements",
+  "requirement.set_status": "change requirements",
 };
+
+/** Refusals worded for the role rather than the action (slice 4a, PRD item 12). */
+export const REVIEWER_REQUIREMENT_MESSAGE = "As a reviewer you can only change a requirement's status.";
 
 /** The acting user's standing in one workspace, as loaded by the caller. */
 export interface WorkspaceAccess {
@@ -90,6 +100,7 @@ export function checkPermission(access: WorkspaceAccess, action: WorkspaceAction
     return domainError("archived", ARCHIVED_MESSAGE);
   }
   if (!ROLE_PERMISSIONS[action].includes(member.role)) {
+    if (action === "requirement.edit" && member.role === "reviewer") return domainError("forbidden", REVIEWER_REQUIREMENT_MESSAGE);
     return domainError("forbidden", `As ${roleWithArticle(member.role)} you cannot ${ACTION_TEXT[action]}.`);
   }
   if (action === "workspace.unarchive" && !isArchived(workspace)) {

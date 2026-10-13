@@ -1,4 +1,4 @@
-// Row types for the tables built so far (slices 0 to 3a). Names and columns mirror docs/data-model-v2.md and
+// Row types for the tables built so far (slices 0 to 4a). Names and columns mirror docs/data-model-v2.md and
 // supabase/migrations/20261002000000_initial_schema.sql, so the Supabase adapter can map them one to one.
 // Timestamps are ISO 8601 strings (timestamptz).
 
@@ -220,6 +220,49 @@ export interface WorkspaceModel {
   mappingInputs: MappingInput[];
 }
 
+// ---- Requirements (data model section 7, slice 4a) ----
+
+export const REQUIREMENT_KINDS = ["need", "data", "business_rule", "dq_rule", "non_functional"] as const;
+export type RequirementKind = (typeof REQUIREMENT_KINDS)[number];
+
+export const REQUIREMENT_STATUSES = ["draft", "agreed", "implemented", "verified"] as const;
+export type RequirementStatus = (typeof REQUIREMENT_STATUSES)[number];
+
+export const REQUIREMENT_PRIORITIES = ["must", "should", "could", "wont"] as const;
+export type RequirementPriority = (typeof REQUIREMENT_PRIORITIES)[number];
+
+export const REQUIREMENT_SEVERITIES = ["warn", "block"] as const;
+export type RequirementSeverity = (typeof REQUIREMENT_SEVERITIES)[number];
+
+/**
+ * A requirement (D-30): `key` such as `REQ-104`, unique per workspace among live rows, compared case-insensitively.
+ * `expression` and `severity` are kept when the kind changes; the panel shows them for the kinds that use them.
+ */
+export interface Requirement extends StandardColumns {
+  key: string;
+  kind: RequirementKind;
+  name: string;
+  description_html: string | null;
+  description_text: string | null;
+  expression: string | null;
+  severity: RequirementSeverity | null;
+  status: RequirementStatus;
+  priority: RequirementPriority;
+  owner_name: string | null;
+  external_ref: string | null;
+  parent_id: Uuid | null;
+}
+
+/** A requirement traced to one model element (AD-15): exactly one of the five targets is set. */
+export interface RequirementLink extends StandardColumns {
+  requirement_id: Uuid;
+  entity_id: Uuid | null;
+  attribute_id: Uuid | null;
+  mapping_id: Uuid | null;
+  source_table_id: Uuid | null;
+  source_column_id: Uuid | null;
+}
+
 // ---- Organisation of work ----
 
 export interface Project extends StandardColumns {
@@ -395,6 +438,8 @@ export interface WritableRows {
   source_column: SourceColumn;
   mapping: Mapping;
   mapping_input: MappingInput;
+  requirement: Requirement;
+  requirement_link: RequirementLink;
   canvas_item: CanvasItem;
   frame: Frame;
   label: Label;

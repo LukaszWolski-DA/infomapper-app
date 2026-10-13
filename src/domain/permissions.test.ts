@@ -10,13 +10,16 @@ const expected: Record<WorkspaceRole, WorkspaceAction[]> = {
   admin: [
     "workspace.view", "workspace.edit_settings", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects",
     "canvas.edit_items", "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
+    "requirement.edit", "requirement.set_status",
   ],
   modeler: [
     "workspace.view", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects", "canvas.edit_items",
     "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
+    "requirement.edit", "requirement.set_status",
   ],
   // Slice 3a: reviewers work on notes as modelers do (Łukasz's step 0 answer 1); labels are for editors (answer 2).
-  reviewer: ["workspace.view", "mapping.set_status", "note.edit"],
+  // Slice 4a: reviewers change a requirement's status only (AD-05).
+  reviewer: ["workspace.view", "mapping.set_status", "note.edit", "requirement.set_status"],
   reader: ["workspace.view"],
 };
 
@@ -38,6 +41,13 @@ describe("role permissions (AD-05)", () => {
     expect(checkPermission(access("admin"), "workspace.archive")?.message).toBe("As an admin you cannot archive this workspace.");
     expect(checkPermission(access("reviewer"), "label.edit")?.message).toBe("As a reviewer you cannot change labels.");
     expect(checkPermission(access("reader"), "note.edit")?.message).toBe("As a reader you cannot change notes.");
+  });
+
+  it("words the requirement refusals for the role (slice 4a, PRD item 12)", () => {
+    expect(checkPermission(access("reviewer"), "requirement.edit")?.message).toBe("As a reviewer you can only change a requirement's status.");
+    expect(checkPermission(access("reader"), "requirement.edit")?.message).toBe("As a reader you cannot change requirements.");
+    expect(checkPermission(access("reader"), "requirement.set_status")?.message).toBe("As a reader you cannot change requirements.");
+    expect(checkPermission(access("owner", { archived_at: "2026-10-01T00:00:00.000Z" }), "requirement.set_status")?.message).toBe(ARCHIVED_MESSAGE);
   });
 
   it("refuses everything to non-members", () => {

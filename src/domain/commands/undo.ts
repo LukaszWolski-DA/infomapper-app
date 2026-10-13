@@ -11,9 +11,13 @@
 // Slice 3a: labels, label links and notes are undo steps (Łukasz's step 0 answer 3); pinning a label to a project is
 // written with its change events but is not an undo step (step 0 answer 3), while the pins that go with a deleted label
 // come back when its deletion is undone.
+// Slice 4a: requirements and requirement links are undo steps. Creating a requirement also raises the workspace's key
+// counter; that write is never reverted (a key is not given out twice), and alone it is not an undo step. A step that
+// would bring back a requirement whose key another live requirement uses by then is refused (Łukasz, step 0).
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
+import { keyTakenMessage, requirementKey, restoreKeyTakenMessage } from "../model/requirements";
 import type { Uuid } from "../ids";
 import { checkPermission, type WorkspaceAccess, type WorkspaceAction } from "../permissions";
 import { LINK_TABLES, type ChangeEvent, type LinkTable, type RowImage, type WritableRows } from "../types";
@@ -45,6 +49,8 @@ export const UNDOABLE_TABLES = [
   "label_link",
   "project_pinned_label",
   "note",
+  "requirement",
+  "requirement_link",
 ] as const;
 export type UndoableTable = (typeof UNDOABLE_TABLES)[number];
 
@@ -75,6 +81,15 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   ],
   project_pinned_label: [["project_id", "project"], ["label_id", "label"]],
   note: [["canvas_id", "canvas"], ["pin_canvas_item_id", "canvas_item"], ["pin_frame_id", "frame"], ["frame_id", "frame"]],
+  requirement: [["parent_id", "requirement"]],
+  requirement_link: [
+    ["requirement_id", "requirement"],
+    ["entity_id", "entity"],
+    ["attribute_id", "attribute"],
+    ["mapping_id", "mapping"],
+    ["source_table_id", "source_table"],
+    ["source_column_id", "source_column"],
+  ],
 };
 
 const isUndoableTable = (table: string): table is UndoableTable => (UNDOABLE_TABLES as readonly string[]).includes(table);
@@ -92,35 +107,52 @@ const keyOf = (table: UndoableTable, row: AnyRow): string =>
 const isLiveRow = (table: UndoableTable, row: AnyRow | undefined): boolean =>
   !!row && (isLinkTable(table) || row.deleted_at === null);
 
+const BOOKKEEPING = new Set(["version", "updated_at", "updated_by"]);
+
+/** The workspace's requirement key counter going up with a new requirement (slice 4a): kept, never reverted. */
+function isKeyCounter(e: ChangeEvent): boolean {
+  if (e.object_type !== "workspace" || e.operation !== "update" || !e.before_image || !e.after_image) return false;
+  const changed = Object.keys({ ...e.before_image, ...e.after_image }).filter((k) => !BOOKKEEPING.has(k) && !sameValue(e.before_image![k], e.after_image![k]));
+  return changed.length > 0 && changed.every((k) => k === "requirement_key_next");
+}
+
 /**
  * A change group can be undone when every row it wrote is in the undo history's tables and no canvas look changed.
- * Pinning or unpinning a label on a project alone is not an undo step (slice 3a).
+ * Pinning or unpinning a label on a project alone is not an undo step (slice 3a), nor is the requirement key counter.
  */
 export function isUndoable(events: readonly ChangeEvent[]): boolean {
+  const rows = events.filter((e) => !isKeyCounter(e));
   return (
-    events.length > 0 &&
-    !events.every((e) => e.object_type === "project_pinned_label") &&
-    events.every(
+    rows.length > 0 &&
+    !rows.every((e) => e.object_type === "project_pinned_label") &&
+    rows.every(
       (e) =>
         isUndoableTable(e.object_type) &&
         !(e.object_type === "canvas" && e.before_image && e.after_image && !sameValue(e.before_image.look, e.after_image.look)),
     )
   );
 }
-
-const BOOKKEEPING = new Set(["version", "updated_at", "updated_by"]);
 const STATUS_COLUMNS = new Set(["status", "approved_by", "approved_at"]);
 
-/** The action a person needs to write this event's row again (AD-05); reviewers can only change a mapping's status. */
+/** Whether an update changed only status columns (a reviewer's approval). */
+function statusOnly(e: ChangeEvent): boolean {
+  if (!e.before_image || !e.after_image) return false;
+  const changed = Object.keys({ ...e.before_image, ...e.after_image }).filter((k) => !BOOKKEEPING.has(k) && !sameValue(e.before_image![k], e.after_image![k]));
+  return changed.length > 0 && changed.every((k) => STATUS_COLUMNS.has(k));
+}
+
+/**
+ * The action a person needs to write this event's row again (AD-05); reviewers can only change a mapping's or a
+ * requirement's status.
+ */
 function actionFor(e: ChangeEvent): WorkspaceAction {
   switch (e.object_type) {
-    case "mapping": {
-      if (!e.before_image || !e.after_image) return "model.edit";
-      const changed = Object.keys({ ...e.before_image, ...e.after_image }).filter(
-        (k) => !BOOKKEEPING.has(k) && !sameValue(e.before_image![k], e.after_image![k]),
-      );
-      return changed.length > 0 && changed.every((k) => STATUS_COLUMNS.has(k)) ? "mapping.set_status" : "model.edit";
-    }
+    case "mapping":
+      return statusOnly(e) ? "mapping.set_status" : "model.edit";
+    case "requirement":
+      return statusOnly(e) ? "requirement.set_status" : "requirement.edit";
+    case "requirement_link":
+      return "requirement.edit";
     case "canvas_item":
     case "frame":
       return "canvas.edit_items";
@@ -170,7 +202,7 @@ export function revertChangeGroup(
   if (events.some((e) => e.user_id !== ctx.actorId)) {
     return fail(domainError("forbidden", "You can only undo your own changes."));
   }
-  for (const action of new Set(events.map(actionFor))) {
+  for (const action of new Set(events.filter((e) => !isKeyCounter(e)).map(actionFor))) {
     const denied = checkPermission(access, action);
     if (denied) return fail(denied);
   }
@@ -186,6 +218,7 @@ export function revertChangeGroup(
   const writes: Write[] = [];
 
   for (const e of [...events].reverse()) {
+    if (isKeyCounter(e)) continue;
     const table = e.object_type as UndoableTable;
     const rows = after.get(table)!;
     const image = (e.after_image ?? e.before_image)!;
@@ -218,6 +251,8 @@ export function revertChangeGroup(
   }
 
   if (!consistent(after, touched)) return fail(refused());
+  const keyClash = requirementKeyClash(after, touched);
+  if (keyClash) return fail(keyClash);
   const writeSet = buildWriteSet(ctx, workspaceId, writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
 }
@@ -274,6 +309,24 @@ function consistent(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: read
     }
   }
   return true;
+}
+
+/**
+ * A requirement that is live after the revert and whose key, in any case, another live requirement has (Łukasz, step
+ * 0): bringing back a deleted one, or giving one its old key back.
+ */
+function requirementKeyClash(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: readonly { table: UndoableTable; key: string; wasLive: boolean }[]): DomainError | null {
+  const requirements = [...rows.get("requirement")!.values()].filter((r) => r.deleted_at === null);
+  for (const { table, key, wasLive } of touched) {
+    if (table !== "requirement") continue;
+    const row = rows.get("requirement")!.get(key);
+    if (!row || row.deleted_at !== null) continue;
+    const k = requirementKey(String(row.key));
+    if (requirements.some((o) => o.id !== row.id && requirementKey(String(o.key)) === k)) {
+      return domainError("conflict", wasLive ? keyTakenMessage(String(row.key)) : restoreKeyTakenMessage(String(row.key)));
+    }
+  }
+  return null;
 }
 
 function sameValue(a: unknown, b: unknown): boolean {
