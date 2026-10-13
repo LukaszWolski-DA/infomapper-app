@@ -7,7 +7,7 @@
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";
 import type { CommandContext, CommandResult } from "@/domain/changes";
-import { addLabel, deleteLabel, removeLabel, renameLabel, setLabelPinned, type AddLabelInput } from "@/domain/commands/label";
+import { addLabel, createLabel, deleteLabel, removeLabel, renameLabel, setLabelPinned, type AddLabelInput } from "@/domain/commands/label";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 
@@ -37,6 +37,14 @@ export async function addLabelAction(workspaceId: string, input: AddLabelInput):
   });
 }
 
+/** Creates a label that marks nothing yet (the working context's “Create “{name}””, slice 3b). */
+export async function createLabelAction(workspaceId: string, input: { name: string }): Promise<ActionResult<{ labelId: string; name: string }>> {
+  return labelCommand(workspaceId, async (ctx, access, store) => {
+    const r = createLabel(ctx, access, { labels: await store.labels.list(access.workspace.id) }, input);
+    return r.ok ? { ...r, value: { labelId: r.value.label.id, name: r.value.label.name } } : r;
+  });
+}
+
 /** Takes a label off one item (by its link). */
 export async function removeLabelAction(workspaceId: string, input: { labelLinkId: string; expectedVersion: number }): Promise<ActionResult> {
   return labelCommand(workspaceId, async (ctx, access, store) =>
@@ -46,18 +54,26 @@ export async function removeLabelAction(workspaceId: string, input: { labelLinkI
 
 export async function renameLabelAction(workspaceId: string, input: { labelId: string; expectedVersion: number; name: string }): Promise<ActionResult<{ name: string }>> {
   return labelCommand(workspaceId, async (ctx, access, store) => {
-    const r = renameLabel(ctx, access, { labels: await store.labels.list(access.workspace.id) }, input);
+    const ws = access.workspace.id;
+    const [labels, canvases] = await Promise.all([store.labels.list(ws), store.canvases.list(ws)]);
+    const r = renameLabel(ctx, access, { labels, canvases }, input);
     return r.ok ? { ...r, value: { name: r.value.label.name } } : r;
   });
 }
 
 /** Deletes a label with its links and project pins (one undo step); the model is untouched. */
-export async function deleteLabelAction(workspaceId: string, input: { labelId: string; expectedVersion: number }): Promise<ActionResult<{ name: string }>> {
+export async function deleteLabelAction(workspaceId: string, input: { labelId: string; expectedVersion: number }): Promise<ActionResult<{ name: string; hadLiveCanvas: boolean }>> {
   return labelCommand(workspaceId, async (ctx, access, store) => {
     const ws = access.workspace.id;
-    const [label, links, pins] = await Promise.all([store.labels.get(ws, str(input?.labelId)), store.labels.listLinks(ws), store.labels.listPins(ws)]);
-    const r = deleteLabel(ctx, access, { label, links, pins }, input);
-    return r.ok ? { ...r, value: { name: r.value.name } } : r;
+    const [label, links, pins, canvases, canvasItems] = await Promise.all([
+      store.labels.get(ws, str(input?.labelId)),
+      store.labels.listLinks(ws),
+      store.labels.listPins(ws),
+      store.canvases.list(ws),
+      store.canvasItems.list(ws),
+    ]);
+    const r = deleteLabel(ctx, access, { label, links, pins, canvases, canvasItems }, input);
+    return r.ok ? { ...r, value: { name: r.value.name, hadLiveCanvas: r.value.liveCanvasId !== null } } : r;
   });
 }
 

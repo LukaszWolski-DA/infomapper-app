@@ -52,3 +52,11 @@ The prototype's miniature (`renderMini`) draws the notes as small rectangles in 
 the bottom-right corner shows none (slice 3a PRD, not listed; Łukasz after step 4). A candidate for slice 3b or the
 minimap slice. It needs its own measurement: the miniature is drawn once per change of the cards (S1A-14), and notes
 would add to what it draws and to when it draws again.
+
+## The “Newly labeled” frame on live canvases (slice 3b, step 0)
+
+The prototype puts cards that become required on a live canvas into a grey frame “Newly labeled” (`sys: "new"`), made
+to the right of the content when missing, grown to fit and removed when empty. Slice 3b leaves it out (Łukasz's answer
+to Q3: no migration for a new `frame.kind`): newly required cards land to the right of the existing content, one under
+another, in no frame, and the toast lists them. A deviation from the prototype to revisit; it needs `newly_labeled` in
+the CHECK on `frame.kind` (or another marker) and a rule so “Arrange into frames” does not rebuild it away.

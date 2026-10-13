@@ -18,7 +18,7 @@ import {
 import { STALE_VERSION_MESSAGE } from "../errors";
 import { changeLabel } from "../model/change-label";
 import type { WorkspaceRole } from "../types";
-import { addLabel, deleteLabel, linksOnItems, removeLabel, renameLabel, setLabelPinned, takenNameMessage } from "./label";
+import { addLabel, createLabel, deleteLabel, linksOnItems, removeLabel, renameLabel, setLabelPinned, takenNameMessage } from "./label";
 import { isUndoable } from "./undo";
 
 const { customer, email, mapEmail, crmCustomer, colEmail, labelCr23, labelJira, linkCustomer, linkEmail, linkMapping, linkTable, projectA } = ids;
@@ -148,7 +148,7 @@ describe("deleteLabel (S3A-04)", () => {
   it("takes the label off every item and every project home, in one change group", () => {
     const r = deleteLabel(makeCtx(), access("modeler"), state, { labelId: labelCr23, expectedVersion: 1 });
     if (!r.ok) throw new Error(r.error.message);
-    expect(r.value).toEqual({ name: "CR-23", items: 2 });
+    expect(r.value).toEqual({ name: "CR-23", items: 2, liveCanvasId: null });
     expect(r.writeSet.writes.map((w) => `${w.kind} ${w.table}`)).toEqual([
       "update label_link",
       "update label_link",
@@ -200,5 +200,15 @@ describe("linksOnItems (D-47 cascade)", () => {
     ]);
     expect(linksOnItems(links, [{ kind: "attribute", id: customer }])).toEqual([]);
     expect(linksOnItems(undefined, [{ kind: "entity", id: customer }])).toEqual([]);
+  });
+});
+
+describe("createLabel (the working context's “Create”, slice 3b)", () => {
+  it("creates a label marking nothing, its name normalised; a name taken in any case is refused; only label editors", () => {
+    const r = createLabel(makeCtx(), access("modeler"), { labels: [label()] }, { name: "cr 99" });
+    expect(r.ok && r.value.label).toMatchObject({ name: "cr-99", name_key: "cr-99" });
+    expect(r.ok && r.writeSet.writes.map((w) => w.table)).toEqual(["label"]);
+    expect(createLabel(makeCtx(), access("owner"), { labels: [label()] }, { name: "cr-23" })).toMatchObject({ ok: false, error: { code: "conflict", message: "Another label is already called “CR-23”." } });
+    expect(createLabel(makeCtx(), access("reviewer"), { labels: [] }, { name: "X" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
   });
 });

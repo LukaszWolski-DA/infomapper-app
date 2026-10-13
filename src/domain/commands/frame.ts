@@ -724,38 +724,21 @@ export function putCardsInNewFrame(
 
 // ---- arrange into frames by concept and system (prototype arrangeLayout) ----
 
-const arrangeInput = z.object({ canvasId: uuidSchema, frames: frameRefs, cards: sizedCards }).strict();
-export type ArrangeIntoFramesInput = z.input<typeof arrangeInput>;
-
-const byName = <R extends { name: string }>(a: R, b: R) => a.name.localeCompare(b.name);
-
 /**
- * “Arrange into frames by concept and system”: free frames stay as they are; concept and source frames are deleted
- * and built again: the tables grouped by system on the left, the entities grouped by concept on the right, in the left
- * panel's order (systems by name, tables by `database.schema` group then name; concepts in panel order, entities by
- * name). Every card ends up in its new frame, also cards that were in a free frame. `cards` must be every card of the canvas with its height; `frames` every frame.
- * Notes on the deleted frames become free notes at their place, and free notes in them leave them (slice 3a).
+ * The plan of “Arrange into frames by concept and system” for these cards (prototype arrangeLayout): the tables grouped
+ * by system on the left, the entities grouped by concept on the right, in the left panel's order (systems by name,
+ * tables by `database.schema` group then name; concepts in panel order, entities by name). Also used when a live canvas
+ * is opened (slice 3b), with heights the domain computes. `sizeOf` gives each card's width and height.
  */
-export function arrangeCanvasIntoFrames(
-  ctx: CommandContext,
-  access: WorkspaceAccess,
-  state: FrameCanvasState & FrameModelState,
-  input: unknown,
-): CommandResult<FrameWriteResult & { frames: number; built: Frame[]; cards: { id: Uuid; x: number; y: number; frameId: Uuid | null }[] }> {
-  const parsed = begin(access, "canvas.edit_items", arrangeInput, input);
-  if (!parsed.ok) return fail(parsed.error);
-  const { canvasId, frames, cards } = parsed.data;
-  const opened = openDraft(access, state, canvasId);
-  if (!opened.ok) return fail(opened.error);
-  const { draft } = opened;
-  const heights = new Map(cards.map((c) => [c.canvasItemId, c.height]));
-  if ([...draft.items.keys()].some((id) => !heights.has(id))) return fail(staleVersion());
-
-  const ws = access.workspace.id;
+export function planArrangement(
+  ws: Uuid,
+  state: FrameModelState,
+  placed: readonly CanvasItem[],
+  sizeOf: (card: CanvasItem) => { width: number; height: number },
+): { layout: ReturnType<typeof arrangeIntoFrames>; names: Map<Uuid, string> } {
   const entities = new Map(state.entities.filter((e) => isLive(e, ws)).map((e) => [e.id, e]));
   const tables = new Map(state.sourceTables.filter((t) => isLive(t, ws)).map((t) => [t.id, t]));
-  const placed = [...draft.items.values()];
-  const sized = (c: CanvasItem) => ({ id: c.id, width: cardWidthOf(c), height: heights.get(c.id)! });
+  const sized = (c: CanvasItem) => ({ id: c.id, ...sizeOf(c) });
 
   // the left panel's order: within a system, tables by `database.schema` group in order of first appearance, then by name
   const schemaRank = new Map<string, number>();
@@ -788,22 +771,67 @@ export function arrangeCanvasIntoFrames(
         .map(sized),
     }));
   const layout = arrangeIntoFrames(systemGroups, conceptGroups);
-  if (!layout.frames.length) return fail(domainError("invalid", "There is nothing on this canvas to arrange."));
+  return { layout, names: new Map([...systemGroups, ...conceptGroups].map((g) => [g.refId, g.name])) };
+}
 
-  const rebuilt = liveFrames(draft).filter((f) => f.kind !== "free");
-  for (const f of rebuilt) f.deleted_at = ctx.now;
-  for (const card of placed) card.frame_id = null;
-  const names = new Map([...systemGroups, ...conceptGroups].map((g) => [g.refId, g.name]));
-  for (const f of layout.frames) {
-    const frame = newFrame(ctx, access, canvasId, f, {
+/** The frames of an arrangement as new rows, each with the cards it holds. */
+export function arrangedFrames(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  canvasId: Uuid,
+  layout: ReturnType<typeof arrangeIntoFrames>,
+  names: ReadonlyMap<Uuid, string>,
+): { frame: Frame; cardIds: Uuid[] }[] {
+  return layout.frames.map((f) => ({
+    frame: newFrame(ctx, access, canvasId, f, {
       name: names.get(f.refId)!,
       kind: f.kind,
       concept_id: f.kind === "concept" ? f.refId : null,
       source_system_id: f.kind === "source_system" ? f.refId : null,
       color: null,
-    });
+    }),
+    cardIds: f.cardIds,
+  }));
+}
+
+
+const arrangeInput = z.object({ canvasId: uuidSchema, frames: frameRefs, cards: sizedCards }).strict();
+export type ArrangeIntoFramesInput = z.input<typeof arrangeInput>;
+
+const byName = <R extends { name: string }>(a: R, b: R) => a.name.localeCompare(b.name);
+
+/**
+ * “Arrange into frames by concept and system”: free frames stay as they are; concept and source frames are deleted
+ * and built again: the tables grouped by system on the left, the entities grouped by concept on the right, in the left
+ * panel's order (systems by name, tables by `database.schema` group then name; concepts in panel order, entities by
+ * name). Every card ends up in its new frame, also cards that were in a free frame. `cards` must be every card of the canvas with its height; `frames` every frame.
+ * Notes on the deleted frames become free notes at their place, and free notes in them leave them (slice 3a).
+ */
+export function arrangeCanvasIntoFrames(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: FrameCanvasState & FrameModelState,
+  input: unknown,
+): CommandResult<FrameWriteResult & { frames: number; built: Frame[]; cards: { id: Uuid; x: number; y: number; frameId: Uuid | null }[] }> {
+  const parsed = begin(access, "canvas.edit_items", arrangeInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { canvasId, frames, cards } = parsed.data;
+  const opened = openDraft(access, state, canvasId);
+  if (!opened.ok) return fail(opened.error);
+  const { draft } = opened;
+  const heights = new Map(cards.map((c) => [c.canvasItemId, c.height]));
+  if ([...draft.items.keys()].some((id) => !heights.has(id))) return fail(staleVersion());
+
+  const placed = [...draft.items.values()];
+  const { layout, names } = planArrangement(access.workspace.id, state, placed, (c) => ({ width: cardWidthOf(c), height: heights.get(c.id)! }));
+  if (!layout.frames.length) return fail(domainError("invalid", "There is nothing on this canvas to arrange."));
+
+  const rebuilt = liveFrames(draft).filter((f) => f.kind !== "free");
+  for (const f of rebuilt) f.deleted_at = ctx.now;
+  for (const card of placed) card.frame_id = null;
+  for (const { frame, cardIds } of arrangedFrames(ctx, access, canvasId, layout, names)) {
     draft.added.push(frame);
-    for (const id of f.cardIds) Object.assign(draft.items.get(id)!, { ...layout.positions.get(id)!, frame_id: frame.id });
+    for (const id of cardIds) Object.assign(draft.items.get(id)!, { ...layout.positions.get(id)!, frame_id: frame.id });
   }
 
   const committed = commit(ctx, draft, seen(frames, cards));

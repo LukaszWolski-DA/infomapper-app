@@ -12,10 +12,13 @@ import {
   updateFrameAction,
 } from "@/app/_actions/frame";
 import { saveCanvasLookAction } from "@/app/_actions/canvas";
+import { labelForLiveCanvasAction, removeFromLiveCanvasAction } from "@/app/_actions/live";
+import { liveNoticesFor } from "@/app/_lib/live-notices";
 import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
 import { AppShell } from "@/app/_components/app-shell";
 import { MovedNotice } from "@/app/_components/moved-notice";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
+import { WorkingContextButton, WorkingContextProvider } from "@/app/_components/working-context";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { canvasHref } from "@/app/_lib/paths";
 import { loadShell } from "@/app/_lib/shell";
@@ -40,7 +43,10 @@ import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
 import { isMeasurementBuild } from "@/data/local/measure-mode";
-import { labelNamesByItem } from "@/domain/model/labels";
+import { labelItemCounts, labelNamesByItem } from "@/domain/model/labels";
+import { liveMembership, liveRemoveQuestion, liveRemoveWhat } from "@/domain/model/live";
+import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
+import { cookies } from "next/headers";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 
 // Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a); the Entity
@@ -60,8 +66,9 @@ export default async function CanvasPage({
   const view = await loadProjectView(shell);
   const store = getDataStore();
   const ws = shell.workspace.id;
-  // when the notes are read: a page that arrives late must not hide a note created after it (slice 3a, step 5)
-  const notesReadAt = new Date().toISOString();
+  // when the data is read: a page that arrives late must not put back an older state, nor hide a card, frame or note
+  // created after it (slice 3a step 5, slice 3b step 1: `mergeFresh`)
+  const readAt = new Date().toISOString();
   const [model, allItems, canvases, workspace, history, projects, frameRows, labels, labelLinks, noteRows, users] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
@@ -90,9 +97,30 @@ export default async function CanvasPage({
   const contentAuthors = Object.fromEntries(model.mappings.map((m) => [m.id, fourEyes ? lastContentEditor(m, events) : ""]).filter(([, u]) => u));
   const liveCanvases = new Set(canvases.map((c) => c.id));
   const items = allItems.filter((i) => liveCanvases.has(i.canvas_id));
-  const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId), labelNames);
+  // a live canvas (slice 3b): its label, what that label makes relevant (computed once here, never while rendering),
+  // and the mappings that carry it (the others are drawn faded)
+  const liveLabel = canvas.live_label_id ? (labels.find((l) => l.id === canvas.live_label_id && l.deleted_at === null) ?? null) : null;
+  const liveLinks = liveLabel ? labelLinks.filter((k) => k.deleted_at === null) : [];
+  const membership = liveLabel ? liveMembership(liveLabel.id, { ...model, links: liveLinks }) : null;
+  const liveMappings = liveLabel ? new Set(liveLinks.filter((k) => k.label_id === liveLabel.id && k.mapping_id).map((k) => k.mapping_id!)) : null;
+  const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId), labelNames,     liveLabel && membership
+      ? {
+          labelName: liveLabel.name,
+          relevantRows: membership.relevantRows,
+          removeOf: (target) => {
+            const q = liveRemoveQuestion(liveLabel.id, target, { ...model, links: liveLinks });
+            return { direct: !!q.direct, what: liveRemoveWhat(q, target.kind), others: q.viaRows.length + q.viaMappings.length };
+          },
+        }
+      : null,
+  );
   const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id));
   const editable = shell.standing === "full";
+  // the working context (slice 3b): for those who change labels (AD-05: the same roles as model editors), from this
+  // person's browser; the labels with how many items each marks, for its menu and the status bar
+  const itemCounts = labelItemCounts(labelLinks);
+  const countedLabels = labels.filter((l) => l.deleted_at === null).map((l) => ({ id: l.id, name: l.name, items: itemCounts.get(l.id) ?? 0 }));
+  const contextCookie = parseContextCookie((await cookies()).get(contextCookieName(shell.user.id, ws))?.value);
   // notes: editors and reviewers write them (Łukasz's step 0 answer 1); readers and an archived workspace only read
   const canNote = shell.standing !== "none";
   const userName = (id: string) => users.find((u) => u.id === id)?.display_name ?? "someone";
@@ -137,6 +165,7 @@ export default async function CanvasPage({
       >
       <PanelsProvider>
         <UndoProvider workspaceId={ws} projectId={projectId} canvasId={canvasId} state={undoState}>
+          <WorkingContextProvider workspaceId={ws} userId={shell.user.id} labels={countedLabels} initial={contextCookie} canLabel={editable}>
           <AppShell
             shell={shell}
             project={{
@@ -152,7 +181,7 @@ export default async function CanvasPage({
                   canvasName={shell.canvas?.name ?? ""}
                   canvasCount={canvases.length}
                   model={model}
-                  cards={cards.map((c) => ({ id: c.id, kind: c.kind, targetId: c.targetId, collapsed: c.collapsed, rowFilter: c.rowFilter }))}
+                  cards={cards.map((c) => ({ id: c.id, kind: c.kind, targetId: c.targetId, collapsed: c.collapsed, rowFilter: c.rowFilter, liveLevel: c.liveLevel }))}
                   tree={tree}
                   editable={editable}
                   canSetStatus={shell.standing !== "none"}
@@ -164,6 +193,10 @@ export default async function CanvasPage({
                   canvasesOf={canvasesOf}
                   labels={labels}
                   labelLinks={labelLinks}
+                  projectId={projectId}
+                  liveCanvases={Object.fromEntries(canvases.filter((c) => c.live_label_id && c.deleted_at === null).map((c) => [c.live_label_id!, c.id]))}
+                  live={liveLabel ? { labelId: liveLabel.id, labelName: liveLabel.name } : null}
+                  canCreateCanvas={editable}
                 />
               ),
               status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} />,
@@ -174,7 +207,7 @@ export default async function CanvasPage({
               key={canvasId}
               canvasId={canvasId}
               cards={cards}
-              lines={buildLines(model, cards, labelNames)}
+              lines={buildLines(model, cards, labelNames, liveMappings)}
               editable={editable}
               saveCard={updateCardAction.bind(null, ws)}
               placeCard={placeCardAction.bind(null, ws, canvasId)}
@@ -200,7 +233,7 @@ export default async function CanvasPage({
               focusLabelId={focusLabelId}
               focusNoteId={focusNoteId}
               notes={notes}
-              notesReadAt={notesReadAt}
+              readAt={readAt}
               canNote={canNote}
               userName={shell.user.name}
               noteWrites={{
@@ -213,8 +246,21 @@ export default async function CanvasPage({
                 moveNotes: moveNotesAction.bind(null, ws, canvasId),
               }}
               diagnosis={diag.length ? { noLines: diag.includes("nolines"), blocks: diag.includes("blocks"), noFrames: diag.includes("noframes"), noLabels: diag.includes("nolabels"), collapsed: diag.includes("collapsed") } : undefined}
+              live={
+                liveLabel
+                  ? {
+                      labelId: liveLabel.id,
+                      labelName: liveLabel.name,
+                      names: Object.fromEntries([...model.entities, ...model.sourceTables].map((r) => [r.id, r.name])),
+                      labelElement: labelForLiveCanvasAction.bind(null, ws, liveLabel.id),
+                      removeCard: removeFromLiveCanvasAction.bind(null, ws),
+                      notices: liveNoticesFor(shell.user.id, canvasId),
+                    }
+                  : null
+              }
             />
           </AppShell>
+          </WorkingContextProvider>
         </UndoProvider>
       </PanelsProvider>
       </CanvasLookProvider>
@@ -230,6 +276,7 @@ const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolea
     {canNote && <NoteToolButton />}
     <HandToolButton />
     <NotationSwitch />
+    <WorkingContextButton />
     <UndoButtons />
     <ZoomControls />
   </>

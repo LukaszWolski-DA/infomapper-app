@@ -3,10 +3,12 @@
 // “Labels in this project” on the project home (D-29, slice 3a, prototype renderHome and projLabels): the labels used
 // on the project's canvases and the ones pinned to it, pinned first. The star pins and unpins a label (saved, not an
 // undo step) and is offered only to roles with label rights; the name opens the label's panel on a canvas of the
-// project. “Open as live canvas” comes with slice 3b.
+// project. “Open as live canvas” (or “Open live canvas” when it has one) opens its live canvas in this project
+// (slice 3b); only roles that create canvases make a new one.
 
 import Link from "next/link";
 import { setLabelPinnedAction } from "@/app/_actions/label";
+import { useOpenLiveCanvas } from "@/app/_components/live-canvas";
 import { useAction } from "@/app/_components/use-action";
 import { TagIcon } from "@/app/_panels/labels-field";
 
@@ -15,12 +17,15 @@ export interface ProjectLabelRow {
   name: string;
   items: number;
   pinned: boolean;
+  /** It has a live canvas (slice 3b). */
+  live: boolean;
   /** The canvas page that opens the label's panel. */
   href: string;
 }
 
 export function ProjectLabels({ workspaceId, projectId, labels, editable }: { workspaceId: string; projectId: string; labels: ProjectLabelRow[]; editable: boolean }) {
   const { run, pending } = useAction();
+  const openLive = useOpenLiveCanvas(workspaceId, projectId);
   if (!labels.length) return <p className="text-im-ink-3">No labels used on this project’s canvases yet.</p>;
   return (
     <div className="flex flex-col gap-0.5" data-testid="list-project-labels">
@@ -53,6 +58,17 @@ export function ProjectLabels({ workspaceId, projectId, labels, editable }: { wo
           <span className="whitespace-nowrap text-[11.5px] text-im-ink-3">
             {l.items} item{l.items === 1 ? "" : "s"}
           </span>
+          {(l.live || editable) && (
+            <button
+              type="button"
+              disabled={openLive.pending}
+              className="h-[26px] whitespace-nowrap rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover"
+              onClick={() => void openLive.open(l.id)}
+              data-testid="button-project-label-live"
+            >
+              {l.live ? "Open live canvas" : "Open as live canvas"}
+            </button>
+          )}
         </div>
       ))}
     </div>

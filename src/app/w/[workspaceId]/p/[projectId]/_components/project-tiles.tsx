@@ -9,6 +9,7 @@ import { addCanvasToProjectAction } from "@/app/_actions/canvas";
 import { useAction } from "@/app/_components/use-action";
 import { canvasHref } from "@/app/_lib/paths";
 import type { ProjectView } from "@/app/_lib/project-view";
+import { TagIcon } from "@/app/_panels/labels-field";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,8 +40,15 @@ export function CanvasTiles({ view }: { view: ProjectView }) {
           >
             <Link href={href} className="block text-left">
               <span className="block h-[140px] border-b border-im-line bg-im-canvas" />
-              <span className="block truncate px-3 pb-0.5 pt-2.5 text-[13.5px] font-semibold" data-testid="tile-canvas-name">
-                {canvas.name}
+              <span className="flex items-center gap-1.5 px-3 pb-0.5 pt-2.5 text-[13.5px] font-semibold">
+                {canvas.liveLabel && (
+                  <span className="inline-flex flex-none text-im-ink-3" title={`Live canvas: shows everything labeled ${canvas.liveLabel}`} data-testid="tile-canvas-live">
+                    <TagIcon className="size-[13px]" />
+                  </span>
+                )}
+                <span className="truncate" data-testid="tile-canvas-name">
+                  {canvas.name}
+                </span>
               </span>
               <span className="block px-3 pb-3 text-[11.5px] text-im-ink-3">
                 {canvas.cards} card{canvas.cards === 1 ? "" : "s"}

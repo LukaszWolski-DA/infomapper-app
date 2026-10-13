@@ -119,7 +119,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
       {p.editable && (
         <Actions>
           <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
-            Remove from this canvas
+            {p.live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas"}
           </button>
           {columns.length ? (
             // With columns it still asks (slice 1b, item 13).

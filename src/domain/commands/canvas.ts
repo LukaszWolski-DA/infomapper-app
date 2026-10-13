@@ -254,7 +254,15 @@ export function duplicateCanvas(
   }
   const items: CanvasItem[] = state.items
     .filter((i) => isLive(i, workspaceId) && i.canvas_id === canvas.id)
-    .map((i) => ({ ...i, ...newRowColumns(ctx), canvas_id: copy.id, frame_id: (i.frame_id && frameCopies.get(i.frame_id)?.id) || null }));
+    // the copy of a live canvas is a normal canvas from the start: no live levels, `labeled` filters as `all` (slice 3b, Q6)
+    .map((i) => ({
+      ...i,
+      ...newRowColumns(ctx),
+      canvas_id: copy.id,
+      frame_id: (i.frame_id && frameCopies.get(i.frame_id)?.id) || null,
+      live_level: null,
+      row_filter: i.row_filter === "labeled" ? "all" : i.row_filter,
+    }));
 
   return {
     ok: true,

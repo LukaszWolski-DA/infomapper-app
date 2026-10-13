@@ -1,6 +1,7 @@
 // Canvas geometry, as in the prototype: card sizes come from data (header, body padding, row height and the rows a
 // card shows), never from measuring the DOM (AD-24 rule 2). Pure functions, tested without a browser.
 
+import { CARD_BODY_PAD, CARD_ROW_HEIGHT, cardHeightFor, cardHeightOf } from "@/domain/model/card-size";
 import { CARD_HEADER_HEIGHT, DEFAULT_CARD_WIDTH } from "@/domain/model/frames";
 import { visibleRows, type CardData } from "./card-data";
 
@@ -11,8 +12,8 @@ export const CARD_W = DEFAULT_CARD_WIDTH;
 export const CARD_W_MIN = 200;
 export const CARD_W_MAX = 600;
 export const HEAD_H = CARD_HEADER_HEIGHT;
-export const ROW_H = 26;
-export const BODY_PAD = 6;
+export const ROW_H = CARD_ROW_HEIGHT;
+export const BODY_PAD = CARD_BODY_PAD;
 
 /** Below this zoom cards draw the header and a plain block instead of rows (AD-24 rule 1). */
 export const LOD_ZOOM = 0.4;
@@ -25,10 +26,9 @@ export const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.mi
 
 export const cardWidth = (card: Pick<CardData, "width">): number => card.width ?? CARD_W;
 
-/** Height of a card: the header only when collapsed, else header, padding and its shown rows (at least one line). */
+/** Height of a card: the header only when collapsed, else header, padding and its shown rows (at least one line; the domain's rule). */
 export function cardHeight(card: Pick<CardData, "rows" | "collapsed" | "rowFilter">): number {
-  if (card.collapsed) return HEAD_H;
-  return HEAD_H + BODY_PAD * 2 + Math.max(1, visibleRows(card).length) * ROW_H;
+  return cardHeightOf(card);
 }
 
 export interface Rect {
@@ -88,7 +88,7 @@ export const NEW_CARD_H = 140;
 export const snap8 = (v: number) => Math.round(v / 8) * 8;
 
 /** Height of a new, expanded card with this many rows. */
-export const newCardHeight = (rows: number) => HEAD_H + BODY_PAD * 2 + Math.max(1, rows) * ROW_H;
+export const newCardHeight = (rows: number) => cardHeightFor(rows);
 
 const clashes = (occupied: readonly Rect[], x: number, y: number, w: number, h: number) =>
   occupied.some((r) => x < r.x + r.w + PLACE_GAP && x + w + PLACE_GAP > r.x && y < r.y + r.h + PLACE_GAP && y + h + PLACE_GAP > r.y);

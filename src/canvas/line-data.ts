@@ -25,6 +25,8 @@ export interface MapLineData {
   cardId: Uuid;
   /** Working labels on the mapping (“CR-23, JIRA-481”): the line's tag and tooltip (slice 3a); null without. */
   labels: string | null;
+  /** On a live canvas, a mapping that does not carry its label: drawn faded, by colour (D-25, slice 3b). */
+  faded?: boolean;
 }
 
 export interface RelLineData {
@@ -46,7 +48,13 @@ export interface CanvasLines {
 }
 
 /** Mapping lines need the attribute's card and at least one input card; relationships need both entity cards. */
-export function buildLines(model: WorkspaceModel, cards: readonly CardData[], labelNames?: LabelNames): CanvasLines {
+export function buildLines(
+  model: WorkspaceModel,
+  cards: readonly CardData[],
+  labelNames?: LabelNames,
+  /** On a live canvas: the mappings that carry its label (the others are faded, slice 3b). */
+  liveMappings: ReadonlySet<Uuid> | null = null,
+): CanvasLines {
   const entityCard = new Map(cards.filter((c) => c.kind === "ent").map((c) => [c.targetId, c.id]));
   const tableCard = new Map(cards.filter((c) => c.kind === "src").map((c) => [c.targetId, c.id]));
   const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
@@ -78,6 +86,7 @@ export function buildLines(model: WorkspaceModel, cards: readonly CardData[], la
       attributeId: attribute.id,
       cardId,
       labels: labelNames?.get(`mapping:${m.id}`)?.join(", ") || null,
+      ...(liveMappings && !liveMappings.has(m.id) ? { faded: true } : {}),
     });
   }
 

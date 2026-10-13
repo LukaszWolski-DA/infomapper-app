@@ -13,7 +13,7 @@ export interface ProjectView {
   /** May create, rename and move canvases between projects. The server checks again. */
   canEdit: boolean;
   /** The project's canvases in tab order, with the projects each one is in, their number of cards and their look. */
-  canvases: { id: Uuid; name: string; version: number; projectIds: Uuid[]; cards: number; look: CanvasLook }[];
+  canvases: { id: Uuid; name: string; version: number; projectIds: Uuid[]; cards: number; look: CanvasLook; liveLabel: string | null }[];
   projects: { id: Uuid; name: string }[];
   /** Canvases of this workspace that are not in this project ("Add a canvas from another project"). */
   outside: { id: Uuid; name: string; projectNames: string[] }[];
@@ -23,7 +23,7 @@ export async function loadProjectView(shell: ShellData): Promise<ProjectView> {
   const store = getDataStore();
   const workspaceId = shell.workspace.id;
   const projectId = shell.project!.id;
-  const [workspace, member, project, projects, canvases, links, items] = await Promise.all([
+  const [workspace, member, project, projects, canvases, links, items, labels] = await Promise.all([
     store.workspaces.get(workspaceId),
     store.workspaces.getMember(workspaceId, shell.user.id),
     store.projects.get(workspaceId, projectId),
@@ -31,7 +31,10 @@ export async function loadProjectView(shell: ShellData): Promise<ProjectView> {
     store.canvases.list(workspaceId),
     store.canvases.listLinksOfProject(workspaceId, projectId),
     store.canvasItems.list(workspaceId),
+    store.labels.list(workspaceId),
   ]);
+  /** A live canvas's label (slice 3b): the tab's and the tile's tag icon. */
+  const liveLabelOf = (labelId: Uuid | null) => (labelId ? (labels.find((l) => l.id === labelId && l.deleted_at === null)?.name ?? null) : null);
   const cards = cardsPerCanvas(items);
   const linksByCanvas = new Map<Uuid, Uuid[]>();
   for (const c of canvases) {
@@ -47,7 +50,7 @@ export async function loadProjectView(shell: ShellData): Promise<ProjectView> {
     canEdit: can({ workspace: workspace!, member }, "canvas.create"),
     canvases: links.map((l) => {
       const c = canvases.find((x) => x.id === l.canvas_id)!;
-      return { id: c.id, name: c.name, version: c.version, projectIds: linksByCanvas.get(c.id) ?? [], cards: cards.get(c.id) ?? 0, look: c.look };
+      return { id: c.id, name: c.name, version: c.version, projectIds: linksByCanvas.get(c.id) ?? [], cards: cards.get(c.id) ?? 0, look: c.look, liveLabel: liveLabelOf(c.live_label_id) };
     }),
     projects: projects.map((p) => ({ id: p.id, name: p.name })),
     outside: canvases

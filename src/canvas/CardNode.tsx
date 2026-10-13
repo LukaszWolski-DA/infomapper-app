@@ -20,8 +20,13 @@ export const isCardNode = (n: Node): n is CardNodeT => n.type === "card";
 /** The card nodes React Flow holds now, hidden ones (in a collapsed frame) included. */
 export const cardNodesOf = (rf: { getNodes: () => Node[] }): CardNodeT[] => rf.getNodes().filter(isCardNode);
 
-export const FILTER_LABEL = { all: "All", mapped: "Mapped", unmapped: "Unmapped", keys: "Keys" } as const;
+export const FILTER_LABEL = { all: "All", labeled: "Labeled", mapped: "Mapped", unmapped: "Unmapped", keys: "Keys" } as const;
 export const FILTER_ORDER = ["all", "mapped", "unmapped", "keys"] as const;
+/** On a live canvas an entity card also offers the rows its label makes relevant (prototype; slice 3b). */
+export const LIVE_ENTITY_FILTER_ORDER = ["all", "labeled", "mapped", "unmapped", "keys"] as const;
+/** The row filters a card offers. */
+export const filtersOf = (card: Pick<CardData, "kind" | "liveLevel">): readonly (keyof typeof FILTER_LABEL)[] =>
+  card.liveLevel !== null && card.kind === "ent" ? LIVE_ENTITY_FILTER_ORDER : FILTER_ORDER;
 
 const Icon = ({ d }: { d: string }) => (
   <svg viewBox="0 0 16 16" aria-hidden>
@@ -67,7 +72,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
   const status = row.mappings === 0 ? "" : row.warn ? " warn" : " ok";
   return (
     <div
-      className={`row${selected ? " sel" : ""}`}
+      className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}`}
       data-testid={kind === "ent" ? "row-attribute" : "row-column"}
       data-row={row.id}
       aria-selected={selected || undefined}
@@ -131,11 +136,13 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   return (
     <div
       onClick={onClick}
-      className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${card.clipName ? " clip-name" : ""}${clipLine1 ? " clip-l1" : ""}`}
+      className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${card.clipName ? " clip-name" : ""}${clipLine1 ? " clip-l1" : ""}${card.liveLevel === "context" ? " ctx" : ""}`}
+      title={card.liveTitle ?? undefined}
       style={isEnt ? ({ "--cc": card.color ?? "#888899" } as React.CSSProperties) : undefined}
       data-testid={isEnt ? "card-entity" : "card-source"}
       data-card={card.id}
       data-collapsed={card.collapsed || undefined}
+      data-live={card.liveLevel ?? undefined}
       data-filter={card.rowFilter}
       aria-selected={cardSelected || undefined}
     >

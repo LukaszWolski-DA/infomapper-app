@@ -46,17 +46,19 @@ import {
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import "./canvas.css";
+import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
 import { withClips, type CardData } from "./card-data";
-import CardNode, { cardNodesOf, FILTER_ORDER, type CardNodeT } from "./CardNode";
+import CardNode, { cardNodesOf, filtersOf, type CardNodeT } from "./CardNode";
 import BlockNode, { blockNodeId, type BlockNodeT } from "./BlockNode";
 import { NOTE_TOOL_HINT, RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
 import { NUDGE, useGroupActions, type GroupWrites } from "./GroupActions";
-import { conceptAsk, frameChips, frameColor, frameShape, frameStats, memberCounts, type ConceptAsk, type FrameData } from "./frame-data";
+import { conceptAsk, frameChips, frameColor, frameShape, frameStats, memberCounts, type FrameData } from "./frame-data";
 import { conceptQuestions, frameAt as smallestFrameAt } from "@/domain/model/frames";
-import { ConceptQuestion } from "./ConceptQuestion";
+import { ConceptQuestion, type CanvasQuestion } from "./ConceptQuestion";
+import { LIVE_ONE_AT_A_TIME } from "@/domain/model/live";
 import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
@@ -89,8 +91,9 @@ import { useCanvasLook } from "./look";
 import { viewKey } from "./views";
 import LineLayer from "./LineLayer";
 import { bundleLines, type Bundle } from "./line-geometry";
-import { Overview } from "./Overview";
+import { Overview, type MiniNote } from "./Overview";
 import NoteLayer, { type ShownNote } from "./NoteLayer";
+import { grownVersions, mergeFresh } from "./fresh";
 import { countsKey, countsOf, frameNoteCounts, noteAt, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
 import { DRAFT_NOTE, NO_NOTE_WRITES, useNotes, type NoteMover, type NoteWrites } from "./useNotes";
 
@@ -144,14 +147,38 @@ export interface ModelCanvasProps {
   focusNoteId?: string | null;
   /** Measurement-only switches (only the measurement-only production build passes them). */
   diagnosis?: Diagnosis;
-  /** The canvas's notes and their writes (slice 3a); when the page read them (server time, step 5). */
+  /** The canvas's notes and their writes (slice 3a). */
   notes?: NoteData[];
-  notesReadAt?: string | null;
+  /** When the page read the data (server time): a fresh page may be older than the canvas (`mergeFresh`). */
+  readAt?: string | null;
   noteWrites?: NoteWrites;
   /** May write notes: editors and reviewers, not archived (Łukasz's step 0 answer 1). */
   canNote?: boolean;
   /** The signed-in person's name (a new note's “by”). */
   userName?: string;
+  /** A live label canvas (slice 3b): its label and what adding and removing a card does there. */
+  live?: LiveCanvas | null;
+}
+
+/** What a change of a live canvas left behind for its toast (“Added from …”, “No longer labeled …”; Q7). */
+export interface LiveNotice {
+  id: number;
+  added: string[];
+  removed: string[];
+}
+
+/** A live canvas (D-10, D-11, slice 3b): adding a card labels its element, taking one off unlabels it, after a question. */
+export interface LiveCanvas {
+  labelId: string;
+  labelName: string;
+  /** The names of the workspace's entities and source tables, for the questions. */
+  names: Record<string, string>;
+  /** Puts the label on an element (a click in the left panel, a feeding source): the sync places its card. */
+  labelElement: (target: CardTarget) => Promise<CanvasWriteResult<unknown>>;
+  /** “Remove from this canvas (unlabel)…” (a server action). */
+  removeCard: (input: { canvasItemId: string; expectedVersion: number }) => Promise<CanvasWriteResult<{ name: string; label: string; mode: "direct" | "context"; what: string }>>;
+  /** What this person's writes changed here, newest last (from the server; shown once, Q7). */
+  notices: readonly LiveNotice[];
 }
 
 type PlaceSpot = { x: number; y: number; height: number };
@@ -209,10 +236,11 @@ export function ModelCanvas({
   focusNoteId,
   diagnosis = NO_DIAGNOSIS,
   notes: initialNotes = NO_NOTES,
-  notesReadAt = null,
+  readAt = null,
   noteWrites,
   canNote = false,
   userName = "",
+  live = null,
 }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
   const look = useCanvasLook()?.look;
@@ -358,6 +386,8 @@ export function ModelCanvas({
   const { toggleEntityTool, toggleHandTool, toggleFrameTool } = modes;
   const deleteFrameRef = useRef<(id: string) => void>(() => {});
   const deleteNoteRef = useRef<(id: string) => void>(() => {});
+  /** On a live canvas: Delete on a card asks to take its label off (slice 3b; set once the canvas has it). */
+  const removeLiveRef = useRef<(cardId: string) => void>(() => {});
   /** N, the toolbar button: the Note tool on or off (editors and reviewers, slice 3a). */
   const toggleNoteTool = useCallback(() => {
     if (!canNote) return;
@@ -399,6 +429,12 @@ export function ModelCanvas({
         deleteFrameRef.current(selection.id);
         return;
       }
+      // on a live canvas Delete on a card asks to take its label off (PRD item 11)
+      if ((e.key === "Delete" || e.key === "Backspace") && editable && live && selection?.t === "card") {
+        e.preventDefault();
+        removeLiveRef.current(selection.id);
+        return;
+      }
       if ((e.key === "Delete" || e.key === "Backspace") && canNote && selection?.t === "note") {
         e.preventDefault();
         deleteNoteRef.current(selection.id);
@@ -429,7 +465,7 @@ export function ModelCanvas({
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", onBlur);
     };
-  }, [fit, ui, select, toggleEntityTool, toggleHandTool, toggleFrameTool, toggleNoteTool, selectAll, editable, canNote, selection, rf]);
+  }, [fit, ui, select, toggleEntityTool, toggleHandTool, toggleFrameTool, toggleNoteTool, selectAll, editable, canNote, selection, rf, live]);
 
   // ---- card changes: applied at once, saved in order, undone on refusal ----
   const queue = useRef(new Map<string, Promise<void>>());
@@ -457,21 +493,38 @@ export function ModelCanvas({
     for (const id of ids) queue.current.set(id, next);
   }, []);
 
-  // ---- fresh cards from the server (after a place, remove or rename): take them, except what is still saving ----
+  /** Cards removed here, at the version they had then (a late fresh page must not put them back; `mergeFresh`). */
+  const removedHere = useRef(new Map<Uuid, number>());
+  // ---- fresh cards from the server (after a place, remove or rename): take them, except the layout of what is still
+  // saving, being dragged or newer here (a page started by an earlier write may arrive after a later move: `mergeFresh`) ----
   useEffect(() => {
+    const pendingOf = (id: Uuid) => pending.current.get(id) ?? 0;
     // The server's cards arrive as props after each write.
     setNodes((ns) => {
       const local = new Map(ns.map((n) => [n.id, n]));
-      return initialCards.map((c) => {
+      const merged = mergeFresh(
+        ns.map((n) => n.data.card),
+        initialCards,
+        {
+          readAt,
+          pendingOf: (id) => pendingOf(id) + (local.get(id)?.dragging ? 1 : 0),
+          deletedHere: removedHere.current,
+          versionOf: (c) => Math.max(c.version, versions.current.get(c.id) ?? 0),
+          // the model's content from the page, the layout as the canvas has it
+          keep: (here, page) => ({ ...page, x: here.x, y: here.y, collapsed: here.collapsed, rowFilter: here.rowFilter, width: here.width, frameId: here.frameId }),
+        },
+      );
+      const page = new Set(initialCards);
+      return merged.map((c) => {
         const mine = local.get(c.id);
         // the number of notes stays as the notes last gave it (slice 3a)
-        if (!mine || (!(pending.current.get(c.id) ?? 0) && !mine.dragging)) return toNode(c, editable, mine?.data.pinnedNotes);
-        const { x, y, collapsed, rowFilter, width, frameId } = mine.data.card;
-        return { ...toNode({ ...c, x, y, collapsed, rowFilter, width, frameId }, editable, mine.data.pinnedNotes), position: mine.position, dragging: mine.dragging };
+        if (!mine || page.has(c)) return toNode(c, editable, mine?.data.pinnedNotes);
+        if (c === mine.data.card) return mine;
+        return { ...toNode(c, editable, mine.data.pinnedNotes), position: mine.position, dragging: mine.dragging };
       });
     });
-    for (const c of initialCards) if (!(pending.current.get(c.id) ?? 0)) versions.current.set(c.id, c.version);
-  }, [initialCards, editable]);
+    for (const [id, v] of grownVersions(initialCards, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
+  }, [initialCards, editable, readAt]);
 
   const patchCard = useCallback((id: string, patch: CardPatch) => {
     setNodes((ns) =>
@@ -597,7 +650,25 @@ export function ModelCanvas({
   );
 
   /** The drop's question (D-05), shown by the canvas further down; read when a drop needs it. */
-  const askRef = useRef<(q: ConceptAsk) => Promise<boolean>>(() => Promise.resolve(false));
+  const askRef = useRef<(q: CanvasQuestion, kind?: "concept" | "live") => Promise<boolean>>(() => Promise.resolve(false));
+  /** A live canvas's toasts about the sync are left out right after this person's own add or remove (it has its toast). */
+  const quietUntil = useRef(0);
+  // what this person's writes changed here comes with the fresh page (PRD item 7, Q7): shown once; a canvas opened
+  // afterwards shows nothing (it starts from the notices it found)
+  const seenNotice = useRef<number | null>(null);
+  if (seenNotice.current === null) seenNotice.current = Math.max(0, ...(live?.notices ?? []).map((n) => n.id));
+  const notices = live?.notices;
+  const liveName = live?.labelName;
+  useEffect(() => {
+    if (!notices?.length) return;
+    const fresh = notices.filter((n) => n.id > (seenNotice.current ?? 0));
+    if (!fresh.length) return;
+    seenNotice.current = Math.max(...fresh.map((n) => n.id));
+    if (Date.now() < quietUntil.current) return;
+    const added = fresh.flatMap((n) => n.added), removed = fresh.flatMap((n) => n.removed);
+    const parts = [added.length ? `Added from ${liveName}: ${added.join(", ")}` : "", removed.length ? `No longer labeled: ${removed.join(", ")}` : ""].filter(Boolean);
+    if (parts.length) toast(`${parts.join(". ")}.`);
+  }, [notices, liveName, toast]);
 
   /**
    * Places an element at a spot; an element already here is selected and shown instead (prototype addToCanvas).
@@ -611,6 +682,29 @@ export function ModelCanvas({
         select({ t: "card", id: here.id });
         centerOn(here.id);
         return;
+      }
+      // on a live canvas, adding a card labels its element, after the question (D-11, PRD item 10); reviewers and
+      // readers get no add there (PRD item 16)
+      if (live && !editable) return;
+      const liveName = live ? (dropped?.name ?? live.names[isEntity(target) ? target.entityId : target.sourceTableId] ?? "it") : "";
+      if (live) {
+        const yes = await askRef.current({ message: `Label ${liveName} with ${live.labelName}? It then appears on this live canvas.`, yes: `Add ${live.labelName}`, no: "Cancel" }, "live");
+        if (!yes) return;
+        quietUntil.current = Date.now() + 8000;
+        if (!dropped) {
+          let labeled: CanvasWriteResult<unknown>;
+          try {
+            labeled = await live.labelElement(target);
+          } catch {
+            labeled = FAILED;
+          }
+          if (!labeled.ok) toast(labeled.message, "refusal");
+          else {
+            const u = ui.undo();
+            toast(`${liveName} is now labeled ${live.labelName}.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
+          }
+          return;
+        }
       }
       const counts = memberCounts(cardNodesOf(rf).map((n) => n.data.card));
       const block = dropped
@@ -641,6 +735,11 @@ export function ModelCanvas({
         return;
       }
       select({ t: "card", id: result.value.canvasItemId });
+      if (live) {
+        const u = ui.undo();
+        toast(`${liveName} is now labeled ${live.labelName}.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
+        return;
+      }
       if (filedInto) {
         toast(`${dropped!.name} added to the collapsed frame ${filedInto.name}.`);
         return;
@@ -649,7 +748,7 @@ export function ModelCanvas({
       if (!inside(viewRect(), box)) centerOnRect(box);
       if (clicked) toast(`Added 1 ${isEntity(target) ? "entity" : "source table"} to the canvas.`);
     },
-    [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect, frameRefs, rf, entityConcepts, concepts],
+    [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect, frameRefs, rf, entityConcepts, concepts, live, ui, editable],
   );
 
   const place = useCallback(
@@ -660,8 +759,41 @@ export function ModelCanvas({
     [placeAt, viewRect, occupied],
   );
 
+  /** “Remove from this canvas (unlabel)…” on a live canvas: the question, then the label comes off (PRD item 11). */
+  const removeLive = useCallback(
+    async (cardId: string) => {
+      const card = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
+      if (!live || !editable || !card?.liveRemove) return;
+      const L = live.labelName;
+      const { direct, what, others } = card.liveRemove;
+      const verb = others === 1 ? "carries" : "carry";
+      const question: CanvasQuestion = direct
+        ? { message: `Take the label ${L} off ${card.name}?${others ? ` It stays here as context, because ${what} of it ${verb} ${L}.` : ""}`, yes: `Remove ${L}`, no: "Cancel" }
+        : { message: `${card.name} is here because ${what} ${verb} ${L}. Take the label off ${others === 1 ? "it" : "them"}?`, yes: `Remove from ${what}`, no: "Cancel" };
+      if (!(await askRef.current(question, "live"))) return;
+      quietUntil.current = Date.now() + 8000;
+      enqueue(cardId, async () => {
+        let result: Awaited<ReturnType<LiveCanvas["removeCard"]>>;
+        try {
+          result = await live.removeCard({ canvasItemId: cardId, expectedVersion: versions.current.get(cardId) ?? 1 });
+        } catch {
+          result = FAILED;
+        }
+        if (!result.ok) {
+          toast(result.message, "refusal");
+          return;
+        }
+        const { name, label, mode } = result.value;
+        const u = ui.undo();
+        toast(mode === "direct" ? `${name} is no longer labeled ${label}.` : `Label ${label} removed from ${result.value.what} of ${name}.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
+      });
+    },
+    [live, editable, rf, enqueue, toast, ui],
+  );
+
   const remove = useCallback(
     (cardId: string) => {
+      if (live) return void removeLive(cardId);
       enqueue(cardId, async () => {
         let result: CanvasWriteResult<unknown>;
         try {
@@ -673,13 +805,14 @@ export function ModelCanvas({
           toast(result.message, "refusal");
           return;
         }
+        removedHere.current.set(cardId, versions.current.get(cardId) ?? 1);
         setNodes((ns) => ns.filter((n) => n.id !== cardId));
         select(null);
         const undo = ui.undo();
         toast("Removed from this canvas. It stays in the model, with its mappings and on other canvases.", "info", undo ? { label: "Undo", run: undo.undo } : undefined);
       });
     },
-    [enqueue, removeCard, select, toast, ui],
+    [enqueue, removeCard, select, toast, ui, live, removeLive],
   );
 
   /** Feeding sources (left) or fed entities (right) beside a card, in one change (prototype placeNear, B-08). */
@@ -690,6 +823,12 @@ export function ModelCanvas({
       const missing = wanted.filter((w) => !cardOf(w.target));
       if (!missing.length) {
         toast("Everything is already on this canvas.");
+        return;
+      }
+      // a live canvas adds one card at a time, each after its question (PRD item 12)
+      if (live) {
+        if (missing.length > 1) toast(LIVE_ONE_AT_A_TIME);
+        else void placeAt(missing[0]!.target, { x: 0, y: 0 }, newCardHeight(missing[0]!.rows), true);
         return;
       }
       // a card hidden in a collapsed frame: beside its block (slice 2c), never on it (occupied)
@@ -720,7 +859,7 @@ export function ModelCanvas({
       const what = isEntity(missing[0]!.target) ? `entit${n === 1 ? "y" : "ies"}` : `source table${n === 1 ? "" : "s"}`;
       toast(`Added ${n} ${what} next to the selection.`);
     },
-    [rf, cardOf, toast, occupied, placeCards, select, viewRect, frameRefs, frameRectsNow],
+    [rf, cardOf, toast, occupied, placeCards, select, viewRect, frameRefs, frameRectsNow, live, placeAt],
   );
 
   // ---- frames (slice 2b) ----
@@ -735,12 +874,13 @@ export function ModelCanvas({
   const conceptColors = useMemo(() => Object.fromEntries(Object.entries(concepts).map(([id, c]) => [id, c.color])), [concepts]);
   const conceptName = useCallback((id: string) => concepts[id]?.name ?? "–", [concepts]);
   // the drop's question (D-05): one at a time, answered in the bar
-  const [asking, setAsking] = useState<{ question: ConceptAsk; answer: (move: boolean) => void } | null>(null);
+  const [asking, setAsking] = useState<{ question: CanvasQuestion; kind: "concept" | "live"; answer: (move: boolean) => void } | null>(null);
   const ask = useCallback(
-    (question: ConceptAsk) =>
+    (question: CanvasQuestion, kind: "concept" | "live" = "concept") =>
       new Promise<boolean>((resolve) =>
         setAsking({
           question,
+          kind,
           answer: (move) => {
             setAsking(null);
             resolve(move);
@@ -756,6 +896,7 @@ export function ModelCanvas({
     editable,
     showAllCollapsed: diagnosis.collapsed,
     initialFrames,
+    readAt,
     setNodes,
     patchCard,
     enqueueGroup,
@@ -807,7 +948,7 @@ export function ModelCanvas({
   const noteState = useNotes({
     canNote,
     initialNotes,
-    notesReadAt,
+    readAt,
     versions,
     pending,
     enqueue,
@@ -826,6 +967,7 @@ export function ModelCanvas({
   });
   useEffect(() => {
     askRef.current = ask;
+    removeLiveRef.current = (id) => void removeLive(id);
     saveLayoutRef.current = saveLayout;
     deleteFrameRef.current = frameState.deleteFrame;
     deleteNoteRef.current = noteState.remove;
@@ -981,6 +1123,11 @@ export function ModelCanvas({
       pinnedTo: s.note.pinCardId ?? s.note.pinFrameId,
     }));
   }, [shownNotes]);
+  /** The notes as the Overview's miniature draws them (slice 3b). */
+  const miniNotes = useMemo<MiniNote[]>(
+    () => shownNotes.map((s) => ({ id: s.note.id, x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80, color: s.note.color })),
+    [shownNotes],
+  );
   /** The notes as the selection marks them. */
   const noteRects = useMemo(() => new Map(shownNotes.map((s) => [s.note.id, { x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80 }])), [shownNotes]);
 
@@ -1066,6 +1213,7 @@ export function ModelCanvas({
     enqueueGroup,
     versions,
     pending,
+    removedHere,
     occupied,
     viewRect,
     undo: ui.undo,
@@ -1120,8 +1268,9 @@ export function ModelCanvas({
       selectAll,
       arrangeSelection: group.arrangeSelection,
       fitSelectionWidths: group.fitSelectionWidths,
-      removeSelection: group.removeSelection,
-      placeSourcesOfSelection: group.placeSourcesOfSelection,
+      // a live canvas: one card at a time (PRD item 12)
+      removeSelection: live ? () => toast("On a live canvas, remove cards one at a time: each one takes its label off.") : group.removeSelection,
+      placeSourcesOfSelection: live ? () => toast(LIVE_ONE_AT_A_TIME) : group.placeSourcesOfSelection,
       createFrameAt: frameState.createFrameAt,
       frameView: frameState.frameView,
       updateFrame: frameState.updateFrame,
@@ -1172,7 +1321,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect]);
+  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -1210,7 +1359,9 @@ export function ModelCanvas({
       cycleFilter: (id) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
         if (!card) return;
-        const next = FILTER_ORDER[(FILTER_ORDER.indexOf(card.rowFilter) + 1) % FILTER_ORDER.length]!;
+        // a live canvas's entity cards also offer Labeled (slice 3b)
+        const order = filtersOf(card);
+        const next = order[(order.indexOf(card.rowFilter) + 1) % order.length]!;
         change(id, { rowFilter: next }, { rowFilter: card.rowFilter });
       },
       startRelate: modes.startRelate,
@@ -1374,13 +1525,13 @@ export function ModelCanvas({
             onCancel={noteState.cancel}
             onHeight={noteState.onHeight}
           />
-          <Overview lines={lines} />
+          <Overview lines={lines} notes={miniNotes} notesDragging={noteState.dragging} />
           <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
           <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} frameRects={frameRects} noteRects={noteRects} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>
-        {asking && <ConceptQuestion question={asking.question} onAnswer={asking.answer} />}
+        {asking && <ConceptQuestion question={asking.question} onAnswer={asking.answer} kind={asking.kind} />}
         {nodes.length === 0 && frames.length === 0 && (
           <div className="im-empty" data-testid="canvas-empty">
             <div>

@@ -256,7 +256,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
       {p.editable && (
         <Actions>
           <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
-            Remove from this canvas
+            {p.live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas"}
           </button>
           <button type="button" className={dangerClass} onClick={() => setDeleting(true)} data-testid="button-delete-entity">
             Delete from model…

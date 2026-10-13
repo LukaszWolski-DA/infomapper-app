@@ -250,7 +250,7 @@ function LineLayer({
     const el = reuse(`map:${l.id}`, key, () => {
       const geom = mapGeom(l, lookup);
       if (!geom) return null;
-      const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.part ? " part" : ""}${l.inputCount > 1 ? " combined" : ""}${state("map", l.id)}`;
+      const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.part ? " part" : ""}${l.inputCount > 1 ? " combined" : ""}${l.faded ? " ctxline" : ""}${state("map", l.id)}`;
       return (
         <MapPath
           key={l.id}
@@ -291,7 +291,7 @@ function LineLayer({
       if (!geom) return null;
       if (geom.kind === "single") {
         const l = geom.line;
-        const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.geom.part ? " part" : ""}${st}`;
+        const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.geom.part ? " part" : ""}${l.faded ? " ctxline" : ""}${st}`;
         return (
           <MapPath
             key={b.key}

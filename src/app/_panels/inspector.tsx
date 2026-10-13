@@ -52,6 +52,14 @@ export interface InspectorProps {
   /** The workspace's working labels and what they mark (slice 3a). */
   labels: Label[];
   labelLinks: LabelLink[];
+  /** The open project (live canvases open in it, slice 3b). */
+  projectId: Uuid;
+  /** Each label's live canvas, by label id (slice 3b). */
+  liveCanvases: Record<Uuid, Uuid>;
+  /** This canvas's label when it is a live canvas (slice 3b). */
+  live: { labelId: Uuid; labelName: string } | null;
+  /** May create canvases (opening a new live canvas): owners, admins, modelers. */
+  canCreateCanvas: boolean;
 }
 
 export interface CanvasPlace {
@@ -98,7 +106,7 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     const cardByTarget = new Map(cards.map((c) => [c.targetId, c.id]));
     return (id: Uuid) => cardByTarget.get(id) ?? null;
   }, [cards]);
-  const host = useCanvasHost({ ix, workspaceId: rest.workspaceId, canvasId: rest.canvasId, editable: rest.editable, canSetStatus: rest.canSetStatus, canNote: rest.canNote, cards });
+  const host = useCanvasHost({ ix, workspaceId: rest.workspaceId, canvasId: rest.canvasId, editable: rest.editable, canSetStatus: rest.canSetStatus, canNote: rest.canNote, cards, live: rest.live });
   const { mapColumn, pendingInput, clearPendingInput } = host;
 
   const panel = useMemo<PanelContext>(() => {

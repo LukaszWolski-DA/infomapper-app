@@ -92,8 +92,32 @@ describe("buildCards", () => {
     expect(buildCards(ruled, items).find((c) => c.kind === "ent")!.rows[0]!.warn).toBe(false);
   });
 
-  it("shows a stored 'labeled' filter as All until labels exist", () => {
+  it("shows a stored 'labeled' filter as All outside a live canvas", () => {
     expect(buildCards(model, [canvasItem(ids.itemCustomer, { row_filter: "labeled", deleted_at: null, updated_at: NOW })])[0]!.rowFilter).toBe("all");
+  });
+
+  it("on a live canvas (slice 3b): the level, a context card's line and tooltip, relevant rows, the Labeled filter, the remove question", () => {
+    const live = {
+      labelName: "CR-23",
+      relevantRows: new Set([ids.email]),
+      removeOf: () => ({ direct: false, what: "1 attribute", others: 1 }),
+    };
+    const [card] = buildCards(model, [canvasItem(ids.itemCustomer, { row_filter: "labeled", live_level: "context" })], undefined, live);
+    expect(card).toMatchObject({
+      liveLevel: "context",
+      rowFilter: "labeled",
+      line1b: "context only",
+      liveTitle: "Context: the entity itself is not labeled CR-23, only some of its attributes are",
+      liveRemove: { direct: false, what: "1 attribute", others: 1 },
+    });
+    expect(card!.rows.map((r) => [r.name, r.relevant])).toEqual([
+      ["customer_id", false],
+      ["email", true],
+    ]);
+    expect(visibleRows(card!).map((r) => r.id)).toEqual([ids.email]);
+    const full = buildCards(model, [canvasItem(ids.itemCustomer, { live_level: "full" })], undefined, live)[0]!;
+    expect([full.liveLevel, full.liveTitle, full.line1b.startsWith("in ")]).toEqual(["full", null, true]);
+    expect(buildCards(model, [canvasItem(ids.itemCustomer, { live_level: "full" })])[0]!.liveLevel).toBeNull();
   });
 });
 

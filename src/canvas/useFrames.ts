@@ -46,6 +46,7 @@ import type { CardData } from "./card-data";
 import { cardNodesOf, type CardNodeT } from "./CardNode";
 import type { FramePatch, FrameView, UndoHooks } from "./context";
 import { buildFrames, conceptAsk, frameStats, memberCounts, type ConceptAsk, type FrameData } from "./frame-data";
+import { grownVersions, mergeFresh } from "./fresh";
 import type { FramePart } from "./FrameLayer";
 import { cardHeight, cardWidth, snap8, type Pt, type Rect } from "./geometry";
 import { planLayout, planReframe, type LayoutChange, type PlanCard } from "./layout-plan";
@@ -109,6 +110,8 @@ interface Options {
   /** Measurement only (`?diag=collapsed`, S2C-12): every frame shown collapsed, nothing saved. */
   showAllCollapsed?: boolean;
   initialFrames: readonly FrameData[];
+  /** When the page read `initialFrames` (server time; `mergeFresh`). */
+  readAt: string | null;
   setNodes: Dispatch<SetStateAction<CardNodeT[]>>;
   patchCard: (id: Uuid, patch: CardPatch) => void;
   enqueueGroup: (ids: readonly Uuid[], write: () => Promise<void>) => void;
@@ -191,16 +194,16 @@ export function useFrames(o: Options) {
     conceptNameRef.current = o.conceptName;
   });
 
-  // ---- fresh frames from the server: take them, except what is still saving ----
-  const { initialFrames } = o;
+  // ---- fresh frames from the server: take them, except what is still saving or newer here (a page started by an
+  // earlier write may arrive after a later move or resize: `mergeFresh`) ----
+  const { initialFrames, readAt } = o;
+  /** Frames deleted here (Delete, or rebuilt by “Arrange into frames”), at the version they had then. */
+  const deletedHere = useRef(new Map<Uuid, number>());
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- the server's frames arrive as props after each write
-    setFrames((fs) => {
-      const local = new Map(fs.map((f) => [f.id, f]));
-      return initialFrames.map((f) => ((pending.current.get(f.id) ?? 0) && local.has(f.id) ? local.get(f.id)! : f));
-    });
-    for (const f of initialFrames) if (!(pending.current.get(f.id) ?? 0)) versions.current.set(f.id, f.version);
-  }, [initialFrames, pending, versions]);
+    const pendingOf = (id: Uuid) => pending.current.get(id) ?? 0;
+    setFrames((fs) => mergeFresh(fs, initialFrames, { readAt, pendingOf, deletedHere: deletedHere.current, versionOf: (f) => Math.max(f.version, versions.current.get(f.id) ?? 0) }));
+    for (const [id, v] of grownVersions(initialFrames, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
+  }, [initialFrames, readAt, pending, versions]);
 
   const nodes = useCallback(() => cardNodesOf(rf), [rf]);
   /** The frames as the rules see them now (a collapsed one by its block). */
@@ -569,7 +572,8 @@ export function useFrames(o: Options) {
       }
       const { frameId, versions: v } = result.value;
       noteVersions(v);
-      const frame: FrameData = { id: frameId, version: v[frameId] ?? 1, name: NEW_FRAME_NAME, kind: "free", conceptId: null, sourceSystemId: null, color: FREE_FRAME_COLORS[0], x: rect.x, y: rect.y, width: rect.w, height: rect.h, collapsed: false };
+      // created now: the browser's clock stands in for the server's (the create refreshes the page, which brings the real one)
+      const frame: FrameData = { id: frameId, version: v[frameId] ?? 1, name: NEW_FRAME_NAME, kind: "free", conceptId: null, sourceSystemId: null, color: FREE_FRAME_COLORS[0], x: rect.x, y: rect.y, width: rect.w, height: rect.h, collapsed: false, createdAt: new Date().toISOString() };
       setFrames((fs) => (fs.some((f) => f.id === frameId) ? fs : [...fs, frame]));
       for (const id of Object.keys(v)) if (id !== frameId) patchCard(id, { frameId });
       select({ t: "frame", id: frameId });
@@ -661,6 +665,7 @@ export function useFrames(o: Options) {
           toast(result.message, "refusal");
           return;
         }
+        deletedHere.current.set(frameId, ver(frameId));
         setFrames((fs) => fs.filter((x) => x.id !== frameId));
         for (const id of members) {
           patchCard(id, { frameId: null });
@@ -870,6 +875,7 @@ export function useFrames(o: Options) {
         }
         const { versions: v, built, cards, frames: n } = result.value;
         noteVersions(v);
+        for (const f of framesRef.current) if (f.kind !== "free" && !built.some((b) => b.id === f.id)) deletedHere.current.set(f.id, ver(f.id));
         setFrames((fs) => [...fs.filter((f) => f.kind === "free"), ...buildFrames(built)]);
         for (const c of cards) patchCard(c.id, { x: c.x, y: c.y, frameId: c.frameId });
         select(null);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { ids, NOW, T0 } from "../__fixtures__/domain";
 import type { Label, LabelLink } from "../types";
-import { labelItemCounts, labelKey, labelNamed, labelSuggestions, normalizeLabelName, targetColumns, targetOf } from "./labels";
+import { contextMenuEntries, labelItemCounts, labelKey, labelNamed, labelSuggestions, normalizeLabelName, targetColumns, targetOf } from "./labels";
 
 const std = { workspace_id: ids.ws, version: 1, created_at: T0, created_by: ids.actor, updated_at: T0, updated_by: ids.actor, deleted_at: null };
 let n = 0;
@@ -86,5 +86,22 @@ describe("the Labels field's suggestions (prototype showLblSug)", () => {
     const many = Array.from({ length: 12 }, (_, i) => label(`T-${String(i).padStart(2, "0")}`));
     expect(labelSuggestions(many, [], "t", new Set()).labels).toHaveLength(8);
     expect(labelSuggestions([label("Old", { deleted_at: NOW })], [], "old", new Set())).toEqual({ create: "old", labels: [] });
+  });
+});
+
+describe("contextMenuEntries (the working context's menu, slice 3b)", () => {
+  const ls = [
+    { id: "a", name: "CR-23", items: 4 },
+    { id: "b", name: "JIRA-481", items: 2 },
+    { id: "c", name: "CR-7", items: 9 },
+  ];
+  it("lists the active label first, then by items marked; at most 8", () => {
+    expect(contextMenuEntries(ls, "b", "").labels.map((l) => l.id)).toEqual(["b", "c", "a"]);
+    expect(contextMenuEntries(Array.from({ length: 12 }, (_, i) => ({ id: `${i}`, name: `L-${i}`, items: i })), null, "").labels).toHaveLength(8);
+  });
+  it("filters by what was typed (normalised, any case) and offers Create when no label has that name", () => {
+    expect(contextMenuEntries(ls, null, "cr")).toEqual({ create: "cr", labels: [ls[2], ls[0]] });
+    expect(contextMenuEntries(ls, null, "cr 23").create).toBeNull();
+    expect(contextMenuEntries(ls, null, "cr 99")).toEqual({ create: "cr-99", labels: [] });
   });
 });

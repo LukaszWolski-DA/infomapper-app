@@ -56,6 +56,8 @@ interface Options extends GroupWrites {
   enqueueGroup: (ids: readonly string[], write: () => Promise<void>) => void;
   versions: MutableRefObject<Map<string, number>>;
   pending: MutableRefObject<Map<string, number>>;
+  /** Cards removed here, at the version they had then (`mergeFresh`). */
+  removedHere: MutableRefObject<Map<string, number>>;
   occupied: () => Rect[];
   viewRect: () => Rect;
   undo: () => UndoHooks | null;
@@ -83,7 +85,7 @@ const rectOf = (n: CardNodeT): Rect => ({ x: n.position.x, y: n.position.y, w: c
 export function useGroupActions(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
-  const { editable, selection, select, setNodes, patchCard, enqueueGroup, versions, pending, undo, occupied, viewRect } = o;
+  const { editable, selection, select, setNodes, patchCard, enqueueGroup, versions, pending, removedHere, undo, occupied, viewRect } = o;
   const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames, frameRect, canNote, notes: noteMover, saveNoteMoves } = o;
 
   /** The selected cards themselves on this canvas (not frames): several, or the one selected card. */
@@ -441,6 +443,7 @@ export function useGroupActions(o: Options) {
         toast(result.message, "refusal");
         return;
       }
+      for (const id of ids) removedHere.current.set(id, versions.current.get(id) ?? 1);
       setNodes((ns) => ns.filter((n) => !ids.includes(n.id)));
       select(null);
       const u = undo();
@@ -451,7 +454,7 @@ export function useGroupActions(o: Options) {
         u ? { label: "Undo", run: u.undo } : undefined,
       );
     });
-  }, [editable, selectedNodes, enqueueGroup, removeCards, versions, setNodes, select, undo, toast]);
+  }, [editable, selectedNodes, enqueueGroup, removeCards, versions, removedHere, setNodes, select, undo, toast]);
 
   /**
    * “Add sources of selected entities” (PRD item 9): each entity's missing feeding source tables go beside its own card,

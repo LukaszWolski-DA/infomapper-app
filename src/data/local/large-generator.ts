@@ -8,10 +8,9 @@
 //  - 40 relationships between entities, with cardinalities and labels
 //  - 8 frames holding 6–15 cards each (stored as free frames by seed-large.ts, slice 2b)
 
+import { cardHeightFor } from "@/domain/model/card-size";
+
 export const CARD_W = 256;
-const HEAD_H = 54;
-const ROW_H = 26;
-const BODY_PAD = 6;
 
 export type Kind = "src" | "ent";
 
@@ -75,7 +74,7 @@ export interface GenDataSet {
   frames: GenFrame[];
 }
 
-export const cardHeight = (rows: number) => HEAD_H + BODY_PAD * 2 + Math.max(1, rows) * ROW_H;
+export const cardHeight = (rows: number) => cardHeightFor(rows);
 
 /* ---------- seeded RNG (mulberry32) ---------- */
 function rng(seed: number) {

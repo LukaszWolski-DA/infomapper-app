@@ -70,6 +70,14 @@
 .im-canvas .tag.pii { color: var(--im-warn); background: var(--im-warn-soft) }
 .im-canvas .tag.bk { color: var(--im-physical); background: var(--im-physical-soft) }
 .im-canvas .dt { color: var(--im-ink-3); font-size: 11px; flex: none }
+/* live canvases (slice 3b, prototype .card.ctx, .row.lab): a context card is outlined and its header light; classes on
+   the existing elements, no new element per card or row (AD-24) */
+.im-canvas .card.ctx { outline: 1.5px dashed var(--im-ink-3); outline-offset: 3px }
+.im-canvas .card.ctx .c-head { background-color: var(--im-hover); border-radius: 10px 10px 0 0 }
+.im-canvas .card.ctx.collapsed .c-head { border-radius: 10px }
+.im-canvas .card.src.ctx .c-head { background: linear-gradient(var(--im-physical), var(--im-physical)) top / 100% 3px no-repeat, var(--im-hover) }
+.im-canvas .card.ent.ctx .c-name { color: var(--im-ink-2); font-weight: 500 }
+.im-canvas .row.lab .nm { font-weight: 600 }
 /* working labels (slice 3a, prototype .lmark): a tag mark in rows and the table header, never a model tag (D-08) */
 /* one element: the outline tag (16 × 16, stroke 1.6, as the prototype's SVG) is a mask over the text colour */
 .im-canvas .lmark {
@@ -141,6 +149,11 @@
 /* bundled lines at a collapsed frame (slice 2c, prototype .lnk.bundle): the width grows with the count (inline) */
 .im-canvas .lnk.bundle .s { stroke-linecap: round }
 .im-canvas .lnk.bundle .chip circle { stroke-width: 1.6 }
+/* on a live canvas, a mapping that does not carry its label is faded by colour, never opacity (D-25, AD-24 rule 4) */
+.im-canvas .map.ctxline .s { stroke: color-mix(in srgb, var(--im-map) 28%, var(--im-canvas)) }
+.im-canvas .map.ctxline.warn .s { stroke: color-mix(in srgb, var(--im-warn) 28%, var(--im-canvas)) }
+.im-canvas .map.ctxline .end { fill: color-mix(in srgb, var(--im-map) 28%, var(--im-canvas)) }
+.im-canvas .map.ctxline.warn .end { fill: color-mix(in srgb, var(--im-warn) 28%, var(--im-canvas)) }
 /* a labeled mapping line (slice 3a, prototype .ltag): a small tag in a dashed circle, part of the line's own drawing */
 /* two elements, no group and no transform: the circle and the tag, its path already scaled (0.62, so its stroke 1.3 is 0.8) */
 .im-canvas .ltag { pointer-events: none }

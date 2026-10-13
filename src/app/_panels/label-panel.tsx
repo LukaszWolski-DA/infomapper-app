@@ -9,10 +9,12 @@ import { useContext, useState } from "react";
 import { deleteLabelAction, renameLabelAction } from "@/app/_actions/label";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
+import { useWorkingContext } from "@/ui/working-context";
+import { useOpenLiveCanvas } from "@/app/_components/live-canvas";
 import type { Uuid } from "@/domain/ids";
 import { targetOf, type LabelTargetKind } from "@/domain/model/labels";
 import type { Label } from "@/domain/types";
-import { Actions, dangerClass, Field, Fold, Kind, Li, LongList, TextField, TypeDot } from "./fields";
+import { Actions, dangerClass, Field, Fold, Kind, Li, LongList, primaryClass, TextField, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { attributeLabel, inputsLabel, typeCheckOf } from "./model-index";
 
@@ -31,6 +33,9 @@ export function LabelPanel({ label }: { label: Label }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
   const { run, pending } = useAction();
+  const workingContext = useWorkingContext();
+  const liveCanvas = p.liveCanvases[label.id] ?? null;
+  const openLive = useOpenLiveCanvas(p.workspaceId, p.projectId);
   /** A refused rename shows the stored name again. */
   const [reset, setReset] = useState(0);
   const ix = p.ix;
@@ -66,8 +71,18 @@ export function LabelPanel({ label }: { label: Label }) {
   }
 
   async function remove() {
-    const r = await run(() => deleteLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: label.version }), (v) => `Deleted the label ${v.name}.`, { undoable: true });
+    // the active context's label: the context goes off first, quietly, and one toast says both, with Undo (slice 3b,
+    // after step 2); the undo brings the label back, not the context
+    const wasContext = workingContext?.active?.id === label.id;
+    if (wasContext) workingContext!.set(null, { silent: true });
+    const r = await run(
+      () => deleteLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: label.version }),
+      // a live canvas became a normal canvas in the same step (slice 3b, PRD item 13)
+      (v) => `${wasContext ? `Deleted the label ${v.name}; the working context is off.` : `Deleted the label ${v.name}.`}${v.hadLiveCanvas ? " Its live canvas became a normal canvas." : ""}`,
+      { undoable: true },
+    );
     if (r.ok) ui.select(null);
+    else if (wasContext) workingContext!.set(label.id, { silent: true });
   }
 
   const section = (k: LabelTargetKind, title: string) =>
@@ -102,6 +117,13 @@ export function LabelPanel({ label }: { label: Label }) {
       <p className="mt-3 text-im-ink-2" data-testid="text-label-marks">
         {parts.length ? `Marks ${parts.join(", ")}.` : "Not used anywhere yet."} Labels belong to your working context, not to the model.
       </p>
+      {(liveCanvas || p.canCreateCanvas) && (
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" className={primaryClass} disabled={openLive.pending} onClick={() => void openLive.open(label.id)} data-testid="button-label-live">
+            {liveCanvas ? "Go to its live canvas" : "Open as live canvas"}
+          </button>
+        </div>
+      )}
       {section("entity", "Entities")}
       {section("attribute", "Attributes")}
       {section("mapping", "Mappings")}

@@ -180,6 +180,7 @@ export const Actions = ({ children }: { children: ReactNode }) => <div className
 export const buttonClass = "h-8 rounded-md border border-im-line bg-im-surface px-3 text-im-ink hover:bg-im-hover disabled:opacity-50";
 export const smallButtonClass = "h-[26px] rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover";
 export const dangerClass = `${buttonClass} text-im-warn`;
+export const primaryClass = "h-8 rounded-md border border-im-logical bg-im-logical px-3 font-medium text-im-surface disabled:opacity-50";
 
 /** A select with option groups (columns by table). */
 export function GroupedSelect({

@@ -90,6 +90,31 @@ export function labelSuggestions(labels: readonly Label[], links: readonly Label
   return { create: q && !all.some((l) => l.name_key === q) ? name : null, labels: matching };
 }
 
+/** A label as the working context's menu lists it: its name and how many items it marks. */
+export interface CountedLabel {
+  id: Uuid;
+  name: string;
+  items: number;
+}
+
+export interface ContextMenuEntries {
+  /** What was typed, normalised, when no label has that name: “Create “{name}”” comes first. */
+  create: string | null;
+  /** At most 8 labels matching what was typed: the active one first, then by items marked, then by name. */
+  labels: CountedLabel[];
+}
+
+/** The working context's menu (prototype renderCtxList, slice 3b PRD item 1). */
+export function contextMenuEntries(labels: readonly CountedLabel[], activeId: Uuid | null, typed: string): ContextMenuEntries {
+  const name = normalizeLabelName(typed);
+  const q = labelKey(name);
+  const matching = labels
+    .filter((l) => !q || labelKey(l.name).includes(q))
+    .sort((a, b) => Number(b.id === activeId) - Number(a.id === activeId) || b.items - a.items || a.name.localeCompare(b.name))
+    .slice(0, LABEL_SUGGESTIONS_MAX);
+  return { create: q && !labels.some((l) => labelKey(l.name) === q) ? name : null, labels: matching };
+}
+
 /** An item as a key of `labelNamesByItem`: `attribute:<id>`, `mapping:<id>`, … */
 export const itemKey = (target: LabelTarget): string => `${target.kind}:${target.id}`;
 
