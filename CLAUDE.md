@@ -126,6 +126,10 @@ npm run measure:canvas -- --quick --rounds 1 --against slice-02b                
 npm run measure:canvas -- --quick --rounds 1 --against slice-02b --branch-diag collapsed    # S2C-12, all frames collapsed
 npm run measure:canvas -- --quick --rounds 1 --against slice-02c                            # S3A-14, labels and notes on
 npm run measure:canvas -- --quick --rounds 1 --against slice-02c --branch-diag collapsed    # S3A-14, all frames collapsed
+npm run measure:canvas -- --quick --rounds 2 --against slice-03a                            # S3B-15 (b), balanced, frames expanded
+npm run measure:canvas -- --quick --rounds 2 --against slice-03a --branch-diag collapsed    # S3B-15 (b), all frames collapsed
+MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=<file> npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S3B-15 (a) element counts
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-live.spec.ts     # S3B-15 (c) a live canvas against Performance test
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
 DIAG=nolines MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # diagnosis: no line layer (or DIAG=blocks)
@@ -149,12 +153,18 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   column and attribute (`mappingId`) and `removeCard`. Slice 3a's add the demo working layer from the data file
   (`loadLabels`, `loadLinks`, `loadPins`, `loadNotes`, `noteWithText`, `rawDb` with deleted rows), the demo notes' texts
   (`DEMO_NOTES`), the Labels field (`labelsField`, `typeLabel`, `chipNames`), a note on the page (`noteEl`, `notePoint`),
-  `removeLabel` as test data and `undo`. The undo history lives in the server's memory and is empty again after each
-  reseed.
+  `removeLabel` as test data and `undo`. Slice 3b's write test data as the server does (`liveWrite`: the command, then
+  the live step that labels placed cards and syncs live canvases; plain `asUser` skips it), make a label's live canvas
+  (`openLiveFor`, `liveUrl`), put a label on an item (`labelItem`), switch the working context on in the browser
+  (`contextOn`, its cookie), and read back live cards (`liveCards`), a label's items (`linkedTo`), the newest change
+  group (`lastGroup`) and the commit counters (`canvasCommits`, `miniatureCommits`). The undo history lives in the
+  server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
-  with notes below 40 % zoom (a note measured while drawn plain once grew on every round). Keep it when changing
-  `ModelCanvas.tsx`; a render loop once cost a collapsed canvas a third of its frames.
+  with notes below 40 % zoom (a note measured while drawn plain once grew on every round), `S3B-15-idle.spec.ts` on a
+  live canvas. Keep it when changing `ModelCanvas.tsx`; a render loop once cost a collapsed canvas a third of its frames.
+  The Overview's miniature counts its commits in `window.__imMiniatureCommits` (slice 3b): `S3B-13.spec.ts` checks that
+  panning and zooming do not redraw it and a note's drag redraws it once, on the drop.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only
@@ -163,7 +173,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   (`src/canvas/text-fit.ts`). The `DIAG` switches (`?diag=nolines`, `blocks`, `noframes`, `nolabels`, `collapsed`,
   `nonotes`, `nolabelmarks`) work only in that measurement build (`isMeasurementBuild()`, `INFOMAPPER_MEASURE=1`); a dev
   or normal production run ignores them. Every element in the viewport costs paint and layerize time on each pan and
-  zoom frame: keep repeated marks to one element (slice 3a's label marks are CSS masks).
+  zoom frame: keep repeated marks to one element (slice 3a's label marks are CSS masks); `S3B-15-elements.spec.ts`
+  counts them against the previous tag. A sitting is balanced (`--rounds 2`, each side first once) and starts with one
+  discarded warm-up run after the builds, before the counted rounds (e.g. `npm run measure:canvas -- --prepare-only`,
+  then one `--quick --rounds 1` sitting that is not counted): the first side measured after the builds ran slow in
+  slice 3b, and the laptop's state drifted within a sitting in slice 3a (`docs/prd/slice-03b-acceptance.md`).
 - e2e servers use their own build folders (`.next-e2e`, `.next-e2e-restart`) via `NEXT_DIST_DIR`, because Next.js
   refuses a second dev server on the same folder. Next.js adds them to `tsconfig.json`'s `include`; keep that.
   They run without Turbopack's dev cache and start empty each run (`scripts/clean-e2e-build.ts`); the global setup
