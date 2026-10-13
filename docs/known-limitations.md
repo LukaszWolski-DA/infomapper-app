@@ -212,18 +212,17 @@ templates are compiled. Its only path is `eslint-plugin-boundaries` 7.2.0 (dev, 
 - **Decision (Łukasz, 13 October, slice 3b):** the plugin still has no fix (7.2.0; `@boundaries/elements` 3.1.1 still
   pins 4.7.9). The override comes as a separate small pull request after slice 3b's merge, from 19 October 2026.
 
-## Right panel (slice 1a)
+### `npm` override: `fast-equals` 5.4.3 under `@tiptap/react` (slice 4a, step 2)
 
-### Panel links only reach rows whose card is on this canvas (step 5a)
+`@tiptap/react` 3.31.3 asks for `fast-equals` `^5.3.3`, which resolved to 5.4.4, published 8 October 2026, younger than
+the 14 days the dependency rule asks for. `package.json` has `"overrides": { "@tiptap/react": { "fast-equals": "5.4.3" } }`
+(20 September 2026), for Tiptap only.
 
-The canvas selection points at a card (a card, a row of a card, or a line), so the right panel can only show an
-attribute or a column whose entity or source table has a card on the open canvas. Links in the panels (the
-attribute list of an entity, the source and target of a mapping, “Comes from”) do nothing for attributes and columns
-whose card is not here. Mappings open from anywhere, because a mapping is selected by itself.
-
-- **Accepted** by Łukasz for slice 1a.
-- **Later:** let the selection name an attribute or a column directly (as the prototype's `attr` and `col`
-  selections do), so the panel can show them without a card.
+- **Risk: none known.** 5.4.3 and 5.4.4 are patch releases of a small comparison library; `npm audit` reports nothing
+  for either.
+- **Review on 22 October 2026** (5.4.4 is then 14 days old), together with the `handlebars` pull request: remove the
+  override, `npm install`, check that `fast-equals` resolves to a release at least 14 days old, then lint, typecheck,
+  unit tests and the editor's end-to-end tests.
 
 ## End-to-end tests (slice 1a, step 6)
 

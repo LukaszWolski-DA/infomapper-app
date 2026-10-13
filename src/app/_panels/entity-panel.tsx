@@ -24,10 +24,12 @@ import { NotesHere } from "./notes-here";
 import { useMoveAttribute } from "./move-attribute";
 import { feedingSources, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
+import { RequirementsSection } from "./requirements-section";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uuid }) {
+/** `cardId` is null when the entity has no card on this canvas (a go-to link's fallback, slice 4a): its panel only. */
+export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uuid | null }) {
   const p = usePanel();
   const move = useMoveAttribute(p.ix, p.workspaceId);
   /** Dragging in the attribute list: which attribute, and where it would go. */
@@ -46,7 +48,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   const relationships = ix.model.relationships.filter((r) => r.from_entity_id === e.id || r.to_entity_id === e.id);
 
   useEffect(() => {
-    if (nameFocus !== cardId) return;
+    if (!cardId || nameFocus !== cardId) return;
     nameRef.current?.focus();
     nameRef.current?.select();
     setNameFocus(null);
@@ -64,7 +66,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   async function addAttribute() {
     const result = await run(() => addAttributeAction(p.workspaceId, { entityId: e.id }));
     if (result.ok) {
-      ui.select({ t: "row", cardId, id: result.value.attributeId });
+      ui.select(cardId ? { t: "row", cardId, id: result.value.attributeId } : { t: "element", kind: "attribute", id: result.value.attributeId });
       setNameFocus(result.value.attributeId);
     }
   }
@@ -116,6 +118,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         key={v}
         label="Definition"
         html={e.definition_html}
+        text={e.definition_text}
         empty="What this entity means for the business. Click to write it."
         editable={p.editable}
         subtitle="Entity definition"
@@ -216,7 +219,9 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
                   onClick={() =>
                     here
                       ? (ui.select({ t: "card", id: here }), ui.centerOn(here))
-                      : ui.placeBeside([{ target: { sourceTableId: table.id }, rows: (ix.columnsOf.get(table.id) ?? []).length }], cardId, "left")
+                      : cardId
+                        ? ui.placeBeside([{ target: { sourceTableId: table.id }, rows: (ix.columnsOf.get(table.id) ?? []).length }], cardId, "left")
+                        : ui.place({ sourceTableId: table.id }, (ix.columnsOf.get(table.id) ?? []).length)
                   }
                   meta={`${ix.systemName.get(table.source_system_id) ?? ""}, ${mappings} mapping${mappings === 1 ? "" : "s"}`}
                 >
@@ -231,7 +236,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         ) : (
           <Hint>No source table maps into this entity yet.</Hint>
         )}
-        {p.editable && missing.length > 0 && (
+        {p.editable && cardId && missing.length > 0 && (
           <div className="mt-2 flex gap-2">
             <button type="button" className={smallButtonClass} onClick={() => ui.placeBeside(missing, cardId, "left")} data-testid="button-feed-all">
               {missing.length === feeds.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}
@@ -254,15 +259,18 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         </Fold>
       )}
 
-      <NotesHere pin={{ cardId }} />
+      <RequirementsSection target={{ kind: "entity", id: e.id }} />
+      {cardId && <NotesHere pin={{ cardId }} />}
       <OnCanvases kind="entity" targetId={e.id} cardId={cardId} />
-      <CardFrame cardId={cardId} kind="ent" />
+      {cardId && <CardFrame cardId={cardId} kind="ent" />}
 
       {p.editable && (
         <Actions>
-          <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
-            {p.live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas"}
-          </button>
+          {cardId && (
+            <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
+              {p.live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas"}
+            </button>
+          )}
           <button type="button" className={dangerClass} onClick={() => setDeleting(true)} data-testid="button-delete-entity">
             Delete from model…
           </button>

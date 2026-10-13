@@ -38,6 +38,7 @@ export function TextField({
   testId,
   inputRef,
   mono,
+  placeholder,
 }: {
   id?: string;
   value: string;
@@ -47,6 +48,7 @@ export function TextField({
   testId?: string;
   inputRef?: React.Ref<HTMLInputElement>;
   mono?: boolean;
+  placeholder?: string;
 }) {
   return (
     <input
@@ -54,6 +56,7 @@ export function TextField({
       ref={inputRef}
       defaultValue={value}
       readOnly={readOnly}
+      placeholder={placeholder}
       data-testid={testId}
       autoComplete="off"
       className={`${inputClass} ${mono ? "font-mono text-xs" : ""}`}

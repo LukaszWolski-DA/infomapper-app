@@ -37,6 +37,7 @@ import { ItemLabels } from "./item-labels";
 import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, businessKeyHint, columnLabel, columnOptions, inputColumns, inputsLabel, typeCheckOf } from "./model-index";
 import { usePanels } from "./panels-context";
+import { RequirementsSection } from "./requirements-section";
 
 export const STATUS_LABEL = { draft: "Draft", review: "In review", approved: "Approved" } as const;
 
@@ -210,6 +211,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         key={v}
         label="Definition"
         html={a.definition_html}
+        text={a.definition_text}
         empty="What this attribute means for the business. Click to write it."
         editable={p.editable}
         subtitle="Attribute definition"
@@ -218,6 +220,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         testId="field-attribute-definition"
       />
       <ItemLabels target={{ kind: "attribute", id: a.id }} />
+      <RequirementsSection target={{ kind: "attribute", id: a.id }} />
 
       <Fold title="Comes from" count={mappings.length}>
         {mappings.length ? (

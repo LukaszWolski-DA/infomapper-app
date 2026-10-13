@@ -3,12 +3,15 @@
 // The left panel (prototype #side): Model and Sources tabs, search over names and fields, “Only what this project
 // uses”, “Only on this canvas”, folding groups with sticky headers, collapse all and expand all (D-35). A click on an item places it in a free spot of the view (or shows its card);
 // dragging it onto the canvas places it there. Model tab, for those who may edit: “+” per concept, “New concept”,
-// rename a concept by double-click, and its ⋯ menu (D-46, D-47). Sources tab: “New source table”.
-// The Requirements tab comes with requirements.
+// rename a concept by double-click, and its ⋯ menu (D-46, D-47). Sources tab: “New source table”. Requirements tab
+// (slice 4a): groups by kind with their coverage bars; a click opens the requirement's panel (no lens, no dragging:
+// slice 4b); “New requirement” for those who may edit.
 
 import { newCardHeight } from "@/canvas/geometry";
 import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { createConceptAction, createEntityAction, renameConceptAction } from "@/app/_actions/model";
+import { createRequirementAction } from "@/app/_actions/requirement";
+import { KIND_NAMES } from "@/domain/model/requirements";
 import { useAction } from "@/app/_components/use-action";
 import { DotsIcon, itemClass, menuClass, sectionClass } from "@/app/w/[workspaceId]/p/[projectId]/_components/canvas-menu";
 import { readPreference, writePreference } from "@/canvas/CanvasProvider";
@@ -25,12 +28,16 @@ import { useToast } from "@/ui/components/toast";
 import { DeleteConceptDialog } from "./delete-concept-dialog";
 import { NewSourceTableDialog } from "./new-source-table-dialog";
 import { usePanels } from "./panels-context";
+import { CoverageBar, coverageTitle, KindIcon, ReqDot } from "./requirement-ui";
+import { requirementNameFocus } from "./requirements-section";
 import {
   allGroups,
   conceptGroup,
   filterConcepts,
+  filterRequirements,
   filterSystems,
   isOpen,
+  requirementGroup,
   schemaGroup,
   systemGroup,
   type Presence,
@@ -43,7 +50,8 @@ const SHUT_KEY = "infomapper:tree-shut";
 const CANVAS_ONLY_KEY = "infomapper:tree-canvas-only";
 const PROJECT_ONLY_KEY = "infomapper:tree-project-only";
 
-type Tab = "model" | "sources";
+type Tab = "model" | "sources" | "requirements";
+const TAB_NAMES: Record<Tab, string> = { model: "Model", sources: "Sources", requirements: "Requirements" };
 
 export interface LeftPanelProps {
   workspaceId: string;
@@ -347,12 +355,75 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     }), <div key="new-table">{newTable}</div>];
   };
 
-  const content = tab === "model" ? modelTree() : sourceTree();
+  // ---- the Requirements tab (slice 4a) ----
+  async function newRequirement() {
+    const result = await run(() => createRequirementAction(workspaceId, {}));
+    if (!result.ok) return;
+    setNameFocus(requirementNameFocus(result.value.requirementId));
+    ui.select({ t: "req", id: result.value.requirementId });
+  }
+  const newRequirementButton = editable && !searching && (
+    <div className="mx-2 my-2.5">
+      <button type="button" className={smallButton} data-testid="button-new-requirement" onClick={() => void newRequirement()}>
+        New requirement
+      </button>
+    </div>
+  );
+  const requirementTree = () => {
+    if (canvasOnly) return <p className="p-3 text-im-ink-3" data-testid="text-req-empty">No requirement has a card on this canvas yet.</p>;
+    const groups = filterRequirements(tree.requirements, filter);
+    if (!groups.length) {
+      if (searching || tree.requirements.length) return null;
+      return (
+        <>
+          <p className="p-3 text-im-ink-3" data-testid="text-req-empty">
+            No requirements yet.
+          </p>
+          {newRequirementButton}
+        </>
+      );
+    }
+    return [
+      ...groups.map(({ kind, items }) => {
+        const key = requirementGroup(kind);
+        return (
+          <div key={kind} data-testid="tree-req-group" data-kind={kind}>
+            <GroupHead open={isOpen(shut, key, q)} count={items.length} dot={<ReqDot />} onClick={() => fold(key)} sticky testId="tree-req-head">
+              {KIND_NAMES[kind]}
+            </GroupHead>
+            {isOpen(shut, key, q) &&
+              items.map((r) => (
+                <button
+                  key={r.id}
+                  type="button"
+                  onClick={() => ui.select({ t: "req", id: r.id })}
+                  title="Click for details."
+                  data-testid="tree-req"
+                  data-key={r.key}
+                  className="flex w-full items-center gap-2 rounded-md py-[5px] pl-3.5 pr-2 text-left hover:bg-im-hover"
+                >
+                  <span className="flex flex-none items-center gap-1 text-im-req">
+                    <KindIcon kind={r.kind} />
+                    <span className="font-mono text-[11.5px]">{r.key}</span>
+                  </span>
+                  <span className="min-w-0 flex-1 truncate">{r.name}</span>
+                  <CoverageBar ok={r.covered} total={r.total} testId="bar-req-coverage" />
+                  <span className="sr-only">{coverageTitle(r.covered, r.total)}</span>
+                </button>
+              ))}
+          </div>
+        );
+      }),
+      <div key="new-requirement">{newRequirementButton}</div>,
+    ];
+  };
+
+  const content = tab === "model" ? modelTree() : tab === "sources" ? sourceTree() : requirementTree();
 
   return (
     <>
       <div className="flex gap-0.5 px-2.5 pt-2.5" role="tablist">
-        {(["model", "sources"] as const).map((t) => (
+        {(["model", "sources", "requirements"] as const).map((t) => (
           <button
             key={t}
             type="button"
@@ -362,7 +433,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
             onClick={() => setTab(t)}
             className="h-[30px] flex-1 rounded-t-md border-b-2 border-transparent text-[12.5px] font-medium text-im-ink-3 aria-selected:border-im-ink aria-selected:text-im-ink"
           >
-            {t === "model" ? "Model" : "Sources"}
+            {TAB_NAMES[t]}
           </button>
         ))}
       </div>
@@ -410,9 +481,11 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
           </p>
         )}
       </div>
-      <div className="border-t border-im-line px-3 py-2.5 text-[11.5px] text-im-ink-3">
-        Drag onto the canvas, or click to add. A filled dot means it is on this canvas, a ring means it is on another one.
-      </div>
+      {tab !== "requirements" && (
+        <div className="border-t border-im-line px-3 py-2.5 text-[11.5px] text-im-ink-3">
+          Drag onto the canvas, or click to add. A filled dot means it is on this canvas, a ring means it is on another one.
+        </div>
+      )}
       {addingTable && <NewSourceTableDialog workspaceId={workspaceId} systems={tree.systems.map((s) => s.name)} onClose={() => setAddingTable(false)} />}
       {deleting && (
         <DeleteConceptDialog

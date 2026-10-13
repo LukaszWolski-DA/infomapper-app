@@ -31,6 +31,7 @@
   --im-review: #854f0b;
   --im-review-strong: #ba7517;
   --im-review-soft: #faeeda;
+  --im-req: #534ab7;
   --im-req-soft: #eeedfe;
   --im-req-ink: #3c3489;
   --im-shadow: rgba(22, 32, 48, 0.16);
@@ -57,6 +58,7 @@
     --im-warn-soft: #3e2518;
     --im-review: #fac775;
     --im-review-soft: #412402;
+    --im-req: #afa9ec;
     --im-req-soft: #26215c;
     --im-req-ink: #cecbf6;
     --im-shadow: rgba(0, 0, 0, 0.5);
@@ -144,6 +146,7 @@
   --color-im-review: var(--im-review);
   --color-im-review-strong: var(--im-review-strong);
   --color-im-review-soft: var(--im-review-soft);
+  --color-im-req: var(--im-req);
   --color-im-req-soft: var(--im-req-soft);
   --color-im-req-ink: var(--im-req-ink);
 }

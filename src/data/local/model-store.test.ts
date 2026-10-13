@@ -13,6 +13,7 @@ import { addMappingInput, setMappingStatus } from "@/domain/commands/mapping";
 import { uuidv7 } from "@/domain/ids";
 import { frameOfCard } from "@/domain/model/frames";
 import { noteFrameAt } from "@/domain/model/notes";
+import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import { entityImpact } from "@/domain/model/impact";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 import { checkMappingTypes } from "@/domain/model/type-check";
@@ -125,9 +126,12 @@ describe("demo model (slice 1a PRD, demo data)", () => {
         canvases: await store.canvases.list(RETAIL),
         projects: await store.projects.list(RETAIL),
         projectCanvases: await store.canvases.listLinksOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders),
+        requirements: buildRequirementIndex(await store.requirements.list(RETAIL), await store.requirements.listLinks(RETAIL), m),
       },
     );
     expect(impact).toMatchObject({ attributes: 8, mappings: 8, approvedMappings: 5, relationships: 2 });
+    // slice 4a: the requirements whose scope contains Customer
+    expect(impact.requirements.map((r) => r.key)).toEqual(["REQ-101", "REQ-102", "REQ-103", "REQ-105"]);
     expect(impact.canvases.map((c) => c.name)).toEqual(["Customer & orders"]);
     expect(impact.projects.map((p) => p.name)).toEqual(["Customer 360", "Order management"]);
   });

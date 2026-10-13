@@ -6,13 +6,15 @@
 // server, which sanitized it when it was stored (AD-17). Saving is one undo step and toasts “Saved.”
 
 import { useLayoutEffect, useRef, useState } from "react";
+import { shownHtml } from "@/domain/model/plain-text";
 import { useToast } from "@/ui/components/toast";
 import { RichTextDialog } from "./rich-text-dialog";
 
 export interface RichTextFieldProps {
   label: string;
-  /** The stored HTML, or null. */
+  /** The stored HTML and its plain text (`shownHtml` shows plain text as escaped paragraphs, never as HTML). */
   html: string | null;
+  text?: string | null;
   /** The hint when empty. */
   empty: string;
   editable: boolean;
@@ -24,14 +26,15 @@ export interface RichTextFieldProps {
   testId: string;
 }
 
-export function RichTextField({ label, html, empty, editable, subtitle, title, template = null, onSave, testId }: RichTextFieldProps) {
+export function RichTextField({ label, html: stored, text = null, empty, editable, subtitle, title, template = null, onSave, testId }: RichTextFieldProps) {
   const toast = useToast();
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [more, setMore] = useState(false);
   const [cut, setCut] = useState(false);
   const view = useRef<HTMLDivElement>(null);
-  const has = !!html?.trim();
+  const html = shownHtml(stored, text);
+  const has = !!html;
 
   useLayoutEffect(() => {
     const el = view.current;

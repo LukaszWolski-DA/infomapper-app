@@ -1,13 +1,15 @@
 "use client";
 
 // The right panel (prototype #ins): shows and edits what is selected on the canvas: an entity, attribute, mapping,
-// relationship, source table or column, a frame (slice 2b), a bundle of lines (slice 2c), a working label or a note (slice 3a);
-// with nothing selected, an overview of this canvas.
+// relationship, source table or column, a frame (slice 2b), a bundle of lines (slice 2c), a working label or a note (slice 3a),
+// a requirement, or an element whose card is not on this canvas (slice 4a: the go-to links' fallback); with nothing
+// selected, an overview of this canvas.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
-import type { Label, LabelLink, WorkspaceModel } from "@/domain/types";
+import { buildRequirementIndex, type RequirementIndex } from "@/domain/model/requirement-index";
+import type { Label, LabelLink, Requirement, RequirementLink, WorkspaceModel } from "@/domain/types";
 import { AttributePanel } from "./attribute-panel";
 import { BundlePanel } from "./bundle-panel";
 import { EntityPanel } from "./entity-panel";
@@ -20,6 +22,7 @@ import { MappingPanel } from "./mapping-panel";
 import { indexModel, type ModelIndex } from "./model-index";
 import { OverviewPanel } from "./overview-panel";
 import { RelationshipPanel } from "./relationship-panel";
+import { RequirementPanel } from "./requirement-panel";
 import { SelectionPanel } from "./selection-panel";
 import { SourceColumnPanel, SourceTablePanel } from "./source-panels";
 import type { TreeData } from "./tree-data";
@@ -52,6 +55,9 @@ export interface InspectorProps {
   /** The workspace's working labels and what they mark (slice 3a). */
   labels: Label[];
   labelLinks: LabelLink[];
+  /** The workspace's requirements and their links (slice 4a). */
+  requirements: Requirement[];
+  requirementLinks: RequirementLink[];
   /** The open project (live canvases open in it, slice 3b). */
   projectId: Uuid;
   /** Each label's live canvas, by label id (slice 3b). */
@@ -74,18 +80,24 @@ export interface CanvasPlace {
 
 export interface PanelContext extends Omit<InspectorProps, "model" | "cards" | "tree"> {
   ix: ModelIndex;
+  /** The requirement index (slice 4a), built once per data version. */
+  rx: RequirementIndex;
   /** The card of an entity or source table on this canvas. */
   cardOf: (targetId: Uuid) => Uuid | null;
   /** Elements on another canvas but not here (rings in the left panel). */
   elsewhere: (targetId: Uuid) => boolean;
   tablesHere: ReadonlySet<Uuid>;
+  /**
+   * The go-to links: the element's card (or row) on this canvas, selected and its panel open; without a card here, its
+   * panel only (slice 4a): no pan, no card added, no canvas switch.
+   */
   goEntity: (entityId: Uuid) => void;
   goAttribute: (attributeId: Uuid) => void;
   goMapping: (mappingId: Uuid) => void;
-  /** Selects a column row when its table is on this canvas. */
   goColumn: (columnId: Uuid) => void;
-  /** Selects a source table's card when it is on this canvas. */
   goTable: (tableId: Uuid) => void;
+  /** Opens a requirement's panel (slice 4a). */
+  goRequirement: (requirementId: Uuid) => void;
   /** Opens a working label's panel (slice 3a). */
   goLabel: (labelId: Uuid) => void;
   entitiesHere: ReadonlySet<Uuid>;
@@ -102,6 +114,8 @@ export const usePanel = () => useContext(Ctx)!;
 export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
   const ui = useContext(CanvasUiCtx);
   const ix = useMemo(() => indexModel(model), [model]);
+  const { requirements, requirementLinks } = rest;
+  const rx = useMemo(() => buildRequirementIndex(requirements, requirementLinks, model), [requirements, requirementLinks, model]);
   const cardOf = useMemo(() => {
     const cardByTarget = new Map(cards.map((c) => [c.targetId, c.id]));
     return (id: Uuid) => cardByTarget.get(id) ?? null;
@@ -116,6 +130,7 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     return {
       ...rest,
       ix,
+      rx,
       cardOf,
       elsewhere: (id) => elsewhere.has(id),
       tablesHere: new Set(cards.filter((c) => c.kind === "src").map((c) => c.targetId)),
@@ -125,28 +140,29 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
       clearPendingInput,
       goEntity: (entityId) => {
         const card = cardOf(entityId);
-        if (!card) return;
+        if (!card) return ui.select({ t: "element", kind: "entity", id: entityId });
         ui.select({ t: "card", id: card });
         ui.centerOn(card);
       },
       goAttribute: (attributeId) => {
         const card = cardOf(ix.attribute.get(attributeId)?.entity_id ?? "");
-        if (card) ui.select({ t: "row", cardId: card, id: attributeId });
+        ui.select(card ? { t: "row", cardId: card, id: attributeId } : { t: "element", kind: "attribute", id: attributeId });
       },
       goMapping: (mappingId) => ui.select({ t: "map", id: mappingId }),
       goColumn: (columnId) => {
         const card = cardOf(ix.column.get(columnId)?.source_table_id ?? "");
-        if (card) ui.select({ t: "row", cardId: card, id: columnId });
+        ui.select(card ? { t: "row", cardId: card, id: columnId } : { t: "element", kind: "source_column", id: columnId });
       },
       goTable: (tableId) => {
         const card = cardOf(tableId);
-        if (!card) return;
+        if (!card) return ui.select({ t: "element", kind: "source_table", id: tableId });
         ui.select({ t: "card", id: card });
         ui.centerOn(card);
       },
       goLabel: (labelId) => ui.select({ t: "label", id: labelId }),
+      goRequirement: (requirementId) => ui.select({ t: "req", id: requirementId }),
     };
-  }, [cards, tree, rest, ix, ui, cardOf, mapColumn, pendingInput, clearPendingInput]);
+  }, [cards, tree, rest, ix, rx, ui, cardOf, mapColumn, pendingInput, clearPendingInput]);
 
   const sel = ui.selection;
   let body: ReactNode = (
@@ -165,7 +181,7 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
   } else if (sel?.t === "row" && card?.kind === "ent" && ix.attribute.has(sel.id)) {
     body = <AttributePanel key={sel.id} attribute={ix.attribute.get(sel.id)!} />;
   } else if (sel?.t === "row" && card?.kind === "src" && ix.column.has(sel.id)) {
-    body = <SourceColumnPanel key={sel.id} column={ix.column.get(sel.id)!} cardId={card.id} />;
+    body = <SourceColumnPanel key={sel.id} column={ix.column.get(sel.id)!} />;
   } else if (sel?.t === "map" && ix.mapping.has(sel.id)) {
     body = <MappingPanel key={sel.id} mapping={ix.mapping.get(sel.id)!} />;
   } else if (sel?.t === "frame" && ui.frameView(sel.id)) {
@@ -180,6 +196,16 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     body = <NotePanel key={sel.id} noteId={sel.id} />;
   } else if (sel?.t === "label" && rest.labels.some((l) => l.id === sel.id)) {
     body = <LabelPanel key={sel.id} label={rest.labels.find((l) => l.id === sel.id)!} />;
+  } else if (sel?.t === "req" && rx.byId.has(sel.id)) {
+    body = <RequirementPanel key={sel.id} requirement={rx.byId.get(sel.id)!} />;
+  } else if (sel?.t === "element" && sel.kind === "entity" && ix.entity.has(sel.id)) {
+    body = <EntityPanel key={sel.id} entity={ix.entity.get(sel.id)!} cardId={cardOf(sel.id)} />;
+  } else if (sel?.t === "element" && sel.kind === "attribute" && ix.attribute.has(sel.id)) {
+    body = <AttributePanel key={sel.id} attribute={ix.attribute.get(sel.id)!} />;
+  } else if (sel?.t === "element" && sel.kind === "source_table" && ix.table.has(sel.id)) {
+    body = <SourceTablePanel key={sel.id} table={ix.table.get(sel.id)!} cardId={cardOf(sel.id)} />;
+  } else if (sel?.t === "element" && sel.kind === "source_column" && ix.column.has(sel.id)) {
+    body = <SourceColumnPanel key={sel.id} column={ix.column.get(sel.id)!} />;
   } else if (sel?.t === "rel" && ix.model.relationships.some((r) => r.id === sel.id)) {
     body = <RelationshipPanel key={sel.id} relationship={ix.model.relationships.find((r) => r.id === sel.id)!} />;
   }

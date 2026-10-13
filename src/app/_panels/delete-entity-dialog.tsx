@@ -1,7 +1,8 @@
 "use client";
 
-// “Delete from model…” (D-47, prototype askDeleteEntity): the impact first, then the entity goes with its attributes,
-// mappings, relationships and cards, in one change group.
+// “Delete from model…” (D-47, prototype askDeleteEntity): the impact first (with the requirements that lose it from their
+// scope, slice 4a), then the entity goes with its attributes, mappings, relationships, cards and requirement links, in
+// one change group.
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { deleteEntityAction, entityImpactAction } from "@/app/_actions/model";
@@ -57,6 +58,8 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
         [count(impact.mappings, "mapping"), impact.approvedMappings ? `deleted, ${impact.approvedMappings} of them approved` : "deleted"],
         [count(impact.relationships, "relationship"), "deleted"],
         [count(impact.canvases.length, "canvas", "canvases"), impact.canvases.length ? `removed from ${impact.canvases.map((c) => c.name).join(", ")}` : "–"],
+        // slice 4a (prototype entityImpact): requirements whose scope contains the entity
+        [count(impact.requirements.length, "requirement"), impact.requirements.length ? `lose this from their scope: ${impact.requirements.map((r) => r.key).join(", ")}` : "–"],
         [count(impact.projects.length, "project"), impact.projects.length ? impact.projects.map((x) => x.name).join(", ") : "–"],
       ]
     : [];

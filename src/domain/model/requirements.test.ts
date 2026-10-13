@@ -19,10 +19,10 @@ import {
   nextRequirementKey,
   requirementCoverage,
   requirementScope,
-  requirementsOf,
   requirementWithKey,
   withDescendants,
 } from "./requirements";
+import { requirementsOf } from "./requirement-index";
 
 const MAP_ID = "01900000-0000-7000-8000-00000000a011";
 const MAP_ORDER = "01900000-0000-7000-8000-00000000a012";

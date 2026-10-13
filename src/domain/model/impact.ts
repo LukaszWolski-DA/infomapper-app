@@ -2,6 +2,7 @@
 
 import type { Uuid } from "../ids";
 import type { Attribute, Canvas, CanvasItem, Entity, Mapping, MappingInput, Project, ProjectCanvas, Relationship } from "../types";
+import type { RequirementIndex } from "./requirement-index";
 
 /** The live rows around one entity, as loaded by the caller. Rows that do not belong to the entity are ignored. */
 export interface EntityRows {
@@ -48,12 +49,17 @@ export interface EntityImpact {
   canvases: { id: Uuid; name: string }[];
   /** Projects holding one of those canvases, by name. */
   projects: { id: Uuid; name: string }[];
+  /** Requirements whose scope contains the entity, by key (slice 4a: they lose it from their scope). */
+  requirements: { id: Uuid; key: string }[];
 }
 
-/** The impact dialog's numbers: attributes, mappings (approved among them), relationships, canvases and projects. */
+/**
+ * The impact dialog's numbers: attributes, mappings (approved among them), relationships, canvases, projects and the
+ * requirements whose scope contains the entity (prototype `entityImpact`, slice 4a).
+ */
 export function entityImpact(
   rows: EntityRows,
-  context: { canvases: readonly Canvas[]; projects: readonly Project[]; projectCanvases: readonly ProjectCanvas[] },
+  context: { canvases: readonly Canvas[]; projects: readonly Project[]; projectCanvases: readonly ProjectCanvas[]; requirements?: RequirementIndex },
 ): EntityImpact {
   const cascade = entityCascade(rows);
   const canvasIds = new Set(cascade.canvasItems.map((c) => c.canvas_id));
@@ -68,5 +74,9 @@ export function entityImpact(
     relationships: cascade.relationships.length,
     canvases: canvases.map(({ id, name }) => ({ id, name })).sort(byName),
     projects: projects.map(({ id, name }) => ({ id, name })).sort(byName),
+    requirements: (context.requirements?.requirements ?? [])
+      .filter((r) => context.requirements!.scope(r.id).entities.has(rows.entity.id))
+      .map(({ id, key }) => ({ id, key }))
+      .sort((a, b) => a.key.localeCompare(b.key, "en", { numeric: true })),
   };
 }

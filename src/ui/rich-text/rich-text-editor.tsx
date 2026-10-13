@@ -14,6 +14,10 @@ export const UNSAVED_WARNING = "Unsaved changes. Press Esc or Cancel again to di
 /** What the dialog shell asks of the editor: Esc goes through it, so it can close the link field or warn first. */
 export interface RichTextEditorHandle {
   escape: () => void;
+  /** Ctrl + Enter with the focus elsewhere in the dialog (on a toolbar button). */
+  save: () => void;
+  /** Puts the focus back into the text (after a click outside the dialog moved it away). */
+  focus: () => void;
 }
 
 export interface RichTextEditorProps {
@@ -106,7 +110,7 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
     editor?.commands.focus();
   };
 
-  useImperativeHandle(handle, () => ({ escape: () => (linking ? closeLink() : tryCancel()) }));
+  useImperativeHandle(handle, () => ({ escape: () => (linking ? closeLink() : tryCancel()), save, focus: () => editor?.commands.focus() }));
   useEffect(() => {
     if (linking) urlInput.current?.focus();
   }, [linking]);
@@ -151,10 +155,7 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
     <div
       className="flex min-h-0 flex-1 flex-col"
       onKeyDown={(e) => {
-        if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
-          e.preventDefault();
-          save();
-        } else if (e.key === "Enter" && e.target === urlInput.current) {
+        if (e.key === "Enter" && !(e.ctrlKey || e.metaKey) && e.target === urlInput.current) {
           e.preventDefault();
           addLink();
         }
@@ -167,7 +168,7 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
         {TEXT_COLORS.map((c) => (
           <span key={c}>{tool("A", COLOR_TITLES[c], () => chain().setMark("textColor", { color: c }).run(), false, `button-rte-color-${c}`, `font-bold tc-${c}`)}</span>
         ))}
-        {tool("⌫", "Clear formatting", () => chain().unsetAllMarks().run(), false, "button-rte-clear")}
+        {tool("⌫", "Clear formatting", () => chain().unsetMark("bold").unsetMark("italic").unsetMark("textColor").unsetMark("superscript").unsetMark("subscript").run(), false, "button-rte-clear")}
         {sep}
         {tool(
           <svg viewBox="0 0 16 16" className="inline size-3.5 fill-none stroke-current stroke-[1.6] [stroke-linecap:round]" aria-hidden>

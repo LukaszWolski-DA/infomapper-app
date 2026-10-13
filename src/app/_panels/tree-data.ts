@@ -2,7 +2,8 @@
 // and the cards of every canvas, filtered in the browser by the search and “Only on this canvas”.
 
 import type { Uuid } from "@/domain/ids";
-import type { CanvasItem, WorkspaceModel } from "@/domain/types";
+import type { RequirementIndex } from "@/domain/model/requirement-index";
+import { REQUIREMENT_KINDS, type CanvasItem, type RequirementKind, type WorkspaceModel } from "@/domain/types";
 
 /** Where an element has cards: on this canvas (filled dot), only on other canvases (ring), or nowhere. */
 export type Presence = "here" | "elsewhere" | "none";
@@ -52,9 +53,24 @@ export interface TreeSystem {
   schemas: TreeSchema[];
 }
 
+/** A requirement in the Requirements tab (slice 4a): no card on any canvas until slice 4b. */
+export interface TreeRequirement {
+  id: Uuid;
+  key: string;
+  name: string;
+  kind: RequirementKind;
+  /** Attributes in scope covered, and in scope (the coverage bar). */
+  covered: number;
+  total: number;
+  /** Its scope has an entity or table on one of this project's canvases (PRD item 30's rule). */
+  inProject: boolean;
+}
+
 export interface TreeData {
   concepts: TreeConcept[];
   systems: TreeSystem[];
+  /** In the index's order: by kind, then by key. */
+  requirements: TreeRequirement[];
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -69,6 +85,7 @@ export function buildTree(
   items: readonly CanvasItem[],
   canvasId: Uuid,
   projectCanvasIds: readonly Uuid[],
+  requirements?: RequirementIndex,
 ): TreeData {
   const here = new Map<Uuid, Uuid>(), elsewhere = new Set<Uuid>(), inProject = new Set<Uuid>();
   const projectCanvases = new Set(projectCanvasIds);
@@ -117,7 +134,21 @@ export function buildTree(
     return { id: s.id, name: s.name, schemas: [...schemas].map(([name, tables]) => ({ name, tables })) };
   });
 
-  return { concepts, systems };
+  const reqs = (requirements?.requirements ?? []).map<TreeRequirement>((r) => {
+    const scope = requirements!.scope(r.id);
+    const coverage = requirements!.coverage(r.id);
+    return {
+      id: r.id,
+      key: r.key,
+      name: r.name,
+      kind: r.kind,
+      covered: coverage.covered.length,
+      total: coverage.total,
+      inProject: [...scope.entities, ...scope.tables].some((id) => inProject.has(id)),
+    };
+  });
+
+  return { concepts, systems, requirements: reqs };
 }
 
 // ---- filtering (search, “Only on this canvas”) ----
@@ -183,15 +214,29 @@ export function filterSystems(systems: readonly TreeSystem[], f: TreeFilter): Sh
     .filter((s) => s.total > 0);
 }
 
+/**
+ * The Requirements tab's groups, by kind in REQUIREMENT_KINDS order; a group with nothing to show is left out. No
+ * requirement has a card on a canvas until slice 4b, so “Only on this canvas” shows none; “Only what this project uses”
+ * keeps those whose scope has an entity or table on the project's canvases. The search matches key and name.
+ */
+export function filterRequirements(requirements: readonly TreeRequirement[], f: TreeFilter): { kind: RequirementKind; items: TreeRequirement[] }[] {
+  if (f.canvasOnly) return [];
+  const q = f.q.trim().toLowerCase();
+  const shown = requirements.filter((r) => (!f.projectOnly || r.inProject) && (!q || `${r.key} ${r.name}`.toLowerCase().includes(q)));
+  return REQUIREMENT_KINDS.map((kind) => ({ kind, items: shown.filter((r) => r.kind === kind) })).filter((g) => g.items.length > 0);
+}
+
 // ---- folding groups ----
 
 export const conceptGroup = (conceptId: Uuid) => `model:${conceptId}`;
 export const systemGroup = (systemId: Uuid) => `src:${systemId}`;
 export const schemaGroup = (systemId: Uuid, schema: string) => `src:${systemId}/${schema}`;
+export const requirementGroup = (kind: RequirementKind) => `req:${kind}`;
 
 /** Every group key of a tab, for collapse all and expand all. */
-export function allGroups(tree: TreeData, tab: "model" | "sources"): string[] {
+export function allGroups(tree: TreeData, tab: "model" | "sources" | "requirements"): string[] {
   if (tab === "model") return tree.concepts.map((c) => conceptGroup(c.id));
+  if (tab === "requirements") return REQUIREMENT_KINDS.map(requirementGroup);
   return tree.systems.flatMap((s) => [systemGroup(s.id), ...s.schemas.map((sc) => schemaGroup(s.id, sc.name))]);
 }
 

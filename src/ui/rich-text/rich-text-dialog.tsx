@@ -43,8 +43,17 @@ export function RichTextDialog({ open, subtitle, title, html, template = null, s
           onPointerDownOutside={(e) => {
             e.preventDefault();
             editor.current?.escape();
+            // the click takes the focus away from the dialog; keys must keep going to the text, never to the canvas
+            setTimeout(() => editor.current?.focus(), 0);
           }}
-          onKeyDown={(e) => e.stopPropagation()}
+          onKeyDown={(e) => {
+            e.stopPropagation();
+            // Ctrl + Enter saves from anywhere in the dialog; inside the text the editor has handled it already
+            if (e.key === "Enter" && (e.ctrlKey || e.metaKey) && !e.defaultPrevented) {
+              e.preventDefault();
+              editor.current?.save();
+            }
+          }}
           onKeyUp={(e) => e.stopPropagation()}
         >
           <div className="flex items-start gap-2.5 border-b border-im-line px-4 pb-2.5 pt-3.5">

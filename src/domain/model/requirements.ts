@@ -4,6 +4,7 @@
 
 import type { Uuid } from "../ids";
 import type {
+  Attribute,
   ChangeEvent,
   Mapping,
   Requirement,
@@ -11,6 +12,7 @@ import type {
   RequirementLink,
   RequirementPriority,
   RequirementStatus,
+  SourceColumn,
   WorkspaceModel,
 } from "../types";
 import { targetOf, type LabelTarget, type LabelTargetKind } from "./labels";
@@ -92,8 +94,7 @@ export const canBeParent = (requirements: readonly Requirement[], id: Uuid, pare
 
 // ---- scope and coverage (D-31) ----
 
-type ScopeModel = Pick<WorkspaceModel, "entities" | "attributes" | "mappings" | "mappingInputs" | "sourceTables" | "sourceColumns">;
-type CoverageModel = ScopeModel;
+export type ScopeModel = Pick<WorkspaceModel, "entities" | "attributes" | "mappings" | "mappingInputs" | "sourceTables" | "sourceColumns">;
 
 export interface RequirementScope {
   entities: Set<Uuid>;
@@ -103,44 +104,112 @@ export interface RequirementScope {
   columns: Set<Uuid>;
 }
 
+/** An attribute's state for coverage (D-31). */
+export type AttributeCoverage = "covered" | "not_approved" | "not_mapped";
+
 /**
- * What a requirement covers (prototype `reqScope`): linked entities with all their attributes; linked attributes with
- * their entity; linked mappings with their attribute, its entity, every input column and its table; linked tables;
- * linked columns with their table. Deleted links and elements are left out.
+ * The live model looked up once (slice 4a, step 3): what scopes and coverage need, so a whole index is built in one
+ * pass instead of searching the model per requirement. Each attribute's coverage state is worked out once.
  */
-export function requirementScope(requirementId: Uuid, links: readonly RequirementLink[], model: ScopeModel): RequirementScope {
-  const scope: RequirementScope = { entities: new Set(), attributes: new Set(), mappings: new Set(), tables: new Set(), columns: new Set() };
-  const attribute = new Map(live(model.attributes).map((a) => [a.id, a]));
+export interface ModelLookup {
+  attribute: Map<Uuid, Attribute>;
+  /** Live attributes per entity, in model order. */
+  attributesOf: Map<Uuid, Attribute[]>;
+  /** Live attributes in model order (coverage lists follow it). */
+  attributeOrder: Map<Uuid, number>;
+  column: Map<Uuid, SourceColumn>;
+  mapping: Map<Uuid, Mapping>;
+  /** Input columns per mapping (live inputs of live columns). */
+  inputsOf: Map<Uuid, SourceColumn[]>;
+  entities: Set<Uuid>;
+  tables: Set<Uuid>;
+  coverageOf: (attributeId: Uuid) => AttributeCoverage;
+}
+
+export function lookupModel(model: ScopeModel): ModelLookup {
+  const attribute = new Map<Uuid, Attribute>();
+  const attributesOf = new Map<Uuid, Attribute[]>();
+  const attributeOrder = new Map<Uuid, number>();
+  for (const a of live(model.attributes)) {
+    attribute.set(a.id, a);
+    attributeOrder.set(a.id, attributeOrder.size);
+    const list = attributesOf.get(a.entity_id);
+    if (list) list.push(a);
+    else attributesOf.set(a.entity_id, [a]);
+  }
   const column = new Map(live(model.sourceColumns).map((c) => [c.id, c]));
   const mapping = new Map(live(model.mappings).map((m) => [m.id, m]));
-  const entities = new Set(live(model.entities).map((e) => e.id));
-  const tables = new Set(live(model.sourceTables).map((t) => t.id));
+  const inputsOf = new Map<Uuid, SourceColumn[]>();
+  for (const i of live(model.mappingInputs)) {
+    const c = column.get(i.source_column_id);
+    if (!c || !mapping.has(i.mapping_id)) continue;
+    const list = inputsOf.get(i.mapping_id);
+    if (list) list.push(c);
+    else inputsOf.set(i.mapping_id, [c]);
+  }
+  const mappingsOf = new Map<Uuid, Mapping[]>();
+  for (const m of mapping.values()) {
+    const list = mappingsOf.get(m.attribute_id);
+    if (list) list.push(m);
+    else mappingsOf.set(m.attribute_id, [m]);
+  }
+  const counts = (m: Mapping): boolean => {
+    if (m.status !== "approved") return false;
+    const a = attribute.get(m.attribute_id);
+    return !!a && checkMappingTypes(m, a, inputsOf.get(m.id) ?? []).ok;
+  };
+  const states = new Map<Uuid, AttributeCoverage>();
+  const coverageOf = (attributeId: Uuid): AttributeCoverage => {
+    let state = states.get(attributeId);
+    if (!state) {
+      const ms = mappingsOf.get(attributeId) ?? [];
+      state = !ms.length ? "not_mapped" : ms.some(counts) ? "covered" : "not_approved";
+      states.set(attributeId, state);
+    }
+    return state;
+  };
+  return {
+    attribute,
+    attributesOf,
+    attributeOrder,
+    column,
+    mapping,
+    inputsOf,
+    entities: new Set(live(model.entities).map((e) => e.id)),
+    tables: new Set(live(model.sourceTables).map((t) => t.id)),
+    coverageOf,
+  };
+}
+
+/** The scope of the given links (one requirement's live links). */
+export function scopeOfLinks(lookup: ModelLookup, links: readonly RequirementLink[]): RequirementScope {
+  const scope: RequirementScope = { entities: new Set(), attributes: new Set(), mappings: new Set(), tables: new Set(), columns: new Set() };
   const addColumn = (id: Uuid) => {
-    const c = column.get(id);
+    const c = lookup.column.get(id);
     if (!c) return;
     scope.columns.add(c.id);
     scope.tables.add(c.source_table_id);
   };
-  for (const link of live(links)) {
-    if (link.requirement_id !== requirementId) continue;
+  for (const link of links) {
+    if (link.deleted_at !== null) continue;
     const t = targetOf(link);
     if (!t) continue;
-    if (t.kind === "entity" && entities.has(t.id)) {
+    if (t.kind === "entity" && lookup.entities.has(t.id)) {
       scope.entities.add(t.id);
-      for (const a of attribute.values()) if (a.entity_id === t.id) scope.attributes.add(a.id);
-    } else if (t.kind === "attribute" && attribute.has(t.id)) {
+      for (const a of lookup.attributesOf.get(t.id) ?? []) scope.attributes.add(a.id);
+    } else if (t.kind === "attribute" && lookup.attribute.has(t.id)) {
       scope.attributes.add(t.id);
-      scope.entities.add(attribute.get(t.id)!.entity_id);
-    } else if (t.kind === "mapping" && mapping.has(t.id)) {
-      const m = mapping.get(t.id)!;
+      scope.entities.add(lookup.attribute.get(t.id)!.entity_id);
+    } else if (t.kind === "mapping" && lookup.mapping.has(t.id)) {
+      const m = lookup.mapping.get(t.id)!;
       scope.mappings.add(m.id);
-      const a = attribute.get(m.attribute_id);
+      const a = lookup.attribute.get(m.attribute_id);
       if (a) {
         scope.attributes.add(a.id);
         scope.entities.add(a.entity_id);
       }
-      for (const i of live(model.mappingInputs)) if (i.mapping_id === m.id) addColumn(i.source_column_id);
-    } else if (t.kind === "source_table" && tables.has(t.id)) {
+      for (const c of lookup.inputsOf.get(m.id) ?? []) addColumn(c.id);
+    } else if (t.kind === "source_table" && lookup.tables.has(t.id)) {
       scope.tables.add(t.id);
     } else if (t.kind === "source_column") addColumn(t.id);
   }
@@ -160,36 +229,40 @@ export interface RequirementCoverage {
   done: boolean;
 }
 
-/**
- * Whether a mapping counts for coverage: approved, and no type conflict on any of its inputs (AD-26). The type check is
- * the mapping panel's (`checkMappingTypes`): a transformation with a rule handles the conversion.
- */
-export function countsForCoverage(mapping: Mapping, model: CoverageModel): boolean {
-  if (mapping.status !== "approved") return false;
-  const attribute = model.attributes.find((a) => a.id === mapping.attribute_id && a.deleted_at === null);
-  if (!attribute) return false;
-  const columns = new Map(live(model.sourceColumns).map((c) => [c.id, c]));
-  const inputs = live(model.mappingInputs)
-    .filter((i) => i.mapping_id === mapping.id)
-    .map((i) => columns.get(i.source_column_id))
-    .filter((c) => !!c);
-  return checkMappingTypes(mapping, attribute, inputs).ok;
-}
-
-/** Coverage of a requirement (prototype `reqCoverage`, D-31), computed from the mappings on every read. */
-export function requirementCoverage(requirementId: Uuid, links: readonly RequirementLink[], model: CoverageModel): RequirementCoverage {
-  const scope = requirementScope(requirementId, links, model);
-  const mappingsOf = new Map<Uuid, Mapping[]>();
-  for (const m of live(model.mappings)) mappingsOf.set(m.attribute_id, [...(mappingsOf.get(m.attribute_id) ?? []), m]);
-  const order = live(model.attributes).filter((a) => scope.attributes.has(a.id));
+/** Coverage of a scope, attributes in model order. */
+export function coverageOfScope(lookup: ModelLookup, scope: RequirementScope): RequirementCoverage {
+  const order = [...scope.attributes].filter((id) => lookup.attribute.has(id)).sort((a, b) => lookup.attributeOrder.get(a)! - lookup.attributeOrder.get(b)!);
   const covered: Uuid[] = [], notApproved: Uuid[] = [], notMapped: Uuid[] = [];
-  for (const a of order) {
-    const ms = mappingsOf.get(a.id) ?? [];
-    if (!ms.length) notMapped.push(a.id);
-    else if (ms.some((m) => countsForCoverage(m, model))) covered.push(a.id);
-    else notApproved.push(a.id);
+  for (const id of order) {
+    const state = lookup.coverageOf(id);
+    (state === "covered" ? covered : state === "not_approved" ? notApproved : notMapped).push(id);
   }
   return { total: order.length, covered, notApproved, notMapped, done: order.length > 0 && covered.length === order.length };
+}
+
+/**
+ * What a requirement covers (prototype `reqScope`): linked entities with all their attributes; linked attributes with
+ * their entity; linked mappings with their attribute, its entity, every input column and its table; linked tables;
+ * linked columns with their table. Deleted links and elements are left out.
+ */
+export const requirementScope = (requirementId: Uuid, links: readonly RequirementLink[], model: ScopeModel): RequirementScope =>
+  scopeOfLinks(lookupModel(model), links.filter((k) => k.requirement_id === requirementId));
+
+/**
+ * Whether a mapping counts for coverage: approved, and the mapping panel's type check (`checkMappingTypes`) passes on
+ * every input; a transformation with a rule handles the conversion (Łukasz, step 1).
+ */
+export function countsForCoverage(mapping: Mapping, model: ScopeModel): boolean {
+  if (mapping.status !== "approved") return false;
+  const lookup = lookupModel(model);
+  const attribute = lookup.attribute.get(mapping.attribute_id);
+  return !!attribute && checkMappingTypes(mapping, attribute, lookup.inputsOf.get(mapping.id) ?? []).ok;
+}
+
+/** Coverage of one requirement (prototype `reqCoverage`, D-31), computed from the mappings on read. */
+export function requirementCoverage(requirementId: Uuid, links: readonly RequirementLink[], model: ScopeModel): RequirementCoverage {
+  const lookup = lookupModel(model);
+  return coverageOfScope(lookup, scopeOfLinks(lookup, links.filter((k) => k.requirement_id === requirementId)));
 }
 
 // ---- requirements of an element (prototype reqsFor, PRD item 8) ----
@@ -199,41 +272,6 @@ export interface ElementRequirements {
   indirect: Requirement[];
   /** “via entity”, “via attribute” or “via column”; null when the element has no indirect requirements by kind. */
   via: "via entity" | "via attribute" | "via column" | null;
-}
-
-/**
- * An attribute's own requirements plus its entity's (“via entity”); an entity's own plus every requirement whose scope
- * contains it (“via attribute”); a table's own plus every requirement whose scope contains it (“via column”); a
- * column's and a mapping's own only. A requirement is listed once, as direct when it is both.
- */
-export function requirementsOf(
-  target: TraceTarget,
-  requirements: readonly Requirement[],
-  links: readonly RequirementLink[],
-  model: ScopeModel,
-): ElementRequirements {
-  const reqs = live(requirements);
-  const liveLinks = live(links);
-  const linkedTo = (t: TraceTarget) => {
-    const ids = new Set(liveLinks.filter((k) => { const o = targetOf(k); return o?.kind === t.kind && o.id === t.id; }).map((k) => k.requirement_id));
-    return reqs.filter((r) => ids.has(r.id));
-  };
-  const direct = linkedTo(target);
-  let indirect: Requirement[] = [];
-  let via: ElementRequirements["via"] = null;
-  if (target.kind === "attribute") {
-    const entityId = model.attributes.find((a) => a.id === target.id)?.entity_id;
-    indirect = entityId ? linkedTo({ kind: "entity", id: entityId }) : [];
-    via = "via entity";
-  } else if (target.kind === "entity" || target.kind === "source_table") {
-    indirect = reqs.filter((r) => {
-      const s = requirementScope(r.id, liveLinks, model);
-      return target.kind === "entity" ? s.entities.has(target.id) : s.tables.has(target.id);
-    });
-    via = target.kind === "entity" ? "via attribute" : "via column";
-  }
-  const directIds = new Set(direct.map((r) => r.id));
-  return { direct, indirect: indirect.filter((r) => !directIds.has(r.id)), via };
 }
 
 // ---- four-eyes author (AD-06, PRD item 13) ----

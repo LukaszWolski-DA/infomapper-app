@@ -129,6 +129,13 @@ export type Selection =
   | { t: "label"; id: Uuid }
   /** A note on the canvas (slice 3a). */
   | { t: "note"; id: Uuid }
+  /** A requirement (slice 4a): its panel. Nothing on the canvas is selected or emphasised. */
+  | { t: "req"; id: Uuid }
+  /**
+   * An element whose card is not on this canvas (slice 4a, the go-to links' fallback): its panel only; nothing on the
+   * canvas is selected or emphasised, the view does not move.
+   */
+  | { t: "element"; kind: "entity" | "attribute" | "source_table" | "source_column"; id: Uuid }
   | null;
 
 export interface Related {
@@ -142,7 +149,7 @@ export interface Related {
  */
 export function relatedLines(sel: Selection, lines: CanvasLines): Related | null {
   // a bundle's lines are known to the canvas, which emphasises them itself (slice 2c)
-  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame" || sel.t === "bundle" || sel.t === "label" || sel.t === "note") return null;
+  if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame" || sel.t === "bundle" || sel.t === "label" || sel.t === "note" || sel.t === "req" || sel.t === "element") return null;
   const maps = new Set<Uuid>(), rels = new Set<Uuid>();
   switch (sel.t) {
     case "map":
