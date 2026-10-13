@@ -1,7 +1,7 @@
 # Slice 4a – Acceptance
 
-Status: **step 0 answered; waiting for Łukasz's OK for step 1**. Branch `slice/04a-requirements`, from `main` at the
-tag `slice-03b` (`a10899c`).
+Status: **step 1 done; waiting for Łukasz** (one question below). Branch `slice/04a-requirements`, from `main` at the
+tag `slice-03b` (`a10899c`), pull request #11 (draft).
 
 ## Łukasz's answers to step 0 (13 October)
 
@@ -162,3 +162,99 @@ e2e/slice-03b/S3B-15-elements.spec.ts`), no other server running. Counts in
 The viewport counts equal slice 3a's and slice 3b's step 3. The whole page has 24 / 10 more elements than at 3b's step 3:
 step 4's notes in the Overview's miniature, outside the viewport. At step 5 the same spec runs on this branch with
 `ELEMENTS_BASELINE=.data/measure/s4a14-baseline/slice-03b.json`; every viewport count must be identical.
+
+## Step 1 (domain and data, 13 October)
+
+PRD items 1–15, no screens. Commits `b97d022` (dependency), `46cde25` (domain), `5a42186` (adapter, migration, seed,
+delete actions), `c06e65f` (data model).
+
+- **Domain.** `src/domain/types.ts` (`Requirement`, `RequirementLink`, the closed lists);
+  `src/domain/model/requirements.ts` (names of kinds, statuses and priorities; key counter `nextRequirementKey`,
+  `requirementWithKey`; `withDescendants`, `canBeParent`; `requirementScope`, `requirementCoverage`,
+  `countsForCoverage`; `requirementsOf` with “via entity / attribute / column”; `lastRequirementEditor`; the
+  messages); `src/domain/model/rich-text.ts` (`sanitizeRich`, on `htmlparser2` 12.0.0, pinned);
+  `src/domain/commands/requirement.ts` (`createRequirement` with an optional link, `updateRequirement` one field,
+  `setRequirementStatus` with four-eyes, `deleteRequirement`, `linkRequirement`, `unlinkRequirement`,
+  `softDeleteRequirementLinks`); permissions `requirement.edit` (owner, admin, modeler) and `requirement.set_status`
+  (and reviewer) with the PRD's two refusals; undo (`commands/undo.ts`) and the undo history's wording
+  (`model/change-label.ts`: Create, Rename, Delete requirement, Link and Unlink requirement, Set requirement status).
+- **Cascade (item 10).** Deleting an entity, an attribute, a mapping or a source table (with its columns) soft-deletes
+  the requirement links on them in the same change group; merging mappings moves the links of the mappings that go to
+  the one that stays, as labels do (D-24). The server actions for these deletes pass the links (`src/app/_actions/model.ts`,
+  `mapping.ts`); no screen changed.
+- **Data.** `src/data/ports.ts` (`RequirementRepository`, `changeEvents.listForRequirement`);
+  `src/data/local/schema.ts` (both tables with the schema's rules: key unique by `lower(key)` among live rows, kind,
+  status, priority, severity for any kind, not its own parent, exactly one link target, the foreign keys;
+  `canvas_item.requirement_id` now a foreign key, requirement cards still refused until 4b); data file **format 5**
+  (a format-2 to 4 file is read with the missing tables empty); `src/data/local/store.ts`; `tests/schema` lists both
+  tables as built.
+- **Migration** `supabase/migrations/20261013200000_requirement_key_and_severity.sql`: `requirement_key_uq` on
+  `(workspace_id, lower(key)) where deleted_at is null`; `requirement_severity_ck` for any kind. `docs/data-model-v2.md`
+  updated (key, severity, the counter, the domain rules).
+- **Seed** `src/data/local/seed-requirements.ts`: REQ-101 to REQ-105 in “Retail Co – DWH” as item 15, 13 links,
+  `requirement_key_next` 106, no requirement card; “Performance test” unchanged.
+- **Tests.** `npm test`: 899 tests in 60 files (820 before): `model/requirements.test.ts` (19), `model/rich-text.test.ts`
+  (11), `commands/requirement.test.ts` (26), `data/local/requirement-store.test.ts` (11), and additions to
+  `permissions.test.ts`, `change-label.test.ts`, the schema test. `npm run lint` and `npm run typecheck` pass.
+
+### The seed's coverage (the end-to-end tests use these figures)
+
+`requirement-store.test.ts` checks them on the demo data.
+
+| Requirement | Covered / in scope | Mapped, not approved | Not mapped | Covered |
+| --- | --- | --- | --- | --- |
+| REQ-101 Single view of the customer (Customer) | 5 / 8 | birth_date, created_at | segment_code | no |
+| REQ-102 Contact data for every active customer | 3 / 3 | – | – | yes |
+| REQ-103 E-mail is unique per customer | 1 / 1 | – | – | yes |
+| REQ-104 Order total equals the sum of its lines | 1 / 4 | – | quantity, unit_price, discount_pct | no |
+| REQ-105 Personal data is encrypted at rest | 3 / 4 | birth_date | – | no |
+
+Status bar: **“Requirements 5, covered 2”.** As expected from the prototype, REQ-104 and REQ-105 are not covered. Where
+the app's seed differs from the prototype's: Customer has eight attributes here (`customer_number` and `created_at`
+too), so REQ-101's scope is 8; `birth_date` (from `dob`) and `created_at` (a transformation) are in review, not approved;
+Order Line's `quantity`, `unit_price` and `discount_pct` have no mapping in the seed (only `product_id` does), so REQ-104
+is 1 / 4.
+
+### Question for Łukasz
+
+**A type conflict on one input of an approved composite mapping (item 7, S4A-08, your test list).** The app's type
+check (`checkMappingTypes`, `src/domain/model/type-check.ts:131`, the mapping panel's) treats a transformation with a
+rule as handling the conversion, so it never reports a conflict for it; and a composite mapping always has a rule
+(AD-26, D-49). So “an approved composite mapping with a type conflict on one input” cannot occur with today's rule, and
+coverage counts such a mapping as covering. Coverage uses the panel's check, so the panel and the coverage never
+disagree; the unit tests show the composite case with a rule (covered) and without a working rule (a gap). Options:
+
+1. **Keep it** (proposed): coverage follows the mapping panel's type check; S4A-08's composite case becomes “a direct
+   approved mapping with a type conflict is a gap”, and the composite case shows that every input is checked when the
+   rule is missing (unit test only, since the app refuses to save such a mapping).
+2. **Check every input regardless of the rule** for coverage only: the panel says “the rule handles the conversion”
+   while the requirement lists the attribute as not approved. This changes the meaning of the type check, so it would
+   need a decision.
+
+### Assumptions (step 1)
+
+1. **The key counter is never wound back.** Creating a requirement raises `workspace.requirement_key_next` in the same
+   write; undoing the creation removes the requirement but keeps the counter, so a key is not given out twice (REQ-106
+   undone, the next one is REQ-107). The counter's write alone is not an undo step. It also raises the workspace row's
+   version, so a workspace settings change open at the same moment is refused as stale.
+2. **Undoing a key change back to a key someone took meanwhile** is refused with “REQ-104 is already used by another
+   requirement.”; bringing back a deleted one with item 9's message.
+3. **Cycle message:** the PRD's sentence with the roles as they are: choosing REQ-104 as the parent of REQ-101, which
+   REQ-104 is already part of, says “REQ-104 is part of REQ-101 already, so it cannot contain it.” Choosing itself:
+   “A requirement cannot be part of itself.” (not in the PRD).
+4. **Merging mappings** moves the requirement links of the mappings that go to the one that stays, without a second link
+   (as labels, D-24); the PRD does not say.
+5. **Demo requirements only in “Retail Co – DWH”.** “Sales analytics” has the same model but no requirements.
+6. **Lengths:** key up to 40 characters, name 300, owner and reference 2,000, expression 5,000, description 100,000.
+7. **Keys** are stored trimmed as typed and compared trimmed and case-insensitively; the counter only reads
+   `REQ-{number}`.
+8. **Reviewers' undo:** a reviewer can undo their own status change; nothing else (their other writes are refused
+   anyway).
+9. **Sanitizer:** `b`, `i` and `div` become `strong`, `em` and `p`, as in the prototype; a table or another block element
+   closes the paragraph before it, as in a browser, and its cells keep their text.
+10. **The context:** requirement and link writes are not label targets, so the context records itself on their events
+    and labels nothing; with the context's label deleted they are saved without the context (the slice 3b rule for
+    writes it would not label).
+11. **The entity delete dialog's requirements row** (item 10, Q5) comes with the panels in step 3; step 1 has the scope
+    function it needs.
+12. **Columns** are deleted only with their table today, so a column's links go with its table's delete.
