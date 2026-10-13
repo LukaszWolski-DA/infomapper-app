@@ -1,7 +1,127 @@
 # Slice 3b – Acceptance
 
-Status: **step 4 done; the balanced sitting met S3B-15 (b) and (c); waiting for Łukasz** (step 5 next). Branch `slice/03b-context-and-live-canvases`, pull request #10 (draft). Steps are
-reported one by one (below); criteria, runs and the manual checklist come in step 5.
+Status: **step 5 done, waiting for Łukasz's manual acceptance**. Branch `slice/03b-context-and-live-canvases`, pull
+request #10 (draft). Steps 0 to 4 were accepted one by one (below).
+
+## Criteria
+
+Each criterion has its Playwright test in `e2e/slice-03b/`, named after its id; every test starts from a freshly seeded
+data file (the demo labels CR-23 and JIRA-481, no live canvas) and does not depend on another. Data a test starts from is
+written as the server writes it (`liveWrite`: the command, then the live step; a label's live canvas with `openLiveFor`,
+a label on an item with `labelItem`); what the criterion checks goes through the page with the real mouse and keyboard
+and is read back from the data file.
+
+| ID | Test | Result |
+| --- | --- | --- |
+| S3B-01 | `S3B-01.spec.ts`: the menu's heading, help, field and labels (CR-23 “4 items”, JIRA-481 “2 items”); “Create “cr-99”” first, Enter creates the label and turns the context on; button “Working on cr-99” (`aria-pressed`), the toast, “Working on cr-99, items labeled 0”; on after a reload; “cr-99 … active” first in the menu; “Stop working on cr-99”: “Working context switched off.”, off after a reload | passes |
+| S3B-02 | `S3B-02.spec.ts`: with CR-23 on, renaming `customer_id` (labeled, every event of the group carries CR-23, one undo takes name and label away), adding `promo_code`, the mapping made by dragging `customers.segment` onto `segment_code`, `first_name`'s mapping made a transformation with a rule, a relationship drawn from Customer to Sales Order (Sales Order labeled, Customer not twice) and the Entity tool's new entity each get CR-23 | passes |
+| S3B-03 | `S3B-03.spec.ts`: with CR-23 on, moving Customer (the context recorded, no label), “Fit width to names”, collapsing a frame, writing a note and deleting `segment_code` add no label; Alt+↓ on `first_name` labels `first_name` only, not the attribute renumbered around it (Q2) | passes |
+| S3B-04 | `S3B-04.spec.ts`: Piotr and Kasia have no switch and no status part; Piotr's page clears a stale context, and his approval sent directly with CR-23 as context is refused (“As a reviewer you cannot change labels.”), status and links unchanged; JIRA-481 deleted by Anna while Łukasz works on it: his next change is refused and the fresh page switches the context off with “The working context JIRA-481 was deleted, so it is off now.”; deleting the active context's own label in its panel: “Deleted the label CR-23; the working context is off.”, Undo brings the label back, the context stays off | passes |
+| S3B-05 | `S3B-05.spec.ts`: “Open as live canvas” in CR-23's panel makes one canvas CR-23 (toast), Customer full, web_users context with the labeled filter, a concept and a source frame holding every card; “Open live canvas” on the project home goes to it; from Order management “Go to its live canvas” adds it there (“Added the live canvas CR-23 to Order management.”) and opens it; still one live canvas | passes |
+| S3B-06 | `S3B-06.spec.ts`: on CR-23's open live canvas, CR-23 put on the mapping into `customer_id` in its panel brings customers as context, to the right of the content and in no frame, with “Added from CR-23: customers.”; customers labeled directly becomes full with the filter `all`, one undo makes it context again; the mapping's label taken off: customers leaves with “No longer labeled: customers.”, one undo brings it back (an attribute panel opens only for a card on the canvas, so the element brought in is a table) | passes |
+| S3B-07 | `S3B-07.spec.ts`: CR-23 put on `order_line.qty` on Customer & orders, and with the context on, `Sales Order.order_date` renamed there: the live canvas (not open) gets order_line and Sales Order as context; opened afterwards it shows both without the “Added from” toast | passes |
+| S3B-08 | `S3B-08.spec.ts`: the live canvas's tab icon with its tooltip (one tab only), the overview's box with its text and “Open label” (opens the label's panel), the project home's tile icon (one tile only); on Customer & orders none of them | passes (the view-state bar's chip: slice 6) |
+| S3B-09 | `S3B-09.spec.ts`: Sales Order as context: class `ctx`, `data-live="context"`, filter `labeled`, the tooltip, “context only”, a dashed outline, opacity 1; customers full (no `ctx`); `order_date` bold (class `lab`, weight 600); the mapping into `customer_id` faded (class `ctxline`, another stroke than the labeled mapping's, opacity and stroke opacity 1); “Labeled” in Customer's toolbox on the live canvas, not on Customer & orders | passes (“not counted as filtered”: slice 6) |
+| S3B-10 | `S3B-10.spec.ts`: Order Line dropped from the left panel asks “Label Order Line with CR-23? It then appears on this live canvas.” (“Add CR-23”); “Cancel” changes nothing; Sales Order dropped and added: “Sales Order is now labeled CR-23.”, labeled, full, placed where dropped; the Entity tool asks nothing and its toast ends “, labeled CR-23”; on LIVE-1's live canvas (only Customer) “Add all” answers “On a live canvas, add cards one at a time: each one gets the label first.” and places nothing | passes |
+| S3B-11 | `S3B-11.spec.ts`: Customer's toolbox “Remove from this canvas (unlabel)…” asks “Take the label CR-23 off Customer? It stays here as context, because 2 attributes and 1 mapping of it carry CR-23.” (“Remove CR-23”): the label comes off, Customer stays as context, one undo makes it full again; Delete on web_users asks “web_users is here because 1 mapping carries CR-23. Take the label off it?” (“Remove from 1 mapping”): the mapping's label comes off, web_users leaves, one undo brings it back | passes |
+| S3B-12 | `S3B-12.spec.ts`: CR-23 renamed CR-24 renames its live canvas (tab); deleted: “Deleted the label CR-24. Its live canvas became a normal canvas.”, no live label, no live levels, no labeled filter; Undo brings label, links and live canvas back; Duplicate layout: “CR-24 (copy)” is a normal canvas with every card, the original stays live | passes |
+| S3B-13 | `S3B-13.spec.ts` (2 tests): the miniature draws exactly the notes the canvas shows, by colour; without the resolved one when resolved notes are hidden; pans and zooms do not redraw it; a note's drag redraws it once, on the drop; a note in a collapsed frame is not drawn | passes |
+| S3B-14 | `S3B-14.spec.ts`: Piotr and Kasia: “Open live canvas” on the project home opens CR-23's live canvas, NEW-1 (no live canvas) offers nothing; a click in the left panel and Delete ask nothing, the toolbox has no unlabel; the add, remove and open actions called directly are refused (“As a reviewer/reader you cannot …”) and change nothing | passes |
+| S3B-15 | (a) `S3B-15-elements.spec.ts`, (b) the balanced sitting, (c) `S3B-15-live.spec.ts`, all in the measurement build (below); `S3B-15.spec.ts` checks the data (c) measures (PERF-2's 22 cards as `openLiveCanvas` makes them, drawn) and `S3B-15-idle.spec.ts` (d) the idle guard on a live canvas (canvas and miniature, at 100 % and 30 %) | (a) identical viewport counts; (b) +11.9 % at 100 % (level or 1–3 % faster read with the reference's second run), collapsed +23.3 %; (c) 59.3 against 48.2 fps; (d) passes, with S2C-12, S3A-14's idle test and S3B-13 |
+| S3B-16 | CI (lint, typecheck, unit tests, the schema check), three full e2e runs in a row | below |
+
+### Three full runs in a row
+
+`npm run e2e` with no dev server running. The rule: three passing runs in a row, and after any test change the three
+start again.
+
+| Set | Commit | Runs | What happened |
+| --- | --- | --- | --- |
+| 1 | (filled in after the runs) | | |
+
+## Manual checklist (Łukasz)
+
+Fresh demo data, then the app on the preview data file:
+
+PowerShell:
+
+```powershell
+$env:INFOMAPPER_DEV_DB=".data/preview-db.json"; npm run reset-dev-data; npm run seed:large; npm run dev
+```
+
+bash:
+
+```bash
+export INFOMAPPER_DEV_DB=.data/preview-db.json && npm run reset-dev-data && npm run seed:large && npm run dev
+```
+
+Sign in at http://localhost:3000/sign-in by picking a test user: **Anna Nowak** (modeler) unless a check says
+otherwise, **Piotr Wiśniewski** (reviewer), **Kasia Zielińska** (reader). Retail Co – DWH → Customer 360 → Customer &
+orders, unless a check says otherwise.
+
+| ID | As | Steps | Expected |
+| --- | --- | --- | --- |
+| S3B-01 | Anna | Click the tag button left of Undo; type `cr-99`; Enter. Reload the page. Open the menu again, click “Stop working on cr-99”. Reload. | The menu: “Working context”, the help text, “Find or create a label, e.g. CR-23”, CR-23 and JIRA-481 with their item counts, then “Create “cr-99”” first. After Enter: the button reads “Working on cr-99” with a dot, the toast “Working on cr-99: everything you create or change …”, the status bar “Working on **cr-99**, items labeled **0**”. After the reload still on. After “Stop”: “Working context switched off.”, the button back to the tag icon; after the reload still off. |
+| S3B-02 | Anna | Turn the context on for CR-23 (menu). Rename Customer's `customer_id` in its panel; Ctrl+Z. Add an attribute to Customer; drag `customers.segment` onto `segment_code`; make `first_name`'s mapping a transformation with a rule; draw a relationship from Customer to Sales Order (relate button on Customer's header, click Sales Order); create an entity with the Entity tool (E). | After each change the item carries CR-23 (its Labels field, the tag mark on the row or header, the line's tag; the relationship: Sales Order's header). Ctrl+Z after the rename takes the name and the label away together. The status bar's count grows. |
+| S3B-03 | Anna | With CR-23 on: move a card, “Fit width to names”, draw a frame and collapse it, write a note, delete an attribute without mappings, move an attribute with Alt+↓. | Only the moved attribute gets CR-23; nothing else gets a label (status count +1 at the end only). |
+| S3B-04 | Piotr, Kasia, Anna, Łukasz | As Piotr and as Kasia: open the canvas. As Łukasz: turn the context on for JIRA-481; as Anna (another browser or private window) delete JIRA-481 in its panel; as Łukasz rename an attribute. As Łukasz: turn the context on for CR-23, open CR-23's panel (a label chip → open), “Delete label”, then Undo in the toast. | Piotr and Kasia: no tag button left of Undo, nothing about a context in the status bar. Łukasz's rename is refused and the toast “The working context JIRA-481 was deleted, so it is off now.” appears; the button is off. Deleting CR-23: one toast “Deleted the label CR-23; the working context is off.” with Undo; Undo brings CR-23 back, the context stays off. |
+| S3B-05 | Anna | Open CR-23's panel; “Open as live canvas”. Go to the project home; “Open live canvas” on CR-23's row. Open Order management → Order lines & products, open CR-23's panel (from its label list on the home, or a chip), “Go to its live canvas”. | A new tab CR-23 with the tag icon opens with the toast “Live canvas for CR-23. It follows the label: …”: Customer (full) and web_users (dashed, “Labeled” filter) in a concept frame and a source frame. The home's button goes to the same canvas. From Order management: “Added the live canvas CR-23 to Order management.” and the canvas opens there; there is still only one CR-23 canvas. |
+| S3B-06 | Anna | On CR-23's live canvas: select Customer's `customer_id` row, open its mapping, add CR-23 in the mapping's Labels field. Then select the new customers card and add CR-23 in its Labels field; Ctrl+Z. Then take CR-23 off the mapping again (×); Ctrl+Z. | customers appears to the right of the content, dashed, with “Added from CR-23: customers.” Labeled directly it becomes solid with all rows; Ctrl+Z makes it dashed again. Without the mapping's label it leaves with “No longer labeled: customers.”; Ctrl+Z brings it back. |
+| S3B-07 | Anna | With CR-23's live canvas made (S3B-05), go to Customer & orders: add CR-23 to `order_line.qty`; turn the context on for CR-23 and rename `Sales Order.order_date`. Then open the CR-23 tab. | The live canvas shows order_line and Sales Order (dashed, to the right), and no “Added from” toast when it opens. |
+| S3B-08 | Anna | Look at CR-23's live canvas with nothing selected, its tab, the project home's tiles; then at Customer & orders. | The tab has the tag icon (“Live canvas: shows everything labeled CR-23”); the right panel starts with the dashed box “This is the live canvas for CR-23. …” and “Open label” (opens the label); the CR-23 tile has the tag icon. Customer & orders has none of them. (The view-state bar's chip comes with slice 6.) |
+| S3B-09 | Anna | On CR-23's live canvas after S3B-06/07: look at a context card, its rows and the lines; hover a context card; right-click an entity card (Rows). Right-click an entity card on Customer & orders. | Context cards: dashed outline, light header, “context only” (entities), the tooltip “Context: the entity itself is not labeled CR-23, only some of its attributes are”; labeled rows bold; mappings without CR-23 lighter in colour (not see-through); “Labeled” among the Rows choices on the live canvas only. |
+| S3B-10 | Anna | On CR-23's live canvas: drag Order Line from the left panel onto the canvas, “Cancel”; drag Sales Order (if not there) onto the canvas, “Add CR-23”. Use the Entity tool once. Open a live canvas of a label only on Customer (e.g. put a new label on Customer, “Open as live canvas”), select Customer, “Add all” in its feeding sources. | The question “Label Order Line with CR-23? It then appears on this live canvas.”; Cancel changes nothing. Add: “Sales Order is now labeled CR-23.” and the card where it was dropped. The Entity tool asks nothing; its toast ends “, labeled CR-23”. “Add all”: “On a live canvas, add cards one at a time: each one gets the label first.” |
+| S3B-11 | Anna | On CR-23's live canvas: right-click Customer's header, “Remove from this canvas (unlabel)…”, “Remove CR-23”; Ctrl+Z. Select web_users, press Delete, “Remove from 1 mapping”; Ctrl+Z. | Customer: “Take the label CR-23 off Customer? It stays here as context, because 2 attributes and 1 mapping of it carry CR-23.”; Customer turns dashed; Ctrl+Z makes it solid. web_users: “web_users is here because 1 mapping carries CR-23. Take the label off it?”; it leaves; Ctrl+Z brings it back. |
+| S3B-12 | Anna | Open CR-23's panel, rename it to CR-24. “Delete label”; Undo in the toast. Duplicate the live canvas's layout (tab menu “Duplicate layout”). | The tab becomes CR-24. Deleting: “Deleted the label CR-24. Its live canvas became a normal canvas.”; the tab loses its icon, dashed cards turn normal with all rows. Undo: label, marks and the live canvas back. The copy “CR-24 (copy)” has no tag icon and no dashed cards. |
+| S3B-13 | Anna | On Customer & orders look at the Overview (bottom right); untick “Show resolved notes on the canvas”; pan and zoom; drag a note. Collapse a frame that holds a free note. | The miniature shows the notes as small coloured rectangles under the cards; the resolved one goes when hidden; panning does not flicker it; the dragged note moves in the miniature when dropped; a note in a collapsed frame is not drawn. |
+| S3B-14 | Piotr, Kasia | Project home: CR-23's row and a label without a live canvas. Open CR-23's live canvas; click an entity in the left panel; right-click a card; select a card and press Delete. | “Open live canvas” on CR-23's row (it opens the live canvas), nothing on the other row; no question on the click, no “unlabel” in the toolbox, nothing on Delete. |
+
+**Scenario (PRD's Definition of done).** As **Łukasz**: turn the context on for CR-23; create an entity with the Entity
+tool, add an attribute to it, map a column onto it by dragging, draw a relationship from it to Customer; open CR-23's
+panel and “Open as live canvas”. Go to Customer & orders and label `order_line.qty` CR-23 there; back on the CR-23 tab
+it is there, to the right of the content. On the live canvas drag Order Line from the left panel and “Add CR-23”, then
+right-click it and “Remove from this canvas (unlabel)…”. Open CR-23's panel, “Delete label” (one toast: deleted, the
+context off, the live canvas normal), Undo. Finally look at the notes in the Overview of Customer & orders.
+
+## Proposed changes to `docs/decisions.md` (not applied; for Łukasz to approve)
+
+- **D-10** (append): “A label has at most one live canvas. Opening it makes a canvas named after the label in the
+  current project, its elements arranged into frames by concept and system; elements that become labeled later land to
+  the right of the content (no “Newly labeled” frame yet). Deleting the label turns its live canvas into a normal canvas
+  in the same undo step; Duplicate layout of a live canvas gives a normal canvas.”
+- **D-11** (append): “Adding a card there labels its element in the same undo step (the Entity tool without a question);
+  removing one takes the label off the element, or off the rows and mappings that bring it there when it is a context
+  card. Bulk adds and removing several cards are not offered. Owners, admins and modelers do this; reviewers and readers
+  see a live canvas read-only.”
+- **D-25** (append): “Context cards have a dashed outline, a light header and “context only”, and show their relevant
+  rows (the Labeled filter); relevant rows are bold; mappings without the label are faded by colour, never opacity.”
+- **D-26** (append): “The context is a per-person, per-workspace preference in the browser, sent with every write; the
+  server checks it (the label exists, the person may change labels) and records it on every change event of the group.
+  Only owners, admins and modelers have the switch. Moving an attribute labels only the moved attribute. A change the
+  context would label is refused when its label is gone, and the browser switches the context off; undo and redo never
+  label.”
+- **D-39** (append): “A live canvas's “Live: {name}” chip and its Labeled filter (not counted as filtered, kept by “Show
+  all”) belong to the view-state bar.”
+- **D-03** (append): “The Overview's miniature also draws the visible notes in their paper colour, under the cards.”
+- **AD-13** (append): “A change group's change events carry the active working context's label (`context_label_id`).”
+
+## Step 5 (acceptance tests and wrap-up, 13 October)
+
+1. **handlebars:** `eslint-plugin-boundaries` is still 7.2.0 (last change 9 August) and `@boundaries/elements` 3.1.1 still
+   pins `handlebars` 4.7.9; no fix, before 19 October: nothing changed (Łukasz decides between waiting and a small pull
+   request after the merge).
+2. **The warm-up rule** (CLAUDE.md, measuring): a sitting starts with one discarded run after the builds, then balanced
+   rounds. The two cases: in slice 3b's balanced sitting after step 4 the first side measured after the builds
+   (`slice-03a`, round 1) was slow at the overview too (48.6 against 58.6 fps in its second run) and made the branch look
+   12 % faster at 100 %; in slice 3a the laptop's state drifted within a sitting (C-08 1502 ms on the reference, 1512 ms
+   on the branch, then 1701 and 1761 ms in the runs that followed), which put the side measured second behind. A
+   warm-up and balanced rounds address both.
+3. **S3B-06's element** is a table brought in through a mapping's Labels field, not an entity through an attribute's: an
+   attribute panel opens only for a card on the canvas (`S3B-06.spec.ts` says so).
+4. **Test data through the live step:** slice 3a's `asUser` applies a command's writes as they are; data that must
+   follow live canvases is written with `liveWrite` (the command, then `completeLiveWrites`, as `runCommand` does).
+5. **The context in tests** is switched on as the browser does it, by its cookie (`contextOn`); S3B-01 checks the switch
+   itself.
 
 ## Step 0 (12 October)
 
