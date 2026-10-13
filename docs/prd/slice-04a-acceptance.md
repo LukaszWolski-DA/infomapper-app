@@ -1,7 +1,28 @@
 # Slice 4a – Acceptance
 
-Status: **step 0 done; waiting for Łukasz** (answers to the questions below, the S4A-14 baseline run). Branch
-`slice/04a-requirements`, from `main` at the tag `slice-03b` (`a10899c`).
+Status: **step 0 answered; waiting for Łukasz's OK for step 1**. Branch `slice/04a-requirements`, from `main` at the
+tag `slice-03b` (`a10899c`).
+
+## Łukasz's answers to step 0 (13 October)
+
+1. **Migration: approved.** The key is unique among non-deleted requirements, case-insensitively (a unique index on
+   `lower(key)` per workspace `where deleted_at is null`). `severity` is allowed for every kind (`warn`, `block` or
+   null); the domain decides when to show it. New rule: undoing a requirement's delete when its key is used by
+   another requirement by then is refused with “REQ-104 is used by another requirement now, so the deleted one cannot
+   come back.” (unit test and adapter check). `docs/data-model-v2.md` is updated in this pull request, with the
+   migration (step 1).
+2. **Go-to links: approved**, the new selection that names an element without a card, with the helpers falling back
+   to it. It only opens the element's panel: no pan, no card added, no canvas switch. The slice 1a limitation leaves
+   `docs/known-limitations.md` in the step that builds it; every changed earlier test is listed below.
+3. **“Only what this project uses”** on the Requirements tab follows the project home's rule (PRD item 30); with
+   “on this canvas” also on, that filter wins.
+4. **Wording table: approved** as proposed, including case-insensitive keys.
+5. **S4A-14 baseline:** run on 13 October (below); it counts elements, so no laptop preparation.
+6. **`docs/decisions.md`: approved** and applied (`0887e4b`): AD-05 “Reviewers change a requirement's status only.”;
+   AD-06 “For requirements, setting Agreed is the approval; the author is whoever last changed its content (kind,
+   name, description, expression, severity).”
+
+The PRD carries these answers (`dc094bc`, section 7a and items 2, 4, 9, 10, 20, 27).
 
 ## Step 0 (13 October)
 
