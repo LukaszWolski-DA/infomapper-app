@@ -6,6 +6,7 @@ import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResu
 import { domainError, notFound, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { plainTextPair } from "../model/plain-text";
+import { sanitizeRich } from "../model/rich-text";
 import { attributeNamedAfter } from "../model/mapping-choice";
 import { logicalTypeOf } from "../model/type-check";
 import type { WorkspaceAccess } from "../permissions";
@@ -14,7 +15,7 @@ import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { linksOnItems, softDeleteLinks } from "./label";
 import { softDeleteRequirementLinks } from "./requirement";
 import { createMapping } from "./mapping";
-import { begin, current, done, found, isLive, nextSortOrder, nothingToChange, plainTextSchema, softDelete } from "./shared";
+import { begin, current, done, found, isLive, nextSortOrder, nothingToChange, richTextSchema, softDelete } from "./shared";
 
 const DEFAULT_ATTRIBUTE_NAME = "new_attribute";
 
@@ -112,7 +113,7 @@ const updateAttributeInput = z
     isBusinessKey: z.boolean().optional(),
     isPii: z.boolean().optional(),
     isNullable: z.boolean().optional(),
-    definition: plainTextSchema.optional(),
+    definition: richTextSchema.optional(),
   })
   .strict();
 export type UpdateAttributeInput = z.input<typeof updateAttributeInput>;
@@ -153,8 +154,8 @@ export function updateAttribute(
     if (value !== undefined && value !== before[column]) patch[column] = value;
   }
   if (data.definition !== undefined) {
-    const { html, text } = plainTextPair(data.definition);
-    if (text !== before.definition_text) Object.assign(patch, { definition_html: html, definition_text: text });
+    const { html, text } = sanitizeRich(data.definition);
+    if (html !== before.definition_html) Object.assign(patch, { definition_html: html, definition_text: text });
   }
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
 

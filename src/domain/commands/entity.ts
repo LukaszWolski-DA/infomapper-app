@@ -5,11 +5,11 @@ import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResu
 import { notFound } from "../errors";
 import type { Uuid } from "../ids";
 import { entityCascade, type EntityRows } from "../model/impact";
-import { plainTextPair } from "../model/plain-text";
+import { sanitizeRich } from "../model/rich-text";
 import type { WorkspaceAccess } from "../permissions";
 import { STEREOTYPES, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type LabelLink, type Note, type RequirementLink } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
-import { begin, current, done, isLive, nothingToChange, plainTextSchema, softDelete } from "./shared";
+import { begin, current, done, isLive, nothingToChange, richTextSchema, softDelete } from "./shared";
 import { cardHeightSchema, frameRefsSchema, joinFrames, newCanvasItem, positionSchema } from "./canvas-item";
 import { linksOnItems, softDeleteLinks } from "./label";
 import { softDeleteRequirementLinks } from "./requirement";
@@ -107,7 +107,7 @@ const updateEntityInput = z
     name: nameSchema.optional(),
     stereotype: z.enum(STEREOTYPES).optional(),
     conceptId: uuidSchema.optional(),
-    definition: plainTextSchema.optional(),
+    definition: richTextSchema.optional(),
   })
   .strict();
 export type UpdateEntityInput = z.input<typeof updateEntityInput>;
@@ -120,7 +120,7 @@ export interface UpdateEntityState {
   concept: Concept | null;
 }
 
-/** Name, stereotype, concept and definition (plain text, AD-30). A duplicate name gives a warning. */
+/** Name, stereotype, concept and definition (rich text, sanitized on the server; slice 4a). A duplicate name gives a warning. */
 export function updateEntity(
   ctx: CommandContext,
   access: WorkspaceAccess,
@@ -142,8 +142,8 @@ export function updateEntity(
     patch.concept_id = conceptId;
   }
   if (definition !== undefined) {
-    const { html, text } = plainTextPair(definition);
-    if (text !== before.definition_text) Object.assign(patch, { definition_html: html, definition_text: text });
+    const { html, text } = sanitizeRich(definition);
+    if (html !== before.definition_html) Object.assign(patch, { definition_html: html, definition_text: text });
   }
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
 

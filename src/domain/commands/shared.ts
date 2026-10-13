@@ -69,8 +69,11 @@ export const softDelete = <T extends SoftDeletableTable>(ctx: CommandContext, ta
 
 export const nothingToChange = (): DomainError => domainError("invalid", "Nothing to change.");
 
-/** Optional plain text (definitions, notes): absent = unchanged, empty = cleared. */
+/** Optional plain text (notes, mapping notes): absent = unchanged, empty = cleared. */
 export const plainTextSchema = z.string().max(20000, "This text is too long.").nullable();
+
+/** Rich text as the editor sends it (definitions, descriptions; slice 4a): sanitized by the command (`sanitizeRich`). */
+export const richTextSchema = z.string().max(100_000, "This text is too long.").nullable();
 
 /** Sort order after the last of the given rows. */
 export const nextSortOrder = (rows: readonly { sort_order: number }[]): number =>

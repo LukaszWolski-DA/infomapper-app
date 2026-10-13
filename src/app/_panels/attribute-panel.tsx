@@ -1,7 +1,7 @@
 "use client";
 
 // The attribute panel (prototype insAttr): name, data type with its parameters (AD-27), flags with the business-key
-// suggestion (AD-28), definition (plain text, AD-30), where it comes from (one row per mapping, D-49),
+// suggestion (AD-28), definition (rich text in the editor dialog, slice 4a), where it comes from (one row per mapping, D-49),
 // “Add a source column” to create a mapping, and delete; slice 1b: its position on the entity (D-36).
 
 import { useContext, useEffect, useRef } from "react";
@@ -13,6 +13,7 @@ import type { UpdateAttributeInput } from "@/domain/commands/attribute";
 import { checkMappingTypes } from "@/domain/model/type-check";
 import { LOGICAL_TYPES, type Attribute, type LogicalType } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
+import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import {
   Actions,
   ConfirmDelete,
@@ -28,7 +29,6 @@ import {
   Fold,
   LongList,
   smallButtonClass,
-  TextArea,
   TextField,
   TypeDot,
 } from "./fields";
@@ -206,16 +206,17 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         </Note>
       )}
 
-      <Field label="Definition" htmlFor="f-ad">
-        <TextArea
-          key={v}
-          id="f-ad"
-          value={a.definition_text ?? ""}
-          readOnly={!p.editable}
-          placeholder="What this attribute means for the business."
-          onSave={(text) => void save({ definition: text.trim() ? text : null })}
-        />
-      </Field>
+      <RichTextField
+        key={v}
+        label="Definition"
+        html={a.definition_html}
+        empty="What this attribute means for the business. Click to write it."
+        editable={p.editable}
+        subtitle="Attribute definition"
+        title={attributeLabel(ix, a.id)}
+        onSave={async (html) => (await save({ definition: html })).ok}
+        testId="field-attribute-definition"
+      />
       <ItemLabels target={{ kind: "attribute", id: a.id }} />
 
       <Fold title="Comes from" count={mappings.length}>

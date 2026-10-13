@@ -1,7 +1,7 @@
 "use client";
 
 // The entity panel (prototype insEntity): name (focused right after “+”, D-46), stereotype, concept, definition
-// (plain text, AD-30), attributes with their sources and “Add attribute”, feeding sources (placed beside the card,
+// (rich text in the editor dialog, slice 4a), attributes with their sources and “Add attribute”, feeding sources (placed beside the card,
 // “Add the N missing to this canvas”, B-08), relationships,
 // “Remove from this canvas” and “Delete from model…” with the impact dialog (D-47).
 
@@ -13,8 +13,9 @@ import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { STEREOTYPES, type Entity, type Stereotype } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
+import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
-import { Actions, buttonClass, dangerClass, Field, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextArea, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextField } from "./fields";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
@@ -54,6 +55,10 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   async function save(change: Omit<UpdateEntityInput, "entityId" | "expectedVersion">) {
     const result = await run(() => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: e.version, ...change }));
     if (result.ok && result.value.warning) toast(result.value.warning);
+  }
+
+  async function saveDefinition(html: string): Promise<boolean> {
+    return (await run(() => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: e.version, definition: html }))).ok;
   }
 
   async function addAttribute() {
@@ -107,17 +112,17 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
           </select>
         </Field>
       </div>
-      <Field label="Definition" htmlFor="f-ed">
-        <TextArea
-          key={v}
-          id="f-ed"
-          value={e.definition_text ?? ""}
-          readOnly={!p.editable}
-          placeholder="What this entity means for the business."
-          onSave={(text) => void save({ definition: text.trim() ? text : null })}
-          data-testid="input-entity-definition"
-        />
-      </Field>
+      <RichTextField
+        key={v}
+        label="Definition"
+        html={e.definition_html}
+        empty="What this entity means for the business. Click to write it."
+        editable={p.editable}
+        subtitle="Entity definition"
+        title={e.name}
+        onSave={saveDefinition}
+        testId="field-entity-definition"
+      />
 
       <ItemLabels target={{ kind: "entity", id: e.id }} />
 

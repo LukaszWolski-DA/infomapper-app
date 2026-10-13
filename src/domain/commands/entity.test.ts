@@ -69,14 +69,15 @@ describe("updateEntity", () => {
   const state = { entity: entity(customer), entities: [entity(customer), entity(salesOrder)], concept: concept(conceptSales) };
   const ref = { entityId: customer, expectedVersion: 1 };
 
-  it("changes name, stereotype, concept and the plain-text definition (AD-30)", () => {
-    const r = updateEntity(makeCtx(), access("modeler"), state, { ...ref, name: "Client", stereotype: "context", conceptId: conceptSales, definition: "A person who buys." });
+  it("changes name, stereotype, concept and the rich-text definition, sanitized on the server (slice 4a)", () => {
+    const definition = '<p onclick="x()">A person who <strong>buys</strong>.</p><script>alert(1)</script>';
+    const r = updateEntity(makeCtx(), access("modeler"), state, { ...ref, name: "Client", stereotype: "context", conceptId: conceptSales, definition });
     if (!r.ok) throw new Error(r.error.message);
     expect(r.value.entity).toMatchObject({
       name: "Client",
       stereotype: "context",
       concept_id: conceptSales,
-      definition_html: "<p>A person who buys.</p>",
+      definition_html: "<p>A person who <strong>buys</strong>.</p>",
       definition_text: "A person who buys.",
       version: 2,
     });
