@@ -54,15 +54,17 @@ Where the prototype and this PRD differ, this PRD wins; the differences are list
    a requirement becomes a `dq_rule` and has none. The schema allows a severity for every kind (a new migration,
    section 7a).
 5. **Parent.** “Part of” may not create a cycle at any depth (the prototype only blocks itself and its direct
-   children). Refused with “REQ-101 is part of REQ-103 already, so it cannot contain it.”
+   children). Refused with “REQ-104 is already part of REQ-101, so REQ-101 cannot be part of it.”; choosing the
+   requirement itself with “A requirement cannot be part of itself.” (Łukasz, step 1)
 6. **Links** (`requirement_link`, exactly one target, AD-15) to an entity, attribute, mapping, source table or
    source column. A second link to the same target is refused with “Already linked.” (no write).
 7. **Scope and coverage** (D-31), pure functions in `domain`, as in the prototype's `reqScope` and `reqCoverage`:
    - scope: linked entities with all their attributes; linked attributes with their entity; linked mappings with
      their attribute, its entity, every input column and its table; linked tables; linked columns with their table;
-   - an attribute in scope is **covered** when it has at least one mapping with status `approved` that has no type
-     conflict on **any** of its inputs (composite mappings, AD-26); **mapped, not approved** when it has mappings but
-     none counts as covered; **not mapped** when it has none;
+   - an attribute in scope is **covered** when it has at least one mapping with status `approved` that passes the
+     mapping panel's type check (`checkMappingTypes`) on every input (composite mappings, AD-26); a transformation with
+     a rule handles the conversion, so an approved transformation with a rule covers its attribute (Łukasz, step 1);
+     **mapped, not approved** when it has mappings but none counts as covered; **not mapped** when it has none;
    - a requirement is covered when its scope has at least one attribute and all of them are covered. A requirement
      traced only to tables or columns has 0 attributes in scope and is not covered;
    - coverage is computed on read and never stored.
@@ -218,7 +220,7 @@ the domain; what the criterion checks goes through the page and is read back fro
 | S4A-05 | Entity and attribute definitions open in the editor without “Insert template”; a seeded plain-text definition opens as its paragraphs; the panel shows the saved text formatted, shortened with “Show more” when long. |
 | S4A-06 | Linking from each of the five element panels with “Link to a requirement…” (toast per type); the same link twice: “Already linked.” and no write; “+ New requirement…” on `email` creates REQ-106 linked to it (one undo removes both); × in the element panel and in Traces to unlink (“Unlinked.”, one undo each). |
 | S4A-07 | Indirect requirements: `email` shows REQ-102, REQ-103 and REQ-105 directly and REQ-101 “via entity”; Customer shows REQ-101 directly and REQ-102, REQ-103, REQ-105 “via attribute”; a table under a mapping linked to a requirement shows it “via column”; indirect rows have no ×. |
-| S4A-08 | Coverage: the seed's figures (from step 1) in the panel and the left panel's bars; approving a draft mapping into a gap attribute moves it from “not approved” to covered in the open panel; a type conflict on one input of an approved composite mapping makes its attribute a gap; a requirement traced only to a table shows 0 / 0 and is not covered; a click on a gap goes to the attribute (item 27). |
+| S4A-08 | Coverage: the seed's figures (from step 1) in the panel and the left panel's bars; approving a draft mapping into a gap attribute moves it from “not approved” to covered in the open panel; an approved direct mapping with a type conflict is a gap; a requirement traced only to a table shows 0 / 0 and is not covered; a click on a gap goes to the attribute (item 27). |
 | S4A-09 | Traces to: rows with type and the mapping written as `column → Entity.attribute`; a click on an element whose card is on the open canvas selects it there; on a canvas without it, its panel opens. |
 | S4A-10 | Deleting REQ-102: toast, REQ-103 becomes top level, its links are gone, Customer's attributes and mappings are unchanged; one undo brings back the requirement, its links and REQ-103's parent. Deleting the attribute `email` deletes its links and its undo brings them back. |
 | S4A-11 | Roles: Piotr changes REQ-103's status and nothing else (fields read-only, no Edit, no Link field, no ×, no Delete); his other writes sent directly are refused with the reviewer message; Kasia changes nothing (reader message); in the archived workspace nothing changes. |
