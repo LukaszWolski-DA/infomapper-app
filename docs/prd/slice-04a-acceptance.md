@@ -1,6 +1,6 @@
 # Slice 4a – Acceptance
 
-Status: **step 2 done; waiting for Łukasz**. Branch `slice/04a-requirements`, from `main` at the tag `slice-03b`
+Status: **step 3 done; waiting for Łukasz**. Branch `slice/04a-requirements`, from `main` at the tag `slice-03b`
 (`a10899c`), pull request #11 (draft).
 
 ## Łukasz's answers to step 0 (13 October)
@@ -356,3 +356,116 @@ errors.
 - **A line break typed at the very end of a paragraph** (Shift+Enter) is stored as typed (`<br>` before `</p>`); the
   prototype's `finalizeRich` keeps it too, but its browser editor rarely produced it.
 - **The prototype's `<font color>`** from `execCommand` is not read on paste (the app never stored it).
+
+## Łukasz's answers after step 2 (13 October)
+
+Step 2 accepted. (1) Server-sanitized HTML shown without a browser sanitizer: approved, provided every write path goes
+through the server; checked below. (2) Clear formatting keeps links: fixed. (3) A click outside the dialog with unsaved
+changes warns first: confirmed, and fixed so the focus stays in the text (below). (4) Record each e2e run's time in step
+5; above 30 minutes, find the cause before the merge. (5) The `fast-equals` override is in `docs/known-limitations.md`
+with a review date (22 October 2026). (6) A trailing line break stored as typed: accepted (assumption 8 of step 2).
+
+**Every write of a `*_html` column** goes through `sanitizeRich` (entity and attribute definitions, requirement
+descriptions) or `plainTextPair`, which escapes plain text into paragraphs (notes, mapping notes, attributes made from
+a column's comment, the seeds). The panel field shows `shownHtml(html, text)`: the stored HTML, or for a row with only
+its plain text, that text escaped; `plain-text.test.ts` checks `a < b & <img src=x onerror=alert(1)>` both ways (stored
+before slice 4a as escaped paragraphs, and as plain text only).
+
+**Point 3 in the browser:** a click outside the dialog with unsaved changes shows “Unsaved changes. Press Esc or Cancel
+again to discard them.” and keeps the dialog open, as Esc and Cancel do. The click had taken the focus to the page,
+so a key typed next would have reached the canvas and Ctrl+Enter did nothing; now the editor takes the focus back and
+Ctrl+Enter saves from anywhere in the dialog (a Delete typed after the click went into the text, the canvas kept its
+four cards).
+
+## Step 3 (requirements in the panels, 13 October)
+
+PRD items 20–29, the entity delete dialog's requirements row (item 10, Q5) and the go-to links' fallback (item 27, Q6).
+Commit `5db0c92`.
+
+- **Requirement index** (`src/domain/model/requirement-index.ts`): built once per data version from the requirements,
+  their links and the model: live requirements in the left panel's order, each one's live links, scope, coverage and
+  children, and for every element its direct and indirect requirements. The server builds it once per page for the
+  left panel's rows (`tree-data.ts`); the right panel builds it once per data version in the browser (`useMemo` on the
+  server's arrays) and every panel reads from it; nothing works out a scope while rendering. Scope and coverage share
+  one model lookup (`lookupModel`), so each attribute's coverage state is worked out once.
+- **Left panel** (`left-panel.tsx`): a third tab Requirements; groups by kind (Business need, Data requirement, Business
+  rule, Data quality rule, Non-functional) with the diamond dot and count, folding remembered with the other groups
+  (`req:{kind}`); rows with the kind icon, key, name and coverage bar (tooltip “{ok} of {total} attributes covered”);
+  search by key and name; “Only what this project uses” keeps requirements whose scope has an entity or table on one of
+  the project's canvases; “Only on this canvas” shows “No requirement has a card on this canvas yet.” and wins; without
+  any requirement “No requirements yet.”; “New requirement” for owner, admin and modeler. A click opens the
+  requirement's panel; rows are not dragged.
+- **Requirement panel** (`requirement-panel.tsx`): as item 23–26; refusals put the stored value back in the field;
+  “Part of” offers None and every requirement that is not this one or below it; the coverage grid and the gaps
+  (unmapped first, then not approved; a click goes to the attribute); Traces to with each element's type, a mapping as
+  `column → Entity.attribute`, × to unlink; “Delete requirement” (toast with Undo).
+- **Element panels** (`requirements-section.tsx`): entity, attribute, mapping, table and column get a Requirements
+  section: direct rows with ×, indirect rows with “via entity / attribute / column”; “Link to a requirement…” lists every
+  requirement not linked directly, then “+ New requirement…”, which creates it linked to the element and opens its
+  panel with the name selected. Toasts “Linked REQ-104 to the attribute.” (and the other nouns), “Unlinked.”
+- **Delete dialog** (`delete-entity-dialog.tsx`, `impact.ts`): the row “{n} requirement(s) — lose this from their scope:
+  REQ-…” after canvases, “–” when none.
+- **Go-to fallback** (`inspector.tsx`, `line-data.ts`): two new selections, `{ t: "req" }` and `{ t: "element" }`;
+  `goEntity`, `goAttribute`, `goTable` and `goColumn` select the card or row when it is on the open canvas, otherwise
+  open the element's panel only: no pan, no card added, no canvas switch. Neither selection emphasises or fades any line
+  (`relatedLines` returns nothing), so the canvas draws exactly what it drew before. Panels without a card hide what
+  needs one (notes pinned to the card, its frame, “Remove from this canvas”, “Add all to this canvas”). Slice 1a's
+  limitation “Panel links only reach rows whose card is on this canvas” is removed from `docs/known-limitations.md`.
+- **Server actions** (`src/app/_actions/requirement.ts`): create (with `freshOnStale`), change a field, set the status
+  (the author from the change log), delete, link, unlink.
+- **Tests:** `npm test` 917 in 63 files (907 before): `requirement-index.test.ts` (the index agrees with computing each
+  requirement alone), `tree-data.test.ts` (the tab's rows and filters), `plain-text.test.ts` (`shownHtml`), the impact
+  tests. Lint and typecheck pass.
+
+### Benchmark: building the index
+
+`npx tsx scripts/bench-requirement-index.ts` (not part of `npm test`, not a gate): a synthetic model of 500 requirements
+(five kinds, chains of parents), 5,000 attributes on 500 entities, 3,000 columns in 300 tables, 2,000 mappings (every
+fifth a transformation with two inputs, a third of them drafts) and 3,000 links (entities, attributes, mappings, tables,
+columns). 30 builds after a warm-up, on the laptop: **median 25.5 ms**, fastest 18.3 ms, slowest 40.8 ms (an earlier
+run: median 23.7 ms).
+
+### Checked in the browser (dev server, fresh seed)
+
+As Łukasz: the tab lists REQ-101 to REQ-105 by kind with 5/8, 3/3, 1/4, 1/1 and 3/4; REQ-104's panel shows every field,
+coverage 1 / 4 with three unmapped gaps and four traces; the canvas draws nothing differently. On “Order lines &
+products” (no Customer card) REQ-102's trace `Customer.first_name` opens the attribute's panel without moving the view
+or adding a card; its section lists REQ-102 and REQ-105 directly and REQ-101 “via entity”; “+ New requirement…” there
+makes REQ-106 linked to `first_name`, its panel open with the name selected; the description opens with the Data
+requirement template, and a save keeps only the written section. Customer's delete dialog lists “5 requirements — lose
+this from their scope: REQ-101, REQ-102, REQ-103, REQ-105, REQ-106”. As Piotr: the status works, every other field is
+read-only, no Edit, no ×, no Delete, no “New requirement”.
+
+### End-to-end run and changed earlier tests (step 3)
+
+The full suite once on `5db0c92`, no dev server running: **140 passed, 1 failed, 26.6 min** (wall clock 26 min), no
+retries. The failure was expected: `e2e/slice-01a/S1A-10.spec.ts` checks the entity delete dialog's rows exactly, and
+the dialog now has the requirements row. Changed: S1A-10 expects
+“4 requirements — lose this from their scope: REQ-101, REQ-102, REQ-103, REQ-105” after the canvases row; run alone
+afterwards it passes. No other earlier test depended on a go-to link doing nothing without a card. Unit tests changed:
+`entity.test.ts` and `model-store.test.ts` (the impact's requirements), `requirements.test.ts` (imports
+`requirementsOf` from the index).
+
+### Assumptions (step 3)
+
+1. **An element's panel without its card** hides what needs the card (notes pinned to it, its frame, “Remove from this
+   canvas”, “Add all to this canvas”); a feeding source or fed entity clicked there is placed in a free spot of the
+   view instead of beside the card. The prototype's “Add to this canvas” button for such a panel is not added (not in
+   the PRD).
+2. **“Link to a requirement…”** lists every requirement not linked directly, including those that reach the element
+   indirectly (as the prototype).
+3. **Link, unlink and delete** toast with Undo; “New requirement” and “+ New requirement…” toast nothing (step 0's
+   wording).
+4. **Kind and “Part of”** save as soon as they change (selects), as the other panels' selects do.
+5. **The Requirements tab has no footer hint** (the Model and Sources tabs' “Drag onto the canvas …” does not apply).
+6. **The delete dialog's requirements row** sits after canvases and before projects (the prototype has no projects
+   row).
+7. **Gaps** list unmapped attributes first, then those not approved (the prototype's order).
+
+### Not matched from the prototype's panels
+
+- The lens sentence under Coverage, “Place its card on this canvas” and dragging requirements (slice 4b, PRD).
+- “Part of” in the prototype only leaves out the requirement and its direct children; the app leaves out everything
+  below it (PRD item 5).
+- The prototype's requirement rows in element panels say “Click to place its card next to this element”; here a click
+  opens the requirement's panel (4b places cards).

@@ -21,6 +21,8 @@ test("S1A-10: deleting Customer shows the impact dialog (8 attributes, mappings 
     new RegExp(`^${maps.length} mappings\s*deleted, ${approved} of them approved$`),
     /^2 relationships\s*deleted$/,
     /^1 canvas\s*removed from Customer & orders$/,
+    // slice 4a: the demo requirements whose scope contains Customer
+    /^4 requirements\s*lose this from their scope: REQ-101, REQ-102, REQ-103, REQ-105$/,
     /^2 projects\s*Customer 360, Order management$/,
   ]);
   await dialog.getByTestId("button-confirm-delete-entity").click();
