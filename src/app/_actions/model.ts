@@ -134,8 +134,13 @@ export async function deleteEntityAction(
 ): Promise<ActionResult<{ attributes: number; mappings: number; relationships: number }>> {
   return modelCommand(workspaceId, async (ctx, access, model, store) => {
     const ws = access.workspace.id;
-    const [canvasItems, labelLinks, notes] = await Promise.all([store.canvasItems.list(ws), store.labels.listLinks(ws), store.notes.list(ws)]);
-    return deleteEntity(ctx, access, { ...model, entity: byId(model.entities, input?.entityId), canvasItems, labelLinks, notes }, input);
+    const [canvasItems, labelLinks, notes, requirementLinks] = await Promise.all([
+      store.canvasItems.list(ws),
+      store.labels.listLinks(ws),
+      store.notes.list(ws),
+      store.requirements.listLinks(ws),
+    ]);
+    return deleteEntity(ctx, access, { ...model, entity: byId(model.entities, input?.entityId), canvasItems, labelLinks, notes, requirementLinks }, input);
   });
 }
 
@@ -186,8 +191,8 @@ export async function deleteAttributeAction(
   input: { attributeId: string; expectedVersion: number },
 ): Promise<ActionResult<{ mappings: number }>> {
   return modelCommand(workspaceId, async (ctx, access, { attributes, mappings, mappingInputs }, store) => {
-    const labelLinks = await store.labels.listLinks(access.workspace.id);
-    return deleteAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), mappings, mappingInputs, labelLinks }, input);
+    const [labelLinks, requirementLinks] = await Promise.all([store.labels.listLinks(access.workspace.id), store.requirements.listLinks(access.workspace.id)]);
+    return deleteAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), mappings, mappingInputs, labelLinks, requirementLinks }, input);
   });
 }
 
@@ -256,7 +261,12 @@ export async function deleteSourceTableAction(
 ): Promise<ActionResult<{ columns: number }>> {
   return modelCommand(workspaceId, async (ctx, access, model, store) => {
     const ws = access.workspace.id;
-    const [canvasItems, labelLinks, notes] = await Promise.all([store.canvasItems.list(ws), store.labels.listLinks(ws), store.notes.list(ws)]);
+    const [canvasItems, labelLinks, notes, requirementLinks] = await Promise.all([
+      store.canvasItems.list(ws),
+      store.labels.listLinks(ws),
+      store.notes.list(ws),
+      store.requirements.listLinks(ws),
+    ]);
     const table = byId(model.sourceTables, input?.sourceTableId);
     return deleteSourceTable(
       ctx,
@@ -271,6 +281,7 @@ export async function deleteSourceTableAction(
         entities: model.entities,
         labelLinks,
         notes,
+        requirementLinks,
       },
       input,
     );

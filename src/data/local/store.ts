@@ -56,6 +56,19 @@ export function createLocalDataStore(file: string): DataStore {
     });
   };
 
+  /** Live requirement links whose requirement and element are live too (the domain deletes links with their elements). */
+  const liveRequirementLinks = (db: Readonly<DevDb>, workspaceId: Uuid) => {
+    const ids = (rows: readonly { id: Uuid; workspace_id: Uuid; deleted_at: string | null }[]) =>
+      new Set(rows.filter((r) => r.deleted_at === null && r.workspace_id === workspaceId).map((r) => r.id));
+    const requirements = ids(db.requirement);
+    const targets = [ids(db.entity), ids(db.attribute), ids(db.mapping), ids(db.source_table), ids(db.source_column)];
+    return live(db.requirement_link).filter((k) => {
+      if (k.workspace_id !== workspaceId || !requirements.has(k.requirement_id)) return false;
+      const target = [k.entity_id, k.attribute_id, k.mapping_id, k.source_table_id, k.source_column_id];
+      return target.some((id, i) => id !== null && targets[i]!.has(id));
+    });
+  };
+
   /** The change groups in the workspace's log: a history step outside it belongs to data that was replaced. */
   const groupsOf = async (workspaceId: Uuid) =>
     new Set((await load()).change_event.filter((e) => e.workspace_id === workspaceId).map((e) => e.change_group_id));
@@ -184,6 +197,14 @@ export function createLocalDataStore(file: string): DataStore {
       get: async (workspaceId, noteId) => live((await load()).note).find((n) => n.workspace_id === workspaceId && n.id === noteId) ?? null,
     },
 
+    requirements: {
+      list: async (workspaceId) => live((await load()).requirement).filter((r) => r.workspace_id === workspaceId),
+      get: async (workspaceId, requirementId) =>
+        live((await load()).requirement).find((r) => r.workspace_id === workspaceId && r.id === requirementId) ?? null,
+      listLinks: async (workspaceId) => liveRequirementLinks(await load(), workspaceId),
+      getLink: async (workspaceId, requirementLinkId) => liveRequirementLinks(await load(), workspaceId).find((k) => k.id === requirementLinkId) ?? null,
+    },
+
     changeEvents: {
       list: async (workspaceId) => (await load()).change_event.filter((e) => e.workspace_id === workspaceId),
       listForMapping: async (workspaceId, mappingId) =>
@@ -193,6 +214,8 @@ export function createLocalDataStore(file: string): DataStore {
             ((e.object_type === "mapping" && e.object_id === mappingId) ||
               (e.object_type === "mapping_input" && (e.after_image ?? e.before_image)?.mapping_id === mappingId)),
         ),
+      listForRequirement: async (workspaceId, requirementId) =>
+        (await load()).change_event.filter((e) => e.workspace_id === workspaceId && e.object_type === "requirement" && e.object_id === requirementId),
     },
 
     undoHistory: {

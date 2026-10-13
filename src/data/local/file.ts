@@ -42,9 +42,10 @@ export async function readDb(file: string): Promise<DevDb> {
     throw e;
   }
   const db = JSON.parse(text) as DevDb;
-  // Formats 2 (before frames) and 3 (before labels and notes) differ only by the missing tables.
+  // Formats 2 (before frames), 3 (before labels and notes) and 4 (before requirements) differ only by the missing tables.
   if ((db.format as number) === 2) Object.assign(db, { format: 3, frame: [] });
-  if ((db.format as number) === 3) Object.assign(db, { format: DEV_DB_FORMAT, label: [], label_link: [], project_pinned_label: [], note: [] });
+  if ((db.format as number) === 3) Object.assign(db, { format: 4, label: [], label_link: [], project_pinned_label: [], note: [] });
+  if ((db.format as number) === 4) Object.assign(db, { format: DEV_DB_FORMAT, requirement: [], requirement_link: [] });
   if (db.format !== DEV_DB_FORMAT) {
     throw new Error(`${file} has format ${String(db.format)}, expected ${DEV_DB_FORMAT}. Run "npm run reset-dev-data".`);
   }

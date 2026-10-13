@@ -1,0 +1,130 @@
+// The demo requirements (slice 4a, PRD item 15): the prototype's five requirements and their links in “Retail Co –
+// DWH”, on the model that `addDemoModel` seeds, matched by name. Descriptions are the prototype's, one paragraph each.
+// No requirement has a card on a canvas yet (the prototype's REQ-104 card comes with slice 4b). The workspace's key
+// counter is set to 106 by the caller.
+
+import type { Uuid } from "@/domain/ids";
+import { targetColumns, type LabelTarget } from "@/domain/model/labels";
+import { plainTextPair } from "@/domain/model/plain-text";
+import type { Requirement, RequirementLink } from "@/domain/types";
+import type { DevDb } from "./schema";
+import { seedId } from "./seed-model";
+
+export const DEMO_REQUIREMENT_KEY_NEXT = 106;
+
+export interface DemoRequirementsOptions {
+  workspaceId: Uuid;
+  at: string;
+  /** Who wrote them (a modeler). */
+  authorId: Uuid;
+}
+
+type Demo = Pick<Requirement, "key" | "kind" | "name" | "status" | "priority" | "owner_name" | "external_ref"> & {
+  parent?: string;
+  description: string;
+  expression?: string;
+  severity?: "warn";
+  links: string[];
+};
+
+const DEMO: Demo[] = [
+  {
+    key: "REQ-101",
+    kind: "need",
+    name: "Single view of the customer",
+    description: "Marketing and service need one trusted customer record across CRM and the web shop.",
+    status: "agreed",
+    priority: "must",
+    owner_name: "Head of CRM",
+    external_ref: null,
+    links: ["entity:customer"],
+  },
+  {
+    key: "REQ-102",
+    kind: "data",
+    parent: "REQ-101",
+    name: "Contact data for every active customer",
+    description: "First name, last name and e-mail are available for every active customer.",
+    status: "agreed",
+    priority: "must",
+    owner_name: "Data owner CRM",
+    external_ref: null,
+    links: ["attribute:customer.first_name", "attribute:customer.last_name", "attribute:customer.email"],
+  },
+  {
+    key: "REQ-103",
+    kind: "dq_rule",
+    parent: "REQ-102",
+    name: "E-mail is unique per customer",
+    description: "No two active customers share an e-mail address.",
+    expression: "COUNT(DISTINCT customer_id) per lower(email) = 1",
+    severity: "warn",
+    status: "draft",
+    priority: "should",
+    owner_name: "Data steward",
+    external_ref: null,
+    links: ["attribute:customer.email"],
+  },
+  {
+    key: "REQ-104",
+    kind: "business_rule",
+    name: "Order total equals the sum of its lines",
+    description: "Total amount = sum over lines of quantity × unit price × (1 − discount).",
+    expression: "total_amount = SUM(quantity * unit_price * (1 - discount_pct / 100))",
+    status: "draft",
+    priority: "must",
+    owner_name: "Finance controller",
+    external_ref: "JIRA-481",
+    links: ["attribute:order.total_amount", "attribute:line.quantity", "attribute:line.unit_price", "attribute:line.discount_pct"],
+  },
+  {
+    key: "REQ-105",
+    kind: "non_functional",
+    name: "Personal data is encrypted at rest",
+    description: "All PII attributes are encrypted in storage and masked outside production.",
+    status: "agreed",
+    priority: "must",
+    owner_name: "DPO",
+    external_ref: "GDPR",
+    links: ["attribute:customer.first_name", "attribute:customer.last_name", "attribute:customer.email", "attribute:customer.birth_date"],
+  },
+];
+
+export function addDemoRequirements(db: DevDb, o: DemoRequirementsOptions): void {
+  const id = (key: string) => seedId(o.workspaceId, key);
+  const std = (key: string) => ({
+    id: id(key),
+    workspace_id: o.workspaceId,
+    version: 1,
+    created_at: o.at,
+    created_by: o.authorId,
+    updated_at: o.at,
+    updated_by: o.authorId,
+    deleted_at: null,
+  });
+  for (const r of DEMO) {
+    const description = plainTextPair(r.description);
+    const requirement: Requirement = {
+      ...std(`requirement:${r.key}`),
+      key: r.key,
+      kind: r.kind,
+      name: r.name,
+      description_html: description.html,
+      description_text: description.text,
+      expression: r.expression ?? null,
+      severity: r.severity ?? null,
+      status: r.status,
+      priority: r.priority,
+      owner_name: r.owner_name,
+      external_ref: r.external_ref,
+      parent_id: r.parent ? id(`requirement:${r.parent}`) : null,
+    };
+    db.requirement.push(requirement);
+    for (const link of r.links) {
+      const [kind, key] = link.split(":") as ["entity" | "attribute", string];
+      const target: LabelTarget = { kind, id: id(`${kind}:${key}`) };
+      const row: RequirementLink = { ...std(`requirement_link:${r.key}>${link}`), requirement_id: requirement.id, ...targetColumns(target) };
+      db.requirement_link.push(row);
+    }
+  }
+}
