@@ -209,6 +209,8 @@ templates are compiled. Its only path is `eslint-plugin-boundaries` 7.2.0 (dev, 
   October 2026), or earlier if `eslint-plugin-boundaries` ships a release that fixes it; then `npm install`, lint
   (including a deliberately broken layer rule to confirm the layer rules still catch it), typecheck, unit tests, and
   `npm audit` again (expected: only the 11 from `braces`). Do not take the suggested downgrade.
+- **Decision (Łukasz, 13 October, slice 3b):** the plugin still has no fix (7.2.0; `@boundaries/elements` 3.1.1 still
+  pins 4.7.9). The override comes as a separate small pull request after slice 3b's merge, from 19 October 2026.
 
 ## Right panel (slice 1a)
 

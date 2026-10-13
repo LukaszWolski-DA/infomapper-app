@@ -13,7 +13,7 @@ Behaviour reference: `docs/prototype/infomapper-model-prototype.html`. Data refe
 ### Canvas and mappings
 - **D-01** The core of the canvas is mapping a source column to an attribute; layers (mappings, relationships) are toggled on one canvas.
 - **D-02** A mapping is a model object, independent of any canvas. Removing a card does not remove its mappings.
-- **D-03** The canvas is unbounded; the minimap is called “Overview”.
+- **D-03** The canvas is unbounded; the minimap is called “Overview”. The Overview's miniature also draws the visible notes in their paper colour, under the cards.
 - **D-36** Attribute order belongs to the model (same on every canvas). Ctrl/Alt + ↑/↓ moves an attribute, Shift to top/bottom; drag in the entity panel. Source columns keep their physical order.
 - **D-37** Card width (200–600 px) belongs to the canvas. Long names are truncated in the middle, keeping the part after the last underscore (`customer_addr…_line2`).
 - **D-46** New entities: Entity tool (E) and toolbox on the canvas; “+” per concept in the left panel; “New concept”. The concept comes from the concept frame clicked into, else the last used. Duplicate names warn, do not block.
@@ -42,13 +42,13 @@ Behaviour reference: `docs/prototype/infomapper-model-prototype.html`. Data refe
 ### Working layer (labels, notes, context)
 - **D-08** Working labels (e.g. `CR-23`) are stored apart from model tags (BK, PII).
 - **D-09** Labels are assigned by hand first; automatic labeling is an option.
-- **D-10** A live label canvas shows only labeled elements, with context cards for partly labeled ones.
-- **D-11** Adding or removing a card on a live canvas changes the label, always after confirmation.
+- **D-10** A live label canvas shows only labeled elements, with context cards for partly labeled ones. A label has at most one live canvas. Opening it makes a canvas named after the label in the current project, its elements arranged into frames by concept and system; elements that become labeled later land to the right of the content (no “Newly labeled” frame yet). Deleting the label turns its live canvas into a normal canvas in the same undo step; Duplicate layout of a live canvas gives a normal canvas.
+- **D-11** Adding or removing a card on a live canvas changes the label, always after confirmation. Adding a card there labels its element in the same undo step (the Entity tool without a question); removing one takes the label off the element, or off the rows and mappings that bring it there when it is a context card. Bulk adds and removing several cards are not offered. Owners, admins and modelers do this; reviewers and readers see a live canvas read-only.
 - **D-20** Notes belong to the canvas and the working layer. Free notes join the frame they are dropped in; pinned notes follow their card or frame with a dashed tether. Duplicate layout copies no notes. A note joins a frame only when dropped in it (drawing, resizing or fitting a frame never moves or claims notes). A note whose card or frame leaves the canvas stays as a free note at its place, in no frame.
 - **D-21** Notes are open or resolved; resolved ones can be hidden, a preference kept per person in their browser only (not on the server, not an undo step); an empty new note disappears. Every note change is one undo step; anyone who may write notes edits any note, and its panel names who wrote it.
 - **D-24** Labels extend to mappings, tables and columns; the active context comes after that, as an option. Merging mappings keeps the labels of the merged ones on the mapping that stays.
-- **D-25** Live canvases include tables (fully labeled ones whole, others as context) and fade unlabeled mappings.
-- **D-26** An active working context labels every model change (entities, attributes, mappings; relationships through their entities), not layout changes, in the same undo step. It stays on after reload until switched off.
+- **D-25** Live canvases include tables (fully labeled ones whole, others as context) and fade unlabeled mappings. Context cards have a dashed outline, a light header and “context only”, and show their relevant rows (the Labeled filter); relevant rows are bold; mappings without the label are faded by colour, never opacity.
+- **D-26** An active working context labels every model change (entities, attributes, mappings; relationships through their entities), not layout changes, in the same undo step. It stays on after reload until switched off. The context is a per-person, per-workspace preference in the browser, sent with every write; the server checks it (the label exists, the person may change labels) and records it on every change event of the group. Only owners, admins and modelers have the switch. Moving an attribute labels only the moved attribute. Deletions are not labeled; source tables, columns and concepts are not labeled by the context. A change the context would label is refused when its label is gone, and the browser switches the context off; undo and redo never label.
 - **D-53** A count of notes (a card's header, a collapsed frame's block) shows the notes you would see: open ones, and resolved ones while they are shown. Notes take part in the selection: a lassoed frame stands for its free notes, Ctrl+A takes the free notes outside frames, and a pinned note moves with its card or frame, never twice.
 
 ### Projects and navigation
@@ -57,7 +57,7 @@ Behaviour reference: `docs/prototype/infomapper-model-prototype.html`. Data refe
 - **D-29** Opening a project shows its home screen: canvas tiles with thumbnails, stats, labels (pinnable), open notes, requirements. Pinning a label to a project is saved with its change event but is not an undo step (no undo outside canvases yet). Roles without label rights see a pinned label's plain ★, not the pin control.
 - **D-35** Left panel groups fold (count, sticky headers, remembered, search opens matches); “Only on this canvas”. Inspector sections fold (remembered per title); page actions always visible; lists over 20 items get a filter and “Show all”.
 - **D-38** Navigation history covers workspace, project, canvas, home screens and selection (not panning): Alt+←/→, mouse back/forward, clickable breadcrumbs.
-- **D-39** A view-state bar shows everything that hides or fades items (lens, Focus, layer, filters, collapsed cards and frames, hidden notes, active tool), each removable, plus “Show all”.
+- **D-39** A view-state bar shows everything that hides or fades items (lens, Focus, layer, filters, collapsed cards and frames, hidden notes, active tool), each removable, plus “Show all”. A live canvas's “Live: {name}” chip and its Labeled filter (not counted as filtered, kept by “Show all”) belong to the view-state bar.
 
 ### Requirements and content
 - **D-30** One requirements layer with kinds: business need, data requirement, business rule, data-quality rule, non-functional. Requirements can be broken down (parent).
@@ -94,7 +94,7 @@ Behaviour reference: `docs/prototype/infomapper-model-prototype.html`. Data refe
 - **AD-10** Table groups as in the data model; every model and work table has `workspace_id`.
 - **AD-11** UUID v7 ids generated by the application; human keys (`REQ-104`) per workspace.
 - **AD-12** Every row has `version`, `created_at/by`, `updated_at/by`, `deleted_at` (soft delete).
-- **AD-13** Append-only `change_event` log with before/after images and the active context label; one user action = one change group = one undo step.
+- **AD-13** Append-only `change_event` log with before/after images and the active context label; one user action = one change group = one undo step. A change group's change events carry the active working context's label (`context_label_id`).
 - **AD-14** Baselines are JSON snapshots of the model part of a workspace.
 - **AD-15** Requirement and label links: one table per kind, one nullable FK per target type, “exactly one” check.
 - **AD-16** Canvas layout as rows (`canvas_item`, `frame`, `note`); canvas look as JSON.
