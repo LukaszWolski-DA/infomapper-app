@@ -1,6 +1,6 @@
 # Slice 4a – Requirements, step 1 (without the canvas)
 
-Status: **draft for step 0**, 13 October 2026. Branch `slice/04a-requirements`. Starts from `main` at tag `slice-03b`.
+Status: **step 0 answered** (Łukasz, 13 October 2026; section 7a). Branch `slice/04a-requirements`. Starts from `main` at tag `slice-03b`.
 
 ## 1. Why this slice
 
@@ -41,15 +41,18 @@ Where the prototype and this PRD differ, this PRD wins; the differences are list
    “Non-functional”); statuses `draft`, `agreed`, `implemented`, `verified` (“Draft”, “Agreed”, “Implemented”,
    “Verified”); priorities `must`, `should`, `could`, `wont` (“Must”, “Should”, “Could”, “Won't”).
 2. **Key.** A new requirement gets `REQ-{requirement_key_next}` and the counter goes up by one. The key can be
-   edited. It is unique per workspace among non-deleted requirements (AD-11); a duplicate is refused with
+   edited. It is unique per workspace among non-deleted requirements, compared case-insensitively (`req-104` is
+   taken when REQ-104 exists; stored as typed) (AD-11); a duplicate is refused with
    “REQ-104 is already used by another requirement.” If the generated key is already taken (someone typed it),
-   the counter skips forward to the next free number. An empty key or name is refused and the field shows the
-   previous value (as the prototype does).
+   the counter skips forward to the next free number; the counter only reads keys of the form `REQ-{number}`. An
+   empty key (“Enter a key.”) or name (“Enter a name.”) is refused and the field shows the previous value (as the
+   prototype does).
 3. **Commands**, each one write with its `change_event` records and one undo step (AD-13): create (optionally with
    one link, for “+ New requirement…” in an element panel), update one field, set status, delete, link, unlink.
 4. **Kind change** keeps `expression` and `severity` stored; they are shown only for the kinds that use them
    (Rule for `business_rule`, Check for `dq_rule`, “When it fails” for `dq_rule`). Severity defaults to `warn` when
-   a requirement becomes a `dq_rule` and has none.
+   a requirement becomes a `dq_rule` and has none. The schema allows a severity for every kind (a new migration,
+   section 7a).
 5. **Parent.** “Part of” may not create a cycle at any depth (the prototype only blocks itself and its direct
    children). Refused with “REQ-101 is part of REQ-103 already, so it cannot contain it.”
 6. **Links** (`requirement_link`, exactly one target, AD-15) to an entity, attribute, mapping, source table or
@@ -69,9 +72,12 @@ Where the prototype and this PRD differ, this PRD wins; the differences are list
    and a mapping show their own only.
 9. **Delete** (prototype behaviour, no impact dialog): the requirement is soft-deleted, its links are deleted, its
    children become top level, model elements are untouched. One undo brings back all of it. Toast: “Deleted REQ-104.
-   The model elements it traced to are untouched.”
+   The model elements it traced to are untouched.” Undoing the delete is refused when another requirement uses its
+   key by then: “REQ-104 is used by another requirement now, so the deleted one cannot come back.” (the domain and
+   the local adapter check it).
 10. **Deleting model elements** soft-deletes the `requirement_link` rows pointing at them in the same write, and the
-    undo of that delete restores them. The entity delete dialog (D-47) lists the requirements whose links go
+    undo of that delete restores them. The entity delete dialog (D-47) gets the prototype's row “{n} requirement(s)
+    — lose this from their scope: REQ-101, REQ-102” after canvases (“–” when none); it lists the requirements whose links go
     (step 0 checks what it shows today).
 11. **Rich text** (AD-17): the server sanitizes every `*_html` it stores, whatever the client sent, and derives
     `*_text` from it. Allow-list as the prototype's `sanitizeRich`: `p`, `br`, `strong`, `em`, `ul`, `ol`, `li`,
@@ -134,6 +140,9 @@ Where the prototype and this PRD differ, this PRD wins; the differences are list
     requirements' colour dot and count, foldable like the other groups (fold state in the browser); a group with no
     match is not shown. A row: kind icon (`RICON`), key, name, coverage bar (“{ok} of {total} attributes covered”
     as its tooltip). Search filters by key and name. “New requirement” at the end for owner, admin and modeler.
+    Without any requirement: “No requirements yet.” “Only what this project uses” keeps the requirements whose scope
+    has an entity or table on one of the project's canvases (item 30's rule); with “on this canvas” also on, that
+    filter wins (item 22).
 21. A click on a row selects the requirement and opens its panel. **No lens** (4b). Rows are not draggable (4b).
 22. With the left panel's “on this canvas” filter on, the tab shows no requirements, because no requirement has a
     card on a canvas until 4b; it shows “No requirement has a card on this canvas yet.”
@@ -152,8 +161,11 @@ Where the prototype and this PRD differ, this PRD wins; the differences are list
     the panel of an entity, attribute, mapping, table or column.”
 26. **Delete requirement** at the end (owner, admin, modeler). The prototype's “Place its card on this canvas” and
     the lens sentence under Coverage are not shown (4b).
-27. A link to an element (Traces to, gaps) behaves as the app's existing go-to links: if its card is on the open
-    canvas, it is selected there and its panel opens; otherwise its panel opens (step 0 names the existing helper).
+27. A link to an element (Traces to, gaps) behaves as the app's existing go-to links (`goEntity`, `goAttribute`,
+    `goMapping`, `goTable`, `goColumn`): if its card is on the open canvas, it is selected there and its panel opens;
+    otherwise a new selection that names the element without a card opens its panel only: no pan, no card added,
+    no canvas switch. Every existing go-to link falls back to it, which removes slice 1a's limitation “Panel links
+    only reach rows whose card is on this canvas”.
 
 ### Element panels (D-34, panel part)
 
@@ -250,6 +262,30 @@ the requirement and undo.
 - **Q8.** Tiptap: which packages and versions (pinned, older than 14 days), and its bundle size on the canvas page.
   Load the editor only when the dialog opens.
 
+## 7a. Answers (Łukasz, 13 October 2026)
+
+- **Q1.** One new migration: the key is unique among non-deleted requirements, case-insensitively (a unique index
+  on `(workspace_id, lower(key)) where deleted_at is null`, replacing `requirement_key_uq`); `severity` is allowed for
+  every kind (`warn`, `block` or null; the domain decides when to show it). Undoing a requirement's delete when its key
+  is used by another requirement by then is refused (item 9; unit test and adapter check). `docs/data-model-v2.md` is
+  updated in this PR. The local adapter gets both tables with the same rules.
+- **Q2.** A pure allow-list sanitizer in `domain` (`src/domain/model/rich-text.ts`) on `htmlparser2` 12.0.0.
+- **Q3.** As mappings (`lastContentEditor`): the author is read from the latest `change_event` that created the
+  requirement or changed kind, name, description, expression or severity; the creator when there is none.
+- **Q4.** The Requirements groups keep their fold state in the existing browser preference; “Only what this project
+  uses” follows item 30's rule, and “on this canvas” wins when both are on (item 20).
+- **Q5.** The entity delete dialog gets the prototype's requirements row (item 10).
+- **Q6.** The new selection that names an element without a card, with the go-to helpers falling back to it
+  (item 27); the slice 1a limitation is removed from `known-limitations.md`; every changed earlier test is listed in
+  the acceptance file.
+- **Q7.** Every seed name exists; nothing replaced.
+- **Q8.** Tiptap 3.31.3 (`@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-superscript`,
+  `@tiptap/extension-subscript`), loaded with the dialog (`next/dynamic`); step 2 reports the bundle sizes.
+- **Wording** (the acceptance file's table): “Enter a key.”; “That element no longer exists.” / “That requirement no
+  longer exists.”; “Already unlinked.” (no write); no write and no toast for a value that does not change or a Save
+  with nothing changed; the four-eyes hint above Status with item 13's message; “No requirements yet.”; no toast for
+  “New requirement” and “+ New requirement…”.
+
 ## 8. Changes to earlier tests
 
 Expected: tests that type entity or attribute definitions into a textarea (slices 1a and 1b) move to the editor
@@ -258,10 +294,11 @@ dialog; the left panel's tab tests (if any) get the third tab. List every change
 ## 9. Docs in this PR
 
 - `docs/known-limitations.md`: notes are plain text; requirements not on the canvas until 4b; Agreed requirements
-  stay Agreed when edited.
+  stay Agreed when edited; slice 1a's “Panel links only reach rows whose card is on this canvas” removed (item 27).
+- `docs/data-model-v2.md` and a new migration: the key index and the severity check (section 7a).
 - `docs/ideas.md`: “Labels on requirements” moved to requirements step 2 (with D-33's promotion); “Editing an agreed
   requirement sends it back to Draft” (like D-51) for step 2.
-- `docs/decisions.md`, only with Łukasz's approval at step 0: add to AD-06 “For requirements, setting Agreed is the
+- `docs/decisions.md`, approved by Łukasz at step 0: add to AD-06 “For requirements, setting Agreed is the
   approval; the author is whoever last changed its content (kind, name, description, expression, severity).” and to
   AD-05 “Reviewers change a requirement's status only.”
 - `CLAUDE.md`: the slice 4a helpers and commands, as for earlier slices.
