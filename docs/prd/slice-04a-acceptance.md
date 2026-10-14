@@ -36,7 +36,7 @@ the merge). After any test or code change the three start again; a known flaky t
 
 | Set | Commit | Runs | What happened |
 | --- | --- | --- | --- |
-| 1 | `2e8217a` | 3 of 3 passed: 155 tests each (116 files); **26.4, 26.2 and 26.7 min** (wall clock 1,587, 1,575 and 1,608 s); no retries, no flaky test | The server's known “destination stream closed early” lines (23, 26, 26); no Google Fonts error |
+| 1 | `2e8217a` | 3 of 3 passed: 155 tests each (127 files); **26.4, 26.2 and 26.7 min** (wall clock 1,587, 1,575 and 1,608 s); no retries, no flaky test | The server's known “destination stream closed early” lines (23, 26, 26); no Google Fonts error |
 
 All three under 30 minutes, so no cause to look for (step 2's 32.8-minute run stayed an exception). Before the runs:
 `npm run lint`, `npm run typecheck` and `npm test` (920 tests in 64 files) pass; only docs changed after `2e8217a`.
