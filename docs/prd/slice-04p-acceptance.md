@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 2 built (F1, F4, the hover line fade); the sitting waits for Łukasz's OK**; step 1 and the baseline accepted. Draft pull request #12. Branch
+Status: **step 2 measured (sitting `trials-2026-10-14-20-04`); verdicts proposed, Łukasz chooses**; step 1 and the baseline accepted. Draft pull request #12. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -654,3 +654,122 @@ first, as before:
 ```bash
 npx tsx scripts/measure-trials.ts --rounds 1 --against slice-04a --sides perf/4p-trial-a,perf/4p-trial-f1,perf/4p-trial-f4
 ```
+
+## Step 2: the sitting (14–15 October)
+
+`npx tsx scripts/measure-trials.ts --rounds 3 --no-build --against slice-04a --sides
+perf/4p-trial-a,perf/4p-trial-f1,perf/4p-trial-f4`, sitting `trials-2026-10-14-20-04`, after the warm-up sitting
+`trials-2026-10-14-19-27` (one round, not counted, which made the four measurement builds). The laptop was prepared by
+Łukasz. Sides: `slice-04a` (`5e02c96`), trial A (`641518e`), F1 (`37b2e73`), F4 (`f0d0f61`). Each round turns the
+starting side by one. Every side waited for a quiet machine (below 2 % for 30 s, at most 3 minutes).
+
+**Round 1 dropped, replaced by round 4.** Every side of round 1 was slow against rounds 2 and 3:
+- `slice-04a`'s S1B-10 100 % runs 44.0 / 39.8 / 35.7 fps, against 45.6–49.9 later;
+- F1's fading-off 100 % 26.2 fps, against about 47;
+- F4's fading-off 100 % 37.7, against 43–46.
+
+The quiet waits passed, but F4's took 113 s with peaks of 19 %, and Explorer was among the busiest processes after
+`slice-04a`'s and trial A's sides. Round 4 (`--add-round`; all four sides quiet after 31–165 s, nothing above 2.3 %
+after any side) replaces it.
+
+**Flagged, kept:** trial A's round 2, the first side of that round, ran S1B-10 at 100 % at 40.7 / 39.2 / 40.0 fps (46.7–47.8
+in rounds 3 and 4) and its fading-off 100 % at 40.4. It shows as the low end of trial A's ranges below; dropping it
+would not change any verdict.
+
+### Every figure, three rounds (2, 3, 4): median (min–max), change against `slice-04a`
+
+| Figure | `slice-04a` | Trial A | F1 | F4 |
+| --- | --- | --- | --- | --- |
+| C-10 hover to the next frame, median of 40 | 120 (115–121) | **19 (19–24), −84.4 %** | 19 (19–22), −83.9 % | 19 (18–20), −84.5 % |
+| Lasso marks, median of 20 | 28 (28–29) | 29 (23–33), +2.1 % | 29 (26–30), +2.1 % | 23 (23–30), −17.1 % |
+| Pan and zoom, overview (S1B-10) | 58.9 (58.1–59.2) | 58.6 (57.2–59.0), −0.5 % | 58.6 (58.5–59.3), −0.5 % | 58.7 (58.6–59.2), −0.3 % |
+| Pan and zoom, 100 % (S1B-10) | 48.7 (48.5–48.8) | 47.2 (40.0–47.7), −3.1 % | 47.8 (47.6–48.0), −1.8 % | 46.8 (46.1–47.5), −3.9 % |
+| Fading off, 100 % around `ent:23`, expanded | 47.6 (47.5–47.7) | 47.1 (40.4–47.9), −1.1 % | 47.0 (46.9–47.4), −1.3 % | 45.7 (43.3–45.8), −4.0 % |
+| Fading off, 30 %, expanded | 48.9 (45.6–52.2) | 47.6 (47.5–51.1), −2.7 % | 52.0 (48.0–53.2), +6.3 % | 47.6 (44.3–50.1), −2.7 % |
+| Fading off, 100 % dense area, expanded | 45.1 (40.5–46.8) | 42.4 (41.4–47.3), −6.0 % | 48.0 (47.4–48.7), +6.4 % | 44.6 (43.6–47.6), −1.1 % |
+| Fading off, 100 %, collapsed | 55.9 (55.1–56.1) | 55.6 (55.5–56.5), −0.5 % | 56.3 (56.0–56.3), +0.7 % | 56.0 (55.3–57.1), +0.2 % |
+| Fading off, 30 %, collapsed | 57.4 (56.9–57.9) | 57.5 (57.0–58.1), +0.2 % | 58.0 (57.3–58.2), +1.0 % | 57.9 (57.7–58.0), +0.9 % |
+| Fading off, 100 % dense area, collapsed | 60.0 (60.0–60.0) | 60.0 (59.9–60.0), 0.0 % | 60.0 (59.7–60.0), 0.0 % | 59.9 (59.9–60.0), −0.2 % |
+| C-10, hover line fade off (fading spec) | – | 26 (20–26) | 22 (21–32) | 22 (20–22) |
+| C-10, hover line fade “plain” | – | **228 (223–247)** | 224 (222–232) | 223 (222–228) |
+| C-10, hover line fade “layer” | – | **247 (243–319)** | 244 (244–246) | 244 (243–245) |
+
+Frames over 50 ms with fading off: the same on every side within ±1–2 (100 %: 9 on each side; 30 %: 8–9; collapsed 2–6;
+the collapsed dense area 0). Per round and side every value is in the sitting's folder.
+
+### Fading: switching (S4P-02) and pan and zoom with fading on against off (S4P-03), same run
+
+S4P-02: on and off each ≤ 100 ms (median of 40). S4P-03: pan and zoom with fading on at most 5 % below fading off in the
+same run, and no more frames over 50 ms than off plus the baseline's spread (±4).
+
+**F1**
+
+| View | Scenario | On, ms | Off, ms | Pan and zoom off → on, fps | Change | Frames over 50 ms | S4P-02 | S4P-03 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 100 %, expanded | Focus | 27 | 27 | 47.0 → 47.5 | +1.1 % | 9 → 9 | met | met |
+| 100 %, expanded | Lens, small | 29 | 26 | 47.0 → 44.9 | −4.5 % | 9 → 11 | met | met |
+| 100 %, expanded | Lens, large | 27 | 27 | 47.0 → 49.0 | +4.3 % | 9 → 9 | met | met |
+| 30 %, expanded | Focus | 17 | 16 | 52.0 → 49.9 | −4.0 % | 8 → 8 | met | met |
+| 30 %, expanded | Lens, small | 16 | 17 | 52.0 → 50.4 | −3.1 % | 8 → 9 | met | met |
+| 30 %, expanded | Lens, large | 18 | 15 | 52.0 → 48.3 | **−7.1 %** | 8 → 9 | met | **missed by 2.1 points** |
+| 100 % dense area, expanded | Lens, dense | 22 | 22 | 48.0 → 49.0 | +2.1 % | 8 → 9 | met | met |
+| 100 %, collapsed | Focus / small / large | 21–22 | 21 | 56.3 → 55.5–56.9 | −1.4 to +1.1 % | 5 → 4–5 | met | met |
+| 30 %, collapsed | Focus / small / large | 13–15 | 13–15 | 58.0 → 56.6–57.4 | −2.4 to −1.0 % | 3 → 3–6 | met | met |
+| 100 % dense area, collapsed | Lens, dense | 14 | 14 | 60.0 → 59.9 | −0.2 % | 0 → 0 | met | met |
+
+**F4**
+
+| View | Scenario | On, ms | Off, ms | Pan and zoom off → on, fps | Change | Frames over 50 ms | S4P-02 | S4P-03 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 100 %, expanded | Focus / small / large | 27–28 | 27–30 | 45.7 → 45.6–46.0 | −0.2 to +0.7 % | 9 → 10–13 | met | met |
+| 30 %, expanded | Focus | 25 | 26 | 47.6 → 42.1 | **−11.6 %** | 8 → 8 | met | **missed** |
+| 30 %, expanded | Lens, small | 23 | 35 | 47.6 → 43.1 | **−9.5 %** | 8 → 11 | met | **missed** |
+| 30 %, expanded | Lens, large | 22 | 74 | 47.6 → 43.6 | **−8.4 %** | 8 → 9 | met | **missed** |
+| 100 % dense area, expanded | Lens, dense | 27 | 27 | 44.6 → 47.3 | +6.1 % | 10 → 7 | met | met |
+| 100 %, collapsed | Focus / small / large | 21 | 20–21 | 56.0 → 56.4–57.0 | +0.7 to +1.8 % | 5 → 5–6 | met | met |
+| 30 %, collapsed | Focus | 20 | 20 | 57.9 → 55.1 | −4.8 % | 2 → 8 | met | met (frames at the edge) |
+| 30 %, collapsed | Lens, small | 20 | 27 | 57.9 → 52.9 | **−8.6 %** | 2 → 8 | met | **missed** |
+| 30 %, collapsed | Lens, large | 20 | 43 | 57.9 → 52.1 | **−10.0 %** | 2 → 8 | met | **missed** |
+| 100 % dense area, collapsed | Lens, dense | 21 | 21 | 59.9 → 59.9 | 0.0 % | 0 → 0 | met | met |
+
+### Reading
+
+- **Trial A takes C-10 from 120 ms to 19 ms** on every side that has it (F1 and F4 include it): the hover no longer
+  repaints the viewport's big layer. The lasso marks were already at 28 ms on `slice-04a` (Chrome 155) and stay there.
+  Pan and zoom with trial A are within −0.5 to −6.0 % of `slice-04a`, inside the baseline's spread, and F1, which has
+  trial A's overlay too, is at −1.8 % to +6.4 %. So the overlay costs no measurable pan and zoom.
+- **The hover line fade costs about 200 ms** a hover: 223–247 ms against 19–26 ms without it, on every branch. Its
+  element under the cards changes the viewport's big layer (“plain”: everything under it repaints) or, on its own layer
+  (“layer”: 244–247 ms), makes Chrome put the cards above it on layers of their own. Both miss C-10's 100 ms by more
+  than double.
+- **F4, the expected winner, loses pan and zoom at 30 %** (−8.4 to −11.6 % in five of fourteen cells), as step 2's
+  trace suggested: its two layers (the veil and the overlay with the lit lines) add about 55 MiB of tiles at 30 % and
+  about 20 % Layerize per frame. At 100 % and in the dense area it is free. Its switching is fast everywhere
+  (20–28 ms on; off up to 74 ms for the large lens at 30 %).
+- **F1, the comparison, does better than expected.** Switching takes 13–29 ms on and 13–27 ms off in every scenario.
+  Pan and zoom with fading on are within 5 % of fading off in 13 of 14 cells. The one miss is the large lens at 30 %
+  expanded, −7.1 % (52.0 → 48.3), with 8 → 9 frames over 50 ms. That view's own fading-off figure varies 45.6–52.2 on
+  `slice-04a` (about ±7 %). Its veil is one ordinary element in the big layer: Chrome repaints under it once when it
+  appears and then moves it with the rest, with no new layers and no extra tiles.
+- **F1's weaknesses are in how it was built, not in its cost.** It lifts the lit cards by writing `z-index` on React
+  Flow's wrappers, which React Flow overwrites when it re-renders a wrapper (a lit card being dragged drops under the
+  veil until the drop), and it does not lift notes.
+
+### Proposed verdicts (Łukasz chooses)
+
+| Trial | Proposed verdict | Bars |
+| --- | --- | --- |
+| **Trial A** (overlay on its own layer, hover lines above the cards) | **adopt** | S4P-05 C-10 ≤ 100 ms: **met** (19 ms, from 120). S4P-06 lasso marks ≤ 100 ms: **met** (29 ms; already met by `slice-04a` under Chrome 155). S4P-08: pan and zoom −0.5 to −6.0 %, within the baseline's spread: **met**. One element more in the viewport (the container), already recorded. |
+| **Hover line fade** (“plain” and “layer”) | **reject both** | C-10 ≤ 100 ms: **missed**, 228 and 247 ms (19–26 ms without it). The other lines keep their colour on a hover, as since slice 1b. |
+| **F4** (veil with holes on its own layer) | **reject** | S4P-02: **met** (20–28 ms on, ≤ 74 ms off). S4P-03: **missed** at 30 %, 5 of 14 cells −8.4 to −11.6 %; +55 MiB of tiles at 30 %. |
+| **F1** (veil in the big layer, lit cards lifted) | **choose, finished properly in step 3** | S4P-02: **met** in every scenario (13–29 ms). S4P-03: **met in 13 of 14**; the large lens at 30 % expanded −7.1 % (2.1 points over the bar, within that view's ±7 % spread on the reference; Łukasz decides whether that counts as met). No extra layers or memory. |
+
+**If F1 is chosen, step 3 would finish it this way:**
+- lift the lit cards and the notes pinned to them with one stylesheet rule written by the `FadeLayer`
+  (`.react-flow__node[data-id="…"] { z-index: 2 !important }`) instead of the wrappers' inline style, so React Flow's
+  re-renders cannot drop them (no canvas commit either);
+- keep the veil, the lit lines and the lens rows as built;
+- add unit tests for what is lit (the domain's are there) and the guard for S4P-12;
+- trial for the notes layer (item 7) after it.
+
+Then the step 5 sitting confirms S4P-03 for the large lens at 30 % with three rounds against `slice-04a`.
