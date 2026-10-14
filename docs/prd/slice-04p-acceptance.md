@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 1 done (trial A built on `perf/4p-trial-a`), waiting for Łukasz**; baseline accepted (three rounds). Draft pull request #12. Branch
+Status: **step 2 built (F1, F4, the hover line fade); the sitting waits for Łukasz's OK**; step 1 and the baseline accepted. Draft pull request #12. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -528,3 +528,129 @@ e2e/slice-04p/S4P-04-screens.spec.ts`, 1536 × 864, “Customer & orders”):
 4. **Step 2** as in the PRD (F1 for comparison and F4, both on trial A's overlay, each on its own trial branch), with the
    veil's transform during pan and zoom, the holes under a dragged or resized card and the veil's GPU memory at 30 %
    answered; S4P-04 screenshots of Focus and the four lenses before the sitting.
+
+## Step 2: F1 and F4 built, before the sitting (14 October)
+
+### Branches
+
+| Branch | What it adds | Commits |
+| --- | --- | --- |
+| `slice/04p-canvas-performance` | what fading lights, in `domain` (`src/domain/model/lit.ts`, prototype `relatedOf`: `focusLit`, `lensLit` with the rows' covered or gap colour; 7 unit tests); the measuring method (below) | `841390f`, `63016cc`, … |
+| `perf/4p-trial-a` | trial A (step 1) and the **hover line fade** as a variant, off unless the measuring hook switches it: `window.__imHoverFade("off" \| "plain" \| "layer")` | `d63716d` |
+| `perf/4p-fade-base` | shared by F1 and F4 (no trial of its own): what is lit **on the canvas** (`fade-canvas.tsx`: cards, blocks of collapsed frames, notes pinned to a lit card), the lit lines drawn again (`LitLines`) and the lens's rows tinted (`LitRows`) in trial A's overlay, the page passing the model and the requirements to the canvas, an empty `FadeLayer` slot | `badb0d4` |
+| `perf/4p-trial-f4` | **F4**: one veil (an SVG path, in the canvas background's colour at 75 %) on a compositing layer of its own, in the overlay above the cards, with a hole for every lit card, block and note; the lit lines and rows above it | `1e5c57f` |
+| `perf/4p-trial-f1` | **F1** (comparison): one veil in the viewport's big layer at z-index 1, the lit cards' React Flow wrappers lifted to z-index 2, the overlay at z-index 3 with the lit lines and rows | `c77d021`, `7071f1b` |
+
+All the trial branches have the slice branch merged in, so they measure with the same specs. Each trial is tagged
+`perf/4p-trial-{name}` at its verdict after the sitting.
+
+**The hover line fade** (Łukasz after step 1): one element in the canvas background's colour at 88 %, drawn in React
+Flow's edge label layer after the line layer, so it lies above every line and below the cards, mounted only while
+something is hovered (and not while dragging or drawing a lasso); the hovered lines stay bright in the overlay. Two
+ways to measure: “plain” (in the viewport's big layer) and “layer” (its own compositing layer).
+
+**What the switch does not do:** neither F1 nor F4 re-renders the canvas. Both read the fading request from its store,
+so only the `FadeLayer` re-renders (S4P-12).
+
+### Point 3's questions
+
+1. **Does the veil move with the canvas's transform during pan and zoom, with no script per frame?** Yes, for both. The
+   veil is inside React Flow's viewport (F4: in the overlay in the viewport portal; F1: in the viewport portal), so the
+   viewport's own transform moves and scales it, and nothing about it is recomputed while panning or zooming. The guard
+   `e2e/slice-04p/S4P-fading-guard.spec.ts` checks it on the dev server. With Focus on, ten wheel pans and five
+   Ctrl+wheel zooms leave the fading layer's commit counter (`window.__imFadeCommits`, development only) and the
+   canvas's unchanged, on F4 and on F1.
+2. **Do the holes follow a card that is dragged or resized while fading is on?** F4 yes. The `FadeLayer` follows React
+   Flow's nodes (as the selection marks do), and the guard drags Customer by its header and then its width, and checks
+   that the veil's path has Customer's hole at the new position and width after each. F1 lifts the lit card's wrapper,
+   so the card itself shows; the guard checks that it is still lifted after the drag and the resize. Caveat: React Flow
+   re-applies its own z-index to a wrapper it re-renders, so in F1 a dragged lit card may drop under the veil during the
+   drag; the guard sees it lifted again after the drop.
+3. **The veil's GPU memory at 30 %** (F4, measurement build, Chrome's memory-infra dump, 30 % around `ent:23`, fresh
+   page each, 4 s settled):
+
+   | | Fading never on | Focus on | Difference |
+   | --- | --- | --- | --- |
+   | `cc/tile_memory` (the renderer's tiles) | 92.0 MiB | 146.7 MiB | **+54.7 MiB** |
+   | `gpu/shared_images` | 102.8 MiB | 157.5 MiB | **+54.7 MiB** |
+   | `cc/resource_memory` | 61.2 MiB | 121.9 MiB | +60.7 MiB |
+
+   The veil's margin around the content (20,000 px, so its edge is never in view) does not matter. With 2,000 px the
+   figures are identical, so the memory is the tiles of the visible area of the two new layers (the veil and the overlay
+   with the lit lines), not the veil's size. While fading is on, the layer tree has 49 drawing layers instead of 47.
+
+   **A first look at pan and zoom** (the same trace, 5 s of the wheel driver each, before and after Focus on, not a
+   sitting): Layerize 1,096 → 1,320 ms (+20 %), Paint 2,226 → 2,392 ms (+7 %), raster 100 → 86 ms. That is the cost
+   S4P-03 judges; the sitting measures it properly.
+
+### The page's payload
+
+The canvas gets the same `model`, `requirements` and `requirementLinks` objects as the inspector, and React's payload
+carries them once. The “Performance test” canvas page is 3,019,445 bytes on F4 against 3,019,147 on the slice branch
+(+298 bytes, the prop's wrapper), three loads each, measurement build. C-08 should not move.
+
+### Tests (no dev server running)
+
+- **Unit:** `npm test` 932 on every branch (`lit.test.ts` 7, `value-store.test.ts` 1, as before otherwise). Lint and
+  typecheck pass on every branch.
+- **Guards** (`S4P-fading-guard.spec.ts`, `S4P-trial-a.spec.ts`) pass on F4 and F1. The fading guard checks: switching
+  Focus and REQ-101's lens on and off without a canvas or miniature commit; REQ-101 tinting Customer's rows 5 covered and
+  3 gaps; pan and zoom without a fading or canvas commit; the hole or the lifted card after a drag and a resize. It skips
+  itself where the branch has no mechanism.
+- **The overlay list** (slices 1b, 2a, 2b, S2C-02, S2C-12, S3A-10, S3A-14-idle, S3B-13, S3B-15-idle, S4A-14):
+  **57 passed** on F4 and **57 passed** on F1. No earlier test changed.
+
+### Screenshots for S4P-04
+
+`docs/prd/slice-04p-screens/step-2-f4/` and `step-2-f1/` (`SCREENS=<folder> npx playwright test
+e2e/slice-04p/S4P-04-screens.spec.ts` on the trial's branch), 1536 × 864, frames expanded:
+
+| Scenario | 100 % | 30 % | Prototype beside it |
+| --- | --- | --- | --- |
+| Focus, “Customer & orders” (Customer) | `demo-focus-100-app.png` | `demo-focus-30-app.png` | `demo-focus-{100,30}-prototype.png` (Customer selected, Focus on) |
+| Small lens, “Customer & orders” (REQ-102: three attributes) | `demo-lens-small-100-app.png` | `demo-lens-small-30-app.png` | `demo-lens-small-{100,30}-prototype.png` (REQ-102 selected) |
+| Large lens, “Customer & orders” (REQ-101: the entity) | `demo-lens-large-100-app.png` | `demo-lens-large-30-app.png` | `demo-lens-large-{100,30}-prototype.png` (REQ-101 selected) |
+| Focus, “Performance test” (`ent:23`) | `perf-focus-100-app.png` | `perf-focus-30-app.png` | – (the prototype has no such data) |
+| Small lens, “Performance test” (REQ-101) | `perf-lens-small-100-app.png` | `perf-lens-small-30-app.png` | – |
+| Large lens, “Performance test” (REQ-102) | `perf-lens-large-100-app.png` | `perf-lens-large-30-app.png` | – |
+| Dense lens, “Performance test” (REQ-103, S1A-14's view) | `perf-lens-dense-100-app.png` | `perf-lens-dense-30-app.png` | – (no requirement linked to tables only in the prototype) |
+| Hover with the hover line fade (“plain”) | `hover-fade-100-app.png` | `hover-fade-30-app.png` | `hover-{100,30}-prototype.png` |
+
+F1's pictures look the same as F4's: the mechanisms differ, not the look.
+
+**Where it does not look like the prototype** (the first three accepted for now, to be judged on these pictures):
+1. One fade level: cards, frames and notes at about 25 % (the prototype: 25 %, 35 %, 30 %).
+2. Lit lines are drawn above the faded cards they cross; in the prototype they pass under them.
+3. A gap row is tinted orange (translucent, over the row) but its name keeps its colour; the prototype also turns the
+   name orange. Covered rows are tinted blue the same way.
+4. The hook switches fading without selecting anything, so the right panel shows the canvas overview; in the
+   prototype the Focus or the requirement is also selected and its panel open. That is 4b's (the button and the lens in
+   the requirement panel).
+5. The veil lies over the grid too, so the grid's dots fade with everything else; in the prototype the grid stays.
+6. The hover line fade fades the frames too (they are under the lines), and the grid as in 5; the prototype fades only
+   the other lines. F1 does not lift notes, so notes pinned to a lit card fade (F4 cuts a hole for them).
+
+### The sitting (after Łukasz's OK)
+
+Prepared (`npx tsx scripts/measure-trials.ts --prepare-only …`, log `.data/s4p-trials-prepare.log`). It makes a
+worktree per trial next to `../infomapper-ab-main`: `../infomapper-side-perf-4p-trial-a`, `-f1`, `-f4`, each with its
+own `npm ci` and measurement build. One sitting, every side in turns, the starting side moving by one each round, a
+quiet machine before every side:
+
+```bash
+npx tsx scripts/measure-trials.ts --rounds 2 --against slice-04a --sides perf/4p-trial-a,perf/4p-trial-f1,perf/4p-trial-f4
+```
+
+Every side runs S1B-10 (C-10, and pan and zoom at the overview and 100 %), S2A-14's lasso marks, and the fading spec:
+- pan and zoom with fading off in its six views;
+- on F1 and F4, every scenario: switching on and off, and pan and zoom with fading on;
+- on the three trial sides, C-10 with the hover line fade off, “plain” and “layer”.
+
+The summary has one table across the four sides (median, min–max, change against `slice-04a`) and a fading table per
+candidate with S4P-02's and S4P-03's results. Estimated time: about 7 minutes for `slice-04a`, 9 for trial A and 15–17
+for F1 and F4 per round, so about 1 h 45 min for two rounds after a warm-up. A warm-up run (one round, not counted)
+first, as before:
+
+```bash
+npx tsx scripts/measure-trials.ts --rounds 1 --against slice-04a --sides perf/4p-trial-a,perf/4p-trial-f1,perf/4p-trial-f4
+```
