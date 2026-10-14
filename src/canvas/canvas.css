@@ -216,6 +216,10 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .hover-veil.own-layer { will-change: transform }
 /* fading (slice 4p, step 2): the lit lines drawn again above it, and the lens's rows tinted (prototype .row.rq covered,
    .row.gap gap) over the rows, translucent so their text stays readable */
+/* F1: one veil in the viewport's big layer above the cards; the lit cards are lifted above it (z-index 2 on their
+   wrappers) and the overlay above them */
+.im-canvas .fade-veil-f1 { position: absolute; z-index: 1; pointer-events: none; background: color-mix(in srgb, var(--im-canvas) 75%, transparent) }
+.im-canvas .overlay-layer { z-index: 3 }
 .im-canvas .lit-lines .lnk { pointer-events: none }
 .im-canvas .lit-lines .lnk .hit { display: none }
 .im-canvas .lit-rows .covered { fill: var(--im-req-soft); fill-opacity: .65 }
