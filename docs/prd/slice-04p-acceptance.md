@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 0 accepted; baseline measured (S4P-01), waiting for Łukasz's OK for step 1**. Draft pull request #12. Branch
+Status: **step 0 accepted; baseline measured with three rounds (S4P-01), waiting for Łukasz's OK for step 1**. Draft pull request #12. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -352,3 +352,87 @@ narrow the medians; (c) a short sitting with the hook removed, to see whether th
 The application changed a lot since (frames, notes, labels, requirements), so these gains are probably not the
 code. The likely cause is the browser (Chrome 155 against 154) or the laptop's state, not proven. S4P-05 and S4P-06
 start from these numbers: the lasso already meets its bar, and C-10 misses by 17 ms.
+
+## Łukasz's answers after the baseline (14 October)
+
+1. **Option (b):** one more round for the expanded sitting (three rounds, the harness's default); the collapsed sitting
+   keeps its two.
+2. **S4P-08** is judged on three-round medians and reads “not worse than 5 %, or within the baseline's spread”. PRD
+   changed in its own commit (`8a1f17b`).
+3. **Chrome 155 changed the starting point** (below; also in `docs/known-limitations.md`). Only figures from the same
+   sitting (A/B) are compared, never with earlier slices' numbers.
+4. **Trial A merges into step 2.** Step 1 builds the overlay on its own compositing layer and uses it for the hover (the
+   hovered lines above the cards) and the row and lasso marks, on its trial branch, with the affected e2e tests and the
+   hover screenshots, and no sitting. Step 2 builds F1 and F4 on it and measures C-10, the lasso marks and every fading
+   scenario in one sitting, which gives the verdicts for trial A, F1 and F4. PRD steps changed in the same commit as
+   point 2.
+
+### Baseline, frames expanded: three rounds (S4P-01)
+
+Sitting `2026-10-14-15-48`, the two rounds above plus a third. HEAD had moved by the docs commit `a93f5dd` only, so the
+added rounds ran with `--any-commit` on the same measurement builds (`c5f2296` against `5e02c96`).
+
+**Round 3 dropped, replaced by round 4.** Both sides of round 3 started on a quiet machine (58 s and 31 s), but this
+branch's fading-off run in the 100 % dense area measured 24.9 fps with 56 frames over 50 ms and a 350 ms frame. S1A-14's
+run on the same view in the same side measured 49.5, and every other figure of that side was normal. Explorer was among
+the busiest processes after both sides (2.0 % and 1.7 %), as in slice 2p's dropped round. Round 4 replaces it.
+**Flagged, kept:** in round 4 `slice-04a`'s dense-area run measured 42.8 fps (47.3–49.6 in its other rounds), and
+Explorer showed 2.1 % after round 4's branch side. Dropping it would change no conclusion.
+
+| Figure | Bar | `slice-04a`: median (min–max) | This branch: median (min–max) | Change |
+| --- | --- | --- | --- | --- |
+| Pan and zoom at the overview (S1A-14) | ≥ 50 fps | 59.7 (58.5–59.7) | 59.4 (58.9–59.8) | −0.5 % |
+| – frames over 50 ms | 0 | 0 (0–0) | 0 (0–0) | – |
+| Pan and zoom at 100 %, dense area (S1A-14) | ≥ 50 fps | 49.6 (47.4–49.9) | 50.4 (50.4–51.7) | +1.6 % |
+| – frames over 50 ms | 0 | 7 (6–15) | 9 (5–11) | – |
+| Initial render (C-08), median of 5 | ≤ 1500 ms | 1509 (1486–1515) | 1463 (1412–1496) | −3.0 % |
+| Card resize (C-09) | ≥ 45 fps | 34.7 (34.5–35.7) | 37.2 (35.9–37.7) | +7.2 % |
+| Hover to the next frame (C-10), median of 40 | ≤ 100 ms | 117 (117–118) | 115 (115–118) | −1.6 % |
+| Single-card drag at 50 % | ≥ 45 fps | 16.2 (10.7–16.5) | 14.6 (10.7–16.9) | −9.9 % |
+| Group drag, 31 cards at 50 % | ≥ 45 fps | 29.6 (28.1–32.0) | 30.4 (28.2–30.8) | +2.7 % |
+| Lasso marks, median of 20 | ≤ 100 ms | 25 (25–25) | 21 (20–24) | −15.7 % |
+| Fading off, 100 % around `ent:23` | – | 47.5 (47.2–48.1) | 48.7 (48.2–48.7) | +2.5 % |
+| – frames over 50 ms | – | 10 (9–12) | 7 (7–8) | – |
+| Fading off, 30 % around `ent:23` | – | 53.0 (52.5–53.1) | 53.6 (52.3–53.8) | +1.1 % |
+| – frames over 50 ms | – | 8 (6–8) | 8 (7–8) | – |
+| Fading off, 100 % dense area | – | 47.3 (42.8–49.6) | 49.1 (47.8–49.8) | +3.8 % |
+| – frames over 50 ms | – | 9 (5–9) | 10 (6–10) | – |
+| Fading off, 100 % around `ent:23`, collapsed | – | 55.6 (54.6–56.2) | 56.6 (56.5–56.6) | +1.8 % |
+| – frames over 50 ms | – | 6 (6–7) | 5 (5–6) | – |
+| Fading off, 30 % around `ent:23`, collapsed | – | 57.7 (57.4–58.0) | 57.8 (57.3–58.2) | +0.2 % |
+| – frames over 50 ms | – | 3 (2–7) | 4 (2–4) | – |
+| Fading off, 100 % dense area, collapsed | – | 60.0 (60.0–60.0) | 60.0 (59.9–60.0) | 0.0 % |
+| – frames over 50 ms | – | 0 (0–0) | 0 (0–0) | – |
+
+**The spread** (same code on both sides, three rounds):
+- **Pan and zoom** differ by −0.5 to +3.8 % between the sides, the S1A-14 dense area +1.6 % (+5.3 % with two rounds).
+  Within one side: ±1 fps, up to −10 % for one disturbed-looking run.
+- **C-08:** −3.0 %.
+- **C-10:** −1.6 % (115–118 ms on both sides).
+- **C-09:** +7.2 %. Each side's range is tight (34.5–35.7 against 35.9–37.7), so this looks like a steady side
+  difference, not noise. C-09 is out of scope here, but it is worth knowing for S4P-08.
+- **The drags vary most:** single-card drag 10.7–16.9 fps on each side, a median difference of −9.9 %. Group drag
+  +2.7 % (−4.9 % with two rounds).
+- **Lasso marks:** −15.7 %, but 4 ms (25 against 21 ms).
+- **Frames over 50 ms:** vary by up to ±4 per run.
+
+This is the spread S4P-08 and S4P-03 are read against. With three rounds the group drag's difference is gone. The
+single-card drag's −9.9 % comes from its own range (10.7–16.9 on both sides), not from the hook.
+
+### Chrome 155: the new starting point
+
+Measured in Google Chrome 155.0.8059.40 (slice 2p: 154). Against slice 2p's baseline (7 October, `slice-02a`) the same
+measurements now give:
+
+| Figure | Slice 2p (Chrome 154) | Now (Chrome 155, `slice-04a`) |
+| --- | --- | --- |
+| C-10 hover | about 170 ms | 117 ms |
+| Lasso marks | about 140 ms | 22–25 ms |
+| C-09 resize | about 25 fps | about 36 fps |
+| C-08 initial render | about 1.75 s | about 1.45 s |
+| Pan and zoom, overview | 53.5 fps | 59–60 fps |
+
+The application has changed a lot since (frames, notes, labels, requirements), so the gain is very likely the browser.
+That is not proven; the laptop's state may also play a part. So in this slice **only figures from the same sitting are
+compared** (this branch against `slice-04a`, or fading on against off in the same run), never with earlier slices'
+numbers. The lasso marks already meet S4P-06's bar at the baseline, and C-10 misses by about 17 ms.

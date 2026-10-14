@@ -108,6 +108,15 @@ initial render.
   what the overlays themselves cost, under 35 ms for the marks). The card rows need a decision on the card's look
   (fewer elements per row, or detail by zoom between 40 % and 100 %), measured with `DIAG=blocks` as the upper limit.
 
+### Chrome 155 changed the starting point (slice 4p)
+
+Slice 4p's baseline (14 October 2026, Google Chrome 155.0.8059.40, `slice-04a` against itself) gives on the same laptop:
+C-10 hover 117 ms (slice 2p, Chrome 154: about 170), lasso marks 22–25 ms (about 140), C-09 about 36 fps (about 25),
+C-08 about 1.45 s (about 1.75), pan and zoom at the overview 59–60 fps (53.5). The application only grew since, so the
+gain is very likely the browser, not proven. Earlier slices' figures in this file are kept as measured; from slice 4p
+on, only figures from the same sitting are compared (A/B against the previous tag, or fading on against off in the same
+run). Details in [slice-04p-acceptance.md](prd/slice-04p-acceptance.md).
+
 ### Frame cost grows with the number of elements in the viewport (slice 3a)
 
 On every pan and zoom frame Chrome repaints and re-layers the whole viewport of the canvas; Layerize is the main cost
