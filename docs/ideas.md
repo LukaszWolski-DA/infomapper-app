@@ -81,3 +81,20 @@ element's card from its panel the same way.
 Slice 4a opens a requirement from the project home on the project's last opened canvas, else its first (PRD item 30).
 The prototype opens the canvas that shows most of the requirement's scope (its entities, tables and its card) and
 lights the scope up with the lens. A candidate for slice 4b, once the lens exists (Łukasz after step 4).
+
+## Entity-level requirements: scope, coverage and panels (slice 4a, manual acceptance)
+
+To decide with slice 4b. Łukasz's rule for the panels: an entity's panel shows all requirements (its own and its
+attributes'); an attribute's panel shows only the attribute's own requirements, with no “via entity” rows. That changes
+D-34 for attributes (today an attribute also lists its entity's requirements “via entity”, prototype `reqsFor`).
+
+It is consistent only together with scope: today a link to an entity puts all its attributes in scope (D-31), so a
+requirement's gaps would name attributes whose panels do not show that requirement. Options for scope and coverage:
+
+- **A.** Keep D-31: a link to an entity puts all its attributes in scope; only the panels change (and stay
+  inconsistent with the gaps, as above).
+- **B.** A link to an entity means the entity as a whole: its attributes are not in scope, and the entity is covered
+  e.g. through its business key's approved mappings (fits Data Vault 2.0 hubs).
+- **C.** Coverage by kind, e.g. a business need is covered when its parts (the requirements below it) are covered.
+
+Changing it changes D-31 and D-34 (`docs/decisions.md`, with Łukasz).

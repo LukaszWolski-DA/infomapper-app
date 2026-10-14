@@ -1,8 +1,10 @@
 # Slice 4a – Acceptance
 
-Status: **step 5 done; waiting for Łukasz's manual acceptance** (S4A-14's element counts ran on 14 October and pass).
-Branch `slice/04a-requirements`, from `main` at the tag `slice-03b` (`a10899c`), pull request #11
-(draft). Steps 0 to 4 were accepted one by one (below).
+Status: **accepted by Łukasz on 14 October 2026.** Manual acceptance passed (notes: checklist step 2's wording
+clarified, “+ New requirement…” links the new requirement by itself; entity-level requirements recorded in
+`docs/ideas.md` for 4b). Three full runs in a row on `596f619` (set 2, below); S4A-14's viewport counts identical to
+`slice-03b`. Branch `slice/04a-requirements`, from `main` at the tag `slice-03b` (`a10899c`), pull request #11. Steps 0
+to 5 were accepted one by one (below).
 
 ## Criteria
 
@@ -141,7 +143,7 @@ Sign in at http://localhost:3000/sign-in as **Łukasz**; open Retail Co – DWH 
 | # | Steps | Expected |
 | --- | --- | --- |
 | 1 | Open the left panel's **Requirements** tab. Look at the status bar. | Five groups (Business need … Non-functional), REQ-101 to REQ-105, each with a coverage bar (hover: “5 of 8 attributes covered” on REQ-101). Status bar: “Requirements 5, covered 2”. |
-| 2 | On the Customer card click the row **segment_code**; in its panel, Requirements → “Link to a requirement…” → **+ New requirement…**. Type `Customer segment`, Enter. | REQ-106 opens, Data requirement, Draft, Should, the name selected; after Enter the name is saved. Traces to: `Customer.segment_code`, attribute. Coverage 0 / 1, gap “Customer.segment_code unmapped”. |
+| 2 | On the Customer card click the row **segment_code**; in its panel, Requirements → “Link to a requirement…” → **+ New requirement…**. Type `Customer segment`, Enter. | REQ-106 opens, Data requirement, Draft, Should, the name selected; after Enter the name is saved. “+ New requirement…” links the new requirement to segment_code by itself: Traces to: `Customer.segment_code`, attribute; in segment_code's panel REQ-106 is listed under Requirements and is not offered again in its “Link to a requirement…” list (that list offers only requirements not linked directly). Coverage 0 / 1, gap “Customer.segment_code unmapped”. |
 | 3 | Description → **Edit**. In “Data needed” type a sentence with one bold word (Ctrl+B), then **Ctrl+Enter**. | The editor opens with the Data requirement template (seven headings, grey hints). After Ctrl+Enter: “Saved.”; the panel shows only “Data needed” with your sentence, the word bold; the other headings and hints are gone. |
 | 4 | Open **Customer** (Model tab). Then open the project home (Customer 360 in the breadcrumbs). | Customer's Requirements section lists REQ-106 “via attribute”. Home: “6 requirements, 2 covered”; REQ-106 with “0/1, Draft”. A click on it opens Customer & orders with REQ-106's panel. |
 | 5 | Drag the column **customers.segment** onto **segment_code** on the Customer card. Open REQ-106 again (Requirements tab). | A mapping is made (draft). REQ-106: coverage 0 / 1, gap “Customer.segment_code not approved”. |
