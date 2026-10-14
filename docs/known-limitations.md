@@ -145,6 +145,29 @@ tile and its box in the overview.
 - **Later:** with the view-state bar (slice 6, D-39): the “Live: {name}” chip, and the Labeled filter neither counted as
   “filtered” nor reset by “Show all”.
 
+### Requirements are not on the canvas yet (slice 4a)
+
+Slice 4a brings requirements everywhere but the canvas: no requirement cards, no trace lines, no markers on cards, no
+lens and no dragging a requirement onto an element (D-32, D-34). Selecting a requirement opens its panel only; the
+Requirements tab's “Only on this canvas” shows none; linking is done from the element panels.
+
+- **Accepted** in slice 4a's PRD (section 6). **Later:** slice 4b, after the performance review, with Focus (the lens
+  uses the same dimming).
+
+### Notes stay plain text (slice 4a)
+
+Entity and attribute definitions and requirement descriptions are rich text since slice 4a; notes are not (D-42 not
+complete): their text is drawn on the canvas, and the canvas work waits for the performance review.
+
+- **Accepted** in slice 4a's PRD (section 6). **Later:** after the performance review.
+
+### An Agreed requirement stays Agreed when edited (slice 4a)
+
+Four-eyes makes setting Agreed an approval (AD-06), but changing an Agreed requirement's content does not send it back
+to Draft (mappings go back to review, D-51).
+
+- **Accepted** in slice 4a's PRD (item 13). **Later:** requirements step 2 (`ideas.md`).
+
 ### The requirement index is rebuilt on every write (slice 4a, step 3)
 
 The requirement index (scope, coverage, children, and each element's direct and indirect requirements;

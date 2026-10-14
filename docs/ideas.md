@@ -40,11 +40,19 @@ The Entity tool creates the new entity exactly where clicked, also on a collapse
 not join that frame (as in the prototype; Łukasz's decision (i) in step 4). Better: the Entity tool on a collapsed
 block files the new entity into the frame like a drop, and takes the concept of a concept frame.
 
-## Labels on requirements (after slice 2c)
+## Labels on requirements (after slice 2c; moved to requirements step 2 in slice 4a)
 
 Labels on requirements: `label_link` gets a `requirement_id` target (a new migration, with the “exactly one target”
-check extended to it), and the requirement panel gets a Labels field. D-33 keeps labels and requirements separate today;
-decide with the requirements slice (4).
+check extended to it), and the requirement panel gets a Labels field. D-33 keeps labels and requirements separate today.
+Slice 4a builds requirements without labels (PRD item 14); this belongs to requirements step 2, together with D-33's
+promotion of a label to a requirement.
+
+## Editing an agreed requirement sends it back to Draft (slice 4a)
+
+As D-51 does for mappings (an approved mapping whose inputs, kind or rule change goes back to review), a change to an
+Agreed requirement's content (kind, name, description, expression, severity) could send it back to Draft and clear the
+agreement. Slice 4a leaves an Agreed requirement Agreed when edited (PRD item 13, `known-limitations.md`); a candidate for
+requirements step 2.
 
 ## Notes in the Overview miniature (slice 3a, step 4)
 

@@ -130,6 +130,8 @@ npm run measure:canvas -- --quick --rounds 2 --against slice-03a                
 npm run measure:canvas -- --quick --rounds 2 --against slice-03a --branch-diag collapsed    # S3B-15 (b), all frames collapsed
 MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=<file> npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S3B-15 (a) element counts
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-live.spec.ts     # S3B-15 (c) a live canvas against Performance test
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04a/S4A-14-elements.spec.ts # S4A-14 viewport counts against slice-03b's
+npx tsx scripts/bench-requirement-index.ts                    # the requirement index on 500 requirements, 5,000 attributes (not a gate)
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
 DIAG=nolines MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # diagnosis: no line layer (or DIAG=blocks)
@@ -157,8 +159,13 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   the live step that labels placed cards and syncs live canvases; plain `asUser` skips it), make a label's live canvas
   (`openLiveFor`, `liveUrl`), put a label on an item (`labelItem`), switch the working context on in the browser
   (`contextOn`, its cookie), and read back live cards (`liveCards`), a label's items (`linkedTo`), the newest change
-  group (`lastGroup`) and the commit counters (`canvasCommits`, `miniatureCommits`). The undo history lives in the
-  server's memory and is empty again after each reseed.
+  group (`lastGroup`) and the commit counters (`canvasCommits`, `miniatureCommits`). Slice 4a's read the requirements
+  (`loadRequirements`, `loadRequirementLinks`, `requirementByKey`, `tracesOf`), write test data as any person through the
+  domain (`asPerson`), switch four-eyes (`setFourEyes`), open the Requirements tab and a requirement's panel
+  (`openRequirementsTab`, `requirementRow`, `openRequirement`), wait for the panel to show a requirement's stored version
+  before the next edit (`expectPanelVersion`, the panel's `data-version`), read an element panel's Requirements section
+  (`sectionRows`) and open an entity from the Model tab (`openEntityFromTree`). The undo history lives in the server's
+  memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
   with notes below 40 % zoom (a note measured while drawn plain once grew on every round), `S3B-15-idle.spec.ts` on a

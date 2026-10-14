@@ -1,7 +1,98 @@
 # Slice 4a – Acceptance
 
-Status: **step 4 done; waiting for Łukasz**. Branch `slice/04a-requirements`, from `main` at the tag `slice-03b`
-(`a10899c`), pull request #11 (draft).
+Status: **step 5 done; waiting for Łukasz's manual acceptance** (S4A-14's element counts wait for his OK to run the
+measurement build). Branch `slice/04a-requirements`, from `main` at the tag `slice-03b` (`a10899c`), pull request #11
+(draft). Steps 0 to 4 were accepted one by one (below).
+
+## Criteria
+
+Each criterion has its Playwright test in `e2e/slice-04a/`, named after its id; every test starts from a freshly seeded
+data file (the five demo requirements, key counter 106) and depends on no other. Data a test starts from is written
+through the domain (`asPerson`, `setFourEyes`); what the criterion checks goes through the page with the real mouse and
+keyboard and is read back from the data file.
+
+| ID | Test | Result |
+| --- | --- | --- |
+| S4A-01 | `S4A-01.spec.ts`: five groups in kind order with their counts; REQ-104's row with its icon, key, name and bar (“1 of 4 attributes covered”); search “e-mail” leaves REQ-103, “req-105” REQ-105; a folded group stays folded after a reload; “Only on this canvas”: “No requirement has a card on this canvas yet.”; Piotr and Kasia see the five but no “New requirement” | passes |
+| S4A-02 | `S4A-02.spec.ts`: REQ-106 (Data requirement, Draft, Should, “New requirement” selected), then REQ-107; one undo removes it; REQ-106 renamed REQ-108 makes the next one REQ-109 (counter 110); “req-101 is already used by another requirement.” and “Enter a name.”, the fields show the stored values | passes |
+| S4A-03 | `S4A-03.spec.ts`: on REQ-105 the name, owner, reference, priority, status, “Part of”, kind (Data quality rule: Check and severity warn), check, “When it fails” and the key save and survive a reload; REQ-103 as a Business rule shows Rule with its check and no “When it fails”, back as a Data quality rule both again; REQ-101's “Part of” offers only None and REQ-104; a cycle sent directly: “REQ-103 is already part of REQ-101, so REQ-101 cannot be part of it.”; “Broken down into” opens REQ-102 | passes |
+| S4A-04 | `S4A-04.spec.ts`: an empty Business rule opens with its six headings and the first hint, the cursor in it; bold, a colour and a link typed into two sections save with Ctrl+Enter as exactly two headings with their text (no hints, no empty sections), `description_text` the plain text; one undo empties it again; Esc with changes asks, the second Esc discards; sent directly, `onclick`, `<script>` and a `javascript:` link are stripped | passes |
+| S4A-05 | `S4A-05.spec.ts`: Order Line's definition stored as plain text before this slice shows and opens as its two paragraphs (with its line break, `a < b & c` as text), no “Insert template”; an attribute's definition the same (“Attribute definition”, “Customer.email”); Sales Order's long definition shows “Show more”, then “Show less” | passes |
+| S4A-06 | `S4A-06.spec.ts`: REQ-104 linked from the entity, attribute, mapping, table and column panels with their toasts; the same link sent again: “Already linked.”, no write; “+ New requirement…” on email makes REQ-106 linked to it, one undo removes both; × in the element panel and in Traces to: “Unlinked.”, one undo each | passes |
+| S4A-07 | `S4A-07.spec.ts`: email shows REQ-102, REQ-103, REQ-105 and “REQ-101 via entity”; Customer REQ-101 and the others “via attribute”; with REQ-104 on the mapping `customers.email_addr → Customer.email`, the table customers shows “REQ-104 via column”; no × on indirect rows | passes |
+| S4A-08 | `S4A-08.spec.ts`: the seed's figures in REQ-101's panel (5 / 8, the three gaps) and every bar; an approved direct mapping with a type conflict (`order_line.item_code` → `Order Line.quantity`) makes quantity “not approved” in REQ-104; a requirement traced only to a table shows 0 / 0; a click on REQ-105's gap selects `birth_date`, approving its mapping makes REQ-105 4 / 4 | passes |
+| S4A-09 | `S4A-09.spec.ts`: Traces to lists each element with its type and the mapping as `customers.email_addr → Customer.email`; Customer (card here) is selected with its panel; the mapping opens its panel; on “Order lines & products” `Customer.first_name` opens only its panel: view, cards and selection unchanged | passes |
+| S4A-10 | `S4A-10.spec.ts`: deleting REQ-102: “Deleted REQ-102. The model elements it traced to are untouched.”, REQ-103 top level, its links gone, attributes, mappings and inputs unchanged; one undo brings back requirement, links and REQ-103's parent; deleting email takes its three links, its undo brings them back | passes |
+| S4A-11 | `S4A-11.spec.ts`: Piotr and Kasia see every field read-only, no Edit, no Link field, no ×, no Delete, no “New requirement”; Piotr sets REQ-103 to Implemented; his update, link, unlink, create and delete sent directly: “As a reviewer you can only change a requirement's status.”; Kasia's status and update sent directly: “As a reader you cannot change requirements.”; Bank X (archived): “No requirements yet.”, no “New requirement”, a create sent directly: the archive message | passes |
+| S4A-12 | `S4A-12.spec.ts`: four-eyes on: after Anna's description edit her panel shows the hint and Agreed is refused (“You changed REQ-103 last, so someone else has to agree it.”, still Draft); Piotr agrees it, one change event with him as user and Draft before; four-eyes off: Anna agrees REQ-104 | passes |
+| S4A-13 | `S4A-13.spec.ts`: “5 requirements, 2 covered” and the five rows (“5/8, Agreed” …) on both project homes; from Order management REQ-104 opens the first canvas, after visiting “Order lines & products” REQ-103 opens that one, each with the panel; the status bar goes from “Requirements 5, covered 2” to “covered 3” when `customers.dob`'s mapping is approved; with CR-23 as context, a new requirement and a link record it on every event and CR-23 marks nothing more | passes |
+| S4A-14 | `S4A-14.spec.ts` (in every run): requirement panels and an element panel without its card change no card, selection, line class or view, and an idle canvas does not commit; `S4A-14-elements.spec.ts` (measurement build): the viewport counts against `.data/measure/s4a14-baseline/slice-03b.json`; S2C-12, S3A-14's and S3B-15's idle tests and S3B-13 run in every full run | the normal part passes; the element counts wait for Łukasz's OK (the measurement build) |
+| S4A-15 | CI (lint, typecheck, unit tests, the schema check) and three full runs in a row | below |
+
+### Three full runs in a row
+
+`npm run e2e` with no dev server running, each run timed (Łukasz after step 3: above 30 minutes, find the cause before
+the merge). After any test or code change the three start again; a known flaky test (S0-10, S2A-10) also restarts them.
+
+| Set | Commit | Runs | What happened |
+| --- | --- | --- | --- |
+| 1 | `2e8217a` | 3 of 3 passed: 155 tests each (116 files); **26.4, 26.2 and 26.7 min** (wall clock 1,587, 1,575 and 1,608 s); no retries, no flaky test | The server's known “destination stream closed early” lines (23, 26, 26); no Google Fonts error |
+
+All three under 30 minutes, so no cause to look for (step 2's 32.8-minute run stayed an exception). Before the runs:
+`npm run lint`, `npm run typecheck` and `npm test` (920 tests in 64 files) pass; only docs changed after `2e8217a`.
+
+### Step 5 notes
+
+1. **The four-eyes note** (Łukasz's point 1 after step 4): the mapping panel keeps its status buttons enabled, the
+   server refuses, and its note sits below Status. Requirements behaved the same but showed the note above Status; it
+   moved below (`d46ae68`). No other change.
+2. **Empty key or name** now go to the server, which refuses them with “Enter a key.” / “Enter a name.” (S4A-02); before,
+   the field put the stored value back without a message.
+3. **The requirement panel carries `data-version`** so a test can wait for the page to show a saved version before the
+   next edit (several quick edits in a row otherwise meet a stale version, as in the prototype's own panel).
+4. **Google Fonts in the e2e server:** twice in this step the e2e dev server could not build `next/font/google`'s IBM
+   Plex (a network answer it could not read); the next run was fine. Not a change of the app; recorded in case it comes
+   back during the three runs.
+
+### Changed earlier tests (whole slice)
+
+- `e2e/slice-01a/S1A-10.spec.ts`: the entity delete dialog has the requirements row, “4 requirements — lose it from
+  their scope: REQ-101, REQ-102, REQ-103, REQ-105” (step 3, wording after step 3).
+- No other earlier end-to-end test changed: none typed a definition, none relied on a go-to link doing nothing without
+  a card, none counted change events or rows the seed's requirements changed.
+- Unit tests: `entity.test.ts` and `attribute.test.ts` send rich text for definitions (step 2); `entity.test.ts`,
+  `model-store.test.ts` (the delete impact's requirements), `requirements.test.ts` (imports `requirementsOf` from the
+  index), `working-layer-store.test.ts` (data file format 5), `frame.test.ts` and `undo.test.ts` (the undoable rows include
+  the two new tables), `permissions.test.ts`, the schema check's table list.
+
+## Manual checklist (Łukasz)
+
+Fresh demo data in the preview file, then the app on it:
+
+PowerShell:
+
+```powershell
+$env:INFOMAPPER_DEV_DB=".data/preview-db.json"; npm run reset-dev-data; npm run dev
+```
+
+bash:
+
+```bash
+export INFOMAPPER_DEV_DB=.data/preview-db.json && npm run reset-dev-data && npm run dev
+```
+
+Sign in at http://localhost:3000/sign-in as **Łukasz**; open Retail Co – DWH → Customer 360 → Customer & orders.
+
+| # | Steps | Expected |
+| --- | --- | --- |
+| 1 | Open the left panel's **Requirements** tab. Look at the status bar. | Five groups (Business need … Non-functional), REQ-101 to REQ-105, each with a coverage bar (hover: “5 of 8 attributes covered” on REQ-101). Status bar: “Requirements 5, covered 2”. |
+| 2 | On the Customer card click the row **segment_code**; in its panel, Requirements → “Link to a requirement…” → **+ New requirement…**. Type `Customer segment`, Enter. | REQ-106 opens, Data requirement, Draft, Should, the name selected; after Enter the name is saved. Traces to: `Customer.segment_code`, attribute. Coverage 0 / 1, gap “Customer.segment_code unmapped”. |
+| 3 | Description → **Edit**. In “Data needed” type a sentence with one bold word (Ctrl+B), then **Ctrl+Enter**. | The editor opens with the Data requirement template (seven headings, grey hints). After Ctrl+Enter: “Saved.”; the panel shows only “Data needed” with your sentence, the word bold; the other headings and hints are gone. |
+| 4 | Open **Customer** (Model tab). Then open the project home (Customer 360 in the breadcrumbs). | Customer's Requirements section lists REQ-106 “via attribute”. Home: “6 requirements, 2 covered”; REQ-106 with “0/1, Draft”. A click on it opens Customer & orders with REQ-106's panel. |
+| 5 | Drag the column **customers.segment** onto **segment_code** on the Customer card. Open REQ-106 again (Requirements tab). | A mapping is made (draft). REQ-106: coverage 0 / 1, gap “Customer.segment_code not approved”. |
+| 6 | Click the gap, then the mapping under “Comes from”; set its status to **Approved**. Open REQ-106 again. | REQ-106: 1 / 1, no gaps, its bar full. Status bar: “Requirements 6, covered 3”. |
+| 7 | In REQ-106's panel click **Delete requirement**, then **Undo** in the toast. | “Deleted REQ-106. The model elements it traced to are untouched.”; REQ-106 leaves the tab and segment_code's section. After Undo it is back with its description and its link. |
+| 8 | Sign in as **Piotr Wiśniewski**, open REQ-103; then as **Kasia Zielińska**. | Piotr: only Status can be changed (every other field read-only, no Edit, no ×, no Delete, no “New requirement”). Kasia: nothing can be changed. |
 
 ## Łukasz's answers to step 0 (13 October)
 
