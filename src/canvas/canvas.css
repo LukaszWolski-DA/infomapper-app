@@ -216,6 +216,9 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .hover-veil.own-layer { will-change: transform }
 /* fading (slice 4p, step 2): the lit lines drawn again above it, and the lens's rows tinted (prototype .row.rq covered,
    .row.gap gap) over the rows, translucent so their text stays readable */
+/* F4: one veil with holes at the lit cards, blocks and notes, on its own layer, in the canvas background's colour */
+.im-canvas .fade-veil { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; will-change: transform }
+.im-canvas .fade-veil path { fill: var(--im-canvas); fill-opacity: .75 }
 .im-canvas .lit-lines .lnk { pointer-events: none }
 .im-canvas .lit-lines .lnk .hit { display: none }
 .im-canvas .lit-rows .covered { fill: var(--im-req-soft); fill-opacity: .65 }
