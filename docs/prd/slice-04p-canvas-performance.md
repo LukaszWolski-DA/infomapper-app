@@ -120,7 +120,7 @@ one unrecorded warm-up run after the build.
 | S4P-05 | C-10 hover: verdict with figures; met if ≤ 100 ms. |
 | S4P-06 | Lasso marks: verdict with figures; met if ≤ 100 ms. |
 | S4P-07 | Notes layer: verdict with fps, Layerize per frame, GPU memory and raster time. |
-| S4P-08 | No regression with fading off against `slice-04a`, judged on three-round medians: pan and zoom (100 % and 30 %, frames expanded and collapsed) not worse than 5 %, or within the baseline's spread; C-08, C-09 and the drags within the baseline's spread. |
+| S4P-08 | No regression with fading off against `slice-04a`, judged on three-round medians: pan and zoom (100 % and 30 %, frames expanded and collapsed) not worse than 5 %, or within the baseline's spread; C-08, C-09 and the drags within the baseline's spread. C-09 is compared against the baseline's steady side difference of +7.2 % (same code): a regression is a change below +2.2 % (+7.2 % − 5 %), not below −5 %. |
 | S4P-09 | Error boundaries: an error in the canvas shows the message, the panels and top bar still work, “Reload” recovers; an unknown route shows the not-found page. e2e test. |
 | S4P-10 | C-08 diagnosis written in the acceptance doc, with the trace's split and a proposal. |
 | S4P-11 | Requirement index timing in the browser, with the verdict of item 10. |

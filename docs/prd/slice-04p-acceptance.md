@@ -436,3 +436,9 @@ The application has changed a lot since (frames, notes, labels, requirements), s
 That is not proven; the laptop's state may also play a part. So in this slice **only figures from the same sitting are
 compared** (this branch against `slice-04a`, or fading on against off in the same run), never with earlier slices'
 numbers. The lasso marks already meet S4P-06's bar at the baseline, and C-10 misses by about 17 ms.
+
+### C-09's side offset (Łukasz, 14 October)
+
+C-09 showed a steady difference between the two sides with the same code: +7.2 %, with tight ranges (34.5–35.7 against
+35.9–37.7 fps). So S4P-08 compares C-09 against that offset: a regression is a change **below +2.2 %** (+7.2 % − 5 %),
+not below −5 %. Every other figure keeps the rule as written. PRD changed in its own commit.
