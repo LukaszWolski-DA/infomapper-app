@@ -17,6 +17,10 @@
 // `data-fade` = `focus:<entity id>` or `lens:<requirement id>` (and may add `data-lit-cards`); with fading off there is
 // none. Results go to test-results/S4P-fading.json. This file imports only what `slice-04a` has, so the harness can
 // copy it into the reference worktree.
+//
+// The hover line fade (a trial A variant, Łukasz after step 1): where the page has `window.__imHoverFade`, C-10 in
+// S1B-10's view (100 % around src:57, frames expanded) with it "off", "plain" (in the big layer) and "layer" (its own
+// compositing layer), 40 hovers each, C-10's method.
 
 import { LARGE_IDS } from "../../src/data/local/seed-large";
 import { generate } from "../../src/data/local/large-generator";
@@ -181,6 +185,47 @@ test("S4P-fading: switching fading on and off, and pan and zoom with fading on a
     if (mechanism === false) delete v.scenarios;
   }
 
+  // ---- C-10 with the hover line fade variants (trial A), where the page has them ----
+  const hoverFade: Record<string, unknown> = {};
+  if (await page.evaluate(() => typeof (window as unknown as { __imHoverFade?: unknown }).__imHoverFade === "function")) {
+    const dense = all["100 % dense area, expanded"]!.view;
+    for (const mode of ["off", "plain", "layer"] as const) {
+      await open(page, dense, false);
+      hoverFade[mode] = await page.evaluate(
+        async ([mode, hovers]) => {
+          (window as unknown as { __imHoverFade: (m: string) => void }).__imHoverFade(mode);
+          const pane = document.querySelector(".react-flow__pane")!;
+          const p = pane.getBoundingClientRect();
+          const rows = [...document.querySelectorAll<HTMLElement>(".row[data-row]")]
+            .filter((r) => {
+              const b = r.getBoundingClientRect();
+              return b.top > p.top + 10 && b.bottom < p.bottom - 10 && b.left > p.left && b.right < p.right && r.querySelector(".st.ok, .st.warn");
+            })
+            .slice(0, 40);
+          if (!rows.length) return { error: "no mapped rows in view" };
+          const shown = () => !!document.querySelector('[data-testid="hover-row"]') && (mode === "off" || !!document.querySelector('[data-testid="hover-veil"]'));
+          const frame: number[] = [];
+          for (let k = 0; k < hovers; k++) {
+            const r = rows[k % rows.length]!;
+            const t0 = performance.now();
+            r.querySelector(".nm")!.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+            while (!shown() && performance.now() - t0 < 2000) await new Promise((res) => setTimeout(res, 0));
+            if (!shown()) return { error: "hover not shown " + r.dataset.row };
+            await new Promise((res) => requestAnimationFrame(() => setTimeout(res, 0)));
+            frame.push(performance.now() - t0);
+            pane.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+            await new Promise((res) => requestAnimationFrame(() => setTimeout(res, 0)));
+          }
+          (window as unknown as { __imHoverFade: (m: string) => void }).__imHoverFade("off");
+          const sorted = [...frame].sort((a, b) => a - b);
+          return { rows: rows.length, toNextFrameMs: { median: +sorted[Math.floor(sorted.length / 2)]!.toFixed(1), p95: +sorted[Math.floor(sorted.length * 0.95)]!.toFixed(1), max: +sorted[sorted.length - 1]!.toFixed(1) } };
+        },
+        [mode, SWITCHES] as const,
+      );
+      expect(hoverFade[mode], `hover fade ${mode}`).not.toHaveProperty("error");
+    }
+  }
+
   const results = {
     measured: MEASURE,
     browser: browser.version(),
@@ -189,6 +234,7 @@ test("S4P-fading: switching fading on and off, and pan and zoom with fading on a
     centre: { card: FOCUS_CARD, ...centre },
     fading: hook ? (mechanism ? "measured" : "hook without a fading mechanism: only fading off measured") : "no hook on this side: only fading off measured",
     views,
+    hoverFade,
   };
   saveResults("S4P-fading", results);
   await test.info().attach("S4P-fading results", { body: JSON.stringify(results, null, 2), contentType: "application/json" });
