@@ -403,3 +403,63 @@ export const HoverLines = memo(function HoverLines({
     </svg>
   );
 });
+
+/**
+ * The lit lines drawn again in the overlay above the fading (slice 4p, step 2): the mappings and relationships a Focus or
+ * a lens lights, and the bundles holding one of them, at their usual strength; the line layer under the fading stays as
+ * it is.
+ */
+export const LitLines = memo(function LitLines({
+  maps,
+  rels,
+  lines,
+  bundles = NO_BUNDLES,
+  blocks = NO_BLOCKS,
+  mapsById = NO_MAPS,
+}: {
+  maps: ReadonlySet<string>;
+  rels: ReadonlySet<string>;
+  /** The lines drawn on their own, and the bundles, as the line layer has them. */
+  lines: CanvasLines;
+  bundles?: readonly Bundle[];
+  blocks?: ReadonlyMap<string, Rect>;
+  mapsById?: ReadonlyMap<string, MapLineData>;
+}) {
+  useStore((s) => s.nodes); // follow drags, collapses and widths
+  const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
+  const { notation } = useContext(CanvasUiCtx);
+  const lookup = useStoreApi().getState().nodeLookup;
+  const dots = !lod;
+  const placed = (cardId: string) => placedOf(lookup.get(cardId));
+  return (
+    <svg className="line-layer lit-lines" width={1} height={1} data-testid="layer-lit-lines">
+      {lines.relationships
+        .filter((l) => rels.has(l.id))
+        .map((l) => {
+          const a = placed(l.fromCardId), z = placed(l.toCardId);
+          if (!a || !z) return null;
+          return <RelPath key={l.id} sig="" line={l} a={a} z={z} notation={notation} className="lnk rel" onSelect={NOOP} />;
+        })}
+      {lines.mappings
+        .filter((l) => maps.has(l.id))
+        .map((l) => {
+          const geom = mapGeom(l, lookup);
+          if (!geom) return null;
+          const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.part ? " part" : ""}${l.inputCount > 1 ? " combined" : ""}`;
+          return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
+        })}
+      {bundles
+        .filter((b) => b.ids.some((id) => (b.t === "map" ? maps : rels).has(id)))
+        .map((b) => {
+          const geom = bundleGeom(b, placed, blocks, mapsById);
+          if (!geom) return null;
+          if (geom.kind === "single") {
+            const l = geom.line;
+            return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={`lnk map ${l.status}${l.warn ? " warn" : ""}`} onSelect={NOOP} />;
+          }
+          const className = geom.kind === "rel" ? "lnk rel bundle" : `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""}`;
+          return <BundlePath key={b.key} sig="" bundleKey={b.key} geom={geom} className={className} onSelect={NOOP} />;
+        })}
+    </svg>
+  );
+});

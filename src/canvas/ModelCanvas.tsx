@@ -63,6 +63,8 @@ import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
 import HoverVeil from "./HoverVeil";
+import FadeLayer from "./FadeLayer";
+import type { FadeData, FadeNote } from "./fade-canvas";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
 import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
@@ -152,6 +154,8 @@ export interface ModelCanvasProps {
   focusNoteId?: string | null;
   /** Measurement-only switches (only the measurement-only production build passes them). */
   diagnosis?: Diagnosis;
+  /** What fading needs to work out what it lights (slice 4p): the live model and the requirements. */
+  fadeData?: FadeData;
   /** The canvas's notes and their writes (slice 3a). */
   notes?: NoteData[];
   /** When the page read the data (server time): a fresh page may be older than the canvas (`mergeFresh`). */
@@ -241,6 +245,7 @@ export function ModelCanvas({
   focusRequirementId,
   focusNoteId,
   diagnosis = NO_DIAGNOSIS,
+  fadeData,
   notes: initialNotes = NO_NOTES,
   readAt = null,
   noteWrites,
@@ -1140,6 +1145,11 @@ export function ModelCanvas({
       pinnedTo: s.note.pinCardId ?? s.note.pinFrameId,
     }));
   }, [shownNotes]);
+  /** The notes as fading sees them (slice 4p): where they are drawn and the card they are pinned to. */
+  const fadeNotes = useMemo<FadeNote[]>(
+    () => shownNotes.map((s) => ({ id: s.note.id, rect: { x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80 }, pinCardId: s.note.pinCardId })),
+    [shownNotes],
+  );
   /** The notes as the Overview's miniature draws them (slice 3b). */
   const miniNotes = useMemo<MiniNote[]>(
     () => shownNotes.map((s) => ({ id: s.note.id, x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80, color: s.note.color })),
@@ -1547,6 +1557,8 @@ export function ModelCanvas({
           />
           <Overview lines={lines} notes={miniNotes} notesDragging={noteState.dragging} />
           <OverlayLayer>
+            {/* fading (slice 4p, step 2): the candidate draws first, so the hover and the selection marks stay above it */}
+            <FadeLayer data={fadeData} notes={fadeNotes} lines={bundled ?? lines} bundles={bundled?.bundles} blocks={blocks} mapsById={mapsById} />
             {!diagnosis.noLines && (
               <HoverLines
                 hoverStore={hoverStore}

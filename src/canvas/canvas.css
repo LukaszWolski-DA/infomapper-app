@@ -214,6 +214,12 @@ body.connecting .im-canvas .row { cursor: crosshair }
    the cards; the canvas background at 88 % leaves the lines at about the prototype's 12 % */
 .im-canvas .hover-veil { position: absolute; pointer-events: none; background: color-mix(in srgb, var(--im-canvas) 88%, transparent) }
 .im-canvas .hover-veil.own-layer { will-change: transform }
+/* fading (slice 4p, step 2): the lit lines drawn again above it, and the lens's rows tinted (prototype .row.rq covered,
+   .row.gap gap) over the rows, translucent so their text stays readable */
+.im-canvas .lit-lines .lnk { pointer-events: none }
+.im-canvas .lit-lines .lnk .hit { display: none }
+.im-canvas .lit-rows .covered { fill: var(--im-req-soft); fill-opacity: .65 }
+.im-canvas .lit-rows .gap { fill: var(--im-warn-soft); fill-opacity: .75 }
 
 /* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */
 /* One overlay above the cards; the cards are not restyled. Fill opacity on a handful of overlay shapes only. */
