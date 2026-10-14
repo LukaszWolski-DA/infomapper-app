@@ -2,7 +2,8 @@
 // bar and the overview of a canvas, the project home, the workspace home and the canvas tabs. Pure TypeScript.
 
 import type { Uuid } from "@/domain/ids";
-import type { CanvasItem, Entity, Frame, Note, WorkspaceModel } from "@/domain/types";
+import type { RequirementIndex } from "@/domain/model/requirement-index";
+import type { CanvasItem, Entity, Frame, Note, RequirementKind, RequirementStatus, WorkspaceModel } from "@/domain/types";
 import { indexModel, typeCheckOf, type ModelIndex } from "./model-index";
 
 const isMapped = (ix: ModelIndex, attributeId: Uuid) => (ix.mappingsOf.get(attributeId) ?? []).length > 0;
@@ -132,4 +133,39 @@ export function projectOpenNotes(
     .filter((n) => n.deleted_at === null && n.status === "open" && order.has(n.canvas_id))
     .sort((a, b) => order.get(a.canvas_id)! - order.get(b.canvas_id)! || a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id))
     .map((n) => ({ id: n.id, text: n.body_text ?? "", canvasId: n.canvas_id, canvasName: canvases[order.get(n.canvas_id)!]!.name, pinName: pinName(n) }));
+}
+
+/** A requirement on the project home (slice 4a, PRD item 30). */
+export interface ProjectRequirement {
+  id: Uuid;
+  key: string;
+  name: string;
+  kind: RequirementKind;
+  status: RequirementStatus;
+  covered: number;
+  total: number;
+  done: boolean;
+}
+
+/**
+ * The requirements on the project home (prototype projReqs, without requirement cards until slice 4b): every
+ * requirement whose scope has an entity or a source table on one of the project's canvases, in the index's order.
+ */
+export function projectRequirements(index: RequirementIndex, items: readonly CanvasItem[], projectCanvasIds: readonly Uuid[]): ProjectRequirement[] {
+  const canvases = new Set(projectCanvasIds);
+  const here = new Set<Uuid>();
+  for (const i of items) {
+    if (i.deleted_at !== null || !canvases.has(i.canvas_id)) continue;
+    if (i.entity_id) here.add(i.entity_id);
+    if (i.source_table_id) here.add(i.source_table_id);
+  }
+  return index.requirements
+    .filter((r) => {
+      const scope = index.scope(r.id);
+      return [...scope.entities].some((id) => here.has(id)) || [...scope.tables].some((id) => here.has(id));
+    })
+    .map((r) => {
+      const c = index.coverage(r.id);
+      return { id: r.id, key: r.key, name: r.name, kind: r.kind, status: r.status, covered: c.covered.length, total: c.total, done: c.done };
+    });
 }

@@ -58,6 +58,8 @@ export interface InspectorProps {
   /** The workspace's requirements and their links (slice 4a). */
   requirements: Requirement[];
   requirementLinks: RequirementLink[];
+  /** Who last changed each requirement's content (AD-06); only filled when four-eyes is on. */
+  requirementAuthors: Record<Uuid, Uuid>;
   /** The open project (live canvases open in it, slice 3b). */
   projectId: Uuid;
   /** Each label's live canvas, by label id (slice 3b). */

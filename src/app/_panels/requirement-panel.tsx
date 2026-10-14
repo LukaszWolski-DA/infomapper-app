@@ -13,10 +13,10 @@ import { CanvasUiCtx } from "@/canvas/context";
 import type { UpdateRequirementInput } from "@/domain/commands/requirement";
 import { targetOf } from "@/domain/model/labels";
 import { templateHtml } from "@/domain/model/requirement-templates";
-import { KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
+import { fourEyesRequirementMessage, KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
 import { REQUIREMENT_KINDS, REQUIREMENT_PRIORITIES, REQUIREMENT_STATUSES, type Requirement, type RequirementLink } from "@/domain/types";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
-import { Actions, dangerClass, Field, Hint, inputClass, Kind, List, Section, Seg, TextArea, TextField } from "./fields";
+import { Actions, dangerClass, Field, Hint, inputClass, Kind, List, Note, Section, Seg, TextArea, TextField } from "./fields";
 import { usePanel } from "./inspector";
 import { attributeLabel, columnLabel, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -145,6 +145,11 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
         <Field label="When it fails">
           <Seg value={r.severity ?? "warn"} options={[["warn", "Warn"], ["block", "Block the load"]] as const} disabled={!p.editable} onChange={(s) => void save("severity", s)} testId="seg-req-severity" />
         </Field>
+      )}
+      {p.fourEyes && p.canSetStatus && r.status !== "agreed" && p.requirementAuthors[r.id] === p.userId && (
+        <Note warn testId="note-req-four-eyes">
+          {fourEyesRequirementMessage(r.key)}
+        </Note>
       )}
       <Field label="Status">
         <Seg value={r.status} options={REQUIREMENT_STATUSES.map((s) => [s, STATUS_NAMES[s]] as const)} disabled={!p.canSetStatus} onChange={setStatus} testId="seg-req-status" />

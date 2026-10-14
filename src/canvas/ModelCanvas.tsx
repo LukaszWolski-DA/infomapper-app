@@ -143,6 +143,8 @@ export interface ModelCanvasProps {
   focusCardId?: string | null;
   /** A working label asked for on arrival (the project home's labels, slice 3a): its panel opens. */
   focusLabelId?: string | null;
+  /** `?req=<id>` (slice 4a): open this requirement's panel on arrival. */
+  focusRequirementId?: string | null;
   /** A note asked for on arrival (the project home's open notes, slice 3a): selected and in view. */
   focusNoteId?: string | null;
   /** Measurement-only switches (only the measurement-only production build passes them). */
@@ -233,6 +235,7 @@ export function ModelCanvas({
   entityConcepts = NO_CONCEPTS,
   focusCardId,
   focusLabelId,
+  focusRequirementId,
   focusNoteId,
   diagnosis = NO_DIAGNOSIS,
   notes: initialNotes = NO_NOTES,
@@ -634,6 +637,13 @@ export function ModelCanvas({
     select({ t: "label", id: focusLabelId });
     window.history.replaceState(null, "", window.location.pathname);
   }, [ready, focusLabelId, select]);
+  const focusedRequirement = useRef(false);
+  useEffect(() => {
+    if (!ready || !focusRequirementId || focusedRequirement.current) return;
+    focusedRequirement.current = true;
+    select({ t: "req", id: focusRequirementId });
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [ready, focusRequirementId, select]);
 
   const cardOf = useCallback(
     (t: CardTarget) =>

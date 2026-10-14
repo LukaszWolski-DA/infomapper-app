@@ -1,14 +1,16 @@
 import { AppShell } from "@/app/_components/app-shell";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { loadShell } from "@/app/_lib/shell";
-import { projectOpenNotes, projectStats } from "@/app/_panels/stats";
+import { projectOpenNotes, projectRequirements, projectStats } from "@/app/_panels/stats";
 import { canvasHref } from "@/app/_lib/paths";
 import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { projectLabels, type ProjectLabelContext } from "@/domain/model/labels";
+import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import type { CanvasItem, WorkspaceModel } from "@/domain/types";
 import { ProjectLabels } from "./_components/project-labels";
 import { ProjectNotes } from "./_components/project-notes";
+import { ProjectRequirements } from "./_components/project-requirements";
 import { CanvasTiles } from "./_components/project-tiles";
 
 /** What `projectLabels` needs to know about the cards on some canvases. */
@@ -25,7 +27,7 @@ function labelContext(model: WorkspaceModel, items: readonly CanvasItem[]): Proj
 }
 
 // Project home (D-29): the project's canvases as tiles; the labels used on them and pinned to the project, and the
-// number and list of their open notes (slice 3a). Requirements come with their slice.
+// number and list of their open notes (slice 3a); the requirements whose scope touches its canvases (slice 4a).
 export default async function ProjectHomePage({ params }: PageProps<"/w/[workspaceId]/p/[projectId]">) {
   const { workspaceId, projectId } = await params;
   const shell = await loadShell({ workspaceId, projectId });
@@ -33,7 +35,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   const n = view.canvases.length;
   const store = getDataStore();
   const ws = shell.workspace.id;
-  const [model, items, labels, links, pins, notes, frames, allCanvases] = await Promise.all([
+  const [model, items, labels, links, pins, notes, frames, allCanvases, requirements, requirementLinks] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.labels.list(ws),
@@ -42,6 +44,8 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
     store.notes.list(ws),
     store.frames.list(ws),
     store.canvases.list(ws),
+    store.requirements.list(ws),
+    store.requirements.listLinks(ws),
   ]);
   // labels with a live canvas (slice 3b): “Open live canvas” instead of “Open as live canvas”
   const withLive = new Set(allCanvases.filter((c) => c.deleted_at === null && c.live_label_id).map((c) => c.live_label_id!));
@@ -56,6 +60,10 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
     const canvasId = usedOn.find((c) => c.labels.has(label.id))?.id ?? view.canvases[0]!.id;
     return { id: label.id, name: label.name, items: count, pinned: isPinned, live: withLive.has(label.id), href: `${canvasHref(ws, view.project.id, canvasId)}?label=${label.id}` };
   });
+
+  // Requirements whose scope touches the project's canvases (slice 4a): one index for the page
+  const projectReqs = projectRequirements(buildRequirementIndex(requirements, requirementLinks, model), items, view.canvases.map((c) => c.id));
+  const reqCovered = projectReqs.filter((r) => r.done).length;
 
   // Open notes: canvas by canvas in tab order; each opens its canvas with the note selected (S3A-05)
   const openNotes = projectOpenNotes(notes, view.canvases, items, frames, model).map((n) => ({
@@ -86,9 +94,18 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
             <span data-testid="stat-open-notes">
               <b>{openNotes.length}</b> open note{openNotes.length === 1 ? "" : "s"}
             </span>
+            <span data-testid="stat-requirements">
+              <b>{projectReqs.length}</b> requirement{projectReqs.length === 1 ? "" : "s"}, <b>{reqCovered}</b> covered
+            </span>
           </div>
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Canvases</h3>
           <CanvasTiles view={view} />
+          <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Requirements</h3>
+          <ProjectRequirements
+            projectId={view.project.id}
+            requirements={projectReqs}
+            canvases={view.canvases.map((c) => ({ id: c.id, href: canvasHref(ws, view.project.id, c.id) }))}
+          />
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Labels in this project</h3>
           <ProjectLabels workspaceId={ws} projectId={view.project.id} labels={projectLabelRows} editable={shell.standing === "full"} />
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Open notes</h3>
