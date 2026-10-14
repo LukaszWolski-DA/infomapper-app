@@ -8,7 +8,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { deleteEntityAction, entityImpactAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
-import type { EntityImpact } from "@/domain/model/impact";
+import { requirementsImpactRow, type EntityImpact } from "@/domain/model/impact";
 import type { Entity } from "@/domain/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
 import { useToast } from "@/ui/components/toast";
@@ -59,7 +59,7 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
         [count(impact.relationships, "relationship"), "deleted"],
         [count(impact.canvases.length, "canvas", "canvases"), impact.canvases.length ? `removed from ${impact.canvases.map((c) => c.name).join(", ")}` : "–"],
         // slice 4a (prototype entityImpact): requirements whose scope contains the entity
-        [count(impact.requirements.length, "requirement"), impact.requirements.length ? `lose this from their scope: ${impact.requirements.map((r) => r.key).join(", ")}` : "–"],
+        requirementsImpactRow(impact.requirements.map((r) => r.key)),
         [count(impact.projects.length, "project"), impact.projects.length ? impact.projects.map((x) => x.name).join(", ") : "–"],
       ]
     : [];

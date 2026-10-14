@@ -80,3 +80,20 @@ export function entityImpact(
       .sort((a, b) => a.key.localeCompare(b.key, "en", { numeric: true })),
   };
 }
+
+/** At most this many keys are named in the delete dialog's requirements row; the rest are counted. */
+export const IMPACT_KEYS_SHOWN = 5;
+
+/**
+ * The delete dialog's requirements row (slice 4a, Łukasz after step 3): “4 requirements” — “lose it from their scope:
+ * REQ-101, REQ-102, REQ-103, REQ-105”; one: “1 requirement” — “loses it from its scope: REQ-104”; more than five: the
+ * first five keys, then “and 3 more”; none: “0 requirements” — “–”.
+ */
+export function requirementsImpactRow(keys: readonly string[]): [what: string, happens: string] {
+  const n = keys.length;
+  const what = `${n} requirement${n === 1 ? "" : "s"}`;
+  if (!n) return [what, "–"];
+  const named = keys.slice(0, IMPACT_KEYS_SHOWN).join(", ");
+  const rest = n > IMPACT_KEYS_SHOWN ? ` and ${n - IMPACT_KEYS_SHOWN} more` : "";
+  return [what, n === 1 ? `loses it from its scope: ${named}` : `lose it from their scope: ${named}${rest}`];
+}

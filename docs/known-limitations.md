@@ -145,6 +145,20 @@ tile and its box in the overview.
 - **Later:** with the view-state bar (slice 6, D-39): the “Live: {name}” chip, and the Labeled filter neither counted as
   “filtered” nor reset by “Show all”.
 
+### The requirement index is rebuilt on every write (slice 4a, step 3)
+
+The requirement index (scope, coverage, children, and each element's direct and indirect requirements;
+`src/domain/model/requirement-index.ts`) is built from scratch once per data version: once per page on the server for
+the left panel, the project home and the status bar, and once in the browser for the panels whenever the requirements,
+their links or the model change, which is after every write. On a synthetic model of 500 requirements, 5,000
+attributes, 2,000 mappings and 3,000 links one build takes a median of 25.5 ms on the development laptop
+(`npx tsx scripts/bench-requirement-index.ts`).
+
+- **Fine for now:** the demo workspace has five requirements; one build is a small part of a page.
+- **For the performance review (before slice 4b and the database slice, AD-31):** consider an incremental rebuild, so a
+  write that touches one mapping, link or requirement recomputes only the requirements whose scope it reaches, and
+  measure the index together with 4b's lens, which reads it on every selection.
+
 ## Undo history (slice 1b)
 
 ### The undo history lives in server memory

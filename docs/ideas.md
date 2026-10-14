@@ -60,3 +60,10 @@ to the right of the content when missing, grown to fit and removed when empty. S
 to Q3: no migration for a new `frame.kind`): newly required cards land to the right of the existing content, one under
 another, in no frame, and the toast lists them. A deviation from the prototype to revisit; it needs `newly_labeled` in
 the CHECK on `frame.kind` (or another marker) and a rule so “Arrange into frames” does not rebuild it away.
+
+## “Add to this canvas” on a panel without its card (slice 4a, step 3)
+
+Since slice 4a a go-to link to an element whose card is not on the open canvas opens its panel only. The prototype's
+entity and source table panels then offer “Add to this canvas” where “Remove from this canvas” would be. Slice 4a leaves
+it out (not in its PRD; Łukasz after step 3); a candidate for slice 4b, which places requirement cards and can place an
+element's card from its panel the same way.
