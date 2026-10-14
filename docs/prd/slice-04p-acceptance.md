@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 0 accepted; baseline measured with three rounds (S4P-01), waiting for Łukasz's OK for step 1**. Draft pull request #12. Branch
+Status: **step 1 done (trial A built on `perf/4p-trial-a`), waiting for Łukasz**; baseline accepted (three rounds). Draft pull request #12. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -442,3 +442,75 @@ numbers. The lasso marks already meet S4P-06's bar at the baseline, and C-10 mis
 C-09 showed a steady difference between the two sides with the same code: +7.2 %, with tight ranges (34.5–35.7 against
 35.9–37.7 fps). So S4P-08 compares C-09 against that offset: a regression is a change **below +2.2 %** (+7.2 % − 5 %),
 not below −5 %. Every other figure keeps the rule as written. PRD changed in its own commit.
+
+## Step 1: trial A, built (14 October)
+
+Branch `perf/4p-trial-a`, from `slice/04p-canvas-performance` at `177b806`. It will be tagged at its verdict in step 2. No
+measuring sitting in this step (PRD as changed after the baseline).
+
+### What changed (only on the trial branch)
+
+- **`OverlayLayer`** (`src/canvas/OverlayLayer.tsx`, `canvas.css`): one container in React Flow's viewport portal, after
+  the cards, with `will-change: transform`, so it has its own compositing layer. It pans and zooms with the viewport and
+  takes no pointer events. It holds:
+  - **`HoverLines`**, the hovered row's or line's lines drawn again. They moved out of `LineLayer`, where they were drawn
+    below the cards; now they are above them (Łukasz's decision 2). `LineLayer` no longer takes a `hover` prop, so a
+    hover neither re-renders nor repaints the line layer.
+  - **`HoverOverlay`**: the rows at the other ends, the row's two dots, the moved-row flash and the card-width outline.
+  - **`SelectionOverlay`**: the marks of several selected items, the dashed box, “N selected” and the lasso rectangle.
+- **The hover and the lasso rectangle are stores** (`src/canvas/value-store.ts`), not React state. `ModelCanvas` sets
+  them (`onPointerOver`, `useLasso`), and only the overlay's three components read them. So a hover, and a lasso being
+  drawn, re-render the overlay only, never the canvas; the selection a lasso makes at its release re-renders it as
+  before. `busy` no longer includes the lasso; the overlays check it themselves.
+- **Tests:** `value-store.test.ts` (unit; `npm test` 925). The new guard `e2e/slice-04p/S4P-trial-a.spec.ts` (dev
+  server) checks:
+  - the overlay's `will-change` and that it comes after the cards;
+  - hovering `Customer.email`: three rows marked, its two lines drawn again in the overlay, none in the edge label
+    renderer;
+  - no canvas and no miniature commit while hovering or while drawing a lasso;
+  - the marks after the release.
+
+### Tests run (no dev server running)
+
+The guard, and every test that reads the hover or the selection overlays (step 0's Q1), on the e2e dev server:
+- all of slices 1b, 2a and 2b;
+- S2C-02 and S2C-12;
+- S3A-10 and S3A-14-idle;
+- S3B-13 and S3B-15-idle;
+- S4A-14.
+
+**58 passed, none failed.** No earlier test changed. Lint, typecheck and `npm test` pass.
+
+### Element counts (S4A-14's method, measurement build of the trial branch)
+
+| View | `.react-flow__viewport`: `slice-04a` → trial A | Whole page: `slice-04a` → trial A |
+| --- | --- | --- |
+| 100 %, frames expanded | 19,295 → 19,296 | 20,726 → 20,727 |
+| 30 %, frames expanded | 4,498 → 4,499 | 5,929 → 5,930 |
+| 100 %, frames collapsed | 4,905 → 4,906 | 6,242 → 6,243 |
+| 30 %, frames collapsed | 1,463 → 1,464 | 2,800 → 2,801 |
+
+**+1 in every view: the overlay's container**, which is empty while nothing is hovered, selected or lassoed (its
+three components render nothing then). `S4A-14-elements.spec.ts` fails on exactly that +1, as expected; if trial A is
+adopted, its baseline moves by one (S4P-12: “every difference explained”).
+
+### Screenshots for S4P-04
+
+`docs/prd/slice-04p-screens/step-1-trial-a/` (`SCREENS=step-1-trial-a npx playwright test
+e2e/slice-04p/S4P-04-screens.spec.ts`, 1536 × 864, “Customer & orders”):
+
+| | App (trial A) | Prototype |
+| --- | --- | --- |
+| 100 %, the row `Customer.email` hovered | `hover-100-app.png` | `hover-100-prototype.png` |
+| 30 %, the line `customers.email_addr → Customer.email` hovered | `hover-30-app.png` | `hover-30-prototype.png` |
+
+**Where it does not look like the prototype:**
+1. **The other lines do not fade on a hover.** In the prototype every other line fades to 12 %. The app has not faded
+   them since slice 1b (item 9, accepted then: restyling 340 lines made the hover too slow). Trial A does not change
+   that; F4 in step 2 could, if Łukasz wants it.
+2. **The hovered lines are drawn above the cards** (approved). In these two views they cross no card, so the
+   screenshots look the same as before; where a hovered line runs behind a card, it now runs over it.
+3. **At 30 % the app draws no rows** (AD-24 rule 1, below 40 %). So the hover there is on a line, the line is drawn
+   again stronger, and no row is marked; the prototype still draws and marks rows at 30 %.
+4. The prototype's demo canvas has frames (CRM, WEB, Customer …) and the app's demo canvas does not; this has nothing to
+   do with the hover.
