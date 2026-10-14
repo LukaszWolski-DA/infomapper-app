@@ -1,7 +1,7 @@
 # Slice 4a – Acceptance
 
-Status: **step 5 done; waiting for Łukasz's manual acceptance** (S4A-14's element counts wait for his OK to run the
-measurement build). Branch `slice/04a-requirements`, from `main` at the tag `slice-03b` (`a10899c`), pull request #11
+Status: **step 5 done; waiting for Łukasz's manual acceptance** (S4A-14's element counts ran on 14 October and pass).
+Branch `slice/04a-requirements`, from `main` at the tag `slice-03b` (`a10899c`), pull request #11
 (draft). Steps 0 to 4 were accepted one by one (below).
 
 ## Criteria
@@ -26,7 +26,7 @@ keyboard and is read back from the data file.
 | S4A-11 | `S4A-11.spec.ts`: Piotr and Kasia see every field read-only, no Edit, no Link field, no ×, no Delete, no “New requirement”; Piotr sets REQ-103 to Implemented; his update, link, unlink, create and delete sent directly: “As a reviewer you can only change a requirement's status.”; Kasia's status and update sent directly: “As a reader you cannot change requirements.”; Bank X (archived): “No requirements yet.”, no “New requirement”, a create sent directly: the archive message | passes |
 | S4A-12 | `S4A-12.spec.ts`: four-eyes on: after Anna's description edit her panel shows the hint and Agreed is refused (“You changed REQ-103 last, so someone else has to agree it.”, still Draft); Piotr agrees it, one change event with him as user and Draft before; four-eyes off: Anna agrees REQ-104 | passes |
 | S4A-13 | `S4A-13.spec.ts`: “5 requirements, 2 covered” and the five rows (“5/8, Agreed” …) on both project homes; from Order management REQ-104 opens the first canvas, after visiting “Order lines & products” REQ-103 opens that one, each with the panel; the status bar goes from “Requirements 5, covered 2” to “covered 3” when `customers.dob`'s mapping is approved; with CR-23 as context, a new requirement and a link record it on every event and CR-23 marks nothing more | passes |
-| S4A-14 | `S4A-14.spec.ts` (in every run): requirement panels and an element panel without its card change no card, selection, line class or view, and an idle canvas does not commit; `S4A-14-elements.spec.ts` (measurement build): the viewport counts against `.data/measure/s4a14-baseline/slice-03b.json`; S2C-12, S3A-14's and S3B-15's idle tests and S3B-13 run in every full run | the normal part passes; the element counts wait for Łukasz's OK (the measurement build) |
+| S4A-14 | `S4A-14.spec.ts` (in every run): requirement panels and an element panel without its card change no card, selection, line class or view, and an idle canvas does not commit; `S4A-14-elements.spec.ts` (measurement build): the viewport counts against `.data/measure/s4a14-baseline/slice-03b.json`; S2C-12, S3A-14's and S3B-15's idle tests and S3B-13 run in every full run | passes (the element counts on `c2c0727`, below) |
 | S4A-15 | CI (lint, typecheck, unit tests, the schema check) and three full runs in a row | below |
 
 ### Three full runs in a row
@@ -47,12 +47,58 @@ All three under 30 minutes, so no cause to look for (step 2's 32.8-minute run st
    server refuses, and its note sits below Status. Requirements behaved the same but showed the note above Status; it
    moved below (`d46ae68`). No other change.
 2. **Empty key or name** now go to the server, which refuses them with “Enter a key.” / “Enter a name.” (S4A-02); before,
-   the field put the stored value back without a message.
+   the field put the stored value back without a message. A deliberate difference from PRD item 2 (below).
 3. **The requirement panel carries `data-version`** so a test can wait for the page to show a saved version before the
    next edit (several quick edits in a row otherwise meet a stale version, as in the prototype's own panel).
 4. **Google Fonts in the e2e server:** twice in this step the e2e dev server could not build `next/font/google`'s IBM
    Plex (a network answer it could not read); the next run was fine. Not a change of the app; recorded in case it comes
    back during the three runs.
+
+### Deliberate differences from the PRD
+
+- **Empty key or name (item 2).** The PRD says the field shows the previous value “as the prototype does”, and the
+  prototype puts it back silently. The app does put the previous value back, but first sends the empty value to the
+  server, which refuses it with “Enter a key.” / “Enter a name.” (the step 0 wording table) as a toast; nothing is
+  written. So the person sees why their edit did not stick, and the domain's rule is the only one. Checked on `c2c0727`
+  (14 October) with a one-off Playwright test, not kept: on REQ-101 an emptied key (Enter, and a blank key left by a
+  click elsewhere) and an emptied name each toast their message, the field shows `REQ-101` / “Single view of the
+  customer” again, and the requirement's version is unchanged. S4A-02 checks the empty name the same way.
+
+### S4A-14: element counts (14 October)
+
+`S4A-14-elements.spec.ts` on `c2c0727` in the measurement build, no other server running, against
+`.data/measure/s4a14-baseline/slice-03b.json`. It counts elements, not frames, so no laptop preparation.
+
+bash:
+
+```bash
+npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04a/S4A-14-elements.spec.ts
+```
+
+PowerShell (the two variables stay set in that window; `Remove-Item Env:MEASURE, Env:MEASURE_BUILD` afterwards):
+
+```powershell
+npm run measure:build; if ($?) { $env:MEASURE="1"; $env:MEASURE_BUILD="production"; npx playwright test e2e/slice-04a/S4A-14-elements.spec.ts }
+```
+
+Passed (24.6 s). Counts in `test-results/S4A-14-elements.json`:
+
+| View | Whole page, slice-03b → 4a | `.react-flow__viewport`, slice-03b → 4a |
+| --- | --- | --- |
+| 100 %, frames expanded | 20,721 → 20,726 (+5) | 19,295 → 19,295 |
+| 30 %, frames expanded | 5,924 → 5,929 (+5) | 4,498 → 4,498 |
+| 100 %, frames collapsed | 6,237 → 6,242 (+5) | 4,905 → 4,905 |
+| 30 %, frames collapsed | 2,795 → 2,800 (+5) | 1,463 → 1,463 |
+
+Every viewport count is identical. The whole page has five more elements in every view, all outside the canvas: a
+one-off dump of every element outside the viewport (30 %, collapsed) on both measurement builds (`slice-03b` in
+`../infomapper-ab-main`, and this branch) differs in exactly these:
+
+- the left panel's third tab, `button#tab-requirements` (1);
+- the status bar's “Requirements 0, covered 0” (`span#status-requirements` with its two `b`; 3; “Performance test”
+  has no requirements);
+- one more `<script>` in the head (1): the canvas page has five entry chunks instead of four (the panels' new client
+  code; the editor itself still loads only with its dialog, step 2).
 
 ### Changed earlier tests (whole slice)
 
