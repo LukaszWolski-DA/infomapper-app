@@ -1,6 +1,6 @@
 # Slice 4a – Acceptance
 
-Status: **step 3 done; waiting for Łukasz**. Branch `slice/04a-requirements`, from `main` at the tag `slice-03b`
+Status: **step 4 done; waiting for Łukasz**. Branch `slice/04a-requirements`, from `main` at the tag `slice-03b`
 (`a10899c`), pull request #11 (draft).
 
 ## Łukasz's answers to step 0 (13 October)
@@ -469,3 +469,70 @@ afterwards it passes. No other earlier test depended on a go-to link doing nothi
   below it (PRD item 5).
 - The prototype's requirement rows in element panels say “Click to place its card next to this element”; here a click
   opens the requirement's panel (4b places cards).
+
+## Łukasz's answers after step 3 (14 October)
+
+Step 3 accepted, its assumptions too. Before step 4: the previous session ended with a background command running.
+It was the Monitor that followed slice 3b's three e2e runs (`tail -f` on their progress file), not a build or a test;
+no `node`, Playwright browser or `tail` process was left, ports 3000/3001/3200/3300 were free, the tree was clean at
+`0a6b3c9`. Points, commit `b9d35d4`:
+
+1. **The delete dialog's requirements row** (`requirementsImpactRow`, `src/domain/model/impact.ts`): “4 requirements” —
+   “lose it from their scope: REQ-101, REQ-102, REQ-103, REQ-105”; one: “1 requirement” — “loses it from its scope:
+   REQ-104”; more than five: the first five keys, then “and 3 more”; none: “–”. S1A-10 and `impact.test.ts` updated.
+2. **`docs/ideas.md`:** “Add to this canvas” on a panel without its card, a candidate for 4b.
+3. **`docs/known-limitations.md`:** “The requirement index is rebuilt on every write” (median 25.5 ms at 500
+   requirements and 5,000 attributes), for the performance review: an incremental rebuild.
+
+## Step 4 (project home, status bar, roles, four-eyes, 14 October)
+
+PRD items 30–31 and 12–14 across the slice. Commit `eb4c456`.
+
+- **Project home** (`page.tsx`, `_components/project-requirements.tsx`, `projectRequirements` in `stats.ts`): the
+  statistic “{n} requirements, {m} covered” after the open notes, and a Requirements section between Canvases and
+  Labels: every requirement whose scope has an entity or table on one of the project's canvases, with its kind icon,
+  key, name, kind, coverage bar and “{ok}/{total}, {status}”; empty: “No requirement touches this project's canvases
+  yet.” A click opens the project's last opened canvas, else its first, with `?req=<id>`, which opens the
+  requirement's panel on arrival (`ModelCanvas`'s `focusRequirementId`, like `?label=`).
+- **Last opened canvas** (`src/app/_lib/last-canvas.tsx`): a browser preference per project
+  (`infomapper:last-canvas:{projectId}`), written when a canvas page opens; one that is no longer in the project falls
+  back to the first canvas.
+- **Status bar:** “Requirements {n}, covered {m}” after Relationships, for the whole workspace, from the server's
+  requirement index; every write refreshes the page, so a mapping approved elsewhere changes it.
+- **Roles across the slice:** owner, admin and modeler change everything; a reviewer only a requirement's status (every
+  other field read-only, no Edit, no “Link to a requirement”, no ×, no Delete, no “New requirement”); a reader nothing;
+  an archived workspace nothing (`standingOf`: archived means no edit and no status rights). The server refuses the
+  same writes when sent directly (step 1's domain tests; S4A-11 in step 5).
+- **Four-eyes** in the requirement panel: with four-eyes on, the person who last changed a requirement's content sees
+  “You changed REQ-103 last, so someone else has to agree it.” above Status while it is not Agreed (the authors come
+  from the change log, `lastRequirementEditor`, computed on the server only when four-eyes is on); Agreed stays
+  clickable and the server refuses with the same message.
+- **The working context:** requirement and link writes record it on their change events and label nothing (step 1's
+  `completeLiveWrites` test; the action path is `runCommand` as for every write).
+- **Tests:** `npm test` 920 in 64 files (917 before): `impact.test.ts`, `projectRequirements` in `stats.test.ts`.
+  Lint and typecheck pass.
+- **End-to-end:** the full suite once on `eb4c456`, no dev server running: **141 passed, 23.2 min** (wall clock 23
+  min), no retries. No earlier test changed in step 4 (S1A-10's new wording came with the points above, `b9d35d4`).
+
+### Checked in the browser (dev server, fresh seed, four-eyes on in the verify file only)
+
+As Anna: the canvas status bar reads “Requirements 5, covered 2”; after opening Order management's “Order lines &
+products”, the project home shows “5 requirements, 2 covered” and REQ-101 to REQ-105 with “5/8, Agreed”, “3/3, Agreed”,
+“1/4, Draft”, “1/1, Draft”, “3/4, Agreed”; a click on REQ-103 opens “Order lines & products” (the last opened, not the
+first) with REQ-103's panel; Anna, the seeded requirements' creator, sees the four-eyes hint, and Agreed is refused
+with the same message (status stays Draft).
+
+### Assumptions (step 4)
+
+1. **The last opened canvas is remembered in the browser**, per project, like the other panel preferences; on another
+   browser the first canvas opens.
+2. **The project's statistic counts the requirements in its list** (prototype `projReqs`), the status bar the whole
+   workspace's.
+3. **The four-eyes hint** shows only to those who may set the status, and not once the requirement is Agreed.
+4. **The seeded requirements' author is their creator (Anna)** for four-eyes until someone changes their content.
+
+### Not matched from the prototype
+
+- The prototype opens the canvas that shows most of the requirement's scope; the PRD (item 30) asks for the last opened
+  canvas, else the first.
+- The prototype's project home also counts requirement cards on the project's canvases; there are none until 4b.
