@@ -25,7 +25,7 @@ keyboard and is read back from the data file.
 | S4A-10 | `S4A-10.spec.ts`: deleting REQ-102: “Deleted REQ-102. The model elements it traced to are untouched.”, REQ-103 top level, its links gone, attributes, mappings and inputs unchanged; one undo brings back requirement, links and REQ-103's parent; deleting email takes its three links, its undo brings them back | passes |
 | S4A-11 | `S4A-11.spec.ts`: Piotr and Kasia see every field read-only, no Edit, no Link field, no ×, no Delete, no “New requirement”; Piotr sets REQ-103 to Implemented; his update, link, unlink, create and delete sent directly: “As a reviewer you can only change a requirement's status.”; Kasia's status and update sent directly: “As a reader you cannot change requirements.”; Bank X (archived): “No requirements yet.”, no “New requirement”, a create sent directly: the archive message | passes |
 | S4A-12 | `S4A-12.spec.ts`: four-eyes on: after Anna's description edit her panel shows the hint and Agreed is refused (“You changed REQ-103 last, so someone else has to agree it.”, still Draft); Piotr agrees it, one change event with him as user and Draft before; four-eyes off: Anna agrees REQ-104 | passes |
-| S4A-13 | `S4A-13.spec.ts`: “5 requirements, 2 covered” and the five rows (“5/8, Agreed” …) on both project homes; from Order management REQ-104 opens the first canvas, after visiting “Order lines & products” REQ-103 opens that one, each with the panel; the status bar goes from “Requirements 5, covered 2” to “covered 3” when `customers.dob`'s mapping is approved; with CR-23 as context, a new requirement and a link record it on every event and CR-23 marks nothing more | passes |
+| S4A-13 | `S4A-13.spec.ts`: the workspace Overview's “2 of 5 requirements covered”, “3 of 5” after the approval below (step 5 note 5); “5 requirements, 2 covered” and the five rows (“5/8, Agreed” …) on both project homes; from Order management REQ-104 opens the first canvas, after visiting “Order lines & products” REQ-103 opens that one, each with the panel; the status bar goes from “Requirements 5, covered 2” to “covered 3” when `customers.dob`'s mapping is approved; with CR-23 as context, a new requirement and a link record it on every event and CR-23 marks nothing more | passes |
 | S4A-14 | `S4A-14.spec.ts` (in every run): requirement panels and an element panel without its card change no card, selection, line class or view, and an idle canvas does not commit; `S4A-14-elements.spec.ts` (measurement build): the viewport counts against `.data/measure/s4a14-baseline/slice-03b.json`; S2C-12, S3A-14's and S3B-15's idle tests and S3B-13 run in every full run | passes (the element counts on `c2c0727`, below) |
 | S4A-15 | CI (lint, typecheck, unit tests, the schema check) and three full runs in a row | below |
 
@@ -50,6 +50,10 @@ All three under 30 minutes, so no cause to look for (step 2's 32.8-minute run st
    the field put the stored value back without a message. A deliberate difference from PRD item 2 (below).
 3. **The requirement panel carries `data-version`** so a test can wait for the page to show a saved version before the
    next edit (several quick edits in a row otherwise meet a stale version, as in the prototype's own panel).
+5. **The workspace Overview's “{covered} of {total} requirements covered”** was hard-coded as “0 of 0” since slice 0
+   (Łukasz, 14 October). It now reads the whole workspace's figures from the requirement index, as the canvas status bar
+   does (prototype `renderWsHome`); S4A-13 checks “2 of 5” on the demo data and “3 of 5” after `customers.dob`'s mapping
+   is approved. The three full runs start again after this change.
 4. **Google Fonts in the e2e server:** twice in this step the e2e dev server could not build `next/font/google`'s IBM
    Plex (a network answer it could not read); the next run was fine. Not a change of the app; recorded in case it comes
    back during the three runs.

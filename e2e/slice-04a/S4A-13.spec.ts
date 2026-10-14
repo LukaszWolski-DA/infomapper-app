@@ -21,9 +21,12 @@ import {
 const home = (projectId: string) => `/w/${RETAIL}/p/${projectId}`;
 const homeRows = (page: Page) => page.getByTestId("item-project-requirement").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).dataset.key} ${(e as HTMLElement).querySelector("[data-testid=text-project-requirement-coverage]")!.textContent}`));
 
-test("S4A-13: the project home's statistic and Requirements of “Customer 360” and “Order management”; a click opens the last opened canvas (else the first) with the requirement's panel; the status bar's “Requirements 5, covered m” updates after an approval; with the context on, creating and linking a requirement labels nothing and records the context", async ({ page }) => {
+test("S4A-13: the workspace Overview's “{covered} of {total} requirements covered”, the project home's statistic and Requirements of “Customer 360” and “Order management”; a click opens the last opened canvas (else the first) with the requirement's panel; the status bar's “Requirements 5, covered m” and the Overview update after an approval; with the context on, creating and linking a requirement labels nothing and records the context", async ({ page }) => {
   const expected = ["REQ-101 5/8, Agreed", "REQ-102 3/3, Agreed", "REQ-104 1/4, Draft", "REQ-103 1/1, Draft", "REQ-105 3/4, Agreed"];
   await signInAs(page, "Łukasz");
+  // the workspace Overview: the whole workspace's requirements, as the status bar
+  await page.goto(`/w/${RETAIL}`);
+  await expect(page.getByTestId("stat-workspace-requirements")).toHaveText("2 of 5 requirements covered");
   for (const project of [SEED_IDS.projCustomer360, SEED_IDS.projOrderManagement]) {
     await page.goto(home(project));
     await expect(page.getByTestId("stat-requirements")).toHaveText("5 requirements, 2 covered");
@@ -51,6 +54,8 @@ test("S4A-13: the project home's statistic and Requirements of “Customer 360�
   const dob = await mappingId("customers.dob", "Customer.birth_date");
   await expect.poll(async () => (await store().model.load(RETAIL)).mappings.find((m) => m.id === dob)?.status).toBe("approved");
   await expect(page.getByTestId("status-requirements")).toHaveText("Requirements 5, covered 3");
+  await page.goto(`/w/${RETAIL}`);
+  await expect(page.getByTestId("stat-workspace-requirements")).toHaveText("3 of 5 requirements covered");
 
   // the working context: requirement and link writes record it and label nothing
   const cr23 = (await labelNamed("CR-23"))!;

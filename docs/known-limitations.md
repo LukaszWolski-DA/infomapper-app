@@ -296,4 +296,8 @@ S0-10 removes `.next-e2e-restart` before and after use. A global setup warms the
 pages), so the first tests do not wait for compiles.
 
 - **Accepted:** an e2e run compiles every page once (about a minute); `npm run dev` keeps its cache.
+- **`npm run dev` can hit it too** (slice 4a): after a dev server on `.next` was stopped by force (a closed terminal, an
+  ended session), the next one answered 404 for every project and canvas page while the workspace page worked; the data
+  file was not the cause. Fix: stop the server, delete `.next/dev/cache/turbopack`, start it again (the first pages
+  compile once more).
 - **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.

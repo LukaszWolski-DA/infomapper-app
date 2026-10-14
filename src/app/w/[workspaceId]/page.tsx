@@ -6,6 +6,7 @@ import { ROLE_LABEL } from "@/app/_lib/roles";
 import { loadShell } from "@/app/_lib/shell";
 import { workspaceStats } from "@/app/_panels/stats";
 import { getDataStore } from "@/data";
+import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import { can } from "@/domain/permissions";
 import { ArchiveBox, UnarchiveButton } from "./_components/lifecycle";
 import { NewProjectTile } from "./_components/new-project-tile";
@@ -22,11 +23,13 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const shell = await loadShell({ workspaceId });
   const store = getDataStore();
   const workspace = (await store.workspaces.get(workspaceId))!;
-  const [members, users, projects, model] = await Promise.all([
+  const [members, users, projects, model, requirements, requirementLinks] = await Promise.all([
     store.workspaces.listMembers(workspaceId),
     store.users.list(),
     store.projects.list(workspaceId),
     store.model.load(workspaceId),
+    store.requirements.list(workspaceId),
+    store.requirements.listLinks(workspaceId),
   ]);
   const orgMemberships = await store.organizations.listMembershipsOfUsers(members.map((m) => m.user_id));
   const organizations = await Promise.all(
@@ -48,6 +51,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   });
 
   const stats = workspaceStats(model);
+  // the whole workspace's requirements and how many are covered, as the canvas status bar (slice 4a)
+  const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
   const counts = new Map(shell.projects.map((p) => [p.id, p.canvasCount]));
 
   return (
@@ -121,8 +126,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                 <Stat>
                   <b>{stats.approved}</b> of <b>{stats.mappings}</b> mappings approved
                 </Stat>
-                <Stat>
-                  <b>0</b> of <b>0</b> requirements covered
+                <Stat testId="stat-workspace-requirements">
+                  <b>{requirementIndex.coveredCount}</b> of <b>{requirementIndex.requirements.length}</b> requirements covered
                 </Stat>
                 {stats.typeProblems > 0 && (
                   <Stat warn>
@@ -297,8 +302,9 @@ function Banner({ tone, testId, children }: { tone: "warn" | "info"; testId?: st
   );
 }
 
-const Stat = ({ children, warn }: { children: ReactNode; warn?: boolean }) => (
+const Stat = ({ children, warn, testId }: { children: ReactNode; warn?: boolean; testId?: string }) => (
   <span
+    data-testid={testId}
     className={`rounded-[14px] bg-im-surface px-[11px] py-[3px] text-xs shadow-[0_0_0_1px_var(--im-line)] [&_b]:font-semibold ${warn ? "text-im-warn [&_b]:text-im-warn" : "text-im-ink-2 [&_b]:text-im-ink"}`}
   >
     {children}
