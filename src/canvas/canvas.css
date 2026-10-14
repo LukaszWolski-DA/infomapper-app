@@ -210,6 +210,10 @@ body.connecting .im-canvas .row { cursor: crosshair }
    the moved-row flash, the resize outline and the selection marks repaint only it, never the viewport's big layer.
    It sits in the viewport portal and pans and zooms with the viewport; it takes no pointer events. ---------- */
 .im-canvas .overlay-layer { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform }
+/* the hover line fade (slice 4p, a trial A variant, off unless the measuring hook switches it on): above the lines, below
+   the cards; the canvas background at 88 % leaves the lines at about the prototype's 12 % */
+.im-canvas .hover-veil { position: absolute; pointer-events: none; background: color-mix(in srgb, var(--im-canvas) 88%, transparent) }
+.im-canvas .hover-veil.own-layer { will-change: transform }
 
 /* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */
 /* One overlay above the cards; the cards are not restyled. Fill opacity on a handful of overlay shapes only. */

@@ -62,6 +62,7 @@ import { LIVE_ONE_AT_A_TIME } from "@/domain/model/live";
 import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
+import HoverVeil from "./HoverVeil";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
 import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
@@ -1530,6 +1531,8 @@ export function ModelCanvas({
               tethers={tethers}
             />
           )}
+          {/* the hover line fade, a variant measured in slice 4p (off unless the measuring hook switches it on) */}
+          <HoverVeil hoverStore={hoverStore} lassoStore={lasso.lasso} busy={busy} />
           <NoteLayer
             notes={shownNotes}
             selectedId={selection?.t === "note" ? selection.id : null}
