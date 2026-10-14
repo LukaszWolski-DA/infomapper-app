@@ -54,6 +54,10 @@ All three under 30 minutes, so no cause to look for (step 2's 32.8-minute run st
    (Łukasz, 14 October). It now reads the whole workspace's figures from the requirement index, as the canvas status bar
    does (prototype `renderWsHome`); S4A-13 checks “2 of 5” on the demo data and “3 of 5” after `customers.dob`'s mapping
    is approved. The three full runs start again after this change.
+6. **The project home's side panels** no longer say that model, sources and requirements “arrive in a later slice”:
+   “Open a canvas to work with the model, sources and requirements.” and “Open a canvas to see the details of what you
+   select.” (Łukasz, 14 October; text only, no test checked the old texts). The project home without panels, the status
+   bar without “Open notes on canvas” and the tiles without a frame count are in `docs/known-limitations.md`.
 4. **Google Fonts in the e2e server:** twice in this step the e2e dev server could not build `next/font/google`'s IBM
    Plex (a network answer it could not read); the next run was fine. Not a change of the app; recorded in case it comes
    back during the three runs.

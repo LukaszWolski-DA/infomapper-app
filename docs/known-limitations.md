@@ -182,6 +182,33 @@ attributes, 2,000 mappings and 3,000 links one build takes a median of 25.5 ms o
   write that touches one mapping, link or requirement recomputes only the requirements whose scope it reaches, and
   measure the index together with 4b's lens, which reads it on every selection.
 
+## Screens compared with the prototype (slice 4a, step 5)
+
+Found while fixing the workspace Overview's hard-coded “0 of 0 requirements covered” (slice 4a, step 5).
+
+### The project home has no left panel or inspector
+
+The prototype keeps the left panel (Model, Sources, Requirements) and the inspector on its project home. The
+application's project home shows two empty side panels that say “Open a canvas to work with the model, sources and
+requirements.” and “Open a canvas to see the details of what you select.” (`src/app/_components/app-shell.tsx`); the
+panels exist only on canvas pages.
+
+- **Accepted** by Łukasz in slice 4a, step 5. **Later:** not planned yet.
+
+### The status bar has no “Open notes on canvas {n}”
+
+The prototype's status bar (`renderStatus`) ends with “Open notes on canvas {n}” after Requirements; the application's
+stops at Requirements and the working context (`src/app/_panels/status-bar.tsx`).
+
+- **Accepted** by Łukasz in slice 4a, step 5. **Later:** slice 6, with the view-state bar (D-39).
+
+### Canvas tiles have no frame count
+
+The prototype's canvas tile on the project home says “{n} cards, {m} frames. Also in …”; the application's says
+“{n} cards. Also in …” (`src/app/w/[workspaceId]/p/[projectId]/_components/project-tiles.tsx`).
+
+- **Accepted** by Łukasz in slice 4a, step 5. **Later:** not planned yet.
+
 ## Undo history (slice 1b)
 
 ### The undo history lives in server memory
