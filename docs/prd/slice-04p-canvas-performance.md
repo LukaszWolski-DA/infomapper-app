@@ -1,6 +1,6 @@
 # Slice 4p – Canvas performance review
 
-Status: **draft for step 0**, 14 October 2026. Branch `slice/04p-canvas-performance`. Starts from `main` at tag
+Status: **step 0 accepted**, 14 October 2026 (steps and S4P-08 changed after the baseline, Łukasz, 14 October). Branch `slice/04p-canvas-performance`. Starts from `main` at tag
 `slice-04a` (`5e02c96`).
 
 ## 1. Why this slice
@@ -94,9 +94,12 @@ Focus's button and shortcut, the lens in the requirement panel, notes as rich te
    Extend the harness (items 1–3), add the two requirements to `seed:large`. Baseline sitting: this branch against
    `slice-04a`, with the application code still the same, so the difference is the method's spread (as slice 2p's
    step 0). Measuring commands only after Łukasz's OK; he prepares the laptop.
-1. **Trial A** (item 5). Measure C-10 and the lasso marks, and pan and zoom (no regression). Verdict.
-2. **Fading candidates** (item 6): each built only as far as needed to measure the scenarios of item 2 and to take the
-   screenshots of item 4. One sitting with all candidates. Łukasz chooses; the others get their verdict.
+1. **Trial A, built** (item 5), on its trial branch: the overlay on its own compositing layer, used for the hover (the
+   hovered lines drawn above the cards, Łukasz after step 0) and for the row and lasso marks. No sitting in this step:
+   the affected e2e tests, and the hover screenshots for S4P-04.
+2. **Fading candidates** (item 6), F1 and F4 built on trial A's overlay, each only as far as needed to measure the
+   scenarios of item 2 and to take the screenshots of item 4. Then **one sitting** measuring C-10, the lasso marks and
+   every fading scenario; the verdicts for trial A, F1 and F4 come from it. Łukasz chooses.
 3. **The chosen mechanism, finished**, as a canvas capability 4b can use (section 6), with unit tests for what it lights;
    then trial for item 7 (notes layer) and its verdict.
 4. **Error boundaries, C-08 diagnosis, index timing** (items 8–10).
@@ -117,7 +120,7 @@ one unrecorded warm-up run after the build.
 | S4P-05 | C-10 hover: verdict with figures; met if ≤ 100 ms. |
 | S4P-06 | Lasso marks: verdict with figures; met if ≤ 100 ms. |
 | S4P-07 | Notes layer: verdict with fps, Layerize per frame, GPU memory and raster time. |
-| S4P-08 | No regression with fading off against `slice-04a`: pan and zoom ≥ −5 % (100 % and 30 %, frames expanded and collapsed), C-08, C-09 and the drags within the baseline's spread. |
+| S4P-08 | No regression with fading off against `slice-04a`, judged on three-round medians: pan and zoom (100 % and 30 %, frames expanded and collapsed) not worse than 5 %, or within the baseline's spread; C-08, C-09 and the drags within the baseline's spread. |
 | S4P-09 | Error boundaries: an error in the canvas shows the message, the panels and top bar still work, “Reload” recovers; an unknown route shows the not-found page. e2e test. |
 | S4P-10 | C-08 diagnosis written in the acceptance doc, with the trace's split and a proposal. |
 | S4P-11 | Requirement index timing in the browser, with the verdict of item 10. |
