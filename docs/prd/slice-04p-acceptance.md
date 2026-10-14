@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 0 done, waiting for Łukasz** (answers below; the baseline sitting is prepared, not measured). Branch
+Status: **step 0 accepted; baseline measured (S4P-01), waiting for Łukasz's OK for step 1**. Draft pull request #12. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -197,7 +197,7 @@ browser console only, without personal data).
   `model-store.test.ts`); lint and typecheck pass. The e2e specs that seed `seed:large` and all of slice 4a ran on the
   e2e dev server (22 passed): the two requirements change nothing they check.
 
-### Baseline sitting (S4P-01): prepared, not measured
+### Baseline sitting (S4P-01): prepared at step 0 (measured below)
 
 `npm run measure:canvas -- --prepare-only --against slice-04a` ran: `../infomapper-ab-main` is clean at `slice-04a`
 (`5e02c96`) with its measurement build, and this branch's measurement build is made (log `.data/s4p-prepare.log`).
@@ -218,3 +218,137 @@ npm run measure:canvas -- --rounds 2 --against slice-04a
 The first is the warm-up and is not counted. The second is the baseline: every figure (S1A-14, C-09, C-10, the drags,
 the lasso marks and the four fading-off views), two rounds with each side first once. The spread goes into S4P-01. A
 side takes a few minutes more than in slice 3b (the four fading-off views, about 1 minute).
+
+## Łukasz's answers after step 0 (14 October)
+
+Step 0 accepted.
+
+1. **F4 is the fading candidate.** F1 is built only as far as needed for the comparison; F2 is dropped (Q3: React Flow
+   has one node container, and a portal that changes its target remounts its children). Step 2 also checks and reports:
+   the veil moves with the canvas's own transform during pan and zoom, with no script per frame; the holes follow a card
+   that is dragged or resized while fading is on; the veil's GPU memory at 30 %. The look differences of Q4 are accepted
+   for now; Łukasz judges them on the S4P-04 screenshots.
+2. **Trial A** draws the hovered lines above the cards (approved); screenshots of the hover go with S4P-04 too.
+3. **Error pages:** the wording of Q7 is approved, including “your saved work is not affected”.
+4. **The measuring hook stays in for the baseline.** If the sides differ by more than slice 2p's spread, say so, and the
+   hook is checked.
+5. **Added:** REQ-103 in `seed:large`, linked to the source tables in S1A-14's 100 % view, and the large-lens scenario
+   measured in that view too (the heaviest), with its lit counts. The draft pull request is opened now.
+
+## Step 0, additions (14 October)
+
+- **REQ-103 “Lens, dense area”** (`seed-large-requirements.ts`, `denseViewTables`): the source tables in S1A-14's 100 %
+  view, `src:1`, `src:29`, `src:47` and `src:57`; no attributes in scope (0 / 0). The workspace's counter is 104.
+- **The fading spec has six views**: the four around `ent:23`, and S1A-14's 100 % view around `src:57` (“100 % dense
+  area”), frames expanded and collapsed; there the scenario is the dense lens. Under `DIAG=collapsed` only the collapsed
+  views run. Each view records the cards in view (`inView`).
+- **`measure:canvas --diag <switch>`**: a measurement-only switch for both sides, so a collapsed baseline compares
+  `slice-04a` with itself (`--branch-diag` switches only this branch's side).
+- Commit `c5f2296`. Draft pull request
+  [LukaszWolski-DA/infomapper-app#12](https://github.com/LukaszWolski-DA/infomapper-app/pull/12).
+
+### Views and lit counts
+
+The pane in the measuring window is 932 × 718 px (recorded by the spec). The cards in each view (from the sitting) and
+what each scenario lights there (from the scenarios' definitions; the mechanism records its own count from step 2):
+
+| View | Cards in view | Scenario | Lit in view |
+| --- | --- | --- | --- |
+| 100 % around `ent:23` | 4: `ent:4`, `ent:19`, `ent:23`, `ent:28` | Focus `ent:23` | 2 of 4 |
+| | | Lens, small (REQ-101) | 1 of 4 (6 rows coloured on `ent:19`) |
+| | | Lens, large (REQ-102) | 2 of 4 |
+| 30 % around `ent:23` | 19 (12 tables, 7 entities) | Focus | 5 of 19 |
+| | | Lens, small | 4 of 19 |
+| | | Lens, large | 10 of 19 |
+| 100 % dense area (S1A-14's) | 4 tables: `src:1`, `src:29`, `src:47`, `src:57` | Lens, dense (REQ-103) | 4 of 4 (no rows, no lines: tables only) |
+| The same three views, collapsed | 0, 2 blocks, 1 block | as above | measured from step 2 |
+
+## Baseline (S4P-01, 14 October)
+
+Conditions: the laptop prepared by Łukasz (as in earlier sittings). The warm-up sitting `2026-10-14-15-35` (`--quick
+--rounds 1`, not counted) ran first, after the builds. Every side then waited for a quiet machine (below 2 % for 30 s,
+at most 3 minutes) and recorded the busiest processes after it. Google Chrome 155.0.8059.40, headed, 1536 × 864.
+
+### Frames expanded: sitting `2026-10-14-15-48`
+
+`npm run measure:canvas -- --rounds 2 --against slice-04a`, this branch `c5f2296` against `slice-04a` (`5e02c96`).
+All four sides quiet (waits 31–45 s); nothing besides the command's own programs above 0.4 % after any side. No round
+dropped.
+
+| Figure | Bar | `slice-04a`: median (min–max) | This branch: median (min–max) | Change |
+| --- | --- | --- | --- | --- |
+| Pan and zoom at the overview (S1A-14) | ≥ 50 fps | 59.1 (58.5–59.7) | 59.1 (58.9–59.4) | +0.1 % |
+| – frames over 50 ms | 0 | 0 (0–0) | 0 (0–0) | – |
+| Pan and zoom at 100 %, dense area (S1A-14) | ≥ 50 fps | 48.5 (47.4–49.6) | 51.0 (50.4–51.7) | +5.3 % |
+| – frames over 50 ms | 0 | 11 (6–15) | 8 (5–11) | – |
+| Initial render (C-08), median of 5 | ≤ 1500 ms | 1501 (1486–1515) | 1438 (1412–1463) | −4.2 % |
+| Card resize (C-09) | ≥ 45 fps | 34.6 (34.5–34.7) | 37.5 (37.2–37.7) | +8.2 % |
+| Hover to the next frame (C-10), median of 40 | ≤ 100 ms | 117 (117–118) | 117 (115–118) | −0.3 % |
+| Single-card drag at 50 % | ≥ 45 fps | 13.6 (10.7–16.5) | 13.8 (10.7–16.9) | +1.5 % |
+| Group drag, 31 cards at 50 % | ≥ 45 fps | 30.8 (29.6–32.0) | 29.3 (28.2–30.4) | −4.9 % |
+| Lasso marks, median of 20 | ≤ 100 ms | 25 (25–25) | 22 (20–24) | −11.5 % |
+| Fading off, 100 % around `ent:23` | – | 47.7 (47.2–48.1) | 48.7 (48.7–48.7) | +2.2 % |
+| – frames over 50 ms | – | 11 (10–12) | 8 (7–8) | – |
+| Fading off, 30 % around `ent:23` | – | 53.0 (53.0–53.1) | 53.0 (52.3–53.6) | −0.2 % |
+| – frames over 50 ms | – | 7 (6–8) | 8 (7–8) | – |
+| Fading off, 100 % dense area | – | 48.5 (47.3–49.6) | 48.8 (47.8–49.8) | +0.7 % |
+| – frames over 50 ms | – | 7 (5–9) | 10 (10–10) | – |
+| Fading off, 100 % around `ent:23`, collapsed | – | 55.9 (55.6–56.2) | 56.6 (56.6–56.6) | +1.3 % |
+| – frames over 50 ms | – | 7 (6–7) | 5 (5–5) | – |
+| Fading off, 30 % around `ent:23`, collapsed | – | 57.7 (57.4–58.0) | 58.0 (57.8–58.2) | +0.5 % |
+| – frames over 50 ms | – | 5 (2–7) | 3 (2–4) | – |
+| Fading off, 100 % dense area, collapsed | – | 60.0 (60.0–60.0) | 60.0 (60.0–60.0) | 0.0 % |
+| – frames over 50 ms | – | 0 (0–0) | 0 (0–0) | – |
+
+### Frames collapsed: sitting `2026-10-14-16-16`
+
+`npm run measure:canvas -- --quick --rounds 2 --diag collapsed --against slice-04a`: both sides with every frame
+collapsed (C-09, C-10 and the drags need drawn cards and are not measured collapsed).
+
+**Round 1 dropped and replaced by round 3.** After round 1's `slice-04a` side the busiest processes were `chrome`
+(28.8 %) and `claude` (10.4 %); the quiet wait before round 1's branch side then timed out (181 s, up to 76 %), and that
+`slice-04a` side was far below every other side (fading off 49.3 / 43.7 / 46.4 fps against 56–60). No Chrome was left
+running afterwards, so it was most likely the measuring Chrome still closing. Round 3 (`--add-round`, both sides quiet
+after 47 s and 31 s) replaces it; round 1 stays in the sitting's folder.
+
+| Figure | `slice-04a`: median (min–max) | This branch: median (min–max) | Change |
+| --- | --- | --- | --- |
+| Pan and zoom at the overview (S1A-14) | 60.0 (60.0–60.0) | 60.0 (60.0–60.0) | 0.0 % |
+| Pan and zoom at 100 %, dense area (S1A-14) | 60.0 (60.0–60.0) | 60.0 (60.0–60.0) | 0.0 % |
+| Fading off, 100 % around `ent:23` | 56.5 (56.3–56.8) | 56.9 (56.7–57.1) | +0.6 % |
+| – frames over 50 ms | 5 (5–5) | 5 (5–5) | – |
+| Fading off, 30 % around `ent:23` | 58.3 (58.2–58.3) | 58.4 (58.1–58.6) | +0.2 % |
+| – frames over 50 ms | 2 (1–2) | 3 (2–4) | – |
+| Fading off, 100 % dense area | 60.0 (60.0–60.1) | 60.0 (59.9–60.0) | −0.2 % |
+| – frames over 50 ms | 0 (0–0) | 0 (0–0) | – |
+
+Frames over 50 ms in both sittings: 0 at the overview and in the collapsed dense area; 0–15 elsewhere.
+
+### The spread, and the hook (Łukasz's point 4)
+
+Against slice 2p's spread between the two sides (pan and zoom and C-08 within about 4 %, the group drag about 3 %, C-09,
+C-10, the single-card drag and the lasso 5–9 %), three figures differ by more:
+
+- **Pan and zoom at 100 % (S1A-14): +5.3 %**, in this branch's favour. Within a side it ranges 47.4–49.6 and
+  50.4–51.7, and the fading spec's own 100 % dense area (the same view, run later in the same side) differs by only
+  +0.7 %.
+- **Group drag: −4.9 %**, against this branch (30.8 against 29.3 fps; the sides' ranges 29.6–32.0 and 28.2–30.4
+  overlap).
+- **Lasso marks: −11.5 %**, in this branch's favour, but 3 ms (25 against 22 ms).
+
+C-09 (+8.2 %) is inside slice 2p's 5–9 % for the interactive figures. The hook cannot make this branch faster. It also
+takes no part in a group drag: it is one component beside `ModelCanvas` that sets one function on `window`, and nothing
+reads the fade store yet. So I read these three as the method's spread at two rounds rather than the hook's effect.
+Łukasz asked for this to be raised. Options: (a) accept the baseline as it is; (b) one more round (`--add-round`) to
+narrow the medians; (c) a short sitting with the hook removed, to see whether the group drag moves.
+
+**What else the baseline shows.** Against slice 2p's baseline (7 October, Chrome 154, `slice-02a`):
+- C-10 is now 117 ms (about 170 then);
+- the lasso marks are 22–25 ms (about 140 then), so **already below S4P-06's 100 ms bar** with fading off;
+- C-09 is 35–37 fps (about 25 then);
+- C-08 is about 1.44–1.50 s (about 1.75 then);
+- pan and zoom at the overview is 59 fps (53.5 then).
+
+The application changed a lot since (frames, notes, labels, requirements), so these gains are probably not the
+code. The likely cause is the browser (Chrome 155 against 154) or the laptop's state, not proven. S4P-05 and S4P-06
+start from these numbers: the lasso already meets its bar, and C-10 misses by 17 ms.
