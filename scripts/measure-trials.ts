@@ -12,7 +12,7 @@
 //   npx tsx scripts/measure-trials.ts --rounds 2 --sides perf/4p-trial-a,perf/4p-trial-f1,perf/4p-trial-f4
 //
 // Options as `measure:canvas`: --against (default slice-04a), --rounds (default 2), --drop <round,...>, --add-round
-// <sitting>, --resummarize <sitting>, --prepare-only. Results in .data/measure/<sitting>/ (sitting.json, summary.md).
+// <sitting>, --resummarize <sitting>, --prepare-only, and --no-build (use the worktrees and builds a warm-up just made). Results in .data/measure/<sitting>/ (sitting.json, summary.md).
 // Measuring only: no dev or measurement server may run (ports 3200, 3300); prepare the laptop first.
 
 import { execSync, spawnSync } from "node:child_process";
@@ -199,8 +199,16 @@ async function main() {
   }
   const sides = arg("sides", "").split(",").filter(Boolean);
   if (!sides.length) throw new Error("--sides <ref,ref,...> is required.");
-  for (const ref of [against, ...sides]) prepare(ref);
-  for (const ref of [against, ...sides]) sh("npm run measure:build", treeOf(ref));
+  // --no-build: the worktrees and builds a warm-up run just made (the sitting then starts right after it)
+  if (!process.argv.includes("--no-build")) {
+    for (const ref of [against, ...sides]) prepare(ref);
+    for (const ref of [against, ...sides]) sh("npm run measure:build", treeOf(ref));
+  } else {
+    for (const ref of [against, ...sides]) {
+      const at = read("git rev-parse HEAD", treeOf(ref));
+      if (at !== read(`git rev-list -n 1 ${ref}`)) throw new Error(`${treeOf(ref)} is not at ${ref}: run without --no-build.`);
+    }
+  }
   if (process.argv.includes("--prepare-only")) return;
   const dir = path.resolve(HERE, ".data", "measure", `trials-${new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-")}`);
   fs.mkdirSync(dir, { recursive: true });
