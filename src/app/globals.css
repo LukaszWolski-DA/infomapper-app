@@ -31,6 +31,7 @@
   --im-review: #854f0b;
   --im-review-strong: #ba7517;
   --im-review-soft: #faeeda;
+  --im-req: #534ab7;
   --im-req-soft: #eeedfe;
   --im-req-ink: #3c3489;
   --im-shadow: rgba(22, 32, 48, 0.16);
@@ -57,6 +58,7 @@
     --im-warn-soft: #3e2518;
     --im-review: #fac775;
     --im-review-soft: #412402;
+    --im-req: #afa9ec;
     --im-req-soft: #26215c;
     --im-req-ink: #cecbf6;
     --im-shadow: rgba(0, 0, 0, 0.5);
@@ -144,6 +146,7 @@
   --color-im-review: var(--im-review);
   --color-im-review-strong: var(--im-review-strong);
   --color-im-review-soft: var(--im-review-soft);
+  --color-im-req: var(--im-req);
   --color-im-req-soft: var(--im-req-soft);
   --color-im-req-ink: var(--im-req-ink);
 }
@@ -155,4 +158,35 @@
   body {
     @apply bg-background text-foreground;
   }
+}
+
+/* Rich text (slice 4a, prototype .rich, .tc-*, .rt-view, .rte-ed; D-42, D-43) */
+.rich p { margin: 0 0 6px; }
+.rich p:last-child { margin-bottom: 0; }
+.rich ul, .rich ol { margin: 0 0 6px; padding-left: 20px; }
+.rich ul { list-style: disc; }
+.rich ol { list-style: decimal; }
+.rich h4 { font-size: 12px; font-weight: 600; margin: 10px 0 2px; color: var(--im-ink-2); }
+.rich h4:first-child { margin-top: 0; }
+.rich a { color: var(--im-logical); text-decoration: underline; }
+.rich strong { font-weight: 600; }
+.tc-warn { color: #c2410c; }
+.tc-attn { color: #a16207; }
+.tc-ok { color: #15803d; }
+.tc-info { color: #2563eb; }
+@media (prefers-color-scheme: dark) {
+  .tc-warn { color: #ff8b4e; }
+  .tc-attn { color: #e9b949; }
+  .tc-ok { color: #4ade80; }
+  .tc-info { color: #7aa7ff; }
+}
+.rt-view {
+  border: 1px solid var(--im-line); border-radius: 6px; background: var(--im-surface); padding: 8px 10px; min-height: 40px;
+  max-height: 9.2em; overflow: hidden; font-size: 12.5px; line-height: 1.5; text-align: left; width: 100%; color: var(--im-ink);
+}
+.rt-view.open { max-height: none; }
+.rt-view.empty { color: var(--im-ink-3); font-style: italic; }
+.rte-ed { min-height: 300px; padding: 16px 18px; outline: none; font-size: 13.5px; line-height: 1.6; color: var(--im-ink); }
+.rte-ed p.is-empty[data-placeholder]:not([data-placeholder=""])::before {
+  content: attr(data-placeholder); color: var(--im-ink-3); font-style: italic; pointer-events: none; float: left; height: 0;
 }

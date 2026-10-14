@@ -31,11 +31,21 @@ describe("updateAttribute", () => {
   const state = { attribute: attribute(email) };
   const update = (input: object) => updateAttribute(makeCtx(), access("modeler"), state, { ...ref, ...input });
 
-  it("changes name, flags and definition", () => {
-    const r = update({ name: "email_address", isBusinessKey: true, isPii: false, isNullable: false, definition: "Primary e-mail." });
+  it("changes name, flags and the rich-text definition, sanitized on the server (slice 4a)", () => {
+    const r = update({ name: "email_address", isBusinessKey: true, isPii: false, isNullable: false, definition: '<p>Primary <span class="tc-warn" style="x">e-mail</span>.</p><iframe>x</iframe>' });
     expect(r).toMatchObject({
       ok: true,
-      value: { attribute: { name: "email_address", is_business_key: true, is_pii: false, is_nullable: false, definition_text: "Primary e-mail.", version: 2 } },
+      value: {
+        attribute: {
+          name: "email_address",
+          is_business_key: true,
+          is_pii: false,
+          is_nullable: false,
+          definition_html: '<p>Primary <span class="tc-warn">e-mail</span>.</p>',
+          definition_text: "Primary e-mail.",
+          version: 2,
+        },
+      },
     });
   });
 

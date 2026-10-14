@@ -23,6 +23,8 @@ import type {
   ProjectCanvas,
   ProjectPinnedLabel,
   Relationship,
+  Requirement,
+  RequirementLink,
   SourceColumn,
   SourceSystem,
   SourceTable,
@@ -41,6 +43,10 @@ import {
   NOTE_COLORS,
   NOTE_STATUSES,
   ORGANIZATION_ROLES,
+  REQUIREMENT_KINDS,
+  REQUIREMENT_PRIORITIES,
+  REQUIREMENT_SEVERITIES,
+  REQUIREMENT_STATUSES,
   ROW_FILTERS,
   SOURCE_OBJECT_TYPES,
   STEREOTYPES,
@@ -48,11 +54,11 @@ import {
 } from "@/domain/types";
 
 /**
- * 2 = slice 1a (model tables), 3 = slice 2b (frames), 4 = slice 3a (labels, label links, project pins, notes). A
- * format-2 or format-3 file is read as format 4 with the missing tables empty (it is written back as 4 with the next
- * write); an older file is refused with a hint to run "npm run reset-dev-data".
+ * 2 = slice 1a (model tables), 3 = slice 2b (frames), 4 = slice 3a (labels, label links, project pins, notes), 5 = slice
+ * 4a (requirements, requirement links). A format-2, 3 or 4 file is read as format 5 with the missing tables empty (it is
+ * written back as 5 with the next write); an older file is refused with a hint to run "npm run reset-dev-data".
  */
-export const DEV_DB_FORMAT = 4;
+export const DEV_DB_FORMAT = 5;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -73,6 +79,8 @@ export interface DevDb {
   source_column: SourceColumn[];
   mapping: Mapping[];
   mapping_input: MappingInput[];
+  requirement: Requirement[];
+  requirement_link: RequirementLink[];
   canvas_item: CanvasItem[];
   frame: Frame[];
   label: Label[];
@@ -104,6 +112,8 @@ export const emptyDb = (): DevDb => ({
   source_column: [],
   mapping: [],
   mapping_input: [],
+  requirement: [],
+  requirement_link: [],
   canvas_item: [],
   frame: [],
   label: [],
@@ -119,9 +129,10 @@ interface TableRules {
   foreignKeys: Readonly<Record<string, DevTable>>;
   /**
    * Unique indexes besides the key; `live` = only rows with deleted_at null, `where` = a further condition
-   * (partial indexes such as "where entity_id is not null and deleted_at is null").
+   * (partial indexes such as "where entity_id is not null and deleted_at is null"), `lower` = columns compared in lower
+   * case (an index on `lower(column)`).
    */
-  unique?: readonly { columns: readonly string[]; live?: boolean; where?: (row: AnyRow) => boolean }[];
+  unique?: readonly { columns: readonly string[]; live?: boolean; where?: (row: AnyRow) => boolean; lower?: readonly string[] }[];
   checks?: readonly { name: string; test: (row: AnyRow) => boolean }[];
 }
 
@@ -235,10 +246,40 @@ export const RULES: Record<DevTable, TableRules> = {
     foreignKeys: { ...model, mapping_id: "mapping", source_column_id: "source_column" },
     unique: [{ columns: ["mapping_id", "source_column_id"], live: true }],
   },
+  requirement: {
+    key: ["id"],
+    foreignKeys: { ...model, parent_id: "requirement" },
+    // requirement_key_uq: unique per workspace in any case among live rows (slice 4a migration)
+    unique: [{ columns: ["workspace_id", "key"], live: true, lower: ["key"] }],
+    checks: [
+      { name: "requirement_kind_ck", test: oneOf(REQUIREMENT_KINDS, "kind") },
+      { name: "requirement_status_ck", test: oneOf(REQUIREMENT_STATUSES, "status") },
+      { name: "requirement_priority_ck", test: oneOf(REQUIREMENT_PRIORITIES, "priority") },
+      { name: "requirement_severity_ck", test: (r) => r.severity === null || oneOf(REQUIREMENT_SEVERITIES, "severity")(r) },
+      { name: "requirement_not_own_parent_ck", test: (r) => r.parent_id === null || r.parent_id !== r.id },
+    ],
+  },
+  requirement_link: {
+    key: ["id"],
+    foreignKeys: {
+      ...model,
+      requirement_id: "requirement",
+      entity_id: "entity",
+      attribute_id: "attribute",
+      mapping_id: "mapping",
+      source_table_id: "source_table",
+      source_column_id: "source_column",
+    },
+    checks: [
+      {
+        name: "requirement_link_one_target_ck",
+        test: (r) => [r.entity_id, r.attribute_id, r.mapping_id, r.source_table_id, r.source_column_id].filter(isSet).length === 1,
+      },
+    ],
+  },
   canvas_item: {
     key: ["id"],
-    // requirement_id points to a table the local file does not have yet (requirements).
-    foreignKeys: { ...model, canvas_id: "canvas", entity_id: "entity", source_table_id: "source_table", frame_id: "frame" },
+    foreignKeys: { ...model, canvas_id: "canvas", entity_id: "entity", source_table_id: "source_table", requirement_id: "requirement", frame_id: "frame" },
     unique: [
       { columns: ["canvas_id", "entity_id"], live: true, where: (r) => isSet(r.entity_id) },
       { columns: ["canvas_id", "source_table_id"], live: true, where: (r) => isSet(r.source_table_id) },
@@ -249,6 +290,7 @@ export const RULES: Record<DevTable, TableRules> = {
       { name: "canvas_item_width_ck", test: (r) => r.width === null || ((r.width as number) >= 200 && (r.width as number) <= 600) },
       { name: "canvas_item_row_filter_ck", test: oneOf(ROW_FILTERS, "row_filter") },
       { name: "canvas_item_live_level_ck", test: (r) => r.live_level === null || oneOf(LIVE_LEVELS, "live_level")(r) },
+      // requirement cards come with slice 4b
       { name: "canvas_item_no_requirement_yet", test: (r) => !isSet(r.requirement_id) },
     ],
   },
@@ -371,7 +413,7 @@ export function findViolation(db: DevDb): IntegrityViolation | null {
       for (const row of rows) {
         if (index.live && row.deleted_at !== null) continue;
         if (index.where && !index.where(row)) continue;
-        const value = index.columns.map((c) => String(row[c])).join("|");
+        const value = index.columns.map((c) => (index.lower?.includes(c) ? String(row[c]).toLowerCase() : String(row[c]))).join("|");
         if (seen.has(value)) return { kind: "unique", table, detail: `${index.columns.join(", ")} = ${value} exists already` };
         seen.add(value);
       }

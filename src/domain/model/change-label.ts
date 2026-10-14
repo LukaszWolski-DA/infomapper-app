@@ -22,6 +22,8 @@ const NOUN: Record<string, string> = {
   label_link: "label",
   project_pinned_label: "label pin",
   note: "note",
+  requirement: "requirement",
+  requirement_link: "requirement link",
 };
 
 /** The table that names a group: the thing the person acted on, not what came along (cascades, a new card). */
@@ -44,6 +46,8 @@ const PRIORITY = [
   "label_link",
   "project_pinned_label",
   "note",
+  "requirement",
+  "requirement_link",
 ];
 
 const BOOKKEEPING = new Set(["version", "updated_at", "updated_by"]);
@@ -112,6 +116,12 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
     if (links[0]!.operation === "delete" && !labels.length) return "Remove label";
   }
   if (labels.length === 1 && labels[0]!.operation === "update" && only(labels[0]!, ["name", "name_key"])) return "Rename label";
+
+  // Requirements (slice 4a): linked, unlinked, a status set.
+  const reqLinks = of("requirement_link");
+  const reqs = of("requirement");
+  if (reqLinks.length === 1 && reqLinks.length === events.length) return reqLinks[0]!.operation === "create" ? "Link requirement" : "Unlink requirement";
+  if (reqs.length === 1 && reqs.length === events.length && reqs[0]!.operation === "update" && only(reqs[0]!, ["status"])) return "Set requirement status";
 
   // Notes (slice 3a): one note changed by itself.
   const notes = of("note");

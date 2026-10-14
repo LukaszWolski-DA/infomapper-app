@@ -12,7 +12,7 @@ import { useToast } from "@/ui/components/toast";
 import { Fold, Hint, Li, List } from "./fields";
 import { usePanel } from "./inspector";
 
-export function OnCanvases({ kind, targetId, cardId }: { kind: "entity" | "source"; targetId: Uuid; cardId: Uuid }) {
+export function OnCanvases({ kind, targetId, cardId }: { kind: "entity" | "source"; targetId: Uuid; cardId: Uuid | null }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
   const router = useRouter();
@@ -30,6 +30,7 @@ export function OnCanvases({ kind, targetId, cardId }: { kind: "entity" | "sourc
             meta={c.where}
             onClick={() => {
               if (c.id === p.canvasId) {
+                if (!cardId) return;
                 ui.select({ t: "card", id: cardId });
                 ui.centerOn(cardId);
                 return;

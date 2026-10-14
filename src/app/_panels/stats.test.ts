@@ -11,13 +11,16 @@ import {
   note,
   NOW,
   relationship,
+  requirement,
+  requirementLink,
   sourceColumn,
   sourceSystem,
   sourceTable,
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
 import { indexModel } from "./model-index";
-import { canvasStatus, cardsPerCanvas, coverage, projectOpenNotes, projectStats, workspaceStats } from "./stats";
+import { buildRequirementIndex } from "@/domain/model/requirement-index";
+import { canvasStatus, cardsPerCanvas, coverage, projectOpenNotes, projectRequirements, projectStats, workspaceStats } from "./stats";
 
 // Customer (customer_id, email): email ← email (approved, fits); customer_id ← first_name (draft, a type problem).
 // Sales Order has no attributes and is only on canvas 2.
@@ -99,5 +102,33 @@ describe("open notes on the project home (slice 3a, item 12, S3A-05)", () => {
 
   it("is empty when no canvas of the project has an open note", () => {
     expect(projectOpenNotes([note(n3, { status: "resolved" })], canvases, items, frames, model)).toEqual([]);
+  });
+});
+
+describe("requirements on the project home (slice 4a, PRD item 30)", () => {
+  const ordersOnly = "01900000-0000-7000-8000-000000008009";
+  const reqs = [
+    requirement(ids.req101, { kind: "need", status: "agreed" }),
+    requirement(ids.req102, { kind: "data" }),
+    requirement(ids.req103, { kind: "dq_rule" }),
+    requirement(ids.req104, { kind: "business_rule" }),
+  ];
+  const links = [
+    // Customer is on canvas 1, Sales Order only on canvas 2, the CRM table on canvas 1
+    requirementLink(ids.reqLink1, { requirement_id: ids.req101, attribute_id: ids.email }),
+    requirementLink(ids.reqLink2, { requirement_id: ids.req102, attribute_id: null, entity_id: ids.salesOrder }),
+    requirementLink(ids.reqLink3, { requirement_id: ids.req103, attribute_id: null, source_column_id: ids.colEmail }),
+    requirementLink("01900000-0000-7000-8000-00000000e204", { requirement_id: ids.req104, attribute_id: null, source_table_id: ordersOnly }),
+  ];
+  const withOrders = { ...model, sourceTables: [...model.sourceTables, sourceTable({ id: ordersOnly, name: "orders" })] };
+  const index = buildRequirementIndex(reqs, links, withOrders);
+
+  it("lists the requirements whose scope has an entity or table on the project's canvases, with coverage and status", () => {
+    expect(projectRequirements(index, items, [ids.canvas1]).map((r) => [r.key, `${r.covered}/${r.total}`, r.status, r.done])).toEqual([
+      ["REQ-101", "1/1", "agreed", true],
+      ["REQ-103", "0/0", "draft", false],
+    ]);
+    expect(projectRequirements(index, items, [ids.canvas1, ids.canvas2]).map((r) => r.key)).toEqual(["REQ-101", "REQ-102", "REQ-103"]);
+    expect(projectRequirements(index, items, [])).toEqual([]);
   });
 });

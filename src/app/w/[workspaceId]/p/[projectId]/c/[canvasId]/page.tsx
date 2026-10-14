@@ -48,6 +48,9 @@ import { liveMembership, liveRemoveQuestion, liveRemoveWhat } from "@/domain/mod
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
 import { cookies } from "next/headers";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
+import { buildRequirementIndex } from "@/domain/model/requirement-index";
+import { lastRequirementEditor } from "@/domain/model/requirements";
+import { RememberLastCanvas } from "@/app/_lib/last-canvas";
 
 // Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a); the Entity
 // tool and Undo and Redo in the top bar (slice 1b); the Hand tool, a selection of several cards, the canvas's look and
@@ -69,7 +72,7 @@ export default async function CanvasPage({
   // when the data is read: a page that arrives late must not put back an older state, nor hide a card, frame or note
   // created after it (slice 3a step 5, slice 3b step 1: `mergeFresh`)
   const readAt = new Date().toISOString();
-  const [model, allItems, canvases, workspace, history, projects, frameRows, labels, labelLinks, noteRows, users] = await Promise.all([
+  const [model, allItems, canvases, workspace, history, projects, frameRows, labels, labelLinks, noteRows, users, requirements, requirementLinks] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.canvases.list(ws),
@@ -81,6 +84,8 @@ export default async function CanvasPage({
     store.labels.listLinks(ws),
     store.notes.listOfCanvas(ws, canvasId),
     store.users.list(),
+    store.requirements.list(ws),
+    store.requirements.listLinks(ws),
   ]);
   // measurement-only switches (slice 2a diagnosis): only in the measurement-only production build (AD-31); slice 3a:
   // `nolabelmarks` draws no label mark (rows, headers, lines), `nonotes` no note
@@ -114,7 +119,14 @@ export default async function CanvasPage({
         }
       : null,
   );
-  const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id));
+  // requirements (slice 4a): the index is built once per page here for the left panel; the panels build theirs once
+  // per data version in the browser
+  const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
+  const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id), requirementIndex);
+  // the status bar's requirements for the whole workspace (PRD item 31), and who last changed each requirement's content
+  // for the panel's four-eyes hint (AD-06; only with four-eyes on, the server checks again)
+  const requirementCounts = { count: requirementIndex.requirements.length, covered: requirementIndex.coveredCount };
+  const requirementAuthors = fourEyes ? Object.fromEntries(requirementIndex.requirements.map((r) => [r.id, lastRequirementEditor(r, events)])) : {};
   const editable = shell.standing === "full";
   // the working context (slice 3b): for those who change labels (AD-05: the same roles as model editors), from this
   // person's browser; the labels with how many items each marks, for its menu and the status bar
@@ -128,6 +140,8 @@ export default async function CanvasPage({
   const focus = typeof query.card === "string" ? /^(entity|source):(.+)$/.exec(query.card) : null;
   const focusCardId = focus ? (cards.find((c) => c.kind === (focus[1] === "entity" ? "ent" : "src") && c.targetId === focus[2])?.id ?? null) : null;
   const focusLabelId = typeof query.label === "string" && labels.some((l) => l.id === query.label) ? query.label : null;
+  // `?req=<id>`: the project home's requirements open this canvas with the requirement's panel (slice 4a)
+  const focusRequirementId = typeof query.req === "string" && requirementIndex.byId.has(query.req) ? query.req : null;
   const focusNoteId = typeof query.note === "string" && noteRows.some((n) => n.id === query.note) ? query.note : null;
 
   // “On canvases” (slice 2a): every canvas of the workspace and where it opens, and the canvases each element is on.
@@ -193,16 +207,20 @@ export default async function CanvasPage({
                   canvasesOf={canvasesOf}
                   labels={labels}
                   labelLinks={labelLinks}
+                  requirements={requirements}
+                  requirementLinks={requirementLinks}
+                  requirementAuthors={requirementAuthors}
                   projectId={projectId}
                   liveCanvases={Object.fromEntries(canvases.filter((c) => c.live_label_id && c.deleted_at === null).map((c) => [c.live_label_id!, c.id]))}
                   live={liveLabel ? { labelId: liveLabel.id, labelName: liveLabel.name } : null}
                   canCreateCanvas={editable}
                 />
               ),
-              status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} />,
+              status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} requirements={requirementCounts} />,
             }}
           >
             {query.moved === "1" && <MovedNotice project={view.project.name} canvas={canvas.name} />}
+            <RememberLastCanvas projectId={projectId} canvasId={canvasId} />
             <ModelCanvas
               key={canvasId}
               canvasId={canvasId}
@@ -231,6 +249,7 @@ export default async function CanvasPage({
               entityConcepts={Object.fromEntries(model.entities.map((e) => [e.id, e.concept_id]))}
               focusCardId={focusCardId}
               focusLabelId={focusLabelId}
+              focusRequirementId={focusRequirementId}
               focusNoteId={focusNoteId}
               notes={notes}
               readAt={readAt}

@@ -26,7 +26,10 @@ export interface LabelTarget {
   id: Uuid;
 }
 
-const COLUMN: Record<LabelTargetKind, keyof LabelLink> = {
+/** The five target columns, shared by `label_link` and `requirement_link` (AD-15). */
+export type TargetColumns = Pick<LabelLink, "entity_id" | "attribute_id" | "mapping_id" | "source_table_id" | "source_column_id">;
+
+const COLUMN: Record<LabelTargetKind, keyof TargetColumns> = {
   entity: "entity_id",
   attribute: "attribute_id",
   mapping: "mapping_id",
@@ -35,7 +38,7 @@ const COLUMN: Record<LabelTargetKind, keyof LabelLink> = {
 };
 
 /** The five target columns of a link to this item: its own id in one, null in the others. */
-export function targetColumns(target: LabelTarget): Pick<LabelLink, "entity_id" | "attribute_id" | "mapping_id" | "source_table_id" | "source_column_id"> {
+export function targetColumns(target: LabelTarget): TargetColumns {
   return {
     entity_id: target.kind === "entity" ? target.id : null,
     attribute_id: target.kind === "attribute" ? target.id : null,
@@ -46,12 +49,12 @@ export function targetColumns(target: LabelTarget): Pick<LabelLink, "entity_id" 
 }
 
 /** The item a link marks, or null when it breaks the “exactly one target” rule. */
-export function targetOf(link: LabelLink): LabelTarget | null {
+export function targetOf(link: TargetColumns): LabelTarget | null {
   const set = LABEL_TARGET_KINDS.filter((k) => link[COLUMN[k]] !== null);
   return set.length === 1 ? { kind: set[0]!, id: link[COLUMN[set[0]!]] as Uuid } : null;
 }
 
-export const marks = (link: LabelLink, target: LabelTarget): boolean => link[COLUMN[target.kind]] === target.id;
+export const marks = (link: TargetColumns, target: LabelTarget): boolean => link[COLUMN[target.kind]] === target.id;
 
 const live = <R extends { deleted_at: string | null }>(rows: readonly R[]): R[] => rows.filter((r) => r.deleted_at === null);
 

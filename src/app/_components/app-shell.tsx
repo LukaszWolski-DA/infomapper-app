@@ -41,7 +41,7 @@ export function AppShell({ shell, project, children }: { shell: ShellData; proje
           data-testid="panel-left"
           className="hidden min-h-0 flex-col overflow-hidden border-r border-im-line bg-im-panel lg:flex"
         >
-          {project.left ?? <PanelPlaceholder>Model, sources and requirements arrive in a later slice.</PanelPlaceholder>}
+          {project.left ?? <PanelPlaceholder>Open a canvas to work with the model, sources and requirements.</PanelPlaceholder>}
         </aside>
         {/* The open canvas's background colours the tabs and the canvas (prototype #center[data-bg], slice 2a). */}
         <LookFrame className="flex min-h-0 min-w-0 flex-col">
@@ -53,7 +53,7 @@ export function AppShell({ shell, project, children }: { shell: ShellData; proje
           data-testid="panel-inspector"
           className="hidden min-h-0 flex-col overflow-hidden border-l border-im-line bg-im-panel lg:flex"
         >
-          {project.right ?? <PanelPlaceholder>Details of what you select appear here in a later slice.</PanelPlaceholder>}
+          {project.right ?? <PanelPlaceholder>Open a canvas to see the details of what you select.</PanelPlaceholder>}
         </aside>
       </div>
       {project.status}

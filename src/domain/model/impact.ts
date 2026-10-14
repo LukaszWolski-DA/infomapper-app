@@ -2,6 +2,7 @@
 
 import type { Uuid } from "../ids";
 import type { Attribute, Canvas, CanvasItem, Entity, Mapping, MappingInput, Project, ProjectCanvas, Relationship } from "../types";
+import type { RequirementIndex } from "./requirement-index";
 
 /** The live rows around one entity, as loaded by the caller. Rows that do not belong to the entity are ignored. */
 export interface EntityRows {
@@ -48,12 +49,17 @@ export interface EntityImpact {
   canvases: { id: Uuid; name: string }[];
   /** Projects holding one of those canvases, by name. */
   projects: { id: Uuid; name: string }[];
+  /** Requirements whose scope contains the entity, by key (slice 4a: they lose it from their scope). */
+  requirements: { id: Uuid; key: string }[];
 }
 
-/** The impact dialog's numbers: attributes, mappings (approved among them), relationships, canvases and projects. */
+/**
+ * The impact dialog's numbers: attributes, mappings (approved among them), relationships, canvases, projects and the
+ * requirements whose scope contains the entity (prototype `entityImpact`, slice 4a).
+ */
 export function entityImpact(
   rows: EntityRows,
-  context: { canvases: readonly Canvas[]; projects: readonly Project[]; projectCanvases: readonly ProjectCanvas[] },
+  context: { canvases: readonly Canvas[]; projects: readonly Project[]; projectCanvases: readonly ProjectCanvas[]; requirements?: RequirementIndex },
 ): EntityImpact {
   const cascade = entityCascade(rows);
   const canvasIds = new Set(cascade.canvasItems.map((c) => c.canvas_id));
@@ -68,5 +74,26 @@ export function entityImpact(
     relationships: cascade.relationships.length,
     canvases: canvases.map(({ id, name }) => ({ id, name })).sort(byName),
     projects: projects.map(({ id, name }) => ({ id, name })).sort(byName),
+    requirements: (context.requirements?.requirements ?? [])
+      .filter((r) => context.requirements!.scope(r.id).entities.has(rows.entity.id))
+      .map(({ id, key }) => ({ id, key }))
+      .sort((a, b) => a.key.localeCompare(b.key, "en", { numeric: true })),
   };
+}
+
+/** At most this many keys are named in the delete dialog's requirements row; the rest are counted. */
+export const IMPACT_KEYS_SHOWN = 5;
+
+/**
+ * The delete dialog's requirements row (slice 4a, Łukasz after step 3): “4 requirements” — “lose it from their scope:
+ * REQ-101, REQ-102, REQ-103, REQ-105”; one: “1 requirement” — “loses it from its scope: REQ-104”; more than five: the
+ * first five keys, then “and 3 more”; none: “0 requirements” — “–”.
+ */
+export function requirementsImpactRow(keys: readonly string[]): [what: string, happens: string] {
+  const n = keys.length;
+  const what = `${n} requirement${n === 1 ? "" : "s"}`;
+  if (!n) return [what, "–"];
+  const named = keys.slice(0, IMPACT_KEYS_SHOWN).join(", ");
+  const rest = n > IMPACT_KEYS_SHOWN ? ` and ${n - IMPACT_KEYS_SHOWN} more` : "";
+  return [what, n === 1 ? `loses it from its scope: ${named}` : `lose it from their scope: ${named}${rest}`];
 }

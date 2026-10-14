@@ -12,6 +12,7 @@ import {
 } from "@/domain/types";
 import { emptyDb, findViolation, type DevDb } from "./schema";
 import { addDemoModel, DEMO_LAYOUT } from "./seed-model";
+import { addDemoRequirements, DEMO_REQUIREMENT_KEY_NEXT } from "./seed-requirements";
 import { addDemoWorkingLayer } from "./seed-working-layer";
 
 /**
@@ -155,6 +156,8 @@ export function buildSeed(now: Date = new Date()): DevDb {
     labelAuthorId: users.anna.id,
     users: { owner: users.lukasz.id, modeler: users.anna.id, reviewer: users.piotr.id },
   });
+  addDemoRequirements(db, { workspaceId: retailDwh.id, at, authorId: users.anna.id });
+  retailDwh.requirement_key_next = DEMO_REQUIREMENT_KEY_NEXT;
 
   const bankX = workspace(
     SEED_IDS.wsBankX,

@@ -7,7 +7,7 @@ import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound } from "../errors";
 import type { Uuid } from "../ids";
-import { labelKey, labelNamed, LABEL_TARGET_KINDS, marks, normalizeLabelName, targetColumns, type LabelTarget, type LabelTargetKind } from "../model/labels";
+import { labelKey, labelNamed, LABEL_TARGET_KINDS, marks, normalizeLabelName, targetColumns, type LabelTarget, type LabelTargetKind, type TargetColumns } from "../model/labels";
 import type { WorkspaceAccess } from "../permissions";
 import type { Attribute, Canvas, CanvasItem, Entity, Label, LabelLink, Mapping, Project, ProjectPinnedLabel, SourceColumn, SourceTable } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
@@ -250,12 +250,15 @@ export function setLabelPinned(ctx: CommandContext, access: WorkspaceAccess, sta
 
 // ---- links of deleted items (D-47 cascade) ----
 
-/** The live links on any of these items: soft-deleted with them, in the deleting command's change group. */
-export function linksOnItems(links: readonly LabelLink[] | undefined, targets: readonly LabelTarget[]): LabelLink[] {
+/**
+ * The live links on any of these items: soft-deleted with them, in the deleting command's change group. Label links and
+ * requirement links (slice 4a) alike.
+ */
+export function linksOnItems<L extends TargetColumns & { deleted_at: string | null }>(links: readonly L[] | undefined, targets: readonly LabelTarget[]): L[] {
   if (!links?.length || !targets.length) return [];
   const keys = new Set(targets.map((t) => `${t.kind}:${t.id}`));
   return links.filter(
-    (k) => k.deleted_at === null && LABEL_TARGET_KINDS.some((kind) => k[`${kind}_id` as keyof LabelLink] !== null && keys.has(`${kind}:${String(k[`${kind}_id` as keyof LabelLink])}`)),
+    (k) => k.deleted_at === null && LABEL_TARGET_KINDS.some((kind) => k[`${kind}_id`] !== null && keys.has(`${kind}:${String(k[`${kind}_id`])}`)),
   );
 }
 

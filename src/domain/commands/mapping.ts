@@ -11,9 +11,10 @@ import type { Uuid } from "../ids";
 import { afterContentChange, checkFourEyes, checkMappingShape } from "../model/mapping-rules";
 import { plainTextPair } from "../model/plain-text";
 import type { WorkspaceAccess } from "../permissions";
-import { MAPPING_KINDS, MAPPING_STATUSES, type Attribute, type LabelLink, type Mapping, type MappingInput, type SourceColumn } from "../types";
+import { MAPPING_KINDS, MAPPING_STATUSES, type Attribute, type LabelLink, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
 import { linksOnItems, softDeleteLinks } from "./label";
+import { softDeleteRequirementLinks } from "./requirement";
 import { begin, current, done, found, isLive, nextSortOrder, nothingToChange, plainTextSchema, softDelete } from "./shared";
 
 const ruleSchema = z
@@ -37,6 +38,8 @@ export interface MappingState {
   inputs: readonly MappingInput[];
   /** The workspace's label links: those on a deleted mapping go with it (slice 3a). */
   labelLinks?: readonly LabelLink[];
+  /** The workspace's requirement links: those on a deleted mapping go with it (slice 4a). */
+  requirementLinks?: readonly RequirementLink[];
 }
 
 // ---- create ----
@@ -291,7 +294,7 @@ export function setMappingStatus(
 const deleteMappingInput = z.object(ref).strict();
 export type DeleteMappingInput = z.input<typeof deleteMappingInput>;
 
-/** Deletes a mapping, its inputs and the label links on it. */
+/** Deletes a mapping, its inputs and the label and requirement links on it. */
 export function deleteMapping(ctx: CommandContext, access: WorkspaceAccess, state: MappingState, input: unknown): CommandResult {
   const parsed = begin(access, "model.edit", deleteMappingInput, input);
   if (!parsed.ok) return fail(parsed.error);
@@ -302,6 +305,7 @@ export function deleteMapping(ctx: CommandContext, access: WorkspaceAccess, stat
     ...inputs.map((i) => softDelete(ctx, "mapping_input", i)),
     softDelete(ctx, "mapping", got.row),
     ...softDeleteLinks(ctx, linksOnItems(state.labelLinks, [{ kind: "mapping", id: got.row.id }])),
+    ...softDeleteRequirementLinks(ctx, state.requirementLinks, [{ kind: "mapping", id: got.row.id }]),
   ]);
 }
 
@@ -374,6 +378,8 @@ export interface MergeMappingsState {
   inputs: readonly MappingInput[];
   /** The workspace's label links: those on the mappings that go move to the mapping that stays (slice 3a). */
   labelLinks?: readonly LabelLink[];
+  /** The workspace's requirement links: moved the same way (slice 4a). */
+  requirementLinks?: readonly RequirementLink[];
 }
 
 /**
@@ -382,7 +388,7 @@ export interface MergeMappingsState {
  * that is already an input is not added twice. The others are deleted. The result is a transform with the given
  * rule (required) and status “review”, whatever the statuses were. The labels of the deleted ones move to the
  * mapping that stays, without a second link for a label it already has (slice 3a, Łukasz's decision after step 1;
- * the prototype drops them). One change group.
+ * the prototype drops them). Requirement links move the same way (slice 4a). One change group.
  */
 export function mergeMappings(
   ctx: CommandContext,
@@ -432,6 +438,15 @@ export function mergeMappings(
     } else {
       kept.add(k.label_id);
       writes.push({ kind: "update", table: "label_link", before: k, row: nextVersion(ctx, k, { mapping_id: target.id }) });
+    }
+  }
+  const traced = new Set(linksOnItems(state.requirementLinks, [{ kind: "mapping", id: target.id }]).map((k) => k.requirement_id));
+  for (const k of linksOnItems(state.requirementLinks, others.map((m) => ({ kind: "mapping" as const, id: m.id })))) {
+    if (traced.has(k.requirement_id)) {
+      writes.push(softDelete(ctx, "requirement_link", k));
+    } else {
+      traced.add(k.requirement_id);
+      writes.push({ kind: "update", table: "requirement_link", before: k, row: nextVersion(ctx, k, { mapping_id: target.id }) });
     }
   }
   return done(ctx, access, { mapping: row }, writes);

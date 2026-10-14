@@ -105,7 +105,5 @@ export function compareSchemas(domain: readonly TableShape[], database: readonly
 /** Tables the migrations create that no slice has built yet; each comes off this list in the slice that builds it. */
 export const NOT_IN_DOMAIN_YET = [
   "invitation",
-  "requirement",
-  "requirement_link",
   "baseline",
 ] as const;

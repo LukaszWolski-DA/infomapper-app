@@ -21,6 +21,8 @@ import type {
   Project,
   ProjectCanvas,
   ProjectPinnedLabel,
+  Requirement,
+  RequirementLink,
   Workspace,
   WorkspaceMember,
   WorkspaceModel,
@@ -103,11 +105,22 @@ export interface NoteRepository {
   get(workspaceId: Uuid, noteId: Uuid): Promise<Note | null>;
 }
 
+/** Requirements (slice 4a): the workspace's requirements and what they trace to. */
+export interface RequirementRepository {
+  list(workspaceId: Uuid): Promise<Requirement[]>;
+  get(workspaceId: Uuid, requirementId: Uuid): Promise<Requirement | null>;
+  /** Links whose requirement and element are both live. */
+  listLinks(workspaceId: Uuid): Promise<RequirementLink[]>;
+  getLink(workspaceId: Uuid, requirementLinkId: Uuid): Promise<RequirementLink | null>;
+}
+
 export interface ChangeEventRepository {
   /** The change log of a workspace, oldest first. */
   list(workspaceId: Uuid): Promise<ChangeEvent[]>;
   /** Events about one mapping and its inputs, oldest first (four-eyes, AD-06). */
   listForMapping(workspaceId: Uuid, mappingId: Uuid): Promise<ChangeEvent[]>;
+  /** Events about one requirement, oldest first (four-eyes, AD-06; slice 4a). */
+  listForRequirement(workspaceId: Uuid, requirementId: Uuid): Promise<ChangeEvent[]>;
 }
 
 /**
@@ -133,6 +146,7 @@ export interface DataStore {
   frames: FrameRepository;
   labels: LabelRepository;
   notes: NoteRepository;
+  requirements: RequirementRepository;
   changeEvents: ChangeEventRepository;
   undoHistory: UndoHistoryRepository;
   /**

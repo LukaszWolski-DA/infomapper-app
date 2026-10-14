@@ -20,8 +20,10 @@ import { OnCanvases } from "./on-canvases";
 import { CardFrame } from "./card-frame";
 import { NotesHere } from "./notes-here";
 import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tablePath, typeCheckOf } from "./model-index";
+import { RequirementsSection } from "./requirements-section";
 
-export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; cardId: Uuid }) {
+/** `cardId` is null when the table has no card on this canvas (a go-to link's fallback, slice 4a). */
+export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; cardId: Uuid | null }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
   const { run } = useAction();
@@ -63,7 +65,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
             return (
               <Li
                 key={c.id}
-                onClick={() => ui.select({ t: "row", cardId, id: c.id })}
+                onClick={() => ui.select(cardId ? { t: "row", cardId, id: c.id } : { t: "element", kind: "source_column", id: c.id })}
                 meta={targets.length ? targets.join(", ") : <span className="italic">not used</span>}
               >
                 <span className="font-mono text-xs">{c.name}</span>
@@ -88,7 +90,9 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
                   onClick={() =>
                     here
                       ? p.goEntity(entity.id)
-                      : ui.placeBeside([{ target: { entityId: entity.id }, rows: (p.ix.attributesOf.get(entity.id) ?? []).length }], cardId, "right")
+                      : cardId
+                        ? ui.placeBeside([{ target: { entityId: entity.id }, rows: (p.ix.attributesOf.get(entity.id) ?? []).length }], cardId, "right")
+                        : ui.place({ entityId: entity.id }, (p.ix.attributesOf.get(entity.id) ?? []).length)
                   }
                   meta={`${mappings} mapping${mappings === 1 ? "" : "s"}`}
                 >
@@ -103,7 +107,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
         ) : (
           <Hint>This table does not feed any entity yet.</Hint>
         )}
-        {p.editable && missing.length > 0 && (
+        {p.editable && cardId && missing.length > 0 && (
           <div className="mt-2 flex gap-2">
             <button type="button" className={smallButtonClass} onClick={() => ui.placeBeside(missing, cardId, "right")} data-testid="button-feed-all">
               {missing.length === feeds.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}
@@ -112,15 +116,18 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
         )}
       </Fold>
 
-      <NotesHere pin={{ cardId }} />
+      <RequirementsSection target={{ kind: "source_table", id: t.id }} />
+      {cardId && <NotesHere pin={{ cardId }} />}
       <OnCanvases kind="source" targetId={t.id} cardId={cardId} />
-      <CardFrame cardId={cardId} kind="src" />
+      {cardId && <CardFrame cardId={cardId} kind="src" />}
 
       {p.editable && (
         <Actions>
-          <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
-            {p.live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas"}
-          </button>
+          {cardId && (
+            <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
+              {p.live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas"}
+            </button>
+          )}
           {columns.length ? (
             // With columns it still asks (slice 1b, item 13).
             <ConfirmDelete
@@ -140,9 +147,9 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
   );
 }
 
-export function SourceColumnPanel({ column: c, cardId }: { column: SourceColumn; cardId: Uuid }) {
+/** A column, with or without its table's card on this canvas; the table chip goes to the table (slice 4a fallback). */
+export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
   const p = usePanel();
-  const ui = useContext(CanvasUiCtx);
   const { run } = useAction();
   const table = p.ix.table.get(c.source_table_id)!;
   const mappings = mappingsOfColumn(p.ix, c.id);
@@ -163,7 +170,7 @@ export function SourceColumnPanel({ column: c, cardId }: { column: SourceColumn;
         <button
           type="button"
           className="rounded-md bg-im-physical-soft px-1.5 py-px font-mono text-im-physical"
-          onClick={() => ui.select({ t: "card", id: cardId })}
+          onClick={() => p.goTable(table.id)}
         >
           {table.name}
         </button>
@@ -213,6 +220,7 @@ export function SourceColumnPanel({ column: c, cardId }: { column: SourceColumn;
         )}
       </Fold>
       <ItemLabels target={{ kind: "source_column", id: c.id }} />
+      <RequirementsSection target={{ kind: "source_column", id: c.id }} />
 
       {p.editable && (
         <Field label="Map to an attribute" htmlFor="f-adda">

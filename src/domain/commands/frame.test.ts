@@ -657,6 +657,8 @@ function rowsOf(items: CanvasItem[], frames: Frame[], entities: Entity[] = model
     label_link: [],
     project_pinned_label: [],
     note: [],
+    requirement: [],
+    requirement_link: [],
   };
 }
 

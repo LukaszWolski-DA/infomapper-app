@@ -1,7 +1,8 @@
 "use client";
 
 // The status bar under a canvas (prototype renderStatus, the parts of slice 1a): mapped attributes on this canvas,
-// mappings and drafts, type problems, relationships; and the working context with its item count (slice 3b).
+// mappings and drafts, type problems, relationships; the workspace's requirements and how many are covered (slice 4a,
+// from the server's requirement index, fresh after every write); and the working context with its item count (slice 3b).
 
 import { useMemo } from "react";
 import type { WorkspaceModel } from "@/domain/types";
@@ -9,7 +10,7 @@ import { WorkingContextStatus } from "../_components/working-context";
 import { indexModel } from "./model-index";
 import { canvasStatus } from "./stats";
 
-export function StatusBar({ model, entityIds }: { model: WorkspaceModel; entityIds: string[] }) {
+export function StatusBar({ model, entityIds, requirements }: { model: WorkspaceModel; entityIds: string[]; requirements: { count: number; covered: number } }) {
   const s = useMemo(() => canvasStatus(indexModel(model), entityIds), [model, entityIds]);
   return (
     <footer
@@ -30,6 +31,9 @@ export function StatusBar({ model, entityIds }: { model: WorkspaceModel; entityI
       </span>
       <span data-testid="status-relationships">
         Relationships <b>{s.relationships}</b>
+      </span>
+      <span data-testid="status-requirements">
+        Requirements <b>{requirements.count}</b>, covered <b>{requirements.covered}</b>
       </span>
       <WorkingContextStatus />
     </footer>

@@ -1,5 +1,6 @@
-// Definitions and notes are plain text until the rich-text editor arrives (AD-30). They are still stored as the
-// pair the data model asks for (AD-17): `*_html` holds the text as escaped paragraphs, `*_text` the text itself.
+// Plain text stored as the pair the data model asks for (AD-17): `*_html` holds the text as escaped paragraphs,
+// `*_text` the text itself. Notes and mapping notes are plain text (AD-30); definitions and descriptions are rich text
+// since slice 4a (`rich-text.ts`), and those written before it were stored this way.
 
 export interface RichTextPair {
   html: string | null;
@@ -19,3 +20,10 @@ export function plainTextPair(value: string | null | undefined): RichTextPair {
     .join("");
   return { html, text };
 }
+
+/**
+ * The HTML a panel shows for a stored pair (slice 4a): the `*_html` the server wrote (sanitized, or escaped paragraphs
+ * from plain text), or, when a row has only its plain text, that text as escaped paragraphs, never as HTML.
+ */
+export const shownHtml = (html: string | null | undefined, text: string | null | undefined): string | null =>
+  html?.trim() ? html : plainTextPair(text).html;

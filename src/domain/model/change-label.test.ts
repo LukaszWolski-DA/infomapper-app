@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attribute, canvasItem, entity, frame, ids, makeCtx, mapping, mappingInput } from "../__fixtures__/domain";
+import { attribute, canvasItem, entity, frame, ids, makeCtx, mapping, mappingInput, requirement, requirementLink, workspace } from "../__fixtures__/domain";
 import { buildWriteSet, nextVersion, type Write } from "../changes";
 import { changeCanvasId, changeLabel } from "./change-label";
 
@@ -86,6 +86,16 @@ describe("change labels for frames (slice 2b)", () => {
     expect(
       changeLabel(events([update("frame", frame(ids.frameA, { collapsed: true }), { collapsed: false }), update("frame", frame(ids.frameB, { collapsed: true }), { collapsed: false })])),
     ).toBe("Expand all frames");
+  });
+
+  it("names requirement steps (slice 4a)", () => {
+    const create = [update("workspace", workspace(), { requirement_key_next: 102 }), { kind: "insert", table: "requirement", row: requirement() } as unknown as Write];
+    expect(changeLabel(events(create))).toBe("Create requirement");
+    expect(changeLabel(events([{ kind: "insert", table: "requirement_link", row: requirementLink() } as unknown as Write]))).toBe("Link requirement");
+    expect(changeLabel(events([update("requirement_link", requirementLink(), { deleted_at: "2026-10-13T10:00:00.000Z" })]))).toBe("Unlink requirement");
+    expect(changeLabel(events([update("requirement", requirement(), { status: "agreed" })]))).toBe("Set requirement status");
+    expect(changeLabel(events([update("requirement", requirement(), { name: "Unique e-mail" })]))).toBe("Rename requirement");
+    expect(changeLabel(events([update("requirement", requirement(), { deleted_at: "2026-10-13T10:00:00.000Z" })]))).toBe("Delete requirement");
   });
 
   it("finds the canvas of a frame step", () => {

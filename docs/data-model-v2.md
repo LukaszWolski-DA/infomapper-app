@@ -293,19 +293,20 @@ Type checking (D-01) compares the attribute's type and parameters with each inpu
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
 | standard columns | | | |
-| `key` | text | no | `REQ-104`; unique per workspace (AD-11) |
+| `key` | text | no | `REQ-104`; unique per workspace among non-deleted rows, case-insensitive (`lower(key)`, AD-11; slice 4a) |
 | `kind` | text | no | `need`, `data`, `business_rule`, `dq_rule`, `non_functional` (D-30) |
 | `name` | text | no | |
 | `description_html`, `description_text` | text | yes | rich text with kind templates (D-42, D-44) |
 | `expression` | text | yes | for `business_rule` and `dq_rule` |
-| `severity` | text | yes | `warn`, `block`; for `dq_rule` |
+| `severity` | text | yes | `warn`, `block`; shown for `dq_rule`, kept when the kind changes (slice 4a) |
 | `status` | text | no | `draft`, `agreed`, `implemented`, `verified` |
 | `priority` | text | no | `must`, `should`, `could`, `wont` |
 | `owner_name` | text | yes | business owner as text |
 | `external_ref` | text | yes | e.g. `JIRA-481` |
 | `parent_id` | uuid | yes | FK `requirement`; break-down |
 
-Coverage is computed, never stored (D-31).
+Coverage is computed, never stored (D-31). New keys come from `workspace.requirement_key_next` (`REQ-{n}`), which
+skips keys someone typed and is never wound back by an undo (slice 4a).
 
 ### `requirement_link`
 One table with one nullable foreign key per kind of target and a check that exactly one is set (AD-15).
@@ -457,6 +458,8 @@ because they are business logic or must work on any database:
 - Mapping input counts (section 6) and type checking.
 - Duplicate-name warnings for entities (B-25); concept deletion moves entities first (D-47).
 - Soft-delete cascades and the impact preview before deleting an entity (D-47).
+- Requirement parents without cycles at any depth, and a deleted requirement brought back only while no other
+  requirement uses its key (slice 4a).
 - Requirement coverage and scope (D-31), live label canvas membership (D-10, D-25), auto-labeling in an active
   working context (D-26).
 - Rich text sanitizing and the `_text` copy (AD-17).

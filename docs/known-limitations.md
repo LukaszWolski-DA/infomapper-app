@@ -145,6 +145,70 @@ tile and its box in the overview.
 - **Later:** with the view-state bar (slice 6, D-39): the “Live: {name}” chip, and the Labeled filter neither counted as
   “filtered” nor reset by “Show all”.
 
+### Requirements are not on the canvas yet (slice 4a)
+
+Slice 4a brings requirements everywhere but the canvas: no requirement cards, no trace lines, no markers on cards, no
+lens and no dragging a requirement onto an element (D-32, D-34). Selecting a requirement opens its panel only; the
+Requirements tab's “Only on this canvas” shows none; linking is done from the element panels.
+
+- **Accepted** in slice 4a's PRD (section 6). **Later:** slice 4b, after the performance review, with Focus (the lens
+  uses the same dimming).
+
+### Notes stay plain text (slice 4a)
+
+Entity and attribute definitions and requirement descriptions are rich text since slice 4a; notes are not (D-42 not
+complete): their text is drawn on the canvas, and the canvas work waits for the performance review.
+
+- **Accepted** in slice 4a's PRD (section 6). **Later:** after the performance review.
+
+### An Agreed requirement stays Agreed when edited (slice 4a)
+
+Four-eyes makes setting Agreed an approval (AD-06), but changing an Agreed requirement's content does not send it back
+to Draft (mappings go back to review, D-51).
+
+- **Accepted** in slice 4a's PRD (item 13). **Later:** requirements step 2 (`ideas.md`).
+
+### The requirement index is rebuilt on every write (slice 4a, step 3)
+
+The requirement index (scope, coverage, children, and each element's direct and indirect requirements;
+`src/domain/model/requirement-index.ts`) is built from scratch once per data version: once per page on the server for
+the left panel, the project home and the status bar, and once in the browser for the panels whenever the requirements,
+their links or the model change, which is after every write. On a synthetic model of 500 requirements, 5,000
+attributes, 2,000 mappings and 3,000 links one build takes a median of 25.5 ms on the development laptop
+(`npx tsx scripts/bench-requirement-index.ts`).
+
+- **Fine for now:** the demo workspace has five requirements; one build is a small part of a page.
+- **For the performance review (before slice 4b and the database slice, AD-31):** consider an incremental rebuild, so a
+  write that touches one mapping, link or requirement recomputes only the requirements whose scope it reaches, and
+  measure the index together with 4b's lens, which reads it on every selection.
+
+## Screens compared with the prototype (slice 4a, step 5)
+
+Found while fixing the workspace Overview's hard-coded “0 of 0 requirements covered” (slice 4a, step 5).
+
+### The project home has no left panel or inspector
+
+The prototype keeps the left panel (Model, Sources, Requirements) and the inspector on its project home. The
+application's project home shows two empty side panels that say “Open a canvas to work with the model, sources and
+requirements.” and “Open a canvas to see the details of what you select.” (`src/app/_components/app-shell.tsx`); the
+panels exist only on canvas pages.
+
+- **Accepted** by Łukasz in slice 4a, step 5. **Later:** not planned yet.
+
+### The status bar has no “Open notes on canvas {n}”
+
+The prototype's status bar (`renderStatus`) ends with “Open notes on canvas {n}” after Requirements; the application's
+stops at Requirements and the working context (`src/app/_panels/status-bar.tsx`).
+
+- **Accepted** by Łukasz in slice 4a, step 5. **Later:** slice 6, with the view-state bar (D-39).
+
+### Canvas tiles have no frame count
+
+The prototype's canvas tile on the project home says “{n} cards, {m} frames. Also in …”; the application's says
+“{n} cards. Also in …” (`src/app/w/[workspaceId]/p/[projectId]/_components/project-tiles.tsx`).
+
+- **Accepted** by Łukasz in slice 4a, step 5. **Later:** not planned yet.
+
 ## Undo history (slice 1b)
 
 ### The undo history lives in server memory
@@ -212,18 +276,17 @@ templates are compiled. Its only path is `eslint-plugin-boundaries` 7.2.0 (dev, 
 - **Decision (Łukasz, 13 October, slice 3b):** the plugin still has no fix (7.2.0; `@boundaries/elements` 3.1.1 still
   pins 4.7.9). The override comes as a separate small pull request after slice 3b's merge, from 19 October 2026.
 
-## Right panel (slice 1a)
+### `npm` override: `fast-equals` 5.4.3 under `@tiptap/react` (slice 4a, step 2)
 
-### Panel links only reach rows whose card is on this canvas (step 5a)
+`@tiptap/react` 3.31.3 asks for `fast-equals` `^5.3.3`, which resolved to 5.4.4, published 8 October 2026, younger than
+the 14 days the dependency rule asks for. `package.json` has `"overrides": { "@tiptap/react": { "fast-equals": "5.4.3" } }`
+(20 September 2026), for Tiptap only.
 
-The canvas selection points at a card (a card, a row of a card, or a line), so the right panel can only show an
-attribute or a column whose entity or source table has a card on the open canvas. Links in the panels (the
-attribute list of an entity, the source and target of a mapping, “Comes from”) do nothing for attributes and columns
-whose card is not here. Mappings open from anywhere, because a mapping is selected by itself.
-
-- **Accepted** by Łukasz for slice 1a.
-- **Later:** let the selection name an attribute or a column directly (as the prototype's `attr` and `col`
-  selections do), so the panel can show them without a card.
+- **Risk: none known.** 5.4.3 and 5.4.4 are patch releases of a small comparison library; `npm audit` reports nothing
+  for either.
+- **Review on 22 October 2026** (5.4.4 is then 14 days old), together with the `handlebars` pull request: remove the
+  override, `npm install`, check that `fast-equals` resolves to a release at least 14 days old, then lint, typecheck,
+  unit tests and the editor's end-to-end tests.
 
 ## End-to-end tests (slice 1a, step 6)
 
@@ -260,4 +323,8 @@ S0-10 removes `.next-e2e-restart` before and after use. A global setup warms the
 pages), so the first tests do not wait for compiles.
 
 - **Accepted:** an e2e run compiles every page once (about a minute); `npm run dev` keeps its cache.
+- **`npm run dev` can hit it too** (slice 4a): after a dev server on `.next` was stopped by force (a closed terminal, an
+  ended session), the next one answered 404 for every project and canvas page while the workspace page worked; the data
+  file was not the cause. Fix: stop the server, delete `.next/dev/cache/turbopack`, start it again (the first pages
+  compile once more).
 - **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.

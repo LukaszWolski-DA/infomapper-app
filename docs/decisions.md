@@ -84,8 +84,8 @@ Behaviour reference: `docs/prototype/infomapper-model-prototype.html`. Data refe
 - **AD-02** Workspaces share nothing live; patterns are copied. An organization library comes later.
 - **AD-03** Model versions are named baselines (frozen snapshots) to compare with and to generate documents from. No model branches.
 - **AD-04** Sign-in with e-mail and password (Supabase Auth) to start; Microsoft/Google/SSO later.
-- **AD-05** Five roles per workspace: owner, admin, modeler, reviewer (read, comment, notes, approve), reader. Reviewers write, resolve, move, pin and delete any note as modelers do; working labels are changed by owners, admins and modelers only; readers read notes and labels.
-- **AD-06** Four-eyes approval (the author cannot approve their own change) is a workspace setting, off by default. Every approval is logged.
+- **AD-05** Five roles per workspace: owner, admin, modeler, reviewer (read, comment, notes, approve), reader. Reviewers write, resolve, move, pin and delete any note as modelers do; working labels are changed by owners, admins and modelers only; readers read notes and labels. Reviewers change a requirement's status only.
+- **AD-06** Four-eyes approval (the author cannot approve their own change) is a workspace setting, off by default. Every approval is logged. For requirements, setting Agreed is the approval; the author is whoever last changed its content (kind, name, description, expression, severity).
 - **AD-07** After sign-in the user lands on the workspace home. The top bar shows Organization / Workspace / Project.
 - **AD-08** Optional Data Vault 2.0 mode per workspace: hints only (hub, business key, satellites by source), nothing enforced.
 - **AD-09** Workspace lifecycle: create (empty or copy), archive (read-only), transfer to another organization, delete (owner only, after export).

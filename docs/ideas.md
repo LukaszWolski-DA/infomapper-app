@@ -40,11 +40,19 @@ The Entity tool creates the new entity exactly where clicked, also on a collapse
 not join that frame (as in the prototype; Łukasz's decision (i) in step 4). Better: the Entity tool on a collapsed
 block files the new entity into the frame like a drop, and takes the concept of a concept frame.
 
-## Labels on requirements (after slice 2c)
+## Labels on requirements (after slice 2c; moved to requirements step 2 in slice 4a)
 
 Labels on requirements: `label_link` gets a `requirement_id` target (a new migration, with the “exactly one target”
-check extended to it), and the requirement panel gets a Labels field. D-33 keeps labels and requirements separate today;
-decide with the requirements slice (4).
+check extended to it), and the requirement panel gets a Labels field. D-33 keeps labels and requirements separate today.
+Slice 4a builds requirements without labels (PRD item 14); this belongs to requirements step 2, together with D-33's
+promotion of a label to a requirement.
+
+## Editing an agreed requirement sends it back to Draft (slice 4a)
+
+As D-51 does for mappings (an approved mapping whose inputs, kind or rule change goes back to review), a change to an
+Agreed requirement's content (kind, name, description, expression, severity) could send it back to Draft and clear the
+agreement. Slice 4a leaves an Agreed requirement Agreed when edited (PRD item 13, `known-limitations.md`); a candidate for
+requirements step 2.
 
 ## Notes in the Overview miniature (slice 3a, step 4)
 
@@ -60,3 +68,33 @@ to the right of the content when missing, grown to fit and removed when empty. S
 to Q3: no migration for a new `frame.kind`): newly required cards land to the right of the existing content, one under
 another, in no frame, and the toast lists them. A deviation from the prototype to revisit; it needs `newly_labeled` in
 the CHECK on `frame.kind` (or another marker) and a rule so “Arrange into frames” does not rebuild it away.
+
+## “Add to this canvas” on a panel without its card (slice 4a, step 3)
+
+Since slice 4a a go-to link to an element whose card is not on the open canvas opens its panel only. The prototype's
+entity and source table panels then offer “Add to this canvas” where “Remove from this canvas” would be. Slice 4a leaves
+it out (not in its PRD; Łukasz after step 3); a candidate for slice 4b, which places requirement cards and can place an
+element's card from its panel the same way.
+
+## Project home: open the canvas that shows most of the requirement (slice 4a, step 4)
+
+Slice 4a opens a requirement from the project home on the project's last opened canvas, else its first (PRD item 30).
+The prototype opens the canvas that shows most of the requirement's scope (its entities, tables and its card) and
+lights the scope up with the lens. A candidate for slice 4b, once the lens exists (Łukasz after step 4).
+
+## Entity-level requirements: scope, coverage and panels (slice 4a, manual acceptance)
+
+To decide with slice 4b. Łukasz's rule for the panels: an entity's panel shows all requirements (its own and its
+attributes'); an attribute's panel shows only the attribute's own requirements, with no “via entity” rows. That changes
+D-34 for attributes (today an attribute also lists its entity's requirements “via entity”, prototype `reqsFor`).
+
+It is consistent only together with scope: today a link to an entity puts all its attributes in scope (D-31), so a
+requirement's gaps would name attributes whose panels do not show that requirement. Options for scope and coverage:
+
+- **A.** Keep D-31: a link to an entity puts all its attributes in scope; only the panels change (and stay
+  inconsistent with the gaps, as above).
+- **B.** A link to an entity means the entity as a whole: its attributes are not in scope, and the entity is covered
+  e.g. through its business key's approved mappings (fits Data Vault 2.0 hubs).
+- **C.** Coverage by kind, e.g. a business need is covered when its parts (the requirements below it) are covered.
+
+Changing it changes D-31 and D-34 (`docs/decisions.md`, with Łukasz).
