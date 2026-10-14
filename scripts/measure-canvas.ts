@@ -5,6 +5,10 @@
 //   S1B-09  card resize (C-09)
 //   S1B-10  hover to the next frame (C-10)
 //   S2A-14  single-card drag, group drag (31 cards at 50 %), marks after a lasso around the visible cards at the overview
+//   S4P-fading  (slice 4p) pan and zoom at 100 % and 30 % around ent:23, frames expanded and collapsed, fading off; on
+//           this branch, once it has a fading mechanism, each fading scenario: switching on and off (median of 40) and
+//           pan and zoom with fading on, against fading off in the same run. The spec is copied into the reference
+//           worktree, which has no fading: it measures fading off there.
 //
 //   npx tsx scripts/measure-canvas.ts                    # 3 rounds against slice-02a
 //   npx tsx scripts/measure-canvas.ts --rounds 4 --against slice-02a
@@ -30,13 +34,17 @@ const BRANCH = process.cwd();
 const REF_TREE = path.resolve(BRANCH, "..", "infomapper-ab-main");
 /** `--quick`: pan and zoom, C-08 (S1A-14), C-10 (S1B-10) and the lasso marks only, without C-09 and the drags. */
 const QUICK = process.argv.includes("--quick");
+/** The fading scenarios (slice 4p), copied into the reference worktree before its side runs. */
+const FADING_SPEC = "e2e/slice-04p/S4P-fading.spec.ts";
 const SPECS = QUICK
-  ? ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts"]
-  : ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-09.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts"];
+  ? ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts", FADING_SPEC]
+  : ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-09.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts", FADING_SPEC];
 // one word: on Windows the specs run through a shell that does not quote arguments, so "dragging a group" became the
 // filter "dragging" plus the file filters "a" and "group", which ran every spec (found in slice 2b)
 const SPEC_ARGS = QUICK ? ["--grep-invert", "dragging"] : [];
-const RESULT_FILES = QUICK ? ["S1A-14.json", "S1B-10.json", "S2A-14-lasso.json"] : ["S1A-14.json", "S1B-09.json", "S1B-10.json", "S2A-14.json", "S2A-14-lasso.json"];
+const RESULT_FILES = QUICK
+  ? ["S1A-14.json", "S1B-10.json", "S2A-14-lasso.json", "S4P-fading.json"]
+  : ["S1A-14.json", "S1B-09.json", "S1B-10.json", "S2A-14.json", "S2A-14-lasso.json", "S4P-fading.json"];
 
 const arg = (name: string, fallback: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -84,6 +92,11 @@ function measure(tree: string, dir: string, diag = ""): Raw {
   const env: NodeJS.ProcessEnv = { ...process.env, MEASURE: "1", MEASURE_BUILD: "production" };
   delete env.DIAG;
   if (diag) env.DIAG = diag;
+  // the reference has no fading spec of its own: the same file, which measures fading off there (slice 4p)
+  if (tree !== BRANCH) {
+    fs.mkdirSync(path.join(tree, path.dirname(FADING_SPEC)), { recursive: true });
+    fs.copyFileSync(path.join(BRANCH, FADING_SPEC), path.join(tree, FADING_SPEC));
+  }
   // a soft bar that is missed makes Playwright exit with 1; the result files decide whether the run worked
   spawnSync("npx", ["playwright", "test", ...SPECS, ...SPEC_ARGS, "--reporter=line"], { cwd: tree, env, stdio: "inherit", shell: process.platform === "win32" });
   fs.mkdirSync(dir, { recursive: true });
@@ -102,6 +115,9 @@ function measure(tree: string, dir: string, diag = ""): Raw {
 // ---- the figures ----
 
 type Get = (r: Raw) => number;
+/** The fading spec's views and scenarios (slice 4p). */
+const FADING_VIEWS = ["100 %, expanded", "30 %, expanded", "100 %, collapsed", "30 %, collapsed"] as const;
+const FADING_SCENARIOS = ["focus", "lens-small", "lens-large"] as const;
 const at = (o: unknown, ...keys: string[]) => keys.reduce<unknown>((v, k) => (v as Record<string, unknown>)?.[k], o) as number;
 interface Figure {
   id: string;
@@ -124,6 +140,11 @@ const FIGURES: Figure[] = [
   { id: "drag-single", name: "Single-card drag at 50 %", unit: "fps", better: "higher", bar: 45, get: (r) => at(r["S2A-14.json"], "single-card drag", "avgFps") },
   { id: "drag-group", name: "Group drag, 31 cards at 50 %", unit: "fps", better: "higher", bar: 45, get: (r) => at(r["S2A-14.json"], "group drag", "avgFps") },
   { id: "lasso", name: "Marks after a lasso around the visible cards, median of 20", unit: "ms", better: "lower", bar: 100, get: (r) => at(r["S2A-14-lasso.json"], "medianMs") },
+  // slice 4p (S4P-08): pan and zoom with fading off around ent:23, both sides
+  ...FADING_VIEWS.flatMap((v): Figure[] => [
+    { id: `fade-off-${v}`, name: `Pan and zoom, fading off, ${v} (S4P-08)`, unit: "fps", better: "higher", ab: true, get: (r) => at(r["S4P-fading.json"], "views", v, "off", "avgFps") },
+    { id: `fade-off-${v}-long`, name: "– frames over 50 ms", unit: "frames", better: "lower", get: (r) => at(r["S4P-fading.json"], "views", v, "off", "over50ms") },
+  ]),
 ];
 
 const median = (xs: readonly number[]) => {
@@ -140,6 +161,27 @@ interface Sitting {
   branchDiag?: string;
   conditions: { before: unknown; after?: unknown; perSide: { round: number; side: string; busiest: string[]; quietBefore?: unknown }[] };
   sides: { round: number; side: "reference" | "branch"; raw: Raw }[];
+}
+
+/**
+ * The fading figures (slice 4p), this branch's rounds only: per view and scenario the median over the rounds of each
+ * round's median switching time, and of pan and zoom with fading on and off measured in the same run. The frames over
+ * 50 ms are judged against the baseline's spread (S4P-03), so “met” here is the 100 ms and 5 % bars only.
+ */
+function fadingTable(branchSides: readonly { raw: Raw }[]) {
+  const out: { view: string; scenario: string; on: number; off: number; panOff: number; panOn: number; change: number; longOff: number; longOn: number; met: boolean }[] = [];
+  for (const view of FADING_VIEWS) {
+    for (const scenario of FADING_SCENARIOS) {
+      const get = (...keys: string[]) => branchSides.map((x) => at(x.raw["S4P-fading.json"], "views", view, ...keys)).filter((v) => Number.isFinite(v));
+      const on = get("scenarios", scenario, "on", "median");
+      if (!on.length) continue;
+      const off = median(get("scenarios", scenario, "off", "median"));
+      const panOff = median(get("off", "avgFps")), panOn = median(get("scenarios", scenario, "pan", "avgFps"));
+      const row = { view, scenario, on: median(on), off, panOff, panOn, change: +(((panOn - panOff) / panOff) * 100).toFixed(1), longOff: median(get("off", "over50ms")), longOn: median(get("scenarios", scenario, "pan", "over50ms")) };
+      out.push({ ...row, met: row.on <= 100 && row.off <= 100 && panOn >= panOff * 0.95 });
+    }
+  }
+  return out;
 }
 
 function summarize(dir: string, s: Sitting) {
@@ -167,10 +209,27 @@ function summarize(dir: string, s: Sitting) {
       return `| ${f.name} | ${bar} | ${cell(ref, mr)} | ${cell(br, mb)} | ${change} | ${result} |`;
     }),
   ].join("\n");
-  const summary = { ...s, dropped: [...dropped], table: rows.map((r) => ({ id: r.figure.id, name: r.figure.name, bar: r.figure.bar, reference: r.ref, branch: r.br, referenceMedian: r.mr, branchMedian: r.mb, changePercent: +r.diff.toFixed(1), met: r.met })) };
+  const fadingRows = fadingTable(kept.filter((x) => x.side === "branch"));
+  const fadingMd = fadingRows.length
+    ? [
+        "",
+        "Fading (this branch only; S4P-02: switching ≤ 100 ms; S4P-03: pan and zoom with fading on at most 5 % below fading off in the same run):",
+        "",
+        "| View | Scenario | On, ms | Off, ms | Pan and zoom off → on, fps | Change | Frames over 50 ms, off → on | Result |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- |",
+        ...fadingRows.map((f) => `| ${f.view} | ${f.scenario} | ${f.on.toFixed(0)} | ${f.off.toFixed(0)} | ${f.panOff.toFixed(1)} → ${f.panOn.toFixed(1)} | ${f.change >= 0 ? "+" : ""}${f.change.toFixed(1)} % | ${f.longOff} → ${f.longOn} | ${f.met ? "met" : "not met"} |`),
+      ]
+    : [];
+  const summary = {
+    ...s,
+    dropped: [...dropped],
+    table: rows.map((r) => ({ id: r.figure.id, name: r.figure.name, bar: r.figure.bar, reference: r.ref, branch: r.br, referenceMedian: r.mr, branchMedian: r.mb, changePercent: +r.diff.toFixed(1), met: r.met })),
+    fading: fadingRows,
+  };
+  const all = [md, ...fadingMd].join("\n");
   fs.writeFileSync(path.join(dir, "summary.json"), JSON.stringify(summary, null, 2));
-  fs.writeFileSync(path.join(dir, "summary.md"), md + "\n");
-  console.log(md);
+  fs.writeFileSync(path.join(dir, "summary.md"), all + "\n");
+  console.log(all);
 }
 
 async function main() {

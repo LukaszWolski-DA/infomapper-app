@@ -533,6 +533,17 @@ describe("seed:large (S1A-14)", () => {
       expect([c.live_level, c.row_filter]).toEqual([level, level === "full" ? "all" : "labeled"]);
       expect(c.frame_id).not.toBeNull();
     }
+    // The fading scenarios' lenses (slice 4p): two requirements without cards; the small one six attributes of one entity,
+    // one of them without a mapping (a gap), the large one four whole entities.
+    const requirements = await store.requirements.list(ws);
+    expect(requirements.map((r) => [r.key, r.name])).toEqual([["REQ-101", "Lens, small"], ["REQ-102", "Lens, large"]]);
+    expect((await store.workspaces.get(ws))!.requirement_key_next).toBe(103);
+    const lenses = buildRequirementIndex(requirements, await store.requirements.listLinks(ws), m);
+    const small = lenses.coverage(requirements[0]!.id), large = lenses.coverage(requirements[1]!.id);
+    expect([small.total, small.notMapped.length]).toEqual([6, 1]);
+    expect(lenses.linksOf(requirements[1]!.id).every((k) => k.entity_id)).toBe(true);
+    expect(large.total).toBe(5 + 8 + 21 + 12); // ent:3, ent:4, ent:7 and ent:19 with all their attributes (D-31)
+    expect(cards.some((c) => c.requirement_id)).toBe(false);
     // The demo workspaces are untouched.
     expect((await store.model.load(RETAIL)).entities).toHaveLength(6);
   });

@@ -39,10 +39,11 @@ import { HandToolButton } from "@/canvas/HandToolButton";
 import { LayerSwitch } from "@/canvas/LayerSwitch";
 import { CanvasLookProvider } from "@/canvas/look";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
+import { TestHooks } from "@/canvas/TestHooks";
 import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
-import { isMeasurementBuild } from "@/data/local/measure-mode";
+import { areTestHooksOn, isMeasurementBuild } from "@/data/local/measure-mode";
 import { labelItemCounts, labelNamesByItem } from "@/domain/model/labels";
 import { liveMembership, liveRemoveQuestion, liveRemoveWhat } from "@/domain/model/live";
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
@@ -221,6 +222,8 @@ export default async function CanvasPage({
           >
             {query.moved === "1" && <MovedNotice project={view.project.name} canvas={canvas.name} />}
             <RememberLastCanvas projectId={projectId} canvasId={canvasId} />
+            {/* the measuring hook (slice 4p): e2e dev server and measurement build only */}
+            {areTestHooksOn() && <TestHooks />}
             <ModelCanvas
               key={canvasId}
               canvasId={canvasId}

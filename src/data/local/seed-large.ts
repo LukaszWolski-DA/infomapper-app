@@ -2,8 +2,8 @@
 // (100 cards: 60 source tables and 40 entities, one more entity with 200 attributes, 300 mappings, 40 relationships),
 // all on one canvas at the spike's positions, with its 8 frames as free frames (slice 2b), and since slice 3a labels and
 // notes (seed-large-working-layer.ts), and since slice 3b the live canvas of PERF-2, the label with the largest
-// footprint (made by the domain's own `openLiveCanvas`, so it is what “Open as live canvas” would make). For the
-// performance checks.
+// footprint (made by the domain's own `openLiveCanvas`, so it is what “Open as live canvas” would make), and since slice
+// 4p two requirements for the fading scenarios (seed-large-requirements.ts). For the performance checks.
 
 import { openLiveCanvas } from "@/domain/commands/live";
 import type { Uuid } from "@/domain/ids";
@@ -12,6 +12,7 @@ import { parseColumnLines } from "@/domain/model/column-lines";
 import { DEFAULT_CANVAS_LOOK, type LogicalType, type MappingStatus, type Stereotype } from "@/domain/types";
 import { ATTR_TYPES, ENT_COLORS, FRAME_NAMES, generate, STEREOS } from "./large-generator";
 import { findViolation, type DevDb } from "./schema";
+import { addLargeRequirements } from "./seed-large-requirements";
 import { addLargeWorkingLayer } from "./seed-large-working-layer";
 import { SEED_IDS } from "./seed";
 import { seedId } from "./seed-model";
@@ -220,6 +221,8 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
   addLargeWorkingLayer({ db, data, workspaceId: ws, canvasId: LARGE_IDS.canvas, by, at, id });
   // the live canvas of PERF-2 (slice 3b, S3B-15 c), the second tab of the project
   addLiveCanvas(db, at);
+  // the small and the large lens of the fading scenarios (slice 4p); no cards
+  addLargeRequirements({ db, data, workspaceId: ws, by, at, id });
 
   const violation = findViolation(db);
   if (violation) throw new Error(`Generated data breaks a rule: ${violation.table}: ${violation.detail}`);
