@@ -146,14 +146,15 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
           <Seg value={r.severity ?? "warn"} options={[["warn", "Warn"], ["block", "Block the load"]] as const} disabled={!p.editable} onChange={(s) => void save("severity", s)} testId="seg-req-severity" />
         </Field>
       )}
+      <Field label="Status">
+        <Seg value={r.status} options={REQUIREMENT_STATUSES.map((s) => [s, STATUS_NAMES[s]] as const)} disabled={!p.canSetStatus} onChange={setStatus} testId="seg-req-status" />
+      </Field>
+      {/* as the mapping panel's four-eyes note: Agreed stays clickable, the server refuses (AD-06) */}
       {p.fourEyes && p.canSetStatus && r.status !== "agreed" && p.requirementAuthors[r.id] === p.userId && (
         <Note warn testId="note-req-four-eyes">
           {fourEyesRequirementMessage(r.key)}
         </Note>
       )}
-      <Field label="Status">
-        <Seg value={r.status} options={REQUIREMENT_STATUSES.map((s) => [s, STATUS_NAMES[s]] as const)} disabled={!p.canSetStatus} onChange={setStatus} testId="seg-req-status" />
-      </Field>
       <Field label="Priority">
         <Seg value={r.priority} options={REQUIREMENT_PRIORITIES.map((s) => [s, PRIORITY_NAMES[s]] as const)} disabled={!p.editable} onChange={(s) => void save("priority", s)} testId="seg-req-priority" />
       </Field>

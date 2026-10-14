@@ -67,3 +67,9 @@ Since slice 4a a go-to link to an element whose card is not on the open canvas o
 entity and source table panels then offer “Add to this canvas” where “Remove from this canvas” would be. Slice 4a leaves
 it out (not in its PRD; Łukasz after step 3); a candidate for slice 4b, which places requirement cards and can place an
 element's card from its panel the same way.
+
+## Project home: open the canvas that shows most of the requirement (slice 4a, step 4)
+
+Slice 4a opens a requirement from the project home on the project's last opened canvas, else its first (PRD item 30).
+The prototype opens the canvas that shows most of the requirement's scope (its entities, tables and its card) and
+lights the scope up with the lens. A candidate for slice 4b, once the lens exists (Łukasz after step 4).
