@@ -1,12 +1,15 @@
 // Slice 4p, items 1–3 (S4P-02, S4P-03, S4P-08): the fading scenarios on “Performance test”, measurement build only
-// (MEASURE=1 MEASURE_BUILD=production; `npm run measure:canvas` runs it on both sides of a sitting). Four views: 100 % and
-// 30 % around the Focus entity (ent:23, the most relationships), frames expanded and all collapsed (`?diag=collapsed`).
+// (MEASURE=1 MEASURE_BUILD=production; `npm run measure:canvas` runs it on both sides of a sitting). Six views: 100 % and
+// 30 % around the Focus entity (ent:23, the most relationships) and S1A-14's 100 % dense area around src:57, frames
+// expanded and all collapsed (`?diag=collapsed`; under DIAG=collapsed only the collapsed ones).
 //
 // In every view, pan and zoom with fading off (both sides: S4P-08 against the reference). Then, only where the page has
 // the measuring hook and a fading mechanism (this branch from step 2), for each scenario:
 //   Focus        ent:23 and what `relatedOf` gives for it
 //   Lens, small  REQ-101 of seed:large: six attributes of ent:19, one of them a gap
 //   Lens, large  REQ-102 of seed:large: ent:3, ent:4, ent:7 and ent:19, about half the cards of the 30 % view
+// and in S1A-14's 100 % view around src:57 (the heaviest view, Łukasz after step 0):
+//   Lens, dense  REQ-103 of seed:large: the source tables in that view
 // 40 switches on and 40 off, each timed until the fading is in the page and until the next frame (C-10's method), and
 // pan and zoom with fading on (S4P-03: against fading off in the same run).
 //
@@ -32,8 +35,11 @@ const SCENARIOS = {
   focus: { focus: seedId(WS, `entity:${FOCUS_CARD}`) },
   "lens-small": { lens: seedId(WS, "requirement:REQ-101") },
   "lens-large": { lens: seedId(WS, "requirement:REQ-102") },
+  "lens-dense": { lens: seedId(WS, "requirement:REQ-103") },
 } as const;
-type Request = (typeof SCENARIOS)[keyof typeof SCENARIOS];
+type ScenarioName = keyof typeof SCENARIOS;
+type Request = (typeof SCENARIOS)[ScenarioName];
+const AROUND_FOCUS: ScenarioName[] = ["focus", "lens-small", "lens-large"];
 const keyOf = (r: Request) => ("focus" in r ? `focus:${r.focus}` : `lens:${r.lens}`);
 const SWITCHES = MEASURE ? 40 : 5;
 const PAN_MS = MEASURE ? 10_000 : 2_000;
@@ -114,25 +120,45 @@ test("S4P-fading: switching fading on and off, and pan and zoom with fading on a
   await open(page, { x: 0, y: 0, zoom: 1 }, false);
   const pane = await page.locator(".react-flow__pane").evaluate((el) => ({ w: el.clientWidth, h: el.clientHeight }));
   const centre = { x: card.x + card.w / 2, y: card.y + 200 };
+  const src57 = generate().cards.find((c) => c.id === "src:57")!;
   const hook = await hasHook(page);
 
-  const views: Record<string, { zoom: number; collapsed: boolean; off?: FrameStats; scenarios?: Record<string, Scenario> }> = {
-    "100 %, expanded": { zoom: 1, collapsed: false },
-    "30 %, expanded": { zoom: 0.3, collapsed: false },
-    "100 %, collapsed": { zoom: 1, collapsed: true },
-    "30 %, collapsed": { zoom: 0.3, collapsed: true },
+  type View = { view: { x: number; y: number; zoom: number }; collapsed: boolean; scenarioNames: ScenarioName[]; inView?: string[]; off?: FrameStats; scenarios?: Record<string, Scenario> };
+  const around = (zoom: number) => ({ x: pane.w / 2 - centre.x * zoom, y: pane.h / 2 - centre.y * zoom, zoom });
+  // S1A-14's 100 % view (pane coordinates, as S1A-14 writes it)
+  const dense = { x: 768 - src57.x, y: 300 - src57.y, zoom: 1 };
+  const all: Record<string, View> = {
+    "100 %, expanded": { view: around(1), collapsed: false, scenarioNames: AROUND_FOCUS },
+    "30 %, expanded": { view: around(0.3), collapsed: false, scenarioNames: AROUND_FOCUS },
+    "100 % dense area, expanded": { view: dense, collapsed: false, scenarioNames: ["lens-dense"] },
+    "100 %, collapsed": { view: around(1), collapsed: true, scenarioNames: AROUND_FOCUS },
+    "30 %, collapsed": { view: around(0.3), collapsed: true, scenarioNames: AROUND_FOCUS },
+    "100 % dense area, collapsed": { view: dense, collapsed: true, scenarioNames: ["lens-dense"] },
   };
+  // under DIAG=collapsed every view is collapsed: the expanded ones would only repeat them
+  const views = Object.fromEntries(Object.entries(all).filter(([, v]) => v.collapsed || !DIAG.split(",").includes("collapsed")));
   let mechanism: boolean | null = hook ? null : false;
   for (const v of Object.values(views)) {
-    const view = { x: pane.w / 2 - centre.x * v.zoom, y: pane.h / 2 - centre.y * v.zoom, zoom: v.zoom };
+    const view = v.view;
     await open(page, view, v.collapsed);
+    // the cards (and blocks) in view, to check the lit counts against
+    v.inView = await page.evaluate(() => {
+      const p = document.querySelector(".react-flow__pane")!.getBoundingClientRect();
+      return [...document.querySelectorAll<HTMLElement>(".react-flow__node")]
+        .filter((n) => {
+          const b = n.getBoundingClientRect();
+          return getComputedStyle(n).visibility !== "hidden" && n.style.display !== "none" && b.right > p.left && b.left < p.right && b.bottom > p.top && b.top < p.bottom;
+        })
+        .map((n) => n.dataset.id!);
+    });
     await startRecording(page);
     await panZoom(page, PAN_MS);
     v.off = await stopRecording(page);
 
     if (mechanism === false) continue;
     v.scenarios = {};
-    for (const [name, request] of Object.entries(SCENARIOS)) {
+    for (const name of v.scenarioNames) {
+      const request = SCENARIOS[name];
       await open(page, view, v.collapsed);
       // the first time: is there a mechanism that shows the fading? (none before step 2 of slice 4p)
       if (mechanism === null) {

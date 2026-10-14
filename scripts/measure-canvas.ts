@@ -17,7 +17,9 @@
 // every side and round go to .data/measure/<sitting>/, the summary to .data/measure/<sitting>/summary.json and
 // summary.md (one table: median, spread, bar, result). A round disturbed by something else is repeated, not averaged
 // in: `--drop <round>` leaves it out of the summary (`--resummarize <sitting>` redoes only the summary). `--prepare-only`
-// checks the worktree and both builds without measuring; `--branch-diag <switch>` runs this branch's side with a
+// checks the worktree and both builds without measuring; `--diag <switch>` runs both sides with a measurement-only
+// switch (slice 4p: `--diag collapsed` measures the reference against itself with every frame collapsed);
+// `--branch-diag <switch>` runs this branch's side with a
 // measurement-only switch (DIAG); before each side the machine must be quiet (below 2 % for 30 s, at most 3 minutes,
 // recorded); `--add-round <sitting>` measures a replacement round with the
 // builds already made (pair it with `--drop`); `--quick` measures only pan and zoom, C-08, C-10 and the lasso marks.
@@ -55,6 +57,10 @@ const rounds = Number(arg("rounds", "3"));
 const dropped = new Set(arg("drop", "").split(",").filter(Boolean).map(Number));
 /** A measurement-only switch (DIAG) for this branch's side only, e.g. `nolines` or `blocks` (slice 2p used it for a trial renderer). */
 const branchDiag = arg("branch-diag", "");
+/** A measurement-only switch for both sides (slice 4p), e.g. `collapsed` for a baseline with every frame collapsed. */
+const bothDiag = arg("diag", "");
+const diagFor = (s: { branchDiag?: string; bothDiag?: string }, side: "reference" | "branch") =>
+  [s.bothDiag, side === "branch" ? s.branchDiag : ""].filter(Boolean).join(",");
 
 const sh = (cmd: string, cwd = BRANCH) => execSync(cmd, { cwd, stdio: "inherit" });
 const read = (cmd: string, cwd = BRANCH) => execSync(cmd, { cwd, encoding: "utf8" }).trim();
@@ -116,8 +122,8 @@ function measure(tree: string, dir: string, diag = ""): Raw {
 
 type Get = (r: Raw) => number;
 /** The fading spec's views and scenarios (slice 4p). */
-const FADING_VIEWS = ["100 %, expanded", "30 %, expanded", "100 %, collapsed", "30 %, collapsed"] as const;
-const FADING_SCENARIOS = ["focus", "lens-small", "lens-large"] as const;
+const FADING_VIEWS = ["100 %, expanded", "30 %, expanded", "100 % dense area, expanded", "100 %, collapsed", "30 %, collapsed", "100 % dense area, collapsed"] as const;
+const FADING_SCENARIOS = ["focus", "lens-small", "lens-large", "lens-dense"] as const;
 const at = (o: unknown, ...keys: string[]) => keys.reduce<unknown>((v, k) => (v as Record<string, unknown>)?.[k], o) as number;
 interface Figure {
   id: string;
@@ -159,6 +165,7 @@ interface Sitting {
   branchCommit: string;
   referenceCommit: string;
   branchDiag?: string;
+  bothDiag?: string;
   conditions: { before: unknown; after?: unknown; perSide: { round: number; side: string; busiest: string[]; quietBefore?: unknown }[] };
   sides: { round: number; side: "reference" | "branch"; raw: Raw }[];
 }
@@ -196,7 +203,7 @@ function summarize(dir: string, s: Sitting) {
     return { figure: f, ref, br, mr, mb, diff, met: meets(f, mb) && abOk, abOk };
   });
   const md = [
-    `Sitting ${path.basename(dir)}: this branch (${s.branchCommit.slice(0, 7)}${s.branchDiag ? `, DIAG=${s.branchDiag}` : ""}) against ${s.against} (${s.referenceCommit.slice(0, 7)}), production measurement build, ${kept.length / 2} rounds${dropped.size ? ` (round ${[...dropped].join(", ")} left out)` : ""}.`,
+    `Sitting ${path.basename(dir)}: this branch (${s.branchCommit.slice(0, 7)}${s.branchDiag ? `, DIAG=${s.branchDiag}` : ""}) against ${s.against} (${s.referenceCommit.slice(0, 7)})${s.bothDiag ? `, both sides DIAG=${s.bothDiag}` : ""}, production measurement build, ${kept.length / 2} rounds${dropped.size ? ` (round ${[...dropped].join(", ")} left out)` : ""}.`,
     "",
     `| Figure | Bar | ${s.against}: median (min–max) | This branch: median (min–max) | Change | Result |`,
     "| --- | --- | --- | --- | --- | --- |",
@@ -246,7 +253,7 @@ async function main() {
     for (const side of r % 2 ? (["reference", "branch"] as const) : (["branch", "reference"] as const)) {
       // a quiet machine first: below 2 % for 30 s, at most 3 minutes (the wait is recorded)
       const quietBefore = waitUntilQuiet();
-      const raw = measure(side === "reference" ? REF_TREE : BRANCH, path.join(dir, `round-${r}-${side}`), side === "branch" ? sitting.branchDiag : "");
+      const raw = measure(side === "reference" ? REF_TREE : BRANCH, path.join(dir, `round-${r}-${side}`), diagFor(sitting, side));
       sitting.sides.push({ round: r, side, raw });
       sitting.conditions.perSide.push({ round: r, side, quietBefore, busiest: (conditions() as { busiestProcesses?: string[] }).busiestProcesses ?? [] });
       fs.writeFileSync(path.join(dir, "sitting.json"), JSON.stringify(sitting, null, 2));
@@ -275,6 +282,7 @@ async function main() {
     branchCommit: read("git rev-parse HEAD"),
     referenceCommit: read(`git rev-list -n 1 ${against}`),
     branchDiag,
+    bothDiag,
     conditions: { before: conditions(), perSide: [] },
     sides: [],
   };
@@ -288,7 +296,7 @@ async function main() {
     for (const side of r % 2 ? (["reference", "branch"] as const) : (["branch", "reference"] as const)) {
       // a quiet machine first: below 2 % for 30 s, at most 3 minutes (the wait is recorded)
       const quietBefore = waitUntilQuiet();
-      const raw = measure(side === "reference" ? REF_TREE : BRANCH, path.join(dir, `round-${r}-${side}`), side === "branch" ? sitting.branchDiag : "");
+      const raw = measure(side === "reference" ? REF_TREE : BRANCH, path.join(dir, `round-${r}-${side}`), diagFor(sitting, side));
       sitting.sides.push({ round: r, side, raw });
       sitting.conditions.perSide.push({ round: r, side, quietBefore, busiest: (conditions() as { busiestProcesses?: string[] }).busiestProcesses ?? [] });
       save();
