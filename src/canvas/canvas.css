@@ -206,6 +206,11 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas.node-dragging .react-flow__viewport { will-change: auto }
 .im-canvas.resizing, .im-canvas.resizing * { cursor: ew-resize !important }
 
+/* ---------- the overlay (slice 4p, trial A): one container above the cards with its own compositing layer, so the hover,
+   the moved-row flash, the resize outline and the selection marks repaint only it, never the viewport's big layer.
+   It sits in the viewport portal and pans and zooms with the viewport; it takes no pointer events. ---------- */
+.im-canvas .overlay-layer { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform }
+
 /* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */
 /* One overlay above the cards; the cards are not restyled. Fill opacity on a handful of overlay shapes only. */
 .im-canvas .hover-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
@@ -215,7 +220,8 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .hover-layer .moved { fill: var(--im-logical); animation: im-moved .6s ease-out forwards }
 @keyframes im-moved { from { fill-opacity: .22 } to { fill-opacity: 0 } }
 
-/* Hover (C-10): the hovered lines drawn again, a little stronger, above the others; nothing is restyled. */
+/* Hover (C-10): the hovered lines drawn again, a little stronger, in the overlay above the cards (slice 4p, trial A);
+   nothing is restyled. */
 .im-canvas .hover-lines .lnk { pointer-events: none }
 .im-canvas .hover-lines .lnk .hit { display: none }
 .im-canvas .hover-lines .lnk .s { stroke-width: 2.4 }

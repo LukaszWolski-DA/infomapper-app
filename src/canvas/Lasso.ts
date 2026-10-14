@@ -3,12 +3,14 @@
 // The lasso (slice 2a, D-15, D-16; prototype D.type "lasso"): a left drag that starts on the empty canvas draws a
 // rectangle; on release the canvas selects the cards fully inside it. A press without moving is left to the pane's
 // click (it clears the selection, as before). Esc cancels a lasso being drawn. The caller decides when a press may
-// start one (no tool on, Space not held).
+// start one (no tool on, Space not held). Slice 4p (trial A): the rectangle is a store, not React state, so drawing a
+// lasso re-renders only the selection overlay, never the canvas.
 
 import { useCallback, useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useReactFlow } from "@xyflow/react";
 import type { Pt, Rect } from "./geometry";
 import { rectBetween } from "./selection";
+import { createValueStore, type ValueStore } from "./value-store";
 
 /** Moving less than this is a click on the empty canvas, not a lasso. */
 const SLOP = 4;
@@ -29,7 +31,7 @@ export const onEmptyCanvas = (target: EventTarget | null): boolean =>
 
 export function useLasso(onDone: (lasso: Rect, add: boolean) => void) {
   const rf = useReactFlow();
-  const [lasso, setLasso] = useState<Rect | null>(null);
+  const [lasso] = useState<ValueStore<Rect | null>>(() => createValueStore<Rect | null>(null));
   const press = useRef<Press | null>(null);
   // The window listeners stay put while the selection changes; they read the latest callback. (Re-subscribing in
   // the middle of a pointerup would drop the other listeners still to run for it, e.g. a card resize.)
@@ -53,14 +55,14 @@ export function useLasso(onDone: (lasso: Rect, add: boolean) => void) {
   useEffect(() => {
     const end = () => {
       press.current = null;
-      setLasso(null);
+      lasso.set(null);
     };
     const move = (e: PointerEvent) => {
       const p = press.current;
       if (!p) return;
       if (!p.moved && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) <= SLOP) return;
       p.moved = true;
-      setLasso(rectBetween(p.start, rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })));
+      lasso.set(rectBetween(p.start, rf.screenToFlowPosition({ x: e.clientX, y: e.clientY })));
     };
     const up = (e: PointerEvent) => {
       const p = press.current;
@@ -90,7 +92,7 @@ export function useLasso(onDone: (lasso: Rect, add: boolean) => void) {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("keydown", key, true);
     };
-  }, [rf]);
+  }, [rf, lasso]);
 
   return { lasso, onPointerDown };
 }
