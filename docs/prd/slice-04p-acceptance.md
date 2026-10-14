@@ -514,3 +514,17 @@ e2e/slice-04p/S4P-04-screens.spec.ts`, 1536 × 864, “Customer & orders”):
    again stronger, and no row is marked; the prototype still draws and marks rows at 30 %.
 4. The prototype's demo canvas has frames (CRM, WEB, Customer …) and the app's demo canvas does not; this has nothing to
    do with the hover.
+
+## Łukasz's answers after step 1 (14 October)
+
+1. **Trial A accepted as built**; its verdict comes from the step 2 sitting.
+2. **If trial A is adopted, S4A-14's reference counts move up by one** (the overlay container): 19,296 / 4,499 / 4,906 /
+   1,464 in the canvas viewport (100 % and 30 %, frames expanded and collapsed). `S4A-14-elements.spec.ts` changes only at
+   the adoption.
+3. **A hover line fade to measure in step 2**: one semi-transparent element in the canvas background's colour, above the
+   line layer and below the cards, shown only while something is hovered, so every line under it looks faded (the
+   prototype's other lines at 12 %), while the hovered lines stay bright in the overlay above the cards; C-10 with and
+   without it in the same sitting, and screenshots at 100 % and 30 %.
+4. **Step 2** as in the PRD (F1 for comparison and F4, both on trial A's overlay, each on its own trial branch), with the
+   veil's transform during pan and zoom, the holes under a dragged or resized card and the veil's GPU memory at 30 %
+   answered; S4P-04 screenshots of Focus and the four lenses before the sitting.
