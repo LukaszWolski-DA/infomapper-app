@@ -152,7 +152,7 @@ test("S4P-04 screenshots: Focus and the lenses at 100 % and 30 %, app (Performan
 
   // Customer & orders, app and prototype
   const demo = [
-    ["focus", { focus: entity("Customer").id }, { focus: "customer" }],
+    ["focus", { focus: entity("Customer").id }, { focus: "lent_customer" }],
     ["lens-small", { lens: req102.id }, { req: "REQ-102" }],
     ["lens-large", { lens: req101.id }, { req: "REQ-101" }],
   ] as const;
