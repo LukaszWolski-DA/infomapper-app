@@ -32,7 +32,8 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
   const ui = useContext(CanvasUiCtx);
   const { run } = useAction();
   const { nameFocus, setNameFocus } = usePanels();
-  /** Bumped after a refusal, so the fields show the stored values again. */
+  /** Bumped after a refusal, so the fields show the stored values again. An empty key or name goes to the server, which
+   * refuses it with “Enter a key.” / “Enter a name.” (PRD item 2, S4A-02). */
   const [reset, setReset] = useState(0);
   const nameRef = useRef<HTMLInputElement>(null);
   const ix = p.ix;
@@ -95,11 +96,11 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
   const kindName = KIND_NAMES[r.kind].toLowerCase();
 
   return (
-    <div data-testid="panel-requirement">
+    <div data-testid="panel-requirement" data-version={r.version}>
       <Kind>Requirement</Kind>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="ID" htmlFor="f-rqk">
-          <TextField key={v} id="f-rqk" value={r.key} required mono readOnly={!p.editable} onSave={(key) => void save("key", key)} testId="input-req-key" />
+          <TextField key={v} id="f-rqk" value={r.key} mono readOnly={!p.editable} onSave={(key) => void save("key", key)} testId="input-req-key" />
         </Field>
         <Field label="Kind" htmlFor="f-rqkind">
           <select key={v} id="f-rqkind" className={inputClass} defaultValue={r.kind} disabled={!p.editable} onChange={(e) => void save("kind", e.target.value as Requirement["kind"])} data-testid="select-req-kind">
@@ -112,7 +113,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
         </Field>
       </div>
       <Field label="Name" htmlFor="f-rqn">
-        <TextField key={v} id="f-rqn" inputRef={nameRef} value={r.name} required readOnly={!p.editable} onSave={(name) => void save("name", name)} testId="input-req-name" />
+        <TextField key={v} id="f-rqn" inputRef={nameRef} value={r.name} readOnly={!p.editable} onSave={(name) => void save("name", name)} testId="input-req-name" />
       </Field>
       <RichTextField
         key={`d:${v}`}
