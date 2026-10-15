@@ -22,7 +22,9 @@
 // `--branch-diag <switch>` runs this branch's side with a
 // measurement-only switch (DIAG); before each side the machine must be quiet (below 2 % for 30 s, at most 3 minutes,
 // recorded); `--add-round <sitting>` measures a replacement round with the
-// builds already made (pair it with `--drop`); `--quick` measures only pan and zoom, C-08, C-10 and the lasso marks.
+// builds already made (pair it with `--drop`); `--quick` measures only pan and zoom, C-08, C-10 and the lasso marks;
+// `--no-build` (slice 4p) starts a sitting on the builds `--prepare-only` made, so the laptop can be prepared after
+// building (it refuses when the reference worktree is not at `--against` or a build is missing).
 // Measuring only:
 // no dev or measurement server may run (ports 3200, 3300); prepare the laptop first.
 
@@ -275,6 +277,16 @@ async function main() {
     sh("npm run measure:build", BRANCH);
     return;
   }
+  if (process.argv.includes("--no-build")) {
+    // the builds `--prepare-only` made: the reference worktree at --against, both builds there
+    const at = fs.existsSync(REF_TREE) ? read("git rev-parse HEAD", REF_TREE) : "";
+    if (at !== read(`git rev-list -n 1 ${against}`)) throw new Error(`${REF_TREE} is not at ${against}: run --prepare-only first.`);
+    for (const tree of [REF_TREE, BRANCH]) {
+      const id = path.join(tree, ".next-measure", "BUILD_ID");
+      if (!fs.existsSync(id)) throw new Error(`No measurement build in ${tree}: run --prepare-only first.`);
+      console.log(`Using the build in ${tree} from ${fs.statSync(id).mtime.toISOString()}.`);
+    }
+  }
   const dir = path.resolve(BRANCH, ".data", "measure", new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-"));
   fs.mkdirSync(dir, { recursive: true });
   const sitting: Sitting = {
@@ -288,9 +300,11 @@ async function main() {
   };
   const save = () => fs.writeFileSync(path.join(dir, "sitting.json"), JSON.stringify(sitting, null, 2));
   save();
-  prepareReference();
-  sh("npm run measure:build", REF_TREE);
-  sh("npm run measure:build", BRANCH);
+  if (!process.argv.includes("--no-build")) {
+    prepareReference();
+    sh("npm run measure:build", REF_TREE);
+    sh("npm run measure:build", BRANCH);
+  }
   for (let r = 1; r <= rounds; r++) {
     // the side that starts changes every round
     for (const side of r % 2 ? (["reference", "branch"] as const) : (["branch", "reference"] as const)) {
