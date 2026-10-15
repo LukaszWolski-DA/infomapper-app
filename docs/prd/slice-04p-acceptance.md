@@ -858,3 +858,54 @@ because tracing slows everything down (30–43 fps traced against 40–49 untrac
   lifted above the fading veil; every note would fade.
 - **Verdict: rejected**, by the rule. Tag `perf/4p-trial-notes`. Not carried into the slice.
 
+
+## Step 4 (PRD items 8–10, 15 October)
+
+### Item 8: error pages and the canvas's error boundary (S4P-09), done
+
+`13d3b46`. With the wording Łukasz approved at step 0:
+
+- `src/app/not-found.tsx`: “This page does not exist.” / “The link may be out of date, or what it pointed to was
+  deleted.” / “Go to the start page” (status 404 as before; S0-11 unchanged).
+- `src/app/error.tsx`: “Something went wrong.” / “This page could not be shown.” / “Try again” (Next.js `retry`) and
+  “Go to the start page”.
+- `src/app/global-error.tsx`: “Something went wrong.” / “InfoMapper could not start this page.” / “Reload”; its own
+  `<html>` and styles.
+- **The canvas's boundary** (`src/app/_components/canvas-error-boundary.tsx`, Next.js `catchError`) wraps only
+  `<ModelCanvas>` in the canvas page. It shows “Something went wrong on this canvas.” / “The panels still work. Reload
+  the canvas to try again; your saved work is not affected.” / “Reload” (`retry`: the canvas is fetched and drawn again;
+  the state outside it is kept). The top bar, the tabs, the left panel, the inspector and the status bar are outside it.
+- None of them shows or logs the error.
+- **The test hook** `window.__imCanvasThrow()` (`CanvasThrowHook`, inside the boundary, test hooks only).
+- **`e2e/slice-04p/S4P-09.spec.ts`:** the message and its text; the Requirements tab, a requirement's panel and the
+  Model tab still work; Reload brings the canvas back, ready; an unknown route shows the not-found page with status 404
+  and its link leads back. (A canvas id that is not in the project still redirects to the project's first canvas, as
+  since slice 2a, so it does not reach the not-found page.)
+
+### Items 9 and 10: prepared, not measured
+
+`fd70956`. Both run only in the measurement build and wait for Łukasz's OK (a quiet laptop).
+
+- **C-08 diagnosis, `e2e/slice-04p/S4P-10-c08.spec.ts`:** S1A-14's C-08 on “Performance test” at the overview
+  (navigation start to the first frame with every card and line drawn), one warm-up load and five cold loads in fresh
+  browser contexts, each traced. Per load and as medians:
+  - the document: navigation start to the end of the HTML response, and its size;
+  - the scripts: their number, size and when the last one arrived;
+  - the main thread's own work by kind (self time of DevTools' timeline events, as its performance panel counts it):
+    script (JavaScript and React's work in it), style and layout, paint and layerize, HTML parsing, other;
+  - the waiting: the stable frame's time less the main thread's busy time.
+- **Requirement index timing, `e2e/slice-04p/S4P-11-index.spec.ts`:** through `window.__imIndexTiming`, 30 builds after
+  three warm-up builds, three times each, on “Customer & orders” (Retail Co's 5 requirements), on “Performance test” (3
+  requirements, 1,000-odd attributes), and on slice 4a's synthetic model (500 requirements, 5,000 attributes, 2,000
+  mappings, 3,000 links), which moved from `scripts/bench-requirement-index.ts` to
+  `src/domain/model/requirement-index-synthetic.ts` so the browser can build it too. The bar: above 50 ms per build,
+  propose an incremental rebuild for 4b; below, no change.
+- One functional pass of each in the measurement build checked that they work; its figures are discarded (the laptop
+  was not prepared).
+
+### Tests
+
+- `npm test`: 938.
+- Lint and typecheck pass.
+- The whole suite once (`npm run e2e`, no dev server running): **158 passed** in 29.1 min, no retries (157 at step 3,
+  and S4P-09).
