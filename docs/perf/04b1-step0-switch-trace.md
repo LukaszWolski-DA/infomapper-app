@@ -326,12 +326,13 @@ A shorter path than proposed: no separate decision sitting before 4b-1's feature
 
 - **F1 is out as it is.**
 - **4b-1 builds the lens and Focus on F4** (`perf/4p-trial-f4`), because the layer check refuted B2's premise (Łukasz's
-  rule: B2 if the check confirmed it, otherwise F4). B2 stays the fallback.
+  rule: B2 if the check confirmed it, otherwise F4). There is no separate fallback: if F4 misses in 4b-1's closing
+  sitting, Łukasz decides (corrected in 4b-1's step 1).
 - **The method change is accepted as proposed:** to the screen, presented frames, the fixed settled check, C-08 to its
   last present. The tooling is 4b-1's first step, not a step before the slice.
 - **4b-1's closing sitting measures F4 with the deciding rule,** in every view measured:
   - switching ≤ 100 ms to the screen;
   - pan and zoom with fading on within 5 % of fading off, as presented frames.
 
-  If it misses, we talk.
+  If it misses, Łukasz decides.
 - **The doc corrections above land in 4b-1's PR.** AD-24 is reworded after the closing sitting, with Łukasz's approval.
