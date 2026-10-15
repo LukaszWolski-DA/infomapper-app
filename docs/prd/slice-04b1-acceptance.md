@@ -1,7 +1,28 @@
 # Slice 4b-1 – Acceptance
 
-Status: **step 1 (questions), waiting for Łukasz's answers.** Branch `slice/04b1-lens-focus`, from `main` at the tag
-`slice-04p` (`052daaf`). PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0: `docs/perf/04b1-step0-switch-trace.md`.
+Status: **step 1 accepted; step 2 (tooling).** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+(`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
+`docs/perf/04b1-step0-switch-trace.md`.
+
+## Łukasz's answers after step 1 (15 October 2026)
+
+- **A.** S4B1-05 and the definition of done use **REQ-105** for the gap (`birth_date`; approving its mapping turns the
+  row blue) and **REQ-101** for the entity header tint. REQ-102 stays the large set in “Performance test”.
+- **B.** No selection store up front. Selecting a requirement keeps its one `ModelCanvas` commit, as any selection does
+  today. In step 6, a smoke measurement of the colours to the screen decides:
+  - within 100 ms: S4B1-13 reads “one commit on selecting a requirement, as for any selection; none on switching Focus”;
+  - over 100 ms: stop and propose the selection store, which needs Łukasz's OK.
+- **C.** “Focus on this” / “Turn Focus off” in the card and row menus; a deliberate difference from the prototype (card
+  menu only).
+- **D.** Focus turns off when switching canvas, as the PRD says; a deliberate difference (the prototype keeps it).
+- **E.** No view-state chip for coverage colours; the “Focus” chip only (the prototype's “Lens: REQ-x” goes).
+- **Q7.** Step 6 shows both variants (header tint and dot) on screenshots, with a note on what they mean:
+  - a header tint below 40 % would mean “everything on this card in scope is covered”;
+  - above 40 % it means “this directly linked entity has a source”.
+
+  Łukasz decides from the screenshots.
+- **Everything else** (Q1–Q6, the docs plan) is accepted.
+- **An extra task before step 2:** `docs/inventory-prototype-vs-app.md`, what the prototype has that the app does not.
 
 ## Step 1 (15 October 2026)
 
