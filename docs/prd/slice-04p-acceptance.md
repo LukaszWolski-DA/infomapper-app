@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 4 done (items 8–10 measured and recorded), waiting for Łukasz before step 5**; steps 0–3 accepted. Draft pull request #12. Branch
+Status: **step 5 measured (final sitting `2026-10-15-09-36`); two points for Łukasz (S4P-02 at 30 % expanded, C-09 against the offset rule), then his manual acceptance**; steps 0–4 accepted. Draft pull request #12. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -1085,18 +1085,18 @@ thread's busy time):
 | ID | How it is shown | State |
 | --- | --- | --- |
 | S4P-01 | Baseline sittings `2026-10-14-15-48` (three rounds) and `2026-10-14-16-16` (collapsed) | **met** (accepted) |
-| S4P-02 | `S4P-fading.spec.ts` in `measure:canvas`; F1 at step 2: 13–29 ms in every scenario | met at step 2; **step 5's sitting confirms on the finished F1** |
-| S4P-03 | the same; F1 at step 2: 13 of 14 cells, the large lens at 30 % expanded −7.1 % | **step 5's sitting rechecks** (down to about −8 %: partly met with a known-limitations entry; beyond: stop and ask) |
+| S4P-02 | `S4P-fading.spec.ts` in `measure:canvas` (final sitting) | **met in 13 of 14 scenarios; the large lens at 30 % expanded 462 ms (bimodal slow switches): Łukasz decides** |
+| S4P-03 | the same | **met** in all 14 cells; the recheck of the large lens at 30 % expanded: −4.9 % |
 | S4P-04 | Screenshots `docs/prd/slice-04p-screens/step-1-trial-a/`, `step-2-f1/`, `step-2-f4/` | **seen by Łukasz**; look differences accepted for now |
-| S4P-05 | `S4P-05.spec.ts`; C-10 19 ms against 120 (trials sitting) | **met** (trial A adopted) |
-| S4P-06 | `S4P-06.spec.ts`; lasso marks 29 ms (already 28 on `slice-04a` with Chrome 155) | **met** |
+| S4P-05 | `S4P-05.spec.ts`; C-10 18 ms against 116 (final sitting) | **met** |
+| S4P-06 | `S4P-06.spec.ts`; lasso marks 23 ms against 27 (final sitting) | **met** |
 | S4P-07 | Notes layer: traced and untraced A/B/B/A | **rejected with figures** (`perf/4p-trial-notes`) |
-| S4P-08 | `measure:canvas` against `slice-04a`, three rounds | **step 5's sitting** |
+| S4P-08 | `measure:canvas` against `slice-04a`, three rounds (final sitting) | **met** for pan and zoom (−3.5 to +1.4 %), C-08 and the drags; **C-09 +1.9 % is 0.3 points below the +2.2 % offset rule: Łukasz decides** |
 | S4P-09 | `S4P-09.spec.ts` | **met** (accepted) |
-| S4P-10 | `S4P-10-c08.spec.ts` (diagnosis), `scripts/c08-waiting.ts` | split recorded; the waiting's breakdown from step 5's traced run; **C-08's verdict from the sitting's untraced A/B** |
+| S4P-10 | `S4P-10-c08.spec.ts` (diagnosis), `scripts/c08-waiting.ts` | **diagnosis written** (split, waiting breakdown, proposal); **C-08 met** untraced, 1,432 ms |
 | S4P-11 | `S4P-11-index.spec.ts` | **met**: 12.7 ms, no incremental rebuild (accepted) |
 | S4P-12 | `S4P-12.spec.ts`, S2C-12, S3A-14-idle, S3B-15-idle, S3B-13 in every run; `S4A-14-elements.spec.ts` (+1, the overlay container) | passes; counts at 19,296 / 4,499 / 4,906 / 1,464 |
-| S4P-13 | CI, `npm test`, three full e2e runs in a row | below |
+| S4P-13 | CI, `npm test`, three full e2e runs in a row | **met** (159 tests, 27.4–28.3 min; CI green) |
 
 ## Manual checklist (Łukasz)
 
@@ -1162,3 +1162,135 @@ npx tsx scripts/c08-waiting.ts .data/measure/s4p10-traces/<time>
 2. The sitting: untraced C-08 A/B, S4P-08, S4P-02/03 with the recheck of the large lens at 30 % expanded.
 3. The traced diagnostic run last.
 4. The waiting's breakdown from its traces.
+
+## Step 5: the final sitting (15 October)
+
+**Conditions:**
+- The laptop was prepared by Łukasz: restarted, 10 minutes' rest, on the power adapter, “Best performance”, Windows Update
+  and OneDrive paused, his Chrome closed, display and sleep set to “Never”.
+- Builds made before the preparation (11:10, `c8decff`: `slice-04a` in `../infomapper-ab-main`, this branch). No node
+  process, Chrome or server was running at the start; the working tree was clean at `f493f2b` (docs only after the
+  build).
+- **The warm-up** `2026-10-15-09-15` (`--quick --rounds 1 --no-build`, not counted) was `--no-build`'s first use. It
+  printed “Using the build in … from 09:10:01Z / 09:10:28Z”, ran no build, and measured normally.
+- **The sitting** `2026-10-15-09-36`: `npm run measure:canvas -- --rounds 3 --no-build --against slice-04a`, this branch
+  `f493f2b` against `slice-04a` (`5e02c96`).
+- **Every side waited for a quiet machine.** Round 1's branch side waited 163 s (peak 15 %) and then measured normally;
+  the other sides waited 31–52 s. After each side nothing besides the session's own programs and Explorer (at most 3 %)
+  showed. **No round dropped.**
+
+### Every figure (S4P-05, S4P-06, S4P-08, C-08, C-09): three rounds, median (min–max)
+
+| Figure | Bar | `slice-04a` | This branch | Change | Result |
+| --- | --- | --- | --- | --- | --- |
+| Pan and zoom, overview (S1A-14) | ≥ 50 fps; ≥ −5 % | 59.2 (58.8–59.8) | 59.7 (59.1–60.0) | +0.8 % | met |
+| – frames over 50 ms | 0 | 0 (0–1) | 0 (0–0) | – | met |
+| Pan and zoom, 100 % dense area (S1A-14) | ≥ 50 fps; ≥ −5 % | 51.4 (51.2–52.5) | 52.1 (51.5–52.5) | +1.4 % | met |
+| – frames over 50 ms | 0 | 6 (4–12) | 8 (7–9) | – | not met (as on `slice-04a`) |
+| **C-08 initial render, median of 5, untraced** | ≤ 1,500 ms | 1,387 (1,383–1,487) | **1,432 (1,419–1,463)** | +3.2 % | **met** |
+| C-09 card resize | ≥ 45 fps | 36.0 (33.1–36.2) | 36.7 (36.2–36.9) | +1.9 % | not met (bar); see S4P-08 below |
+| **C-10 hover** (S4P-05) | ≤ 100 ms | 116 (116–116) | **18 (17–18)** | −84.9 % | **met** |
+| Single-card drag | ≥ 45 fps | 10.9 (10.7–11.5) | 11.0 (10.9–11.4) | +0.9 % | not met (bar; out of scope) |
+| Group drag | ≥ 45 fps | 32.2 (31.6–32.2) | 32.2 (31.7–32.6) | 0.0 % | not met (bar; out of scope) |
+| **Lasso marks** (S4P-06) | ≤ 100 ms | 27 (25–29) | **23 (22–26)** | −14.7 % | **met** |
+| Fading off, 100 % around `ent:23`, expanded | ≥ −5 % | 46.5 (45.0–48.2) | 46.9 (46.5–50.1) | +0.9 % | met |
+| Fading off, 30 %, expanded | ≥ −5 % | 52.9 (51.0–54.2) | 53.4 (52.4–54.7) | +0.9 % | met |
+| Fading off, 100 % dense area, expanded | ≥ −5 % | 51.6 (47.7–51.7) | 49.8 (45.0–50.8) | −3.5 % | met |
+| Fading off, 100 %, collapsed | ≥ −5 % | 56.8 (56.4–56.8) | 56.8 (56.4–57.0) | 0.0 % | met |
+| Fading off, 30 %, collapsed | ≥ −5 % | 57.9 (57.7–58.4) | 58.3 (58.1–58.6) | +0.7 % | met |
+| Fading off, 100 % dense area, collapsed | ≥ −5 % | 60.1 (60.0–60.1) | 60.0 (60.0–60.0) | −0.2 % | met |
+
+Frames over 50 ms with fading off are within the baseline's spread in every view (3–12 on both sides).
+
+**S4P-08, no regression with fading off:**
+- **Pan and zoom:** met (−3.5 to +1.4 %).
+- **C-08:** +3.2 %, within the baseline's spread (C-08 differed by −3.0 % between identical sides at the baseline).
+- **The drags:** within ±1 %.
+- **C-09:** +1.9 % against the rule Łukasz set after the baseline (a regression is a change below +2.2 %, the baseline's
+  steady side offset of +7.2 % less 5 %). **By the letter of that rule C-09 is 0.3 points below it.** The offset did not
+  come back in this sitting: this branch's C-09 is 36.7 fps against 37.2 on the baseline's branch side, while
+  `slice-04a`'s side rose from 34.7 to 36.0. **For Łukasz to decide.**
+
+**C-08's verdict: met** (untraced, A/B): 1,432 ms against 1,500, every round 1,419–1,463; `slice-04a` 1,387 ms.
+
+### Fading on the finished F1 (S4P-02, S4P-03)
+
+Medians over the three rounds (each round's own median of 40 switches):
+
+| View | Scenario | On, ms | Off, ms | Pan and zoom off → on, fps | Change | Frames over 50 ms | S4P-02 | S4P-03 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 100 %, expanded | Focus | 32 | 31 | 46.9 → 49.6 | +5.8 % | 8 → 6 | met | met |
+| 100 %, expanded | Lens, small | 31 | 30 | 46.9 → 49.5 | +5.5 % | 8 → 7 | met | met |
+| 100 %, expanded | Lens, large | 33 | 33 | 46.9 → 49.2 | +4.9 % | 8 → 10 | met | met |
+| 30 %, expanded | Focus | 20 | 20 | 53.4 → 51.8 | −3.0 % | 8 → 8 | met (round 1: 270) | met |
+| 30 %, expanded | Lens, small | 18 | 18 | 53.4 → 53.5 | +0.2 % | 8 → 8 | met | met |
+| 30 %, expanded | **Lens, large** | **462** | 23 | 53.4 → 50.8 | **−4.9 %** | 8 → 9 | **missed** | **met (the recheck)** |
+| 100 % dense area, expanded | Lens, dense | 29 | 28 | 49.8 → 48.1 | −3.4 % | 8 → 7 | met | met |
+| 100 %, collapsed | Focus, small, large | 23–24 | 23 | 56.8 → 55.0–57.3 | −3.2 to +0.9 % | 5 → 5 | met | met |
+| 30 %, collapsed | Focus, small, large | 15–16 | 12–14 | 58.3 → 58.1–58.3 | −0.3 to 0.0 % | 3 → 2–3 | met | met |
+| 100 % dense area, collapsed | Lens, dense | 17 | 17 | 60.0 → 60.0 | 0.0 % | 0 → 0 | met | met |
+
+**S4P-03, the recheck:** the large lens at 30 % with frames expanded is −4.9 % (−7.1 % at step 2): **met**. S4P-03 is
+met in all 14 cells on the finished F1. The −8 % rule was not triggered.
+
+**S4P-02: missed in one scenario.** In the 30 % expanded view switching is bimodal. Most runs take 15–25 ms, but in
+some a whole run takes 200–600 ms per switch (round medians):
+
+| Round | Focus on / off | Lens, small on / off | Lens, large on / off |
+| --- | --- | --- | --- |
+| 1 | 270 / 221 | 18 / 19 | 26 / 22 |
+| 2 | 20 / 20 | 17 / 18 | **462** / 23 |
+| 3 | 19 / 18 | 18 / 18 | **565** / **466** |
+
+The p95s in this view are 300–610 ms in almost every run, so even the fast runs have slow switches among their 40. The
+same slow mode was in step 2's trial sitting (F1's maxima at 30 % expanded 318–633 ms), hidden then behind fast
+medians. It does not happen at 100 % or with frames collapsed (p95 at most about 185 ms, medians 15–33 ms).
+
+**Hypothesis, not proven:** F1's veil lies in the canvas's big layer. At 30 % expanded about 4,500 elements are in view,
+and when Chrome has to raster the whole visible part of that layer again (on the GPU), one switch costs a full raster.
+At 100 % fewer elements are in view, and collapsed frames are far fewer. The fast runs would be the ones where Chrome
+keeps or reuses its tiles. A trace of switching in this view would tell. **For Łukasz to decide** whether S4P-02 is
+partly met with a known-limitations entry, whether that trace comes first, or whether 4b goes ahead with F1 as it is.
+
+### C-08's waiting after the document (the traced diagnostic run, last)
+
+After the untraced sitting, on the same measurement build (the spec's server starts `measure.ts start`, which runs no
+build, so nothing was rebuilt). The quiet check passed after 31 s (1.4 % at the end, peak 2 %). Five traced cold loads;
+raw traces in `.data/measure/s4p10-traces/2026-10-15-10-37/` (git-ignored, not committed); breakdown by
+`scripts/c08-waiting.ts`. As before, a traced run is a diagnosis, not the verdict.
+
+| Load | Stable (traced) | First byte | Document end | Window to the stable frame | Network in flight | GPU main | Compositor + raster | Main busy | Main idle |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 1,414 | 303 | 369 | 1,045 | 27 | 114 | 2 | 297 | 748 |
+| 2 | 1,352 | 249 | 312 | 1,040 | 62 | 147 | 5 | 331 | 709 |
+| 3 | 1,348 | 255 | 308 | 1,040 | 134 | 139 | 6 | 319 | 721 |
+| 4 | 1,356 | 229 | 318 | 1,038 | 46 | 131 | 1 | 309 | 729 |
+| 5 | 1,349 | 256 | 309 | 1,040 | 46 | 127 | 2 | 310 | 730 |
+
+Whole loads, medians: stable 1,352 ms; the main thread busy 548 ms (script 336, style and layout 146, paint and
+layerize 31, other 31).
+
+**Reading:**
+- **The network is not the waiting.** After the document, the only requests are Next.js prefetching the links to the
+  workspace and the project pages (RSC, at about 300–340 and 460–560 ms after navigation, 20–100 ms each).
+- **Raster and the GPU take about 130 ms.** The GPU process's main thread does the raster (GPU raster): 114–147 ms.
+  The renderer's compositor and tile workers take under 10 ms.
+- **The main thread is idle for about 0.7 s** of the about 1.04 s after the document (709–748 ms), with neither the
+  network nor the GPU filling that time. So something time-based or event-based holds the first full frame back:
+  - a timer in the application;
+  - React Flow's measuring (`ResizeObserver`) and the canvas's ready step;
+  - the fonts, or the scheduler's yielding.
+
+  The saved trace does not name it.
+- **The spread** was small this time (1,348–1,414 ms traced). It followed the first byte (load 1, the slowest, had the
+  latest first byte, 303 ms, and the latest document end, 369 ms).
+
+**Revised proposal (no fix in this slice):**
+1. **C-08 is met** untraced at 1,432 ms; nothing to fix now.
+2. **The idle 0.7 s is the next thing to understand.** If C-08 needs work later (for example with the database's own
+   latency), mark the steps in the measurement build (`performance.mark` at hydration, at the canvas's ready step, when
+   React Flow has measured the cards, when the lines are drawn), and find what the main thread waits for between them.
+3. **The database slice (AD-31): Server-Timing on the canvas page** (data loading, model, tree, index). The first byte
+   (229–303 ms traced, 257–421 ms at step 4) is the part that moves between loads.
+4. **The left panel's tree and the miniature after the canvas's first frame** stays a candidate. The main thread is not
+   where the time goes, though, so it comes after point 2.

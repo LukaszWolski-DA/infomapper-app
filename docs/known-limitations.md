@@ -36,6 +36,53 @@ created after the page read the data (`readAt`) stay, and the versions the canva
 
 ## Canvas performance (slice 1a)
 
+### Where the canvas stands after slice 4p (15 October 2026)
+
+Slice 4p's final sitting (`2026-10-15-09-36`; production measurement build; Chrome 155; three rounds A/B against
+`slice-04a`, untraced; `docs/prd/slice-04p-acceptance.md`). The entries below this one are kept as they were measured.
+
+| Figure | Bar | Now | State |
+| --- | --- | --- | --- |
+| Pan and zoom, overview | ≥ 50 fps, none over 50 ms | 59.7 fps, 0 | met |
+| Pan and zoom, 100 % dense area | ≥ 50 fps, none over 50 ms | 52.1 fps, 7–9 frames over 50 ms | **partly met** (the frames over 50 ms, as on `slice-04a`: 4–12) |
+| C-08 initial render | ≤ 1,500 ms | 1,432 ms (untraced) | **met** |
+| C-09 card resize | ≥ 45 fps | 36.7 fps | **partly met** (card rows; needs a decision on the card's look) |
+| C-10 hover | ≤ 100 ms | 18 ms | **met** (slice 4p's overlay, AD-24) |
+| Lasso marks | ≤ 100 ms | 23 ms | **met** |
+| Single-card and group drags | ≥ 45 fps | 11 and 32 fps | **partly met** (card rows, as C-09) |
+| Fading, switching (S4P-02) | ≤ 100 ms | 15–33 ms, except the 30 % view with frames expanded: see below | **partly met?** (Łukasz decides) |
+| Fading, pan and zoom on vs off (S4P-03) | ≥ −5 % | −4.9 to +5.8 % in all 14 cells | **met** |
+
+### Fading's slow switches at 30 % with frames expanded (slice 4p)
+
+On the finished F1 (one veil in the canvas layer, the lit cards lifted by a stylesheet rule; AD-24) switching takes
+15–33 ms in every view (median of 40), except at 30 % with frames expanded on “Performance test” (about 4,500 elements in
+view). There it is bimodal: most runs switch in 17–26 ms, but in some a whole run takes 200–600 ms per switch.
+- **Medians:** the large lens on 26, 462 and 565 ms in the three rounds; Focus on 270 ms in one round.
+- **p95:** 300–610 ms in almost every run there.
+
+The same mode was already in step 2's trial sitting, behind fast medians.
+
+- **Hypothesis, not proven:** the veil is in the canvas's big layer; when Chrome has to raster the whole visible part
+  of that layer again, a switch costs a full GPU raster at 30 %.
+- **Open:** Łukasz decides whether S4P-02 is partly met with this entry, whether a trace of the switch comes first, or
+  whether 4b goes ahead with F1 as it is.
+
+### C-08: what the first render waits for (slice 4p)
+
+C-08 is met untraced (1,432 ms). The traced diagnosis (five loads, `scripts/c08-waiting.ts`) splits the first render:
+- **the first byte:** about 230–300 ms, the server rendering the page with the local adapter;
+- **the main thread's own work:** about 550 ms (script about 340, style and layout about 145, paint and layerize about
+  30);
+- **after the document**, about 1.04 s to the stable frame:
+  - the network about 30–130 ms, only Next.js prefetching the workspace and project links;
+  - the GPU's raster about 130 ms;
+  - **the main thread idle for about 0.7 s**, with nothing in the trace filling it.
+
+- **Later:** if C-08 needs work (for example with the database's own latency), mark the steps in the measurement build
+  (hydration, the canvas's ready step, React Flow's measuring, the lines drawn) to find what the 0.7 s waits for. In the
+  database slice (AD-31), add Server-Timing to the canvas page.
+
 ### S1A-14 is only partly met, and measured on the dev server
 
 On the “Performance test” workspace (`seed:large`), pan and zoom at the overview mostly reach the bar, but at 100% the
