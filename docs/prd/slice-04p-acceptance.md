@@ -1127,3 +1127,16 @@ Open http://127.0.0.1:3300/sign-in, sign in as **Łukasz**, open Retail Co – D
 | 5 | `__imFade(null)` | Everything is back as before. |
 | 6 | In the console: `__imCanvasThrow()` | The canvas is replaced by “Something went wrong on this canvas.” with **Reload**; the left panel and the inspector still work. Reload brings the canvas back. |
 | 7 | Go to http://127.0.0.1:3300/no-such-page | “This page does not exist.” with “Go to the start page”. |
+
+### Three full runs in a row (S4P-13)
+
+`npm run e2e` with no dev server running, on `15c36cc` (lint, typecheck and `npm test`, 938 tests in 68 files, pass):
+
+| Run | Result | Time (Playwright) | Wall clock |
+| --- | --- | --- | --- |
+| 1 | 159 passed (130 files) | 27.4 min | 1,650 s |
+| 2 | 159 passed | 27.9 min | 1,678 s |
+| 3 | 159 passed | 28.3 min | 1,703 s |
+
+No retries, no flaky test; the server's known “destination stream closed early” lines (26, 26, 28). 159 = slice 4a's 155
+and slice 4p's S4P-05, S4P-06, S4P-09 and S4P-12. No earlier test changed in this slice.
