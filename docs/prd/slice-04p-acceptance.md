@@ -824,11 +824,37 @@ more than that is discussed. Written into the PRD's S4P-03.
 - **The whole suite once** (`npm run e2e`, no dev server running): **157 passed** in 25.5 min, no retries (the 155 of
   slice 4a and the two guards). No earlier test changed.
 
-## Step 3: the notes layer (PRD item 7), built, trace not yet run
+## Step 3: the notes layer (PRD item 7): rejected (15 October)
 
 Branch `perf/4p-trial-notes` (`62f9338`): the notes' container gets `will-change: transform`, so the notes have a
-compositing layer of their own and their paint and Layerize are no longer part of the cards'. Side effect: it makes the
-container a stacking context, so notes pinned to a lit card can no longer be lifted above the fading veil (every note
-would fade). The cheaper path (Łukasz): one Chrome trace panning at 30 %, notes on against this slice. If Layerize and
-memory rise as with F4, the verdict is “rejected” with those figures; a full sitting only if the trace shows a gain.
-The trace waits for Łukasz's OK.
+compositing layer of their own. Łukasz's rule, set before the trace: **adopted only if the trace shows a clear gain at
+30 % (frame time or Layerize better by more than the baseline's spread) and there is a way to keep notes pinned to lit
+cards above the veil at no new cost; otherwise rejected.**
+
+**Method.** A one-off spec (not committed; results in `.data/measure/notes-trace/`) in the measurement build, the trial
+in its own worktree, runs in the order slice, notes, notes, slice. Two views at 30 % on “Performance test”: around
+`ent:23` (2 notes in view) and centred on the notes (4 in view). Each view: 8 s of the wheel driver. The traced set had a
+Chrome trace (Layerize, Paint, raster per frame) and a memory dump; a second set ran without tracing (frame rate only),
+because tracing slows everything down (30–43 fps traced against 40–49 untraced).
+
+| Run | View | Untraced: fps (frames over 50 ms) | Traced: fps | Layerize ms / frame | Paint ms / frame | Tile memory |
+| --- | --- | --- | --- | --- | --- | --- |
+| slice 1 | around `ent:23` | 40.0 (8) | 30.2 | 11.27 | 7.87 | 151.8 MiB |
+| notes 1 | around `ent:23` | 46.7 (7) | 37.6 | 9.21 | 5.67 | 184.4 MiB |
+| notes 2 | around `ent:23` | 43.7 (11) | 43.2 | 8.07 | 5.01 | 194.4 MiB |
+| slice 2 | around `ent:23` | 49.0 (8) | 33.8 | 9.99 | 6.17 | 158.5 MiB |
+| slice 1 | on the notes | 41.2 (7) | 33.0 | 11.07 | 7.03 | 157.4 MiB |
+| notes 1 | on the notes | 45.7 (8) | 37.4 | 9.81 | 5.58 | 175.9 MiB |
+| notes 2 | on the notes | 47.6 (7) | 43.0 | 8.71 | 4.77 | 172.5 MiB |
+| slice 2 | on the notes | 45.3 (8) | 39.5 | 9.28 | 5.19 | 175.8 MiB |
+
+**Reading:**
+- **Untraced, there is no clear gain:** around `ent:23` 44.5 → 45.2 fps (+1.6 %), on the notes 43.3 → 46.7 fps
+  (+7.8 %). The slice's own two runs differ by 9 and 4 fps, and frames over 50 ms are the same (7–11).
+- **The traced runs suggested a gain** (Layerize −19 % and −9 %). They are slower and drift from run to run, and the
+  untraced runs do not confirm it.
+- **Memory rises:** tile memory +20 to +35 MiB.
+- **Side effect:** the notes' container becomes a stacking context, so notes pinned to a lit card could no longer be
+  lifted above the fading veil; every note would fade.
+- **Verdict: rejected**, by the rule. Tag `perf/4p-trial-notes`. Not carried into the slice.
+

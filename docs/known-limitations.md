@@ -155,6 +155,11 @@ mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md]
   about what the element count predicts but inside the run-to-run spread (0.4–0.7 ms); the remaining excess is about
   +0.8 ms Layerize, +0.1 ms layout, +0.15 ms script per frame. So the element-count attribution is consistent with the
   traces but not proven; the performance review starts from these traces (`.data/measure/diag-3a`, `diag-3a-after`).
+- **Slice 4p measured option (c), the notes on a compositing layer of their own, and rejected it** (Łukasz's rule set
+  before the trace; tag `perf/4p-trial-notes`): pan and zoom at 30 % without tracing 44.5 → 45.2 fps around `ent:23` and
+  43.3 → 46.7 fps on the notes, both inside the spread; tile memory +20 to +35 MiB; and it makes the notes' container a
+  stacking context, so notes pinned to a lit card could no longer be lifted above the fading veil
+  (`docs/prd/slice-04p-acceptance.md`). What remains is fewer elements per note, if needed.
 - **What has to happen later (performance review before the database slice, AD-31):** measure a separate compositing
   layer for the notes (option c: their paint and Layerize no longer part of the cards'; it touches AD-24's rules on
   layers and may cost GPU memory or raster time) and, if still needed, fewer elements per note beyond slice 3a's (body,
