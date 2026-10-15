@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 3 in progress**; step 2's verdicts given (trial A adopted, F1 chosen, F4 and the hover line fade rejected). Draft pull request #12. Branch
+Status: **step 4 done (items 8–10 measured and recorded), waiting for Łukasz before step 5**; steps 0–3 accepted. Draft pull request #12. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -909,3 +909,93 @@ because tracing slows everything down (30–43 fps traced against 40–49 untrac
 - Lint and typecheck pass.
 - The whole suite once (`npm run e2e`, no dev server running): **158 passed** in 29.1 min, no retries (157 at step 3,
   and S4P-09).
+
+### Łukasz's answers before the step 4 measurements (15 October)
+
+1. **Notes layer:** accepted as rejected. **Error boundaries:** accepted.
+2. **An unknown canvas id inside a valid project** keeps redirecting to the project's first canvas: no change, no entry.
+3. **The index verdict rule** (replaces “above 50 ms per build”): judged on the synthetic model (500 requirements, 5,000
+   attributes), the median and p95 of the 30 builds per round. An incremental rebuild in 4b if the median is above 50 ms
+   or the p95 is above 100 ms; otherwise the known-limitations entry stays with the browser figures instead of Node's.
+   “Customer & orders” and “Performance test” are context only.
+
+**His two questions:**
+- **Does the console still show an error the canvas's boundary catches?** Yes. A one-off check (not committed) threw
+  through `window.__imCanvasThrow()` and recorded the console. On the e2e dev server and in the measurement build there
+  is exactly one `console.error` with the error and its stack (React 19's default for caught errors). Nothing silences
+  it.
+- **Are S4P-10 and S4P-11 skipped without `MEASURE=1`?** They are not collected at all: `playwright.config.ts` leaves
+  them out (as `S4P-fading`, the `*-elements` specs and `S3B-15-live`) unless `MEASURE_BUILD=production`. `npx
+  playwright test --list` gives **158 tests in 130 files**: slice 4a's 155 and slice 4p's three (S4P-09, the fading
+  guard, the trial A guard). That is the 158 of step 4's run.
+
+### Items 9 and 10: measured (15 October)
+
+**Conditions:**
+- The laptop prepared by Łukasz; the measurement build of 07:26 (application code as at `fd70956`), not rebuilt.
+- No node process and no server running. The user's own Chrome (12 processes, started 06:14) was open and idle.
+- The harness's quiet check passed after 159 s (0.8 % at the end, peak 4.9 %; nothing besides the session's own
+  programs above 0.3 %).
+- One run, `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-10-c08.spec.ts
+  e2e/slice-04p/S4P-11-index.spec.ts`. Chrome 155.0.8059.40, 1536 × 864. Results in `.data/measure/step4/`.
+
+#### C-08: the diagnosis (S4P-10, no fix)
+
+S1A-14's C-08 on “Performance test” at the overview: navigation start to the first frame with all 101 cards and 340
+lines drawn. Bar ≤ 1,500 ms. Five cold loads after one warm-up; the main thread's own time by kind (self time of
+DevTools' timeline events).
+
+| Load | Stable frame | First byte | Document end | DOMContentLoaded | Last script | Main thread busy | Script | Style and layout | Paint and layerize | Other | Waiting |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 1 | 1,706 ms | 404 | 588 | 976 | 611 | 556 | 348 | 147 | 30 | 31 | 1,150 |
+| 2 | 1,487 ms | 263 | 352 | 552 | 371 | 661 | 398 | 194 | 32 | 37 | 826 |
+| 3 | 1,531 ms | 421 | 529 | 748 | 538 | 560 | 353 | 143 | 30 | 34 | 971 |
+| 4 | 1,567 ms | 374 | 479 | 749 | 497 | 556 | 350 | 142 | 28 | 35 | 1,011 |
+| 5 | 1,312 ms | 257 | 345 | 556 | 355 | 558 | 322 | 165 | 30 | 41 | 754 |
+| **Median** | **1,531 ms** | 374 | 479 | 748 | 497 | 558 | 350 | 147 | 30 | 35 | 971 |
+
+The document is 246 KiB; 11 scripts, 346 KiB, all arrived by about 500 ms; HTML parsing is under 1 ms of main-thread
+time (the page is streamed).
+
+**Reading:**
+- **C-08 is 31 ms over its bar at the median.** Two of five loads are under it (1,487 and 1,312 ms), and the spread is
+  1,312–1,706 ms.
+- **The server takes about a quarter:** the first byte comes at 257–421 ms. The page renders on the server with the local
+  data adapter (it reads the data file, builds the model, the lines, the left panel's tree and the requirement index) and
+  sends 246 KiB. Loads 2 and 5, the fastest, are those whose first byte came earliest.
+- **The main thread works about 560 ms, the same in every load** (556–661 ms):
+  - script about 350 ms: hydration, React's first render of the canvas and the panels, React Flow;
+  - style and layout about 150 ms: about 20,000 elements on the page, the whole page's layout once;
+  - paint and Layerize 30 ms;
+  - other 35 ms.
+- **The rest is waiting** (754–1,150 ms): the first byte, the scripts arriving, and the gaps between the tasks until the
+  frame. The loads differ mostly in the server's time and in this waiting, not in the main thread's work.
+
+**Proposal (no fix in this slice):**
+1. **Accept C-08 as partly met** (median 1,531 ms against 1,500; 2 of 5 loads under it), in `known-limitations.md`.
+2. **For the database slice (AD-31), measure the server's part with the real adapter** and add a Server-Timing header
+   (data loading, model, tree, index) to see where its 260–420 ms go; the local adapter reads a JSON file on every
+   request, the database will not.
+3. **The first candidate on the browser side, if C-08 still misses after that:** draw the canvas first and the left
+   panel's tree and the Overview's miniature in the next frame, since they are part of the 350 ms of script and the
+   150 ms of layout but not needed for the canvas's first frame. To decide with a profiling build (React's own timings)
+   before building it.
+
+#### The requirement index in the browser (S4P-11)
+
+Through `window.__imIndexTiming`: 30 builds after three warm-up builds, three rounds per data set. The hook in this build
+returns the median, the fastest and the slowest build (not the p95). The slowest is an upper bound for the p95, so the
+rule can be decided from it.
+
+| Data set | Requirements, attributes | Round 1: median / max | Round 2 | Round 3 |
+| --- | --- | --- | --- | --- |
+| **Synthetic model** (judged) | 500, 5,000 (2,000 mappings, 3,000 links) | **12.7 / 20.6 ms** | **12.8 / 19.9 ms** | **12.6 / 18.6 ms** |
+| “Customer & orders” (context) | 5, 34 | 0.0 / 0.2 ms | 0.0 / 0.1 ms | 0.0 / 0.1 ms |
+| “Performance test” (context) | 3, 779 | 0.4 / 0.6 ms | 0.3 / 1.2 ms | 0.3 / 0.4 ms |
+
+Fastest builds on the synthetic model 8.8–9.9 ms.
+
+**Verdict by the rule:**
+- **No incremental rebuild in 4b.** The synthetic model's median is 12.6–12.8 ms (bar 50 ms), and its p95 is at most
+  the slowest build, 18.6–20.6 ms (bar 100 ms).
+- The known-limitations entry stays with these browser figures instead of Node's 25.5 ms.

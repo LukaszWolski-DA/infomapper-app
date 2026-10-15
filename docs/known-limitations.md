@@ -205,13 +205,14 @@ The requirement index (scope, coverage, children, and each element's direct and 
 `src/domain/model/requirement-index.ts`) is built from scratch once per data version: once per page on the server for
 the left panel, the project home and the status bar, and once in the browser for the panels whenever the requirements,
 their links or the model change, which is after every write. On a synthetic model of 500 requirements, 5,000
-attributes, 2,000 mappings and 3,000 links one build takes a median of 25.5 ms on the development laptop
-(`npx tsx scripts/bench-requirement-index.ts`).
+attributes, 2,000 mappings and 3,000 links one build takes a median of 12.7 ms in the browser (measurement build, Chrome
+155, the development laptop; three rounds of 30 builds: medians 12.6–12.8 ms, slowest 18.6–20.6 ms; slice 4p, S4P-11).
 
-- **Fine for now:** the demo workspace has five requirements; one build is a small part of a page.
-- **For the performance review (before slice 4b and the database slice, AD-31):** consider an incremental rebuild, so a
-  write that touches one mapping, link or requirement recomputes only the requirements whose scope it reaches, and
-  measure the index together with 4b's lens, which reads it on every selection.
+- **Fine for now, decided in slice 4p** (Łukasz's rule): an incremental rebuild only if the median is above 50 ms or the
+  p95 above 100 ms. It is neither, so slice 4b keeps the full rebuild. The demo data builds in under 0.2 ms and
+  “Performance test” in under 1.2 ms.
+- **Measure it again** if a real workspace grows well beyond the synthetic model, or if 4b's lens reads it more often
+  than once per data version.
 
 ## Screens compared with the prototype (slice 4a, step 5)
 
