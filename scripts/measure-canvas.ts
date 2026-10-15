@@ -25,6 +25,14 @@
 // builds already made (pair it with `--drop`); `--quick` measures only pan and zoom, C-08, C-10 and the lasso marks;
 // `--no-build` (slice 4p) starts a sitting on the builds `--prepare-only` made, so the laptop can be prepared after
 // building (it refuses when the reference worktree is not at `--against` or a build is missing).
+// Slice 4b-1 (measuring to the screen): `--to-screen` runs the specs' traced mode (TO_SCREEN=1): switches and
+// interactions from a settled screen to the GPU present, pans as presented frames, C-08 to its last present (S4P-10);
+// raw traces in .data/measure/<sitting>/traces/round-<n>-<side>/; the branch's measuring specs, `e2e/measure/` and
+// `scripts/lib/to-screen.ts` are copied into the reference worktree so both sides measure the same way. `--only
+// <list>` runs a subset: pan (S1A-14, with C-08 untraced), c10 (S1B-10), lasso (S2A-14's marks), fading (S4P-fading),
+// c08 (S4P-10, traced), colours (S4B1-09, once it exists), c09 (S1B-09), drags (S2A-14's drags). A side whose quiet
+// check fails (not quiet within 3 minutes) drops its round, and a replacement round with the same order is added at
+// the end (at most two per sitting).
 // Measuring only:
 // no dev or measurement server may run (ports 3200, 3300); prepare the laptop first.
 
@@ -40,15 +48,48 @@ const REF_TREE = path.resolve(BRANCH, "..", "infomapper-ab-main");
 const QUICK = process.argv.includes("--quick");
 /** The fading scenarios (slice 4p), copied into the reference worktree before its side runs. */
 const FADING_SPEC = "e2e/slice-04p/S4P-fading.spec.ts";
-const SPECS = QUICK
-  ? ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts", FADING_SPEC]
-  : ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-09.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts", FADING_SPEC];
-// one word: on Windows the specs run through a shell that does not quote arguments, so "dragging a group" became the
-// filter "dragging" plus the file filters "a" and "group", which ran every spec (found in slice 2b)
-const SPEC_ARGS = QUICK ? ["--grep-invert", "dragging"] : [];
-const RESULT_FILES = QUICK
-  ? ["S1A-14.json", "S1B-10.json", "S2A-14-lasso.json", "S4P-fading.json"]
-  : ["S1A-14.json", "S1B-09.json", "S1B-10.json", "S2A-14.json", "S2A-14-lasso.json", "S4P-fading.json"];
+/** Slice 4b-1: the specs' traced mode (TO_SCREEN=1). */
+const TO_SCREEN = process.argv.includes("--to-screen");
+/**
+ * One Playwright run: its specs, its filter and the result files it writes. A filter is one word: on Windows the specs
+ * run through a shell that does not quote arguments, so "dragging a group" became the filter "dragging" plus the file
+ * filters "a" and "group", which ran every spec (found in slice 2b).
+ */
+interface Run {
+  specs: string[];
+  args: string[];
+  results: string[];
+}
+const CRITERIA: Record<string, Run> = {
+  pan: { specs: ["e2e/slice-01a/S1A-14.spec.ts"], args: [], results: ["S1A-14.json"] },
+  c10: { specs: ["e2e/slice-01b/S1B-10.spec.ts"], args: [], results: ["S1B-10.json"] },
+  lasso: { specs: ["e2e/slice-02a/S2A-14.spec.ts"], args: ["--grep", "marks"], results: ["S2A-14-lasso.json"] },
+  drags: { specs: ["e2e/slice-02a/S2A-14.spec.ts"], args: ["--grep", "dragging"], results: ["S2A-14.json"] },
+  fading: { specs: [FADING_SPEC], args: [], results: ["S4P-fading.json"] },
+  c08: { specs: ["e2e/slice-04p/S4P-10-c08.spec.ts"], args: [], results: ["S4P-10.json"] },
+  colours: { specs: ["e2e/slice-04b1/S4B1-09.spec.ts"], args: [], results: ["S4B1-09.json"] },
+  c09: { specs: ["e2e/slice-01b/S1B-09.spec.ts"], args: [], results: ["S1B-09.json"] },
+};
+const only = (() => {
+  const i = process.argv.indexOf("--only");
+  return i > 0 ? process.argv[i + 1]!.split(",").filter(Boolean) : [];
+})();
+for (const c of only) if (!CRITERIA[c]) throw new Error(`--only: unknown criterion ${c} (${Object.keys(CRITERIA).join(", ")})`);
+const RUNS: Run[] = only.length
+  ? only.map((c) => CRITERIA[c]!)
+  : [
+      {
+        specs: QUICK
+          ? ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts", FADING_SPEC]
+          : ["e2e/slice-01a/S1A-14.spec.ts", "e2e/slice-01b/S1B-09.spec.ts", "e2e/slice-01b/S1B-10.spec.ts", "e2e/slice-02a/S2A-14.spec.ts", FADING_SPEC],
+        args: QUICK ? ["--grep-invert", "dragging"] : [],
+        results: QUICK
+          ? ["S1A-14.json", "S1B-10.json", "S2A-14-lasso.json", "S4P-fading.json"]
+          : ["S1A-14.json", "S1B-09.json", "S1B-10.json", "S2A-14.json", "S2A-14-lasso.json", "S4P-fading.json"],
+      },
+    ];
+/** What the traced mode needs on both sides besides the specs (copied into the reference with them). */
+const TO_SCREEN_FILES = ["e2e/measure/trace.ts", "e2e/measure/switches.ts", "scripts/lib/to-screen.ts"];
 
 const arg = (name: string, fallback: string) => {
   const i = process.argv.indexOf(`--${name}`);
@@ -96,26 +137,40 @@ function prepareReference() {
 type Raw = Record<string, unknown>;
 
 /** One side of one round: its specs in its own tree; their result files are copied before the next run wipes them. */
-function measure(tree: string, dir: string, diag = ""): Raw {
+function measure(tree: string, dir: string, diag = "", traceDir = ""): Raw {
   const env: NodeJS.ProcessEnv = { ...process.env, MEASURE: "1", MEASURE_BUILD: "production" };
   delete env.DIAG;
+  delete env.TO_SCREEN;
   if (diag) env.DIAG = diag;
-  // the reference has no fading spec of its own: the same file, which measures fading off there (slice 4p)
+  if (TO_SCREEN) Object.assign(env, { TO_SCREEN: "1", TRACE_DIR: traceDir });
   if (tree !== BRANCH) {
-    fs.mkdirSync(path.join(tree, path.dirname(FADING_SPEC)), { recursive: true });
-    fs.copyFileSync(path.join(BRANCH, FADING_SPEC), path.join(tree, FADING_SPEC));
+    // the reference has no fading spec of its own: the same file, which measures fading off there (slice 4p); in the
+    // traced mode every measuring spec and the modules they share, so both sides measure the same way (slice 4b-1)
+    const copies = TO_SCREEN ? [...new Set([...RUNS.flatMap((r) => r.specs), ...TO_SCREEN_FILES])] : [FADING_SPEC];
+    for (const f of copies) {
+      if (!fs.existsSync(path.join(BRANCH, f))) continue;
+      fs.mkdirSync(path.join(tree, path.dirname(f)), { recursive: true });
+      fs.copyFileSync(path.join(BRANCH, f), path.join(tree, f));
+    }
   }
-  // a soft bar that is missed makes Playwright exit with 1; the result files decide whether the run worked
-  spawnSync("npx", ["playwright", "test", ...SPECS, ...SPEC_ARGS, "--reporter=line"], { cwd: tree, env, stdio: "inherit", shell: process.platform === "win32" });
   fs.mkdirSync(dir, { recursive: true });
   const raw: Raw = {};
-  for (const f of RESULT_FILES) {
-    // with a switch, the specs' results carry it in their names (S1A-14 writes its own)
-    const named = diag && f !== "S1A-14.json" ? f.replace(".json", `-diag-${diag}.json`) : f;
-    const from = path.join(tree, "test-results", named);
-    if (!fs.existsSync(from)) throw new Error(`${f} missing in ${tree}: a measuring spec failed (see its output above).`);
-    fs.copyFileSync(from, path.join(dir, f));
-    raw[f] = JSON.parse(fs.readFileSync(from, "utf8"));
+  for (const run of RUNS) {
+    const specs = run.specs.filter((f) => fs.existsSync(path.join(tree, f)));
+    if (!specs.length) {
+      console.log(`Skipped in ${tree}: ${run.specs.join(", ")} does not exist there.`);
+      continue;
+    }
+    // a soft bar that is missed makes Playwright exit with 1; the result files decide whether the run worked
+    spawnSync("npx", ["playwright", "test", ...specs, ...run.args, "--reporter=line"], { cwd: tree, env, stdio: "inherit", shell: process.platform === "win32" });
+    for (const f of run.results) {
+      // with a switch, the specs' results carry it in their names (S1A-14 writes its own)
+      const named = diag && f !== "S1A-14.json" ? f.replace(".json", `-diag-${diag}.json`) : f;
+      const from = path.join(tree, "test-results", named);
+      if (!fs.existsSync(from)) throw new Error(`${f} missing in ${tree}: a measuring spec failed (see its output above).`);
+      fs.copyFileSync(from, path.join(dir, f));
+      raw[f] = JSON.parse(fs.readFileSync(from, "utf8"));
+    }
   }
   return raw;
 }
@@ -148,10 +203,19 @@ const FIGURES: Figure[] = [
   { id: "drag-single", name: "Single-card drag at 50 %", unit: "fps", better: "higher", bar: 45, get: (r) => at(r["S2A-14.json"], "single-card drag", "avgFps") },
   { id: "drag-group", name: "Group drag, 31 cards at 50 %", unit: "fps", better: "higher", bar: 45, get: (r) => at(r["S2A-14.json"], "group drag", "avgFps") },
   { id: "lasso", name: "Marks after a lasso around the visible cards, median of 20", unit: "ms", better: "lower", bar: 100, get: (r) => at(r["S2A-14-lasso.json"], "medianMs") },
+  // slice 4b-1, `--to-screen`: pans as presented frames, C-10 and the lasso to the GPU present, C-08 to its last present
+  { id: "pan-overview-presented", name: "Pan and zoom at the overview, presented fps (S1A-14, traced)", unit: "fps", better: "higher", bar: 50, ab: true, get: (r) => at(r["S1A-14.json"], "C-01", "overview (all cards in view)", "toScreen", "presented", "fps") },
+  { id: "pan-overview-presented-long", name: "– gaps between presents over 50 ms", unit: "frames", better: "lower", get: (r) => at(r["S1A-14.json"], "C-01", "overview (all cards in view)", "toScreen", "presented", "over50ms") },
+  { id: "pan-100-presented", name: "Pan and zoom at 100 %, dense area, presented fps (S1A-14, traced)", unit: "fps", better: "higher", bar: 50, ab: true, get: (r) => at(r["S1A-14.json"], "C-01", "100%, dense area", "toScreen", "presented", "fps") },
+  { id: "pan-100-presented-long", name: "– gaps between presents over 50 ms", unit: "frames", better: "lower", get: (r) => at(r["S1A-14.json"], "C-01", "100%, dense area", "toScreen", "presented", "over50ms") },
+  { id: "c10-screen", name: "Hover to the screen, median of 10 settled (C-10, traced)", unit: "ms", better: "lower", bar: 100, get: (r) => at(r["S1B-10.json"], "C-10", "toScreen", "byDir", "on", "toScreen", "median") },
+  { id: "lasso-screen", name: "Lasso marks to the screen, median of 10 settled (traced)", unit: "ms", better: "lower", bar: 100, get: (r) => at(r["S2A-14-lasso.json"], "toScreen", "byDir", "on", "toScreen", "median") },
+  { id: "c08-present", name: "Initial render to its last present (C-08, traced, diagnosis)", unit: "ms", better: "lower", get: (r) => at(r["S4P-10.json"], "median", "toLastPresentMs") },
   // slice 4p (S4P-08): pan and zoom with fading off around ent:23, both sides
   ...FADING_VIEWS.flatMap((v): Figure[] => [
     { id: `fade-off-${v}`, name: `Pan and zoom, fading off, ${v} (S4P-08)`, unit: "fps", better: "higher", ab: true, get: (r) => at(r["S4P-fading.json"], "views", v, "off", "avgFps") },
     { id: `fade-off-${v}-long`, name: "– frames over 50 ms", unit: "frames", better: "lower", get: (r) => at(r["S4P-fading.json"], "views", v, "off", "over50ms") },
+    { id: `fade-off-${v}-presented`, name: `Pan and zoom, fading off, ${v}, presented fps (traced)`, unit: "fps", better: "higher", ab: true, get: (r) => at(r["S4P-fading.json"], "views", v, "offToScreen", "fps") },
   ]),
 ];
 
@@ -168,7 +232,11 @@ interface Sitting {
   referenceCommit: string;
   branchDiag?: string;
   bothDiag?: string;
+  /** Measured with `--to-screen` (slice 4b-1). */
+  toScreen?: boolean;
   conditions: { before: unknown; after?: unknown; perSide: { round: number; side: string; busiest: string[]; quietBefore?: unknown }[] };
+  /** Rounds a failed quiet check dropped (slice 4b-1); left out of the summary like `--drop`. */
+  autoDropped?: number[];
   sides: { round: number; side: "reference" | "branch"; raw: Raw }[];
 }
 
@@ -193,8 +261,64 @@ function fadingTable(branchSides: readonly { raw: Raw }[]) {
   return out;
 }
 
+/**
+ * The to-screen detail (slice 4b-1, `--to-screen`): per side, case and direction, over the rounds kept: the median of
+ * the rounds' medians, the largest p95 and maximum, and how many switches failed the settled check; for fading also
+ * pan and zoom with fading on against off as presented frames.
+ */
+function screenTables(kept: readonly { side: string; raw: Raw }[]): string[] {
+  type Dir = { toScreen: { median: number; p95: number; max: number }; inPage: { median: number }; notSettled: number };
+  const cases: [string, (r: Raw) => Record<string, Dir> | undefined][] = [
+    ["C-10 hover (S1B-10)", (r) => at(r["S1B-10.json"], "C-10", "toScreen", "byDir") as unknown as Record<string, Dir>],
+    ["Lasso marks (S2A-14)", (r) => at(r["S2A-14-lasso.json"], "toScreen", "byDir") as unknown as Record<string, Dir>],
+  ];
+  for (const view of FADING_VIEWS)
+    for (const scenario of FADING_SCENARIOS) cases.push([`Fading, ${view}, ${scenario}`, (r) => at(r["S4P-fading.json"], "views", view, "scenarios", scenario, "toScreen", "byDir") as unknown as Record<string, Dir>]);
+  const rows: string[] = [];
+  for (const side of ["reference", "branch"]) {
+    const sides = kept.filter((x) => x.side === side);
+    for (const [name, get] of cases) {
+      const per = sides.map((x) => get(x.raw)).filter((d): d is Record<string, Dir> => !!d);
+      if (!per.length) continue;
+      for (const dir of ["on", "off"]) {
+        const ds = per.map((d) => d[dir]).filter((d): d is Dir => !!d && Number.isFinite(d.toScreen?.median));
+        if (!ds.length) continue;
+        const med = median(ds.map((d) => d.toScreen.median)), p95 = Math.max(...ds.map((d) => d.toScreen.p95)), max = Math.max(...ds.map((d) => d.toScreen.max));
+        const inPage = median(ds.map((d) => d.inPage.median));
+        const ns = ds.reduce((n, d) => n + d.notSettled, 0);
+        rows.push(`| ${side} | ${name} | ${dir} | ${ds.length} | ${inPage.toFixed(0)} | ${med.toFixed(0)} / ${p95.toFixed(0)} / ${max.toFixed(0)} | ${ns} | ${med <= 100 ? "met" : "not met"} |`);
+      }
+    }
+  }
+  const pans: string[] = [];
+  for (const side of ["reference", "branch"]) {
+    const sides = kept.filter((x) => x.side === side);
+    for (const view of FADING_VIEWS)
+      for (const scenario of FADING_SCENARIOS) {
+        const off = sides.map((x) => at(x.raw["S4P-fading.json"], "views", view, "offToScreen", "fps")).filter(Number.isFinite);
+        const on = sides.map((x) => at(x.raw["S4P-fading.json"], "views", view, "scenarios", scenario, "panToScreen", "fps")).filter(Number.isFinite);
+        if (!off.length || !on.length) continue;
+        const change = ((median(on) - median(off)) / median(off)) * 100;
+        pans.push(`| ${side} | ${view} | ${scenario} | ${median(off).toFixed(1)} → ${median(on).toFixed(1)} | ${change >= 0 ? "+" : ""}${change.toFixed(1)} % | ${change >= -5 ? "met" : "not met"} |`);
+      }
+  }
+  if (!rows.length && !pans.length) return [];
+  return [
+    "",
+    "To the screen (traced; median of the rounds' medians / largest p95 / largest max, ms; bar 100 ms on the median):",
+    "",
+    "| Side | Case | Dir | Rounds | In page, median | To screen: median / p95 / max | Not settled | Result |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |",
+    ...rows,
+    ...(pans.length
+      ? ["", "Pan and zoom with fading on against off, presented fps (bar: at most 5 % below off):", "", "| Side | View | Scenario | Off → on, fps | Change | Result |", "| --- | --- | --- | --- | --- | --- |", ...pans]
+      : []),
+  ];
+}
+
 function summarize(dir: string, s: Sitting) {
-  const kept = s.sides.filter((x) => !dropped.has(x.round));
+  const drop = new Set([...dropped, ...(s.autoDropped ?? [])]);
+  const kept = s.sides.filter((x) => !drop.has(x.round));
   const values = (side: string, f: Figure) => kept.filter((x) => x.side === side).map((x) => f.get(x.raw)).filter((v) => Number.isFinite(v));
   // figures a quick sitting did not measure are left out of the table
   const rows = FIGURES.filter((f) => kept.some((x) => Number.isFinite(f.get(x.raw)))).map((f) => {
@@ -205,7 +329,7 @@ function summarize(dir: string, s: Sitting) {
     return { figure: f, ref, br, mr, mb, diff, met: meets(f, mb) && abOk, abOk };
   });
   const md = [
-    `Sitting ${path.basename(dir)}: this branch (${s.branchCommit.slice(0, 7)}${s.branchDiag ? `, DIAG=${s.branchDiag}` : ""}) against ${s.against} (${s.referenceCommit.slice(0, 7)})${s.bothDiag ? `, both sides DIAG=${s.bothDiag}` : ""}, production measurement build, ${kept.length / 2} rounds${dropped.size ? ` (round ${[...dropped].join(", ")} left out)` : ""}.`,
+    `Sitting ${path.basename(dir)}: this branch (${s.branchCommit.slice(0, 7)}${s.branchDiag ? `, DIAG=${s.branchDiag}` : ""}) against ${s.against} (${s.referenceCommit.slice(0, 7)})${s.bothDiag ? `, both sides DIAG=${s.bothDiag}` : ""}, production measurement build, ${kept.length / 2} rounds${drop.size ? ` (round ${[...drop].join(", ")} left out)` : ""}${TO_SCREEN || s.toScreen ? ", traced (to the screen)" : ""}.`,
     "",
     `| Figure | Bar | ${s.against}: median (min–max) | This branch: median (min–max) | Change | Result |`,
     "| --- | --- | --- | --- | --- | --- |",
@@ -229,13 +353,14 @@ function summarize(dir: string, s: Sitting) {
         ...fadingRows.map((f) => `| ${f.view} | ${f.scenario} | ${f.on.toFixed(0)} | ${f.off.toFixed(0)} | ${f.panOff.toFixed(1)} → ${f.panOn.toFixed(1)} | ${f.change >= 0 ? "+" : ""}${f.change.toFixed(1)} % | ${f.longOff} → ${f.longOn} | ${f.met ? "met" : "not met"} |`),
       ]
     : [];
+  const screenMd = screenTables(kept);
   const summary = {
     ...s,
-    dropped: [...dropped],
+    dropped: [...drop],
     table: rows.map((r) => ({ id: r.figure.id, name: r.figure.name, bar: r.figure.bar, reference: r.ref, branch: r.br, referenceMedian: r.mr, branchMedian: r.mb, changePercent: +r.diff.toFixed(1), met: r.met })),
     fading: fadingRows,
   };
-  const all = [md, ...fadingMd].join("\n");
+  const all = [md, ...fadingMd, ...screenMd].join("\n");
   fs.writeFileSync(path.join(dir, "summary.json"), JSON.stringify(summary, null, 2));
   fs.writeFileSync(path.join(dir, "summary.md"), all + "\n");
   console.log(all);
@@ -255,7 +380,7 @@ async function main() {
     for (const side of r % 2 ? (["reference", "branch"] as const) : (["branch", "reference"] as const)) {
       // a quiet machine first: below 2 % for 30 s, at most 3 minutes (the wait is recorded)
       const quietBefore = waitUntilQuiet();
-      const raw = measure(side === "reference" ? REF_TREE : BRANCH, path.join(dir, `round-${r}-${side}`), diagFor(sitting, side));
+      const raw = measure(side === "reference" ? REF_TREE : BRANCH, path.join(dir, `round-${r}-${side}`), diagFor(sitting, side), path.join(dir, "traces", `round-${r}-${side}`));
       sitting.sides.push({ round: r, side, raw });
       sitting.conditions.perSide.push({ round: r, side, quietBefore, busiest: (conditions() as { busiestProcesses?: string[] }).busiestProcesses ?? [] });
       fs.writeFileSync(path.join(dir, "sitting.json"), JSON.stringify(sitting, null, 2));
@@ -295,6 +420,7 @@ async function main() {
     referenceCommit: read(`git rev-list -n 1 ${against}`),
     branchDiag,
     bothDiag,
+    toScreen: TO_SCREEN,
     conditions: { before: conditions(), perSide: [] },
     sides: [],
   };
@@ -305,14 +431,30 @@ async function main() {
     sh("npm run measure:build", REF_TREE);
     sh("npm run measure:build", BRANCH);
   }
-  for (let r = 1; r <= rounds; r++) {
-    // the side that starts changes every round
-    for (const side of r % 2 ? (["reference", "branch"] as const) : (["branch", "reference"] as const)) {
+  // the side that starts changes every round; a round whose quiet check fails is dropped and replaced (slice 4b-1)
+  const queue: { round: number; order: readonly ("reference" | "branch")[] }[] = [];
+  for (let r = 1; r <= rounds; r++) queue.push({ round: r, order: r % 2 ? ["reference", "branch"] : ["branch", "reference"] });
+  let replacements = 0;
+  for (let q = 0; q < queue.length; q++) {
+    const { round: r, order } = queue[q]!;
+    for (const side of order) {
       // a quiet machine first: below 2 % for 30 s, at most 3 minutes (the wait is recorded)
       const quietBefore = waitUntilQuiet();
-      const raw = measure(side === "reference" ? REF_TREE : BRANCH, path.join(dir, `round-${r}-${side}`), diagFor(sitting, side));
+      const busiest = (conditions() as { busiestProcesses?: string[] }).busiestProcesses ?? [];
+      if (!quietBefore.quiet) {
+        sitting.conditions.perSide.push({ round: r, side, quietBefore, busiest });
+        sitting.autoDropped = [...(sitting.autoDropped ?? []), r];
+        save();
+        if (replacements < 2) {
+          replacements++;
+          queue.push({ round: Math.max(...queue.map((x) => x.round)) + 1, order });
+          console.log(`Round ${r} dropped: the machine did not get quiet before the ${side} side. A replacement round follows.`);
+        } else console.log(`Round ${r} dropped: the machine did not get quiet before the ${side} side. No replacements left.`);
+        break;
+      }
+      const raw = measure(side === "reference" ? REF_TREE : BRANCH, path.join(dir, `round-${r}-${side}`), diagFor(sitting, side), path.join(dir, "traces", `round-${r}-${side}`));
       sitting.sides.push({ round: r, side, raw });
-      sitting.conditions.perSide.push({ round: r, side, quietBefore, busiest: (conditions() as { busiestProcesses?: string[] }).busiestProcesses ?? [] });
+      sitting.conditions.perSide.push({ round: r, side, quietBefore, busiest });
       save();
     }
   }

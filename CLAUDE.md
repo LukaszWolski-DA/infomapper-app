@@ -138,6 +138,9 @@ npx tsx scripts/c08-waiting.ts .data/measure/s4p10-traces/<time>                
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-11-index.spec.ts   # the requirement index in the browser
 SCREENS=<folder> npx playwright test e2e/slice-04p/S4P-04-screens.spec.ts                   # screenshots beside the prototype
 npx tsx scripts/bench-requirement-index.ts                    # the requirement index on 500 requirements, 5,000 attributes (not a gate)
+npm run measure:canvas -- --to-screen --rounds 3 --no-build --against slice-04p             # slice 4b-1: interactions to the screen, pans as presented frames (traced)
+npm run measure:canvas -- --to-screen --only fading,pan,c10,lasso,c08,colours --rounds 1 --no-build --against slice-04p  # a subset
+npx tsx scripts/to-screen.ts <folder>                         # analyse saved traces again: switches to the screen, pans as presented frames
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
 DIAG=nolines MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # diagnosis: no line layer (or DIAG=blocks)
@@ -190,7 +193,13 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   through the nodes array. `window.__imFadeCommits` (development) counts its commits; `S4P-12.spec.ts` checks that
   switching, panning, zooming and dragging with fading on add no canvas or miniature commit.
 - Measure with tracing only in a diagnosis, never in a timed sitting: traced runs are slower and drift (slice 4p's notes
-  trial looked like a gain traced and was none untraced).
+  trial looked like a gain traced and was none untraced). **Except to the screen** (slice 4b-1, step 0's method):
+  interactions are measured from a settled screen (1.2 s pause) to the first GPU present after the compositor activates
+  their commit, and pans as presented frames, both traced and both sides traced alike; the in-page time and the untraced
+  rAF pan stay as the breakdown and the trace's own cost. `TO_SCREEN=1` switches the measuring specs (S1A-14, S1B-10,
+  S2A-14's lasso, S4P-fading, S4P-10) to it; the shared code is `e2e/measure/` (`trace.ts`, `switches.ts`) and
+  `scripts/lib/to-screen.ts` (anchor, settled check, split, presented frames; `tests/to-screen.test.ts`). Raw traces go
+  to `.data/measure/` (git-ignored, never committed).
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only

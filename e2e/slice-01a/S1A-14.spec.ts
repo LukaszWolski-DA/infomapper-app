@@ -20,6 +20,8 @@ import { seedLargeData } from "../../src/data/local/dev-data";
 import { E2E_DB } from "../config";
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, loadModel, signInAs, store, zoomOf } from "./helpers";
+import { tracedPan } from "../measure/switches";
+import { TO_SCREEN } from "../measure/trace";
 
 const MEASURE = !!process.env.MEASURE;
 const VIEWPORT = { width: 1536, height: 864 };
@@ -162,6 +164,18 @@ test("S1A-14: performance on seed:large, Chrome, same laptop as the spike: pan a
     await startRecording(page);
     const range = await panZoom(page, MEASURE ? 10_000 : 2_000);
     c01[name] = { ...(await stopRecording(page)), zoomRange: [+range.minZoom.toFixed(2), +range.maxZoom.toFixed(2)] };
+    // slice 4b-1: with TO_SCREEN=1 the same pan again from the same view, traced, as presented frames; the untraced run
+    // above stays as the rAF figure and the trace's own cost
+    if (TO_SCREEN) {
+      await open(page, view);
+      await page.waitForTimeout(1500);
+      const traced = await tracedPan(page, `S1A-14 ${name}`, async () => {
+        await startRecording(page);
+        await panZoom(page, 10_000);
+        return stopRecording(page);
+      });
+      (c01[name] as Record<string, unknown>).toScreen = { presented: traced.presented, rafTraced: traced.raf, trace: traced.trace };
+    }
   }
   results["C-01"] = c01;
 

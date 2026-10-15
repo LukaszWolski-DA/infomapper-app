@@ -10,7 +10,8 @@
 // Results in test-results/S4P-10.json. The raw trace of each load is kept (Łukasz before step 5) in
 // .data/measure/s4p10-traces/<time>/load-<n>.json (git-ignored; never committed), for `scripts/c08-waiting.ts`, which
 // breaks the waiting after the document down: network requests in flight, compositor, raster and GPU thread time, and
-// the main thread's idle gaps.
+// the main thread's idle gaps. Slice 4b-1: each load also records C-08 to its last present (`toLastPresentMs`: the
+// first GPU present after the stable frame's commit is activated) and the gap from the stable frame to it.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -20,6 +21,8 @@ import { E2E_DB, E2E_PRODUCTION } from "../config";
 import { expect, test } from "../slice-01a/fixtures";
 import { signInAs } from "../slice-01a/helpers";
 import { LARGE_URL, MEASURE_USE, saveResults } from "../slice-01b/measure";
+import { presentAfter, traceIndex, type TraceEvent as ScreenEvent } from "../../scripts/lib/to-screen";
+import { TRACE_BUFFER_KB } from "../measure/trace";
 
 test.use(MEASURE_USE);
 
@@ -57,20 +60,25 @@ test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split
             document.querySelector('[data-testid="area-canvas"][data-ready="true"]') &&
             document.querySelectorAll(".react-flow__node").length === cards &&
             document.querySelectorAll('[data-testid="line-mapping"], [data-testid="line-relationship"]').length === lines;
-          if (ready) requestAnimationFrame((t) => (w.__stableAt = t));
-          else requestAnimationFrame(check);
+          // slice 4b-1: a user-timing mark in the trace in the frame where the page first is complete (its commit carries
+          // it to the screen), so the trace's own clock says where that is; C-08 itself stays the next rAF, as before
+          if (ready) {
+            performance.mark("im:stable");
+            requestAnimationFrame((t) => (w.__stableAt = t));
+          } else requestAnimationFrame(check);
         };
         requestAnimationFrame(check);
       },
       [cards, lines] as const,
     );
     const session = await context.newCDPSession(p);
-    const cdp = session as unknown as { send: (m: string, x?: unknown) => Promise<unknown>; on: (e: string, f: (x: never) => void) => void; once: (e: string, f: () => void) => void };
+    const cdp = session as unknown as { send: (m: string, x?: unknown) => Promise<unknown>; on: (e: string, f: (x: never) => void) => void; once: (e: string, f: (x: never) => void) => void };
     const events: TraceEvent[] = [];
     cdp.on("Tracing.dataCollected", (e: { value: TraceEvent[] }) => events.push(...e.value));
     if (i > 0) {
       await cdp.send("Tracing.start", {
-        traceConfig: { includedCategories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "disabled-by-default-devtools.timeline.frame", "v8.execute", "v8", "blink", "blink.user_timing", "loading", "toplevel", "cc", "gpu", "viz", "netlog", "__metadata"] },
+        // slice 4b-1: a large buffer; Chrome's default one filled about 0.6 s into the load and dropped the rest
+        traceConfig: { includedCategories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "disabled-by-default-devtools.timeline.frame", "v8.execute", "v8", "blink", "blink.user_timing", "loading", "toplevel", "cc", "gpu", "viz", "netlog", "__metadata"], recordMode: "recordUntilFull", traceBufferSizeInKb: TRACE_BUFFER_KB },
         transferMode: "ReportEvents",
       });
     }
@@ -81,6 +89,7 @@ test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split
       const scripts = performance.getEntriesByType("resource").filter((r) => (r as PerformanceResourceTiming).initiatorType === "script") as PerformanceResourceTiming[];
       return {
         stableAt: Math.round((window as unknown as { __stableAt: number }).__stableAt),
+        completeAt: performance.getEntriesByName("im:stable")[0]?.startTime ?? null,
         responseStart: Math.round(n.responseStart),
         responseEnd: Math.round(n.responseEnd),
         documentKiB: Math.round(n.transferSize / 1024),
@@ -92,8 +101,11 @@ test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split
       };
     });
     if (i > 0) {
+      // slice 4b-1: the stable frame's present comes after its rAF; keep tracing a little so it is in the trace
+      await p.waitForTimeout(500);
       await cdp.send("Tracing.end");
-      await new Promise<void>((done) => cdp.once("Tracing.tracingComplete", () => done()));
+      const lost = await new Promise<boolean>((done) => cdp.once("Tracing.tracingComplete", (e: { dataLossOccurred?: boolean }) => done(!!e.dataLossOccurred)));
+      expect(lost, "the trace lost data (its buffer was full)").toBe(false);
       // the renderer's main thread: where the page's HTML is parsed
       const main = events.find((e) => e.name === "ParseHTML");
       const navStart = events.filter((e) => e.name === "navigationStart" && e.pid === main?.pid).sort((a, b) => b.ts - a.ts)[0]?.ts ?? 0;
@@ -122,8 +134,19 @@ test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split
       // the raw trace, for the waiting's breakdown (git-ignored)
       fs.mkdirSync(TRACE_DIR, { recursive: true });
       fs.writeFileSync(path.join(TRACE_DIR, `load-${i}.json`), JSON.stringify({ nav, navStart, mainPid: main?.pid, mainTid: main?.tid, events }));
+      // slice 4b-1: C-08 to its last present: the stable frame's rAF is where the page has everything drawn; the
+      // screen has it at the first present after that frame's commit is activated (scripts/lib/to-screen.ts)
+      // the stable frame in the trace's own clock: its mark. `navStart + stableAt` (4p's anchor) is recorded against it,
+      // because the trace's last navigationStart need not be the page's time origin (slice 4b-1, step 2)
+      const mark = events.find((e) => e.name === "im:stable" && e.pid === main?.pid);
+      const stableTs = mark?.ts ?? null;
+      const present = main && stableTs !== null ? presentAfter(traceIndex(events as unknown as ScreenEvent[], main.pid), stableTs) : null;
       loads.push({
         ...nav,
+        // the complete frame's page time plus the trace's time from its mark to the present
+        toLastPresentMs: present === null || stableTs === null || nav.completeAt === null ? null : Math.round(nav.completeAt + (present - stableTs) / 1000),
+        stableToPresentMs: present === null || stableTs === null || nav.completeAt === null ? null : Math.round(nav.completeAt + (present - stableTs) / 1000 - nav.stableAt),
+        navStartOffsetMs: stableTs === null ? null : Math.round((stableTs - end) / 1000),
         traced: { events: events.length, mainSlices: slices.length, navigationStart: navStart > 0 },
         mainThreadMs: Object.fromEntries([...self].map(([k, v]) => [k, Math.round(v / 1000)])),
         mainThreadBusyMs: Math.round(busy),
@@ -146,6 +169,8 @@ test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split
       lastScriptEnd: pick("lastScriptEnd"),
       mainThreadBusyMs: pick("mainThreadBusyMs"),
       waitingMs: pick("waitingMs"),
+      toLastPresentMs: pick("toLastPresentMs"),
+      stableToPresentMs: pick("stableToPresentMs"),
       ...Object.fromEntries(kinds.map((k) => [k, median(loads.map((l) => ((l.mainThreadMs as Record<string, number>)[k] ?? 0)))])),
     },
   });

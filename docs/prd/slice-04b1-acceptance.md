@@ -4,6 +4,87 @@ Status: **step 1 accepted; step 2 (tooling).** Branch `slice/04b1-lens-focus`, f
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
 
+## Step 2: tooling (15 October 2026)
+
+Measuring to the screen (PRD items 1–5). Test and measuring code only; no application code changed. Smoke runs only:
+their figures were taken on an unprepared laptop and are thrown away, except where a smoke run found something about
+the method (below).
+
+### What was built
+
+| File | What |
+| --- | --- |
+| `scripts/lib/to-screen.ts` | Pure functions on trace events. **The anchor:** the first GPU present ending after the `ActivateLayerTree` that follows the start of the first main-thread `Commit` after the start. **The settled check.** **The split:** main thread, GPU raster, rest. **Presented frames:** fps, gaps over 50 ms, the longest gap and the p95 gap, `PipelineReporter` states when the trace has them; the source is the swap chain's `Present`, else Viz's `DrawAndSwap`. **`stats`:** median, p95, max. |
+| `tests/to-screen.test.ts` | 15 Vitest tests on hand-written traces shaped like step 0's: F1's long raster, the hover presented while the main thread's `Commit` still blocks, the lasso's empty commit, a switch without a present, the settled rules, presented frames, the fallback source. |
+| `scripts/to-screen.ts` | Analyses saved traces again: switches to the screen per file and direction, pans as presented frames (`to-screen.md`, `to-screen.json`). On step 0's 0.3b traces it gives exactly step 0's medians (for example F1's large lens 438 / 342 ms, the hover 20 / 16 ms, the lasso 43 ms). |
+| `e2e/measure/trace.ts` | `TO_SCREEN`, `PAUSE_MS` (1.2 s), `SETTLED_PAIRS` (10, or the environment's); `startTrace(page, "full" \| "light")` with a 512 MiB buffer that refuses a trace that lost data; `saveTrace` into `TRACE_DIR` (`.data/measure/…`, git-ignored). |
+| `e2e/measure/switches.ts` | `tracedSwitches` (a settled loop traced, summarised per direction) and `tracedPan` (one pan traced, bracketed `pan:<name>`, presented frames next to its rAF figures). The loops: `fadingLoop` (the hook), `hoverLoop` (C-10), `lassoLoop` (S2A-14's lasso). |
+| `scripts/measure-canvas.ts` | **`--to-screen`:** sets `TO_SCREEN=1` and a trace folder per round and side; copies the branch's measuring specs, `e2e/measure/` and `scripts/lib/to-screen.ts` into the reference worktree, so both sides measure the same way. **`--only`:** `pan`, `c10`, `lasso`, `fading`, `c08`, `colours` (once S4B1-09 exists; skipped where a spec is missing), `c09`, `drags`; one Playwright run per criterion. **A failed quiet check** drops its round and adds a replacement with the same order (at most two). **New rows:** pans as presented fps (S1A-14, S4P-fading's fading off), C-10 and the lasso to the screen, C-08 to its last present. **A to-screen table** (per side, case and direction: in page, to the screen as median / largest p95 / largest max, switches not settled), and pans with fading on against off as presented fps. |
+| `eslint.config.mjs` | `.data/**` ignored, like the build and result folders: lint had started reading the git-ignored measuring scratch scripts there. |
+| README, CLAUDE.md | the new commands; the measuring rule (to the screen, presented frames, traced on both sides) |
+
+### Specs with a traced mode (`TO_SCREEN=1`; without it they measure as before)
+
+| Spec | Traced mode |
+| --- | --- |
+| `e2e/slice-01a/S1A-14.spec.ts` | after each untraced pan, the same pan again from the same view, traced, as presented frames (`C-01.<view>.toScreen`) |
+| `e2e/slice-01b/S1B-10.spec.ts` | C-10 to the screen, 10 settled pairs (`C-10.toScreen`); its own three pan-and-zoom runs are skipped in this mode (`measure:canvas` does not use them; S1A-14 measures pans) |
+| `e2e/slice-02a/S2A-14.spec.ts` | **always:** the lasso's p95 (`p95Ms`) next to its median and max, as owed since 4p; traced: the marks to the screen, 10 settled lassos (`toScreen`) |
+| `e2e/slice-04p/S4P-fading.spec.ts` | each scenario's switching as 10 settled pairs to the screen (their in-page times as `on` / `off`); pan and zoom with fading off and on, also as presented frames (`offToScreen`, `panToScreen`) |
+| `e2e/slice-04p/S4P-10-c08.spec.ts` | **always traced** (as before): each load also gives C-08 to its last present (`toLastPresentMs`) and the gap from the stable frame (`stableToPresentMs`) |
+
+### What the smoke runs found about the method
+
+1. **The settled check needed a correction.** Step 0's rule ("the last raster before the start was presented") flagged
+   19 of 20 settled switches of the 0.3b traces. After a frame, Chrome often rasters a few tiles that change nothing on
+   the screen, and no present follows them.
+
+   **The rule now:** no raster running at the start, and the last raster either ended at least 50 ms earlier or was
+   presented before the start. That passes every switch of the 0.3b sitting (the lasso's included) and flags 19 of 20
+   in each direction of step 0's back-to-back trace.
+2. **C-08's anchor in the trace was off by about 1.0–1.2 s.** S4P-10 (slice 4p) placed the stable frame in the trace at
+   the last `navigationStart` event plus the page's `stableAt`. The page now puts a `performance.mark("im:stable")` in
+   the frame where it first is complete, and in ten loads (two smoke runs) the mark lies **1.0–1.2 s before** where 4p's
+   anchor put the stable frame. So the trace's last `navigationStart` is not the page's time origin.
+
+   **Consequence for 4p's C-08 breakdown** (`scripts/c08-waiting.ts`, the “main thread idle for about 0.7 s” in
+   `docs/known-limitations.md`): its window from the document's end to the stable frame was shifted by about a second,
+   mostly into the time after the page was complete. Its idle figure is very likely an artefact. I first suspected the
+   trace buffer; Chrome reports no data loss, so that is ruled out. **To correct in step 8** (with the 4p corrections),
+   after re-running the breakdown with the mark.
+
+   S4P-10 now anchors on the mark, keeps tracing 0.5 s after the stable frame so the present is in the trace, and
+   records the offset (`navStartOffsetMs`).
+3. **C-08 to its last present** (smoke only, five loads, not a figure): 1,501–1,566 ms, 148–163 ms after the stable
+   frame's rAF.
+4. **Pans with F1's fading on, as presented frames** (smoke only, one run each, unprepared laptop, not a figure):
+   - at 30 % expanded, 28–36 fps with fading on against 54 fading off;
+   - at 30 % collapsed, 44–52 against 58.
+
+   4p judged S4P-03 met on rAF intervals. The closing sitting measures this properly, on F4.
+5. **A harness smoke** (`--to-screen --only c10,lasso,pan,c08 --rounds 1 --no-build --against slice-04p`,
+   `SETTLED_PAIRS=2`) ran end to end on both sides in 9 minutes: the copies into the reference, the trace folders, the
+   rows and the to-screen table. Its S1A-14 soft bars were missed on the unprepared laptop, as expected.
+
+### Other changes
+
+- **The reference worktree** `../infomapper-ab-main` is now at `slice-04p` (`052daaf`), with its measurement build
+  (`--prepare-only --against slice-04p`).
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch (`npm run e2e`):
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 159 passed | 24.6 min |
+| 2 | 159 passed | 25.0 min |
+| 3 | 159 passed | 25.3 min |
+
+- **Lint, typecheck and unit tests pass:** 953 tests in 69 files (the 15 new ones in `tests/to-screen.test.ts`).
+- **No earlier test's behaviour changed in the normal run.** The traced modes switch on only with `TO_SCREEN=1` and
+  `MEASURE_BUILD=production`. S2A-14 now also records its lasso's p95.
+
 ## Łukasz's answers after step 1 (15 October 2026)
 
 - **A.** S4B1-05 and the definition of done use **REQ-105** for the gap (`birth_date`; approving its mapping turns the

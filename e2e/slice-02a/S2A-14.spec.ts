@@ -18,6 +18,8 @@ import { E2E_DB } from "../config";
 import { DIAG, MEASURE, MEASURE_USE, NOT_APPLICABLE, openLarge, saveResults, startRecording, stopRecording } from "../slice-01b/measure";
 import { expect, test, type Page } from "./fixtures";
 import { box, loadItems, signInAs } from "./helpers";
+import { lassoLoop, tracedSwitches } from "../measure/switches";
+import { SETTLED_PAIRS, TO_SCREEN } from "../measure/trace";
 
 if (MEASURE) test.use(MEASURE_USE);
 
@@ -159,8 +161,16 @@ test("S2A-14: on “Performance test”, the selection marks appear within 100 m
   await expect(page.getByTestId("mark-selected")).toHaveCount(cards);
   const sorted = [...times].sort((a, b) => a - b);
   const medianMs = sorted[Math.floor(sorted.length / 2)]!;
+  // slice 4b-1: the p95 next to the median and the max (the method since slice 4p), and with TO_SCREEN=1 the marks to
+  // the screen, from a settled screen (S2A-14's own timing stays as the breakdown)
+  const p95Ms = sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]!;
+  let toScreen: unknown = null;
+  if (TO_SCREEN) {
+    toScreen = await tracedSwitches(page, "S2A-14 lasso", () => lassoLoop(page, pane, marks, frames + cards, SETTLED_PAIRS));
+    expect(toScreen, "lasso to the screen").not.toHaveProperty("error");
+  }
   const build = process.env.MEASURE_BUILD === "production" ? "production (measurement build)" : "dev server";
-  const results = { measured: MEASURE, build, browser: browser.version(), viewport: page.viewportSize(), frames, cards, total, medianMs, maxMs: sorted[sorted.length - 1], times };
+  const results = { measured: MEASURE, build, browser: browser.version(), viewport: page.viewportSize(), frames, cards, total, medianMs, p95Ms, maxMs: sorted[sorted.length - 1], times, ...(toScreen ? { toScreen } : {}) };
   saveResults("S2A-14-lasso", results);
   await test.info().attach("S2A-14 lasso results", { body: JSON.stringify(results, null, 2), contentType: "application/json" });
   if (MEASURE) expect.soft(medianMs, "marks after the lasso, median ms of 20 (bar 100)").toBeLessThanOrEqual(100);
