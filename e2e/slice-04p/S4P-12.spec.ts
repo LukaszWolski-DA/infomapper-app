@@ -1,4 +1,4 @@
-// Slice 4p: guards for fading (F1, AD-24), on the e2e dev server where the canvas, the Overview's miniature and the
+// S4P-12 (slice 4p): guards for fading (F1, AD-24), on the e2e dev server where the canvas, the Overview's miniature and the
 // fading layer count their commits. On “Customer & orders”:
 //   - switching Focus, a lens and a lit set given directly on and off re-renders neither the canvas nor the miniature
 //     (S4P-12);
@@ -7,7 +7,8 @@
 //   - panning and zooming with fading on re-render neither the canvas nor the fading layer (no script per frame);
 //   - a drag and a resize with fading on commit the canvas no more than the same with fading off, and the lit card stays
 //     above the veil during and after them (the stylesheet rule wins over React Flow's own z-index).
-// Part of S4P-12's test at step 5.
+// The other S4P-12 guards: S2C-12, S3A-14-idle, S3B-15-idle and S3B-13 in every run, and the viewport counts in the
+// measurement build (S4A-14-elements.spec.ts, slice 3b's counts plus the overlay container).
 
 import { expect, test, type Page } from "../slice-04a/fixtures";
 import { box, canvasUrl, card, ids, openCanvas, paneMiddle, requirementByKey, signInAs, WHOLE } from "../slice-04a/helpers";
@@ -40,7 +41,7 @@ async function dragHead(page: Page, name: string, during?: () => Promise<void>) 
   await page.mouse.up();
 }
 
-test("S4P fading (guard): switching, panning, zooming and dragging with fading on re-render neither the canvas nor the miniature beyond what they do without it; Focus, a lens and a given lit set light the right cards, rows and notes; the lit card stays above the veil during and after a drag", async ({ page }) => {
+test("S4P-12: switching, panning, zooming and dragging with fading on re-render neither the canvas nor the miniature beyond what they do without it; Focus, a lens and a given lit set light the right cards, rows and notes; the lit card stays above the veil during and after a drag", async ({ page }) => {
   const { entity, model } = await ids();
   const customer = entity("Customer");
   const orderLine = model.sourceTables.find((t) => t.name === "order_line")!;

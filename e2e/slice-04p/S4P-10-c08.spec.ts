@@ -7,8 +7,13 @@
 //     compiling and running JavaScript, React's work inside it), style and layout, paint and layerize, HTML parsing,
 //     other;
 //   - the rest: the main thread waiting (network for the scripts and fonts, the GPU, idle).
-// Results in test-results/S4P-10.json.
+// Results in test-results/S4P-10.json. The raw trace of each load is kept (Łukasz before step 5) in
+// .data/measure/s4p10-traces/<time>/load-<n>.json (git-ignored; never committed), for `scripts/c08-waiting.ts`, which
+// breaks the waiting after the document down: network requests in flight, compositor, raster and GPU thread time, and
+// the main thread's idle gaps.
 
+import fs from "node:fs";
+import path from "node:path";
 import { generate } from "../../src/data/local/large-generator";
 import { seedLargeData } from "../../src/data/local/dev-data";
 import { E2E_DB, E2E_PRODUCTION } from "../config";
@@ -27,6 +32,7 @@ const KIND: [RegExp, string][] = [
   [/^ParseHTML$/, "HTML parsing"],
 ];
 const kindOf = (name: string) => KIND.find(([re]) => re.test(name))?.[1] ?? "other";
+const TRACE_DIR = path.resolve(".data", "measure", "s4p10-traces", new Date().toISOString().slice(0, 16).replace(/[:T]/g, "-"));
 
 test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split into document, main-thread work by kind, and waiting", async ({ page, browser }) => {
   expect(E2E_PRODUCTION, "measurement build only (MEASURE_BUILD=production)").toBe(true);
@@ -64,7 +70,7 @@ test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split
     cdp.on("Tracing.dataCollected", (e: { value: TraceEvent[] }) => events.push(...e.value));
     if (i > 0) {
       await cdp.send("Tracing.start", {
-        traceConfig: { includedCategories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "v8.execute", "v8", "blink", "blink.user_timing", "loading", "toplevel", "__metadata"] },
+        traceConfig: { includedCategories: ["devtools.timeline", "disabled-by-default-devtools.timeline", "disabled-by-default-devtools.timeline.frame", "v8.execute", "v8", "blink", "blink.user_timing", "loading", "toplevel", "cc", "gpu", "viz", "netlog", "__metadata"] },
         transferMode: "ReportEvents",
       });
     }
@@ -113,6 +119,9 @@ test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split
       }
       close(Infinity);
       const busy = [...self.values()].reduce((a, b) => a + b, 0) / 1000;
+      // the raw trace, for the waiting's breakdown (git-ignored)
+      fs.mkdirSync(TRACE_DIR, { recursive: true });
+      fs.writeFileSync(path.join(TRACE_DIR, `load-${i}.json`), JSON.stringify({ nav, navStart, mainPid: main?.pid, mainTid: main?.tid, events }));
       loads.push({
         ...nav,
         traced: { events: events.length, mainSlices: slices.length, navigationStart: navStart > 0 },
@@ -128,6 +137,7 @@ test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split
   const kinds = ["script", "style and layout", "paint and layerize", "HTML parsing", "other"];
   saveResults("S4P-10", {
     browser: browser.version(),
+    traces: TRACE_DIR,
     loads,
     median: {
       stableAt: pick("stableAt"),
