@@ -39,7 +39,8 @@ import { HandToolButton } from "@/canvas/HandToolButton";
 import { LayerSwitch } from "@/canvas/LayerSwitch";
 import { CanvasLookProvider } from "@/canvas/look";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
-import { TestHooks } from "@/canvas/TestHooks";
+import { CanvasThrowHook, TestHooks } from "@/canvas/TestHooks";
+import { CanvasErrorBoundary } from "@/app/_components/canvas-error-boundary";
 import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
@@ -224,6 +225,8 @@ export default async function CanvasPage({
             <RememberLastCanvas projectId={projectId} canvasId={canvasId} />
             {/* the measuring hook (slice 4p): e2e dev server and measurement build only */}
             {areTestHooksOn() && <TestHooks />}
+            {/* an error inside the canvas shows a message in its place; the panels and the top bar keep working (slice 4p) */}
+            <CanvasErrorBoundary>
             <ModelCanvas
               key={canvasId}
               canvasId={canvasId}
@@ -283,6 +286,8 @@ export default async function CanvasPage({
                   : null
               }
             />
+            {areTestHooksOn() && <CanvasThrowHook />}
+            </CanvasErrorBoundary>
           </AppShell>
           </WorkingContextProvider>
         </UndoProvider>
