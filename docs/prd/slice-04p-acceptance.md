@@ -786,3 +786,49 @@ Then the step 5 sitting confirms S4P-03 for the large lens at 30 % with three ro
 **F1's one miss** (the large lens at 30 %, frames expanded, −7.1 %) is re-checked on the finished F1 in the step 5
 sitting: missing by at most about 3 points is accepted as partly met, with an entry in `docs/known-limitations.md`;
 more than that is discussed. Written into the PRD's S4P-03.
+
+## Step 3: fading finished (15 October)
+
+- **Into the slice:** trial A and F1 (merge `4e65baf` of `perf/4p-trial-f1`, which carries trial A and the shared
+  base). Trial A's hover line fade is not carried in (removed; the fading spec's hover-fade part skips itself without
+  its hook).
+- **F1 finished** (`ffec39b`): the lit cards and blocks, and the notes pinned to a lit card, are lifted above the veil
+  by one stylesheet rule the `FadeLayer` writes (`.react-flow__node[data-id="…"], .nt[data-note="…"] { z-index: 2
+  !important }`), no longer by writing `z-index` on React Flow's wrappers. `!important` in a stylesheet wins over the
+  inline `z-index` React Flow writes when it renders a wrapper, so a lit card stays above the veil while it is dragged.
+  Nothing re-renders the canvas.
+- **The capability for 4b** (PRD section 6, `src/canvas/fade.ts`): `requestFade({ focus })`, `requestFade({ lens })`,
+  or `requestFade({ lit, key })` with a lit set worked out elsewhere (entities and tables for cards, rows with a covered
+  or gap colour, mappings and relationships for lines), or `null`. The domain computes Focus's and the lens's sets
+  (`src/domain/model/lit.ts`).
+- **S4A-14's reference counts** move up by one (the overlay container): `S4A-14-elements.spec.ts` adds it to slice 3b's
+  file. In the measurement build: 19,296 / 4,499 / 4,906 / 1,464 in the viewport, as the rule expects. Fading adds no
+  element while it is off.
+- **`docs/decisions.md`, AD-24** (approved by Łukasz): the overlay on its own layer; fading as one veil with a
+  stylesheet lift; F4 and the hover line fade rejected with their figures (`55bc44e`).
+- **`docs/known-limitations.md`:** C-10 met; the other lines do not fade on a hover, rejected with figures.
+
+### Tests
+
+- **Unit:** `npm test` 938 (932 before):
+  - `fade-canvas.test.ts`: what is lit on the canvas, including a hidden lit card lighting its collapsed frame's
+    block; the lift rule; the direct lit set's key;
+  - the domain's Focus and lens tests, row colours included, as at step 2 (`lit.test.ts`).
+- **Guard** `e2e/slice-04p/S4P-fading-guard.spec.ts`, rewritten for the finished F1:
+  - Focus on Customer lifts its four cards, not `order_header`;
+  - REQ-101's lens tints 5 covered and 3 gap rows;
+  - a lit set given directly (the table `order_line`) lifts it and its two pinned notes, not the free note;
+  - switching, panning and zooming commit neither the canvas nor the miniature (nor the fading layer while panning);
+  - the same drag commits the canvas and the miniature as often with fading on as off;
+  - Customer stays at z-index 2 during and after the drag, and after a resize.
+- **The whole suite once** (`npm run e2e`, no dev server running): **157 passed** in 25.5 min, no retries (the 155 of
+  slice 4a and the two guards). No earlier test changed.
+
+## Step 3: the notes layer (PRD item 7), built, trace not yet run
+
+Branch `perf/4p-trial-notes` (`62f9338`): the notes' container gets `will-change: transform`, so the notes have a
+compositing layer of their own and their paint and Layerize are no longer part of the cards'. Side effect: it makes the
+container a stacking context, so notes pinned to a lit card can no longer be lifted above the fading veil (every note
+would fade). The cheaper path (Łukasz): one Chrome trace panning at 30 %, notes on against this slice. If Layerize and
+memory rise as with F4, the verdict is “rejected” with those figures; a full sitting only if the trace shows a gain.
+The trace waits for Łukasz's OK.
