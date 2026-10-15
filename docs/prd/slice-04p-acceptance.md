@@ -1140,3 +1140,25 @@ Open http://127.0.0.1:3300/sign-in, sign in as **Łukasz**, open Retail Co – D
 
 No retries, no flaky test; the server's known “destination stream closed early” lines (26, 26, 28). 159 = slice 4a's 155
 and slice 4p's S4P-05, S4P-06, S4P-09 and S4P-12. No earlier test changed in this slice.
+
+### The sitting: builds made before the laptop is prepared (Łukasz)
+
+`npm run measure:canvas` now takes `--no-build` (`c8decff`): it starts a sitting on the builds that `--prepare-only`
+made, and refuses if `../infomapper-ab-main` is not at `--against` or a build is missing. Built on 15 October at 11:10
+with `npm run measure:canvas -- --prepare-only --against slice-04a`: `slice-04a` (`5e02c96`) in `../infomapper-ab-main`
+(clean), this branch at `c8decff`. No application code changed after `15c36cc` (the three runs), only the measuring
+script and docs.
+
+After the laptop is prepared:
+
+```bash
+npm run measure:canvas -- --quick --rounds 1 --no-build --against slice-04a
+npm run measure:canvas -- --rounds 3 --no-build --against slice-04a
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-10-c08.spec.ts
+npx tsx scripts/c08-waiting.ts .data/measure/s4p10-traces/<time>
+```
+
+1. The warm-up (not counted).
+2. The sitting: untraced C-08 A/B, S4P-08, S4P-02/03 with the recheck of the large lens at 30 % expanded.
+3. The traced diagnostic run last.
+4. The waiting's breakdown from its traces.
