@@ -117,6 +117,23 @@ gain is very likely the browser, not proven. Earlier slices' figures in this fil
 on, only figures from the same sitting are compared (A/B against the previous tag, or fading on against off in the same
 run). Details in [slice-04p-acceptance.md](prd/slice-04p-acceptance.md).
 
+### C-10 met; the other lines do not fade on a hover (slice 4p)
+
+Since slice 4p the hover, the row and selection marks and the lasso are drawn in an overlay on its own compositing layer
+(AD-24): C-10 is **met**, 19 ms against 120 ms on `slice-04a` (sitting `trials-2026-10-14-20-04`, three rounds; slice
+1b's “partly met” at about 190 ms is closed). The lasso marks were already at about 28 ms with Chrome 155 and stay
+there.
+
+What remains: on a hover the hovered lines are drawn again, stronger, above the cards, but the **other lines keep their
+colour**. The prototype fades them to 12 %. Slice 4p measured a veil above the lines and below the cards, shown only
+while something is hovered (the hover line fade): C-10 **228 ms** with it in the canvas layer and **247 ms** on its own
+layer, against 19–26 ms without it, on every branch.
+
+- **Rejected** by Łukasz on 15 October 2026, with these figures (`docs/prd/slice-04p-acceptance.md`, tag
+  `perf/4p-trial-a`).
+- **Later:** only with a way to fade lines that changes neither the canvas layer nor the cards' layering; none is
+  known.
+
 ### Frame cost grows with the number of elements in the viewport (slice 3a)
 
 On every pan and zoom frame Chrome repaints and re-layers the whole viewport of the canvas; Layerize is the main cost
