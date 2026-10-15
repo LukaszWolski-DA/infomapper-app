@@ -224,7 +224,7 @@ export default async function CanvasPage({
             {query.moved === "1" && <MovedNotice project={view.project.name} canvas={canvas.name} />}
             <RememberLastCanvas projectId={projectId} canvasId={canvasId} />
             {/* the measuring hook (slice 4p): e2e dev server and measurement build only */}
-            {areTestHooksOn() && <TestHooks />}
+            {areTestHooksOn() && <TestHooks indexData={{ model, requirements, requirementLinks }} />}
             {/* an error inside the canvas shows a message in its place; the panels and the top bar keep working (slice 4p) */}
             <CanvasErrorBoundary>
             <ModelCanvas
