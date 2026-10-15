@@ -20,6 +20,8 @@ test.use({
 
 const OUT = path.resolve("test-results", "S4A-14-elements.json");
 const BASELINE = process.env.ELEMENTS_BASELINE ?? path.resolve(".data", "measure", "s4a14-baseline", "slice-03b.json");
+/** Slice 4p: the overlay container (trial A) on top of slice 3b's counts. */
+const OVERLAY_CONTAINER = 1;
 
 test("S4A-14 (elements): the viewport of “Performance test” has as many elements as on slice-03b, at 100 % and 30 %, frames expanded and collapsed", async ({ page }) => {
   test.setTimeout(240_000);
@@ -48,6 +50,8 @@ test("S4A-14 (elements): the viewport of “Performance test” has as many elem
   console.log("S4A-14 elements " + JSON.stringify(counts));
   // the viewport, as S3B-15 (a): the whole page also counts the panels and the tab bar
   const before = JSON.parse(fs.readFileSync(BASELINE, "utf8")) as typeof counts;
-  const viewport = (c: typeof counts) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.viewport]));
-  expect(viewport(counts)).toEqual(viewport(before));
+  const viewport = (c: typeof counts, plus = 0) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.viewport + plus]));
+  // slice 4p (trial A, adopted): the overlay's container is one more element in the viewport in every view, empty while
+  // nothing is hovered, selected or lassoed (Łukasz after step 1)
+  expect(viewport(counts)).toEqual(viewport(before, OVERLAY_CONTAINER));
 });

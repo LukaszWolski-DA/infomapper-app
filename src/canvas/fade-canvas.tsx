@@ -1,8 +1,8 @@
 "use client";
 
-// Fading on the canvas (slice 4p, step 2), what every candidate shares: the request (`fade.ts`), what it lights on this
-// canvas (the domain's `focusLit` / `lensLit` mapped onto cards, blocks, notes, rows and lines), and the lens's row
-// colours drawn in the overlay above the cards. How the rest is faded is the candidate's own (`FadeLayer.tsx`).
+// Fading on the canvas (slice 4p): what a request (`fade.ts`) lights on this canvas (the domain's `focusLit` / `lensLit`,
+// or a lit set given directly, mapped onto cards, blocks, notes, rows and lines), and the lens's row colours drawn in the
+// overlay above the cards. The veil and the lifting are `FadeLayer.tsx`'s.
 
 import { memo, useMemo } from "react";
 import { useStore, type InternalNode } from "@xyflow/react";
@@ -34,7 +34,9 @@ export interface FadeNote {
 export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | null {
   const request = useFadeRequest();
   return useMemo(() => {
-    if (!request || !data) return null;
+    if (!request) return null;
+    if ("lit" in request) return { key: fadeKey(request), lit: request.lit };
+    if (!data) return null;
     if ("focus" in request) return { key: fadeKey(request), lit: focusLit(data.model, request.focus) };
     const index = buildRequirementIndex([...data.requirements], [...data.requirementLinks], data.model);
     if (!index.byId.has(request.lens)) return null;

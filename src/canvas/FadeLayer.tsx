@@ -1,13 +1,15 @@
 "use client";
 
-// Fading, candidate F1 (slice 4p, step 2; built only as far as the comparison needs): one veil in the viewport's big
-// layer (no layer of its own), above the cards at z-index 1, in the canvas background's colour at 75 %; the lit cards
-// and blocks lifted above it (z-index 2 on their React Flow wrappers); the lit lines and the lens's rows drawn again in
-// the overlay (z-index 3, canvas.css). Lifting is done on the wrappers' style directly, because lifting through the
-// nodes array would re-render the canvas (S4P-12); React Flow puts its own z-index back when a lifted node re-renders
-// (e.g. while it is dragged). Notes are not lifted (all notes fade).
+// Fading (slice 4p, F1, chosen after step 2; AD-24): one veil in the viewport's big layer, above the cards at z-index 1,
+// in the canvas background's colour at 75 % (cards, frames and notes at about the prototype's 25 %); the lit cards and
+// blocks, and the notes pinned to a lit card, lifted above it by one stylesheet rule (z-index 2); the lit lines and the
+// lens's rows drawn again in the overlay (z-index 3, canvas.css). The rule is a stylesheet, not the nodes' z-index: React
+// Flow writes its own z-index on a wrapper whenever it renders it (e.g. while it is dragged), and changing the nodes
+// array would re-render the canvas (S4P-12); `!important` in a stylesheet wins over that inline style. The veil and the
+// rule move with the viewport, so panning and zooming run no script for them. The request comes from its store
+// (`fade.ts`), so switching re-renders this layer only.
 
-import { useEffect, useLayoutEffect } from "react";
+import { useEffect } from "react";
 import { useStore, ViewportPortal } from "@xyflow/react";
 import { LitLines } from "./LineLayer";
 import { LitRows, litNodeIds, nodeRect, useLit, type FadeData, type FadeNote } from "./fade-canvas";
@@ -27,34 +29,29 @@ export interface FadeLayerProps {
 /** Beyond the content on every side, so the veil's edge is never in view. */
 const MARGIN = 20_000;
 
+/** The stylesheet rule lifting the lit nodes and notes above the veil. */
+export function liftRule(nodeIds: Iterable<string>, noteIds: Iterable<string>): string {
+  const q = (v: string) => `"${v.replace(/["\\]/g, "\\$&")}"`;
+  const sel = [...[...nodeIds].map((id) => `.im-canvas .react-flow__node[data-id=${q(id)}]`), ...[...noteIds].map((id) => `.im-canvas .nt[data-note=${q(id)}]`)];
+  return sel.length ? `${sel.join(",\n")} { z-index: 2 !important }` : "";
+}
+
 export default function FadeLayer({ data, notes, lines, bundles, blocks, mapsById }: FadeLayerProps) {
   const shown = useLit(data);
-  useStore((s) => s.nodes);
+  useStore((s) => s.nodes); // follow drags, collapses and widths (the veil's size; which blocks are lit)
   const lookup = useStore((s) => s.nodeLookup);
-  const ids = shown ? litNodeIds(lookup, shown.lit) : null;
-  const idsKey = ids ? [...ids].sort().join(",") : "";
-  // Development only (slice 4p): its commits are counted, as F4's.
+  // Development only (slice 4p): its commits are counted, so a spec can check that panning and zooming with fading on
+  // run no script for it.
   useEffect(() => {
     if (process.env.NODE_ENV === "development") {
       const w = window as unknown as { __imFadeCommits?: number };
       w.__imFadeCommits = (w.__imFadeCommits ?? 0) + 1;
     }
   });
+  if (!shown) return null;
+  const { key, lit } = shown;
 
-  // lift the lit nodes above the veil
-  useLayoutEffect(() => {
-    if (!idsKey) return;
-    const lifted = idsKey
-      .split(",")
-      .map((id) => document.querySelector<HTMLElement>(`.react-flow__node[data-id="${CSS.escape(id)}"]`))
-      .filter((el): el is HTMLElement => !!el);
-    for (const el of lifted) el.style.zIndex = "2";
-    return () => {
-      for (const el of lifted) el.style.zIndex = "0";
-    };
-  }, [idsKey]);
-
-  if (!shown || !ids) return null;
+  const ids = litNodeIds(lookup, lit);
   let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
   const grow = (r: Rect) => {
     x0 = Math.min(x0, r.x);
@@ -65,13 +62,14 @@ export default function FadeLayer({ data, notes, lines, bundles, blocks, mapsByI
   for (const n of lookup.values()) if (!n.hidden) grow(nodeRect(n));
   for (const note of notes) grow(note.rect);
   if (!Number.isFinite(x0)) return null;
-  const { key, lit } = shown;
+  const litNotes = notes.filter((n) => n.pinCardId && ids.has(n.pinCardId)).map((n) => n.id);
 
   return (
     <>
+      <style data-testid="style-fade-lift">{liftRule(ids, litNotes)}</style>
       <ViewportPortal>
         <div
-          className="fade-veil-f1"
+          className="fade-veil"
           data-testid="layer-fade"
           data-fade={key}
           data-lit-cards={ids.size}
