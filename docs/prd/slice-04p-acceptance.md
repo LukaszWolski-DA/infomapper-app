@@ -939,7 +939,7 @@ because tracing slows everything down (30–43 fps traced against 40–49 untrac
 - One run, `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-10-c08.spec.ts
   e2e/slice-04p/S4P-11-index.spec.ts`. Chrome 155.0.8059.40, 1536 × 864. Results in `.data/measure/step4/`.
 
-#### C-08: the diagnosis (S4P-10, no fix)
+#### C-08: the diagnosis (S4P-10, no fix; a diagnosis only, not the verdict: every load was traced)
 
 S1A-14's C-08 on “Performance test” at the overview: navigation start to the first frame with all 101 cards and 340
 lines drawn. Bar ≤ 1,500 ms. Five cold loads after one warm-up; the main thread's own time by kind (self time of
@@ -999,3 +999,65 @@ Fastest builds on the synthetic model 8.8–9.9 ms.
 - **No incremental rebuild in 4b.** The synthetic model's median is 12.6–12.8 ms (bar 50 ms), and its p95 is at most
   the slowest build, 18.6–20.6 ms (bar 100 ms).
 - The known-limitations entry stays with these browser figures instead of Node's 25.5 ms.
+
+### Łukasz's answers after the step 4 measurements (15 October)
+
+- **The index:** accepted. No incremental rebuild in 4b; the known-limitations entry has the browser figures
+  (`23300a0`).
+- **C-08:** every load of S4P-10 was traced, and tracing slowed every run in the notes trial. So **S4P-10 is a
+  diagnosis only, not the C-08 verdict.** The verdict comes from step 5's sitting: S1A-14's C-08 without tracing, A/B
+  against `slice-04a`, and partly met only if that misses the bar. The proposal above (“accept C-08 as partly met”) is
+  withdrawn.
+- **Step 5's sitting also rechecks S4P-03's large lens at 30 %, frames expanded** (−7.1 % at step 2): down to about
+  −8 % is partly met with a known-limitations entry; beyond that, stop and ask.
+
+### C-08's “waiting”: what the saved results can and cannot say
+
+Łukasz asked to break “Waiting” (754–1,150 ms) down from the step 4 traces, without a new run:
+- network: the requests in flight after the last script;
+- raster and GPU: the compositor, raster and GPU threads between the last script and the stable frame;
+- the stable-frame detector's window.
+
+**The traces were not kept.** S4P-10 summarised each trace in the run and saved only the summary
+(`.data/measure/step4/S4P-10.json`: per load the stable frame, first byte, document end, DOMContentLoaded, the scripts'
+count, size and last arrival, the main thread's self time by kind, and the waiting). The other threads' events and the
+requests after the scripts were never written. So **the network and the raster/GPU parts of “Waiting” cannot be told
+apart without a new run.** What the saved figures do say:
+
+**The stable-frame detector** (S1A-14's, which S4P-10 copies) waits for no run of quiet frames. Once a frame shows the
+canvas ready with all 101 cards and 340 lines, it records the time of the very next animation frame. So its window is
+at most two frames, about 33 ms of “Waiting” (the frame in which readiness is checked, and the next one).
+
+**“Waiting” per load, split by the document's end** (waiting after the document = stable frame − document end − main
+thread's busy time):
+
+| Load | Stable frame | Document end | Main thread busy | Waiting after the document |
+| --- | --- | --- | --- | --- |
+| 5 | 1,312 | 345 | 558 | 409 |
+| 2 | 1,487 | 352 | 661 | 474 |
+| 3 | 1,531 | 529 | 560 | 442 |
+| 4 | 1,567 | 479 | 556 | 532 |
+| 1 | 1,706 | 588 | 556 | 562 |
+| Spread | 394 | 243 | 105 | 153 |
+
+**The spread follows the document most:**
+- The order of the loads by stable frame is almost the order by the document's end (only loads 3 and 4 swap).
+- The document's end varies by 243 ms, the waiting after it by 153 ms, and the main thread's work by 105 ms (only load 2
+  is different: 661 against 556–560).
+- The document's end is mostly the first byte (257–421 ms, then 88–184 ms to download the 246 KiB).
+- **The second part is the 409–562 ms of waiting after the document.** Its split between the network (the scripts are
+  all in by about 500 ms, so it would be data or RSC requests after them), raster and GPU, and gaps between tasks is
+  unknown from the saved figures.
+
+### The proposal, revised (no fix in this slice)
+
+1. **C-08's verdict comes from step 5's untraced A/B** (above).
+2. **The database slice (AD-31): Server-Timing on the canvas page** (data loading, model, tree, index), with the real
+   adapter. The server's first byte is the largest movable part and the main source of the spread. The local adapter
+   reads its JSON file on every request; the database will not.
+3. **If the waiting after the document (about 0.4–0.56 s) needs explaining:** S4P-10 can keep the raw traces (network
+   requests, compositor, raster and GPU threads, frames) and the breakdown above can be made from them. That is a new
+   traced run and needs Łukasz's OK, for example as one diagnostic run after step 5's sitting.
+4. **On the main thread (about 0.56 s, steady across loads):** drawing the canvas first and the left panel's tree and
+   the miniature one frame later stays the first candidate, to decide with a profiling build. It is not where the spread
+   comes from.
