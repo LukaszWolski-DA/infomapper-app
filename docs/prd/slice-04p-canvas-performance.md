@@ -115,7 +115,7 @@ one unrecorded warm-up run after the build.
 | --- | --- |
 | S4P-01 | Baseline sitting `slice-04a` against itself with the extended harness, figures and spread recorded. |
 | S4P-02 | Fading, chosen mechanism: switching on and off ≤ 100 ms (median of 40) in every scenario of item 2. |
-| S4P-03 | Pan and zoom with fading on: not worse than 5 % against fading off, same branch, same sitting; no more frames over 50 ms than with fading off plus the baseline's spread. |
+| S4P-03 | Pan and zoom with fading on: not worse than 5 % against fading off, same branch, same sitting; no more frames over 50 ms than with fading off plus the baseline's spread. F1's one miss at step 2 (the large lens at 30 %, frames expanded, −7.1 %) is re-checked on the finished F1 in the step 5 sitting: missing by at most about 3 points (−8 %) is accepted as partly met, with an entry in `docs/known-limitations.md`; more than that is discussed with Łukasz (Łukasz, 15 October). |
 | S4P-04 | Fading looks as item 4 describes: screenshots of Focus, small and large lens, at 100 % and 30 %, beside the prototype's, approved by Łukasz. |
 | S4P-05 | C-10 hover: verdict with figures; met if ≤ 100 ms. |
 | S4P-06 | Lasso marks: verdict with figures; met if ≤ 100 ms. |

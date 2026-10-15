@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 2 measured (sitting `trials-2026-10-14-20-04`); verdicts proposed, Łukasz chooses**; step 1 and the baseline accepted. Draft pull request #12. Branch
+Status: **step 3 in progress**; step 2's verdicts given (trial A adopted, F1 chosen, F4 and the hover line fade rejected). Draft pull request #12. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -773,3 +773,16 @@ same run, and no more frames over 50 ms than off plus the baseline's spread (±4
 - trial for the notes layer (item 7) after it.
 
 Then the step 5 sitting confirms S4P-03 for the large lens at 30 % with three rounds against `slice-04a`.
+
+## Łukasz's verdicts after step 2 (15 October)
+
+| Trial | Verdict | Tag | Figures (sitting `trials-2026-10-14-20-04`) |
+| --- | --- | --- | --- |
+| Trial A: the overlay on its own compositing layer | **adopted** | `perf/4p-trial-a` (`641518e`) | C-10 120 → 19 ms; lasso marks 28 → 29 ms; pan and zoom −0.5 to −6.0 %, within the baseline's spread |
+| The hover line fade, “plain” and “layer” | **rejected** | inside `perf/4p-trial-a` (`d63716d`), not carried into the slice | C-10 228 and 247 ms against 26 ms without it |
+| F4: a veil with holes on its own layer | **rejected** | `perf/4p-trial-f4` (`f0d0f61`) | switching 20–74 ms (S4P-02 met); pan and zoom −8.4 to −11.6 % at 30 % in 5 of 14 cells (S4P-03 missed); +55 MiB of tiles at 30 % |
+| F1: one veil in the canvas layer, lit cards lifted | **chosen** | `perf/4p-trial-f1` (`37b2e73`) | switching 13–29 ms (S4P-02 met); pan and zoom within 5 % in 13 of 14 cells |
+
+**F1's one miss** (the large lens at 30 %, frames expanded, −7.1 %) is re-checked on the finished F1 in the step 5
+sitting: missing by at most about 3 points is accepted as partly met, with an entry in `docs/known-limitations.md`;
+more than that is discussed. Written into the PRD's S4P-03.
