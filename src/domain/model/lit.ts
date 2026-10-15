@@ -1,17 +1,16 @@
-// What fading keeps lit (slice 4p, PRD section 6; prototype `relatedOf`, `applyHighlight`): Focus on an entity, and the
-// lens of a requirement. Pure functions on the live model; the canvas maps the result onto its cards, rows and lines and
-// fades the rest. Slice 4b switches them from Focus and the requirement panel.
+// What Focus keeps lit (slice 4p, PRD section 6; slice 4b-1, PRD item 21; prototype `relatedOf`). Pure functions on the
+// live model; the canvas maps the result onto its cards and lines and fades the rest. No row is coloured: a selected
+// requirement's coverage colours are drawn by themselves, with or without Focus (slice 4b-1, step 6).
 //
 // - Focus on an entity (prototype relatedOf “entity”): the entity; every mapping of its attributes with the source
-//   tables of their inputs; every relationship of the entity with the entities at both ends. No row is coloured.
-// - The lens of a requirement (prototype relatedOf “req”): the entities and tables of its scope (D-31); for every
-//   attribute in scope its mappings with their tables and entities; for every column in scope its mappings; the mappings
-//   in scope. The scope's attributes are coloured covered or gap (the requirement's coverage, D-31), its columns
-//   covered (prototype `.row.rq`, `.row.gap`).
+//   tables of their inputs; every relationship of the entity with the entities at both ends.
+// - Focus on a requirement (prototype relatedOf “req”; slice 4p's lens without its colours): the entities and tables of
+//   its scope (D-31); for every attribute in scope its mappings with their tables and entities; for every column in
+//   scope its mappings; the mappings in scope.
 
 import type { Uuid } from "../ids";
 import type { WorkspaceModel } from "../types";
-import type { RequirementCoverage, RequirementScope } from "./requirements";
+import type { RequirementScope } from "./requirements";
 
 export type LitRowColour = "covered" | "gap";
 
@@ -75,21 +74,14 @@ export function focusLit(model: LitModel, entityId: Uuid): Lit {
   return lit;
 }
 
-/** The lens of a requirement (prototype relatedOf “req” and applyHighlight's row colours). */
-export function lensLit(model: LitModel, scope: RequirementScope, coverage: RequirementCoverage): Lit {
+/** Focus on a requirement (prototype relatedOf “req”): its scope's cards and the mappings around it; no row coloured. */
+export function requirementFocusLit(model: LitModel, scope: RequirementScope): Lit {
   const l = lookup(model);
   const lit = empty();
   for (const e of scope.entities) lit.entities.add(e);
   for (const t of scope.tables) lit.tables.add(t);
-  const covered = new Set(coverage.covered);
-  for (const a of scope.attributes) {
-    lit.rows.set(a, covered.has(a) ? "covered" : "gap");
-    for (const m of l.mappingsOfAttribute.get(a) ?? []) addMapping(lit, l, m);
-  }
-  for (const c of scope.columns) {
-    lit.rows.set(c, "covered");
-    for (const m of l.mappingsOfColumn.get(c) ?? []) addMapping(lit, l, m);
-  }
+  for (const a of scope.attributes) for (const m of l.mappingsOfAttribute.get(a) ?? []) addMapping(lit, l, m);
+  for (const c of scope.columns) for (const m of l.mappingsOfColumn.get(c) ?? []) addMapping(lit, l, m);
   for (const m of scope.mappings) addMapping(lit, l, m);
   return lit;
 }

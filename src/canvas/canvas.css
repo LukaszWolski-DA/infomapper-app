@@ -210,11 +210,11 @@ body.connecting .im-canvas .row { cursor: crosshair }
    the moved-row flash, the resize outline and the selection marks repaint only it, never the viewport's big layer.
    It sits in the viewport portal and pans and zooms with the viewport; it takes no pointer events. ---------- */
 .im-canvas .overlay-layer { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform }
-/* fading (slice 4p, step 2): the lit lines drawn again above it, and the lens's rows tinted (prototype .row.rq covered,
-   .row.gap gap) over the rows, translucent so their text stays readable */
-/* fading (slice 4p, AD-24): one veil in the viewport's big layer above the cards, in the canvas background's colour; the
-   lit cards and their pinned notes lifted above it by `FadeLayer`'s stylesheet rule (z-index 2); the overlay above both */
-.im-canvas .fade-veil { position: absolute; z-index: 1; pointer-events: none; background: color-mix(in srgb, var(--im-canvas) 75%, transparent) }
+/* fading (slice 4b-1, F4; AD-24): one veil with holes at the lit cards, blocks and pinned notes, on its own layer in the
+   overlay above the cards, in the canvas background's colour (`fill-opacity` on this one element only); the lit lines and
+   the tinted rows (prototype .row.rq covered, .row.gap gap, translucent so their text stays readable) above it */
+.im-canvas .fade-veil { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; will-change: transform }
+.im-canvas .fade-veil path { fill: var(--im-canvas); fill-opacity: .75 }
 .im-canvas .overlay-layer { z-index: 3 }
 .im-canvas .lit-lines .lnk { pointer-events: none }
 .im-canvas .lit-lines .lnk .hit { display: none }

@@ -8,13 +8,16 @@
 //   Focus        ent:23 and what `relatedOf` gives for it
 //   Lens, small  REQ-101 of seed:large: six attributes of ent:19, one of them a gap
 //   Lens, large  REQ-102 of seed:large: ent:3, ent:4, ent:7 and ent:19, about half the cards of the 30 % view
+// (slice 4b-1, step 3: the lens is gone; the "lens" scenarios are Focus on the requirement, `{ focus: { t:
+// "requirement", id } }`, under their old names so the sittings stay comparable. On a reference without it, such as
+// slice-04p, they are not shown and only fading off is measured there.)
 // and in S1A-14's 100 % view around src:57 (the heaviest view, Łukasz after step 0):
 //   Lens, dense  REQ-103 of seed:large: the source tables in that view
 // 40 switches on and 40 off, each timed until the fading is in the page and until the next frame (C-10's method), and
 // pan and zoom with fading on (S4P-03: against fading off in the same run).
 //
 // The mechanism's side of the contract: while it shows a request it renders `[data-testid="layer-fade"]` with
-// `data-fade` = `focus:<entity id>` or `lens:<requirement id>` (and may add `data-lit-cards`); with fading off there is
+// `data-fade` = `focus:<entity id>` or `focus:requirement:<id>` (and may add `data-lit-cards`); with fading off there is
 // none. Results go to test-results/S4P-fading.json. This file imports only what `slice-04a` has, so the harness can
 // copy it into the reference worktree.
 //
@@ -39,14 +42,14 @@ const WS = LARGE_IDS.workspace;
 const FOCUS_CARD = "ent:23";
 const SCENARIOS = {
   focus: { focus: seedId(WS, `entity:${FOCUS_CARD}`) },
-  "lens-small": { lens: seedId(WS, "requirement:REQ-101") },
-  "lens-large": { lens: seedId(WS, "requirement:REQ-102") },
-  "lens-dense": { lens: seedId(WS, "requirement:REQ-103") },
+  "lens-small": { focus: { t: "requirement", id: seedId(WS, "requirement:REQ-101") } },
+  "lens-large": { focus: { t: "requirement", id: seedId(WS, "requirement:REQ-102") } },
+  "lens-dense": { focus: { t: "requirement", id: seedId(WS, "requirement:REQ-103") } },
 } as const;
 type ScenarioName = keyof typeof SCENARIOS;
 type Request = (typeof SCENARIOS)[ScenarioName];
 const AROUND_FOCUS: ScenarioName[] = ["focus", "lens-small", "lens-large"];
-const keyOf = (r: Request) => ("focus" in r ? `focus:${r.focus}` : `lens:${r.lens}`);
+const keyOf = (r: Request) => (typeof r.focus === "string" ? `focus:${r.focus}` : `focus:${r.focus.t}:${r.focus.id}`);
 const SWITCHES = MEASURE ? 40 : 5;
 const PAN_MS = MEASURE ? 10_000 : 2_000;
 

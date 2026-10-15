@@ -222,7 +222,9 @@ mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md]
   before the trace; tag `perf/4p-trial-notes`): pan and zoom at 30 % without tracing 44.5 → 45.2 fps around `ent:23` and
   43.3 → 46.7 fps on the notes, both inside the spread; tile memory +20 to +35 MiB; and it makes the notes' container a
   stacking context, so notes pinned to a lit card could no longer be lifted above the fading veil
-  (`docs/prd/slice-04p-acceptance.md`). What remains is fewer elements per note, if needed.
+  (`docs/prd/slice-04p-acceptance.md`). What remains is fewer elements per note, if needed. **Since slice 4b-1, step 3
+  (F4):** the veil cuts a hole for every note pinned to a lit card, so those notes stay lit without being lifted; this
+  point no longer stands in option (c)'s way.
 - **What has to happen later (performance review before the database slice, AD-31):** measure a separate compositing
   layer for the notes (option c: their paint and Layerize no longer part of the cards'; it touches AD-24's rules on
   layers and may cost GPU memory or raster time) and, if still needed, fewer elements per note beyond slice 3a's (body,

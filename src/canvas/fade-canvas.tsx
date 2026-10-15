@@ -1,19 +1,19 @@
 "use client";
 
-// Fading on the canvas (slice 4p): what a request (`fade.ts`) lights on this canvas (the domain's `focusLit` / `lensLit`,
-// or a lit set given directly, mapped onto cards, blocks, notes, rows and lines), and the lens's row colours drawn in the
-// overlay above the cards. The veil and the lifting are `FadeLayer.tsx`'s.
+// Fading on the canvas (slice 4p; slice 4b-1): what a request (`fade.ts`) lights on this canvas (the domain's `focusLit`
+// / `requirementFocusLit`, or a lit set given directly, mapped onto cards, blocks, notes, rows and lines), and rows tinted
+// covered or gap in the overlay above the cards (`LitRows`). The veil is `FadeLayer.tsx`'s.
 
 import { memo, useMemo } from "react";
 import { useStore, type InternalNode } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
-import { focusLit, lensLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
+import { focusLit, requirementFocusLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import type { ScopeModel } from "@/domain/model/requirements";
 import type { Requirement, RequirementLink } from "@/domain/types";
 import type { BlockNodeT } from "./BlockNode";
 import type { CardNodeT } from "./CardNode";
-import { fadeKey, useFadeRequest } from "./fade";
+import { fadeKey, focusTarget, useFadeRequest } from "./fade";
 import { cardWidth, LOD_ZOOM, ROW_H, rowEnd, type Rect } from "./geometry";
 
 /** What the canvas needs to work out a lit set: the live model and the requirements (the page has them). */
@@ -37,10 +37,12 @@ export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | 
     if (!request) return null;
     if ("lit" in request) return { key: fadeKey(request), lit: request.lit };
     if (!data) return null;
-    if ("focus" in request) return { key: fadeKey(request), lit: focusLit(data.model, request.focus) };
+    const target = focusTarget(request.focus);
+    if (target.t === "entity") return { key: fadeKey(request), lit: focusLit(data.model, target.id) };
+    // a requirement's scope from the requirement index (slice 4b-1, step 4: the inspector's index, not one built here)
     const index = buildRequirementIndex([...data.requirements], [...data.requirementLinks], data.model);
-    if (!index.byId.has(request.lens)) return null;
-    return { key: fadeKey(request), lit: lensLit(data.model, index.scope(request.lens), index.coverage(request.lens)) };
+    if (!index.byId.has(target.id)) return null;
+    return { key: fadeKey(request), lit: requirementFocusLit(data.model, index.scope(target.id)) };
   }, [request, data]);
 }
 
@@ -75,7 +77,7 @@ export function litNodeIds(lookup: Map<string, AnyNode>, lit: Lit): Set<string> 
 /** A node's rectangle as React Flow measured it. */
 export const nodeRect = (n: AnyNode): Rect => ({ x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, w: n.measured.width ?? 0, h: n.measured.height ?? 0 });
 
-/** The lens's rows, tinted covered (blue) or gap (orange) above the cards (prototype `.row.rq`, `.row.gap`); none below 40 %. */
+/** Rows tinted covered (blue) or gap (orange) above the cards (prototype `.row.rq`, `.row.gap`); none below 40 %. */
 export const LitRows = memo(function LitRows({ rows }: { rows: ReadonlyMap<Uuid, LitRowColour> }) {
   useStore((s) => s.nodes); // follow drags, collapses and widths
   const lod = useStore((s) => s.transform[2] < LOD_ZOOM);

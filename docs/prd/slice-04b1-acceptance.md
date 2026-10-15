@@ -1,8 +1,97 @@
 # Slice 4b-1 – Acceptance
 
-Status: **step 1 accepted; step 2 (tooling).** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+Status: **steps 1 and 2 accepted; step 3 (F4) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
+
+## Step 3: F4 onto the branch (15 October 2026)
+
+PRD items 6–8. F4's veil replaces F1's behind the existing request (`fade.ts`); F1's lift rule is gone. No UI yet:
+fading is switched only by the test hook.
+
+### What changed
+
+| File | Change |
+| --- | --- |
+| `src/canvas/FadeLayer.tsx` | F4 from `perf/4p-trial-f4`: one SVG `path` (outer rectangle plus a rounded hole per lit card, per block of a collapsed frame with a lit card, and per note pinned to a lit card; `fill-rule: evenodd`) on its own compositing layer in the overlay; the lit lines and rows above it. **F1's veil and its lift `<style>` (`liftRule`) are removed.** New: `data-lit-notes` (the notes holed), `roundRect` exported for its test. |
+| `src/canvas/canvas.css` | F1's `.fade-veil` (a `div` in the big layer, z-index 1) replaced by F4's two rules: `.fade-veil` with `will-change: transform`, and `.fade-veil path` with the canvas colour at `fill-opacity: .75`, on that one element only (AD-24). `.overlay-layer { z-index: 3 }` kept. |
+| `src/canvas/fade.ts` | **The lens (`{ lens }`) is gone.** `{ focus }` takes an entity id (slice 4p's short form) or a `FocusTarget`, `{ t: "entity" \| "requirement", id }`; step 7 adds the other selections. Keys: `focus:<entity id>` as in 4p, so the reference side stays comparable; `focus:requirement:<id>`; `lit:<key>`. |
+| `src/domain/model/lit.ts` | `lensLit` becomes `requirementFocusLit(model, scope)`: the same lit set (the prototype's `relatedOf "req"`), with **no row coloured**. A selected requirement's coverage colours are drawn by themselves (step 6). Step 4's new scope (an entity link without its attributes) applies to it as soon as the index changes. |
+| `src/canvas/fade-canvas.tsx` | `useLit` reads the Focus target. A requirement's scope still comes from an index built here per request, which step 4 replaces with the inspector's index; Q1's answer said this step would already drop it, but Focus on a requirement needs the scope. |
+| `src/canvas/TestHooks.tsx` | the hook's documented forms |
+
+### Holes for pinned notes
+
+F4 already had them (Q1). The new spec checks that notes pinned to a lit table are holed (two in the seed), that the
+free note is not, and that notes pinned to a faded card are not. A note pinned to a card inside a collapsed frame is
+hidden with its card.
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `src/domain/model/lit.test.ts` (changed) | the lens cases become Focus on a requirement: the same cards and lines, no row coloured |
+| `src/canvas/fade-canvas.test.ts` (changed) | the lift rule's tests go; a hole's rounded rectangle; the keys of every request form |
+| `src/canvas/fade.test.ts` (changed) | `{ lens }` replaced by Focus on a requirement |
+| `e2e/slice-04b1/S4B1-07.spec.ts` (new) | S4B1-07. **Focus on Customer:** a hole at each of its 4 cards, none for faded notes; the hole moves with a drag and widens with a resize. **A lit table:** its 2 pinned notes holed, the free note not. **At 30 %:** the holes still lie on the cards. **Customer in a collapsed frame:** the block holed, the card hidden. |
+| `e2e/slice-04b1/fixtures.ts`, `helpers.ts` (new) | the slice's fixture; `fade`, `fadeTables`, `commitCounters`, `veilHoles` (the holes read back from the path), `nodeRect`, `holeAt` |
+| `e2e/slice-04p/S4P-12.spec.ts` (changed) | F1's z-index checks become hole checks (during and after a drag, after a resize); REQ-101's lens becomes Focus on REQ-101 (3 cards: Customer and its two tables under 4a's scope; no tinted rows); a lit table's notes counted by `data-lit-notes`. The commit guards are unchanged. |
+| `e2e/slice-04p/S4P-fading.spec.ts`, `S4P-04-screens.spec.ts` (changed) | the "lens" scenarios are Focus on the requirement, under their old names |
+
+- **The fading screenshots** (S4P-04's spec, kept in `.data/measure/s4b1-step3-screens/`, not committed) look as
+  expected:
+  - Focus on Customer keeps Customer, its two feeding tables and Sales Order lit; `order_header` and its notes fade;
+  - Focus on REQ-101 keeps Customer and its tables, with no row tints.
+- **`docs/known-limitations.md`:** the notes entry notes that F4 holes notes pinned to a lit card, so the stacking
+  conflict 4p found no longer stands.
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 161 passed | 25.3 min |
+| 2 | 161 passed | 25.6 min |
+| 3 | 161 passed | 25.3 min |
+
+Lint, typecheck and the unit tests (953) pass.
+
+### Smoke run: F4 to the screen. A clear miss on pan and zoom; the step stops here.
+
+S4P-fading's traced mode on this branch's measurement build (rebuilt after the change). **Smoke conditions:** two
+settled pairs per scenario (so each "median" is the larger of two), one pan per case, traced, unprepared laptop. These
+are not figures for a verdict.
+
+| View | Fading off, presented fps (rAF) | Scenario | Switch on / off, to screen, ms | Pan with Focus on, presented fps (rAF) |
+| --- | --- | --- | --- | --- |
+| 100 %, expanded | 46.4 (46.8) | Focus ent:23 | 35 / 17 | 53.4 (50.6) |
+| | | REQ-101 (small) | 31 / 15 | 54.0 (50.0) |
+| | | REQ-102 (large) | 54 / 22 | 53.7 (50.2) |
+| **30 %, expanded** | 46.5 (53.9) | Focus ent:23 | 92 / 16 | **32.4** (43.2) |
+| | | REQ-101 (small) | 86 / 17 | **28.3** (45.6) |
+| | | REQ-102 (large) | **213** / 14 | **20.6** (39.3) |
+| 100 % dense, expanded | 35.7 (35.7) | REQ-103 (dense) | 59 / 22 | 41.6 (41.3) |
+| 100 %, collapsed | 55.1 (54.8) | Focus, small, large | 16–47 / 9–10 | 58.2–59.0 (56.5–56.9) |
+| **30 %, collapsed** | 57.2 (58.4) | Focus, small, large | 41–76 / 11–21 | **43.1–45.4** (57.1–57.6) |
+| 100 % dense, collapsed | 58.9 (60.0) | REQ-103 (dense) | 12 / 20 | 54.8 (59.9) |
+
+**Reading:**
+- **Switching mostly meets the bar.** F4 is far below F1's 300–550 ms, except the large set at 30 % expanded (213 ms
+  on, against 86 in step 0's sitting). Two switches can't tell whether that is the first switch after the page opened
+  (the veil's layer allocated) or real.
+- **Pan and zoom with Focus on clearly miss S4B1-11** (at most 5 % below off) at 30 %:
+  - expanded: −30 to −56 % presented, and −15 to −27 % even on rAF intervals;
+  - collapsed: −21 to −25 % presented.
+
+  At 100 % and in the dense views, Focus on is not slower.
+- **F1 smoked the same way in step 2** (30 % expanded, 28–36 presented fps with fading on against 54 off). So the cost is
+  likely not F4's veil alone, but what both have in the overlay while fading is on: the lit lines drawn again
+  (`LitLines`, one SVG as large as everything it draws) and the veil, each a layer that pans and zooms with the
+  viewport. **Not shown**; a pan trace would tell.
+
+**The PRD's rule:** a step that clearly misses a bar in its smoke run reports it and stops, and a trial needs Łukasz's OK
+and a time estimate. The proposal is in the step report.
 
 ## Step 2: tooling (15 October 2026)
 
