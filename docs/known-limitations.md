@@ -46,11 +46,11 @@ Slice 4p's final sitting (`2026-10-15-09-36`; production measurement build; Chro
 | Pan and zoom, overview | ≥ 50 fps, none over 50 ms | 59.7 fps, 0 | met |
 | Pan and zoom, 100 % dense area | ≥ 50 fps, none over 50 ms | 52.1 fps, 7–9 frames over 50 ms | **partly met** (the frames over 50 ms, as on `slice-04a`: 4–12) |
 | C-08 initial render | ≤ 1,500 ms | 1,432 ms (untraced) | **met** |
-| C-09 card resize | ≥ 45 fps | 36.7 fps | **partly met** (card rows; needs a decision on the card's look) |
+| C-09 card resize | ≥ 45 fps | 36.7 fps (+1.9 % A/B, no regression) | **partly met** against its bar (card rows; needs a decision on the card's look) |
 | C-10 hover | ≤ 100 ms | 18 ms | **met** (slice 4p's overlay, AD-24) |
 | Lasso marks | ≤ 100 ms | 23 ms | **met** |
 | Single-card and group drags | ≥ 45 fps | 11 and 32 fps | **partly met** (card rows, as C-09) |
-| Fading, switching (S4P-02) | ≤ 100 ms | 15–33 ms, except the 30 % view with frames expanded: see below | **partly met?** (Łukasz decides) |
+| Fading, switching (S4P-02) | ≤ 100 ms | 15–33 ms, except the 30 % view with frames expanded: see below | **partly met** (Łukasz, 15 October) |
 | Fading, pan and zoom on vs off (S4P-03) | ≥ −5 % | −4.9 to +5.8 % in all 14 cells | **met** |
 
 ### Fading's slow switches at 30 % with frames expanded (slice 4p)
@@ -65,8 +65,10 @@ The same mode was already in step 2's trial sitting, behind fast medians.
 
 - **Hypothesis, not proven:** the veil is in the canvas's big layer; when Chrome has to raster the whole visible part
   of that layer again, a switch costs a full GPU raster at 30 %.
-- **Open:** Łukasz decides whether S4P-02 is partly met with this entry, whether a trace of the switch comes first, or
-  whether 4b goes ahead with F1 as it is.
+- **Partly met** (Łukasz, 15 October 2026), with this entry; no trace in slice 4p.
+- **Slice 4b, step 0:** trace a switch in this view (large lens, 30 %, frames expanded) before building the lens on F1.
+- Since slice 4p, switch and interaction times are reported with their p90 and max next to the median; these slow
+  switches hid behind medians from step 2 on.
 
 ### C-08: what the first render waits for (slice 4p)
 
@@ -79,6 +81,20 @@ C-08 is met untraced (1,432 ms). The traced diagnosis (five loads, `scripts/c08-
   - the GPU's raster about 130 ms;
   - **the main thread idle for about 0.7 s**, with nothing in the trace filling it.
 
+- **A lead from the code** (15 October, no measurement): the idle time is nearly the same in every load (709–748 ms),
+  which looks like a fixed wait, not work. There is no timer, debounce, animation or transition of about 300 ms or more
+  on the path from the page's load to the canvas being ready:
+  - the first view is set once without animation (`ModelCanvas`, `setViewport` with no `duration`), and `<ReactFlow>`
+    gets no `fitView` or `onInit`;
+  - the 250 ms durations belong to the Fit button, the go-to links and a frame's fit, all user actions;
+  - the other timers (the moved row's 700 ms flash, toasts, the delete confirmation, the right-drag's click swallow, the
+    local adapter's write retry) are not on the load path;
+  - the fonts come from `next/font/google` with its default `display: swap`, and nothing waits for them;
+  - the canvas is `visibility: hidden` only until React Flow's observer reports the pane's size.
+
+  So the wait is most likely outside our code: how React hydrates the streamed page (the 246 KiB document carries the
+  React payload inline; hydration may wait for the stream to end and then work in yielding slices) or when Chrome
+  starts drawing frames for the page. Unconfirmed.
 - **Later:** if C-08 needs work (for example with the database's own latency), mark the steps in the measurement build
   (hydration, the canvas's ready step, React Flow's measuring, the lines drawn) to find what the 0.7 s waits for. In the
   database slice (AD-31), add Server-Timing to the canvas page.

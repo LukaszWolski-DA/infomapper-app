@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 5 measured (final sitting `2026-10-15-09-36`); two points for Łukasz (S4P-02 at 30 % expanded, C-09 against the offset rule), then his manual acceptance**; steps 0–4 accepted. Draft pull request #12. Branch
+Status: **step 5 done; waiting for Łukasz's manual acceptance** (checklist below); steps 0–4 accepted; no merge without his command. Draft pull request #12. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -1085,13 +1085,13 @@ thread's busy time):
 | ID | How it is shown | State |
 | --- | --- | --- |
 | S4P-01 | Baseline sittings `2026-10-14-15-48` (three rounds) and `2026-10-14-16-16` (collapsed) | **met** (accepted) |
-| S4P-02 | `S4P-fading.spec.ts` in `measure:canvas` (final sitting) | **met in 13 of 14 scenarios; the large lens at 30 % expanded 462 ms (bimodal slow switches): Łukasz decides** |
+| S4P-02 | `S4P-fading.spec.ts` in `measure:canvas` (final sitting) | **partly met** (Łukasz): met in 13 of 14 scenarios; the large lens at 30 % expanded 462 ms (bimodal slow switches); known-limitations entry, traced at 4b's step 0 |
 | S4P-03 | the same | **met** in all 14 cells; the recheck of the large lens at 30 % expanded: −4.9 % |
 | S4P-04 | Screenshots `docs/prd/slice-04p-screens/step-1-trial-a/`, `step-2-f1/`, `step-2-f4/` | **seen by Łukasz**; look differences accepted for now |
 | S4P-05 | `S4P-05.spec.ts`; C-10 18 ms against 116 (final sitting) | **met** |
 | S4P-06 | `S4P-06.spec.ts`; lasso marks 23 ms against 27 (final sitting) | **met** |
 | S4P-07 | Notes layer: traced and untraced A/B/B/A | **rejected with figures** (`perf/4p-trial-notes`) |
-| S4P-08 | `measure:canvas` against `slice-04a`, three rounds (final sitting) | **met** for pan and zoom (−3.5 to +1.4 %), C-08 and the drags; **C-09 +1.9 % is 0.3 points below the +2.2 % offset rule: Łukasz decides** |
+| S4P-08 | `measure:canvas` against `slice-04a`, three rounds (final sitting) | **met** (Łukasz): pan and zoom −3.5 to +1.4 %, C-08, the drags, and C-09 +1.9 % compared A/B directly |
 | S4P-09 | `S4P-09.spec.ts` | **met** (accepted) |
 | S4P-10 | `S4P-10-c08.spec.ts` (diagnosis), `scripts/c08-waiting.ts` | **diagnosis written** (split, waiting breakdown, proposal); **C-08 met** untraced, 1,432 ms |
 | S4P-11 | `S4P-11-index.spec.ts` | **met**: 12.7 ms, no incremental rebuild (accepted) |
@@ -1294,3 +1294,25 @@ layerize 31, other 31).
    (229–303 ms traced, 257–421 ms at step 4) is the part that moves between loads.
 4. **The left panel's tree and the miniature after the canvas's first frame** stays a candidate. The main thread is not
    where the time goes, though, so it comes after point 2.
+
+## Łukasz's decisions after the final sitting (15 October)
+
+- **C-09: met.** The +7.2 % side offset of the baseline did not come back in the final sitting (the two sides differ by
+  +1.9 %, and this branch's C-09 is 36.7 fps against 37.2 at the baseline, within noise), so **the offset rule set after
+  the baseline was not reproducible and has no basis**. C-09 is judged A/B directly: +1.9 %, no regression. Later
+  slices compare A/B directly, without side offsets.
+- **S4P-02: partly met**, with the known-limitations entry (“Fading's slow switches at 30 % with frames expanded”),
+  which now says: slice 4b, step 0, traces a switch in this view (large lens, 30 %, frames expanded) before building the
+  lens on F1. No trace in 4p.
+- **C-08: met** (1,432 ms untraced). One cheap check without measuring or changing anything: a search of the load path
+  for fixed delays. It found none of about 300 ms or more in our code or in how we call React Flow (details and the lead
+  in `docs/known-limitations.md`, “C-08: what the first render waits for”). The near-constant 0.7 s of idle main thread
+  most likely lies in how React hydrates the streamed page or when Chrome starts drawing frames. Unconfirmed.
+
+### Measuring method, from now on
+
+**Switch and interaction times report the p90 and the max next to the median** (switching fading, the hover, the lasso
+marks, any time to the next frame). S4P-02's slow switches at 30 % expanded hid behind medians from step 2 on: a
+round's median can be 20 ms while one switch in ten takes 600 ms. Today's specs report the median, the p95 and the max
+(`S4P-fading`, S1B-10 the median, p95 and max; S2A-14's lasso the median); adding the p90 to them is the first change of
+the next slice that measures (4b), so this slice's specs and runs stay as they are.
