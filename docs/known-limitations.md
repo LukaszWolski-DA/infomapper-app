@@ -67,7 +67,7 @@ The same mode was already in step 2's trial sitting, behind fast medians.
   of that layer again, a switch costs a full GPU raster at 30 %.
 - **Partly met** (Łukasz, 15 October 2026), with this entry; no trace in slice 4p.
 - **Slice 4b, step 0:** trace a switch in this view (large lens, 30 %, frames expanded) before building the lens on F1.
-- Since slice 4p, switch and interaction times are reported with their p90 and max next to the median; these slow
+- Since slice 4p, switch and interaction times are reported with their p95 and max next to the median; these slow
   switches hid behind medians from step 2 on.
 
 ### C-08: what the first render waits for (slice 4p)

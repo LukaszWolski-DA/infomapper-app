@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slice 4p (the canvas performance review), step 5; slices 0 to 4a are merged. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 4p are merged (4p: the canvas performance review); next is slice 4b. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a

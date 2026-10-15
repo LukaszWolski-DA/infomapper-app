@@ -1,6 +1,6 @@
 # Slice 4p – Acceptance
 
-Status: **step 5 done; waiting for Łukasz's manual acceptance** (checklist below); steps 0–4 accepted; no merge without his command. Draft pull request #12. Branch
+Status: **accepted by Łukasz on 15 October 2026** (manual acceptance passed); merged as pull request #12, tag `slice-04p`. Branch
 `slice/04p-canvas-performance`, from `main` at the tag `slice-04a` (`5e02c96`).
 
 ## Step 0 (14 October 2026)
@@ -1311,8 +1311,8 @@ layerize 31, other 31).
 
 ### Measuring method, from now on
 
-**Switch and interaction times report the p90 and the max next to the median** (switching fading, the hover, the lasso
-marks, any time to the next frame). S4P-02's slow switches at 30 % expanded hid behind medians from step 2 on: a
-round's median can be 20 ms while one switch in ten takes 600 ms. Today's specs report the median, the p95 and the max
-(`S4P-fading`, S1B-10 the median, p95 and max; S2A-14's lasso the median); adding the p90 to them is the first change of
-the next slice that measures (4b), so this slice's specs and runs stay as they are.
+**Switch and interaction times report the p95 and the max next to the median** (switching fading, the hover, the lasso
+marks, any time to the next frame; Łukasz at the merge: median, p95 and max, no p90). S4P-02's slow switches at 30 %
+expanded hid behind medians from step 2 on: a round's median can be 20 ms while one switch in ten takes 600 ms. `S4P-fading`
+and S1B-10 already report the median, the p95 and the max; S2A-14's lasso marks report the median only, and slice 4b adds
+the p95 and the max to that spec, so this slice's specs and runs stay as they are.
