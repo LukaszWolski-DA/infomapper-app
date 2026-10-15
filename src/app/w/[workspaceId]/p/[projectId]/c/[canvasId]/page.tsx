@@ -254,6 +254,8 @@ export default async function CanvasPage({
               focusLabelId={focusLabelId}
               focusRequirementId={focusRequirementId}
               focusNoteId={focusNoteId}
+              // fading (slice 4p): the same objects the inspector gets, so the page's payload carries them once
+              fadeData={{ model, requirements, requirementLinks }}
               notes={notes}
               readAt={readAt}
               canNote={canNote}
