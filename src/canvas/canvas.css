@@ -307,7 +307,10 @@ body.connecting .im-canvas .row { cursor: crosshair }
 /* ---------- notes (slice 3a, prototype .nt): paper-coloured blocks with a note icon, never confused with model cards.
    Their own layer above the cards (React Flow's viewport portal). A resolved note is told by its colours, never
    `opacity` (AD-24 rule 4): the paper mixed with the surface, the text in a quieter ink. ---------- */
-.im-canvas .note-layer { position: absolute; left: 0; top: 0; pointer-events: none }
+/* trial (slice 4p, item 7): the notes on a compositing layer of their own, so their paint and Layerize are no longer
+   part of the cards'. It also makes the layer a stacking context: notes pinned to a lit card can no longer be lifted
+   above the fading veil (all notes fade with it). */
+.im-canvas .note-layer { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform }
 .nt, .nsw { --np: #fff1b8; --npe: #e9d27a }
 .nt.c-blue, .nsw.c-blue { --np: #dcebff; --npe: #a9c7ee }
 .nt.c-green, .nsw.c-green { --np: #ddf3e4; --npe: #a7d7b6 }
