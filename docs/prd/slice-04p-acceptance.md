@@ -1061,3 +1061,69 @@ thread's busy time):
 4. **On the main thread (about 0.56 s, steady across loads):** drawing the canvas first and the left panel's tree and
    the miniature one frame later stays the first candidate, to decide with a profiling build. It is not where the spread
    comes from.
+
+## Step 5 (15 October): before the sitting
+
+### What changed
+
+- **S4P-10 keeps the raw trace of each load** in `.data/measure/s4p10-traces/<time>/load-<n>.json` (git-ignored, about
+  32 MB each; never committed).
+- **`scripts/c08-waiting.ts <folder>`** breaks the waiting after the document down per load: network requests in flight
+  (what, start, end), the compositor, raster (tile workers), GPU main and Viz compositor threads' busy time, and the main
+  thread's idle gaps. One functional pass on the step 4 build checked that both work; its figures and traces were
+  discarded.
+- **Acceptance tests named after their criteria** (`e2e/slice-04p/`; helpers in `helpers.ts`): `S4P-05.spec.ts` (the
+  hover in the overlay, no commit), `S4P-06.spec.ts` (the lasso and the marks in the overlay, no commit while drawing),
+  `S4P-09.spec.ts` (error boundaries), `S4P-12.spec.ts` (fading's guards, formerly `S4P-fading-guard.spec.ts`; the trial
+  A guard is split into S4P-05 and S4P-06). The measurement specs (`S4P-fading`, `S4P-10-c08`, `S4P-11-index`,
+  `S4P-04-screens`) run only when asked.
+- **Docs:** `README.md` (status, the new commands), `CLAUDE.md` (the commands, the test hooks, the overlay and fading
+  rules, no tracing in timed sittings).
+
+### Criteria
+
+| ID | How it is shown | State |
+| --- | --- | --- |
+| S4P-01 | Baseline sittings `2026-10-14-15-48` (three rounds) and `2026-10-14-16-16` (collapsed) | **met** (accepted) |
+| S4P-02 | `S4P-fading.spec.ts` in `measure:canvas`; F1 at step 2: 13–29 ms in every scenario | met at step 2; **step 5's sitting confirms on the finished F1** |
+| S4P-03 | the same; F1 at step 2: 13 of 14 cells, the large lens at 30 % expanded −7.1 % | **step 5's sitting rechecks** (down to about −8 %: partly met with a known-limitations entry; beyond: stop and ask) |
+| S4P-04 | Screenshots `docs/prd/slice-04p-screens/step-1-trial-a/`, `step-2-f1/`, `step-2-f4/` | **seen by Łukasz**; look differences accepted for now |
+| S4P-05 | `S4P-05.spec.ts`; C-10 19 ms against 120 (trials sitting) | **met** (trial A adopted) |
+| S4P-06 | `S4P-06.spec.ts`; lasso marks 29 ms (already 28 on `slice-04a` with Chrome 155) | **met** |
+| S4P-07 | Notes layer: traced and untraced A/B/B/A | **rejected with figures** (`perf/4p-trial-notes`) |
+| S4P-08 | `measure:canvas` against `slice-04a`, three rounds | **step 5's sitting** |
+| S4P-09 | `S4P-09.spec.ts` | **met** (accepted) |
+| S4P-10 | `S4P-10-c08.spec.ts` (diagnosis), `scripts/c08-waiting.ts` | split recorded; the waiting's breakdown from step 5's traced run; **C-08's verdict from the sitting's untraced A/B** |
+| S4P-11 | `S4P-11-index.spec.ts` | **met**: 12.7 ms, no incremental rebuild (accepted) |
+| S4P-12 | `S4P-12.spec.ts`, S2C-12, S3A-14-idle, S3B-15-idle, S3B-13 in every run; `S4A-14-elements.spec.ts` (+1, the overlay container) | passes; counts at 19,296 / 4,499 / 4,906 / 1,464 |
+| S4P-13 | CI, `npm test`, three full e2e runs in a row | below |
+
+## Manual checklist (Łukasz)
+
+Fading has no button in this slice (that is 4b), so it is switched from the browser's console. The test hooks exist
+only in the measurement build (and the e2e dev server), so the checklist runs on it, with fresh demo data in the preview
+file:
+
+PowerShell:
+
+```powershell
+$env:INFOMAPPER_DEV_DB=".data/preview-db.json"; npm run reset-dev-data; npm run measure:build; npm run measure:start
+```
+
+bash:
+
+```bash
+export INFOMAPPER_DEV_DB=.data/preview-db.json && npm run reset-dev-data && npm run measure:build && npm run measure:start
+```
+
+Open http://127.0.0.1:3300/sign-in, sign in as **Łukasz**, open Retail Co – DWH → Customer 360 → Customer & orders.
+
+| # | Steps | Expected |
+| --- | --- | --- |
+| 1 | Move the mouse over Customer's row **email**, then over other mapped rows. | The row's lines are drawn again, stronger, above the cards, and the rows at their other ends are tinted, at once; the other lines keep their colour. |
+| 2 | Draw a lasso around Customer and Sales Order on the empty canvas. | The lasso's rectangle follows the mouse; on release both cards are marked with “2 selected”. |
+| 3 | Open the project home (Customer 360 in the breadcrumbs), click **REQ-101** in its Requirements list. In the console (F12): `__imFade({ lens: new URLSearchParams(location.search).get("req") })` | Everything fades to about a quarter except Customer and the tables feeding it, with their lines; Customer's eight rows are tinted, five blue (covered) and three orange (gaps). |
+| 4 | With the lens on, drag Customer by its header, then pan and zoom. | Customer stays bright above the fading while it moves and after the drop; panning and zooming feel as without fading. |
+| 5 | `__imFade(null)` | Everything is back as before. |
+| 6 | In the console: `__imCanvasThrow()` | The canvas is replaced by “Something went wrong on this canvas.” with **Reload**; the left panel and the inspector still work. Reload brings the canvas back. |
+| 7 | Go to http://127.0.0.1:3300/no-such-page | “This page does not exist.” with “Go to the start page”. |
