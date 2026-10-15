@@ -6,25 +6,39 @@
 // (the spike's follow-up for C-10). The same overlay flashes a row that was just moved (D-36, prototype .row.moved)
 // and draws the outline of a card whose width is being dragged (C-09).
 // Below 40 % zoom there are no rows, so only the lines are emphasised.
+// Slice 4p (trial A): drawn in `OverlayLayer` (its own compositing layer); the hover comes from a store, so hovering
+// re-renders this overlay and the hovered lines only, never the canvas.
 
 import { memo } from "react";
-import { useStore, ViewportPortal } from "@xyflow/react";
+import { useStore } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import type { ResizeOutline } from "./CardResize";
 import { cardWidth, LOD_ZOOM, ROW_H, rowEnd } from "./geometry";
 import { hoverRows, type CanvasLines, type Selection } from "./line-data";
+import type { Rect } from "./geometry";
+import { useValue, type ValueStore } from "./value-store";
 
 function HoverOverlay({
-  hover,
+  hoverStore,
+  lassoStore,
+  busy,
   lines,
   flash,
   outline,
 }: {
-  hover: Selection;
+  /** The row or line under the mouse. */
+  hoverStore: ValueStore<Selection>;
+  /** The lasso being drawn: no hover meanwhile. */
+  lassoStore: ValueStore<Rect | null>;
+  /** Dragging, a tool, a resize, a frame or note gesture: no hover. */
+  busy: boolean;
   lines: CanvasLines;
   flash: { rowId: string; n: number } | null;
   outline: ResizeOutline | null;
 }) {
+  const hovered = useValue(hoverStore);
+  const lassoing = useValue(lassoStore) !== null;
+  const hover = busy || lassoing ? null : hovered;
   useStore((s) => s.nodes); // follow drags, collapses and widths
   const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
   const lookup = useStore((s) => s.nodeLookup);
@@ -52,19 +66,17 @@ function HoverOverlay({
   if (!marks.length && !flashBox && !outline) return null;
 
   return (
-    <ViewportPortal>
-      <svg className="hover-layer" width={1} height={1} data-testid="layer-hover">
-        {marks.map(({ key, b }) => b && <rect key={key} className="hl" data-testid="hover-row" x={b.x} y={b.y} width={b.w} height={ROW_H} />)}
-        {own && (
-          <>
-            <circle className="hnd" cx={own.x} cy={own.cy} r={4.5} />
-            <circle className="hnd" cx={own.x + own.w} cy={own.cy} r={4.5} />
-          </>
-        )}
-        {outline && <rect className="resize-outline" data-testid="outline-card-width" x={outline.x} y={outline.y} width={outline.w} height={outline.h} rx={8} />}
-        {flashBox && <rect key={flash!.n} className="moved" data-testid="row-moved" x={flashBox.x} y={flashBox.y} width={flashBox.w} height={ROW_H} />}
-      </svg>
-    </ViewportPortal>
+    <svg className="hover-layer" width={1} height={1} data-testid="layer-hover">
+      {marks.map(({ key, b }) => b && <rect key={key} className="hl" data-testid="hover-row" x={b.x} y={b.y} width={b.w} height={ROW_H} />)}
+      {own && (
+        <>
+          <circle className="hnd" cx={own.x} cy={own.cy} r={4.5} />
+          <circle className="hnd" cx={own.x + own.w} cy={own.cy} r={4.5} />
+        </>
+      )}
+      {outline && <rect className="resize-outline" data-testid="outline-card-width" x={outline.x} y={outline.y} width={outline.w} height={outline.h} rx={8} />}
+      {flashBox && <rect key={flash!.n} className="moved" data-testid="row-moved" x={flashBox.x} y={flashBox.y} width={flashBox.w} height={ROW_H} />}
+    </svg>
   );
 }
 

@@ -15,3 +15,13 @@ export const isLocalHost = (host: string | null): boolean => {
   const name = (host ?? "").replace(/:\d+$/, "").toLowerCase();
   return name === "localhost" || name === "127.0.0.1" || name === "[::1]";
 };
+
+/**
+ * The test hooks (slice 4p: the fading switch for measuring; the canvas error for S4P-09): set only by the e2e dev server
+ * (`playwright.config.ts`); the measurement-only build has them too. A normal production build never does, and a plain
+ * `npm run dev` neither (slice 2p's rule for test hooks).
+ */
+export const TEST_HOOKS_ENV = "INFOMAPPER_TEST_HOOKS";
+
+/** Whether the page installs the test hooks: in the e2e dev server, or in the measurement-only build. */
+export const areTestHooksOn = (): boolean => isMeasurementBuild() || (process.env.NODE_ENV !== "production" && process.env[TEST_HOOKS_ENV] === "1");

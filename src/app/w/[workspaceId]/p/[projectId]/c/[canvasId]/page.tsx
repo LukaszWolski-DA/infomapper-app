@@ -39,10 +39,12 @@ import { HandToolButton } from "@/canvas/HandToolButton";
 import { LayerSwitch } from "@/canvas/LayerSwitch";
 import { CanvasLookProvider } from "@/canvas/look";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
+import { CanvasThrowHook, TestHooks } from "@/canvas/TestHooks";
+import { CanvasErrorBoundary } from "@/app/_components/canvas-error-boundary";
 import { NotationSwitch } from "@/canvas/NotationSwitch";
 import { ZoomControls } from "@/canvas/ZoomControls";
 import { getDataStore } from "@/data";
-import { isMeasurementBuild } from "@/data/local/measure-mode";
+import { areTestHooksOn, isMeasurementBuild } from "@/data/local/measure-mode";
 import { labelItemCounts, labelNamesByItem } from "@/domain/model/labels";
 import { liveMembership, liveRemoveQuestion, liveRemoveWhat } from "@/domain/model/live";
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
@@ -221,6 +223,10 @@ export default async function CanvasPage({
           >
             {query.moved === "1" && <MovedNotice project={view.project.name} canvas={canvas.name} />}
             <RememberLastCanvas projectId={projectId} canvasId={canvasId} />
+            {/* the measuring hook (slice 4p): e2e dev server and measurement build only */}
+            {areTestHooksOn() && <TestHooks indexData={{ model, requirements, requirementLinks }} />}
+            {/* an error inside the canvas shows a message in its place; the panels and the top bar keep working (slice 4p) */}
+            <CanvasErrorBoundary>
             <ModelCanvas
               key={canvasId}
               canvasId={canvasId}
@@ -251,6 +257,8 @@ export default async function CanvasPage({
               focusLabelId={focusLabelId}
               focusRequirementId={focusRequirementId}
               focusNoteId={focusNoteId}
+              // fading (slice 4p): the same objects the inspector gets, so the page's payload carries them once
+              fadeData={{ model, requirements, requirementLinks }}
               notes={notes}
               readAt={readAt}
               canNote={canNote}
@@ -278,6 +286,8 @@ export default async function CanvasPage({
                   : null
               }
             />
+            {areTestHooksOn() && <CanvasThrowHook />}
+            </CanvasErrorBoundary>
           </AppShell>
           </WorkingContextProvider>
         </UndoProvider>

@@ -5,31 +5,35 @@
 // restyled (AD-24, as the hover highlight). Positions come from the store, so the marks follow a drag. Slice 2b: a
 // selected frame gets a mark around it too and counts in “N selected”. Slice 2c: a collapsed frame's mark goes around
 // its block, with the block's corners; a card hidden in a collapsed frame gets none. Slice 3a: a selected note gets a
-// mark with the note's corners and counts too.
+// mark with the note's corners and counts too. Slice 4p (trial A): drawn in `OverlayLayer` (its own compositing layer);
+// the lasso comes from a store, so drawing it re-renders this overlay only, never the canvas.
 
 import { memo } from "react";
-import { useStore, ViewportPortal, type Node } from "@xyflow/react";
+import { useStore, type Node } from "@xyflow/react";
 import { isCardNode } from "./CardNode";
 import type { FrameData } from "./frame-data";
 import { cardHeight, cardWidth, type Rect } from "./geometry";
 import type { Selection } from "./line-data";
 import { cardKey, frameKey, noteKey, selectionBounds } from "./selection";
+import { useValue, type ValueStore } from "./value-store";
 
 function SelectionOverlay({
   selection,
-  lasso,
+  lassoStore,
   frames,
   frameRects,
   noteRects,
 }: {
   selection: Selection;
-  lasso: Rect | null;
+  /** The lasso being drawn. */
+  lassoStore: ValueStore<Rect | null>;
   frames: readonly FrameData[];
   /** What stands for each frame: the frame, or its block when collapsed (slice 2c). */
   frameRects: ReadonlyMap<string, Rect>;
   /** The notes shown, by id (slice 3a). */
   noteRects: ReadonlyMap<string, Rect>;
 }) {
+  const lasso = useValue(lassoStore);
   const nodes = (useStore((s) => s.nodes) as Node[]).filter(isCardNode); // follow drags, collapses and widths
   const keys = selection?.t === "multi" ? new Set(selection.keys) : null;
   if (!keys && !lasso) return null;
@@ -48,7 +52,7 @@ function SelectionOverlay({
   const box = selectionBounds(marks.map((m) => m.r));
 
   return (
-    <ViewportPortal>
+    <>
       <svg className="hover-layer selection-layer" width={1} height={1} data-testid="layer-selection">
         {marks.map(({ id, r, frame, note, rx }) =>
           note ? (
@@ -63,7 +67,7 @@ function SelectionOverlay({
         {lasso && <rect className="lasso" data-testid="lasso" x={lasso.x} y={lasso.y} width={lasso.w} height={lasso.h} rx={2} />}
       </svg>
       {box && marks.length > 1 && <SelectionLabel box={box} count={marks.length} />}
-    </ViewportPortal>
+    </>
   );
 }
 

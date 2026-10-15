@@ -62,6 +62,8 @@ import { LIVE_ONE_AT_A_TIME } from "@/domain/model/live";
 import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
+import FadeLayer from "./FadeLayer";
+import type { FadeData, FadeNote } from "./fade-canvas";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
 import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
@@ -89,7 +91,9 @@ import {
 import { relatedLines, type CanvasLines, type Selection } from "./line-data";
 import { useCanvasLook } from "./look";
 import { viewKey } from "./views";
-import LineLayer from "./LineLayer";
+import LineLayer, { HoverLines } from "./LineLayer";
+import { OverlayLayer } from "./OverlayLayer";
+import { createValueStore } from "./value-store";
 import { bundleLines, type Bundle } from "./line-geometry";
 import { Overview, type MiniNote } from "./Overview";
 import NoteLayer, { type ShownNote } from "./NoteLayer";
@@ -149,6 +153,8 @@ export interface ModelCanvasProps {
   focusNoteId?: string | null;
   /** Measurement-only switches (only the measurement-only production build passes them). */
   diagnosis?: Diagnosis;
+  /** What fading needs to work out what it lights (slice 4p): the live model and the requirements. */
+  fadeData?: FadeData;
   /** The canvas's notes and their writes (slice 3a). */
   notes?: NoteData[];
   /** When the page read the data (server time): a fresh page may be older than the canvas (`mergeFresh`). */
@@ -238,6 +244,7 @@ export function ModelCanvas({
   focusRequirementId,
   focusNoteId,
   diagnosis = NO_DIAGNOSIS,
+  fadeData,
   notes: initialNotes = NO_NOTES,
   readAt = null,
   noteWrites,
@@ -274,10 +281,14 @@ export function ModelCanvas({
     }
   });
   const [ready, setReady] = useState(false);
-  /** The row or line under the mouse (C-10); it takes over the emphasis from the selection while it lasts. */
-  const [hover, setHover] = useState<Selection>(null);
+  /**
+   * The row or line under the mouse (C-10). A store, not state (slice 4p, trial A): a hover re-renders only the overlay
+   * that draws it, never the canvas.
+   */
+  const [hoverStore] = useState(() =>
+    createValueStore<Selection>(null, (a, b) => a?.t === b?.t && (a && "id" in a ? a.id : null) === (b && "id" in b ? b.id : null)),
+  );
   const related = useMemo(() => relatedLines(selection, lines), [selection, lines]);
-  const hoverRelated = useMemo(() => relatedLines(hover, lines), [hover, lines]);
   const onColumnDrop = useCallback((drop: ColumnDrop) => ui.host()?.dropColumn(drop), [ui]);
   const { draft, onPointerDown } = useColumnDrag(editable, onColumnDrop);
   const modes = useCanvasModes(editable);
@@ -1133,6 +1144,11 @@ export function ModelCanvas({
       pinnedTo: s.note.pinCardId ?? s.note.pinFrameId,
     }));
   }, [shownNotes]);
+  /** The notes as fading sees them (slice 4p): where they are drawn and the card they are pinned to. */
+  const fadeNotes = useMemo<FadeNote[]>(
+    () => shownNotes.map((s) => ({ id: s.note.id, rect: { x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80 }, pinCardId: s.note.pinCardId })),
+    [shownNotes],
+  );
   /** The notes as the Overview's miniature draws them (slice 3b). */
   const miniNotes = useMemo<MiniNote[]>(
     () => shownNotes.map((s) => ({ id: s.note.id, x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80, color: s.note.color })),
@@ -1428,17 +1444,19 @@ export function ModelCanvas({
     [noteState],
   );
 
-  // ---- hover (C-10): a row of a card or a mapping line; nothing while dragging or with a tool on ----
-  const busy = !!draft || !!ui.mode || resize.resizing || !!lasso.lasso || frameState.busy || noteState.dragging;
-  const onHoverOver = useCallback((e: React.PointerEvent) => {
-    if (e.buttons) return;
-    const el = e.target as Element;
-    const row = el.closest<HTMLElement>(".row[data-row]");
-    const cardId = row?.closest<HTMLElement>("[data-card]")?.dataset.card;
-    const mappingId = el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
-    const next: Selection = row && cardId ? { t: "row", cardId, id: row.dataset.row! } : mappingId ? { t: "map", id: mappingId } : null;
-    setHover((h) => (h?.t === next?.t && (h && "id" in h ? h.id : null) === (next && "id" in next ? next.id : null) ? h : next));
-  }, []);
+  // ---- hover (C-10): a row of a card or a mapping line; nothing while dragging, drawing a lasso or with a tool on ----
+  const busy = !!draft || !!ui.mode || resize.resizing || frameState.busy || noteState.dragging;
+  const onHoverOver = useCallback(
+    (e: React.PointerEvent) => {
+      if (e.buttons) return;
+      const el = e.target as Element;
+      const row = el.closest<HTMLElement>(".row[data-row]");
+      const cardId = row?.closest<HTMLElement>("[data-card]")?.dataset.card;
+      const mappingId = el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
+      hoverStore.set(row && cardId ? { t: "row", cardId, id: row.dataset.row! } : mappingId ? { t: "map", id: mappingId } : null);
+    },
+    [hoverStore],
+  );
 
   return (
     <DiagnosisCtx.Provider value={diagnosis}>
@@ -1465,7 +1483,7 @@ export function ModelCanvas({
           if (!resize.onPointerDown(e)) modes.onPointerDownCapture(e);
         }}
         onPointerOver={onHoverOver}
-        onPointerLeave={() => setHover(null)}
+        onPointerLeave={() => hoverStore.set(null)}
         onContextMenu={modes.onContextMenu}
       >
         {grid !== "none" && <div className="im-grid" ref={gridRef} aria-hidden data-testid="canvas-grid" />}
@@ -1518,7 +1536,6 @@ export function ModelCanvas({
               mapsById={mapsById}
               selection={selection}
               related={bundleRelated ?? related}
-              hover={busy ? null : hoverRelated}
               onSelect={select}
               tethers={tethers}
             />
@@ -1536,8 +1553,24 @@ export function ModelCanvas({
             onHeight={noteState.onHeight}
           />
           <Overview lines={lines} notes={miniNotes} notesDragging={noteState.dragging} />
-          <HoverOverlay hover={busy ? null : hover} lines={lines} flash={ui.flash} outline={resize.outline} />
-          <SelectionOverlay selection={selection} lasso={lasso.lasso} frames={frames} frameRects={frameRects} noteRects={noteRects} />
+          <OverlayLayer>
+            {/* fading (slice 4p, step 2): the candidate draws first, so the hover and the selection marks stay above it */}
+            <FadeLayer data={fadeData} notes={fadeNotes} lines={bundled ?? lines} bundles={bundled?.bundles} blocks={blocks} mapsById={mapsById} />
+            {!diagnosis.noLines && (
+              <HoverLines
+                hoverStore={hoverStore}
+                lassoStore={lasso.lasso}
+                busy={busy}
+                allLines={lines}
+                lines={bundled ?? lines}
+                bundles={bundled?.bundles}
+                blocks={blocks}
+                mapsById={mapsById}
+              />
+            )}
+            <HoverOverlay hoverStore={hoverStore} lassoStore={lasso.lasso} busy={busy} lines={lines} flash={ui.flash} outline={resize.outline} />
+            <SelectionOverlay selection={selection} lassoStore={lasso.lasso} frames={frames} frameRects={frameRects} noteRects={noteRects} />
+          </OverlayLayer>
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>

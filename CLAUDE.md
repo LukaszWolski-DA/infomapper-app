@@ -130,7 +130,13 @@ npm run measure:canvas -- --quick --rounds 2 --against slice-03a                
 npm run measure:canvas -- --quick --rounds 2 --against slice-03a --branch-diag collapsed    # S3B-15 (b), all frames collapsed
 MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=<file> npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S3B-15 (a) element counts
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-live.spec.ts     # S3B-15 (c) a live canvas against Performance test
-MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04a/S4A-14-elements.spec.ts # S4A-14 viewport counts against slice-03b's
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04a/S4A-14-elements.spec.ts # S4A-14 viewport counts against slice-03b's (+1, slice 4p's overlay)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-fading.spec.ts      # slice 4p's fading scenarios (measure:canvas runs it on both sides)
+npx tsx scripts/measure-trials.ts --rounds 3 --against slice-04a --sides perf/4p-trial-a,perf/4p-trial-f1  # trial branches in one sitting
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-10-c08.spec.ts     # C-08 diagnosis, traced (never in a timed sitting)
+npx tsx scripts/c08-waiting.ts .data/measure/s4p10-traces/<time>                           # C-08's waiting after the document, from the raw traces
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-11-index.spec.ts   # the requirement index in the browser
+SCREENS=<folder> npx playwright test e2e/slice-04p/S4P-04-screens.spec.ts                   # screenshots beside the prototype
 npx tsx scripts/bench-requirement-index.ts                    # the requirement index on 500 requirements, 5,000 attributes (not a gate)
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
@@ -164,14 +170,27 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   domain (`asPerson`), switch four-eyes (`setFourEyes`), open the Requirements tab and a requirement's panel
   (`openRequirementsTab`, `requirementRow`, `openRequirement`), wait for the panel to show a requirement's stored version
   before the next edit (`expectPanelVersion`, the panel's `data-version`), read an element panel's Requirements section
-  (`sectionRows`) and open an entity from the Model tab (`openEntityFromTree`). The undo history lives in the server's
-  memory and is empty again after each reseed.
+  (`sectionRows`) and open an entity from the Model tab (`openEntityFromTree`). Slice 4p's read the canvas's, the
+  miniature's and the fading layer's commit counters (`counters`). The undo history lives in the server's memory and is
+  empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
   with notes below 40 % zoom (a note measured while drawn plain once grew on every round), `S3B-15-idle.spec.ts` on a
   live canvas. Keep it when changing `ModelCanvas.tsx`; a render loop once cost a collapsed canvas a third of its frames.
   The Overview's miniature counts its commits in `window.__imMiniatureCommits` (slice 3b): `S3B-13.spec.ts` checks that
   panning and zooming do not redraw it and a note's drag redraws it once, on the drop.
+- **Test hooks** (slice 4p): the canvas page installs them only where `areTestHooksOn()` (the e2e dev server, which sets
+  `INFOMAPPER_TEST_HOOKS=1`, and the measurement build): `window.__imFade({ focus } | { lens } | { lit, key } | null)`
+  switches fading, `window.__imCanvasThrow()` throws inside the canvas's error boundary, `window.__imIndexTiming("page" |
+  "synthetic")` times the requirement index. A plain `npm run dev` and a normal production build never have them.
+- **Overlay and fading** (slice 4p, AD-24): the hover, the row marks, the selection marks and the lasso are drawn in
+  `OverlayLayer` (its own compositing layer); the hover and the lasso rectangle are value stores, so they never re-render
+  `ModelCanvas`. Fading is `FadeLayer`: one veil in the canvas layer, the lit cards and their pinned notes lifted by one
+  stylesheet rule, lit lines and lens rows in the overlay; switch it with `requestFade` (`src/canvas/fade.ts`), never
+  through the nodes array. `window.__imFadeCommits` (development) counts its commits; `S4P-12.spec.ts` checks that
+  switching, panning, zooming and dragging with fading on add no canvas or miniature commit.
+- Measure with tracing only in a diagnosis, never in a timed sitting: traced runs are slower and drift (slice 4p's notes
+  trial looked like a gain traced and was none untraced).
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only

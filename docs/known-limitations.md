@@ -36,6 +36,69 @@ created after the page read the data (`readAt`) stay, and the versions the canva
 
 ## Canvas performance (slice 1a)
 
+### Where the canvas stands after slice 4p (15 October 2026)
+
+Slice 4p's final sitting (`2026-10-15-09-36`; production measurement build; Chrome 155; three rounds A/B against
+`slice-04a`, untraced; `docs/prd/slice-04p-acceptance.md`). The entries below this one are kept as they were measured.
+
+| Figure | Bar | Now | State |
+| --- | --- | --- | --- |
+| Pan and zoom, overview | ≥ 50 fps, none over 50 ms | 59.7 fps, 0 | met |
+| Pan and zoom, 100 % dense area | ≥ 50 fps, none over 50 ms | 52.1 fps, 7–9 frames over 50 ms | **partly met** (the frames over 50 ms, as on `slice-04a`: 4–12) |
+| C-08 initial render | ≤ 1,500 ms | 1,432 ms (untraced) | **met** |
+| C-09 card resize | ≥ 45 fps | 36.7 fps (+1.9 % A/B, no regression) | **partly met** against its bar (card rows; needs a decision on the card's look) |
+| C-10 hover | ≤ 100 ms | 18 ms | **met** (slice 4p's overlay, AD-24) |
+| Lasso marks | ≤ 100 ms | 23 ms | **met** |
+| Single-card and group drags | ≥ 45 fps | 11 and 32 fps | **partly met** (card rows, as C-09) |
+| Fading, switching (S4P-02) | ≤ 100 ms | 15–33 ms, except the 30 % view with frames expanded: see below | **partly met** (Łukasz, 15 October) |
+| Fading, pan and zoom on vs off (S4P-03) | ≥ −5 % | −4.9 to +5.8 % in all 14 cells | **met** |
+
+### Fading's slow switches at 30 % with frames expanded (slice 4p)
+
+On the finished F1 (one veil in the canvas layer, the lit cards lifted by a stylesheet rule; AD-24) switching takes
+15–33 ms in every view (median of 40), except at 30 % with frames expanded on “Performance test” (about 4,500 elements in
+view). There it is bimodal: most runs switch in 17–26 ms, but in some a whole run takes 200–600 ms per switch.
+- **Medians:** the large lens on 26, 462 and 565 ms in the three rounds; Focus on 270 ms in one round.
+- **p95:** 300–610 ms in almost every run there.
+
+The same mode was already in step 2's trial sitting, behind fast medians.
+
+- **Hypothesis, not proven:** the veil is in the canvas's big layer; when Chrome has to raster the whole visible part
+  of that layer again, a switch costs a full GPU raster at 30 %.
+- **Partly met** (Łukasz, 15 October 2026), with this entry; no trace in slice 4p.
+- **Slice 4b, step 0:** trace a switch in this view (large lens, 30 %, frames expanded) before building the lens on F1.
+- Since slice 4p, switch and interaction times are reported with their p95 and max next to the median; these slow
+  switches hid behind medians from step 2 on.
+
+### C-08: what the first render waits for (slice 4p)
+
+C-08 is met untraced (1,432 ms). The traced diagnosis (five loads, `scripts/c08-waiting.ts`) splits the first render:
+- **the first byte:** about 230–300 ms, the server rendering the page with the local adapter;
+- **the main thread's own work:** about 550 ms (script about 340, style and layout about 145, paint and layerize about
+  30);
+- **after the document**, about 1.04 s to the stable frame:
+  - the network about 30–130 ms, only Next.js prefetching the workspace and project links;
+  - the GPU's raster about 130 ms;
+  - **the main thread idle for about 0.7 s**, with nothing in the trace filling it.
+
+- **A lead from the code** (15 October, no measurement): the idle time is nearly the same in every load (709–748 ms),
+  which looks like a fixed wait, not work. There is no timer, debounce, animation or transition of about 300 ms or more
+  on the path from the page's load to the canvas being ready:
+  - the first view is set once without animation (`ModelCanvas`, `setViewport` with no `duration`), and `<ReactFlow>`
+    gets no `fitView` or `onInit`;
+  - the 250 ms durations belong to the Fit button, the go-to links and a frame's fit, all user actions;
+  - the other timers (the moved row's 700 ms flash, toasts, the delete confirmation, the right-drag's click swallow, the
+    local adapter's write retry) are not on the load path;
+  - the fonts come from `next/font/google` with its default `display: swap`, and nothing waits for them;
+  - the canvas is `visibility: hidden` only until React Flow's observer reports the pane's size.
+
+  So the wait is most likely outside our code: how React hydrates the streamed page (the 246 KiB document carries the
+  React payload inline; hydration may wait for the stream to end and then work in yielding slices) or when Chrome
+  starts drawing frames for the page. Unconfirmed.
+- **Later:** if C-08 needs work (for example with the database's own latency), mark the steps in the measurement build
+  (hydration, the canvas's ready step, React Flow's measuring, the lines drawn) to find what the 0.7 s waits for. In the
+  database slice (AD-31), add Server-Timing to the canvas page.
+
 ### S1A-14 is only partly met, and measured on the dev server
 
 On the “Performance test” workspace (`seed:large`), pan and zoom at the overview mostly reach the bar, but at 100% the
@@ -108,6 +171,32 @@ initial render.
   what the overlays themselves cost, under 35 ms for the marks). The card rows need a decision on the card's look
   (fewer elements per row, or detail by zoom between 40 % and 100 %), measured with `DIAG=blocks` as the upper limit.
 
+### Chrome 155 changed the starting point (slice 4p)
+
+Slice 4p's baseline (14 October 2026, Google Chrome 155.0.8059.40, `slice-04a` against itself) gives on the same laptop:
+C-10 hover 117 ms (slice 2p, Chrome 154: about 170), lasso marks 22–25 ms (about 140), C-09 about 36 fps (about 25),
+C-08 about 1.45 s (about 1.75), pan and zoom at the overview 59–60 fps (53.5). The application only grew since, so the
+gain is very likely the browser, not proven. Earlier slices' figures in this file are kept as measured; from slice 4p
+on, only figures from the same sitting are compared (A/B against the previous tag, or fading on against off in the same
+run). Details in [slice-04p-acceptance.md](prd/slice-04p-acceptance.md).
+
+### C-10 met; the other lines do not fade on a hover (slice 4p)
+
+Since slice 4p the hover, the row and selection marks and the lasso are drawn in an overlay on its own compositing layer
+(AD-24): C-10 is **met**, 19 ms against 120 ms on `slice-04a` (sitting `trials-2026-10-14-20-04`, three rounds; slice
+1b's “partly met” at about 190 ms is closed). The lasso marks were already at about 28 ms with Chrome 155 and stay
+there.
+
+What remains: on a hover the hovered lines are drawn again, stronger, above the cards, but the **other lines keep their
+colour**. The prototype fades them to 12 %. Slice 4p measured a veil above the lines and below the cards, shown only
+while something is hovered (the hover line fade): C-10 **228 ms** with it in the canvas layer and **247 ms** on its own
+layer, against 19–26 ms without it, on every branch.
+
+- **Rejected** by Łukasz on 15 October 2026, with these figures (`docs/prd/slice-04p-acceptance.md`, tag
+  `perf/4p-trial-a`).
+- **Later:** only with a way to fade lines that changes neither the canvas layer nor the cards' layering; none is
+  known.
+
 ### Frame cost grows with the number of elements in the viewport (slice 3a)
 
 On every pan and zoom frame Chrome repaints and re-layers the whole viewport of the canvas; Layerize is the main cost
@@ -129,6 +218,11 @@ mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md]
   about what the element count predicts but inside the run-to-run spread (0.4–0.7 ms); the remaining excess is about
   +0.8 ms Layerize, +0.1 ms layout, +0.15 ms script per frame. So the element-count attribution is consistent with the
   traces but not proven; the performance review starts from these traces (`.data/measure/diag-3a`, `diag-3a-after`).
+- **Slice 4p measured option (c), the notes on a compositing layer of their own, and rejected it** (Łukasz's rule set
+  before the trace; tag `perf/4p-trial-notes`): pan and zoom at 30 % without tracing 44.5 → 45.2 fps around `ent:23` and
+  43.3 → 46.7 fps on the notes, both inside the spread; tile memory +20 to +35 MiB; and it makes the notes' container a
+  stacking context, so notes pinned to a lit card could no longer be lifted above the fading veil
+  (`docs/prd/slice-04p-acceptance.md`). What remains is fewer elements per note, if needed.
 - **What has to happen later (performance review before the database slice, AD-31):** measure a separate compositing
   layer for the notes (option c: their paint and Layerize no longer part of the cards'; it touches AD-24's rules on
   layers and may cost GPU memory or raster time) and, if still needed, fewer elements per note beyond slice 3a's (body,
@@ -174,13 +268,14 @@ The requirement index (scope, coverage, children, and each element's direct and 
 `src/domain/model/requirement-index.ts`) is built from scratch once per data version: once per page on the server for
 the left panel, the project home and the status bar, and once in the browser for the panels whenever the requirements,
 their links or the model change, which is after every write. On a synthetic model of 500 requirements, 5,000
-attributes, 2,000 mappings and 3,000 links one build takes a median of 25.5 ms on the development laptop
-(`npx tsx scripts/bench-requirement-index.ts`).
+attributes, 2,000 mappings and 3,000 links one build takes a median of 12.7 ms in the browser (measurement build, Chrome
+155, the development laptop; three rounds of 30 builds: medians 12.6–12.8 ms, slowest 18.6–20.6 ms; slice 4p, S4P-11).
 
-- **Fine for now:** the demo workspace has five requirements; one build is a small part of a page.
-- **For the performance review (before slice 4b and the database slice, AD-31):** consider an incremental rebuild, so a
-  write that touches one mapping, link or requirement recomputes only the requirements whose scope it reaches, and
-  measure the index together with 4b's lens, which reads it on every selection.
+- **Fine for now, decided in slice 4p** (Łukasz's rule): an incremental rebuild only if the median is above 50 ms or the
+  p95 above 100 ms. It is neither, so slice 4b keeps the full rebuild. The demo data builds in under 0.2 ms and
+  “Performance test” in under 1.2 ms.
+- **Measure it again** if a real workspace grows well beyond the synthetic model, or if 4b's lens reads it more often
+  than once per data version.
 
 ## Screens compared with the prototype (slice 4a, step 5)
 

@@ -5,8 +5,13 @@ const baseURL = E2E_BASE;
 
 export default defineConfig({
   testDir: "e2e",
-  // element counts and the live canvas's pan and zoom (S3B-15 a, c) only mean something in the measurement build
-  testIgnore: E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts"],
+  // element counts, the live canvas's pan and zoom (S3B-15 a, c) and the fading scenarios (slice 4p) only mean something
+  // in the measurement build
+  // and the S4P-04 screenshots (slice 4p) run only when asked with SCREENS=1
+  testIgnore: [
+    ...(E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts", "**/S4P-fading.spec.ts", "**/S4P-10-c08.spec.ts", "**/S4P-11-index.spec.ts"]),
+    ...(process.env.SCREENS ? [] : ["**/*-screens.spec.ts"]),
+  ],
   // The dev server compiles pages on first use, which can take a while.
   timeout: 60_000,
   expect: { timeout: 15_000 },
@@ -36,7 +41,8 @@ export default defineConfig({
         // a fresh build folder every run: the server is stopped by force at the end, so nothing of the last run is reused
         command: `npx tsx scripts/clean-e2e-build.ts .next-e2e && npm run reset-dev-data && npm run dev -- --port ${E2E_PORT}`,
         url: `${baseURL}/sign-in`,
-        env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e" },
+        // the test hooks (slice 4p) are on in the e2e dev server only
+        env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e", INFOMAPPER_TEST_HOOKS: "1" },
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
       },

@@ -206,6 +206,21 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas.node-dragging .react-flow__viewport { will-change: auto }
 .im-canvas.resizing, .im-canvas.resizing * { cursor: ew-resize !important }
 
+/* ---------- the overlay (slice 4p, trial A): one container above the cards with its own compositing layer, so the hover,
+   the moved-row flash, the resize outline and the selection marks repaint only it, never the viewport's big layer.
+   It sits in the viewport portal and pans and zooms with the viewport; it takes no pointer events. ---------- */
+.im-canvas .overlay-layer { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform }
+/* fading (slice 4p, step 2): the lit lines drawn again above it, and the lens's rows tinted (prototype .row.rq covered,
+   .row.gap gap) over the rows, translucent so their text stays readable */
+/* fading (slice 4p, AD-24): one veil in the viewport's big layer above the cards, in the canvas background's colour; the
+   lit cards and their pinned notes lifted above it by `FadeLayer`'s stylesheet rule (z-index 2); the overlay above both */
+.im-canvas .fade-veil { position: absolute; z-index: 1; pointer-events: none; background: color-mix(in srgb, var(--im-canvas) 75%, transparent) }
+.im-canvas .overlay-layer { z-index: 3 }
+.im-canvas .lit-lines .lnk { pointer-events: none }
+.im-canvas .lit-lines .lnk .hit { display: none }
+.im-canvas .lit-rows .covered { fill: var(--im-req-soft); fill-opacity: .65 }
+.im-canvas .lit-rows .gap { fill: var(--im-warn-soft); fill-opacity: .75 }
+
 /* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */
 /* One overlay above the cards; the cards are not restyled. Fill opacity on a handful of overlay shapes only. */
 .im-canvas .hover-layer { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
@@ -215,7 +230,8 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .hover-layer .moved { fill: var(--im-logical); animation: im-moved .6s ease-out forwards }
 @keyframes im-moved { from { fill-opacity: .22 } to { fill-opacity: 0 } }
 
-/* Hover (C-10): the hovered lines drawn again, a little stronger, above the others; nothing is restyled. */
+/* Hover (C-10): the hovered lines drawn again, a little stronger, in the overlay above the cards (slice 4p, trial A);
+   nothing is restyled. */
 .im-canvas .hover-lines .lnk { pointer-events: none }
 .im-canvas .hover-lines .lnk .hit { display: none }
 .im-canvas .hover-lines .lnk .s { stroke-width: 2.4 }

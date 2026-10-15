@@ -7,7 +7,9 @@
 // computed again only when one of its cards moved or changed (slice 2a step 3b): a drag recomputes the lines of the
 // dragged cards, not all of them, on every frame.
 // Hover (slice 1b, C-10): the lines are not restyled and the others do not fade (restyling 340 lines, or one veil over
-// them, made the hover too slow); the hovered lines are drawn again, emphasised, above the others and below the cards.
+// them, made the hover too slow); the hovered lines are drawn again, emphasised, by `HoverLines` below. Slice 4p (trial
+// A): `HoverLines` draws in the overlay above the cards (its own compositing layer, `OverlayLayer.tsx`), so a hover
+// neither re-renders nor repaints this layer.
 // Slice 2c (D-07): lines touching a collapsed frame come as bundles (`bundleLines`), drawn in the same layer: a group of
 // one mapping as that mapping, two or more as one line with a count, relationships with “N relationship(s)”.
 
@@ -17,7 +19,8 @@ import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type Notation } from "./context";
 import { cardRect, ieMarker, LOD_ZOOM, multText, relGeom, umlMarker, type Placed, type Rect } from "./geometry";
 import { bundleGeom, mapGeom, placedOf, type Bundle, type BundleEnd, type BundleGeom, type MapGeom } from "./line-geometry";
-import type { CanvasLines, MapLineData, RelLineData, Related, Selection } from "./line-data";
+import { relatedLines, type CanvasLines, type MapLineData, type RelLineData, type Related, type Selection } from "./line-data";
+import { useValue, type ValueStore } from "./value-store";
 
 interface LineProps {
   sig: string;
@@ -169,7 +172,6 @@ function LineLayer({
   mapsById = NO_MAPS,
   selection,
   related,
-  hover,
   onSelect,
   tethers = NO_TETHERS,
 }: {
@@ -183,8 +185,6 @@ function LineLayer({
   mapsById?: ReadonlyMap<string, MapLineData>;
   selection: Selection;
   related: Related | null;
-  /** The lines of the hovered row or line, drawn above the veil; null when nothing is hovered. */
-  hover: Related | null;
   onSelect: (sel: Selection) => void;
   /** The dashed tethers of pinned notes (slice 3a, D-20), drawn here as part of the one line layer (AD-24 rule 3). */
   tethers?: readonly { id: string; x1: number; y1: number; x2: number; y2: number }[];
@@ -336,32 +336,130 @@ function LineLayer({
           ))}
         </g>
       </svg>
-      {hover && (
-        <svg className="line-layer hover-lines" width={1} height={1} data-testid="layer-hover-lines">
-          {lines.mappings
-            .filter((l) => hover.maps.has(l.id))
-            .map((l) => {
-              const geom = mapGeom(l, lookup);
-              if (!geom) return null;
-              const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${l.inputCount > 1 ? " combined" : ""} hl`;
-              return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={() => {}} />;
-            })}
-          {bundles
-            .filter((b) => b.t === "map" && b.ids.some((id) => hover.maps.has(id)))
-            .map((b) => {
-              const geom = bundleGeom(b, placed, blocks, mapsById);
-              if (!geom || geom.kind === "rel") return null;
-              if (geom.kind === "single") {
-                const l = geom.line;
-                return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={`lnk map ${l.status}${l.warn ? " warn" : ""} hl`} onSelect={() => {}} />;
-              }
-              const className = `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""} hl`;
-              return <BundlePath key={b.key} sig="" bundleKey={b.key} geom={geom} className={className} onSelect={() => {}} />;
-            })}
-        </svg>
-      )}
     </EdgeLabelRenderer>
   );
 }
 
 export default memo(LineLayer);
+
+const NOOP = () => {};
+
+/**
+ * The hovered row's or line's lines drawn again, a little stronger (slice 1b, C-10), in the overlay above the cards
+ * (slice 4p, trial A). The hover and the lasso come from stores, so only this re-renders on a hover.
+ */
+export const HoverLines = memo(function HoverLines({
+  hoverStore,
+  lassoStore,
+  busy,
+  allLines,
+  lines,
+  bundles = NO_BUNDLES,
+  blocks = NO_BLOCKS,
+  mapsById = NO_MAPS,
+}: {
+  hoverStore: ValueStore<Selection>;
+  lassoStore: ValueStore<Rect | null>;
+  busy: boolean;
+  /** Every line of the canvas: what the hovered row or line emphasises. */
+  allLines: CanvasLines;
+  /** The lines drawn on their own, and the bundles, as the line layer has them. */
+  lines: CanvasLines;
+  bundles?: readonly Bundle[];
+  blocks?: ReadonlyMap<string, Rect>;
+  mapsById?: ReadonlyMap<string, MapLineData>;
+}) {
+  const hovered = useValue(hoverStore);
+  const lassoing = useValue(lassoStore) !== null;
+  useStore((s) => s.nodes); // follow drags, collapses and widths
+  const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
+  const lookup = useStoreApi().getState().nodeLookup;
+  const hover = busy || lassoing ? null : relatedLines(hovered, allLines);
+  if (!hover) return null;
+  const dots = !lod;
+  const placed = (cardId: string) => placedOf(lookup.get(cardId));
+  return (
+    <svg className="line-layer hover-lines" width={1} height={1} data-testid="layer-hover-lines">
+      {lines.mappings
+        .filter((l) => hover.maps.has(l.id))
+        .map((l) => {
+          const geom = mapGeom(l, lookup);
+          if (!geom) return null;
+          const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${l.inputCount > 1 ? " combined" : ""} hl`;
+          return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
+        })}
+      {bundles
+        .filter((b) => b.t === "map" && b.ids.some((id) => hover.maps.has(id)))
+        .map((b) => {
+          const geom = bundleGeom(b, placed, blocks, mapsById);
+          if (!geom || geom.kind === "rel") return null;
+          if (geom.kind === "single") {
+            const l = geom.line;
+            return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={`lnk map ${l.status}${l.warn ? " warn" : ""} hl`} onSelect={NOOP} />;
+          }
+          const className = `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""} hl`;
+          return <BundlePath key={b.key} sig="" bundleKey={b.key} geom={geom} className={className} onSelect={NOOP} />;
+        })}
+    </svg>
+  );
+});
+
+/**
+ * The lit lines drawn again in the overlay above the fading (slice 4p, step 2): the mappings and relationships a Focus or
+ * a lens lights, and the bundles holding one of them, at their usual strength; the line layer under the fading stays as
+ * it is.
+ */
+export const LitLines = memo(function LitLines({
+  maps,
+  rels,
+  lines,
+  bundles = NO_BUNDLES,
+  blocks = NO_BLOCKS,
+  mapsById = NO_MAPS,
+}: {
+  maps: ReadonlySet<string>;
+  rels: ReadonlySet<string>;
+  /** The lines drawn on their own, and the bundles, as the line layer has them. */
+  lines: CanvasLines;
+  bundles?: readonly Bundle[];
+  blocks?: ReadonlyMap<string, Rect>;
+  mapsById?: ReadonlyMap<string, MapLineData>;
+}) {
+  useStore((s) => s.nodes); // follow drags, collapses and widths
+  const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
+  const { notation } = useContext(CanvasUiCtx);
+  const lookup = useStoreApi().getState().nodeLookup;
+  const dots = !lod;
+  const placed = (cardId: string) => placedOf(lookup.get(cardId));
+  return (
+    <svg className="line-layer lit-lines" width={1} height={1} data-testid="layer-lit-lines">
+      {lines.relationships
+        .filter((l) => rels.has(l.id))
+        .map((l) => {
+          const a = placed(l.fromCardId), z = placed(l.toCardId);
+          if (!a || !z) return null;
+          return <RelPath key={l.id} sig="" line={l} a={a} z={z} notation={notation} className="lnk rel" onSelect={NOOP} />;
+        })}
+      {lines.mappings
+        .filter((l) => maps.has(l.id))
+        .map((l) => {
+          const geom = mapGeom(l, lookup);
+          if (!geom) return null;
+          const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.part ? " part" : ""}${l.inputCount > 1 ? " combined" : ""}`;
+          return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
+        })}
+      {bundles
+        .filter((b) => b.ids.some((id) => (b.t === "map" ? maps : rels).has(id)))
+        .map((b) => {
+          const geom = bundleGeom(b, placed, blocks, mapsById);
+          if (!geom) return null;
+          if (geom.kind === "single") {
+            const l = geom.line;
+            return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={`lnk map ${l.status}${l.warn ? " warn" : ""}`} onSelect={NOOP} />;
+          }
+          const className = geom.kind === "rel" ? "lnk rel bundle" : `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""}`;
+          return <BundlePath key={b.key} sig="" bundleKey={b.key} geom={geom} className={className} onSelect={NOOP} />;
+        })}
+    </svg>
+  );
+});
