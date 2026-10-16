@@ -305,7 +305,8 @@ Type checking (D-01) compares the attribute's type and parameters with each inpu
 | `external_ref` | text | yes | e.g. `JIRA-481` |
 | `parent_id` | uuid | yes | FK `requirement`; break-down |
 
-Coverage is computed, never stored (D-31). New keys come from `workspace.requirement_key_next` (`REQ-{n}`), which
+Coverage is computed, never stored (D-31), over the requirement's items: its linked entities, its linked attributes
+and the attributes of its linked mappings. New keys come from `workspace.requirement_key_next` (`REQ-{n}`), which
 skips keys someone typed and is never wound back by an undo (slice 4a).
 
 ### `requirement_link`

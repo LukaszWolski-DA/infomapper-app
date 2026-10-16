@@ -542,13 +542,13 @@ describe("seed:large (S1A-14)", () => {
     const byKey = (key: string) => requirements.find((r) => r.key === key)!.id;
     const small = lenses.coverage(byKey("REQ-101")), large = lenses.coverage(byKey("REQ-102"));
     expect([small.total, small.notMapped.length]).toEqual([6, 1]);
-    expect(lenses.linksOf(byKey("REQ-102")).every((k) => k.entity_id)).toBe(true);
+    // REQ-102 links every attribute of ent:3, ent:4, ent:7 and ent:19 (slice 4b-1: an entity link no longer brings them)
+    expect(lenses.linksOf(byKey("REQ-102")).every((k) => k.attribute_id)).toBe(true);
     // the dense area's lens: the four tables in S1A-14's 100 % view, no attributes in scope
     const dense = lenses.linksOf(byKey("REQ-103"));
     expect(dense.map((k) => k.source_table_id).sort()).toEqual(["src:1", "src:29", "src:47", "src:57"].map((c) => seedId(ws, `table:${c}`)).sort());
     expect(lenses.coverage(byKey("REQ-103")).total).toBe(0);
-    // ent:3, ent:4, ent:7 and ent:19: four entity items since slice 4b-1 (PRD item 9; 4a counted their 46 attributes)
-    expect([large.total, large.parts.entities]).toEqual([4, 4]);
+    expect([large.total, large.parts.attributes]).toEqual([5 + 8 + 21 + 12, 5 + 8 + 21 + 12]);
     expect(cards.some((c) => c.requirement_id)).toBe(false);
     // The demo workspaces are untouched.
     expect((await store.model.load(RETAIL)).entities).toHaveLength(6);

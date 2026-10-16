@@ -4,8 +4,9 @@
 // S4P-12).
 //
 //   REQ-101 “Lens, small”: five mapped attributes of ent:19 and one without a mapping (its rows coloured covered or gap)
-//   REQ-102 “Lens, large”: the entities ent:3, ent:4, ent:7 and ent:19 (all their attributes in scope, D-31), about half
-//           of the cards in the 30 % view
+//   REQ-102 “Lens, large”: every attribute of the entities ent:3, ent:4, ent:7 and ent:19 (46 attribute links since slice
+//           4b-1: an entity link no longer brings its attributes, D-31, so the large set stays what slice 4p and 4b-1's
+//           step 0 measured: 29 cards, 29 lines, 46 rows), about half of the cards in the 30 % view
 //   REQ-103 “Lens, dense area”: the source tables in S1A-14's 100 % view around src:57, the heaviest view (Łukasz after
 //           step 0)
 
@@ -19,7 +20,7 @@ import type { DevDb } from "./schema";
 export const LARGE_FOCUS_CARD = "ent:23";
 /** The small lens's entity. */
 const SMALL_ENTITY = "ent:19";
-/** The large lens's entities. */
+/** The large lens's entities: REQ-102 links all their attributes. */
 const LARGE_ENTITIES = ["ent:3", "ent:4", "ent:7", "ent:19"] as const;
 export const LARGE_LENS_KEYS = { small: "REQ-101", large: "REQ-102", dense: "REQ-103" } as const;
 export const LARGE_REQUIREMENT_KEY_NEXT = 104;
@@ -70,7 +71,12 @@ export function addLargeRequirements(o: { db: DevDb; data: GenDataSet; workspace
     }
   };
   add(LARGE_LENS_KEYS.small, "Lens, small", "data", smallLensRows(o.data).map((row) => ({ kind: "attribute", id: id(`attribute:${row}`) })));
-  add(LARGE_LENS_KEYS.large, "Lens, large", "need", LARGE_ENTITIES.map((card) => ({ kind: "entity", id: id(`entity:${card}`) })));
+  add(
+    LARGE_LENS_KEYS.large,
+    "Lens, large",
+    "need",
+    LARGE_ENTITIES.flatMap((card) => o.data.cards.find((c) => c.id === card)!.rows.map((row) => ({ kind: "attribute" as const, id: id(`attribute:${row.id}`) }))),
+  );
   add(LARGE_LENS_KEYS.dense, "Lens, dense area", "data", denseViewTables(o.data).map((card) => ({ kind: "source_table", id: id(`table:${card}`) })));
   db.workspace.find((w) => w.id === o.workspaceId)!.requirement_key_next = LARGE_REQUIREMENT_KEY_NEXT;
 }
