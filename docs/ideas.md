@@ -98,3 +98,9 @@ requirement's gaps would name attributes whose panels do not show that requireme
 - **C.** Coverage by kind, e.g. a business need is covered when its parts (the requirements below it) are covered.
 
 Changing it changes D-31 and D-34 (`docs/decisions.md`, with Łukasz).
+
+## Palette contrast to WCAG AA (slice 4b-1, step 6)
+
+The grey text (`--im-ink-3`, 3.6:1 on white), the PII tag (4.4:1) and the BK tag (4.1:1) are below WCAG AA's 4.5:1 on a
+plain card (`docs/known-limitations.md`, Text contrast). A candidate for the ergonomics slice: darker values for these
+three, checked in both colour schemes, with the prototype's look kept as far as possible (Łukasz after step 6).

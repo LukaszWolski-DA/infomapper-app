@@ -7,6 +7,10 @@
 // - Focus on a requirement (prototype relatedOf “req”; slice 4p's lens without its colours): the entities and tables of
 //   its scope (D-31); for every attribute in scope its mappings with their tables and entities; for every column in
 //   scope its mappings; the mappings in scope.
+// - Slice 4b-1, step 7 (PRD item 21), the rest of the prototype's relatedOf: a table (“source”: the table and its
+//   columns' mappings with their ends), an attribute (its mappings with their ends, and its entity), a column (its
+//   mappings with their ends, and its table), a mapping (with its ends), a relationship (with both entities), and
+//   several entities and tables at once (a frame's cards or a multi-selection: what each of them lights).
 
 import type { Uuid } from "../ids";
 import type { WorkspaceModel } from "../types";
@@ -61,17 +65,7 @@ function addMapping(lit: Lit, l: ReturnType<typeof lookup>, mappingId: Uuid) {
 
 /** Focus on an entity (prototype relatedOf “entity”). */
 export function focusLit(model: LitModel, entityId: Uuid): Lit {
-  const l = lookup(model);
-  const lit = empty();
-  lit.entities.add(entityId);
-  for (const a of live(model.attributes)) if (a.entity_id === entityId) for (const m of l.mappingsOfAttribute.get(a.id) ?? []) addMapping(lit, l, m);
-  for (const r of live(model.relationships)) {
-    if (r.from_entity_id !== entityId && r.to_entity_id !== entityId) continue;
-    lit.relationships.add(r.id);
-    lit.entities.add(r.from_entity_id);
-    lit.entities.add(r.to_entity_id);
-  }
-  return lit;
+  return targetLit(model, { t: "entity", id: entityId });
 }
 
 /** Focus on a requirement (prototype relatedOf “req”): its scope's cards and the mappings around it; no row coloured. */
@@ -83,5 +77,71 @@ export function requirementFocusLit(model: LitModel, scope: RequirementScope): L
   for (const a of scope.attributes) for (const m of l.mappingsOfAttribute.get(a) ?? []) addMapping(lit, l, m);
   for (const c of scope.columns) for (const m of l.mappingsOfColumn.get(c) ?? []) addMapping(lit, l, m);
   for (const m of scope.mappings) addMapping(lit, l, m);
+  return lit;
+}
+
+/** What Focus can be on besides a requirement (slice 4b-1, PRD item 21). A frame or several items: their cards. */
+export type LitTarget =
+  | { t: "entity" | "table" | "attribute" | "column" | "mapping" | "relationship"; id: Uuid }
+  | { t: "several"; entities: readonly Uuid[]; tables: readonly Uuid[] };
+
+/** Focus on a table (prototype relatedOf “source”): the table, its columns' mappings with their ends. */
+function tableLit(model: LitModel, l: ReturnType<typeof lookup>, lit: Lit, tableId: Uuid) {
+  lit.tables.add(tableId);
+  for (const c of live(model.sourceColumns)) if (c.source_table_id === tableId) for (const m of l.mappingsOfColumn.get(c.id) ?? []) addMapping(lit, l, m);
+}
+
+function entityLit(model: LitModel, l: ReturnType<typeof lookup>, lit: Lit, entityId: Uuid) {
+  lit.entities.add(entityId);
+  for (const a of live(model.attributes)) if (a.entity_id === entityId) for (const m of l.mappingsOfAttribute.get(a.id) ?? []) addMapping(lit, l, m);
+  for (const r of live(model.relationships)) {
+    if (r.from_entity_id !== entityId && r.to_entity_id !== entityId) continue;
+    lit.relationships.add(r.id);
+    lit.entities.add(r.from_entity_id);
+    lit.entities.add(r.to_entity_id);
+  }
+}
+
+/** What Focus lights for a selection other than a requirement (prototype relatedOf); nothing for an unknown id. */
+export function targetLit(model: LitModel, target: LitTarget): Lit {
+  const l = lookup(model);
+  const lit = empty();
+  switch (target.t) {
+    case "entity":
+      entityLit(model, l, lit, target.id);
+      break;
+    case "table":
+      tableLit(model, l, lit, target.id);
+      break;
+    case "attribute": {
+      const entity = l.entityOf.get(target.id);
+      if (!entity) break;
+      lit.entities.add(entity);
+      for (const m of l.mappingsOfAttribute.get(target.id) ?? []) addMapping(lit, l, m);
+      break;
+    }
+    case "column": {
+      const table = l.tableOf.get(target.id);
+      if (!table) break;
+      lit.tables.add(table);
+      for (const m of l.mappingsOfColumn.get(target.id) ?? []) addMapping(lit, l, m);
+      break;
+    }
+    case "mapping":
+      addMapping(lit, l, target.id);
+      break;
+    case "relationship": {
+      const r = live(model.relationships).find((x) => x.id === target.id);
+      if (!r) break;
+      lit.relationships.add(r.id);
+      lit.entities.add(r.from_entity_id);
+      lit.entities.add(r.to_entity_id);
+      break;
+    }
+    case "several":
+      for (const e of target.entities) entityLit(model, l, lit, e);
+      for (const t of target.tables) tableLit(model, l, lit, t);
+      break;
+  }
   return lit;
 }

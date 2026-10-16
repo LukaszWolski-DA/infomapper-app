@@ -25,6 +25,8 @@ import { newCardHeight } from "@/canvas/geometry";
 import { FILTER_LABEL, filtersOf } from "@/canvas/CardNode";
 import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
 import { isCardKey } from "@/canvas/selection";
+import { focusOn } from "@/canvas/fade";
+import { toggleFocus } from "@/canvas/Focus";
 import type { Uuid } from "@/domain/ids";
 import { NOTE_COLORS, type MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
@@ -225,15 +227,21 @@ export function useCanvasHost({
       if (!ui.cardFrame(card.id)) {
         items.push({ label: `Put in a new ${isEnt ? "concept" : "source system"} frame`, act: () => ui.putInNewFrame([card.id], true) });
       }
+      items.push(focusItem());
       items.push({ sep: true });
       // on a live canvas removing a card takes its label off, after the question (PRD item 11)
       items.push({ label: live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
       if (isEnt) items.push({ label: "Delete from model…", danger: true, act: () => setDeleting(card.targetId) });
-    } else if (canNote) {
-      items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });
+    } else {
+      if (canNote) items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });
+      items.push(focusItem());
     }
     return items;
   };
+
+  // Focus (slice 4b-1, item 20; prototype ctxFor): in the card and row menus, for every role; the right-click has
+  // already selected what Focus will be on
+  const focusItem = (): ToolboxItem => ({ label: focusOn.get() ? "Turn Focus off" : "Focus on this", testId: "toolbox-focus", act: () => toggleFocus(ui.selection, toast) });
 
   const cardName = (card: HostCard) => (card.kind === "ent" ? ix.entity.get(card.targetId)?.name : ix.table.get(card.targetId)?.name) ?? "";
 
@@ -476,12 +484,14 @@ export function useCanvasHost({
               }),
           });
         }
+        items.push(focusItem());
       }
       return items;
     }
     if (t.kind === "row" && card.kind === "src" && ix.column.has(t.rowId)) {
       items.push({ head: columnLabel(ix, t.rowId) });
       if (editable) items.push({ label: "Map to an attribute…", act: () => focusField("f-adda") });
+      items.push(focusItem());
       return items;
     }
     items.push({ head: cardName(card) });

@@ -1,8 +1,95 @@
 # Slice 4b-1 – Acceptance
 
-Status: **steps 1 to 6 accepted; step 6's follow-up (dot, collapsed blocks, D-32, contrast) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+Status: **steps 1 to 6 and step 6's follow-up accepted; step 7 (Focus, with the “and N more” dot) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
+
+## Step 7: Focus, and step 6's last answers (16 October 2026)
+
+Step 6's follow-up was accepted. Łukasz's answers, built together with step 7 (PRD items 20–23):
+1. **The “and N more” row gets the summary dot** for its hidden members (orange if any of them is a gap). S4B1-05
+   checks it with a frame whose only member in scope is past the sixth.
+2. **The palette's contrast: not now.** Recorded in `docs/known-limitations.md` (Text contrast) and in `docs/ideas.md`
+   as a candidate for the ergonomics slice.
+
+### What changed
+
+| File | Change |
+| --- | --- |
+| `src/domain/model/lit.ts` | `targetLit(model, target)`: what Focus lights for each selection besides a requirement (prototype `relatedOf`), with `LitTarget`: an entity, a table (its columns' mappings with their ends), an attribute, a column, a mapping, a relationship, or several entities and tables (a frame's cards or a multi-selection). `focusLit` is its entity case. |
+| `src/canvas/fade.ts` | `FocusTarget` = `LitTarget` or a requirement; keys `focus:<kind>:<id>` and `focus:several:<entities>\|<tables>` (an entity keeps 4p's `focus:<id>`); `focusOn`, a store of its own: on or off |
+| `src/canvas/Focus.tsx` (new) | `focusTargetOf(selection, cards)`; `FocusDriver` (turns Focus and the selection into the fade request; off when leaving or switching canvas); `toggleFocus`; the toolbar's `FocusButton`; the status bar's `FocusChip` |
+| `src/canvas/fade-canvas.tsx` | `useLit` works out every target with `targetLit`, a requirement with the index as before |
+| `src/canvas/ModelCanvas.tsx` | the selection's Focus target, and `FocusDriver` |
+| `src/app/.../c/[canvasId]/page.tsx` | the Focus button after the layer switch, as in the prototype |
+| `src/app/_panels/status-bar.tsx` | the Focus chip after Requirements |
+| `src/app/_panels/canvas-host.tsx` | “Focus on this” / “Turn Focus off” in the card menus (every role) and the attribute and column row menus |
+| `src/canvas/CoverageLayer.tsx` | the “and N more” row's dot (`data-member="more"`) |
+| `docs/known-limitations.md`, `docs/ideas.md` | the palette's contrast |
+
+### How it works
+
+- **On and off:**
+  - the toolbar button (`aria-pressed`, the prototype's title, no shortcut);
+  - “Focus on this” / “Turn Focus off” in a card's and a row's menu (the right-click has already selected it);
+  - the chip “Focus ×” in the status bar.
+
+  Turning it on with nothing selected toasts “Focus fades everything not connected to what you select.”
+- **What it lights:** the selection's lit set (item 21). A change of selection moves it. With nothing selected, or a
+  note, a label or a bundle, Focus stays on and fades nothing (prototype `relatedOf` has nothing for them). A
+  requirement keeps its coverage colours.
+- **Momentary:** a store in the page's memory, never saved; off after a reload. `FocusDriver` turns it off when the
+  canvas is left or another one opens.
+- **No canvas commit on switching:** the button, the chip and the menu set `focusOn`; only `FocusDriver` and the
+  fading layer draw again. S4B1-06 checks that the canvas's and the miniature's commit counters stay as they were.
+- **Every role** (item 23): the button, the chip and the menu entry are there for reviewers and readers too. A reader's
+  card menu now has one entry, so it opens.
+
+### Not built: “Show everything”
+
+PRD item 22 says Focus also turns off with “Show everything” (the view reset). The application has no such reset:
+- in the prototype it is the view-state bar's “Show all” (`data-vall`, D-39);
+- that bar is not built yet (`docs/known-limitations.md`, "Live canvases without the view-state bar": slice 6).
+
+I didn't add a reset, so as not to build a piece of D-39 in this slice. **A question for Łukasz:** leave it to the
+view-state bar's slice (recorded as a deliberate gap), or add a reset now, and where?
+
+### Assumptions
+
+- **The chip sits in the status bar after Requirements**, as the PRD says (item 20). The prototype's view-state list is
+  in the bar under the tabs.
+- **Row menus:** the attribute and column rows (answer C). Frame, line and selection menus have no entry, as in the
+  prototype. Focus on a frame or several items comes from the toolbar or the chip.
+- **A frame's lit set** is what its cards light (the prototype's `relatedOf "frame"`). The frame's own outline stays
+  under the veil, as since step 3.
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `src/domain/model/lit.test.ts` | six new cases: a table, an attribute, a column, a mapping and a relationship, several items, unknown or deleted ids |
+| `src/canvas/focus.test.ts` (new) | the selection's target for every kind, and the keys |
+| `e2e/slice-04b1/S4B1-06.spec.ts` (new) | **S4B1-06.** **On and off:** on from the toolbar (the hint, the chip), off from the chip, on and off from a card's menu, on from a column row's menu. **Lit sets:** Customer (written out) and an attribute, a mapping, a relationship, several cards, a frame and REQ-105 (with its colours), each against the domain. **Commits:** switching Focus commits neither the canvas nor the miniature. **Off** after switching canvas (and back) and after a reload. |
+| `e2e/slice-04b1/S4B1-08.spec.ts` (new) | **S4B1-08.** Piotr (reviewer) and Kasia (reader): Focus from the toolbar, the chip and a card's menu, REQ-105's colours with Focus on; the data file unchanged. |
+| `e2e/slice-04b1/S4B1-05.spec.ts` | a third test: a frame around all seven cards, collapsed; a requirement on the seventh puts one dot on the “and 1 more” row |
+
+No earlier test changed in this step.
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 172 passed | 27.5 min |
+| 2 | 172 passed | 27.2 min |
+| 3 | 171 passed, **1 failed: S0-10** | 29.6 min |
+
+- **Run 3's failure is S0-10** (slice 0): “Server did not start within 300 s”. Its own restarted dev server on port 3201
+  did not come up in time. This is the slow cold start seen before in slices 1a and 1b. No step 7 file is on its path,
+  and it passed in runs 1 and 2. Not changed.
+- **172** is step 6's 167 plus S4B1-06 (two tests), S4B1-08 (two) and S4B1-05's “and N more” test.
+- Lint, typecheck and the unit tests (976 in 72 files) pass.
 
 ## Step 6 follow-up: Łukasz's answers (16 October 2026)
 

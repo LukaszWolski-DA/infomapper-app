@@ -7,7 +7,7 @@
 import { memo, useMemo } from "react";
 import { useStore, type InternalNode } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
-import { focusLit, requirementFocusLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
+import { requirementFocusLit, targetLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import type { ScopeModel } from "@/domain/model/requirements";
 import type { Requirement, RequirementLink } from "@/domain/types";
@@ -39,7 +39,7 @@ export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | 
     if ("lit" in request) return { key: fadeKey(request), lit: request.lit };
     if (!data) return null;
     const target = focusTarget(request.focus);
-    if (target.t === "entity") return { key: fadeKey(request), lit: focusLit(data.model, target.id) };
+    if (target.t !== "requirement") return { key: fadeKey(request), lit: targetLit(data.model, target) };
     if (!index?.byId.has(target.id)) return null;
     return { key: fadeKey(request), lit: requirementFocusLit(data.model, index.scope(target.id)) };
   }, [request, data, index]);

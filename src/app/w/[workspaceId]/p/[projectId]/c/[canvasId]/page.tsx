@@ -36,6 +36,7 @@ import { NoteToolButton } from "@/canvas/NoteToolButton";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
 import { EntityToolButton } from "@/canvas/EntityToolButton";
 import { HandToolButton } from "@/canvas/HandToolButton";
+import { FocusButton } from "@/canvas/Focus";
 import { LayerSwitch } from "@/canvas/LayerSwitch";
 import { CanvasLookProvider } from "@/canvas/look";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
@@ -300,6 +301,7 @@ export default async function CanvasPage({
 const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolean }) => (
   <>
     <LayerSwitch />
+    <FocusButton />
     {editable && <EntityToolButton />}
     {editable && <FrameToolButton />}
     {canNote && <NoteToolButton />}

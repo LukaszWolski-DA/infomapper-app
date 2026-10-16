@@ -7,7 +7,7 @@
 // or style changes. The overlay lies above the text, so a mark is a faint fill (the text keeps 4.5:1) and a bar in the
 // full colour where no text is (`LitRows`; a header's bar along its bottom edge). Below 40 % rows are not drawn; a dot
 // at the header's right end carries the card's summary (item 19), and a collapsed frame's block the same dot on each
-// member's row. Selecting anything else, a click on empty canvas or Escape clears the selection and with it the colours.
+// member's row (the members past the sixth one dot on the “and N more” row). Selecting anything else, a click on empty canvas or Escape clears the selection and with it the colours.
 
 import { memo, useMemo } from "react";
 import { useStore } from "@xyflow/react";
@@ -87,11 +87,24 @@ export const CoverageLayer = memo(function CoverageLayer({
       // the 12 px padding after the count (on the left it would sit beside the kind marker, an entity's a blue dot too);
       // below 40 %, larger, where the card header's dot is (the rows are a plain block then)
       const { frame, members } = (n as unknown as BlockNodeT).data;
+      const summaryOf = (cardId: string) => {
+        const card = lookup.get(cardId) as unknown as CardNodeT | undefined;
+        return card ? colours.summary.get(card.data.card.targetId) : undefined;
+      };
+      const dot = (i: number, colour: CoverageColour, member: string) =>
+        dots.push({ key: `${id}|${member}`, colour, x: x + BLOCK.width - (lod ? 26 : 6), y: y + HEAD_H + BLOCK.bodyPad + (i + 0.5) * BLOCK.rowHeight, r: lod ? 9 : 3.5, block: frame.id, member });
       members.slice(0, BLOCK.maxRows).forEach((m, i) => {
-        const card = lookup.get(m.id) as unknown as CardNodeT | undefined;
-        const sum = card ? colours.summary.get(card.data.card.targetId) : undefined;
-        if (sum) dots.push({ key: `${id}|${m.id}`, colour: sum, x: x + BLOCK.width - (lod ? 26 : 6), y: y + HEAD_H + BLOCK.bodyPad + (i + 0.5) * BLOCK.rowHeight, r: lod ? 9 : 3.5, block: frame.id, member: m.id });
+        const sum = summaryOf(m.id);
+        if (sum) dot(i, sum, m.id);
       });
+      // the members past the sixth share the “and N more” row (Łukasz's answer after step 6): one dot for them, orange
+      // when any of them is a gap
+      let more: CoverageColour | undefined;
+      for (const m of members.slice(BLOCK.maxRows)) {
+        const sum = summaryOf(m.id);
+        if (sum && more !== "gap") more = sum;
+      }
+      if (more) dot(BLOCK.maxRows, more, "more");
     }
   }
 

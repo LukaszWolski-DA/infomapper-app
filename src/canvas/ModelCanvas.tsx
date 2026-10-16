@@ -63,6 +63,7 @@ import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
 import { CoverageLayer } from "./CoverageLayer";
+import { FocusDriver, focusTargetOf } from "./Focus";
 import FadeLayer from "./FadeLayer";
 import { useRequirementIndex, type FadeData, type FadeNote } from "./fade-canvas";
 import { requirementMarks, sameMark } from "./requirement-marks";
@@ -1003,6 +1004,8 @@ export function ModelCanvas({
     noteMoverRef.current = { noteOf: noteState.noteOf, show: noteState.show };
   });
   const cardData = useMemo(() => nodes.map((n) => n.data.card), [nodes]);
+  // what Focus is on for this selection (slice 4b-1, item 21); Focus itself is a store of its own (`FocusDriver`)
+  const focusTarget = useMemo(() => focusTargetOf(selection, cardData), [selection, cardData]);
   // The panels that show frames draw again when frames, their cards or the cards' numbers change; not on a move.
   const layoutKey = useMemo(
     () =>
@@ -1616,6 +1619,7 @@ export function ModelCanvas({
             <HoverOverlay hoverStore={hoverStore} lassoStore={lasso.lasso} busy={busy} lines={lines} flash={ui.flash} outline={resize.outline} />
             <SelectionOverlay selection={selection} lassoStore={lasso.lasso} frames={frames} frameRects={frameRects} noteRects={noteRects} />
           </OverlayLayer>
+          <FocusDriver target={focusTarget} canvasId={canvasId} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>

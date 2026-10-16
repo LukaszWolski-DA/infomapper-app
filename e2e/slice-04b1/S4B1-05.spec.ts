@@ -5,10 +5,12 @@
 // Escape and a click on empty canvas clear the colours. No card's own class or style changes (checked on the DOM).
 // With a frame around Customer and Sales Order collapsed, the block's Customer row carries the summary dot (Łukasz's
 // answer to step 6): orange for REQ-105 (birth_date a gap), blue for REQ-101; Sales Order's row none (not in scope).
+// With a frame around all seven cards collapsed, a requirement on the one card past the sixth puts its dot on the “and
+// 1 more” row and on no member's row (Łukasz's answer after step 6's follow-up).
 
-import { AROUND, collapsedFrame, item } from "../slice-02c/helpers";
+import { AROUND, collapsedFrame, item, loadItems } from "../slice-02c/helpers";
 import { expect, test, type Page } from "./fixtures";
-import { canvasUrl, card, emptySpot, ids, mappingId, openCanvas, openRequirement, RETAIL, signInAs, store, WHOLE } from "./helpers";
+import { canvasUrl, card, emptySpot, ids, mappingId, openCanvas, openRequirement, requirementLinkedTo, RETAIL, signInAs, store, WHOLE } from "./helpers";
 
 const rows = (page: Page, colour: "covered" | "gap") => page.getByTestId(`coverage-row-${colour}`).evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.row));
 /** Every card's own class and style, to check that colouring changes none of them. */
@@ -81,4 +83,23 @@ test("S4B1-05 (collapsed frames): a collapsed frame's block carries the summary 
   await expect(dot("covered", customer.id)).toHaveCount(1);
   await page.keyboard.press("Escape");
   await expect(page.locator('[data-testid^="coverage-block-dot-"]')).toHaveCount(0);
+});
+
+test("S4B1-05 (and N more): the members past the sixth share one dot on the block's “and N more” row", async ({ page }) => {
+  const frameId = await collapsedFrame({ x: -4000, y: -4000, width: 12000, height: 12000 }, { name: "Everything" });
+  await signInAs(page, "Łukasz");
+  await openCanvas(page, canvasUrl(), WHOLE);
+  // the seventh card: the one the block does not list
+  const shown = await page.getByTestId("block-member").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.member));
+  expect(shown).toHaveLength(6);
+  await expect(page.getByTestId("block-more")).toHaveText("and 1 more");
+  const seventh = (await loadItems()).find((i) => !shown.includes(i.id))!;
+  const key = await requirementLinkedTo(seventh.entity_id ? { kind: "entity", id: seventh.entity_id } : { kind: "source_table", id: seventh.source_table_id! });
+
+  await page.reload();
+  await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true");
+  await openRequirement(page, key);
+  const dots = page.locator(`[data-testid^="coverage-block-dot-"][data-block="${frameId}"]`);
+  await expect(dots).toHaveCount(1);
+  await expect(dots).toHaveAttribute("data-member", "more");
 });

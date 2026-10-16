@@ -306,6 +306,24 @@ The prototype's canvas tile on the project home says “{n} cards, {m} frames. A
 
 - **Accepted** by Łukasz in slice 4a, step 5. **Later:** not planned yet.
 
+## Text contrast (slice 4b-1, step 6)
+
+### Grey text and two tags are below WCAG AA on a plain card
+
+Found while checking the text under slice 4b-1's coverage colours (step 6). On a plain white card, three texts are
+below WCAG AA's 4.5:1 for normal text, with or without any tint:
+
+| Text | Colours | Contrast |
+| --- | --- | --- |
+| Grey text: data types, counts, key letters, a card's “in {concept}” (`--im-ink-3`) | `#7c8998` on `#ffffff` | 3.6:1 (dark mode 4.1:1) |
+| The PII tag | `--im-warn` on `--im-warn-soft` | 4.4:1 |
+| The BK tag | `--im-physical` on `--im-physical-soft` | 4.1:1 |
+
+The prototype's palette has the same values. This comes from the palette and does not depend on the coverage tints:
+those keep every text that reaches 4.5:1 on a plain card at 4.5:1 under them (step 6's follow-up).
+
+- **Accepted** by Łukasz after slice 4b-1, step 6. **Later:** a candidate for the ergonomics slice (`docs/ideas.md`).
+
 ## Undo history (slice 1b)
 
 ### The undo history lives in server memory
