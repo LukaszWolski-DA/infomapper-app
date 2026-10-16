@@ -4,6 +4,59 @@ Status: **steps 1 and 2 accepted; step 3 (F4) waiting for Łukasz.** Branch `sli
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
 
+## After step 3: the pan diagnosis (16 October 2026)
+
+Step 3 was accepted as built. Łukasz asked for a diagnosis (about 20 min, no laptop preparation, figures diagnostic) of
+the smoke's pan miss before going on, because step 6's coverage colours draw lit lines and rows in the same overlay
+without Focus.
+
+**The method:**
+- **View:** “Performance test”, 30 % around ent:23, frames expanded; F4's measurement build at `744080c`.
+- **Pans:** one 10 s pan per case (S1A-14's wheel driver), traced with the full categories.
+- **Hiding a layer:** an injected stylesheet (`display: none` on the lit lines' SVG or on the veil), from the test, not
+  the app.
+- **Layer sizes:** from CDP `LayerTree`.
+- **Files:** `.data/measure/s4b1-step3-diag/` (the spec and the raw traces).
+
+| Case | Presented fps (rAF) | Per presented frame: main / GPU raster + draw, ms | Veil's layer | Lit lines' layer |
+| --- | --- | --- | --- | --- |
+| Focus off | **49.0** (49.9) | 18.3 / 11.6 | – | – |
+| Focus ent:23 (4 cards lit) | **36.0** (36.8) | 20.8 / 16.2 | 46,328 × 47,376 (2,195 Mpx) | 5,090 × 4,327 (22 Mpx) |
+| – without lit lines (veil only) | 45.1 (46.2) | 20.4 / 13.8 | the same | – |
+| – without veil (lit lines only) | 48.3 (49.4) | 18.8 / 12.0 | – | the same |
+| Focus REQ-102 (large set) | **43.4** (44.3) | 20.8 / 15.0 | 2,195 Mpx | 4,438 × 7,055 (31 Mpx) |
+| – without lit lines (veil only) | 46.0 (47.1) | 20.0 / 12.8 | the same | – |
+| – without veil (lit lines only) | 45.8 (46.7) | 19.5 / 13.0 | – | the same |
+
+**Reading:**
+- **The cost is mostly the veil, and the two layers together cost more than each alone.**
+  - The veil alone costs 3–4 fps (−6 to −8 %).
+  - The lit lines alone cost 1–3 fps (−1 to −6.5 %, more for the larger set).
+  - Both together cost 6–13 fps (−11 to −27 %).
+  - Per presented frame the GPU's raster and draw grow from 11.6 ms to 15–16 ms; the main thread grows by about
+    2.5 ms.
+- **The veil's layer is 46,328 × 47,376 px, about 2,200 megapixels:** the content plus a 20,000 px margin on each
+  side, so its edge is never in view. Chrome rasters only the visible tiles (slice 4p: the margin changed no tile
+  memory), but drawing such a layer and blending a translucent full-screen quad over everything on every frame is
+  likely the cost on this GPU. **Not proven.**
+- **Even with Focus off, the main thread is busy about 900 ms per second of pan,** Layerize alone about 355 ms per
+  second. Pan and zoom at 30 % expanded are close to the main thread's limit anyway, so small extra costs per frame
+  cost frames.
+- **For step 6:** the coverage colours without Focus are the "lit lines only" case: −1 % for a small set, −6.5 % for
+  REQ-102's large set (single pans, so within a few percent of noise). The lit lines' SVG gets a layer of its own
+  (22–31 Mpx) even without the veil.
+
+**The large Focus switch** (REQ-102, 30 % expanded, 10 settled pairs, to the screen, in order):
+
+| Switch | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| On, ms | **126** | 87 | 91 | 107 | 94 | 86 | 91 | 89 | 90 | 84 |
+| Off, ms | 13 | 12 | 40 | 12 | 13 | 13 | 11 | 16 | 25 | 12 |
+
+- **The first switch is slower, then it is steady at about 90 ms on** (median 90, max 107) and about 13 ms off.
+- **So the smoke's 213 ms was a first-switch effect,** made worse by the smoke's two pairs. But steady "on" is close to
+  the 100 ms bar.
+
 ## Step 3: F4 onto the branch (15 October 2026)
 
 PRD items 6–8. F4's veil replaces F1's behind the existing request (`fade.ts`); F1's lift rule is gone. No UI yet:
