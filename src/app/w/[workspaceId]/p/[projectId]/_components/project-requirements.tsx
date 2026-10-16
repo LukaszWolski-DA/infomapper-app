@@ -43,7 +43,7 @@ export function ProjectRequirements({ projectId, requirements, canvases }: { pro
           </span>
           <span className="min-w-0 flex-1 truncate">{r.name}</span>
           <span className="whitespace-nowrap text-[11.5px] text-im-ink-3">{KIND_NAMES[r.kind]}</span>
-          <CoverageBar ok={r.covered} total={r.total} />
+          <CoverageBar ok={r.covered} total={r.total} parts={r.parts} />
           <span className="whitespace-nowrap text-[11.5px] text-im-ink-3" data-testid="text-project-requirement-coverage">
             {r.covered}/{r.total}, {STATUS_NAMES[r.status]}
           </span>

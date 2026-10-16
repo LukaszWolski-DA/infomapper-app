@@ -1,8 +1,131 @@
 # Slice 4b-1 – Acceptance
 
-Status: **steps 1 and 2 accepted; step 3 (F4) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+Status: **steps 1 to 3 accepted; step 4 (the domain) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
+
+## Step 4: the domain (16 October 2026)
+
+PRD items 9–13: scope items, coverage over items, indirect requirements each with its own “via”, and the panels, the
+Requirements tab, the project home, the status bar and the Overview on the new coverage.
+
+### What changed
+
+| File | Change |
+| --- | --- |
+| `src/domain/model/requirements.ts` | **Scope:** `RequirementScope` gains `entityItems` and `attributeItems`, and `scopeOfLinks` no longer adds a linked entity's attributes. **Coverage:** `RequirementCoverage` counts items; it gains `entityGaps` and `parts`, with `covered` holding entity and attribute ids. **New helpers:** `coverageParts` (“1 entity, 3 attributes”) and `ENTITY_GAP_REASON` (“no approved mapping on any attribute”). **Indirect requirements:** `ElementRequirements.indirect` carries a `via` per row (`"via attribute" \| "via mapping" \| "via column"`). **The lookup** gains mappings per attribute, mappings per column and columns per table. |
+| `src/domain/model/requirement-index.ts` | `of(target)` follows PRD item 12: an entity via attribute and via mapping; an attribute via mapping; a table via column and via mapping; mappings and columns direct only; no “via entity”; each requirement once, as direct when it is both, else with the first way it was found; sorted in the requirements' order. The scopes-reach maps go. |
+| `src/domain/model/lit.ts` | (no change) Focus on a requirement now lights only what the new scope says: an entity link lights the entity alone. |
+| `src/canvas/fade-canvas.tsx` | The canvas's requirement index is built once per data version (`useRequirementIndex`), not per Focus request. The inspector builds its own from the same data; the canvas can't read the app layer's context (AD-19). |
+| `src/app/_panels/requirement-panel.tsx` | **Coverage:** “In scope: {m} of {n} covered”, its tooltip naming the parts. **A row for entity gaps** (“Entities without an approved mapping”), shown only when the requirement has entity items. **The gap list:** entity items first (“Order Line · no approved mapping on any attribute”, a click opens the entity), then attribute items as before. |
+| `src/app/_panels/requirement-ui.tsx` | `coverageText` (“{m} of {n} covered”); `coverageTitle` adds the parts in brackets (“1 of 4 covered (1 entity, 3 attributes)”), none without items; `CoverageBar` takes `parts`. |
+| `src/app/_panels/requirements-section.tsx` | the indirect rows show their own `via` |
+| `src/app/_panels/tree-data.ts`, `stats.ts`, `left-panel.tsx`, `project-requirements.tsx` | the rows carry `parts` for the bars' tooltips. The project home, the status bar and the Overview read the index's `coveredCount` and `done` as before (item 13). |
+
+### The seed's figures (as agreed in step 1, Q5)
+
+| Requirement | 4a | Now |
+| --- | --- | --- |
+| REQ-101 (entity Customer) | 5 of 8 | **1 of 1, covered** |
+| REQ-102 | 3 of 3 | 3 of 3 |
+| REQ-103 | 1 of 1 | 1 of 1 |
+| REQ-104 | 1 of 4 | 1 of 4 |
+| REQ-105 | 3 of 4 | 3 of 4 |
+| Covered | 2 of 5 | **3 of 5** |
+
+### A consequence for measuring: “Performance test”'s REQ-102
+
+REQ-102 in `seed:large` (the "large lens", then Focus on a requirement) links four whole entities (ent:3, ent:4, ent:7,
+ent:19). Under the new rules it has 4 entity items, and Focus on it lights those 4 cards only. Its 46 attributes, their
+mappings and tables are no longer in scope. So S4P-fading's "lens-large" and S4B1-10's "requirement" case are no longer
+a large set. **Question for Łukasz:** link REQ-102 to those four entities' attributes in `seed:large` instead, so it
+stays the large set (about the same cards and lines as before)? That changes test data only; `model-store.test.ts` now
+checks 4 entity items.
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `src/domain/model/requirements.test.ts` (changed) | **Scope:** an entity link is one item without its attributes; an attribute link adds its card's entity but no entity item; a mapping link adds its attribute; tables and columns are not items. **Coverage:** attribute items; an entity item covered by one covered attribute, a gap otherwise, the same type check; an entity and its attribute together; a table-only requirement 0 / 0; `coverageParts`. **Indirect lists:** each kind of element, once each, direct first. |
+| `src/domain/model/requirement-index.test.ts` (changed) | covered count 3 (REQ-101 now covered); `via` per row |
+| `src/domain/model/lit.test.ts` (changed) | an entity link lights the entity alone |
+| `src/app/_panels/tree-data.test.ts`, `src/data/local/requirement-store.test.ts`, `model-store.test.ts` (changed) | the new figures (REQ-101 1 / 1; `seed:large`'s REQ-102: 4 entity items) |
+| `e2e/slice-04b1/S4B1-01.spec.ts` (new) | **S4B1-01:** the seed's figures in the bars; an entity link (Order Line) is 0 of 1, still 0 after an approved mapping with a type conflict, 1 of 1 after a type-correct one; an attribute link and a mapping link one attribute item each; a table-only requirement 0 of 0; the status bar's count |
+| `e2e/slice-04b1/S4B1-02.spec.ts` (new) | **S4B1-02:** email with its own and “via mapping”, no “via entity”; an attribute without its own gets nothing from its entity; Customer “via attribute” and “via mapping”; the table customers “via mapping” and “via column”; no × on indirect rows |
+| `e2e/slice-04b1/S4B1-03.spec.ts` (new) | **S4B1-03:** “0 of 2 covered” with “1 entity, 1 attribute”; the entity gap first, then the attribute gap; its click opens Order Line's panel; the status bar, the project home (rows and statistic), the Overview and the left panel's bar agree |
+| `e2e/slice-04b1/helpers.ts` | `requirementLinkedTo` and `approvedMapping` as test data through the domain |
+
+**Changed earlier tests:**
+- **S4A-01:** the bars' titles “1 of 4 covered (4 attributes)”, “3 of 3 covered (3 attributes)”.
+- **S4A-07:** “REQ-101 via entity” → “REQ-104 via mapping” on email; REQ-104 “via mapping” on Customer and on the
+  table; the title says so.
+- **S4A-08:** REQ-101 1 of 1, no gaps; the bars' titles; the texts “{m} of {n} covered”.
+- **S4A-13:** covered 2 → 3 of 5 (status bar, project homes, Overview), 3 → 4 after the approval; REQ-101's home row
+  1/1.
+- **`e2e/slice-04a/helpers.ts`:** a comment.
+- **S4P-12:** Focus on REQ-101 lights 1 card (Customer) instead of 3.
+
+### Checked in the browser
+
+On the preview server (port 3001; stopped before the e2e runs), REQ-104's panel reads “In scope: 1 of 4 covered”,
+with the tooltip “4 attributes”, the three gaps as before, and REQ-101's bar “1 of 1 covered (1 entity)”.
+
+### Proposed text for `docs/decisions.md` (for Łukasz's approval; not applied)
+
+**D-31, now:** “Coverage is computed: a requirement is covered when every attribute in its scope (direct, via entity,
+via mapping) has an approved mapping without a type conflict.”
+
+**D-31, proposed:**
+
+> Coverage is computed from a requirement's items. A linked entity is one item, a linked attribute is one, and a linked
+> mapping makes its attribute one. Links to tables and columns are in scope but are not items, and nothing is pulled
+> in implicitly: an entity link does not bring its attributes. An attribute item is covered when it has an approved
+> mapping without a type conflict. An entity item is covered when at least one of its attributes is covered that way.
+> A requirement is covered when it has at least one item and all of them are covered. Coverage reads “{m} of {n}
+> covered”, its tooltip naming the parts (“1 entity, 3 attributes”). (Changed in slice 4b-1.)
+
+**D-34, now:** “Element panels list direct and indirect requirements; clicking places the requirement card next to the
+element; “Add all”.”
+
+**D-34, proposed:**
+
+> Element panels list each requirement once: direct ones first, with × to unlink, then indirect ones, without ×. An
+> entity's come via its attributes (“via attribute”) or via mappings onto them (“via mapping”); an attribute's via
+> mappings onto it (“via mapping”); a table's via its columns (“via column”) or via mappings that read them (“via
+> mapping”). Mappings and columns show their own only. There is no “via entity”. Clicking a requirement opens its
+> panel; from slice 4b-2 it places the requirement card next to the element, with “Add all”. (Changed in slice 4b-1.)
+
+**`docs/data-model-v2.md`, proposed** (one sentence after `requirement`'s table, also with Łukasz's approval):
+
+> Coverage is computed, never stored (D-31), over the requirement's items: its linked entities, its linked attributes
+> and the attributes of its linked mappings.
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 164 passed | 26.0 min |
+| 2 | 164 passed | 26.8 min |
+| 3 | 164 passed | 27.6 min |
+
+Lint, typecheck and the unit tests (958 in 69 files) pass.
+
+## Łukasz's decision after the pan diagnosis (16 October 2026)
+
+- **No trials now.** The pan miss with Focus on at 30 % (step 3's smoke figures), the diagnosis below and the trial
+  candidates are recorded here:
+  - **T1, a smaller veil:** its margin computed from the minimum zoom and the pane, instead of a fixed 20,000 px;
+  - **T2, the lit lines inside the veil's SVG:** one layer instead of two;
+  - **T3, the lit lines and rows in the overlay's own layer:** no new layer.
+
+  They are candidates for after the closing sitting, if it misses.
+- **Steps 4, 5, 6 and 7 go on as in the PRD,** stopping after each.
+- **In step 6,** the lit lines and rows are drawn without a large layer of their own if that is straightforward, with no
+  separate branch and no extra measuring. If it is not straightforward, today's way stays, and the report says so.
+- **The closing sitting decides on proper figures.** If S4B1-11 misses there, the step stops with the figures, and
+  Łukasz decides between the trials and the bar.
 
 ## After step 3: the pan diagnosis (16 October 2026)
 

@@ -66,12 +66,12 @@ test("S4P-12: switching, panning, zooming and dragging with fading on re-render 
   await fade(page, null);
   await expect(layer).toHaveCount(0);
 
-  // Focus on REQ-101 (an entity link, Customer): Customer and the tables of its attributes' mappings (4a's scope until
-  // step 4), no row tinted
+  // Focus on REQ-101 (an entity link, Customer): Customer alone (slice 4b-1, PRD item 9: an entity link does not bring its
+  // attributes), no row tinted
   await fade(page, { focus: { t: "requirement", id: req101.id } });
   await expect(layer).toHaveAttribute("data-fade", `focus:requirement:${req101.id}`);
   expect(await holed(page, "Customer")).toBe(true);
-  expect(Number(await layer.getAttribute("data-lit-cards"))).toBe(3);
+  expect(Number(await layer.getAttribute("data-lit-cards"))).toBe(1);
   await expect(page.getByTestId("lit-row-covered")).toHaveCount(0);
   await expect(page.getByTestId("lit-row-gap")).toHaveCount(0);
   await fade(page, null);

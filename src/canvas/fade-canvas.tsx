@@ -33,17 +33,26 @@ export interface FadeNote {
 /** The request asked for now, its key, and what it lights in the model; null with fading off. */
 export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | null {
   const request = useFadeRequest();
+  const index = useRequirementIndex(data);
   return useMemo(() => {
     if (!request) return null;
     if ("lit" in request) return { key: fadeKey(request), lit: request.lit };
     if (!data) return null;
     const target = focusTarget(request.focus);
     if (target.t === "entity") return { key: fadeKey(request), lit: focusLit(data.model, target.id) };
-    // a requirement's scope from the requirement index (slice 4b-1, step 4: the inspector's index, not one built here)
-    const index = buildRequirementIndex([...data.requirements], [...data.requirementLinks], data.model);
-    if (!index.byId.has(target.id)) return null;
+    if (!index?.byId.has(target.id)) return null;
     return { key: fadeKey(request), lit: requirementFocusLit(data.model, index.scope(target.id)) };
-  }, [request, data]);
+  }, [request, data, index]);
+}
+
+/**
+ * The canvas's requirement index (slice 4b-1, step 4): built once per data version (the page's model, requirements and
+ * links), not per Focus request. The inspector builds its own from the same data; the canvas cannot read the app
+ * layer's context (AD-19).
+ */
+export function useRequirementIndex(data: FadeData | undefined) {
+  const model = data?.model, requirements = data?.requirements, links = data?.requirementLinks;
+  return useMemo(() => (model && requirements && links ? buildRequirementIndex([...requirements], [...links], model) : null), [model, requirements, links]);
 }
 
 type AnyNode = InternalNode;

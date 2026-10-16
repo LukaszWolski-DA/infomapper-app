@@ -50,13 +50,10 @@ describe("Focus (slice 4p; prototype relatedOf “entity”)", () => {
 });
 
 describe("Focus on a requirement (slice 4b-1, slice 4p's lens without its colours; prototype relatedOf “req”)", () => {
-  it("an entity link: the entity and its attributes' mappings with tables (4a's scope until step 4); no row coloured", () => {
+  it("an entity link: the entity alone, without its attributes' mappings (slice 4b-1, PRD item 9); no row coloured", () => {
     const lit = lens([link({ entity_id: ids.customer })], model([mapping(), approvedCustId], [mappingInput(), custIdInput]));
     expect(lit.entities).toEqual(new Set([ids.customer]));
-    expect(lit.tables).toEqual(new Set([ids.crmCustomer]));
-    expect(lit.mappings).toEqual(new Set([ids.mapEmail, MAP_ID]));
-    expect(lit.rows.size).toBe(0);
-    expect(lit.relationships.size).toBe(0);
+    expect(lit.tables.size + lit.mappings.size + lit.relationships.size + lit.rows.size).toBe(0);
   });
 
   it("an attribute without a mapping lights only its entity", () => {

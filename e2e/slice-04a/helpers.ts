@@ -69,7 +69,7 @@ export async function expectPanelVersion(page: Page, key: string): Promise<void>
   await expect(page.getByTestId("panel-requirement")).toHaveAttribute("data-version", String(r.version));
 }
 
-/** The rows of the Requirements section of the open element panel: `REQ-101` or `REQ-101 via entity`. */
+/** The rows of the Requirements section of the open element panel: `REQ-101` or `REQ-101 via attribute`. */
 export const sectionRows = (page: Page) =>
   page.getByTestId("item-requirement").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).dataset.key}${(e as HTMLElement).dataset.via ? ` ${(e as HTMLElement).dataset.via}` : ""}`));
 

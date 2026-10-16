@@ -547,7 +547,8 @@ describe("seed:large (S1A-14)", () => {
     const dense = lenses.linksOf(byKey("REQ-103"));
     expect(dense.map((k) => k.source_table_id).sort()).toEqual(["src:1", "src:29", "src:47", "src:57"].map((c) => seedId(ws, `table:${c}`)).sort());
     expect(lenses.coverage(byKey("REQ-103")).total).toBe(0);
-    expect(large.total).toBe(5 + 8 + 21 + 12); // ent:3, ent:4, ent:7 and ent:19 with all their attributes (D-31)
+    // ent:3, ent:4, ent:7 and ent:19: four entity items since slice 4b-1 (PRD item 9; 4a counted their 46 attributes)
+    expect([large.total, large.parts.entities]).toEqual([4, 4]);
     expect(cards.some((c) => c.requirement_id)).toBe(false);
     // The demo workspaces are untouched.
     expect((await store.model.load(RETAIL)).entities).toHaveLength(6);

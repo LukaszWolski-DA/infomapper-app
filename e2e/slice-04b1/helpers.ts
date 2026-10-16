@@ -2,8 +2,34 @@
 // holes read back from its path, a node's rectangle on the canvas, and the commit counters (slice 4p).
 
 import type { Locator, Page } from "@playwright/test";
+import { createMapping, setMappingStatus } from "../../src/domain/commands/mapping";
+import { createRequirement } from "../../src/domain/commands/requirement";
+import type { TraceTarget } from "../../src/domain/model/requirements";
+import { asPerson, loadModel, loadRequirements, RETAIL, SEED_IDS, store } from "../slice-04a/helpers";
 
 export * from "../slice-04a/helpers";
+
+/** Test data: a new requirement linked to one element, made by Anna through the domain; returns its key. */
+export async function requirementLinkedTo(target: TraceTarget): Promise<string> {
+  const [requirements, model] = await Promise.all([loadRequirements(), loadModel()]);
+  const r = await asPerson(SEED_IDS.userAnna, (ctx, access) => createRequirement(ctx, access, { requirements, ...model }, { link: target }));
+  return r.requirement.key;
+}
+
+/** Test data: a mapping from a column onto an attribute, made by Anna and approved by Piotr; returns its id. */
+export async function approvedMapping(attributeId: string, columnId: string): Promise<string> {
+  const model = await loadModel();
+  const attribute = model.attributes.find((a) => a.id === attributeId)!;
+  const column = model.sourceColumns.find((c) => c.id === columnId)!;
+  const created = await asPerson(SEED_IDS.userAnna, (ctx, access) =>
+    createMapping(ctx, access, { attribute, column, mappings: [], mappingInputs: [] }, { attributeId, sourceColumnId: columnId }),
+  );
+  const m = (await store().model.load(RETAIL)).mappings.find((x) => x.id === created.mappingId)!;
+  await asPerson(SEED_IDS.userPiotr, (ctx, access) =>
+    setMappingStatus(ctx, access, { mapping: m, contentAuthorId: SEED_IDS.userAnna }, { mappingId: m.id, expectedVersion: m.version, status: "approved" }),
+  );
+  return m.id;
+}
 
 export type Rect = { x: number; y: number; w: number; h: number };
 

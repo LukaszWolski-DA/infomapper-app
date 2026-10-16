@@ -3,6 +3,7 @@
 
 import type { Uuid } from "@/domain/ids";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
+import { coverageParts } from "@/domain/model/requirements";
 import type { CanvasItem, Entity, Frame, Note, RequirementKind, RequirementStatus, WorkspaceModel } from "@/domain/types";
 import { indexModel, typeCheckOf, type ModelIndex } from "./model-index";
 
@@ -144,6 +145,8 @@ export interface ProjectRequirement {
   status: RequirementStatus;
   covered: number;
   total: number;
+  /** The coverage items by kind, for the tooltip (“1 entity, 3 attributes”; slice 4b-1). */
+  parts: string;
   done: boolean;
 }
 
@@ -166,6 +169,6 @@ export function projectRequirements(index: RequirementIndex, items: readonly Can
     })
     .map((r) => {
       const c = index.coverage(r.id);
-      return { id: r.id, key: r.key, name: r.name, kind: r.kind, status: r.status, covered: c.covered.length, total: c.total, done: c.done };
+      return { id: r.id, key: r.key, name: r.name, kind: r.kind, status: r.status, covered: c.covered.length, total: c.total, parts: coverageParts(c.parts), done: c.done };
     });
 }

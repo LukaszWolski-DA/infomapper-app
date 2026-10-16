@@ -42,7 +42,8 @@ describe("the requirement index (slice 4a, step 3)", () => {
       expect(ix.scope(r.id)).toEqual(requirementScope(r.id, links, model));
       expect(ix.coverage(r.id)).toEqual(requirementCoverage(r.id, links, model));
     }
-    expect(ix.coveredCount).toBe(2); // REQ-102 (email) and REQ-103 (its mapping); REQ-101 has customer_id unmapped
+    // REQ-101 (Customer: email is covered, slice 4b-1's entity item), REQ-102 (email) and REQ-103 (its mapping)
+    expect(ix.coveredCount).toBe(3);
   });
 
   it("keeps each requirement's live links and children", () => {
@@ -51,13 +52,13 @@ describe("the requirement index (slice 4a, step 3)", () => {
     expect(ix.children(ids.req102)).toEqual([]);
   });
 
-  it("finds an element's direct and indirect requirements", () => {
-    expect([keys(ix.of({ kind: "attribute", id: ids.email }).direct), keys(ix.of({ kind: "attribute", id: ids.email }).indirect)]).toEqual([["REQ-102"], ["REQ-101"]]);
-    expect(ix.of({ kind: "entity", id: ids.customer })).toMatchObject({ via: "via attribute" });
-    expect(keys(ix.of({ kind: "entity", id: ids.customer }).indirect)).toEqual(["REQ-102", "REQ-103"]);
+  it("finds an element's direct and indirect requirements, each with how it reaches it (slice 4b-1)", () => {
+    const via = (r: { indirect: { requirement: { key: string }; via: string }[] }) => r.indirect.map((x) => `${x.requirement.key} ${x.via}`);
+    expect([keys(ix.of({ kind: "attribute", id: ids.email }).direct), via(ix.of({ kind: "attribute", id: ids.email }))]).toEqual([["REQ-102"], ["REQ-103 via mapping"]]);
+    expect(via(ix.of({ kind: "entity", id: ids.customer }))).toEqual(["REQ-102 via attribute", "REQ-103 via mapping"]);
     expect(keys(ix.of({ kind: "source_table", id: ids.crmCustomer }).direct)).toEqual(["REQ-104"]);
-    expect(keys(ix.of({ kind: "source_table", id: ids.crmCustomer }).indirect)).toEqual(["REQ-103"]);
-    expect(ix.of({ kind: "attribute", id: ids.orderId })).toEqual({ direct: [], indirect: [], via: "via entity" });
+    expect(via(ix.of({ kind: "source_table", id: ids.crmCustomer }))).toEqual(["REQ-103 via mapping"]);
+    expect(ix.of({ kind: "attribute", id: ids.orderId })).toEqual({ direct: [], indirect: [] });
     expect(keys(ix.of({ kind: "mapping", id: ids.mapEmail }).direct)).toEqual(["REQ-103"]);
   });
 });

@@ -2,7 +2,8 @@
 
 // The Requirements section of the entity, attribute, mapping, source table and column panels (slice 4a, PRD items
 // 28–29, prototype reqSection, D-34 panel part): the requirements linked to the element, with × to unlink, then those
-// that reach it indirectly (“via entity”, “via attribute”, “via column”), without ×. A click opens the requirement's
+// that reach it indirectly (slice 4b-1, PRD item 12: “via attribute”, “via mapping”, “via column”; no “via entity”),
+// without ×. A click opens the requirement's
 // panel (its card comes with slice 4b; rows are not dragged). Below, for those who may edit: “Link to a requirement…”,
 // with “+ New requirement…” at the end, which creates a requirement linked to this element and opens it with its name
 // selected. Read from the requirement index, never computed while rendering.
@@ -26,7 +27,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
   const p = usePanel();
   const { run } = useAction();
   const { setNameFocus } = usePanels();
-  const { direct, indirect, via } = p.rx.of(target);
+  const { direct, indirect } = p.rx.of(target);
   const linked = new Set(direct.map((r) => r.id));
   const available = p.rx.requirements.filter((r) => !linked.has(r.id));
 
@@ -76,7 +77,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
       {direct.length + indirect.length ? (
         <List testId="list-requirements">
           {direct.map((r) => row(r, null))}
-          {indirect.map((r) => row(r, via))}
+          {indirect.map(({ requirement, via }) => row(requirement, via))}
         </List>
       ) : (
         <Hint>Not linked to any requirement yet.</Hint>
