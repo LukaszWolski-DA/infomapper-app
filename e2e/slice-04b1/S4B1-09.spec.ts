@@ -1,8 +1,8 @@
 // S4B1-09 (slice 4b-1, PRD item 16; section 6): coverage colours to the screen, measurement build only (MEASURE=1
 // MEASURE_BUILD=production; `npm run measure:canvas -- --to-screen --only colours`). On “Performance test”, REQ-102 (46
-// attributes of ent:3, ent:4, ent:7 and ent:19; its colours: the rows at 100 %, the headers' summary below 40 %) selected
-// from the Requirements tab and cleared with Escape, SETTLED_PAIRS times from a settled screen, at 100 % and 30 % around
-// ent:23, frames expanded and collapsed. Each switch is timed in the page (to the first setTimeout after the next rAF)
+// attributes of ent:3, ent:4, ent:7 and ent:19; its colours: the rows at 100 %, the summary dots below 40 % and on the
+// collapsed frames' blocks) selected from the Requirements tab and cleared with Escape, SETTLED_PAIRS times from a
+// settled screen, at 100 % and 30 % around ent:23, frames expanded and collapsed. Each switch is timed in the page (to the first setTimeout after the next rAF)
 // and to the screen (the first GPU present after its commit is activated; e2e/measure). Results in
 // test-results/S4B1-09.json; raw traces in TRACE_DIR (.data/measure/, git-ignored). Bar: ≤ 100 ms, median (p95 and max
 // reported).
@@ -76,15 +76,11 @@ test("S4B1-09: coverage colours to the screen on “Performance test” (REQ-102
   for (const [name, v] of Object.entries(views)) {
     await open(page, v.view, v.collapsed);
     if (v.collapsed) {
-      // with every frame collapsed, REQ-102's cards are hidden in their blocks and nothing is coloured (step 6: a block
-      // tint is a question for Łukasz); recorded as not applicable rather than timed
+      // every frame collapsed: REQ-102's cards are in blocks, and the blocks' rows carry their summary dots (Łukasz's
+      // answer to step 6); checked once before timing
       await page.locator('[data-testid="tree-req"][data-key="REQ-102"]').click();
-      const drawn = await page.locator('[data-testid="layer-coverage-rows"], [data-testid="layer-coverage-headers"]').count();
+      await expect(page.locator('[data-testid^="coverage-block-dot-"]').first()).toBeAttached();
       await page.keyboard.press("Escape");
-      if (!drawn) {
-        results[name] = { notApplicable: "every frame collapsed: REQ-102's cards are in blocks, which show no coverage colours" };
-        continue;
-      }
       await page.waitForTimeout(PAUSE_MS);
     }
     const traced = await tracedSwitches(page, `S4B1-09 ${name}`, () => coloursLoop(page, SETTLED_PAIRS));

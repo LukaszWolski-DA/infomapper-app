@@ -86,7 +86,14 @@ export function litNodeIds(lookup: Map<string, AnyNode>, lit: Lit): Set<string> 
 /** A node's rectangle as React Flow measured it. */
 export const nodeRect = (n: AnyNode): Rect => ({ x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, w: n.measured.width ?? 0, h: n.measured.height ?? 0 });
 
-/** Rows tinted covered (blue) or gap (orange) above the cards (prototype `.row.rq`, `.row.gap`); none below 40 %. */
+/** The bar's width: inside the row's 12 px left padding (canvas.css `.row`). */
+const ROW_BAR = 4;
+
+/**
+ * Rows marked covered (blue) or gap (orange) above the cards (prototype `.row.rq`, `.row.gap`); none below 40 %. The
+ * overlay lies above the text, so each row gets a faint fill that keeps its text at 4.5:1 (canvas.css) and a bar in the
+ * full colour in the row's left padding, where no text is.
+ */
 export const LitRows = memo(function LitRows({ rows, testId = "lit-row" }: { rows: ReadonlyMap<Uuid, LitRowColour>; testId?: string }) {
   useStore((s) => s.nodes); // follow drags, collapses and widths
   const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
@@ -108,7 +115,10 @@ export const LitRows = memo(function LitRows({ rows, testId = "lit-row" }: { row
   return (
     <svg className="hover-layer lit-rows" width={1} height={1} data-testid={`layer-${testId}s`}>
       {marks.map((m) => (
-        <rect key={m.key} className={m.colour} data-testid={`${testId}-${m.colour}`} data-row={m.key.split("|")[1]} x={m.x} y={m.y} width={m.w} height={ROW_H} />
+        <g key={m.key} data-testid={`${testId}-${m.colour}`} data-row={m.key.split("|")[1]}>
+          <rect className={m.colour} x={m.x} y={m.y} width={m.w} height={ROW_H} />
+          <rect className={`bar ${m.colour}`} x={m.x} y={m.y} width={ROW_BAR} height={ROW_H} />
+        </g>
       ))}
     </svg>
   );

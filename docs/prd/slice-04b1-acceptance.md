@@ -1,8 +1,101 @@
 # Slice 4b-1 – Acceptance
 
-Status: **steps 1 to 5 accepted; step 6 (coverage colours) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+Status: **steps 1 to 6 accepted; step 6's follow-up (dot, collapsed blocks, D-32, contrast) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
+
+## Step 6 follow-up: Łukasz's answers (16 October 2026)
+
+Step 6 was accepted. Łukasz's answers:
+1. **Below 40 %: the dot.**
+2. **Collapsed frames: yes.** The block's member row carries the same summary dot. S4B1-05 checks it, and S4B1-09
+   measures the collapsed views too.
+3. **D-32 approved** with three changes: "a violet diamond", the bracket filled with the dot, and the collapsed block's
+   sentence. Applied.
+4. **Contrast:** check the text under the tints at 4.5:1 (WCAG AA); if short, adjust the tint, not the text, with a
+   before/after screenshot.
+
+### What changed
+
+| File | Change |
+| --- | --- |
+| `src/canvas/coverage-colours.ts`, `src/canvas/TestHooks.tsx` | the tint variant, its value store and `__imCoverageLod` removed: the dot is the only look below 40 % |
+| `src/canvas/CoverageLayer.tsx` | a collapsed frame's block: the summary dot on each shown member's row (`coverage-block-dot-covered` / `-gap`, `data-block`, `data-member`); a header's mark is a faint fill and a bar along its bottom edge |
+| `src/canvas/fade-canvas.tsx` | `LitRows`: each row a faint fill and a 4 px bar in the full colour in the row's left padding (Focus's rows too, which share it) |
+| `src/canvas/canvas.css` | the fills' opacities set for 4.5:1 (light .06 blue, .04 orange; dark .16); bars and dots in the full colour |
+| `docs/decisions.md` | D-32 as approved |
+| `CardNode.tsx`, `requirement-marks.ts`, `canvas.css` | the marker called a diamond in the comments, as it is drawn |
+
+### The dot on a block's rows
+
+- **At 40 % and above,** the dot (7 px) sits at the row's right end, in the 12 px padding after the count. On the left it
+  would sit beside the kind marker, and an entity's is a blue dot too.
+- **Below 40 %** the block's body is plain (AD-24 rule 1). The dot is larger (18 px) and sits where a card header's
+  dot is, one per member row.
+- **Members past the sixth** are not listed in the block; their row is "and N more". They get no dot (question below).
+
+Screenshots in `docs/prd/slice-04b1-screens/step-6b/`: `demo-req-105-100-collapsed.png`, `demo-req-105-30-collapsed.png`
+(a frame around Customer and Sales Order, REQ-105: Customer's row orange, Sales Order's none). The cards' dots at 30 %:
+`demo-req-105-30.png`, `demo-req-101-30.png`, `perf-req-102-30.png`.
+
+### Contrast under the tints
+
+**The tints failed by far.** The overlay lies above the cards, so a translucent fill lies over the text as well and
+lightens it as much as the background. Measured on the screenshots' pixels (darkest text pixel against the background):
+
+| Text | Plain card | Before (step 6) | After |
+| --- | --- | --- | --- |
+| attribute name (covered row) | 16.2 | 2.2 | 14.4 |
+| attribute name (gap row) | 16.2 | 1.7 | 15.1 |
+| entity name (covered header) | 16.2 | 2.2 | 14.4 |
+| stereotype "Object" (header) | 7.4 | 1.6 | 5.0 |
+| data type, count (grey) | 3.3 | 1.3–1.5 | 3.0–3.2 |
+
+**The adjustment** changes the tint, not the text:
+- **The fill** is the strongest at which every text that reaches 4.5:1 on a plain card keeps 4.5:1. That is .06 for
+  blue and .04 for orange in light mode, and .16 in dark mode (computed; dark not screenshot). The source key's brown
+  ("PK" on a table's row, 4.8:1 plain) sets the light limit.
+- **A bar in the full colour** carries the colour where no text is: 4 px in a row's left padding, and 3 px along a
+  header's bottom edge (10 px below 40 %).
+
+Before/after: `docs/prd/slice-04b1-screens/step-6b/contrast-before-after.png`. From left to right: REQ-105 before, after;
+REQ-101 before, after.
+
+**What stays short, without any tint:**
+- **The grey texts** (`--im-ink-3`: data types, counts, key letters, "in Customer") are 3.6:1 on a plain white card
+  (computed; 3.3 measured with anti-aliasing) and 4.1:1 in dark mode.
+- **The PII tag** (orange on its light orange) is 4.4:1.
+- **The BK tag** (brown on its light brown) is 4.1:1.
+
+These are the palette's, not the tints'. No tint can fix them, and changing them is not this step's. A question for
+Łukasz below.
+
+### Questions for Łukasz
+
+1. **Members past the sixth** in a block (the "and N more" row): give that row the summary dot of those members (orange
+   when any of them is a gap)? Not built. Today a frame whose only member in scope is the seventh shows no dot.
+2. **The grey text** (`--im-ink-3`) and the PII and BK tags are below 4.5:1 on a plain card. Record it in
+   `docs/ideas.md` for a palette change later, or change it now?
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `e2e/slice-04b1/S4B1-05.spec.ts` | a second test: a frame around Customer and Sales Order, collapsed. REQ-105: Customer's row an orange dot, Sales Order's none. REQ-101: blue. Escape clears. The header checks find the header's mark as before. |
+| `e2e/slice-04b1/S4B1-09.spec.ts` | the collapsed views are measured (a dot is checked first), no longer "not applicable". Not run: a measurement, it waits for the closing sitting. |
+| `e2e/slice-04b1/S4B1-06-screens.spec.ts` | the dot at 30 % and the collapsed block at 100 % and 30 %, instead of the two variants |
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 167 passed | 26.2 min |
+| 2 | 167 passed | 26.7 min |
+| 3 | 167 passed | 26.5 min |
+
+Lint, typecheck and the unit tests (965 in 71 files) pass. 167 is step 6's 166 plus S4B1-05's collapsed-frame test.
 
 ## Step 6: coverage colours (16 October 2026)
 

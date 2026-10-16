@@ -87,7 +87,7 @@
 /* open notes pinned to a card (slice 3a, prototype .nmark): a note icon in the header, with the number when more than one */
 .im-canvas .nmark { display: inline-flex; align-items: center; gap: 2px; color: var(--im-ink-3); font-size: 10px; font-style: normal; flex: none }
 .im-canvas .nmark svg { width: 11px; height: 11px; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round }
-/* requirements (slice 4b-1, prototype .rmark): a violet dot and the number in the header; one element, the dot its ::before */
+/* requirements (slice 4b-1, prototype .rmark): a violet diamond and the number in the header; one element, the diamond its ::before */
 .im-canvas .rmark { display: inline-flex; align-items: center; gap: 2px; flex: none; font-size: 9.5px; font-weight: 600; font-style: normal; color: var(--im-req); background: var(--im-req-soft); border-radius: 3px; padding: 0 4px; line-height: 15px }
 .im-canvas .rmark::before { content: ""; width: 6px; height: 6px; border-radius: 1px; transform: rotate(45deg); background: currentColor }
 .im-canvas .src .dt { font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 10.5px }
@@ -215,20 +215,23 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .overlay-layer { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform }
 /* fading (slice 4b-1, F4; AD-24): one veil with holes at the lit cards, blocks and pinned notes, on its own layer in the
    overlay above the cards, in the canvas background's colour (`fill-opacity` on this one element only); the lit lines and
-   the tinted rows (prototype .row.rq covered, .row.gap gap, translucent so their text stays readable) above it */
+   the marked rows (prototype .row.rq covered, .row.gap gap; below) above it */
 .im-canvas .fade-veil { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; will-change: transform }
 .im-canvas .fade-veil path { fill: var(--im-canvas); fill-opacity: .75 }
 .im-canvas .overlay-layer { z-index: 3 }
 .im-canvas .lit-lines .lnk { pointer-events: none }
 .im-canvas .lit-lines .lnk .hit { display: none }
-.im-canvas .lit-rows .covered { fill: var(--im-req-soft); fill-opacity: .65 }
-.im-canvas .lit-rows .gap { fill: var(--im-warn-soft); fill-opacity: .75 }
-/* coverage colours below 40 % (slice 4b-1, item 19): the headers in the full colour, translucent, so a tint shows at
-   10–40 %; the dot variant's summary dot at the header's right end */
-.im-canvas .lit-rows .lod.covered { fill: var(--im-req); fill-opacity: .35 }
-.im-canvas .lit-rows .lod.gap { fill: var(--im-warn); fill-opacity: .35 }
-.im-canvas .lit-rows .dot.covered { fill: var(--im-req); fill-opacity: 1 }
-.im-canvas .lit-rows .dot.gap { fill: var(--im-warn); fill-opacity: 1 }
+/* coverage marks (slice 4b-1): the overlay lies above the text, so a fill dims the text as much as its background. The
+   fill is the strongest that keeps every text that reaches 4.5:1 on a plain card at 4.5:1 (WCAG AA; the source key's
+   brown sets the limit), and a bar in the full colour where no text is carries the colour (rows: the left padding;
+   headers: the bottom edge). Below 40 % the summary dot at the header's right end, and on a collapsed block's rows. */
+.im-canvas .lit-rows .covered { fill: var(--im-req); fill-opacity: .06 }
+.im-canvas .lit-rows .gap { fill: var(--im-warn); fill-opacity: .04 }
+@media (prefers-color-scheme: dark) {
+  .im-canvas .lit-rows .covered, .im-canvas .lit-rows .gap { fill-opacity: .16 }
+}
+.im-canvas .lit-rows .bar.covered, .im-canvas .lit-rows .dot.covered { fill: var(--im-req); fill-opacity: 1 }
+.im-canvas .lit-rows .bar.gap, .im-canvas .lit-rows .dot.gap { fill: var(--im-warn); fill-opacity: 1 }
 
 /* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */
 /* One overlay above the cards; the cards are not restyled. Fill opacity on a handful of overlay shapes only. */

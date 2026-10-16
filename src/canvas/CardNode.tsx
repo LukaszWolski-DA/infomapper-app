@@ -67,9 +67,9 @@ const NoteMark = ({ n }: { n: number }) => (
 const LabelMark = ({ labels }: { labels: string }) => <i className="lmark" title={`Working labels: ${labels}`} data-testid="mark-label" />;
 
 /**
- * The requirement marker (slice 4b-1, PRD items 14–15; prototype reqMark, .rmark): a violet dot and the number of
+ * The requirement marker (slice 4b-1, PRD items 14–15; prototype reqMark, .rmark): a violet diamond and the number of
  * requirements the card's panel lists, the list as its tooltip; at every zoom, like the rest of the header. One element
- * (the dot is its ::before, canvas.css). A click on it does nothing, not even select the card.
+ * (the diamond is its ::before, canvas.css). A click on it does nothing, not even select the card.
  */
 const RequirementMarker = ({ mark }: { mark: RequirementMark }) => (
   <i className="rmark" title={mark.title} data-testid="mark-requirements" data-count={mark.n}>

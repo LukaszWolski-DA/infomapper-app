@@ -1,5 +1,5 @@
 // Requirement markers on cards (slice 4b-1, PRD item 14; prototype reqMark, CSS .rmark): an entity or table card shows a
-// violet dot and the number of requirements its panel lists (direct and indirect, D-34), with the tooltip “Requirements:”
+// violet diamond and the number of requirements its panel lists (direct and indirect, D-34), with the tooltip “Requirements:”
 // and one line per requirement. Worked out from the canvas's requirement index once per data version; a card gets its
 // marker in its node data only when it changes (as the pinned notes' number), so no other card draws again.
 

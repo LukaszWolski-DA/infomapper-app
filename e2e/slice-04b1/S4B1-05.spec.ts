@@ -3,7 +3,10 @@
 // entity item) tints Customer's header. Approving birth_date's mapping turns its row blue; with REQ-105 still selected,
 // an undo turns it orange again and a redo blue (the colours follow the data while the requirement stays selected).
 // Escape and a click on empty canvas clear the colours. No card's own class or style changes (checked on the DOM).
+// With a frame around Customer and Sales Order collapsed, the block's Customer row carries the summary dot (Łukasz's
+// answer to step 6): orange for REQ-105 (birth_date a gap), blue for REQ-101; Sales Order's row none (not in scope).
 
+import { AROUND, collapsedFrame, item } from "../slice-02c/helpers";
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, card, emptySpot, ids, mappingId, openCanvas, openRequirement, RETAIL, signInAs, store, WHOLE } from "./helpers";
 
@@ -62,4 +65,20 @@ test("S4B1-05: selecting REQ-105 colours its covered rows blue and its gap orang
   await page.mouse.click(spot.x, spot.y);
   await expect(page.getByTestId("layer-coverage-rows")).toHaveCount(0);
   expect(await cardsLook(page)).toEqual(before);
+});
+
+test("S4B1-05 (collapsed frames): a collapsed frame's block carries the summary dot on its members' rows in scope", async ({ page }) => {
+  const frameId = await collapsedFrame(AROUND.customerAndSales, { name: "Customer and orders" });
+  const [customer, sales] = await Promise.all([item("Customer"), item("Sales Order")]);
+  await signInAs(page, "Łukasz");
+  await openCanvas(page, canvasUrl(), WHOLE);
+  const dot = (colour: "covered" | "gap", member: string) => page.locator(`[data-testid="coverage-block-dot-${colour}"][data-block="${frameId}"][data-member="${member}"]`);
+
+  await openRequirement(page, "REQ-105");
+  await expect(dot("gap", customer.id)).toHaveCount(1);
+  await expect(page.locator(`[data-member="${sales.id}"][data-testid^="coverage-block-dot-"]`)).toHaveCount(0);
+  await openRequirement(page, "REQ-101");
+  await expect(dot("covered", customer.id)).toHaveCount(1);
+  await page.keyboard.press("Escape");
+  await expect(page.locator('[data-testid^="coverage-block-dot-"]')).toHaveCount(0);
 });

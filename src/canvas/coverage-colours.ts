@@ -4,13 +4,13 @@
 //   - entity items: their cards' headers blue or orange (covered when any of the entity's attributes is, D-31);
 //   - linked columns: their rows blue; linked tables: their headers blue;
 //   - linked mappings: their lines lit, as the hover highlight draws them.
-// Below 40 % rows are not drawn (AD-24 rule 1), so a card's summary stands for them (item 19, Łukasz decides between a
-// header tint and a dot): orange when any of the card's items in scope is a gap, else blue.
+// Below 40 % rows are not drawn (AD-24 rule 1), so a card's summary stands for them (item 19; Łukasz chose a dot at the
+// header's right end): orange when any of the card's items in scope is a gap, else blue. A collapsed frame's block
+// carries the same dot on each member's row.
 
 import type { Uuid } from "@/domain/ids";
 import { targetOf } from "@/domain/model/labels";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
-import { createValueStore } from "./value-store";
 
 export type CoverageColour = "covered" | "gap";
 
@@ -65,10 +65,3 @@ export function coverageColours(index: RequirementIndex | null, requirementId: U
   return out;
 }
 
-/**
- * Item 19's two variants for below 40 % (slice 4b-1, step 6: Łukasz chooses from screenshots): `tint` colours the header
- * of every card with something in scope by its summary; `dot` keeps the headers as above 40 % and adds a dot with the
- * summary at the header's right end. A value store, so the measuring hook can switch it for the screenshots.
- */
-export type LodVariant = "tint" | "dot";
-export const lodVariant = createValueStore<LodVariant>("tint");
