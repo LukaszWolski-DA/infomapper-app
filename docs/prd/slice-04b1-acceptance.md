@@ -1,8 +1,163 @@
 # Slice 4b-1 – Acceptance
 
-Status: **steps 1 to 4 accepted; step 5 (markers) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+Status: **steps 1 to 5 accepted; step 6 (coverage colours) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
+
+## Step 6: coverage colours (16 October 2026)
+
+PRD items 16–19. Selecting a requirement (from the Requirements tab, its panel, a go-to link or the project home)
+colours its scope on the open canvas, with nothing faded:
+- attribute items' rows: blue when covered, orange when a gap;
+- entity items' headers: tinted the same way;
+- linked columns' rows and linked tables' headers: blue;
+- linked mappings: their lines drawn lit.
+
+Selecting anything else, a click on empty canvas or Escape clears the colours.
+
+### What changed
+
+| File | Change |
+| --- | --- |
+| `src/canvas/coverage-colours.ts` (new) | `coverageColours(index, requirementId, entityOf, tableOf)`: the rows, the headers, the lit mappings and each card's summary (orange when any of its items in scope is a gap) from the requirement index; `lodVariant`, item 19's variant below 40 % as a value store (`tint` by default). |
+| `src/canvas/CoverageLayer.tsx` (new) | draws them in `OverlayLayer` above the fading, from positions computed from data (AD-24 rule 2): rows with `LitRows`, header tints and the dots as one SVG, lit lines with `LitLines`. No card's own class or style changes. |
+| `src/canvas/ModelCanvas.tsx` | `CoverageLayer` after `FadeLayer` in the overlay, with the selected requirement (`selection.t === "req"`) and the canvas's requirement index (step 5's) |
+| `src/canvas/LineLayer.tsx`, `fade-canvas.tsx` | `LitLines` and `LitRows` take their test ids, so Focus's and the coverage colours' copies can be told apart (`layer-coverage-lines`, `layer-coverage-rows`, `coverage-row-covered` / `-gap`). The rows carry `data-row`. |
+| `src/canvas/canvas.css` | below 40 %, the header tints in the full colour at 35 % opacity (`.lod`); the dot variant's dots |
+| `src/canvas/TestHooks.tsx` | `__imCoverageLod("tint" \| "dot")`, for the screenshots (test hooks only) |
+| `scripts/measure-canvas.ts`, `playwright.config.ts` | S4B1-09 in the to-screen table (`--only colours`); kept out of normal e2e runs (measurement build only) |
+
+### The smoke: colours to the screen, and answer B
+
+S4B1-09 on the rebuilt measurement build: “Performance test”, REQ-102 (46 attribute rows) selected from its row and
+cleared with Escape. Two runs, 5 settled pairs each, traced, unprepared laptop; smoke figures, not a verdict:
+
+| View | Switch | To screen median / p95 / max, ms | Main thread, ms (median) | Not settled |
+| --- | --- | --- | --- | --- |
+| 100 %, expanded | on | 78 / 108 / 108 and 83 / 125 / 125 | 77–81 | 0 |
+| 100 %, expanded | off | 72 / 77 / 77 and 72 / 78 / 78 | 72 | 0 |
+| 30 %, expanded | on | 42 / 56 / 56 and 41 / 54 / 54 | 37–38 | 0 |
+| 30 %, expanded | off | 42 / 63 / 63 and 39 / 50 / 50 | 37–40 | 0 |
+| 100 % and 30 %, collapsed | – | not applicable: REQ-102's cards are in blocks, and blocks show no colours (question below) | | |
+
+- **The medians are within 100 ms,** so under Łukasz's answer B the one `ModelCanvas` commit on selecting a
+  requirement stays. S4B1-13 reads “one commit on selecting a requirement, as for any selection; none on switching
+  Focus”. **No selection store.**
+- **Almost all of it is the main thread** (the selection's canvas commit and the panel; raster under 3 ms): the colours
+  themselves are cheap to draw.
+- **The p95 and max at 100 % (108–125 ms on)** are over 100 ms in the smoke. The closing sitting gives the proper
+  figures; S4B1-09's bar is on the median.
+
+### How the lit lines and rows are drawn, and their layers
+
+**Today's way, in the overlay, with no work for it:**
+- The rows, header tints and dots are one SVG each (rows; headers and dots), and the lit lines one SVG (`LitLines`).
+- None has `will-change`, and none is drawn in the canvas's big layer.
+
+In step 3's diagnosis, Focus's lit lines had a layer of their own (22–31 Mpx), even with the veil hidden.
+
+**CDP `LayerTree`** (`.data/measure/s4b1-step6-diag/`). “Performance test”, around ent:23, frames expanded; REQ-101
+of `seed:large` linked to two mappings for the check:
+
+| View | Selected | Drawing layers | Total Mpx | Coverage layers |
+| --- | --- | --- | --- | --- |
+| 100 % | nothing | 53 | 67.8 | – |
+| 100 % | REQ-102 (46 rows) | 54 | 75.7 | rows 1,758 × 4,466 (7.9 Mpx) |
+| 100 % | REQ-101 (6 rows, 2 lit lines) | 54 | 70.3 | rows 618 × 4,026 (2.5 Mpx); the lit lines no layer of their own |
+| 30 % | nothing | 54 | 69.6 | – |
+| 30 % | REQ-102 | 55 | 77.2 | headers 1,758 × 4,330 (7.6 Mpx) |
+| 30 % | REQ-101 | 55 | 71.9 | headers 618 × 3,708 (2.3 Mpx) |
+
+- **The coverage SVG gets one layer of its own,** the size of what it draws: 2–8 Mpx, against the veil's 2,195 Mpx in
+  step 3's diagnosis.
+- **The lit lines had none in this read.** That was two lines. Whether a large set of lit coverage lines gets a layer
+  of its own, as Focus's did, this read doesn't settle; no requirement in `seed:large` links many mappings.
+
+So no large layer for the rows, the headers or a few lit lines, without changing how they are drawn. For many lit lines
+the question stays open (step 3's T3 is the candidate).
+
+### The rows' look
+
+- **The tints lie translucent over the rows,** in the overlay above the cards, as 4p's lens did. The rows' text looks
+  lighter than in the prototype, where the row's background is coloured.
+- **`mix-blend-mode: multiply` was tried and dropped.** The overlay is its own composited layer, so the tints blended
+  only with its transparent backdrop and came out opaque. A separate blend layer would cost GPU time on every pan with
+  colours on, Focus with a requirement included (S4B1-11).
+- **The 4p look stays.** Łukasz accepted it for the lens in 4p.
+
+### Item 19: below 40 %, two variants for Łukasz
+
+Screenshots in `docs/prd/slice-04b1-screens/step-6/`:
+
+| File | What |
+| --- | --- |
+| `demo-req-105-100-app.png`, `demo-req-105-100-prototype.png` | REQ-105 at 100 %: the three covered rows blue, birth_date orange; the prototype's lens beside it |
+| `demo-req-101-100-app.png` | REQ-101 at 100 %: Customer's header tinted blue (an entity item, covered) |
+| `demo-req-105-30-tint.png`, `demo-req-105-30-dot.png` | REQ-105 at 30 %: Customer's header tinted orange (a gap among its items), or a dot at its right end |
+| `demo-req-101-30-tint.png`, `demo-req-101-30-dot.png` | REQ-101 at 30 % |
+| `perf-req-102-30-tint.png`, `perf-req-102-30-dot.png` | “Performance test”, REQ-102 at 30 %: four cards with gaps |
+
+**What the header colour means at each zoom level:**
+- **At 40 % and above,** a header tint marks an entity item or a linked table. Blue on an entity means “this directly
+  linked entity has a source” (at least one attribute covered); orange means it has none. The rows carry the attribute
+  items.
+- **Below 40 %, the tint variant:** every card with something in scope gets a header tint. Blue means everything on
+  this card in scope is covered; orange means at least one item on it is a gap. So the same blue means two different
+  things at the two zoom levels.
+- **Below 40 %, the dot variant:** the headers keep their meaning from 40 % and above, and a dot at the header's right
+  end carries the summary. Blue or orange, as the tint variant's colour.
+
+**Proposal:** the dot. It keeps one meaning per mark at every zoom. The tint is easier to see at 10–30 %. Łukasz
+decides from the screenshots.
+
+### Question for Łukasz: collapsed frames
+
+With frames collapsed, the cards in scope are hidden in their frames' blocks, and nothing is coloured: the PRD names
+cards only. A block lists its member cards as rows (prototype `blockCard`).
+
+**Proposal:** tint a member's row in the block by its card's summary (blue or orange), one rectangle per member in
+scope, in the same overlay. Not built.
+
+Until it's decided, S4B1-09 records the collapsed views as not applicable.
+
+### Proposed text for `docs/decisions.md` D-32 (for Łukasz's approval; not applied)
+
+**D-32, now:** “On the canvas: markers on cards, a lens when a requirement is selected (covered rows blue, gaps orange),
+and optional requirement cards with dashed trace lines.”
+
+**D-32, proposed:**
+
+> On the canvas: requirement markers on entity and table cards (a violet dot and the number of requirements the card's
+> panel lists, the list as its tooltip). Selecting a requirement colours its scope without fading anything:
+> attribute items' rows blue when covered and orange when a gap, entity items' headers the same way, linked columns'
+> rows and linked tables' headers blue, and linked mappings' lines drawn lit. Below 40 % a card's summary (orange when
+> any of its items in scope is a gap) stands for its rows, as [a dot at the header's right end | a header tint]
+> (Łukasz's choice in step 6). Fading the rest is always Focus (D-22), also for a requirement. (Changed in slice 4b-1.)
+> (Requirement cards with dashed trace lines: slice 4b-2.)
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `src/canvas/coverage-colours.test.ts` (new) | attribute items' colours and the card's summary; an entity item's header; a linked column, table and mapping; nothing without a requirement or an index |
+| `e2e/slice-04b1/S4B1-05.spec.ts` (new) | **S4B1-05.** **REQ-105:** covered rows blue, birth_date orange, no fading. **REQ-101:** Customer's header blue. **After approving birth_date's mapping:** blue; with REQ-105 still selected, an undo turns it orange and a redo blue. **Clearing:** Escape and a click on empty canvas. **Cards' look:** every card's own class and style unchanged (DOM). |
+| `e2e/slice-04b1/S4B1-09.spec.ts` (new, measurement build only) | **S4B1-09:** colours to the screen, REQ-102 selected and cleared, 100 % and 30 %, frames expanded (collapsed: not applicable for now) |
+| `e2e/slice-04b1/S4B1-06-screens.spec.ts` (new, with `SCREENS=<folder>` only) | the screenshots above |
+| `e2e/slice-04a/S4A-14.spec.ts` (changed) | `drawn()` counts only the line layer's own lines, not the lit copies in the overlay (as planned in Q5) |
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 166 passed | 26.2 min |
+| 2 | 166 passed | 26.9 min |
+| 3 | 166 passed | 27.2 min |
+
+Lint, typecheck and the unit tests (965 in 71 files) pass. 166 is step 5's 165 plus S4B1-05; S4B1-09 and the screens
+spec run only when asked (measurement build, `SCREENS`). The idle-commit guards (S2C-12, S3A-14-idle, S3B-15-idle,
+S3B-13), S4P-12 and S4A-14 pass with the coverage layer.
 
 ## Step 5: markers on cards (16 October 2026)
 

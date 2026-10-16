@@ -6,6 +6,7 @@
 //   window.__imFade({ focus: "<entity id>" })     Focus on an entity
 //   window.__imFade({ focus: { t: "requirement", id: "<requirement id>" } })   Focus on a requirement (slice 4b-1)
 //   window.__imFade(null)                         no fading
+//   window.__imCoverageLod("tint" | "dot")        item 19's variant below 40 % (slice 4b-1, for the screenshots)
 //   window.__imIndexTiming("page" | "synthetic")  times 30 builds of the requirement index in the browser, on the page's
 //                                                 data or on slice 4a's synthetic model (item 10); resolves to the figures
 
@@ -13,6 +14,7 @@ import { useEffect, useState } from "react";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import type { ScopeModel } from "@/domain/model/requirements";
 import type { Requirement, RequirementLink } from "@/domain/types";
+import { lodVariant, type LodVariant } from "./coverage-colours";
 import { requestFade, type FadeRequest } from "./fade";
 
 /** The page's requirements and model, for timing the index (the same objects the inspector gets). */
@@ -55,8 +57,9 @@ async function timeIndex(which: "page" | "synthetic", data: IndexData | undefine
 
 export function TestHooks({ indexData }: { indexData?: IndexData }) {
   useEffect(() => {
-    const w = window as unknown as { __imFade?: (r: FadeRequest) => void; __imIndexTiming?: (which: "page" | "synthetic") => Promise<unknown> };
+    const w = window as unknown as { __imFade?: (r: FadeRequest) => void; __imIndexTiming?: (which: "page" | "synthetic") => Promise<unknown>; __imCoverageLod?: (v: LodVariant) => void };
     w.__imFade = requestFade;
+    w.__imCoverageLod = (v) => lodVariant.set(v);
     w.__imIndexTiming = (which) => timeIndex(which, indexData);
     return () => {
       delete w.__imFade;

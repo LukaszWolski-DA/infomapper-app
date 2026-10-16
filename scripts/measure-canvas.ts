@@ -274,6 +274,9 @@ function screenTables(kept: readonly { side: string; raw: Raw }[]): string[] {
   ];
   for (const view of FADING_VIEWS)
     for (const scenario of FADING_SCENARIOS) cases.push([`Fading, ${view}, ${scenario}`, (r) => at(r["S4P-fading.json"], "views", view, "scenarios", scenario, "toScreen", "byDir") as unknown as Record<string, Dir>]);
+  // slice 4b-1: coverage colours (S4B1-09), REQ-102 selected and cleared
+  for (const view of ["100 %, expanded", "30 %, expanded", "100 %, collapsed", "30 %, collapsed"])
+    cases.push([`Coverage colours (S4B1-09), ${view}`, (r) => at(r["S4B1-09.json"], "views", view, "byDir") as unknown as Record<string, Dir>]);
   const rows: string[] = [];
   for (const side of ["reference", "branch"]) {
     const sides = kept.filter((x) => x.side === side);

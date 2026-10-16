@@ -62,6 +62,7 @@ import { LIVE_ONE_AT_A_TIME } from "@/domain/model/live";
 import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
+import { CoverageLayer } from "./CoverageLayer";
 import FadeLayer from "./FadeLayer";
 import { useRequirementIndex, type FadeData, type FadeNote } from "./fade-canvas";
 import { requirementMarks, sameMark } from "./requirement-marks";
@@ -1591,6 +1592,15 @@ export function ModelCanvas({
           <OverlayLayer>
             {/* fading (slice 4p, step 2): the candidate draws first, so the hover and the selection marks stay above it */}
             <FadeLayer data={fadeData} notes={fadeNotes} lines={bundled ?? lines} bundles={bundled?.bundles} blocks={blocks} mapsById={mapsById} />
+            {/* a selected requirement's coverage colours (slice 4b-1): above the fading, so Focus keeps them on */}
+            <CoverageLayer
+              index={requirementIndex}
+              requirementId={selection?.t === "req" ? selection.id : null}
+              lines={bundled ?? lines}
+              bundles={bundled?.bundles}
+              blocks={blocks}
+              mapsById={mapsById}
+            />
             {!diagnosis.noLines && (
               <HoverLines
                 hoverStore={hoverStore}

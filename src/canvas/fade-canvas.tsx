@@ -87,7 +87,7 @@ export function litNodeIds(lookup: Map<string, AnyNode>, lit: Lit): Set<string> 
 export const nodeRect = (n: AnyNode): Rect => ({ x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, w: n.measured.width ?? 0, h: n.measured.height ?? 0 });
 
 /** Rows tinted covered (blue) or gap (orange) above the cards (prototype `.row.rq`, `.row.gap`); none below 40 %. */
-export const LitRows = memo(function LitRows({ rows }: { rows: ReadonlyMap<Uuid, LitRowColour> }) {
+export const LitRows = memo(function LitRows({ rows, testId = "lit-row" }: { rows: ReadonlyMap<Uuid, LitRowColour>; testId?: string }) {
   useStore((s) => s.nodes); // follow drags, collapses and widths
   const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
   const lookup = useStore((s) => s.nodeLookup);
@@ -106,9 +106,9 @@ export const LitRows = memo(function LitRows({ rows }: { rows: ReadonlyMap<Uuid,
   }
   if (!marks.length) return null;
   return (
-    <svg className="hover-layer lit-rows" width={1} height={1} data-testid="layer-lit-rows">
+    <svg className="hover-layer lit-rows" width={1} height={1} data-testid={`layer-${testId}s`}>
       {marks.map((m) => (
-        <rect key={m.key} className={m.colour} data-testid={`lit-row-${m.colour}`} x={m.x} y={m.y} width={m.w} height={ROW_H} />
+        <rect key={m.key} className={m.colour} data-testid={`${testId}-${m.colour}`} data-row={m.key.split("|")[1]} x={m.x} y={m.y} width={m.w} height={ROW_H} />
       ))}
     </svg>
   );

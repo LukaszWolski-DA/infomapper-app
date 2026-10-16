@@ -11,7 +11,8 @@ const drawn = (page: Page) =>
   page.evaluate(() => ({
     cards: document.querySelectorAll("[data-card]").length,
     selected: document.querySelectorAll("[data-card].sel, .row.sel").length,
-    lines: [...document.querySelectorAll("[data-testid=line-mapping], [data-testid=line-relationship]")].map((l) => (l as Element).getAttribute("class")).join("|"),
+    // the line layer's own lines, not the lit copies a requirement's colours or Focus draw in the overlay (slice 4b-1)
+    lines: [...document.querySelectorAll("[data-testid=line-mapping], [data-testid=line-relationship]")].filter((l) => !l.closest(".lit-lines")).map((l) => (l as Element).getAttribute("class")).join("|"),
     view: (document.querySelector(".react-flow__viewport") as HTMLElement).style.transform,
   }));
 

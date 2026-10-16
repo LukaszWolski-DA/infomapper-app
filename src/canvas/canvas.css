@@ -223,6 +223,12 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .lit-lines .lnk .hit { display: none }
 .im-canvas .lit-rows .covered { fill: var(--im-req-soft); fill-opacity: .65 }
 .im-canvas .lit-rows .gap { fill: var(--im-warn-soft); fill-opacity: .75 }
+/* coverage colours below 40 % (slice 4b-1, item 19): the headers in the full colour, translucent, so a tint shows at
+   10–40 %; the dot variant's summary dot at the header's right end */
+.im-canvas .lit-rows .lod.covered { fill: var(--im-req); fill-opacity: .35 }
+.im-canvas .lit-rows .lod.gap { fill: var(--im-warn); fill-opacity: .35 }
+.im-canvas .lit-rows .dot.covered { fill: var(--im-req); fill-opacity: 1 }
+.im-canvas .lit-rows .dot.gap { fill: var(--im-warn); fill-opacity: 1 }
 
 /* ---------- hover highlight and moved row (slice 1b, C-10, D-36; prototype .row.hl, .hnd, .row.moved) ---------- */
 /* One overlay above the cards; the cards are not restyled. Fill opacity on a handful of overlay shapes only. */

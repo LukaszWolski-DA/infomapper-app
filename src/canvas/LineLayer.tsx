@@ -416,9 +416,12 @@ export const LitLines = memo(function LitLines({
   bundles = NO_BUNDLES,
   blocks = NO_BLOCKS,
   mapsById = NO_MAPS,
+  testId = "layer-lit-lines",
 }: {
   maps: ReadonlySet<string>;
   rels: ReadonlySet<string>;
+  /** Focus's lit lines, or a selected requirement's (slice 4b-1, coverage colours). */
+  testId?: string;
   /** The lines drawn on their own, and the bundles, as the line layer has them. */
   lines: CanvasLines;
   bundles?: readonly Bundle[];
@@ -432,7 +435,7 @@ export const LitLines = memo(function LitLines({
   const dots = !lod;
   const placed = (cardId: string) => placedOf(lookup.get(cardId));
   return (
-    <svg className="line-layer lit-lines" width={1} height={1} data-testid="layer-lit-lines">
+    <svg className="line-layer lit-lines" width={1} height={1} data-testid={testId}>
       {lines.relationships
         .filter((l) => rels.has(l.id))
         .map((l) => {
