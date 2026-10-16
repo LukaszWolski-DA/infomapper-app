@@ -1,8 +1,72 @@
 # Slice 4b-1 – Acceptance
 
-Status: **steps 1 to 3 accepted; step 4 (the domain) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+Status: **steps 1 to 4 accepted; step 5 (markers) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
+
+## Step 5: markers on cards (16 October 2026)
+
+PRD items 14–15. Before the step, Łukasz approved the D-31 and D-34 texts (D-34 ending “Clicking a requirement opens
+its panel.”, then “(Placing requirement cards from panels and ‘Add all’: slice 4b-2.)”) and the data model's
+sentence, and asked for `seed:large`'s REQ-102 on the 46 attributes. All of it is committed in `3739df1` (docs and test
+data only).
+
+### `seed:large`'s REQ-102: the lit set before and after
+
+Focus on REQ-102 (“Performance test”), worked out from the seed by the domain's `requirementFocusLit` (scratch script in
+`.data/measure/s4b1-step5/`):
+
+| REQ-102 | Links | Cards lit (entities + tables) | Lines lit | Attribute rows in scope |
+| --- | --- | --- | --- | --- |
+| 4a's scope (an entity link brings its attributes), as slice 4p and step 0 measured | 4 entities | **29** (4 + 25) | **29** | **46** |
+| Step 4's scope, before the seed change | 4 entities | 4 (4 + 0) | 0 | 0 |
+| **Now** (the 46 attributes linked) | 46 attributes | **29** (4 + 25) | **29** | **46** |
+
+So the large set is the same as before, and S4P-fading's "lens-large" and S4B1-10's requirement case stay comparable
+with slice 4p and step 0. Its coverage is 4 of 46 items (46 attributes).
+
+### What changed
+
+| File | Change |
+| --- | --- |
+| `src/canvas/requirement-marks.ts` (new) | `requirementMarks(index, cards)`: for each entity and table card, the number of requirements its panel lists (direct and indirect) and the tooltip, in the prototype's form (“Requirements: REQ-101 Single view of the customer” and a line per further requirement); none without requirements. `sameMark` compares two markers. |
+| `src/canvas/CardNode.tsx` | `RequirementMarker`, one `<i class="rmark">` with the count, after the label and note marks in the header's first line (prototype order). A click on it does nothing (the card's click handler ignores it). The header's clip check counts its width. |
+| `src/canvas/ModelCanvas.tsx` | The markers come from the canvas's requirement index (`useRequirementIndex`, once per data version) and the cards' targets. An effect writes a card's `reqMark` into its node data only when the marker changes, so no other card draws again. `toNode` keeps the pinned notes' number and the marker when the page's data merges in. |
+| `src/canvas/text-fit.ts` | `reqMarkWidth`; `lineNeedsClip` takes the number of requirements |
+| `src/canvas/canvas.css` | `.rmark` as the prototype's, the dot a rotated square in its `::before` (one element per marker, AD-24) |
+
+- **At every zoom:** the header is drawn below 40 % too, so the markers are there (item 15).
+- **Updates:** they follow link, unlink, delete and undo through the page's data: the canvas's index is rebuilt with
+  each new data version.
+
+### For the closing sitting (S4B1-13)
+
+Markers add one element per marked card. In “Performance test” these are ent:19 (REQ-101 and REQ-102 via attribute),
+ent:3, ent:4 and ent:7 (REQ-102 via attribute), and the four tables of REQ-103: up to 8 elements, those in view.
+S4A-14-elements' counts will differ by them (and by F4's layer when Focus is on); S4B1-13 explains every difference.
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `src/canvas/requirement-marks.test.ts` (new) | counts what the panel lists, direct and indirect; the tooltip; no marker without requirements or without an index; `sameMark` |
+| `e2e/slice-04b1/S4B1-04.spec.ts` (new) | **S4B1-04.** **Count and tooltip:** Customer 4 (REQ-101 directly, REQ-102, 103 and 105 via attribute), in the order of its panel; Sales Order and Order Line 1 each; no table has one. **Updates:** linking REQ-103 from order_line's panel adds its marker, unlinking takes it away; deleting REQ-104 takes Sales Order's and Order Line's away, and one undo brings them back. **Click:** nothing selected, nothing written. **At 30 %:** drawn. |
+
+- **Checked in the browser** (preview server, stopped before the e2e runs): Customer's header shows the violet diamond
+  and the count after the label mark, as the prototype does, with the tooltip listing the requirements.
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 165 passed | 26.7 min |
+| 2 | 165 passed | 26.9 min |
+| 3 | 165 passed | 27.0 min |
+
+Lint, typecheck and the unit tests (961 in 70 files) pass. The idle-commit guards (S2C-12, S3A-14-idle, S3B-15-idle,
+S3B-13) and S4P-12 pass with the markers' effect.
 
 ## Step 4: the domain (16 October 2026)
 

@@ -63,7 +63,8 @@ import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
 import FadeLayer from "./FadeLayer";
-import type { FadeData, FadeNote } from "./fade-canvas";
+import { useRequirementIndex, type FadeData, type FadeNote } from "./fade-canvas";
+import { requirementMarks, sameMark } from "./requirement-marks";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
 import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
@@ -192,13 +193,18 @@ export interface LiveCanvas {
 type PlaceSpot = { x: number; y: number; height: number };
 type FrameRef = { frameId: string; expectedVersion: number };
 
-const toNode = (card: CardData, editable: boolean, pinnedNotes?: number): CardNodeT => ({
+/** A card's node; `keep` carries what the canvas added to its data (the pinned notes' number, the requirement marker). */
+const toNode = (card: CardData, editable: boolean, keep?: Omit<CardNodeT["data"], "card">): CardNodeT => ({
   id: card.id,
   type: "card",
   position: { x: card.x, y: card.y },
   width: cardWidth(card),
   height: cardHeight(card),
-  data: pinnedNotes ? { card, pinnedNotes } : { card },
+  data: {
+    card,
+    ...(keep?.pinnedNotes ? { pinnedNotes: keep.pinnedNotes } : {}),
+    ...(keep?.reqMark ? { reqMark: keep.reqMark } : {}),
+  },
   draggable: editable,
   dragHandle: ".c-head",
   selectable: false,
@@ -531,10 +537,10 @@ export function ModelCanvas({
       const page = new Set(initialCards);
       return merged.map((c) => {
         const mine = local.get(c.id);
-        // the number of notes stays as the notes last gave it (slice 3a)
-        if (!mine || page.has(c)) return toNode(c, editable, mine?.data.pinnedNotes);
+        // the number of notes and the requirement marker stay as they were last given (slices 3a, 4b-1)
+        if (!mine || page.has(c)) return toNode(c, editable, mine?.data);
         if (c === mine.data.card) return mine;
-        return { ...toNode(c, editable, mine.data.pinnedNotes), position: mine.position, dragging: mine.dragging };
+        return { ...toNode(c, editable, mine.data), position: mine.position, dragging: mine.dragging };
       });
     });
     for (const [id, v] of grownVersions(initialCards, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
@@ -1062,11 +1068,40 @@ export function ModelCanvas({
         const count = cardNotes.get(n.id) ?? 0;
         if ((n.data.pinnedNotes ?? 0) === count) return n;
         changed = true;
-        return { ...n, data: count ? { ...n.data, pinnedNotes: count } : { card: n.data.card } };
+        const { pinnedNotes: _drop, ...rest } = n.data;
+        void _drop;
+        return { ...n, data: count ? { ...n.data, pinnedNotes: count } : rest };
       });
       return changed ? next : ns;
     });
   }, [cardNotes]);
+  // The requirement markers (slice 4b-1, PRD item 14): from the canvas's requirement index, once per data version and
+  // per set of cards; a card's data changes only when its marker does, so no other card draws again.
+  const requirementIndex = useRequirementIndex(fadeData);
+  const cardTargets = nodes.map((n) => `${n.id}|${n.data.card.kind}|${n.data.card.targetId}`).join(",");
+  const reqMarks = useMemo(
+    () =>
+      requirementMarks(
+        requirementIndex,
+        cardTargets ? cardTargets.split(",").map((t) => { const [id, kind, targetId] = t.split("|") as [string, "ent" | "src", string]; return { id, kind, targetId }; }) : [],
+      ),
+    [requirementIndex, cardTargets],
+  );
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the markers follow the requirements, which live beside the cards
+    setNodes((ns) => {
+      let changed = false;
+      const next = ns.map((n) => {
+        const mark = reqMarks.get(n.id);
+        if (sameMark(n.data.reqMark, mark)) return n;
+        changed = true;
+        const { reqMark: _drop, ...rest } = n.data;
+        void _drop;
+        return { ...n, data: mark ? { ...rest, reqMark: mark } : rest };
+      });
+      return changed ? next : ns;
+    });
+  }, [reqMarks]);
   /** The nodes React Flow draws: the cards, those of a collapsed frame hidden, and the blocks. */
   const flowNodes = useMemo(() => {
     const cards = collapsedIds.size
