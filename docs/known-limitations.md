@@ -36,6 +36,24 @@ created after the page read the data (`readAt`) stay, and the versions the canva
 
 ## Canvas performance (slice 1a)
 
+### Where the canvas stands after slice 4b-1 (17 October 2026)
+
+Slice 4b-1's closing sitting (`2026-10-17-15-39`, `-16-44`, `-17-04`; production measurement build; three rounds A/B
+against `slice-04p`; to the screen and as presented frames, traced; `docs/prd/slice-04b1-acceptance.md`). The method is
+the entry “How canvas figures are measured since slice 4b-1”. The entries below this one are kept as they were measured.
+
+| Figure | Bar | Now | State |
+| --- | --- | --- | --- |
+| Pan and zoom, overview | ≥ 50 fps; ≥ −5 % | 58.9 presented, 59.5 rAF; +0.3 % | met |
+| Pan and zoom, 100 % dense area | ≥ 50 fps; ≥ −5 % | 43.2 presented, 47.5 rAF; −8.7 % | **met, layers confirmed; fps confirmed in 4b-2's sitting** (Łukasz): the cause was the requirement markers, two compositing layers each (+16 in this view); fixed, the layers are `slice-04p`'s again (47) |
+| Pan and zoom, frames collapsed | ≥ 50 fps; ≥ −5 % | 59.1–59.4 presented; 0.0 % | met |
+| C-08 initial render | ≤ 1,500 ms to the stable frame | 1,382 ms (untraced); **to its last present 1,462 ms** (traced; two of five loads over 1,500) | **met** on the stable frame; the last present is recorded beside it. Redefining the bar: the performance review before the database slice (Łukasz) |
+| C-10 hover | ≤ 100 ms | 23 ms to the screen | met |
+| Lasso marks | ≤ 100 ms | 42 ms to the screen (p95 48) | met |
+| Coverage colours (S4B1-09) | ≤ 100 ms | 31–77 ms to the screen | met |
+| Focus switching (S4B1-10) | ≤ 100 ms | 11–88 ms to the screen (p95 at most 126) | met |
+| Pan and zoom with Focus on (S4B1-11) | ≥ −5 % vs Focus off | 100 %: +5 to +15 %; **30 %: −40 % expanded, −22 % collapsed** | **partly met** (Łukasz; below) |
+
 ### Where the canvas stands after slice 4p (15 October 2026)
 
 Slice 4p's final sitting (`2026-10-15-09-36`; production measurement build; Chrome 155; three rounds A/B against
@@ -64,7 +82,7 @@ step 0's settled sitting `sitting-2026-10-15-16-02`, traced, `docs/perf/04b1-ste
   about 20 ms low.
 - **C-08 was met in the page,** at a rAF before the last raster; its last present is not included (C-08 entry below).
 
-The figures after slice 4b-1, measured to the screen in its closing sitting, follow in step 8, part 2.
+The figures after slice 4b-1, measured to the screen in its closing sitting, are in the entry above this one.
 
 ### Fading: F1's slow switches, and F4 instead (slice 4p; slice 4b-1)
 
@@ -86,7 +104,16 @@ page, except at 30 % with frames expanded on “Performance test”, where whole
 - **Trial candidates,** if the closing sitting confirms the miss: T1 (a smaller veil), T2 (the lit lines inside the
   veil's SVG), T3 (the lit lines and rows in the overlay's own layer) (`docs/prd/slice-04b1-acceptance.md`).
 
-F4's figures from the closing sitting follow in step 8, part 2.
+**The closing sitting** (slice 4b-1, 17 October 2026):
+- **Switching meets the bar:** 11–88 ms to the screen; the large set at 30 % expanded has p95 126 ms.
+- **Pan and zoom with Focus on at 30 % do not:** −40 % presented frames with frames expanded, −22 % collapsed. The page
+  keeps its pace (rAF −1 to −8 %), but the presents stall up to 0.77 s about 20 times per 10 s pan: compositing and GPU
+  raster. At 100 %, Focus on is faster than off.
+- **Partly met** (Łukasz, 17 October 2026). **T1 applied in slice 4b-1:** the veil reaches one pane at the minimum zoom
+  beyond the content instead of 20,000 px. Its layer fell from 2,195 to 543 Mpx (LayerTree, no timing), and a test
+  checks that its edge never shows while any of the content is in view (S4B1-07).
+- **Later: T2 and T3 in slice 4b-2,** designed together with its dashed trace lines; 4b-2's sitting measures pan with
+  Focus on.
 
 ### C-08: what the first render waits for (slice 4p)
 

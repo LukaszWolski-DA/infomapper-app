@@ -1,8 +1,131 @@
 # Slice 4b-1 – Acceptance
 
-Status: **steps 1 to 7 and step 8's part 1 accepted; the closing sitting done (17 October 2026): S4B1-11 and S4B1-12 missed, waiting for Łukasz's decision.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+Status: **steps 1 to 8 done; Łukasz's decisions after the sitting applied (17 October 2026); waiting for his manual acceptance.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
+
+## Step 8, part 3: Łukasz's decisions after the sitting (17 October 2026)
+
+**Decisions:**
+1. **S4B1-12:** draw the marker's diamond without `transform`; confirm by a LayerTree read (frames expanded, Focus off):
+   47 drawing layers, or explain. If confirmed: “met, layers confirmed; fps confirmed in 4b-2's sitting”, and AD-24
+   gets “no transform on small repeated elements in cards”.
+2. **S4B1-11: partly met.** T1 now (the smaller veil), with a test that its edge never shows, confirmed by the veil's
+   layer size. T2 and T3 go to slice 4b-2, designed with its dashed trace lines; 4b-2's sitting measures pan with
+   Focus on.
+3. **C-08:** the 1,500 ms bar stays on the stable frame (met); the last present is recorded beside it (1,462 ms, two of
+   five loads over). Redefining the bar: the performance review before the database slice.
+4. **AD-24 approved** with the bracket and the transform rule; apply it.
+5. **Fix S4A-14-elements' baseline handling** on both sides.
+
+### 1. The markers' layers: confirmed, but the cause was the pill's fill, not the transform
+
+| Marker drawn as | Drawing layers, 100 % dense, expanded, Focus off |
+| --- | --- |
+| `slice-04p` (no markers) | 47 |
+| step 5: a rotated square (`transform`), filled pill | 63 |
+| a `clip-path` diamond, filled pill | 63 |
+| a diamond of four gradients, filled pill | 63 |
+| … without the diamond, or without the title | 63 |
+| … pill filled by an inset shadow or a gradient image | 63 |
+| … **pill without a fill** (none, or a 1 px ring) | **47** |
+| **the marker as built now:** gradient diamond, 1 px ring | **47** (and 30 with frames collapsed, as `slice-04p`) |
+
+(CDP LayerTree; the variants were injected as CSS into the page of one build, the last row is its own build.)
+
+- **Chrome's reason** for each marker's layer (`LayerTree.compositingReasons`) was “Overlap”, with a squashing layer
+  for “Overlap” right after each marker: two layers per marker, 7 markers in view, +14, plus a `span.path` beside one.
+  With the ring, no “Overlap” layer is left.
+- **So the transform was not the cause.** Without it the layers stayed; the filled pill made them. Why a filled
+  element there can't be squashed with the content below it, the read does not tell.
+- **What changed:** the diamond is drawn by four gradients (no `transform`, no `clip-path`), 8 px with a −1 px margin
+  on each side so it takes the old 6 px of room; the pill is a 1 px ring in the requirement colour at 35 %, no fill. The
+  number stays violet on the header's white (more contrast than on the soft violet before). Before and after:
+  `docs/prd/slice-04b1-screens/step-8/marker-before-after.png`.
+- **S4B1-12: met, layers confirmed; fps confirmed in 4b-2's sitting** (Łukasz's wording).
+- **AD-24's rule:** not added as worded, because the evidence does not support it (below, a proposal).
+
+### 2. T1: the smaller veil
+
+- **The veil reaches one pane at the minimum zoom beyond the content** (`veilMargin`, `FadeLayer.tsx`), instead of a
+  fixed 20,000 px. The view is at most one pane wide at 10 %, so while any of the content is in view, the whole view
+  lies inside the veil. The pane's size comes from React Flow's store: a window resize redraws the veil, a pan or zoom
+  does not.
+- **Its layer** (Focus on ent:23, 30 % and 100 %, frames expanded): **46,328 × 47,376 (2,195 Mpx) → 24,968 × 21,736
+  (543 Mpx), −75 %.** Drawing layers in that view with Focus on: 63–65 before the marker fix, 47–49 after.
+- **The test:** S4B1-07's new case puts each corner of the content at the opposite corner of the pane at 10 % and
+  checks that the veil covers the whole view; it reads the content's extent from the page, not from the veil's
+  formula. It also checks that the veil is no larger than one pane beyond the content. A unit test covers
+  `veilMargin`.
+- **Not measured as frames now** (Łukasz: layer size only). Recorded in `docs/known-limitations.md`: S4B1-11 partly met,
+  T1 applied, T2 and T3 with slice 4b-2, whose sitting measures pan with Focus on.
+
+### 3. C-08
+
+Recorded in `docs/known-limitations.md` (“Where the canvas stands after slice 4b-1”): **met** on the stable frame
+(1,382 ms untraced), the last present beside it (1,462 ms traced, two of five loads over 1,500), and the bar's
+redefinition left to the performance review before the database slice.
+
+### 4. AD-24
+
+Applied as approved, with the bracket: “Partly met: pan and zoom with Focus on at 30 % lose 22–40 % of presented frames
+(slice 4b-1); T1 applied in 4b-1, T2 and T3 with slice 4b-2.”
+
+**The rule in (4) is not applied.** “No transform on small repeated elements in cards” was to follow if the read
+confirmed the transform as the cause, and it did not. **Proposed instead, for Łukasz's approval:** in rule (4), “no
+filled background on small repeated elements in a card's header; a new repeated element is checked with a LayerTree
+read against the previous slice (slice 4b-1: the requirement marker's filled pill made two compositing layers per
+marker).”
+
+### 5. S4A-14-elements' baseline
+
+- **Each side records the elements added on purpose since slice 3b:** 4p's overlay container (`overlay`) and 4b-1's
+  markers (`markers`). The comparison leaves them out on both sides, so a baseline from any slice compares; older files
+  without these fields count them as 0.
+- **Without a baseline file** (a reference worktree is cleaned before a sitting), the counts are recorded and nothing is
+  compared (an annotation says so).
+- **Checked:** on `slice-04p` without a baseline (recorded, passed); on the branch against `slice-04p`'s counts
+  (passed) and against slice 3b's file (passed).
+
+| View | `slice-04p` viewport (overlay, markers) | Branch viewport (overlay, markers) |
+| --- | --- | --- |
+| 100 %, expanded | 19,296 (1, 0) | 19,304 (1, 8) |
+| 30 %, expanded | 4,499 (1, 0) | 4,507 (1, 8) |
+| 100 %, collapsed | 4,906 (1, 0) | 4,906 (1, 0) |
+| 30 %, collapsed | 1,464 (1, 0) | 1,464 (1, 0) |
+
+### The criteria now
+
+| ID | Result |
+| --- | --- |
+| S4B1-01 to S4B1-08 | pass (e2e, every run) |
+| S4B1-09 | met |
+| S4B1-10 | met |
+| S4B1-11 | **partly met** (Łukasz): 30 % −22 to −40 %; T1 applied (veil 2,195 → 543 Mpx); T2 and T3 in 4b-2 |
+| S4B1-12 | **met, layers confirmed; fps confirmed in 4b-2's sitting** |
+| S4B1-13 | met: elements and layers explained (layers now equal to `slice-04p`'s), commits met |
+| S4B1-14 | three full runs below; CI on the pull request |
+| C-08 | met on the stable frame; last present 1,462 ms recorded beside it |
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `e2e/slice-04b1/S4B1-07.spec.ts` | a new case: the veil's edge never shows at 10 % with each content corner at the opposite pane corner; the veil is no larger than one pane beyond the content |
+| `src/canvas/veil.test.ts` (new) | `veilMargin` |
+| `e2e/slice-04a/S4A-14-elements.spec.ts` (changed) | the baseline handling above |
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch, in a row:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 173 passed | 26.8 min |
+| 2 | 173 passed | 27.6 min |
+| 3 | 173 passed | 27.3 min |
+
+Lint, typecheck and the unit tests (978 in 73 files) pass. 173 is 172 plus S4B1-07's veil-edge case.
 
 ## Step 8, part 2: the closing sitting (17 October 2026)
 
