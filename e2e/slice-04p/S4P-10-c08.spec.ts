@@ -59,7 +59,8 @@ test("S4P-10: the C-08 diagnosis, initial render of “Performance test” split
           const ready =
             document.querySelector('[data-testid="area-canvas"][data-ready="true"]') &&
             document.querySelectorAll(".react-flow__node").length === cards &&
-            document.querySelectorAll('[data-testid="line-mapping"], [data-testid="line-relationship"]').length === lines;
+            // the line layer's own lines (a hover by the real mouse pointer draws copies; slice 4b-1's closing sitting)
+            document.querySelectorAll('[data-testid="layer-lines"] [data-testid="line-mapping"], [data-testid="layer-lines"] [data-testid="line-relationship"]').length === lines;
           // slice 4b-1: a user-timing mark in the trace in the frame where the page first is complete (its commit carries
           // it to the screen), so the trace's own clock says where that is; C-08 itself stays the next rAF, as before
           if (ready) {

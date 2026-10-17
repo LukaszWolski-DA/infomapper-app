@@ -145,7 +145,7 @@ test("S1A-14: performance on seed:large, Chrome, same laptop as the spike: pan a
     await expect(page.getByTestId("block")).toHaveCount(8);
   } else {
     await expect(page.locator(".react-flow__node")).toHaveCount(cards);
-    await expect(page.locator('[data-testid="line-mapping"], [data-testid="line-relationship"]')).toHaveCount(lines);
+    await expect(page.getByTestId("layer-lines").locator('[data-testid="line-mapping"], [data-testid="line-relationship"]')).toHaveCount(lines);
     const fitZoom = await zoomOf(page);
     expect(fitZoom).toBeLessThan(0.4);
     await expect(page.getByTestId("card-block")).toHaveCount(cards);
@@ -192,7 +192,9 @@ test("S1A-14: performance on seed:large, Chrome, same laptop as the spike: pan a
           const ready =
             document.querySelector('[data-testid="area-canvas"][data-ready="true"]') &&
             document.querySelectorAll(".react-flow__node").length === cards &&
-            document.querySelectorAll('[data-testid="line-mapping"], [data-testid="line-relationship"]').length === lines;
+            // the line layer's own lines: the hover and lit layers draw copies with the same test ids, and in headed Chrome
+            // the real mouse pointer can hover a row of the new window (slice 4b-1's closing sitting: one line over)
+            document.querySelectorAll('[data-testid="layer-lines"] [data-testid="line-mapping"], [data-testid="layer-lines"] [data-testid="line-relationship"]').length === lines;
           if (ready) requestAnimationFrame((t) => (w.__stableAt = t));
           else requestAnimationFrame(check);
         };
