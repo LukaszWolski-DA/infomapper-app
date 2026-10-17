@@ -1,8 +1,209 @@
 # Slice 4b-1 – Acceptance
 
-Status: **steps 1 to 7 accepted; step 8, part 1 (docs, checklist, builds, the sitting's plan) waiting for Łukasz; part 2 (the closing sitting) after he prepares the laptop.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+Status: **steps 1 to 7 and step 8's part 1 accepted; the closing sitting done (17 October 2026): S4B1-11 and S4B1-12 missed, waiting for Łukasz's decision.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
+
+## Step 8, part 2: the closing sitting (17 October 2026)
+
+**In short:**
+
+| Criterion | Result |
+| --- | --- |
+| S4B1-09 coverage colours to the screen | **met** (31–77 ms medians) |
+| S4B1-10 Focus switching to the screen | **met** (11–88 ms medians; the large set at 30 % expanded has p95 126 ms) |
+| S4B1-11 pan with Focus on against off | **missed at 30 %:** −40 % with frames expanded, −22 % collapsed (presented frames). Met at 100 %. |
+| S4B1-12 no regression against `slice-04p`, Focus off | **missed in one view:** the 100 % dense area with frames expanded, −8.7 % presented (−6.9 % rAF); every other view, C-10 and the lasso met |
+| S4B1-13 guards | elements: every difference explained (the 8 markers, the Focus button). **Layers: +16 drawing layers with frames expanded, from the markers.** Commits: met (S4B1-06 in every e2e run) |
+| C-08 | **met untraced and in the page; at the bar to its last present** (branch 1,462 ms traced, `slice-04p` 1,500) |
+
+Per Łukasz's rule the sitting was finished and the step stops here with the figures.
+
+### How the sitting ran
+
+- **Conditions:** Łukasz prepared the laptop (restart, 10 min wait, power adapter, Best performance, Update and
+  OneDrive paused, Chrome closed, display and sleep Never). No node process, server or Chrome before each part.
+- **First attempt stopped:** the warm-up failed on the reference side. S1A-14's C-08 loads count every line, and the
+  real mouse pointer hovered a row of the new window, so the hover layer drew one line more and the load never counted
+  as ready. Fix: count only the line layer's own lines (S1A-14, S4P-10; `7d581ff`). S1A-14 and S4P-10 passed once each
+  functionally, and the sitting started again from the warm-up. The pointer was moved off the canvas windows.
+- **Builds:** the measurement builds of 17 October (`--prepare-only`), used with `--no-build`; branch `7d581ff`
+  (no app code changed since the builds), reference `slice-04p` (`052daaf`).
+- **Parts** (raw traces and results under `.data/measure/`, not committed):
+
+| Part | Sitting | Time | CPU checks |
+| --- | --- | --- | --- |
+| Warm-up, discarded (`SETTLED_PAIRS=1`) | `2026-10-17-15-25` | 14.7 min | all passed |
+| A: colours, Focus, pan with Focus, S1A-14, C-10, lasso; 3 rounds | `2026-10-17-15-39` | 65.2 min | all passed, no round replaced |
+| B: S1A-14 with every frame collapsed; 3 rounds | `2026-10-17-16-44` | 19.2 min | **rounds 1 and 3 dropped and replaced** (rounds 4 and 5): the reference side's check did not reach 30 s below 2 % within 3 min (peaks 3.5 %; iCloud, PSExpressCore, Google Drive under 1 % each) |
+| C: C-08, five traced loads per side | `2026-10-17-17-04` | 2.8 min | passed |
+| D: element and layer counts, Focus off | `.data/measure/s4b1-closing/` | about 6 min | not timed |
+
+Switches are settled (1.2 s pause, the settled check) with 10 pairs per case and round; figures are the median of the
+three rounds' medians, with the largest p95 and max. **No switch failed the settled check in any case.**
+
+### S4B1-09: coverage colours to the screen (REQ-102)
+
+| View | On: median / p95 / max | Off: median / p95 / max | In page (on / off) | Result |
+| --- | --- | --- | --- | --- |
+| 100 %, expanded | 77 / 107 / 107 | 70 / 81 / 81 | 85 / 74 | met |
+| 30 %, expanded | 42 / 53 / 53 | 39 / 44 / 44 | 51 / 42 | met |
+| 100 %, collapsed | 38 / 45 / 45 | 35 / 43 / 43 | 43 / 36 | met |
+| 30 %, collapsed | 31 / 38 / 38 | 28 / 32 / 32 | 25 / 24 | met |
+
+### S4B1-10: Focus switching to the screen
+
+| View | Focus ent:23 on / off | Focus REQ-102 on / off | Result |
+| --- | --- | --- | --- |
+| 100 %, expanded | 26 / 19 (p95 63, 33) | 40 / 18 (p95 56, 38) | met |
+| 30 %, expanded | 45 / 14 (p95 82, 23) | **88** / 15 (p95 **126**, 25) | met on the median |
+| 100 %, collapsed | 11 / 9 (p95 23, 20) | 21 / 8 (p95 34, 25) | met |
+| 30 %, collapsed | 21 / 9 (p95 41, 23) | 46 / 9 (p95 76, 23) | met |
+
+Medians in ms, to the screen. In the page every switch reads 5–19 ms.
+
+### S4B1-11: pan and zoom with Focus on against off (same branch, same rounds)
+
+| View | Off, presented (rAF) | Focus ent:23, presented (rAF) | Focus REQ-102, presented (rAF) | Change, presented | Gaps over 50 ms, off → on | Result |
+| --- | --- | --- | --- | --- | --- | --- |
+| 100 %, expanded | 43.7 (47.9) | 49.6 (47.3) | 50.1 (47.1) | +13.5 / +14.6 % | 11–15 → 1–2 | met |
+| **30 %, expanded** | 53.2 (54.6) | **31.8** (51.5) | **32.5** (50.5) | **−40.2 / −38.9 %** | 10–12 → **22–24** (longest **720–770 ms**) | **missed** |
+| 100 %, collapsed | 56.3 (57.0) | 59.0 (57.2) | 59.0 (57.3) | +4.8 / +4.8 % | 6–7 → 1 | met |
+| **30 %, collapsed** | 58.1 (58.7) | **45.1** (58.0) | **45.0** (57.7) | **−22.4 / −22.5 %** | 4–9 → **17–21** (longest **450–500 ms**) | **missed** |
+
+Presented fps, median of three rounds; rAF from the untraced pan of the same case.
+
+**Reading:**
+- **The same in every round:** at 30 % expanded the presented fps were 31.8–33.7 with Focus on in all six pans, and
+  45.0–46.0 collapsed. It is no disturbance.
+- **The page keeps its pace; the screen does not.** The rAF intervals drop only 1–8 %, while the presents stall for up to
+  0.77 s about 20 times per 10 s pan. So the main thread is not the cost. It lies after it: compositing and GPU raster.
+  This fits step 3's diagnosis (the veil's own layer of 2,195 Mpx, a layer of 22–31 Mpx under the lit lines). The
+  sitting traced presents only, so it does not show which of the two. Step 3's T1–T3 are the candidates.
+- **At 100 % Focus on is faster than off** (+13.5 %, gaps over 50 ms 11–15 → 1–2). Most of the canvas lies under the veil
+  then, and Chrome draws less of the big layer. Not examined further.
+- **4p's S4P-03 was met on rAF intervals** (−3.0 % for Focus at 30 % expanded). As presented frames, F4 misses it here.
+
+### S4B1-12: no regression against `slice-04p`, Focus off
+
+| Figure | `slice-04p` | This branch | Change | Result |
+| --- | --- | --- | --- | --- |
+| Overview, presented fps | 58.7 | 58.9 | +0.3 % | met |
+| Overview, rAF fps (untraced) | 59.0 | 59.5 | +0.8 % | met |
+| **100 % dense area, presented fps** | 47.3 | **43.2** | **−8.7 %** | **missed** |
+| 100 % dense area, rAF fps (untraced) | 51.0 | 47.5 | −6.9 % | missed |
+| – gaps between presents over 50 ms | 12 (10–16) | 10 (9–11) | – | – |
+| Overview, frames collapsed, presented / rAF (B) | 59.4 / 60.0 | 59.4 / 60.0 | 0.0 % | met |
+| 100 % dense, frames collapsed, presented / rAF (B) | 59.1 / 60.0 | 59.1 / 60.0 | 0.0 % | met |
+| C-10 to the screen (on / off) | 21 / 17 | 23 / 19 | – | met |
+| Lasso marks to the screen | 41 (p95 49) | 42 (p95 48) | +2.4 % | met |
+
+**A likely cause: the requirement markers make compositing layers** (D below). The dense area has 7 markers in view
+(`i.rmark` in the layer read). Each marker's diamond is its `::before` with `transform: rotate(45deg)`,
+and Chrome gives the markers layers of their own: 16 more drawing layers in this view. More layers cost Layerize on
+every pan frame. **Not proven:** no trace of the cost per frame was taken.
+
+### S4B1-13: element, layer and commit counts with Focus off
+
+**Elements** (S4A-14-elements, the viewport of “Performance test” at S1A-14's views):
+
+| View | `slice-04p` (viewport / page) | This branch | Difference | Why |
+| --- | --- | --- | --- | --- |
+| 100 %, expanded | 19,296 / 20,730 | 19,304 / 20,743 | +8 / +13 | 8 markers in view; the toolbar's Focus button (5 elements: button, icon, two shapes, label) |
+| 30 %, expanded | 4,499 / 5,933 | 4,507 / 5,946 | +8 / +13 | the same |
+| 100 %, collapsed | 4,906 / 6,246 | 4,906 / 6,251 | 0 / +5 | the Focus button; the marked cards are in blocks |
+| 30 %, collapsed | 1,464 / 2,804 | 1,464 / 2,809 | 0 / +5 | the same |
+
+S4A-14-elements' own assertion failed on both sides: the reference has no slice-03b baseline file (its worktree was
+cleaned), and on the branch the spec adds 4p's overlay container (+1) to a baseline that already has it. The counts are
+what counts here.
+
+**Drawing layers** (CDP LayerTree, no timing):
+
+| View | `slice-04p` | This branch | Owners of the difference |
+| --- | --- | --- | --- |
+| 100 % and 30 %, expanded | 47 layers, 68.4 Mpx | **63 layers, 69.0–70.2 Mpx** | `i.rmark` 7, 7 without a node (their `::before`), a `span.path` next to a marker, one note |
+| 100 % and 30 %, collapsed | 30 layers, 48.2 Mpx | 30 layers, 48.2 Mpx | – |
+
+**Commits:** switching Focus commits neither the canvas nor the miniature (S4B1-06), selecting a requirement commits the
+canvas once (step 6, answer B), and S4P-12, S2C-12, S3A-14-idle, S3B-15-idle and S3B-13 pass in every e2e run.
+
+### C-08, both ways (bar 1,500 ms)
+
+| | `slice-04p` | This branch |
+| --- | --- | --- |
+| In the page, untraced (A, S1A-14), median of 5 per round, median of 3 rounds | 1,391 (1,374–1,634) | 1,382 (1,364–1,435) |
+| In the page, traced (C), median of 5 | 1,340 | 1,309 |
+| To its last present, traced (C), median of 5 | 1,500 (1,451–1,562) | 1,462 (1,429–1,550) |
+| Last present after the stable frame | 139–160 | 153–196 |
+
+- **The stable frame meets the bar** on both sides, untraced and traced.
+- **To its last present, C-08 is at the bar:** the branch's median is 1,462 ms, `slice-04p`'s 1,500. Two of the
+  branch's five loads are over 1,500.
+- **Untraced, the last present would be about 1,540 ms:** the untraced stable frame (1,382) plus the gap (median 163).
+  That is an estimate; the last present is only measured traced.
+- **No regression:** the branch is within 3 % of `slice-04p` both ways.
+
+### The calibration: presented frames against 4p's rAF figures
+
+Fading off, the same views around ent:23, frames per second:
+
+| View | 4p's final sitting, rAF | This sitting, rAF (untraced) | This sitting, presented (traced) |
+| --- | --- | --- | --- |
+| 100 %, expanded | 46.9 | 47.9 | 43.7 |
+| 30 %, expanded | 53.4 | 54.6 | 53.2 |
+| 100 %, collapsed | 56.8 | 57.0 | 56.3 |
+| 30 %, collapsed | 58.3 | 58.7 | 58.1 |
+
+- **rAF is steady across slices:** this sitting's rAF figures are within 0.2–1.2 fps of 4p's in every view, so 4p's
+  figures and these compare directly.
+- **Where the GPU keeps up, presented equals rAF less the trace's cost** (0.6–1.4 fps at 30 % and collapsed).
+- **Where it does not, rAF overstates the screen:** 100 % expanded with fading off (43.7 presented, 47.9 rAF), and much
+  more with Focus on at 30 % (31.8 presented, 51.5 rAF). That is why S4P-03 read “met” in 4p.
+- **The smokes' figures fit:** step 2 saw about 54 presented with fading off at 30 % expanded, as here (53.2). The rAF
+  figures around 45 in the smokes (step 3: 43.2–45.6 with Focus on at 30 % expanded) were rAF on traced pans on an
+  unprepared laptop. The untraced rAF pans of this sitting (50.5–51.5) replace them.
+
+### Proposed AD-24 text (for Łukasz's approval; not applied)
+
+The part “**Overlay and fading** (slice 4p, 15 October 2026) … C-10 228–247 ms).” would become:
+
+> **Overlay and fading** (slice 4p, 15 October 2026; changed in slice 4b-1, 17 October 2026): the hover highlight, the
+> row marks, the selection marks, the lasso and a selected requirement's coverage colours are drawn in one overlay above
+> the cards on its own compositing layer (`will-change: transform`), so they repaint only that layer and not the canvas
+> layer (C-10 120 → 19 ms); the hovered and lit lines are drawn there too. A mark that lies over text keeps the text at
+> 4.5:1 (the overlay lies above it): a faint fill and a bar in the full colour where no text is. Fading (Focus) is one
+> veil with holes at the lit cards, blocks and pinned notes, as one SVG path on a compositing layer of its own in the
+> overlay (F4), switched through a store outside React, never through the nodes or a canvas re-render. Slice 4b-1
+> replaced 4p's veil in the canvas layer with lifted cards (F1): its lift rule re-rastered the whole visible canvas
+> layer on every switch (300–550 ms to the screen at 30 %), F4 switches in 11–88 ms. [Open: pan and zoom with Focus on
+> at 30 % lose 22–40 % of presented frames (slice 4b-1's closing sitting); Łukasz's decision.] **Measuring** (slice
+> 4b-1): interactions are measured to the screen (from the input to the first GPU present after the compositor
+> activates their commit, from a settled screen), pan and zoom as presented frames, C-08 to its last present, all
+> traced and both sides alike, with medians, p95 and max; in-page times and rAF intervals stay as the breakdown, since
+> they miss the GPU's work (slice 4b-1, step 0). Rejected with figures: a veil below the cards that fades the other lines
+> on a hover (in `perf/4p-trial-a`: C-10 228–247 ms).
+
+The bracketed sentence depends on Łukasz's decision on S4B1-11 and goes out or changes with it. If the markers' layers
+are confirmed as S4B1-12's cause, a rule in (4) would follow: no `transform` on repeated small elements in cards.
+
+### Three full runs (after the sitting)
+
+**This time the three runs came after the sitting, not before it.** The warm-up's failure needed a fix to S1A-14 and
+S4P-10 (a test change). Łukasz chose to run the sitting first (his option B), with each of the two specs checked once
+functionally before it, and the three full runs after it. If they had forced any change to S1A-14 or S4P-10, the
+affected part of the sitting would be re-run after his OK.
+
+No dev server, Playwright or measurement server running; each run from scratch, in a row, on `7d581ff`:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 172 passed | 25.6 min |
+| 2 | 172 passed | 25.2 min |
+| 3 | 172 passed | 25.4 min |
+
+Lint, typecheck and the unit tests (976 in 72 files) pass. Nothing forced a change to S1A-14 or S4P-10, so no part of
+the sitting needs re-running.
 
 ## Step 8, part 1: docs, checklist, builds, the sitting's plan (17 October 2026)
 
