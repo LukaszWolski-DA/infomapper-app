@@ -1316,3 +1316,39 @@ marks, any time to the next frame; Łukasz at the merge: median, p95 and max, no
 expanded hid behind medians from step 2 on: a round's median can be 20 ms while one switch in ten takes 600 ms. `S4P-fading`
 and S1B-10 already report the median, the p95 and the max; S2A-14's lasso marks report the median only, and slice 4b adds
 the p95 and the max to that spec, so this slice's specs and runs stay as they are.
+
+## Corrections after slice 4b-1, step 0 (17 October 2026)
+
+Slice 4p's text above stays as it was measured. Slice 4b-1's step 0 traced the switches to the screen
+(`docs/perf/04b1-step0-switch-trace.md`; settled sitting `sitting-2026-10-15-16-02`), and step 2 moved the measuring
+there (`docs/known-limitations.md`, “How canvas figures are measured since slice 4b-1”). What that changes here:
+
+| 4p result | 4p figure (in page) | To the screen | Now |
+| --- | --- | --- | --- |
+| S4P-02, 30 % expanded, large lens | 462 ms median, bimodal | 436 on / 341 off | **missed** on every switch: the slow runs were real, the fast ones were timed before the GPU's raster |
+| S4P-02, 30 % expanded, Focus | 20 ms (one round 270) | 285 / 237 | **missed** (4p: met) |
+| S4P-02, 100 % expanded, large lens | 33 ms | 160 / 146 | **missed** (4p: met) |
+| S4P-02, 30 % collapsed, large lens | 15–16 ms | 190 / 153 | **missed** (4p: met) |
+| S4P-02, 100 % collapsed and the dense area | 17–29 ms | 23–76 | holds (the dense lens's p95 103 ms) |
+| S4P-03, pan and zoom with fading on against off | −4.9 to +5.8 % | not measured as presented frames | **unverified:** rAF intervals |
+| C-10, hover | 18–19 ms | 20 / 16 | **holds** |
+| Lasso marks | 23 ms | 43 (p95 51) | **holds**; the in-page figure is about 20 ms low |
+| C-08, initial render | 1,432 ms | to its last present: smoked at 1,501–1,566 ms (step 2, not a figure) | its stable frame ended at a rAF before the last raster; the closing sitting of 4b-1 gives both figures |
+
+**Why S4P-02 missed:** F1's lift rule changes the z-index of about half the cards, so the big layer's paint order
+changes and every visible tile is rastered again (about 540 ms for the rule alone, 13 ms for the veil alone). The
+bimodal mode was the in-page timer, not the work.
+
+**C-08's “main thread idle for about 0.7 s” (step 4) was an artefact.** S4P-10 placed the page's time origin at the
+trace's last `navigationStart`, about 1.0–1.2 s after the real origin, so the window “from the document's end to the
+stable frame” was shifted by that much. Anchored on the page's own mark, the main thread is busy for the whole window
+(mostly React's scheduled work, about 560 ms). Details in `docs/known-limitations.md` (C-08 entry).
+
+**F4's rejection (step 2's verdicts)** rested on two things:
+- **pan and zoom at 30 %** (−8.4 to −11.6 %), measured as rAF intervals, so **unverified**;
+- **+55 MiB of tiles and +20 % Layerize per frame**, which **stand** (memory-infra measured the tiles; Layerize is the
+  main thread's own work).
+
+**F1 or F4 was reopened** with these figures. Łukasz decided on 15 October 2026 that slice 4b-1 builds on F4 and
+removes F1 (step 3 of 4b-1). AD-24's wording follows after 4b-1's closing sitting, with his approval.
+

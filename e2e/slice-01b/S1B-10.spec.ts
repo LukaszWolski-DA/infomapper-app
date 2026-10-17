@@ -17,6 +17,8 @@ import { E2E_DB } from "../config";
 import { expect, test } from "./fixtures";
 import { canvasUrl, ids, LEFT_AT_100, openCanvas, rowNamed, signInAs } from "./helpers";
 import { DIAG, median, MEASURE, MEASURE_USE, NOT_APPLICABLE, openLarge, panZoom, saveResults, startRecording, stopRecording, type FrameStats } from "./measure";
+import { hoverLoop, tracedSwitches } from "../measure/switches";
+import { SETTLED_PAIRS, TO_SCREEN } from "../measure/trace";
 
 if (MEASURE) test.use(MEASURE_USE);
 
@@ -90,6 +92,13 @@ test("S1B-10: hovering a row highlights its lines and far-end rows within 100 ms
     return { rows: rows.length, hovers, commitMs: st(commit), toNextFrameMs: st(frame) };
   }, hovers);
   expect(latency).not.toHaveProperty("error");
+  // slice 4b-1: with TO_SCREEN=1, C-10 to the screen as well, from a settled screen (the in-page time above stays)
+  let toScreen: unknown = null;
+  if (TO_SCREEN && !collapsed) {
+    await openLarge(page, { x: size.width / 2 - src57.x, y: 300 - src57.y, zoom: 1 });
+    toScreen = await tracedSwitches(page, "S1B-10 C-10", () => hoverLoop(page, SETTLED_PAIRS));
+    expect(toScreen, "C-10 to the screen").not.toHaveProperty("error");
+  }
   let sweep: FrameStats | null = null;
   if (!collapsed) {
     const sweepCard = await page.evaluate(([x, y]) => {
@@ -108,7 +117,8 @@ test("S1B-10: hovering a row highlights its lines and far-end rows within 100 ms
   }
 
   // ---- pan and zoom: three runs at the overview (fit) and at 100 % in the dense area ----
-  const runs = MEASURE ? 3 : 1;
+  // (not in the traced mode: measure:canvas does not use these runs, and S1A-14 measures pan and zoom as presented frames)
+  const runs = TO_SCREEN ? 0 : MEASURE ? 3 : 1;
   const panZoomRuns: Record<keyof typeof PAN_ZOOM_BARS, FrameStats[]> = { overview: [], "100%": [] };
   for (let r = 0; r < runs; r++) {
     for (const [name, view] of [
@@ -131,7 +141,7 @@ test("S1B-10: hovering a row highlights its lines and far-end rows within 100 ms
     browser: browser.version(),
     viewport: page.viewportSize(),
     demoHoverMs: hoverMs,
-    "C-10": { ...latency, hoverSweep: sweep },
+    "C-10": { ...latency, hoverSweep: sweep, ...(toScreen ? { toScreen } : {}) },
     panZoom: { runs: panZoomRuns, medianFps: panZoomMedian, bars: PAN_ZOOM_BARS },
   };
   saveResults("S1B-10", results);
@@ -140,7 +150,7 @@ test("S1B-10: hovering a row highlights its lines and far-end rows within 100 ms
     const c10 = latency as { toNextFrameMs: { median: number } };
     expect.soft(c10.toNextFrameMs.median, "C-10: hover to the next frame, median ms (bar 100)").toBeLessThanOrEqual(100);
   }
-  if (MEASURE) {
+  if (MEASURE && runs) {
     expect.soft(panZoomMedian.overview, "pan and zoom at the overview, median fps of 3 runs (bar 52.8)").toBeGreaterThanOrEqual(PAN_ZOOM_BARS.overview);
     expect.soft(panZoomMedian["100%"], "pan and zoom at 100 %, median fps of 3 runs (bar 47.0)").toBeGreaterThanOrEqual(PAN_ZOOM_BARS["100%"]);
   }

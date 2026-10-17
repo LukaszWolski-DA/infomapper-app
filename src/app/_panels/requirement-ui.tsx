@@ -1,5 +1,6 @@
 // Small pieces shared by the left panel's Requirements tab and the panels (slice 4a): the kind icons (prototype RICON),
-// the requirements' diamond dot and the coverage bar (“{ok} of {total} attributes covered”).
+// the requirements' diamond dot and the coverage bar (“{ok} of {total} covered”, its tooltip naming the parts, e.g.
+// “1 entity, 3 attributes”; slice 4b-1, PRD item 11).
 
 import type { RequirementKind } from "@/domain/types";
 
@@ -40,13 +41,15 @@ export const KindIcon = ({ kind }: { kind: RequirementKind }) => (
 /** The requirements' diamond (prototype .rdot). */
 export const ReqDot = () => <i className="size-[7px] flex-none rotate-45 rounded-[1px] bg-im-req" aria-hidden />;
 
-export const coverageTitle = (ok: number, total: number) => `${ok} of ${total} attributes covered`;
+export const coverageText = (ok: number, total: number) => `${ok} of ${total} covered`;
+/** The text and, in brackets, the parts (“1 of 4 covered (1 entity, 3 attributes)”); no parts without items. */
+export const coverageTitle = (ok: number, total: number, parts?: string) => (parts && total ? `${coverageText(ok, total)} (${parts})` : coverageText(ok, total));
 
-export function CoverageBar({ ok, total, testId }: { ok: number; total: number; testId?: string }) {
+export function CoverageBar({ ok, total, parts, testId }: { ok: number; total: number; parts?: string; testId?: string }) {
   return (
     <span
       className="relative h-1 w-9 flex-none overflow-hidden rounded-full bg-im-line"
-      title={coverageTitle(ok, total)}
+      title={coverageTitle(ok, total, parts)}
       data-testid={testId}
       data-covered={ok}
       data-total={total}

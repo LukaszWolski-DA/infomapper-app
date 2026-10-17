@@ -8,13 +8,17 @@
 //     tasks, so nested events count once);
 //   - the renderer main thread's busy time and its idle gaps between tasks.
 // Writes waiting.json and waiting.md next to the traces.
+//
+// The page's time origin in the trace: where its `im:stable` mark lies minus the page's own time of it (`completeAt`;
+// slice 4b-1, step 2). Traces without the mark (slice 4p's) fall back to the trace's last `navigationStart`, which
+// 4b-1 found to lie about 1.0–1.2 s after the page's origin: their window is shifted by that much.
 
 import fs from "node:fs";
 import path from "node:path";
 
 type TraceEvent = { name: string; ph: string; ts: number; dur?: number; pid: number; tid: number; cat: string; args?: Record<string, unknown> };
 interface Load {
-  nav: { stableAt: number; responseEnd: number; lastScriptEnd: number };
+  nav: { stableAt: number; responseEnd: number; lastScriptEnd: number; completeAt?: number | null };
   navStart: number;
   mainPid: number;
   mainTid: number;
@@ -43,7 +47,10 @@ const ms = (us: number) => Math.round(us / 1000);
 const results: Record<string, unknown>[] = [];
 for (const file of fs.readdirSync(dir).filter((f) => /^load-\d+\.json$/.test(f)).sort()) {
   const load = JSON.parse(fs.readFileSync(path.join(dir, file), "utf8")) as Load;
-  const { events, navStart } = load;
+  const { events } = load;
+  const mark = events.find((e) => e.name === "im:stable" && e.pid === load.mainPid);
+  const anchored = !!mark && typeof load.nav.completeAt === "number";
+  const navStart = anchored ? mark!.ts - load.nav.completeAt! * 1000 : load.navStart;
   const from = navStart + load.nav.responseEnd * 1000, to = navStart + load.nav.stableAt * 1000;
   // thread names
   const names = new Map<string, string>();
@@ -67,6 +74,8 @@ for (const file of fs.readdirSync(dir).filter((f) => /^load-\d+\.json$/.test(f))
   const window = ms(to - from);
   results.push({
     load: file,
+    anchor: anchored ? "im:stable" : "navigationStart",
+    navStartShiftMs: ms(load.navStart - navStart),
     stableAt: load.nav.stableAt,
     documentEnd: load.nav.responseEnd,
     windowMs: window,
@@ -84,9 +93,9 @@ for (const file of fs.readdirSync(dir).filter((f) => /^load-\d+\.json$/.test(f))
 const md = [
   `C-08's waiting after the document (${dir}): from the end of the HTML response to the stable frame, per load.`,
   "",
-  "| Load | Stable | Document end | Window | Network in flight | Compositor | Raster | GPU main | Viz compositor | Main busy | Main idle |",
-  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
-  ...results.map((r) => `| ${r.load} | ${r.stableAt} | ${r.documentEnd} | ${r.windowMs} | ${r.networkInFlightMs} | ${r.compositorMs} | ${r.rasterMs} | ${r.gpuMainMs} | ${r.vizCompositorMs} | ${r.mainBusyMs} | ${r.mainIdleMs} |`),
+  "| Load | Anchor (shift, ms) | Stable | Document end | Window | Network in flight | Compositor | Raster | GPU main | Viz compositor | Main busy | Main idle |",
+  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+  ...results.map((r) => `| ${r.load} | ${r.anchor} (${r.navStartShiftMs}) | ${r.stableAt} | ${r.documentEnd} | ${r.windowMs} | ${r.networkInFlightMs} | ${r.compositorMs} | ${r.rasterMs} | ${r.gpuMainMs} | ${r.vizCompositorMs} | ${r.mainBusyMs} | ${r.mainIdleMs} |`),
   "",
   ...results.flatMap((r) => [`${r.load}: requests in flight`, ...(r.network as { what: string; startMs: number; endMs: number | null }[]).map((n) => `- ${n.what}: ${n.startMs}–${n.endMs ?? "open"} ms`), ""]),
 ].join("\n");

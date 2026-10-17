@@ -1,17 +1,20 @@
-// What fading keeps lit (slice 4p, PRD section 6; prototype `relatedOf`, `applyHighlight`): Focus on an entity, and the
-// lens of a requirement. Pure functions on the live model; the canvas maps the result onto its cards, rows and lines and
-// fades the rest. Slice 4b switches them from Focus and the requirement panel.
+// What Focus keeps lit (slice 4p, PRD section 6; slice 4b-1, PRD item 21; prototype `relatedOf`). Pure functions on the
+// live model; the canvas maps the result onto its cards and lines and fades the rest. No row is coloured: a selected
+// requirement's coverage colours are drawn by themselves, with or without Focus (slice 4b-1, step 6).
 //
 // - Focus on an entity (prototype relatedOf “entity”): the entity; every mapping of its attributes with the source
-//   tables of their inputs; every relationship of the entity with the entities at both ends. No row is coloured.
-// - The lens of a requirement (prototype relatedOf “req”): the entities and tables of its scope (D-31); for every
-//   attribute in scope its mappings with their tables and entities; for every column in scope its mappings; the mappings
-//   in scope. The scope's attributes are coloured covered or gap (the requirement's coverage, D-31), its columns
-//   covered (prototype `.row.rq`, `.row.gap`).
+//   tables of their inputs; every relationship of the entity with the entities at both ends.
+// - Focus on a requirement (prototype relatedOf “req”; slice 4p's lens without its colours): the entities and tables of
+//   its scope (D-31); for every attribute in scope its mappings with their tables and entities; for every column in
+//   scope its mappings; the mappings in scope.
+// - Slice 4b-1, step 7 (PRD item 21), the rest of the prototype's relatedOf: a table (“source”: the table and its
+//   columns' mappings with their ends), an attribute (its mappings with their ends, and its entity), a column (its
+//   mappings with their ends, and its table), a mapping (with its ends), a relationship (with both entities), and
+//   several entities and tables at once (a frame's cards or a multi-selection: what each of them lights).
 
 import type { Uuid } from "../ids";
 import type { WorkspaceModel } from "../types";
-import type { RequirementCoverage, RequirementScope } from "./requirements";
+import type { RequirementScope } from "./requirements";
 
 export type LitRowColour = "covered" | "gap";
 
@@ -62,8 +65,33 @@ function addMapping(lit: Lit, l: ReturnType<typeof lookup>, mappingId: Uuid) {
 
 /** Focus on an entity (prototype relatedOf “entity”). */
 export function focusLit(model: LitModel, entityId: Uuid): Lit {
+  return targetLit(model, { t: "entity", id: entityId });
+}
+
+/** Focus on a requirement (prototype relatedOf “req”): its scope's cards and the mappings around it; no row coloured. */
+export function requirementFocusLit(model: LitModel, scope: RequirementScope): Lit {
   const l = lookup(model);
   const lit = empty();
+  for (const e of scope.entities) lit.entities.add(e);
+  for (const t of scope.tables) lit.tables.add(t);
+  for (const a of scope.attributes) for (const m of l.mappingsOfAttribute.get(a) ?? []) addMapping(lit, l, m);
+  for (const c of scope.columns) for (const m of l.mappingsOfColumn.get(c) ?? []) addMapping(lit, l, m);
+  for (const m of scope.mappings) addMapping(lit, l, m);
+  return lit;
+}
+
+/** What Focus can be on besides a requirement (slice 4b-1, PRD item 21). A frame or several items: their cards. */
+export type LitTarget =
+  | { t: "entity" | "table" | "attribute" | "column" | "mapping" | "relationship"; id: Uuid }
+  | { t: "several"; entities: readonly Uuid[]; tables: readonly Uuid[] };
+
+/** Focus on a table (prototype relatedOf “source”): the table, its columns' mappings with their ends. */
+function tableLit(model: LitModel, l: ReturnType<typeof lookup>, lit: Lit, tableId: Uuid) {
+  lit.tables.add(tableId);
+  for (const c of live(model.sourceColumns)) if (c.source_table_id === tableId) for (const m of l.mappingsOfColumn.get(c.id) ?? []) addMapping(lit, l, m);
+}
+
+function entityLit(model: LitModel, l: ReturnType<typeof lookup>, lit: Lit, entityId: Uuid) {
   lit.entities.add(entityId);
   for (const a of live(model.attributes)) if (a.entity_id === entityId) for (const m of l.mappingsOfAttribute.get(a.id) ?? []) addMapping(lit, l, m);
   for (const r of live(model.relationships)) {
@@ -72,24 +100,48 @@ export function focusLit(model: LitModel, entityId: Uuid): Lit {
     lit.entities.add(r.from_entity_id);
     lit.entities.add(r.to_entity_id);
   }
-  return lit;
 }
 
-/** The lens of a requirement (prototype relatedOf “req” and applyHighlight's row colours). */
-export function lensLit(model: LitModel, scope: RequirementScope, coverage: RequirementCoverage): Lit {
+/** What Focus lights for a selection other than a requirement (prototype relatedOf); nothing for an unknown id. */
+export function targetLit(model: LitModel, target: LitTarget): Lit {
   const l = lookup(model);
   const lit = empty();
-  for (const e of scope.entities) lit.entities.add(e);
-  for (const t of scope.tables) lit.tables.add(t);
-  const covered = new Set(coverage.covered);
-  for (const a of scope.attributes) {
-    lit.rows.set(a, covered.has(a) ? "covered" : "gap");
-    for (const m of l.mappingsOfAttribute.get(a) ?? []) addMapping(lit, l, m);
+  switch (target.t) {
+    case "entity":
+      entityLit(model, l, lit, target.id);
+      break;
+    case "table":
+      tableLit(model, l, lit, target.id);
+      break;
+    case "attribute": {
+      const entity = l.entityOf.get(target.id);
+      if (!entity) break;
+      lit.entities.add(entity);
+      for (const m of l.mappingsOfAttribute.get(target.id) ?? []) addMapping(lit, l, m);
+      break;
+    }
+    case "column": {
+      const table = l.tableOf.get(target.id);
+      if (!table) break;
+      lit.tables.add(table);
+      for (const m of l.mappingsOfColumn.get(target.id) ?? []) addMapping(lit, l, m);
+      break;
+    }
+    case "mapping":
+      addMapping(lit, l, target.id);
+      break;
+    case "relationship": {
+      const r = live(model.relationships).find((x) => x.id === target.id);
+      if (!r) break;
+      lit.relationships.add(r.id);
+      lit.entities.add(r.from_entity_id);
+      lit.entities.add(r.to_entity_id);
+      break;
+    }
+    case "several":
+      for (const e of target.entities) entityLit(model, l, lit, e);
+      for (const t of target.tables) tableLit(model, l, lit, t);
+      break;
   }
-  for (const c of scope.columns) {
-    lit.rows.set(c, "covered");
-    for (const m of l.mappingsOfColumn.get(c) ?? []) addMapping(lit, l, m);
-  }
-  for (const m of scope.mappings) addMapping(lit, l, m);
   return lit;
 }

@@ -36,6 +36,24 @@ created after the page read the data (`readAt`) stay, and the versions the canva
 
 ## Canvas performance (slice 1a)
 
+### Where the canvas stands after slice 4b-1 (17 October 2026)
+
+Slice 4b-1's closing sitting (`2026-10-17-15-39`, `-16-44`, `-17-04`; production measurement build; three rounds A/B
+against `slice-04p`; to the screen and as presented frames, traced; `docs/prd/slice-04b1-acceptance.md`). The method is
+the entry “How canvas figures are measured since slice 4b-1”. The entries below this one are kept as they were measured.
+
+| Figure | Bar | Now | State |
+| --- | --- | --- | --- |
+| Pan and zoom, overview | ≥ 50 fps; ≥ −5 % | 58.9 presented, 59.5 rAF; +0.3 % | met |
+| Pan and zoom, 100 % dense area | ≥ 50 fps; ≥ −5 % | 43.2 presented, 47.5 rAF; −8.7 % | **met, layers confirmed; fps confirmed in 4b-2's sitting** (Łukasz): the cause was the requirement markers, two compositing layers each (+16 in this view); fixed, the layers are `slice-04p`'s again (47) |
+| Pan and zoom, frames collapsed | ≥ 50 fps; ≥ −5 % | 59.1–59.4 presented; 0.0 % | met |
+| C-08 initial render | ≤ 1,500 ms to the stable frame | 1,382 ms (untraced); **to its last present 1,462 ms** (traced; two of five loads over 1,500) | **met** on the stable frame; the last present is recorded beside it. Redefining the bar: the performance review before the database slice (Łukasz) |
+| C-10 hover | ≤ 100 ms | 23 ms to the screen | met |
+| Lasso marks | ≤ 100 ms | 42 ms to the screen (p95 48) | met |
+| Coverage colours (S4B1-09) | ≤ 100 ms | 31–77 ms to the screen | met |
+| Focus switching (S4B1-10) | ≤ 100 ms | 11–88 ms to the screen (p95 at most 126) | met |
+| Pan and zoom with Focus on (S4B1-11) | ≥ −5 % vs Focus off | 100 %: +5 to +15 %; **30 %: −40 % expanded, −22 % collapsed** | **partly met** (Łukasz; below) |
+
 ### Where the canvas stands after slice 4p (15 October 2026)
 
 Slice 4p's final sitting (`2026-10-15-09-36`; production measurement build; Chrome 155; three rounds A/B against
@@ -53,22 +71,49 @@ Slice 4p's final sitting (`2026-10-15-09-36`; production measurement build; Chro
 | Fading, switching (S4P-02) | ≤ 100 ms | 15–33 ms, except the 30 % view with frames expanded: see below | **partly met** (Łukasz, 15 October) |
 | Fading, pan and zoom on vs off (S4P-03) | ≥ −5 % | −4.9 to +5.8 % in all 14 cells | **met** |
 
-### Fading's slow switches at 30 % with frames expanded (slice 4p)
+**Corrections after slice 4b-1, step 0** (the table above stays as 4p measured it; the figures to the screen are from
+step 0's settled sitting `sitting-2026-10-15-16-02`, traced, `docs/perf/04b1-step0-switch-trace.md`):
+- **S4P-02 missed to the screen** at 30 % and 100 % with frames expanded and at 30 % collapsed: the large lens 436 / 341 ms
+  (on / off) at 30 % expanded, Focus 285 / 237 ms, the large lens 160 / 146 ms at 100 % expanded and 190 / 153 ms at
+  30 % collapsed. In the page these read 15–33 ms: the GPU's raster came after the page's timer had stopped.
+- **S4P-03, pan and zoom, C-09 and the drags were measured as rAF intervals.** Whether the screen showed as many
+  frames is unverified (“presented frames” in the method entry below).
+- **C-10 holds to the screen:** 20 ms on, 16 ms off. **The lasso marks hold:** 43 ms (p95 51); the in-page figure is
+  about 20 ms low.
+- **C-08 was met in the page,** at a rAF before the last raster; its last present is not included (C-08 entry below).
 
-On the finished F1 (one veil in the canvas layer, the lit cards lifted by a stylesheet rule; AD-24) switching takes
-15–33 ms in every view (median of 40), except at 30 % with frames expanded on “Performance test” (about 4,500 elements in
-view). There it is bimodal: most runs switch in 17–26 ms, but in some a whole run takes 200–600 ms per switch.
-- **Medians:** the large lens on 26, 462 and 565 ms in the three rounds; Focus on 270 ms in one round.
-- **p95:** 300–610 ms in almost every run there.
+The figures after slice 4b-1, measured to the screen in its closing sitting, are in the entry above this one.
 
-The same mode was already in step 2's trial sitting, behind fast medians.
+### Fading: F1's slow switches, and F4 instead (slice 4p; slice 4b-1)
 
-- **Hypothesis, not proven:** the veil is in the canvas's big layer; when Chrome has to raster the whole visible part
-  of that layer again, a switch costs a full GPU raster at 30 %.
-- **Partly met** (Łukasz, 15 October 2026), with this entry; no trace in slice 4p.
-- **Slice 4b, step 0:** trace a switch in this view (large lens, 30 %, frames expanded) before building the lens on F1.
-- Since slice 4p, switch and interaction times are reported with their p95 and max next to the median; these slow
-  switches hid behind medians from step 2 on.
+**Slice 4p's F1** (one veil in the canvas layer, the lit cards lifted by a stylesheet rule) switched in 15–33 ms in the
+page, except at 30 % with frames expanded on “Performance test”, where whole runs took 200–600 ms per switch (bimodal).
+4p's hypothesis was a full GPU raster of the canvas's big layer.
+
+**Slice 4b-1's step 0 traced it** (`docs/perf/04b1-step0-switch-trace.md`):
+- **The lift rule is the cost,** not the veil. Changing the z-index of about half the cards changes the big layer's
+  paint order, and every visible tile is rastered again: about 540 ms for the rule alone, 13 ms for the veil alone.
+- **It happens on every switch in this view,** not on some. The bimodal mode was the in-page timer: the raster fell
+  either before the timer stopped (slow) or in the untimed wait after it (fast).
+- **To the screen:** the large lens 436 ms on, Focus 285 ms on; F4 (the veil with holes on a layer of its own) 86 and
+  44 ms.
+
+**Slice 4b-1 builds on F4** (Łukasz, 15 October 2026; F1 and its lift rule removed in step 3). Its open point:
+- **Pan with Focus on at 30 %, frames expanded,** smoked at 20–32 presented fps against 46.5 with Focus off (step 3).
+- **Step 3's diagnosis:** the veil's own layer (2,195 Mpx) and a layer of 22–31 Mpx under the lit lines.
+- **Trial candidates,** if the closing sitting confirms the miss: T1 (a smaller veil), T2 (the lit lines inside the
+  veil's SVG), T3 (the lit lines and rows in the overlay's own layer) (`docs/prd/slice-04b1-acceptance.md`).
+
+**The closing sitting** (slice 4b-1, 17 October 2026):
+- **Switching meets the bar:** 11–88 ms to the screen; the large set at 30 % expanded has p95 126 ms.
+- **Pan and zoom with Focus on at 30 % do not:** −40 % presented frames with frames expanded, −22 % collapsed. The page
+  keeps its pace (rAF −1 to −8 %), but the presents stall up to 0.77 s about 20 times per 10 s pan: compositing and GPU
+  raster. At 100 %, Focus on is faster than off.
+- **Partly met** (Łukasz, 17 October 2026). **T1 applied in slice 4b-1:** the veil reaches one pane at the minimum zoom
+  beyond the content instead of 20,000 px. Its layer fell from 2,195 to 543 Mpx (LayerTree, no timing), and a test
+  checks that its edge never shows while any of the content is in view (S4B1-07).
+- **Later: T2 and T3 in slice 4b-2,** designed together with its dashed trace lines; 4b-2's sitting measures pan with
+  Focus on.
 
 ### C-08: what the first render waits for (slice 4p)
 
@@ -79,7 +124,8 @@ C-08 is met untraced (1,432 ms). The traced diagnosis (five loads, `scripts/c08-
 - **after the document**, about 1.04 s to the stable frame:
   - the network about 30–130 ms, only Next.js prefetching the workspace and project links;
   - the GPU's raster about 130 ms;
-  - **the main thread idle for about 0.7 s**, with nothing in the trace filling it.
+  - **the main thread idle for about 0.7 s**, with nothing in the trace filling it. **Corrected in slice 4b-1:** an
+    artefact (below).
 
 - **A lead from the code** (15 October, no measurement): the idle time is nearly the same in every load (709–748 ms),
   which looks like a fixed wait, not work. There is no timer, debounce, animation or transition of about 300 ms or more
@@ -95,9 +141,36 @@ C-08 is met untraced (1,432 ms). The traced diagnosis (five loads, `scripts/c08-
   So the wait is most likely outside our code: how React hydrates the streamed page (the 246 KiB document carries the
   React payload inline; hydration may wait for the stream to end and then work in yielding slices) or when Chrome
   starts drawing frames for the page. Unconfirmed.
-- **Later:** if C-08 needs work (for example with the database's own latency), mark the steps in the measurement build
-  (hydration, the canvas's ready step, React Flow's measuring, the lines drawn) to find what the 0.7 s waits for. In the
-  database slice (AD-31), add Server-Timing to the canvas page.
+- **Correction (slice 4b-1, step 8): the 0.7 s idle was an artefact of the anchor.** `c08-waiting.ts` placed the
+  page's time origin at the trace's last `navigationStart`, which lies about 1.0–1.2 s after the real origin. Since
+  slice 4b-1 the page puts a mark (`im:stable`) in the frame where it is first complete, and the script anchors on it.
+  Re-run on the five traced loads of step 2's smoke (`2026-10-15-18-05`, unprepared laptop, diagnosis only), the window
+  from the document's end to the stable frame (984–1,028 ms) has **the main thread busy all of it** (idle about 1 ms):
+  - React's scheduled work (`MessagePort::Accept`, its scheduler's tasks): about 560 ms;
+  - frames (`BeginMainFrame`): about 145 ms;
+  - incoming messages: about 165 ms;
+  - deferred scripts: about 70 ms; parsing about 40 ms.
+
+  So the first render waits for work, mostly React's, not for a fixed delay. The lead from the code above is moot.
+  The four older trace folders have no mark and keep the shifted window.
+- **Later:** if C-08 needs work (for example with the database's own latency), profile React's work in that window
+  (hydration, the canvas's first renders). In the database slice (AD-31), add Server-Timing to the canvas page.
+
+### How canvas figures are measured since slice 4b-1
+
+Slice 4b-1, step 0 found that the in-page times missed the GPU's work. Since then (`e2e/measure/`,
+`scripts/lib/to-screen.ts`; CLAUDE.md):
+- **Interactions to the screen:** from the input to the first GPU present after the compositor activates the commit it
+  caused, traced. The split is main thread, GPU raster and the rest.
+- **From a settled screen:** a 1.2 s pause before each switch. A switch counts only if no raster is running at its start
+  and the last raster ended at least 50 ms earlier or was presented. A switch that fails the check is reported, not
+  counted.
+- **Pan and zoom as presented frames:** the frames the GPU presented during the pan, traced. One untraced pan per case
+  keeps the trace's own cost known, and rAF intervals stay as a breakdown.
+- **C-08 to its last present:** the first present after the stable frame, anchored on the page's `im:stable` mark.
+- **Medians with p95 and max,** and the number of switches that failed the settled check.
+
+The entries above slice 4b-1 report in-page and rAF figures as they were measured.
 
 ### S1A-14 is only partly met, and measured on the dev server
 
@@ -222,7 +295,9 @@ mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md]
   before the trace; tag `perf/4p-trial-notes`): pan and zoom at 30 % without tracing 44.5 → 45.2 fps around `ent:23` and
   43.3 → 46.7 fps on the notes, both inside the spread; tile memory +20 to +35 MiB; and it makes the notes' container a
   stacking context, so notes pinned to a lit card could no longer be lifted above the fading veil
-  (`docs/prd/slice-04p-acceptance.md`). What remains is fewer elements per note, if needed.
+  (`docs/prd/slice-04p-acceptance.md`). What remains is fewer elements per note, if needed. **Since slice 4b-1, step 3
+  (F4):** the veil cuts a hole for every note pinned to a lit card, so those notes stay lit without being lifted; this
+  point no longer stands in option (c)'s way.
 - **What has to happen later (performance review before the database slice, AD-31):** measure a separate compositing
   layer for the notes (option c: their paint and Layerize no longer part of the cards'; it touches AD-24's rules on
   layers and may cost GPU memory or raster time) and, if still needed, fewer elements per note beyond slice 3a's (body,
@@ -239,14 +314,30 @@ tile and its box in the overview.
 - **Later:** with the view-state bar (slice 6, D-39): the “Live: {name}” chip, and the Labeled filter neither counted as
   “filtered” nor reset by “Show all”.
 
-### Requirements are not on the canvas yet (slice 4a)
+### Focus without the view-state bar (slice 4b-1)
 
-Slice 4a brings requirements everywhere but the canvas: no requirement cards, no trace lines, no markers on cards, no
-lens and no dragging a requirement onto an element (D-32, D-34). Selecting a requirement opens its panel only; the
-Requirements tab's “Only on this canvas” shows none; linking is done from the element panels.
+PRD item 22 turns Focus off with “Show everything” (the view reset). In the prototype that is the view-state bar's
+“Show all” (D-39), and the application has no view-state bar yet. Focus turns off from its toolbar button, its chip,
+the card and row menus, a canvas switch and a reload, but there is no view reset.
 
-- **Accepted** in slice 4a's PRD (section 6). **Later:** slice 4b, after the performance review, with Focus (the lens
-  uses the same dimming).
+The “Focus” chip sits in the status bar for now (PRD item 20).
+
+- **Accepted** by Łukasz after slice 4b-1, step 7, as a deliberate gap.
+- **Later:** slice 6, with the view-state bar (D-39): “Show all” turns Focus off, and the “Focus” chip moves from the
+  status bar to the view-state bar.
+
+### Requirement cards are not on the canvas yet (slice 4a; slice 4b-1)
+
+Slice 4a brought requirements everywhere but the canvas. **Slice 4b-1** adds:
+- markers on entity and table cards;
+- coverage colours when a requirement is selected: rows and headers, and below 40 % a dot at the header's right end
+  and on a collapsed block's rows (item 19, Łukasz's choice);
+- Focus on a requirement (D-32).
+
+Still missing: requirement cards, trace lines and dragging a requirement onto an element. The Requirements tab's “Only
+on this canvas” shows none, and linking is done from the element panels.
+
+- **Accepted** in slice 4a's PRD (section 6) and slice 4b-1's. **Later:** slice 4b-2 (requirement cards).
 
 ### Notes stay plain text (slice 4a)
 
@@ -303,6 +394,24 @@ The prototype's canvas tile on the project home says “{n} cards, {m} frames. A
 “{n} cards. Also in …” (`src/app/w/[workspaceId]/p/[projectId]/_components/project-tiles.tsx`).
 
 - **Accepted** by Łukasz in slice 4a, step 5. **Later:** not planned yet.
+
+## Text contrast (slice 4b-1, step 6)
+
+### Grey text and two tags are below WCAG AA on a plain card
+
+Found while checking the text under slice 4b-1's coverage colours (step 6). On a plain white card, three texts are
+below WCAG AA's 4.5:1 for normal text, with or without any tint:
+
+| Text | Colours | Contrast |
+| --- | --- | --- |
+| Grey text: data types, counts, key letters, a card's “in {concept}” (`--im-ink-3`) | `#7c8998` on `#ffffff` | 3.6:1 (dark mode 4.1:1) |
+| The PII tag | `--im-warn` on `--im-warn-soft` | 4.4:1 |
+| The BK tag | `--im-physical` on `--im-physical-soft` | 4.1:1 |
+
+The prototype's palette has the same values. This comes from the palette and does not depend on the coverage tints:
+those keep every text that reaches 4.5:1 on a plain card at 4.5:1 under them (step 6's follow-up).
+
+- **Accepted** by Łukasz after slice 4b-1, step 6. **Later:** a candidate for the ergonomics slice (`docs/ideas.md`).
 
 ## Undo history (slice 1b)
 

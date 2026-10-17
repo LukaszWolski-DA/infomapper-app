@@ -407,8 +407,8 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                     <span className="font-mono text-[11.5px]">{r.key}</span>
                   </span>
                   <span className="min-w-0 flex-1 truncate">{r.name}</span>
-                  <CoverageBar ok={r.covered} total={r.total} testId="bar-req-coverage" />
-                  <span className="sr-only">{coverageTitle(r.covered, r.total)}</span>
+                  <CoverageBar ok={r.covered} total={r.total} parts={r.parts} testId="bar-req-coverage" />
+                  <span className="sr-only">{coverageTitle(r.covered, r.total, r.parts)}</span>
                 </button>
               ))}
           </div>

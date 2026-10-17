@@ -3,6 +3,7 @@
 
 import type { Uuid } from "@/domain/ids";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
+import { coverageParts } from "@/domain/model/requirements";
 import { REQUIREMENT_KINDS, type CanvasItem, type RequirementKind, type WorkspaceModel } from "@/domain/types";
 
 /** Where an element has cards: on this canvas (filled dot), only on other canvases (ring), or nowhere. */
@@ -62,6 +63,8 @@ export interface TreeRequirement {
   /** Attributes in scope covered, and in scope (the coverage bar). */
   covered: number;
   total: number;
+  /** The coverage items by kind, for the tooltip (“1 entity, 3 attributes”; slice 4b-1). */
+  parts: string;
   /** Its scope has an entity or table on one of this project's canvases (PRD item 30's rule). */
   inProject: boolean;
 }
@@ -144,6 +147,7 @@ export function buildTree(
       kind: r.kind,
       covered: coverage.covered.length,
       total: coverage.total,
+      parts: coverageParts(coverage.parts),
       inProject: [...scope.entities, ...scope.tables].some((id) => inProject.has(id)),
     };
   });

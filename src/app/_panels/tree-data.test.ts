@@ -120,7 +120,7 @@ describe("the Requirements tab (slice 4a, PRD items 20, 22)", () => {
 
   it("rows carry key, name, kind, coverage and whether the project uses their scope", () => {
     expect(tree.requirements.map((r) => [r.key, r.covered, r.total, r.inProject])).toEqual([
-      ["REQ-101", 0, 2, true],
+      ["REQ-101", 0, 1, true], // an entity link: one item (slice 4b-1)
       ["REQ-102", 0, 0, false],
       ["REQ-104", 0, 0, false],
       ["REQ-103", 0, 1, true],

@@ -10,10 +10,14 @@ import { visibleRows, type CardData, type CardRow } from "./card-data";
 import { CanvasCardsCtx, DiagnosisCtx } from "./context";
 import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
 import { splitName } from "./names";
+import type { RequirementMark } from "./requirement-marks";
 import { lineNeedsClip } from "./text-fit";
 
-/** `pinnedNotes`: the notes pinned to the card that are shown (slice 3a), given by the canvas only when there are some. */
-export type CardNodeT = Node<{ card: CardData; pinnedNotes?: number }, "card">;
+/**
+ * `pinnedNotes`: the notes pinned to the card that are shown (slice 3a); `reqMark`: its requirement marker (slice 4b-1).
+ * Both given by the canvas only when there are some.
+ */
+export type CardNodeT = Node<{ card: CardData; pinnedNotes?: number; reqMark?: RequirementMark }, "card">;
 
 /** A card node, not a collapsed frame's block (slice 2c): React Flow holds both kinds. */
 export const isCardNode = (n: Node): n is CardNodeT => n.type === "card";
@@ -62,6 +66,17 @@ const NoteMark = ({ n }: { n: number }) => (
  */
 const LabelMark = ({ labels }: { labels: string }) => <i className="lmark" title={`Working labels: ${labels}`} data-testid="mark-label" />;
 
+/**
+ * The requirement marker (slice 4b-1, PRD items 14–15; prototype reqMark, .rmark): a violet diamond and the number of
+ * requirements the card's panel lists, the list as its tooltip; at every zoom, like the rest of the header. One element
+ * (the diamond is its ::before, canvas.css). A click on it does nothing, not even select the card.
+ */
+const RequirementMarker = ({ mark }: { mark: RequirementMark }) => (
+  <i className="rmark" title={mark.title} data-testid="mark-requirements" data-count={mark.n}>
+    {mark.n}
+  </i>
+);
+
 function keyTitle(r: CardRow) {
   if (r.pk && r.fk) return "Primary key and foreign key";
   return r.pk ? "Primary key" : "Foreign key";
@@ -105,7 +120,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
 }
 
 function CardNode({ data }: NodeProps<CardNodeT>) {
-  const { card, pinnedNotes = 0 } = data;
+  const { card, pinnedNotes = 0, reqMark } = data;
   const ctx = useContext(CanvasCardsCtx);
   const blocks = !!useContext(DiagnosisCtx).blocks;
   const lod = useStore((s) => blocks || s.transform[2] < LOD_ZOOM);
@@ -118,13 +133,17 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   const cardSelected = sel?.t === "card" && sel.id === card.id;
   const selectedRow = sel?.t === "row" && sel.cardId === card.id ? sel.id : null;
   // the open-notes mark takes room in the first line too (slice 3a): checked only on cards that have one
-  const clipLine1 = card.clipLine1 || (pinnedNotes > 0 && lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, card.width ?? undefined, !!card.labels, pinnedNotes));
+  const clipLine1 =
+    card.clipLine1 ||
+    ((pinnedNotes > 0 || !!reqMark) && lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, card.width ?? undefined, !!card.labels, pinnedNotes, reqMark?.n ?? 0));
 
   // A click on a row selects the row, anywhere else on the card the card; the card tools do their own thing.
   // Shift+click anywhere on the card puts the card in or out of a selection of several (slice 2a).
   const onClick = (e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest(".c-tools")) return;
+    // the requirement marker does nothing on a click (PRD item 14)
+    if (target.closest(".rmark")) return;
     if (e.shiftKey) {
       ctx.toggleCard(card.id);
       return;
@@ -158,6 +177,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
           )}
           {card.labels && <LabelMark labels={card.labels} />}
           {pinnedNotes > 0 && <NoteMark n={pinnedNotes} />}
+          {reqMark && <RequirementMarker mark={reqMark} />}
           {ctx.editable && (
             <span className="c-tools nodrag">
               {isEnt && (

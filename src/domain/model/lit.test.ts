@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { attribute, entity, ids, mapping, mappingInput, relationship, requirementLink, sourceColumn, sourceTable, T0 } from "../__fixtures__/domain";
 import type { Mapping, MappingInput, RequirementLink, WorkspaceModel } from "../types";
-import { focusLit, lensLit } from "./lit";
-import { requirementCoverage, requirementScope } from "./requirements";
+import { focusLit, requirementFocusLit, targetLit } from "./lit";
+import { requirementScope } from "./requirements";
 
 const MAP_ID = "01900000-0000-7000-8000-00000000a011";
 const IN_2 = "01900000-0000-7000-8000-00000000b002";
@@ -25,7 +25,7 @@ function model(mappings: Mapping[] = [mapping()], inputs: MappingInput[] = [mapp
 const approvedCustId = mapping({ id: MAP_ID, attribute_id: ids.customerId, status: "approved", approved_by: ids.someoneElse, approved_at: T0 });
 const custIdInput = mappingInput(IN_2, { mapping_id: MAP_ID, source_column_id: ids.colCustId });
 const link = (over: Partial<RequirementLink>) => requirementLink(ids.reqLink1, { attribute_id: null, ...over });
-const lens = (links: RequirementLink[], m: WorkspaceModel) => lensLit(m, requirementScope(ids.req101, links, m), requirementCoverage(ids.req101, links, m));
+const lens = (links: RequirementLink[], m: WorkspaceModel) => requirementFocusLit(m, requirementScope(ids.req101, links, m));
 
 describe("Focus (slice 4p; prototype relatedOf “entity”)", () => {
   it("lights the entity, its attributes' mappings with their tables, and its relationships with both ends; colours no row", () => {
@@ -49,38 +49,77 @@ describe("Focus (slice 4p; prototype relatedOf “entity”)", () => {
   });
 });
 
-describe("the lens (slice 4p; prototype relatedOf “req” and applyHighlight)", () => {
-  it("an entity link: the entity, every attribute coloured by coverage (covered or gap), their mappings with tables", () => {
+describe("Focus on a requirement (slice 4b-1, slice 4p's lens without its colours; prototype relatedOf “req”)", () => {
+  it("an entity link: the entity alone, without its attributes' mappings (slice 4b-1, PRD item 9); no row coloured", () => {
     const lit = lens([link({ entity_id: ids.customer })], model([mapping(), approvedCustId], [mappingInput(), custIdInput]));
     expect(lit.entities).toEqual(new Set([ids.customer]));
-    expect(lit.tables).toEqual(new Set([ids.crmCustomer]));
-    expect(lit.mappings).toEqual(new Set([ids.mapEmail, MAP_ID]));
-    // customer_id has an approved mapping; email only a draft one
-    expect(lit.rows).toEqual(new Map([[ids.customerId, "covered"], [ids.email, "gap"]]));
-    expect(lit.relationships.size).toBe(0);
+    expect(lit.tables.size + lit.mappings.size + lit.relationships.size + lit.rows.size).toBe(0);
   });
 
-  it("an attribute without a mapping is a gap and lights only its entity", () => {
+  it("an attribute without a mapping lights only its entity", () => {
     const lit = lens([link({ attribute_id: ids.orderId })], model());
     expect(lit.entities).toEqual(new Set([ids.salesOrder]));
-    expect(lit.rows).toEqual(new Map([[ids.orderId, "gap"]]));
+    expect(lit.rows.size).toBe(0);
     expect(lit.tables.size + lit.mappings.size).toBe(0);
   });
 
-  it("a table link lights the table only; a column link colours the column and lights its mappings with their entity", () => {
+  it("a table link lights the table only; a column link lights its mappings with their entity", () => {
     expect(lens([link({ source_table_id: ids.crmCustomer })], model())).toMatchObject({ entities: new Set(), tables: new Set([ids.crmCustomer]), rows: new Map(), mappings: new Set() });
     const lit = lens([link({ source_column_id: ids.colEmail })], model());
-    expect(lit.rows).toEqual(new Map([[ids.colEmail, "covered"]]));
+    expect(lit.rows.size).toBe(0);
     expect(lit.mappings).toEqual(new Set([ids.mapEmail]));
     expect(lit.entities).toEqual(new Set([ids.customer]));
     expect(lit.tables).toEqual(new Set([ids.crmCustomer]));
   });
 
-  it("a mapping link: the mapping, its attribute's entity and its inputs' table; the attribute coloured", () => {
+  it("a mapping link: the mapping, its attribute's entity and its inputs' table", () => {
     const lit = lens([link({ mapping_id: ids.mapEmail })], model());
     expect(lit.mappings).toEqual(new Set([ids.mapEmail]));
     expect(lit.entities).toEqual(new Set([ids.customer]));
     expect(lit.tables).toEqual(new Set([ids.crmCustomer]));
-    expect(lit.rows.get(ids.email)).toBe("gap");
+    expect(lit.rows.size).toBe(0);
+  });
+});
+
+describe("Focus on the other selections (slice 4b-1, PRD item 21; prototype relatedOf)", () => {
+  const both = () => model([mapping(), approvedCustId], [mappingInput(), custIdInput]);
+
+  it("a table: the table and its columns' mappings with their entities; no relationship", () => {
+    const lit = targetLit(both(), { t: "table", id: ids.crmCustomer });
+    expect(lit.tables).toEqual(new Set([ids.crmCustomer]));
+    expect(lit.mappings).toEqual(new Set([ids.mapEmail, MAP_ID]));
+    expect(lit.entities).toEqual(new Set([ids.customer]));
+    expect(lit.relationships.size + lit.rows.size).toBe(0);
+  });
+
+  it("an attribute: its entity and its mappings with their tables; an attribute without one, its entity alone", () => {
+    expect(targetLit(model(), { t: "attribute", id: ids.email })).toMatchObject({ entities: new Set([ids.customer]), tables: new Set([ids.crmCustomer]), mappings: new Set([ids.mapEmail]) });
+    expect(targetLit(model(), { t: "attribute", id: ids.orderId })).toMatchObject({ entities: new Set([ids.salesOrder]), tables: new Set(), mappings: new Set() });
+  });
+
+  it("a column: its table and its mappings with their entities; a column without one, its table alone", () => {
+    expect(targetLit(model(), { t: "column", id: ids.colEmail })).toMatchObject({ entities: new Set([ids.customer]), tables: new Set([ids.crmCustomer]), mappings: new Set([ids.mapEmail]) });
+    expect(targetLit(model(), { t: "column", id: ids.colFirstName })).toMatchObject({ entities: new Set(), tables: new Set([ids.crmCustomer]), mappings: new Set() });
+  });
+
+  it("a mapping: the mapping with its ends; a relationship: the relationship with both entities", () => {
+    expect(targetLit(model(), { t: "mapping", id: ids.mapEmail })).toMatchObject({ entities: new Set([ids.customer]), tables: new Set([ids.crmCustomer]), mappings: new Set([ids.mapEmail]), relationships: new Set() });
+    expect(targetLit(model(), { t: "relationship", id: ids.relPlaces })).toMatchObject({ entities: new Set([ids.customer, ids.salesOrder]), tables: new Set(), mappings: new Set(), relationships: new Set([ids.relPlaces]) });
+  });
+
+  it("several items (a frame's cards or a multi-selection): what each of them lights, together", () => {
+    const lit = targetLit(model(), { t: "several", entities: [ids.salesOrder], tables: [ids.crmCustomer] });
+    expect(lit.entities).toEqual(new Set([ids.salesOrder, ids.customer]));
+    expect(lit.tables).toEqual(new Set([ids.crmCustomer]));
+    expect(lit.mappings).toEqual(new Set([ids.mapEmail]));
+    expect(lit.relationships).toEqual(new Set([ids.relPlaces]));
+  });
+
+  it("an unknown or deleted id lights nothing", () => {
+    const m = model([mapping({ deleted_at: T0 })]);
+    for (const t of ["attribute", "column", "mapping", "relationship"] as const) {
+      const lit = targetLit(m, { t, id: t === "mapping" ? ids.mapEmail : "01900000-0000-7000-8000-0000000fffff" });
+      expect(lit.entities.size + lit.tables.size + lit.mappings.size + lit.relationships.size, t).toBe(0);
+    }
   });
 });

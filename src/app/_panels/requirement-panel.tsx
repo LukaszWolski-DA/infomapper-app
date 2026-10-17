@@ -13,7 +13,8 @@ import { CanvasUiCtx } from "@/canvas/context";
 import type { UpdateRequirementInput } from "@/domain/commands/requirement";
 import { targetOf } from "@/domain/model/labels";
 import { templateHtml } from "@/domain/model/requirement-templates";
-import { fourEyesRequirementMessage, KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
+import { coverageText } from "./requirement-ui";
+import { coverageParts, ENTITY_GAP_REASON, fourEyesRequirementMessage, KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
 import { REQUIREMENT_KINDS, REQUIREMENT_PRIORITIES, REQUIREMENT_STATUSES, type Requirement, type RequirementLink } from "@/domain/types";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import { Actions, dangerClass, Field, Hint, inputClass, Kind, List, Note, Section, Seg, TextArea, TextField } from "./fields";
@@ -74,7 +75,12 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
   }
   const parents = p.rx.requirements.filter((x) => !below.has(x.id));
 
-  const gaps = [...coverage.notMapped.map((id) => [id, "unmapped"] as const), ...coverage.notApproved.map((id) => [id, "not approved"] as const)];
+  // slice 4b-1 (PRD item 11): entity items first, then attribute items as before; a click goes to the element
+  const gaps = [
+    ...coverage.entityGaps.map((id) => ({ id, why: ENTITY_GAP_REASON, label: ix.entity.get(id)?.name ?? "", go: () => p.goEntity(id) })),
+    ...coverage.notMapped.map((id) => ({ id, why: "unmapped", label: attributeLabel(ix, id), go: () => p.goAttribute(id) })),
+    ...coverage.notApproved.map((id) => ({ id, why: "not approved", label: attributeLabel(ix, id), go: () => p.goAttribute(id) })),
+  ];
   const traced = (k: RequirementLink) => {
     const t = targetOf(k);
     if (!t) return null;
@@ -193,13 +199,18 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       )}
 
       <Section>Coverage</Section>
+      {/* slice 4b-1 (PRD items 10–11): coverage counts items, entities and attributes; the tooltip names the parts */}
       <div className="grid grid-cols-[1fr_auto] gap-x-3 gap-y-0.5 text-im-ink-2" data-testid="grid-req-coverage">
-        <span>Attributes in scope</span>
-        <span className="text-right font-semibold text-im-ink" data-testid="text-req-coverage">
-          {coverage.covered.length} / {coverage.total}
+        <span>In scope</span>
+        <span className="text-right font-semibold text-im-ink" title={coverageParts(coverage.parts)} data-testid="text-req-coverage">
+          {coverageText(coverage.covered.length, coverage.total)}
         </span>
-        <span>Mapped and approved</span>
-        <span className="text-right">{coverage.covered.length}</span>
+        {coverage.parts.entities > 0 && (
+          <>
+            <span>Entities without an approved mapping</span>
+            <span className="text-right">{coverage.entityGaps.length}</span>
+          </>
+        )}
         <span>Mapped, not approved yet</span>
         <span className="text-right">{coverage.notApproved.length}</span>
         <span>Not mapped</span>
@@ -207,11 +218,11 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       </div>
       {gaps.length > 0 && (
         <List testId="list-req-gaps">
-          {gaps.map(([id, why]) => (
-            <button key={id} type="button" className="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-im-hover" onClick={() => p.goAttribute(id)} data-testid="item-req-gap" data-why={why}>
-              <span className={`size-2.5 flex-none rounded-full ${why === "unmapped" ? "shadow-[inset_0_0_0_1.5px_var(--im-ink-3)]" : "bg-im-warn"}`} />
-              <span className="min-w-0 flex-1 truncate">{attributeLabel(ix, id)}</span>
-              <span className="whitespace-nowrap text-[11.5px] text-im-ink-3">{why}</span>
+          {gaps.map((g) => (
+            <button key={g.id} type="button" className="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-im-hover" onClick={g.go} data-testid="item-req-gap" data-why={g.why}>
+              <span className={`size-2.5 flex-none rounded-full ${g.why === "not approved" ? "bg-im-warn" : "shadow-[inset_0_0_0_1.5px_var(--im-ink-3)]"}`} />
+              <span className="min-w-0 flex-1 truncate">{g.label}</span>
+              <span className="whitespace-nowrap text-[11.5px] text-im-ink-3">{g.why}</span>
             </button>
           ))}
         </List>

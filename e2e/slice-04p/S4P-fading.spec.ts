@@ -8,13 +8,16 @@
 //   Focus        ent:23 and what `relatedOf` gives for it
 //   Lens, small  REQ-101 of seed:large: six attributes of ent:19, one of them a gap
 //   Lens, large  REQ-102 of seed:large: ent:3, ent:4, ent:7 and ent:19, about half the cards of the 30 % view
+// (slice 4b-1, step 3: the lens is gone; the "lens" scenarios are Focus on the requirement, `{ focus: { t:
+// "requirement", id } }`, under their old names so the sittings stay comparable. On a reference without it, such as
+// slice-04p, they are not shown and only fading off is measured there.)
 // and in S1A-14's 100 % view around src:57 (the heaviest view, Łukasz after step 0):
 //   Lens, dense  REQ-103 of seed:large: the source tables in that view
 // 40 switches on and 40 off, each timed until the fading is in the page and until the next frame (C-10's method), and
 // pan and zoom with fading on (S4P-03: against fading off in the same run).
 //
 // The mechanism's side of the contract: while it shows a request it renders `[data-testid="layer-fade"]` with
-// `data-fade` = `focus:<entity id>` or `lens:<requirement id>` (and may add `data-lit-cards`); with fading off there is
+// `data-fade` = `focus:<entity id>` or `focus:requirement:<id>` (and may add `data-lit-cards`); with fading off there is
 // none. Results go to test-results/S4P-fading.json. This file imports only what `slice-04a` has, so the harness can
 // copy it into the reference worktree.
 //
@@ -30,6 +33,8 @@ import { E2E_DB, E2E_PRODUCTION } from "../config";
 import { expect, test, type Page } from "../slice-01a/fixtures";
 import { signInAs } from "../slice-01a/helpers";
 import { DIAG, LARGE_URL, MEASURE, MEASURE_USE, panZoom, saveResults, startRecording, stopRecording, type FrameStats } from "../slice-01b/measure";
+import { fadingLoop, tracedPan, tracedSwitches, type SwitchSummary } from "../measure/switches";
+import { SETTLED_PAIRS, TO_SCREEN } from "../measure/trace";
 
 test.use(MEASURE_USE);
 
@@ -37,14 +42,20 @@ const WS = LARGE_IDS.workspace;
 const FOCUS_CARD = "ent:23";
 const SCENARIOS = {
   focus: { focus: seedId(WS, `entity:${FOCUS_CARD}`) },
-  "lens-small": { lens: seedId(WS, "requirement:REQ-101") },
-  "lens-large": { lens: seedId(WS, "requirement:REQ-102") },
-  "lens-dense": { lens: seedId(WS, "requirement:REQ-103") },
+  "lens-small": { focus: { t: "requirement", id: seedId(WS, "requirement:REQ-101") } },
+  "lens-large": { focus: { t: "requirement", id: seedId(WS, "requirement:REQ-102") } },
+  "lens-dense": { focus: { t: "requirement", id: seedId(WS, "requirement:REQ-103") } },
 } as const;
 type ScenarioName = keyof typeof SCENARIOS;
 type Request = (typeof SCENARIOS)[ScenarioName];
-const AROUND_FOCUS: ScenarioName[] = ["focus", "lens-small", "lens-large"];
-const keyOf = (r: Request) => ("focus" in r ? `focus:${r.focus}` : `lens:${r.lens}`);
+/**
+ * `FADING_SCENARIOS=focus,lens-large` measures only these scenarios, and only the views that have one (slice 4b-1's
+ * closing sitting: S4B1-10 and S4B1-11 need Focus on ent:23 and on REQ-102 only); unset, all of them.
+ */
+const ONLY_SCENARIOS = (process.env.FADING_SCENARIOS ?? "").split(",").filter(Boolean);
+const wanted = (names: ScenarioName[]) => (ONLY_SCENARIOS.length ? names.filter((n) => ONLY_SCENARIOS.includes(n)) : names);
+const AROUND_FOCUS: ScenarioName[] = wanted(["focus", "lens-small", "lens-large"]);
+const keyOf = (r: Request) => (typeof r.focus === "string" ? `focus:${r.focus}` : `focus:${r.focus.t}:${r.focus.id}`);
 const SWITCHES = MEASURE ? 40 : 5;
 const PAN_MS = MEASURE ? 10_000 : 2_000;
 
@@ -53,7 +64,17 @@ interface Latency {
   p95: number;
   max: number;
 }
-type Scenario = { key: string; litCards: string | null; on: Latency; off: Latency; pan: FrameStats } | { notApplicable: string };
+type Scenario = { key: string; litCards: string | null; on: Latency; off: Latency; pan: FrameStats; toScreen?: unknown; panToScreen?: unknown } | { notApplicable: string };
+
+/** A direction's in-page time from the traced loop, as `switchTimes` reports it. */
+const inPageOf = (d: SwitchSummary[string] | undefined): Latency => ({ median: d?.inPage.median ?? NaN, p95: d?.inPage.p95 ?? NaN, max: d?.inPage.max ?? NaN });
+
+/** One pan of PAN_MS with its rAF figures (for the traced pans). */
+const recordPan = async (page: Page) => {
+  await startRecording(page);
+  await panZoom(page, PAN_MS);
+  return stopRecording(page);
+};
 
 /** Opens the large canvas at a view (pane coordinates), frames expanded or all collapsed, and lets it settle. */
 async function open(page: Page, view: { x: number; y: number; zoom: number }, collapsed: boolean) {
@@ -127,23 +148,24 @@ test("S4P-fading: switching fading on and off, and pan and zoom with fading on a
   const src57 = generate().cards.find((c) => c.id === "src:57")!;
   const hook = await hasHook(page);
 
-  type View = { view: { x: number; y: number; zoom: number }; collapsed: boolean; scenarioNames: ScenarioName[]; inView?: string[]; off?: FrameStats; scenarios?: Record<string, Scenario> };
+  type View = { label?: string; view: { x: number; y: number; zoom: number }; collapsed: boolean; scenarioNames: ScenarioName[]; inView?: string[]; off?: FrameStats; offToScreen?: unknown; scenarios?: Record<string, Scenario> };
   const around = (zoom: number) => ({ x: pane.w / 2 - centre.x * zoom, y: pane.h / 2 - centre.y * zoom, zoom });
   // S1A-14's 100 % view (pane coordinates, as S1A-14 writes it)
   const dense = { x: 768 - src57.x, y: 300 - src57.y, zoom: 1 };
   const all: Record<string, View> = {
     "100 %, expanded": { view: around(1), collapsed: false, scenarioNames: AROUND_FOCUS },
     "30 %, expanded": { view: around(0.3), collapsed: false, scenarioNames: AROUND_FOCUS },
-    "100 % dense area, expanded": { view: dense, collapsed: false, scenarioNames: ["lens-dense"] },
+    "100 % dense area, expanded": { view: dense, collapsed: false, scenarioNames: wanted(["lens-dense"]) },
     "100 %, collapsed": { view: around(1), collapsed: true, scenarioNames: AROUND_FOCUS },
     "30 %, collapsed": { view: around(0.3), collapsed: true, scenarioNames: AROUND_FOCUS },
-    "100 % dense area, collapsed": { view: dense, collapsed: true, scenarioNames: ["lens-dense"] },
+    "100 % dense area, collapsed": { view: dense, collapsed: true, scenarioNames: wanted(["lens-dense"]) },
   };
   // under DIAG=collapsed every view is collapsed: the expanded ones would only repeat them
-  const views = Object.fromEntries(Object.entries(all).filter(([, v]) => v.collapsed || !DIAG.split(",").includes("collapsed")));
+  const views = Object.fromEntries(Object.entries(all).filter(([, v]) => (v.collapsed || !DIAG.split(",").includes("collapsed")) && v.scenarioNames.length));
   let mechanism: boolean | null = hook ? null : false;
-  for (const v of Object.values(views)) {
+  for (const [label, v] of Object.entries(views)) {
     const view = v.view;
+    v.label = label;
     await open(page, view, v.collapsed);
     // the cards (and blocks) in view, to check the lit counts against
     v.inView = await page.evaluate(() => {
@@ -158,6 +180,12 @@ test("S4P-fading: switching fading on and off, and pan and zoom with fading on a
     await startRecording(page);
     await panZoom(page, PAN_MS);
     v.off = await stopRecording(page);
+    // slice 4b-1: with TO_SCREEN=1 the same pan again, traced, as presented frames (the run above stays as the rAF
+    // figure and the trace's own cost)
+    if (TO_SCREEN) {
+      await open(page, view, v.collapsed);
+      v.offToScreen = (await tracedPan(page, `S4P-fading ${label} off`, () => recordPan(page))).presented;
+    }
 
     if (mechanism === false) continue;
     v.scenarios = {};
@@ -170,7 +198,13 @@ test("S4P-fading: switching fading on and off, and pan and zoom with fading on a
         await fade(page, null);
         if (!mechanism) break;
       }
-      const times = await switchTimes(page, request, SWITCHES);
+      // slice 4b-1: with TO_SCREEN=1, settled switches traced to the screen (their in-page times as `on` and `off`)
+      const traced = TO_SCREEN ? await tracedSwitches(page, `S4P-fading ${v.label} ${name}`, () => fadingLoop(page, request, keyOf(request), SETTLED_PAIRS)) : null;
+      const times = traced
+        ? "error" in traced
+          ? traced
+          : { on: inPageOf(traced.byDir.on), off: inPageOf(traced.byDir.off) }
+        : await switchTimes(page, request, SWITCHES);
       expect(times, `${name}: switching`).not.toHaveProperty("error");
       const shown = await fade(page, request);
       expect(shown, `${name}: fading shown before pan and zoom`).toBe(true);
@@ -179,8 +213,9 @@ test("S4P-fading: switching fading on and off, and pan and zoom with fading on a
       await startRecording(page);
       await panZoom(page, PAN_MS);
       const pan = await stopRecording(page);
+      const panToScreen = TO_SCREEN ? (await tracedPan(page, `S4P-fading ${v.label} ${name} on`, () => recordPan(page))).presented : undefined;
       await fade(page, null);
-      v.scenarios[name] = { key: keyOf(request), litCards, ...(times as { on: Latency; off: Latency }), pan };
+      v.scenarios[name] = { key: keyOf(request), litCards, ...(times as { on: Latency; off: Latency }), pan, ...(traced && !("error" in traced) ? { toScreen: traced, panToScreen } : {}) };
     }
     if (mechanism === false) delete v.scenarios;
   }

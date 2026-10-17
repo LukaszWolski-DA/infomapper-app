@@ -153,8 +153,9 @@ test("S4P-04 screenshots: Focus and the lenses at 100 % and 30 %, app (Performan
   // Customer & orders, app and prototype
   const demo = [
     ["focus", { focus: entity("Customer").id }, { focus: "lent_customer" }],
-    ["lens-small", { lens: req102.id }, { req: "REQ-102" }],
-    ["lens-large", { lens: req101.id }, { req: "REQ-101" }],
+    // slice 4b-1: the lens is gone; Focus on the requirement (the prototype's lens is its nearest picture)
+    ["lens-small", { focus: { t: "requirement", id: req102.id } }, { req: "REQ-102" }],
+    ["lens-large", { focus: { t: "requirement", id: req101.id } }, { req: "REQ-101" }],
   ] as const;
   for (const [name, app, proto] of demo) {
     for (const [zoom, view] of Object.entries(VIEWS)) {
@@ -177,9 +178,9 @@ test("S4P-04 screenshots: Focus and the lenses at 100 % and 30 %, app (Performan
   const around = (cx: number, cy: number, zoom: number) => ({ x: pane.w / 2 - cx * zoom, y: pane.h / 2 - cy * zoom, zoom });
   const perf = [
     ["focus", { focus: seedId(WS, "entity:ent:23") }, ent23.x + 128, ent23.y + 200],
-    ["lens-small", { lens: seedId(WS, "requirement:REQ-101") }, ent23.x + 128, ent23.y + 200],
-    ["lens-large", { lens: seedId(WS, "requirement:REQ-102") }, ent23.x + 128, ent23.y + 200],
-    ["lens-dense", { lens: seedId(WS, "requirement:REQ-103") }, src57.x + 128, src57.y + 300],
+    ["lens-small", { focus: { t: "requirement", id: seedId(WS, "requirement:REQ-101") } }, ent23.x + 128, ent23.y + 200],
+    ["lens-large", { focus: { t: "requirement", id: seedId(WS, "requirement:REQ-102") } }, ent23.x + 128, ent23.y + 200],
+    ["lens-dense", { focus: { t: "requirement", id: seedId(WS, "requirement:REQ-103") } }, src57.x + 128, src57.y + 300],
   ] as const;
   for (const [name, request, cx, cy] of perf) {
     for (const zoom of [1, 0.3]) {

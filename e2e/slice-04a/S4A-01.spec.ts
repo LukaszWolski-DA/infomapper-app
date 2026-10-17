@@ -13,8 +13,8 @@ test("S4A-01: the Requirements tab: groups in kind order with counts, rows with 
   await expect(r104).toContainText("REQ-104");
   await expect(r104).toContainText("Order total equals the sum of its lines");
   await expect(r104.locator("svg[data-kind=business_rule]")).toHaveCount(1);
-  await expect(r104.getByTestId("bar-req-coverage")).toHaveAttribute("title", "1 of 4 attributes covered");
-  await expect(requirementRow(page, "REQ-102").getByTestId("bar-req-coverage")).toHaveAttribute("title", "3 of 3 attributes covered");
+  await expect(r104.getByTestId("bar-req-coverage")).toHaveAttribute("title", "1 of 4 covered (4 attributes)");
+  await expect(requirementRow(page, "REQ-102").getByTestId("bar-req-coverage")).toHaveAttribute("title", "3 of 3 covered (3 attributes)");
   await expect(page.getByTestId("button-new-requirement")).toBeVisible();
 
   // search by key and name
