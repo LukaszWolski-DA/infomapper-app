@@ -48,7 +48,13 @@ const SCENARIOS = {
 } as const;
 type ScenarioName = keyof typeof SCENARIOS;
 type Request = (typeof SCENARIOS)[ScenarioName];
-const AROUND_FOCUS: ScenarioName[] = ["focus", "lens-small", "lens-large"];
+/**
+ * `FADING_SCENARIOS=focus,lens-large` measures only these scenarios, and only the views that have one (slice 4b-1's
+ * closing sitting: S4B1-10 and S4B1-11 need Focus on ent:23 and on REQ-102 only); unset, all of them.
+ */
+const ONLY_SCENARIOS = (process.env.FADING_SCENARIOS ?? "").split(",").filter(Boolean);
+const wanted = (names: ScenarioName[]) => (ONLY_SCENARIOS.length ? names.filter((n) => ONLY_SCENARIOS.includes(n)) : names);
+const AROUND_FOCUS: ScenarioName[] = wanted(["focus", "lens-small", "lens-large"]);
 const keyOf = (r: Request) => (typeof r.focus === "string" ? `focus:${r.focus}` : `focus:${r.focus.t}:${r.focus.id}`);
 const SWITCHES = MEASURE ? 40 : 5;
 const PAN_MS = MEASURE ? 10_000 : 2_000;
@@ -149,13 +155,13 @@ test("S4P-fading: switching fading on and off, and pan and zoom with fading on a
   const all: Record<string, View> = {
     "100 %, expanded": { view: around(1), collapsed: false, scenarioNames: AROUND_FOCUS },
     "30 %, expanded": { view: around(0.3), collapsed: false, scenarioNames: AROUND_FOCUS },
-    "100 % dense area, expanded": { view: dense, collapsed: false, scenarioNames: ["lens-dense"] },
+    "100 % dense area, expanded": { view: dense, collapsed: false, scenarioNames: wanted(["lens-dense"]) },
     "100 %, collapsed": { view: around(1), collapsed: true, scenarioNames: AROUND_FOCUS },
     "30 %, collapsed": { view: around(0.3), collapsed: true, scenarioNames: AROUND_FOCUS },
-    "100 % dense area, collapsed": { view: dense, collapsed: true, scenarioNames: ["lens-dense"] },
+    "100 % dense area, collapsed": { view: dense, collapsed: true, scenarioNames: wanted(["lens-dense"]) },
   };
   // under DIAG=collapsed every view is collapsed: the expanded ones would only repeat them
-  const views = Object.fromEntries(Object.entries(all).filter(([, v]) => v.collapsed || !DIAG.split(",").includes("collapsed")));
+  const views = Object.fromEntries(Object.entries(all).filter(([, v]) => (v.collapsed || !DIAG.split(",").includes("collapsed")) && v.scenarioNames.length));
   let mechanism: boolean | null = hook ? null : false;
   for (const [label, v] of Object.entries(views)) {
     const view = v.view;

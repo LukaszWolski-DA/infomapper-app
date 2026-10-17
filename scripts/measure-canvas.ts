@@ -30,9 +30,10 @@
 // raw traces in .data/measure/<sitting>/traces/round-<n>-<side>/; the branch's measuring specs, `e2e/measure/` and
 // `scripts/lib/to-screen.ts` are copied into the reference worktree so both sides measure the same way. `--only
 // <list>` runs a subset: pan (S1A-14, with C-08 untraced), c10 (S1B-10), lasso (S2A-14's marks), fading (S4P-fading),
-// c08 (S4P-10, traced), colours (S4B1-09, once it exists), c09 (S1B-09), drags (S2A-14's drags). A side whose quiet
-// check fails (not quiet within 3 minutes) drops its round, and a replacement round with the same order is added at
-// the end (at most two per sitting).
+// c08 (S4P-10, traced), colours (S4B1-09, this branch only), c09 (S1B-09), drags (S2A-14's drags); with --only,
+// fading runs on this branch only too. `FADING_SCENARIOS=focus,lens-large` limits S4P-fading's scenarios. A side whose
+// quiet check fails (not quiet within 3 minutes) drops its round, and a replacement round with the same order is added
+// at the end (at most two per sitting).
 // Measuring only:
 // no dev or measurement server may run (ports 3200, 3300); prepare the laptop first.
 
@@ -59,15 +60,19 @@ interface Run {
   specs: string[];
   args: string[];
   results: string[];
+  /** Measures what only this branch has (slice 4b-1's coverage colours): not copied to, nor run on, the reference. */
+  branchOnly?: boolean;
 }
 const CRITERIA: Record<string, Run> = {
   pan: { specs: ["e2e/slice-01a/S1A-14.spec.ts"], args: [], results: ["S1A-14.json"] },
   c10: { specs: ["e2e/slice-01b/S1B-10.spec.ts"], args: [], results: ["S1B-10.json"] },
   lasso: { specs: ["e2e/slice-02a/S2A-14.spec.ts"], args: ["--grep", "marks"], results: ["S2A-14-lasso.json"] },
   drags: { specs: ["e2e/slice-02a/S2A-14.spec.ts"], args: ["--grep", "dragging"], results: ["S2A-14.json"] },
-  fading: { specs: [FADING_SPEC], args: [], results: ["S4P-fading.json"] },
+  // with --only, fading is this branch's (slice 4b-1: S4B1-10 and S4B1-11 compare Focus on and off on the same side);
+  // the full set without --only still measures it on both sides (slice 4p)
+  fading: { specs: [FADING_SPEC], args: [], results: ["S4P-fading.json"], branchOnly: true },
   c08: { specs: ["e2e/slice-04p/S4P-10-c08.spec.ts"], args: [], results: ["S4P-10.json"] },
-  colours: { specs: ["e2e/slice-04b1/S4B1-09.spec.ts"], args: [], results: ["S4B1-09.json"] },
+  colours: { specs: ["e2e/slice-04b1/S4B1-09.spec.ts"], args: [], results: ["S4B1-09.json"], branchOnly: true },
   c09: { specs: ["e2e/slice-01b/S1B-09.spec.ts"], args: [], results: ["S1B-09.json"] },
 };
 const only = (() => {
@@ -146,7 +151,7 @@ function measure(tree: string, dir: string, diag = "", traceDir = ""): Raw {
   if (tree !== BRANCH) {
     // the reference has no fading spec of its own: the same file, which measures fading off there (slice 4p); in the
     // traced mode every measuring spec and the modules they share, so both sides measure the same way (slice 4b-1)
-    const copies = TO_SCREEN ? [...new Set([...RUNS.flatMap((r) => r.specs), ...TO_SCREEN_FILES])] : [FADING_SPEC];
+    const copies = TO_SCREEN ? [...new Set([...RUNS.filter((r) => !r.branchOnly).flatMap((r) => r.specs), ...TO_SCREEN_FILES])] : [FADING_SPEC];
     for (const f of copies) {
       if (!fs.existsSync(path.join(BRANCH, f))) continue;
       fs.mkdirSync(path.join(tree, path.dirname(f)), { recursive: true });
@@ -156,6 +161,10 @@ function measure(tree: string, dir: string, diag = "", traceDir = ""): Raw {
   fs.mkdirSync(dir, { recursive: true });
   const raw: Raw = {};
   for (const run of RUNS) {
+    if (run.branchOnly && tree !== BRANCH) {
+      console.log(`Skipped in ${tree}: ${run.specs.join(", ")} measures this branch only.`);
+      continue;
+    }
     const specs = run.specs.filter((f) => fs.existsSync(path.join(tree, f)));
     if (!specs.length) {
       console.log(`Skipped in ${tree}: ${run.specs.join(", ")} does not exist there.`);

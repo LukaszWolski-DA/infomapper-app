@@ -1,8 +1,168 @@
 # Slice 4b-1 – Acceptance
 
-Status: **steps 1 to 6 and step 6's follow-up accepted; step 7 (Focus, with the “and N more” dot) waiting for Łukasz.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+Status: **steps 1 to 7 accepted; step 8, part 1 (docs, checklist, builds, the sitting's plan) waiting for Łukasz; part 2 (the closing sitting) after he prepares the laptop.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
 (`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
+
+## Step 8, part 1: docs, checklist, builds, the sitting's plan (17 October 2026)
+
+Step 7 was accepted. Łukasz's answers:
+1. **“Show everything”: left to slice 6** (D-39). Recorded in `docs/known-limitations.md` as a deliberate gap
+   (“Focus without the view-state bar”), with the note that the “Focus” chip moves from the status bar to the
+   view-state bar there.
+2. **Run 3's S0-10 failure: accepted** as the known cold-start flake (noted in step 7's runs).
+
+No measuring in this part.
+
+### Docs (PRD section 9)
+
+| File | What | State |
+| --- | --- | --- |
+| `docs/decisions.md` D-31, D-32, D-34 | as approved | applied in steps 4 and 6 |
+| `docs/decisions.md` AD-24 | “Overlay and fading”: F4, the method rule | **waits for the sitting's figures** (part 2, Łukasz approves the text) |
+| `docs/data-model-v2.md` | the coverage sentence | applied in step 4 |
+| `docs/known-limitations.md` | **corrections** under “Where the canvas stands after slice 4p” (S4P-02 missed to the screen; S4P-03, C-09 and the drags as rAF figures, unverified as presented; C-10 20 ms and the lasso 43 ms to the screen; C-08's last present not included); “Fading's slow switches at 30 %” **replaced** by “Fading: F1's slow switches, and F4 instead” (the lift's re-raster, the bimodal mode explained, F4's open pan point with T1–T3); **C-08's 0.7 s idle corrected** (below); **a method entry** (“How canvas figures are measured since slice 4b-1”); “Requirements are not on the canvas yet” brought up to date with item 19's outcome (the dot); “Focus without the view-state bar” (new); the pinned-notes point closed in step 3; the palette's contrast in step 7 | done; F4's closing figures and “where the canvas stands after 4b-1” in part 2 |
+| `docs/prd/slice-04p-acceptance.md` | new section “Corrections after slice 4b-1, step 0”: S4P-02, S4P-03, C-10, the lasso, C-08 (its idle an artefact), F4's rejection; 4p's own text unchanged | done |
+| `docs/ideas.md` | “Entity-level requirements” marked resolved (link to the PRD); new: “Coverage by hierarchy”, “Link all attributes in an entity panel”; the palette's contrast (step 7) | done |
+| `README.md` | status (4b-1 in review, 4b-2 next), what 4b-1 brings, the acceptance link | done |
+| `CLAUDE.md` | “Overlay and fading” for F4, Focus and the coverage colours; the test hook's request forms; S4B1-09's and the screenshots' commands | done |
+
+### C-08's “0.7 s idle”: an artefact
+
+`scripts/c08-waiting.ts` now anchors on the page's `im:stable` mark when a trace has it, and falls back to 4p's
+`navigationStart` otherwise. Re-run on the traces that have the mark (step 2's smoke, `2026-10-15-18-05`, five loads,
+unprepared laptop, diagnosis only):
+
+| | 4p's anchor (`2026-10-15-10-37`, 4p's sitting) | The mark (`2026-10-15-18-05`) |
+| --- | --- | --- |
+| The anchor's shift | – | the origin 1,067–1,132 ms before 4p's |
+| Window: document end → stable frame | 1,038–1,045 ms | 984–1,028 ms |
+| Main thread busy | 297–331 ms | 983–1,027 ms |
+| Main thread idle | **709–748 ms** | **about 1 ms** |
+
+With the right anchor, the main thread works through the whole window. Its work, a median per load (top-level tasks):
+
+| Work | ms |
+| --- | --- |
+| React's scheduled work (`MessagePort::Accept`) | about 560 |
+| incoming messages | about 165 |
+| frames (`BeginMainFrame`) | about 145 |
+| deferred scripts | about 70 |
+| parsing | about 40 |
+
+So 4p's idle was the shifted window, which held mostly the time after the page was complete. Recorded in
+`docs/known-limitations.md` (C-08 entry) and in 4p's corrections. C-08's own figures, both ways, come from the sitting.
+
+### Tooling changes for the sitting
+
+The sitting runs `measure:canvas --only …`. Two things in it would have cost time or failed:
+- **S4B1-09 on the reference side.** In traced mode every measuring spec is copied into the `slice-04p` worktree, and
+  S4B1-09 needs this slice's helpers, so the reference's run would fail and stop the sitting. `colours` now runs on
+  this branch only.
+- **S4P-fading on the reference side.** S4B1-10 and S4B1-11 compare Focus on and off on this branch; the reference's F1
+  fading was about 29 min per round that no criterion uses. With `--only`, `fading` now runs on this branch only.
+  Without `--only` it still runs on both sides, as in slice 4p.
+- **S4P-fading's scenarios.** `FADING_SCENARIOS=focus,lens-large` limits it to Focus on ent:23 and on REQ-102 (and to
+  the four views around ent:23). 4p's lens-small and lens-dense cases are not 4b-1's criteria. Unset, it measures all of
+  them.
+
+These are measurement-only files; the three full runs below include them.
+
+### Measurement builds
+
+`npm run measure:canvas -- --prepare-only --against slice-04p` (17 October 2026, 1.4 min): the reference worktree
+`../infomapper-ab-main` at `slice-04p`, and both measurement builds (`.next-measure`). The sitting uses them with
+`--no-build`. No app code changed after the builds.
+
+### The sitting's final plan
+
+**Before:** Łukasz prepares the laptop (power, restart, nothing else running) and says so. No dev or measurement
+server runs (ports 3200, 3300). Every command below checks the CPU before each side and replaces a disturbed round.
+
+PowerShell:
+
+```powershell
+$env:FADING_SCENARIOS="focus,lens-large"
+$env:SETTLED_PAIRS="1"; npm run measure:canvas -- --to-screen --only pan,c10,lasso,fading,colours --rounds 1 --no-build --against slice-04p; Remove-Item Env:SETTLED_PAIRS   # warm-up, discarded
+npm run measure:canvas -- --to-screen --only pan,c10,lasso,fading,colours --rounds 3 --no-build --against slice-04p   # A
+npm run measure:canvas -- --to-screen --only pan --diag collapsed --rounds 3 --no-build --against slice-04p          # B
+npm run measure:canvas -- --to-screen --only c08 --rounds 1 --no-build --against slice-04p                           # C
+```
+
+bash:
+
+```bash
+export FADING_SCENARIOS=focus,lens-large
+SETTLED_PAIRS=1 npm run measure:canvas -- --to-screen --only pan,c10,lasso,fading,colours --rounds 1 --no-build --against slice-04p   # warm-up, discarded
+npm run measure:canvas -- --to-screen --only pan,c10,lasso,fading,colours --rounds 3 --no-build --against slice-04p   # A
+npm run measure:canvas -- --to-screen --only pan --diag collapsed --rounds 3 --no-build --against slice-04p          # B
+npm run measure:canvas -- --to-screen --only c08 --rounds 1 --no-build --against slice-04p                           # C
+```
+
+Then **D**, S4B1-13's element counts with Focus off (not timed): S4A-14-elements on the reference build for the
+baseline, then on this branch against it (`ELEMENTS_BASELINE`), each difference explained (F4's layer, the markers).
+
+| Part | Covers | Side | Per round | Rounds | Time |
+| --- | --- | --- | --- | --- | --- |
+| Warm-up | everything in A with one pair per case (`SETTLED_PAIRS=1`; the pans full length), discarded | both | about 21 min | 1 | about 21 min |
+| A | **S4B1-09:** coverage colours, 4 views. **S4B1-10:** Focus ent:23 and REQ-102 switching, 4 views. **S4B1-11:** pan with Focus on against off. **S4B1-12, expanded:** pan and zoom (overview, dense), C-10, lasso, and C-08 untraced | branch about 27 min (fading 17, colours 4, pan, C-10 and lasso 4.5, server and CPU check 1.5); reference about 6 min | about 33 min | 3 | about 1 h 40 min |
+| B | **S4B1-12, collapsed:** pan and zoom with every frame collapsed | both, about 3 min each | about 6 min | 3 | about 18 min |
+| C | **C-08** to its stable frame and to its last present (S4P-10, five traced loads) | both | about 10 min | 1 | about 10 min |
+| D | **S4B1-13:** element counts with Focus off against `slice-04p` | both | – | 1 | about 5 min |
+
+- **Total: about 2 h 35 min,** plus about 33 min for each replaced round of A. That is a little over the PRD's 2–2.5 h
+  and over step 1's estimate of 1 h 50 min. Step 1 counted neither the collapsed pans (B) nor the element counts (D),
+  and timed S4P-fading's views for fewer cases. Without B it is about 2 h 15 min. B is S4B1-12's “frames collapsed”.
+- **Not in the sitting:** S4B1-13's commit counters. S4B1-06 checks them in every e2e run (switching Focus: no canvas
+  and no miniature commit), with S4P-12, S2C-12, S3A-14-idle, S3B-15-idle and S3B-13.
+
+**Part 2's report** (as Łukasz asked):
+- S4B1-09 to S4B1-13 with median, p95, max and the settled-check failures;
+- C-08 both ways (in-page stable frame and last present) against the 1,500 ms bar;
+- the calibration: presented fps with fading off against 4p's rAF figures (the presented 54 against rAF 45 seen in
+  step 2's smoke);
+- the proposed AD-24 text for Łukasz's approval (not applied).
+
+### Manual acceptance checklist (Łukasz)
+
+On a dev server with fresh demo data in the preview file. Stop it again before any e2e run.
+
+PowerShell:
+
+```powershell
+$env:INFOMAPPER_DEV_DB=".data/preview-db.json"; npm run reset-dev-data; npm run dev
+```
+
+bash:
+
+```bash
+export INFOMAPPER_DEV_DB=.data/preview-db.json && npm run reset-dev-data && npm run dev
+```
+
+Open http://localhost:3000/sign-in, sign in as **Łukasz**, open Retail Co – DWH → Customer 360 → Customer & orders.
+
+| # | Steps | Expected |
+| --- | --- | --- |
+| 1 | Look at Customer's header, then hover over its violet diamond. Open Customer's panel (click its header) and compare its Requirements section. | The diamond shows **4**. Its tooltip lists REQ-101, REQ-102, REQ-103 and REQ-105, in the panel's order. Sales Order and Order Line show 1 (REQ-104); no table shows one in the demo data. |
+| 2 | In the left panel's Requirements tab, click **REQ-105**. | Nothing fades. On Customer, first_name, last_name and email have a blue bar at the left and a faint blue tint; birth_date has an orange bar and tint. The text stays fully readable. The panel says “3 of 4 covered”. |
+| 3 | Click birth_date's row. In its panel, open the mapping from customers.dob and set it to **Approved**. Click REQ-105 again. | birth_date's row turns blue; the panel says “4 of 4 covered”. |
+| 4 | With REQ-105 selected, zoom out below 40 % (the zoom box or Ctrl + wheel). | Rows are no longer drawn. A blue dot sits at the right end of Customer's header. Zoom back to 100 %. |
+| 5 | With REQ-105 selected, click **Focus** in the toolbar. | Everything fades except Customer, customers and web_users with the lines between them. The rows stay coloured. The status bar shows the chip “Focus ×”. |
+| 6 | Click Customer's header, then drag Customer by its header and drop it. | Focus moves: Customer, customers, web_users and Sales Order stay lit, the rest fades. Customer stays lit while it moves and after the drop. |
+| 7 | Right-click Sales Order's header → **Turn Focus off**. Then right-click it again → **Focus on this**. Click × on the chip. | The fading goes, comes back around Sales Order, and goes again with the chip. The Focus button's pressed look follows each time. |
+| 8 | Click Focus, then press F5. Then turn Focus on again and switch the project to **Order management** (top bar) and open the tab **Order lines & products**. | After F5, Focus is off (no chip, nothing faded). On the other canvas, Focus is off too. |
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch, in a row:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 172 passed | 27.6 min |
+| 2 | 172 passed | 27.3 min |
+| 3 | 172 passed | 27.3 min |
+
+Lint, typecheck and the unit tests (976 in 72 files) pass.
 
 ## Step 7: Focus, and step 6's last answers (16 October 2026)
 
@@ -87,7 +247,8 @@ No dev server, Playwright or measurement server running; each run from scratch:
 
 - **Run 3's failure is S0-10** (slice 0): “Server did not start within 300 s”. Its own restarted dev server on port 3201
   did not come up in time. This is the slow cold start seen before in slices 1a and 1b. No step 7 file is on its path,
-  and it passed in runs 1 and 2. Not changed.
+  and it passed in runs 1 and 2. Not changed. **Accepted by Łukasz as the known cold-start flake;** no fresh set, since
+  step 8 runs three in a row before the merge.
 - **172** is step 6's 167 plus S4B1-06 (two tests), S4B1-08 (two) and S4B1-05's “and N more” test.
 - Lint, typecheck and the unit tests (976 in 72 files) pass.
 
