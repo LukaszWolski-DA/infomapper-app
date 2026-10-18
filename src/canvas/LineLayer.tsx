@@ -12,13 +12,20 @@
 // neither re-renders nor repaints this layer.
 // Slice 2c (D-07): lines touching a collapsed frame come as bundles (`bundleLines`), drawn in the same layer: a group of
 // one mapping as that mapping, two or more as one line with a count, relationships with “N relationship(s)”.
+// Slice 4b-2 (items 8–11): the requirement cards' trace lines, dashed, in the same layer (one path and one end dot each,
+// no dot below 40 %), from data (`traceGeom`); each redrawn only when its ends move. They fade with the other lines on a
+// selection (the layer's `dimmed` class), never on a hover.
 
 import { Fragment, memo, useContext, useState, type ReactNode } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type Notation } from "./context";
-import { cardRect, ieMarker, LOD_ZOOM, multText, relGeom, umlMarker, type Placed, type Rect } from "./geometry";
-import { bundleGeom, mapGeom, placedOf, type Bundle, type BundleEnd, type BundleGeom, type MapGeom } from "./line-geometry";
+import { blockNodeId, type BlockNodeT } from "./BlockNode";
+import { cardRect, ieMarker, LOD_ZOOM, multText, relGeom, umlMarker, type Placed, type Pt, type Rect } from "./geometry";
+import { bundleGeom, mapGeom, placedOf, traceGeom, type Bundle, type BundleEnd, type BundleGeom, type MapGeom, type TraceCardPlace } from "./line-geometry";
+import { REQ_CARD, requirementCardHeight } from "./requirement-card-data";
+import type { ReqNodeT } from "./RequirementCardNode";
+import type { TraceData } from "./trace-data";
 import { relatedLines, type CanvasLines, type MapLineData, type RelLineData, type Related, type Selection } from "./line-data";
 import { useValue, type ValueStore } from "./value-store";
 
@@ -164,6 +171,20 @@ const NO_BUNDLES: Bundle[] = [];
 const NO_BLOCKS = new Map<string, Rect>();
 const NO_MAPS = new Map<string, MapLineData>();
 const NO_TETHERS: readonly { id: string; x1: number; y1: number; x2: number; y2: number }[] = [];
+const NO_TRACES: readonly TraceData[] = [];
+
+/** A trace line (slice 4b-2): a dashed path and, at 40 % and above, its end dot; two elements, no group (S3A-14). */
+const TracePath = memo(
+  function TracePath({ id, x1, y1, x2, y2, dot }: { sig: string; id: string; x1: number; y1: number; x2: number; y2: number; dot: boolean }) {
+    return (
+      <>
+        <path className="trace" d={`M${x1},${y1} L${x2},${y2}`} data-testid="line-trace" data-trace={id} />
+        {dot && <circle className="trace-dot" cx={x2} cy={y2} r={2.6} />}
+      </>
+    );
+  },
+  (a, b) => a.sig === b.sig,
+);
 
 function LineLayer({
   lines,
@@ -174,6 +195,7 @@ function LineLayer({
   related,
   onSelect,
   tethers = NO_TETHERS,
+  traces = NO_TRACES,
 }: {
   /** The lines drawn on their own: those touching no collapsed frame. */
   lines: CanvasLines;
@@ -188,6 +210,8 @@ function LineLayer({
   onSelect: (sel: Selection) => void;
   /** The dashed tethers of pinned notes (slice 3a, D-20), drawn here as part of the one line layer (AD-24 rule 3). */
   tethers?: readonly { id: string; x1: number; y1: number; x2: number; y2: number }[];
+  /** The requirement cards' trace lines (slice 4b-2); empty outside “Everything” (item 10). */
+  traces?: readonly TraceData[];
 }) {
   // Re-render on any node change (drag, collapse, filter); panning and zooming leave the nodes alone.
   useStore((s) => s.nodes);
@@ -320,12 +344,60 @@ function LineLayer({
     if (el) bundled.push(el);
   }
 
+  // ---- trace lines (slice 4b-2, items 8–9) ----
+  const traced: ReactNode[] = [];
+  if (traces.length) {
+    const bundleOf = new Map<string, Bundle>();
+    for (const b of bundles) if (b.t === "map") for (const id of b.ids) bundleOf.set(id, b);
+    const shown = new Map(lines.mappings.map((l) => [l.id, l]));
+    const reqRect = (id: string): Rect | null => {
+      const n = lookup.get(id);
+      if (!n) return null;
+      const card = (n as unknown as ReqNodeT).data.card;
+      return { x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, w: REQ_CARD.width, h: requirementCardHeight(card.nameLines) };
+    };
+    // a card hidden in a collapsed frame: its block, and its place among the block's members (item 9)
+    const placeOf = (cardId: string): TraceCardPlace => {
+      const n = lookup.get(cardId);
+      if (!n) return null;
+      if (!n.hidden) return { placed: placedOf(n)! };
+      const frameId = (n as unknown as CardNodeT).data.card.frameId;
+      const rect = frameId ? blocks.get(frameId) : undefined;
+      const block = frameId ? (lookup.get(blockNodeId(frameId)) as unknown as BlockNodeT | undefined) : undefined;
+      if (!rect || !block) return null;
+      return { block: rect, index: Math.max(0, block.data.members.findIndex((m) => m.id === cardId)) };
+    };
+    // a mapping's middle: its line, or the bundle line that carries it at a collapsed frame
+    const mapMid = (id: string): Pt | null => {
+      const b = bundleOf.get(id);
+      if (b) {
+        const g = bundleGeom(b, placed, blocks, mapsById);
+        return g ? (g.kind === "single" ? g.geom.mid : g.kind === "map" ? g.mid : null) : null;
+      }
+      const l = shown.get(id);
+      return l ? (mapGeom(l, lookup)?.mid ?? null) : null;
+    };
+    for (const t of traces) {
+      let g = traceGeom(reqRect(t.reqCardId), t.target, placeOf, mapMid);
+      // a mapping not drawn on its own (both ends in one collapsed frame): its attribute's row in the block
+      if (!g && t.target.t === "map") {
+        const l = mapsById.get(t.target.mappingId);
+        if (l) g = traceGeom(reqRect(t.reqCardId), { t: "row", cardId: l.cardId, rowId: l.attributeId }, placeOf, mapMid);
+      }
+      if (!g) continue;
+      const r = (v: number) => +v.toFixed(1);
+      const [x1, y1, x2, y2] = [r(g.x1), r(g.y1), r(g.x2), r(g.y2)];
+      traced.push(<TracePath key={t.id} sig={`${x1},${y1},${x2},${y2},${dots}`} id={t.id} x1={x1} y1={y1} x2={x2} y2={y2} dot={dots} />);
+    }
+  }
+
   return (
     <EdgeLabelRenderer>
       <svg className={`line-layer${related ? " dimmed" : ""}`} width={1} height={1} data-testid="layer-lines">
         <g>{rels}</g>
         <g>{maps}</g>
         <g>{bundled}</g>
+        <g>{traced}</g>
         <g>
           {tethers.map((t) => (
             // no group per tether: two elements (slice 3a, S3A-14)

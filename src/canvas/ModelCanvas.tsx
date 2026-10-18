@@ -53,6 +53,7 @@ import CardNode, { cardNodesOf, filtersOf, type CardNodeT } from "./CardNode";
 import BlockNode, { blockNodeId, type BlockNodeT } from "./BlockNode";
 import RequirementCardNode, { reqNodesOf, type ReqNodeT } from "./RequirementCardNode";
 import { REQ_CARD, requirementCardHeight, type RequirementCardData } from "./requirement-card-data";
+import { buildTraces, type TraceData } from "./trace-data";
 import { NOTE_TOOL_HINT, RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
@@ -109,6 +110,7 @@ import { DRAFT_NOTE, NO_NOTE_WRITES, useNotes, type NoteMover, type NoteWrites }
 const nodeTypes = { card: CardNode, block: BlockNode, req: RequirementCardNode };
 const NO_REQ_CARDS: RequirementCardData[] = [];
 const NO_BLOCK_NODES: BlockNodeT[] = [];
+const NO_TRACES: TraceData[] = [];
 const NO_DIAGNOSIS: Diagnosis = {};
 const NO_FRAMES: FrameData[] = [];
 const NO_CONCEPTS: Record<string, string> = {};
@@ -1241,6 +1243,25 @@ export function ModelCanvas({
   // per set of cards; a card's data changes only when its marker does, so no other card draws again.
   const requirementIndex = useRequirementIndex(fadeData);
   const cardTargets = nodes.map((n) => `${n.id}|${n.data.card.kind}|${n.data.card.targetId}`).join(",");
+  // ---- trace lines (slice 4b-2, items 8–11): which elements each requirement card's links reach on this canvas; once per
+  // set of cards and data version, not per move (the line layer works out where they run) ----
+  const reqCardsKey = reqNodes.map((n) => `${n.id}|${n.data.card.requirementId}`).join(",");
+  const fadeModel = fadeData?.model;
+  const allMappings = allLines.mappings;
+  const traces = useMemo((): TraceData[] => {
+    if (!requirementIndex || !reqCardsKey || !fadeModel) return NO_TRACES;
+    const cardIdOf = new Map(cardTargets.split(",").filter(Boolean).map((t) => { const [id, kind, targetId] = t.split("|") as [string, string, string]; return [`${kind}:${targetId}`, id] as const; }));
+    const entityOf = new Map(fadeModel.attributes.map((a) => [a.id, a.entity_id]));
+    const tableOf = new Map(fadeModel.sourceColumns.map((c) => [c.id, c.source_table_id]));
+    const mappingIds = new Set(allMappings.map((m) => m.id));
+    const cards = reqCardsKey.split(",").map((t) => { const [id, requirementId] = t.split("|") as [string, string]; return { id, requirementId }; });
+    return buildTraces(cards, requirementIndex.linksOf, {
+      cardOf: (kind, targetId) => cardIdOf.get(`${kind}:${targetId}`),
+      entityOf: (id) => entityOf.get(id),
+      tableOf: (id) => tableOf.get(id),
+      hasMapping: (id) => mappingIds.has(id),
+    });
+  }, [requirementIndex, reqCardsKey, cardTargets, fadeModel, allMappings]);
   const reqMarks = useMemo(
     () =>
       requirementMarks(
@@ -1757,6 +1778,8 @@ export function ModelCanvas({
               related={bundleRelated ?? related}
               onSelect={select}
               tethers={tethers}
+              // trace lines only in “Everything” (item 10)
+              traces={layer === "all" && !diagnosis.noLines ? traces : NO_TRACES}
             />
           )}
           <NoteLayer

@@ -5,7 +5,8 @@
 import type { InternalNode } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import type { CanvasLayer } from "@/domain/types";
-import { cardRect, curve, fNode, relGeom, rowEnd, type End, type Placed, type Pt, type Rect } from "./geometry";
+import { BLOCK } from "@/domain/model/frames";
+import { cardRect, cardWidth, clamp, curve, fNode, HEAD_H, relGeom, rowEnd, type End, type Placed, type Pt, type Rect } from "./geometry";
 import type { CanvasLines, MapLineData, RelLineData } from "./line-data";
 
 export const placedOf = (n: InternalNode | undefined): Placed | null =>
@@ -19,6 +20,8 @@ export interface MapGeom {
   part: boolean;
   /** Where the tag of a labeled mapping goes: a quarter along the (first input's) curve (slice 3a). */
   tag: { x: number; y: number };
+  /** The line's middle, where a requirement's trace line ends (slice 4b-2): its curve's middle, or the ƒ node. */
+  mid: Pt;
 }
 
 export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): MapGeom | null {
@@ -41,6 +44,7 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
       chip: { x: f.node.x, y: f.node.y, text: "ƒ" },
       part,
       tag: curves[0]!.q,
+      mid: f.node,
     };
   }
   const g = curve(inputs[0]!, attr);
@@ -54,6 +58,7 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
     chip: text ? { x: g.mid.x, y: g.mid.y, text } : null,
     part,
     tag: g.q,
+    mid: g.mid,
   };
 }
 
@@ -202,8 +207,53 @@ export function bundleGeom(
         chip: text ? { x: g.mid.x, y: g.mid.y, text } : null,
         part: a.hidden || z.hidden,
         tag: g.q,
+        mid: g.mid,
       },
     };
   }
   return { kind: "map", d: g.d, mid: g.mid, count: n, width: bundleWidth(n), ...bundleLook(b, maps) };
+}
+
+// ---- trace lines (slice 4b-2, PRD items 8–9; prototype reqTraces) ----
+
+/** Where a trace line meets an element: the side of its rectangle nearer to the requirement card. */
+export const nearerSide = (from: Rect, to: Rect): number => (from.x + from.w / 2 < to.x + to.w / 2 ? to.x : to.x + to.w);
+
+/** The point of a rectangle nearest to a point (a trace line starts there on the requirement card; prototype clamp). */
+export const nearestOn = (r: Rect, p: Pt): Pt => ({ x: clamp(p.x, r.x, r.x + r.w), y: clamp(p.y, r.y, r.y + r.h) });
+
+/** The height of a member's row in a collapsed frame's block; past the sixth member, the “and N more” row. */
+export const blockRowY = (block: Pick<Rect, "y">, index: number): number => block.y + HEAD_H + BLOCK.bodyPad + (Math.min(index, BLOCK.maxRows) + 0.5) * BLOCK.rowHeight;
+
+/** Where an element's card is for a trace line: drawn (placed), or hidden in a collapsed frame (its block and its row). */
+export type TraceCardPlace = { placed: Placed } | { block: Rect; index: number } | null;
+
+/**
+ * A trace line's two ends, from data (AD-24 rule 2): to an entity or table at the nearer side of its card at the
+ * header's middle; to an attribute or column at its row (a hidden row: the header's middle, as mapping lines do); to a
+ * mapping at its line's middle (`mapMid`); a card hidden in a collapsed frame at its member row in the block. It starts
+ * at the requirement card's point nearest to that end. Null when either end is not on the canvas.
+ */
+export function traceGeom(
+  req: Rect | null,
+  target: { t: "card"; cardId: string } | { t: "row"; cardId: string; rowId: string } | { t: "map"; mappingId: string },
+  placeOf: (cardId: string) => TraceCardPlace,
+  mapMid: (mappingId: string) => Pt | null,
+): { x1: number; y1: number; x2: number; y2: number } | null {
+  if (!req) return null;
+  let end: Pt | null = null;
+  if (target.t === "map") end = mapMid(target.mappingId);
+  else {
+    const place = placeOf(target.cardId);
+    if (!place) return null;
+    if ("block" in place) end = { x: nearerSide(req, place.block), y: blockRowY(place.block, place.index) };
+    else {
+      const p = place.placed;
+      const r = { x: p.x, y: p.y, w: cardWidth(p.card), h: 0 };
+      end = { x: nearerSide(req, r), y: target.t === "row" ? rowEnd(p, target.rowId).y : p.y + HEAD_H / 2 };
+    }
+  }
+  if (!end) return null;
+  const start = nearestOn(req, end);
+  return { x1: start.x, y1: start.y, x2: end.x, y2: end.y };
 }

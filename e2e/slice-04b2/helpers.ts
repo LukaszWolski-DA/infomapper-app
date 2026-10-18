@@ -3,6 +3,7 @@
 
 import type { Page } from "@playwright/test";
 import { placeRequirementCards } from "../../src/domain/commands/canvas-item";
+import { linkRequirement } from "../../src/domain/commands/requirement";
 import { asLukasz, loadRequirementCards, loadRequirements, RETAIL, SEED_IDS, store } from "../slice-04b1/helpers";
 
 export * from "../slice-04b1/helpers";
@@ -30,3 +31,25 @@ export async function reqCardData(key: string, canvasId: string = SEED_IDS.canva
   const r = (await loadRequirements()).find((x) => x.key === key)!;
   return (await loadRequirementCards(RETAIL, canvasId)).find((i) => i.requirement_id === r.id);
 }
+
+/** Test data: a requirement linked to an element by Łukasz through the domain. */
+export async function linkReq(key: string, target: { kind: "entity" | "attribute" | "mapping" | "source_table" | "source_column"; id: string }): Promise<void> {
+  const [requirements, links, model] = await Promise.all([loadRequirements(), store().requirements.listLinks(RETAIL), store().model.load(RETAIL)]);
+  const requirement = requirements.find((r) => r.key === key)!;
+  await asLukasz((ctx, access) => linkRequirement(ctx, access, { requirement, links, ...model }, { requirementId: requirement.id, target }));
+}
+
+/** A trace line's two ends on the screen (its path's start and end). */
+export const traceEnds = (line: import("@playwright/test").Locator) =>
+  line.evaluate((p) => {
+    const path = p as SVGPathElement;
+    const m = path.getScreenCTM()!;
+    const at = (q: DOMPoint) => ({ x: q.x * m.a + q.y * m.c + m.e, y: q.x * m.b + q.y * m.d + m.f });
+    return { start: at(path.getPointAtLength(0)), end: at(path.getPointAtLength(path.getTotalLength())) };
+  });
+
+/** A requirement card's trace lines on the page. */
+export const tracesOfCard = async (page: Page, key: string) => {
+  const id = await reqCard(page, key).getAttribute("data-card");
+  return page.locator(`[data-testid="line-trace"][data-trace^="${id}|"]`);
+};

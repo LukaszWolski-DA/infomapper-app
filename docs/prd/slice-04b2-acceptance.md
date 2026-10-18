@@ -25,6 +25,17 @@ those. Its own children are what it would overlap. That is a reason to expect an
 the overlay before the veil has a layer of its own, and 4b-1's step 6 read found the coverage SVG with one (2–8 Mpx)
 without a veil. So the read before step 6 first asks why that SVG had a layer; without an answer, T3 is dropped.
 
+## Łukasz's answers after step 2 (18 October 2026)
+
+- **Step 2 accepted.**
+- **1.** REQ-104's card stays at (1176, 1136).
+- **2.** The layer result is accepted for step 2. In the closing sitting S4B2-15 also reports the cost of cards laid over
+  frames at 30 % (layers and presented fps), and whether item 15's placement can ever put a card over a frame.
+- **3.** D-41 and the data-model text: quoted in full in the next report, approved there; not applied until then.
+- **4.** The e2e runs grew from about 27 to 32 min with two new tests: before step 3, find out why (per-file durations
+  against `slice-04b1`, the ten files that grew most, the app or the tests). No fix without Łukasz's OK.
+- **Then step 3** (trace lines), stopping after it.
+
 ## Step 2: the card (18 October 2026)
 
 Items 1–7, 13 and 25, with the answers G, H, I, J, L and N where they touch the card.

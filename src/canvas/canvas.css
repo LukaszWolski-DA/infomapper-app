@@ -206,6 +206,12 @@
 .im-canvas .dimmed .lnk:not(.hl) .chip circle,
 .im-canvas .dimmed .lnk:not(.hl) .rlab rect { stroke-opacity: .12; fill-opacity: .12 }
 .im-canvas .dimmed .lnk:not(.hl) .chip text { fill-opacity: .12 }
+/* trace lines (slice 4b-2, prototype .trace-rq): dashed, in the requirement violet, an end dot at 40 % and above; not
+   selectable. On a selection they fade with the other lines (prototype .dimmed-rq), never on a hover (C-10, B) */
+.im-canvas .trace { fill: none; stroke: var(--im-req); stroke-width: 1.3; stroke-dasharray: 6 3; pointer-events: none }
+.im-canvas .trace-dot { fill: var(--im-req); pointer-events: none }
+.im-canvas .dimmed .trace { stroke-opacity: .15 }
+.im-canvas .dimmed .trace-dot { fill-opacity: .15 }
 
 /* ---------- selection and dragging (prototype .card.sel, .row.sel, .c-head cursor) ---------- */
 .im-canvas .card.sel { box-shadow: 0 0 0 2px var(--im-logical), 0 10px 24px -12px var(--im-shadow) }
