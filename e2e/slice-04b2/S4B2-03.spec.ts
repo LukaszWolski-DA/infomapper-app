@@ -19,6 +19,9 @@ import {
   openCanvas,
   pointOnLine,
   reqCard,
+  RETAIL,
+  SEED_IDS,
+  store,
   requirementByKey,
   signInAs,
   traceEnds,
@@ -103,6 +106,8 @@ test("S4B2-03: trace lines to cards, rows and mapping middles, none off the canv
   await expect(page.getByTestId("line-trace")).toHaveCount(0);
   await layerButton(page, "all").click();
   await expect(await tracesOfCard(page, "REQ-104")).toHaveCount(8);
+  // the layer is saved per canvas (S2A-11): wait for “all” in the data before the page is opened again below
+  await expect.poll(async () => (await store().canvases.get(RETAIL, SEED_IDS.canvasCustomerOrders))!.look.layer).toBe("all");
 
   // a collapsed frame around Sales Order and Order Line: their lines end at their rows in the block
   const frameId = await collapsedFrame(AROUND.sales);
