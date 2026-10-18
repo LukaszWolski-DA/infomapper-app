@@ -86,6 +86,9 @@ test("S3A-09: a card's header shows its pinned notes; card and frame panels list
   await expect(links.filter({ hasText: DEMO_NOTES.pinned })).toContainText("order_line");
   await expect(links.filter({ hasText: DEMO_NOTES.resolved })).toHaveCount(0);
   const undo = page.getByTestId("button-undo");
+  // the collapse and the expand above are undo steps saved in the background: wait for them, so a slow run does not
+  // read Undo before they land (slice 4b-2, step 4)
+  await expect(undo).toBeEnabled();
   const undoBefore = await undo.isEnabled();
   const show = page.getByTestId("checkbox-show-resolved");
   await expect(show).toBeChecked();
