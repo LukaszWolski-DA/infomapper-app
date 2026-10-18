@@ -25,6 +25,14 @@ those. Its own children are what it would overlap. That is a reason to expect an
 the overlay before the veil has a layer of its own, and 4b-1's step 6 read found the coverage SVG with one (2–8 Mpx)
 without a veil. So the read before step 6 first asks why that SVG had a layer; without an answer, T3 is dropped.
 
+## Łukasz's answers after step 3 (18 October 2026)
+
+- **Step 3 accepted.**
+- **4.** The e2e timing is the laptop, not the branch: no fix and no extra run.
+- **D-41 and the data-model text approved as written:** applied in step 4 (`docs/decisions.md` D-41,
+  `docs/data-model-v2.md` under `canvas_item`).
+- **Then step 4** (placing from element panels, items 14–16), stopping after it.
+
 ## Step 3: trace lines (18 October 2026)
 
 Items 8–12. Before it, answer 4: why the e2e runs grew.
