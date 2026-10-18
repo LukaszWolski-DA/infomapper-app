@@ -1,19 +1,19 @@
 "use client";
 
-// Fading on the canvas (slice 4p): what a request (`fade.ts`) lights on this canvas (the domain's `focusLit` / `lensLit`,
-// or a lit set given directly, mapped onto cards, blocks, notes, rows and lines), and the lens's row colours drawn in the
-// overlay above the cards. The veil and the lifting are `FadeLayer.tsx`'s.
+// Fading on the canvas (slice 4p; slice 4b-1): what a request (`fade.ts`) lights on this canvas (the domain's `focusLit`
+// / `requirementFocusLit`, or a lit set given directly, mapped onto cards, blocks, notes, rows and lines), and rows tinted
+// covered or gap in the overlay above the cards (`LitRows`). The veil is `FadeLayer.tsx`'s.
 
 import { memo, useMemo } from "react";
 import { useStore, type InternalNode } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
-import { focusLit, lensLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
+import { requirementFocusLit, targetLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import type { ScopeModel } from "@/domain/model/requirements";
 import type { Requirement, RequirementLink } from "@/domain/types";
 import type { BlockNodeT } from "./BlockNode";
 import type { CardNodeT } from "./CardNode";
-import { fadeKey, useFadeRequest } from "./fade";
+import { fadeKey, focusTarget, useFadeRequest } from "./fade";
 import { cardWidth, LOD_ZOOM, ROW_H, rowEnd, type Rect } from "./geometry";
 
 /** What the canvas needs to work out a lit set: the live model and the requirements (the page has them). */
@@ -33,15 +33,26 @@ export interface FadeNote {
 /** The request asked for now, its key, and what it lights in the model; null with fading off. */
 export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | null {
   const request = useFadeRequest();
+  const index = useRequirementIndex(data);
   return useMemo(() => {
     if (!request) return null;
     if ("lit" in request) return { key: fadeKey(request), lit: request.lit };
     if (!data) return null;
-    if ("focus" in request) return { key: fadeKey(request), lit: focusLit(data.model, request.focus) };
-    const index = buildRequirementIndex([...data.requirements], [...data.requirementLinks], data.model);
-    if (!index.byId.has(request.lens)) return null;
-    return { key: fadeKey(request), lit: lensLit(data.model, index.scope(request.lens), index.coverage(request.lens)) };
-  }, [request, data]);
+    const target = focusTarget(request.focus);
+    if (target.t !== "requirement") return { key: fadeKey(request), lit: targetLit(data.model, target) };
+    if (!index?.byId.has(target.id)) return null;
+    return { key: fadeKey(request), lit: requirementFocusLit(data.model, index.scope(target.id)) };
+  }, [request, data, index]);
+}
+
+/**
+ * The canvas's requirement index (slice 4b-1, step 4): built once per data version (the page's model, requirements and
+ * links), not per Focus request. The inspector builds its own from the same data; the canvas cannot read the app
+ * layer's context (AD-19).
+ */
+export function useRequirementIndex(data: FadeData | undefined) {
+  const model = data?.model, requirements = data?.requirements, links = data?.requirementLinks;
+  return useMemo(() => (model && requirements && links ? buildRequirementIndex([...requirements], [...links], model) : null), [model, requirements, links]);
 }
 
 type AnyNode = InternalNode;
@@ -75,8 +86,15 @@ export function litNodeIds(lookup: Map<string, AnyNode>, lit: Lit): Set<string> 
 /** A node's rectangle as React Flow measured it. */
 export const nodeRect = (n: AnyNode): Rect => ({ x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, w: n.measured.width ?? 0, h: n.measured.height ?? 0 });
 
-/** The lens's rows, tinted covered (blue) or gap (orange) above the cards (prototype `.row.rq`, `.row.gap`); none below 40 %. */
-export const LitRows = memo(function LitRows({ rows }: { rows: ReadonlyMap<Uuid, LitRowColour> }) {
+/** The bar's width: inside the row's 12 px left padding (canvas.css `.row`). */
+const ROW_BAR = 4;
+
+/**
+ * Rows marked covered (blue) or gap (orange) above the cards (prototype `.row.rq`, `.row.gap`); none below 40 %. The
+ * overlay lies above the text, so each row gets a faint fill that keeps its text at 4.5:1 (canvas.css) and a bar in the
+ * full colour in the row's left padding, where no text is.
+ */
+export const LitRows = memo(function LitRows({ rows, testId = "lit-row" }: { rows: ReadonlyMap<Uuid, LitRowColour>; testId?: string }) {
   useStore((s) => s.nodes); // follow drags, collapses and widths
   const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
   const lookup = useStore((s) => s.nodeLookup);
@@ -95,9 +113,12 @@ export const LitRows = memo(function LitRows({ rows }: { rows: ReadonlyMap<Uuid,
   }
   if (!marks.length) return null;
   return (
-    <svg className="hover-layer lit-rows" width={1} height={1} data-testid="layer-lit-rows">
+    <svg className="hover-layer lit-rows" width={1} height={1} data-testid={`layer-${testId}s`}>
       {marks.map((m) => (
-        <rect key={m.key} className={m.colour} data-testid={`lit-row-${m.colour}`} x={m.x} y={m.y} width={m.w} height={ROW_H} />
+        <g key={m.key} data-testid={`${testId}-${m.colour}`} data-row={m.key.split("|")[1]}>
+          <rect className={m.colour} x={m.x} y={m.y} width={m.w} height={ROW_H} />
+          <rect className={`bar ${m.colour}`} x={m.x} y={m.y} width={ROW_BAR} height={ROW_H} />
+        </g>
       ))}
     </svg>
   );

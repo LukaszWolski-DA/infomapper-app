@@ -2,6 +2,10 @@
 // frames expanded and collapsed, must equal slice 3b's (`.data/measure/s4a14-baseline/slice-03b.json`, taken on
 // `slice-03b` in step 0; another file with ELEMENTS_BASELINE). The same method as S3B-15-elements.spec.ts. Measurement
 // build only (MEASURE_BUILD=production, after `npm run measure:build`); the normal e2e run leaves this file out.
+// Slice 4b-1, step 8: each side also records the elements added on purpose since slice 3b (4p's overlay container,
+// 4b-1's requirement markers), and the comparison leaves them out on both sides, so a baseline from any slice compares
+// (files without these fields count them as 0). Without a baseline file (a reference worktree is cleaned before a
+// sitting) the counts are recorded and nothing is compared.
 import fs from "node:fs";
 import path from "node:path";
 import { LARGE_IDS } from "../../src/data/local/seed-large";
@@ -20,8 +24,6 @@ test.use({
 
 const OUT = path.resolve("test-results", "S4A-14-elements.json");
 const BASELINE = process.env.ELEMENTS_BASELINE ?? path.resolve(".data", "measure", "s4a14-baseline", "slice-03b.json");
-/** Slice 4p: the overlay container (trial A) on top of slice 3b's counts. */
-const OVERLAY_CONTAINER = 1;
 
 test("S4A-14 (elements): the viewport of “Performance test” has as many elements as on slice-03b, at 100 % and 30 %, frames expanded and collapsed", async ({ page }) => {
   test.setTimeout(240_000);
@@ -29,7 +31,7 @@ test("S4A-14 (elements): the viewport of “Performance test” has as many elem
   await signInAs(page, "Łukasz");
   const src57 = generate().cards.find((c) => c.id === "src:57")!;
   const views = { "100": 1, "30": 0.3 } as const;
-  const counts: Record<string, { page: number; viewport: number }> = {};
+  const counts: Record<string, { page: number; viewport: number; overlay?: number; markers?: number }> = {};
   for (const frames of ["expanded", "collapsed"] as const) {
     for (const [name, zoom] of Object.entries(views)) {
       await page.goto("/sign-in");
@@ -42,16 +44,23 @@ test("S4A-14 (elements): the viewport of “Performance test” has as many elem
       counts[`${name} %, ${frames}`] = await page.evaluate(() => ({
         page: document.querySelectorAll("*").length,
         viewport: document.querySelectorAll(".react-flow__viewport *").length,
+        // added on purpose: 4p's overlay container (empty while nothing is hovered, selected or lassoed) and 4b-1's
+        // requirement markers (one element each)
+        overlay: document.querySelectorAll(".react-flow__viewport .overlay-layer").length,
+        markers: document.querySelectorAll(".react-flow__viewport .rmark").length,
       }));
     }
   }
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
   fs.writeFileSync(OUT, JSON.stringify(counts, null, 2));
   console.log("S4A-14 elements " + JSON.stringify(counts));
-  // the viewport, as S3B-15 (a): the whole page also counts the panels and the tab bar
+  if (!fs.existsSync(BASELINE)) {
+    test.info().annotations.push({ type: "no baseline", description: `${BASELINE} does not exist: counts recorded in ${OUT}, nothing compared` });
+    return;
+  }
+  // the viewport, as S3B-15 (a): the whole page also counts the panels and the tab bar; without the elements added on
+  // purpose since slice 3b (the overlay's container, slice 4p, Łukasz after its step 1; the markers, slice 4b-1)
   const before = JSON.parse(fs.readFileSync(BASELINE, "utf8")) as typeof counts;
-  const viewport = (c: typeof counts, plus = 0) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.viewport + plus]));
-  // slice 4p (trial A, adopted): the overlay's container is one more element in the viewport in every view, empty while
-  // nothing is hovered, selected or lassoed (Łukasz after step 1)
-  expect(viewport(counts)).toEqual(viewport(before, OVERLAY_CONTAINER));
+  const core = (c: typeof counts) => Object.fromEntries(Object.entries(c).map(([k, v]) => [k, v.viewport - (v.overlay ?? 0) - (v.markers ?? 0)]));
+  expect(core(counts)).toEqual(core(before));
 });

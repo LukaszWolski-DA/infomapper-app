@@ -4,7 +4,7 @@
 // the measurement-only build). Renders nothing.
 //
 //   window.__imFade({ focus: "<entity id>" })     Focus on an entity
-//   window.__imFade({ lens: "<requirement id>" }) the lens of a requirement
+//   window.__imFade({ focus: { t: "requirement", id: "<requirement id>" } })   Focus on a requirement (slice 4b-1)
 //   window.__imFade(null)                         no fading
 //   window.__imIndexTiming("page" | "synthetic")  times 30 builds of the requirement index in the browser, on the page's
 //                                                 data or on slice 4a's synthetic model (item 10); resolves to the figures

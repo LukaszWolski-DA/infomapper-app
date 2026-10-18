@@ -84,6 +84,11 @@ lights the scope up with the lens. A candidate for slice 4b, once the lens exist
 
 ## Entity-level requirements: scope, coverage and panels (slice 4a, manual acceptance)
 
+**Resolved in slice 4b-1** ([PRD](prd/slice-04b1-coverage-focus.md), items 9–12; D-31 and D-34 changed): a link to an
+entity is one item, covered when any of its attributes has an approved, type-correct mapping (close to option B,
+without the business key); attribute panels have no “via entity”. Option C stays an idea (“Coverage by hierarchy”,
+below). The text below is kept as it was written.
+
 To decide with slice 4b. Łukasz's rule for the panels: an entity's panel shows all requirements (its own and its
 attributes'); an attribute's panel shows only the attribute's own requirements, with no “via entity” rows. That changes
 D-34 for attributes (today an attribute also lists its entity's requirements “via entity”, prototype `reqsFor`).
@@ -98,3 +103,22 @@ requirement's gaps would name attributes whose panels do not show that requireme
 - **C.** Coverage by kind, e.g. a business need is covered when its parts (the requirements below it) are covered.
 
 Changing it changes D-31 and D-34 (`docs/decisions.md`, with Łukasz).
+
+## Palette contrast to WCAG AA (slice 4b-1, step 6)
+
+The grey text (`--im-ink-3`, 3.6:1 on white), the PII tag (4.4:1) and the BK tag (4.1:1) are below WCAG AA's 4.5:1 on a
+plain card (`docs/known-limitations.md`, Text contrast). A candidate for the ergonomics slice: darker values for these
+three, checked in both colour schemes, with the prototype's look kept as far as possible (Łukasz after step 6).
+
+## Coverage by hierarchy (slice 4b-1, step 8)
+
+A requirement with parts (“Broken down into REQ-102”) could be covered when its parts are covered, instead of (or as
+well as) through its own links: e.g. a business need covered when its data requirements are. Today a requirement's
+coverage counts only its own items (D-31). Option C of the entity-level idea above; changes D-31.
+
+## “Link all attributes” in an entity panel (slice 4b-1, step 8)
+
+Since slice 4b-1 a link to an entity is one item, not its attributes (D-31). An entity panel's Requirements section
+could offer “Link all attributes” to link a requirement to each of the entity's attributes in one step (one undo step),
+for requirements that need every attribute sourced.
+

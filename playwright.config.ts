@@ -5,11 +5,12 @@ const baseURL = E2E_BASE;
 
 export default defineConfig({
   testDir: "e2e",
-  // element counts, the live canvas's pan and zoom (S3B-15 a, c) and the fading scenarios (slice 4p) only mean something
+  // element counts, the live canvas's pan and zoom (S3B-15 a, c), the fading scenarios (slice 4p) and slice 4b-1's
+  // measurements to the screen (S4B1-09) only mean something
   // in the measurement build
   // and the S4P-04 screenshots (slice 4p) run only when asked with SCREENS=1
   testIgnore: [
-    ...(E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts", "**/S4P-fading.spec.ts", "**/S4P-10-c08.spec.ts", "**/S4P-11-index.spec.ts"]),
+    ...(E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts", "**/S4P-fading.spec.ts", "**/S4P-10-c08.spec.ts", "**/S4P-11-index.spec.ts", "**/S4B1-09.spec.ts"]),
     ...(process.env.SCREENS ? [] : ["**/*-screens.spec.ts"]),
   ],
   // The dev server compiles pages on first use, which can take a while.

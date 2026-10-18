@@ -69,7 +69,8 @@ describe("demo requirements (PRD item 15)", () => {
         return [r.key, `${c.covered.length} / ${c.total}`, c.notApproved.map(name), c.notMapped.map(name), c.done];
       });
     expect(figures).toEqual([
-      ["REQ-101", "5 / 8", ["birth_date", "created_at"], ["segment_code"], false],
+      // an entity link: one item, covered because Customer has covered attributes (slice 4b-1; 4a: 5 / 8)
+      ["REQ-101", "1 / 1", [], [], true],
       ["REQ-102", "3 / 3", [], [], true],
       ["REQ-103", "1 / 1", [], [], true],
       ["REQ-104", "1 / 4", [], ["quantity", "unit_price", "discount_pct"], false],

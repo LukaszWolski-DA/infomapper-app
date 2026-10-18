@@ -77,6 +77,8 @@ const eslintConfig = defineConfig([
     "docs/**",
     "playwright-report/**",
     "test-results/**",
+    // local data, measurements and their scratch scripts (git-ignored, AD-29)
+    ".data/**",
   ]),
 ]);
 
