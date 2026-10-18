@@ -52,7 +52,9 @@ import { withClips, type CardData } from "./card-data";
 import CardNode, { cardNodesOf, filtersOf, type CardNodeT } from "./CardNode";
 import BlockNode, { blockNodeId, type BlockNodeT } from "./BlockNode";
 import RequirementCardNode, { reqNodesOf, type ReqNodeT } from "./RequirementCardNode";
-import { REQ_CARD, requirementCardHeight, type RequirementCardData } from "./requirement-card-data";
+import { REQ_CARD, requirementCardHeight, requirementCardHeightOf, type RequirementCardData } from "./requirement-card-data";
+import { requirementCardSpots } from "@/domain/model/requirement-placement";
+import type { TraceTarget } from "@/domain/model/requirements";
 import { buildTraces, type TraceData } from "./trace-data";
 import { NOTE_TOOL_HINT, RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
@@ -75,7 +77,7 @@ import SelectionOverlay from "./SelectionOverlay";
 import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, reqKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
-import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis, type NoteListItem } from "./context";
+import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, REQ_CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis, type NoteListItem } from "./context";
 import {
   besideAnchor,
   besideSpots,
@@ -90,8 +92,10 @@ import {
   MIN_ZOOM,
   newCardHeight,
   HEAD_H,
+  rowEnd,
   snap8,
   stackSpot,
+  type Placed,
   type Rect,
 } from "./geometry";
 import { relatedLines, type CanvasLines, type Selection } from "./line-data";
@@ -100,7 +104,7 @@ import { viewKey } from "./views";
 import LineLayer, { HoverLines } from "./LineLayer";
 import { OverlayLayer } from "./OverlayLayer";
 import { createValueStore } from "./value-store";
-import { bundleLines, type Bundle } from "./line-geometry";
+import { bundleLines, mapGeom, type Bundle } from "./line-geometry";
 import { Overview, type MiniNote } from "./Overview";
 import NoteLayer, { type ShownNote } from "./NoteLayer";
 import { grownVersions, mergeFresh } from "./fresh";
@@ -1262,6 +1266,76 @@ export function ModelCanvas({
       hasMapping: (id) => mappingIds.has(id),
     });
   }, [requirementIndex, reqCardsKey, cardTargets, fadeModel, allMappings]);
+
+  // ---- requirement cards next to an element (slice 4b-2, items 14–16; prototype elemAnchor, placeReqCards) ----
+  /** Where an element is for placing its requirements' cards beside it: its card (its block when in a collapsed frame),
+   * its row (from 20 px above it), or a 20 × 40 box around its mapping's middle; null when it is not on the canvas. */
+  const elementAnchor = useCallback(
+    (target: TraceTarget): Rect | null => {
+      const cardPlace = (kind: "ent" | "src", id: string): { rect: Rect; placed: Placed | null } | null => {
+        const n = cardNodesOf(rf).find((c) => c.data.card.kind === kind && c.data.card.targetId === id);
+        if (!n) return null;
+        const block = n.data.card.frameId ? frameRectsNow().find(({ f }) => f.collapsed && f.id === n.data.card.frameId)?.r : undefined;
+        if (block) return { rect: block, placed: null };
+        return { rect: { x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) }, placed: { x: n.position.x, y: n.position.y, card: n.data.card } };
+      };
+      if (target.kind === "entity" || target.kind === "source_table") return cardPlace(target.kind === "entity" ? "ent" : "src", target.id)?.rect ?? null;
+      if (target.kind === "attribute" || target.kind === "source_column") {
+        const owner = target.kind === "attribute" ? fadeModel?.attributes.find((a) => a.id === target.id)?.entity_id : fadeModel?.sourceColumns.find((c) => c.id === target.id)?.source_table_id;
+        const c = owner ? cardPlace(target.kind === "attribute" ? "ent" : "src", owner) : null;
+        if (!c) return null;
+        if (!c.placed) return c.rect;
+        return { x: c.rect.x, y: rowEnd(c.placed, target.id).y - 20, w: c.rect.w, h: 40 };
+      }
+      const l = allMappings.find((m) => m.id === target.id);
+      const g = l ? mapGeom(l, storeApi.getState().nodeLookup) : null;
+      return g ? { x: g.mid.x - 10, y: g.mid.y - 20, w: 20, h: 40 } : null;
+    },
+    [rf, frameRectsNow, fadeModel, allMappings, storeApi],
+  );
+  /** “Place card”, “Add all to this canvas” (item 15): beside the element, each in the first free place going down; the
+   * view fits them when one falls outside it; one card placed is selected. Cards already here are skipped. */
+  const placeRequirementCardsBeside = useCallback(
+    async (requirementIds: readonly string[], target: TraceTarget) => {
+      if (!editable || !requirementIndex) return;
+      const missing = requirementIds.filter((id, i) => requirementIds.indexOf(id) === i && !reqNodeOf(id) && requirementIndex.byId.has(id));
+      if (!missing.length) return;
+      const anchor = elementAnchor(target);
+      const heights = missing.map((id) => requirementCardHeightOf(requirementIndex.byId.get(id)!.name));
+      const spots = requirementCardSpots(anchor, viewRect(), heights, occupied());
+      const ids = await placeReqCards(missing.map((id, i) => ({ requirementId: id, ...spots[i]! })));
+      if (!ids) return;
+      if (ids.length === 1) select({ t: "req", id: missing[0]! });
+      const placed = spots.map((s, i) => ({ ...s, w: REQ_CARD.width, h: heights[i]! }));
+      if (placed.some((r) => !inside(viewRect(), r))) {
+        const all = anchor ? [anchor, ...placed] : placed;
+        const x0 = Math.min(...all.map((r) => r.x)), y0 = Math.min(...all.map((r) => r.y));
+        const x1 = Math.max(...all.map((r) => r.x + r.w)), y1 = Math.max(...all.map((r) => r.y + r.h));
+        void rf.fitBounds({ x: x0 - 40, y: y0 - 40, width: x1 - x0 + 80, height: y1 - y0 + 80 }, { duration: 250, padding: 0 });
+      }
+      const n = ids.length;
+      toast(`Placed ${n} requirement card${n === 1 ? "" : "s"} on this canvas.`);
+    },
+    [editable, requirementIndex, reqNodeOf, elementAnchor, viewRect, occupied, placeReqCards, select, rf, toast],
+  );
+  /** A requirement's card already here (the row's “Place card”): selected and brought into view (prototype showReqCard). */
+  const showRequirementCard = useCallback(
+    (requirementId: string) => {
+      const n = reqNodeOf(requirementId);
+      if (!n) return;
+      select({ t: "req", id: requirementId });
+      void rf.fitBounds({ x: n.position.x - 200, y: n.position.y - 150, width: 630, height: 400 }, { duration: 250, padding: 0 });
+    },
+    [reqNodeOf, select, rf],
+  );
+  /** “Add to this canvas” on an entity or table panel without its card (item 16): the view's centre, upper third. */
+  const addToCanvas = useCallback(
+    (target: CardTarget, rows: number) => {
+      const v = viewRect();
+      void placeAt(target, { x: snap8(v.x + v.w / 2 - CARD_W / 2), y: snap8(v.y + v.h / 3) }, newCardHeight(rows), false);
+    },
+    [viewRect, placeAt],
+  );
   const reqMarks = useMemo(
     () =>
       requirementMarks(
@@ -1553,6 +1627,9 @@ export function ModelCanvas({
       },
       placeRequirementCard,
       removeRequirementCard,
+      placeRequirementCardsBeside: (ids, target) => void placeRequirementCardsBeside(ids, target),
+      showRequirementCard,
+      addToCanvas,
       showNote: (id) => {
         select({ t: "note", id });
         const r = noteBoxesRef.current.find((b) => b.id === id)?.rect;
@@ -1575,17 +1652,40 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, fit, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
-    if (!e.dataTransfer.types.includes(CARD_DRAG_TYPE)) return;
+    if (!e.dataTransfer.types.includes(CARD_DRAG_TYPE) && !(editable && e.dataTransfer.types.includes(REQ_CARD_DRAG_TYPE))) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
-  }, []);
+  }, [editable]);
 
   const onDrop = useCallback(
     (e: DragEvent) => {
+      // a requirement row from an element panel (item 14): its card where it is dropped, never a link; a card already
+      // here moves there (M)
+      const req = editable ? e.dataTransfer.getData(REQ_CARD_DRAG_TYPE) : "";
+      if (req) {
+        e.preventDefault();
+        let r: { requirementId: string; key: string };
+        try {
+          r = JSON.parse(req) as { requirementId: string; key: string };
+        } catch {
+          return;
+        }
+        const at = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        const spot = { x: snap8(at.x - REQ_CARD.width / 2), y: snap8(at.y - 30) };
+        const here = reqNodeOf(r.requirementId);
+        select({ t: "req", id: r.requirementId });
+        if (here) {
+          saveLayout({ cards: [{ id: here.id, ...spot }] });
+          toast(`Moved ${r.key}'s card.`);
+        } else {
+          void placeReqCards([{ requirementId: r.requirementId, ...spot }]).then((ids) => ids && toast(`Placed ${r.key} on this canvas.`));
+        }
+        return;
+      }
       const raw = e.dataTransfer.getData(CARD_DRAG_TYPE);
       if (!raw) return;
       e.preventDefault();
@@ -1598,7 +1698,7 @@ export function ModelCanvas({
       const at = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
       void placeAt(data.target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(data.rows), false, { name: data.name ?? "The card" });
     },
-    [rf, placeAt],
+    [rf, placeAt, editable, reqNodeOf, select, saveLayout, toast, placeReqCards],
   );
 
   const cardsApi = useMemo<CanvasCardsApi>(

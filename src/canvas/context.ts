@@ -2,6 +2,7 @@
 
 import { createContext, type PointerEvent as ReactPointerEvent } from "react";
 import type { Uuid } from "@/domain/ids";
+import type { TraceTarget } from "@/domain/model/requirements";
 import type { ArrangeMode } from "./arrange";
 import type { FrameData, FrameStats } from "./frame-data";
 import type { NoteData } from "./note-data";
@@ -167,6 +168,12 @@ export interface CanvasHandle {
   placeRequirementCard: (requirementId: Uuid) => void;
   /** “Remove its card from this canvas” (item 7): the requirement stays; `deselect` clears the selection after. */
   removeRequirementCard: (requirementId: Uuid, options?: { deselect?: boolean }) => void;
+  /** “Place card”, “Add all to this canvas” (slice 4b-2, items 14–15): requirements' cards beside an element. */
+  placeRequirementCardsBeside: (requirementIds: readonly Uuid[], target: TraceTarget) => void;
+  /** A requirement's card already here: selected and brought into view. */
+  showRequirementCard: (requirementId: Uuid) => void;
+  /** “Add to this canvas” on an entity or table panel without its card (item 16): the view's centre, upper third. */
+  addToCanvas: (target: CardTarget, rows: number) => void;
 }
 
 /** A note as the panels list it (the card and frame panels, the canvas overview). */
@@ -388,6 +395,9 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   requirementCard: () => null,
   placeRequirementCard: noop,
   removeRequirementCard: noop,
+  placeRequirementCardsBeside: noop,
+  showRequirementCard: noop,
+  addToCanvas: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,
@@ -405,3 +415,5 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
 
 /** Drag data of a left-panel item dropped onto the canvas: JSON `{ target: CardTarget, rows: number }`. */
 export const CARD_DRAG_TYPE = "application/x-infomapper-card";
+/** Drag data of a requirement row of an element panel (slice 4b-2, item 14): JSON `{ requirementId, key }`; it places the card. */
+export const REQ_CARD_DRAG_TYPE = "application/x-infomapper-requirement-card";

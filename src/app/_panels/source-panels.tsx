@@ -123,9 +123,14 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
 
       {p.editable && (
         <Actions>
-          {cardId && (
+          {cardId ? (
             <button type="button" className={buttonClass} onClick={() => ui.remove(cardId)} data-testid="button-remove-card">
               {p.live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas"}
+            </button>
+          ) : (
+            // slice 4b-2, item 16 (prototype add-card): where “Remove from this canvas” stands when the card is not here
+            <button type="button" className={buttonClass} onClick={() => ui.addToCanvas({ sourceTableId: t.id }, columns.length)} data-testid="button-add-card">
+              Add to this canvas
             </button>
           )}
           {columns.length ? (
