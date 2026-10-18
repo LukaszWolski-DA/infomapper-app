@@ -50,9 +50,10 @@ test("S3A-10: notes take part in the selection: click, Shift+click, lasso (not w
   await expect(page.getByTestId("panel-note")).toBeVisible();
   await expect(page.getByTestId("input-note-panel-text")).toHaveValue(new RegExp(`^${DEMO_NOTES.free}`));
 
-  // Ctrl+A: every card in no frame and the free note in no frame, not the notes pinned to order_line
+  // Ctrl+A: every card in no frame and the free note in no frame, not the notes pinned to order_line; since slice 4b-2
+  // REQ-104's requirement card (L)
   await key(page, "Control+a");
-  await expect(kinds(page)).toHaveText("3 entities, 4 tables, 1 note.");
+  await expect(kinds(page)).toHaveText("3 entities, 4 tables, 1 note, 1 requirement.");
   await expect(noteMarks(page)).toHaveCount(1);
   await key(page, "Escape");
 
@@ -108,9 +109,9 @@ test("S3A-10: notes take part in the selection: click, Shift+click, lasso (not w
   await lasso(page, { x: 980, y: 520 }, { x: 1560, y: 40 });
   await expect(page.getByTestId("panel-frame")).toBeVisible();
   await expect(noteMarks(page)).toHaveCount(0);
-  // Ctrl+A leaves a note in a frame out (the frame stands for it)
+  // Ctrl+A leaves a note in a frame out (the frame stands for it); REQ-104's card is in no frame (slice 4b-2)
   await key(page, "Control+a");
-  await expect(kinds(page)).toHaveText("3 entities, 4 tables, 1 frame.");
+  await expect(kinds(page)).toHaveText("3 entities, 4 tables, 1 frame, 1 requirement.");
   await key(page, "Escape");
 
   // Delete removes a selected note
