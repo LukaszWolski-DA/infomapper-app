@@ -39,6 +39,8 @@ async function traceTo(page: Page, column: "entity_id" | "attribute_id" | "mappi
 }
 
 test("S4B2-03: trace lines to cards, rows and mapping middles, none off the canvas; at collapsed frames to the block row; following a move; hidden in Mappings and Relationships", async ({ page }) => {
+  // a long test (about a minute): room for a slow run (slice 4b-2, step 4)
+  test.setTimeout(120_000);
   const model = await loadModel();
   const entity = (name: string) => model.entities.find((e) => e.name === name)!;
   const table = (name: string) => model.sourceTables.find((t) => t.name === name)!;

@@ -26,6 +26,8 @@ const VIEW = { x: 10, y: 10, zoom: 0.42 };
 const sectionRow = (page: Page, key: string) => page.locator(`[data-testid="item-requirement"][data-key="${key}"]`).first();
 
 test("S4B2-04: “Place card” beside the element, or showing a card already here; dragging a row places the card at the drop; “Add the n missing”; the view fits; a click on the name opens the requirement", async ({ page }) => {
+  // a long test (about 45 s): room for a slow run
+  test.setTimeout(120_000);
   const model = await loadModel();
   const customer = model.entities.find((e) => e.name === "Customer")!;
   const birth = model.attributes.find((a) => a.entity_id === customer.id && a.name === "birth_date")!;

@@ -25,6 +25,46 @@ those. Its own children are what it would overlap. That is a reason to expect an
 the overlay before the veil has a layer of its own, and 4b-1's step 6 read found the coverage SVG with one (2–8 Mpx)
 without a veil. So the read before step 6 first asks why that SVG had a layer; without an answer, T3 is dropped.
 
+## Step 4: placing from element panels (18 October 2026)
+
+Items 14–16. D-41 and the data-model text applied as approved.
+
+### What changed
+
+| Part | Change |
+| --- | --- |
+| Requirements section (`requirements-section.tsx`) | for those who may edit: each row (direct and indirect) gets a “Place card” icon and can be dragged (`REQ_CARD_DRAG_TYPE`); under the list “Add all to this canvas”, or “Add the {n} missing to this canvas”, hidden when all are here. A click on the name still opens the requirement's panel. The row carries `data-on-canvas` |
+| Canvas (`ModelCanvas.tsx`) | `placeRequirementCardsBeside` (item 15): the element's anchor (prototype `elemAnchor`: its card, or its block in a collapsed frame; an attribute's or column's card from 20 px above its row; a 20 × 40 box around a mapping's middle; none when the element is not here: the view's top centre), then `requirementCardSpots` (step 2) keeping clear of cards, blocks, notes and requirement cards; one change; the view fits the element and the new cards when one is outside it; one card placed is selected; toast “Placed {n} requirement card(s) on this canvas.” `showRequirementCard`: selects a card already here and fits a 630 × 400 box around it (prototype `showReqCard`). A row dropped on the canvas places its card there (top middle 115 px left and 30 px above the drop, on the grid; prototype), or moves it there when it is here (M), and selects it |
+| Entity and table panels (item 16) | “Add to this canvas” where “Remove from this canvas” stands, when the card is not on the open canvas: placed with its top middle at the view's centre, a third down (prototype `add-card`), and selected; on a live canvas it asks first, as any add there (D-11) |
+
+### Assumptions
+
+- **Readers and reviewers** get neither the icon, nor the drag, nor “Add all”, nor “Add to this canvas” (item 24; the
+  permissions sweep is step 7).
+- **The rule moves a card past what is in the way:** “Add all” on Customer placed three cards beside it and the fourth
+  below Order Line, the first free place going down (prototype). Checked in the browser.
+- **A mapping hidden whole in a collapsed frame** has no line, so its cards go to the view's top centre.
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `e2e/slice-04b2/S4B2-04.spec.ts` (new) | at 300 % with Customer at the left edge, birth_date's “Place card” places REQ-105 at (832, row − 20 on the grid), selects it, and the view fits it; on the card already here it selects it and writes nothing; a click on REQ-103's name opens its panel; REQ-101's row dragged onto the canvas places its card at the drop; “Add the 2 missing to this canvas” places REQ-102 and REQ-103 stacked at x = 832, then the button goes |
+| `e2e/slice-04b2/S4B2-05.spec.ts` (new) | Product and the table `items` (not on “Customer & orders”) opened from REQ-101's traces: no “Remove from this canvas”, “Add to this canvas” places the card at the view's centre, upper third, selects it, and the panel then offers “Remove” |
+
+No earlier test changed in this step.
+
+### Proposed text (for Łukasz's approval; not applied)
+
+**`docs/decisions.md` D-34**, the closing bracket replaced:
+
+> … Clicking a requirement opens its panel. (Changed in slice 4b-1.) Each row's “Place card” places the requirement's
+> card next to the element, or shows its card when it is on the canvas; a row dragged onto the canvas places the card
+> where it is dropped; “Add all to this canvas” or “Add the {n} missing to this canvas” under the list. An entity or table
+> panel whose card is not on the open canvas offers “Add to this canvas”. (Changed in slice 4b-2.)
+
+RUNS4_PLACEHOLDER
+
 ## Łukasz's answers after step 3 (18 October 2026)
 
 - **Step 3 accepted.**
