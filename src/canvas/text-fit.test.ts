@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { fitWidth, lineNeedsClip, rowNeedsClip, titleNeedsClip, noteMarkWidth } from "./text-fit";
+import { fitWidth, lineNeedsClip, noteMarkWidth, requirementNameLines, rowNeedsClip, titleNeedsClip } from "./text-fit";
 
 const row = { name: "email", type: "String(100)", pk: false, fk: false, pii: false, bk: false, mappings: 1 };
 
@@ -59,5 +59,15 @@ describe("the open-notes mark in a card's header (slice 3a, item 12)", () => {
     expect(noteMarkWidth(0)).toBe(0);
     expect(noteMarkWidth(2)).toBeGreaterThan(noteMarkWidth(1));
     expect(noteMarkWidth(12)).toBeGreaterThan(noteMarkWidth(2));
+  });
+});
+
+describe("requirement card names (slice 4b-2)", () => {
+  it("wraps by words, at least one line, more for long names and words wider than a line", () => {
+    expect(requirementNameLines("")).toBe(1);
+    expect(requirementNameLines("Single view")).toBe(1);
+    expect(requirementNameLines("Order total equals the sum of its lines")).toBe(2);
+    expect(requirementNameLines("Contact data for every active customer, with consent and source recorded for each field")).toBeGreaterThanOrEqual(3);
+    expect(requirementNameLines("x".repeat(80))).toBeGreaterThanOrEqual(2);
   });
 });

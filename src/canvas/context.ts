@@ -161,6 +161,12 @@ export interface CanvasHandle {
   notesView: () => NoteListItem[];
   /** Selects a note and brings it into view when it is shown and outside the view (a panel's link). */
   showNote: (noteId: Uuid) => void;
+  /** A requirement's card on this canvas as the canvas has it now (slice 4b-2), or null. */
+  requirementCard: (requirementId: Uuid) => { cardId: Uuid; key: string; name: string } | null;
+  /** “Place its card on this canvas” (slice 4b-2, item 13): at the top centre of the view. */
+  placeRequirementCard: (requirementId: Uuid) => void;
+  /** “Remove its card from this canvas” (item 7): the requirement stays; `deselect` clears the selection after. */
+  removeRequirementCard: (requirementId: Uuid, options?: { deselect?: boolean }) => void;
 }
 
 /** A note as the panels list it (the card and frame panels, the canvas overview). */
@@ -249,7 +255,9 @@ export type ToolboxTarget =
   /** A bundle of lines at a collapsed frame (slice 2c). */
   | { kind: "bundle"; key: string }
   /** A note (slice 3a): before the card or frame under it. */
-  | { kind: "note"; noteId: Uuid };
+  | { kind: "note"; noteId: Uuid }
+  /** A requirement's card (slice 4b-2): the requirement is selected. */
+  | { kind: "requirement"; requirementId: Uuid; cardId: Uuid };
 
 export interface ToolboxRequest {
   target: ToolboxTarget;
@@ -377,6 +385,9 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   deleteNote: noop,
   notesView: () => [],
   showNote: noop,
+  requirementCard: () => null,
+  placeRequirementCard: noop,
+  removeRequirementCard: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,

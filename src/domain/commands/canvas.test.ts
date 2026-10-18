@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { access, archived, canvas, canvasItem, frame, ids, link, makeCtx, NOW, project } from "../__fixtures__/domain";
 import { STALE_VERSION_MESSAGE } from "../errors";
 import { changeLabel } from "../model/change-label";
+import type { CanvasItem } from "../types";
 import {
   addCanvasToProject,
   applyLookToAllCanvases,
@@ -228,6 +229,14 @@ describe("duplicateCanvas (slice 2a)", () => {
       [0, true],
       [1000, false],
     ]);
+  });
+
+  it("copies requirement cards too: they are part of the layout (slice 4b-2, H; the prototype copies none)", () => {
+    const reqCard = canvasItem("01900000-0000-7000-8000-00000000c201", { entity_id: null, requirement_id: ids.req101, x: 800, y: 40 });
+    const r = duplicateCanvas(makeCtx(), access("modeler"), { ...state, items: [...items, reqCard] }, { projectId: projectA, canvasId: canvas1 });
+    if (!r.ok) throw new Error(r.error.message);
+    const copies = r.writeSet.writes.filter((w) => w.kind === "insert" && w.table === "canvas_item").map((w) => w.row as CanvasItem);
+    expect(copies.find((c) => c.requirement_id === ids.req101)).toMatchObject({ canvas_id: r.value.canvasId, x: 800, y: 40, frame_id: null });
   });
 });
 

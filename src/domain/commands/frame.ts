@@ -26,6 +26,7 @@ import {
   type FrameBox,
   type Rect,
 } from "../model/frames";
+import { isElementCard, isRequirementCard } from "../model/card-kinds";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
 import { FRAME_KINDS, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type Note, type SourceSystem, type SourceTable } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
@@ -98,7 +99,9 @@ function openDraft(access: WorkspaceAccess, state: FrameCanvasState, canvasId: U
   const ws = access.workspace.id;
   if (!isLive(state.canvas, ws) || state.canvas.id !== canvasId) return { ok: false, error: notFound("canvas") };
   const frames = state.frames.filter((f) => isLive(f, ws) && f.canvas_id === canvasId);
-  const items = state.items.filter((i) => isLive(i, ws) && i.canvas_id === canvasId);
+  // requirement cards are never frame members and the frame rules ignore them (slice 4b-2, item 6); `moveOnCanvas`
+  // moves them on its own
+  const items = state.items.filter((i) => isLive(i, ws) && i.canvas_id === canvasId && isElementCard(i));
   return {
     ok: true,
     draft: {
@@ -434,7 +437,13 @@ export function moveOnCanvas(
     const frame = draft.frames.get(f.frameId);
     if (frame && f.x !== undefined && f.y !== undefined) shifts.set(f.frameId, { dx: f.x - frame.x, dy: f.y - frame.y });
   }
-  const moved = applyMoves(draft, parsed.data);
+  // requirement cards named in the move: only their position, on no frame (slice 4b-2, item 6)
+  const ws0 = access.workspace.id;
+  const requirementCards = new Map(
+    state.items.filter((i) => isLive(i, ws0) && i.canvas_id === draft.canvasId && isRequirementCard(i)).map((i) => [i.id, i]),
+  );
+  const requirementMoves = parsed.data.items.filter((c) => requirementCards.has(c.canvasItemId));
+  const moved = applyMoves(draft, { ...parsed.data, items: parsed.data.items.filter((c) => !requirementCards.has(c.canvasItemId)) });
   if (!moved.ok) return fail(moved.error);
 
   const heights = new Map(parsed.data.items.map((c) => [c.canvasItemId, c.height]));
@@ -464,6 +473,14 @@ export function moveOnCanvas(
 
   const committed = commit(ctx, draft, seen(parsed.data.frames, parsed.data.items));
   if (!committed.ok) return fail(committed.error);
+  for (const c of requirementMoves) {
+    const before = requirementCards.get(c.canvasItemId)!;
+    if (c.x === undefined || c.y === undefined || (c.x === before.x && c.y === before.y)) continue;
+    if (before.version !== c.expectedVersion) return fail(staleVersion());
+    const row = nextVersion(ctx, before, { x: c.x, y: c.y });
+    committed.writes.push({ kind: "update", table: "canvas_item", before, row });
+    committed.versions[row.id] = row.version;
+  }
   const canvasNotes = (state.notes ?? []).filter((n) => isLive(n, access.workspace.id) && n.canvas_id === draft.canvasId);
   const moves = parsed.data.notes ?? [];
   if (moves.length) {

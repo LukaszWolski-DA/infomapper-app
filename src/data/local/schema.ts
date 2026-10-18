@@ -290,8 +290,6 @@ export const RULES: Record<DevTable, TableRules> = {
       { name: "canvas_item_width_ck", test: (r) => r.width === null || ((r.width as number) >= 200 && (r.width as number) <= 600) },
       { name: "canvas_item_row_filter_ck", test: oneOf(ROW_FILTERS, "row_filter") },
       { name: "canvas_item_live_level_ck", test: (r) => r.live_level === null || oneOf(LIVE_LEVELS, "live_level")(r) },
-      // requirement cards come with slice 4b
-      { name: "canvas_item_no_requirement_yet", test: (r) => !isSet(r.requirement_id) },
     ],
   },
   frame: {

@@ -4,8 +4,9 @@
 // uses”, “Only on this canvas”, folding groups with sticky headers, collapse all and expand all (D-35). A click on an item places it in a free spot of the view (or shows its card);
 // dragging it onto the canvas places it there. Model tab, for those who may edit: “+” per concept, “New concept”,
 // rename a concept by double-click, and its ⋯ menu (D-46, D-47). Sources tab: “New source table”. Requirements tab
-// (slice 4a): groups by kind with their coverage bars; a click opens the requirement's panel (no lens, no dragging:
-// slice 4b); “New requirement” for those who may edit.
+// (slice 4a): groups by kind with their coverage bars; a click opens the requirement's panel; slice 4b-2: “Only on
+// this canvas” and the on-canvas dot for requirement cards (dragging: a later step of 4b-2); “New requirement” for
+// those who may edit.
 
 import { newCardHeight } from "@/canvas/geometry";
 import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -370,8 +371,8 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     </div>
   );
   const requirementTree = () => {
-    if (canvasOnly) return <p className="p-3 text-im-ink-3" data-testid="text-req-empty">No requirement has a card on this canvas yet.</p>;
     const groups = filterRequirements(tree.requirements, filter);
+    if (!groups.length && canvasOnly && !searching) return <p className="p-3 text-im-ink-3" data-testid="text-req-empty">No requirement has a card on this canvas yet.</p>;
     if (!groups.length) {
       if (searching || tree.requirements.length) return null;
       return (
@@ -397,11 +398,14 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                   key={r.id}
                   type="button"
                   onClick={() => ui.select({ t: "req", id: r.id })}
-                  title="Click for details."
+                  title={r.presence === "here" ? "Its card is on this canvas. Click for details." : "Click for details."}
                   data-testid="tree-req"
                   data-key={r.key}
+                  data-presence={r.presence}
                   className="flex w-full items-center gap-2 rounded-md py-[5px] pl-3.5 pr-2 text-left hover:bg-im-hover"
                 >
+                  {/* its card's presence (slice 4b-2, J; prototype .oncanvas), as the Model tab's items */}
+                  <span className={`size-[7px] flex-none rounded-full ${r.presence === "here" ? "bg-im-req" : r.presence === "elsewhere" ? "shadow-[inset_0_0_0_1.5px_var(--im-ink-3)]" : "opacity-0"}`} />
                   <span className="flex flex-none items-center gap-1 text-im-req">
                     <KindIcon kind={r.kind} />
                     <span className="font-mono text-[11.5px]">{r.key}</span>

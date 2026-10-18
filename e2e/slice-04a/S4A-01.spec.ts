@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { openCanvas, openRequirementsTab, requirementRow, signInAs } from "./helpers";
 
-test("S4A-01: the Requirements tab: groups in kind order with counts, rows with icon, key, name and coverage bar; search; folding survives a reload; “on this canvas” shows the empty text; reviewers and readers have no “New requirement”", async ({ page }) => {
+test("S4A-01: the Requirements tab: groups in kind order with counts, rows with icon, key, name and coverage bar; search; folding survives a reload; “on this canvas” shows the requirements with a card here (slice 4b-2); reviewers and readers have no “New requirement”", async ({ page }) => {
   await signInAs(page, "Łukasz");
   await openCanvas(page);
   await openRequirementsTab(page);
@@ -34,10 +34,11 @@ test("S4A-01: the Requirements tab: groups in kind order with counts, rows with 
   await expect(requirementRow(page, "REQ-101")).toHaveCount(0);
   await expect(requirementRow(page, "REQ-102")).toBeVisible();
 
-  // no requirement has a card until slice 4b
+  // only the requirements with a card here: REQ-104's, seeded on this canvas (slice 4b-2, J)
   await page.getByTestId("check-canvas-only").check();
-  await expect(page.getByTestId("tree-req")).toHaveCount(0);
-  await expect(page.getByTestId("text-req-empty")).toHaveText("No requirement has a card on this canvas yet.");
+  await expect(page.getByTestId("tree-req")).toHaveCount(1);
+  await expect(requirementRow(page, "REQ-104")).toHaveAttribute("data-presence", "here");
+  await expect(page.getByTestId("text-req-empty")).toHaveCount(0);
   // both are browser preferences: back for the next people in this browser
   await page.getByTestId("check-canvas-only").uncheck();
   await groups.filter({ hasText: "Business need" }).getByTestId("tree-req-head").click();

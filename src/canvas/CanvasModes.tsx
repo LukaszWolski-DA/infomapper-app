@@ -20,7 +20,7 @@ import { EdgeLabelRenderer, useReactFlow, useStore } from "@xyflow/react";
 import { useToast } from "@/ui/components/toast";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type ToolboxTarget } from "./context";
-import { cardKey, frameKey, noteKey } from "./selection";
+import { cardKey, frameKey, noteKey, reqKey } from "./selection";
 import { cardWidth, HEAD_H, type Pt } from "./geometry";
 
 /** A right-click that moved more than this is a pan, not a toolbox. */
@@ -210,9 +210,11 @@ export function useCanvasModes(editable: boolean) {
       const mappingId = noteId ? undefined : el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
       const relationshipId = el.closest<SVGElement>("[data-relationship]")?.dataset.relationship;
       const bundleKey = el.closest<SVGElement>("[data-bundle]")?.dataset.bundle;
-      const cardId = noteId ? undefined : el.closest<HTMLElement>("[data-card]")?.dataset.card;
+      // a requirement card (slice 4b-2): selecting it is selecting the requirement
+      const reqCard = noteId ? null : el.closest<HTMLElement>("[data-requirement]");
+      const cardId = noteId || reqCard ? undefined : el.closest<HTMLElement>("[data-card]")?.dataset.card;
       const rowId = cardId ? el.closest<HTMLElement>(".row[data-row]")?.dataset.row : undefined;
-      const frameId = cardId || noteId ? undefined : el.closest<HTMLElement>("[data-frame]")?.dataset.frame;
+      const frameId = cardId || noteId || reqCard ? undefined : el.closest<HTMLElement>("[data-frame]")?.dataset.frame;
       let target: ToolboxTarget;
       if (noteId && ui.selection?.t === "multi" && ui.selection.keys.includes(noteKey(noteId))) {
         // a note that is part of a selection of several: the group's toolbox (slice 3a, prototype ctxFor)
@@ -220,6 +222,11 @@ export function useCanvasModes(editable: boolean) {
       } else if (noteId) {
         target = { kind: "note", noteId };
         select({ t: "note", id: noteId });
+      } else if (reqCard && ui.selection?.t === "multi" && ui.selection.keys.includes(reqKey(reqCard.dataset.requirement!))) {
+        target = { kind: "selection" };
+      } else if (reqCard) {
+        target = { kind: "requirement", requirementId: reqCard.dataset.requirement!, cardId: reqCard.dataset.card! };
+        select({ t: "req", id: reqCard.dataset.requirement! });
       } else if (mappingId) {
         target = { kind: "map", mappingId };
         select({ t: "map", id: mappingId });

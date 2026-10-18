@@ -107,9 +107,12 @@ describe("demo model (slice 1a PRD, demo data)", () => {
 
   it("places the cards on the two canvases at the prototype's positions, without frames", async () => {
     const m = await store.model.load(RETAIL);
-    const main = await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders);
+    // the entity and table cards; REQ-104's requirement card besides them since slice 4b-2
+    const all = await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders);
+    const main = all.filter((i) => i.requirement_id === null);
     const lines = await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasOrderLines);
     expect(main).toHaveLength(7);
+    expect(all).toHaveLength(8);
     expect(lines).toHaveLength(4);
     const customerCard = main.find((i) => i.entity_id === byName(m.entities, "Customer").id);
     expect(customerCard).toMatchObject({ x: 496, y: 40, collapsed: false, row_filter: "all", frame_id: null, width: null });
@@ -141,7 +144,8 @@ describe("demo model (slice 1a PRD, demo data)", () => {
     expect(sales.entities).toHaveLength(6);
     expect(sales.mappings).toHaveLength(14);
     expect(sales.mappings.find((x) => x.status === "approved")).toMatchObject({ created_by: SEED_IDS.userMarek, approved_by: SEED_IDS.userLukasz });
-    const retailCards = await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders);
+    // the entity and table cards (REQ-104's card is Retail Co's own, slice 4b-2: Sales analytics has no requirements)
+    const retailCards = (await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders)).filter((i) => i.requirement_id === null);
     const salesCards = await store.canvasItems.listOfCanvas(SEED_IDS.wsSales, SEED_IDS.canvasSalesFirst);
     const place = (items: CanvasItem[], m: WorkspaceModel) =>
       items
@@ -220,7 +224,7 @@ describe("domain commands applied through the adapter", () => {
     expect(after.mappings).toHaveLength(m.mappings.length - 8);
     expect(after.mappingInputs).toHaveLength(m.mappingInputs.length - 8);
     expect(after.relationships).toHaveLength(3);
-    expect(await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders)).toHaveLength(6);
+    expect((await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders)).filter((i) => i.requirement_id === null)).toHaveLength(6);
     expect(new Set((await store.changeEvents.list(RETAIL)).map((e) => e.change_group_id)).size).toBe(1);
   });
 
@@ -313,6 +317,13 @@ describe("the data model's checks on the model tables", () => {
     const product = byName(m.entities, "Product").id;
     expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ entity_id: product }) }])).toMatchObject({ ok: false, error: { code: "conflict" } });
     expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ entity_id: product, canvas_id: SEED_IDS.canvasCustomerOrders }) }])).toEqual({ ok: true });
+  });
+
+  it("canvas_item: a requirement card, one live card per requirement and canvas (slice 4b-2)", async () => {
+    const req = (await store.requirements.list(RETAIL)).find((r) => r.key === "REQ-101")!.id;
+    expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ requirement_id: req }) }])).toEqual({ ok: true });
+    expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ requirement_id: req }) }])).toMatchObject({ ok: false, error: { code: "conflict" } });
+    expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ requirement_id: req, canvas_id: SEED_IDS.canvasCustomerOrders }) }])).toEqual({ ok: true });
   });
 
   it("canvas_item: width between 200 and 600, known row filters", async () => {

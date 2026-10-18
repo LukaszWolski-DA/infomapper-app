@@ -3,8 +3,8 @@
 // The requirement panel (slice 4a, PRD items 23–27, prototype insReq): ID and kind, name, description (rich text with
 // its kind's template), Rule or Check and “When it fails” by kind, status and priority, owner and external reference,
 // “Part of” (never a cycle) and “Broken down into”, coverage with its gaps, what it traces to, and “Delete
-// requirement”. Reviewers change the status only; readers and archived workspaces nothing. No lens, no card (slice
-// 4b). Everything comes from the requirement index.
+// requirement”. Reviewers change the status only; readers and archived workspaces nothing. Slice 4b-2 (items 7, 13):
+// “Place its card on this canvas” or “Remove its card from this canvas”. Everything comes from the requirement index.
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { deleteRequirementAction, setRequirementStatusAction, unlinkRequirementAction, updateRequirementAction } from "@/app/_actions/requirement";
@@ -17,7 +17,7 @@ import { coverageText } from "./requirement-ui";
 import { coverageParts, ENTITY_GAP_REASON, fourEyesRequirementMessage, KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
 import { REQUIREMENT_KINDS, REQUIREMENT_PRIORITIES, REQUIREMENT_STATUSES, type Requirement, type RequirementLink } from "@/domain/types";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
-import { Actions, dangerClass, Field, Hint, inputClass, Kind, List, Note, Section, Seg, TextArea, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, Hint, inputClass, Kind, List, Note, Section, Seg, TextArea, TextField } from "./fields";
 import { usePanel } from "./inspector";
 import { attributeLabel, columnLabel, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -255,6 +255,15 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
 
       {p.editable && (
         <Actions>
+          {ui.requirementCard(r.id) ? (
+            <button type="button" className={buttonClass} onClick={() => ui.removeRequirementCard(r.id)} data-testid="button-requirement-uncard">
+              Remove its card from this canvas
+            </button>
+          ) : (
+            <button type="button" className={buttonClass} onClick={() => ui.placeRequirementCard(r.id)} data-testid="button-requirement-card">
+              Place its card on this canvas
+            </button>
+          )}
           <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-requirement">
             Delete requirement
           </button>

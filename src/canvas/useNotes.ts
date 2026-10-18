@@ -267,7 +267,8 @@ export function useNotes(o: Options) {
       swallowNextClick();
       o.endNoteTool();
       const block = el.closest<HTMLElement>("[data-block]")?.dataset.block;
-      const card = block ? undefined : el.closest<HTMLElement>("[data-card]")?.dataset.card;
+      // notes pin to entity and table cards, never to a requirement card (slice 4b-2, N)
+      const card = block ? undefined : el.closest<HTMLElement>("[data-card]:not([data-requirement])")?.dataset.card;
       const label = block || card ? undefined : el.closest(".f-lab") ? el.closest<HTMLElement>("[data-frame]")?.dataset.frame : undefined;
       if (block || label) newNote({ frameId: (block ?? label)! });
       else if (card) newNote({ cardId: card });

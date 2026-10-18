@@ -116,6 +116,7 @@ describe("frames in the selection (slice 2b, D-16, D-17)", () => {
       cards: ["c3", "c4"],
       members: ["c1", "c2"],
       notes: [],
+      reqs: [],
     });
   });
 
@@ -161,12 +162,32 @@ describe("notes in the selection (slice 3a, item 13, S3A-10)", () => {
 
   it("units: a note moves once; a free note with its frame, a pinned note with its card or frame", () => {
     const keys = ["frame:F1", "source:customers", "note:n1", "note:n2", "note:n3", "note:n4", "note:n5"] as const;
-    expect(unitsOf([...keys], items)).toEqual({ frames: ["F1"], cards: ["c3"], members: ["c1"], notes: ["n2"] });
+    expect(unitsOf([...keys], items)).toEqual({ frames: ["F1"], cards: ["c3"], members: ["c1"], notes: ["n2"], reqs: [] });
     // nothing else moves: every note moves by itself
     expect(unitsOf(["note:n1", "note:n3", "note:n5"], items).notes).toEqual(["n1", "n3", "n5"]);
   });
 
   it("notes are not cards: fit widths, remove and put in a new frame leave them out", () => {
     expect(selectedCardIds(["note:n2", "source:customers", "frame:F1"], items)).toEqual(["c3"]);
+  });
+});
+
+describe("requirement cards in the selection (slice 4b-2, L)", () => {
+  const req: ItemBox = { id: "rc1", key: "req:r1", rect: { x: 800, y: 0, w: 230, h: 94 } };
+  const frame: ItemBox = { id: "f1", key: "frame:f1", rect: { x: 700, y: -50, w: 600, h: 400 } };
+  const all = [...cards, req, frame];
+
+  it("one requirement key is the requirement selected; it reads back as its key while its card is here", () => {
+    expect(fromKeys(["req:r1"], all)).toEqual({ t: "req", id: "r1" });
+    expect(selectedKeys({ t: "req", id: "r1" }, all)).toEqual(["req:r1"]);
+    expect(selectedKeys({ t: "req", id: "r2" }, all)).toEqual([]);
+    expect(toggleCard({ t: "card", id: "c1" }, "rc1", all)).toEqual({ t: "multi", keys: ["entity:customer", "req:r1"] });
+  });
+
+  it("a lasso and Ctrl+A take requirement cards; a caught frame never stands for them; they move on their own", () => {
+    expect(lassoHits(all, { x: 690, y: -60, w: 620, h: 420 })).toEqual(["frame:f1", "req:r1"]);
+    expect(allKeys(all)).toContain("req:r1");
+    expect(unitsOf(["frame:f1", "req:r1"], all)).toMatchObject({ frames: ["f1"], cards: [], reqs: ["rc1"] });
+    expect(selectedCardIds(["entity:customer", "req:r1"], all)).toEqual(["c1"]);
   });
 });

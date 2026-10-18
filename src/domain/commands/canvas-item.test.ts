@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { access, archived, canvas, canvasItem, entity, frame, ids, makeCtx, NOW, sourceTable } from "../__fixtures__/domain";
+import { access, archived, canvas, canvasItem, entity, frame, ids, makeCtx, NOW, requirement, sourceTable } from "../__fixtures__/domain";
 import { STALE_VERSION_MESSAGE } from "../errors";
 import { changeLabel } from "../model/change-label";
-import { placeManyOnCanvas, placeOnCanvas, removeCanvasItems, removeFromCanvas, updateCanvasItem } from "./canvas-item";
+import { placeManyOnCanvas, placeOnCanvas, placeRequirementCards, removeCanvasItems, removeFromCanvas, REQUIREMENT_CARD_THERE, updateCanvasItem } from "./canvas-item";
 
 const { canvas1, customer, crmCustomer, itemCustomer } = ids;
 
@@ -219,5 +219,49 @@ describe("a placed card joins the frame it lands in (slice 2b, D-05)", () => {
       cards: [{ entityId: ids.customer, x: 100, y: 100, height: 100 }, { sourceTableId: ids.crmCustomer, x: 2000, y: 0, height: 100 }],
     });
     expect(r.ok && r.writeSet.writes.map((w) => (w.table === "canvas_item" && w.kind === "insert" ? w.row.frame_id : w.table))).toEqual([ids.frameA, null]);
+  });
+});
+
+describe("requirement cards (slice 4b-2)", () => {
+  const reqCard = (id: string, over: object = {}) => canvasItem(id, { entity_id: null, requirement_id: ids.req101, ...over });
+  const cardA = "01900000-0000-7000-8000-00000000c201";
+  const state = { canvas: canvas(), requirements: [requirement(ids.req101), requirement(ids.req102, { key: "REQ-102" })], items: [] as ReturnType<typeof canvasItem>[] };
+  const place = (cards: object[], s: object = {}, role: "owner" | "modeler" | "reviewer" | "reader" = "modeler") =>
+    placeRequirementCards(makeCtx(), access(role), { ...state, ...s }, { canvasId: canvas1, cards });
+
+  it("places one or more requirement cards in one change group, with no frame, width or live level", () => {
+    const r = place([
+      { requirementId: ids.req101, x: 80, y: 40 },
+      { requirementId: ids.req102, x: 80, y: 200 },
+    ]);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes).toMatchObject([
+      { kind: "insert", table: "canvas_item", row: { requirement_id: ids.req101, entity_id: null, source_table_id: null, x: 80, y: 40, width: null, frame_id: null, live_level: null } },
+      { kind: "insert", table: "canvas_item", row: { requirement_id: ids.req102, x: 80, y: 200 } },
+    ]);
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+  });
+
+  it("refuses a second card for the same requirement on a canvas, a deleted requirement and a requirement twice", () => {
+    expect(place([{ requirementId: ids.req101, x: 0, y: 0 }], { items: [reqCard(cardA)] })).toMatchObject({ ok: false, error: { code: "conflict", message: REQUIREMENT_CARD_THERE } });
+    expect(place([{ requirementId: ids.req101, x: 0, y: 0 }], { items: [reqCard(cardA, { deleted_at: NOW })] }).ok).toBe(true);
+    expect(place([{ requirementId: ids.req101, x: 0, y: 0 }], { items: [reqCard(cardA, { canvas_id: ids.canvas2 })] }).ok).toBe(true);
+    expect(place([{ requirementId: ids.req101, x: 0, y: 0 }], { requirements: [requirement(ids.req101, { deleted_at: NOW })] })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(place([{ requirementId: ids.req101, x: 0, y: 0 }, { requirementId: ids.req101, x: 0, y: 200 }])).toMatchObject({ ok: false, error: { message: "A requirement is listed twice." } });
+  });
+
+  it("is refused to reviewers and readers (AD-05)", () => {
+    for (const role of ["reviewer", "reader"] as const) expect(place([{ requirementId: ids.req101, x: 0, y: 0 }], {}, role)).toMatchObject({ ok: false, error: { code: "forbidden" } });
+  });
+
+  it("is layout only on a live canvas: placing and removing need no label (G)", () => {
+    const live = canvas(canvas1, { live_label_id: ids.labelCr23 });
+    expect(place([{ requirementId: ids.req101, x: 0, y: 0 }], { canvas: live }).ok).toBe(true);
+    expect(removeFromCanvas(makeCtx(), access("modeler"), { item: reqCard(cardA), canvas: live }, { canvasItemId: cardA, expectedVersion: 1 }).ok).toBe(true);
+    expect(removeFromCanvas(makeCtx(), access("modeler"), { item: canvasItem(), canvas: live }, { canvasItemId: itemCustomer, expectedVersion: 1 })).toMatchObject({ ok: false });
+    const items = [reqCard(cardA), canvasItem()];
+    const several = (refs: string[]) => removeCanvasItems(makeCtx(), access("modeler"), { canvas: live, items }, { canvasId: canvas1, items: refs.map((id) => ({ canvasItemId: id, expectedVersion: 1 })) });
+    expect(several([cardA]).ok).toBe(true);
+    expect(several([cardA, itemCustomer])).toMatchObject({ ok: false });
   });
 });

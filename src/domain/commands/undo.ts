@@ -69,7 +69,7 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   source_column: [["source_table_id", "source_table"]],
   mapping: [["attribute_id", "attribute"]],
   mapping_input: [["mapping_id", "mapping"], ["source_column_id", "source_column"]],
-  canvas_item: [["canvas_id", "canvas"], ["entity_id", "entity"], ["source_table_id", "source_table"], ["frame_id", "frame"]],
+  canvas_item: [["canvas_id", "canvas"], ["entity_id", "entity"], ["source_table_id", "source_table"], ["requirement_id", "requirement"], ["frame_id", "frame"]],
   frame: [["canvas_id", "canvas"], ["concept_id", "concept"], ["source_system_id", "source_system"]],
   label_link: [
     ["label_id", "label"],

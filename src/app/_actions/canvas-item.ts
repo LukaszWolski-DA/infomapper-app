@@ -8,6 +8,7 @@ import { revalidatePath } from "next/cache";
 import {
   placeManyOnCanvas,
   placeOnCanvas,
+  placeRequirementCards,
   removeCanvasItems,
   removeFromCanvas,
   updateCanvasItem,
@@ -148,6 +149,31 @@ function onCanvasCards<T>(workspaceId: string, canvasId: string, command: GroupC
 /** Takes several cards off the canvas in one change; the elements stay in the model (D-02). */
 export async function removeCardsAction(workspaceId: string, canvasId: string, items: { canvasItemId: string; expectedVersion: number }[]) {
   const result = await onCanvasCards(workspaceId, canvasId, removeCanvasItems, { items });
+  if (result.ok) revalidatePath("/", "layout");
+  return result;
+}
+
+/**
+ * Places the cards of requirements on a canvas in one change (slice 4b-2: “Place its card”, “Add all to this canvas”,
+ * a drop from a panel or the left panel). Returns the new cards' ids.
+ */
+export async function placeRequirementCardsAction(
+  workspaceId: string,
+  canvasId: string,
+  cards: { requirementId: string; x: number; y: number }[],
+): Promise<ActionResult<{ canvasItemIds: string[] }>> {
+  const result = await runCommand(async (ctx, store, user) => {
+    const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
+    if (!workspace) return NOT_FOUND;
+    const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
+    const cid = typeof canvasId === "string" ? canvasId : "";
+    const [canvas, requirements, items] = await Promise.all([
+      store.canvases.get(workspace.id, cid),
+      store.requirements.list(workspace.id),
+      store.canvasItems.listOfCanvas(workspace.id, cid),
+    ]);
+    return placeRequirementCards(ctx, access, { canvas, requirements, items }, { canvasId, cards });
+  });
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }

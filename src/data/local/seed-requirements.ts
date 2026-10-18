@@ -4,9 +4,13 @@
 // counter is set to 106 by the caller.
 
 import type { Uuid } from "@/domain/ids";
+import { cardHeightFor } from "@/domain/model/card-size";
+import { DEFAULT_CARD_WIDTH } from "@/domain/model/frames";
 import { targetColumns, type LabelTarget } from "@/domain/model/labels";
+import { notePlaces, notePosition } from "@/domain/model/notes";
+import { requirementCardSpots } from "@/domain/model/requirement-placement";
 import { plainTextPair } from "@/domain/model/plain-text";
-import type { Requirement, RequirementLink } from "@/domain/types";
+import type { CanvasItem, Requirement, RequirementLink } from "@/domain/types";
 import type { DevDb } from "./schema";
 import { seedId } from "./seed-model";
 
@@ -127,4 +131,54 @@ export function addDemoRequirements(db: DevDb, o: DemoRequirementsOptions): void
       db.requirement_link.push(row);
     }
   }
+}
+
+/** A requirement card's height for placing it before it is drawn: two name lines (the canvas measures the name). */
+const SEED_CARD_HEIGHT = 111;
+
+/**
+ * REQ-104's card on “Customer & orders” (slice 4b-2, PRD item 25, prototype placeSeedReq): next to the Sales concept's
+ * cards, where the prototype's Sales frame would put it (the demo seed has no frames), by the placing rule of item 15:
+ * 80 px right of their box, at its top + 40, then down to the first free place.
+ */
+export function addDemoRequirementCard(db: DevDb, o: { workspaceId: Uuid; canvasId: Uuid; at: string; authorId: Uuid }): void {
+  const id = (key: string) => seedId(o.workspaceId, key);
+  const items = db.canvas_item.filter((i) => i.canvas_id === o.canvasId && i.deleted_at === null);
+  const salesConcept = id("concept:sales");
+  const rowsOf = (i: CanvasItem) =>
+    i.entity_id ? db.attribute.filter((a) => a.entity_id === i.entity_id).length : db.source_column.filter((c) => c.source_table_id === i.source_table_id).length;
+  const box = (i: CanvasItem) => ({ x: i.x, y: i.y, w: i.width ?? DEFAULT_CARD_WIDTH, h: cardHeightFor(rowsOf(i)) });
+  const sales = items.filter((i) => i.entity_id && db.entity.find((e) => e.id === i.entity_id)?.concept_id === salesConcept).map(box);
+  const x0 = Math.min(...sales.map((b) => b.x)), y0 = Math.min(...sales.map((b) => b.y));
+  const anchor = { x: x0, y: y0 + 40, w: Math.max(...sales.map((b) => b.x + b.w)) - x0, h: 0 };
+  const places = notePlaces(items, db.frame.filter((f) => f.canvas_id === o.canvasId && f.deleted_at === null));
+  const occupied = [
+    ...items.map(box),
+    // notes where they are drawn (a pinned one at its card's corner plus its offset), about 120 px high
+    ...db.note
+      .filter((n) => n.canvas_id === o.canvasId && n.deleted_at === null)
+      .map((n) => ({ ...notePosition(n, places), w: n.width, h: 120 })),
+  ];
+  const [spot] = requirementCardSpots(anchor, anchor, [SEED_CARD_HEIGHT], occupied);
+  db.canvas_item.push({
+    id: id("canvas_item:REQ-104"),
+    workspace_id: o.workspaceId,
+    version: 1,
+    created_at: o.at,
+    created_by: o.authorId,
+    updated_at: o.at,
+    updated_by: o.authorId,
+    deleted_at: null,
+    canvas_id: o.canvasId,
+    entity_id: null,
+    source_table_id: null,
+    requirement_id: id("requirement:REQ-104"),
+    x: spot!.x,
+    y: spot!.y,
+    width: null,
+    collapsed: false,
+    row_filter: "all",
+    frame_id: null,
+    live_level: null,
+  });
 }

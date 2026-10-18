@@ -263,6 +263,8 @@ export interface RequirementCoverage {
   notMapped: Uuid[];
   /** Entity items none of whose attributes is covered. */
   entityGaps: Uuid[];
+  /** Of those, the ones with a mapping on some attribute (mapped but not approved; the card's bar, slice 4b-2). */
+  entityNotApproved: Uuid[];
   /** The items by kind, for the tooltip (“1 entity, 3 attributes”). */
   parts: { entities: number; attributes: number };
   /** At least one item, and all of them covered. */
@@ -284,14 +286,21 @@ export const ENTITY_GAP_REASON = "no approved mapping on any attribute";
 export function coverageOfScope(lookup: ModelLookup, scope: RequirementScope): RequirementCoverage {
   const entities = [...scope.entityItems].filter((id) => lookup.entities.has(id));
   const order = [...scope.attributeItems].filter((id) => lookup.attribute.has(id)).sort((a, b) => lookup.attributeOrder.get(a)! - lookup.attributeOrder.get(b)!);
-  const covered: Uuid[] = [], notApproved: Uuid[] = [], notMapped: Uuid[] = [], entityGaps: Uuid[] = [];
-  for (const id of entities) ((lookup.attributesOf.get(id) ?? []).some((a) => lookup.coverageOf(a.id) === "covered") ? covered : entityGaps).push(id);
+  const covered: Uuid[] = [], notApproved: Uuid[] = [], notMapped: Uuid[] = [], entityGaps: Uuid[] = [], entityNotApproved: Uuid[] = [];
+  for (const id of entities) {
+    const states = (lookup.attributesOf.get(id) ?? []).map((a) => lookup.coverageOf(a.id));
+    if (states.includes("covered")) covered.push(id);
+    else {
+      entityGaps.push(id);
+      if (states.includes("not_approved")) entityNotApproved.push(id);
+    }
+  }
   for (const id of order) {
     const state = lookup.coverageOf(id);
     (state === "covered" ? covered : state === "not_approved" ? notApproved : notMapped).push(id);
   }
   const total = entities.length + order.length;
-  return { total, covered, notApproved, notMapped, entityGaps, parts: { entities: entities.length, attributes: order.length }, done: total > 0 && covered.length === total };
+  return { total, covered, notApproved, notMapped, entityGaps, entityNotApproved, parts: { entities: entities.length, attributes: order.length }, done: total > 0 && covered.length === total };
 }
 
 /**
@@ -350,4 +359,13 @@ export function lastRequirementEditor(requirement: Requirement, events: readonly
     if (content && (!last || e.occurred_at >= last.occurred_at)) last = e;
   }
   return last?.user_id ?? requirement.created_by;
+}
+
+/** A requirement card's three-part bar (D-41, slice 4b-2 PRD item 2): items covered, mapped but not approved, not mapped. */
+export function coverageBar(c: RequirementCoverage): { covered: number; mapped: number; notMapped: number } {
+  return {
+    covered: c.covered.length,
+    mapped: c.notApproved.length + c.entityNotApproved.length,
+    notMapped: c.notMapped.length + c.entityGaps.length - c.entityNotApproved.length,
+  };
 }

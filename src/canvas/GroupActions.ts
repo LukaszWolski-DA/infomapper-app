@@ -21,12 +21,12 @@ import type { CardData } from "./card-data";
 import type { FrameData } from "./frame-data";
 import { cardNodesOf, type CardNodeT } from "./CardNode";
 import type { CardTarget, UndoHooks } from "./context";
-import type { SaveLayoutOptions } from "./useFrames";
+import type { ReqMover, SaveLayoutOptions } from "./useFrames";
 import type { LayoutChange } from "./layout-plan";
 import { besideSpots, CARD_W, cardHeight, cardWidth, inside, newCardHeight, snap8, type Pt, type Rect } from "./geometry";
 import type { Selection } from "./line-data";
 import type { NoteData } from "./note-data";
-import { isNoteKey, selectedCardIds, selectedKeys, unitsOf, type ItemBox } from "./selection";
+import { isNoteKey, selectedCardIds, selectedKeys, selectedReqCardIds, unitsOf, type ItemBox } from "./selection";
 import type { NoteMove, NoteMover } from "./useNotes";
 import { fitWidth as fitWidthOf } from "./text-fit";
 
@@ -75,6 +75,8 @@ interface Options extends GroupWrites {
   /** The canvas's notes; and a save of notes moved without cards or frames (one change). */
   notes: MutableRefObject<NoteMover | null>;
   saveNoteMoves: (moves: readonly NoteMove[]) => void;
+  /** The canvas's requirement cards (slice 4b-2): they move and leave with the selection. */
+  reqs: MutableRefObject<ReqMover | null>;
 }
 
 type Move = { id: string; from: Pt; to: Pt };
@@ -86,7 +88,7 @@ export function useGroupActions(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
   const { editable, selection, select, setNodes, patchCard, enqueueGroup, versions, pending, removedHere, undo, occupied, viewRect } = o;
-  const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames, frameRect, canNote, notes: noteMover, saveNoteMoves } = o;
+  const { saveLayout, removeCards, placeCards, items, framesNow, patchFrames, frameRect, canNote, notes: noteMover, saveNoteMoves, reqs: reqMover } = o;
 
   /** The selected cards themselves on this canvas (not frames): several, or the one selected card. */
   const selectedNodes = useCallback((): CardNodeT[] => {
@@ -112,8 +114,13 @@ export function useGroupActions(o: Options) {
       cards: u.cards.filter((id) => !hidden.has(id)).map((id) => byId.get(id)).filter((n): n is CardNodeT => !!n),
       members: u.members.map((id) => byId.get(id)).filter((n): n is CardNodeT => !!n),
       notes: canNote ? u.notes.map((id) => noteMover.current?.noteOf(id)).filter((n): n is NoteData => !!n) : [],
+      // requirement cards (slice 4b-2): each on its own, where it is shown now
+      reqs: u.reqs.flatMap((id) => {
+        const at = reqMover.current?.has(id) ? rf.getNode(id)?.position : undefined;
+        return at ? [{ id, position: { x: at.x, y: at.y } }] : [];
+      }),
     };
-  }, [items, selection, rf, framesNow, editable, canNote, noteMover]);
+  }, [items, selection, rf, framesNow, editable, canNote, noteMover, reqMover]);
 
   /**
    * New positions on screen at once, saved in one change with the cards' frames; a refusal puts everything back.
@@ -169,8 +176,8 @@ export function useGroupActions(o: Options) {
       const m = moving();
       drag.current = {
         lead: node.id,
-        start: new Map([...m.cards, ...m.members].map((n) => [n.id, { ...n.position }])),
-        loose: new Set(m.cards.map((n) => n.id)),
+        start: new Map([...m.cards, ...m.members, ...m.reqs].map((n) => [n.id, { ...n.position }])),
+        loose: new Set([...m.cards, ...m.reqs].map((n) => n.id)),
         frames: new Map(m.frames.map((f) => [f.id, { x: f.x, y: f.y }])),
         notes: notesAt(m.notes),
         dx: 0,
@@ -239,7 +246,7 @@ export function useGroupActions(o: Options) {
   const startDrag = useCallback(
     (e: ReactPointerEvent, onClick: () => void): boolean => {
       const m = moving();
-      if (!m.cards.length && !m.frames.length && !m.notes.length) return false;
+      if (!m.cards.length && !m.frames.length && !m.notes.length && !m.reqs.length) return false;
       e.preventDefault();
       const zoom = rf.getViewport().zoom;
       const sx = e.clientX, sy = e.clientY;
@@ -247,11 +254,13 @@ export function useGroupActions(o: Options) {
       const loose = new Set(m.cards.map((n) => n.id));
       const frames = new Map(m.frames.map((f) => [f.id, { x: f.x, y: f.y }]));
       const notes = notesAt(m.notes);
+      const reqs = new Map(m.reqs.map((n) => [n.id, n.position]));
       let dx = 0, dy = 0, moved = false;
       let raf: number | null = null;
       const show = () => {
         raf = null;
         if (start.size) setNodes((ns) => applyNodeChanges([...start].map(([id, p]) => ({ type: "position" as const, id, position: { x: p.x + dx, y: p.y + dy } })), ns));
+        if (reqs.size) reqMover.current?.show(new Map([...reqs].map(([id, p]) => [id, { x: p.x + dx, y: p.y + dy }])));
         if (frames.size) patchFrames(new Map([...frames].map(([id, p]) => [id, { x: p.x + dx, y: p.y + dy }])));
         showNotes(notes, dx, dy);
       };
@@ -284,7 +293,7 @@ export function useGroupActions(o: Options) {
         saveMoves(
           {
             frames: [...frames].map(([id, from]) => ({ id, from, to: by(from) })),
-            cards: [...loose].map((id) => ({ id, from: start.get(id)!, to: by(start.get(id)!) })),
+            cards: [...[...loose].map((id) => ({ id, from: start.get(id)!, to: by(start.get(id)!) })), ...[...reqs].map(([id, from]) => ({ id, from, to: by(from) }))],
             carried: start,
             notes: noteMoves(notes, dx, dy),
           },
@@ -296,7 +305,7 @@ export function useGroupActions(o: Options) {
       window.addEventListener("pointercancel", up);
       return true;
     },
-    [moving, rf, setNodes, patchFrames, showNotes, saveMoves],
+    [moving, rf, setNodes, patchFrames, showNotes, saveMoves, reqMover],
   );
 
   // ---- nudge: the selection moves at once, the moves are saved together after the keys are still ----
@@ -308,6 +317,8 @@ export function useGroupActions(o: Options) {
     framesAt: Map<string, Pt>;
     notes: Map<string, Pt>;
     notesAt: Map<string, Pt>;
+    reqs: Map<string, Pt>;
+    reqsAt: Map<string, Pt>;
     timer: ReturnType<typeof setTimeout> | null;
   } | null>(null);
 
@@ -315,10 +326,10 @@ export function useGroupActions(o: Options) {
     const n = nudging.current;
     nudging.current = null;
     if (!n) return;
-    for (const id of [...n.from.keys(), ...n.frames.keys(), ...n.notes.keys()]) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
+    for (const id of [...n.from.keys(), ...n.frames.keys(), ...n.notes.keys(), ...n.reqs.keys()]) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
     saveMoves({
       frames: changedOnly([...n.frames].map(([id, from]) => ({ id, from, to: n.framesAt.get(id)! }))),
-      cards: changedOnly([...n.loose].map((id) => ({ id, from: n.from.get(id)!, to: n.at.get(id)! }))),
+      cards: changedOnly([...[...n.loose].map((id) => ({ id, from: n.from.get(id)!, to: n.at.get(id)! })), ...[...n.reqs].map(([id, from]) => ({ id, from, to: n.reqsAt.get(id)! }))]),
       carried: n.from,
       notes: changedOnly([...n.notes].map(([id, from]) => ({ id, from, to: n.notesAt.get(id)! }))),
     });
@@ -328,8 +339,8 @@ export function useGroupActions(o: Options) {
     (dx: number, dy: number): boolean => {
       if (!editable && !canNote) return false;
       const m = moving();
-      if (!m.cards.length && !m.frames.length && !m.notes.length) return false;
-      const n = (nudging.current ??= { from: new Map(), at: new Map(), loose: new Set(), frames: new Map(), framesAt: new Map(), notes: new Map(), notesAt: new Map(), timer: null });
+      if (!m.cards.length && !m.frames.length && !m.notes.length && !m.reqs.length) return false;
+      const n = (nudging.current ??= { from: new Map(), at: new Map(), loose: new Set(), frames: new Map(), framesAt: new Map(), notes: new Map(), notesAt: new Map(), reqs: new Map(), reqsAt: new Map(), timer: null });
       // a fresh page from the server must not put them back before they are saved
       const hold = (id: string) => pending.current.set(id, (pending.current.get(id) ?? 0) + 1);
       for (const node of [...m.cards, ...m.members]) {
@@ -370,11 +381,24 @@ export function useGroupActions(o: Options) {
         notesTo.set(note.id, to);
       }
       if (notesTo.size) noteMover.current?.show(notesTo);
+      const reqsTo = new Map<string, Pt>();
+      for (const r of m.reqs) {
+        if (!n.reqs.has(r.id)) {
+          n.reqs.set(r.id, r.position);
+          n.reqsAt.set(r.id, r.position);
+          hold(r.id);
+        }
+        const p = n.reqsAt.get(r.id)!;
+        const to = { x: p.x + dx, y: p.y + dy };
+        n.reqsAt.set(r.id, to);
+        reqsTo.set(r.id, to);
+      }
+      if (reqsTo.size) reqMover.current?.show(reqsTo);
       if (n.timer) clearTimeout(n.timer);
       n.timer = setTimeout(flushNudge, NUDGE_SAVE_MS);
       return true;
     },
-    [editable, canNote, moving, pending, patchCard, patchFrames, flushNudge, noteMover],
+    [editable, canNote, moving, pending, patchCard, patchFrames, flushNudge, noteMover, reqMover],
   );
 
   // Leaving the canvas saves what was nudged at once.
@@ -429,9 +453,11 @@ export function useGroupActions(o: Options) {
   }, [editable, selectedNodes, saveLayout, toast]);
 
   const removeSelection = useCallback(() => {
-    const nodes = selectedNodes();
-    if (!editable || !nodes.length) return;
-    const ids = nodes.map((n) => n.id);
+    const all = items();
+    // the selected requirement cards leave with the cards (slice 4b-2, L)
+    const reqIds = selectedReqCardIds(selectedKeys(selection, all), all);
+    const ids = [...selectedNodes().map((n) => n.id), ...reqIds];
+    if (!editable || !ids.length) return;
     enqueueGroup(ids, async () => {
       let result: WriteResult<unknown>;
       try {
@@ -445,6 +471,7 @@ export function useGroupActions(o: Options) {
       }
       for (const id of ids) removedHere.current.set(id, versions.current.get(id) ?? 1);
       setNodes((ns) => ns.filter((n) => !ids.includes(n.id)));
+      if (reqIds.length) reqMover.current?.drop(reqIds);
       select(null);
       const u = undo();
       const n = ids.length;
@@ -454,7 +481,7 @@ export function useGroupActions(o: Options) {
         u ? { label: "Undo", run: u.undo } : undefined,
       );
     });
-  }, [editable, selectedNodes, enqueueGroup, removeCards, versions, removedHere, setNodes, select, undo, toast]);
+  }, [editable, items, selection, selectedNodes, enqueueGroup, removeCards, versions, removedHere, setNodes, select, undo, toast, reqMover]);
 
   /**
    * “Add sources of selected entities” (PRD item 9): each entity's missing feeding source tables go beside its own card,

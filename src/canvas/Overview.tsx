@@ -13,11 +13,13 @@
 // places while anything is dragged, and the miniature takes them again only when they look different, so a note's
 // drag redraws it once, on the drop. In development each commit of the miniature is counted in
 // `window.__imMiniatureCommits` (S3B-13 checks that panning and zooming do not redraw it).
+// Slice 4b-2 (I): requirement cards as violet rounded rectangles, above the notes.
 
 import { memo, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { Panel, useReactFlow, useStore, type Node } from "@xyflow/react";
 import { blockNodeId, type BlockNodeT } from "./BlockNode";
 import { isCardNode, type CardNodeT } from "./CardNode";
+import { isReqNode } from "./RequirementCardNode";
 import { CanvasUiCtx } from "./context";
 import { cardHeight, cardWidth, type Rect } from "./geometry";
 import type { CanvasLines } from "./line-data";
@@ -217,6 +219,8 @@ const Miniature = memo(function Miniature({
       ))}
       {nodes.map((n) => {
         const r = rects.get(n.id)!;
+        // a requirement card (slice 4b-2, I; prototype thumb): violet
+        if (isReqNode(n as Node)) return <rect key={n.id} className="mq" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} data-testid="mini-requirement" />;
         if (!isCardNode(n)) return <rect key={n.id} className="mb" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: n.data.color }} />;
         const card = n.data.card;
         return card.kind === "ent" ? (

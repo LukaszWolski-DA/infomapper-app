@@ -1,4 +1,4 @@
-import { placeCardAction, placeCardsAction, removeCardAction, removeCardsAction, updateCardAction } from "@/app/_actions/canvas-item";
+import { placeCardAction, placeCardsAction, placeRequirementCardsAction, removeCardAction, removeCardsAction, updateCardAction } from "@/app/_actions/canvas-item";
 import {
   arrangeIntoFramesAction,
   createFrameAction,
@@ -28,6 +28,7 @@ import { PanelsProvider } from "@/app/_panels/panels-context";
 import { StatusBar } from "@/app/_panels/status-bar";
 import { buildTree } from "@/app/_panels/tree-data";
 import { buildCards } from "@/canvas/card-data";
+import { buildRequirementCards } from "@/canvas/requirement-card-data";
 import { buildFrames, conceptsOf } from "@/canvas/frame-data";
 import { FrameToolButton } from "@/canvas/FrameToolButton";
 import { buildLines } from "@/canvas/line-data";
@@ -125,6 +126,8 @@ export default async function CanvasPage({
   // requirements (slice 4a): the index is built once per page here for the left panel; the panels build theirs once
   // per data version in the browser
   const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
+  // requirement cards (slice 4b-2): this canvas's cards with a requirement, drawn from the same index
+  const requirementCards = buildRequirementCards(items.filter((i) => i.canvas_id === canvasId), requirementIndex);
   const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id), requirementIndex);
   // the status bar's requirements for the whole workspace (PRD item 31), and who last changed each requirement's content
   // for the panel's four-eyes hint (AD-06; only with four-eyes on, the server checks again)
@@ -239,6 +242,8 @@ export default async function CanvasPage({
               placeCards={placeCardsAction.bind(null, ws, canvasId)}
               removeCard={removeCardAction.bind(null, ws)}
               removeCards={removeCardsAction.bind(null, ws, canvasId)}
+              requirementCards={requirementCards}
+              placeRequirementCards={placeRequirementCardsAction.bind(null, ws, canvasId)}
               frames={frames}
               concepts={conceptsOf(model)}
               frameWrites={{

@@ -107,20 +107,21 @@ test("S2B-08: a lasso around a whole frame selects the frame, not its cards; gro
   expect(now.frame.y).toBe(start.web.y);
   expectCarried(now, start);
 
-  // Ctrl+A: the frame and every card in no frame (5), not the frame's cards; since slice 3a also the demo's free note
+  // Ctrl+A: the frame and every card in no frame (5), not the frame's cards; since slice 3a also the demo's free note,
+  // since slice 4b-2 REQ-104's requirement card (L)
   await key(page, "Control+a");
   await expect(frameMarks(page)).toHaveCount(1);
   await expect(cardMarks(page)).toHaveCount(5);
-  await expect(page.getByTestId("selection-kinds")).toHaveText("1 entity, 4 tables, 1 frame, 1 note.");
+  await expect(page.getByTestId("selection-kinds")).toHaveText("1 entity, 4 tables, 1 frame, 1 note, 1 requirement.");
   // Shift+click without moving on an empty spot inside the frame takes it out and puts it back (answer 2 of step 4);
   // Shift+click on its name does the same
   await shiftClick(page, await emptyIn(page, "Area"));
   await expect(frameMarks(page)).toHaveCount(0);
-  await expect(page.getByTestId("selection-count")).toHaveText("6 items selected");
+  await expect(page.getByTestId("selection-count")).toHaveText("7 items selected");
   await shiftClick(page, await emptyIn(page, "Area"));
   await expect(frameMarks(page)).toHaveCount(1);
   await shiftClick(page, await namePoint(page, "Area"));
   await expect(frameMarks(page)).toHaveCount(0);
   await shiftClick(page, await namePoint(page, "Area"));
-  await expect(page.getByTestId("selection-count")).toHaveText("7 items selected");
+  await expect(page.getByTestId("selection-count")).toHaveText("8 items selected");
 });

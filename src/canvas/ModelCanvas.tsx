@@ -51,6 +51,8 @@ import { useToast } from "@/ui/components/toast";
 import { withClips, type CardData } from "./card-data";
 import CardNode, { cardNodesOf, filtersOf, type CardNodeT } from "./CardNode";
 import BlockNode, { blockNodeId, type BlockNodeT } from "./BlockNode";
+import RequirementCardNode, { reqNodesOf, type ReqNodeT } from "./RequirementCardNode";
+import { REQ_CARD, requirementCardHeight, type RequirementCardData } from "./requirement-card-data";
 import { NOTE_TOOL_HINT, RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
@@ -60,7 +62,7 @@ import { conceptQuestions, frameAt as smallestFrameAt } from "@/domain/model/fra
 import { ConceptQuestion, type CanvasQuestion } from "./ConceptQuestion";
 import { LIVE_ONE_AT_A_TIME } from "@/domain/model/live";
 import FrameLayer, { type FramePart } from "./FrameLayer";
-import { useFrames, type CardPatch, type FrameWrites } from "./useFrames";
+import { useFrames, type CardPatch, type FrameWrites, type ReqMover } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
 import { CoverageLayer } from "./CoverageLayer";
 import { FocusDriver, focusTargetOf } from "./Focus";
@@ -69,7 +71,7 @@ import { useRequirementIndex, type FadeData, type FadeNote } from "./fade-canvas
 import { requirementMarks, sameMark } from "./requirement-marks";
 import { useLasso } from "./Lasso";
 import SelectionOverlay from "./SelectionOverlay";
-import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
+import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, reqKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
 import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis, type NoteListItem } from "./context";
@@ -104,7 +106,9 @@ import { grownVersions, mergeFresh } from "./fresh";
 import { countsKey, countsOf, frameNoteCounts, noteAt, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
 import { DRAFT_NOTE, NO_NOTE_WRITES, useNotes, type NoteMover, type NoteWrites } from "./useNotes";
 
-const nodeTypes = { card: CardNode, block: BlockNode };
+const nodeTypes = { card: CardNode, block: BlockNode, req: RequirementCardNode };
+const NO_REQ_CARDS: RequirementCardData[] = [];
+const NO_BLOCK_NODES: BlockNodeT[] = [];
 const NO_DIAGNOSIS: Diagnosis = {};
 const NO_FRAMES: FrameData[] = [];
 const NO_CONCEPTS: Record<string, string> = {};
@@ -169,6 +173,10 @@ export interface ModelCanvasProps {
   userName?: string;
   /** A live label canvas (slice 3b): its label and what adding and removing a card does there. */
   live?: LiveCanvas | null;
+  /** The canvas's requirement cards (slice 4b-2). */
+  requirementCards?: RequirementCardData[];
+  /** Places requirements' cards on this canvas in one change (a server action). */
+  placeRequirementCards?: (cards: { requirementId: string; x: number; y: number }[]) => Promise<CanvasWriteResult<{ canvasItemIds: string[] }>>;
 }
 
 /** What a change of a live canvas left behind for its toast (“Added from …”, “No longer labeled …”; Q7). */
@@ -216,6 +224,20 @@ const toNode = (card: CardData, editable: boolean, keep?: Omit<CardNodeT["data"]
 });
 
 
+/** A requirement card's node (slice 4b-2): 230 px, its height from its name; dragged anywhere on it. */
+const toReqNode = (card: RequirementCardData, editable: boolean): ReqNodeT => ({
+  id: card.id,
+  type: "req",
+  position: { x: card.x, y: card.y },
+  width: REQ_CARD.width,
+  height: requirementCardHeight(card.nameLines),
+  data: { card },
+  draggable: editable,
+  selectable: false,
+  connectable: false,
+  style: { pointerEvents: "all" },
+});
+
 function readView(canvasId: string): Viewport | null {
   const raw = readPreference(viewKey(canvasId));
   if (!raw) return null;
@@ -259,6 +281,8 @@ export function ModelCanvas({
   canNote = false,
   userName = "",
   live = null,
+  requirementCards: initialReqCards = NO_REQ_CARDS,
+  placeRequirementCards,
 }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
   const look = useCanvasLook()?.look;
@@ -327,6 +351,8 @@ export function ModelCanvas({
         contentBounds(cardsNow()),
         ...frameRectsNow().map(({ f, r }) => (f.collapsed ? r : { x: r.x, y: r.y - 30, w: r.w, h: r.h + 30 })),
         ...noteBoxesRef.current.map((b) => b.rect),
+        // requirement cards count too (slice 4b-2, I; prototype fit)
+        ...reqNodesOf(rf).map(({ position, data: { card } }) => ({ x: position.x, y: position.y, w: REQ_CARD.width, h: requirementCardHeight(card.nameLines) })),
       ].filter((r) => r !== null);
       const bounds = boxes.length
         ? (() => {
@@ -336,7 +362,7 @@ export function ModelCanvas({
         : null;
       return fitViewport(bounds, { width: w, height: h }, ui.overviewOpen);
     },
-    [cardsNow, frameRectsNow, ui.overviewOpen],
+    [cardsNow, frameRectsNow, ui.overviewOpen, rf],
   );
 
   const fit = useCallback(() => {
@@ -387,6 +413,8 @@ export function ModelCanvas({
       })),
       // the notes shown, not a new one being written (slice 3a, item 13)
       ...noteBoxesRef.current.filter((b) => b.id !== DRAFT_NOTE).map((b) => ({ id: b.id, key: noteKey(b.id), rect: b.rect, frameId: b.frameId, pinnedTo: b.pinnedTo })),
+      // requirement cards (slice 4b-2, L): in no frame
+      ...reqNodesOf(rf).map(({ id, position, data: { card } }) => ({ id, key: reqKey(card.requirementId), rect: { x: position.x, y: position.y, w: REQ_CARD.width, h: requirementCardHeight(card.nameLines) } })),
     ],
     [rf, frameRectsNow],
   );
@@ -408,6 +436,8 @@ export function ModelCanvas({
   const { toggleEntityTool, toggleHandTool, toggleFrameTool } = modes;
   const deleteFrameRef = useRef<(id: string) => void>(() => {});
   const deleteNoteRef = useRef<(id: string) => void>(() => {});
+  /** Delete on a requirement whose card is here takes the card off, never the requirement (slice 4b-2, item 7). */
+  const removeReqRef = useRef<(requirementId: string) => boolean>(() => false);
   /** On a live canvas: Delete on a card asks to take its label off (slice 3b; set once the canvas has it). */
   const removeLiveRef = useRef<(cardId: string) => void>(() => {});
   /** N, the toolbar button: the Note tool on or off (editors and reviewers, slice 3a). */
@@ -455,6 +485,10 @@ export function ModelCanvas({
       if ((e.key === "Delete" || e.key === "Backspace") && editable && live && selection?.t === "card") {
         e.preventDefault();
         removeLiveRef.current(selection.id);
+        return;
+      }
+      if ((e.key === "Delete" || e.key === "Backspace") && editable && selection?.t === "req" && removeReqRef.current(selection.id)) {
+        e.preventDefault();
         return;
       }
       if ((e.key === "Delete" || e.key === "Backspace") && canNote && selection?.t === "note") {
@@ -548,6 +582,64 @@ export function ModelCanvas({
     for (const [id, v] of grownVersions(initialCards, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
   }, [initialCards, editable, readAt]);
 
+  // ---- requirement cards (slice 4b-2): nodes of their own beside the cards; they move with the selection and leave as
+  // cards do, but join no frame (item 6). Fresh ones from the server are merged as the cards are. ----
+  const [reqNodes, setReqNodes] = useState<ReqNodeT[]>(() => initialReqCards.map((c) => toReqNode(c, editable)));
+  const reqNodesRef = useRef(reqNodes);
+  useEffect(() => {
+    reqNodesRef.current = reqNodes;
+  }, [reqNodes]);
+  useEffect(() => {
+    const pendingOf = (id: Uuid) => pending.current.get(id) ?? 0;
+    setReqNodes((ns) => {
+      const local = new Map(ns.map((n) => [n.id, n]));
+      const merged = mergeFresh(
+        ns.map((n) => n.data.card),
+        initialReqCards,
+        {
+          readAt,
+          pendingOf: (id) => pendingOf(id) + (local.get(id)?.dragging ? 1 : 0),
+          deletedHere: removedHere.current,
+          versionOf: (c) => Math.max(c.version, versions.current.get(c.id) ?? 0),
+          keep: (here, page) => ({ ...page, x: here.x, y: here.y }),
+        },
+      );
+      return merged.map((c) => {
+        const mine = local.get(c.id);
+        if (mine && c === mine.data.card) return mine;
+        const node = toReqNode(c, editable);
+        return mine?.dragging ? { ...node, position: mine.position, dragging: true } : node;
+      });
+    });
+    for (const [id, v] of grownVersions(initialReqCards, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
+  }, [initialReqCards, editable, readAt]);
+  /** Shows requirement cards at new places (data and node), not saved. */
+  const showReqs = useCallback((places: ReadonlyMap<string, { x: number; y: number }>) => {
+    setReqNodes((ns) =>
+      ns.map((n) => {
+        const p = places.get(n.id);
+        return p ? { ...n, position: { x: p.x, y: p.y }, data: { card: { ...n.data.card, x: p.x, y: p.y } } } : n;
+      }),
+    );
+  }, []);
+  const reqMoverRef = useRef<ReqMover | null>(null);
+  useEffect(() => {
+    reqMoverRef.current = {
+      has: (id) => reqNodesRef.current.some((n) => n.id === id),
+      at: (id) => {
+        const card = reqNodesRef.current.find((n) => n.id === id)?.data.card;
+        return card ? { x: card.x, y: card.y } : null;
+      },
+      show: showReqs,
+      drop: (ids) => {
+        for (const id of ids) removedHere.current.set(id, versions.current.get(id) ?? 1);
+        setReqNodes((ns) => ns.filter((n) => !ids.includes(n.id)));
+      },
+    };
+  }, [showReqs]);
+  /** The node of a requirement's card on this canvas, if it has one. */
+  const reqNodeOf = useCallback((requirementId: string) => reqNodesRef.current.find((n) => n.data.card.requirementId === requirementId) ?? null, []);
+
   const patchCard = useCallback((id: string, patch: CardPatch) => {
     setNodes((ns) =>
       ns.map((n) => {
@@ -612,6 +704,7 @@ export function ModelCanvas({
       }),
       ...frameRectsNow().filter(({ f }) => f.collapsed).map(({ r }) => r),
       ...noteBoxesRef.current.map((b) => b.rect),
+      ...reqNodesOf(rf).map(({ position, data: { card } }) => ({ x: position.x, y: position.y, w: REQ_CARD.width, h: requirementCardHeight(card.nameLines) })),
     ],
     [rf, cardsNow, frameRectsNow],
   );
@@ -844,6 +937,61 @@ export function ModelCanvas({
     [enqueue, removeCard, select, toast, ui, live, removeLive],
   );
 
+  // ---- requirement cards: placing and removing (slice 4b-2, items 7 and 13) ----
+  /** Places requirements' cards at these points in one change; the page brings the new cards. */
+  const placeReqCards = useCallback(
+    async (cards: { requirementId: string; x: number; y: number }[]): Promise<string[] | null> => {
+      if (!placeRequirementCards || !cards.length) return null;
+      let result: CanvasWriteResult<{ canvasItemIds: string[] }>;
+      try {
+        result = await placeRequirementCards(cards);
+      } catch {
+        result = FAILED;
+      }
+      if (!result.ok) {
+        toast(result.message, "refusal");
+        return null;
+      }
+      ui.undo()?.noteSaved();
+      return result.value.canvasItemIds;
+    },
+    [placeRequirementCards, toast, ui],
+  );
+  /** “Place its card on this canvas” (item 13; prototype req-card): at the top centre of the view, on the grid. */
+  const placeRequirementCard = useCallback(
+    (requirementId: string) => {
+      if (reqNodeOf(requirementId)) return;
+      const v = viewRect();
+      void placeReqCards([{ requirementId, x: snap8(v.x + v.w / 2 - REQ_CARD.width / 2), y: snap8(v.y + 60) }]);
+    },
+    [reqNodeOf, viewRect, placeReqCards],
+  );
+  /** Takes a requirement's card off this canvas; the requirement stays (item 7). */
+  const removeRequirementCard = useCallback(
+    (requirementId: string, options: { deselect?: boolean } = {}) => {
+      const node = reqNodeOf(requirementId);
+      if (!node || !editable) return;
+      const cardId = node.id;
+      enqueue(cardId, async () => {
+        let result: CanvasWriteResult<unknown>;
+        try {
+          result = await removeCard({ canvasItemId: cardId, expectedVersion: versions.current.get(cardId) ?? 1 });
+        } catch {
+          result = FAILED;
+        }
+        if (!result.ok) {
+          toast(result.message, "refusal");
+          return;
+        }
+        reqMoverRef.current?.drop([cardId]);
+        if (options.deselect) select(null);
+        const undo = ui.undo();
+        toast(`Removed ${node.data.card.key}'s card from this canvas. The requirement stays.`, "info", undo ? { label: "Undo", run: undo.undo } : undefined);
+      });
+    },
+    [reqNodeOf, editable, enqueue, removeCard, toast, select, ui],
+  );
+
   /** Feeding sources (left) or fed entities (right) beside a card, in one change (prototype placeNear, B-08). */
   const placeBeside = useCallback(
     async (wanted: readonly { target: CardTarget; rows: number }[], anchorCardId: string, side: "left" | "right") => {
@@ -943,6 +1091,7 @@ export function ModelCanvas({
     ask,
     groupOf: (frameId) => (selection?.t === "multi" && selection.keys.includes(frameKey(frameId)) ? unitsOf(selection.keys, boxes()) : null),
     notes: noteMoverRef,
+    reqs: reqMoverRef,
   });
   const { frames, saveLayout, arrangeIntoFrames } = frameState;
 
@@ -1000,20 +1149,28 @@ export function ModelCanvas({
     saveLayoutRef.current = saveLayout;
     deleteFrameRef.current = frameState.deleteFrame;
     deleteNoteRef.current = noteState.remove;
+    removeReqRef.current = (requirementId) => {
+      if (!reqNodeOf(requirementId)) return false;
+      removeRequirementCard(requirementId, { deselect: true });
+      return true;
+    };
     framesNowRef.current = frameState.framesNow;
     noteMoverRef.current = { noteOf: noteState.noteOf, show: noteState.show };
   });
   const cardData = useMemo(() => nodes.map((n) => n.data.card), [nodes]);
   // what Focus is on for this selection (slice 4b-1, item 21); Focus itself is a store of its own (`FocusDriver`)
   const focusTarget = useMemo(() => focusTargetOf(selection, cardData), [selection, cardData]);
+  const reqIdsKey = useMemo(() => reqNodes.map((n) => n.data.card.requirementId).join(","), [reqNodes]);
   // The panels that show frames draw again when frames, their cards or the cards' numbers change; not on a move.
   const layoutKey = useMemo(
     () =>
       JSON.stringify([
         frames.map((f) => [f.id, f.name, f.kind, f.conceptId, f.sourceSystemId, f.color, f.version, f.collapsed]),
         cardData.map((c) => [c.id, c.frameId, c.mapped, c.links.length, c.subject.entityConceptId ?? c.subject.sourceSystemId]),
+        // which requirements have a card here (slice 4b-2): their panels offer to place or remove it
+        reqIdsKey,
       ]),
-    [frames, cardData],
+    [frames, cardData, reqIdsKey],
   );
   const selectedFrameId = selection?.t === "frame" ? selection.id : null;
 
@@ -1029,7 +1186,8 @@ export function ModelCanvas({
   /** What stands for each frame on the canvas: the frame, or its block (selection marks, slice 2c). */
   const frameRects = useMemo(() => new Map(frames.map((f) => [f.id, frameShape(f, counts)])), [frames, counts]);
   const blockNodes = useMemo((): BlockNodeT[] => {
-    if (!collapsedIds.size) return [];
+    // the same empty list each time: a new one would rebuild the nodes React Flow gets on every selection (S4P-06)
+    if (!collapsedIds.size) return NO_BLOCK_NODES;
     const selectedKeys = selection?.t === "multi" ? new Set(selection.keys) : null;
     return frames
       .filter((f) => f.collapsed)
@@ -1111,8 +1269,11 @@ export function ModelCanvas({
     const cards = collapsedIds.size
       ? nodes.map((n) => (n.data.card.frameId && collapsedIds.has(n.data.card.frameId) ? { ...n, hidden: true } : n))
       : nodes;
-    return blockNodes.length ? [...cards, ...blockNodes] : cards;
-  }, [nodes, blockNodes, collapsedIds]);
+    const withBlocks = blockNodes.length ? [...cards, ...blockNodes] : cards;
+    // requirement cards last: above the cards, as in the prototype (step 2's LayerTree read: drawing them first changed
+    // no layer count)
+    return reqNodes.length ? [...withBlocks, ...reqNodes] : withBlocks;
+  }, [nodes, blockNodes, collapsedIds, reqNodes]);
   // ---- bundled lines (slice 2c, items 6 and 7): the lines touching a collapsed frame, grouped per pair of ends ----
   /** Which collapsed frame each hidden card is in, as one string: the bundles change only when it does. */
   const hiddenIn = useMemo(
@@ -1292,6 +1453,7 @@ export function ModelCanvas({
     canNote,
     notes: noteMoverRef,
     saveNoteMoves: noteState.saveMoves,
+    reqs: reqMoverRef,
   });
   useEffect(() => {
     groupDragRef.current = group.startDrag;
@@ -1364,6 +1526,12 @@ export function ModelCanvas({
             pinFrameId: n.pinFrameId,
             pinName: n.pinCardId ? nameOf("card", n.pinCardId) : n.pinFrameId ? nameOf("frame", n.pinFrameId) : null,
           })),
+      requirementCard: (requirementId) => {
+        const n = reqNodeOf(requirementId);
+        return n ? { cardId: n.id, key: n.data.card.key, name: n.data.card.name } : null;
+      },
+      placeRequirementCard,
+      removeRequirementCard,
       showNote: (id) => {
         select({ t: "note", id });
         const r = noteBoxesRef.current.find((b) => b.id === id)?.rect;
@@ -1386,7 +1554,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, fit, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   const onDragOver = useCallback((e: DragEvent) => {
@@ -1448,7 +1616,12 @@ export function ModelCanvas({
       // every round of React Flow's measuring re-rendered the whole canvas on every frame (S2C-12 diagnosis)
       const all = withGroup(changes.filter((c) => !("id" in c) || !c.id.startsWith("block:")));
       if (!all.length) return;
-      setNodes((ns) => applyNodeChanges(all, ns));
+      // a requirement card's changes are its own nodes' (slice 4b-2)
+      const isReq = (c: NodeChange<CardNodeT>) => "id" in c && reqNodesRef.current.some((n) => n.id === c.id);
+      const reqChanges = all.filter(isReq);
+      const cardChanges = reqChanges.length ? all.filter((c) => !isReq(c)) : all;
+      if (cardChanges.length) setNodes((ns) => applyNodeChanges(cardChanges, ns));
+      if (reqChanges.length) setReqNodes((ns) => applyNodeChanges(reqChanges as unknown as NodeChange<ReqNodeT>[], ns));
     },
     [withGroup],
   );
@@ -1467,6 +1640,13 @@ export function ModelCanvas({
     (_, node) => {
       setDragging(false);
       if (onGroupDragStop()) return;
+      // a requirement card: its position only, in no frame (slice 4b-2, item 6)
+      if ((node as unknown as ReqNodeT).type === "req") {
+        const at = (node as unknown as ReqNodeT).data.card;
+        const x = Math.round(node.position.x), y = Math.round(node.position.y);
+        if (x !== at.x || y !== at.y) saveLayout({ cards: [{ id: node.id, x, y }] });
+        return;
+      }
       const card = node.data.card;
       const x = Math.round(node.position.x), y = Math.round(node.position.y);
       if (x === card.x && y === card.y) return;

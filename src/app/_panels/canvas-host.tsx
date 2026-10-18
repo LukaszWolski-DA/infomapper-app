@@ -24,7 +24,7 @@ import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
 import { newCardHeight } from "@/canvas/geometry";
 import { FILTER_LABEL, filtersOf } from "@/canvas/CardNode";
 import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
-import { isCardKey } from "@/canvas/selection";
+import { isCardKey, isReqKey } from "@/canvas/selection";
 import { focusOn } from "@/canvas/fade";
 import { toggleFocus } from "@/canvas/Focus";
 import type { Uuid } from "@/domain/ids";
@@ -390,7 +390,8 @@ export function useCanvasHost({
         if (keys.some((k) => k.startsWith("entity:")) && !live) {
           items.push({ label: "Add sources of selected entities", act: () => ui.placeSourcesOfSelection((id) => feedingSourceCards(ix, id)) });
         }
-        if (cardKeys.length && !live) items.push({ label: "Remove from this canvas", danger: true, act: () => ui.removeSelection() });
+        // requirement cards leave with the selection too (slice 4b-2, L)
+        if ((cardKeys.length || keys.some(isReqKey)) && !live) items.push({ label: "Remove from this canvas", danger: true, act: () => ui.removeSelection() });
       }
       items.push({ sep: true });
       items.push({ label: "Clear selection", kbd: "Esc", act: () => ui.select(null) });
@@ -427,6 +428,22 @@ export function useCanvasHost({
         if (!("frameId" in e)) continue;
         const name = ui.frameView(e.frameId)?.frame.name ?? "?";
         items.push({ label: `Expand ${name}`, act: () => ui.setFrameCollapsed(e.frameId, false), testId: "toolbox-bundle-expand" });
+      }
+      return items;
+    }
+    if (t.kind === "requirement") {
+      // a requirement's card (slice 4b-2, item 7; prototype ctxFor “a requirement card”)
+      const card = ui.requirementCard(t.requirementId);
+      if (!card) return items;
+      items.push({ head: `${card.key} ${card.name}` });
+      if (editable) {
+        items.push({
+          label: "Remove its card from this canvas",
+          kbd: "Del",
+          danger: true,
+          testId: "toolbox-requirement-remove",
+          act: () => ui.removeRequirementCard(t.requirementId, { deselect: true }),
+        });
       }
       return items;
     }

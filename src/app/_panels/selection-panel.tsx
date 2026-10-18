@@ -6,12 +6,13 @@
 // Slice 2b: frames in the selection are counted (“3 entities, 2 frames”, the prototype's order) and listed (a link selects the frame); they
 // stand for their cards, so “Put in a new frame” and “Remove from this canvas” act on the selected cards only and are
 // offered only when there are some. Slice 3a: notes in the selection are counted and listed too (their first line; a
-// link selects the note); the group's actions leave them alone.
+// link selects the note); the group's actions leave them alone. Slice 4b-2 (L): requirement cards too, counted and listed
+// (key and name; a link selects the requirement); “Remove from this canvas” takes them off with the cards.
 
 import { useContext } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import { firstLine } from "@/canvas/note-data";
-import { isCardKey, isFrameKey, isNoteKey, type SelectionKey } from "@/canvas/selection";
+import { isCardKey, isFrameKey, isNoteKey, isReqKey, type SelectionKey } from "@/canvas/selection";
 import { Actions, buttonClass, dangerClass, Hint, Kind, Li, List, Section } from "./fields";
 import { usePanel } from "./inspector";
 import { feedingSourceCards } from "./model-index";
@@ -26,12 +27,14 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
   const tables = keys.filter((k) => k.startsWith("source:")).map(idOf);
   const frames = keys.filter(isFrameKey).map(idOf);
   const notes = keys.filter(isNoteKey).map(idOf);
+  const reqs = keys.filter(isReqKey).map(idOf);
   const cardKeys = keys.filter(isCardKey);
   const counts = [
     entities.length && plural(entities.length, "entity", "entities"),
     tables.length && plural(tables.length, "table", "tables"),
     frames.length && plural(frames.length, "frame", "frames"),
     notes.length && plural(notes.length, "note", "notes"),
+    reqs.length && plural(reqs.length, "requirement", "requirements"),
   ].filter(Boolean);
   const open = (targetId: string) => {
     const card = p.cardOf(targetId);
@@ -64,7 +67,7 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
           </button>
         )}
         {/* a live canvas removes one card at a time, each with its question (PRD item 12) */}
-        {p.editable && !p.live && cardKeys.length > 0 && (
+        {p.editable && !p.live && cardKeys.length + reqs.length > 0 && (
           <button type="button" className={dangerClass} data-testid="button-selection-remove" onClick={() => ui.removeSelection()}>
             Remove from this canvas
           </button>
@@ -82,6 +85,14 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
             return (
               <Li key={k} meta="note" onClick={() => ui.select({ t: "note", id })} testId="selection-item">
                 <span className="truncate">{firstLine(text) || "Empty note"}</span>
+              </Li>
+            );
+          }
+          if (isReqKey(k)) {
+            const r = p.rx.byId.get(id);
+            return (
+              <Li key={k} meta="requirement" onClick={() => ui.select({ t: "req", id })} testId="selection-item">
+                <span className="truncate">{r ? `${r.key} ${r.name}` : "?"}</span>
               </Li>
             );
           }

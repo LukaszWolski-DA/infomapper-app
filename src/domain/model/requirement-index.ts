@@ -35,7 +35,7 @@ export interface RequirementIndex {
 }
 
 const EMPTY_SCOPE: RequirementScope = { entities: new Set(), attributes: new Set(), mappings: new Set(), tables: new Set(), columns: new Set(), entityItems: new Set(), attributeItems: new Set() };
-const EMPTY_COVERAGE: RequirementCoverage = { total: 0, covered: [], notApproved: [], notMapped: [], entityGaps: [], parts: { entities: 0, attributes: 0 }, done: false };
+const EMPTY_COVERAGE: RequirementCoverage = { total: 0, covered: [], notApproved: [], notMapped: [], entityGaps: [], entityNotApproved: [], parts: { entities: 0, attributes: 0 }, done: false };
 const byKey = (a: Requirement, b: Requirement) => a.key.localeCompare(b.key, "en", { numeric: true, sensitivity: "base" });
 const KIND_ORDER = new Map(REQUIREMENT_KINDS.map((k, i) => [k, i]));
 

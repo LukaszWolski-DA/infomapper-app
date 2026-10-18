@@ -90,6 +90,20 @@ export interface FrameWrites {
 
 export type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width" | "frameId">>;
 
+/**
+ * The canvas's requirement cards as a layout save sees them (slice 4b-2): they move with a selection in the same change
+ * (one undo step), but join no frame and carry no height, so they stay out of the frame rules (`planLayout`).
+ */
+export interface ReqMover {
+  has: (id: Uuid) => boolean;
+  /** Where the card is saved now (not where a drag shows it). */
+  at: (id: Uuid) => Pt | null;
+  /** Shows the cards at these places (data and node), not saved. */
+  show: (places: ReadonlyMap<Uuid, Pt>) => void;
+  /** Takes these cards off the screen (removed). */
+  drop: (ids: readonly Uuid[]) => void;
+}
+
 export interface SaveLayoutOptions {
   /** Align, stack, line up: positions on the 8 px grid. */
   onGrid?: boolean;
@@ -134,9 +148,11 @@ interface Options {
   /** Shows the drop's question; resolves with the answer (true: move them in the model). */
   ask: (question: ConceptAsk) => Promise<boolean>;
   /** When this frame is part of a selection of several: what the selection moves (`unitsOf`), else null. */
-  groupOf: (frameId: Uuid) => { frames: Uuid[]; cards: Uuid[]; members: Uuid[]; notes: Uuid[] } | null;
+  groupOf: (frameId: Uuid) => { frames: Uuid[]; cards: Uuid[]; members: Uuid[]; notes: Uuid[]; reqs: Uuid[] } | null;
   /** The canvas's notes, to move selected ones with the rest (slice 3a); set once the notes are there. */
   notes: MutableRefObject<NoteMover | null>;
+  /** The canvas's requirement cards (slice 4b-2). */
+  reqs: MutableRefObject<ReqMover | null>;
 }
 
 const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
@@ -163,7 +179,7 @@ const boxOf = (f: FrameData, counts: ReadonlyMap<Uuid, number>): FrameBox => ({
 export function useFrames(o: Options) {
   const rf = useReactFlow();
   const toast = useToast();
-  const { editable, setNodes, patchCard, enqueueGroup, versions, pending, select, undo, writes, spaceDown, notes: noteMover } = o;
+  const { editable, setNodes, patchCard, enqueueGroup, versions, pending, select, undo, writes, spaceDown, notes: noteMover, reqs: reqMover } = o;
   /** The frames as saved (and as an editor changes them). */
   const [saved, setFrames] = useState<FrameData[]>(() => [...o.initialFrames]);
   /** Reviewers and readers: the frames collapsed or expanded in this tab only (item 11), by frame id. */
@@ -232,7 +248,13 @@ export function useFrames(o: Options) {
 
   // ---- every change of positions and widths ----
   const saveLayout = useCallback(
-    (change: LayoutChange, opts: SaveLayoutOptions = {}) => {
+    (whole: LayoutChange, opts: SaveLayoutOptions = {}) => {
+      // requirement cards move on their own, outside the frame rules, in the same change (slice 4b-2)
+      const reqs = reqMover.current;
+      const reqMoves = (whole.cards ?? []).filter((c) => reqs?.has(c.id) && c.x !== undefined && c.y !== undefined) as { id: Uuid; x: number; y: number }[];
+      const change: LayoutChange = reqMoves.length ? { ...whole, cards: (whole.cards ?? []).filter((c) => !reqs?.has(c.id)) } : whole;
+      const reqsBack = new Map(reqMoves.map((m) => [m.id, opts.from?.get(m.id) ?? reqs!.at(m.id) ?? { x: m.x, y: m.y }]));
+      if (reqMoves.length) reqs!.show(new Map(reqMoves.map((m) => [m.id, { x: m.x, y: m.y }])));
       const framesBefore = framesRef.current.map((f) => ({ ...f, ...(opts.framesFrom?.get(f.id) ?? {}) }));
       const before = planCards(opts.from);
       const beforeById = new Map(before.map((c) => [c.id, c]));
@@ -307,11 +329,11 @@ export function useFrames(o: Options) {
         : null;
       // asked at once, while the write waits in the queue (the drop is already on the screen)
       const answer = question ? askRef.current(question) : Promise.resolve(false);
-      if (!touched.length && !moved.size && !noteMoves.length) return;
+      if (!touched.length && !moved.size && !noteMoves.length && !reqMoves.length) return;
       const widths = new Map((change.cards ?? []).filter((c) => c.width !== undefined).map((c) => [c.id, c.width]));
       const positions = new Map((change.cards ?? []).filter((c) => c.x !== undefined).map((c) => [c.id, c]));
       const frameIds = framesBefore.map((f) => f.id);
-      enqueueGroup([...frameIds, ...touched, ...noteMoves.map((m) => m.id)], async () => {
+      enqueueGroup([...frameIds, ...touched, ...noteMoves.map((m) => m.id), ...reqMoves.map((m) => m.id)], async () => {
         const moveToConcepts = await answer;
         let result: WriteResult<Versions & { movedToConcepts: number }>;
         try {
@@ -327,7 +349,7 @@ export function useFrames(o: Options) {
                 ...(widths.has(id) ? { width: widths.get(id)! } : {}),
                 height: beforeById.get(id)!.height,
               };
-            }),
+            }).concat(reqMoves.map((m) => ({ canvasItemId: m.id, expectedVersion: ver(m.id), x: m.x, y: m.y }))),
             ...(opts.onGrid ? { onGrid: true } : {}),
             ...(moveToConcepts ? { moveToConcepts: true } : {}),
             ...(opts.ask ? { dragDrop: true } : {}),
@@ -349,13 +371,14 @@ export function useFrames(o: Options) {
           if (question) toast(moveToConcepts ? question.moved : question.kept, "info", moveToConcepts && u ? { label: "Undo", run: u.undo } : undefined);
         } else {
           for (const [id, back] of cardsBack) patchCard(id, back);
+          if (reqsBack.size) reqMover.current?.show(reqsBack);
           patchFrames(framesBack);
           noteMover.current?.show(notesBack);
           toast(result.message, "refusal");
         }
       });
     },
-    [planCards, boxes, rf, patchCard, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast, noteMover],
+    [planCards, boxes, rf, patchCard, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast, noteMover, reqMover],
   );
 
   // ---- dragging a frame, resizing it ----
@@ -373,6 +396,8 @@ export function useFrames(o: Options) {
         loose: Set<Uuid>;
         /** Selected notes that move by themselves, and where each started (place or offset, slice 3a). */
         notes: Map<Uuid, Pt>;
+        /** Selected requirement cards, and where each started (slice 4b-2). */
+        reqs: Map<Uuid, Pt>;
         dx: number;
         dy: number;
         moved: boolean;
@@ -416,9 +441,15 @@ export function useFrames(o: Options) {
           return n ? [[id, { x: n.x, y: n.y }] as const] : [];
         }),
       );
-      press.current = { kind: "move", frameId, sx: e.clientX, sy: e.clientY, zoom, frames, members, loose, notes, dx: 0, dy: 0, moved: false };
+      const reqs = new Map(
+        (group?.reqs ?? []).flatMap((id) => {
+          const at = reqMover.current?.at(id);
+          return at ? [[id, at] as const] : [];
+        }),
+      );
+      press.current = { kind: "move", frameId, sx: e.clientX, sy: e.clientY, zoom, frames, members, loose, notes, reqs, dx: 0, dy: 0, moved: false };
     },
-    [editable, rf, nodes, spaceDown, noteMover],
+    [editable, rf, nodes, spaceDown, noteMover, reqMover],
   );
 
   // Window listeners subscribe once and read the latest callbacks: re-subscribing in the middle of a pointerup would
@@ -470,6 +501,7 @@ export function useFrames(o: Options) {
         const changes: NodeChange<CardNodeT>[] = [...q.members].map(([id, s]) => ({ type: "position", id, position: { x: s.x + q.dx, y: s.y + q.dy } }));
         if (changes.length) setNodes((ns) => applyNodeChanges(changes, ns));
         if (q.notes.size) noteMover.current?.show(new Map([...q.notes].map(([id, s]) => [id, { x: s.x + q.dx, y: s.y + q.dy }])));
+        if (q.reqs.size) reqMover.current?.show(new Map([...q.reqs].map(([id, s]) => [id, { x: s.x + q.dx, y: s.y + q.dy }])));
       });
     };
     const up = () => {
@@ -498,7 +530,8 @@ export function useFrames(o: Options) {
         if (p.moved) setNodes((ns) => applyNodeChanges([...p.members].map(([id, s]) => ({ type: "position", id, position: s, dragging: false })), ns));
         if (p.moved) patchFrames(p.frames);
         if (p.moved) noteMover.current?.show(p.notes);
-        else select({ t: "frame", id: p.frameId });
+        if (p.moved && p.reqs.size) reqMover.current?.show(p.reqs);
+        if (!p.moved) select({ t: "frame", id: p.frameId });
         return;
       }
       swallowNextClick();
@@ -506,11 +539,11 @@ export function useFrames(o: Options) {
       saveLayout(
         {
           frames: [...p.frames].map(([id, s]) => ({ id, ...by(s) })),
-          cards: [...p.loose].map((id) => ({ id, ...by(p.members.get(id)!) })),
+          cards: [...[...p.loose].map((id) => ({ id, ...by(p.members.get(id)!) })), ...[...p.reqs].map(([id, s]) => ({ id, ...by(s) }))],
           notes: [...p.notes].map(([id, s]) => ({ id, ...by(s) })),
         },
         // a group with cards of its own is a drag drop: they may be asked about (D-05)
-        { framesFrom: p.frames, from: p.members, notesFrom: p.notes, ...(p.loose.size ? { ask: true } : {}) },
+        { framesFrom: p.frames, from: new Map([...p.members, ...p.reqs]), notesFrom: p.notes, ...(p.loose.size ? { ask: true } : {}) },
       );
     };
     window.addEventListener("pointermove", move);
@@ -521,7 +554,7 @@ export function useFrames(o: Options) {
       window.removeEventListener("pointerup", up);
       window.removeEventListener("pointercancel", up);
     };
-  }, [setNodes, noteMover]);
+  }, [setNodes, noteMover, reqMover]);
 
   /** A frame given a new size: saved with the cards that join or leave it (D-06). */
   const resize = useCallback(

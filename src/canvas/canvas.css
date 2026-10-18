@@ -109,6 +109,28 @@
 .im-canvas .c-lod { padding: 6px 10px }
 .im-canvas .c-block { height: 100%; border-radius: 4px; background: var(--im-hover) }
 
+/* ---------- requirement cards (slice 4b-2, D-41; prototype .rq-card) ----------
+   230 px, a filled header in the reserved violet, the name, a three-part bar and the status pill. AD-24 rule 4: the kind
+   icon is a mask (one element), the bar one element with a gradient, no opacity, no transform, no overflow: hidden (the
+   header carries its own top corners). Its height is set from its name's lines; the selection mark is in the overlay. */
+.im-canvas .rq-card { width: 230px; background: var(--im-surface); border-radius: 8px; user-select: none; cursor: move;
+  box-shadow: 0 0 0 1px var(--im-req-head), 0 8px 18px -10px var(--im-shadow) }
+.im-canvas .rq-card .rh { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px; font-size: 11px; line-height: 14px;
+  background: var(--im-req-head); color: var(--im-req-on); border-radius: 8px 8px 0 0 }
+.im-canvas .rq-card .k { font-family: var(--font-mono, ui-monospace, monospace); font-weight: 500 }
+.im-canvas .rq-card .kind { margin-left: auto }
+.im-canvas .ric { display: inline-block; width: 13px; height: 13px; flex: none; background-color: currentColor; mask: center / 13px 13px no-repeat }
+.im-canvas .ric.need { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Ccircle cx='8' cy='8' r='5.5'/%3E%3Ccircle cx='8' cy='8' r='2.5'/%3E%3C/svg%3E") }
+.im-canvas .ric.data { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Cellipse cx='8' cy='4' rx='5' ry='2'/%3E%3Cpath d='M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2'/%3E%3C/svg%3E") }
+.im-canvas .ric.business_rule { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M8 2.5v11M4 13.5h8M2.5 5.5h11M4.5 5.5L2.5 10h4zM11.5 5.5L9.5 10h4z'/%3E%3C/svg%3E") }
+.im-canvas .ric.dq_rule { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Cpath d='M8 2l5 2v4c0 3-2.2 5-5 6-2.8-1-5-3-5-6V4z'/%3E%3Cpath d='M5.8 8.2l1.6 1.6 3-3.2'/%3E%3C/svg%3E") }
+.im-canvas .ric.non_functional { mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' fill='none' stroke='%23000' stroke-width='1.5' stroke-linejoin='round' stroke-linecap='round'%3E%3Crect x='3.5' y='7' width='9' height='6.5' rx='1'/%3E%3Cpath d='M5.5 7V5a2.5 2.5 0 015 0v2'/%3E%3C/svg%3E") }
+.im-canvas .rq-card .rn { padding: 8px 10px 6px; font-weight: 600; font-size: 13px; line-height: 17px; overflow-wrap: anywhere }
+.im-canvas .rq-card .tri { height: 5px; margin: 0 10px 6px; border-radius: 3px;
+  background: linear-gradient(to right, var(--im-map) 0 var(--a), var(--im-review-strong) var(--a) var(--b), var(--im-line) var(--b) 100%) }
+.im-canvas .rq-card .rf { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 9px; font-size: 11px; color: var(--im-ink-3) }
+.im-canvas .rq-card .st-pill { background: var(--im-req-soft); color: var(--im-req-ink); border-radius: 6px; padding: 1px 6px; font-weight: 500 }
+
 /* ---------- empty canvas (prototype #empty) ---------- */
 .im-empty { position: absolute; inset: 0; display: grid; place-items: center; pointer-events: none; color: var(--im-ink-3); text-align: center }
 .im-empty b { display: block; color: var(--im-ink-2); font-size: 15px; font-weight: 500; margin-bottom: 4px }
@@ -126,6 +148,7 @@
 .im-canvas .overview-view { position: absolute; inset: 0; display: block; cursor: pointer; touch-action: none }
 .im-canvas .overview-svg .me { fill-opacity: .55; stroke: none }
 .im-canvas .overview-svg .ms { fill: var(--im-physical); fill-opacity: .5; stroke: none }
+.im-canvas .overview-svg .mq { fill: var(--im-req); fill-opacity: .85; stroke: none }
 .im-canvas .overview-svg .mm { stroke: var(--im-map); stroke-opacity: .55; stroke-width: 1; vector-effect: non-scaling-stroke }
 .im-canvas .overview-svg .mr { stroke: var(--im-rel); stroke-opacity: .7; stroke-width: 1; vector-effect: non-scaling-stroke }
 .im-canvas .overview-view .mv { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1.5; vector-effect: non-scaling-stroke; cursor: grab }
@@ -259,6 +282,7 @@ body.connecting .im-canvas .row { cursor: crosshair }
 /* ---------- several selected cards and the lasso (slice 2a; prototype .card.msel, #selbox, #lasso) ----------
    Drawn in the overlay: the cards are not restyled (AD-24). One box, one label and one lasso, so the fills are fine. */
 .im-canvas .selection-layer .msel { fill: none; stroke: var(--im-logical); stroke-width: 2; vector-effect: non-scaling-stroke }
+.im-canvas .selection-layer .msel.req { stroke: var(--im-req); stroke-width: 3 }
 .im-canvas .selection-layer .selbox { fill: none; stroke: var(--im-logical); stroke-width: 1.5; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke }
 .im-canvas .selection-layer .lasso { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1; vector-effect: non-scaling-stroke }
 .im-canvas .selbox-label { position: absolute; transform-origin: 0 0; pointer-events: none; white-space: nowrap; background: var(--im-logical);

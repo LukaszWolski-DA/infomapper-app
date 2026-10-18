@@ -25,6 +25,93 @@ those. Its own children are what it would overlap. That is a reason to expect an
 the overlay before the veil has a layer of its own, and 4b-1's step 6 read found the coverage SVG with one (2–8 Mpx)
 without a veil. So the read before step 6 first asks why that SVG had a layer; without an answer, T3 is dropped.
 
+## Step 2: the card (18 October 2026)
+
+Items 1–7, 13 and 25, with the answers G, H, I, J, L and N where they touch the card.
+
+### What changed
+
+| Part | Change |
+| --- | --- |
+| Data (Q1) | The adapter's guard `canvas_item_no_requirement_yet` is gone; undo checks a card's requirement as its parent; deleting a requirement soft-deletes its cards on every canvas in the same change group |
+| Domain | `placeRequirementCards` (one or more, one change group; refused for reviewers and readers, a second card on a canvas, a deleted requirement); `card-kinds.ts` (`isRequirementCard`, `isElementCard`); the frame rules, the live sync and note pins ignore requirement cards (item 6, G, N); `moveOnCanvas` moves requirement cards by position only, never into a frame; removing them on a live canvas needs no label (G); `coverageBar` and `entityNotApproved` for the bar's middle part over entity items (item 2); `requirementCardSpots`, item 15's placing rule (pure, used by the seed now and by the panels in step 4) |
+| Canvas | `RequirementCardNode`, a third React Flow node type with its own state beside the cards; `requirement-card-data.ts` builds the cards on the server from the requirement index. Selecting it is selecting the requirement (`req:<id>` keys in the selection); the mark is in the overlay (`SelectionOverlay`); single drag, group drag, nudge, lasso and Ctrl+A move it in the same change as the cards (`ReqMover` in `useFrames` and `GroupActions`, one undo step); Delete and the card's menu remove the card; fit (F) and the Overview's miniature include it (I) |
+| Panels | The requirement panel: “Place its card on this canvas” (the view's top centre) or “Remove its card from this canvas”; the Requirements tab's “Only on this canvas” and the on-canvas dot (J) |
+| Seed (A) | REQ-104's card on “Customer & orders”, by item 15's rule from the Sales cards' box (below) |
+
+### The seed's REQ-104 card: where item 15's rule put it
+
+Answer A said 80 px right of the Sales cards' box, 40 px below its top: (1176, 608). The `order_line` table already
+stands at (1176, 600), with two notes pinned below it. So the seed uses item 15's rule from that point: down in 16 px
+steps to the first place 20 px clear of cards and notes. The card lands at **(1176, 1136)**, below `order_line`'s notes,
+right of the Sales cards. If you prefer it elsewhere (for instance right of `order_line`, at x = 1512), say so.
+
+### Assumptions
+
+- **No toast when placing from the requirement's panel** (prototype `req-card`); removing a card toasts “Removed
+  REQ-104's card from this canvas. The requirement stays.” with Undo, as removing an element card does.
+- **Delete and the card's menu clear the selection** after removing the card (prototype); the panel's “Remove its card”
+  keeps the requirement selected, so its panel stays open.
+- **The project tiles have no thumbnails** in the app (an empty strip), so I's “tiles” part has nothing to draw. The
+  tile's card count stays the entity and table cards.
+- **A live canvas's “Remove from this canvas” for several** still refuses when the selection holds element cards (D-11);
+  a selection of requirement cards only is removed.
+- **The height** comes from the name's lines (`requirementNameLines`, an estimate that errs on more lines), so the card's
+  height is the same at every zoom and known before it is drawn. S4B2-01 checks that the name never reaches the bar.
+
+### LayerTree read against `slice-04b1` (AD-24 rule 4)
+
+Measurement builds of both sides (`../infomapper-ab-main` moved to `slice-04b1`; its earlier sitting copies are in a git
+stash there), CDP `LayerTree`, no timing (`.data/measure/s4b2-step2-layers/`). “Performance test” with requirement cards
+placed through the domain: in a grid over whatever is in view, or by item 15's rule beside elements.
+
+| View | Cards | Drawing layers (`slice-04b1`) | Drawing Mpx | Viewport elements |
+| --- | --- | --- | --- | --- |
+| “Customer & orders”, 60 % | REQ-104 (seed) | 8 (7) | 4.5 (4.5) | 612 (601) |
+| Performance test, 100 % dense | 0 / 1 / 12 grid / 12 beside | 47 / 47 / 47 / 47 (47) | 68.4 | +0 / +11 / +132 / +132 |
+| Performance test, 30 % ent:23 | 0 / 1 / 12 grid / 12 beside | 47 / 48 / **53** / 47 (47) | 69.2–69.4 | +0 / +8 / +96 / +96 |
+
+- **Elements per card: 11 at 40 % and above, 8 below** (step 1 estimated 7 below: the plain block has an inner element,
+  as on entity cards).
+- **No growth at 100 %, and none at 30 % with item 15's placement.**
+- **At 30 %, cards laid over frames and other cards get a layer each** for “Overlaps other composited content”: 6 of 12.
+  The frames' bodies, labels and handles are composited in that view. Element cards there squash into one shared layer;
+  scattered requirement cards do not (Chrome does not squash sparse layers). Notes behave the same way today (each note
+  over composited content has its own layer in the same read). Drawing the requirement cards below the cards instead of
+  above them changed nothing, so they stay above (prototype).
+- **“Customer & orders” +1:** REQ-104's card next to the pinned notes, for the same reason.
+- **Reading:** the rule holds for cards where the app places them; a user who drops many cards over frames at 30 % adds
+  a layer per card, as with notes. S4B2-15 counts this again in the closing sitting.
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `e2e/slice-04b2/S4B2-01.spec.ts` (new) | the card's content against the domain for REQ-101, REQ-104, REQ-105; tooltip; 230 px; the name above the bar; below 40 % header and block at the same height |
+| `e2e/slice-04b2/S4B2-02.spec.ts` (new) | placed from the panel at the view's top centre; one per canvas; moved on the grid and kept out of a frame; removed from the panel, the menu and by Delete; deleting REQ-104 removes its cards on both canvases, undo restores them; Ctrl+A and a group drag take it along, one undo |
+| Unit (new) | `requirement-card-data.test.ts`, `requirement-placement.test.ts`; requirement cards in `canvas-item`, `frame` (moves), `requirement` (cascade and undo), `canvas` (duplicate copies them, H), `selection`, `text-fit`, `requirements` (`coverageBar`), the adapter (a requirement card, one per canvas) |
+| `e2e/slice-01a/helpers.ts` (changed) | `loadItems` returns the entity and table cards, as every caller meant; `loadRequirementCards` and `cardNodes` are new |
+| `src/data/local/model-store.test.ts`, `requirement-store.test.ts` (changed) | the demo seed's counts: seven element cards plus REQ-104's card; REQ-104's card is the only requirement card |
+| `selection.test.ts`, `requirements.test.ts` (changed) | `unitsOf` returns `reqs`; coverage carries `entityNotApproved` |
+
+### Proposed texts (for Łukasz's approval; not applied)
+
+**`docs/decisions.md` D-41**, replacing the line:
+
+> **D-41** Requirement card: 230 px, filled header in a reserved violet (excluded from the concept palette) with the
+> kind's icon, the key and the kind's name; the name; a three-part coverage bar over the requirement's items (D-31):
+> covered, mapped but not approved, not mapped (an entity item is mapped when any of its attributes has a mapping); the
+> status badge and “{m} of {n} covered”. Below 40 % the header and a plain block. Selecting the card is selecting the
+> requirement. A requirement has at most one card per canvas; its cards are layout, never frame members, carry no label
+> on a live canvas and hold no pinned notes; Duplicate layout copies them. (Changed in slice 4b-2.)
+
+**`docs/data-model-v2.md`**, under `canvas_item`, after the table:
+
+> A requirement card (`requirement_id` set) stores `width` null (drawn 230 px), `collapsed` false, `row_filter` `all`,
+> and `frame_id` and `live_level` null: it is layout only (slice 4b-2).
+
+RUNS_PLACEHOLDER
+
 ## Step 1 (18 October 2026)
 
 - **Start:** local `main` was behind `origin/main` (`052daaf`); fast-forwarded to `8133ee8` (tag `slice-04b1`), tree

@@ -20,12 +20,14 @@ import {
   requirementWithKey,
 } from "../model/requirements";
 import { sanitizeRich } from "../model/rich-text";
+import { requirementCardsGone } from "./canvas-item";
 import type { WorkspaceAccess } from "../permissions";
 import {
   REQUIREMENT_KINDS,
   REQUIREMENT_PRIORITIES,
   REQUIREMENT_SEVERITIES,
   REQUIREMENT_STATUSES,
+  type CanvasItem,
   type Requirement,
   type RequirementLink,
 } from "../types";
@@ -238,13 +240,14 @@ const deleteInput = z.object(ref).strict();
 export type DeleteRequirementInput = z.input<typeof deleteInput>;
 
 /**
- * Deletes a requirement (prototype behaviour, no impact dialog): its links go, its children become top level, model
- * elements are untouched. One change group, so one undo brings it all back.
+ * Deletes a requirement (prototype behaviour, no impact dialog): its links go, its children become top level, its
+ * cards leave every canvas (slice 4b-2, PRD item 7; `items`: the workspace's cards), model elements are untouched. One
+ * change group, so one undo brings it all back.
  */
 export function deleteRequirement(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: { requirements: readonly Requirement[]; links: readonly RequirementLink[] },
+  state: { requirements: readonly Requirement[]; links: readonly RequirementLink[]; items: readonly CanvasItem[] },
   input: unknown,
 ): CommandResult<{ key: string; message: string }> {
   const parsed = begin(access, "requirement.edit", deleteInput, input);
@@ -258,6 +261,7 @@ export function deleteRequirement(
     ...state.requirements
       .filter((r) => isLive(r, ws) && r.parent_id === requirement.id)
       .map((r): Write => ({ kind: "update", table: "requirement", before: r, row: nextVersion(ctx, r, { parent_id: null }) })),
+    ...requirementCardsGone(ctx, ws, state.items, new Set([requirement.id])),
     softDelete(ctx, "requirement", requirement),
   ];
   return done(ctx, access, { key: requirement.key, message: DELETED_REQUIREMENT_MESSAGE(requirement.key) }, writes);
