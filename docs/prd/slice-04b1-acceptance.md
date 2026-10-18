@@ -1,7 +1,7 @@
 # Slice 4b-1 – Acceptance
 
-Status: **steps 1 to 8 done; Łukasz's decisions after the sitting applied (17 October 2026); waiting for his manual acceptance.** Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
-(`052daaf`), draft pull request #13. PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
+Status: **accepted by Łukasz on 18 October 2026** (manual acceptance passed); merged as pull request #13, tag `slice-04b1`. Branch `slice/04b1-lens-focus`, from `main` at the tag `slice-04p`
+(`052daaf`). PRD: `docs/prd/slice-04b1-coverage-focus.md`. Step 0:
 `docs/perf/04b1-step0-switch-trace.md`.
 
 ## Step 8, part 3: Łukasz's decisions after the sitting (17 October 2026)
@@ -70,6 +70,11 @@ redefinition left to the performance review before the database slice.
 
 Applied as approved, with the bracket: “Partly met: pan and zoom with Focus on at 30 % lose 22–40 % of presented frames
 (slice 4b-1); T1 applied in 4b-1, T2 and T3 with slice 4b-2.”
+
+**Rule (4), as Łukasz worded it (18 October 2026), applied:** “A new repeated element in cards is checked with a
+LayerTree read against the previous slice: drawing layers must not grow with the number of cards (slice 4b-1: the
+requirement marker's filled pill added two compositing layers per marker by overlap).” The text below is the proposal it
+replaced.
 
 **The rule in (4) is not applied.** “No transform on small repeated elements in cards” was to follow if the read
 confirmed the transform as the cause, and it did not. **Proposed instead, for Łukasz's approval:** in rule (4), “no

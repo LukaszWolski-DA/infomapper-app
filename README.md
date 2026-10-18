@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 4p are merged (4p: the canvas performance review); slice 4b-1 (requirements on the canvas: markers, coverage colours, Focus) is in review; next is slice 4b-2 (requirement cards). On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 4b-1 are merged (4b-1: requirements on the canvas: markers, coverage colours, Focus); next is slice 4b-2 (requirement cards). On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -23,14 +23,14 @@ requirement panel with coverage computed from the mappings, Requirements section
 home and the status bar, reviewers setting the status as their approval, four-eyes) and the rich-text editor for
 definitions and descriptions; slice 4p's performance review: the hover and selection marks on an overlay of their own
 (C-10 from about 120 ms to about 19 ms), the fading mechanism slice 4b's Focus and requirement lens will use, and error
-pages with a boundary around the canvas; slice 4b-1's requirements on the canvas (in review): requirement markers on
+pages with a boundary around the canvas; slice 4b-1's requirements on the canvas: requirement markers on
 cards, coverage colours when a requirement is selected (blue covered, orange gaps; a dot below 40 % and on collapsed
 blocks), Focus on any selection from the toolbar, the menus and a chip, entity links as items of their own, and figures
 measured to the screen. Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md) (in review).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md).
 
 ## Getting started
 
