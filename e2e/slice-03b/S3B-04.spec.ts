@@ -48,6 +48,8 @@ test("S3B-04: a reviewer and a reader see no context switch; a write sent with a
   await rowNamed(o0, "Customer", model.attributes.find((a) => a.id === used.attribute_id)!.name).click();
   await o0.getByTestId("list-attribute-mappings").getByRole("button").filter({ hasText: labelOf(used) }).click();
   const statusId = await captureActionId(o0, () => o0.getByTestId("panel-mapping").getByTestId("seg-mapping-status").getByRole("button", { name: "In review" }).click());
+  // the write lands before its version is read below (with one draft, `draft` is `used`; slice 4b-2, step 4)
+  await expect.poll(async () => (await loadModel()).mappings.find((m) => m.id === used.id)!.status).toBe("review");
   await owner0.page.context().close();
 
   const links = await linkedTo("CR-23");
