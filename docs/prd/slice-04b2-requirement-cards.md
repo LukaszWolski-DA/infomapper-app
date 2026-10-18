@@ -1,6 +1,6 @@
 # Slice 4b-2 – Requirement cards on the canvas
 
-Status: **draft for step 1**, 18 October 2026. Branch `slice/04b2-requirement-cards`, from `main` at tag `slice-04b1`
+Status: **step 1 accepted** with Łukasz's answers A–N (section 10), 18 October 2026. Branch `slice/04b2-requirement-cards`, from `main` at tag `slice-04b1`
 (`8133ee8`).
 
 ## 1. Why this slice
@@ -81,8 +81,9 @@ Decisions agreed with Łukasz on 18 October 2026:
 11. **Where they are drawn:** in the existing lines SVG layer (AD-24 rule 3), so they are rastered once and moved by the
     compositor while panning. They are redrawn when a card at either end moves or resizes, a link changes, or a frame
     collapses or expands.
-12. **Dimming:** while another element (not a requirement) is selected or hovered, trace lines are dimmed, as in the
-    prototype; under Focus they follow their card (item 21).
+12. **Dimming:** while another element (not a requirement) is selected, trace lines are dimmed with the other lines (the
+    line layer's existing class); a hover dims none, as for mapping lines since slice 4p (B). Under Focus they follow
+    their card (item 21).
 
 ### Placing cards
 
@@ -120,11 +121,15 @@ Decisions agreed with Łukasz on 18 October 2026:
 ### Focus with requirement cards
 
 20. Focus's veil (F4) cuts a hole at each lit requirement card.
-21. A requirement card is lit when its requirement is selected or is linked to anything in the lit set; its trace lines
-    are lit when both ends are lit, otherwise faded with the veil.
-22. **T3:** the lit lines of Focus and of the coverage colours are drawn in the overlay's existing layer, without a
-    large SVG layer of their own. Checked by a LayerTree read (layer count and sizes) before and after; judged in the
-    closing sitting (S4B1-11 rerun).
+21. A requirement card is lit when its requirement is the Focus target, or when its requirement's scope contains the
+    focused element itself (prototype `reqActive`; C): for a frame any member, for several any of them, for a mapping
+    the mapping or its attribute, for a relationship either entity. Its trace lines are lit when both ends are lit,
+    otherwise faded with the veil.
+22. **T3, conditional (D):** before step 6, what is different from step 0's B2 (refuted: every veil is composited by
+    overlap) is reported. Only with a reason to expect another result does a LayerTree read (no timing) check the veil
+    without a layer of its own. Without such a reason, or if the read shows an overlap layer, T3 is dropped: step 6 is
+    Focus with requirement cards only, and S4B2-11 is measured as it is (partly met if it misses, to the performance
+    review).
 
 ### Project home
 
@@ -141,9 +146,11 @@ Decisions agreed with Łukasz on 18 October 2026:
 
 ### Seeds
 
-25. The demo seed places REQ-104's card to the right of the Sales frame (prototype `placeSeedReq`).
-26. `seed:large` places a set of requirement cards with trace lines in “Performance test” for the closing sitting; the
-    number and placement are proposed in step 1 (Q8).
+25. The demo seed places REQ-104's card on “Customer & orders”, 80 px to the right of the box around the Sales
+    concept's cards (Sales Order, Order Line) and 40 px below its top, on the grid: where the prototype's Sales frame
+    puts it (`placeSeedReq`; the demo seed has no frames; A).
+26. `seed:large` adds a second canvas, “Performance test – requirements”: the same layout, frames and notes, plus 12
+    requirement cards with about 120 trace lines (acceptance doc, Q8). “Performance test” stays as in `slice-04b1` (E).
 
 ## 4. Steps (stop after each one)
 
@@ -230,6 +237,10 @@ untraced calibration pan per case and round. Covers S4B2-10 to S4B2-15 only. Ste
 - Trace lines into a collapsed frame end at the block's member row (the prototype draws none to a hidden card).
 - The bar's middle part covers entity items too (4b-1's items).
 - Reviewer and reader cannot place, link or remove (AD-05).
+- A hover dims no trace line (B; slice 4p's C-10 decision).
+- Duplicate layout copies requirement cards: they are part of the canvas's layout (H; the prototype copies none).
+- Requirement cards take part in the lasso and Ctrl+A (L; the prototype drags them one at a time).
+- Requirement cards are allowed on live canvases as layout only (G).
 - Focus fades and lights requirement cards through F4's veil; selecting a requirement alone fades nothing (since 4b-1).
 
 ## 9. Docs in this PR
@@ -246,3 +257,29 @@ untraced calibration pan per case and round. Covers S4B2-10 to S4B2-15 only. Ste
   resolved (link to this PRD).
 - `docs/data-model-v2.md`: only if Q1 finds a gap.
 - README and CLAUDE.md: slice status; requirement cards and trace lines in the canvas section; the seed.
+
+## 10. Decisions after step 1 (18 October 2026)
+
+Łukasz's answers to the acceptance doc's questions (`docs/prd/slice-04b2-acceptance.md`, step 1):
+
+- **A.** REQ-104's seeded card: right of the Sales concept's cards (item 25).
+- **B.** Trace lines dim on a selection, not on a hover (item 12).
+- **C.** The prototype's rule for lit requirement cards (item 21).
+- **D.** T3 only with a reason to expect another result than step 0's B2, checked by a LayerTree read; otherwise
+  dropped (item 22).
+- **E.** “Performance test – requirements” as a second canvas (item 26).
+- **F.** S4B2-12's drop highlight anchors on a mark set before each dispatched `dragover`; step 5's smoke checks it.
+- **G.** Requirement cards on live canvases are layout only: no label changes, no question; the live sync and the live
+  arrange ignore them.
+- **H.** Duplicate layout copies requirement cards (a deliberate difference from the prototype).
+- **I.** Fit everything, the Overview's miniature and the project home's tiles include requirement cards.
+- **J.** The Requirements tab's “Only on this canvas” lists the requirements with a card here; requirement rows get the
+  on-canvas dot.
+- **K.** The project home lists a requirement whose card lies on one of the project's canvases.
+- **L.** The lasso and Ctrl+A take requirement cards; moving, “Remove from this canvas” and Delete act on them;
+  arranging, fitting widths and placing sources ignore them.
+- **M.** A requirement whose card is already on the canvas, dropped on empty canvas, moves its card there (“Move
+  card”, “Moved {key}'s card.”).
+- **N.** Notes are not pinned to requirement cards.
+- **Earlier tests:** where a test means entity and table cards, its selector is narrowed; expectations stay.
+- **S4B2-13:** both drags measured as presented frames, on both sides, in every round.

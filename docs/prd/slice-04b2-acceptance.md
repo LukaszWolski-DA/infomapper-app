@@ -1,7 +1,29 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 1, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
-(`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md`.
+Status: **step 2, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+(`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
+
+## Łukasz's answers after step 1 (18 October 2026)
+
+- **A, B, C, E, F:** as proposed.
+- **G, I, J, K, L, M, N:** as proposed.
+- **H: the opposite.** Duplicate layout copies requirement cards too: they are part of the canvas's layout. A deliberate
+  difference from the prototype.
+- **D:** “the veil without its own layer” is B2, which step 0's layer check refuted (Chrome composites every veil by
+  overlap). Before step 6, say what is different now:
+  - with a reason to expect another result, check it with a LayerTree read only (no timing, no laptop preparation);
+  - without one, or if the read shows an overlap layer: T3 is dropped. Step 6 is then Focus with requirement cards
+    only, and S4B2-11 is measured as it is; if it misses, it is partly met and goes to the performance review.
+- **Costly or unclear:** the proposals accepted. Where a test means entity and table cards, its selector is narrowed.
+  S4B2-13's drags are measured as presented frames on both sides in every round.
+- **Then step 2** (the card), stopping after it.
+
+**What D will need before step 6** (noted now, reported then). B2 put the veil in the viewport's big layer, and the
+check found Chrome composites it by overlap with the notes', frames' and sticky headers' layers below it. Step 1's
+proposal puts it **inside the overlay**, which is already a composited layer (`will-change: transform`) above all of
+those. Its own children are what it would overlap. That is a reason to expect another result only if nothing inside
+the overlay before the veil has a layer of its own, and 4b-1's step 6 read found the coverage SVG with one (2–8 Mpx)
+without a veil. So the read before step 6 first asks why that SVG had a layer; without an answer, T3 is dropped.
 
 ## Step 1 (18 October 2026)
 
