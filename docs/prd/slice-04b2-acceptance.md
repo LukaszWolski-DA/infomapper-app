@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 3, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 4, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Łukasz's answers after step 1 (18 October 2026)
@@ -52,7 +52,31 @@ Items 14–16. D-41 and the data-model text applied as approved.
 | `e2e/slice-04b2/S4B2-04.spec.ts` (new) | at 300 % with Customer at the left edge, birth_date's “Place card” places REQ-105 at (832, row − 20 on the grid), selects it, and the view fits it; on the card already here it selects it and writes nothing; a click on REQ-103's name opens its panel; REQ-101's row dragged onto the canvas places its card at the drop; “Add the 2 missing to this canvas” places REQ-102 and REQ-103 stacked at x = 832, then the button goes |
 | `e2e/slice-04b2/S4B2-05.spec.ts` (new) | Product and the table `items` (not on “Customer & orders”) opened from REQ-101's traces: no “Remove from this canvas”, “Add to this canvas” places the card at the view's centre, upper third, selects it, and the panel then offers “Remove” |
 
-No earlier test changed in this step.
+**Test fixes found by the full runs** (four attempts; each failure stopped the three and they began again):
+
+| Run | Failure | Cause | Fix |
+| --- | --- | --- | --- |
+| 1st, run 2 | `S4B2-03` over 60 s | the test takes up to a minute in a loaded run | `S4B2-03` and `S4B2-04` get 120 s |
+| 2nd, run 1 | `S4B2-03`: a trace line to a card in the collapsed frame never came (120 s) | **a race in the test:** the three layer choices are saved one after another; the test opened the page again while “Everything” was still queued, so the canvas stayed saved in “Relationships”, where trace lines are hidden | it waits until the data shows `all` before opening the page again |
+| 3rd, run 2 | `S3A-09` (slice 3a): Undo enabled where it expected no change | **an older race:** the frame's collapse and expand just before are undo steps saved in the background; on a slow run Undo turned on after the test read “before” | it waits for Undo to be enabled (those two saved) before reading it |
+| 4th attempt, run 2 | `S3B-04` (slice 3b): “stale version” instead of the role refusal | **an older race:** with one draft mapping on Customer, `draft` is `used`; the test clicked “In review” and read the mapping's version before that write landed | it waits for the status `review` in the data before reading the version |
+
+None of them is caused by this step's code; S3A-09 and S3B-04 passed in every run so far and fail only when a write
+lands late, which today's slow runs (34–36 min) made likely.
+
+**Changed earlier tests:** `e2e/slice-03a/S3A-09.spec.ts`, `e2e/slice-03b/S3B-04.spec.ts` (the two waits above).
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch (`npm run e2e`), in a row:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 178 passed | 34.6 min |
+| 2 | 178 passed | 34.9 min |
+| 3 | 178 passed | 34.6 min |
+
+Lint, typecheck and the unit tests (1,004 in 76 files) pass. 178 is step 3's 176 plus S4B2-04 and S4B2-05.
 
 ### Proposed text (for Łukasz's approval; not applied)
 
@@ -63,7 +87,6 @@ No earlier test changed in this step.
 > where it is dropped; “Add all to this canvas” or “Add the {n} missing to this canvas” under the list. An entity or table
 > panel whose card is not on the open canvas offers “Add to this canvas”. (Changed in slice 4b-2.)
 
-RUNS4_PLACEHOLDER
 
 ## Łukasz's answers after step 3 (18 October 2026)
 
