@@ -269,6 +269,8 @@ layer, against 19–26 ms without it, on every branch.
   `perf/4p-trial-a`).
 - **Later:** only with a way to fade lines that changes neither the canvas layer nor the cards' layering; none is
   known.
+- **Trace lines too** (slice 4b-2, answer B): a requirement card's dashed trace lines fade with the other lines on a
+  selection (the line layer's `dimmed` class), not on a hover; the prototype fades them on both.
 
 ### Frame cost grows with the number of elements in the viewport (slice 3a)
 

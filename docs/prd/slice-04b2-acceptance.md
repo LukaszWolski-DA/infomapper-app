@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 2, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 3, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Łukasz's answers after step 1 (18 October 2026)
@@ -24,6 +24,106 @@ proposal puts it **inside the overlay**, which is already a composited layer (`w
 those. Its own children are what it would overlap. That is a reason to expect another result only if nothing inside
 the overlay before the veil has a layer of its own, and 4b-1's step 6 read found the coverage SVG with one (2–8 Mpx)
 without a veil. So the read before step 6 first asks why that SVG had a layer; without an answer, T3 is dropped.
+
+## Step 3: trace lines (18 October 2026)
+
+Items 8–12. Before it, answer 4: why the e2e runs grew.
+
+### Why the e2e runs grew from 27 to 32 min (answer 4)
+
+`slice-04b1`'s own suite, run today on the same laptop from the reference worktree (`../infomapper-ab-main`, its
+fresh build folder, one run from scratch), took **33.8 min**, against 26.8–27.6 min on 17 October. Step 2's three runs of
+this branch took 31.8–32.1 min.
+
+| Run (18 October) | Tests | Total | Inside the tests |
+| --- | --- | --- | --- |
+| `slice-04b1` | 173 | 33.8 min | 31.6 min |
+| this branch, step 2, run 1 / 2 / 3 | 175 | 31.8 / 32.1 / 32.1 min | 30.2 / 30.3 / 30.1 min |
+
+**Per file** (the branch's median of three against `slice-04b1`'s run, seconds):
+
+| File | `slice-04b1` | Branch | Difference |
+| --- | --- | --- | --- |
+| `slice-04b2/S4B2-02` (new) | – | 21.8 | +21.8 |
+| `slice-04b2/S4B2-01` (new) | – | 7.5 | +7.5 |
+| `slice-03a/S3A-09` | 13.4 | 18.7 | +5.3 |
+| `slice-04b1/S4B1-06` | 16.7 | 19.7 | +3.0 |
+| `slice-03a/S3A-04` | 6.4 | 8.9 | +2.5 |
+| `slice-02a/S2A-14-pan-zoom` | 42.6 | 45.0 | +2.4 |
+| `slice-02c/S2C-01` | 29.8 | 32.1 | +2.3 |
+| `slice-02c/S2C-07` | 14.4 | 16.6 | +2.2 |
+| `slice-02a/S2A-10` | 12.4 | 14.6 | +2.2 |
+| `slice-03a/S3A-13` | 32.2 | 34.1 | +1.9 |
+| … the most shrunk: `slice-01a/S1A-14` | 60.0 | 47.4 | −12.6 |
+| `slice-00/S0-10`, `slice-04a/S4A-11`, `S0-04`, `S0-05`, `S4B1-05` | | | −6.3 to −6.8 each |
+
+**Reading:**
+- **Not the branch.** On the same day the branch spends 1.4 min less inside its tests than `slice-04b1`, the two new
+  tests (29 s) included. The ten files that grew most, after the two new ones, grew by 2–5 s each, while as many shrank
+  by 6–13 s: the noise of one run against three.
+- **So not REQ-104's card, not the requirement index, not renders.** A cost there would show on the demo canvas's
+  tests (S2A-*, S3A-*, S4A-*), and those moved both ways.
+- **It is the laptop today:** the same code ran 6–7 min slower than on 17 October. I don't know why (background load,
+  power mode, a Chrome update since); I did not change anything to find out.
+- **Proposal:** no fix. If you want the reason, a restart and one `slice-04b1` run afterwards (about 30 min) would show
+  whether it comes back to 27 min. Each step keeps reporting its three runs' times.
+
+### What changed
+
+| Part | Change |
+| --- | --- |
+| `trace-data.ts` (new) | `buildTraces`: per requirement card on the canvas, one line per direct link to an element that is here: an entity or table (its card), an attribute or column (its row of its card), a mapping (its line); none to an element off the canvas |
+| `line-geometry.ts` | `traceGeom`, from data (AD-24 rule 2): the nearer side of the element's card, at the header's middle or the row's height (a hidden row: the header, as mapping lines); a mapping's middle (`MapGeom.mid`: its curve's middle, or the ƒ node of a combined mapping); a card in a collapsed frame: its member row in the block, past the sixth the “and N more” row (`blockRowY`). It starts at the requirement card's point nearest to that end. A mapping in a bundle ends at the bundle line's middle; one hidden whole in a collapsed frame ends at its attribute's block row |
+| `LineLayer.tsx` | a fourth group in the one SVG (AD-24 rule 3): a dashed path and an end dot per line, no dot below 40 %, no group per line (S3A-14). Each line is drawn again only when its ends move (memo on its coordinates) |
+| `ModelCanvas.tsx` | the traces from the requirement index once per set of cards and data version (not per move); passed only in “Everything” (item 10) |
+| `canvas.css` | `.trace` dashed in `--im-req`, `.trace-dot`; under the layer's `dimmed` class (a selection with related lines) they fade with the other lines, never on a hover (B) |
+| `known-limitations.md` | B's note under “C-10 met; the other lines do not fade on a hover” |
+
+What redraws them (item 11): the line layer re-renders on node changes (a drag, a resize, a collapse), and a line whose
+coordinates did not change keeps its element; a link changes the page's data and so the traces; panning and zooming
+change no node, so the layer is rastered once and moved by the compositor.
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `e2e/slice-04b2/S4B2-03.spec.ts` (new) | REQ-104 (four seeded rows) also linked to Customer, `order_header`, a column of `customers`, a mapping onto Customer and Product (off the canvas): eight lines, none to Product; every line starts on the requirement card's edge; ends at Customer's and `order_header`'s right edge at the header's middle, at the `total_amount` and `email_addr` rows, at the mapping line's middle; Customer dragged, its line follows; none in “Mappings” and “Relationships”, eight again in “Everything”; Sales Order and Order Line in a collapsed frame: their lines end at their member rows on the block's edge |
+| `src/canvas/trace-data.test.ts` (new) | `buildTraces` (card, row, column, mapping, table; none off the canvas, none for a deleted link); `traceGeom` (nearer side, nearest point on the requirement card, row height, mapping middle, block row and “and N more”, nothing without both ends); `nearerSide`, `nearestOn` |
+
+No earlier test changed in this step.
+
+### Checked in the browser
+
+“Customer & orders” at 62 %: REQ-104's four dashed lines run from the top of its card to the right edges of Sales Order's
+`total_amount` row and Order Line's `quantity`, `unit_price` and `discount_pct` rows; no console error.
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch (`npm run e2e`), in a row:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 176 passed | 33.6 min |
+| 2 | 176 passed | 32.2 min |
+| 3 | 176 passed | 32.0 min |
+
+Lint, typecheck and the unit tests (1,004 in 76 files) pass. 176 is step 2's 175 plus S4B2-03 (about 60 s).
+
+### The texts you approve in this report (not applied)
+
+**`docs/decisions.md` D-41**, replacing the line:
+
+> **D-41** Requirement card: 230 px, filled header in a reserved violet (excluded from the concept palette) with the
+> kind's icon, the key and the kind's name; the name; a three-part coverage bar over the requirement's items (D-31):
+> covered, mapped but not approved, not mapped (an entity item is mapped when any of its attributes has a mapping); the
+> status badge and “{m} of {n} covered”. Below 40 % the header and a plain block. Selecting the card is selecting the
+> requirement. A requirement has at most one card per canvas; its cards are layout, never frame members, carry no label
+> on a live canvas and hold no pinned notes; Duplicate layout copies them. (Changed in slice 4b-2.)
+
+**`docs/data-model-v2.md`**, under `canvas_item`, after the table:
+
+> A requirement card (`requirement_id` set) stores `width` null (drawn 230 px), `collapsed` false, `row_filter` `all`,
+> and `frame_id` and `live_level` null: it is layout only (slice 4b-2).
 
 ## Łukasz's answers after step 2 (18 October 2026)
 
