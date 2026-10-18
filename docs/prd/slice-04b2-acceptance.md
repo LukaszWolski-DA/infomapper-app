@@ -94,6 +94,36 @@ placed through the domain: in a grid over whatever is in view, or by item 15's r
 | `src/data/local/model-store.test.ts`, `requirement-store.test.ts` (changed) | the demo seed's counts: seven element cards plus REQ-104's card; REQ-104's card is the only requirement card |
 | `selection.test.ts`, `requirements.test.ts` (changed) | `unitsOf` returns `reqs`; coverage carries `entityNotApproved` |
 
+**Changed earlier e2e tests** (the first full run had seven failures; all are REQ-104's seeded card or decision J/L):
+
+| Test | Change |
+| --- | --- |
+| `S1A-03`, `S2A-11`, `S2A-13` | narrowed to the entity and table cards' nodes (`.react-flow__node-card`, `cardNodes`); expectations unchanged |
+| `S2A-02`, `S2B-08`, `S3A-10` | Ctrl+A takes REQ-104's card (L): “9 selected”, “… 1 note, 1 requirement.”, one more item; the selection panel lists it as “REQ-104 Order total …” |
+| `S2A-13` | “Remove from this canvas” on Ctrl+A's selection removes eight cards, REQ-104's included (L); undo restores them |
+| `S4A-01` | “Only on this canvas” lists REQ-104 (J) instead of the empty text; the test's title says so |
+
+**A regression the suite caught (S4P-06):** with no collapsed frame, every selection change built a new empty block list,
+so the canvas handed React Flow a new nodes array and the miniature redrew once per selection. The block list is now one
+constant empty array, as the nodes array was before (fixed in `ModelCanvas.tsx`, no test changed).
+
+**The selection panel** (`selection-panel.tsx`) counts and lists requirement cards and offers “Remove from this canvas”
+for them; without it a requirement card in a selection showed as a table named “?”.
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch (`npm run e2e`), in a row:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 175 passed | 31.8 min |
+| 2 | 175 passed | 32.1 min |
+| 3 | 175 passed | 32.1 min |
+
+Lint, typecheck and the unit tests (999 in 75 files) pass. 175 is 173 plus S4B2-01 and S4B2-02. The runs are about 5 min
+longer than 4b-1's (26.8–27.6 min); the two new tests take about 50 s, the rest is this laptop's load (the measurement
+builds ran just before).
+
 ### Proposed texts (for Łukasz's approval; not applied)
 
 **`docs/decisions.md` D-41**, replacing the line:
@@ -110,7 +140,13 @@ placed through the domain: in a grid over whatever is in view, or by item 15's r
 > A requirement card (`requirement_id` set) stores `width` null (drawn 230 px), `collapsed` false, `row_filter` `all`,
 > and `frame_id` and `live_level` null: it is layout only (slice 4b-2).
 
-RUNS_PLACEHOLDER
+### Questions for Łukasz
+
+| # | Question | Proposal |
+| --- | --- | --- |
+| 1 | **REQ-104's seeded card** sits at (1176, 1136), below `order_line`'s two notes, because answer A's spot is taken (above). | Keep it there. Alternative: right of `order_line` at (1512, 608), closer to the Sales cards' row. |
+| 2 | **The texts for D-41 and the data model** above. | Apply them as written, in this PR. |
+| 3 | **The layer read:** no growth where the app places cards; at 30 % a card laid over frames gets an overlap layer, as notes do. | Accept for step 2; S4B2-15 counts it again in the closing sitting, and AD-24's text records it after the sitting. |
 
 ## Step 1 (18 October 2026)
 
