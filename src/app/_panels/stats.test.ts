@@ -131,4 +131,19 @@ describe("requirements on the project home (slice 4a, PRD item 30)", () => {
     expect(projectRequirements(index, items, [ids.canvas1, ids.canvas2]).map((r) => r.key)).toEqual(["REQ-101", "REQ-102", "REQ-103"]);
     expect(projectRequirements(index, items, [])).toEqual([]);
   });
+
+  it("the canvas that shows most of each, ties to the earlier one; a card counts one and lists its requirement (slice 4b-2, item 23, K)", () => {
+    const both = [ids.canvas1, ids.canvas2];
+    const best = (list: ReturnType<typeof projectRequirements>) => Object.fromEntries(list.map((r) => [r.key, r.bestCanvasId]));
+    expect(best(projectRequirements(index, items, both))).toEqual({ "REQ-101": ids.canvas1, "REQ-102": ids.canvas2, "REQ-103": ids.canvas1 });
+    expect(best(projectRequirements(index, items, [ids.canvas2, ids.canvas1]))["REQ-101"]).toBe(ids.canvas1);
+    // REQ-104's table is on no canvas: its card on canvas 2 lists it and sends it there; REQ-101's card there ties with
+    // canvas 1 (Customer), so the earlier canvas in the project's order wins
+    const cards = [
+      canvasItem("01900000-0000-7000-8000-00000000c901", { canvas_id: ids.canvas2, entity_id: null, requirement_id: ids.req104 }),
+      canvasItem("01900000-0000-7000-8000-00000000c902", { canvas_id: ids.canvas2, entity_id: null, requirement_id: ids.req101 }),
+    ];
+    expect(best(projectRequirements(index, [...items, ...cards], both))).toEqual({ "REQ-101": ids.canvas1, "REQ-102": ids.canvas2, "REQ-103": ids.canvas1, "REQ-104": ids.canvas2 });
+    expect(best(projectRequirements(index, [...items, ...cards], [ids.canvas2, ids.canvas1]))["REQ-101"]).toBe(ids.canvas2);
+  });
 });

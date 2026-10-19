@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 6, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 7, in progress.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Manual acceptance checklist (step 8)
@@ -10,6 +10,19 @@ Status: **step 6, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, 
 | # | From | Check | Expected |
 | --- | --- | --- | --- |
 | 1 | step 5 | Drag a requirement from the left panel onto Customer's `email` row, about 40 px from the row's left edge | The hint says “Link to email” and the drop creates the link. If it fails in a real browser, it is a product bug for this slice. |
+
+## Łukasz's answers after step 6 (19 October 2026)
+
+- **Step 6 accepted.**
+- **1. S0-10:** run 3's failure accepted as the known flake. It keeps coming back and costs about 5 min each time, and
+  the merge needs three clean runs in a row: step 7's report proposes a fix (cause, change, risk), not applied without
+  his OK.
+- **2. D-32 and AD-24 approved as written:** applied (`docs/decisions.md`), with AD-24's ending “T1 applied in 4b-1, T3
+  in 4b-2 (T2 dropped).” AD-24 gets the sitting's figures in step 8.
+- **3. The lit-lines fix:** kept; recorded in step 8's `known-limitations.md` update.
+- **4. Multi-selections with requirement cards:** kept as built.
+- **Then step 7** (project home, permissions sweep, `seed:large`'s requirement cards), with the closing sitting's final
+  plan and time estimate.
 
 ## Łukasz's answers after step 5 (19 October 2026)
 

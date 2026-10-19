@@ -148,27 +148,46 @@ export interface ProjectRequirement {
   /** The coverage items by kind, for the tooltip (“1 entity, 3 attributes”; slice 4b-1). */
   parts: string;
   done: boolean;
+  /**
+   * The project canvas that shows most of it (slice 4b-2, PRD item 23): the most entities and tables of its scope, plus
+   * one for its card; ties to the earlier canvas in the project's order. Null when no canvas scores above zero.
+   */
+  bestCanvasId: Uuid | null;
 }
 
 /**
- * The requirements on the project home (prototype projReqs, without requirement cards until slice 4b): every
- * requirement whose scope has an entity or a source table on one of the project's canvases, in the index's order.
+ * The requirements on the project home (prototype projReqs): every requirement whose scope has an entity or a source
+ * table on one of the project's canvases, or whose card lies on one (slice 4b-2, K), in the index's order; each with the
+ * canvas that shows most of it (slice 4b-2, PRD item 23).
  */
 export function projectRequirements(index: RequirementIndex, items: readonly CanvasItem[], projectCanvasIds: readonly Uuid[]): ProjectRequirement[] {
-  const canvases = new Set(projectCanvasIds);
-  const here = new Set<Uuid>();
+  /** Per canvas of the project: the entities and tables on it, and the requirements with a card on it. */
+  const on = new Map<Uuid, { elements: Set<Uuid>; cards: Set<Uuid> }>(projectCanvasIds.map((id) => [id, { elements: new Set(), cards: new Set() }]));
   for (const i of items) {
-    if (i.deleted_at !== null || !canvases.has(i.canvas_id)) continue;
-    if (i.entity_id) here.add(i.entity_id);
-    if (i.source_table_id) here.add(i.source_table_id);
+    const c = i.deleted_at === null ? on.get(i.canvas_id) : undefined;
+    if (!c) continue;
+    if (i.entity_id) c.elements.add(i.entity_id);
+    if (i.source_table_id) c.elements.add(i.source_table_id);
+    if (i.requirement_id) c.cards.add(i.requirement_id);
   }
-  return index.requirements
-    .filter((r) => {
-      const scope = index.scope(r.id);
-      return [...scope.entities].some((id) => here.has(id)) || [...scope.tables].some((id) => here.has(id));
-    })
-    .map((r) => {
-      const c = index.coverage(r.id);
-      return { id: r.id, key: r.key, name: r.name, kind: r.kind, status: r.status, covered: c.covered.length, total: c.total, parts: coverageParts(c.parts), done: c.done };
-    });
+  const out: ProjectRequirement[] = [];
+  for (const r of index.requirements) {
+    const scope = index.scope(r.id);
+    let best: Uuid | null = null, bestScore = 0, listed = false;
+    for (const [canvasId, c] of on) {
+      let score = c.cards.has(r.id) ? 1 : 0;
+      for (const id of scope.entities) if (c.elements.has(id)) score++;
+      for (const id of scope.tables) if (c.elements.has(id)) score++;
+      if (score > 0) listed = true;
+      // canvases come in the project's order: a tie keeps the earlier one
+      if (score > bestScore) {
+        best = canvasId;
+        bestScore = score;
+      }
+    }
+    if (!listed) continue;
+    const c = index.coverage(r.id);
+    out.push({ id: r.id, key: r.key, name: r.name, kind: r.kind, status: r.status, covered: c.covered.length, total: c.total, parts: coverageParts(c.parts), done: c.done, bestCanvasId: best });
+  }
+  return out;
 }
