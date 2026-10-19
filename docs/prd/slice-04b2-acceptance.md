@@ -1,7 +1,23 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 5, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 6, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
+
+## Manual acceptance checklist (step 8)
+
+Łukasz's own checks in a real browser, besides the PRD's definition of done. Collected per step:
+
+| # | From | Check | Expected |
+| --- | --- | --- | --- |
+| 1 | step 5 | Drag a requirement from the left panel onto Customer's `email` row, about 40 px from the row's left edge | The hint says “Link to email” and the drop creates the link. If it fails in a real browser, it is a product bug for this slice. |
+
+## Łukasz's answers after step 5 (19 October 2026)
+
+- **Step 5 accepted.**
+- **The `email` row's spot** (Playwright's drag got no `dragover` 40 px into it) goes to the manual checklist above as its
+  own check.
+- **Then step 6** (Focus with requirement cards, items 20–22). D settled first, by his rule: no explanation, or a
+  LayerTree read with an overlap layer: T3 dropped; a confirmed reason and a read without one: T3 built as well.
 
 ## Łukasz's answers after step 1 (18 October 2026)
 
@@ -24,6 +40,158 @@ proposal puts it **inside the overlay**, which is already a composited layer (`w
 those. Its own children are what it would overlap. That is a reason to expect another result only if nothing inside
 the overlay before the veil has a layer of its own, and 4b-1's step 6 read found the coverage SVG with one (2–8 Mpx)
 without a veil. So the read before step 6 first asks why that SVG had a layer; without an answer, T3 is dropped.
+
+## Step 6: Focus with requirement cards, and T3 (19 October 2026)
+
+Items 20–22. **D was the second case:** a confirmed reason and a read without an overlap layer, so T3 is built as well.
+
+### D: why 4b-1's coverage colours had a layer of their own
+
+CDP `LayerTree` with each layer's compositing reasons and the element Chrome names it after, no timing, the measurement
+build of step 5's code (`.data/measure/s4b2-step6-d/layers.spec.ts`). “Performance test” around ent:23, frames
+expanded. The veil without a layer of its own is step 1's T3, put in by the test (`will-change: auto` on `.fade-veil`),
+not by the app.
+
+| View | Case | Drawing layers | Drawing Mpx | Overlay layers (size, Mpx, reason) |
+| --- | --- | --- | --- | --- |
+| 30 % | Focus off, nothing selected | 38 | 68.9 | none |
+| 30 % | REQ-102 selected (coverage), Focus off | 39 | 76.5 | 1,750 × 4,321, 7.6, `WillChangeTransform` (named after the coverage SVG) |
+| 30 % | Focus ent:23, veil on its own layer (as in 4b-1) | 40 | 632.9 | veil 24,968 × 21,736, 542.7; above it 5,090 × 4,327, 22.0 (named after the lit lines); both `WillChangeTransform` |
+| 30 % | REQ-102 selected and Focus on it, own layer | 40 | 642.2 | veil 542.7; above it 4,438 × 7,055, 31.3; both `WillChangeTransform` |
+| 30 % | Focus ent:23, **no layer of its own (T3)** | **39** | **610.9** | **one:** 24,968 × 21,736, 542.7, `WillChangeTransform` |
+| 30 % | REQ-102 and Focus on it, T3 | **39** | **610.9** | one, 542.7 |
+| 100 % | Focus off | 37 | 65.8 | none |
+| 100 % | REQ-102 selected (coverage) | 38 | 73.7 | 1,758 × 4,466, 7.9, `WillChangeTransform` |
+| 100 % | Focus ent:23 / REQ-102, own layer | 39 / 39 | 630.5 / 639.8 | veil 542.7 and 22.0 / 31.3 above it |
+| 100 % | Focus ent:23 / REQ-102, T3 | **38 / 38** | **608.5 / 608.5** | one, 542.7 |
+
+**The reason, confirmed:**
+- **The coverage SVG never had a layer of its own. That layer is the overlay's.** Its reason is `WillChangeTransform`,
+  and only the overlay has `will-change` (the SVG has none). Chrome names a layer after the first element it paints. An
+  empty overlay paints nothing, so it has no drawing layer (Focus off). With the coverage colours in it, the overlay's
+  layer is the size of what they draw (2–8 Mpx), and it carries the SVG's name.
+- **The same goes for 4b-1's “22–31 Mpx layer under the lit lines”:** it is the overlay's own layer again. The veil had
+  a layer of its own, and what the overlay paints after it (the lit lines, rows and marks) must lie above that layer. So
+  the overlay's content after the veil became a second layer, for the overlay's own reason, not by overlap.
+- **What differs from B2:** B2's veil sat in the viewport's big layer, below the composited notes, frames and sticky
+  headers, and Chrome gave it a layer because it overlapped them. Inside the overlay the veil is painted first, and
+  nothing composited lies below it there. So without `will-change` it paints into the overlay's layer.
+- **The read shows no `Overlap` reason in any case:** with T3 the veil, the lit lines and the coverage colours are one
+  layer, the overlay's: **one drawing layer for Focus instead of two, 22–31 Mpx less.**
+
+### What changed
+
+| Part | Change |
+| --- | --- |
+| Domain (`lit.ts`) | `litRequirements`: the requirement cards that stay lit (C, prototype `reqActive`): the focused requirement's; otherwise those whose scope contains the focused element itself (`scopeContains`: an entity, table, attribute or column in it; a mapping in it or its attribute; a relationship with either entity in it; for several items any of their entities or tables, and the requirements among them). The mapping or relationship is looked up once per Focus, not per requirement. `mergeLit`; `Lit.requirements` |
+| Focus target (`Focus.tsx`, `fade.ts`) | a multi-selection's requirement cards (`req:` keys) join the `several` target as `requirements`; its key ends `\|<requirement ids>` |
+| Lit set (`fade-canvas.tsx`) | `useLit` adds the lit requirements (from the canvas's requirement index), and for a multi-selection lights its requirements' scopes too (prototype `relatedOf` “multi”); `litNodeIds` includes the lit requirement cards' nodes; `litTraces`: a trace line is lit when its requirement card is and its element is (an entity's or table's card, hidden in a collapsed frame too; a row's card; a mapping) |
+| Veil (`FadeLayer.tsx`) | a hole at each lit requirement card (8 px corners); the lit trace lines go to `LitLines` |
+| `LineLayer.tsx` | `traceSegments`: step 3's trace geometry as one function, used by the line layer and by `LitLines`, which draws the lit trace lines above the veil (`lit-trace`) |
+| **T3** (`canvas.css`) | `.fade-veil` loses `will-change: transform`: it paints into the overlay's layer |
+| **Fix** (`LineLayer.tsx`) | Focus's lit relationship, mapping and bundle lines now carry the same signature as the line layer's. Before, their copies were memoised on an empty signature and **kept their old place after a drag** while the holes followed (a 4b-1 bug, found in the browser while checking this step) |
+| `CLAUDE.md` | the overlay note: the veil without a layer of its own; requirement cards' holes and lit trace lines |
+
+### The LayerTree read after T3
+
+The measurement build of this step (`.data/measure/s4b2-step6-d/after.spec.ts`). “Performance test” around ent:23, with
+REQ-101's and REQ-102's cards placed right of ent:23 for the read (diagnosis data; 52 trace lines in view, REQ-102's 46
+of them lit when it is focused):
+
+| View | Focus off | Focus ent:23 | REQ-102 selected, Focus on it | Lit cards (ent:23 / REQ-102) |
+| --- | --- | --- | --- | --- |
+| 30 %, expanded | 38 / 68.9 Mpx | **39** / 610.9 | **39** / 610.9 | 10 / 30 |
+| 100 %, expanded | 37 / 65.8 | **38** / 608.5 | **38** / 608.5 | 10 / 30 |
+| 30 %, collapsed | 21 / 48.5 | **22** / 586.0 | **22** / 586.0 | 4 / 13 |
+| 100 %, collapsed | 20 / 46.3 | **21** / 584.5 | **21** / 584.5 | 4 / 13 |
+
+- **Focus adds exactly one drawing layer everywhere** (before T3: two), the overlay's, the veil's size.
+- **The 46 lit trace lines add no layer:** they paint into the overlay's layer with the veil.
+- The requirement cards themselves change nothing with Focus off (38 and 37, as without them in the read before).
+
+### Focus switching and C-10 with Focus on, to the screen (diagnosis)
+
+Step 1's D asked for this with T3: the overlay's layer is now the veil's size, so switching and a hover repaint parts of
+a larger layer. Same build, same sitting, T3 against the veil on its own layer again (put back by the test), in turns; 10
+settled pairs each, traced (`.data/measure/s4b2-step6-d/screen.spec.ts`). **No laptop preparation: diagnostic figures**,
+not S4B2-12's.
+
+| Case | T3: on (median / p95 / max) | Own layer: on | T3: off | Own layer: off |
+| --- | --- | --- | --- | --- |
+| Focus ent:23, 100 % | 24.3 / 43.5 / 43.5 ms | 24.9 / 30.6 / 30.6 | 15.9 | 16.0 |
+| Focus REQ-102, 100 % | 40.7 / 58.0 / 58.0 | 39.4 / 45.4 / 45.4 | 15.4 | 15.3 |
+| Focus ent:23, 30 % | **36.2** / 49.9 / 49.9 | 44.1 / 62.9 / 62.9 | 12.3 | 13.6 |
+| Focus REQ-102, 30 % | **73.9** / 88.9 / 88.9 | 85.3 / 106.5 / 106.5 | 12.7 | 12.7 |
+| C-10, dense view, Focus on ent:23 | 21.7 / 25.5 / 25.5 | 20.2 / 26.5 / 26.5 | 18.9 | 17.5 |
+| C-10, dense view, Focus off (reference) | 19.9 / 21.3 / 21.3 | | 15.8 | |
+
+- **Every switch is under 100 ms** (the bar), p95 and max included; no stop.
+- **At 30 % T3 switches faster** (raster 18.8 against 25.8 ms for ent:23, 57.9 against 66.8 ms for REQ-102): one layer
+  to raster instead of two. At 100 % the two are the same within the noise.
+- **A hover with Focus on costs about 1.5 ms more with T3** (raster 3.7 against 1.9 ms): it repaints a small part of the
+  overlay's larger layer. C-10 stays about 20 ms.
+- The pan with Focus on is S4B2-11, in the closing sitting.
+
+### Assumptions
+
+- **A multi-selection with requirement cards** lights those requirements' cards and their scopes (prototype `relatedOf`
+  “multi”). A selection of requirement cards only is a Focus target now (before, Focus faded nothing for it).
+- **A trace line to a row** is lit when the row's card is lit (a row has no lit state of its own under Focus).
+- **REQ-102's 30 % switching at 74 ms** is the heaviest case here; with the laptop prepared it should come lower, but
+  the margin to 100 ms is the smallest. S4B2-12 measures it properly.
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `e2e/slice-04b2/S4B2-07.spec.ts` (new) | REQ-101 (Customer) and REQ-105 (Customer's attributes) placed beside REQ-104, REQ-104 also linked to `customers`. Focus on Customer: REQ-101 and REQ-105 have holes in the veil and their 1 + 4 lines lit; REQ-104 faded, although Focus lights `customers` (C). Focus moves to Sales Order: REQ-104 lit with its four attribute lines, its line to `customers` faded; the others faded. After dragging Sales Order every lit line and trace line lies where the line layer draws it (the fix). Focus on REQ-104 (from the Requirements tab; the Overview covers its card at this view): only its card, all five lines lit. Focus off: no veil, no lit copy |
+| `src/domain/model/lit.test.ts` | `litRequirements` per target (requirement, entity against a neighbour, table, attribute, column, mapping by itself and by its attribute, relationship, several with requirements, only the given cards), `scopeContains`, `mergeLit` |
+| `src/canvas/focus.test.ts`, `fade-canvas.test.ts` | the `several` target with requirement cards and its key; lit requirement nodes and their holes; `litTraces` (card, row, hidden card, mapping, faded requirement, missing card) |
+
+No earlier test changed in this step. Before the full runs: S4B2-03, S4B2-07, slice 4b-1's tests and S4P-12 passed (17).
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch (`npm run e2e`), in a row, after the
+diagnosis above (no restart since step 5's runs):
+
+| Run | Result | Time | Playwright's figure |
+| --- | --- | --- | --- |
+| 1 | 180 passed | 29.7 min | 29.7 min |
+| 2 | 180 passed | 30.0 min | 29.9 min |
+| 3 | 179 passed, **1 failed: S0-10** | 32.6 min | 32.5 min |
+
+- **Run 3's failure is S0-10** (slice 0): “Server did not start within 300 s”, its own restarted dev server on port 3201
+  did not come up in time. It is the cold-start flake 4b-1 had in its step 7 run 3, accepted there by Łukasz. No step 6
+  file is on its path, and it passed in runs 1 and 2. Not changed. Without its 5 min wait, run 3 is about as long as
+  the others.
+- **180** is step 5's 179 plus S4B2-07.
+- **About 1.5 min faster than step 5's** (31.1–31.3 min) with one test more.
+- Lint, typecheck and the unit tests (1,022 in 77 files) pass.
+
+### Proposed texts (for Łukasz's approval; not applied)
+
+**`docs/decisions.md` D-32**, its last bracket “(Requirement cards with dashed trace lines: slice 4b-2.)” replaced by:
+
+> Requirement cards (D-41) draw a dashed line with an end dot to each element their requirement is linked to on the
+> canvas: an entity's or table's card at its header, an attribute's or column's row, a mapping's middle; into a collapsed
+> frame, the member's row in its block. The lines show in “Everything” and are hidden in “Mappings” and “Relationships”;
+> they dim with the other lines on a selection, never on a hover. A requirement dragged from the left panel onto a row, a
+> card or a mapping line is linked to it at once, with Undo; onto empty canvas it places its card. Under Focus a
+> requirement card stays lit when its requirement is the target or its scope contains the focused element itself, and a
+> trace line when both its ends are lit. (Changed in slice 4b-2.)
+
+**`docs/decisions.md` AD-24, “Overlay and fading”**: the code now differs from its sentence “Fading (Focus) is one veil
+with holes at the lit cards, blocks and pinned notes, as one SVG path on a compositing layer of its own in the overlay
+(F4)”. Replacement:
+
+> Fading (Focus) is one veil with holes at the lit cards, blocks, pinned notes and requirement cards, as one SVG path in
+> the overlay (F4), painted into the overlay's layer with the lit lines, trace lines and rows: inside the overlay nothing
+> composited lies below it, so it needs no layer of its own and gets none by overlap (T3, slice 4b-2: Focus adds one
+> drawing layer instead of two).
+
+and its end “T1 applied in 4b-1, T2 and T3 with slice 4b-2.” becomes “T1 applied in 4b-1, T3 in 4b-2 (T2 dropped).”
+The sitting's figures follow in step 8, as planned.
 
 ## Step 5: dragging a requirement from the left panel (19 October 2026)
 
