@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { attribute, entity, ids, mapping, mappingInput, relationship, requirementLink, sourceColumn, sourceTable, T0 } from "../__fixtures__/domain";
 import type { Mapping, MappingInput, RequirementLink, WorkspaceModel } from "../types";
-import { focusLit, requirementFocusLit, targetLit } from "./lit";
+import { focusLit, litRequirements, mergeLit, requirementFocusLit, scopeContains, targetLit } from "./lit";
 import { requirementScope } from "./requirements";
 
 const MAP_ID = "01900000-0000-7000-8000-00000000a011";
@@ -121,5 +121,70 @@ describe("Focus on the other selections (slice 4b-1, PRD item 21; prototype rela
       const lit = targetLit(m, { t, id: t === "mapping" ? ids.mapEmail : "01900000-0000-7000-8000-0000000fffff" });
       expect(lit.entities.size + lit.tables.size + lit.mappings.size + lit.relationships.size, t).toBe(0);
     }
+  });
+});
+
+describe("lit requirement cards (slice 4b-2, PRD item 21, answer C; prototype reqActive)", () => {
+  const m = model();
+  /** REQ-101 on the attribute email (Customer), REQ-102 on the table CRM customer, REQ-103 on Sales Order's mapping-less entity. */
+  const links = [
+    link({ attribute_id: ids.email }),
+    requirementLink(ids.reqLink2, { requirement_id: ids.req102, attribute_id: null, source_table_id: ids.crmCustomer }),
+    requirementLink(ids.reqLink3, { requirement_id: ids.req103, attribute_id: null, entity_id: ids.salesOrder }),
+  ];
+  const scopeOf = (id: string) => requirementScope(id, links, m);
+  const all = [ids.req101, ids.req102, ids.req103];
+  const lit = (target: Parameters<typeof litRequirements>[1]) => litRequirements(m, target, all, scopeOf);
+
+  it("the focused requirement's card only", () => {
+    expect(lit({ t: "requirement", id: ids.req102 })).toEqual(new Set([ids.req102]));
+  });
+
+  it("an entity: the cards whose scope holds it (an attribute link brings its entity), not its neighbours'", () => {
+    expect(lit({ t: "entity", id: ids.customer })).toEqual(new Set([ids.req101]));
+    // Customer's Focus lights Sales Order through the relationship, but REQ-103's scope does not contain Customer
+    expect(focusLit(m, ids.customer).entities.has(ids.salesOrder)).toBe(true);
+  });
+
+  it("a table, an attribute, a column", () => {
+    expect(lit({ t: "table", id: ids.crmCustomer })).toEqual(new Set([ids.req102]));
+    expect(lit({ t: "attribute", id: ids.email })).toEqual(new Set([ids.req101]));
+    expect(lit({ t: "attribute", id: ids.customerId })).toEqual(new Set());
+    expect(lit({ t: "column", id: ids.colEmail })).toEqual(new Set());
+  });
+
+  it("a mapping: in scope itself, or its attribute is", () => {
+    // email's mapping: REQ-101 holds the attribute email
+    expect(lit({ t: "mapping", id: ids.mapEmail })).toEqual(new Set([ids.req101]));
+    const onMap = [requirementLink(ids.reqLink1, { requirement_id: ids.req104, attribute_id: null, mapping_id: ids.mapEmail })];
+    expect(litRequirements(m, { t: "mapping", id: ids.mapEmail }, [ids.req104], (id) => requirementScope(id, onMap, m))).toEqual(new Set([ids.req104]));
+  });
+
+  it("a relationship: either entity in scope", () => {
+    expect(lit({ t: "relationship", id: ids.relPlaces })).toEqual(new Set([ids.req101, ids.req103]));
+  });
+
+  it("several: any of their entities or tables, and the requirements among them", () => {
+    expect(lit({ t: "several", entities: [ids.salesOrder], tables: [ids.crmCustomer] })).toEqual(new Set([ids.req102, ids.req103]));
+    expect(lit({ t: "several", entities: [], tables: [], requirements: [ids.req101] })).toEqual(new Set([ids.req101]));
+  });
+
+  it("only among the given requirements (the cards on the canvas)", () => {
+    expect(litRequirements(m, { t: "entity", id: ids.customer }, [ids.req102], scopeOf)).toEqual(new Set());
+  });
+
+  it("scopeContains for one requirement; unknown mapping or relationship: no", () => {
+    expect(scopeContains(m, scopeOf(ids.req101), { t: "entity", id: ids.customer })).toBe(true);
+    expect(scopeContains(m, scopeOf(ids.req101), { t: "mapping", id: MAP_ID })).toBe(false);
+    expect(scopeContains(m, scopeOf(ids.req101), { t: "relationship", id: MAP_ID })).toBe(false);
+  });
+
+  it("mergeLit adds everything the second set lights", () => {
+    const a = targetLit(m, { t: "table", id: ids.crmCustomer });
+    const merged = mergeLit(a, targetLit(m, { t: "relationship", id: ids.relPlaces }));
+    expect(merged.tables).toEqual(new Set([ids.crmCustomer]));
+    expect(merged.entities).toEqual(new Set([ids.customer, ids.salesOrder]));
+    expect(merged.relationships).toEqual(new Set([ids.relPlaces]));
+    expect(merged.mappings).toEqual(new Set([ids.mapEmail]));
   });
 });

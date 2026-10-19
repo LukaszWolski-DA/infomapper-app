@@ -11,6 +11,10 @@
 //   columns' mappings with their ends), an attribute (its mappings with their ends, and its entity), a column (its
 //   mappings with their ends, and its table), a mapping (with its ends), a relationship (with both entities), and
 //   several entities and tables at once (a frame's cards or a multi-selection: what each of them lights).
+// - Slice 4b-2, step 6 (PRD items 20–21, answer C; prototype reqActive): which requirement cards stay lit. A card is lit
+//   when its requirement is the Focus target, or when its requirement's scope contains the focused element itself; for
+//   several items any of them, a requirement among them (its card in a multi-selection) included. A multi-selection's
+//   requirements light their own scopes too (prototype relatedOf “multi”, the union of each item's).
 
 import type { Uuid } from "../ids";
 import type { WorkspaceModel } from "../types";
@@ -25,6 +29,8 @@ export interface Lit {
   rows: Map<Uuid, LitRowColour>;
   mappings: Set<Uuid>;
   relationships: Set<Uuid>;
+  /** Requirements whose cards stay lit (slice 4b-2, PRD item 21); absent: none. */
+  requirements?: ReadonlySet<Uuid>;
 }
 
 export type LitModel = Pick<WorkspaceModel, "attributes" | "mappings" | "mappingInputs" | "relationships" | "sourceColumns">;
@@ -83,7 +89,7 @@ export function requirementFocusLit(model: LitModel, scope: RequirementScope): L
 /** What Focus can be on besides a requirement (slice 4b-1, PRD item 21). A frame or several items: their cards. */
 export type LitTarget =
   | { t: "entity" | "table" | "attribute" | "column" | "mapping" | "relationship"; id: Uuid }
-  | { t: "several"; entities: readonly Uuid[]; tables: readonly Uuid[] };
+  | { t: "several"; entities: readonly Uuid[]; tables: readonly Uuid[]; requirements?: readonly Uuid[] };
 
 /** Focus on a table (prototype relatedOf “source”): the table, its columns' mappings with their ends. */
 function tableLit(model: LitModel, l: ReturnType<typeof lookup>, lit: Lit, tableId: Uuid) {
@@ -144,4 +150,69 @@ export function targetLit(model: LitModel, target: LitTarget): Lit {
       break;
   }
   return lit;
+}
+
+/** Everything `b` lights added to `a` (a multi-selection's items, slice 4b-2). */
+export function mergeLit(a: Lit, b: Lit): Lit {
+  for (const e of b.entities) a.entities.add(e);
+  for (const t of b.tables) a.tables.add(t);
+  for (const [r, c] of b.rows) if (!a.rows.has(r)) a.rows.set(r, c);
+  for (const m of b.mappings) a.mappings.add(m);
+  for (const r of b.relationships) a.relationships.add(r);
+  return a;
+}
+
+/**
+ * Whether a requirement's scope contains the focused element itself (slice 4b-2, PRD item 21, answer C; prototype
+ * reqActive): an entity, table, attribute or column in it; a mapping in it, or its attribute; a relationship with either
+ * entity in it; for several items, any of their entities or tables.
+ */
+export function scopeContains(model: LitModel, scope: RequirementScope, target: LitTarget): boolean {
+  return containsTest(model, target)(scope);
+}
+
+/** `scopeContains` for one target, with its mapping or relationship looked up once (for many requirements). */
+function containsTest(model: LitModel, target: LitTarget): (scope: RequirementScope) => boolean {
+  switch (target.t) {
+    case "entity":
+      return (s) => s.entities.has(target.id);
+    case "table":
+      return (s) => s.tables.has(target.id);
+    case "attribute":
+      return (s) => s.attributes.has(target.id);
+    case "column":
+      return (s) => s.columns.has(target.id);
+    case "mapping": {
+      const m = live(model.mappings).find((x) => x.id === target.id);
+      return (s) => s.mappings.has(target.id) || (!!m && s.attributes.has(m.attribute_id));
+    }
+    case "relationship": {
+      const r = live(model.relationships).find((x) => x.id === target.id);
+      return (s) => !!r && (s.entities.has(r.from_entity_id) || s.entities.has(r.to_entity_id));
+    }
+    case "several":
+      return (s) => target.entities.some((e) => s.entities.has(e)) || target.tables.some((t) => s.tables.has(t));
+  }
+}
+
+/**
+ * The requirements among `requirementIds` whose cards stay lit under Focus (slice 4b-2, PRD item 21): the focused
+ * requirement itself; for any other target, those whose scope contains it (`scopeContains`); for several items also the
+ * requirements among them.
+ */
+export function litRequirements(
+  model: LitModel,
+  target: LitTarget | { t: "requirement"; id: Uuid },
+  requirementIds: Iterable<Uuid>,
+  scopeOf: (requirementId: Uuid) => RequirementScope,
+): Set<Uuid> {
+  const out = new Set<Uuid>();
+  if (target.t === "requirement") {
+    for (const id of requirementIds) if (id === target.id) out.add(id);
+    return out;
+  }
+  const chosen = new Set(target.t === "several" ? (target.requirements ?? []) : []);
+  const contains = containsTest(model, target);
+  for (const id of requirementIds) if (chosen.has(id) || contains(scopeOf(id))) out.add(id);
+  return out;
 }

@@ -33,13 +33,14 @@ export const focusTarget = (focus: Uuid | FocusTarget): FocusTarget => (typeof f
 
 /**
  * A short key for the request: `focus:<entity id>` (as in slice 4p), `focus:<kind>:<id>` (e.g. `focus:requirement:<id>`),
- * `focus:several:<entity ids>|<table ids>`, `lit:<key>`, or "" for none.
+ * `focus:several:<entity ids>|<table ids>` (and `|<requirement ids>` with requirement cards among them, slice 4b-2),
+ * `lit:<key>`, or "" for none.
  */
 export const fadeKey = (r: FadeRequest): string => {
   if (!r) return "";
   if ("lit" in r) return `lit:${r.key}`;
   const t = focusTarget(r.focus);
-  if (t.t === "several") return `focus:several:${t.entities.join(",")}|${t.tables.join(",")}`;
+  if (t.t === "several") return `focus:several:${t.entities.join(",")}|${t.tables.join(",")}${t.requirements?.length ? `|${t.requirements.join(",")}` : ""}`;
   return t.t === "entity" ? `focus:${t.id}` : `focus:${t.t}:${t.id}`;
 };
 

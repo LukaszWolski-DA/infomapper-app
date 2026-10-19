@@ -190,9 +190,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   "synthetic")` times the requirement index. A plain `npm run dev` and a normal production build never have them.
 - **Overlay and fading** (slice 4p, AD-24; slice 4b-1): the hover, the row marks, the selection marks and the lasso are
   drawn in `OverlayLayer` (its own compositing layer); the hover and the lasso rectangle are value stores, so they never
-  re-render `ModelCanvas`. Fading is `FadeLayer` (F4, slice 4b-1): one veil with holes at the lit cards, blocks and
-  pinned notes, as one SVG path on a layer of its own in the overlay, and the lit lines above it; switch it with
-  `requestFade` (`src/canvas/fade.ts`), never through the nodes array. **Focus** (`src/canvas/Focus.tsx`) is the store
+  re-render `ModelCanvas`. Fading is `FadeLayer` (F4, slice 4b-1): one veil with holes at the lit cards, blocks,
+  pinned notes and requirement cards, as one SVG path in the overlay, and the lit lines and lit trace lines above it; since
+  slice 4b-2 (T3) the veil has no layer of its own and paints into the overlay's layer (Focus adds one drawing layer, not
+  two); switch it with `requestFade` (`src/canvas/fade.ts`), never through the nodes array. **Focus** (`src/canvas/Focus.tsx`) is the store
   `focusOn`; `FocusDriver` turns it and the selection into the request, so switching Focus never re-renders
   `ModelCanvas`. **Coverage colours** of a selected requirement are `CoverageLayer`, in the overlay: a faint fill (text
   keeps 4.5:1, the overlay lies above it) and a bar in the full colour; below 40 % a dot. `window.__imFadeCommits`

@@ -14,10 +14,11 @@
 // one mapping as that mapping, two or more as one line with a count, relationships with “N relationship(s)”.
 // Slice 4b-2 (items 8–11): the requirement cards' trace lines, dashed, in the same layer (one path and one end dot each,
 // no dot below 40 %), from data (`traceGeom`); each redrawn only when its ends move. They fade with the other lines on a
-// selection (the layer's `dimmed` class), never on a hover.
+// selection (the layer's `dimmed` class), never on a hover. Step 6 (item 21): under Focus a trace line with both ends lit
+// is drawn again above the veil by `LitLines`; the rest fade under it.
 
 import { Fragment, memo, useContext, useState, type ReactNode } from "react";
-import { EdgeLabelRenderer, useStore, useStoreApi } from "@xyflow/react";
+import { EdgeLabelRenderer, useStore, useStoreApi, type InternalNode } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type Notation } from "./context";
 import { blockNodeId, type BlockNodeT } from "./BlockNode";
@@ -175,16 +176,76 @@ const NO_TRACES: readonly TraceData[] = [];
 
 /** A trace line (slice 4b-2): a dashed path and, at 40 % and above, its end dot; two elements, no group (S3A-14). */
 const TracePath = memo(
-  function TracePath({ id, x1, y1, x2, y2, dot }: { sig: string; id: string; x1: number; y1: number; x2: number; y2: number; dot: boolean }) {
+  function TracePath({ id, x1, y1, x2, y2, dot, lit }: { sig: string; id: string; x1: number; y1: number; x2: number; y2: number; dot: boolean; lit?: boolean }) {
     return (
       <>
-        <path className="trace" d={`M${x1},${y1} L${x2},${y2}`} data-testid="line-trace" data-trace={id} />
+        <path className="trace" d={`M${x1},${y1} L${x2},${y2}`} data-testid={lit ? "lit-trace" : "line-trace"} data-trace={id} />
         {dot && <circle className="trace-dot" cx={x2} cy={y2} r={2.6} />}
       </>
     );
   },
   (a, b) => a.sig === b.sig,
 );
+
+/**
+ * Where the trace lines run (slice 4b-2, items 8–9), from data (`traceGeom`): from the requirement card's edge to the
+ * element's card, row or mapping middle; into a collapsed frame, its member row in the block; a mapping in a bundle at
+ * the bundle line's middle; one hidden whole in a collapsed frame at its attribute's block row. A line without both ends
+ * is left out. Shared by the line layer and Focus's lit copy above the veil (step 6).
+ */
+function traceSegments(
+  traces: readonly TraceData[],
+  lookup: Map<string, InternalNode>,
+  lines: CanvasLines,
+  bundles: readonly Bundle[],
+  blocks: ReadonlyMap<string, Rect>,
+  mapsById: ReadonlyMap<string, MapLineData>,
+): { id: string; x1: number; y1: number; x2: number; y2: number }[] {
+  if (!traces.length) return [];
+  const placed = (cardId: string) => placedOf(lookup.get(cardId));
+  const bundleOf = new Map<string, Bundle>();
+  for (const b of bundles) if (b.t === "map") for (const id of b.ids) bundleOf.set(id, b);
+  const shown = new Map(lines.mappings.map((l) => [l.id, l]));
+  const reqRect = (id: string): Rect | null => {
+    const n = lookup.get(id);
+    if (!n) return null;
+    const card = (n as unknown as ReqNodeT).data.card;
+    return { x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, w: REQ_CARD.width, h: requirementCardHeight(card.nameLines) };
+  };
+  // a card hidden in a collapsed frame: its block, and its place among the block's members (item 9)
+  const placeOf = (cardId: string): TraceCardPlace => {
+    const n = lookup.get(cardId);
+    if (!n) return null;
+    if (!n.hidden) return { placed: placedOf(n)! };
+    const frameId = (n as unknown as CardNodeT).data.card.frameId;
+    const rect = frameId ? blocks.get(frameId) : undefined;
+    const block = frameId ? (lookup.get(blockNodeId(frameId)) as unknown as BlockNodeT | undefined) : undefined;
+    if (!rect || !block) return null;
+    return { block: rect, index: Math.max(0, block.data.members.findIndex((m) => m.id === cardId)) };
+  };
+  // a mapping's middle: its line, or the bundle line that carries it at a collapsed frame
+  const mapMid = (id: string): Pt | null => {
+    const b = bundleOf.get(id);
+    if (b) {
+      const g = bundleGeom(b, placed, blocks, mapsById);
+      return g ? (g.kind === "single" ? g.geom.mid : g.kind === "map" ? g.mid : null) : null;
+    }
+    const l = shown.get(id);
+    return l ? (mapGeom(l, lookup)?.mid ?? null) : null;
+  };
+  const out: { id: string; x1: number; y1: number; x2: number; y2: number }[] = [];
+  const r = (v: number) => +v.toFixed(1);
+  for (const t of traces) {
+    let g = traceGeom(reqRect(t.reqCardId), t.target, placeOf, mapMid);
+    // a mapping not drawn on its own (both ends in one collapsed frame): its attribute's row in the block
+    if (!g && t.target.t === "map") {
+      const l = mapsById.get(t.target.mappingId);
+      if (l) g = traceGeom(reqRect(t.reqCardId), { t: "row", cardId: l.cardId, rowId: l.attributeId }, placeOf, mapMid);
+    }
+    if (g) out.push({ id: t.id, x1: r(g.x1), y1: r(g.y1), x2: r(g.x2), y2: r(g.y2) });
+  }
+  return out;
+}
 
 function LineLayer({
   lines,
@@ -345,51 +406,9 @@ function LineLayer({
   }
 
   // ---- trace lines (slice 4b-2, items 8–9) ----
-  const traced: ReactNode[] = [];
-  if (traces.length) {
-    const bundleOf = new Map<string, Bundle>();
-    for (const b of bundles) if (b.t === "map") for (const id of b.ids) bundleOf.set(id, b);
-    const shown = new Map(lines.mappings.map((l) => [l.id, l]));
-    const reqRect = (id: string): Rect | null => {
-      const n = lookup.get(id);
-      if (!n) return null;
-      const card = (n as unknown as ReqNodeT).data.card;
-      return { x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, w: REQ_CARD.width, h: requirementCardHeight(card.nameLines) };
-    };
-    // a card hidden in a collapsed frame: its block, and its place among the block's members (item 9)
-    const placeOf = (cardId: string): TraceCardPlace => {
-      const n = lookup.get(cardId);
-      if (!n) return null;
-      if (!n.hidden) return { placed: placedOf(n)! };
-      const frameId = (n as unknown as CardNodeT).data.card.frameId;
-      const rect = frameId ? blocks.get(frameId) : undefined;
-      const block = frameId ? (lookup.get(blockNodeId(frameId)) as unknown as BlockNodeT | undefined) : undefined;
-      if (!rect || !block) return null;
-      return { block: rect, index: Math.max(0, block.data.members.findIndex((m) => m.id === cardId)) };
-    };
-    // a mapping's middle: its line, or the bundle line that carries it at a collapsed frame
-    const mapMid = (id: string): Pt | null => {
-      const b = bundleOf.get(id);
-      if (b) {
-        const g = bundleGeom(b, placed, blocks, mapsById);
-        return g ? (g.kind === "single" ? g.geom.mid : g.kind === "map" ? g.mid : null) : null;
-      }
-      const l = shown.get(id);
-      return l ? (mapGeom(l, lookup)?.mid ?? null) : null;
-    };
-    for (const t of traces) {
-      let g = traceGeom(reqRect(t.reqCardId), t.target, placeOf, mapMid);
-      // a mapping not drawn on its own (both ends in one collapsed frame): its attribute's row in the block
-      if (!g && t.target.t === "map") {
-        const l = mapsById.get(t.target.mappingId);
-        if (l) g = traceGeom(reqRect(t.reqCardId), { t: "row", cardId: l.cardId, rowId: l.attributeId }, placeOf, mapMid);
-      }
-      if (!g) continue;
-      const r = (v: number) => +v.toFixed(1);
-      const [x1, y1, x2, y2] = [r(g.x1), r(g.y1), r(g.x2), r(g.y2)];
-      traced.push(<TracePath key={t.id} sig={`${x1},${y1},${x2},${y2},${dots}`} id={t.id} x1={x1} y1={y1} x2={x2} y2={y2} dot={dots} />);
-    }
-  }
+  const traced = traceSegments(traces, lookup, lines, bundles, blocks, mapsById).map((g) => (
+    <TracePath key={g.id} sig={`${g.x1},${g.y1},${g.x2},${g.y2},${dots}`} id={g.id} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} dot={dots} />
+  ));
 
   return (
     <EdgeLabelRenderer>
@@ -488,10 +507,13 @@ export const LitLines = memo(function LitLines({
   bundles = NO_BUNDLES,
   blocks = NO_BLOCKS,
   mapsById = NO_MAPS,
+  traces = NO_TRACES,
   testId = "layer-lit-lines",
 }: {
   maps: ReadonlySet<string>;
   rels: ReadonlySet<string>;
+  /** Focus's lit trace lines (slice 4b-2, PRD item 21: both ends lit). */
+  traces?: readonly TraceData[];
   /** Focus's lit lines, or a selected requirement's (slice 4b-1, coverage colours). */
   testId?: string;
   /** The lines drawn on their own, and the bundles, as the line layer has them. */
@@ -513,7 +535,8 @@ export const LitLines = memo(function LitLines({
         .map((l) => {
           const a = placed(l.fromCardId), z = placed(l.toCardId);
           if (!a || !z) return null;
-          return <RelPath key={l.id} sig="" line={l} a={a} z={z} notation={notation} className="lnk rel" onSelect={NOOP} />;
+          // a signature as in the line layer, so a lit line follows a drag (slice 4b-2, step 6: it kept its old place)
+          return <RelPath key={l.id} sig={`${placedSig(a)}|${placedSig(z)}|${notation}|${l.label}|${l.fromMin}${l.fromMax}${l.toMin}${l.toMax}`} line={l} a={a} z={z} notation={notation} className="lnk rel" onSelect={NOOP} />;
         })}
       {lines.mappings
         .filter((l) => maps.has(l.id))
@@ -521,7 +544,7 @@ export const LitLines = memo(function LitLines({
           const geom = mapGeom(l, lookup);
           if (!geom) return null;
           const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.part ? " part" : ""}${l.inputCount > 1 ? " combined" : ""}`;
-          return <MapPath key={l.id} sig="" id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
+          return <MapPath key={l.id} sig={`${geom.paths.join("")}|${dots}|${className}|${geom.chip?.text ?? ""}|${l.labels ?? ""}`} id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
         })}
       {bundles
         .filter((b) => b.ids.some((id) => (b.t === "map" ? maps : rels).has(id)))
@@ -530,11 +553,15 @@ export const LitLines = memo(function LitLines({
           if (!geom) return null;
           if (geom.kind === "single") {
             const l = geom.line;
-            return <MapPath key={b.key} sig="" id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={`lnk map ${l.status}${l.warn ? " warn" : ""}`} onSelect={NOOP} />;
+            const className = `lnk map ${l.status}${l.warn ? " warn" : ""}`;
+            return <MapPath key={b.key} sig={`${geom.geom.paths.join("")}|${dots}|${className}|${geom.geom.chip?.text ?? ""}|${l.labels ?? ""}`} id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
           }
           const className = geom.kind === "rel" ? "lnk rel bundle" : `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""}`;
-          return <BundlePath key={b.key} sig="" bundleKey={b.key} geom={geom} className={className} onSelect={NOOP} />;
+          return <BundlePath key={b.key} sig={`${geom.d}|${className}|${geom.kind === "map" ? geom.count : geom.label}|${geom.width}`} bundleKey={b.key} geom={geom} className={className} onSelect={NOOP} />;
         })}
+      {traceSegments(traces, lookup, lines, bundles, blocks, mapsById).map((g) => (
+        <TracePath key={g.id} sig={`${g.x1},${g.y1},${g.x2},${g.y2},${dots}`} id={g.id} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} dot={dots} lit />
+      ))}
     </svg>
   );
 });

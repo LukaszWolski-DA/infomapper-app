@@ -19,18 +19,18 @@ export const FOCUS_HINT = "Focus fades everything not connected to what you sele
 
 /**
  * What Focus is on for a selection (PRD item 21): a card (its entity or table), a row (its attribute or column), a
- * mapping, a relationship, a frame (its cards), several items (their cards; frames stand for theirs, notes add nothing)
- * or a requirement. Nothing for no selection, a note, a label, a bundle or an element not on this canvas: then Focus
+ * mapping, a relationship, a frame (its cards), several items (their cards; frames stand for theirs, notes add nothing;
+ * requirement cards for their requirements, slice 4b-2) or a requirement. Nothing for no selection, a note, a label, a bundle or an element not on this canvas: then Focus
  * stays on and fades nothing (prototype `relatedOf`).
  */
 export function focusTargetOf(selection: Selection, cards: readonly Pick<CardData, "id" | "kind" | "targetId" | "frameId">[]): FocusTarget | null {
   if (!selection) return null;
   const byId = new Map(cards.map((c) => [c.id, c]));
-  const several = (frameIds: ReadonlySet<string>, entities: Uuid[], tables: Uuid[]): FocusTarget | null => {
+  const several = (frameIds: ReadonlySet<string>, entities: Uuid[], tables: Uuid[], requirements: Uuid[] = []): FocusTarget | null => {
     for (const c of cards) if (c.frameId && frameIds.has(c.frameId)) (c.kind === "ent" ? entities : tables).push(c.targetId);
-    if (!entities.length && !tables.length) return null;
+    if (!entities.length && !tables.length && !requirements.length) return null;
     const unique = (ids: Uuid[]) => [...new Set(ids)].sort();
-    return { t: "several", entities: unique(entities), tables: unique(tables) };
+    return { t: "several", entities: unique(entities), tables: unique(tables), ...(requirements.length ? { requirements: unique(requirements) } : {}) };
   };
   switch (selection.t) {
     case "card": {
@@ -48,14 +48,15 @@ export function focusTargetOf(selection: Selection, cards: readonly Pick<CardDat
     case "frame":
       return several(new Set([selection.id]), [], []);
     case "multi": {
-      const entities: Uuid[] = [], tables: Uuid[] = [], frames = new Set<string>();
+      const entities: Uuid[] = [], tables: Uuid[] = [], requirements: Uuid[] = [], frames = new Set<string>();
       for (const k of selection.keys) {
         const id = k.slice(k.indexOf(":") + 1);
         if (k.startsWith("entity:")) entities.push(id);
         else if (k.startsWith("source:")) tables.push(id);
         else if (k.startsWith("frame:")) frames.add(id);
+        else if (k.startsWith("req:")) requirements.push(id);
       }
-      return several(frames, entities, tables);
+      return several(frames, entities, tables, requirements);
     }
     case "req":
       return { t: "requirement", id: selection.id };

@@ -26,6 +26,11 @@ describe("what Focus is on for a selection (slice 4b-1, PRD item 21)", () => {
     expect(focusTargetOf({ t: "multi", keys: ["entity:e2", "frame:f2", "note:n1", "source:t1"] }, cards)).toEqual({ t: "several", entities: ["e2", "e3"], tables: ["t1"] });
   });
 
+  it("requirement cards in several items: their requirements (slice 4b-2, PRD item 21)", () => {
+    expect(focusTargetOf({ t: "multi", keys: ["entity:e2", "req:q2", "req:q1"] }, cards)).toEqual({ t: "several", entities: ["e2"], tables: [], requirements: ["q1", "q2"] });
+    expect(focusTargetOf({ t: "multi", keys: ["req:q1", "note:n1"] }, cards)).toEqual({ t: "several", entities: [], tables: [], requirements: ["q1"] });
+  });
+
   it("nothing for no selection, a note, a label, a bundle or an unknown card", () => {
     for (const sel of [null, { t: "note", id: "n1" }, { t: "label", id: "l1" }, { t: "bundle", id: "b" }, { t: "card", id: "gone" }] as const) expect(focusTargetOf(sel, cards)).toBeNull();
   });
@@ -34,5 +39,6 @@ describe("what Focus is on for a selection (slice 4b-1, PRD item 21)", () => {
     expect(fadeKey({ focus: { t: "entity", id: "e1" } })).toBe("focus:e1");
     expect(fadeKey({ focus: { t: "column", id: "col1" } })).toBe("focus:column:col1");
     expect(fadeKey({ focus: { t: "several", entities: ["e1", "e2"], tables: ["t1"] } })).toBe("focus:several:e1,e2|t1");
+    expect(fadeKey({ focus: { t: "several", entities: ["e1"], tables: [], requirements: ["q1"] } })).toBe("focus:several:e1||q1");
   });
 });

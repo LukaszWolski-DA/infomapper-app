@@ -250,10 +250,11 @@ body.connecting .im-canvas .row { cursor: crosshair }
    the moved-row flash, the resize outline and the selection marks repaint only it, never the viewport's big layer.
    It sits in the viewport portal and pans and zooms with the viewport; it takes no pointer events. ---------- */
 .im-canvas .overlay-layer { position: absolute; left: 0; top: 0; pointer-events: none; will-change: transform }
-/* fading (slice 4b-1, F4; AD-24): one veil with holes at the lit cards, blocks and pinned notes, on its own layer in the
-   overlay above the cards, in the canvas background's colour (`fill-opacity` on this one element only); the lit lines and
-   the marked rows (prototype .row.rq covered, .row.gap gap; below) above it */
-.im-canvas .fade-veil { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; will-change: transform }
+/* fading (slice 4b-1, F4; AD-24): one veil with holes at the lit cards, blocks, pinned notes and (slice 4b-2) requirement
+   cards, in the overlay above the cards, in the canvas background's colour (`fill-opacity` on this one element only); the
+   lit lines, trace lines and the marked rows (prototype .row.rq covered, .row.gap gap; below) above it. Slice 4b-2, T3:
+   no layer of its own; it paints into the overlay's layer (FadeLayer.tsx) */
+.im-canvas .fade-veil { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none }
 .im-canvas .fade-veil path { fill: var(--im-canvas); fill-opacity: .75 }
 .im-canvas .overlay-layer { z-index: 3 }
 .im-canvas .lit-lines .lnk { pointer-events: none }

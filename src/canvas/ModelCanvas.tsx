@@ -2003,7 +2003,15 @@ export function ModelCanvas({
           {editable && <DropHint store={dropStore} hintRef={hintRef} />}
           <OverlayLayer>
             {/* fading (slice 4p, step 2): the candidate draws first, so the hover and the selection marks stay above it */}
-            <FadeLayer data={fadeData} notes={fadeNotes} lines={bundled ?? lines} bundles={bundled?.bundles} blocks={blocks} mapsById={mapsById} />
+            <FadeLayer
+              data={fadeData}
+              notes={fadeNotes}
+              lines={bundled ?? lines}
+              bundles={bundled?.bundles}
+              blocks={blocks}
+              mapsById={mapsById}
+              traces={layer === "all" && !diagnosis.noLines ? traces : NO_TRACES}
+            />
             {/* a selected requirement's coverage colours (slice 4b-1): above the fading, so Focus keeps them on */}
             <CoverageLayer
               index={requirementIndex}
