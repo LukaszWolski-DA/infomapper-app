@@ -289,6 +289,13 @@ body.connecting .im-canvas .row { cursor: crosshair }
    Drawn in the overlay: the cards are not restyled (AD-24). One box, one label and one lasso, so the fills are fine. */
 .im-canvas .selection-layer .msel { fill: none; stroke: var(--im-logical); stroke-width: 2; vector-effect: non-scaling-stroke }
 .im-canvas .selection-layer .msel.req { stroke: var(--im-req); stroke-width: 3 }
+/* a requirement dragged from the left panel (slice 4b-2, item 18): the drop target outlined in the overlay, and the hint
+   at the pointer (portalled to the body, outside the canvas) */
+.im-canvas .drop-layer .drop-mark { fill: var(--im-req); fill-opacity: .06; stroke: var(--im-req); stroke-width: 2; vector-effect: non-scaling-stroke }
+.im-canvas .drop-layer .drop-mark.linked { fill-opacity: 0; stroke-dasharray: 5 4 }
+.drop-hint { position: fixed; left: 0; top: 0; z-index: 60; pointer-events: none; padding: 3px 8px; border-radius: 6px; font-size: 12px;
+  background: var(--im-req-head); color: var(--im-req-on); box-shadow: 0 6px 16px -8px var(--im-shadow); white-space: nowrap }
+.drop-hint[hidden] { display: none }
 .im-canvas .selection-layer .selbox { fill: none; stroke: var(--im-logical); stroke-width: 1.5; stroke-dasharray: 6 4; vector-effect: non-scaling-stroke }
 .im-canvas .selection-layer .lasso { fill: var(--im-logical); fill-opacity: .08; stroke: var(--im-logical); stroke-width: 1; vector-effect: non-scaling-stroke }
 .im-canvas .selbox-label { position: absolute; transform-origin: 0 0; pointer-events: none; white-space: nowrap; background: var(--im-logical);

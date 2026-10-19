@@ -5,8 +5,8 @@
 // dragging it onto the canvas places it there. Model tab, for those who may edit: “+” per concept, “New concept”,
 // rename a concept by double-click, and its ⋯ menu (D-46, D-47). Sources tab: “New source table”. Requirements tab
 // (slice 4a): groups by kind with their coverage bars; a click opens the requirement's panel; slice 4b-2: “Only on
-// this canvas” and the on-canvas dot for requirement cards (dragging: a later step of 4b-2); “New requirement” for
-// those who may edit.
+// this canvas” and the on-canvas dot for requirement cards; editors drag a requirement onto an element to link it or
+// onto the canvas to place its card (items 17–19); “New requirement” for those who may edit.
 
 import { newCardHeight } from "@/canvas/geometry";
 import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -16,7 +16,8 @@ import { KIND_NAMES } from "@/domain/model/requirements";
 import { useAction } from "@/app/_components/use-action";
 import { DotsIcon, itemClass, menuClass, sectionClass } from "@/app/w/[workspaceId]/p/[projectId]/_components/canvas-menu";
 import { readPreference, writePreference } from "@/canvas/CanvasProvider";
-import { CanvasUiCtx, CARD_DRAG_TYPE, type CardTarget } from "@/canvas/context";
+import { CanvasUiCtx, CARD_DRAG_TYPE, REQ_DRAG_TYPE, type CardTarget } from "@/canvas/context";
+import { requirementDrag } from "@/canvas/requirement-drop";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -398,7 +399,25 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                   key={r.id}
                   type="button"
                   onClick={() => ui.select({ t: "req", id: r.id })}
-                  title={r.presence === "here" ? "Its card is on this canvas. Click for details." : "Click for details."}
+                  // slice 4b-2, item 17 (prototype reqTree): editors drag it onto an element to link it, or onto the canvas
+                  draggable={editable || undefined}
+                  onDragStart={
+                    editable
+                      ? (e) => {
+                          requirementDrag.current = { requirementId: r.id, key: r.key };
+                          e.dataTransfer.setData(REQ_DRAG_TYPE, JSON.stringify({ requirementId: r.id, key: r.key }));
+                          e.dataTransfer.effectAllowed = "copy";
+                        }
+                      : undefined
+                  }
+                  onDragEnd={editable ? () => (requirementDrag.current = null) : undefined}
+                  title={
+                    editable
+                      ? "Click for details. Drag onto an entity, attribute, mapping, table or column to link it, or onto empty canvas to place its card."
+                      : r.presence === "here"
+                        ? "Its card is on this canvas. Click for details."
+                        : "Click for details."
+                  }
                   data-testid="tree-req"
                   data-key={r.key}
                   data-presence={r.presence}

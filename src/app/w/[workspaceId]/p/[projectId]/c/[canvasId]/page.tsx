@@ -12,6 +12,7 @@ import {
   updateFrameAction,
 } from "@/app/_actions/frame";
 import { saveCanvasLookAction } from "@/app/_actions/canvas";
+import { linkRequirementAction } from "@/app/_actions/requirement";
 import { labelForLiveCanvasAction, removeFromLiveCanvasAction } from "@/app/_actions/live";
 import { liveNoticesFor } from "@/app/_lib/live-notices";
 import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
@@ -244,6 +245,7 @@ export default async function CanvasPage({
               removeCards={removeCardsAction.bind(null, ws, canvasId)}
               requirementCards={requirementCards}
               placeRequirementCards={placeRequirementCardsAction.bind(null, ws, canvasId)}
+              linkRequirement={linkRequirementAction.bind(null, ws)}
               frames={frames}
               concepts={conceptsOf(model)}
               frameWrites={{

@@ -56,6 +56,9 @@ import { REQ_CARD, requirementCardHeight, requirementCardHeightOf, type Requirem
 import { requirementCardSpots } from "@/domain/model/requirement-placement";
 import type { TraceTarget } from "@/domain/model/requirements";
 import { buildTraces, type TraceData } from "./trace-data";
+import { DROP_TOAST, dropTargetAt, requirementDrag, sameDropTarget, type DropTarget } from "./requirement-drop";
+import { DropHint, DropTargetMark, moveDropHint } from "./RequirementDrop";
+import type { LabelTarget } from "@/domain/model/labels";
 import { NOTE_TOOL_HINT, RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
 import { DraftLine, useColumnDrag } from "./ColumnDrag";
@@ -77,7 +80,7 @@ import SelectionOverlay from "./SelectionOverlay";
 import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, reqKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
-import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, REQ_CARD_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis, type NoteListItem } from "./context";
+import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, REQ_CARD_DRAG_TYPE, REQ_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis, type NoteListItem } from "./context";
 import {
   besideAnchor,
   besideSpots,
@@ -181,6 +184,8 @@ export interface ModelCanvasProps {
   live?: LiveCanvas | null;
   /** The canvas's requirement cards (slice 4b-2). */
   requirementCards?: RequirementCardData[];
+  /** Links a requirement to an element (a requirement dropped from the left panel; a server action). */
+  linkRequirement?: (input: { requirementId: string; target: LabelTarget }) => Promise<CanvasWriteResult<unknown>>;
   /** Places requirements' cards on this canvas in one change (a server action). */
   placeRequirementCards?: (cards: { requirementId: string; x: number; y: number }[]) => Promise<CanvasWriteResult<{ canvasItemIds: string[] }>>;
 }
@@ -289,6 +294,7 @@ export function ModelCanvas({
   live = null,
   requirementCards: initialReqCards = NO_REQ_CARDS,
   placeRequirementCards,
+  linkRequirement,
 }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
   const look = useCanvasLook()?.look;
@@ -1655,14 +1661,112 @@ export function ModelCanvas({
   }, [registerCanvas, fit, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
+  // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store
+  // (the overlay's mark and the hint read it), written only when it changes, so the drag re-renders neither the canvas
+  // nor the miniature (S4B2-15) ----
+  const [dropStore] = useState(() => createValueStore<DropTarget | null>(null, sameDropTarget));
+  const hintRef = useRef<HTMLDivElement | null>(null);
+  const dropTargetFor = useCallback(
+    (e: DragEvent, requirementId: string): DropTarget =>
+      dropTargetAt(document.elementFromPoint(e.clientX, e.clientY), {
+        card: (cardId) => {
+          const c = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
+          return c ? { kind: c.kind, targetId: c.targetId, name: c.name, rowName: (rowId) => c.rows.find((r) => r.id === rowId)?.name } : null;
+        },
+        mappingName: (mappingId) => {
+          const l = allMappings.find((m) => m.id === mappingId);
+          if (!l) return null;
+          const cardOfId = (id: string) => (rf.getNode(id) as CardNodeT | undefined)?.data.card;
+          const inputs = l.inputs.map((i) => { const c = cardOfId(i.cardId); return `${c?.name ?? "?"}.${c?.rows.find((r) => r.id === i.columnId)?.name ?? "?"}`; });
+          const a = cardOfId(l.cardId);
+          return `${inputs.join(", ")} → ${a?.name ?? "?"}.${a?.rows.find((r) => r.id === l.attributeId)?.name ?? "?"}`;
+        },
+        links: requirementIndex?.linksOf(requirementId) ?? [],
+        hasCard: !!reqNodeOf(requirementId),
+      }),
+    [rf, allMappings, requirementIndex, reqNodeOf],
+  );
+  const endRequirementDrag = useCallback(() => dropStore.set(null), [dropStore]);
+  useEffect(() => {
+    window.addEventListener("dragend", endRequirementDrag);
+    window.addEventListener("drop", endRequirementDrag);
+    return () => {
+      window.removeEventListener("dragend", endRequirementDrag);
+      window.removeEventListener("drop", endRequirementDrag);
+    };
+  }, [endRequirementDrag]);
+
   const onDragOver = useCallback((e: DragEvent) => {
+    const dragged = editable && e.dataTransfer.types.includes(REQ_DRAG_TYPE) ? requirementDrag.current : null;
+    if (dragged) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "copy";
+      dropStore.set(dropTargetFor(e, dragged.requirementId));
+      moveDropHint(hintRef.current, e.clientX, e.clientY);
+      return;
+    }
     if (!e.dataTransfer.types.includes(CARD_DRAG_TYPE) && !(editable && e.dataTransfer.types.includes(REQ_CARD_DRAG_TYPE))) return;
     e.preventDefault();
     e.dataTransfer.dropEffect = "copy";
-  }, [editable]);
+  }, [editable, dropStore, dropTargetFor]);
+  /** The pointer left the canvas while dragging: no target, no hint. */
+  const onDragLeave = useCallback(
+    (e: DragEvent) => {
+      if (!(e.relatedTarget instanceof Node && e.currentTarget.contains(e.relatedTarget))) dropStore.set(null);
+    },
+    [dropStore],
+  );
+  /** A requirement dropped from the left panel: a link (with Undo), “already linked” (nothing written), or its card. */
+  const dropRequirement = useCallback(
+    async (e: DragEvent, r: { requirementId: string; key: string }) => {
+      const target = dropTargetFor(e, r.requirementId);
+      dropStore.set(null);
+      if (target.t === "place") {
+        const at = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
+        const spot = { x: snap8(at.x - REQ_CARD.width / 2), y: snap8(at.y - 30) };
+        const here = reqNodeOf(r.requirementId);
+        select({ t: "req", id: r.requirementId });
+        if (here) {
+          saveLayout({ cards: [{ id: here.id, ...spot }] });
+          toast(DROP_TOAST.moved(r.key));
+        } else if (await placeReqCards([{ requirementId: r.requirementId, ...spot }])) toast(DROP_TOAST.placed(r.key));
+        return;
+      }
+      if (target.linked) {
+        toast(DROP_TOAST.already(r.key, target.name));
+        return;
+      }
+      if (!linkRequirement) return;
+      let result: CanvasWriteResult<unknown>;
+      try {
+        result = await linkRequirement({ requirementId: r.requirementId, target: target.target });
+      } catch {
+        result = FAILED;
+      }
+      if (!result.ok) {
+        toast(result.message, "refusal");
+        return;
+      }
+      const u = ui.undo();
+      u?.noteSaved();
+      toast(DROP_TOAST.linked(r.key, target.name), "info", u ? { label: "Undo", run: u.undo } : undefined);
+    },
+    [dropTargetFor, dropStore, rf, reqNodeOf, select, saveLayout, toast, placeReqCards, linkRequirement, ui],
+  );
 
   const onDrop = useCallback(
     (e: DragEvent) => {
+      // a requirement from the left panel (items 17–19): a link or its card, by what lies under the pointer
+      const fromTree = editable ? e.dataTransfer.getData(REQ_DRAG_TYPE) : "";
+      if (fromTree) {
+        e.preventDefault();
+        try {
+          void dropRequirement(e, JSON.parse(fromTree) as { requirementId: string; key: string });
+        } catch {
+          dropStore.set(null);
+        }
+        return;
+      }
       // a requirement row from an element panel (item 14): its card where it is dropped, never a link; a card already
       // here moves there (M)
       const req = editable ? e.dataTransfer.getData(REQ_CARD_DRAG_TYPE) : "";
@@ -1698,7 +1802,7 @@ export function ModelCanvas({
       const at = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
       void placeAt(data.target, { x: snap8(at.x - CARD_W / 2), y: snap8(at.y - 20) }, newCardHeight(data.rows), false, { name: data.name ?? "The card" });
     },
-    [rf, placeAt, editable, reqNodeOf, select, saveLayout, toast, placeReqCards],
+    [rf, placeAt, editable, reqNodeOf, select, saveLayout, toast, placeReqCards, dropRequirement, dropStore],
   );
 
   const cardsApi = useMemo<CanvasCardsApi>(
@@ -1812,6 +1916,7 @@ export function ModelCanvas({
         data-notation={ui.notation}
         style={{ visibility: ready ? "visible" : "hidden" }}
         onDragOver={onDragOver}
+        onDragLeave={onDragLeave}
         onDrop={onDrop}
         onPointerDown={(e) => {
           if (!ui.mode && !spaceDown.current) lasso.onPointerDown(e);
@@ -1895,6 +2000,7 @@ export function ModelCanvas({
             onHeight={noteState.onHeight}
           />
           <Overview lines={lines} notes={miniNotes} notesDragging={noteState.dragging} />
+          {editable && <DropHint store={dropStore} hintRef={hintRef} />}
           <OverlayLayer>
             {/* fading (slice 4p, step 2): the candidate draws first, so the hover and the selection marks stay above it */}
             <FadeLayer data={fadeData} notes={fadeNotes} lines={bundled ?? lines} bundles={bundled?.bundles} blocks={blocks} mapsById={mapsById} />
@@ -1921,6 +2027,7 @@ export function ModelCanvas({
             )}
             <HoverOverlay hoverStore={hoverStore} lassoStore={lasso.lasso} busy={busy} lines={lines} flash={ui.flash} outline={resize.outline} />
             <SelectionOverlay selection={selection} lassoStore={lasso.lasso} frames={frames} frameRects={frameRects} noteRects={noteRects} />
+            <DropTargetMark store={dropStore} lines={bundled ?? lines} bundles={bundled?.bundles} blocks={blocks} mapsById={mapsById} />
           </OverlayLayer>
           <FocusDriver target={focusTarget} canvasId={canvasId} />
           {draft && <DraftLine draft={draft} />}

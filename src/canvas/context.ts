@@ -417,3 +417,5 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
 export const CARD_DRAG_TYPE = "application/x-infomapper-card";
 /** Drag data of a requirement row of an element panel (slice 4b-2, item 14): JSON `{ requirementId, key }`; it places the card. */
 export const REQ_CARD_DRAG_TYPE = "application/x-infomapper-requirement-card";
+/** Drag data of a requirement of the left panel (slice 4b-2, item 17): JSON `{ requirementId, key }`; it links or places. */
+export const REQ_DRAG_TYPE = "application/x-infomapper-requirement";
