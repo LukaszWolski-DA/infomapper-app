@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 4, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 4 accepted; step 5 next, after a laptop restart.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Łukasz's answers after step 1 (18 October 2026)
@@ -24,6 +24,13 @@ proposal puts it **inside the overlay**, which is already a composited layer (`w
 those. Its own children are what it would overlap. That is a reason to expect another result only if nothing inside
 the overlay before the veil has a layer of its own, and 4b-1's step 6 read found the coverage SVG with one (2–8 Mpx)
 without a veil. So the read before step 6 first asks why that SVG had a layer; without an answer, T3 is dropped.
+
+## Łukasz's answers after step 4 (19 October 2026)
+
+- **Step 4 accepted,** with the test fixes (waiting for the saved state is the right way).
+- **D-34 approved as written:** applied (`docs/decisions.md`).
+- **Before step 5:** Łukasz compacts the session and restarts the laptop. Step 5's three full runs are reported against
+  step 4's (34.6–34.9 min) and 4b-1's (about 27 min), to see whether the restart helped.
 
 ## Step 4: placing from element panels (18 October 2026)
 
