@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 4 accepted; step 5 next, after a laptop restart.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 5, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Łukasz's answers after step 1 (18 October 2026)
@@ -24,6 +24,73 @@ proposal puts it **inside the overlay**, which is already a composited layer (`w
 those. Its own children are what it would overlap. That is a reason to expect another result only if nothing inside
 the overlay before the veil has a layer of its own, and 4b-1's step 6 read found the coverage SVG with one (2–8 Mpx)
 without a veil. So the read before step 6 first asks why that SVG had a layer; without an answer, T3 is dropped.
+
+## Step 5: dragging a requirement from the left panel (19 October 2026)
+
+Items 17–19. The laptop was restarted before this step (booted 07:33).
+
+### What changed
+
+| Part | Change |
+| --- | --- |
+| `requirement-drop.ts` (new) | `dropTargetAt`: under the pointer an attribute or column row of an entity or table card (rows are drawn at 40 % and above), else a mapping line (its hit path; a bundle of several is no target), else an entity or table card, else a place (empty canvas, a collapsed frame's block, a note, a requirement card). `isLinkedTo` (direct, live links), `dropHint`, `DROP_TOAST`, `sameDropTarget`; `requirementDrag` holds the dragged requirement (a `dragover` sees only the drag's types) |
+| `RequirementDrop.tsx` (new) | `DropTargetMark` in the overlay: the row or the card outlined in violet from data (dashed when already linked), a mapping line drawn again lit (`LitLines`); `DropHint`, portalled to the body, its text from the store and its position set on its element from each `dragover` |
+| `ModelCanvas.tsx` | the drop store (written only when the target changes), `onDragOver` / `onDragLeave` / `onDrop` for `REQ_DRAG_TYPE`, cleared on `dragend` and `drop`; the drop: a link (`linkRequirement`, toast “Linked {key} to {name}.” with Undo), “{key} is already linked to {name}.” with nothing written, or the card placed at the drop (“Placed {key} on this canvas. Dashed lines show what it traces to.”, selected) or moved there (“Moved {key}'s card.”, M) |
+| Left panel | requirement rows are draggable for editors, with the prototype's tooltip |
+| Canvas page | passes `linkRequirementAction` |
+
+A mapping's name in the hint and the toast is the requirement panel's: “customers.first_name → Customer.first_name”.
+
+### Assumptions
+
+- **Only editors drag** (`canvas.edit_items` and `requirement.edit` are both editors' rights, AD-05); reviewers and
+  readers get no drag (item 24's sweep is step 7).
+- **A link doesn't select anything;** a placed or moved card selects its requirement (item 19).
+- **On a live canvas** a drop links as anywhere (a requirement link is not labeled, D-26) and a placed card is layout (G).
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `e2e/slice-04b2/S4B2-06.spec.ts` (new) | onto Customer's `first_name` row: hint “Link to first_name”, the row outlined, the link, the toast's Undo removes it; onto `email` (REQ-103 is linked): “Already linked to email”, nothing written; onto `customers.email_addr`, Sales Order's and `order_header`'s headers and a mapping line (lit while over it): the links; S4B2-15's guard, no canvas or miniature commit while dragging over a card, a row and a line; empty canvas: “Place card”, the card, selected; on its own card: “Move card”, moved; onto a collapsed frame's block: “Place card”, the card in no frame |
+| `src/canvas/requirement-drop.test.ts` (new) | the hit test on stand-in elements (row, card, mapping, place, move, unknown card), hints, toasts, the store's equality, live links only |
+
+**What the test found about Playwright's drag** (no product change):
+- **`dragover` arrives only now and then.** In Playwright's emulated native drag, Chromium delivers `dragover` for
+  some of the mouse moves only (5 of 20 on one path), and never while the mouse rests; a real browser sends one about
+  every 50 ms. So the test nudges the mouse by a pixel at each target until one lands there (`nudgeTo`), then checks
+  the hint.
+- **One spot got none at all:** 40 px into Customer's `email` row. The row's middle works, so the tests aim there.
+  Whether a real drag over that spot behaves differently I can't tell from the emulation: worth a look in the manual
+  check.
+- **The commit guard waits for the page to settle first.** The previous link's fresh page committed the canvas three
+  times during the first try; with the counters still for a second beforehand, the drag itself commits nothing.
+
+No earlier test changed in this step.
+
+### Three full runs, and what the restart did
+
+No dev server, Playwright or measurement server running; each run from scratch (`npm run e2e`), in a row, after the
+restart:
+
+| Run | Result | Time | Inside the tests |
+| --- | --- | --- | --- |
+| 1 | 179 passed | 31.3 min | 30.0 min |
+| 2 | 179 passed | 31.1 min | 29.5 min |
+| 3 | 179 passed | 31.3 min | 29.8 min |
+
+Lint, typecheck and the unit tests (1,010 in 77 files) pass. 179 is step 4's 178 plus S4B2-06.
+
+| Against | Total | Inside the tests | Reading |
+| --- | --- | --- | --- |
+| step 4 (18 Oct, before the restart; 178 tests) | 34.6–34.9 min | 32.8–33.0 min | **about 3.5 min (10 %) faster** with one test more |
+| 4b-1 (17 Oct; 173 tests) | 26.8–27.6 min | – | still **about 3.5–4.5 min slower**; this slice's six tests take 1.3 min of it, so about 2.5 min (9 %) is left unexplained |
+
+- **The restart helped,** by about the same amount on every file (per file the differences against step 4 are all
+  within a few seconds; nothing stands out).
+- **The rest is not this slice's code** as far as step 3's comparison could tell (`slice-04b1`'s own suite took 33.8
+  min on 18 October). A `slice-04b1` run now, after the restart, would say whether 27 min comes back; I have not run it
+  (no extra run, your answer 4).
 
 ## Łukasz's answers after step 4 (19 October 2026)
 
