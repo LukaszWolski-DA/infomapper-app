@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 7, in progress.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 7, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Manual acceptance checklist (step 8)
@@ -10,6 +10,132 @@ Status: **step 7, in progress.** Branch `slice/04b2-requirement-cards`, from `ma
 | # | From | Check | Expected |
 | --- | --- | --- | --- |
 | 1 | step 5 | Drag a requirement from the left panel onto Customer's `email` row, about 40 px from the row's left edge | The hint says “Link to email” and the drop creates the link. If it fails in a real browser, it is a product bug for this slice. |
+
+## Step 7: project home, permissions sweep, `seed:large`'s requirement cards (19 October 2026)
+
+Items 23, 24 and 26, with K. D-32 and AD-24 applied as approved (AD-24's “switched through a store …” stays as the
+sentence after the approved one).
+
+### What changed
+
+| Part | Change |
+| --- | --- |
+| Project home (`stats.ts`, `project-requirements.tsx`) | `projectRequirements` gives each requirement `bestCanvasId` (item 23): per project canvas, the entities and tables of its scope there, plus one for its card; the highest wins, a tie the earlier canvas in the project's order. A click opens it with `?req=`, which selects the requirement (its panel and coverage colours, since 4a and 4b-1). **K:** a requirement whose card lies on one of the project's canvases is listed even when its scope touches none |
+| Permissions (item 24) | **No code change.** Every requirement-card action is behind the one `editable` flag (editors only): the requirement panel's “Place its card” and “Remove its card”, the card's menu entry and Delete, dragging the card, the left panel's drag, the element panels' “Place card”, row drag and “Add all”, and “Add to this canvas”. S4B2-09 checks each for a reviewer and a reader |
+| `seed:large` (item 26, E) | `seed-large-requirement-cards.ts`: the project's third tab, **“Performance test – requirements”**: copies of “100 cards”' 101 cards, 8 frames and 24 notes (pins and frames moved to the copies), REQ-104 to REQ-112 and **12 requirement cards with 126 trace lines** |
+
+### `seed:large`'s requirement cards
+
+| Requirement | Links (trace lines) | Placed |
+| --- | --- | --- |
+| REQ-101 (existing) | 6 attributes of ent:19 | beside ent:19 (item 15) |
+| REQ-102 (existing) | 46 attributes of ent:3, ent:4, ent:7, ent:19 | beside ent:3 |
+| REQ-104 to REQ-109 (new) | 6 to 8 each: ent:3, ent:4, ent:7, ent:19 and their attributes (44 in all) | beside their first link |
+| REQ-112 (new) | ent:3, its mapping from `src:29` (m45), `src:29`, three of its columns (6) | beside ent:3 |
+| REQ-103 (existing), REQ-110, REQ-111 (new) | the dense view's 4 tables; 10 columns of `src:57`; 6 of `src:1` and 4 of `src:47` (24) | the dense view's top centre (item 13), one third of the view apart |
+
+| View (the sitting's) | Cards | Trace lines | Step 1's bar |
+| --- | --- | --- | --- |
+| 30 % around ent:23 | 9 | 102 | ≥ 8, ≥ 80 |
+| 100 % dense (S1A-14's, around `src:57`) | 3 | 24 | ≥ 2, ≥ 20 |
+
+- **“100 cards” keeps its elements** (S4B2-14 and S4B2-15 compare it with `slice-04b1`): no card there, and the new
+  requirements link only what REQ-101 to REQ-103 reach already (ent:3, ent:4, ent:7, ent:19 and the four dense tables;
+  m45 is the one mapping between them). Their cards' markers change their numbers, not their elements. The unit test
+  checks it.
+- **The dense view has no room beside its tables:** their frames abut, so item 15's rule moves a card far down, out of
+  the view. Those three cards stand in the free strip above the frames, where “Place its card on this canvas” (item 13)
+  puts a card at that view. None lies over a frame or a card there.
+- **At 30 %, cards beside ent:3, ent:4, ent:7 and ent:19 lie over frames f4 and f5** (item 15 ignores frames, as the
+  prototype): step 2's overlap layers per card are expected there, and S4B2-15 counts them (Łukasz's answer 2 after step 2).
+- Checked in the browser: the canvas shows 12 cards and 126 trace lines.
+
+### Assumptions
+
+- **Item 23's fallback (the last opened canvas, else the first) can no longer happen:** a requirement is listed only
+  when it scores above zero on some project canvas, and then that canvas opens. The code keeps the fallback for safety;
+  no test can reach it through the page. S4A-13's case “after Order lines & products, that one opens” now checks that
+  the best canvas wins over the last opened one.
+- **The canvas's name** is “Performance test – requirements”, as the PRD says, although the project's other tabs are
+  named “100 cards” and “PERF-2”.
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `e2e/slice-04b2/S4B2-08.spec.ts` (new) | in “Order management” (“Customer & orders” first): REQ-102 also on Product and `items` opens “Order lines & products” (2 against 1), selected (coverage colours); REQ-103 also on `items`: 1 against 1, the earlier canvas, not the last opened one; with its card on “Order lines & products”: 2 against 1, it opens there with its card's selection mark |
+| `e2e/slice-04b2/S4B2-09.spec.ts` (new) | Piotr and Kasia: REQ-104's card and its 4 lines; selecting it (mark, panel without “Place” or “Remove its card”); Focus on it (4 lit lines); Delete, the right-click (no menu opens: nothing to offer) and a drag change nothing; no drag on the left panel's rows; no “Place card”, row drag or “Add all” in Customer's panel; no “Add to this canvas” on Product; the data file unchanged |
+| `src/app/_panels/stats.test.ts` | `bestCanvasId`: most shown, ties by project order, a card counts one and lists its requirement (K) |
+| `src/data/local/model-store.test.ts` (changed) | the project's three tabs, 12 requirements, `requirement_key_next` 113; the copy's cards, frames and notes, 12 requirement cards in no frame, the new requirements reaching only already-marked cards, 126 links |
+| `e2e/slice-04a/S4A-13.spec.ts` (changed) | the last-opened case above (item 23; Q9 foresaw it) |
+
+### S0-10: cause and proposed fix (not applied)
+
+**What fails:** the second start, after the restart. The test waits the full 300 s every time (4b-1 step 7, this
+slice's step 6). A slow compile would sometimes finish at 200 or 280 s, not always time out.
+
+**Cause (inferred from Next.js 16's code, not traced):** `next dev` takes an exclusive lockfile in its build folder
+(`Lockfile.acquireWithRetriesOrExit`, `node_modules/next/dist/build/lockfile.d.ts`). On Windows a lock that is not
+released explicitly is cleaned up by the system “some time after process exit”. S0-10 stops its server with
+`taskkill /F`, so no exit handler releases it. The restarted server reuses the same folder (`.next-e2e-restart`),
+finds the lock still held, retries a few times and exits. Its output goes nowhere (`stdio: "ignore"`), so the test
+cannot see the exit, and it polls the port until 300 s are up.
+
+**Proposed change** (test code only, `e2e/slice-00/S0-10.spec.ts`):
+1. **The restart gets a fresh build folder** (`.next-e2e-restart-2`; both removed before and after). The data survive
+   in the JSON file, which is what S0-10 checks, and e2e servers have no compile cache to lose (step 4's note in
+   `known-limitations.md`).
+2. **The server's output goes to a log** (`.data/e2e-runs/S0-10-server-<n>.log`), so a later failure shows its cause.
+3. **A server that exits before it answers fails the wait at once,** with the log's last lines, instead of after 300 s.
+
+**Risk:** low. Only S0-10 changes, and it still restarts a real dev server against the same data file. If the cause is
+different (a really slow cold start), 1 does not help, but 2 and 3 show it the next time, and nothing hangs longer than
+today. Time: about 30 min with three S0-10 runs alone, then the full runs as usual.
+
+### The closing sitting: final plan and time estimate
+
+As step 1's Q8 plan, now with `seed:large`'s cards. Both sides are measurement builds made **before Łukasz's restart**
+and used with `--no-build`. One unrecorded warm-up, then three rounds with the sides rotated, a CPU check before every
+side, a disturbed round dropped and replaced. Interactions are measured from a settled screen to the GPU present; pans as
+presented frames, each with one untraced calibration pan.
+
+| Criterion | Side and canvas | Cases per round | Per round |
+| --- | --- | --- | --- |
+| S4B2-10 cards and lines in view, Focus off | branch on “– requirements”; `slice-04b1` on “100 cards” (shared with S4B2-14) | 30 % around ent:23 and 100 % dense, expanded and collapsed: 4 traced + 4 untraced pans | 3.5 min |
+| S4B2-11 pan with Focus on, after T3 | branch on “– requirements” | 30 % and 100 %, expanded and collapsed × (off, ent:23, REQ-102): 12 traced + 12 untraced | 9 min |
+| S4B2-12 to the screen | branch on “– requirements” | the drop highlight (row, card, line), selecting a requirement card, Focus on with cards lit; 100 % and 30 %, expanded; 10 pairs each | 6 min |
+| S4B2-13 dragging a card | branch on “– requirements” | a requirement card and an entity card, 100 % and 30 %, traced | 2 min |
+| S4B2-14 no regression, no requirement cards | both on “100 cards” | 4 pans traced and untraced; C-10 10 pairs; the lasso 10; C-08 five loads | 6.5 min each |
+| Server start and CPU checks | both | | 1.5 min each |
+
+- **Per round:** branch about 28.5 min, `slice-04b1` about 8 min: **about 37 min**.
+- **Three rounds** about 1 h 50 min, the warm-up about 12 min: **about 2 h 5 min**, plus about 37 min for each replaced
+  round.
+- **Before Łukasz's restart (not in the estimate):** the two measurement builds (about 10 min).
+- **Before the sitting, without preparation:** S4B2-15's LayerTree and element reads, about 15 min. Without and with
+  requirement cards against `slice-04b1`: “100 cards” and “– requirements” at the sitting's views, and the 30 %
+  cards over frames (answer 2 after step 2).
+- **Step 8 writes the measuring specs first,** in `e2e/slice-04b2/`, as 4b-1 did: S4B2-10 to S4B2-14 on the shared
+  to-screen tools. That means the new canvas in `measure:canvas`, the drop-highlight anchor from answer F (a mark before
+  each dispatched `dragover`), and the two drags as presented frames. Each gets one smoke run without preparation
+  (figures not counted), about 1 h of work and 30 min of smoke runs, before the builds.
+- **The 4b-1 side's S4B2-10 figures** come from “100 cards”, so S4B2-10 compares the canvas with cards against the
+  same layout without them, as Q8 said.
+
+### Three full runs
+
+No dev server, Playwright or measurement server running; each run from scratch (`npm run e2e`), in a row:
+
+| Run | Result | Time | Playwright's figure |
+| --- | --- | --- | --- |
+| 1 | 183 passed | 31.1 min | 31.1 min |
+| 2 | 183 passed | 29.8 min | 29.7 min |
+| 3 | 183 passed | 30.3 min | 30.2 min |
+
+- **183** is step 6's 180 plus S4B2-08 and S4B2-09 (two tests).
+- **Three clean runs in a row;** S0-10 passed in each.
+- Lint, typecheck and the unit tests (1,024 in 77 files) pass.
+- **Changed earlier tests:** `e2e/slice-04a/S4A-13.spec.ts` (item 23), `src/data/local/model-store.test.ts` (the seed).
 
 ## Łukasz's answers after step 6 (19 October 2026)
 
