@@ -134,7 +134,7 @@ No dev server, Playwright or measurement server running; each run from scratch (
 
 - **183** is step 6's 180 plus S4B2-08 and S4B2-09 (two tests).
 - **Three clean runs in a row;** S0-10 passed in each.
-- Lint, typecheck and the unit tests (1,024 in 77 files) pass.
+- Lint, typecheck and the unit tests (1,023 in 77 files) pass.
 - **Changed earlier tests:** `e2e/slice-04a/S4A-13.spec.ts` (item 23), `src/data/local/model-store.test.ts` (the seed).
 
 ## Łukasz's answers after step 6 (19 October 2026)
