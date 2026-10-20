@@ -12,6 +12,7 @@ import {
   emptySpot,
   expectToast,
   loadModel,
+  makeFrame,
   openCanvas,
   openEntityFromTree,
   reqCard,
@@ -97,4 +98,21 @@ test("S4B2-04: “Place card” beside the element, or showing a card already he
   expect(b.y).toBeGreaterThan(a.y);
   await expect(page.getByTestId("button-requirements-add-all")).toHaveCount(0);
   await expect(card(page, "Customer")).toBeVisible();
+});
+
+test("S4B2-04: “Place card” keeps frames clear: an element inside a frame gets its card below the frame (Łukasz after step 7)", async ({ page }) => {
+  test.setTimeout(120_000);
+  // test data: a frame around Customer, wide enough that the card's spot right of Customer lies inside it
+  const frame = { x: 480, y: 0, width: 800, height: 400 };
+  await makeFrame(frame, { name: "Around Customer" });
+  await signInAs(page, "Łukasz");
+  await openCanvas(page, canvasUrl(), VIEW);
+  await openEntityFromTree(page, "Customer");
+  await sectionRow(page, "REQ-101").getByTestId("button-requirement-place").click();
+  await expect.poll(() => reqCardData("REQ-101")).toBeTruthy();
+  const at = (await reqCardData("REQ-101"))!;
+  // right of Customer (496 + 256 + 80), and below the frame and its 20 px instead of over it
+  expect(at.x).toBe(832);
+  expect(at.y).toBeGreaterThanOrEqual(frame.y + frame.height + 20);
+  expect(at.frame_id).toBeNull();
 });

@@ -1308,7 +1308,11 @@ export function ModelCanvas({
       if (!missing.length) return;
       const anchor = elementAnchor(target);
       const heights = missing.map((id) => requirementCardHeightOf(requirementIndex.byId.get(id)!.name));
-      const spots = requirementCardSpots(anchor, viewRect(), heights, occupied());
+      // expanded frames are kept clear too (Łukasz after step 7): with their name strip, as fitting counts them
+      const frames = frameRectsNow()
+        .filter(({ f }) => !f.collapsed)
+        .map(({ r }) => ({ x: r.x, y: r.y - 30, w: r.w, h: r.h + 30 }));
+      const spots = requirementCardSpots(anchor, viewRect(), heights, occupied(), frames);
       const ids = await placeReqCards(missing.map((id, i) => ({ requirementId: id, ...spots[i]! })));
       if (!ids) return;
       if (ids.length === 1) select({ t: "req", id: missing[0]! });
@@ -1322,7 +1326,7 @@ export function ModelCanvas({
       const n = ids.length;
       toast(`Placed ${n} requirement card${n === 1 ? "" : "s"} on this canvas.`);
     },
-    [editable, requirementIndex, reqNodeOf, elementAnchor, viewRect, occupied, placeReqCards, select, rf, toast],
+    [editable, requirementIndex, reqNodeOf, elementAnchor, viewRect, occupied, frameRectsNow, placeReqCards, select, rf, toast],
   );
   /** A requirement's card already here (the row's “Place card”): selected and brought into view (prototype showReqCard). */
   const showRequirementCard = useCallback(

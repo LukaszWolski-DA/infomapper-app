@@ -40,6 +40,8 @@
     ".next-e2e/dev/types/**/*.ts",
     ".next-e2e-restart/types/**/*.ts",
     ".next-e2e-restart/dev/types/**/*.ts",
+    ".next-e2e-restart-2/types/**/*.ts",
+    ".next-e2e-restart-2/dev/types/**/*.ts",
     ".next-measure/types/**/*.ts",
     ".next-measure/dev/types/**/*.ts",
     ".next-e2e-preview/types/**/*.ts",
@@ -51,6 +53,7 @@
     "docs",
     ".next-e2e",
     ".next-e2e-restart",
+    ".next-e2e-restart-2",
     ".next-measure"
   ]
 }

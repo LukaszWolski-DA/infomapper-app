@@ -85,6 +85,9 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 - `domain`: Vitest unit tests next to the code (`*.test.ts`). Every business rule gets a test.
 - Each slice: Playwright end-to-end tests in `e2e/slice-XX/`, one per acceptance criterion in the PRD, named after
   the criterion id. They run against a seeded local database, never against production.
+- **Full e2e runs** (Łukasz, slice 4b-2): after each step one full run (`npm run e2e`, from scratch, no dev server
+  running); if a test fails, run that file three times on its own to tell a flake from a bug. Before a merge: two full
+  runs in a row. Report each run's time.
 - Use `data-testid` attributes for elements tests need; name them after the components (e.g. `card-entity`,
   `panel-inspector`, `nav-breadcrumbs`).
 

@@ -159,7 +159,8 @@ export function addDemoRequirementCard(db: DevDb, o: { workspaceId: Uuid; canvas
       .filter((n) => n.canvas_id === o.canvasId && n.deleted_at === null)
       .map((n) => ({ ...notePosition(n, places), w: n.width, h: 120 })),
   ];
-  const [spot] = requirementCardSpots(anchor, anchor, [SEED_CARD_HEIGHT], occupied);
+  // the demo canvas has no frames
+  const [spot] = requirementCardSpots(anchor, anchor, [SEED_CARD_HEIGHT], occupied, []);
   db.canvas_item.push({
     id: id("canvas_item:REQ-104"),
     workspace_id: o.workspaceId,

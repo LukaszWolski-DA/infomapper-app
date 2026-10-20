@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 7, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 8, part 1 in progress.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Manual acceptance checklist (step 8)
@@ -10,6 +10,25 @@ Status: **step 7, waiting for Łukasz.** Branch `slice/04b2-requirement-cards`, 
 | # | From | Check | Expected |
 | --- | --- | --- | --- |
 | 1 | step 5 | Drag a requirement from the left panel onto Customer's `email` row, about 40 px from the row's left edge | The hint says “Link to email” and the drop creates the link. If it fails in a real browser, it is a product bug for this slice. |
+
+## Łukasz's answers after step 7 (20 October 2026)
+
+- **Step 7 accepted.**
+- **A new rule for e2e runs, from now on** (also in `CLAUDE.md`): after each step one full run; if a test fails, that
+  file three times on its own, to tell a flake from a bug. Before the merge: two full runs in a row.
+- **1. S0-10:** the proposed fix, applied at the start of step 8.
+- **2. The sitting plan:** approved, with 4.
+- **3. Item 23's fallback:** kept in the code as a safeguard. **The page cannot reach it:** a requirement is listed only
+  when some project canvas scores above zero, and then that canvas opens.
+- **4. Placement over frames:** item 15's free-place search treats frame rectangles as occupied, like cards and notes,
+  so “Place card” and “Add all” never put a requirement card over a frame. A deliberate difference from the prototype.
+  `seed:large` places its cards by the changed rule. S4B2-15 still reads the layers of a card dragged over a frame by
+  hand, as the worst case (a read only). D-34 or D-41 wording proposed if either needs it, not applied until approved.
+- **Step 8, part 1:** the S0-10 fix, item 4, the measuring specs with their smoke runs, the LayerTree reads, the docs
+  (except AD-24's figures), the manual checklist, two full e2e runs in a row, then the two measurement builds; stop when
+  the laptop needs preparing.
+- **After the merge (not now):** an estimate for running the e2e suite in parallel (several workers, each with its own
+  data file and server): cost, risk, expected time per run.
 
 ## Step 7: project home, permissions sweep, `seed:large`'s requirement cards (19 October 2026)
 
