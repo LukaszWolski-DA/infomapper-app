@@ -54,7 +54,7 @@ export interface TreeSystem {
   schemas: TreeSchema[];
 }
 
-/** A requirement in the Requirements tab (slice 4a): no card on any canvas until slice 4b. */
+/** A requirement in the Requirements tab (slice 4a); its card's presence since slice 4b-2. */
 export interface TreeRequirement {
   id: Uuid;
   key: string;
@@ -65,8 +65,10 @@ export interface TreeRequirement {
   total: number;
   /** The coverage items by kind, for the tooltip (“1 entity, 3 attributes”; slice 4b-1). */
   parts: string;
-  /** Its scope has an entity or table on one of this project's canvases (PRD item 30's rule). */
+  /** Its scope has an entity or table on one of this project's canvases (PRD item 30's rule), or its card is on one (slice 4b-2, K). */
   inProject: boolean;
+  /** Its card: on this canvas, on another one, or on none (slice 4b-2, J). */
+  presence: Presence;
 }
 
 export interface TreeData {
@@ -92,7 +94,14 @@ export function buildTree(
 ): TreeData {
   const here = new Map<Uuid, Uuid>(), elsewhere = new Set<Uuid>(), inProject = new Set<Uuid>();
   const projectCanvases = new Set(projectCanvasIds);
+  // requirement cards (slice 4b-2): by requirement, apart from the elements
+  const reqHere = new Set<Uuid>(), reqElsewhere = new Set<Uuid>(), reqInProject = new Set<Uuid>();
   for (const i of items) {
+    if (i.requirement_id) {
+      (i.canvas_id === canvasId ? reqHere : reqElsewhere).add(i.requirement_id);
+      if (projectCanvases.has(i.canvas_id)) reqInProject.add(i.requirement_id);
+      continue;
+    }
     const target = i.entity_id ?? i.source_table_id;
     if (!target) continue;
     if (i.canvas_id === canvasId) here.set(target, i.id);
@@ -148,7 +157,8 @@ export function buildTree(
       covered: coverage.covered.length,
       total: coverage.total,
       parts: coverageParts(coverage.parts),
-      inProject: [...scope.entities, ...scope.tables].some((id) => inProject.has(id)),
+      inProject: reqInProject.has(r.id) || [...scope.entities, ...scope.tables].some((id) => inProject.has(id)),
+      presence: reqHere.has(r.id) ? "here" : reqElsewhere.has(r.id) ? "elsewhere" : "none",
     };
   });
 
@@ -219,14 +229,15 @@ export function filterSystems(systems: readonly TreeSystem[], f: TreeFilter): Sh
 }
 
 /**
- * The Requirements tab's groups, by kind in REQUIREMENT_KINDS order; a group with nothing to show is left out. No
- * requirement has a card on a canvas until slice 4b, so “Only on this canvas” shows none; “Only what this project uses”
- * keeps those whose scope has an entity or table on the project's canvases. The search matches key and name.
+ * The Requirements tab's groups, by kind in REQUIREMENT_KINDS order; a group with nothing to show is left out.
+ * “Only on this canvas” keeps the requirements with a card here (slice 4b-2, J); “Only what this project uses” those
+ * whose scope has an entity or table on the project's canvases, or whose card is on one. The search matches key and name.
  */
 export function filterRequirements(requirements: readonly TreeRequirement[], f: TreeFilter): { kind: RequirementKind; items: TreeRequirement[] }[] {
-  if (f.canvasOnly) return [];
   const q = f.q.trim().toLowerCase();
-  const shown = requirements.filter((r) => (!f.projectOnly || r.inProject) && (!q || `${r.key} ${r.name}`.toLowerCase().includes(q)));
+  const shown = requirements.filter(
+    (r) => (!f.canvasOnly || r.presence === "here") && (!f.projectOnly || r.inProject) && (!q || `${r.key} ${r.name}`.toLowerCase().includes(q)),
+  );
   return REQUIREMENT_KINDS.map((kind) => ({ kind, items: shown.filter((r) => r.kind === kind) })).filter((g) => g.items.length > 0);
 }
 

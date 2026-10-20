@@ -85,6 +85,9 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 - `domain`: Vitest unit tests next to the code (`*.test.ts`). Every business rule gets a test.
 - Each slice: Playwright end-to-end tests in `e2e/slice-XX/`, one per acceptance criterion in the PRD, named after
   the criterion id. They run against a seeded local database, never against production.
+- **Full e2e runs** (Łukasz, slice 4b-2): after each step one full run (`npm run e2e`, from scratch, no dev server
+  running); if a test fails, run that file three times on its own to tell a flake from a bug. Before a merge: two full
+  runs in a row. Report each run's time.
 - Use `data-testid` attributes for elements tests need; name them after the components (e.g. `card-entity`,
   `panel-inspector`, `nav-breadcrumbs`).
 
@@ -107,7 +110,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 ```
 npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet)
 npm run reset-dev-data   # replace .data/dev-db.json with fresh demo data
-npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards, labels and notes) to .data/dev-db.json
+npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards, labels and notes; slice 4b-2: a second canvas with 12 requirement cards) to .data/dev-db.json
 npm run dev              # local app on http://localhost:3000; sign in at /sign-in by picking a test user
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
 npm run measure:build    # measurement-only production build in .next-measure (AD-31)
@@ -142,6 +145,8 @@ npm run measure:canvas -- --to-screen --rounds 3 --no-build --against slice-04p 
 npm run measure:canvas -- --to-screen --only fading,pan,c10,lasso,c08,colours --rounds 1 --no-build --against slice-04p  # a subset
 npx tsx scripts/to-screen.ts <folder>                         # analyse saved traces again: switches to the screen, pans as presented frames
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b1/S4B1-09.spec.ts       # coverage colours to the screen (always traced)
+npm run measure:canvas -- --to-screen --only s4b2pans,c10,lasso,c08,s4b2focus,s4b2screen,s4b2drag --rounds 3 --no-build --against slice-04b1  # slice 4b-2's sitting
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b2/S4B2-15-layers.spec.ts # S4B2-15's layer and element reads
 SCREENS=<folder> npx playwright test e2e/slice-04b1/S4B1-06-screens.spec.ts               # slice 4b-1's coverage colour screenshots
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
@@ -176,7 +181,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   (`openRequirementsTab`, `requirementRow`, `openRequirement`), wait for the panel to show a requirement's stored version
   before the next edit (`expectPanelVersion`, the panel's `data-version`), read an element panel's Requirements section
   (`sectionRows`) and open an entity from the Model tab (`openEntityFromTree`). Slice 4p's read the canvas's, the
-  miniature's and the fading layer's commit counters (`counters`). The undo history lives in the server's memory and is
+  miniature's and the fading layer's commit counters (`counters`). Slice 4b-2's find requirement cards on the page and in
+  the data (`reqCard`, `reqNode`, `reqCardData`), place them and link requirements as test data (`placeReqCards`,
+  `linkReq`), and read trace lines (`tracesOfCard`, `traceEnds`); its measuring steps on “Performance test –
+  requirements” are in `e2e/slice-04b2/measure.ts` (S4B2-10 keeps its own, as it runs in the `slice-04b1` worktree too). The undo history lives in the server's memory and is
   empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
@@ -190,9 +198,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   "synthetic")` times the requirement index. A plain `npm run dev` and a normal production build never have them.
 - **Overlay and fading** (slice 4p, AD-24; slice 4b-1): the hover, the row marks, the selection marks and the lasso are
   drawn in `OverlayLayer` (its own compositing layer); the hover and the lasso rectangle are value stores, so they never
-  re-render `ModelCanvas`. Fading is `FadeLayer` (F4, slice 4b-1): one veil with holes at the lit cards, blocks and
-  pinned notes, as one SVG path on a layer of its own in the overlay, and the lit lines above it; switch it with
-  `requestFade` (`src/canvas/fade.ts`), never through the nodes array. **Focus** (`src/canvas/Focus.tsx`) is the store
+  re-render `ModelCanvas`. Fading is `FadeLayer` (F4, slice 4b-1): one veil with holes at the lit cards, blocks,
+  pinned notes and requirement cards, as one SVG path in the overlay, and the lit lines and lit trace lines (solid, slice 4b-2) above it; since
+  slice 4b-2 (T3) the veil has no layer of its own and paints into the overlay's layer (Focus adds one drawing layer, not
+  two); switch it with `requestFade` (`src/canvas/fade.ts`), never through the nodes array. **Focus** (`src/canvas/Focus.tsx`) is the store
   `focusOn`; `FocusDriver` turns it and the selection into the request, so switching Focus never re-renders
   `ModelCanvas`. **Coverage colours** of a selected requirement are `CoverageLayer`, in the overlay: a faint fill (text
   keeps 4.5:1, the overlay lies above it) and a bar in the full colour; below 40 % a dot. `window.__imFadeCommits`

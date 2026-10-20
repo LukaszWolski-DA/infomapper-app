@@ -21,7 +21,7 @@ import {
 const home = (projectId: string) => `/w/${RETAIL}/p/${projectId}`;
 const homeRows = (page: Page) => page.getByTestId("item-project-requirement").evaluateAll((els) => els.map((e) => `${(e as HTMLElement).dataset.key} ${(e as HTMLElement).querySelector("[data-testid=text-project-requirement-coverage]")!.textContent}`));
 
-test("S4A-13: the workspace Overview's “{covered} of {total} requirements covered”, the project home's statistic and Requirements of “Customer 360” and “Order management”; a click opens the last opened canvas (else the first) with the requirement's panel; the status bar's “Requirements 5, covered m” and the Overview update after an approval; with the context on, creating and linking a requirement labels nothing and records the context", async ({ page }) => {
+test("S4A-13: the workspace Overview's “{covered} of {total} requirements covered”, the project home's statistic and Requirements of “Customer 360” and “Order management”; a click opens the canvas that shows most of the requirement (slice 4b-2, item 23) with its panel; the status bar's “Requirements 5, covered m” and the Overview update after an approval; with the context on, creating and linking a requirement labels nothing and records the context", async ({ page }) => {
   // REQ-101's entity link is one item, covered (slice 4b-1, PRD item 10)
   const expected = ["REQ-101 1/1, Agreed", "REQ-102 3/3, Agreed", "REQ-104 1/4, Draft", "REQ-103 1/1, Draft", "REQ-105 3/4, Agreed"];
   await signInAs(page, "Łukasz");
@@ -34,15 +34,16 @@ test("S4A-13: the workspace Overview's “{covered} of {total} requirements cove
     await expect.poll(() => homeRows(page)).toEqual(expected);
   }
 
-  // no canvas opened yet in Order management: the first one (Customer & orders) opens, with REQ-104's panel
+  // REQ-104 shows most on “Customer & orders” (Sales Order, Order Line and its card), with its panel
   await page.getByTestId("item-project-requirement").filter({ hasText: "REQ-104" }).click();
   await expect(page).toHaveURL(new RegExp(`/c/${SEED_IDS.canvasCustomerOrders}$`));
   await expect(page.getByTestId("input-req-key")).toHaveValue("REQ-104");
-  // after “Order lines & products”, that one opens
+  // slice 4b-2 (item 23): after “Order lines & products”, REQ-103 (Customer's email) still opens where Customer is; the
+  // last opened canvas no longer decides (until slice 4b-2 it did)
   await openCanvas(page, canvasUrl(SEED_IDS.canvasOrderLines, SEED_IDS.projOrderManagement));
   await page.goto(home(SEED_IDS.projOrderManagement));
   await page.getByTestId("item-project-requirement").filter({ hasText: "REQ-103" }).click();
-  await expect(page).toHaveURL(new RegExp(`/c/${SEED_IDS.canvasOrderLines}$`));
+  await expect(page).toHaveURL(new RegExp(`/c/${SEED_IDS.canvasCustomerOrders}$`));
   await expect(page.getByTestId("input-req-key")).toHaveValue("REQ-103");
 
   // the status bar, before and after birth_date's mapping is approved (REQ-105 becomes covered)

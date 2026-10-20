@@ -8,6 +8,7 @@ import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound, staleVersion, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
+import { isElementCard } from "../model/card-kinds";
 import { freedAtPlace, isPinned, noteFrameAt, notePlaces, notePosition, NOTE_WIDTH, pinOffset, pinTargetRect, type FramePlace, type NotePlaces } from "../model/notes";
 import { plainTextPair } from "../model/plain-text";
 import type { WorkspaceAccess } from "../permissions";
@@ -41,7 +42,8 @@ type Opened = { ok: true; notes: Map<Uuid, Note>; places: NotePlaces; items: Can
 function openCanvas(access: WorkspaceAccess, state: NoteCanvasState, canvasId: Uuid): Opened {
   const ws = access.workspace.id;
   if (!isLive(state.canvas, ws) || state.canvas.id !== canvasId) return { ok: false, error: notFound("canvas") };
-  const items = state.items.filter((i) => isLive(i, ws) && i.canvas_id === canvasId);
+  // notes pin to entity and table cards and frames only (slice 4b-2, N)
+  const items = state.items.filter((i) => isLive(i, ws) && i.canvas_id === canvasId && isElementCard(i));
   const frames = state.frames.filter((f) => isLive(f, ws) && f.canvas_id === canvasId);
   const notes = new Map(state.notes.filter((n) => isLive(n, ws) && n.canvas_id === canvasId).map((n) => [n.id, n]));
   return { ok: true, notes, places: notePlaces(items, frames), items, frames };

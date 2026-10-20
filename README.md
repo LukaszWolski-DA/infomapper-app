@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 4b-1 are merged (4b-1: requirements on the canvas: markers, coverage colours, Focus); next is slice 4b-2 (requirement cards). On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 4b-1 are merged (4b-1: requirements on the canvas: markers, coverage colours, Focus); slice 4b-2 (requirement cards) is in its closing step. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -26,11 +26,15 @@ definitions and descriptions; slice 4p's performance review: the hover and selec
 pages with a boundary around the canvas; slice 4b-1's requirements on the canvas: requirement markers on
 cards, coverage colours when a requirement is selected (blue covered, orange gaps; a dot below 40 % and on collapsed
 blocks), Focus on any selection from the toolbar, the menus and a chip, entity links as items of their own, and figures
-measured to the screen. Acceptance:
+measured to the screen; slice 4b-2's requirement cards: a violet card per requirement with a three-part coverage bar
+and dashed trace lines to what it is linked to, placed from the requirement's panel and the element panels (beside the
+element, never over a frame), a requirement dragged from the left panel onto a row, a card or a mapping line linked to
+it at once, Focus lighting the cards whose scope holds the focused element, and the project home opening the canvas that
+shows most of a requirement. Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md).
 
 ## Getting started
 
@@ -68,12 +72,14 @@ Until the database slice (last, AD-31), data lives in a JSON file on the server 
 | `npm run e2e` | Playwright end-to-end tests (`e2e/`). Starts its own dev server on port 3200 with `.data/e2e-db.json`, freshly seeded before every test, so it runs next to `npm run dev` |
 | `npm run seed` | Creates the demo data in `.data/dev-db.json` if it does not exist yet |
 | `npm run reset-dev-data` | Replaces `.data/dev-db.json` with fresh demo data |
-| `npm run seed:large` | Adds the workspace “Performance test” for Łukasz (the canvas spike's 100-card data set, with 8 frames since slice 2b, and labels and 24 notes since slice 3a, and PERF-2's live canvas since slice 3b) to `.data/dev-db.json`; a file that has it already is left alone (`npm run reset-dev-data` first) |
+| `npm run seed:large` | Adds the workspace “Performance test” for Łukasz (the canvas spike's 100-card data set, with 8 frames since slice 2b, and labels and 24 notes since slice 3a, and PERF-2's live canvas since slice 3b, and since slice 4b-2 the canvas “Performance test – requirements”: the same layout with 12 requirement cards and 126 trace lines) to `.data/dev-db.json`; a file that has it already is left alone (`npm run reset-dev-data` first) |
 | `MEASURE=1 npx playwright test e2e/slice-01a/S1A-14.spec.ts` | The canvas performance measurement (S1A-14) in installed Google Chrome, headed; results in `test-results/S1A-14.json` |
 | `MEASURE=1 npx playwright test e2e/slice-01b/S1B-09.spec.ts` | Card resize on “Performance test” (C-09), same way; results in `test-results/S1B-09.json` |
 | `MEASURE=1 npx playwright test e2e/slice-01b/S1B-10.spec.ts` | Hover delay (C-10) and three pan-and-zoom runs against slice 1a's median, same way; results in `test-results/S1B-10.json` |
 | `MEASURE=1 npx playwright test e2e/slice-02a/S2A-14.spec.ts` | Group drag and the selection marks after a lasso on “Performance test” (S2A-14), same way; results in `test-results/S2A-14.json`, `S2A-14-lasso.json` |
 | `npm run measure:canvas` | Every canvas performance figure (pan and zoom, C-08, C-09, C-10, drags, lasso marks) in the measurement build, A/B against the tag `slice-02a` (`--against`, `--rounds`, `--drop`, `--prepare-only`, `--quick`); summary table in `.data/measure/<sitting>/summary.md` (slice 2p). Slice 2b's quick round: `npm run measure:canvas -- --rounds 1 --against slice-02p`. Slice 2c's (S2C-12): `npm run measure:canvas -- --quick --rounds 1 --against slice-02b`, then the same with `--branch-diag collapsed` (every frame collapsed on this branch's side). Slice 3a's (S3A-14): `npm run measure:canvas -- --quick --rounds 1 --against slice-02c`, then the same with `--branch-diag collapsed`. Slice 3b's (S3B-15 b): a discarded warm-up run first, then `npm run measure:canvas -- --quick --rounds 2 --against slice-03a` and the same with `--branch-diag collapsed`. Slice 4b-1: `--to-screen` measures interactions to the GPU present and pans as presented frames (traced, both sides), `--only fading,pan,c10,lasso,c08,colours` a subset; a side whose quiet check fails drops its round and a replacement follows |
+| `npm run measure:canvas -- --to-screen --only s4b2pans,c10,lasso,c08,s4b2focus,s4b2screen,s4b2drag --rounds 3 --no-build --against slice-04b1` | Slice 4b-2's closing sitting: S4B2-10 and S4B2-14's pans (`e2e/slice-04b2/S4B2-10.spec.ts`, both sides), C-10, the lasso and C-08 (both sides), S4B2-11 to S4B2-13 (this branch); `--prepare-only` first makes both builds |
+| `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b2/S4B2-15-layers.spec.ts` | S4B2-15's reads (slice 4b-2): drawing layers, their megapixels and viewport elements on “100 cards” and “Performance test – requirements”, and requirement cards moved over a frame; copy the spec into the reference worktree for `slice-04b1`'s side |
 | `npx tsx scripts/to-screen.ts <folder>` | Analyses saved traces again (slice 4b-1): every switch to the screen (median, p95, max, the split into main thread, GPU raster and rest, the switches not settled) and every pan's presented frames |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts` | S3B-15 (a): the elements in the viewport of “Performance test” at 100 % and 30 %, frames expanded and collapsed; with `ELEMENTS_BASELINE=<file>` they must equal the previous tag's (`test-results/S3B-15-elements.json`) |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-live.spec.ts` | S3B-15 (c): pan and zoom at 100 % on PERF-2's live canvas against “Performance test”, in turns (`test-results/S3B-15-live.json`) |

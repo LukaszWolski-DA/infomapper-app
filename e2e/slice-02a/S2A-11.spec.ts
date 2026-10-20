@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { canvasIn, card, expectToast, key, openCanvas, SEED_IDS, signInAs, store, WHOLE } from "./helpers";
+import { canvasIn, card, cardNodes, expectToast, key, openCanvas, SEED_IDS, signInAs, store, WHOLE } from "./helpers";
 
 const ws = SEED_IDS.wsRetailDwh;
 const layerOf = async (canvasId: string) => (await store().canvases.get(ws, canvasId))!.look.layer;
@@ -26,7 +26,7 @@ test("S2A-11: Mappings hides the relationship lines and Relationships hides the 
 
   await layerButton(page, "mappings").click();
   await expect.poll(() => counts(page)).toEqual({ maps: all.maps, rels: 0 });
-  await expect(page.locator(".react-flow__node")).toHaveCount(7); // the cards stay
+  await expect(cardNodes(page)).toHaveCount(7); // the cards stay
   await layerButton(page, "relationships").click();
   await expect.poll(() => counts(page)).toEqual({ maps: 0, rels: all.rels });
   await expect.poll(() => layerOf(here)).toBe("relationships");

@@ -31,7 +31,10 @@
 // `scripts/lib/to-screen.ts` are copied into the reference worktree so both sides measure the same way. `--only
 // <list>` runs a subset: pan (S1A-14, with C-08 untraced), c10 (S1B-10), lasso (S2A-14's marks), fading (S4P-fading),
 // c08 (S4P-10, traced), colours (S4B1-09, this branch only), c09 (S1B-09), drags (S2A-14's drags); with --only,
-// fading runs on this branch only too. `FADING_SCENARIOS=focus,lens-large` limits S4P-fading's scenarios. A side whose
+// fading runs on this branch only too. `FADING_SCENARIOS=focus,lens-large` limits S4P-fading's scenarios. Slice 4b-2:
+// s4b2pans (S4B2-10: pans with requirement cards on “Performance test – requirements” and, for S4B2-14, on “100 cards”;
+// both sides, the reference on “100 cards”), s4b2focus (S4B2-11), s4b2screen (S4B2-12), s4b2drag (S4B2-13), the last
+// three on this branch only. A side whose
 // quiet check fails (not quiet within 3 minutes) drops its round, and a replacement round with the same order is added
 // at the end (at most two per sitting).
 // Measuring only:
@@ -74,6 +77,11 @@ const CRITERIA: Record<string, Run> = {
   c08: { specs: ["e2e/slice-04p/S4P-10-c08.spec.ts"], args: [], results: ["S4P-10.json"] },
   colours: { specs: ["e2e/slice-04b1/S4B1-09.spec.ts"], args: [], results: ["S4B1-09.json"], branchOnly: true },
   c09: { specs: ["e2e/slice-01b/S1B-09.spec.ts"], args: [], results: ["S1B-09.json"] },
+  // slice 4b-2's closing sitting
+  s4b2pans: { specs: ["e2e/slice-04b2/S4B2-10.spec.ts"], args: [], results: ["S4B2-10.json"] },
+  s4b2focus: { specs: ["e2e/slice-04b2/S4B2-11.spec.ts"], args: [], results: ["S4B2-11.json"], branchOnly: true },
+  s4b2screen: { specs: ["e2e/slice-04b2/S4B2-12.spec.ts"], args: [], results: ["S4B2-12.json"], branchOnly: true },
+  s4b2drag: { specs: ["e2e/slice-04b2/S4B2-13.spec.ts"], args: [], results: ["S4B2-13.json"], branchOnly: true },
 };
 const only = (() => {
   const i = process.argv.indexOf("--only");
@@ -190,6 +198,16 @@ type Get = (r: Raw) => number;
 /** The fading spec's views and scenarios (slice 4p). */
 const FADING_VIEWS = ["100 %, expanded", "30 %, expanded", "100 % dense area, expanded", "100 %, collapsed", "30 %, collapsed", "100 % dense area, collapsed"] as const;
 const FADING_SCENARIOS = ["focus", "lens-small", "lens-large", "lens-dense"] as const;
+/** Slice 4b-2's pan views (S4B2-10, S4B2-14) and its Focus views and cases (S4B2-11). */
+const S4B2_VIEWS = ["30 % around ent:23, expanded", "100 % dense, expanded", "30 % around ent:23, collapsed", "100 % dense, collapsed"] as const;
+const S4B2_FOCUS_VIEWS = ["30 %, expanded", "100 %, expanded", "30 %, collapsed", "100 %, collapsed"] as const;
+const S4B2_FOCUS = ["ent:23", "REQ-102"] as const;
+const S4B2_DRAGS = ["requirement card, 100 %", "entity card, 100 %", "requirement card, 30 %", "entity card, 30 %"] as const;
+/** S4B2-10's canvas on a side: the requirements canvas where it exists (this branch), else “100 cards” (the reference). */
+const withCards = (r: Raw, view: string, ...keys: string[]) => {
+  const c = at(r["S4B2-10.json"], "canvases") as unknown as Record<string, unknown> | undefined;
+  return at(c?.["– requirements"] ?? c?.["100 cards"], view, ...keys);
+};
 const at = (o: unknown, ...keys: string[]) => keys.reduce<unknown>((v, k) => (v as Record<string, unknown>)?.[k], o) as number;
 interface Figure {
   id: string;
@@ -220,6 +238,13 @@ const FIGURES: Figure[] = [
   { id: "c10-screen", name: "Hover to the screen, median of 10 settled (C-10, traced)", unit: "ms", better: "lower", bar: 100, get: (r) => at(r["S1B-10.json"], "C-10", "toScreen", "byDir", "on", "toScreen", "median") },
   { id: "lasso-screen", name: "Lasso marks to the screen, median of 10 settled (traced)", unit: "ms", better: "lower", bar: 100, get: (r) => at(r["S2A-14-lasso.json"], "toScreen", "byDir", "on", "toScreen", "median") },
   { id: "c08-present", name: "Initial render to its last present (C-08, traced, diagnosis)", unit: "ms", better: "lower", get: (r) => at(r["S4P-10.json"], "median", "toLastPresentMs") },
+  // slice 4b-2: S4B2-10 (the branch with requirement cards against the reference without) and S4B2-14 (both on “100 cards”)
+  ...S4B2_VIEWS.flatMap((v): Figure[] => [
+    { id: `s4b2-10-${v}`, name: `S4B2-10 pan and zoom with requirement cards, ${v}, presented fps`, unit: "fps", better: "higher", ab: true, get: (r) => withCards(r, v, "presented", "fps") },
+    { id: `s4b2-10-${v}-raf`, name: "– untraced (rAF), the calibration", unit: "fps", better: "higher", get: (r) => withCards(r, v, "raf", "avgFps") },
+    { id: `s4b2-14-${v}`, name: `S4B2-14 pan and zoom without requirement cards (“100 cards”), ${v}, presented fps`, unit: "fps", better: "higher", ab: true, get: (r) => at(r["S4B2-10.json"], "canvases", "100 cards", v, "presented", "fps") },
+    { id: `s4b2-14-${v}-raf`, name: "– untraced (rAF), the calibration", unit: "fps", better: "higher", get: (r) => at(r["S4B2-10.json"], "canvases", "100 cards", v, "raf", "avgFps") },
+  ]),
   // slice 4p (S4P-08): pan and zoom with fading off around ent:23, both sides
   ...FADING_VIEWS.flatMap((v): Figure[] => [
     { id: `fade-off-${v}`, name: `Pan and zoom, fading off, ${v} (S4P-08)`, unit: "fps", better: "higher", ab: true, get: (r) => at(r["S4P-fading.json"], "views", v, "off", "avgFps") },
@@ -283,6 +308,9 @@ function screenTables(kept: readonly { side: string; raw: Raw }[]): string[] {
   ];
   for (const view of FADING_VIEWS)
     for (const scenario of FADING_SCENARIOS) cases.push([`Fading, ${view}, ${scenario}`, (r) => at(r["S4P-fading.json"], "views", view, "scenarios", scenario, "toScreen", "byDir") as unknown as Record<string, Dir>]);
+  // slice 4b-2: S4B2-12's cases (the drop target, selecting a requirement card, Focus with requirement cards lit)
+  const s4b2Cases = new Set(kept.flatMap((x) => Object.keys((at(x.raw["S4B2-12.json"], "cases") as unknown as Record<string, unknown>) ?? {})));
+  for (const c of s4b2Cases) cases.push([`S4B2-12 ${c}`, (r) => at(r["S4B2-12.json"], "cases", c, "byDir") as unknown as Record<string, Dir>]);
   // slice 4b-1: coverage colours (S4B1-09), REQ-102 selected and cleared
   for (const view of ["100 %, expanded", "30 %, expanded", "100 %, collapsed", "30 %, collapsed"])
     cases.push([`Coverage colours (S4B1-09), ${view}`, (r) => at(r["S4B1-09.json"], "views", view, "byDir") as unknown as Record<string, Dir>]);
@@ -314,6 +342,22 @@ function screenTables(kept: readonly { side: string; raw: Raw }[]): string[] {
         pans.push(`| ${side} | ${view} | ${scenario} | ${median(off).toFixed(1)} → ${median(on).toFixed(1)} | ${change >= 0 ? "+" : ""}${change.toFixed(1)} % | ${change >= -5 ? "met" : "not met"} |`);
       }
   }
+  // slice 4b-2: S4B2-11 (Focus on against off, presented) and S4B2-13 (the drags, presented)
+  const branch = kept.filter((x) => x.side === "branch");
+  for (const view of S4B2_FOCUS_VIEWS)
+    for (const focus of S4B2_FOCUS) {
+      const off = branch.map((x) => at(x.raw["S4B2-11.json"], "views", view, "off", "presented", "fps")).filter(Number.isFinite);
+      const on = branch.map((x) => at(x.raw["S4B2-11.json"], "views", view, focus, "presented", "fps")).filter(Number.isFinite);
+      if (!off.length || !on.length) continue;
+      const change = ((median(on) - median(off)) / median(off)) * 100;
+      pans.push(`| branch (S4B2-11) | ${view} | Focus ${focus} | ${median(off).toFixed(1)} → ${median(on).toFixed(1)} | ${change >= 0 ? "+" : ""}${change.toFixed(1)} % | ${change >= -5 ? "met" : "not met (partly met)"} |`);
+    }
+  const drags: string[] = [];
+  for (const d of S4B2_DRAGS) {
+    const v = branch.map((x) => at(x.raw["S4B2-13.json"], "drags", d, "presented", "fps")).filter(Number.isFinite);
+    if (v.length) drags.push(`| ${d} | ${v.map((x) => x.toFixed(1)).join(", ")} | ${median(v).toFixed(1)} | ${Math.min(...v).toFixed(1)}–${Math.max(...v).toFixed(1)} |`);
+  }
+  if (drags.length) pans.push("", "S4B2-13 drags, presented fps (bar: the requirement drag's median within the entity drag's spread, or above):", "", "| Drag | Rounds | Median | Spread |", "| --- | --- | --- | --- |", ...drags);
   if (!rows.length && !pans.length) return [];
   return [
     "",

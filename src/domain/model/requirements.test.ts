@@ -15,6 +15,7 @@ import {
 import type { Mapping, MappingInput, RequirementLink, WorkspaceModel } from "../types";
 import {
   canBeParent,
+  coverageBar,
   coverageParts,
   lastRequirementEditor,
   nextRequirementKey,
@@ -97,6 +98,7 @@ describe("coverage (D-31; slice 4b-1, PRD item 10)", () => {
       notApproved: [ids.email],
       notMapped: [ids.orderId],
       entityGaps: [],
+      entityNotApproved: [],
       parts: { entities: 0, attributes: 3 },
       done: false,
     });
@@ -111,11 +113,12 @@ describe("coverage (D-31; slice 4b-1, PRD item 10)", () => {
       notApproved: [],
       notMapped: [],
       entityGaps: [],
+      entityNotApproved: [],
       parts: { entities: 1, attributes: 0 },
       done: true,
     });
     // only a draft mapping on email: no attribute covered, the entity is a gap
-    expect(requirementCoverage(ids.req101, links, model([mapping()], [mappingInput()]))).toMatchObject({ total: 1, covered: [], entityGaps: [ids.customer], done: false });
+    expect(requirementCoverage(ids.req101, links, model([mapping()], [mappingInput()]))).toMatchObject({ total: 1, covered: [], entityGaps: [ids.customer], entityNotApproved: [ids.customer], done: false });
   });
 
   it("an entity item uses the same rule: an approved mapping with a type conflict does not cover it", () => {
@@ -140,6 +143,7 @@ describe("coverage (D-31; slice 4b-1, PRD item 10)", () => {
       notApproved: [],
       notMapped: [],
       entityGaps: [],
+      entityNotApproved: [],
       parts: { entities: 0, attributes: 1 },
       done: true,
     });
@@ -163,7 +167,7 @@ describe("coverage (D-31; slice 4b-1, PRD item 10)", () => {
 
   it("a requirement traced only to tables or columns has no items, 0 / 0, and is not covered", () => {
     const c = requirementCoverage(ids.req101, [link({ source_table_id: ids.crmCustomer }), link({ id: ids.reqLink2, source_column_id: ids.colEmail })], model([custIdMapping], [custIdInput]));
-    expect(c).toEqual({ total: 0, covered: [], notApproved: [], notMapped: [], entityGaps: [], parts: { entities: 0, attributes: 0 }, done: false });
+    expect(c).toEqual({ total: 0, covered: [], notApproved: [], notMapped: [], entityGaps: [], entityNotApproved: [], parts: { entities: 0, attributes: 0 }, done: false });
   });
 
   it("names the parts for the tooltip (PRD item 11)", () => {
@@ -284,5 +288,12 @@ describe("four-eyes author (AD-06, PRD item 13)", () => {
   it("falls back to the creator without any content event (seeded data), and skips other objects", () => {
     expect(lastRequirementEditor(r, [])).toBe(ids.someoneElse);
     expect(lastRequirementEditor(r, [changeEvent({ object_type: "requirement", object_id: ids.req101, user_id: ids.actor, operation: "create", after_image: {} })])).toBe(ids.someoneElse);
+  });
+});
+
+describe("coverageBar (slice 4b-2, PRD item 2)", () => {
+  it("counts items covered, mapped but not approved (attributes and entities) and not mapped", () => {
+    const c = { total: 6, covered: ["a"], notApproved: ["b"], notMapped: ["c", "d"], entityGaps: ["e", "f"], entityNotApproved: ["e"], parts: { entities: 2, attributes: 4 }, done: false };
+    expect(coverageBar(c)).toEqual({ covered: 1, mapped: 2, notMapped: 3 });
   });
 });

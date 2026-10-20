@@ -12,7 +12,8 @@ import type { Uuid } from "../ids";
 import { cardWidthOf, dropCards } from "../model/frames";
 import { LIVE_ONE_AT_A_TIME, LIVE_REMOVE_UNLABELS } from "../model/live";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
-import type { Canvas, CanvasItem, Entity, Frame, Note, SourceTable } from "../types";
+import { isElementCard, isRequirementCard } from "../model/card-kinds";
+import type { Canvas, CanvasItem, Entity, Frame, Note, Requirement, SourceTable } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
 import { releaseNotes } from "./note";
 import { begin, current, done, isLive, nothingToChange, softDelete } from "./shared";
@@ -42,7 +43,7 @@ export function newCanvasItem(
   ctx: CommandContext,
   workspaceId: Uuid,
   canvasId: Uuid,
-  target: { entity_id: Uuid } | { source_table_id: Uuid },
+  target: { entity_id: Uuid } | { source_table_id: Uuid } | { requirement_id: Uuid },
   position: { x: number; y: number },
 ): CanvasItem {
   return {
@@ -234,7 +235,7 @@ export function placeManyOnCanvas(
   if (state.canvas.live_label_id) return fail(domainError("invalid", LIVE_ONE_AT_A_TIME));
 
   const here = new Set(
-    state.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvasId).map((i) => i.entity_id ?? i.source_table_id),
+    state.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvasId && isElementCard(i)).map((i) => i.entity_id ?? i.source_table_id),
   );
   const placed: { item: CanvasItem; height: number | undefined }[] = [];
   for (const { entityId, sourceTableId, x, y, height: h } of cards) {
@@ -317,8 +318,9 @@ export function removeFromCanvas(
   if (!parsed.ok) return fail(parsed.error);
   const got = current(state.item, access, parsed.data.canvasItemId, parsed.data.expectedVersion, "card");
   if (!got.ok) return fail(got.error);
-  // on a live canvas, removing a card takes its label off (`removeFromLiveCanvas`, slice 3b)
-  if (state.canvas?.id === got.row.canvas_id && state.canvas.live_label_id) return fail(domainError("invalid", LIVE_REMOVE_UNLABELS));
+  // on a live canvas, removing a card takes its label off (`removeFromLiveCanvas`, slice 3b); a requirement card is
+  // layout only there (slice 4b-2, G)
+  if (isElementCard(got.row) && state.canvas?.id === got.row.canvas_id && state.canvas.live_label_id) return fail(domainError("invalid", LIVE_REMOVE_UNLABELS));
   return done(ctx, access, undefined, [
     softDelete(ctx, "canvas_item", got.row),
     ...releaseNotes(ctx, state.notes, { items: [got.row], frames: [] }, { cardIds: [got.row.id] }),
@@ -359,7 +361,6 @@ export function removeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, 
   const { canvasId, items } = parsed.data;
   const workspaceId = access.workspace.id;
   if (!isLive(state.canvas, workspaceId) || state.canvas.id !== canvasId) return fail(notFound("canvas"));
-  if (state.canvas.live_label_id) return fail(domainError("invalid", LIVE_REMOVE_UNLABELS));
   const byId = new Map(state.items.map((i) => [i.id, i]));
   const rows: CanvasItem[] = [];
   for (const { canvasItemId, expectedVersion } of items) {
@@ -368,8 +369,70 @@ export function removeCanvasItems(ctx: CommandContext, access: WorkspaceAccess, 
     if (row.version !== expectedVersion) return fail(staleVersion());
     rows.push(row);
   }
+  // several requirement cards may leave a live canvas together (layout only, slice 4b-2, G); element cards may not
+  if (state.canvas.live_label_id && rows.some(isElementCard)) return fail(domainError("invalid", LIVE_REMOVE_UNLABELS));
   return done(ctx, access, { removed: rows.length }, [
     ...rows.map((row) => softDelete(ctx, "canvas_item", row)),
     ...releaseNotes(ctx, state.notes, { items: rows, frames: [] }, { cardIds: rows.map((r) => r.id) }),
   ]);
+}
+
+// ---- requirement cards (slice 4b-2) ----
+
+const placeRequirementsInput = z
+  .object({
+    canvasId: uuidSchema,
+    cards: z
+      .array(z.object({ requirementId: uuidSchema, ...positionSchema.shape }).strict())
+      .min(1, "Nothing to place.")
+      .max(200, "Place at most 200 cards at once.")
+      .refine((cards) => new Set(cards.map((c) => c.requirementId)).size === cards.length, "A requirement is listed twice."),
+  })
+  .strict();
+export type PlaceRequirementCardsInput = z.input<typeof placeRequirementsInput>;
+
+export interface PlaceRequirementCardsState {
+  canvas: Canvas | null;
+  requirements: readonly Requirement[];
+  /** Live cards of the canvas, to refuse a second card for the same requirement. */
+  items: readonly CanvasItem[];
+}
+
+/** The refusal when a requirement's card is on the canvas already (one card per requirement per canvas). */
+export const REQUIREMENT_CARD_THERE = "Its card is already on this canvas.";
+
+/**
+ * Places the cards of one or more requirements on a canvas, in one change group (“Place its card”, “Add all to this
+ * canvas”; PRD items 13–15). A requirement card is layout only: it joins no frame, and on a live canvas it changes no
+ * label (G). Each requirement has at most one card per canvas.
+ */
+export function placeRequirementCards(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: PlaceRequirementCardsState,
+  input: unknown,
+): CommandResult<{ canvasItemIds: Uuid[] }> {
+  const parsed = begin(access, "canvas.edit_items", placeRequirementsInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { canvasId, cards } = parsed.data;
+  const workspaceId = access.workspace.id;
+  if (!isLive(state.canvas, workspaceId) || state.canvas.id !== canvasId) return fail(notFound("canvas"));
+  const here = new Set(state.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvasId && isRequirementCard(i)).map((i) => i.requirement_id));
+  const rows: CanvasItem[] = [];
+  for (const { requirementId, x, y } of cards) {
+    if (!state.requirements.some((r) => r.id === requirementId && isLive(r, workspaceId))) return fail(notFound("requirement"));
+    if (here.has(requirementId)) return fail(domainError("conflict", REQUIREMENT_CARD_THERE));
+    rows.push(newCanvasItem(ctx, workspaceId, canvasId, { requirement_id: requirementId }, { x, y }));
+  }
+  return done(ctx, access, { canvasItemIds: rows.map((r) => r.id) }, rows.map((row): Write => ({ kind: "insert", table: "canvas_item", row })));
+}
+
+/**
+ * The cards of requirements on every canvas, soft-deleted with them (deleting a requirement, PRD item 7) in the
+ * deleting command's change group, so one undo brings them back.
+ */
+export function requirementCardsGone(ctx: CommandContext, workspaceId: Uuid, items: readonly CanvasItem[], requirementIds: ReadonlySet<Uuid>): Write[] {
+  return items
+    .filter((i) => isLive(i, workspaceId) && i.requirement_id !== null && requirementIds.has(i.requirement_id))
+    .map((i) => softDelete(ctx, "canvas_item", i));
 }

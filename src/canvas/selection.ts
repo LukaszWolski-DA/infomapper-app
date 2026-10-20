@@ -8,12 +8,14 @@
 // Slice 3a (item 13; prototype lassoHits, selectAll, movingItems): notes too, `note:<id>`. A lasso catches a note fully
 // inside it unless its frame is caught as well; Ctrl+A takes the free notes in no frame; a note moves with a selection
 // unless its frame (a free note) or its card or frame (a pinned note) moves anyway, so nothing moves twice.
+// Slice 4b-2 (L): requirement cards too, `req:<requirement id>`; one such key is the requirement selected. A lasso or
+// Ctrl+A takes them; they are in no frame, so they always move on their own.
 
 import type { CardData } from "./card-data";
 import type { Rect } from "./geometry";
 import type { Selection } from "./line-data";
 
-export type SelectionKey = `entity:${string}` | `source:${string}` | `frame:${string}` | `note:${string}`;
+export type SelectionKey = `entity:${string}` | `source:${string}` | `frame:${string}` | `note:${string}` | `req:${string}`;
 
 export const cardKey = (card: Pick<CardData, "kind" | "targetId">): SelectionKey =>
   card.kind === "ent" ? `entity:${card.targetId}` : `source:${card.targetId}`;
@@ -21,8 +23,11 @@ export const frameKey = (frameId: string): SelectionKey => `frame:${frameId}`;
 export const isFrameKey = (key: string): key is `frame:${string}` => key.startsWith("frame:");
 export const noteKey = (noteId: string): SelectionKey => `note:${noteId}`;
 export const isNoteKey = (key: string): key is `note:${string}` => key.startsWith("note:");
+/** A requirement card's key (slice 4b-2): the requirement, as for elements, so the same key works on every canvas. */
+export const reqKey = (requirementId: string): SelectionKey => `req:${requirementId}`;
+export const isReqKey = (key: string): key is `req:${string}` => key.startsWith("req:");
 /** A card's key: an entity or a source table. */
-export const isCardKey = (key: string): boolean => !isFrameKey(key) && !isNoteKey(key);
+export const isCardKey = (key: string): boolean => !isFrameKey(key) && !isNoteKey(key) && !isReqKey(key);
 
 /** A card, frame or note on this canvas: its id, key and rectangle on the board; a card or free note names its frame. */
 export interface ItemBox {
@@ -40,6 +45,8 @@ export interface ItemBox {
 /** The keys a selection holds: several items, one card or frame, or none (a row or a line is not such a selection). */
 export function selectedKeys(sel: Selection, items: readonly ItemBox[]): SelectionKey[] {
   if (sel?.t === "multi") return [...sel.keys];
+  // a requirement whose card is on this canvas (slice 4b-2): selecting the card is selecting the requirement
+  if (sel?.t === "req") return items.some((i) => i.key === reqKey(sel.id)) ? [reqKey(sel.id)] : [];
   if (sel?.t === "card" || sel?.t === "frame" || sel?.t === "note") {
     const item = items.find((c) => c.id === sel.id);
     return item ? [item.key] : [];
@@ -52,6 +59,7 @@ export function fromKeys(keys: Iterable<SelectionKey>, items: readonly ItemBox[]
   const here = new Map(items.map((c) => [c.key, c.id]));
   const kept = [...new Set(keys)].filter((k) => here.has(k));
   if (kept.length === 0) return null;
+  if (kept.length === 1 && isReqKey(kept[0]!)) return { t: "req", id: kept[0]!.slice(4) };
   if (kept.length === 1) return { t: isFrameKey(kept[0]!) ? "frame" : isNoteKey(kept[0]!) ? "note" : "card", id: here.get(kept[0]!)! };
   return { t: "multi", keys: kept };
 }
@@ -67,7 +75,7 @@ export function toggleItem(sel: Selection, key: SelectionKey, items: readonly It
 
 /** Shift+click on a card. */
 export function toggleCard(sel: Selection, cardId: string, items: readonly ItemBox[]): Selection {
-  const card = items.find((c) => c.id === cardId && isCardKey(c.key));
+  const card = items.find((c) => c.id === cardId && (isCardKey(c.key) || isReqKey(c.key)));
   return card ? toggleItem(sel, card.key, items) : sel;
 }
 
@@ -92,7 +100,9 @@ export function lassoHits(items: readonly ItemBox[], lasso: Rect): SelectionKey[
   const loose = (i: ItemBox) => !i.hidden && !(i.frameId && caught.has(i.frameId)) && within(i.rect, lasso);
   const cards = items.filter((i) => isCardKey(i.key) && loose(i));
   const notes = items.filter((i) => isNoteKey(i.key) && loose(i));
-  return [...frames, ...cards, ...notes].map((i) => i.key);
+  // requirement cards are in no frame (slice 4b-2): a caught frame never stands for them
+  const reqs = items.filter((i) => isReqKey(i.key) && within(i.rect, lasso));
+  return [...frames, ...cards, ...notes, ...reqs].map((i) => i.key);
 }
 
 /** After a lasso: its hits, added to the selection so far when Shift was held at the start. */
@@ -105,6 +115,7 @@ export const allKeys = (items: readonly ItemBox[]): SelectionKey[] => [
   ...items.filter((i) => isFrameKey(i.key)).map((i) => i.key),
   ...items.filter((i) => isCardKey(i.key) && !i.frameId).map((i) => i.key),
   ...items.filter((i) => isNoteKey(i.key) && !i.frameId && !i.pinnedTo && !i.hidden).map((i) => i.key),
+  ...items.filter((i) => isReqKey(i.key)).map((i) => i.key),
 ];
 
 /** What a selection moves and arranges (prototype movingItems): each part named by its id. */
@@ -120,6 +131,8 @@ export interface Units {
    * pinned note whose card or frame moves (it follows).
    */
   notes: string[];
+  /** Selected requirement cards (slice 4b-2): each moves on its own; nothing carries them. */
+  reqs: string[];
 }
 
 export function unitsOf(keys: readonly SelectionKey[], items: readonly ItemBox[]): Units {
@@ -134,13 +147,20 @@ export function unitsOf(keys: readonly SelectionKey[], items: readonly ItemBox[]
   const notes = chosen
     .filter((i) => isNoteKey(i.key) && !(i.pinnedTo ? moving.has(i.pinnedTo) : i.frameId && inFrames.has(i.frameId)))
     .map((i) => i.id);
-  return { frames, cards, members, notes };
+  const reqs = chosen.filter((i) => isReqKey(i.key)).map((i) => i.id);
+  return { frames, cards, members, notes, reqs };
 }
 
 /** The selected cards themselves, not frames (fit widths, remove, put in a new frame act on these). */
 export const selectedCardIds = (keys: readonly SelectionKey[], items: readonly ItemBox[]): string[] => {
   const byKey = new Map(items.map((i) => [i.key, i]));
   return keys.filter(isCardKey).map((k) => byKey.get(k)?.id).filter((id): id is string => !!id);
+};
+
+/** The selected requirement cards (slice 4b-2: removing a selection takes them off too). */
+export const selectedReqCardIds = (keys: readonly SelectionKey[], items: readonly ItemBox[]): string[] => {
+  const byKey = new Map(items.map((i) => [i.key, i]));
+  return keys.filter(isReqKey).map((k) => byKey.get(k)?.id).filter((id): id is string => !!id);
 };
 
 /** The box drawn around several selected items: their bounds, 12 px out (prototype #selbox). */

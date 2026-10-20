@@ -1,5 +1,6 @@
 import { spawn, spawnSync, type ChildProcess } from "node:child_process";
-import { rmSync } from "node:fs";
+import { closeSync, mkdirSync, openSync, readFileSync, rmSync } from "node:fs";
+import path from "node:path";
 import { E2E_DB } from "../config";
 import type { BrowserContext } from "@playwright/test";
 import { expect, test } from "./fixtures";
@@ -9,16 +10,40 @@ import { createFromSwitcher, expectToast, signInAs } from "./helpers";
 // so it can restart it without touching the server the other tests use.
 const PORT = 3201;
 const BASE = `http://localhost:${PORT}`;
-const DIST = ".next-e2e-restart";
+/**
+ * The first start's build folder, and the restart's (slice 4b-2, step 8): `next dev` holds a lock in its build folder,
+ * and on Windows a lock left by a server stopped by force is released only some time after its process is gone. A
+ * restart on the same folder then found it held, gave up and exited, and the test waited out its 300 s (the S0-10
+ * failures since slice 1a). The data the test checks lives in the data file, not here.
+ */
+const DISTS = [".next-e2e-restart", ".next-e2e-restart-2"] as const;
+/** The servers' output, for when a start fails. */
+const LOGS = path.join(".data", "e2e-runs");
+const logOf = (n: number) => path.join(LOGS, `S0-10-server-${n}.log`);
 
-function startServer(): ChildProcess {
-  return spawn("npx", ["next", "dev", "--port", String(PORT)], {
-    env: { ...process.env, INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: DIST },
+/** Starts the dev server on the given build folder; its output goes to `logOf(n)`; `exited` is set when it ends. */
+function startServer(n: number): ChildProcess {
+  mkdirSync(LOGS, { recursive: true });
+  const out = openSync(logOf(n), "w");
+  const child = spawn("npx", ["next", "dev", "--port", String(PORT)], {
+    env: { ...process.env, INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: DISTS[n] },
     shell: true,
-    stdio: "ignore",
+    stdio: ["ignore", out, out],
     detached: process.platform !== "win32",
   });
+  closeSync(out);
+  exited = null;
+  // only the current server's end counts (the stopped one's may be reported after the restart began)
+  child.on("exit", (code) => {
+    if (server === child) exited = { code, log: logOf(n) };
+  });
+  return child;
 }
+let exited: { code: number | null; log: string } | null = null;
+
+const removeDists = () => {
+  for (const d of DISTS) rmSync(d, { recursive: true, force: true });
+};
 
 /** Stops the server: its process tree, and whatever still listens on the port (npx can leave next running). */
 function stopServer(server?: ChildProcess) {
@@ -50,8 +75,8 @@ test.afterEach(async () => {
   stopServer(server);
   server = undefined;
   await waitUntil(false);
-  // a server stopped by force can leave half-written files (route types that `tsc` reads); this folder is only ours
-  rmSync(DIST, { recursive: true, force: true });
+  // a server stopped by force can leave half-written files (route types that `tsc` reads); these folders are only ours
+  removeDists();
 });
 
 /** Steps on a freshly started dev server wait longer: it compiles each page and action on first use. */
@@ -67,6 +92,11 @@ const STOP = 120_000;
 async function waitUntil(up: boolean) {
   const deadline = Date.now() + (up ? START : STOP);
   while (Date.now() < deadline) {
+    // a server that ended before it answered will not answer: fail now, with its last words (slice 4b-2, step 8)
+    if (up && exited) {
+      const tail = readFileSync(exited.log, "utf8").split("\n").slice(-15).join("\n");
+      throw new Error(`Server exited (code ${exited.code}) before it answered; ${exited.log}:\n${tail}`);
+    }
     const ok = await fetch(`${BASE}/sign-in`, { signal: AbortSignal.timeout(Math.max(1_000, deadline - Date.now())) }).then(
       (r) => r.ok,
       () => false,
@@ -87,8 +117,8 @@ test("S0-10: after stopping and restarting the dev server, created projects and 
   test.setTimeout(900_000);
   stopServer(); // a server left over from an interrupted run
   await waitUntil(false);
-  rmSync(DIST, { recursive: true, force: true });
-  server = startServer();
+  removeDists();
+  server = startServer(0);
   // a browser session that talks to this test's own server, not the shared one
   const context = await browser.newContext({ baseURL: BASE });
   const page = await context.newPage();
@@ -110,7 +140,9 @@ test("S0-10: after stopping and restarting the dev server, created projects and 
 
     stopServer(server);
     await waitUntil(false);
-    server = startServer();
+    exited = null;
+    // the restart on a build folder of its own (DISTS): the first server's lock cannot hold it up
+    server = startServer(1);
     await waitUntil(true);
     await warm(context, canvasUrl);
 

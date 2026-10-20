@@ -1,8 +1,9 @@
 "use client";
 
 // The project home's Requirements (slice 4a, PRD item 30, prototype renderHome): every requirement whose scope touches
-// the project's canvases, with key, name, kind, coverage bar and “{ok}/{total}, {status}”. A click opens the project's
-// last opened canvas (else its first) with the requirement's panel open.
+// the project's canvases, with key, name, kind, coverage bar and “{ok}/{total}, {status}”. A click opens the canvas that
+// shows most of it (slice 4b-2, PRD item 23; `bestCanvasId`), else the project's last opened canvas (else its first), with
+// the requirement selected and its panel open.
 
 import { useRouter } from "next/navigation";
 import { lastCanvasKey } from "@/app/_lib/last-canvas";
@@ -20,10 +21,10 @@ export function ProjectRequirements({ projectId, requirements, canvases }: { pro
       </p>
     );
   }
-  const open = (id: string) => {
+  const open = (r: ProjectRequirement) => {
     const last = readPreference(lastCanvasKey(projectId));
-    const canvas = canvases.find((c) => c.id === last) ?? canvases[0];
-    if (canvas) router.push(`${canvas.href}?req=${id}`);
+    const canvas = canvases.find((c) => c.id === r.bestCanvasId) ?? canvases.find((c) => c.id === last) ?? canvases[0];
+    if (canvas) router.push(`${canvas.href}?req=${r.id}`);
   };
   return (
     <div className="flex max-w-[620px] flex-col gap-0.5" data-testid="list-project-requirements">
@@ -33,7 +34,7 @@ export function ProjectRequirements({ projectId, requirements, canvases }: { pro
           type="button"
           className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-im-hover"
           title="Open it on a canvas of this project"
-          onClick={() => open(r.id)}
+          onClick={() => open(r)}
           data-testid="item-project-requirement"
           data-key={r.key}
         >

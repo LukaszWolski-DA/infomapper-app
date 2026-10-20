@@ -82,8 +82,8 @@ export async function setRequirementStatusAction(
 export async function deleteRequirementAction(workspaceId: string, input: { requirementId: string; expectedVersion: number }): Promise<ActionResult<{ message: string }>> {
   return requirementCommand(workspaceId, async (ctx, access, store) => {
     const ws = access.workspace.id;
-    const [requirements, links] = await Promise.all([store.requirements.list(ws), store.requirements.listLinks(ws)]);
-    const r = deleteRequirement(ctx, access, { requirements, links }, input);
+    const [requirements, links, items] = await Promise.all([store.requirements.list(ws), store.requirements.listLinks(ws), store.canvasItems.list(ws)]);
+    const r = deleteRequirement(ctx, access, { requirements, links, items }, input);
     return r.ok ? { ...r, value: { message: r.value.message } } : r;
   });
 }

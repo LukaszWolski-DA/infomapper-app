@@ -13,6 +13,7 @@ import { z } from "zod";
 import { buildWriteSet, fail, nextVersion, newRowColumns, type CommandContext, type CommandResult, type Write, type WriteSet } from "../changes";
 import { domainError, notFound, staleVersion } from "../errors";
 import type { Uuid } from "../ids";
+import { isElementCard } from "../model/card-kinds";
 import { cardHeightFor } from "../model/card-size";
 import { DEFAULT_CARD_WIDTH } from "../model/frames";
 import { targetColumns, type LabelTarget } from "../model/labels";
@@ -287,10 +288,12 @@ const sameWrite = (a: Write, b: Write) => a.kind === b.kind && a.table === b.tab
 function syncCanvas(ctx: CommandContext, ws: Uuid, s: LiveWriteState, canvas: Canvas, out: Writes): LiveCanvasChange {
   const labelId = canvas.live_label_id!;
   const membership = liveMembership(labelId, liveModelOf(s, ws));
-  const items = s.canvasItems.filter((i) => isLive(i, ws) && i.canvas_id === canvas.id);
+  const placedHere = s.canvasItems.filter((i) => isLive(i, ws) && i.canvas_id === canvas.id);
+  // requirement cards are layout only on a live canvas (slice 4b-2, G): the sync leaves them, new cards keep clear of them
+  const items = placedHere.filter(isElementCard);
   const frames = s.frames.filter((f) => isLive(f, ws) && f.canvas_id === canvas.id);
   const boxes = [
-    ...items.map((i) => ({ x: i.x, y: i.y, w: i.width ?? DEFAULT_CARD_WIDTH, itemId: i.id })),
+    ...placedHere.map((i) => ({ x: i.x, y: i.y, w: i.width ?? DEFAULT_CARD_WIDTH, itemId: i.id })),
     ...frames.map((f) => ({ x: f.x, y: f.y, w: f.width })),
   ];
   const byName = <R extends { id: Uuid; name: string }>(rows: readonly R[], ids: Iterable<Uuid>) => {
@@ -426,7 +429,7 @@ export function removeFromLiveCanvas(
   if (!parsed.ok) return fail(parsed.error);
   const ws = access.workspace.id;
   const item = state.canvasItems.find((i) => i.id === parsed.data.canvasItemId);
-  if (!isLive(item, ws)) return fail(notFound("card"));
+  if (!isLive(item, ws) || !isElementCard(item)) return fail(notFound("card"));
   if (item.version !== parsed.data.expectedVersion) return fail(staleVersion());
   const canvas = state.canvases.find((c) => c.id === item.canvas_id);
   const label = state.labels.find((l) => l.id === canvas?.live_label_id);

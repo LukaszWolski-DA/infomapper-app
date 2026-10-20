@@ -742,3 +742,29 @@ describe("undo of frame steps", () => {
     expect(revertChangeGroup(makeCtx(), access("modeler"), { events: created.writeSet.events, rows: later }, "undo")).toMatchObject({ ok: false, error: { code: "conflict" } });
   });
 });
+
+describe("moveOnCanvas: requirement cards (slice 4b-2, item 6)", () => {
+  const reqItem = "01900000-0000-7000-8000-00000000c201";
+  const reqCard = canvasItem(reqItem, { entity_id: null, requirement_id: ids.req101, x: 2000, y: 0 });
+  const area = frame(frameA, { x: 0, y: 0, width: 800, height: 400 });
+  const state = { canvas: canvas(), frames: [area], items: [customerCard({ frame_id: frameA, x: 40, y: 80 }), reqCard], entities: model.entities, concepts: model.concepts };
+  const move = (input: object) => moveOnCanvas(makeCtx(), access("modeler"), state, { canvasId: canvas1, frames: [], items: [], ...input });
+
+  it("moves a requirement card dropped onto a frame without making it a member or growing the frame", () => {
+    const r = ok(move({ items: [{ ...ref(reqCard), x: 100, y: 100 }], frames: [fref(area)], dragDrop: true }));
+    const rows = written(r.writeSet);
+    expect(rows[`canvas_item:${reqItem}`]).toMatchObject({ x: 100, y: 100, frame_id: null, version: 2 });
+    expect(rows[`frame:${frameA}`]).toBeUndefined();
+    expect(r.value).toMatchObject({ moved: 1, versions: { [reqItem]: 2 } });
+  });
+
+  it("does not carry a requirement card that lies inside a moved frame", () => {
+    const inside = canvasItem(reqItem, { entity_id: null, requirement_id: ids.req101, x: 100, y: 100 });
+    const r = ok(moveOnCanvas(makeCtx(), access("modeler"), { ...state, items: [state.items[0]!, inside] }, { canvasId: canvas1, frames: [{ ...fref(area), x: 400, y: 0 }], items: [ref(state.items[0]!)] }));
+    expect(written(r.writeSet)[`canvas_item:${reqItem}`]).toBeUndefined();
+  });
+
+  it("refuses a requirement card moved at a stale version", () => {
+    expect(move({ items: [{ ...ref(reqCard), expectedVersion: 5, x: 8, y: 8 }] })).toMatchObject(refusedAsStale);
+  });
+});

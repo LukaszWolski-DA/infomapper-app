@@ -2,17 +2,20 @@
 
 // Fading on the canvas (slice 4p; slice 4b-1): what a request (`fade.ts`) lights on this canvas (the domain's `focusLit`
 // / `requirementFocusLit`, or a lit set given directly, mapped onto cards, blocks, notes, rows and lines), and rows tinted
-// covered or gap in the overlay above the cards (`LitRows`). The veil is `FadeLayer.tsx`'s.
+// covered or gap in the overlay above the cards (`LitRows`). The veil is `FadeLayer.tsx`'s. Slice 4b-2, step 6: the
+// requirement cards a Focus lights (the domain's `litRequirements`, PRD item 21, C) and the trace lines with both ends lit.
 
 import { memo, useMemo } from "react";
 import { useStore, type InternalNode } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
-import { requirementFocusLit, targetLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
+import { litRequirements, mergeLit, requirementFocusLit, targetLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import type { ScopeModel } from "@/domain/model/requirements";
 import type { Requirement, RequirementLink } from "@/domain/types";
 import type { BlockNodeT } from "./BlockNode";
 import type { CardNodeT } from "./CardNode";
+import type { ReqNodeT } from "./RequirementCardNode";
+import type { TraceData } from "./trace-data";
 import { fadeKey, focusTarget, useFadeRequest } from "./fade";
 import { cardWidth, LOD_ZOOM, ROW_H, rowEnd, type Rect } from "./geometry";
 
@@ -30,7 +33,10 @@ export interface FadeNote {
   pinCardId: Uuid | null;
 }
 
-/** The request asked for now, its key, and what it lights in the model; null with fading off. */
+/**
+ * The request asked for now, its key, and what it lights in the model; null with fading off. A Focus request also says
+ * which requirement cards stay lit (slice 4b-2, PRD item 21); a multi-selection's requirements light their scopes too.
+ */
 export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | null {
   const request = useFadeRequest();
   const index = useRequirementIndex(data);
@@ -39,9 +45,16 @@ export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | 
     if ("lit" in request) return { key: fadeKey(request), lit: request.lit };
     if (!data) return null;
     const target = focusTarget(request.focus);
-    if (target.t !== "requirement") return { key: fadeKey(request), lit: targetLit(data.model, target) };
-    if (!index?.byId.has(target.id)) return null;
-    return { key: fadeKey(request), lit: requirementFocusLit(data.model, index.scope(target.id)) };
+    let lit: Lit;
+    if (target.t === "requirement") {
+      if (!index?.byId.has(target.id)) return null;
+      lit = requirementFocusLit(data.model, index.scope(target.id));
+    } else {
+      lit = targetLit(data.model, target);
+      if (target.t === "several" && index) for (const r of target.requirements ?? []) if (index.byId.has(r)) mergeLit(lit, requirementFocusLit(data.model, index.scope(r)));
+    }
+    if (index) lit.requirements = litRequirements(data.model, target, index.byId.keys(), index.scope);
+    return { key: fadeKey(request), lit };
   }, [request, data, index]);
 }
 
@@ -64,14 +77,19 @@ export const isLitCard = (n: AnyNode, lit: Lit): boolean => {
   return c.kind === "ent" ? lit.entities.has(c.targetId) : lit.tables.has(c.targetId);
 };
 
+/** Whether a node is a requirement card whose requirement is lit (slice 4b-2, PRD item 20). */
+export const isLitReqCard = (n: AnyNode, lit: Lit): boolean => n.type === "req" && !!lit.requirements?.has((n as unknown as ReqNodeT).data.card.requirementId);
+
 /**
- * The React Flow nodes that stay lit: the cards of lit entities and tables that are drawn, and the block of a collapsed
- * frame when one of its hidden cards is lit (prototype: a frame stays lit when a member is).
+ * The React Flow nodes that stay lit: the cards of lit entities and tables that are drawn, the block of a collapsed
+ * frame when one of its hidden cards is lit (prototype: a frame stays lit when a member is), and the lit requirement
+ * cards (slice 4b-2; never in a block).
  */
 export function litNodeIds(lookup: Map<string, AnyNode>, lit: Lit): Set<string> {
   const out = new Set<string>();
   const litFrames = new Set<string>();
   for (const [id, n] of lookup) {
+    if (isLitReqCard(n, lit)) out.add(id);
     if (!isLitCard(n, lit)) continue;
     if (!n.hidden) out.add(id);
     else {
@@ -81,6 +99,21 @@ export function litNodeIds(lookup: Map<string, AnyNode>, lit: Lit): Set<string> 
   }
   for (const [id, n] of lookup) if (n.type === "block" && litFrames.has((n as unknown as BlockNodeT).data.frame.id)) out.add(id);
   return out;
+}
+
+/**
+ * The trace lines that stay lit (slice 4b-2, PRD item 21): both ends lit, the requirement card and the element (an
+ * entity's or table's card, also hidden in a collapsed frame; a row's card; a mapping). The rest fade with the veil.
+ */
+export function litTraces(traces: readonly TraceData[], lookup: Map<string, AnyNode>, lit: Lit): TraceData[] {
+  if (!lit.requirements?.size) return [];
+  return traces.filter((t) => {
+    const req = lookup.get(t.reqCardId);
+    if (!req || !isLitReqCard(req, lit)) return false;
+    if (t.target.t === "map") return lit.mappings.has(t.target.mappingId);
+    const card = lookup.get(t.target.cardId);
+    return !!card && isLitCard(card, lit);
+  });
 }
 
 /** A node's rectangle as React Flow measured it. */

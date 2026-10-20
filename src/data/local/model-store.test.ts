@@ -107,9 +107,12 @@ describe("demo model (slice 1a PRD, demo data)", () => {
 
   it("places the cards on the two canvases at the prototype's positions, without frames", async () => {
     const m = await store.model.load(RETAIL);
-    const main = await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders);
+    // the entity and table cards; REQ-104's requirement card besides them since slice 4b-2
+    const all = await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders);
+    const main = all.filter((i) => i.requirement_id === null);
     const lines = await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasOrderLines);
     expect(main).toHaveLength(7);
+    expect(all).toHaveLength(8);
     expect(lines).toHaveLength(4);
     const customerCard = main.find((i) => i.entity_id === byName(m.entities, "Customer").id);
     expect(customerCard).toMatchObject({ x: 496, y: 40, collapsed: false, row_filter: "all", frame_id: null, width: null });
@@ -141,7 +144,8 @@ describe("demo model (slice 1a PRD, demo data)", () => {
     expect(sales.entities).toHaveLength(6);
     expect(sales.mappings).toHaveLength(14);
     expect(sales.mappings.find((x) => x.status === "approved")).toMatchObject({ created_by: SEED_IDS.userMarek, approved_by: SEED_IDS.userLukasz });
-    const retailCards = await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders);
+    // the entity and table cards (REQ-104's card is Retail Co's own, slice 4b-2: Sales analytics has no requirements)
+    const retailCards = (await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders)).filter((i) => i.requirement_id === null);
     const salesCards = await store.canvasItems.listOfCanvas(SEED_IDS.wsSales, SEED_IDS.canvasSalesFirst);
     const place = (items: CanvasItem[], m: WorkspaceModel) =>
       items
@@ -220,7 +224,7 @@ describe("domain commands applied through the adapter", () => {
     expect(after.mappings).toHaveLength(m.mappings.length - 8);
     expect(after.mappingInputs).toHaveLength(m.mappingInputs.length - 8);
     expect(after.relationships).toHaveLength(3);
-    expect(await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders)).toHaveLength(6);
+    expect((await store.canvasItems.listOfCanvas(RETAIL, SEED_IDS.canvasCustomerOrders)).filter((i) => i.requirement_id === null)).toHaveLength(6);
     expect(new Set((await store.changeEvents.list(RETAIL)).map((e) => e.change_group_id)).size).toBe(1);
   });
 
@@ -313,6 +317,13 @@ describe("the data model's checks on the model tables", () => {
     const product = byName(m.entities, "Product").id;
     expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ entity_id: product }) }])).toMatchObject({ ok: false, error: { code: "conflict" } });
     expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ entity_id: product, canvas_id: SEED_IDS.canvasCustomerOrders }) }])).toEqual({ ok: true });
+  });
+
+  it("canvas_item: a requirement card, one live card per requirement and canvas (slice 4b-2)", async () => {
+    const req = (await store.requirements.list(RETAIL)).find((r) => r.key === "REQ-101")!.id;
+    expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ requirement_id: req }) }])).toEqual({ ok: true });
+    expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ requirement_id: req }) }])).toMatchObject({ ok: false, error: { code: "conflict" } });
+    expect(await apply([{ kind: "insert", table: "canvas_item", row: card({ requirement_id: req, canvas_id: SEED_IDS.canvasCustomerOrders }) }])).toEqual({ ok: true });
   });
 
   it("canvas_item: width between 200 and 600, known row filters", async () => {
@@ -523,7 +534,8 @@ describe("seed:large (S1A-14)", () => {
     const perf2 = wl.label.find((l) => l.workspace_id === ws && l.name === LARGE_LIVE_LABEL)!;
     const liveCanvas = wl.canvas.find((c) => c.live_label_id === perf2.id)!;
     expect(liveCanvas.name).toBe("PERF-2");
-    expect((await store.canvases.listLinksOfProject(ws, LARGE_IDS.project)).map((l) => l.canvas_id)).toEqual([LARGE_IDS.canvas, liveCanvas.id]);
+    // slice 4b-2: “Performance test – requirements” is the third tab
+    expect((await store.canvases.listLinksOfProject(ws, LARGE_IDS.project)).map((l) => l.canvas_id)).toEqual([LARGE_IDS.canvas, liveCanvas.id, LARGE_IDS.canvasRequirements]);
     const liveCards = await store.canvasItems.listOfCanvas(ws, liveCanvas.id);
     const membership = liveMembership(perf2.id, { ...m, links });
     expect(liveCards).toHaveLength(22);
@@ -536,8 +548,10 @@ describe("seed:large (S1A-14)", () => {
     // The fading scenarios' lenses (slice 4p): two requirements without cards; the small one six attributes of one entity,
     // one of them without a mapping (a gap), the large one four whole entities.
     const requirements = await store.requirements.list(ws);
-    expect(requirements.map((r) => [r.key, r.name]).sort()).toEqual([["REQ-101", "Lens, small"], ["REQ-102", "Lens, large"], ["REQ-103", "Lens, dense area"]]);
-    expect((await store.workspaces.get(ws))!.requirement_key_next).toBe(104);
+    expect(requirements.filter((r) => ["REQ-101", "REQ-102", "REQ-103"].includes(r.key)).map((r) => [r.key, r.name]).sort()).toEqual([["REQ-101", "Lens, small"], ["REQ-102", "Lens, large"], ["REQ-103", "Lens, dense area"]]);
+    // slice 4b-2: REQ-104 to REQ-112 for the requirements canvas
+    expect(requirements).toHaveLength(12);
+    expect((await store.workspaces.get(ws))!.requirement_key_next).toBe(113);
     const lenses = buildRequirementIndex(requirements, await store.requirements.listLinks(ws), m);
     const byKey = (key: string) => requirements.find((r) => r.key === key)!.id;
     const small = lenses.coverage(byKey("REQ-101")), large = lenses.coverage(byKey("REQ-102"));
@@ -550,6 +564,28 @@ describe("seed:large (S1A-14)", () => {
     expect(lenses.coverage(byKey("REQ-103")).total).toBe(0);
     expect([large.total, large.parts.attributes]).toEqual([5 + 8 + 21 + 12, 5 + 8 + 21 + 12]);
     expect(cards.some((c) => c.requirement_id)).toBe(false);
+    // “Performance test – requirements” (slice 4b-2, PRD item 26): the same cards, frames and notes, plus 12 requirement
+    // cards, none in a frame; their requirements touch only cards that carry a marker on “100 cards” already (REQ-101 to
+    // REQ-103's), so that canvas's marks change their numbers only
+    const copy = await store.canvasItems.listOfCanvas(ws, LARGE_IDS.canvasRequirements);
+    expect(copy.filter((c) => !c.requirement_id).map((c) => [c.entity_id, c.source_table_id, c.x, c.y]).sort()).toEqual(cards.map((c) => [c.entity_id, c.source_table_id, c.x, c.y]).sort());
+    const reqCards = copy.filter((c) => c.requirement_id);
+    expect(reqCards).toHaveLength(12);
+    expect(reqCards.every((c) => c.frame_id === null)).toBe(true);
+    expect(await store.frames.listOfCanvas(ws, LARGE_IDS.canvasRequirements)).toHaveLength(8);
+    expect(wl.note.filter((n) => n.canvas_id === LARGE_IDS.canvasRequirements)).toHaveLength(notes.length);
+    const all = buildRequirementIndex(requirements, await store.requirements.listLinks(ws), m);
+    const marked = (keys: string[]) => {
+      const out = new Set<string>();
+      for (const k of keys) {
+        const sc = all.scope(byKey(k));
+        for (const id of [...sc.entities, ...sc.tables]) out.add(id);
+      }
+      return out;
+    };
+    const before = marked(["REQ-101", "REQ-102", "REQ-103"]);
+    expect([...marked(requirements.map((r) => r.key))].every((id) => before.has(id))).toBe(true);
+    expect(requirements.reduce((n, r) => n + all.linksOf(r.id).length, 0) - 6 - 46 - 4).toBe(126 - 56);
     // The demo workspaces are untouched.
     expect((await store.model.load(RETAIL)).entities).toHaveLength(6);
   });

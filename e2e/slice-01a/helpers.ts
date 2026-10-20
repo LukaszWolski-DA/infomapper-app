@@ -18,8 +18,13 @@ export const canvasUrl = (canvasId: string = SEED_IDS.canvasCustomerOrders, proj
 export async function loadModel(ws: string = RETAIL): Promise<WorkspaceModel> {
   return createLocalDataStore(E2E_DB).model.load(ws);
 }
+/** The entity and table cards of a canvas (requirement cards since slice 4b-2: `loadRequirementCards`). */
 export async function loadItems(ws: string = RETAIL, canvasId: string = SEED_IDS.canvasCustomerOrders) {
-  return createLocalDataStore(E2E_DB).canvasItems.listOfCanvas(ws, canvasId);
+  return (await createLocalDataStore(E2E_DB).canvasItems.listOfCanvas(ws, canvasId)).filter((i) => i.requirement_id === null);
+}
+/** The requirement cards of a canvas (slice 4b-2). */
+export async function loadRequirementCards(ws: string = RETAIL, canvasId: string = SEED_IDS.canvasCustomerOrders) {
+  return (await createLocalDataStore(E2E_DB).canvasItems.listOfCanvas(ws, canvasId)).filter((i) => i.requirement_id !== null);
 }
 export const store = () => createLocalDataStore(E2E_DB);
 
@@ -38,6 +43,8 @@ export async function openCanvas(page: Page, url = canvasUrl(), view?: { x: numb
 }
 
 export const card = (page: Page, name: string) => page.locator(".react-flow__node").filter({ has: page.getByTestId("card-name").getByText(name, { exact: true }) });
+/** The entity and table cards' nodes (not blocks, not requirement cards: slice 4b-2). */
+export const cardNodes = (page: Page) => page.locator(".react-flow__node-card");
 export const cardEl = (page: Page, name: string) => card(page, name).locator("[data-card]");
 export const row = (page: Page, cardName: string, rowId: string) => card(page, cardName).locator(`[data-row="${rowId}"]`);
 export const mappingLine = (page: Page, mappingId: string) => page.locator(`[data-testid="line-mapping"][data-mapping="${mappingId}"]`);

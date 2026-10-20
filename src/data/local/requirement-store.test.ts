@@ -56,7 +56,10 @@ describe("demo requirements (PRD item 15)", () => {
     expect(await store.requirements.listLinks(RETAIL)).toHaveLength(13);
     expect((await store.workspaces.get(RETAIL))!.requirement_key_next).toBe(106);
     expect(await store.requirements.list(SEED_IDS.wsSales)).toEqual([]);
-    expect((await readDb(file)).canvas_item.some((i) => i.requirement_id !== null)).toBe(false);
+    // REQ-104's card on “Customer & orders” (slice 4b-2, PRD item 25), the only requirement card
+    const reqCards = (await readDb(file)).canvas_item.filter((i) => i.requirement_id !== null);
+    expect(reqCards).toHaveLength(1);
+    expect(reqCards[0]).toMatchObject({ canvas_id: SEED_IDS.canvasCustomerOrders, requirement_id: reqs.find((r) => r.key === "REQ-104")!.id, frame_id: null });
   });
 
   it("have this coverage on the demo mappings (the end-to-end tests rely on it)", async () => {
@@ -174,7 +177,7 @@ describe("commands end to end (local adapter)", () => {
     const anna = await accessAs(SEED_IDS.userAnna);
     const reqs = await store.requirements.list(RETAIL);
     const r104 = reqs.find((r) => r.key === "REQ-104")!;
-    const del = deleteRequirement(ctxFor(SEED_IDS.userAnna), anna, { requirements: reqs, links: await store.requirements.listLinks(RETAIL) }, { requirementId: r104.id, expectedVersion: 1 });
+    const del = deleteRequirement(ctxFor(SEED_IDS.userAnna), anna, { requirements: reqs, links: await store.requirements.listLinks(RETAIL), items: await store.canvasItems.list(RETAIL) }, { requirementId: r104.id, expectedVersion: 1 });
     expect(del.ok && (await store.apply(del.writeSet))).toEqual({ ok: true });
     const r101 = (await store.requirements.list(RETAIL)).find((r) => r.key === "REQ-101")!;
     const renamed = updateRequirement(ctxFor(SEED_IDS.userAnna), anna, { requirements: await store.requirements.list(RETAIL) }, { requirementId: r101.id, expectedVersion: 1, field: "key", value: "REQ-104" });

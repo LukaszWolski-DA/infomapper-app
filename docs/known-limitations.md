@@ -36,6 +36,27 @@ created after the page read the data (`readAt`) stay, and the versions the canva
 
 ## Canvas performance (slice 1a)
 
+### Where the canvas stands after slice 4b-2 (20 October 2026)
+
+Slice 4b-2's closing sitting (`2026-10-20-12-00`; production measurement build; three rounds A/B against `slice-04b1`,
+no round dropped; to the screen and as presented frames, traced; `docs/prd/slice-04b2-acceptance.md`). Each pan now
+starts from a freshly opened view, and drags are driven in the page (AD-24, “Measuring”). The entries below this one are
+kept as they were measured.
+
+| Figure | Bar | Now | State |
+| --- | --- | --- | --- |
+| Pan and zoom with 12 requirement cards and 126 trace lines (S4B2-10) | ≥ −5 % against the same view without them | 30 % −0.4 %, dense −0.6 %, collapsed −0.3 % | met |
+| Pan and zoom without requirement cards (S4B2-14) | ≥ −5 % against `slice-04b1` | −0.9 / +1.0 / +0.5 / −0.2 % | met |
+| Pan and zoom, 100 % dense area | ≥ 50 fps | 49.4 presented (`slice-04b1` 48.9) | **fps confirmed against `slice-04b1`** (S4B1-12): the markers' cost is gone; the absolute 50 fps at 100 % stays with S1A-14's entry below (partly met, the database slice) |
+| Pan and zoom with Focus on (S4B2-11, S4B1-11) | within 5 % of Focus off | −1.4 to +2.3 % at 30 % and 100 %, expanded and collapsed | **met** (S4B1-11 closed) |
+| Focus switching with requirement cards lit (S4B2-12) | ≤ 100 ms | 17–71 ms to the screen (p95 at most 94) | met |
+| Selecting a requirement card (S4B2-12) | ≤ 100 ms | 44–73 ms (p95 116–117: the main thread) | met on the median |
+| The drop target while dragging (S4B2-12) | ≤ 100 ms | 12–22 ms | met |
+| Dragging a requirement card (S4B2-13) | within the entity drag's spread or above | 11.5 against 9.7 presented fps at 100 %, 26.5 against 24.0 at 30 % | met |
+| C-10 hover / lasso marks | ≤ 100 ms | 19 / 40 ms to the screen | met |
+| C-08 initial render | ≤ 1,500 ms to the stable frame | 1,350–1,367 ms; last present 1,509 ms (recorded) | met |
+| Drawing layers (S4B2-15) | not growing with requirement cards | 47 / 30 with 0 and 12 cards, and with cards over a frame | met |
+
 ### Where the canvas stands after slice 4b-1 (17 October 2026)
 
 Slice 4b-1's closing sitting (`2026-10-17-15-39`, `-16-44`, `-17-04`; production measurement build; three rounds A/B
@@ -45,14 +66,14 @@ the entry “How canvas figures are measured since slice 4b-1”. The entries be
 | Figure | Bar | Now | State |
 | --- | --- | --- | --- |
 | Pan and zoom, overview | ≥ 50 fps; ≥ −5 % | 58.9 presented, 59.5 rAF; +0.3 % | met |
-| Pan and zoom, 100 % dense area | ≥ 50 fps; ≥ −5 % | 43.2 presented, 47.5 rAF; −8.7 % | **met, layers confirmed; fps confirmed in 4b-2's sitting** (Łukasz): the cause was the requirement markers, two compositing layers each (+16 in this view); fixed, the layers are `slice-04p`'s again (47) |
+| Pan and zoom, 100 % dense area | ≥ 50 fps; ≥ −5 % | 43.2 presented, 47.5 rAF; −8.7 % | **met, layers confirmed; fps confirmed in slice 4b-2's sitting** (49.4 presented, +1.0 % against `slice-04b1`; above): the cause was the requirement markers, two compositing layers each (+16 in this view); fixed, the layers are `slice-04p`'s again (47) |
 | Pan and zoom, frames collapsed | ≥ 50 fps; ≥ −5 % | 59.1–59.4 presented; 0.0 % | met |
 | C-08 initial render | ≤ 1,500 ms to the stable frame | 1,382 ms (untraced); **to its last present 1,462 ms** (traced; two of five loads over 1,500) | **met** on the stable frame; the last present is recorded beside it. Redefining the bar: the performance review before the database slice (Łukasz) |
 | C-10 hover | ≤ 100 ms | 23 ms to the screen | met |
 | Lasso marks | ≤ 100 ms | 42 ms to the screen (p95 48) | met |
 | Coverage colours (S4B1-09) | ≤ 100 ms | 31–77 ms to the screen | met |
 | Focus switching (S4B1-10) | ≤ 100 ms | 11–88 ms to the screen (p95 at most 126) | met |
-| Pan and zoom with Focus on (S4B1-11) | ≥ −5 % vs Focus off | 100 %: +5 to +15 %; **30 %: −40 % expanded, −22 % collapsed** | **partly met** (Łukasz; below) |
+| Pan and zoom with Focus on (S4B1-11) | ≥ −5 % vs Focus off | 100 %: +5 to +15 %; **30 %: −40 % expanded, −22 % collapsed** | **partly met** (Łukasz; below); **closed in slice 4b-2**: met, −1.4 to +2.3 % (above) |
 
 ### Where the canvas stands after slice 4p (15 October 2026)
 
@@ -114,6 +135,22 @@ page, except at 30 % with frames expanded on “Performance test”, where whole
   checks that its edge never shows while any of the content is in view (S4B1-07).
 - **Later: T2 and T3 in slice 4b-2,** designed together with its dashed trace lines; 4b-2's sitting measures pan with
   Focus on.
+- **Slice 4b-2:** T3 applied (the veil paints into the overlay's layer; Focus adds one drawing layer instead of two), T2
+  dropped. **A caveat on the 30 % figures above,** found in 4b-2's step 8: S4P-fading measured its traced pan with fading
+  on right after the untraced one, without opening the view again. The spike's 10 s driver ends on a zoom-in segment
+  (30 % becomes about 37 %), so that pan ran from 37 % to above 40 %, where cards draw their rows, while the pan with
+  fading off started at 30 %. Part of the −22 to −40 % is likely that, not Focus. 4b-2's S4B2-11 opens the view again
+  before every pan; its sitting gives the figures.
+- **Closed in slice 4b-2's sitting** (20 October 2026): with T3 and every pan from a freshly opened view, Focus on is
+  within −1.4 to +2.3 % of off at 30 % and 100 %, frames expanded and collapsed (S4B2-11). How much of 4b-1's −40 % was
+  the drift and how much T3 removed was left unmeasured (Łukasz).
+
+### Focus's lit lines stayed in place after a drag (slice 4b-1; fixed in slice 4b-2)
+
+With Focus on, the lit relationship, mapping and bundle lines drawn again above the veil were memoised on an empty
+signature: after a card was dragged they kept their old place while the holes followed. Found in the browser in slice
+4b-2's step 6 and fixed there (`LitLines` carries the line layer's signatures); S4B2-07 checks that every lit line lies
+where the line layer draws it after a drag.
 
 ### C-08: what the first render waits for (slice 4p)
 
@@ -269,6 +306,8 @@ layer, against 19–26 ms without it, on every branch.
   `perf/4p-trial-a`).
 - **Later:** only with a way to fade lines that changes neither the canvas layer nor the cards' layering; none is
   known.
+- **Trace lines too** (slice 4b-2, answer B): a requirement card's dashed trace lines fade with the other lines on a
+  selection (the line layer's `dimmed` class), not on a hover; the prototype fades them on both.
 
 ### Frame cost grows with the number of elements in the viewport (slice 3a)
 
@@ -327,6 +366,10 @@ The “Focus” chip sits in the status bar for now (PRD item 20).
   status bar to the view-state bar.
 
 ### Requirement cards are not on the canvas yet (slice 4a; slice 4b-1)
+
+**Closed in slice 4b-2** ([PRD](prd/slice-04b2-requirement-cards.md)): requirement cards with dashed trace lines,
+placed from the requirement's panel and the element panels, dragged from the left panel onto an element to link it,
+lit or faded by Focus (D-32, D-34, D-41). The text below is kept as it was written.
 
 Slice 4a brought requirements everywhere but the canvas. **Slice 4b-1** adds:
 - markers on entity and table cards;

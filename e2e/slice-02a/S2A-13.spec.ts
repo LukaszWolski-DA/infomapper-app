@@ -61,17 +61,18 @@ test("S2A-13: as Piotr (reviewer): lasso, Ctrl+A, Hand tool and layer buttons wo
   const widthsId = await captureActionId(o, () => o.getByTestId("menu-toolbox").getByRole("menuitem", { name: "Fit widths to names" }).click());
   await expectToast(o, "Fitted 7 cards to their names.");
   const removeId = await captureActionId(o, () => o.getByTestId("button-selection-remove").click());
-  await expectToast(o, "Removed 7 cards from this canvas. They stay in the model with their mappings.");
+  // the seven cards and, since slice 4b-2, REQ-104's requirement card (L)
+  await expectToast(o, "Removed 8 cards from this canvas. They stay in the model with their mappings.");
   await o.getByTestId("toast").getByTestId("toast-action").click();
-  await expectToast(o, "Undone: Remove 7 cards");
-  await expect(o.locator(".react-flow__node")).toHaveCount(7);
+  await expectToast(o, "Undone: Remove 8 cards");
+  await expect(o.locator(".react-flow__node-card")).toHaveCount(7);
   await card(o, "web_users").getByTestId("card-name").click();
   await o.getByTestId("button-remove-card").click();
-  await expect(o.locator(".react-flow__node")).toHaveCount(6);
+  await expect(o.locator(".react-flow__node-card")).toHaveCount(6);
   await o.getByTestId("card-name").getByText("Customer", { exact: true }).click();
   await shiftClick(o, "Sales Order");
   const sourcesId = await captureActionId(o, () => o.getByTestId("button-selection-sources").click());
-  await expect(o.locator(".react-flow__node")).toHaveCount(7);
+  await expect(o.locator(".react-flow__node-card")).toHaveCount(7);
   await o.keyboard.press("Escape");
   const lookId = await captureActionId(o, () => o.getByTestId("section-canvas-look").getByTestId("group-canvas-background").locator('[data-background="warm"]').click());
   let menu = await openCanvasMenu(o, "Customer & orders");

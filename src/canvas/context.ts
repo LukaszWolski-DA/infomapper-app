@@ -2,6 +2,7 @@
 
 import { createContext, type PointerEvent as ReactPointerEvent } from "react";
 import type { Uuid } from "@/domain/ids";
+import type { TraceTarget } from "@/domain/model/requirements";
 import type { ArrangeMode } from "./arrange";
 import type { FrameData, FrameStats } from "./frame-data";
 import type { NoteData } from "./note-data";
@@ -161,6 +162,18 @@ export interface CanvasHandle {
   notesView: () => NoteListItem[];
   /** Selects a note and brings it into view when it is shown and outside the view (a panel's link). */
   showNote: (noteId: Uuid) => void;
+  /** A requirement's card on this canvas as the canvas has it now (slice 4b-2), or null. */
+  requirementCard: (requirementId: Uuid) => { cardId: Uuid; key: string; name: string } | null;
+  /** “Place its card on this canvas” (slice 4b-2, item 13): at the top centre of the view. */
+  placeRequirementCard: (requirementId: Uuid) => void;
+  /** “Remove its card from this canvas” (item 7): the requirement stays; `deselect` clears the selection after. */
+  removeRequirementCard: (requirementId: Uuid, options?: { deselect?: boolean }) => void;
+  /** “Place card”, “Add all to this canvas” (slice 4b-2, items 14–15): requirements' cards beside an element. */
+  placeRequirementCardsBeside: (requirementIds: readonly Uuid[], target: TraceTarget) => void;
+  /** A requirement's card already here: selected and brought into view. */
+  showRequirementCard: (requirementId: Uuid) => void;
+  /** “Add to this canvas” on an entity or table panel without its card (item 16): the view's centre, upper third. */
+  addToCanvas: (target: CardTarget, rows: number) => void;
 }
 
 /** A note as the panels list it (the card and frame panels, the canvas overview). */
@@ -249,7 +262,9 @@ export type ToolboxTarget =
   /** A bundle of lines at a collapsed frame (slice 2c). */
   | { kind: "bundle"; key: string }
   /** A note (slice 3a): before the card or frame under it. */
-  | { kind: "note"; noteId: Uuid };
+  | { kind: "note"; noteId: Uuid }
+  /** A requirement's card (slice 4b-2): the requirement is selected. */
+  | { kind: "requirement"; requirementId: Uuid; cardId: Uuid };
 
 export interface ToolboxRequest {
   target: ToolboxTarget;
@@ -377,6 +392,12 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   deleteNote: noop,
   notesView: () => [],
   showNote: noop,
+  requirementCard: () => null,
+  placeRequirementCard: noop,
+  removeRequirementCard: noop,
+  placeRequirementCardsBeside: noop,
+  showRequirementCard: noop,
+  addToCanvas: noop,
   registerCanvas: noop,
   mode: null,
   setMode: noop,
@@ -394,3 +415,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
 
 /** Drag data of a left-panel item dropped onto the canvas: JSON `{ target: CardTarget, rows: number }`. */
 export const CARD_DRAG_TYPE = "application/x-infomapper-card";
+/** Drag data of a requirement row of an element panel (slice 4b-2, item 14): JSON `{ requirementId, key }`; it places the card. */
+export const REQ_CARD_DRAG_TYPE = "application/x-infomapper-requirement-card";
+/** Drag data of a requirement of the left panel (slice 4b-2, item 17): JSON `{ requirementId, key }`; it links or places. */
+export const REQ_DRAG_TYPE = "application/x-infomapper-requirement";

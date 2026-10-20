@@ -11,10 +11,12 @@
 import { memo } from "react";
 import { useStore, type Node } from "@xyflow/react";
 import { isCardNode } from "./CardNode";
+import { isReqNode } from "./RequirementCardNode";
+import { REQ_CARD, requirementCardHeight } from "./requirement-card-data";
 import type { FrameData } from "./frame-data";
 import { cardHeight, cardWidth, type Rect } from "./geometry";
 import type { Selection } from "./line-data";
-import { cardKey, frameKey, noteKey, selectionBounds } from "./selection";
+import { cardKey, frameKey, noteKey, reqKey, selectionBounds } from "./selection";
 import { useValue, type ValueStore } from "./value-store";
 
 function SelectionOverlay({
@@ -34,11 +36,13 @@ function SelectionOverlay({
   noteRects: ReadonlyMap<string, Rect>;
 }) {
   const lasso = useValue(lassoStore);
-  const nodes = (useStore((s) => s.nodes) as Node[]).filter(isCardNode); // follow drags, collapses and widths
-  const keys = selection?.t === "multi" ? new Set(selection.keys) : null;
+  const all = useStore((s) => s.nodes) as Node[]; // follow drags, collapses and widths
+  const nodes = all.filter(isCardNode);
+  // a requirement selected whose card is here (slice 4b-2, item 5): its card gets the mark, alone or in a group
+  const keys = selection?.t === "multi" ? new Set(selection.keys) : selection?.t === "req" ? new Set([reqKey(selection.id)]) : null;
   if (!keys && !lasso) return null;
 
-  const marks: { id: string; r: Rect; frame?: boolean; note?: boolean; rx?: number }[] = [];
+  const marks: { id: string; r: Rect; frame?: boolean; note?: boolean; req?: boolean; rx?: number }[] = [];
   if (keys) {
     for (const f of frames) {
       if (keys.has(frameKey(f.id))) marks.push({ id: f.id, r: frameRects.get(f.id) ?? { x: f.x, y: f.y, w: f.width, h: f.height }, frame: true, rx: f.collapsed ? 13 : 17 });
@@ -48,14 +52,21 @@ function SelectionOverlay({
       if (!n.hidden && keys.has(cardKey(card))) marks.push({ id: n.id, r: { x: n.position.x, y: n.position.y, w: cardWidth(card), h: cardHeight(card) } });
     }
     for (const [id, r] of noteRects) if (keys.has(noteKey(id))) marks.push({ id, r, note: true });
+    for (const n of all) {
+      if (!isReqNode(n) || !keys.has(reqKey(n.data.card.requirementId))) continue;
+      marks.push({ id: n.id, r: { x: n.position.x, y: n.position.y, w: REQ_CARD.width, h: requirementCardHeight(n.data.card.nameLines) }, req: true });
+    }
   }
+  if (!marks.length && !lasso) return null;
   const box = selectionBounds(marks.map((m) => m.r));
 
   return (
     <>
       <svg className="hover-layer selection-layer" width={1} height={1} data-testid="layer-selection">
-        {marks.map(({ id, r, frame, note, rx }) =>
-          note ? (
+        {marks.map(({ id, r, frame, note, req, rx }) =>
+          req ? (
+            <rect key={id} className="msel req" data-testid="mark-selected-requirement" data-card={id} x={r.x - 2} y={r.y - 2} width={r.w + 4} height={r.h + 4} rx={9} />
+          ) : note ? (
             <rect key={id} className="msel" data-testid="mark-selected-note" data-note-mark={id} x={r.x - 1} y={r.y - 1} width={r.w + 2} height={r.h + 2} rx={5} />
           ) : frame ? (
             <rect key={id} className="msel" data-testid="mark-selected-frame" data-frame-mark={id} x={r.x - 1} y={r.y - 1} width={r.w + 2} height={r.h + 2} rx={rx} />

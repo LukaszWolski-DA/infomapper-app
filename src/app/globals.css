@@ -34,6 +34,9 @@
   --im-req: #534ab7;
   --im-req-soft: #eeedfe;
   --im-req-ink: #3c3489;
+  /* a requirement card's filled header (D-41, prototype --req-head, --req-on; slice 4b-2) */
+  --im-req-head: #534ab7;
+  --im-req-on: #ffffff;
   --im-shadow: rgba(22, 32, 48, 0.16);
 }
 @media (prefers-color-scheme: dark) {
@@ -61,6 +64,8 @@
     --im-req: #afa9ec;
     --im-req-soft: #26215c;
     --im-req-ink: #cecbf6;
+    --im-req-head: #3c3489;
+    --im-req-on: #eeedfe;
     --im-shadow: rgba(0, 0, 0, 0.5);
   }
 }

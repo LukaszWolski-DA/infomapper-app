@@ -3,7 +3,9 @@
 // all on one canvas at the spike's positions, with its 8 frames as free frames (slice 2b), and since slice 3a labels and
 // notes (seed-large-working-layer.ts), and since slice 3b the live canvas of PERF-2, the label with the largest
 // footprint (made by the domain's own `openLiveCanvas`, so it is what “Open as live canvas” would make), and since slice
-// 4p two requirements for the fading scenarios (seed-large-requirements.ts). For the performance checks.
+// 4p two requirements for the fading scenarios (seed-large-requirements.ts), and since slice 4b-2 the canvas
+// “Performance test – requirements” with 12 requirement cards (seed-large-requirement-cards.ts). For the performance
+// checks.
 
 import { openLiveCanvas } from "@/domain/commands/live";
 import type { Uuid } from "@/domain/ids";
@@ -12,6 +14,7 @@ import { parseColumnLines } from "@/domain/model/column-lines";
 import { DEFAULT_CANVAS_LOOK, type LogicalType, type MappingStatus, type Stereotype } from "@/domain/types";
 import { ATTR_TYPES, ENT_COLORS, FRAME_NAMES, generate, STEREOS } from "./large-generator";
 import { findViolation, type DevDb } from "./schema";
+import { addLargeRequirementCards } from "./seed-large-requirement-cards";
 import { addLargeRequirements } from "./seed-large-requirements";
 import { addLargeWorkingLayer } from "./seed-large-working-layer";
 import { SEED_IDS } from "./seed";
@@ -21,6 +24,8 @@ export const LARGE_IDS = {
   workspace: "01a0f9e9-2012-7a40-9c1d-5e1f0a7e5701",
   project: "01a0f9e9-2013-7b20-8e44-0c3b9f1d2a02",
   canvas: "01a0f9e9-2014-7c80-a0f5-6d2e8b4c1f03",
+  /** “Performance test – requirements” (slice 4b-2, PRD item 26). */
+  canvasRequirements: "01a0f9e9-2015-7d10-8b26-3f4a9c0d2e04",
 } as const;
 
 const LOGICAL: Record<(typeof ATTR_TYPES)[number], LogicalType> = {
@@ -223,6 +228,8 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
   addLiveCanvas(db, at);
   // the small and the large lens of the fading scenarios (slice 4p); no cards
   addLargeRequirements({ db, data, workspaceId: ws, by, at, id });
+  // the same layout with 12 requirement cards on a canvas of its own (slice 4b-2, PRD item 26, E): the third tab
+  addLargeRequirementCards({ db, data, workspaceId: ws, projectId: LARGE_IDS.project, canvasId: LARGE_IDS.canvasRequirements, fromCanvasId: LARGE_IDS.canvas, by, at, id });
 
   const violation = findViolation(db);
   if (violation) throw new Error(`Generated data breaks a rule: ${violation.table}: ${violation.detail}`);

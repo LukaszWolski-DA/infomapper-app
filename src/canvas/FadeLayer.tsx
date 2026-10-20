@@ -1,6 +1,6 @@
 "use client";
 
-// Fading (slice 4b-1, F4; AD-24): one veil with holes on a compositing layer of its own, in the overlay above the cards,
+// Fading (slice 4b-1, F4; AD-24): one veil with holes in the overlay above the cards,
 // in the canvas background's colour at 75 % (cards, frames and notes under it at about the prototype's 25 %), with a
 // hole for every lit card, every block of a collapsed frame with a lit card, and every note pinned to a lit card; the lit
 // lines and rows drawn again above it. Nothing in the viewport's big layer is restyled, moved or re-ordered, so switching
@@ -9,14 +9,20 @@
 // (drags, resizes, collapses, the card heights by zoom level) and the notes; panning and zooming move the veil with the
 // viewport, with no script per frame; the veil reaches one pane at the minimum zoom beyond the content (T1). The request
 // comes from its store (`fade.ts`), so switching re-renders this layer only, never the canvas.
+// Slice 4b-2, step 6: a hole at every lit requirement card (PRD item 20), and the trace lines with both ends lit drawn
+// again above the veil (item 21). T3 (item 22): the veil has no compositing layer of its own any more. It paints into the
+// overlay's layer with the lit lines and rows, so Focus adds one drawing layer instead of two; the LayerTree read before
+// (`docs/prd/slice-04b2-acceptance.md`, step 6) found the overlay's content above everything composited, so the veil
+// gets no layer by overlap there (unlike B2's veil in the viewport's big layer, slice 4b-1, step 0).
 
 import { useEffect } from "react";
 import { useStore } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { LitLines } from "./LineLayer";
-import { LitRows, litNodeIds, nodeRect, useLit, type FadeData, type FadeNote } from "./fade-canvas";
+import { LitRows, litNodeIds, litTraces, nodeRect, useLit, type FadeData, type FadeNote } from "./fade-canvas";
 import type { CanvasLines, MapLineData } from "./line-data";
 import type { Bundle } from "./line-geometry";
+import type { TraceData } from "./trace-data";
 import { MIN_ZOOM, type Rect } from "./geometry";
 
 export interface FadeLayerProps {
@@ -26,7 +32,11 @@ export interface FadeLayerProps {
   bundles?: readonly Bundle[];
   blocks?: ReadonlyMap<string, Rect>;
   mapsById?: ReadonlyMap<string, MapLineData>;
+  /** The trace lines the line layer draws (slice 4b-2; none outside “Everything”). */
+  traces?: readonly TraceData[];
 }
+
+const NO_TRACES: readonly TraceData[] = [];
 
 const n1 = (v: number) => +v.toFixed(1);
 
@@ -39,7 +49,7 @@ export function roundRect({ x, y, w, h }: Rect, r: number): string {
 /** The veil's margin beyond the content: the pane's width and height at the minimum zoom (a 1 px pane until measured). */
 export const veilMargin = (paneW: number, paneH: number): [number, number] => [Math.ceil(Math.max(1, paneW) / MIN_ZOOM), Math.ceil(Math.max(1, paneH) / MIN_ZOOM)];
 
-export default function FadeLayer({ data, notes, lines, bundles, blocks, mapsById }: FadeLayerProps) {
+export default function FadeLayer({ data, notes, lines, bundles, blocks, mapsById, traces = NO_TRACES }: FadeLayerProps) {
   const shown = useLit(data);
   useStore((s) => s.nodes); // the holes follow drags, resizes and collapses
   const lookup = useStore((s) => s.nodeLookup);
@@ -70,8 +80,8 @@ export default function FadeLayer({ data, notes, lines, bundles, blocks, mapsByI
     if (n.hidden) continue;
     const r = nodeRect(n);
     grow(r);
-    // the corners of a block, an entity card and a source card (canvas.css)
-    if (ids.has(id)) holes.push(roundRect(r, n.type === "block" ? 12 : (n as unknown as CardNodeT).data.card.kind === "src" ? 3 : 10));
+    // the corners of a block, a requirement card, an entity card and a source card (canvas.css)
+    if (ids.has(id)) holes.push(roundRect(r, n.type === "block" ? 12 : n.type === "req" ? 8 : (n as unknown as CardNodeT).data.card.kind === "src" ? 3 : 10));
   }
   let litNotes = 0;
   for (const note of notes) {
@@ -93,7 +103,7 @@ export default function FadeLayer({ data, notes, lines, bundles, blocks, mapsByI
       <svg className="fade-veil" width={1} height={1} data-testid="layer-fade" data-fade={key} data-lit-cards={ids.size} data-lit-notes={litNotes}>
         <path d={outer + holes.join("")} fillRule="evenodd" />
       </svg>
-      <LitLines maps={lit.mappings} rels={lit.relationships} lines={lines} bundles={bundles} blocks={blocks} mapsById={mapsById} />
+      <LitLines maps={lit.mappings} rels={lit.relationships} lines={lines} bundles={bundles} blocks={blocks} mapsById={mapsById} traces={litTraces(traces, lookup, lit)} />
       <LitRows rows={lit.rows} />
     </>
   );

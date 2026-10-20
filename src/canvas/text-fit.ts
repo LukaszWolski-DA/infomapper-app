@@ -85,3 +85,28 @@ export function fitWidth(card: { kind: "ent" | "src"; name: string; coverage: st
   }
   return CARD_W_MAX;
 }
+
+/** The width a requirement card's name wraps in: 230 px less 10 px padding on each side (canvas.css `.rq-card .rn`). */
+const REQ_NAME_WIDTH = 230 - 20 - SAFETY;
+
+/**
+ * How many lines a requirement card's name wraps to (slice 4b-2; 13 px semibold, words wrap, a word longer than a line
+ * breaks). The estimate errs on the side of more lines, so the card's fixed height never cuts the name; at least one.
+ */
+export function requirementNameLines(name: string): number {
+  const space = sansWidth(" ", 13) * 1.05;
+  let lines = 1, used = 0;
+  for (const word of name.trim().split(/\s+/).filter(Boolean)) {
+    const w = sansWidth(word, 13) * 1.05;
+    if (used > 0 && used + space + w <= REQ_NAME_WIDTH) {
+      used += space + w;
+      continue;
+    }
+    if (used > 0) lines++;
+    // a word wider than a line takes as many lines as it needs
+    const extra = Math.max(0, Math.ceil(w / REQ_NAME_WIDTH) - 1);
+    lines += extra;
+    used = w - extra * REQ_NAME_WIDTH;
+  }
+  return lines;
+}

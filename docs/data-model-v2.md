@@ -397,6 +397,9 @@ One card on one canvas (AD-16). Layout belongs to the canvas, not the model (D-0
 | `frame_id` | uuid | yes | frame membership |
 | `live_level` | text | yes | `full`, `context`; only on live canvases |
 
+A requirement card (`requirement_id` set) stores `width` null (drawn 230 px), `collapsed` false, `row_filter` `all`,
+and `frame_id` and `live_level` null: it is layout only (slice 4b-2).
+
 ### `frame`
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |

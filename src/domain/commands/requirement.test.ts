@@ -159,7 +159,7 @@ describe("roles (PRD item 12, AD-05, AD-09)", () => {
   const all = (who: ReturnType<typeof access>) => [
     createRequirement(makeCtx(), who, { requirements: reqs }, {}),
     update({ field: "name", value: "x" }, reqs, who),
-    deleteRequirement(makeCtx(), who, { requirements: reqs, links: [] }, { requirementId: ids.req103, expectedVersion: 1 }),
+    deleteRequirement(makeCtx(), who, { requirements: reqs, links: [], items: [] }, { requirementId: ids.req103, expectedVersion: 1 }),
     linkRequirement(makeCtx(), who, { requirement: reqs[2]!, links: [], ...targets }, { requirementId: ids.req103, target: { kind: "entity", id: ids.customer } }),
     unlinkRequirement(makeCtx(), who, { link: requirementLink() }, { requirementLinkId: ids.reqLink1, expectedVersion: 1 }),
   ];
@@ -186,7 +186,7 @@ describe("delete, link and unlink (PRD items 6, 9)", () => {
   const links = [requirementLink(ids.reqLink1, { requirement_id: ids.req102 }), requirementLink(ids.reqLink2, { requirement_id: ids.req101, attribute_id: null, entity_id: ids.customer })];
 
   it("deletes the requirement and its links and makes its children top level; the model is untouched", () => {
-    const r = ok(deleteRequirement(makeCtx(), owner, { requirements: reqs, links }, { requirementId: ids.req102, expectedVersion: 1 }));
+    const r = ok(deleteRequirement(makeCtx(), owner, { requirements: reqs, links, items: [] }, { requirementId: ids.req102, expectedVersion: 1 }));
     expect(r.value.message).toBe("Deleted REQ-102. The model elements it traced to are untouched.");
     expect(r.writeSet.writes.map((w) => [w.table, w.kind === "update" ? (w.row as { id: string }).id : null])).toEqual([
       ["requirement_link", ids.reqLink1],
@@ -273,7 +273,7 @@ describe("undo of requirement steps", () => {
   it("one undo brings back a deleted requirement, its links and its children's parent", () => {
     const links = [requirementLink(ids.reqLink1, { requirement_id: ids.req102 })];
     const rows = baseRows({ requirement_link: links });
-    const deleted = ok(deleteRequirement(makeCtx(), owner, { requirements: reqs, links }, { requirementId: ids.req102, expectedVersion: 1 }));
+    const deleted = ok(deleteRequirement(makeCtx(), owner, { requirements: reqs, links, items: [] }, { requirementId: ids.req102, expectedVersion: 1 }));
     const after = applied(rows, deleted.writeSet);
     const restored = applied(after, ok(undo(after, deleted.writeSet)).writeSet);
     expect(live(restored.requirement).map((r) => [r.key, r.parent_id])).toEqual([
@@ -284,8 +284,21 @@ describe("undo of requirement steps", () => {
     expect(live(restored.requirement_link).map((k) => k.id)).toEqual([ids.reqLink1]);
   });
 
+  it("deleting a requirement takes its cards off every canvas; one undo brings them back (slice 4b-2, item 7)", () => {
+    const card1 = canvasItem("01900000-0000-7000-8000-00000000c101", { entity_id: null, requirement_id: ids.req102 });
+    const card2 = canvasItem("01900000-0000-7000-8000-00000000c102", { entity_id: null, requirement_id: ids.req102, canvas_id: ids.canvas2 });
+    const other = canvasItem("01900000-0000-7000-8000-00000000c103", { entity_id: null, requirement_id: ids.req103 });
+    const items = [card1, card2, other, canvasItem()];
+    const rows = baseRows({ canvas: [canvas(), canvas(ids.canvas2)], canvas_item: items });
+    const deleted = ok(deleteRequirement(makeCtx(), owner, { requirements: reqs, links: [], items }, { requirementId: ids.req102, expectedVersion: 1 }));
+    const after = applied(rows, deleted.writeSet);
+    expect(live(after.canvas_item).map((i) => i.id)).toEqual([other.id, ids.itemCustomer]);
+    const restored = applied(after, ok(undo(after, deleted.writeSet)).writeSet);
+    expect(live(restored.canvas_item).map((i) => i.id)).toEqual([card1.id, card2.id, other.id, ids.itemCustomer]);
+  });
+
   it("refuses to bring back a deleted requirement whose key another requirement uses now, in any case", () => {
-    const deleted = ok(deleteRequirement(makeCtx(), owner, { requirements: reqs, links: [] }, { requirementId: ids.req103, expectedVersion: 1 }));
+    const deleted = ok(deleteRequirement(makeCtx(), owner, { requirements: reqs, links: [], items: [] }, { requirementId: ids.req103, expectedVersion: 1 }));
     const after = applied(baseRows(), deleted.writeSet);
     after.requirement.push(requirement(ids.req104, { key: "req-103" }));
     expect(undo(after, deleted.writeSet)).toMatchObject({ ok: false, error: { code: "conflict", message: "REQ-103 is used by another requirement now, so the deleted one cannot come back." } });
