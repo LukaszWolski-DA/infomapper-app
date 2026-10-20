@@ -69,3 +69,31 @@ export const viewportTransform = (page: Page) =>
   });
 
 export const projectHome = (projectId: string = SEED_IDS.projCustomer360) => `/w/${SEED_IDS.wsRetailDwh}/p/${projectId}`;
+
+// ---- step 3: the grips ----
+
+export const grip = (page: Page, side: Side) => page.getByTestId(side === "left" ? "grip-left" : "grip-right");
+export const guide = (page: Page) => page.getByTestId("panel-guide");
+
+/** The guide line's middle on the screen, while it shows. */
+export const guideX = async (page: Page) => {
+  const b = await box(guide(page));
+  return b.x + b.width / 2;
+};
+
+/** A panel's width on the screen, rounded. */
+export const panelWidth = async (page: Page, side: Side) => Math.round((await box(panel(page, side))).width);
+
+/**
+ * Drags a grip with the real mouse by `dx` in 12 steps. `during` runs with the button still down, after the last
+ * move; then the button is released.
+ */
+export async function dragGrip(page: Page, side: Side, dx: number, during?: () => Promise<void>): Promise<void> {
+  const g = await box(grip(page, side));
+  const x = g.x + g.width / 2, y = g.y + g.height / 2;
+  await page.mouse.move(x, y);
+  await page.mouse.down();
+  for (let i = 1; i <= 12; i++) await page.mouse.move(x + (dx * i) / 12, y);
+  if (during) await during();
+  await page.mouse.up();
+}

@@ -1,9 +1,8 @@
 // S5A-02 (slice 5a, PRD items 3–4, 11): hidden panels survive a reload, a move to another canvas and to the project
-// home; a storage error leaves the panels shown. Step 2 covers the shown and hidden state; the widths come with the
-// grips in step 3.
+// home, and so do the widths set with the grips; a storage error leaves the panels shown.
 
 import { expect, test } from "./fixtures";
-import { SEED_IDS, canvasIn, expectHidden, expectShown, openCanvas, panelsCookie, projectHome, signInAs, togglePanel } from "./helpers";
+import { SEED_IDS, canvasIn, dragGrip, expectHidden, expectShown, grip, openCanvas, panelWidth, panelsCookie, projectHome, signInAs, togglePanel } from "./helpers";
 
 test("S5A-02: hidden panels are remembered across a reload, another canvas and the project home", async ({ page }) => {
   await signInAs(page, "Łukasz");
@@ -74,4 +73,31 @@ test("S5A-02: blocked cookies: the buttons still work, nothing is remembered, th
   await page.reload();
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true");
   await expectShown(page, "left");
+});
+
+test("S5A-02: the widths are remembered across a reload, another canvas and the project home, also while hidden", async ({ page }) => {
+  await signInAs(page, "Łukasz");
+  await openCanvas(page);
+  await dragGrip(page, "left", 80);
+  await grip(page, "right").focus();
+  await page.keyboard.press("Shift+ArrowLeft");
+  await expect.poll(() => panelsCookie(page)).toBe("l1.r1.344.404");
+
+  await page.reload();
+  await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true");
+  await expectShown(page, "left", 344);
+  await expectShown(page, "right", 404);
+  await openCanvas(page, canvasIn(SEED_IDS.projOrderManagement, SEED_IDS.canvasOrderLines));
+  await expectShown(page, "left", 344);
+  await page.goto(projectHome());
+  await expect(page.getByTestId("page-project-home")).toBeVisible();
+  await expectShown(page, "left", 344);
+  await expectShown(page, "right", 404);
+
+  // hidden, a panel keeps its width for when it comes back
+  await togglePanel(page, "left");
+  await openCanvas(page);
+  await expectHidden(page, "left");
+  await togglePanel(page, "left");
+  await expect.poll(() => panelWidth(page, "left")).toBe(344);
 });

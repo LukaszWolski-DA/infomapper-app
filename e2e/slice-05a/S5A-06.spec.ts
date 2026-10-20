@@ -1,7 +1,7 @@
 // S5A-06 (slice 5a, PRD items 12–13, Łukasz's answer 3): on a narrow screen (a 1000 px wide window) both panels start
 // hidden and the canvas has the whole width; a toolbar button slides its panel over the canvas, one at a time, and the
 // canvas keeps its width. A selection does not open the details panel; clicking an entity in the left panel closes
-// it. The remembered layout applies again above 1000 px. (No grips on a narrow screen: step 3.)
+// it. The remembered layout applies again above 1000 px. No grips on a narrow screen.
 
 import { expect, test } from "./fixtures";
 import { box, canvasArea, card, expectCanvasWidth, expectHidden, openCanvas, panel, signInAs, toggle, togglePanel, treeItem } from "./helpers";
@@ -25,6 +25,7 @@ test("S5A-06: narrow screen: panels hidden, slid over the canvas one at a time, 
   await togglePanel(page, "left");
   await expect(panel(page, "left")).toBeVisible();
   await expect(panel(page, "left")).not.toHaveAttribute("inert");
+  await expect(page.getByTestId("grip-left")).toBeHidden();
   const left = await box(panel(page, "left"));
   expect(left.x).toBeLessThanOrEqual(1);
   expect(Math.round(left.width)).toBe(300);
@@ -38,6 +39,7 @@ test("S5A-06: narrow screen: panels hidden, slid over the canvas one at a time, 
   expect(Math.round(right.x + right.width)).toBe(1000);
   expect(Math.round(right.width)).toBe(300);
   await expect(panel(page, "right")).toHaveCSS("box-shadow", /rgba?\(/);
+  await expect(page.getByTestId("grip-right")).toBeHidden();
   await expectCanvasWidth(page, 1000);
   // the same button closes it
   await togglePanel(page, "right");
