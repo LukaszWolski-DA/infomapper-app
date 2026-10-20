@@ -114,6 +114,19 @@ page, except at 30 % with frames expanded on “Performance test”, where whole
   checks that its edge never shows while any of the content is in view (S4B1-07).
 - **Later: T2 and T3 in slice 4b-2,** designed together with its dashed trace lines; 4b-2's sitting measures pan with
   Focus on.
+- **Slice 4b-2:** T3 applied (the veil paints into the overlay's layer; Focus adds one drawing layer instead of two), T2
+  dropped. **A caveat on the 30 % figures above,** found in 4b-2's step 8: S4P-fading measured its traced pan with fading
+  on right after the untraced one, without opening the view again. The spike's 10 s driver ends on a zoom-in segment
+  (30 % becomes about 37 %), so that pan ran from 37 % to above 40 %, where cards draw their rows, while the pan with
+  fading off started at 30 %. Part of the −22 to −40 % is likely that, not Focus. 4b-2's S4B2-11 opens the view again
+  before every pan; its sitting gives the figures.
+
+### Focus's lit lines stayed in place after a drag (slice 4b-1; fixed in slice 4b-2)
+
+With Focus on, the lit relationship, mapping and bundle lines drawn again above the veil were memoised on an empty
+signature: after a card was dragged they kept their old place while the holes followed. Found in the browser in slice
+4b-2's step 6 and fixed there (`LitLines` carries the line layer's signatures); S4B2-07 checks that every lit line lies
+where the line layer draws it after a drag.
 
 ### C-08: what the first render waits for (slice 4p)
 
@@ -329,6 +342,10 @@ The “Focus” chip sits in the status bar for now (PRD item 20).
   status bar to the view-state bar.
 
 ### Requirement cards are not on the canvas yet (slice 4a; slice 4b-1)
+
+**Closed in slice 4b-2** ([PRD](prd/slice-04b2-requirement-cards.md)): requirement cards with dashed trace lines,
+placed from the requirement's panel and the element panels, dragged from the left panel onto an element to link it,
+lit or faded by Focus (D-32, D-34, D-41). The text below is kept as it was written.
 
 Slice 4a brought requirements everywhere but the canvas. **Slice 4b-1** adds:
 - markers on entity and table cards;

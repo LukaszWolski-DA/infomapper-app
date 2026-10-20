@@ -145,6 +145,8 @@ npm run measure:canvas -- --to-screen --rounds 3 --no-build --against slice-04p 
 npm run measure:canvas -- --to-screen --only fading,pan,c10,lasso,c08,colours --rounds 1 --no-build --against slice-04p  # a subset
 npx tsx scripts/to-screen.ts <folder>                         # analyse saved traces again: switches to the screen, pans as presented frames
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b1/S4B1-09.spec.ts       # coverage colours to the screen (always traced)
+npm run measure:canvas -- --to-screen --only s4b2pans,c10,lasso,c08,s4b2focus,s4b2screen,s4b2drag --rounds 3 --no-build --against slice-04b1  # slice 4b-2's sitting
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b2/S4B2-15-layers.spec.ts # S4B2-15's layer and element reads
 SCREENS=<folder> npx playwright test e2e/slice-04b1/S4B1-06-screens.spec.ts               # slice 4b-1's coverage colour screenshots
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
@@ -179,7 +181,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   (`openRequirementsTab`, `requirementRow`, `openRequirement`), wait for the panel to show a requirement's stored version
   before the next edit (`expectPanelVersion`, the panel's `data-version`), read an element panel's Requirements section
   (`sectionRows`) and open an entity from the Model tab (`openEntityFromTree`). Slice 4p's read the canvas's, the
-  miniature's and the fading layer's commit counters (`counters`). The undo history lives in the server's memory and is
+  miniature's and the fading layer's commit counters (`counters`). Slice 4b-2's find requirement cards on the page and in
+  the data (`reqCard`, `reqNode`, `reqCardData`), place them and link requirements as test data (`placeReqCards`,
+  `linkReq`), and read trace lines (`tracesOfCard`, `traceEnds`); its measuring steps on “Performance test –
+  requirements” are in `e2e/slice-04b2/measure.ts` (S4B2-10 keeps its own, as it runs in the `slice-04b1` worktree too). The undo history lives in the server's memory and is
   empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same

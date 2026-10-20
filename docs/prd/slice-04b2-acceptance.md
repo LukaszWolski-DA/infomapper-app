@@ -1,15 +1,151 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 8, part 1 in progress.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 8, part 1: waiting for Łukasz (laptop preparation).** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Manual acceptance checklist (step 8)
 
-Łukasz's own checks in a real browser, besides the PRD's definition of done. Collected per step:
+Łukasz's own checks in a real browser, after the PRD's definition of done (section 5: REQ-104's card beside the Sales
+cards with its dashed lines; REQ-105 placed from `birth_date`'s panel; REQ-103 dragged onto `email`, the line and the
+toast with Undo; REQ-101 dragged onto empty canvas; “Mappings” hides the lines; Focus on Customer keeps the cards linked
+to it lit; REQ-102 from the project home lands on the canvas that shows most of it). As Łukasz unless said otherwise,
+on a fresh demo seed (`npm run reset-dev-data`):
 
 | # | From | Check | Expected |
 | --- | --- | --- | --- |
 | 1 | step 5 | Drag a requirement from the left panel onto Customer's `email` row, about 40 px from the row's left edge | The hint says “Link to email” and the drop creates the link. If it fails in a real browser, it is a product bug for this slice. |
+| 2 | step 2 | Select REQ-104's card, at 100 % and below 40 % | Its panel opens and its coverage colours show; the card has the violet selection mark. Below 40 % the card is its header and a plain block |
+| 3 | step 2 | Ctrl+A, then drag the selection | REQ-104's card moves with the cards; one Undo puts all back |
+| 4 | step 2 | Delete on the selected card; then delete REQ-104 in its panel, and Undo | Delete removes the card, not the requirement; deleting the requirement removes its cards on both canvases, Undo brings them back |
+| 5 | step 3 | Drag Customer; draw a frame around Sales Order and Order Line and collapse it | Trace lines follow the card; into the collapsed frame they end at the members' rows in the block |
+| 6 | step 4 | Customer's panel: “Add the n missing to this canvas”, then a row's “Place card” on a card already placed | The cards stack beside Customer; the icon selects the card already there and brings it into view |
+| 7 | step 8 (answer 4) | Draw a frame around Customer, then “Place card” from its panel | The card lands below the frame, never over it |
+| 8 | step 4 | Product's panel (from REQ-101's traces; Product is not on “Customer & orders”): “Add to this canvas” | The card appears in the view's upper third, selected; the panel then offers “Remove from this canvas” |
+| 9 | step 5 | Drag a requirement over a row, a card, a mapping line, then empty canvas, without dropping | The target is outlined in violet (a line drawn lit); the hint says “Link to …”, “Already linked to …” or “Place card”; nothing else on the canvas changes |
+| 10 | step 6 | Focus on Sales Order, then on Customer, then select REQ-104 | REQ-104's card is lit with Sales Order (its scope holds it) and faded with Customer; with REQ-104 selected only its card is lit, with its lines |
+| 11 | step 6 | With Focus on, drag a lit card | The lit lines and the holes follow the card |
+| 12 | step 7 | As Piotr (reviewer) and Kasia (reader): select a card, Focus on, try to drag a card and a requirement row | Cards and lines show, selection and Focus work; no drag, no “Place card”, “Add all” or “Remove its card” |
+| 13 | step 7 | `npm run seed:large`, then open “Performance test – requirements” | 12 requirement cards, none over a frame, with their trace lines |
+
+## Step 8, part 1: S0-10, placement clear of frames, measuring specs, reads, docs (20 October 2026)
+
+### What changed
+
+| Part | Change |
+| --- | --- |
+| S0-10 (answer 1) | The restart gets its own build folder (`.next-e2e-restart-2`, both removed before and after; `tsconfig.json` lists it as the others). The servers' output goes to `.data/e2e-runs/S0-10-server-<n>.log`, and a server that exits before it answers fails the wait at once, with its log's last lines. **Three runs of S0-10 alone passed in 70, 66 and 72 s** |
+| Item 15, frames (answer 4) | `requirementCardSpots` takes the expanded frames' rectangles (their name strip included) and keeps them clear like cards and notes. “Place card” and “Add all” never put a card over a frame; an element inside a frame gets its cards below the frame. **A deliberate difference from the prototype**, which ignores frames. The demo canvas has no frames, so nothing moves there |
+| `seed:large` (answer 4) | Placed by the changed rule. ent:3's frame (f5) reaches below the 30 % view, so REQ-102 is placed by ent:4 instead, REQ-107 is about ent:19, and REQ-112 goes to that view's top centre. Still 12 cards and 126 trace lines: **30 % view 9 cards and 102 lines, dense view 3 cards and 24 lines**, none over a frame |
+| Measuring specs | `e2e/slice-04b2/S4B2-10.spec.ts` (pans with and without requirement cards, both sides; also S4B2-14's pans), `S4B2-11` (pans with Focus on), `S4B2-12` (to the screen: the drop target, selecting a card, Focus with cards lit), `S4B2-13` (dragging a requirement card against an entity card), `S4B2-15-layers` (the reads); `measure.ts` shares their steps. `measure:canvas` gets `s4b2pans`, `s4b2focus`, `s4b2screen` and `s4b2drag`, with their figures and tables. They run only in the measurement build (`playwright.config.ts`) |
+| Docs | `known-limitations.md` (requirement cards closed; the lit-lines fix; a caveat on S4B1-11's 30 % figures, below), `ideas.md` (two ideas resolved; what the prototype's requirement cards have besides), README (status, the sitting's commands), `CLAUDE.md` (the e2e rule, slice 4b-2's helpers and commands) |
+
+**Item 23's fallback (answer 3):** kept in the code as a safeguard; the page cannot reach it (step 7's note).
+
+### Tests
+
+| Test | What |
+| --- | --- |
+| `e2e/slice-04b2/S4B2-04.spec.ts` (a second test) | a frame around Customer; REQ-101's “Place card” puts the card at x = 832 (beside Customer), below the frame and its 20 px, in no frame |
+| `src/domain/model/requirement-placement.test.ts` | a frame kept clear: an element in a frame gets its card below it |
+| `e2e/slice-00/S0-10.spec.ts` (changed) | the fix above |
+
+### The smoke runs (no laptop preparation; figures not counted)
+
+All on the measurement build of this branch, traced (`TO_SCREEN=1`), once each (`.data/measure/s4b2-step8-smoke/`).
+
+**S4B2-10** (4.3 min): every case measured on both canvases. Presented fps, “– requirements” / “100 cards”: 30 %
+expanded 49.3 / 50.3, dense expanded 45.8 / 44.3, 30 % collapsed 57.0 / 56.7, dense collapsed 58.9 / 58.9.
+
+**S4B2-11** (6.8 min), **after a fix to the method:**
+- **The first smoke ran each traced pan right after the untraced one,** as S4P-fading does for its pans with fading on.
+  The spike's 10 s driver ends on a zoom-in segment: the zoom after one pan was 37 % (from 30 %) and 114–133 % (from
+  100 %). So the second pan started there, and at 30 % it crossed 40 %, where cards draw their rows. Focus off gave 29.9
+  presented fps, against 49.3 for the same view in S4B2-10.
+- **Now each pan starts from the same view** (the page opened again, Focus switched on again). Presented fps:
+
+| View | Off | Focus ent:23 | Focus REQ-102 |
+| --- | --- | --- | --- |
+| 30 %, expanded | 49.5 | 46.6 (−5.9 %) | 44.6 (−9.9 %) |
+| 100 %, expanded | 40.4 | 40.6 | 40.6 |
+| 30 %, collapsed | 55.1 | 52.5 (−4.7 %) | 53.2 (−3.4 %) |
+| 100 %, collapsed | 54.2 | 53.6 | 54.1 |
+
+- **What it means for 4b-1:** S4B1-11's “−40 % expanded, −22 % collapsed” at 30 % compared a pan with Focus on from
+  about 37 % with a pan with Focus off from 30 %. Part of it is likely that drift, not Focus (noted in
+  `known-limitations.md`). S4P-fading itself is not changed: it is not in this sitting.
+
+**S4B2-12** (5.6 min), to the screen, median / p95 (ms):
+
+| Case | 100 % | 30 % |
+| --- | --- | --- |
+| Drop target: row | 19 / 40 | – (no rows below 40 %) |
+| Drop target: card | 18 / 22 | 14 / 24 |
+| Drop target: line | 24 / 31 (second smoke, see below) | 15 / 31 |
+| Selecting REQ-102's card | 79 / 118 (main thread 77) | 46 / 65 |
+| Focus ent:4 (3 cards lit) | 24 / 45 | 41 / 55 |
+| **Focus REQ-102 (46 lit trace lines)** | 55 / 80 | **107 / 122** |
+
+- **Focus on REQ-102 at 30 % misses 100 ms in the smoke.** It is GPU raster (89 ms); the main thread takes 12 ms. A
+  diagnosis (`.data/measure/s4b2-step8-diag/`, two rounds, the styles put in by the test):
+
+| Lit trace lines | To the screen, median (round 1 / 2) | Raster |
+| --- | --- | --- |
+| as built (dashed) | 107.6 / 106.7 ms | 91 / 90 ms |
+| hidden | 75.6 / 74.9 | 58 / 57 |
+| **drawn solid** | **76.5 / 76.2** | **59 / 58** |
+| all trace lines hidden | 74.9 / 75.2 | 58 / 58 |
+
+  **The dashes are the cost.** Rastering 46 long dashed lines over the visible tiles of the overlay's 543 Mpx layer
+  costs about 32 ms; drawn solid they cost about 1 ms. Question 1 below.
+- **The line target at 100 %:** around ent:23 the middle of every mapping line in view lay under a card. The spec now
+  tries more points along each line (a measuring change only). A second smoke of the whole spec found one: 24 / 31 ms.
+  Its other figures moved by up to 15 ms either way (the laptop was not prepared); Focus on REQ-102 at 30 % was 111 / 165
+  ms there.
+- **Selecting a requirement card at 100 %** is main-thread time (the selection's canvas commit and the panel, as
+  4b-1's S4B1-09): median 79, p95 118 ms.
+
+**S4B2-13** (1.8 min), **after a fix to the method:**
+- **Playwright's mouse broke the presented frames.** Each move is one CDP round trip, and it left the display compositor
+  drawing about 2 frames a second (54 begin-frames in 7 s, against 573 in a pan) while the page ran its frames. Those
+  presented frames meant nothing.
+- **The drag is now driven in the page,** one pointer and mouse move per frame, like the pan driver. The spec checks that
+  each card really moved.
+- **Untraced rAF fps:** requirement card 24.5, entity card 19.5 at 100 %; 48.6 and 40.7 at 30 %.
+- **Traced presented fps:** 10.4 and 9.0 at 100 %; 23.5 and 20.8 at 30 %. The drag is main-thread bound, so it presents
+  fewer frames than rAF counts, for both cards alike.
+
+### S4B2-15: the reads (no timing; `.data/measure/s4b2-step8-layers/`)
+
+Drawing layers / drawing megapixels / elements in the viewport:
+
+| Canvas, side | 30 % expanded | 100 % dense expanded | 30 % collapsed | 100 % dense collapsed |
+| --- | --- | --- | --- | --- |
+| “100 cards”, `slice-04b1` | 47 / 69.2 / 4,507 | 47 / 68.4 / 19,304 | 30 / 48.9 / 1,464 | 30 / 48.2 / 4,906 |
+| “100 cards”, this branch | 47 / 69.2 / 4,508 | 47 / 68.4 / 19,305 | 30 / 48.9 / 1,465 | 30 / 48.2 / 4,907 |
+| “– requirements” (12 cards) | 47 / 69.2 / 4,730 | 47 / 68.4 / 19,689 | 30 / 48.9 / 1,687 | 30 / 48.2 / 5,291 |
+| REQ-102's card moved over f4 (worst case) | 47 / 69.2 / 4,730 | | | |
+| all nine cards of the view over f4 | 47 / 69.2 / 4,730 | | | |
+
+- **Drawing layers do not grow with requirement cards** (AD-24 rule 4): 47 and 30, with 0 and with 12 cards.
+- **“100 cards” is `slice-04b1`'s plus one element in every view:** the line layer's group for trace lines
+  (`LineLayer.tsx`), there even when empty. One element, not one per card.
+- **What the 12 cards add, explained exactly:**
+  - below 40 %: 222 = 12 cards × 8 elements + 126 trace paths (no end dots);
+  - at 100 %: 384 = 12 × 11 + 126 paths + 126 end dots.
+  - All 12 cards and lines are counted in every view, because React Flow keeps every node in the page.
+- **Cards laid over a frame by hand add no layer here:** with one card, and with nine cards, over frame f4 at 30 %, the
+  read stays at 47 layers. Step 2's +6 came from cards laid in a grid over other cards as well as frames. Over a frame's
+  body alone, Chrome squashes them into a layer it already has.
+
+### Proposed text (for Łukasz's approval; not applied)
+
+**`docs/decisions.md` D-34**: in “Each row's “Place card” places the requirement's card next to the element, or shows its
+card when it is on the canvas”, after “next to the element”:
+
+> … places the requirement's card next to the element (below its frame when the element is in one: a placed card never
+> lies over a frame), or shows its card when it is on the canvas; …
+
+D-41 needs no change.
 
 ## Łukasz's answers after step 7 (20 October 2026)
 

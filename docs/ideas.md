@@ -71,12 +71,19 @@ the CHECK on `frame.kind` (or another marker) and a rule so “Arrange into fram
 
 ## “Add to this canvas” on a panel without its card (slice 4a, step 3)
 
+**Resolved in slice 4b-2** ([PRD](prd/slice-04b2-requirement-cards.md), item 16; D-34). The text below is kept as it was
+written.
+
 Since slice 4a a go-to link to an element whose card is not on the open canvas opens its panel only. The prototype's
 entity and source table panels then offer “Add to this canvas” where “Remove from this canvas” would be. Slice 4a leaves
 it out (not in its PRD; Łukasz after step 3); a candidate for slice 4b, which places requirement cards and can place an
 element's card from its panel the same way.
 
 ## Project home: open the canvas that shows most of the requirement (slice 4a, step 4)
+
+**Resolved in slice 4b-2** ([PRD](prd/slice-04b2-requirement-cards.md), item 23): the canvas with most of the
+requirement's entities and tables, plus one for its card; the requirement is selected, so its coverage colours show.
+The text below is kept as it was written.
 
 Slice 4a opens a requirement from the project home on the project's last opened canvas, else its first (PRD item 30).
 The prototype opens the canvas that shows most of the requirement's scope (its entities, tables and its card) and
@@ -122,3 +129,9 @@ Since slice 4b-1 a link to an entity is one item, not its attributes (D-31). An 
 could offer “Link all attributes” to link a requirement to each of the entity's attributes in one step (one undo step),
 for requirements that need every attribute sourced.
 
+## Requirement cards: what the prototype has besides (slice 4b-2, step 1)
+
+Left out of slice 4b-2 on purpose (not in its PRD):
+- a double-click on a requirement card, and the card menu's “Edit description…”, open the description editor;
+- “Show its requirements (n)” in the attribute row and card menus;
+- resizing a requirement card (230 px fixed, as the prototype).
