@@ -1,7 +1,63 @@
 # Slice 5a – Acceptance
 
-Status: **step 1 (questions), waiting for Łukasz.** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
+Status: **step 2 (show and hide).** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
 (`1bd3a13`). PRD: `docs/prd/slice-05a-side-panels.md`.
+
+## Łukasz's answers to step 1 (20 October 2026)
+
+Step 1 accepted.
+
+1. **Cookie** per person, as the working context does, so the server draws the right layout from the start (P1).
+2. **No `ModelCanvas` re-render on a size change** (P2); S5A-07 is checked against zero canvas and zero miniature
+   commits. The first view after a load must still be placed correctly: a check of its own (S5A-07).
+3. **Narrow screens:** a selection does not open the details overlay; clicking an entity or a table in the left
+   overlay closes it.
+4. **The two Q4 lists** as written.
+5. **Yes to all four** (mounted when hidden, the saved view accepted, the test rule's reading, the toasts), with an
+   addition: a hidden panel stays in the page but is **inert** (not reachable by Tab, hidden from screen readers),
+   and that is tested.
+
+**The PRD's note that resizing probably exists is wrong** (section 1, item 3): the app has fixed widths and no grips;
+step 3 builds the grips, their limits, double-click, keyboard and stored widths from scratch.
+
+D-54: the final text is quoted in step 4, where Łukasz approves it.
+
+## Step 2: show and hide (items 1–6, 12–13)
+
+**What changed**
+- `src/ui/side-panels-cookie.ts`: the layout cookie `im-panels.<userId>` (`l1.r0.264.340`: shown or hidden, both
+  widths), the prototype's limits; an unreadable value gives the defaults. Unit tests next to it.
+- `src/app/_components/side-panels.tsx`: `SidePanelsProvider` (state, cookie, narrow screens, `openDetails`,
+  `closeLeftOverlay`), `SidePanelsGrid` (the three columns; a hidden panel keeps its content, `visibility: hidden` and
+  `inert`), `PanelToggle` (the prototype's icons and titles, `aria-pressed`). `AppShell` reads the cookie on the server
+  and wraps project and canvas pages in the provider; `TopBar` puts the buttons at its two ends.
+- `src/app/globals.css`: `.im-panels`; up to 1000 px the panels lie over the canvas (300 px, shadow), one at a time.
+- No jump: the left button calls `ui.shiftView(±width)` in the same click (`ModelCanvas`'s new `shiftView`, a
+  `setViewport` without duration, which React Flow applies at once).
+- P2: `ModelCanvas` subscribes only to “the pane has a size”, not to the size; the first view reads the size from the
+  store.
+- Q4: `canvas-host.tsx` (the six menu items, “Show what is inside”, the Entity tool, “New entity here”, a new frame)
+  and `left-panel.tsx` (“+”, “New requirement”, a requirement's click) call `openDetails`; an entity's or a table's
+  click calls `closeLeftOverlay`. `focusField` waits until the panel is no longer inert. A canvas opened with `?card`,
+  `?label`, `?req` or `?note` is drawn by the server with the panel shown, and the browser remembers it.
+
+**Found in the browser:** at 900–1,000 px the canvas page's top bar is about 1,080 px wide, so the new right button
+(and the user indicator, already before) lay outside the window. Playwright still clicked it, as it scrolls a clipped
+bar. The canvas tools now sit in a container that is cut off first (`top-bar.tsx`); S5A-06 checks that both buttons
+are inside the window. Making the tools fit is in `docs/ideas.md`.
+
+**Tests** (`e2e/slice-05a/`): S5A-01 (buttons, widths, both hidden; inert: Tab and the accessibility tree), S5A-02
+(reload, another canvas, the project home, per person, an unreadable cookie, blocked cookies), S5A-03 (hide and show at
+100 % and 35 %, ±1 px), S5A-04 (selections; the four links; the six menu items with the field focused; creating;
+requirements), S5A-06 (1000 px window), S5A-07 (0 canvas and 0 miniature commits for four switches; the first view
+after a load, remembered and fitted, with the left panel hidden). The grips' parts of S5A-02, -03, -05, -06 and -07
+come in step 3.
+
+**Runs (step 2):** lint, typecheck, unit tests (1,028) pass. `e2e/slice-05a` 19 of 19. The earlier specs for what the
+step touched: `slice-00` (all), S1B-03, S1B-07, S2B-01, the commit-counter specs S2C-12, S3A-14-idle, S3B-15-idle,
+S3B-13, S4P-12, S4B1-06, and S4A-01, S4A-02, S4A-11: 37 of 37 (6.6 min). After the top-bar fix: `slice-05a`,
+`slice-00`, S1B-07, S2B-01 again, 41 of 41 (6.8 min). No test failed, so none was run three times. S1B-03's
+`setPanelWidth` still works unchanged (it sets the grid's columns inline); it changes with the grips in step 3.
 
 ## Answers to the PRD's questions (step 1)
 
