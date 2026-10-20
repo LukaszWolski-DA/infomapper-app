@@ -196,15 +196,34 @@
   content: attr(data-placeholder); color: var(--im-ink-3); font-style: italic; pointer-events: none; float: left; height: 0;
 }
 
-/* The side panels (slice 5a; prototype main.noleft, main.noright, .mleft, .mright). The widths come from the page
-   (--im-lw, --im-rw: 0 while a panel is hidden). A hidden panel stays in the page, invisible and inert. Up to 1000 px
-   wide both are hidden and a toolbar button slides one over the canvas, which keeps its size. */
-.im-panels { display: grid; grid-template-columns: var(--im-lw, 264px) minmax(0, 1fr) var(--im-rw, 340px); position: relative; }
+/* The side panels (slice 5a; prototype main.noleft, main.noright, .mleft, .mright). The columns come from the page, set
+   on the grid itself (0 while a panel is hidden; no inherited CSS variables, AD-24 rule 4). A hidden panel stays in the
+   page, invisible and inert. Up to 1000 px wide both are hidden and a toolbar button slides one over the canvas, which
+   keeps its size. */
+.im-panels { display: grid; grid-template-columns: 264px minmax(0, 1fr) 340px; position: relative; }
 .im-panels > aside[data-shown="false"] { visibility: hidden; border-width: 0; }
 @media (max-width: 1000px) {
-  .im-panels { grid-template-columns: minmax(0, 1fr); } /* the panels lie over it, out of the grid */
+  .im-panels { grid-template-columns: minmax(0, 1fr) !important; } /* over the page's columns: the panels lie over it */
   .im-panels > aside { position: absolute; top: 0; bottom: 0; z-index: 40; width: 300px; visibility: hidden; box-shadow: 0 0 30px var(--im-shadow); }
   .im-panels > aside[data-side="left"] { left: 0; }
   .im-panels > aside[data-side="right"] { right: 0; }
   .im-panels > aside[data-overlay="true"] { visibility: visible; }
+}
+
+/* The panels' grips and the guide line (slice 5a; prototype .pgrip). The guide is moved with a transform
+   while a grip is dragged; the panel and the canvas change size once, on release. No grips on a narrow screen. */
+.im-grip { position: absolute; top: 0; bottom: 0; width: 8px; z-index: 20; cursor: col-resize; touch-action: none; }
+.im-grip[data-side="left"] { right: 0; }
+.im-grip[data-side="right"] { left: 0; }
+.im-grip::after { content: ""; position: absolute; top: 0; bottom: 0; width: 2px; background: transparent; transition: background 0.12s; }
+.im-grip[data-side="left"]::after { right: 0; }
+.im-grip[data-side="right"]::after { left: 0; }
+.im-grip:hover::after, .im-grip:focus-visible::after, .im-grip.on::after { background: var(--im-logical); }
+.im-grip:focus-visible { outline: none; }
+.im-guide { position: absolute; top: 0; bottom: 0; left: -1px; width: 2px; z-index: 50; background: var(--im-logical); pointer-events: none; display: none; }
+.im-guide.on { display: block; }
+/* no page-wide drag class (prototype body.pdrag): toggling it restyled the whole page on release (S5A-08); the grip
+   holds the pointer, so its cursor stays, and its pointerdown prevents text selection */
+@media (max-width: 1000px) {
+  .im-grip, .im-guide { display: none !important; }
 }

@@ -7,12 +7,18 @@
 // same event, so the model stays where it was on the screen (item 6). A selection never opens a hidden details panel;
 // the actions that lead to details on purpose call `openDetails` (Q4). Up to 1000 px wide both panels are hidden and a
 // button slides one over the canvas, one at a time; that is not remembered.
+// Resizing (items 7–11; prototype PANEL, .pgrip): a grip on each panel's inner edge. While it is dragged only a guide
+// line moves (a DOM element moved directly, no render); on release the panel takes the width, the canvas resizes once,
+// and the left panel's change moves the view as hiding does. Double-click resets, the keyboard as the prototype's.
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
+import { Fragment, createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
+import { useToast } from "@/ui/components/toast";
 import {
   DEFAULT_SIDE_PANELS,
+  PANEL_LIMITS,
   SIDE_PANELS_COOKIE_MAX_AGE,
+  clampWidth,
   formatSidePanelsCookie,
   sidePanelsCookieName,
   type PanelSide,
@@ -32,6 +38,8 @@ interface SidePanelsApi {
   openDetails: () => void;
   /** Closes the left overlay on a narrow screen (after an entity or a table was clicked in it). */
   closeLeftOverlay: () => void;
+  /** Gives a panel a width (within its limits), remembered; the left panel's change moves the view (item 9). */
+  setWidth: (side: PanelSide, width: number) => void;
 }
 
 const noop = () => {};
@@ -42,6 +50,7 @@ const SidePanelsCtx = createContext<SidePanelsApi>({
   toggle: noop,
   openDetails: noop,
   closeLeftOverlay: noop,
+  setWidth: noop,
 });
 
 export const useSidePanels = () => useContext(SidePanelsCtx);
@@ -130,9 +139,22 @@ export function SidePanelsProvider({
 
   const closeLeftOverlay = useCallback(() => setOverlay((o) => (o === "left" ? null : o)), []);
 
+  const setWidth = useCallback(
+    (side: PanelSide, width: number) => {
+      const s = stateRef.current;
+      const key = side === "left" ? "leftWidth" : "rightWidth";
+      const next = clampWidth(side, width);
+      if (next === s[key]) return;
+      commit({ ...s, [key]: next });
+      // a wider left panel pushes the canvas's left edge right: the view goes back by as much (item 9)
+      if (side === "left" && s.left) ui.shiftView(s.leftWidth - next);
+    },
+    [commit, ui],
+  );
+
   const api = useMemo(
-    () => ({ state, narrow, overlay, toggle, openDetails, closeLeftOverlay }),
-    [state, narrow, overlay, toggle, openDetails, closeLeftOverlay],
+    () => ({ state, narrow, overlay, toggle, openDetails, closeLeftOverlay, setWidth }),
+    [state, narrow, overlay, toggle, openDetails, closeLeftOverlay, setWidth],
   );
   return <SidePanelsCtx.Provider value={api}>{children}</SidePanelsCtx.Provider>;
 }
@@ -140,22 +162,26 @@ export function SidePanelsProvider({
 /** The three columns: left panel | content | right panel. */
 export function SidePanelsGrid({ left, right, children }: { left: ReactNode; right: ReactNode; children: ReactNode }) {
   const { state, narrow, overlay } = useSidePanels();
-  const style = {
-    "--im-lw": `${state.left ? state.leftWidth : 0}px`,
-    "--im-rw": `${state.right ? state.rightWidth : 0}px`,
-  } as CSSProperties;
+  // the columns themselves, never CSS variables: a variable here would be inherited by every element of the canvas and
+  // restyle all of them on each change (AD-24 rule 4; S5A-08 found 75–140 ms of style recalculation in the dense view)
+  const style: CSSProperties = {
+    gridTemplateColumns: `${state.left ? state.leftWidth : 0}px minmax(0, 1fr) ${state.right ? state.rightWidth : 0}px`,
+  };
   const hidden = (side: PanelSide) => (narrow ? overlay !== side : !state[side]);
   return (
     <div className="im-panels min-h-0 flex-1" style={style} data-testid="side-panels">
+      <div className="im-guide" data-testid="panel-guide" aria-hidden />
       <aside
         data-testid="panel-left"
         data-side="left"
         data-shown={state.left}
         data-overlay={overlay === "left"}
         inert={hidden("left")}
-        className="flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-im-line bg-im-panel"
+        className="relative flex min-h-0 min-w-0 flex-col overflow-hidden border-r border-im-line bg-im-panel"
       >
-        {left}
+        {/* keyed: the content comes from the server page, next to the grip (React's key check in development) */}
+        <Fragment key="content">{left}</Fragment>
+        <Grip key="grip" side="left" />
       </aside>
       {children}
       <aside
@@ -164,11 +190,100 @@ export function SidePanelsGrid({ left, right, children }: { left: ReactNode; rig
         data-shown={state.right}
         data-overlay={overlay === "right"}
         inert={hidden("right")}
-        className="flex min-h-0 min-w-0 flex-col overflow-hidden border-l border-im-line bg-im-panel"
+        className="relative flex min-h-0 min-w-0 flex-col overflow-hidden border-l border-im-line bg-im-panel"
       >
-        {right}
+        <Grip key="grip" side="right" />
+        <Fragment key="content">{right}</Fragment>
       </aside>
     </div>
+  );
+}
+
+const KEY_STEP = 16;
+const SHIFT_STEP = 64;
+
+/**
+ * A panel's grip (prototype #gripL, #gripR): drag to resize, double-click to reset, ←/→ 16 px (Shift 64 px) and Home
+ * on the keyboard. → always moves the edge right: it widens the left panel and narrows the right one.
+ */
+function Grip({ side }: { side: PanelSide }) {
+  const { state, setWidth } = useSidePanels();
+  const toast = useToast();
+  const width = side === "left" ? state.leftWidth : state.rightWidth;
+  const limits = PANEL_LIMITS[side];
+  const grow = side === "left" ? 1 : -1;
+  /** The drag under way: where it started, the width it would give, the grid's width and the guide line. */
+  const drag = useRef<{ x0: number; w0: number; w: number; edge: number; guide: HTMLElement | null } | null>(null);
+
+  const moveGuide = (w: number) => {
+    const d = drag.current;
+    if (!d) return;
+    d.w = w;
+    // the guide stands where the panel's inner edge will be: the new width in from the grid's own edge
+    if (d.guide) d.guide.style.transform = `translateX(${side === "left" ? w : d.edge - w}px)`;
+  };
+  const endDrag = (el: HTMLElement) => {
+    drag.current?.guide?.classList.remove("on");
+    drag.current = null;
+    el.classList.remove("on");
+  };
+
+  return (
+    <div
+      role="separator"
+      aria-orientation="vertical"
+      aria-label={side === "left" ? "Resize the left panel" : "Resize the right panel"}
+      aria-valuenow={width}
+      aria-valuemin={limits.min}
+      aria-valuemax={limits.max}
+      tabIndex={0}
+      title="Drag to resize; double-click to reset"
+      data-testid={side === "left" ? "grip-left" : "grip-right"}
+      className="im-grip"
+      data-side={side}
+      onPointerDown={(e) => {
+        if (e.button !== 0) return;
+        e.preventDefault();
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          // a pointer the browser does not know (the diagnosis drives the grip with synthetic events): no capture
+        }
+        const grid = e.currentTarget.closest(".im-panels")!;
+        const guide = grid.querySelector<HTMLElement>(":scope > .im-guide");
+        drag.current = { x0: e.clientX, w0: width, w: width, edge: grid.getBoundingClientRect().width, guide };
+        e.currentTarget.classList.add("on");
+        moveGuide(width);
+        guide?.classList.add("on");
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (d) moveGuide(clampWidth(side, d.w0 + grow * (e.clientX - d.x0)));
+      }}
+      onPointerUp={(e) => {
+        const d = drag.current;
+        if (!d) return;
+        endDrag(e.currentTarget);
+        setWidth(side, d.w);
+      }}
+      onLostPointerCapture={(e) => {
+        // a drag cut short (the window lost the pointer): nothing changes
+        if (drag.current) endDrag(e.currentTarget);
+      }}
+      onDoubleClick={() => {
+        setWidth(side, limits.def);
+        toast(side === "left" ? "Left panel width reset." : "Right panel width reset.");
+      }}
+      onKeyDown={(e) => {
+        const step = e.shiftKey ? SHIFT_STEP : KEY_STEP;
+        if (e.key === "ArrowRight") setWidth(side, width + step * grow);
+        else if (e.key === "ArrowLeft") setWidth(side, width - step * grow);
+        else if (e.key === "Home") setWidth(side, limits.def);
+        else return;
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+    />
   );
 }
 
