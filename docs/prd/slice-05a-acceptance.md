@@ -1,6 +1,6 @@
 # Slice 5a – Acceptance
 
-Status: **step 2 (show and hide).** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
+Status: **step 3 (resize and the diagnosis).** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
 (`1bd3a13`). PRD: `docs/prd/slice-05a-side-panels.md`.
 
 ## Łukasz's answers to step 1 (20 October 2026)
@@ -58,6 +58,64 @@ step touched: `slice-00` (all), S1B-03, S1B-07, S2B-01, the commit-counter specs
 S3B-13, S4P-12, S4B1-06, and S4A-01, S4A-02, S4A-11: 37 of 37 (6.6 min). After the top-bar fix: `slice-05a`,
 `slice-00`, S1B-07, S2B-01 again, 41 of 41 (6.8 min). No test failed, so none was run three times. S1B-03's
 `setPanelWidth` still works unchanged (it sets the grid's columns inline); it changes with the grips in step 3.
+
+## Step 3: resize (items 7–11) and the diagnosis
+
+**What changed**
+- `side-panels.tsx`: a `Grip` on each panel's inner edge (`role="separator"`, `aria-orientation="vertical"`,
+  `aria-valuenow`/`min`/`max`, focusable, “Drag to resize; double-click to reset”). Dragging moves only the guide line
+  (`panel-guide`, moved by a transform, no React render); the release calls `setWidth`, which clamps (left 200–520,
+  right 280–640), remembers the width in the cookie and, for the left panel, moves the view by the change (item 9).
+  Double-click resets with the prototype's toast; ←/→ 16 px, Shift 64 px, Home resets, each at once (→ moves the edge
+  right on both grips). No grips up to 1000 px. A synthetic pointer without capture (the diagnosis) still drags.
+- `globals.css`: `.im-grip` (8 px, a 2 px line on hover, focus and drag) and `.im-guide`.
+- **Two fixes the diagnosis found** (below): the grid's columns are set directly, not through inherited CSS variables;
+  no page-wide drag class.
+- `S1B-03`'s `setPanelWidth` uses the right grip's keyboard (Home for 340 px, Shift+→ for 280 px) instead of writing
+  the grid's columns.
+- Panel content and grip are keyed (React's key check in development warned once the content had a sibling).
+
+**Tests:** S5A-05 (separators at the edges; the guide within the limits while the panel keeps its width; the release;
+double-click with its toasts; the keyboard), S5A-02 (widths across a reload, another canvas, the project home, and
+kept while hidden), S5A-03 (drag, keyboard and double-click on the left grip, a right resize, hide and show at a new
+width: ±1 px), S5A-06 (no grips on a narrow screen), S5A-07 (no canvas or miniature commit during a drag, on release,
+double-click or keyboard).
+
+### S5A-08: the diagnosis to the screen
+
+Measurement build, headed Chrome 155, 1536 × 864 (pane 932 × 718), no laptop preparation; “Performance test”, frames
+expanded; 10 settled pairs per case; every switch settled. The drag is driven in the page, one move per frame; the
+switch is the release. Medians to the screen (p95) in ms; raw results in `.data/measure/s5a-step3/`.
+
+| Case | 30 % around ent:23: first run | after fix 1 | after fix 2 | 100 % dense: first run | after fix 1 | after fix 2 |
+| --- | --- | --- | --- | --- | --- | --- |
+| left hide | 71.8 (145) | 32.3 | **33.4** (54) | 129.9 (251) | 44.7 | **45.0** (67) |
+| left show | 72.1 (93) | 39.8 | **40.6** (55) | 115.5 (175) | 46.6 | **49.6** (57) |
+| right hide | 58.9 (371) | 26.0 | **25.2** (257) | 114.7 (174) | 34.8 | **33.2** (49) |
+| right show | 66.7 (74) | 31.7 | **31.0** (36) | 106.8 (162) | 38.9 | **38.4** (43) |
+| left resize +100 | 108.6 (112) | 73.3 | **37.0** (50) | 180.5 (238) | 121.5 | **53.8** (72) |
+| left resize −100 | 98.7 (141) | 68.2 | **37.2** (40) | 180.7 (193) | 128.2 | **54.9** (61) |
+| right resize +100 | 106.1 (123) | 68.3 | **33.3** (54) | 168.9 (221) | 110.2 | **42.3** (51) |
+| right resize −100 | 101.3 (147) | 63.8 | **31.9** (42) | 167.9 (191) | 110.2 | **38.8** (47) |
+
+- **First run: over the bar** (100 ms) in the dense view and for resizes at 30 %. The main thread took nearly all of
+  it (raster 1–7 ms); in the traces, style recalculation (`UpdateLayoutTree`) was 75–140 ms of each switch, layout
+  2–3 ms.
+- **Fix 1: no inherited CSS variables on the grid.** Step 2 gave the widths to the grid as `--im-lw` and `--im-rw`;
+  custom properties inherit, so every change restyled every element of the canvas (about 19,000 in the dense view):
+  AD-24 rule 4's case, on the grid instead of the canvas root. The grid now gets `grid-template-columns` itself.
+- **Fix 2: no page-wide drag class.** The resize still spent 69 ms in style recalculation: the prototype's
+  `body.pdrag *` (cursor and no text selection on every element while dragging) restyled the whole page when it came
+  off on release. Dropped: the grip holds the pointer, so its cursor stays, and its pointerdown prevents selection.
+  Style recalculation in a release: 69 → 0.5 ms.
+- **After both: every median 25–55 ms**; the slowest, a left resize in the dense view, is the canvas's own layerize,
+  pre-paint and paint of the wider view. One p95 of 257 ms (right hide at 30 %) is a single switch.
+
+**LayerTree read** (drawing layers / megapixels): with the panels shown 47 / 69.2 at 30 % and 47 / 68.4 dense, the same
+as slice 4b-2's S4B2-15 for “100 cards”; S4B2-15 itself, run again on this branch, gives 4b-2's figures on all four
+views of both canvases (47 and 30 layers; elements in the viewport equal). The left panel hidden: 38; both hidden: 36;
+the guide line showing during a drag: 49 (two more, outside the canvas, for as long as the drag lasts). **The slice
+adds no drawing layer to the canvas.**
 
 ## Answers to the PRD's questions (step 1)
 
