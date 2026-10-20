@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 8: docs closed, two full runs before the merge; waiting for Łukasz's manual acceptance.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **accepted by Łukasz (manual acceptance passed, 20 October 2026); waiting for his merge command.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Manual acceptance checklist (step 8)
@@ -27,6 +27,11 @@ on a fresh demo seed (`npm run reset-dev-data`):
 | 12 | step 7 | As Piotr (reviewer) and Kasia (reader): select a card, Focus on, try to drag a card and a requirement row | Cards and lines show, selection and Focus work; no drag, no “Place card”, “Add all” or “Remove its card” |
 | 13 | step 7 | `npm run seed:large`, then open “Performance test – requirements” | 12 requirement cards, none over a frame, with their trace lines |
 | 14 | step 8 | Focus on REQ-102 (select its card, then Focus) on “Customer & orders” or the requirements canvas | Its lit trace lines are solid, in violet with their end dots, and still read as trace lines, not mappings; the faded ones under the veil stay dashed |
+
+## Manual acceptance (20 October 2026)
+
+**Passed** (Łukasz): the definition of done and the 14 checks of the manual checklist. The merge waits for his command;
+then the annotated tag `slice-04b2`.
 
 ## Łukasz's answers after the sitting (20 October 2026)
 
