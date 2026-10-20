@@ -39,6 +39,14 @@ on a fresh demo seed (`npm run reset-dev-data`):
 - **3. The S4B1-11 artefact:** a note only (`known-limitations.md`, as in part 1).
 - **Then** stop and say when the laptop needs preparing.
 
+**Done** (20 October 2026):
+- **One full run** (`npm run e2e`, from scratch, no server running): **184 passed, 30.9 min.** Lint, typecheck and the
+  unit tests pass.
+- **This branch's measurement build again** at `eea915b`; `slice-04b1`'s build (`8133ee8`) kept.
+- **The smoke** (no preparation, diagnostic; step 8's diagnosis spec, two rounds): **Focus on REQ-102 at 30 %, as built
+  now: 76.3 ms to the screen in both rounds** (p95 93; raster 58 ms), against 107 ms before. The spec's other variants
+  (lit lines hidden, all trace lines hidden) give 75–90 ms in the same run, so the solid lines cost nothing measurable.
+
 ## Step 8, part 1: S0-10, placement clear of frames, measuring specs, reads, docs (20 October 2026)
 
 ### What changed
