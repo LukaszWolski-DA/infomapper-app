@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 8: waiting for the laptop's preparation, then the closing sitting.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 8: the closing sitting done, every measured criterion met; waiting for Łukasz (AD-24 text, manual acceptance).** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Manual acceptance checklist (step 8)
@@ -27,6 +27,99 @@ on a fresh demo seed (`npm run reset-dev-data`):
 | 12 | step 7 | As Piotr (reviewer) and Kasia (reader): select a card, Focus on, try to drag a card and a requirement row | Cards and lines show, selection and Focus work; no drag, no “Place card”, “Add all” or “Remove its card” |
 | 13 | step 7 | `npm run seed:large`, then open “Performance test – requirements” | 12 requirement cards, none over a frame, with their trace lines |
 | 14 | step 8 | Focus on REQ-102 (select its card, then Focus) on “Customer & orders” or the requirements canvas | Its lit trace lines are solid, in violet with their end dots, and still read as trace lines, not mappings; the faded ones under the veil stay dashed |
+
+## Step 8, part 2: the closing sitting (20 October 2026)
+
+**Every measured criterion is met.** No round was dropped, and one switch failed the settled check.
+
+### How it ran
+
+- **The laptop:** prepared by Łukasz (restarted, 10 min, power adapter, Best performance; Update, OneDrive, iCloud and
+  Google Drive paused; Chrome closed; display and sleep Never; the pointer off the windows). Before the warm-up no node
+  process, server or Chrome was running, and the tree was clean.
+- **The builds** from part 1, used with `--no-build`: this branch at `eea915b` (the sitting ran at `5153047`, which
+  changes docs only); `slice-04b1` at `8133ee8` in `../infomapper-ab-main`.
+- **The warm-up:** one round with three settled pairs per switch case (`2026-10-20-11-33`, 26 min, not counted).
+  Every spec passed on both sides.
+- **The sitting:** `npm run measure:canvas -- --to-screen --only s4b2pans,c10,lasso,c08,s4b2focus,s4b2screen,s4b2drag
+  --rounds 3 --no-build --against slice-04b1` (`.data/measure/2026-10-20-12-00/`, 83.5 min; raw traces there, not
+  committed).
+- **The quiet check before every side** passed in each case: 31–38 s to quiet (round 1's reference, the first side:
+  104 s, peak 15 %). **No round was dropped or replaced.**
+
+### The criteria
+
+| ID | Result | Figures |
+| --- | --- | --- |
+| S4B2-01 to S4B2-09 | **met** | the e2e tests (every full run since step 7) |
+| S4B2-10 | **met** | presented fps with 12 requirement cards (this branch, “– requirements”) against `slice-04b1` (“100 cards”), median of 3 (min–max): 30 % expanded 54.0 (54.0–55.0) against 54.2, −0.4 %; dense expanded 48.6 (48.6–49.9) against 48.9, −0.6 %; 30 % collapsed 57.5 against 57.7, −0.3 %; dense collapsed 58.8 against 59.0, −0.3 %. Bar ≥ −5 % |
+| S4B2-11 | **met** | Focus on against off, presented, this branch, median of 3: 30 % expanded +1.8 % (ent:23) / +2.3 % (REQ-102); 100 % expanded −0.6 % / +1.3 %; 30 % collapsed −1.0 % / −1.4 %; 100 % collapsed −1.1 % / −1.1 %. Bar: within 5 % |
+| S4B2-12 | **met** | to the screen, median / p95 / max (ms) below; the largest median 73 ms (selecting REQ-102's card at 100 %), Focus on REQ-102 at 30 % 71 / 94 / 94 |
+| S4B2-13 | **met** | presented fps, median (spread): requirement card 11.5 (11.0–11.5) against entity card 9.7 (9.6–9.8) at 100 %; 26.5 (26.1–27.4) against 24.0 (23.5–24.8) at 30 %. The requirement drag lies above the entity drag's spread |
+| S4B2-14 | **met** | no requirement cards (“100 cards” on both sides): presented fps 53.7 against 54.2 (−0.9 %), 49.4 against 48.9 (+1.0 %), 58.0 against 57.7 (+0.5 %), 58.9 against 59.0 (−0.2 %). C-10 to the screen 19 / 25 / 25 ms (`slice-04b1` 18 / 43 / 43); the lasso 40 / 50 / 50 ms (39 / 55 / 55). C-08 stable frame 1,350–1,367 ms (`slice-04b1` 1,371–1,418), bar ≤ 1,500: met; last present 1,509 ms median (1,508–1,514; `slice-04b1` 1,552), recorded |
+| S4B2-15 | **met** | step 8 part 1's reads (no timing): drawing layers 47 / 30 with 0 and 12 requirement cards and with cards over a frame; every element difference explained; the commit guard in S4B2-06 (every full run) |
+| S4B2-16 | **open** | CI and the two full runs in a row before the merge |
+
+### S4B2-12 in detail (this branch, three rounds; median of the rounds' medians / largest p95 / largest max, ms)
+
+| Case | On | Off | Not settled |
+| --- | --- | --- | --- |
+| Drop target, row, 100 % | 17 / 36 / 36 | 18 / 32 / 32 | 0 |
+| Drop target, card, 100 % | 17 / 23 / 23 | 18 / 25 / 25 | 0 |
+| Drop target, line, 100 % | 22 / 37 / 37 | 18 / 23 / 23 | 0 |
+| Drop target, card, 30 % | 13 / 22 / 22 | 12 / 28 / 28 | 0 |
+| Drop target, line, 30 % | 15 / 30 / 30 | 14 / 27 / 27 | 0 |
+| Selecting REQ-102's card, 100 % | 73 / 116 / 116 | 68 / 117 / 117 | 0 |
+| Selecting REQ-102's card, 30 % | 44 / 116 / 116 | 41 / 59 / 59 | 0 |
+| Focus ent:4 (3 cards lit), 30 % | 33 / 48 / 48 | 12 / 16 / 16 | 0 |
+| **Focus REQ-102 (46 lit trace lines), 30 %** | **71 / 94 / 94** | 12 / 23 / 23 | **1** (off) |
+| Focus ent:4, 100 % | 17 / 21 / 21 | 14 / 22 / 22 | 0 |
+| Focus REQ-102, 100 % | 29 / 57 / 57 | 15 / 31 / 31 | 0 |
+
+- **Selecting a requirement card** has the largest p95 (116–117 ms, one switch per round above 100 ms). Its time is
+  the main thread (the selection's canvas commit and the panel), as 4b-1's coverage colours. The bar is on the median.
+- **Focus on REQ-102 at 30 %:** 71 ms, against 107 ms in part 1's smoke with dashed lit lines (answer 1).
+- **The one switch not settled:** Focus REQ-102 at 30 %, “off”, in one round: a raster was still running when it began.
+
+### S4B2-11 against 4b-1's S4B1-11, and the drift
+
+| View | S4B1-11 (4b-1's sitting) | S4B2-11 (now) |
+| --- | --- | --- |
+| 30 %, expanded | −40 % | +1.8 % (ent:23), +2.3 % (REQ-102) |
+| 30 %, collapsed | −22 % | −1.0 %, −1.4 % |
+| 100 %, expanded and collapsed | +5 to +15 % | −1.1 to +1.3 % |
+
+- **Two things changed between them:**
+  - **T3:** the veil paints into the overlay's layer, so Focus adds one drawing layer instead of two (step 6).
+  - **The method:** every pan now starts from the same view.
+- **The drift, which affected S4B1-11:** S4P-fading ran each pan with fading on right after the untraced pan, without
+  opening the view again, and the 10 s driver ends on a zoom-in. In this sitting the zoom after a pan was 37–40 % (from
+  30 %) and 115–134 % (from 100 %). So 4b-1's Focus-on pans at 30 % ran from about 38 % to past 40 %, where cards draw
+  their rows, while the Focus-off pans started at 30 %.
+- **This sitting cannot say how much of 4b-1's miss each of the two explains.** It would need S4P-fading's old method
+  run once more on this build (about 15 min). The note in `known-limitations.md` stays as it is (answer 3 after part 1).
+- **Frames over 50 ms** (presented gaps) are the same with Focus on and off: 5–16 per 10 s pan, in every view.
+
+### Proposed AD-24 text (for Łukasz's approval; not applied)
+
+**`docs/decisions.md` AD-24**: at the end of “Overlay and fading”, after “T1 applied in 4b-1, T3 in 4b-2 (T2
+dropped).”, add:
+
+> Slice 4b-2's sitting (20 October 2026; three rounds; presented frames and to the screen, traced): pan and zoom with
+> Focus on within 2.3 % of off at 30 % and 100 %, frames expanded and collapsed (S4B2-11; 4b-1's −22 to −40 % at 30 %
+> had its pans with Focus on start from a view the pan before had zoomed in); Focus switching at most 71 ms to the
+> screen with requirement cards lit (the lit trace lines solid: dashed, they cost about 32 ms of raster). Requirement
+> cards and their trace lines: pan and zoom within 0.6 % of the same view without them, and no drawing layer more with
+> 12 cards (S4B2-10, S4B2-15).
+
+And in “Measuring”, add:
+
+> Each measured pan starts from a freshly opened view: the spike's 10 s driver ends on a zoom-in, so a pan that follows
+> another starts zoomed in (slice 4b-2). A drag is driven in the page, one pointer move per frame; Playwright's mouse
+> leaves the display compositor drawing about 2 frames a second (slice 4b-2).
+
+**`docs/known-limitations.md`** (in step 8's closing, no approval needed): S4B1-11 closed with the figures above, S4B1-12's
+fps confirmed (S4B2-14), and a new “Where the canvas stands after slice 4b-2” above 4b-1's.
 
 ## Łukasz's answers after step 8, part 1 (20 October 2026)
 
