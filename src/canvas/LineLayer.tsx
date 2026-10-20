@@ -15,7 +15,8 @@
 // Slice 4b-2 (items 8–11): the requirement cards' trace lines, dashed, in the same layer (one path and one end dot each,
 // no dot below 40 %), from data (`traceGeom`); each redrawn only when its ends move. They fade with the other lines on a
 // selection (the layer's `dimmed` class), never on a hover. Step 6 (item 21): under Focus a trace line with both ends lit
-// is drawn again above the veil by `LitLines`; the rest fade under it.
+// is drawn again above the veil by `LitLines`, solid (step 8: dashed, they cost about 32 ms of raster per Focus switch at
+// 30 %); the rest fade under it, dashed.
 
 import { Fragment, memo, useContext, useState, type ReactNode } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi, type InternalNode } from "@xyflow/react";

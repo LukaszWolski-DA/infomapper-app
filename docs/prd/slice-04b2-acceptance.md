@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 8, part 1: waiting for Łukasz (laptop preparation).** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 8: waiting for the laptop's preparation, then the closing sitting.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Manual acceptance checklist (step 8)
@@ -26,6 +26,18 @@ on a fresh demo seed (`npm run reset-dev-data`):
 | 11 | step 6 | With Focus on, drag a lit card | The lit lines and the holes follow the card |
 | 12 | step 7 | As Piotr (reviewer) and Kasia (reader): select a card, Focus on, try to drag a card and a requirement row | Cards and lines show, selection and Focus work; no drag, no “Place card”, “Add all” or “Remove its card” |
 | 13 | step 7 | `npm run seed:large`, then open “Performance test – requirements” | 12 requirement cards, none over a frame, with their trace lines |
+| 14 | step 8 | Focus on REQ-102 (select its card, then Focus) on “Customer & orders” or the requirements canvas | Its lit trace lines are solid, in violet with their end dots, and still read as trace lines, not mappings; the faded ones under the veil stay dashed |
+
+## Łukasz's answers after step 8, part 1 (20 October 2026)
+
+- **Part 1 accepted.**
+- **1. Lit trace lines solid under Focus:** applied (`canvas.css`: `.lit-lines .trace` without dashes; violet, with the
+  end dot at 40 % and above, as every trace line). The faded ones under the veil stay dashed. **A deliberate
+  difference from the prototype**, whose trace lines are always dashed. Check 14 in the manual checklist. One full run,
+  this branch's measurement build again (`slice-04b1`'s stays), and one smoke of Focus on REQ-102 at 30 %.
+- **2. D-34:** applied as approved.
+- **3. The S4B1-11 artefact:** a note only (`known-limitations.md`, as in part 1).
+- **Then** stop and say when the laptop needs preparing.
 
 ## Step 8, part 1: S0-10, placement clear of frames, measuring specs, reads, docs (20 October 2026)
 

@@ -199,7 +199,7 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
 - **Overlay and fading** (slice 4p, AD-24; slice 4b-1): the hover, the row marks, the selection marks and the lasso are
   drawn in `OverlayLayer` (its own compositing layer); the hover and the lasso rectangle are value stores, so they never
   re-render `ModelCanvas`. Fading is `FadeLayer` (F4, slice 4b-1): one veil with holes at the lit cards, blocks,
-  pinned notes and requirement cards, as one SVG path in the overlay, and the lit lines and lit trace lines above it; since
+  pinned notes and requirement cards, as one SVG path in the overlay, and the lit lines and lit trace lines (solid, slice 4b-2) above it; since
   slice 4b-2 (T3) the veil has no layer of its own and paints into the overlay's layer (Focus adds one drawing layer, not
   two); switch it with `requestFade` (`src/canvas/fade.ts`), never through the nodes array. **Focus** (`src/canvas/Focus.tsx`) is the store
   `focusOn`; `FocusDriver` turns it and the selection into the request, so switching Focus never re-renders

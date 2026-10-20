@@ -259,6 +259,10 @@ body.connecting .im-canvas .row { cursor: crosshair }
 .im-canvas .overlay-layer { z-index: 3 }
 .im-canvas .lit-lines .lnk { pointer-events: none }
 .im-canvas .lit-lines .lnk .hit { display: none }
+/* Focus's lit trace lines (slice 4b-2, step 8; Łukasz): solid, in the violet, with their end dot at 40 % and above; the
+   faded ones under the veil stay dashed. Dashed, 46 long lit lines cost about 32 ms of raster per switch at 30 % (S4B2-12's
+   smoke). A deliberate difference from the prototype, whose trace lines are always dashed */
+.im-canvas .lit-lines .trace { stroke-dasharray: none }
 /* coverage marks (slice 4b-1): the overlay lies above the text, so a fill dims the text as much as its background. The
    fill is the strongest that keeps every text that reaches 4.5:1 on a plain card at 4.5:1 (WCAG AA; the source key's
    brown sets the limit), and a bar in the full colour where no text is carries the colour (rows: the left padding;
