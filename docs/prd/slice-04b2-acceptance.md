@@ -1,6 +1,6 @@
 # Slice 4b-2 – Acceptance
 
-Status: **step 8: the closing sitting done, every measured criterion met; waiting for Łukasz (AD-24 text, manual acceptance).** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
+Status: **step 8: docs closed, two full runs before the merge; waiting for Łukasz's manual acceptance.** Branch `slice/04b2-requirement-cards`, from `main` at the tag `slice-04b1`
 (`8133ee8`). PRD: `docs/prd/slice-04b2-requirement-cards.md` (its section 10 holds the answers below).
 
 ## Manual acceptance checklist (step 8)
@@ -27,6 +27,16 @@ on a fresh demo seed (`npm run reset-dev-data`):
 | 12 | step 7 | As Piotr (reviewer) and Kasia (reader): select a card, Focus on, try to drag a card and a requirement row | Cards and lines show, selection and Focus work; no drag, no “Place card”, “Add all” or “Remove its card” |
 | 13 | step 7 | `npm run seed:large`, then open “Performance test – requirements” | 12 requirement cards, none over a frame, with their trace lines |
 | 14 | step 8 | Focus on REQ-102 (select its card, then Focus) on “Customer & orders” or the requirements canvas | Its lit trace lines are solid, in violet with their end dots, and still read as trace lines, not mappings; the faded ones under the veil stay dashed |
+
+## Łukasz's answers after the sitting (20 October 2026)
+
+- **The sitting accepted;** every criterion met.
+- **1. AD-24:** applied as approved, with his addition: 4b-1's bracket in “Overlay and fading” (“Partly met: pan and
+  zoom with Focus on at 30 % lose 22–40 % … T1 applied in 4b-1, T3 in 4b-2 (T2 dropped).”) became “Met in slice 4b-2
+  (T1 in 4b-1, T3 in 4b-2, T2 dropped).”, followed by the sitting's figures; the measuring note is in “Measuring”.
+- **2. The split of 4b-1's −40 %:** left unmeasured.
+- **Then:** the closing docs (`known-limitations.md`: S4B1-11 closed, S4B1-12's fps confirmed, “Where the canvas stands
+  after slice 4b-2”) and two full runs in a row before the merge.
 
 ## Step 8, part 2: the closing sitting (20 October 2026)
 
