@@ -137,6 +137,22 @@ Drawing layers / drawing megapixels / elements in the viewport:
   read stays at 47 layers. Step 2's +6 came from cards laid in a grid over other cards as well as frames. Over a frame's
   body alone, Chrome squashes them into a layer it already has.
 
+### Two full runs and the builds
+
+No dev server, Playwright or measurement server running; each run from scratch (`npm run e2e`), in a row (answer
+after step 7):
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 184 passed | 30.5 min |
+| 2 | 184 passed | 30.2 min |
+
+- **184** is step 7's 183 plus S4B2-04's frame test. S0-10 passed in both.
+- Lint, typecheck and the unit tests (1,024 in 77 files) pass.
+- **The two measurement builds** (`npm run measure:canvas -- --prepare-only --against slice-04b1`): this branch at
+  `42d5b50`, and `slice-04b1` (`8133ee8`) in `../infomapper-ab-main`, 3.4 min together. The sitting uses them with
+  `--no-build`. If question 1's change is applied, this branch's build is made again (and one full run).
+
 ### Proposed text (for Łukasz's approval; not applied)
 
 **`docs/decisions.md` D-34**: in “Each row's “Place card” places the requirement's card next to the element, or shows its
