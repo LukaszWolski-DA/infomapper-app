@@ -195,3 +195,16 @@
 .rte-ed p.is-empty[data-placeholder]:not([data-placeholder=""])::before {
   content: attr(data-placeholder); color: var(--im-ink-3); font-style: italic; pointer-events: none; float: left; height: 0;
 }
+
+/* The side panels (slice 5a; prototype main.noleft, main.noright, .mleft, .mright). The widths come from the page
+   (--im-lw, --im-rw: 0 while a panel is hidden). A hidden panel stays in the page, invisible and inert. Up to 1000 px
+   wide both are hidden and a toolbar button slides one over the canvas, which keeps its size. */
+.im-panels { display: grid; grid-template-columns: var(--im-lw, 264px) minmax(0, 1fr) var(--im-rw, 340px); position: relative; }
+.im-panels > aside[data-shown="false"] { visibility: hidden; border-width: 0; }
+@media (max-width: 1000px) {
+  .im-panels { grid-template-columns: minmax(0, 1fr); } /* the panels lie over it, out of the grid */
+  .im-panels > aside { position: absolute; top: 0; bottom: 0; z-index: 40; width: 300px; visibility: hidden; box-shadow: 0 0 30px var(--im-shadow); }
+  .im-panels > aside[data-side="left"] { left: 0; }
+  .im-panels > aside[data-side="right"] { right: 0; }
+  .im-panels > aside[data-overlay="true"] { visibility: visible; }
+}

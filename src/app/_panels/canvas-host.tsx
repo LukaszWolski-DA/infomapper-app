@@ -36,6 +36,7 @@ import { useMapColumn } from "./map-column";
 import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, columnLabel, fedEntities, feedingSourceCards, feedingSources, inputsLabel, type ModelIndex } from "./model-index";
 import { usePanels } from "./panels-context";
+import { useSidePanels } from "../_components/side-panels";
 import { Toolbox, type SearchResult, type ToolboxItem } from "./toolbox";
 
 /** A card of this canvas as the host needs it. */
@@ -52,10 +53,13 @@ export interface HostCard {
 const snap8 = (v: number) => Math.round(v / 8) * 8;
 const MAX_RESULTS = 8;
 
-/** Focuses a field of the right panel once it is there (the panel renders after the selection changes). */
+/**
+ * Focuses a field of the right panel once it is there (the panel renders after the selection changes) and shown (a
+ * hidden panel is inert until it opens, slice 5a).
+ */
 function focusField(id: string, tries = 20) {
   const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
-  if (el && !el.disabled) {
+  if (el && !el.disabled && !el.closest("[inert]")) {
     el.focus();
     if ("select" in el && el.tagName !== "SELECT") el.select();
   } else if (tries > 0) setTimeout(() => focusField(id, tries - 1), 30);
@@ -84,6 +88,12 @@ export function useCanvasHost({
 }) {
   const ui = useContext(CanvasUiCtx);
   const panels = usePanels();
+  // actions that lead to the details panel on purpose open it when it is hidden (slice 5a, Q4); a selection does not
+  const { openDetails } = useSidePanels();
+  const focusDetails = (id: string) => {
+    openDetails();
+    focusField(id);
+  };
   const { run } = useAction();
   const toast = useToast();
   const [toolbox, setToolbox] = useState<ToolboxRequest | null>(null);
@@ -123,10 +133,13 @@ export function useCanvasHost({
       else {
         // on a live canvas the new entity is labeled at once, without a question (PRD item 10)
         toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}. Type its name now; change the concept in the panel.`);
-        if (cardId) panels.setNameFocus(cardId);
+        if (cardId) {
+          openDetails();
+          panels.setNameFocus(cardId);
+        }
       }
     },
-    [editable, ix, panels, toast, run, workspaceId, canvasId, ui, live],
+    [editable, ix, panels, toast, run, workspaceId, canvasId, ui, live, openDetails],
   );
 
   const relate = useCallback(
@@ -178,10 +191,13 @@ export function useCanvasHost({
         if (editable) void moveAttribute(attributeId, how);
       },
       deleteLine: (line) => void deleteLine(line),
-      frameCreated: (frameId) => panels.setNameFocus(frameId),
+      frameCreated: (frameId) => {
+        openDetails();
+        panels.setNameFocus(frameId);
+      },
     });
     return () => ui.registerHost(null);
-  }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable, deleteLine, panels]);
+  }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable, deleteLine, panels, openDetails]);
 
   // ---- the toolbox ----
 
@@ -325,7 +341,10 @@ export function useCanvasHost({
       }
       if (editable) {
         items.push({ sep: true });
-        items.push({ label: "Edit transformation rule…", act: () => panels.setRuleFocus(m.id) });
+        items.push({ label: "Edit transformation rule…", act: () => {
+          openDetails();
+          panels.setRuleFocus(m.id);
+        } });
         if ((ix.inputsOf.get(m.id) ?? []).length > 1) {
           items.push({
             label: "Split into separate mappings",
@@ -337,7 +356,10 @@ export function useCanvasHost({
           });
         }
         if ((ix.mappingsOf.get(m.attribute_id) ?? []).length > 1) {
-          items.push({ label: "Merge mappings…", act: () => panels.setMergeFocus(m.id) });
+          items.push({ label: "Merge mappings…", act: () => {
+            openDetails();
+            panels.setMergeFocus(m.id);
+          } });
         }
         items.push({
           label: "Delete mapping",
@@ -354,7 +376,7 @@ export function useCanvasHost({
       items.push({ head: `${ix.entity.get(r.from_entity_id)?.name ?? "?"} – ${ix.entity.get(r.to_entity_id)?.name ?? "?"}` });
       if (editable) {
         const ref = { relationshipId: r.id, expectedVersion: r.version };
-        items.push({ label: "Edit name and cardinality…", act: () => focusField("f-rl") });
+        items.push({ label: "Edit name and cardinality…", act: () => focusDetails("f-rl") });
         items.push({ label: "Swap direction", act: () => void run(() => swapRelationshipAction(workspaceId, ref)) });
         items.push({
           label: "Delete relationship",
@@ -403,7 +425,7 @@ export function useCanvasHost({
       if (!view) return items;
       items.push({ head: view.frame.name });
       const collapsed = view.frame.collapsed;
-      if (editable) items.push({ label: "Rename…", act: () => focusField("f-fn"), testId: "toolbox-frame-rename" });
+      if (editable) items.push({ label: "Rename…", act: () => focusDetails("f-fn"), testId: "toolbox-frame-rename" });
       // slice 2c (D-07): collapse into one block or expand, for every role (reviewers and readers in their own tab
       // only, item 11); a block offers no fit, and its cards are not selectable
       items.push({ label: collapsed ? "Expand" : "Collapse into one block", act: () => ui.setFrameCollapsed(t.frameId, !collapsed), testId: "toolbox-frame-collapse" });
@@ -422,7 +444,10 @@ export function useCanvasHost({
       const b = ui.bundleView(t.key);
       if (!b) return items;
       items.push({ head: `${b.ids.length} bundled ${b.t === "rel" ? "relationships" : "mappings"}` });
-      items.push({ label: "Show what is inside", act: () => ui.select({ t: "bundle", id: b.key }), testId: "toolbox-bundle-show" });
+      items.push({ label: "Show what is inside", act: () => {
+        openDetails();
+        ui.select({ t: "bundle", id: b.key });
+      }, testId: "toolbox-bundle-show" });
       // every role: reviewers and readers expand in their own tab only (item 11)
       for (const e of [b.a, b.z]) {
         if (!("frameId" in e)) continue;
@@ -483,7 +508,7 @@ export function useCanvasHost({
           items.push({ label: "Move to the top", kbd: "Ctrl Shift ↑", disabled: pos <= 0, act: move("top") });
           items.push({ label: "Move to the bottom", kbd: "Ctrl Shift ↓", disabled: pos >= last, act: move("bottom") });
           items.push({ sep: true });
-          items.push({ label: "Map from a column…", act: () => focusField("f-addc") });
+          items.push({ label: "Map from a column…", act: () => focusDetails("f-addc") });
           items.push({ sep: true });
           // the same confirmation as in the attribute panel: with mappings it asks for a second click
           const n = (ix.mappingsOf.get(a.id) ?? []).length;
@@ -507,7 +532,7 @@ export function useCanvasHost({
     }
     if (t.kind === "row" && card.kind === "src" && ix.column.has(t.rowId)) {
       items.push({ head: columnLabel(ix, t.rowId) });
-      if (editable) items.push({ label: "Map to an attribute…", act: () => focusField("f-adda") });
+      if (editable) items.push({ label: "Map to an attribute…", act: () => focusDetails("f-adda") });
       items.push(focusItem());
       return items;
     }

@@ -223,6 +223,7 @@ export default async function CanvasPage({
                   canCreateCanvas={editable}
                 />
               ),
+              openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId),
               status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} requirements={requirementCounts} />,
             }}
           >

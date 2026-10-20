@@ -30,6 +30,7 @@ import { useToast } from "@/ui/components/toast";
 import { DeleteConceptDialog } from "./delete-concept-dialog";
 import { NewSourceTableDialog } from "./new-source-table-dialog";
 import { usePanels } from "./panels-context";
+import { useSidePanels } from "../_components/side-panels";
 import { CoverageBar, coverageTitle, KindIcon, ReqDot } from "./requirement-ui";
 import { requirementNameFocus } from "./requirements-section";
 import {
@@ -70,6 +71,9 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   const toast = useToast();
   const { run } = useAction();
   const { setNameFocus, setLastConcept } = usePanels();
+  // slice 5a (Q4): creating something whose name is typed in the details panel, and a requirement's click, open it
+  // when hidden; an entity's or a table's click selects or places its card and, on a narrow screen, closes this panel
+  const { openDetails, closeLeftOverlay } = useSidePanels();
   const [tab, setTab] = useState<Tab>("model");
   const [q, setQ] = useState("");
   const [canvasOnly, setCanvasOnly] = useState(false);
@@ -137,6 +141,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
 
   /** A click: show the card that is here, else place the element in a free spot of the view. */
   const open = (target: CardTarget, cardId: string | null, rows: number) => {
+    closeLeftOverlay();
     if (cardId) {
       ui.select({ t: "card", id: cardId });
       ui.centerOn(cardId);
@@ -154,6 +159,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     toast(`Created ${result.value.name} in ${c.name}. Type its name now; change the concept in the panel.`);
     const cardId = result.value.canvasItemId;
     if (cardId) {
+      openDetails();
       ui.select({ t: "card", id: cardId });
       setNameFocus(cardId);
     }
@@ -361,6 +367,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   async function newRequirement() {
     const result = await run(() => createRequirementAction(workspaceId, {}));
     if (!result.ok) return;
+    openDetails();
     setNameFocus(requirementNameFocus(result.value.requirementId));
     ui.select({ t: "req", id: result.value.requirementId });
   }
@@ -398,7 +405,10 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                 <button
                   key={r.id}
                   type="button"
-                  onClick={() => ui.select({ t: "req", id: r.id })}
+                  onClick={() => {
+                    openDetails();
+                    ui.select({ t: "req", id: r.id });
+                  }}
                   // slice 4b-2, item 17 (prototype reqTree): editors drag it onto an element to link it, or onto the canvas
                   draggable={editable || undefined}
                   onDragStart={
