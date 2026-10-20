@@ -38,6 +38,16 @@ on a fresh demo seed (`npm run reset-dev-data`):
 - **Then:** the closing docs (`known-limitations.md`: S4B1-11 closed, S4B1-12's fps confirmed, “Where the canvas stands
   after slice 4b-2”) and two full runs in a row before the merge.
 
+**Done:** AD-24 and `known-limitations.md` (`158d198`). **Two full runs in a row before the merge** (`npm run e2e`,
+from scratch, no server running), with lint, typecheck and the unit tests (1,024) passing:
+
+| Run | Result | Time |
+| --- | --- | --- |
+| 1 | 184 passed | 28.5 min |
+| 2 | 184 passed | 28.6 min |
+
+S4B2-16 (CI and the runs before the merge): **met** once CI on the PR is green.
+
 ## Step 8, part 2: the closing sitting (20 October 2026)
 
 **Every measured criterion is met.** No round was dropped, and one switch failed the settled check.
