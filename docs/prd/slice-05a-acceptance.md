@@ -1,6 +1,6 @@
 # Slice 5a – Acceptance
 
-Status: **step 4 (closing): waiting for Łukasz's approval of D-54 and AD-24's text, and his manual acceptance.** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
+Status: **step 4 (closing): decisions approved and applied; the second full e2e run, then the merge on Łukasz's command.** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
 (`1bd3a13`). PRD: `docs/prd/slice-05a-side-panels.md`.
 
 ## Łukasz's answers to step 1 (20 October 2026)
@@ -84,7 +84,12 @@ Open http://localhost:3000, pick Łukasz, open Retail Co – DWH › Customer 36
 | 6 | Hide the right panel, widen the left one, reload; then open “Order lines & products” and the project home | The same layout everywhere |
 | 7 | Make the window narrower than 1000 px; the left button, then the right button; click an entity in the left panel; select a card | Both panels start hidden; each button slides its panel over the canvas with a shadow, one at a time; the entity's click closes the left panel; the selection does not open the details panel |
 
-### Decisions (Łukasz approves the quoted text)
+### Łukasz's answer (21 October 2026)
+
+“OK from my end”: D-54 and AD-24's text approved as quoted and applied to `docs/decisions.md`; the second full run
+after his manual acceptance, on a quiet laptop; the narrow top bar left for a later slice.
+
+### Decisions (approved, applied)
 
 **New D-54**, under “Projects and navigation”, after D-39:
 
