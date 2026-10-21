@@ -1,6 +1,6 @@
 # Slice 5a – Acceptance
 
-Status: **step 4 (closing): decisions approved and applied; the second full e2e run, then the merge on Łukasz's command.** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
+Status: **step 4 (closing): decisions applied, full run 213 of 213; waiting for Łukasz's merge command.** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
 (`1bd3a13`). PRD: `docs/prd/slice-05a-side-panels.md`.
 
 ## Łukasz's answers to step 1 (20 October 2026)
@@ -36,7 +36,7 @@ D-54: the final text is quoted in step 4, where Łukasz approves it.
 | S5A-06 | **met** | `S5A-06.spec.ts`: 1000 px window: hidden, 300 px overlays one at a time, the canvas keeps its width, no grips, both buttons inside the window; selection and an entity's click; the remembered layout above 1000 px |
 | S5A-07 | **met** | `S5A-07.spec.ts`: 0 canvas and 0 miniature commits for hiding, showing, a drag, its release, a double-click and the keyboard; the first view after a load (remembered and fitted) |
 | S5A-08 | **met** | step 3's diagnosis after two fixes: medians 25–55 ms (bar 100 ms); no drawing layer more on the canvas (47 / 30 as slice 4b-2) |
-| S5A-09 | see below | CI on the PR; one full e2e run; changed earlier test: `S1B-03.spec.ts` (`setPanelWidth` through the grip's keyboard) |
+| S5A-09 | **met** | CI on the PR; one full e2e run; changed earlier test: `S1B-03.spec.ts` (`setPanelWidth` through the grip's keyboard) |
 
 ### Full e2e run
 
@@ -53,7 +53,8 @@ CPU, 2 of 8 GB free); every test ran 2.5–4 times slower than in step 3 on the 
   (`?card`, `?label`, `?req`, `?note`), and 120 s for the creation test's eleven actions. Three runs after it: 9 of 9,
   9 of 9, then 8 of 9 (the first test's sign-in waited over 15 s for the freshly started server's first page).
 
-**A second full run** waits for a quiet laptop (and after Łukasz's manual acceptance, which needs his own dev server).
+**Run 2** (21 October 2026, from scratch, no dev server, the computer kept awake): **213 of 213 passed, 35.2 min**
+(210 tests in run 1, plus three from splitting S5A-04's link test).
 
 ### Manual acceptance checklist
 
