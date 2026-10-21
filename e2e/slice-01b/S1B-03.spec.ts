@@ -25,7 +25,7 @@ test("S1B-03: dropping order_line.price on the Order Line header creates attribu
   // its type's precision and scale fit the right panel, also at its narrowest (280 px): they wrap under the type
   await expect(page.getByTestId("input-type-precision")).toHaveValue("10");
   await expect(page.getByTestId("input-type-scale")).toHaveValue("2");
-  for (const width of [340, 280]) {
+  for (const width of [340, 280] as const) {
     await setPanelWidth(page, width);
     await expectTypeFieldsFit(page, ["input-type-precision", "input-type-scale"], width === 280);
   }
@@ -34,7 +34,7 @@ test("S1B-03: dropping order_line.price on the Order Line header creates attribu
   await rowNamed(page, "Order Line", "product_id").click();
   await page.getByTestId("select-attribute-type").selectOption("string");
   await expect(page.getByTestId("input-type-length")).toBeVisible();
-  for (const width of [340, 280]) {
+  for (const width of [340, 280] as const) {
     await setPanelWidth(page, width);
     await expectTypeFieldsFit(page, ["input-type-length"], false);
   }
@@ -94,11 +94,14 @@ test("S1B-03: a column dropped on the header of an entity whose attribute of tha
   expect(fromWeb[0]!.kind).toBe("direct");
 });
 
-/** Sets the right panel's width (the page's grid column), as a narrow window would. */
-async function setPanelWidth(page: Page, width: number) {
-  await page.getByTestId("panel-inspector").evaluate((el, w) => {
-    (el.parentElement as HTMLElement).style.gridTemplateColumns = `264px 1fr ${w}px`;
-  }, width);
+/**
+ * Sets the right panel's width with its grip's keyboard (slice 5a): Home for the default 340 px, Shift+→ for the
+ * narrowest, 280 px.
+ */
+async function setPanelWidth(page: Page, width: 340 | 280) {
+  const grip = page.getByTestId("grip-right");
+  await grip.focus();
+  await page.keyboard.press(width === 340 ? "Home" : "Shift+ArrowRight");
   await expect.poll(async () => Math.round((await page.getByTestId("panel-inspector").boundingBox())!.width)).toBe(width);
 }
 

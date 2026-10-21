@@ -88,6 +88,7 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       selection,
       select,
       fit: () => handle.current?.fit(),
+      shiftView: (dx) => handle.current?.shiftView(dx),
       place: (target, rows, options) => handle.current?.place(target, rows, options),
       remove: (cardId) => handle.current?.remove(cardId),
       centerOn: (cardId) => handle.current?.centerOn(cardId),

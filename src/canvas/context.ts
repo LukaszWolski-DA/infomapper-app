@@ -74,6 +74,11 @@ export type CardTarget = { entityId: Uuid } | { sourceTableId: Uuid };
 export interface CanvasHandle {
   /** Fits all cards into the view. */
   fit: () => void;
+  /**
+   * Moves the view by `dx` screen pixels at once, without a canvas render (slice 5a, item 6): the left panel's change
+   * of width, so the model stays where it was on the screen.
+   */
+  shiftView: (dx: number) => void;
   /** Places an element in a free spot of the view, or shows its card when it is already here. `rows` sizes the card. */
   place: (target: CardTarget, rows: number, options?: { quiet?: boolean }) => void;
   /** Takes a card off this canvas (D-02); waits for the card's pending saves. */
@@ -352,6 +357,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   selection: null,
   select: noop,
   fit: noop,
+  shiftView: noop,
   place: noop,
   remove: noop,
   centerOn: noop,

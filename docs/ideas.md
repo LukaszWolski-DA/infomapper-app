@@ -135,3 +135,10 @@ Left out of slice 4b-2 on purpose (not in its PRD):
 - a double-click on a requirement card, and the card menu's “Edit description…”, open the description editor;
 - “Show its requirements (n)” in the attribute row and card menus;
 - resizing a requirement card (230 px fixed, as the prototype).
+
+## A top bar that fits narrow windows (slice 5a, step 2)
+
+Below about 1,100 px the canvas page's top bar has more tools than room. Since slice 5a the tools are cut off at
+their right end (the details panel's button and the user indicator stay visible); before, the user indicator was cut
+off. The prototype shortens its labels at 2,100 and 1,300 px and hides some tools at 1,000 px (`.lf`, `.ls`,
+`.hide-l`, `.hide-s`, `.hide-m`). A later slice could do the same, or move the overflow into a “More” menu.

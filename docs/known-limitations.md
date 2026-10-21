@@ -423,6 +423,27 @@ requirements.” and “Open a canvas to see the details of what you select.” 
 panels exist only on canvas pages.
 
 - **Accepted** by Łukasz in slice 4a, step 5. **Later:** not planned yet.
+- **Slice 5a:** the empty panels follow the same layout as the canvas pages' (hidden, shown, widths, the toolbar's two
+  buttons).
+
+## Side panels (slice 5a)
+
+### A remembered canvas view and a different left panel
+
+Each canvas remembers its last view in the browser, in the canvas's own coordinates (`infomapper:view:<canvas id>`).
+Hiding, showing or resizing the left panel moves the view so the model stays in place (PRD item 6), but a view saved
+with the left panel at one width and opened with it at another is shifted on the screen by the difference (264 px for
+a hidden panel).
+
+- **Accepted** by Łukasz in slice 5a, step 1 (answer 5). **Later:** not planned.
+
+### The top bar on narrow windows
+
+Below about 1,100 px the canvas page's top bar has more tools than room: the tools are cut off at their right end, the
+details panel's button and the user indicator stay visible (slice 5a, step 2). The canvas still zooms with the wheel
+and undoes with Ctrl+Z. Idea in `docs/ideas.md` (“A top bar that fits narrow windows”).
+
+- **Found** in slice 5a, step 2; left for a later slice. **Later:** not planned yet.
 
 ### The status bar has no “Open notes on canvas {n}”
 

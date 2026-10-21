@@ -313,8 +313,9 @@ export function ModelCanvas({
   const { selection, select, registerCanvas } = ui;
   const toast = useToast();
   const rf = useReactFlow();
-  const width = useStore((s) => s.width);
-  const height = useStore((s) => s.height);
+  // Whether the pane has a size yet; the size itself is read from the store where needed, so a resize of the pane
+  // (a side panel shown, hidden or resized, slice 5a) never re-renders the canvas.
+  const sized = useStore((s) => s.width > 0 && s.height > 0);
   const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(c, editable)));
   // Development only (slice 2c, S2C-12): every commit of the canvas is counted, so a spec can check that nothing
   // re-renders the canvas while nobody touches it (a render loop once cost a collapsed canvas a third of its frames).
@@ -381,6 +382,14 @@ export function ModelCanvas({
     const { width: w, height: h } = storeApi.getState();
     void rf.setViewport(fitView(w, h), { duration: 250 });
   }, [rf, storeApi, fitView]);
+  /** No duration: React Flow sets the transform at once, so it reaches the screen with the panel's change (slice 5a). */
+  const shiftView = useCallback(
+    (dx: number) => {
+      const [x, y, zoom] = storeApi.getState().transform;
+      if (dx) void rf.setViewport({ x: x + dx, y, zoom });
+    },
+    [rf, storeApi],
+  );
 
   const onMoveEnd = useCallback(
     (_: unknown, v: Viewport) => writePreference(viewKey(canvasId), JSON.stringify(v)),
@@ -1463,11 +1472,12 @@ export function ModelCanvas({
   const noteRects = useMemo(() => new Map(shownNotes.map((s) => [s.note.id, { x: s.x, y: s.y, w: s.note.width, h: s.height ?? 80 }])), [shownNotes]);
 
   useEffect(() => {
-    if (ready || width === 0 || height === 0) return;
+    if (ready || !sized) return;
+    const { width, height } = storeApi.getState();
     void rf.setViewport(readView(canvasId) ?? fitView(width, height));
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the view can only be set once the pane has a size
     setReady(true);
-  }, [ready, width, height, canvasId, rf, fitView]);
+  }, [ready, sized, storeApi, canvasId, rf, fitView]);
 
   // Cards, frames and notes that left the canvas (removed, deleted, undone, hidden) leave the selection too, and so do
   // the cards of a frame that was collapsed (slice 2c, prototype pruneMulti); checked when the set of cards, frames or
@@ -1586,6 +1596,7 @@ export function ModelCanvas({
   useEffect(() => {
     registerCanvas({
       fit,
+      shiftView,
       place,
       remove,
       centerOn,
@@ -1662,7 +1673,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, fit, shiftView, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store

@@ -1,7 +1,8 @@
 "use client";
 
 // The top bar as in the prototype: brand, Organization ▾ / Workspace ▾ / Project ▾ switchers and the user indicator.
-// Canvas pages add their tools (slice 1a: zoom and fit) before the user indicator.
+// Canvas pages add their tools (slice 1a: zoom and fit) before the user indicator. Pages with side panels get the
+// buttons that show and hide them at the bar's two ends (slice 5a, prototype #tLeft, #tRight).
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,13 +23,15 @@ import type { ActionResult } from "../_lib/run-command";
 import type { ShellData } from "../_lib/shell";
 import { projectHref, workspaceHref } from "../_lib/paths";
 import { ROLE_CAN, ROLE_LABEL } from "../_lib/roles";
+import { PanelToggle } from "./side-panels";
 
-export function TopBar({ shell, tools }: { shell: ShellData; tools?: ReactNode }) {
+export function TopBar({ shell, tools, panelToggles = false }: { shell: ShellData; tools?: ReactNode; panelToggles?: boolean }) {
   return (
     <header
       data-testid="bar-top"
       className="flex h-12 min-w-0 flex-none items-center gap-2.5 overflow-hidden border-b border-im-line bg-im-surface px-2.5"
     >
+      {panelToggles && <PanelToggle side="left" />}
       <div className="mr-1.5 hidden whitespace-nowrap sm:block">
         <b className="text-sm font-semibold">InfoMapper</b>
       </div>
@@ -38,7 +41,9 @@ export function TopBar({ shell, tools }: { shell: ShellData; tools?: ReactNode }
       <PathSep />
       <ProjectSwitcher shell={shell} />
       <div className="flex-1" />
-      {tools}
+      {/* on a narrow window the tools are cut off, not the details panel's button and the user indicator (slice 5a) */}
+      {tools && <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">{tools}</div>}
+      {panelToggles && <PanelToggle side="right" />}
       <UserIndicator shell={shell} />
     </header>
   );
