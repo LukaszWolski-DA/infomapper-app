@@ -1,7 +1,36 @@
 # Slice 6a – Acceptance
 
-Status: **step 1 (questions) done, waiting for Łukasz.** Branch `slice/06a-view-state-bar`, from `main` at the tag
-`slice-05a` (`93f0df7`). PRD: `docs/prd/slice-06a-view-state-bar.md`.
+Status: **step 2 (the bar and its chips) done, waiting for Łukasz.** Branch `slice/06a-view-state-bar`, from `main` at the tag
+`slice-05a` (`93f0df7`). PRD: `docs/prd/slice-06a-view-state-bar.md`. The PRD stays as written; this file is its
+amendment (Łukasz, 21 October 2026).
+
+## Łukasz's answers to step 1 (21 October 2026)
+
+Step 1 accepted.
+
+1. **Lens:** no lens chip; “lens” leaves D-39.
+2. **Role/archived chip:** left out; the bar is on canvas pages only.
+3. **Overflow:** “+{n}” with “Live: {name}” and “Show all” always visible, the breadcrumbs shrinking first. The fold has
+   a small hysteresis, so a chip at the edge cannot flip between the row and “+{n}” on every observation.
+4. **Undo:** the new command; one step per chip (filters, collapsed cards, collapsed frames) and one for “Show all”'s
+   layout part. The command is **all or nothing**: if any row's version check fails, nothing is written and the person
+   gets a toast; a unit test covers it. The DoD is corrected as proposed (draw a frame first; Ctrl+Z after “Show all”
+   brings back the layout part only).
+5. **Readers and reviewers:** the filter and collapsed-card chips have no ×; their tooltip ends with “Only editors can
+   change this.”
+6. **Delete on a chip:** dropped (item 7 keeps only the buttons in tab order).
+7. **Narrow top bar:** the rule is **nothing cut off at any width from 800 to 2,560 px, both panels shown**. The
+   prototype's label steps are the starting point; the widths at which Focus and notation, then Entity, Frame, Note and
+   Hand, move into “More” are set by measurement in step 4, above 1,000 px if needed (the reference laptop is 1,536 px
+   and cuts off today). The layer switch, the working context, undo, zoom, the details button and the user indicator are
+   never hidden or cut off. S6A-10 also checks 1,536 and 1,880 px.
+8. **“Show all” from two items, “Open notes on canvas {n}” counting open notes only**, as the prototype. Tooltips as
+   proposed; no tool chip while drawing a relationship; “Entity tool” gets its text (the prototype's “undefined” is a
+   deliberate difference, for the inventory).
+9. **Remembered view:** the canvas's left edge on the screen, corrected in the one `setViewport` call.
+10. **D-39 and D-54:** direction approved; the final wording comes in step 5.
+
+When “The top bar on narrow windows” closes in step 5, it states the measured figure (about 1,700 px), not 1,100.
 
 ## Step 1: questions (21 October 2026)
 
@@ -271,3 +300,31 @@ and “Show all” are buttons in tab order after the breadcrumbs; Enter and Spa
 9. **Remembered view:** store the canvas's left edge on the screen instead of reading the panel's state? *Proposal: yes;
    same result, and `ModelCanvas` stays independent of the panels.*
 10. **D-39 and D-54 texts** as quoted above (final wording again in step 5)? *Proposal: approve the direction now.*
+
+## Step 2: the bar and its chips (21 October 2026)
+
+What changed:
+- `src/app/_components/view-state-bar.tsx`: the bar at the right end of the breadcrumbs row (canvas pages only, passed
+  through `AppShell`'s `viewState` into `Breadcrumbs`). Chips in the prototype's order and wording: “Live: {name}”
+  (first, no ×), Focus, Mappings only / Relationships only, `{n} card(s) filtered`, `{n} card(s) collapsed`,
+  `{n} frame(s) collapsed`, Resolved notes hidden (only when the canvas has a resolved note), Entity / Frame / Note /
+  Hand tool (none while drawing a relationship). Tooltips as agreed; each × is titled “Remove”, named “Remove {chip}”.
+- **The fold:** chips that do not fit go into “+{n}” from the end; its menu lists them with their ×. The breadcrumbs
+  keep their current crumb and the ones above it shrink to 40 px first. `src/ui/fit-chips.ts` does the arithmetic,
+  with 16 px of hysteresis (unit tests). A `ResizeObserver` on the row itself; the chips' widths come from a hidden copy
+  inside the bar.
+- `src/canvas/view-counts.ts`: `ModelCanvas` publishes the counts (cards filtered, cards collapsed, frames collapsed,
+  resolved and open notes) into a value store from an effect when a number changes; the bar and the status bar read it.
+- The status bar: the Focus chip left (the bar's Focus chip keeps the test ids `chip-focus`, `chip-focus-off`); “Open
+  notes on canvas {n}” after Requirements, open notes only (the page's count until the canvas publishes its own).
+- **× in this step:** Focus, the layer (saved for editors, in the tab for others), collapsed frames (the existing
+  `setAllFramesCollapsed`: one step for editors, in the tab for reviewers and readers), resolved notes, the tool.
+  **The filter and collapsed-card chips have no × yet for anyone**; editors get it with step 3's command (one undo
+  step each). For readers and reviewers they stay without ×, their tooltip ending with “Only editors can change this.”
+
+Tests (`e2e/slice-06a/`): S6A-01 (wording, order, counts, off elsewhere), S6A-02 (× against the switches, Tab and
+Enter, a reader's chips), S6A-04 (live), S6A-06 (row height, a card's place, “+{n}” and its menu at 1,280 px), S6A-07
+(status bar), S6A-08 (commits: Focus adds none; a ×'s canvas and miniature commits never more than its switch's).
+
+Runs: lint, typecheck, unit tests (79 files, 1,033 tests) pass. The slice's specs and the earlier specs this step
+touched (S4B1-06, S4B1-08, S3B-08, S3B-09, S4A-13, S4B1-01, S4B1-03): 17 passed, 2.8 min, none changed.

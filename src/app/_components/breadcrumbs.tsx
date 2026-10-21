@@ -1,12 +1,13 @@
 // Breadcrumbs under the top bar (D-38, prototype navigation bar): Organization › Workspace › … , each part a link.
-// Navigation history (back/forward) and the view-state bar are out of scope in slice 0 (D-38, D-39).
+// Navigation history (back/forward) is slice 6b (D-38). Canvas pages put the view-state bar at the row's right end
+// (`children`, slice 6a, D-39); the row's height never changes.
 
 import Link from "next/link";
-import { Fragment } from "react";
+import { Fragment, type ReactNode } from "react";
 import type { ShellData } from "../_lib/shell";
 import { canvasHref, projectHref, workspaceHref } from "../_lib/paths";
 
-export function Breadcrumbs({ shell }: { shell: ShellData }) {
+export function Breadcrumbs({ shell, children }: { shell: ShellData; children?: ReactNode }) {
   const { workspace, project, canvas, page } = shell;
   const firstInOrg = shell.organizations.find((o) => o.id === shell.organization.id)?.firstWorkspaceId ?? workspace.id;
 
@@ -55,6 +56,7 @@ export function Breadcrumbs({ shell }: { shell: ShellData }) {
           );
         })}
       </ol>
+      {children}
     </nav>
   );
 }

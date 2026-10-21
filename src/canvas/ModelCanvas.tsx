@@ -104,6 +104,7 @@ import {
 import { relatedLines, type CanvasLines, type Selection } from "./line-data";
 import { useCanvasLook } from "./look";
 import { viewKey } from "./views";
+import { viewCounts } from "./view-counts";
 import LineLayer, { HoverLines } from "./LineLayer";
 import { OverlayLayer } from "./OverlayLayer";
 import { createValueStore } from "./value-store";
@@ -1203,6 +1204,16 @@ export function ModelCanvas({
   const cardNotes = useMemo(() => countsOf(cardNotesKey), [cardNotesKey]);
   const frameNotesKey = useMemo(() => countsKey(frameNoteCounts(savedNotes, ui.hideResolved)), [savedNotes, ui.hideResolved]);
   const frameNotes = useMemo(() => countsOf(frameNotesKey), [frameNotesKey]);
+  // what the view-state bar and the status bar count (slice 6a): published as numbers, so the canvas never re-renders
+  // for them and they draw only when a number changes
+  const filteredCards = useMemo(() => cardData.filter((c) => c.rowFilter !== "all" && c.rowFilter !== "labeled").length, [cardData]);
+  const collapsedCards = useMemo(() => cardData.filter((c) => c.collapsed).length, [cardData]);
+  const resolvedNotes = useMemo(() => savedNotes.filter((n) => n.status === "resolved").length, [savedNotes]);
+  const openNotes = savedNotes.length - resolvedNotes;
+  useEffect(() => {
+    viewCounts.set({ filtered: filteredCards, collapsedCards, collapsedFrames: collapsedIds.size, resolvedNotes, openNotes });
+  }, [filteredCards, collapsedCards, collapsedIds.size, resolvedNotes, openNotes]);
+  useEffect(() => () => viewCounts.set(null), []);
   const counts = useMemo(() => memberCounts(cardData), [cardData]);
   /** What stands for each frame on the canvas: the frame, or its block (selection marks, slice 2c). */
   const frameRects = useMemo(() => new Map(frames.map((f) => [f.id, frameShape(f, counts)])), [frames, counts]);

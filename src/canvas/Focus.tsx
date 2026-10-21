@@ -1,8 +1,9 @@
 "use client";
 
 // Focus (slice 4b-1, PRD items 20–23; D-22; prototype #tFocus, V.focus, focusCtx): fades everything not connected to
-// the selection. On and off from the toolbar button, the card and row menus (“Focus on this” / “Turn Focus off”) and the
-// status bar's chip (×). Momentary: never saved, off after a reload and when switching canvas. Every role may use it.
+// the selection. On and off from the toolbar button, the card and row menus (“Focus on this” / “Turn Focus off”) and its
+// chip in the view-state bar (×; in the status bar until slice 6a). Momentary: never saved, off after a reload and when
+// switching canvas. Every role may use it.
 // The on/off state is a store of its own (`focusOn`), and `FocusDriver` turns it and the selection into a fade request
 // (`fade.ts`), so switching Focus never re-renders the canvas; only the fading draws again (S4B1-13).
 
@@ -117,26 +118,5 @@ export function FocusButton() {
       </svg>
       <span className="hidden lg:inline">Focus</span>
     </button>
-  );
-}
-
-/** The status bar's view-state chip while Focus is on (prototype `viewState`): “Focus” with × to turn it off. */
-export function FocusChip() {
-  const on = useValue(focusOn);
-  if (!on) return null;
-  return (
-    <span data-testid="chip-focus" className="inline-flex items-center gap-1 rounded-full border border-im-line bg-im-panel py-px pl-2 pr-0.5 text-im-ink-2">
-      Focus
-      <button
-        type="button"
-        title="Turn Focus off"
-        aria-label="Turn Focus off"
-        data-testid="chip-focus-off"
-        onClick={() => focusOn.set(false)}
-        className="grid size-4 place-items-center rounded-full text-im-ink-3 hover:bg-im-hover hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
-      >
-        ×
-      </button>
-    </span>
   );
 }

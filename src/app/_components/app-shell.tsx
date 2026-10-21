@@ -18,6 +18,8 @@ interface ProjectFrame {
   /** Panel contents on canvas pages; project pages show placeholders. */
   left?: ReactNode;
   right?: ReactNode;
+  /** The view-state bar at the right end of the breadcrumbs row, on canvas pages (slice 6a). */
+  viewState?: ReactNode;
   /** The status bar under the panels, on canvas pages. */
   status?: ReactNode;
   /** The page was opened to show something's details: a hidden right panel opens (slice 5a, Q4). */
@@ -51,7 +53,7 @@ export async function AppShell({ shell, project, children }: { shell: ShellData;
         {/* The open canvas's background colours the tabs and the canvas (prototype #center[data-bg], slice 2a). */}
         <LookFrame className="flex min-h-0 min-w-0 flex-col">
           <CanvasTabs view={project.view} currentCanvasId={project.currentCanvasId} renameOnOpen={!!project.renameOnOpen} />
-          <Breadcrumbs shell={shell} />
+          <Breadcrumbs shell={shell}>{project.viewState}</Breadcrumbs>
           <main className="relative min-h-0 flex-1 overflow-auto">{children}</main>
         </LookFrame>
       </SidePanelsGrid>

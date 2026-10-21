@@ -18,6 +18,7 @@ import { liveNoticesFor } from "@/app/_lib/live-notices";
 import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
 import { AppShell } from "@/app/_components/app-shell";
 import { MovedNotice } from "@/app/_components/moved-notice";
+import { ViewStateBar } from "@/app/_components/view-state-bar";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { WorkingContextButton, WorkingContextProvider } from "@/app/_components/working-context";
 import { loadProjectView } from "@/app/_lib/project-view";
@@ -224,7 +225,15 @@ export default async function CanvasPage({
                 />
               ),
               openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId),
-              status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} requirements={requirementCounts} />,
+              viewState: <ViewStateBar editable={editable} live={liveLabel ? { labelName: liveLabel.name } : null} />,
+              status: (
+                <StatusBar
+                  model={model}
+                  entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)}
+                  requirements={requirementCounts}
+                  openNotes={noteRows.filter((n) => n.deleted_at === null && n.status === "open").length}
+                />
+              ),
             }}
           >
             {query.moved === "1" && <MovedNotice project={view.project.name} canvas={canvas.name} />}
