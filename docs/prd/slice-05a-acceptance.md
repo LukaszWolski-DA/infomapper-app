@@ -1,6 +1,6 @@
 # Slice 5a – Acceptance
 
-Status: **step 4 (closing): decisions applied, full run 213 of 213; waiting for Łukasz's merge command.** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
+Status: **accepted by Łukasz (manual acceptance passed, 21 October 2026); waiting for his merge command.** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
 (`1bd3a13`). PRD: `docs/prd/slice-05a-side-panels.md`.
 
 ## Łukasz's answers to step 1 (20 October 2026)
@@ -55,6 +55,11 @@ CPU, 2 of 8 GB free); every test ran 2.5–4 times slower than in step 3 on the 
 
 **Run 2** (21 October 2026, from scratch, no dev server, the computer kept awake): **213 of 213 passed, 35.2 min**
 (210 tests in run 1, plus three from splitting S5A-04's link test).
+
+### Manual acceptance (21 October 2026)
+
+**Passed** (Łukasz): the definition of done and the 7 checks below. The merge waits for his command; then the
+annotated tag `slice-05a`.
 
 ### Manual acceptance checklist
 
