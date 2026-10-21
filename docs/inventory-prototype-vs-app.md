@@ -27,7 +27,7 @@ acceptance docs (for example, other lines not fading on a hover since 4p).
 
 | Area | Missing in the app | Planned |
 | --- | --- | --- |
-| Canvas | requirement cards and dashed traces; markers, coverage colours, Focus; the view-state bar; showing or hiding the side panels | 4b-1, 4b-2, slice 6; panels: – |
+| Canvas | requirement cards and dashed traces; markers, coverage colours, Focus; the view-state bar; showing or hiding the side panels | 4b-1, 4b-2, slice 6; panels: 5a (done) |
 | Panels and navigation | back and forward (Alt ←/→), history; requirement cards from panels | slice 6 (D-38); 4b-2 |
 | Model | Data Vault 2.0 hints in the entity panel (hub, link, business key, satellites) | decision only (AD-08) |
 | Mappings | suggested mappings (the “Suggestions” mode, accept one or all strong matches); re-pointing a mapping to another attribute | – |
@@ -47,7 +47,7 @@ acceptance docs (for example, other lines not fading on a hover since 4p).
 | Requirement cards and trace lines | a requirement's card on the canvas, dashed lines to what it traces to, fading by Focus | `renderReqCards`, `reqTraces`, `reqActive`, `placeReqCards`, `showReqCard`, `dropReq` | 4b-2 |
 | Requirement card menu | “Edit description…”, “Remove from this canvas (keeps the requirement)” | `ctxFor` (requirement card) | 4b-2 |
 | View-state bar | chips for what hides or fades things (lens, Focus, layer, filters, collapsed cards and frames, hidden notes, tool, “Live: {name}”), each with ×, plus “Show all” | `viewState`, `renderNavBar` (`data-voff`, `data-vall`) | slice 6 (D-39) |
-| Show or hide the side panels | toolbar buttons for the object browser and the details panel | `#tLeft`, `#tRight`, `applyPanels` | – |
+| Show or hide the side panels | toolbar buttons for the object browser and the details panel | `#tLeft`, `#tRight`, `applyPanels` | 5a (done; with resizing by the grips, `PANEL`, `.pgrip`) |
 
 **Present in the app and not listed:**
 - the toolbox (right-click), including quick add with a “new entity” entry;

@@ -71,25 +71,29 @@ test("S5A-04: selecting a card, a row, a line or an entity in the left panel lea
   await expectShown(page, "right");
 });
 
-test("S5A-04: arriving through a link that names what to show opens the details panel (?card, ?label, ?req, ?note)", async ({ page }) => {
-  const { entity } = await ids();
-  const label = (await loadLabels())[0]!;
-  const note = (await loadNotes())[0]!;
-  const req = await requirementByKey("REQ-101");
-  await signInAs(page, "Łukasz");
-  for (const [query, testId] of [
-    [`card=entity:${entity("Customer").id}`, "panel-entity"],
-    [`label=${label.id}`, "panel-label"],
-    [`req=${req.id}`, "panel-requirement"],
-    [`note=${note.id}`, "panel-note"],
-  ] as const) {
+// one test per link: each loads the canvas twice (slice 5a, step 4: eight loads in one test outran 60 s on a busy laptop)
+for (const [param, testId] of [
+  ["card", "panel-entity"],
+  ["label", "panel-label"],
+  ["req", "panel-requirement"],
+  ["note", "panel-note"],
+] as const) {
+  test(`S5A-04: arriving through a link that names what to show opens the details panel (?${param})`, async ({ page }) => {
+    const value = async () => {
+      if (param === "card") return `entity:${(await ids()).entity("Customer").id}`;
+      if (param === "label") return (await loadLabels())[0]!.id;
+      if (param === "req") return (await requirementByKey("REQ-101")).id;
+      return (await loadNotes())[0]!.id;
+    };
+    const query = `${param}=${await value()}`;
+    await signInAs(page, "Łukasz");
     await openCanvas(page);
     await hideRight(page);
     await page.goto(`${canvasUrl()}?${query}`);
     await expectOpened(page);
     await expect(panel(page, "right").getByTestId(testId), query).toBeVisible();
-  }
-});
+  });
+}
 
 test("S5A-04: the menu items that edit a field in the details panel open it, with the field focused", async ({ page }) => {
   const { model, attribute } = await ids();
@@ -151,6 +155,7 @@ test("S5A-04: a bundle's “Show what is inside” opens the details panel", asy
 });
 
 test("S5A-04: creating something whose name is typed in the details panel opens it; so does a requirement's click in the left panel", async ({ page }) => {
+  test.setTimeout(120_000); // eleven actions, each with a write and a fresh page
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), { x: 0, y: -900, zoom: 1 });
   const nameField = page.getByTestId("input-entity-name");

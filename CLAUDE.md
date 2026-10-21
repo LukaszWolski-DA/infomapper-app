@@ -88,6 +88,9 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 - **Full e2e runs** (Łukasz, slice 4b-2): after each step one full run (`npm run e2e`, from scratch, no dev server
   running); if a test fails, run that file three times on its own to tell a flake from a bug. Before a merge: two full
   runs in a row. Report each run's time.
+- **Small slices** (Łukasz, slice 5a): after each step the slice's specs and the earlier specs of what the step
+  touched, plus CI (lint, typecheck, unit tests); a failing test run three times on its own; one full e2e run before
+  the merge. The PRD says which kind a slice is.
 - Use `data-testid` attributes for elements tests need; name them after the components (e.g. `card-entity`,
   `panel-inspector`, `nav-breadcrumbs`).
 
@@ -147,6 +150,7 @@ npx tsx scripts/to-screen.ts <folder>                         # analyse saved tr
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b1/S4B1-09.spec.ts       # coverage colours to the screen (always traced)
 npm run measure:canvas -- --to-screen --only s4b2pans,c10,lasso,c08,s4b2focus,s4b2screen,s4b2drag --rounds 3 --no-build --against slice-04b1  # slice 4b-2's sitting
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b2/S4B2-15-layers.spec.ts # S4B2-15's layer and element reads
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-05a/S5A-08.spec.ts         # slice 5a: side panels to the screen, layers
 SCREENS=<folder> npx playwright test e2e/slice-04b1/S4B1-06-screens.spec.ts               # slice 4b-1's coverage colour screenshots
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
@@ -184,8 +188,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   miniature's and the fading layer's commit counters (`counters`). Slice 4b-2's find requirement cards on the page and in
   the data (`reqCard`, `reqNode`, `reqCardData`), place them and link requirements as test data (`placeReqCards`,
   `linkReq`), and read trace lines (`tracesOfCard`, `traceEnds`); its measuring steps on “Performance test –
-  requirements” are in `e2e/slice-04b2/measure.ts` (S4B2-10 keeps its own, as it runs in the `slice-04b1` worktree too). The undo history lives in the server's memory and is
-  empty again after each reseed.
+  requirements” are in `e2e/slice-04b2/measure.ts` (S4B2-10 keeps its own, as it runs in the `slice-04b1` worktree too).
+  Slice 5a's switch the side panels (`togglePanel`, `toggle`, `panel`, `expectShown`, `expectHidden`), drag and read
+  the grips (`dragGrip`, `grip`, `guide`, `guideX`, `panelWidth`), read the canvas's width and a card's place on the
+  screen (`expectCanvasWidth`, `cardAt`, `expectCardAt`), the layout cookie (`panelsCookie`) and the view's transform
+  (`viewportTransform`). The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
   with notes below 40 % zoom (a note measured while drawn plain once grew on every round), `S3B-15-idle.spec.ts` on a
@@ -215,6 +222,12 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   S2A-14's lasso, S4P-fading, S4P-10) to it; the shared code is `e2e/measure/` (`trace.ts`, `switches.ts`) and
   `scripts/lib/to-screen.ts` (anchor, settled check, split, presented frames; `tests/to-screen.test.ts`). Raw traces go
   to `.data/measure/` (git-ignored, never committed).
+- **Side panels** (slice 5a): `src/app/_components/side-panels.tsx`; the layout is a cookie per person
+  (`im-panels.<userId>`, `src/ui/side-panels-cookie.ts`) the server reads, so the first paint is right. Hiding,
+  showing or resizing the left panel moves the view in the same event (`ui.shiftView`); `ModelCanvas` does not
+  subscribe to the pane's size (S5A-07 checks zero commits). Never set a CSS variable or a page-wide class on an
+  element that contains the canvas: it restyles every card (S5A-08 found 75–140 ms per switch in the dense view); the
+  grid gets its columns directly. Actions that lead to details on purpose call `openDetails()`; a selection never does.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only

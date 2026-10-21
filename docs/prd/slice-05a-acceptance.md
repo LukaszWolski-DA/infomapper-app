@@ -1,6 +1,6 @@
 # Slice 5a – Acceptance
 
-Status: **step 3 (resize and the diagnosis).** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
+Status: **step 4 (closing): waiting for Łukasz's approval of D-54 and AD-24's text, and his manual acceptance.** Branch `slice/05a-side-panels`, from `main` at the tag `slice-04b2`
 (`1bd3a13`). PRD: `docs/prd/slice-05a-side-panels.md`.
 
 ## Łukasz's answers to step 1 (20 October 2026)
@@ -22,42 +22,90 @@ step 3 builds the grips, their limits, double-click, keyboard and stored widths 
 
 D-54: the final text is quoted in step 4, where Łukasz approves it.
 
-## Step 2: show and hide (items 1–6, 12–13)
+## Step 4: closing
 
-**What changed**
-- `src/ui/side-panels-cookie.ts`: the layout cookie `im-panels.<userId>` (`l1.r0.264.340`: shown or hidden, both
-  widths), the prototype's limits; an unreadable value gives the defaults. Unit tests next to it.
-- `src/app/_components/side-panels.tsx`: `SidePanelsProvider` (state, cookie, narrow screens, `openDetails`,
-  `closeLeftOverlay`), `SidePanelsGrid` (the three columns; a hidden panel keeps its content, `visibility: hidden` and
-  `inert`), `PanelToggle` (the prototype's icons and titles, `aria-pressed`). `AppShell` reads the cookie on the server
-  and wraps project and canvas pages in the provider; `TopBar` puts the buttons at its two ends.
-- `src/app/globals.css`: `.im-panels`; up to 1000 px the panels lie over the canvas (300 px, shadow), one at a time.
-- No jump: the left button calls `ui.shiftView(±width)` in the same click (`ModelCanvas`'s new `shiftView`, a
-  `setViewport` without duration, which React Flow applies at once).
-- P2: `ModelCanvas` subscribes only to “the pane has a size”, not to the size; the first view reads the size from the
-  store.
-- Q4: `canvas-host.tsx` (the six menu items, “Show what is inside”, the Entity tool, “New entity here”, a new frame)
-  and `left-panel.tsx` (“+”, “New requirement”, a requirement's click) call `openDetails`; an entity's or a table's
-  click calls `closeLeftOverlay`. `focusField` waits until the panel is no longer inert. A canvas opened with `?card`,
-  `?label`, `?req` or `?note` is drawn by the server with the panel shown, and the browser remembers it.
+### Acceptance criteria
 
-**Found in the browser:** at 900–1,000 px the canvas page's top bar is about 1,080 px wide, so the new right button
-(and the user indicator, already before) lay outside the window. Playwright still clicked it, as it scrolls a clipped
-bar. The canvas tools now sit in a container that is cut off first (`top-bar.tsx`); S5A-06 checks that both buttons
-are inside the window. Making the tools fit is in `docs/ideas.md`.
+| ID | Status | Evidence |
+| --- | --- | --- |
+| S5A-01 | **met** | `S5A-01.spec.ts`: both buttons, `aria-pressed`, the canvas takes the width, both hidden; hidden panels inert (Tab, accessibility tree) |
+| S5A-02 | **met** | `S5A-02.spec.ts`: hidden panels and widths across a reload, another canvas and the project home; per person; an unreadable cookie and blocked cookies leave the panels shown |
+| S5A-03 | **met** | `S5A-03.spec.ts`: ±1 px after hide and show (100 % and 35 %), a left drag, the keyboard, a double-click, a right resize |
+| S5A-04 | **met** | `S5A-04.spec.ts`: selections leave it hidden; the button, the four links, the six menu items (field focused), creating and the requirement's click open it, remembered |
+| S5A-05 | **met** | `S5A-05.spec.ts`: separators at the edges, the guide within the limits while the panel keeps its width, the release, double-click and its toasts, the keyboard |
+| S5A-06 | **met** | `S5A-06.spec.ts`: 1000 px window: hidden, 300 px overlays one at a time, the canvas keeps its width, no grips, both buttons inside the window; selection and an entity's click; the remembered layout above 1000 px |
+| S5A-07 | **met** | `S5A-07.spec.ts`: 0 canvas and 0 miniature commits for hiding, showing, a drag, its release, a double-click and the keyboard; the first view after a load (remembered and fitted) |
+| S5A-08 | **met** | step 3's diagnosis after two fixes: medians 25–55 ms (bar 100 ms); no drawing layer more on the canvas (47 / 30 as slice 4b-2) |
+| S5A-09 | see below | CI on the PR; one full e2e run; changed earlier test: `S1B-03.spec.ts` (`setPanelWidth` through the grip's keyboard) |
 
-**Tests** (`e2e/slice-05a/`): S5A-01 (buttons, widths, both hidden; inert: Tab and the accessibility tree), S5A-02
-(reload, another canvas, the project home, per person, an unreadable cookie, blocked cookies), S5A-03 (hide and show at
-100 % and 35 %, ±1 px), S5A-04 (selections; the four links; the six menu items with the field focused; creating;
-requirements), S5A-06 (1000 px window), S5A-07 (0 canvas and 0 miniature commits for four switches; the first view
-after a load, remembered and fitted, with the left panel hidden). The grips' parts of S5A-02, -03, -05, -06 and -07
-come in step 3.
+### Full e2e run
 
-**Runs (step 2):** lint, typecheck, unit tests (1,028) pass. `e2e/slice-05a` 19 of 19. The earlier specs for what the
-step touched: `slice-00` (all), S1B-03, S1B-07, S2B-01, the commit-counter specs S2C-12, S3A-14-idle, S3B-15-idle,
-S3B-13, S4P-12, S4B1-06, and S4A-01, S4A-02, S4A-11: 37 of 37 (6.6 min). After the top-bar fix: `slice-05a`,
-`slice-00`, S1B-07, S2B-01 again, 41 of 41 (6.8 min). No test failed, so none was run three times. S1B-03's
-`setPanelWidth` still works unchanged (it sets the grid's columns inline); it changes with the grips in step 3.
+**Run 1** (21 October 2026, from scratch, no dev server): **208 passed, 2 failed, 89 min** (slice 4b-2's full runs: 28 min
+for 184 tests). The laptop slept during it: S4A-11 failed with `net::ERR_NETWORK_IO_SUSPENDED` (Chrome's error when the
+computer suspends), and S5A-04's creation test reached its 60 s limit.
+
+Each failing file three times on its own, the computer kept awake, but busy (a video-call client and Explorer on the
+CPU, 2 of 8 GB free); every test ran 2.5–4 times slower than in step 3 on the same code:
+- **S4A-11** (slice 4a, untouched by 5a): failed once (`net::ERR_ABORTED` on a page load), then passed twice. A flake
+  of the load.
+- **S5A-04**: 4 of 6 passed, then 5 of 6, then 6 of 6. The failures were S5A-04's link test, which loaded the canvas
+  eight times in one test and outran its 60 s, and once the creation test. **Test fix:** one test per link
+  (`?card`, `?label`, `?req`, `?note`), and 120 s for the creation test's eleven actions. Three runs after it: 9 of 9,
+  9 of 9, then 8 of 9 (the first test's sign-in waited over 15 s for the freshly started server's first page).
+
+**A second full run** waits for a quiet laptop (and after Łukasz's manual acceptance, which needs his own dev server).
+
+### Manual acceptance checklist
+
+Start the app on the preview data (create it once with the same variable and `npm run reset-dev-data` if it is missing):
+
+PowerShell:
+
+```
+$env:INFOMAPPER_DEV_DB=".data/preview-db.json"; npm run dev
+```
+
+bash:
+
+```
+INFOMAPPER_DEV_DB=.data/preview-db.json npm run dev
+```
+
+Open http://localhost:3000, pick Łukasz, open Retail Co – DWH › Customer 360 › “Customer & orders”, window wider than
+1000 px.
+
+| # | Check | Expected |
+| --- | --- | --- |
+| 1 | The button at the top bar's left end (“Show or hide the object browser”), twice | The left panel goes, the canvas widens, the cards stay where they are on the screen; the second click brings it back |
+| 2 | The button at the right end, before your initials; then click a card, a row and a mapping line | The details panel goes and stays hidden through the three selections |
+| 3 | Right-click a mapping line, “Edit transformation rule…”; then hide the panel again and open REQ-101 from the project home's requirements | Each time the details panel comes back with the rule field focused, or REQ-101's panel; it stays open afterwards |
+| 4 | Drag the left panel's inner edge 150 px to the right, slowly, and past 520 px before letting go | Only a thin blue line moves and stops at the limit; on release the panel takes the width and the cards stay in place |
+| 5 | Double-click that edge; then click it and press →, Shift+→ and Home | Back to the default width with the toast “Left panel width reset.”; the keys change the width by 16 and 64 px, Home resets |
+| 6 | Hide the right panel, widen the left one, reload; then open “Order lines & products” and the project home | The same layout everywhere |
+| 7 | Make the window narrower than 1000 px; the left button, then the right button; click an entity in the left panel; select a card | Both panels start hidden; each button slides its panel over the canvas with a shadow, one at a time; the entity's click closes the left panel; the selection does not open the details panel |
+
+### Decisions (Łukasz approves the quoted text)
+
+**New D-54**, under “Projects and navigation”, after D-39:
+
+> - **D-54** Side panels: the object browser and the details panel are shown and hidden by the toolbar's buttons at its
+>   two ends, and resized by dragging their inner edge (left 200–520 px, default 264; right 280–640 px, default 340):
+>   while dragging only a guide line moves, and the panel and the canvas change size once, on release; double-click or
+>   Home resets, ←/→ change the width by 16 px, Shift by 64 px. Hidden panels and widths are remembered per person in
+>   the browser, on every page with the panels. A hidden panel stays in the page, inert. Selecting never opens a hidden
+>   details panel; actions that lead to details on purpose do (links that name what to show, menu items that edit a
+>   field in the panel, creating an element whose name is typed there, a requirement clicked in the left panel), and
+>   it stays open. Hiding, showing or resizing the left panel keeps the model where it is on the screen. Up to 1000 px
+>   wide both panels are hidden; a button slides one over the canvas (one at a time, not remembered), a selection does
+>   not open the details panel, and clicking an entity or a table in the left panel closes it.
+
+**AD-24, rule (4)**: after “… (a variable on the root restyles every card on each zoom step; found in slice 2b,
+S2B-14);” insert:
+
+> the same holds for every element that contains the canvas, and for a class with a universal selector on the page
+> (slice 5a, S5A-08: the side panels' widths as inherited variables on the page's grid and the prototype's
+> `body.pdrag *` drag class cost 75–140 ms of style recalculation per switch in the dense view; the grid now gets its
+> columns directly, and the drag has no page-wide class);
 
 ## Step 3: resize (items 7–11) and the diagnosis
 
@@ -116,6 +164,43 @@ as slice 4b-2's S4B2-15 for “100 cards”; S4B2-15 itself, run again on this b
 views of both canvases (47 and 30 layers; elements in the viewport equal). The left panel hidden: 38; both hidden: 36;
 the guide line showing during a drag: 49 (two more, outside the canvas, for as long as the drag lasts). **The slice
 adds no drawing layer to the canvas.**
+
+## Step 2: show and hide (items 1–6, 12–13)
+
+**What changed**
+- `src/ui/side-panels-cookie.ts`: the layout cookie `im-panels.<userId>` (`l1.r0.264.340`: shown or hidden, both
+  widths), the prototype's limits; an unreadable value gives the defaults. Unit tests next to it.
+- `src/app/_components/side-panels.tsx`: `SidePanelsProvider` (state, cookie, narrow screens, `openDetails`,
+  `closeLeftOverlay`), `SidePanelsGrid` (the three columns; a hidden panel keeps its content, `visibility: hidden` and
+  `inert`), `PanelToggle` (the prototype's icons and titles, `aria-pressed`). `AppShell` reads the cookie on the server
+  and wraps project and canvas pages in the provider; `TopBar` puts the buttons at its two ends.
+- `src/app/globals.css`: `.im-panels`; up to 1000 px the panels lie over the canvas (300 px, shadow), one at a time.
+- No jump: the left button calls `ui.shiftView(±width)` in the same click (`ModelCanvas`'s new `shiftView`, a
+  `setViewport` without duration, which React Flow applies at once).
+- P2: `ModelCanvas` subscribes only to “the pane has a size”, not to the size; the first view reads the size from the
+  store.
+- Q4: `canvas-host.tsx` (the six menu items, “Show what is inside”, the Entity tool, “New entity here”, a new frame)
+  and `left-panel.tsx` (“+”, “New requirement”, a requirement's click) call `openDetails`; an entity's or a table's
+  click calls `closeLeftOverlay`. `focusField` waits until the panel is no longer inert. A canvas opened with `?card`,
+  `?label`, `?req` or `?note` is drawn by the server with the panel shown, and the browser remembers it.
+
+**Found in the browser:** at 900–1,000 px the canvas page's top bar is about 1,080 px wide, so the new right button
+(and the user indicator, already before) lay outside the window. Playwright still clicked it, as it scrolls a clipped
+bar. The canvas tools now sit in a container that is cut off first (`top-bar.tsx`); S5A-06 checks that both buttons
+are inside the window. Making the tools fit is in `docs/ideas.md`.
+
+**Tests** (`e2e/slice-05a/`): S5A-01 (buttons, widths, both hidden; inert: Tab and the accessibility tree), S5A-02
+(reload, another canvas, the project home, per person, an unreadable cookie, blocked cookies), S5A-03 (hide and show at
+100 % and 35 %, ±1 px), S5A-04 (selections; the four links; the six menu items with the field focused; creating;
+requirements), S5A-06 (1000 px window), S5A-07 (0 canvas and 0 miniature commits for four switches; the first view
+after a load, remembered and fitted, with the left panel hidden). The grips' parts of S5A-02, -03, -05, -06 and -07
+come in step 3.
+
+**Runs (step 2):** lint, typecheck, unit tests (1,028) pass. `e2e/slice-05a` 19 of 19. The earlier specs for what the
+step touched: `slice-00` (all), S1B-03, S1B-07, S2B-01, the commit-counter specs S2C-12, S3A-14-idle, S3B-15-idle,
+S3B-13, S4P-12, S4B1-06, and S4A-01, S4A-02, S4A-11: 37 of 37 (6.6 min). After the top-bar fix: `slice-05a`,
+`slice-00`, S1B-07, S2B-01 again, 41 of 41 (6.8 min). No test failed, so none was run three times. S1B-03's
+`setPanelWidth` still works unchanged (it sets the grid's columns inline); it changes with the grips in step 3.
 
 ## Answers to the PRD's questions (step 1)
 
