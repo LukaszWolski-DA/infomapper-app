@@ -142,7 +142,8 @@ export interface Relationship extends StandardColumns {
 
 // ---- Sources (data model section 5) ----
 
-export const SOURCE_OBJECT_TYPES = ["table", "view"] as const;
+/** `file` (slice 7a): a flat file described like a table, with its format in `file_format`. */
+export const SOURCE_OBJECT_TYPES = ["table", "view", "file"] as const;
 export type SourceObjectType = (typeof SOURCE_OBJECT_TYPES)[number];
 
 export interface SourceSystem extends StandardColumns {
@@ -156,8 +157,12 @@ export interface SourceTable extends StandardColumns {
   schema_name: string;
   name: string;
   object_type: SourceObjectType;
+  /** For a file: `xlsx`, `csv`, `json`… as the import file calls it (slice 7a). */
+  file_format: string | null;
   row_count: number | null;
   comment: string | null;
+  /** Not in the last import that judged it (slice 7a, P3): a status, not a delete. */
+  missing_since: Timestamp | null;
 }
 
 export interface SourceColumn extends StandardColumns {
@@ -166,6 +171,7 @@ export interface SourceColumn extends StandardColumns {
   ordinal: number;
   /** Physical type as in the source, e.g. `varchar`. */
   data_type: string;
+  /** -1 (`MAX_LENGTH`) is `max`, shown as `max` (slice 7a). */
   type_length: number | null;
   type_precision: number | null;
   type_scale: number | null;
@@ -176,6 +182,49 @@ export interface SourceColumn extends StandardColumns {
   is_pii: boolean;
   default_value: string | null;
   comment: string | null;
+  /** Not in the last import that judged it (slice 7a, P3). */
+  missing_since: Timestamp | null;
+}
+
+/** Closed list (slice 7a): foreign keys an import declares; room for later kinds. */
+export const SOURCE_RELATIONSHIP_KINDS = ["declared"] as const;
+export type SourceRelationshipKind = (typeof SOURCE_RELATIONSHIP_KINDS)[number];
+
+/** A foreign key between two source tables (slice 7a): `name` is unique per from-table among live rows, in any case. */
+export interface SourceRelationship extends StandardColumns {
+  source_table_id: Uuid;
+  to_source_table_id: Uuid;
+  name: string;
+  kind: SourceRelationshipKind;
+  missing_since: Timestamp | null;
+}
+
+/** One column pair of a source relationship, in key order. */
+export interface SourceRelationshipColumn extends StandardColumns {
+  source_relationship_id: Uuid;
+  from_column_id: Uuid;
+  to_column_id: Uuid;
+  sort_order: number;
+}
+
+export const IMPORT_CHANNELS = ["file", "query", "ddl"] as const;
+export type ImportChannel = (typeof IMPORT_CHANNELS)[number];
+
+/**
+ * One import into a source system (slice 7a): who and when are the standard `created_by` and `created_at`; the counts
+ * are the summary's (“2 new tables, 5 new columns…”).
+ */
+export interface SourceImport extends StandardColumns {
+  source_system_id: Uuid;
+  channel: ImportChannel;
+  /** The file's name, “pasted query result” or “{script} (translated)”. */
+  source_label: string;
+  tables_new: number;
+  columns_new: number;
+  columns_changed: number;
+  columns_renamed: number;
+  columns_missing: number;
+  relationships_new: number;
 }
 
 // ---- Mappings (data model section 6, AD-26) ----
@@ -195,6 +244,8 @@ export interface Mapping extends StandardColumns {
   note_text: string | null;
   approved_by: Uuid | null;
   approved_at: Timestamp | null;
+  /** Why an import sent the approved mapping back to review (slice 7a, P6); cleared on any status or content change. */
+  review_reason: string | null;
 }
 
 export interface MappingInput extends StandardColumns {
@@ -218,6 +269,10 @@ export interface WorkspaceModel {
   mappings: Mapping[];
   /** Per mapping in rule order (sort_order). */
   mappingInputs: MappingInput[];
+  /** Foreign keys between source tables (slice 7a). */
+  sourceRelationships: SourceRelationship[];
+  /** Per relationship in key order (sort_order). */
+  sourceRelationshipColumns: SourceRelationshipColumn[];
 }
 
 // ---- Requirements (data model section 7, slice 4a) ----
@@ -436,6 +491,9 @@ export interface WritableRows {
   source_system: SourceSystem;
   source_table: SourceTable;
   source_column: SourceColumn;
+  source_relationship: SourceRelationship;
+  source_relationship_column: SourceRelationshipColumn;
+  source_import: SourceImport;
   mapping: Mapping;
   mapping_input: MappingInput;
   requirement: Requirement;

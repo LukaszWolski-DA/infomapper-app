@@ -195,6 +195,26 @@ describe("file format", () => {
     await writeFile(file, JSON.stringify(old), "utf8");
     expect(await store.requirements.list(RETAIL)).toEqual([]);
     expect(await store.requirements.listLinks(RETAIL)).toEqual([]);
-    expect((await readDb(file)).format).toBe(5);
+    expect((await readDb(file)).format).toBe(6);
+  });
+
+  it("reads a slice 4a to 6b file (format 5) as one without source imports, the new columns null (slice 7a)", async () => {
+    const db = await readDb(file);
+    const strip = <R extends object>(rows: R[], keys: string[]) => rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !keys.includes(k))));
+    const old: Record<string, unknown> = {
+      ...db,
+      format: 5,
+      source_table: strip(db.source_table, ["file_format", "missing_since"]),
+      source_column: strip(db.source_column, ["missing_since"]),
+      mapping: strip(db.mapping, ["review_reason"]),
+    };
+    for (const t of ["source_relationship", "source_relationship_column", "source_import"]) delete old[t];
+    await writeFile(file, JSON.stringify(old), "utf8");
+    const upgraded = await readDb(file);
+    expect(upgraded.format).toBe(6);
+    expect([upgraded.source_relationship, upgraded.source_relationship_column, upgraded.source_import]).toEqual([[], [], []]);
+    expect(upgraded.source_table.every((t) => t.file_format === null && t.missing_since === null)).toBe(true);
+    expect(upgraded.source_column.every((c) => c.missing_since === null)).toBe(true);
+    expect(upgraded.mapping.every((m) => m.review_reason === null)).toBe(true);
   });
 });

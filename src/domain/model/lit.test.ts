@@ -18,6 +18,8 @@ function model(mappings: Mapping[] = [mapping()], inputs: MappingInput[] = [mapp
     sourceTables: [sourceTable()],
     sourceColumns: [sourceColumn(ids.colCustId), sourceColumn(ids.colEmail), sourceColumn(ids.colFirstName)],
     mappings,
+    sourceRelationships: [],
+    sourceRelationshipColumns: [],
     mappingInputs: inputs,
   };
 }

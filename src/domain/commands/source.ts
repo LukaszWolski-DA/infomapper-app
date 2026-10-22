@@ -92,8 +92,10 @@ export function createSourceTable(
     schema_name: schemaName,
     name,
     object_type: objectType ?? "table",
+    file_format: null,
     row_count: null,
     comment: null,
+    missing_since: null,
   };
   writes.push({ kind: "insert", table: "source_table", row: table });
   columns.columns.forEach((c, i) => {
@@ -110,6 +112,7 @@ export function createSourceTable(
       is_pii: false,
       default_value: null,
       comment: null,
+      missing_since: null,
     };
     writes.push({ kind: "insert", table: "source_column", row: column });
   });

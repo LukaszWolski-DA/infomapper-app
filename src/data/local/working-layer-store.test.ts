@@ -242,6 +242,6 @@ describe("file format", () => {
     await writeFile(file, JSON.stringify(old), "utf8");
     expect(await store.labels.list(RETAIL)).toEqual([]);
     expect(await store.notes.list(RETAIL)).toEqual([]);
-    expect((await readDb(file)).format).toBe(5);
+    expect((await readDb(file)).format).toBe(6);
   });
 });

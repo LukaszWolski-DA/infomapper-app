@@ -256,8 +256,10 @@ export const sourceTable = (over: Partial<SourceTable> = {}): SourceTable => ({
   schema_name: "dbo",
   name: "customer",
   object_type: "table",
+  file_format: null,
   row_count: null,
   comment: null,
+  missing_since: null,
   ...over,
 });
 
@@ -278,6 +280,7 @@ export const sourceColumn = (id: string = ids.colEmail, over: Partial<SourceColu
   is_pii: id !== ids.colCustId,
   default_value: null,
   comment: null,
+  missing_since: null,
   ...over,
 });
 
@@ -292,6 +295,7 @@ export const mapping = (over: Partial<Mapping> = {}): Mapping => ({
   note_text: null,
   approved_by: null,
   approved_at: null,
+  review_reason: null,
   ...over,
 });
 

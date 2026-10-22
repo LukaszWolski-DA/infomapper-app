@@ -226,8 +226,10 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
       schema_name: schema,
       name,
       object_type: "table",
+      file_format: null,
       row_count: rows,
       comment: null,
+      missing_since: null,
     };
     db.source_table.push(table);
     const parsed = parseColumnLines(columns.map(([n, t]) => `${n} ${t}`).join("\n"));
@@ -246,6 +248,7 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
         is_pii: has(flags, "PII"),
         default_value: null,
         comment: null,
+        missing_since: null,
       };
       db.source_column.push(column);
     });
@@ -264,6 +267,7 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
       note_text: text.text,
       approved_by: status === "approved" ? o.approverId : null,
       approved_at: status === "approved" ? o.at : null,
+      review_reason: null,
     };
     db.mapping.push(mapping);
     db.mapping_input.push({ ...std(`${key}#0`), mapping_id: mapping.id, source_column_id: id(`column:${table}.${column}`), sort_order: 0 });

@@ -42,10 +42,17 @@ export async function readDb(file: string): Promise<DevDb> {
     throw e;
   }
   const db = JSON.parse(text) as DevDb;
-  // Formats 2 (before frames), 3 (before labels and notes) and 4 (before requirements) differ only by the missing tables.
+  // Formats 2 (before frames), 3 (before labels and notes) and 4 (before requirements) differ only by the missing tables;
+  // 5 (before source imports) also by the new columns, null on every row.
   if ((db.format as number) === 2) Object.assign(db, { format: 3, frame: [] });
   if ((db.format as number) === 3) Object.assign(db, { format: 4, label: [], label_link: [], project_pinned_label: [], note: [] });
-  if ((db.format as number) === 4) Object.assign(db, { format: DEV_DB_FORMAT, requirement: [], requirement_link: [] });
+  if ((db.format as number) === 4) Object.assign(db, { format: 5, requirement: [], requirement_link: [] });
+  if ((db.format as number) === 5) {
+    Object.assign(db, { format: DEV_DB_FORMAT, source_relationship: [], source_relationship_column: [], source_import: [] });
+    for (const t of db.source_table) Object.assign(t, { file_format: t.file_format ?? null, missing_since: t.missing_since ?? null });
+    for (const c of db.source_column) c.missing_since ??= null;
+    for (const m of db.mapping) m.review_reason ??= null;
+  }
   if (db.format !== DEV_DB_FORMAT) {
     throw new Error(`${file} has format ${String(db.format)}, expected ${DEV_DB_FORMAT}. Run "npm run reset-dev-data".`);
   }
@@ -110,7 +117,11 @@ export async function writeDb(file: string, db: DevDb): Promise<void> {
     await rm(temp, { force: true });
     throw e;
   }
-  cache.delete(file);
+  // The file now holds what this process wrote: keep it, so the next read does not parse it again (slice 7a: after a
+  // large import the file is tens of MB). Frozen, as every cached read; the caller hands over `db`.
+  const stamp = await stampOf(file);
+  if (stamp) cache.set(file, { stamp, db: deepFreeze(db) });
+  else cache.delete(file);
 }
 
 // On Windows a rename or read can fail briefly while another process has the file open.

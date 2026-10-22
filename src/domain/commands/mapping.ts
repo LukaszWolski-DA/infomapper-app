@@ -86,6 +86,7 @@ export function createMapping(
     note_text: null,
     approved_by: null,
     approved_at: null,
+    review_reason: null,
   };
   const first: MappingInput = {
     ...newRowColumns(ctx),
@@ -350,6 +351,7 @@ export function splitMapping(
       note_text: null,
       approved_by: null,
       approved_at: null,
+      review_reason: null,
     };
     newMappingIds.push(mapping.id);
     writes.push(

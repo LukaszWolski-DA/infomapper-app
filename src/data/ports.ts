@@ -23,6 +23,7 @@ import type {
   ProjectPinnedLabel,
   Requirement,
   RequirementLink,
+  SourceImport,
   Workspace,
   WorkspaceMember,
   WorkspaceModel,
@@ -71,6 +72,8 @@ export interface ModelRepository {
   load(workspaceId: Uuid): Promise<WorkspaceModel>;
   /** Every row of the undoable tables, deleted ones included (undo and redo, slice 1b). */
   loadForUndo(workspaceId: Uuid): Promise<WorkspaceRows>;
+  /** The live imports of the workspace (slice 7a), newest first; of one system when given. */
+  listImports(workspaceId: Uuid, sourceSystemId?: Uuid): Promise<SourceImport[]>;
 }
 
 export interface CanvasItemRepository {

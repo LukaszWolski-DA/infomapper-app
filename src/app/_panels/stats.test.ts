@@ -34,6 +34,8 @@ const model: WorkspaceModel = {
   sourceTables: [sourceTable()],
   sourceColumns: [sourceColumn(ids.colEmail), sourceColumn(ids.colFirstName)],
   mappings: [mapping({ status: "approved" }), mapping({ id: typeProblem, attribute_id: ids.customerId, status: "draft" })],
+  sourceRelationships: [],
+  sourceRelationshipColumns: [],
   mappingInputs: [
     mappingInput(),
     mappingInput("01900000-0000-7000-8000-00000000b002", { mapping_id: typeProblem, source_column_id: ids.colFirstName }),

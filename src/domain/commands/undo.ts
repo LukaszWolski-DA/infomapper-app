@@ -41,6 +41,9 @@ export const UNDOABLE_TABLES = [
   "source_system",
   "source_table",
   "source_column",
+  "source_relationship",
+  "source_relationship_column",
+  "source_import",
   "mapping",
   "mapping_input",
   "canvas_item",
@@ -67,6 +70,9 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   relationship: [["from_entity_id", "entity"], ["to_entity_id", "entity"]],
   source_table: [["source_system_id", "source_system"]],
   source_column: [["source_table_id", "source_table"]],
+  source_relationship: [["source_table_id", "source_table"], ["to_source_table_id", "source_table"]],
+  source_relationship_column: [["source_relationship_id", "source_relationship"], ["from_column_id", "source_column"], ["to_column_id", "source_column"]],
+  source_import: [["source_system_id", "source_system"]],
   mapping: [["attribute_id", "attribute"]],
   mapping_input: [["mapping_id", "mapping"], ["source_column_id", "source_column"]],
   canvas_item: [["canvas_id", "canvas"], ["entity_id", "entity"], ["source_table_id", "source_table"], ["requirement_id", "requirement"], ["frame_id", "frame"]],
@@ -132,7 +138,8 @@ export function isUndoable(events: readonly ChangeEvent[]): boolean {
     )
   );
 }
-const STATUS_COLUMNS = new Set(["status", "approved_by", "approved_at"]);
+// slice 7a: approving clears an import's `review_reason`, so a reviewer's approval may change it too
+const STATUS_COLUMNS = new Set(["status", "approved_by", "approved_at", "review_reason"]);
 
 /** Whether an update changed only status columns (a reviewer's approval). */
 function statusOnly(e: ChangeEvent): boolean {
@@ -263,7 +270,8 @@ export function revertChangeGroup(
  */
 function unchangedSince(table: UndoableTable, current: AnyRow, image: AnyRow): boolean {
   const keys = new Set([...Object.keys(current), ...Object.keys(image)]);
-  return [...keys].every((k) => BOOKKEEPING.has(k) || (table === "canvas" && k === "look") || sameValue(current[k], image[k]));
+  // a column added to the table after the step was recorded is null on the row and absent from the image (slice 7a)
+  return [...keys].every((k) => BOOKKEEPING.has(k) || (table === "canvas" && k === "look") || sameValue(current[k] ?? null, image[k] ?? null));
 }
 
 /**
@@ -273,22 +281,41 @@ function unchangedSince(table: UndoableTable, current: AnyRow, image: AnyRow): b
  */
 function consistent(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: readonly { table: UndoableTable; key: string; wasLive: boolean }[]): boolean {
   const live = (table: UndoableTable, id: unknown) => typeof id === "string" && isLiveRow(table, rows.get(table)!.get(id));
+  // built once per revert (slice 7a: an import's undo touches tens of thousands of rows): the parents that have live
+  // children, and the live cards per canvas and element
+  let parentsWithChildren: Set<string> | null = null;
+  const hasLiveChild = (table: UndoableTable, key: string) => {
+    if (!parentsWithChildren) {
+      parentsWithChildren = new Set();
+      for (const [childTable, refs] of Object.entries(PARENTS) as [UndoableTable, readonly (readonly [string, UndoableTable])[]][]) {
+        for (const child of rows.get(childTable)!.values()) {
+          if (!isLiveRow(childTable, child)) continue;
+          for (const [column, parent] of refs) if (typeof child[column] === "string") parentsWithChildren.add(`${parent}|${child[column] as string}`);
+        }
+      }
+    }
+    return parentsWithChildren.has(`${table}|${key}`);
+  };
+  let cardsOn: Map<string, number> | null = null;
+  const cardKey = (c: AnyRow) => `${String(c.canvas_id)}|${String(c.entity_id ?? "")}|${String(c.source_table_id ?? "")}`;
+  const cardsAt = (c: AnyRow) => {
+    if (!cardsOn) {
+      cardsOn = new Map();
+      for (const o of rows.get("canvas_item")!.values()) {
+        if (o.deleted_at !== null || (o.entity_id === null && o.source_table_id === null)) continue;
+        cardsOn.set(cardKey(o), (cardsOn.get(cardKey(o)) ?? 0) + 1);
+      }
+    }
+    return cardsOn.get(cardKey(c)) ?? 0;
+  };
   for (const { table, key, wasLive } of touched) {
     const row = rows.get(table)!.get(key);
     if (isLiveRow(table, row)) {
       for (const [column, parent] of PARENTS[table] ?? []) {
         if (row![column] !== null && !live(parent, row![column])) return false;
       }
-      if (table === "canvas_item" && !wasLive) {
-        const twin = [...rows.get("canvas_item")!.values()].some(
-          (o) =>
-            o.id !== row!.id &&
-            o.deleted_at === null &&
-            o.canvas_id === row!.canvas_id &&
-            ((row!.entity_id !== null && o.entity_id === row!.entity_id) || (row!.source_table_id !== null && o.source_table_id === row!.source_table_id)),
-        );
-        if (twin) return false;
-      }
+      // a card that comes back must not be on its canvas twice (itself counted once)
+      if (table === "canvas_item" && !wasLive && (row!.entity_id !== null || row!.source_table_id !== null) && cardsAt(row!) > 1) return false;
     } else if (wasLive) {
       if (table === "project_canvas") {
         const [projectId, canvasId] = key.split("|");
@@ -298,14 +325,7 @@ function consistent(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: read
         continue;
       }
       if (isLinkTable(table)) continue;
-      for (const [childTable, refs] of Object.entries(PARENTS) as [UndoableTable, readonly (readonly [string, UndoableTable])[]][]) {
-        for (const [column, parent] of refs) {
-          if (parent !== table) continue;
-          for (const child of rows.get(childTable)!.values()) {
-            if (isLiveRow(childTable, child) && child[column] === key) return false;
-          }
-        }
-      }
+      if (hasLiveChild(table, key)) return false;
     }
   }
   return true;

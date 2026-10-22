@@ -30,6 +30,8 @@ const model: WorkspaceModel = {
   sourceTables: [sourceTable()],
   sourceColumns: [sourceColumn(ids.colCustId), sourceColumn(ids.colEmail), sourceColumn(ids.colFirstName)],
   mappings: [mapping(), firstNameMap],
+  sourceRelationships: [],
+  sourceRelationshipColumns: [],
   mappingInputs: [mappingInput(), mappingInput("01900000-0000-7000-8000-00000000b002", { mapping_id: firstNameMap.id, source_column_id: ids.colFirstName })],
 };
 const items = [
