@@ -132,7 +132,10 @@ async function main() {
         console.log(`  the re-import: ${summary}; the data file after both imports: ${fileSize}`);
         continue; // the warm-up
       }
-      t.first.push(a), t.again.push(b), t.undoAgain.push(c), t.undoFirst.push(d);
+      t.first.push(a);
+      t.again.push(b);
+      t.undoAgain.push(c);
+      t.undoFirst.push(d);
     }
     if (process.env.ONLY_MOVE !== "1") {
     report("first import (every row new), with change events", 5_000, t.first);
