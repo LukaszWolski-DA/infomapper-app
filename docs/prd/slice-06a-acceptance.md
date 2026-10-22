@@ -1,6 +1,6 @@
 # Slice 6a – Acceptance
 
-Status: **step 5 (closing): points 1–4 done; waiting for Łukasz's approval of D-39 and D-54 and his go for the full run.** Branch `slice/06a-view-state-bar`, from `main` at the tag
+Status: **step 5 (closing): docs approved; the full e2e run and the manual acceptance next.** Branch `slice/06a-view-state-bar`, from `main` at the tag
 `slice-05a` (`93f0df7`). PRD: `docs/prd/slice-06a-view-state-bar.md`. The PRD stays as written; this file is its
 amendment (Łukasz, 21 October 2026).
 
@@ -606,3 +606,17 @@ and S0-11 (the breadcrumbs row) and S5A-06 (the bar at 1,000 px): **23 passed, 2
 S6A-09-hand and S6A-09 with `HAND_ONLY=1` (twice), all passed.
 
 Next: one full e2e run on a quiet laptop, when Łukasz says so; then the manual acceptance.
+
+### Łukasz's answers (22 October 2026)
+
+Points 1–4 accepted.
+
+- **S6A-09 is met on the trace evidence**: with the bar, the main thread does the same work as without it (script
+  31.8 against 29.8 ms dense, 14.1 against 15.2 ms at 30 %; one layout of 24 dirty objects, 1.4 and 0.8 ms, in the
+  browser's own frame step). The two Hand-pair runs of step 5 stay as diagnostic figures; their run-to-run spread (up to
+  12 ms) is larger than what is measured. CLAUDE.md gets the lesson: once a UI addition costs a few milliseconds,
+  compare phase traces with and without it rather than unprepared medians to the screen.
+- **D-54** approved as quoted; **D-39** approved with three edits (“hidden resolved notes” in both places; “People who
+  cannot edit the canvas see”; the fold sentence: “…chips that do not fit fold into “+{n}”, after the breadcrumbs above
+  the current page have shrunk; its menu lists them with their ×, while “Live: {name}” and “Show all” stay visible.”).
+  Both written into `docs/decisions.md`.

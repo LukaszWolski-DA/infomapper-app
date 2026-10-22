@@ -250,6 +250,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   (bars, rows, panels). When the canvas restyles in the same commit (a tool's class), the read forces that restyle (about
   20,000 elements in the dense view) and a layout of the page synchronously. Take sizes from a `ResizeObserver`, which
   reports after the browser's own layout. Later PRDs: say so for every element they add above the canvas.
+- **A few milliseconds: compare phase traces, not medians** (slice 6a, S6A-09): once a UI addition costs a few
+  milliseconds, compare phase traces with and without it (script, style with its element count, layout with its dirty
+  and total objects, paint, layerize; as `S6A-09-hand.spec.ts` does) rather than unprepared medians to the screen, whose
+  run-to-run spread (up to 12 ms in slice 6a) is larger than what is measured.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only
