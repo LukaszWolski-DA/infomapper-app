@@ -1,6 +1,6 @@
 # Slice 6b – Acceptance
 
-Status: **step 4 (closing): docs done; waiting for Łukasz's approval of D-38 and his go for the full run.** Branch `slice/06b-back-and-forward`, from `main` at
+Status: **step 4 (closing): D-38 approved and written; the full run and the manual acceptance next.** Branch `slice/06b-back-and-forward`, from `main` at
 the tag `slice-06a` (`80241ef`). PRD: `docs/prd/slice-06b-back-and-forward.md`. The PRD stays as written; this file is
 its amendment (Łukasz, 22 October 2026).
 
@@ -167,7 +167,7 @@ The details panel's fields save on `blur` (`fields.tsx`: `TextInput`, `TextArea`
   reload, the app can even select the place again; *proposal:* do not, as the PRD says (a reload starts without a
   selection, as today).
 - **Item 6, centering when off screen: yes**, for anything with a place on the canvas: cards, rows (their card),
-  frames, notes and requirement cards, the view moved to center it at the same zoom; lines and panel-only selections
+  frames, notes and requirement cards, the view moved to centre it at the same zoom; lines and panel-only selections
   (a label, a requirement without a card, an element not on the canvas) do not move the view.
 - **Item 8, no cap: yes** (the browser's 50).
 - **Item 10, the own index: drop it** (the Navigation API; fallback above).
@@ -430,3 +430,17 @@ too, the figures above.
 ### Runs
 
 Lint, typecheck, unit tests (80 files, 1,045 tests) pass. Step 4 touched docs only, no code; the slice's specs: 13 passed, 6.5 min. The full run waits for Łukasz's approval of D-38 and his go.
+
+### Łukasz's answers (22 October 2026)
+
+Both checks accepted, nothing to change. D-38 approved with four edits (what is centred and what is selected without
+moving the view; a plain name for the go-to element; “A field being edited is saved before Back or Forward leaves it.”;
+the repo's spelling “centred”); written into `docs/decisions.md`.
+
+**The browsers smoke, after the install:** `npx playwright install firefox webkit` from the project folder (in the shell
+the tests run from) downloaded Firefox 155.0 (playwright firefox v1543, 122 MiB) to
+`C:\Users\Lukas\AppData\Local\ms-playwright\firefox-1543` and WebKit 26.6 (playwright webkit v2359, 59.8 MiB) to
+`C:\Users\Lukas\AppData\Local\ms-playwright\webkit-2359`. `BROWSERS=1 npx playwright test
+e2e/slice-06b/S6B-browsers.spec.ts`: **3 passed** (Chromium 13.0 s, Firefox 30.4 s, WebKit 20.5 s), 1.9 min: the
+buttons are there, and a selection place and a page place go back and forward in all three.
+
