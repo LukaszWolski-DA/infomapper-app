@@ -1,6 +1,6 @@
 # Slice 7a – Acceptance
 
-Status: **step 3 done (22 October 2026); step 4 waits for Łukasz's go.** Branch
+Status: **step 4 done (22 October 2026); step 5 waits for Łukasz's go.** Branch
 `slice/07a-source-import`, from `main` at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as
 written; this file is its amendment (Łukasz, 22 October 2026).
 
@@ -743,3 +743,159 @@ a direct approved mapping on every tenth column.
 
 The plans: 400 changed, 300 renamed (all by suggestion), 300 missing and 15 mappings back to review at 20,000 columns;
 2,000, 1,500, 1,500 and 110 at 100,000.
+
+## Łukasz's answers to step 3 (22 October 2026)
+
+Step 3 accepted. **Decision 1 changed:** a name that changes only in case is a name change in the review; names that
+differ only in case within one system (two tables) or one table (two columns) do not stop the import: the affected
+table is left out of scope (it cannot be selected), the scope step and the warnings say why, and the rest is imported;
+two columns in conflict take out only their own table. Decisions 2–5 as taken. **Questions:** fractional seconds go
+into the SQL Server and PostgreSQL catalog queries in step 5; S7A-17 as worded: "A system imported from a DDL script and
+re-imported from the matching catalog-query result shows no changes apart from what a script cannot give (the type of a
+computed column, views), and sends no mapping to review."
+
+## Step 4: data and the command (22 October 2026)
+
+### What changed
+
+- **Case conflicts** (`plan.ts`, answer 1): `plan.leftOut` lists the file's tables that cannot be selected, each with its
+  reason (also in the warnings); they are never compared, never marked missing, and keys to them are skipped with a
+  warning. Texts: "{system} has two tables whose names differ only in case, {a} and {b}, so the file's table cannot be
+  matched to one of them. It is left out of this import; rename or delete one of the two first." and "{table} in
+  {system} has two columns whose names differ only in case, {a} and {b}. The table is left out of this import; rename or
+  delete one of the two first."
+- **Migration** `supabase/migrations/20261022220000_source_import.sql` (items 1–5): `object_type` allows `file`;
+  `file_format`, `missing_since` on `source_table`; `missing_since` and `type_length` -1 (max) on `source_column`;
+  `mapping.review_reason`, only while in review (CHECK); `source_relationship` (name unique per from-table in any case),
+  `source_relationship_column` (standard columns, F13), `source_import` (who and when are `created_by`/`created_at`,
+  F14; counts with a CHECK); RLS on the three new tables. `npm run schema:check` passes on a throwaway Postgres
+  (18.3 here, initialised UTF-8; CI uses 17): "The schema matches the domain: 29 tables, 382 columns".
+- **`docs/data-model-v2.md`**: the new columns and tables, -1 as max, who owns what on a column (P1, P2), the
+  import standard as the import format (D-13), the new domain rules.
+- **Domain types** (`src/domain/types.ts`): the new columns and tables, `WritableRows`, `WorkspaceModel` (relationships
+  and their columns); every row builder (seeds, fixtures, commands) fills the new columns.
+- **Local adapter** (`src/data/local/`): the three tables with their keys, foreign keys, unique name and CHECKs;
+  `DEV_DB_FORMAT` 6, a format-5 file is read as 6 (new tables empty, new columns null; unit test);
+  `model.load` returns the relationships; `model.listImports` (newest first).
+- **Undo** (`undo.ts`): the new tables and their parents; `review_reason` counts as a status column, so a reviewer can
+  undo their own approval (F5); a column added after a step was recorded compares as null.
+- **Speed** (F10, F11): the adapter finds rows by an index instead of searching each table per write; it keeps its own
+  write in the cache instead of parsing the file again; it copies only the tables a write touches; the integrity check
+  covers only what a write can break (the touched tables, the new change events); the file is written without
+  indentation; undo's consistency check builds its child index once per revert.
+- **Deleting a source table** takes its relationships in both directions along (`deleteSourceTable`); the
+  confirmation lists them ("6 columns, 1 relationship", D-47).
+- **The command** `src/domain/commands/import.ts`, `importSources`: owners, admins, modelers, not archived (AD-05,
+  AD-09); reads the text again with the domain's readers; builds the plan from the review's choices; writes only when
+  `planFingerprint` (two 53-bit hashes of the digest and its length) matches the review's (P8, otherwise P8's text with
+  `fields.review`); one change group with an event per row; the import recorded; `labelNothing` (P9: the context labels
+  nothing, its events still record it, D-26). The undo history's label is "Import {file}".
+- **Answers 6, 7, 9**: any status or content change clears `review_reason`; with four-eyes on, an import's send-back
+  makes the person who imported the mapping's last editor (`lastContentEditor`); an approved mapping from a column
+  missing from source covers no requirement (`countsForCoverage` and the requirement index).
+- **The upload route** `POST /w/{workspace}/import` (`src/app/w/[workspaceId]/import/route.ts`, `src/app/_lib/import-sources.ts`):
+  JSON body, refused above 25 MB (413); runs `runCommand` and the command like any write (AD-23). **The proxy**
+  (`src/proxy.ts`, every route) buffers request bodies up to 10 MB by default and cuts off the rest:
+  `next.config.ts` sets `experimental.proxyClientMaxBodySize: "25mb"`.
+- **e2e** `e2e/slice-07a/S7A-04-route.spec.ts`: a new system through the route (one change group of 18 events, the
+  import recorded), a reader refused (S7A-12's server part), P8's refusal, a 12 MB body that arrives whole, a 26 MB
+  body refused.
+- **Earlier tests changed:** the format tests now expect format 6 (`requirement-store.test.ts`,
+  `working-layer-store.test.ts`); `compare-schema.test.ts` lists the three tables; the hand-built rows in
+  `undo.test.ts` and `frame.test.ts` and seven `WorkspaceModel` fixtures have the new lists.
+
+### Runs
+
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: **87 files, 1,168 tests pass**. `npm run schema:check`: pass.
+- The requirement-coverage specs answer 9 touches (S2C-11, S4A-01, S4A-08, S4A-13, S4B1-01, -03, -05, -06, -08,
+  S4B2-01, -08, -12): **15 passed, 2.5 min**.
+- **The full e2e run** (22 October 2026, 23:00–23:43, `npm run e2e` from scratch, no dev server running): **246 passed,
+  0 failed, 43.0 min**. “The destination stream closed early” was printed 35 times, each between two tests (after
+  S0-11, S1B-03, S1B-04, S2A-03 and others): the known, accepted message of `docs/known-limitations.md` (a page left while
+  it still streams). Slice 4p's three runs printed it 26–28 times with fewer tests; nothing new from slice 7a, and no
+  test fails on it.
+
+### Timings (Node, `scripts/bench-import-write.ts`, median of 5 after a warm-up)
+
+Each write runs the server's steps: the state from the store, the command, the live canvas rules, the adapter
+(which writes the whole data file), the undo history; on copies of the demo data.
+
+| Case | 20,000 columns | 100,000 columns | Bar |
+| --- | --- | --- | --- |
+| First import (every row new), with change events | 2,149 ms | 13,120 ms | ≤ 5 s: met / **missed** |
+| Re-import, 5 % changed, renamed or missing | 1,085 ms | 7,907 ms | ≤ 5 s: met / **missed** |
+| Undo the re-import | 521 ms | 4,034 ms | ≤ 5 s: met / met |
+| Undo the first import | 2,502 ms | 16,354 ms | ≤ 5 s: met / **missed** |
+| Move a card after three large imports | **1,146 ms** | **out of memory** | ≤ 500 ms: **missed** |
+
+- After a first import and a re-import of 20,000 columns the data file is 44 MB; after three first imports of 20,000
+  columns, 128 MB: 80 MB of change events (78,000), 48 MB of rows. Serialising it takes 591 ms alone.
+- At 100,000 columns the data file is 221 MB after two imports; the third import of 100,000 columns ran the process
+  out of memory (Node's default heap, 2.4 GB). A dev server would stop the same way.
+- Before the speed fixes, the card move after three 20,000-column imports took 3,334 ms (166 MB indented).
+
+### The size limit (answer 13): proposal
+
+From all the figures (read, translate, plan, apply, undo): reading, translating and planning meet their bars at
+100,000 rows; writing and undoing grow with the rows written, about 0.11 ms (import) and 0.16 ms (undo) per column at
+the sizes measured. **Proposal: one import takes up to 30,000 column rows** (expected first import about 3.3 s and its
+undo about 4.8 s here), and the text up to 20 MB as now. Above it: "The file has {n} rows; one import takes up to
+30,000. Split it by database or schema." A larger system is imported in parts, one database or schema at a time ("Only
+columns of the tables in the file", P4). The limit is the local adapter's (development, AD-29); it is looked at again
+with the database slice (AD-31).
+
+### Question: a card move after large imports (the extra figure, F10)
+
+The local adapter writes the whole data file on every write, so every write after large imports is slow: 1.1 s per
+card move after three 20,000-column imports. Production never has this (Supabase, the last slice). Options:
+
+1. **Accept it for now** (my recommendation for this slice): the local adapter is a development tool until the database
+   slice; a line in `docs/known-limitations.md` ("after very large imports every write takes about a second"),
+   `npm run reset-dev-data` brings it back. The 30,000-row limit keeps one import's file growth bounded.
+2. **Change events in a file of their own**, appended per write (format 7): about 0.3 s less per write by my estimate
+   (stringifying the events is 283 ms of 591 ms); still above 500 ms after three 20,000-column imports, since the rows
+   alone are 48 MB.
+3. **One file per table, change events appended**: a card move would rewrite only the cards and append its events,
+   well under 100 ms. A larger change to the adapter (AD-29) and its e2e helpers that read the data file whole
+   (`rawDb`, `loadModel` go through the store, a few read the file directly); about a day with a full e2e run. Could
+   be its own small slice before 7b.
+
+### Proposed decision texts (for docs/decisions.md, after your approval)
+
+> - **D-55** Source import (slice 7a). A system is described once from a file in InfoMapper's source standard, a
+>   catalog query's result or DDL scripts, and re-imported the same way; the review shows everything an import would do
+>   before anything is written, and the import is one undo step. The source owns a column's name, position, type,
+>   nullable, keys and comment, and a re-import updates them; the comment stays editable, and the review shows every
+>   overwrite. The modeller owns the classifications: a re-import never changes them. A field the file leaves out is
+>   never compared or overwritten. Missing is a status, not a delete: a table, column or relationship not in the file
+>   gets “missing from source” and keeps its mappings, cards and links, and loses it when it comes back. Missing is
+>   judged only inside the scope the modeller picks: the imported schemas, or only the columns of the tables in the
+>   file; more than half of a system's columns going missing is warned about. Renames are the modeller's choice; the
+>   engine suggests one for the same position and type, and a rename keeps the column's identity. The server builds the
+>   plan again from the same text and choices and writes only when it does what the review showed; otherwise the review
+>   refreshes and says so. The working context labels nothing an import writes. A type the importer cannot read, and a
+>   table whose name differs only in case from another, are never passed over silently: the first is kept with a
+>   warning, the second left out of the import with its reason. The app has no sample files; one import takes up to
+>   30,000 column rows.
+>
+> - **D-51** (added) … An import sends an approved mapping back to review, with a stored reason, when an input gets a
+>   type conflict it did not have, an input marked business key changes type, or a renamed input is named in its rule
+>   (the rule is rewritten). The reason is cleared by any change of the mapping's status or content. With four-eyes on,
+>   the person who ran the import counts as the mapping's last editor. An approved mapping from a column missing from
+>   source covers no requirement.
+>
+> - **D-26** (added) … An import labels nothing, the mappings it sends back to review included.
+
+### How to check
+
+```
+npx vitest run src/domain/commands/import.test.ts src/domain/import src/data
+npx playwright test e2e/slice-07a
+npx tsx scripts/bench-import-write.ts 20000
+```
+
+### Questions
+
+1. **The size limit:** 30,000 column rows per import?
+2. **The card move after large imports:** option 1, 2 or 3?
+3. **The decision texts** above: approve, or change?
