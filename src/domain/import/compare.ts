@@ -17,6 +17,7 @@ export function planDigest(plan: ImportPlan): string {
     errors: plan.errors,
     warnings: plan.warnings,
     compare: plan.compare,
+    leftOut: plan.leftOut,
     tables: plan.tables.map((t) => ({
       key: t.key,
       status: t.status,

@@ -126,6 +126,8 @@ export interface ImportPlan {
   warnings: string[];
   fields: ReadonlySet<StandardField>;
   compare: MissingScope;
+  /** The file's tables that cannot be selected (names that differ only in case in the system), with the reason. */
+  leftOut: { key: string; reason: string }[];
   tables: PlanTable[];
   relationships: PlanRelationship[];
   renames: RenameChoice[];
@@ -177,6 +179,11 @@ export function rewriteRule(rule: string, renames: ReadonlyMap<string, string>):
   return out === rule ? null : out;
 }
 
+export const TABLES_IN_CASE = (system: string, a: string, b: string) =>
+  `${system} has two tables whose names differ only in case, ${a} and ${b}, so the file's table cannot be matched to one of them. It is left out of this import; rename or delete one of the two first.`;
+export const COLUMNS_IN_CASE = (system: string, table: string, a: string, b: string) =>
+  `${table} in ${system} has two columns whose names differ only in case, ${a} and ${b}. The table is left out of this import; rename or delete one of the two first.`;
+
 export function buildPlan(model: ImportModel, read: StandardRead, target: ImportTarget, choices: PlanChoices): ImportPlan {
   const errors: string[] = [];
   const warnings = [...read.warnings];
@@ -200,10 +207,12 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
   // the system's live tables and columns, indexed
   const existing = systemId ? model.tables.filter((t) => isLive(t) && t.source_system_id === systemId) : [];
   const exByKey = new Map<string, ImportTable>();
+  // names that differ only in case cannot be matched: those tables are left out, the rest is imported (step 3, answer 1)
+  const blocked = new Map<string, string>();
   for (const t of existing) {
     const k = tableKey(t.database_name, t.schema_name, t.name);
     const twin = exByKey.get(k);
-    if (twin) errors.push(`${systemName} has two tables that differ only in case: ${twin.schema_name}.${twin.name} and ${t.schema_name}.${t.name}.`);
+    if (twin) blocked.set(k, TABLES_IN_CASE(systemName, `${twin.schema_name}.${twin.name}`, `${t.schema_name}.${t.name}`));
     else exByKey.set(k, t);
   }
   const tableIds = new Set(existing.map((t) => t.id));
@@ -215,6 +224,19 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
     else colsOf.set(c.source_table_id, [c]);
   }
   for (const list of colsOf.values()) list.sort((a, b) => a.ordinal - b.ordinal);
+  for (const [k, t] of exByKey) {
+    if (blocked.has(k)) continue;
+    const seenNames = new Map<string, string>();
+    for (const c of colsOf.get(t.id) ?? []) {
+      const twin = seenNames.get(lower(c.name));
+      if (twin !== undefined) {
+        blocked.set(k, COLUMNS_IN_CASE(systemName, `${t.schema_name}.${t.name}`, twin, c.name));
+        break;
+      }
+      seenNames.set(lower(c.name), c.name);
+    }
+  }
+  const fileKeys = new Set(read.tables.map((t) => t.key));
   const liveMappings = new Map(model.mappings.filter(isLive).map((m) => [m.id, m]));
   const inputsOf = new Map<Uuid, Uuid[]>(); // mapping → columns, in rule order
   const mappingsOfColumn = new Map<Uuid, Uuid[]>();
@@ -224,7 +246,9 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
   }
   const mappingIdsOf = (columnId: Uuid | undefined) => (columnId ? (mappingsOfColumn.get(columnId) ?? []) : []);
 
-  const inScope = read.tables.filter((t) => choices.scope.has(t.key));
+  const leftOut = [...blocked].filter(([k]) => fileKeys.has(k)).map(([key, reason]) => ({ key, reason }));
+  for (const b of leftOut) warnings.push(b.reason);
+  const inScope = read.tables.filter((t) => choices.scope.has(t.key) && !blocked.has(t.key));
   const schemasInScope = new Set(inScope.map((t) => `${lower(t.database)}|${lower(t.schema)}`));
   const tables: PlanTable[] = [];
   const renames: RenameChoice[] = [];
@@ -244,12 +268,7 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
       continue;
     }
     const ecols = colsOf.get(et.id) ?? [];
-    const byName = new Map<string, ImportColumn>();
-    for (const c of ecols) {
-      const twin = byName.get(lower(c.name));
-      if (twin) errors.push(`${et.schema_name}.${et.name} in ${systemName} has two columns that differ only in case: ${twin.name} and ${c.name}.`);
-      else byName.set(lower(c.name), c);
-    }
+    const byName = new Map(ecols.map((c) => [lower(c.name), c]));
     const columns: PlanColumn[] = [];
     const used = new Set<Uuid>();
     const unmatched: StandardColumn[] = [];
@@ -352,10 +371,13 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
 
   // the system's tables in an imported schema that are not in the file: missing (P4; never with "tables")
   if (choices.compare === "schemas") {
-    const fileKeys = new Set(read.tables.map((t) => t.key));
     for (const [key, et] of exByKey) {
       if (fileKeys.has(key)) continue; // in the file: in scope above, or left out of the scope and untouched
       if (!schemasInScope.has(`${lower(et.database_name)}|${lower(et.schema_name)}`)) continue;
+      if (blocked.has(key)) {
+        warnings.push(blocked.get(key)!);
+        continue;
+      }
       tables.push({
         key,
         status: et.missing_since ? "still_missing" : "missing",
@@ -377,7 +399,7 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
     }
   }
 
-  const relationships = planRelationships(model, inScope, exByKey, colsOf, tables, warnings);
+  const relationships = planRelationships(model, inScope, exByKey, colsOf, tables, warnings, blocked);
   const mappings = planMappings(model, tables, liveMappings, inputsOf);
 
   let massWarning: ImportPlan["massWarning"] = null;
@@ -387,7 +409,7 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
     if (present && missing > present / 2) massWarning = { missing, present };
   }
 
-  return { target, systemName, errors, warnings, fields, compare: choices.compare, tables, relationships, renames, mappings, massWarning };
+  return { target, systemName, errors, warnings, fields, compare: choices.compare, leftOut, tables, relationships, renames, mappings, massWarning };
 }
 
 function planRelationships(
@@ -397,6 +419,7 @@ function planRelationships(
   colsOf: ReadonlyMap<Uuid, ImportColumn[]>,
   tables: readonly PlanTable[],
   warnings: string[],
+  blocked: ReadonlyMap<string, string>,
 ): PlanRelationship[] {
   const out: PlanRelationship[] = [];
   const fileByKey = new Map(inScope.map((t) => [t.key, t]));
@@ -429,6 +452,10 @@ function planRelationships(
     const fromNames = new Set(ft.columns.map((c) => lower(c.name)));
     for (const fk of ft.foreignKeys) {
       const toKey = tableKey(ft.database, fk.toSchema, fk.toTable);
+      if (blocked.has(toKey)) {
+        warnings.push(`Foreign key ${fk.name} on ${label(ft)} refers to ${fk.toSchema}.${fk.toTable}, which is left out of this import. Relationship skipped.`);
+        continue;
+      }
       const target = targetColumns(toKey);
       if (!target) {
         warnings.push(`Foreign key ${fk.name} on ${label(ft)} refers to ${fk.toSchema}.${fk.toTable}, which is neither in this file nor in the system. Relationship skipped.`);

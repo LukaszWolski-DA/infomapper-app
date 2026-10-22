@@ -16,7 +16,7 @@ import {
 import { applyPlan } from "./apply";
 import { readDdl } from "./ddl";
 import type { ImportModel } from "./model";
-import { buildPlan, importSummary, planCounts, rewriteRule, type ImportPlan, type PlanColumn } from "./plan";
+import { buildPlan, COLUMNS_IN_CASE, importSummary, planCounts, rewriteRule, TABLES_IN_CASE, type ImportPlan, type PlanColumn } from "./plan";
 import { readStandard } from "./standard";
 
 const sample = (name: string) => readFileSync(new URL(`./samples/${name}`, import.meta.url), "utf8");
@@ -237,13 +237,39 @@ describe("a re-import of a changed file (S7A-05)", () => {
     expect(columnNamed(again.model, "t", "email").id).toBe(columnNamed(first.model, "t", "Email").id);
   });
 
-  it("refuses a system with two tables or columns that differ only in case", () => {
-    const first = importInto(emptyModel(), csv("d,s,t,a,1,int,yes,no,"), { newName: "S" });
-    const twin = { ...first.model.tables[0]!, id: "01900000-0000-7000-8000-f00000000001", name: "T" };
+  it("leaves out a table whose name differs only in case from another of the system, and imports the rest (step 3, answer 1)", () => {
+    const first = importInto(emptyModel(), csv("d,s,t,a,1,int,yes,no,\nd,s,u,a,1,int,yes,no,"), { newName: "S" });
+    const twin = { ...tableNamed(first.model, "t"), id: "01900000-0000-7000-8000-f00000000001", name: "T" };
     const model: ImportModel = { ...first.model, tables: [...first.model.tables, twin] };
-    expect(buildPlan(model, csv("d,s,t,a,1,int,yes,no,"), { systemId: systemNamed(model, "S").id }, allOf(csv("d,s,t,a,1,int,yes,no,"))).errors).toEqual([
-      "S has two tables that differ only in case: s.t and s.T.",
-    ]);
+    const file = csv("d,s,t,a,1,bigint,yes,no,\nd,s,u,a,1,bigint,yes,no,");
+    const { plan, changes } = importInto(model, file, { systemId: systemNamed(model, "S").id });
+    expect(plan.errors).toEqual([]);
+    const reason = TABLES_IN_CASE("S", "s.t", "s.T");
+    expect(reason).toBe(
+      "S has two tables whose names differ only in case, s.t and s.T, so the file's table cannot be matched to one of them. It is left out of this import; rename or delete one of the two first.",
+    );
+    expect(plan.leftOut).toEqual([{ key: "d|s|t", reason }]);
+    expect(plan.warnings).toEqual([reason]);
+    expect(plan.tables.map((t) => [t.key, t.status])).toEqual([["d|s|u", "changed"]]);
+    expect(changes.columns.update).toHaveLength(1);
+  });
+
+  it("two columns that differ only in case take out only their own table", () => {
+    const first = importInto(emptyModel(), csv("d,s,t,a,1,int,yes,no,\nd,s,u,a,1,int,yes,no,"), { newName: "S" });
+    const a = columnNamed(first.model, "t", "a");
+    const model: ImportModel = { ...first.model, columns: [...first.model.columns, { ...a, id: "01900000-0000-7000-8000-f00000000002", name: "A", ordinal: 2 }] };
+    const file = csv("d,s,t,a,1,int,yes,no,\nd,s,u,a,1,int,yes,no,");
+    const plan = buildPlan(model, file, { systemId: systemNamed(model, "S").id }, allOf(file));
+    expect(plan.leftOut).toEqual([{ key: "d|s|t", reason: COLUMNS_IN_CASE("S", "s.t", "a", "A") }]);
+    expect(COLUMNS_IN_CASE("S", "s.t", "a", "A")).toBe(
+      "s.t in S has two columns whose names differ only in case, a and A. The table is left out of this import; rename or delete one of the two first.",
+    );
+    expect(plan.tables.map((t) => t.key)).toEqual(["d|s|u"]);
+    // not marked missing either when another file leaves it out
+    const other = csv("d,s,u,a,1,int,yes,no,");
+    const missing = buildPlan(model, other, { systemId: systemNamed(model, "S").id }, allOf(other));
+    expect(missing.tables.map((t) => [t.key, t.status])).toEqual([["d|s|u", "unchanged"]]);
+    expect(missing.warnings).toEqual([COLUMNS_IN_CASE("S", "s.t", "a", "A")]);
   });
 });
 
