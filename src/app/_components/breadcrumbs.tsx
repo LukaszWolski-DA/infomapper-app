@@ -1,10 +1,11 @@
 // Breadcrumbs under the top bar (D-38, prototype navigation bar): Organization › Workspace › … , each part a link.
-// Navigation history (back/forward) is slice 6b (D-38). Canvas pages put the view-state bar at the row's right end
-// (`children`, slice 6a, D-39); the row's height never changes.
+// Back and Forward at the row's left end (slice 6b, D-38, `HistoryNav`), on every page with the row. Canvas pages put
+// the view-state bar at the row's right end (`children`, slice 6a, D-39); the row's height never changes.
 
 import Link from "next/link";
 import { Fragment, type ReactNode } from "react";
 import type { ShellData } from "../_lib/shell";
+import { HistoryNav } from "./history-nav";
 import { canvasHref, projectHref, workspaceHref } from "../_lib/paths";
 
 export function Breadcrumbs({ shell, children }: { shell: ShellData; children?: ReactNode }) {
@@ -30,6 +31,7 @@ export function Breadcrumbs({ shell, children }: { shell: ShellData; children?: 
       // cards; a static property on the row's own element (AD-24 rule 4), its height fixed anyway
       className="flex h-8 min-w-0 flex-none items-center gap-1.5 overflow-hidden border-b border-im-line bg-im-canvas px-2 text-xs [contain:strict]"
     >
+      <HistoryNav />
       <ol className="flex min-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap text-im-ink-3">
         {parts.map((part, i) => {
           const current = i === parts.length - 1;

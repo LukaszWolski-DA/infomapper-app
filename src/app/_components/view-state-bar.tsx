@@ -149,7 +149,14 @@ export function ViewStateBar({ editable, live }: { editable: boolean; live: { la
     const rowWidth = row ? sizes.current.get(row) : undefined;
     if (!bar || !measure || !row || rowWidth === undefined) return;
     const size = (el: Element) => sizes.current.get(el);
+    // Back and Forward before the breadcrumbs (slice 6b): fixed, never folded
     let crumbs = 0;
+    const history = row.querySelector("[data-testid='nav-history']");
+    if (history) {
+      const w = size(history);
+      if (w === undefined) return;
+      crumbs += w + ROW_GAP;
+    }
     const items = [...(row.querySelector("ol")?.children ?? [])];
     for (const [i, li] of items.entries()) {
       const w = i === items.length - 1 || li.getAttribute("aria-hidden") ? size(li) : CRUMB_MIN;
@@ -182,7 +189,8 @@ export function ViewStateBar({ editable, live }: { editable: boolean; live: { la
       fold();
     });
     observer.observe(row);
-    for (const el of [...(row.querySelector("ol")?.children ?? []), ...measure.children]) observer.observe(el);
+    const history = row.querySelector("[data-testid='nav-history']");
+    for (const el of [...(history ? [history] : []), ...(row.querySelector("ol")?.children ?? []), ...measure.children]) observer.observe(el);
     return () => observer.disconnect();
   }, [key, fold, pathname]);
 

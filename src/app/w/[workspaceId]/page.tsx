@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppShell } from "@/app/_components/app-shell";
+import { GoneNotice } from "@/app/_components/gone-notice";
 import { projectHref, workspaceHref } from "@/app/_lib/paths";
 import { ROLE_LABEL } from "@/app/_lib/roles";
 import { loadShell } from "@/app/_lib/shell";
@@ -17,7 +18,8 @@ type Tab = (typeof TABS)[number];
 
 export default async function WorkspaceHomePage({ params, searchParams }: PageProps<"/w/[workspaceId]">) {
   const { workspaceId } = await params;
-  const tabParam = (await searchParams).tab;
+  const query = await searchParams;
+  const tabParam = query.tab;
   const tab: Tab = TABS.includes(tabParam as Tab) ? (tabParam as Tab) : "overview";
 
   const shell = await loadShell({ workspaceId });
@@ -57,6 +59,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
 
   return (
     <AppShell shell={shell}>
+      {query.gone === "project" && <GoneNotice message="That project no longer exists." />}
       <div data-testid="page-workspace-home" className="min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-6">
         <div className="mx-auto max-w-[1180px]">
           <div className="mb-1 text-xs text-im-ink-3">{shell.organization.name} · workspace</div>
@@ -97,6 +100,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
             ).map(([key, label]) => (
               <Link
                 key={key}
+                // the tab is not a place of its own (slice 6b, prototype): it replaces the entry, Back leaves the page
+                replace
                 role="tab"
                 aria-selected={tab === key}
                 data-testid={`tab-${key}`}

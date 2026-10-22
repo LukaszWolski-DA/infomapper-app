@@ -1,7 +1,30 @@
 # Slice 6b – Acceptance
 
-Status: **step 1 (questions) done, waiting for Łukasz.** Branch `slice/06b-back-and-forward`, from `main` at the tag
-`slice-06a` (`80241ef`). PRD: `docs/prd/slice-06b-back-and-forward.md`.
+Status: **step 2 (page places, the buttons, the keys) done, waiting for Łukasz.** Branch `slice/06b-back-and-forward`, from `main` at
+the tag `slice-06a` (`80241ef`). PRD: `docs/prd/slice-06b-back-and-forward.md`. The PRD stays as written; this file is
+its amendment (Łukasz, 22 October 2026).
+
+## Łukasz's answers to step 1 (22 October 2026)
+
+Step 1 accepted.
+
+1. **Section 8:** option A; places in `sessionStorage` under `navigation.currentEntry.key`; `history.state` left to
+   Next. Keys whose entry is no longer in `navigation.entries()` are pruned.
+2. **Browsers without the Navigation API: no fallback.** The API is Baseline since January 2026 (Chrome and Edge 102,
+   Firefox 147, Safari 26.2). Without it the buttons are hidden and our handler is off; the browser's own back still
+   works for pages. One line in `known-limitations.md`. A smoke spec for Firefox and WebKit if Playwright's builds are
+   installed here (pages and one selection place).
+3. **Places** as proposed. **The workspace home's tab is not a place** (prototype): the tabs replace the entry instead of
+   pushing one. Bundles, deselection and multi-selection are not recorded (deliberate differences, for the inventory). A
+   selection made on arrival is written into the page's own entry.
+4. **Centering** as proposed.
+5. **Gone places** as proposed; a deleted project goes to the workspace home for **every** arrival (a typed URL too).
+6. **Stale pages:** a background refresh after Back/Forward lands on another page; it must not move the view or change the
+   selection, and never runs for a step within one page. Part of step 3's trace.
+7. **Keys:** our own Alt+←/→ handler outside text fields, with `preventDefault`, so one press is one step on Windows too.
+   The mouse buttons are left to the browser (manual acceptance).
+8. **Edits in progress:** blur on every Back/Forward; its own spec (a field focused, `page.goBack()`, the edit saved).
+9. **DoD step 5:** as proposed (remove the source table's card on Customer & orders, Back, then Forward).
 
 ## Step 1: questions (22 October 2026)
 
@@ -207,3 +230,48 @@ The details panel's fields save on `blur` (`fields.tsx`: `TextInput`, `TextArea`
 7. **Keys:** our own Alt+←/→ handler outside text fields; the mouse buttons left to the browser? *Proposal: yes.*
 8. **Edits in progress:** blur the focused field on every traversal so it saves? *Proposal: yes.*
 9. **DoD step 5** changed as above? *Proposal: yes.*
+
+## Step 2: page places, the buttons, the keys (22 October 2026)
+
+What changed:
+- **`src/ui/history-places.ts`** (+ 5 unit tests): the places store, `sessionStorage` under
+  `infomapper:place:<navigation entry key>`, pruned to the keys in `navigation.entries()` on every save and on every
+  `currententrychange`. `navigationApi()` and the small typed part of the Navigation API the app uses (TypeScript 5.9's
+  DOM lib has none). Step 3 writes the selection places into it.
+- **`src/app/_components/history-nav.tsx`**: Back and Forward at the left end of the breadcrumbs row on every page with
+  the row (24 px each, never folded), titles “Back (Alt+←)” / “Forward (Alt+→)”, names “Back” / “Forward”, enabled from
+  `navigation.canGoBack` / `canGoForward` through a store that re-renders only the buttons; hidden without the
+  Navigation API. Alt+←/→ in the capture phase on `window`, outside text fields, with `preventDefault` and
+  `stopImmediatePropagation` (one press, one step; a focused grip does not resize). After a traversal that lands on
+  another page, `router.refresh()` once (never for a step within one page).
+- **The blur (answer 8):** measured in step 2, **a traversal blurs the focused field itself when it starts, and an edit
+  blurred that way never reaches its save** (no request at all; a plain blur saves). The Navigation API's `navigate`
+  event comes before that blur: the app blurs the field there (`navigationType === "traverse"`), and again on `popstate`
+  as a backstop, so the edit saves as on a click. S6B-08-edit passes with `page.goBack()` and with an in-page
+  `history.back()` (what Alt+← in a field on Windows and the mouse's back button do).
+- **The workspace home's tabs** replace the entry (`<Link replace>`): a tab is not a place (answer 3).
+- **A project that no longer exists** (or was never in the workspace) redirects to the workspace home with
+  `?gone=project` for every arrival (`shell.ts`), and the page shows “That project no longer exists.” once
+  (`gone-notice.tsx`) and drops the parameter. The app cannot delete projects yet, so the specs use an unknown id.
+- **The 6a fold** counts the buttons' width (from the same `ResizeObserver`; nothing reads layout in a commit).
+
+**Firefox and WebKit:** Playwright's Firefox and WebKit builds are not installed here (only Chromium 1208 and 1243 in
+`ms-playwright`), so there is no smoke spec for them. Installing them is a download of about 200 MB (`npx playwright
+install firefox webkit`); *proposal:* Łukasz installs them if he wants the two smoke specs, and I add them in step 3.
+
+Tests (`e2e/slice-06b/`): S6B-01 (four page places, Back three times by the button, Alt+← and `page.goBack()`, Forward
+twice by the button and Alt+→; the tab replaces), S6B-06 (the project part: a typed unknown project, then Back and
+Forward around it), S6B-07 (a fresh tab: both disabled; after a breadcrumb, Back only; after Back, Forward only; a reload
+keeps it; titles and names), S6B-08 (Alt+←/→ on a home page and the canvas, one step per press; nothing in a text field;
+a focused grip goes forward and keeps its width), S6B-08-edit (the edit saved after `page.goBack()`), S6B-09 (from 2,560
+to 800 px with chips on: the buttons 24 px, before the breadcrumbs, nothing past the row, 32 px; a state change of the
+buttons adds 0 canvas and 0 miniature commits).
+
+**Changed earlier test:** `S6A-08`'s fold test expected Focus to push exactly one more chip into “+{n}”; with the buttons
+taking room, the narrow Focus chip now fits where a wider one did not, so the count stays. It now checks that the row's
+chips change (Focus first, “+{n}” shown) and come back, with 0 commits; 3 of 3 passed.
+
+Runs: lint, typecheck, unit tests (80 files, 1,045 tests) pass. The slice's specs: 6 passed, 1.1 min. Earlier specs of
+what the step touched (slice 6a whole; S0-04, S0-06, S0-07, S0-10, S0-11 breadcrumbs, tabs and switchers; S2A-10,
+S2A-11, S3B-08, S3B-12, S3B-15 canvas tabs; S4B1-06; S5A-06; S4P-09 the not-found page): 35 passed, 1 failed
+(S6A-08's fold test, above), 6.1 min. No earlier spec uses `page.goBack()`.
