@@ -1,0 +1,15 @@
+database,schema,table,object_type,file_format,row_count,table_comment,column,ordinal,data_type,length,precision,scale,nullable,primary_key,fk_name,fk_ref_schema,fk_ref_table,fk_ref_column,column_comment,classifications
+flat_files,ref_data,country_codes,file,xlsx,,Country list kept by Finance on SharePoint,iso_code,1,string(2),,,,no,yes,,,,,ISO 3166 alpha-2,BK
+flat_files,ref_data,country_codes,file,xlsx,,,country_name,2,string(100),,,,no,no,,,,,,
+flat_files,ref_data,country_codes,file,xlsx,,,region,3,string(30),,,,yes,no,,,,,,
+flat_files,ref_data,country_codes,file,xlsx,,,eu_member,4,boolean,,,,yes,no,,,,,,
+flat_files,ref_data,fx_rates,file,csv,,"Daily rates from the treasury export, semicolon separated",rate_date,1,date,,,,no,no,,,,,,Effective date
+flat_files,ref_data,fx_rates,file,csv,,,currency,2,string(3),,,,no,no,,,,,,BK
+flat_files,ref_data,fx_rates,file,csv,,,rate_to_pln,3,"decimal(18,6)",,,,no,no,,,,,,
+flat_files,ref_data,product_hierarchy,file,json,,"Product tree from the PIM, flattened to one row per product",product_code,1,string(30),,,,no,no,,,,,,BK
+flat_files,ref_data,product_hierarchy,file,json,,,category.code,2,string(10),,,,yes,no,,,,,,
+flat_files,ref_data,product_hierarchy,file,json,,,category.name,3,string(100),,,,yes,no,,,,,,
+flat_files,ref_data,product_hierarchy,file,json,,,brand,4,string(50),,,,yes,no,,,,,,
+flat_files,ref_data,sales_targets,file,txt,,Fixed-width file from the planning tool,target_month,1,string(6),,,,no,no,,,,,YYYYMM,
+flat_files,ref_data,sales_targets,file,txt,,,region,2,string(30),,,,no,no,,,,,,
+flat_files,ref_data,sales_targets,file,txt,,,target_amount,3,"decimal(14,2)",,,,yes,no,,,,,,

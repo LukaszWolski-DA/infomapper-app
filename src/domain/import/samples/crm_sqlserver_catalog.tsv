@@ -1,0 +1,16 @@
+database	schema	table	object_type	row_count	table_comment	column	ordinal	data_type	length	precision	scale	nullable	primary_key	fk_name	fk_ref_schema	fk_ref_table	fk_ref_column	column_comment	classifications
+crmprod	dbo	customer_addresses	table	240118	NULL	addr_id	1	int	NULL	NULL	NULL	no	yes	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customer_addresses	table	240118	NULL	cust_id	2	int	NULL	NULL	NULL	yes	no	FK_customer_addresses_customers	dbo	customers	cust_id	NULL	NULL
+crmprod	dbo	customer_addresses	table	240118	NULL	street_line1	3	nvarchar	100	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customer_addresses	table	240118	NULL	city	4	nvarchar	60	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customer_addresses	table	240118	NULL	zip	5	varchar	10	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customer_addresses	table	240118	NULL	country_iso	6	char	2	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customers	table	182340	NULL	cust_id	1	int	NULL	NULL	NULL	no	yes	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customers	table	182340	NULL	cust_no	2	varchar	20	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customers	table	182340	NULL	fname	3	nvarchar	50	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customers	table	182340	NULL	lname	4	nvarchar	50	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customers	table	182340	NULL	email_addr	5	varchar	120	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customers	table	182340	NULL	dob	6	date	NULL	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customers	table	182340	NULL	segment	7	char	3	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customers	table	182340	NULL	created_ts	8	datetime2	NULL	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+crmprod	dbo	customers	table	182340	NULL	updated_ts	9	datetime2	NULL	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL

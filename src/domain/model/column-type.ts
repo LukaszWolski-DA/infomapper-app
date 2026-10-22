@@ -13,7 +13,25 @@ export type ColumnTypeRead =
   /** `unreadable`: not a type and parameters; `zero`: a length or precision of 0; `scale`: scale above precision. */
   | { ok: false; reason: "unreadable" | "zero" | "scale" };
 
-const WORDS = "[A-Za-z][A-Za-z0-9_]*(?:\\s+[A-Za-z][A-Za-z0-9_]*)*";
+/**
+ * One name for types the databases spell differently (prototype `TYPE_ALIAS`): the DDL channel writes these names,
+ * and step 3's comparison reads both sides through the same table, so a spelling is never a change.
+ */
+export const TYPE_ALIASES: Readonly<Record<string, string>> = {
+  "character varying": "varchar",
+  character: "char",
+  int4: "int",
+  int8: "bigint",
+  int2: "smallint",
+  integer: "int",
+  "timestamp without time zone": "timestamp",
+  "timestamp with time zone": "timestamptz",
+  "time without time zone": "time",
+  bool: "boolean",
+  double: "double precision",
+};
+
+const WORDS ="[A-Za-z][A-Za-z0-9_]*(?:\\s+[A-Za-z][A-Za-z0-9_]*)*";
 const TYPE = new RegExp(`^(${WORDS})\\s*(?:\\(([^()]*)\\))?((?:\\s+[A-Za-z][A-Za-z0-9_]*)*)$`);
 /** A number with Oracle's optional length unit, `max`, or SQL Server's -1. */
 const ARG = /^(?:(\d+)(?:\s+(?:char|byte))?|(max|-1))$/i;

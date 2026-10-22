@@ -1,0 +1,11 @@
+database,schema,table,object_type,file_format,row_count,table_comment,column,ordinal,data_type,length,precision,scale,nullable,primary_key,fk_name,fk_ref_schema,fk_ref_table,fk_ref_column,column_comment,classifications
+hrdb,dbo,employees,table,,2140,Current and former employees,emp_id,1,int,,,,no,yes,,,,,,
+hrdb,dbo,employees,table,,2140,,emp_no,2,varchar(10),,,,no,no,,,,,,BK
+hrdb,dbo,employees,table,,2140,,first_name,3,nvarchar(50),,,,yes,no,,,,,,PII
+hrdb,dbo,employees,table,,2140,,last_name,4,nvarchar(50),,,,yes,no,,,,,,PII
+hrdb,dbo,employees,table,,2140,,dept_id,5,int,,,,yes,no,FK_employees_departments,dbo,departments,dept_id,,
+hrdb,dbo,employees,table,,2140,,manager_id,6,int,,,,yes,no,FK_employees_manager,dbo,employees,emp_id,,
+hrdb,dbo,employees,table,,2140,,hired_on,7,date,,,,yes,no,,,,,,
+hrdb,dbo,departments,table,,38,,dept_id,1,int,,,,no,yes,,,,,,
+hrdb,dbo,departments,table,,38,,dept_code,2,varchar(10),,,,no,no,,,,,,BK
+hrdb,dbo,departments,table,,38,,dept_name,3,nvarchar(100),,,,yes,no,,,,,,

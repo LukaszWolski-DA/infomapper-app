@@ -9,6 +9,24 @@ import boundaries from "eslint-plugin-boundaries";
 //   domain imports nothing from the other layers, and no React, Next.js or storage code.
 const layers = ["domain", "data", "app", "ui", "canvas"];
 
+// The domain is pure TypeScript. These patterns also catch imports of files that do not exist yet.
+const pureDomain = {
+  group: ["react", "react/*", "react-dom", "react-dom/*", "next", "next/*", "@supabase/*"],
+  message: "src/domain is pure TypeScript: no React, Next.js or database code (AD-19).",
+};
+const noStorage = {
+  group: ["fs", "fs/*", "node:fs", "node:fs/*"],
+  message: "src/domain does not touch storage; use src/data (AD-19).",
+};
+const noOtherLayers = {
+  // Climbing out with ../ or using the @/ alias to reach another layer. (So src/domain must not have
+  // folders or files of its own named data, app, ui or canvas; ./canvas within a folder is fine.)
+  regex: "^(@/|(\\.\\./)+)(data|app|ui|canvas)(/|$)",
+  message: "src/domain imports nothing from the other layers (AD-19).",
+};
+const SAMPLES = "Import samples are for tests only (slice 7a, P10: no samples in the app).";
+const noSamples = { group: ["**/import/samples", "**/import/samples/**"], message: SAMPLES };
+
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
@@ -40,31 +58,28 @@ const eslintConfig = defineConfig([
     },
   },
   {
-    // The domain is pure TypeScript. These patterns also catch imports of files that do not exist yet.
-    files: ["src/domain/**/*.{ts,tsx}"],
+    // Import samples (slice 7a, P10): test files only. Outside tests nothing in src/ imports or names them, so they
+    // never reach a bundle (tests/ and e2e/ read them from disk).
+    files: ["src/**/*.{ts,tsx}"],
+    ignores: ["src/**/*.test.ts"],
     rules: {
-      "no-restricted-imports": [
+      "no-restricted-imports": ["error", { patterns: [noSamples] }],
+      "no-restricted-syntax": [
         "error",
-        {
-          patterns: [
-            {
-              group: ["react", "react/*", "react-dom", "react-dom/*", "next", "next/*", "@supabase/*"],
-              message: "src/domain is pure TypeScript: no React, Next.js or database code (AD-19).",
-            },
-            {
-              group: ["fs", "fs/*", "node:fs", "node:fs/*"],
-              message: "src/domain does not touch storage; use src/data (AD-19).",
-            },
-            {
-              // Climbing out with ../ or using the @/ alias to reach another layer. (So src/domain must not have
-              // folders or files of its own named data, app, ui or canvas; ./canvas within a folder is fine.)
-              regex: "^(@/|(\\.\\./)+)(data|app|ui|canvas)(/|$)",
-              message: "src/domain imports nothing from the other layers (AD-19).",
-            },
-          ],
-        },
+        { selector: "Literal[value=/import[\\\\/]samples/]", message: SAMPLES },
+        { selector: "TemplateElement[value.raw=/import[\\\\/]samples/]", message: SAMPLES },
       ],
     },
+  },
+  {
+    files: ["src/domain/**/*.{ts,tsx}"],
+    ignores: ["src/domain/**/*.test.ts"],
+    rules: { "no-restricted-imports": ["error", { patterns: [pureDomain, noStorage, noOtherLayers, noSamples] }] },
+  },
+  {
+    // Domain tests may read their test files (the import samples) from disk.
+    files: ["src/domain/**/*.test.ts"],
+    rules: { "no-restricted-imports": ["error", { patterns: [pureDomain, noOtherLayers] }] },
   },
   globalIgnores([
     ".next/**",
