@@ -14,7 +14,6 @@ import {
   fitFrameToContent,
   moveOnCanvas,
   putCardsInNewFrame,
-  resetCanvasView,
   resizeFrame,
   setAllFramesCollapsed,
   setFrameCollapsed,
@@ -22,6 +21,7 @@ import {
   type FrameCanvasState,
   type MoveState,
 } from "@/domain/commands/frame";
+import { resetCanvasView } from "@/domain/commands/canvas";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { DataStore } from "@/data";
 import { runCommand, type ActionResult } from "../_lib/run-command";

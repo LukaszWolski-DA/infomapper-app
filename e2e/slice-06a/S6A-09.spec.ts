@@ -130,6 +130,8 @@ async function layers(page: Page) {
   return { drawingLayers: drawing.length, drawingMegapixels: +(drawing.reduce((s, l) => s + l.width * l.height, 0) / 1e6).toFixed(1) };
 }
 
+/** `HAND_ONLY=1`: only the Hand tool pair (with and without the bar), saved as S6A-09-hand-pair. */
+const HAND_ONLY = process.env.HAND_ONLY === "1";
 const FADE = '[data-testid="layer-fade"]';
 const BLOCK = '[data-testid="block"]';
 const focusOn: Step = { click: '[data-testid="button-focus"]', until: [{ sel: FADE, count: 1 }] };
@@ -157,6 +159,16 @@ test("S6A-09: chips, “Show all” and a chip appearing, to the screen on “Pe
   for (const [name, { view, card }] of Object.entries(views)) {
     results[name] = {};
     const r = results[name]!;
+    if (HAND_ONLY) {
+      const hand: Step = { click: '[data-testid="button-tool-hand"]', until: [{ sel: '[data-testid="area-canvas"]', attr: ["data-mode", "hand"] }] };
+      const handOnOff: Scenario = { on: [hand], off: [{ click: '[data-testid="button-tool-hand"]', until: [{ sel: '[data-testid="area-canvas"]', attr: ["data-mode", null] }] }] };
+      await open(page, view);
+      await run(name, "Hand tool on and off, with the bar", handOnOff);
+      await open(page, view, "noviewbar");
+      await run(name, "Hand tool on and off, without the bar", handOnOff);
+      saveResults("S6A-09-hand-pair", { measured: MEASURE, browser: browser.version(), pane, views: results });
+      continue;
+    }
 
     // the drawing layers: no chips; Focus, the layer, a filter and the Hand tool on (four chips and “Show all”); the same
     // without the bar, so the bar's own share shows

@@ -26,7 +26,9 @@ export function Breadcrumbs({ shell, children }: { shell: ShellData; children?: 
     <nav
       aria-label="Breadcrumbs"
       data-testid="nav-breadcrumbs"
-      className="flex h-8 min-w-0 flex-none items-center gap-1.5 overflow-hidden border-b border-im-line bg-im-canvas px-2 text-xs"
+      // contained (slice 6a, S6A-09): a chip coming or going lays out this row only, not the page with the canvas's
+      // cards; a static property on the row's own element (AD-24 rule 4), its height fixed anyway
+      className="flex h-8 min-w-0 flex-none items-center gap-1.5 overflow-hidden border-b border-im-line bg-im-canvas px-2 text-xs [contain:strict]"
     >
       <ol className="flex min-w-0 items-center gap-0.5 overflow-hidden whitespace-nowrap text-im-ink-3">
         {parts.map((part, i) => {

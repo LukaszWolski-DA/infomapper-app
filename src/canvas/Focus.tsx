@@ -110,13 +110,13 @@ export function FocusButton() {
       title="Fade everything not connected to the selection"
       data-testid="button-focus"
       onClick={() => toggleFocus(ui.selection, toast)}
-      className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover hover:text-im-ink aria-pressed:bg-im-logical-soft aria-pressed:text-im-logical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+      className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover max-[2101px]:px-1.5 hover:text-im-ink aria-pressed:bg-im-logical-soft aria-pressed:text-im-logical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.4] [stroke-linecap:round]" aria-hidden>
         <circle cx="8" cy="8" r="3" />
         <path d="M8 1.5v2.5M8 12v2.5M1.5 8h2.5M12 8h2.5" />
       </svg>
-      <span className="hidden lg:inline">Focus</span>
+      <span className="hidden min-[1881px]:inline">Focus</span>
     </button>
   );
 }

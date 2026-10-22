@@ -250,12 +250,20 @@ const toReqNode = (card: RequirementCardData, editable: boolean): ReqNodeT => ({
   style: { pointerEvents: "all" },
 });
 
-function readView(canvasId: string): Viewport | null {
+/**
+ * A remembered view: the canvas's coordinates, and since slice 6a where the canvas's left edge was on the screen when it
+ * was saved (`left`: the left panel's width, 0 when hidden or up to 1000 px wide). A view without it (saved before) is
+ * read as it is.
+ */
+type SavedView = Viewport & { left?: number };
+
+function readView(canvasId: string): SavedView | null {
   const raw = readPreference(viewKey(canvasId));
   if (!raw) return null;
   try {
-    const v = JSON.parse(raw) as Viewport;
-    return [v.x, v.y, v.zoom].every(Number.isFinite) && v.zoom >= MIN_ZOOM && v.zoom <= MAX_ZOOM ? v : null;
+    const v = JSON.parse(raw) as SavedView;
+    if (!([v.x, v.y, v.zoom].every(Number.isFinite) && v.zoom >= MIN_ZOOM && v.zoom <= MAX_ZOOM)) return null;
+    return Number.isFinite(v.left) ? v : { x: v.x, y: v.y, zoom: v.zoom };
   } catch {
     return null;
   }
@@ -392,8 +400,13 @@ export function ModelCanvas({
     [rf, storeApi],
   );
 
+  // saved with the canvas's left edge on the screen (slice 6a, D-54): opened beside another left panel, the view is
+  // moved by the difference, so the model stands where it stood
   const onMoveEnd = useCallback(
-    (_: unknown, v: Viewport) => writePreference(viewKey(canvasId), JSON.stringify(v)),
+    (_: unknown, v: Viewport) => {
+      const left = rootRef.current?.getBoundingClientRect().left;
+      writePreference(viewKey(canvasId), JSON.stringify(left === undefined ? v : { ...v, left: Math.round(left) }));
+    },
     [canvasId],
   );
 
@@ -1485,7 +1498,12 @@ export function ModelCanvas({
   useEffect(() => {
     if (ready || !sized) return;
     const { width, height } = storeApi.getState();
-    void rf.setViewport(readView(canvasId) ?? fitView(width, height));
+    const saved = readView(canvasId);
+    // the one view set on open: a view saved beside another left panel moves by the difference in the same call, so
+    // there is no second commit and no visible jump (slice 6a, item 13)
+    const left = Math.round(rootRef.current?.getBoundingClientRect().left ?? 0);
+    const view = saved ? { x: saved.x + (saved.left === undefined ? 0 : saved.left - left), y: saved.y, zoom: saved.zoom } : fitView(width, height);
+    void rf.setViewport(view);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the view can only be set once the pane has a size
     setReady(true);
   }, [ready, sized, storeApi, canvasId, rf, fitView]);

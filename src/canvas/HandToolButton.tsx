@@ -22,12 +22,12 @@ export function HandToolButton() {
         ui.setMode(on ? null : { kind: "hand" });
         if (!on) toast(HAND_TOOL_HINT);
       }}
-      className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover hover:text-im-ink aria-pressed:bg-im-logical-soft aria-pressed:text-im-logical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+      className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover max-[2101px]:px-1.5 hover:text-im-ink aria-pressed:bg-im-logical-soft aria-pressed:text-im-logical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.4] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden>
         <path d="M5.5 8V3.8a1 1 0 0 1 2 0V7.5M7.5 7V2.8a1 1 0 0 1 2 0V7.5M9.5 7.2V3.8a1 1 0 0 1 2 0v5.4c0 2.7-1.8 4.8-4.3 4.8-1.6 0-2.6-.7-3.5-2L2.2 9.4a1 1 0 0 1 1.6-1.2L5.5 10" />
       </svg>
-      <span className="hidden lg:inline">Hand</span>
+      <span className="hidden min-[1881px]:inline">Hand</span>
     </button>
   );
 }

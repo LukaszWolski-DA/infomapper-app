@@ -1,6 +1,6 @@
 # Slice 6a – Acceptance
 
-Status: **step 3 (“Show all”, undo, the diagnosis) done, waiting for Łukasz.** Branch `slice/06a-view-state-bar`, from `main` at the tag
+Status: **step 4 (layout: the top bar, the remembered view) done, waiting for Łukasz.** Branch `slice/06a-view-state-bar`, from `main` at the tag
 `slice-05a` (`93f0df7`). PRD: `docs/prd/slice-06a-view-state-bar.md`. The PRD stays as written; this file is its
 amendment (Łukasz, 21 October 2026).
 
@@ -381,8 +381,8 @@ settled pairs each, to the first GPU present after the switch's commit, medians 
 | (Focus on with the button, both loops) | 42.9 / 61.8, 43.2 / 63.7 | 40.8 / 50.3, 38.4 / 44.4 |
 | “Show all”: Focus and a filter | 501.5 / 532.5 | 233.4 / 292.8 |
 | The same through the Focus button and the card's filter button | 410.9 / 460.3 | 211.5 / 234.3 |
-| “Show all”: five frames collapsed (and the Hand tool) | 849.5 / 867.0 | 451.2 / 524.1 |
-| The same through “Expand all” and the Hand tool's button | 802.2 / 934.9 | 465.6 / 494.4 |
+| “Show all”: five frames collapsed (and the Hand tool) | 849.5 / 867.0 (incl. 1 unsettled switch of 10) | 451.2 / 524.1 |
+| The same through “Expand all” and the Hand tool's button | 802.2 / 934.9 (incl. 2 unsettled switches of 10) | 465.6 / 494.4 |
 | Hand tool on, with the bar (its chip appears) | 75.0 / 150.7 | 171.8 / 223.1 |
 | Hand tool on, without the bar | 67.8 / 161.7 | 157.1 / 205.8 |
 | Hand tool off, with the bar | 62.0 / 76.1 | 153.8 / 163.1 |
@@ -410,3 +410,107 @@ Runs: lint, typecheck, unit tests (79 files, 1,040 tests) pass. The slice's spec
 “Collapse all”/“Expand all”, which share the frames' queue), S5A-07, S4B1-06 and S4B1-08: 47 passed, 5.3 min.
 S6A-09 in the measurement build: passed, 14.6 min (two earlier attempts stopped on the test itself: a click in the
 dense view the neighbouring cards covered, then the clash of test ids, both fixed).
+
+Łukasz accepted step 3 (22 October 2026): the fresh page after “Show all” stays, and the idea of dropping it when only
+cards change goes to `docs/ideas.md` (done).
+
+## Step 4: layout (22 October 2026)
+
+### Before step 4: three points
+
+**1. Why a chip costs more on a dense canvas.** `S6A-09-hand.spec.ts` (measurement build, on demand) traces seven
+single “Hand on” switches per case and sums the main thread's phases in the 300 ms after the click (medians, ms):
+
+| Case | script | style (elements) | layout (dirty / total objects) | paint | layerize |
+| --- | --- | --- | --- | --- | --- |
+| 30 %, with the bar | 42.0 | 23.3 (5,165) | 2.6 (36 / 15,578) | 5.5 | 20.4 |
+| 30 %, without the bar | 15.7 | 28.9 (5,158) | 0 | 6.0 | 20.4 |
+| 100 % dense, with the bar | 112.0 | 79.0 (19,957) | 5.9 (36 / 56,148) | 23.8 | 11.2 |
+| 100 % dense, without the bar | 34.1 | 81.6 (19,952) | 0 | 20.9 | 11.5 |
+
+- **Style is not the bar's.** The Hand tool's own class on the canvas restyles about 20,000 elements in the dense view
+  (5,000 at 30 %), with or without the bar; the chip adds 5 to 7 elements.
+- **Layout is the bar's, and it grows with the canvas.** Without the bar the switch has no layout at all. With it, one
+  layout with 36 dirty objects runs over a layout tree of 56,148 objects in the dense view (15,578 at 30 %): 5.9 against
+  2.6 ms.
+- **Where the time goes:** with the bar, script grows by about the style time (about 70 ms dense, 25 ms at 30 %). The
+  fold reads the chips' widths (`offsetWidth`) in a layout effect right after the Hand tool's class change, so the
+  browser recalculates the 20,000 styles and lays the page out synchronously inside the commit instead of in its own
+  frame step. The work moves; it is not done twice.
+- **Tried: a static `contain: strict` on the breadcrumbs row** (`breadcrumbs.tsx`; the row's own element, never toggled,
+  its height fixed anyway; AD-24 rule 4 holds). The trace still shows one layout with 36 dirty of 56,148 objects
+  (4.1 ms dense, 1.9 ms at 30 %, within the drift of the other phases between the two runs: paint moved as much), and
+  the forced style stays.
+- **S6A-09's Hand pair, before / after the containment** (to the screen, median beyond the same switch without the bar):
+  30 % +7.2 → +2.3 ms; dense +14.7 → +10.1 ms (Hand off: +0.5 → +1.1, +3.7 → −0.6). Both within the 16 ms limit.
+- **Cause and proposal (not done, as asked):** the remaining growth is the synchronous style and layout that the fold's
+  width reads force when a chip appears in the same commit as a canvas restyle. *Proposal:* measure the chips without
+  forcing it: take their widths from a `ResizeObserver` on the hidden copy (it reports after the browser's own layout)
+  and fold from there, so a chip appearing never reads layout in the commit. The containment stays: static, harmless,
+  and it keeps the row's own layout to itself.
+
+**2. S6A-09 is on demand, like S5A-08.** `playwright.config.ts` ignores `S5A-08.spec.ts` and now `S6A-09*.spec.ts`
+(S6A-09 and its follow-up `S6A-09-hand`) unless `MEASURE_BUILD=production`, so `npm run e2e` never runs them; both need
+`npm run measure:build` and `MEASURE=1 MEASURE_BUILD=production`. `HAND_ONLY=1` runs only S6A-09's Hand pair.
+
+**3. `resetCanvasView` moved to `src/domain/commands/canvas.ts`**, with the canvas-level commands (create, rename, look),
+written there on its own rows instead of the frame commands' draft; its 7 tests are in `canvas.test.ts` (the undo test
+now carries the card's entity and concept, which the undo's consistency check needs). The frames scenario's medians in
+step 3's table are marked as including 1 and 2 unsettled switches.
+
+### The top bar (items 9–11 as amended)
+
+- **The prototype's steps**, each a class on the element itself: up to 2,100 px short labels (All / Maps / Rels, IE /
+  UML), narrower tool padding and switchers (150 px); up to 1,880 px icons only for Focus, Hand, Entity, Note and Frame
+  and no “No working context” text; up to 1,300 px no brand and no path separators, switchers 110 px, the working
+  context's label at most 100 px. Tailwind's `min-[1880px]` includes 1,880 px while the prototype's steps apply at
+  ≤ 1,880, so the app's boundaries are written 1 px higher (`max-[1881px]`, `min-[1881px]`).
+- **The tools never shrink** (`bar-tools` is `flex-none`): the switchers' names shorten first, down to 52 px (44 px up to
+  1,000 px).
+- **“More” (⋯)**, `src/canvas/MoreTools.tsx`, at the tools' right end; the widths in `src/canvas/more-breakpoints.ts` (a
+  plain module, since the server page and the client menu share them): **up to 1,200 px** Focus and the notation switch
+  move there, **up to 1,100 px** the Entity, Frame, Note and Hand tools too. Set by measurement with the working context
+  on (its widest state, “Working on CR-23”): at 1,101 px the bar overflowed by 35 px with Focus and the notation still in
+  it, and at 1,001 px the switchers were at their minimum with no room left for a longer role label (e.g. “Modeler ·
+  guest”), so both steps moved up by 100 px from my first try (1,100 and 1,000). Up to 1,200 px the working context's
+  label is at most 56 px, up to 1,000 px 40 px; up to 1,000 px the bar's gaps and the layer switch's padding are smaller.
+  The layer switch, the working context, undo, zoom, both panel buttons and the user indicator are never in “More”.
+
+**Measured** (S6A-10, Łukasz on Customer & orders, working context on, both panels shown; scroll = how far the bar
+scrolls; switchers organization / workspace / project; px). Before (step 1): tools cut from about 1,700 px (zoom at
+1,600; working context, undo and zoom at 1,300; notation, context, undo and zoom at 1,000; Note and Hand too at 800).
+After: nothing cut at any width.
+
+| Window | scroll | switchers | tools in the bar |
+| --- | --- | --- | --- |
+| 2,560 | 0 | 88/131/118 | layer 261, Focus 72, Entity 72, Frame 75, Note 66, Hand 69, notation 136, context 136, undo 56, zoom 128 |
+| 2,100 | 0 | 84/127/114 | layer 136, Focus 68, Entity 68, Frame 71, Note 62, Hand 65, notation 83, context 136, undo 56, zoom 128 |
+| 1,880 | 0 | 84/127/114 | layer 136, Focus 28, Entity 28, Frame 28, Note 28, Hand 28, notation 83, context 136, undo 56, zoom 128 |
+| 1,600 | 0 | 84/127/114 | the same |
+| 1,536 | 0 | 84/127/114 | the same |
+| 1,300 | 0 | 84/110/110 | the same, context 130 |
+| 1,201 | 0 | 58/86/77 | the same (the tightest width: 6, 34 and 25 px above the switchers' minimum) |
+| 1,200 | 0 | 84/110/110 | layer 136, Entity 28, Frame 28, Note 28, Hand 28, context 86, undo 56, zoom 128, More 28 |
+| 1,101 | 0 | 67/99/90 | the same |
+| 1,100 | 0 | 84/110/110 | layer 136, context 86, undo 56, zoom 128, More 28 |
+| 1,000 | 0 | 84/110/110 | layer 112, context 70, undo 56, zoom 128, More 28 |
+| 800 | 0 | 51/74/67 | the same |
+
+### The remembered view (items 12–14 as amended in Q5)
+
+`ModelCanvas` saves the view as `{ x, y, zoom, left }`, `left` the canvas root's left edge on the screen (rounded), on
+every `onMoveEnd` (React Flow also reports the opening view, so a view is in the new format right after a canvas
+opens). On open, the one `setViewport` it already makes moves `x` by the saved `left` minus the current one; the canvas
+is still hidden then, so there is no second commit and no visible jump. A view without `left` opens as stored.
+
+### Tests and runs
+
+- S6A-10 (above) and S6A-11 (two tests: an old view opens exactly as stored; a view saved with the left panel at 264 px,
+  put back as saved, opens with the card at its place, ±1 px, with the panel hidden, at 520 px and in a 1,000 px
+  window).
+- Lint, typecheck, unit tests (79 files, 1,040 tests) pass.
+- The slice's specs, slice 5a's (S5A-02, S5A-04, S5A-06 and the rest), S0-11, and every earlier spec that touches the
+  top bar's tools, the switchers, the working context, the viewport size or a copied view (39 files: S0-02 to S0-10,
+  S1A-06, S1B-07, S1B-14, S2A-07, S2A-08, S2A-10, S2A-11, S2A-13, S2B-01, S2B-12, S2B-13, S2C-06, S2C-09, S3A-06,
+  S3A-11, S3A-13, S3B-01 to S3B-04, S3B-10, S3B-12, S4B1-06, S4B1-08, S4B2-03, S4B2-07, S4B2-09): **93 passed,
+  14.5 min**; no earlier spec changed.

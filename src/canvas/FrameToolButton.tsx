@@ -22,13 +22,13 @@ export function FrameToolButton() {
         ui.setMode(on ? null : { kind: "frame" });
         if (!on) toast(FRAME_TOOL_HINT);
       }}
-      className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover hover:text-im-ink aria-pressed:bg-im-logical-soft aria-pressed:text-im-logical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
+      className="inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover max-[2101px]:px-1.5 hover:text-im-ink aria-pressed:bg-im-logical-soft aria-pressed:text-im-logical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
     >
       <svg viewBox="0 0 16 16" className="size-4 fill-none stroke-current stroke-[1.5] [stroke-linecap:round] [stroke-linejoin:round]" aria-hidden>
         <rect x="2.5" y="4" width="11" height="9.5" rx="2.5" strokeDasharray="2.5 2" />
         <path d="M2.5 2h5" />
       </svg>
-      <span className="hidden lg:inline">Frame</span>
+      <span className="hidden min-[1881px]:inline">Frame</span>
     </button>
   );
 }

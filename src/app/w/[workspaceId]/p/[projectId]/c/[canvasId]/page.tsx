@@ -37,6 +37,8 @@ import { FrameToolButton } from "@/canvas/FrameToolButton";
 import { buildLines } from "@/canvas/line-data";
 import { buildNotes } from "@/canvas/note-data";
 import { NoteToolButton } from "@/canvas/NoteToolButton";
+import { MoreTools } from "@/canvas/MoreTools";
+import { MORE_FOCUS, MORE_TOOLS } from "@/canvas/more-breakpoints";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
 import { EntityToolButton } from "@/canvas/EntityToolButton";
 import { HandToolButton } from "@/canvas/HandToolButton";
@@ -318,17 +320,26 @@ export default async function CanvasPage({
   );
 }
 
+// On a narrow window Focus and the notation, then the four tools, leave the bar for “More” (slice 6a): each wrapper is
+// the tool's own element in the bar (`display: contents` until its breakpoint).
 const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolean }) => (
   <>
     <LayerSwitch />
-    <FocusButton />
-    {editable && <EntityToolButton />}
-    {editable && <FrameToolButton />}
-    {canNote && <NoteToolButton />}
-    <HandToolButton />
-    <NotationSwitch />
+    <span className={`contents ${MORE_FOCUS.inBar}`}>
+      <FocusButton />
+    </span>
+    <span className={`contents ${MORE_TOOLS.inBar}`}>
+      {editable && <EntityToolButton />}
+      {editable && <FrameToolButton />}
+      {canNote && <NoteToolButton />}
+      <HandToolButton />
+    </span>
+    <span className={`contents ${MORE_FOCUS.inBar}`}>
+      <NotationSwitch />
+    </span>
     <WorkingContextButton />
     <UndoButtons />
     <ZoomControls />
+    <MoreTools editable={editable} canNote={canNote} />
   </>
 );
