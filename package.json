@@ -61,6 +61,7 @@
   "overrides": {
     "@tiptap/react": {
       "fast-equals": "5.4.3"
-    }
+    },
+    "handlebars": "4.7.10"
   }
 }
