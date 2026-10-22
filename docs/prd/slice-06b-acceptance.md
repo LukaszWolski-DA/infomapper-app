@@ -1,6 +1,6 @@
 # Slice 6b – Acceptance
 
-Status: **step 4 (closing): full e2e run done; waiting for Łukasz's manual acceptance and his merge command.** Branch `slice/06b-back-and-forward`, from `main` at
+Status: **accepted by Łukasz (manual acceptance passed, 22 October 2026); merged on his command, tag `slice-06b`.** Branch `slice/06b-back-and-forward`, from `main` at
 the tag `slice-06a` (`80241ef`). PRD: `docs/prd/slice-06b-back-and-forward.md`. The PRD stays as written; this file is
 its amendment (Łukasz, 22 October 2026).
 
@@ -481,3 +481,5 @@ at least 1,600 px wide.
 | 7 | Select Customer, click its name in the details panel, add “ X” without leaving the field, press Alt+←. | The browser goes back (Windows: Alt+← in a field is the browser's); Forward to Customer: its name is “Customer X” (saved). Put the name back. |
 | 8 | Narrow the window to 1,100 px. | Back and Forward still at the row's left end, nothing in the top bar or the row cut off. |
 | 9 | Firefox: open http://localhost:3000 in Firefox, sign in, repeat steps 1 and 3 with the buttons (and the mouse's back button). | The same as in Chrome or Edge. |
+
+Łukasz: manual acceptance passed (22 October 2026), all steps, including the mouse's back and forward buttons, Alt+← in a field (the edit saved) and Firefox; merge on his command.
