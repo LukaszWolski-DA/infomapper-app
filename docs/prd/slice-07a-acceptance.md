@@ -1,7 +1,78 @@
 # Slice 7a – Acceptance
 
-Status: **step 1 done, waiting for Łukasz's answers** (22 October 2026). Branch `slice/07a-source-import`, from `main`
-at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as written; this file is its amendment.
+Status: **step 1 accepted by Łukasz's answers (22 October 2026); step 2 waits for his go.** Branch
+`slice/07a-source-import`, from `main` at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as
+written; this file is its amendment (Łukasz, 22 October 2026).
+
+## Łukasz's answers to step 1 (22 October 2026)
+
+Guiding principle for all of them: the modeller stays in control and sees what will happen before it happens. Nothing
+changes silently; whatever an import does is visible before it is written and can be undone.
+
+1. **Branch:** from `main` including PR #18.
+2. **Old references:** the old prototype's name stays in closed slices, the inventory and the spike.
+3. **`max` (F2):** `type_length = -1`, on one condition: -1 lives only inside the domain's type reader and storage;
+   every screen, review row and export shows `max`, never -1. Existing rows that lost `max`: see "Open after the
+   answers", point 1.
+4. **Fractional seconds (F3):** kept as precision; one type reader for "New source table" and the import.
+   `datetime2(3)` → `datetime2(7)` is a real change and shows as one; differences that are not real never show.
+5. **Type table (F4):** Oracle and PostgreSQL names in D-01's table, `number(p,0)` as integer. **New criterion
+   S7A-16:** re-importing an unchanged SQL Server, PostgreSQL and Oracle file shows no changes and sends no mapping to
+   review.
+6. **`review_reason` (F6):** set only when an import moves a mapping from approved to review; cleared on any change of
+   the mapping's status or content.
+7. **Four-eyes (F7):** yes, and only while four-eyes is on: it stays a workspace setting (AD-06, off by default). With
+   it off, the person who ran the import approves the mapping themselves. P6 applies either way: it answers "is the
+   approval still valid", not "who approves", consistent with D-51, which already applies with four-eyes off.
+8. **Column comment (F19): stays editable** (tables added with "New source table" need it until 7c). A re-import that
+   would overwrite it shows it in the review as a change ("comment: {current} → {from the source}"), so the modeller
+   sees it before importing. P2 still lets a file without `column_comment` leave every comment alone.
+9. **Coverage (F20):** in 7a, an approved mapping from a column missing from source no longer counts toward coverage.
+10. **Seed (F21):** the attribute lengths and the two source relationships from the new prototype go into the seed.
+11. **Positions (F23):** the new position is written; the review shows "position {a} → {b}" among the unchanged
+    columns, not counted as a change.
+12. **Upload and P8 (F15, F16):** a separate upload endpoint (route handler; the write still goes through the domain
+    command, AD-23); the server rebuilds the plan and compares it with the one shown in the review.
+13. **Size (F17):** measure at 20,000 and 100,000 column rows, then propose the limit with the figures.
+14. **"New source table" (F27):** stays, with the proposed texts for its hint and the empty workspace.
+15. **Samples (F25):** `src/domain/import/samples/`, on one condition: no application code imports them and they
+    never reach the client bundle (P10: no samples in the app). Only tests read them.
+16. **Tests per step (F28):** CI after steps 2 and 3; a full e2e run after steps 4, 5 and 6; two full runs in a row
+    at the close.
+17. **Extra figure (F10):** moving a card after three large imports, bar 500 ms.
+18. **CLAUDE.md rule:** word for word, added in step 1 as its own commit.
+
+Also:
+
+- **S7A-08 (F1):** the type conflict is tested on a direct mapping; the business key change and the renamed input in
+  the rule on a combined mapping.
+- **`docs/ideas.md`, for 7b:** "Approve again all {n}" for the mappings one import sent back to review (added).
+
+### Open after the answers
+
+1. **Rows that lost `max` (answer 3).** The demo seed and `seed:large` have no `(max)` column, so no seeded row lost
+   it. Only columns typed by hand as `(max)` in a local data file are stored with no length; that information is gone
+   and cannot be recovered. From step 2 on, "New source table" stores `(max)` as -1. A later re-import of such a
+   column from a file that says `max` shows one real change against what is stored, "type nvarchar → nvarchar(max)",
+   and writes -1. Nothing is converted silently.
+2. **Answer 10 makes a demo mapping a type problem.** With Customer.email at `string(120)`, the draft mapping
+   `web_users.email` (`varchar(255)`) → Customer.email no longer fits: the canvas shows its warning chip and the
+   status bar's "Type problems" goes up by one. The new prototype has the same seed and the same result. Earlier specs
+   that count type problems or read that line are checked when the seed changes (step 6); I take this as intended
+   unless you say otherwise.
+3. **Answer 8 and P1.** P1 says the source owns the comment, and the comment stays editable. I write it into the new
+   D-entry as: the source owns it on re-import, the modeller may edit it in between, and the review shows every
+   overwrite. The review shows the overwrite whether the stored comment came from a person or from an earlier import.
+4. **Answer 5's criterion needs vendor files.** S7A-16 needs one file per vendor shaped as its catalog query returns it
+   (Oracle and PostgreSQL type names, `NULL` cells). They are made in step 2 next to the prototype's samples in
+   `src/domain/import/samples/`.
+5. **Answer 15's condition is enforced by lint.** Step 2 adds an ESLint rule: files under
+   `src/domain/import/samples/` may be read only from `*.test.ts`, `tests/` and `e2e/`; the samples are text files read
+   with `fs`, not modules, so no bundle can include them.
+6. **Steps 2 and 3 change behaviour the app already has.** Steps 2–3 are CI only (answer 16), but step 2's type changes
+   (`max`, the type table, one type reader) touch the type check and "New source table" that pages already use. Under
+   CLAUDE.md's rule for a step's touched specs, step 2 also runs the earlier specs of the type check and of "New
+   source table" (slice 1a, 1b). Say if you want them left to step 4's full run.
 
 ## Step 1: start checks (22 October 2026)
 
@@ -407,7 +478,7 @@ Nothing else in the main prototype changed (2,231 diff lines, all inside these h
 | `docs/decisions.md` | new D-entry "Source import" (P1–P5, P7–P10 as amended here); D-51 extended with P6, F6, F7; D-26 with P9; D-01's type table with F2–F4. Quoted text for approval first | step 4 |
 | `docs/data-model-v2.md` | section 5: new columns, `source_relationship`, `source_relationship_column`, `source_import`; section 6: `review_reason`; the standard v1 as the import format (D-13); `type_length = -1` if F2 is accepted | step 4 |
 | `docs/inventory-prototype-vs-app.md` | rewritten against the new file; "Sources" lists what 7b and 7c still miss | step 7 |
-| `docs/ideas.md` | own headers in the standard; dbt, Snowflake, Databricks; relationships as grey lines on the canvas | step 7 |
+| `docs/ideas.md` | "Approve again all {n}" for 7b (done in step 1); own headers in the standard; dbt, Snowflake, Databricks; relationships as grey lines on the canvas | step 1, 7 |
 | `docs/known-limitations.md` | the size limit; no changes to resolve in 7a; F30 (key names); F31 (undo) | step 7 |
 | `README.md` | the import in the model section; the bench script | step 7 |
 

@@ -152,3 +152,10 @@ collapsed cards change, the canvas already shows the result, and the card's own 
 without a fresh page. In S6A-09 that refresh made “Show all” with Focus and a filter about 90 ms slower to the screen
 than the same changes through the controls at 30 % (22 ms in the dense view). The action could skip the refresh when no
 frame changed.
+
+## “Approve again all {n}” after an import (slice 7a, step 1; for slice 7b)
+
+One import can send many approved mappings back to review (P6: a new type conflict, a business key column that changed
+type, a renamed input in the rule). A button “Approve again all {n}” for the mappings one import sent back, with each
+one's reason shown before the click, would spare a solo modeller approving them one by one. It respects four-eyes: with
+four-eyes on, the person who ran the import cannot use it for those mappings (Łukasz, 22 October 2026).
