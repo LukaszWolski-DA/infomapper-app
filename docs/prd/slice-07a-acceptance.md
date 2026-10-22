@@ -1,6 +1,6 @@
 # Slice 7a – Acceptance
 
-Status: **step 1 accepted by Łukasz's answers (22 October 2026); step 2 waits for his go.** Branch
+Status: **step 2 done (22 October 2026); step 3 waits for Łukasz's go.** Branch
 `slice/07a-source-import`, from `main` at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as
 written; this file is its amendment (Łukasz, 22 October 2026).
 
@@ -537,3 +537,91 @@ To add as a new bullet after "Work in the steps the PRD lists…", exactly:
 16. **Tests per step (F28):** steps 2–3 CI only; full e2e after 4, 5, 6 and two at closing?
 17. **F10's extra figure:** a card move after three large imports, bar 500 ms?
 18. **The CLAUDE.md rule:** approve the text above?
+
+## Łukasz's answers to the open points (22 October 2026)
+
+All six as proposed: rows that lost `max` show the real change on their next import; the new type problem in the demo
+(`web_users.email` → Customer.email `string(120)`) is intended, a draft that P6 does not touch, checked in step 6; the
+D-entry text for answer 8 and P1; S7A-16's vendor files; the lint rule for the samples. **Tests after step 2:** CI plus
+the e2e specs of what the step changes (the small-slice rule), at least "New source table" (S1A-13), the type check and
+its warning chips, the status bar's type-problem count and D-51's specs; a failing spec three times on its own. Steps
+4, 5 and 6 keep their full e2e runs.
+
+## Step 2: readers in the domain (22 October 2026)
+
+### What changed
+
+- **One type reader** (`readColumnType`, `src/domain/model/column-type.ts`), used by "New source table"
+  (`parseColumnLines`) and the import. `max` and -1 are stored as `MAX_LENGTH` (-1) and shown as `max` everywhere
+  (`formatColumnType`); fractional seconds stay precision (`datetime2(7)`); Oracle's length units are dropped
+  (`varchar2(100 char)`); `timestamp(6) with time zone` keeps its parameter and is shown that way. The same type written
+  differently reads the same (`VARCHAR (20)` and `varchar(20)`).
+- **The type table** (`src/domain/model/type-check.ts`, D-01): `varchar2`, `nvarchar2`, `long` (text); `binary_double`,
+  `binary_float` (decimal); the timestamp and time names with and without time zone (temporal); `number(p,0)` and
+  `number(p)` are integers (`columnClass`); `max` is longer than any string length; a new attribute from a `max`
+  column is a string without length. `TYPE_ALIASES` is the one table of spellings for step 3's comparison.
+- **The standard reader** (`readStandard`, `src/domain/import/standard.ts`, items 7–13) and delimited text
+  (`src/domain/import/delimited.ts`), `STANDARD_TEMPLATE` (`template.csv`), `MAX_IMPORT_ROWS` (100,000 until the
+  figures of steps 3–4 set it).
+- **The DDL translator** (`ddlToStandard`, `readDdl`, `skippedText`, `ddlSummaryText`, `src/domain/import/ddl.ts`,
+  items 16–18), a port of the prototype that keeps type parameters (answer 4).
+- **Samples** in `src/domain/import/samples/` (README there): the prototype's three standard samples and three DDL
+  samples, written from the prototype's own code; three catalog-query results for S7A-16 (SQL Server as SSMS copies it,
+  PostgreSQL as psql writes it, Oracle as SQL Developer exports it). `.gitattributes` keeps their bytes (the SQL Server
+  file's CRLF).
+- **Lint** (`eslint.config.mjs`): outside `*.test.ts` nothing in `src/` may import or name `import/samples` (checked
+  with a probe file: an import, a string and a template literal are refused); domain tests may read files from disk;
+  the rest of the domain still may not.
+- **Earlier spec changed:** `S1A-13` now expects `nvarchar(max)` on the card and `type_length` -1 in the data.
+
+### Decisions I took (please check)
+
+1. **P11's text names the table:** "Classification “{name}” on {schema}.{table} is not read yet: only Business key and
+   PII are read for now." Without the table, the same line listed once per table reads as a duplicate. No slice name
+   (F24).
+2. **"Personal data" counts as PII** besides the code `PII`: the column panel calls the flag "Personal data".
+3. **A type the reader cannot read** (`integer[]`, PostgreSQL arrays) is kept as written, without parameters, as the
+   prototype does; no warning (none in the PRD).
+4. **Several missing headers** read "The file has no “database”, “schema” columns." (plural); one reads as item 9.
+5. **Warnings name the file's line**, also after blank lines and line breaks inside quotes (the prototype counted rows).
+6. **The DDL channel keeps the prototype's spellings** (`integer` → `int`, `timestamp with time zone` →
+   `timestamptz`); the catalog queries return their own. Step 3 compares both sides through `TYPE_ALIASES`, so a
+   spelling never shows as a change.
+
+### How to check
+
+```
+npx vitest run src/domain/import src/domain/model
+npx tsx scripts/bench-import-read.ts
+```
+
+### Runs
+
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: **84 files, 1,111 tests pass** (51 new in `src/domain/import`,
+  the rest of the new ones in `column-type.test.ts`, `column-lines.test.ts`, `type-check.test.ts`).
+- e2e, the specs of what step 2 changes: **10 passed, 1.9 min**, none failed.
+
+| Spec | Why |
+| --- | --- |
+| S1A-13 | "New source table" now reads types through `readColumnType` (`max`) |
+| S1A-09 | the type check, its warning chip and the status bar's type-problem count |
+| S1A-01 | the cards' column types and the type-problem marks on the lines |
+| S2B-07 | the frame chips' type-problem count |
+| S1B-03 (3 tests) | a new attribute from a column (`logicalTypeOf`) |
+| S1A-08, S1A-12 | D-51: a content change sends an approved mapping back to review; four-eyes |
+| S1A-11 | the reviewer: no "New source table", the server refuses `createSourceTable` |
+
+The seeds' types read the same as before (no `(max)`; `seed:large`'s types are `VARCHAR(50)`, `DECIMAL(18,2)` and
+others the old reader read the same way), so no seeded row changes.
+
+### Timings (Node, `scripts/bench-import-read.ts`, median of 5 after a warm-up)
+
+| Case | Size | Median (fastest–slowest) | Bar |
+| --- | --- | --- | --- |
+| Read the standard, 20,000 columns (2,000 tables) | 1.5 MB | 113 ms (94–128) | ≤ 1 s, met |
+| Translate and read a 2,000-table DDL script | 1.7 MB | 385 ms (344–499) | ≤ 2 s, met |
+| Read the standard, 100,000 columns (10,000 tables) | 7.7 MB | 539 ms (526–593) | ≤ 1 s, met |
+| Translate and read a 10,000-table DDL script | 8.3 MB | 1,772 ms (1,637–2,350) | ≤ 2 s, met, close |
+
+At 100,000 rows the standard is 7.7 MB, so the row limit, not the 20 MB, binds for files of this shape. The limit is
+proposed after steps 3 and 4 measure plan, apply and undo at both sizes (answer 13).
