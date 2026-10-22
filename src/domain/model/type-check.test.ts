@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { AttributeType } from "../types";
-import { checkColumnType, checkMappingTypes, formatAttributeType, formatColumnType, logicalTypeOf, physicalClass, type ColumnType } from "./type-check";
+import { checkColumnType, checkMappingTypes, columnClass, formatAttributeType, formatColumnType, logicalTypeOf, MAX_LENGTH, physicalClass, type ColumnType } from "./type-check";
 
 const attr = (data_type: AttributeType["data_type"], over: Partial<AttributeType> = {}): AttributeType => ({
   data_type,
@@ -181,5 +181,50 @@ describe("logicalTypeOf: the type table in reverse (slice 1b, new attribute from
       col("date"), col("datetimeoffset"), col("time"), col("boolean"), col("json"), col("xml"), col("varbinary", { type_length: 16 }),
     ];
     for (const c of columns) expect(fits(logicalTypeOf(c), c), formatColumnType(c)).toBe(true);
+  });
+});
+
+describe("slice 7a: the catalog queries' names, Oracle's number and max (step 1, answers 3 and 5)", () => {
+  it("classifies Oracle's and PostgreSQL's long names", () => {
+    expect(["varchar2", "NVARCHAR2", "long"].map(physicalClass)).toEqual(["text", "text", "text"]);
+    expect(["binary_double", "binary_float"].map(physicalClass)).toEqual(["decimal", "decimal"]);
+    const temporal = ["timestamp with time zone", "timestamp without time zone", "timestamp with local time zone", "time with time zone", "time without time zone"];
+    expect(temporal.map(physicalClass)).toEqual(temporal.map(() => "temporal"));
+  });
+
+  it("makes number(p,0) and number(p) an integer, and number and number(p,s) a decimal", () => {
+    expect(columnClass(col("number", { type_precision: 10, type_scale: 0 }))).toBe("integer");
+    expect(columnClass(col("NUMBER", { type_precision: 10 }))).toBe("integer");
+    expect(columnClass(col("number", { type_scale: 0 }))).toBe("integer");
+    expect(columnClass(col("number"))).toBe("decimal");
+    expect(columnClass(col("number", { type_precision: 12, type_scale: 2 }))).toBe("decimal");
+    expect(fits(attr("integer"), col("number", { type_precision: 10, type_scale: 0 }))).toBe(true);
+    expect(fits(attr("integer"), col("number", { type_precision: 12, type_scale: 2 }))).toBe(false);
+    expect(fits(attr("decimal", { type_precision: 12, type_scale: 2 }), col("number", { type_precision: 10, type_scale: 0 }))).toBe(true);
+    expect(fits(attr("decimal", { type_precision: 8, type_scale: 2 }), col("number", { type_precision: 10, type_scale: 0 }))).toBe(false);
+    expect(logicalTypeOf(col("number", { type_precision: 10, type_scale: 0 })).data_type).toBe("integer");
+  });
+
+  it("fits the Oracle and PostgreSQL types to their attributes", () => {
+    expect(fits(attr("string", { type_length: 100 }), col("varchar2", { type_length: 100 }))).toBe(true);
+    expect(fits(attr("datetime"), col("timestamp with time zone", { type_precision: 6 }))).toBe(true);
+    expect(fits(attr("decimal"), col("binary_double"))).toBe(true);
+    expect(logicalTypeOf(col("time with time zone"))).toEqual(attr("custom", { custom_type: "time with time zone" }));
+  });
+
+  it("shows max as max and treats it as longer than any string length", () => {
+    const max = col("nvarchar", { type_length: MAX_LENGTH });
+    expect(formatColumnType(max)).toBe("nvarchar(max)");
+    expect(checkColumnType(attr("string", { type_length: 100 }), max)).toEqual({
+      ok: false,
+      message: "nvarchar(max) does not fit string(100): values can be longer than 100 characters.",
+    });
+    expect(fits(attr("string"), max)).toBe(true);
+    expect(logicalTypeOf(max)).toEqual(attr("string"));
+  });
+
+  it("puts the parameter of a timestamp with a time zone after its first word", () => {
+    expect(formatColumnType(col("timestamp with time zone", { type_precision: 6 }))).toBe("timestamp(6) with time zone");
+    expect(formatColumnType(col("timestamp with time zone"))).toBe("timestamp with time zone");
   });
 });

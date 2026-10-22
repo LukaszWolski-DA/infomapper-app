@@ -4,6 +4,9 @@
 //   decimal ← decimal or integer (precision and scale checks) · date, datetime ← date and time types
 //   boolean ← bit, boolean · json ← json or text · custom ← a column whose type has the custom type's name.
 // Anything else is a type problem with a short reason. A transform with a rule is never a type problem.
+// Slice 7a (step 1, answers 3 and 5): the Oracle and long PostgreSQL names the catalog queries return; Oracle's `number`
+// with scale 0, or with a precision and no scale, is an integer; a length of `MAX_LENGTH` (-1) is `max`, shown as
+// `(max)` and longer than any string length. -1 never leaves the domain's reader, storage and this file.
 
 import type { AttributeType, Mapping, SourceColumn } from "../types";
 import type { Uuid } from "../ids";
@@ -11,10 +14,13 @@ import type { Uuid } from "../ids";
 export type PhysicalClass = "text" | "integer" | "decimal" | "temporal" | "boolean" | "json" | "other";
 
 const PHYSICAL_CLASSES: Record<Exclude<PhysicalClass, "other">, readonly string[]> = {
-  text: ["varchar", "nvarchar", "char", "nchar", "text", "ntext", "string", "character varying", "character", "citext", "clob", "nclob", "uuid", "uniqueidentifier"],
+  text: ["varchar", "nvarchar", "char", "nchar", "text", "ntext", "string", "character varying", "character", "citext", "clob", "nclob", "uuid", "uniqueidentifier", "varchar2", "nvarchar2", "long"],
   integer: ["int", "integer", "bigint", "smallint", "tinyint", "int2", "int4", "int8", "serial", "bigserial"],
-  decimal: ["decimal", "numeric", "number", "float", "real", "double", "double precision", "float4", "float8", "money", "smallmoney"],
-  temporal: ["date", "datetime", "datetime2", "smalldatetime", "datetimeoffset", "timestamp", "timestamptz", "time", "timetz"],
+  decimal: ["decimal", "numeric", "number", "float", "real", "double", "double precision", "float4", "float8", "money", "smallmoney", "binary_double", "binary_float"],
+  temporal: [
+    "date", "datetime", "datetime2", "smalldatetime", "datetimeoffset", "timestamp", "timestamptz", "time", "timetz",
+    "timestamp with time zone", "timestamp without time zone", "timestamp with local time zone", "time with time zone", "time without time zone",
+  ],
   boolean: ["bit", "boolean", "bool"],
   json: ["json", "jsonb"],
 };
@@ -33,11 +39,30 @@ export const physicalClass = (dataType: string): PhysicalClass => CLASS_OF.get(b
 
 export type ColumnType = Pick<SourceColumn, "data_type" | "type_length" | "type_precision" | "type_scale">;
 
-/** `varchar(255)`, `decimal(18,2)`, `int`. */
+/** The stored length of `varchar(max)`, `nvarchar(max)`, `varbinary(max)` (SQL Server's own catalog value). */
+export const MAX_LENGTH = -1;
+
+/** Oracle's `number(10,0)` and `number(10)` hold whole numbers; `number` and `number(12,2)` do not. */
+const isWholeNumber = (c: ColumnType): boolean =>
+  baseType(c.data_type) === "number" && (c.type_scale === 0 || (c.type_precision !== null && c.type_scale === null));
+
+/** The class of a column: its physical type's, except Oracle's whole `number`, which is an integer. */
+export const columnClass = (c: ColumnType): PhysicalClass => (isWholeNumber(c) ? "integer" : physicalClass(c.data_type));
+
+/** Types whose parameter stands after their first word: `timestamp(6) with time zone`. */
+const PARAMETER_AFTER_FIRST_WORD = /^(timestamp|time) (with|without) /;
+
+/** `varchar(255)`, `nvarchar(max)`, `decimal(18,2)`, `int`, `timestamp(6) with time zone`. */
 export function formatColumnType(c: ColumnType): string {
-  if (c.type_length !== null) return `${c.data_type}(${c.type_length})`;
-  if (c.type_precision !== null) return `${c.data_type}(${c.type_precision}${c.type_scale !== null ? `,${c.type_scale}` : ""})`;
-  return c.data_type;
+  const params =
+    c.type_length !== null
+      ? `(${c.type_length === MAX_LENGTH ? "max" : c.type_length})`
+      : c.type_precision !== null
+        ? `(${c.type_precision}${c.type_scale !== null ? `,${c.type_scale}` : ""})`
+        : "";
+  if (!params) return c.data_type;
+  const split = PARAMETER_AFTER_FIRST_WORD.exec(c.data_type);
+  return split ? `${split[1]}${params} ${c.data_type.slice(split[1]!.length + 1)}` : `${c.data_type}${params}`;
 }
 
 /** `string(100)`, `decimal(18,2)`, `integer`; a custom type shows its name. */
@@ -59,7 +84,7 @@ export interface TypeVerdict {
 export function checkColumnType(attribute: AttributeType, column: ColumnType): TypeVerdict {
   const from = formatColumnType(column);
   const to = formatAttributeType(attribute);
-  const cls = physicalClass(column.data_type);
+  const cls = columnClass(column);
   const fits: TypeVerdict = { ok: true, message: `${from} fits ${to}.` };
   const mismatch: TypeVerdict = {
     ok: false,
@@ -69,7 +94,7 @@ export function checkColumnType(attribute: AttributeType, column: ColumnType): T
   switch (attribute.data_type) {
     case "string":
       if (cls !== "text") return mismatch;
-      if (attribute.type_length !== null && column.type_length !== null && column.type_length > attribute.type_length) {
+      if (attribute.type_length !== null && column.type_length !== null && (column.type_length === MAX_LENGTH || column.type_length > attribute.type_length)) {
         return { ok: false, message: `${from} does not fit ${to}: values can be longer than ${attribute.type_length} characters.` };
       }
       return fits;
@@ -101,7 +126,7 @@ function checkDecimal(
   const precision = attribute.type_precision;
   const scale = attribute.type_scale ?? 0;
   if (cls === "integer") {
-    const digits = INTEGER_DIGITS[baseType(column.data_type)];
+    const digits = isWholeNumber(column) ? (column.type_precision ?? 38) : INTEGER_DIGITS[baseType(column.data_type)];
     if (precision !== null && digits !== undefined && digits > precision - scale) {
       return { ok: false, message: `${from} does not fit ${to}: it can hold larger numbers.` };
     }
@@ -152,9 +177,10 @@ export function checkMappingTypes(
 export function logicalTypeOf(column: ColumnType): AttributeType {
   const type: AttributeType = { data_type: "custom", custom_type: null, type_length: null, type_precision: null, type_scale: null };
   const base = baseType(column.data_type);
-  switch (physicalClass(column.data_type)) {
+  switch (columnClass(column)) {
     case "text":
-      return { ...type, data_type: "string", type_length: column.type_length };
+      // `max` has no string length: the attribute takes any text
+      return { ...type, data_type: "string", type_length: column.type_length === MAX_LENGTH ? null : column.type_length };
     case "integer":
       return { ...type, data_type: "integer" };
     case "decimal":
@@ -166,7 +192,7 @@ export function logicalTypeOf(column: ColumnType): AttributeType {
       };
     case "temporal":
       if (base === "date") return { ...type, data_type: "date" };
-      if (base === "time" || base === "timetz") return { ...type, custom_type: column.data_type.trim() };
+      if (base === "time" || base === "timetz" || base.startsWith("time with")) return { ...type, custom_type: column.data_type.trim() };
       return { ...type, data_type: "datetime" };
     case "boolean":
       return { ...type, data_type: "boolean" };

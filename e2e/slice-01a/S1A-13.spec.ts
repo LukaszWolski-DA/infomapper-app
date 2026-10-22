@@ -23,7 +23,7 @@ test("S1A-13: “New source table” with columns typed as lines creates the tab
     /card_id\s*int/,
     /email\s*varchar\(255\)/,
     /balance\s*decimal\(18,2\)/,
-    /notes\s*nvarchar/,
+    /notes\s*nvarchar\(max\)/, // max stored as -1, always shown as max (slice 7a)
     /issued_at\s*datetime2/,
   ]);
   await expect(treeItem(page, "loyalty_cards")).toHaveAttribute("data-presence", "here");
@@ -38,7 +38,7 @@ test("S1A-13: “New source table” with columns typed as lines creates the tab
     [1, "card_id", "int", null, null, null],
     [2, "email", "varchar", 255, null, null],
     [3, "balance", "decimal", null, 18, 2],
-    [4, "notes", "nvarchar", null, null, null],
+    [4, "notes", "nvarchar", -1, null, null],
     [5, "issued_at", "datetime2", null, null, null],
   ]);
 
