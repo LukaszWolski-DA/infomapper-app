@@ -45,6 +45,28 @@ export function planDigest(plan: ImportPlan): string {
 /** Whether the plan the server built does what the review showed. */
 export const samePlan = (shown: string, rebuilt: ImportPlan): boolean => shown === planDigest(rebuilt);
 
+/** 53 bits of a string (cyrb53): not for secrets, only to tell two digests apart. */
+function hash53(text: string, seed: number): number {
+  let h1 = 0xdeadbeef ^ seed, h2 = 0x41c6ce57 ^ seed;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return 4294967296 * (2097151 & h2) + (h1 >>> 0);
+}
+
+/**
+ * The digest in a few characters (two 53-bit hashes and its length), what the review sends with the import: a plan of
+ * 100,000 columns has a digest of many megabytes, and P8 only needs to know whether the two are the same.
+ */
+export function planFingerprint(plan: ImportPlan): string {
+  const digest = planDigest(plan);
+  return `${hash53(digest, 1).toString(36)}-${hash53(digest, 2).toString(36)}-${digest.length.toString(36)}`;
+}
+
 /**
  * The choices a refreshed review keeps (P8): the scope and the compare choice as they were (the file has not changed),
  * and each rename choice whose gone column is still offered with the chosen new column (or “removed”).

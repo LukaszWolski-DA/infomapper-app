@@ -5,7 +5,7 @@
 import type { Uuid } from "@/domain/ids";
 import { suggestsBusinessKey } from "@/domain/model/mapping-rules";
 import { checkMappingTypes, formatAttributeType, formatColumnType, type MappingTypeCheck } from "@/domain/model/type-check";
-import type { Attribute, Entity, Mapping, MappingInput, SourceColumn, SourceTable, WorkspaceModel } from "@/domain/types";
+import type { Attribute, Entity, Mapping, MappingInput, SourceColumn, SourceRelationship, SourceTable, WorkspaceModel } from "@/domain/types";
 
 export interface ModelIndex {
   model: WorkspaceModel;
@@ -18,6 +18,8 @@ export interface ModelIndex {
   conceptName: Map<Uuid, string>;
   attributesOf: Map<Uuid, Attribute[]>;
   columnsOf: Map<Uuid, SourceColumn[]>;
+  /** A source table's relationships, from it and to it (slice 7a). */
+  relationshipsOf: Map<Uuid, SourceRelationship[]>;
   mappingsOf: Map<Uuid, Mapping[]>;
   inputsOf: Map<Uuid, MappingInput[]>;
 }
@@ -29,6 +31,11 @@ export function indexModel(model: WorkspaceModel): ModelIndex {
   const mappingsOf = new Map<Uuid, Mapping[]>(), inputsOf = new Map<Uuid, MappingInput[]>();
   for (const a of model.attributes) push(attributesOf, a.entity_id, a);
   for (const c of model.sourceColumns) push(columnsOf, c.source_table_id, c);
+  const relationshipsOf = new Map<Uuid, SourceRelationship[]>();
+  for (const r of model.sourceRelationships) {
+    push(relationshipsOf, r.source_table_id, r);
+    if (r.to_source_table_id !== r.source_table_id) push(relationshipsOf, r.to_source_table_id, r);
+  }
   for (const m of model.mappings) push(mappingsOf, m.attribute_id, m);
   for (const i of [...model.mappingInputs].sort((a, b) => a.sort_order - b.sort_order)) push(inputsOf, i.mapping_id, i);
   return {
@@ -42,6 +49,7 @@ export function indexModel(model: WorkspaceModel): ModelIndex {
     conceptName: new Map(model.concepts.map((c) => [c.id, c.name])),
     attributesOf,
     columnsOf,
+    relationshipsOf,
     mappingsOf,
     inputsOf,
   };

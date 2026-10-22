@@ -28,6 +28,8 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
   const ui = useContext(CanvasUiCtx);
   const { run } = useAction();
   const columns = p.ix.columnsOf.get(t.id) ?? [];
+  /** Relationships from and to the table: they go with it (slice 7a, D-47). */
+  const relationships = (p.ix.relationshipsOf.get(t.id) ?? []).length;
   const feeds = fedEntities(p.ix, t.id);
   /** Fed entities not on this canvas, to place on the right of the card (B-08). */
   const missing = feeds
@@ -137,7 +139,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
             // With columns it still asks (slice 1b, item 13).
             <ConfirmDelete
               label="Delete table"
-              also={`${columns.length} column${columns.length === 1 ? "" : "s"}`}
+              also={[`${columns.length} column${columns.length === 1 ? "" : "s"}`, ...(relationships ? [`${relationships} relationship${relationships === 1 ? "" : "s"}`] : [])].join(", ")}
               onConfirm={() => void remove()}
               testId="button-delete-table"
             />
