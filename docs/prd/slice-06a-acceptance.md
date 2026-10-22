@@ -1,6 +1,6 @@
 # Slice 6a – Acceptance
 
-Status: **step 5 (closing): full e2e run done; waiting for Łukasz's manual acceptance and his merge command.** Branch `slice/06a-view-state-bar`, from `main` at the tag
+Status: **accepted by Łukasz (manual acceptance passed, 22 October 2026); merged on his command, tag `slice-06a`.** Branch `slice/06a-view-state-bar`, from `main` at the tag
 `slice-05a` (`93f0df7`). PRD: `docs/prd/slice-06a-view-state-bar.md`. The PRD stays as written; this file is its
 amendment (Łukasz, 21 October 2026).
 
@@ -665,3 +665,5 @@ at least 1,600 px wide, both panels shown.
 | 6 | Narrow the window to 1,536 px, then to 1,100 px (browser window or DevTools' responsive mode). | 1,536: every tool in the bar as an icon, nothing cut off. 1,100: Focus, the notation and the Entity, Frame, Note and Hand tools have left the bar; “⋯” at the tools' end holds them; Hand tool from there gives the “Hand tool” chip. The layer switch, the working context, undo, zoom, the two panel buttons and your indicator stay in the bar. |
 | 7 | Back at full width, with four chips on and the window around 1,280 px, if they do not all fit. | The last chips fold into “+{n}” (its menu lists them with ×); “Show all” stays visible; the canvas does not move up or down. |
 | 8 | On Customer & orders pan the canvas a little and note where Customer stands. Hide the left panel with the toolbar's left button, then reload (F5). Show the panel again and reload. | Customer stays at the same place on the screen through each step. |
+
+Łukasz: manual acceptance passed (22 October 2026); merge on his command.
