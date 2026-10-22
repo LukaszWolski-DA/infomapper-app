@@ -1,6 +1,6 @@
 # Slice 6a – Acceptance
 
-Status: **step 2 (the bar and its chips) done, waiting for Łukasz.** Branch `slice/06a-view-state-bar`, from `main` at the tag
+Status: **step 3 (“Show all”, undo, the diagnosis) done, waiting for Łukasz.** Branch `slice/06a-view-state-bar`, from `main` at the tag
 `slice-05a` (`93f0df7`). PRD: `docs/prd/slice-06a-view-state-bar.md`. The PRD stays as written; this file is its
 amendment (Łukasz, 21 October 2026).
 
@@ -328,3 +328,85 @@ Enter, a reader's chips), S6A-04 (live), S6A-06 (row height, a card's place, “
 
 Runs: lint, typecheck, unit tests (79 files, 1,033 tests) pass. The slice's specs and the earlier specs this step
 touched (S4B1-06, S4B1-08, S3B-08, S3B-09, S4A-13, S4B1-01, S4B1-03): 17 passed, 2.8 min, none changed.
+
+Łukasz accepted step 2 (22 October 2026), with the three assumptions: “Customer 360” is its canvas “Customer &
+orders”; “at most” is S6A-08's check for a ×; 2,400 px windows are fine, since S6A-06 forces the fold.
+
+## Step 3: “Show all”, undo, the diagnosis (22 October 2026)
+
+**Runs missing from step 2, done first:** S5A-07 (`ModelCanvas` publishes the counts) and every earlier spec that
+checks the breadcrumbs, found by test id (`nav-breadcrumbs`, `breadcrumb`) and text: S0-04, S0-11. 7 passed, 1.3 min.
+
+**Which S6A-08 test checks “0 commits”:** the first, “chips add no canvas or miniature commit; a × costs what its switch
+costs”: Focus on (its chip appears) and off through its × (the chip goes), each exactly 0 canvas and 0 miniature
+commits. Focus is the one item whose switch commits nothing, so it is where the chip's own share can be read alone.
+Step 3 adds a third test, “a chip folding into “+{n}” and coming back adds no canvas or miniature commit”: at 1,280 px
+with three chips on, Focus pushes the last chip into “+{n}” and back, again 0 and 0. For the other items, whose switches
+commit the canvas themselves, the check is that the × costs at most what the switch costs (the second and fourth tests),
+and S6A-09 times a chip appearing against `?diag=noviewbar`.
+
+What changed:
+- **`resetCanvasView`** (`src/domain/commands/frame.ts`, with the frame commands' draft and commit): row filters to All
+  (a live canvas keeps Labeled), cards expanded, frames expanded, each part optional, one change group. All or nothing:
+  one changed row the person did not read at its version refuses the whole write (stale version; the browser puts
+  everything back and shows the message as a toast). Nothing to change writes nothing (“Nothing to change.”, no undo
+  step). Unit tests in `frame.test.ts`: the three parts, the parts alone, the Labeled rule, all or nothing, nothing to
+  change, reviewers, readers, archive, a deleted canvas, and one undo putting all of it back (7 tests).
+- `resetCanvasViewAction` (`src/app/_actions/frame.ts`, a fresh page after it, as “Expand all”); `useFrames.resetView`
+  shows the change at once and writes it in the frames' queue; reviewers and readers expand frames in the tab only.
+  The canvas handle offers it as `ui.resetView`.
+- **The filter chip's × and the collapsed-card chip's ×** for editors: one change each over every card (one undo step);
+  no toast, as the prototype's chips.
+- **“Show all”** (`button-view-show-all`; the source table panel already has a `button-show-all`) at the bar's end,
+  always visible, from two chips the person can remove. It turns off Focus, the layer, hidden notes and the tool, and
+  sends the layout part through the command only when something changes; the toast “Showing everything on this
+  canvas.” has Undo when that step exists. For reviewers and readers it counts and removes only their chips (frames in
+  the tab).
+- `?diag=noviewbar` (measurement build only, like the other `DIAG` switches): the canvas page without the bar, for
+  S6A-09.
+
+Tests: S6A-03 (three tests: an editor's “Show all” and the one-chip case, a live canvas, a reader), S6A-05 (the two ×
+and “Show all”, each undone with one Ctrl+Z; Focus does not come back), S6A-08's third test, S6A-09.
+
+### S6A-09: the diagnosis to the screen
+
+Measurement build, headed Chrome 155, 1,536 × 864 (pane 932 × 718), no laptop preparation (diagnostic figures); 10
+settled pairs each, to the first GPU present after the switch's commit, medians and p95 in ms. Raw traces in
+`.data/measure/traces-2026-10-22-*` (not committed), results in `test-results/S6A-09.json`.
+
+| Scenario | 30 % around ent:23: median / p95 | 100 % dense: median / p95 |
+| --- | --- | --- |
+| Focus off with the button | 18.7 / 23.4 | 21.5 / 24.3 |
+| Focus off with its chip's × | 16.2 / 23.7 | 21.6 / 31.9 |
+| (Focus on with the button, both loops) | 42.9 / 61.8, 43.2 / 63.7 | 40.8 / 50.3, 38.4 / 44.4 |
+| “Show all”: Focus and a filter | 501.5 / 532.5 | 233.4 / 292.8 |
+| The same through the Focus button and the card's filter button | 410.9 / 460.3 | 211.5 / 234.3 |
+| “Show all”: five frames collapsed (and the Hand tool) | 849.5 / 867.0 | 451.2 / 524.1 |
+| The same through “Expand all” and the Hand tool's button | 802.2 / 934.9 | 465.6 / 494.4 |
+| Hand tool on, with the bar (its chip appears) | 75.0 / 150.7 | 171.8 / 223.1 |
+| Hand tool on, without the bar | 67.8 / 161.7 | 157.1 / 205.8 |
+| Hand tool off, with the bar | 62.0 / 76.1 | 153.8 / 163.1 |
+| Hand tool off, without the bar | 61.5 / 79.7 | 150.1 / 180.9 |
+
+- **Focus through its chip against the button: within 10 ms** (−2.5 ms at 30 %, +0.1 ms at 100 %). Met.
+- **A chip appearing: ≤ 16 ms median beyond the switch.** +7.2 ms at 30 %, +14.7 ms at 100 % (Hand on); going: +0.5,
+  +3.7 ms. Met, at 100 % close to the limit.
+- **“Show all” against the controls one after another** (reported, no limit): with Focus and a filter, +91 ms at 30 % and
+  +22 ms at 100 %; the split puts it on the main thread (248 against 50 ms at 30 %), where “Show all” also gets a fresh
+  page after its write (`revalidatePath`, as “Expand all”) and the card's filter button does not. With five frames
+  collapsed, +47 ms at 30 % and −14 ms at 100 % (both sides get a fresh page). Of the frame pairs at 30 %, 1 and 2 of 10
+  did not start from a settled screen (the fresh page's work); the medians include them.
+- **LayerTree:** the bar adds no drawing layer. 30 %: 47 drawing layers, 69.2 Mpx without chips, the same without the
+  bar; with Focus, Mappings, a filter and the Hand tool on, 50 layers and 610.5 Mpx, the same without the bar. 100 %: 48
+  and 68.4, and 51 and 610.3, each the same without the bar. The 3 layers and about 540 Mpx with the four items on come
+  from the items themselves (with or without the bar alike), not from the bar.
+
+**Question:** “Show all” costs about 90 ms more than the controls at 30 % with a filter, mostly the fresh page after its
+write. *Proposal:* leave it as it is in this slice (it matches “Expand all”, and S6A-09 has no limit for it), and note
+in `docs/ideas.md` that the command's fresh page could be dropped when only cards change, since the canvas already shows
+the result.
+
+Runs: lint, typecheck, unit tests (79 files, 1,040 tests) pass. The slice's specs, slice 2c's specs (collapsed frames,
+“Collapse all”/“Expand all”, which share the frames' queue), S5A-07, S4B1-06 and S4B1-08: 47 passed, 5.3 min.
+S6A-09 in the measurement build: passed, 14.6 min (two earlier attempts stopped on the test itself: a click in the
+dense view the neighbouring cards covered, then the clash of test ids, both fixed).

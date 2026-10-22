@@ -3,7 +3,7 @@
 // (expanded and saved for an editor, in the tab only for a reader), resolved notes (shown, remembered in the browser),
 // the tool (back to selecting). The chips are buttons in tab order after the breadcrumbs; Enter works (no Delete key).
 // Who cannot edit sees the filter and collapsed-card chips without ×, their tooltip saying why.
-// The filter and collapsed-card chips' × for editors come with step 3's command (one undo step each).
+// The filter and collapsed-card chips' × for editors (step 3's command, one undo step each): S6A-05.
 
 import { SEED_IDS } from "../../src/data/local/seed";
 import { expect, test } from "./fixtures";

@@ -638,6 +638,54 @@ export function setAllFramesCollapsed(
   return done(ctx, access, { frames: committed.writes.length, versions: committed.versions }, committed.writes);
 }
 
+// ---- what hides things on a canvas, removed (slice 6a, D-39) ----
+
+const resetViewInput = z
+  .object({
+    canvasId: uuidSchema,
+    /** Every row filter to All; a live canvas keeps its Labeled filters (D-39). */
+    filters: z.boolean().optional(),
+    /** Every collapsed card expanded. */
+    expandCards: z.boolean().optional(),
+    /** Every collapsed frame expanded. */
+    expandFrames: z.boolean().optional(),
+    cards: cardRefs,
+    frames: frameRefs,
+  })
+  .strict();
+export type ResetCanvasViewInput = z.input<typeof resetViewInput>;
+
+/**
+ * The view-state bar's filter and collapsed-card chips and the layout part of “Show all” (slice 6a): the canvas's row
+ * filters to All, its cards expanded and its frames expanded, each part when asked, in one change group (one undo step).
+ * `cards` and `frames` are the rows at the versions the user read; all or nothing: one changed row the user did not
+ * read at its version refuses the whole write. Nothing to change writes nothing.
+ */
+export function resetCanvasView(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: FrameCanvasState,
+  input: unknown,
+): CommandResult<FrameWriteResult & { cards: number; frames: number }> {
+  const parsed = begin(access, "canvas.edit_items", resetViewInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { canvasId, filters, expandCards, expandFrames, cards, frames } = parsed.data;
+  const opened = openDraft(access, state, canvasId);
+  if (!opened.ok) return fail(opened.error);
+  const { draft } = opened;
+  const live = !!state.canvas?.live_label_id;
+  for (const item of draft.items.values()) {
+    if (filters && item.row_filter !== "all" && !(live && item.row_filter === "labeled")) item.row_filter = "all";
+    if (expandCards) item.collapsed = false;
+  }
+  if (expandFrames) for (const f of liveFrames(draft)) f.collapsed = false;
+  const committed = commit(ctx, draft, seen(frames, cards));
+  if (!committed.ok) return fail(committed.error);
+  if (!committed.writes.length) return fail(nothingToChange());
+  const count = (table: string) => committed.writes.filter((w) => w.table === table).length;
+  return done(ctx, access, { versions: committed.versions, cards: count("canvas_item"), frames: count("frame") }, committed.writes);
+}
+
 // ---- delete ----
 
 const deleteInput = z.object({ frameId: uuidSchema, expectedVersion: versionSchema, cards: cardRefs }).strict();

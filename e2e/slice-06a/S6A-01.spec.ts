@@ -11,7 +11,7 @@ test("S6A-01: chips appear in the prototype's order and wording and go when thei
   await openCanvas(page, canvasUrl(), WHOLE_CO);
   await expect(viewBar(page)).toBeAttached();
   expect(await chipTexts(page)).toEqual([]);
-  await expect(page.getByTestId("button-show-all")).toHaveCount(0);
+  await expect(page.getByTestId("button-view-show-all")).toHaveCount(0);
 
   // test data: two cards filtered, one collapsed, one frame (Sales Order and Order Line) collapsed
   await setCard("Customer", { rowFilter: "keys" });

@@ -6,6 +6,7 @@ import {
   fitFrameAction,
   moveOnCanvasAction,
   putInNewFrameAction,
+  resetCanvasViewAction,
   resizeFrameAction,
   setAllFramesCollapsedAction,
   setFrameCollapsedAction,
@@ -225,7 +226,8 @@ export default async function CanvasPage({
                 />
               ),
               openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId),
-              viewState: <ViewStateBar editable={editable} live={liveLabel ? { labelName: liveLabel.name } : null} />,
+              // `?diag=noviewbar` (measurement build only, slice 6a S6A-09): the page without the bar, to time a switch alone
+              viewState: diag.includes("noviewbar") ? undefined : <ViewStateBar editable={editable} live={liveLabel ? { labelName: liveLabel.name } : null} />,
               status: (
                 <StatusBar
                   model={model}
@@ -269,6 +271,7 @@ export default async function CanvasPage({
                 arrangeIntoFrames: arrangeIntoFramesAction.bind(null, ws, canvasId),
                 setFrameCollapsed: setFrameCollapsedAction.bind(null, ws),
                 setAllFramesCollapsed: setAllFramesCollapsedAction.bind(null, ws, canvasId),
+                resetCanvasView: resetCanvasViewAction.bind(null, ws, canvasId),
               }}
               entityConcepts={Object.fromEntries(model.entities.map((e) => [e.id, e.concept_id]))}
               focusCardId={focusCardId}

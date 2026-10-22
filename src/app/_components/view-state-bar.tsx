@@ -4,8 +4,8 @@
 // breadcrumbs row, one chip for each thing that hides or fades items on this canvas, in the prototype's order and
 // wording, each with × (`data-voff`). A live canvas's “Live: {name}” comes first and has no ×. The row keeps its height:
 // chips that do not fit fold into “+{n}” from the end, whose menu lists them; the breadcrumbs shrink first (Łukasz's
-// step 1 answer 3). No lens chip (slice 4b-1 removed the lens), no role chip (the user indicator shows it), no chip
-// while drawing a relationship.
+// step 1 answer 3). “Show all” ends the bar, always visible, from two removable chips. No lens chip (slice 4b-1 removed
+// the lens), no role chip (the user indicator shows it), no chip while drawing a relationship.
 // The bar reads the canvas through stores and the canvas context (`focusOn`, `viewCounts`, `ui.mode`), never through
 // `ModelCanvas`, so a chip appearing or going re-renders only the bar (S6A-08). The fold is measured on the bar's own
 // elements (AD-24 rule 4).
@@ -17,6 +17,7 @@ import { useCanvasLook } from "@/canvas/look";
 import { useValue } from "@/canvas/value-store";
 import { viewCounts } from "@/canvas/view-counts";
 import { fitChips } from "@/ui/fit-chips";
+import { useToast } from "@/ui/components/toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/ui/components/dropdown-menu";
 
 export interface ViewChip {
@@ -60,12 +61,14 @@ export function useViewChips(editable: boolean): ViewChip[] {
       id: "filtered",
       text: `${plural(counts.filtered, "card")} filtered`,
       title: `Some rows of these cards are hidden by their row filter.${editable ? "" : EDITORS_ONLY}`,
+      off: editable ? () => void ui.resetView({ filters: true }) : undefined,
     });
   if (counts?.collapsedCards)
     chips.push({
       id: "collapsed-cards",
       text: `${plural(counts.collapsedCards, "card")} collapsed`,
       title: `These cards show their header only.${editable ? "" : EDITORS_ONLY}`,
+      off: editable ? () => void ui.resetView({ expandCards: true }) : undefined,
     });
   if (counts?.collapsedFrames)
     chips.push({
@@ -80,6 +83,30 @@ export function useViewChips(editable: boolean): ViewChip[] {
   if (tool) chips.push({ id: "tool", ...tool, off: () => ui.setMode(null) });
   return chips;
 }
+
+/**
+ * “Show all” (slice 6a, item 5 as amended; prototype `data-vall`): turns off Focus, the layer, hidden notes and the tool
+ * in the browser, and sends the layout part (filters, collapsed cards and frames) as one change, one undo step, only
+ * when something changes; the toast offers Undo when that step exists. Reviewers and readers remove only what they may:
+ * frames expand in their tab. A live canvas's Labeled filter stays.
+ */
+function useShowAll(): () => void {
+  const ui = useContext(CanvasUiCtx);
+  const look = useCanvasLook();
+  const toast = useToast();
+  return useCallback(() => {
+    focusOn.set(false);
+    if (look && look.look.layer !== "all") look.setLook({ layer: "all" });
+    if (ui.hideResolved) ui.setHideResolved(false);
+    if (ui.mode) ui.setMode(null);
+    void ui.resetView({ filters: true, expandCards: true, expandFrames: true }).then((saved) => {
+      const u = saved ? ui.undo() : null;
+      toast(SHOW_ALL_TOAST, "info", u ? { label: "Undo", run: u.undo } : undefined);
+    });
+  }, [ui, look, toast]);
+}
+
+export const SHOW_ALL_TOAST = "Showing everything on this canvas.";
 
 const toolChip = (mode: CanvasMode) => (mode && mode.kind !== "relate" ? (TOOL_CHIP[mode.kind] ?? null) : null);
 
@@ -97,11 +124,14 @@ const CRUMB_GAP = 2;
 
 export function ViewStateBar({ editable, live }: { editable: boolean; live: { labelName: string } | null }) {
   const chips = useViewChips(editable);
+  const showAll = useShowAll();
+  // from two items that this person can remove (prototype: two items; Łukasz's step 1 answer 8)
+  const withShowAll = chips.filter((c) => c.off).length >= 2;
   const barRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
   const [shown, setShown] = useState(chips.length);
   const shownRef = useRef(shown);
-  const key = chips.map((c) => c.text).join("|");
+  const key = `${chips.map((c) => `${c.text}${c.off ? "×" : ""}`).join("|")}${withShowAll ? "|all" : ""}`;
 
   /** How many chips fit: the breadcrumbs keep their current crumb, the ones above it shrink first. */
   const fold = useCallback(() => {
@@ -115,13 +145,14 @@ export function ViewStateBar({ editable, live }: { editable: boolean; live: { la
       items.forEach((li, i) => (crumbs += (i ? CRUMB_GAP : 0) + (i === items.length - 1 || li.getAttribute("aria-hidden") ? li.offsetWidth : CRUMB_MIN)));
     }
     const widths = [...measure.children].map((el) => (el as HTMLElement).offsetWidth);
+    const all = withShowAll ? widths.pop()! + CHIP_GAP : 0;
     const plus = widths.pop() ?? 0;
     const liveWidth = live ? widths.shift()! + CHIP_GAP : 0;
-    const room = row.clientWidth - ROW_PADDING - ROW_GAP - crumbs - liveWidth;
+    const room = row.clientWidth - ROW_PADDING - ROW_GAP - crumbs - liveWidth - all;
     const k = fitChips({ widths, gap: CHIP_GAP, plus, room, shown: shownRef.current, hysteresis: HYSTERESIS });
     shownRef.current = k;
     setShown(k);
-  }, [live]);
+  }, [live, withShowAll]);
 
   useLayoutEffect(() => {
     shownRef.current = chips.length;
@@ -148,6 +179,11 @@ export function ViewStateBar({ editable, live }: { editable: boolean; live: { la
         <Chip key={c.id} chip={c} />
       ))}
       {folded.length > 0 && <MoreChips chips={folded} />}
+      {withShowAll && (
+        <button type="button" data-testid="button-view-show-all" title="Remove everything that hides or fades things on this canvas" onClick={showAll} className={showAllClass}>
+          Show all
+        </button>
+      )}
       {/* the chips at their natural widths, for the fold; never seen, never focused */}
       <div ref={measureRef} aria-hidden className="pointer-events-none invisible absolute left-0 top-0 flex w-max">
         {live && <span className={`${chipClass} border border-dashed pr-2`}>Live: {live.labelName}</span>}
@@ -155,6 +191,7 @@ export function ViewStateBar({ editable, live }: { editable: boolean; live: { la
           <Chip key={c.id} chip={c} measure />
         ))}
         <span className={`${chipClass} pr-2`}>+{chips.length}</span>
+        {withShowAll && <span className={showAllClass}>Show all</span>}
       </div>
     </div>
   );
@@ -162,6 +199,9 @@ export function ViewStateBar({ editable, live }: { editable: boolean; live: { la
 
 const chipClass =
   "inline-flex h-[22px] flex-none items-center gap-[3px] whitespace-nowrap rounded-[11px] bg-im-surface pl-2 text-im-ink-2 shadow-[0_0_0_1px_var(--im-line)]";
+/** The prototype's `.btn.sm.vreset`. */
+const showAllClass =
+  "inline-flex h-6 flex-none items-center whitespace-nowrap rounded-md border border-im-line bg-im-surface px-2.5 text-xs text-im-ink hover:bg-im-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical";
 const offClass =
   "grid size-[18px] place-items-center rounded-full text-im-ink-3 hover:bg-im-hover hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical";
 

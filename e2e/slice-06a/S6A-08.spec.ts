@@ -73,3 +73,27 @@ test("S6A-08: a collapsed frame's chip × costs what “Expand all” costs", as
   expect(byChip.canvas).toBeLessThanOrEqual(bySwitch.canvas);
   expect(byChip.miniature).toBeLessThanOrEqual(bySwitch.miniature);
 });
+
+test("S6A-08: a chip folding into “+{n}” and coming back adds no canvas or miniature commit", async ({ page }) => {
+  // the default 1,280 px window: with three chips on, Focus's chip pushes the last one into “+{n}”
+  await signInAs(page, "Łukasz");
+  await openCanvas(page, canvasUrl(), WHOLE_CO);
+  await page.locator('[data-testid="switch-layer"] [data-layer="mappings"]').click();
+  await page.getByTestId("checkbox-show-resolved").uncheck();
+  await page.getByTestId("button-tool-hand").click();
+  await expect(page.getByTestId("button-view-show-all")).toBeVisible();
+  const folded = async () => ((await chip(page, "more").count()) ? Number((await chip(page, "more").innerText()).slice(1)) : 0);
+  const before = await folded();
+  const on = await commitsOf(page, async () => {
+    await page.getByTestId("button-focus").click();
+    await expect(chip(page, "focus")).toBeVisible();
+    await expect.poll(folded).toBe(before + 1);
+  });
+  expect(on).toEqual({ canvas: 0, miniature: 0 });
+  const off = await commitsOf(page, async () => {
+    await chipOff(page, "focus").click();
+    await expect(chip(page, "focus")).toHaveCount(0);
+    await expect.poll(folded).toBe(before);
+  });
+  expect(off).toEqual({ canvas: 0, miniature: 0 });
+});

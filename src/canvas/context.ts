@@ -8,6 +8,7 @@ import type { FrameData, FrameStats } from "./frame-data";
 import type { NoteData } from "./note-data";
 import type { Selection } from "./line-data";
 import type { Bundle } from "./line-geometry";
+import type { ViewReset } from "./useFrames";
 
 /** What the card nodes may do and see; kept in a context so node data stays plain and memo-friendly. */
 export interface CanvasCardsApi {
@@ -149,6 +150,11 @@ export interface CanvasHandle {
   setFrameCollapsed: (frameId: Uuid, collapsed: boolean) => void;
   /** “Collapse all” / “Expand all” (canvas overview), saved or in this tab only, as one frame. */
   setAllFramesCollapsed: (collapsed: boolean) => void;
+  /**
+   * The view-state bar (slice 6a): row filters to All, cards and frames expanded, the parts asked for, in one change (one
+   * undo step); reviewers and readers expand frames in this tab only. Resolves whether a step was saved.
+   */
+  resetView: (parts: ViewReset) => Promise<boolean>;
   /** A bundle of lines at a collapsed frame as the canvas draws it now (slice 2c, the bundle panel). */
   bundleView: (key: string) => Bundle | null;
   /** A note as the canvas has it now (slice 3a, the note panel), or null. */
@@ -388,6 +394,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   selectFrameCards: noop,
   setFrameCollapsed: noop,
   setAllFramesCollapsed: noop,
+  resetView: () => Promise.resolve(false),
   bundleView: () => null,
   noteView: () => null,
   newNote: noop,

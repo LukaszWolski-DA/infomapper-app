@@ -25,6 +25,7 @@ import {
   fitFrameToContent,
   moveOnCanvas,
   putCardsInNewFrame,
+  resetCanvasView,
   resizeFrame,
   setAllFramesCollapsed,
   setFrameCollapsed,
@@ -766,5 +767,80 @@ describe("moveOnCanvas: requirement cards (slice 4b-2, item 6)", () => {
 
   it("refuses a requirement card moved at a stale version", () => {
     expect(move({ items: [{ ...ref(reqCard), expectedVersion: 5, x: 8, y: 8 }] })).toMatchObject(refusedAsStale);
+  });
+});
+
+describe("resetCanvasView (slice 6a)", () => {
+  const filtered = customerCard({ row_filter: "mapped" });
+  const collapsed = tableCard({ collapsed: true });
+  const labeled = orderCard({ row_filter: "labeled", collapsed: true });
+  const plain = addressCard();
+  const fA = frame(frameA, { collapsed: true }), fB = frame(frameB, { x: 2000 });
+  const items = [filtered, collapsed, labeled, plain];
+  const state = (over: { live?: boolean } = {}) => ({ canvas: canvas(canvas1, over.live ? { live_label_id: ids.frameB } : {}), frames: [fA, fB], items });
+  const all = { cards: items.map(ref), frames: [fref(fA), fref(fB)] };
+  const reset = (parts: object, over: { live?: boolean; role?: "modeler" | "reviewer" | "reader"; ws?: object; refs?: object } = {}) =>
+    resetCanvasView(makeCtx(), access(over.role ?? "modeler", over.ws ?? {}), state(over), { canvasId: canvas1, ...all, ...over.refs, ...parts });
+
+  it("sets every filter to All, expands cards and frames, in one change group", () => {
+    const r = ok(reset({ filters: true, expandCards: true, expandFrames: true }));
+    const rows = written(r.writeSet);
+    expect(rows[`canvas_item:${itemCustomer}`]).toMatchObject({ row_filter: "all" });
+    expect(rows[`canvas_item:${itemCrmCustomer}`]).toMatchObject({ collapsed: false });
+    expect(rows[`canvas_item:${itemOrder}`]).toMatchObject({ row_filter: "all", collapsed: false });
+    expect(rows[`canvas_item:${itemAddress}`]).toBeUndefined();
+    expect(rows[`frame:${frameA}`]).toMatchObject({ collapsed: false });
+    expect(rows[`frame:${frameB}`]).toBeUndefined();
+    expect(r.value).toMatchObject({ cards: 3, frames: 1 });
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+  });
+
+  it("does only the parts asked for", () => {
+    const f = written(ok(reset({ filters: true })).writeSet);
+    expect(Object.keys(f).sort()).toEqual([`canvas_item:${itemCustomer}`, `canvas_item:${itemOrder}`]);
+    expect(f[`canvas_item:${itemOrder}`]).toMatchObject({ collapsed: true });
+    const c = written(ok(reset({ expandCards: true })).writeSet);
+    expect(Object.keys(c).sort()).toEqual([`canvas_item:${itemCrmCustomer}`, `canvas_item:${itemOrder}`]);
+    expect(c[`canvas_item:${itemOrder}`]).toMatchObject({ row_filter: "labeled" });
+    expect(Object.keys(written(ok(reset({ expandFrames: true })).writeSet))).toEqual([`frame:${frameA}`]);
+  });
+
+  it("keeps a live canvas's Labeled filters", () => {
+    const rows = written(ok(reset({ filters: true }, { live: true })).writeSet);
+    expect(rows[`canvas_item:${itemCustomer}`]).toMatchObject({ row_filter: "all" });
+    expect(rows[`canvas_item:${itemOrder}`]).toBeUndefined();
+    expect(reset({ filters: true }, { live: true, refs: { cards: [ref(filtered)] } })).toMatchObject({ ok: true });
+  });
+
+  it("is all or nothing: one changed row read at another version, or not read, refuses the whole write", () => {
+    expect(reset({ filters: true, expandFrames: true }, { refs: { cards: [ref(filtered), { ...ref(labeled), expectedVersion: 7 }] } })).toMatchObject(refusedAsStale);
+    expect(reset({ filters: true, expandFrames: true }, { refs: { frames: [fref(fB)] } })).toMatchObject(refusedAsStale);
+    // a row it would not change may be missing or stale
+    expect(reset({ expandFrames: true }, { refs: { cards: [], frames: [fref(fA), { ...fref(fB), expectedVersion: 9 }] } })).toMatchObject({ ok: true });
+  });
+
+  it("writes nothing when nothing would change, or no part is asked for", () => {
+    const clean = resetCanvasView(makeCtx(), access("modeler"), { canvas: canvas(), frames: [fB], items: [plain] }, { canvasId: canvas1, cards: [ref(plain)], frames: [fref(fB)], filters: true, expandCards: true, expandFrames: true });
+    expect(clean).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(reset({})).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+  });
+
+  it("is refused to reviewers, readers, in an archived workspace and on a deleted canvas", () => {
+    expect(reset({ filters: true }, { role: "reviewer" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(reset({ filters: true }, { role: "reader" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(reset({ filters: true }, { ws: archived })).toMatchObject({ ok: false, error: { code: "archived" } });
+    expect(resetCanvasView(makeCtx(), access("modeler"), { canvas: canvas(canvas1, { deleted_at: NOW }), frames: [], items }, { canvasId: canvas1, ...all, filters: true })).toMatchObject({
+      ok: false,
+      error: { code: "not_found" },
+    });
+  });
+
+  it("one undo puts the filters, collapsed cards and frames back", () => {
+    const before = rowsOf(items, [fA, fB]);
+    const r = ok(reset({ filters: true, expandCards: true, expandFrames: true }));
+    const after = undo(apply(before, r.writeSet), r.writeSet);
+    expect(after.canvas_item.find((i) => i.id === itemCustomer)).toMatchObject({ row_filter: "mapped" });
+    expect(after.canvas_item.find((i) => i.id === itemOrder)).toMatchObject({ row_filter: "labeled", collapsed: true });
+    expect(after.frame.find((f) => f.id === frameA)).toMatchObject({ collapsed: true });
   });
 });
