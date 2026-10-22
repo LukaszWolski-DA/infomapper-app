@@ -86,6 +86,7 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
         "organization", "organization_member", "project", "project_canvas", "relationship", "source_column",
         "label", "label_link", "project_pinned_label", "note", "requirement", "requirement_link",
         "source_system", "source_table", "workspace", "workspace_member",
+        "source_relationship", "source_relationship_column", "source_import",
       ].sort(),
     );
     for (const t of NOT_IN_DOMAIN_YET) expect(tables.map((x) => x.table)).not.toContain(t);
