@@ -28,6 +28,13 @@ If these disagree, stop and ask. Do not resolve a conflict silently.
   are not in it, even small ones. Put ideas in `docs/ideas.md` and mention them at the end of your answer.
 - **Work in the steps the PRD lists, and stop after each step** with a short summary of what changed and how to
   check it. Wait for Łukasz before the next step unless he said to continue.
+- **Step 1 checks the PRD against the code.** A PRD is a proposal to verify, not a specification: it may be written
+  from the prototype and the docs without reading the code. In step 1, check every item, decision and acceptance
+  criterion against the code, `docs/decisions.md` and the earlier slices' acceptance docs, and write into
+  `docs/prd/slice-XX-acceptance.md` where the PRD is wrong, contradicts the code or a decision, duplicates what the app
+  already has, misses what the code needs, or costs more than it assumes (data model, undo, change events,
+  performance), each with the files and functions behind it and a proposal. List the differences between the
+  reference prototype and the app that the slice touches. No application code in step 1; Łukasz answers before step 2.
 - **One branch per slice** (`slice/00-skeleton`, …), small commits in Conventional Commits style
   (`feat:`, `fix:`, `test:`, `docs:`, `chore:`). Never push to `main` directly.
 - **Done means:** the PRD’s acceptance tests pass, `npm run lint`, `npm run typecheck`, `npm test` and
