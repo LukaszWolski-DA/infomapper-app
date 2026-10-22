@@ -1,6 +1,6 @@
 # Slice 6b – Acceptance
 
-Status: **step 4 (closing): D-38 approved and written; the full run and the manual acceptance next.** Branch `slice/06b-back-and-forward`, from `main` at
+Status: **step 4 (closing): full e2e run done; waiting for Łukasz's manual acceptance and his merge command.** Branch `slice/06b-back-and-forward`, from `main` at
 the tag `slice-06a` (`80241ef`). PRD: `docs/prd/slice-06b-back-and-forward.md`. The PRD stays as written; this file is
 its amendment (Łukasz, 22 October 2026).
 
@@ -444,3 +444,40 @@ the tests run from) downloaded Firefox 155.0 (playwright firefox v1543, 122 MiB)
 e2e/slice-06b/S6B-browsers.spec.ts`: **3 passed** (Chromium 13.0 s, Firefox 30.4 s, WebKit 20.5 s), 1.9 min: the
 buttons are there, and a selection place and a page place go back and forward in all three.
 
+
+### The full e2e run (22 October 2026)
+
+`npm run e2e` from scratch, no dev server, the laptop quiet (Łukasz); the measurement specs (S6B-10 among them) and the
+browsers smoke excluded as configured: **242 passed, 0 failed, 46.1 min** (17:22–18:08). GitHub CI on the PR (check,
+migrations): passed.
+
+### Manual acceptance (Łukasz)
+
+Start the app on the preview data (it has CR-23's live canvas):
+
+PowerShell:
+
+```powershell
+$env:INFOMAPPER_DEV_DB = ".data/preview-db.json"; npm run dev
+```
+
+bash:
+
+```bash
+INFOMAPPER_DEV_DB=.data/preview-db.json npm run dev
+```
+
+Sign in at http://localhost:3000/sign-in as Łukasz; open Retail Co – DWH › Customer 360 › Customer & orders, the window
+at least 1,600 px wide.
+
+| # | Do | Expected |
+| --- | --- | --- |
+| 1 | On Customer & orders select Customer, then a mapping from it (click its line), then the table customers. | Each selection shows in the details panel; Back (the ← before the breadcrumbs) is enabled. |
+| 2 | Open the CR-23 tab (the live canvas) and select a card. | The card is selected. |
+| 3 | Press Back four times, mixing the ← button, Alt+← (nothing focused) and the mouse's back button. | 1: CR-23's canvas with nothing selected (its own entry); 2: Customer & orders with customers selected; 3: the mapping; 4: Customer. Each time the details panel stays as it was (shown or hidden). |
+| 4 | Press Forward twice (the → button, Alt+→ or the mouse's forward button). | The mapping, then customers. |
+| 5 | Right-click customers' card and choose “Remove from this canvas”. Press Back, then Forward. | Back: the mapping. Forward: the canvas with nothing selected and the toast “That card is no longer on this canvas.” (Ctrl+Z, clicking an empty spot first, brings the card back.) |
+| 6 | Hide the details panel (the toolbar's right button), select Customer, then Sales Order, pan until neither shows, press Back. | Customer selected and centred at the same zoom; the details panel stays hidden. |
+| 7 | Select Customer, click its name in the details panel, add “ X” without leaving the field, press Alt+←. | The browser goes back (Windows: Alt+← in a field is the browser's); Forward to Customer: its name is “Customer X” (saved). Put the name back. |
+| 8 | Narrow the window to 1,100 px. | Back and Forward still at the row's left end, nothing in the top bar or the row cut off. |
+| 9 | Firefox: open http://localhost:3000 in Firefox, sign in, repeat steps 1 and 3 with the buttons (and the mouse's back button). | The same as in Chrome or Edge. |
