@@ -11,7 +11,7 @@ import type { Uuid } from "../ids";
 import { applyPlan, type RowPatch } from "../import/apply";
 import { planFingerprint, STALE_REVIEW } from "../import/compare";
 import { readDdl } from "../import/ddl";
-import type { ImportModel } from "../import/model";
+import { relationshipsWithColumns, type ImportModel } from "../import/model";
 import { buildPlan, importSummary, type ImportCounts, type ImportTarget } from "../import/plan";
 import { MAX_IMPORT_ROWS, readStandard } from "../import/standard";
 import type { WorkspaceAccess } from "../permissions";
@@ -24,6 +24,7 @@ import {
   type SourceRelationshipColumn,
   type SourceSystem,
   type SourceTable,
+  type WorkspaceModel,
   type WritableRows,
 } from "../types";
 import { nameSchema, uuidSchema } from "../validation";
@@ -71,6 +72,22 @@ export interface ImportState {
   relationships: readonly SourceRelationship[];
   relationshipColumns: readonly SourceRelationshipColumn[];
 }
+
+/** The command's state from the workspace's live model. */
+export const importStateOf = (model: WorkspaceModel): ImportState => ({
+  model: {
+    systems: model.sourceSystems,
+    tables: model.sourceTables,
+    columns: model.sourceColumns,
+    relationships: relationshipsWithColumns(model.sourceRelationships, model.sourceRelationshipColumns),
+    mappings: model.mappings,
+    mappingInputs: model.mappingInputs,
+    attributes: model.attributes,
+    entities: model.entities,
+  },
+  relationships: model.sourceRelationships,
+  relationshipColumns: model.sourceRelationshipColumns,
+});
 
 export function importSources(ctx: CommandContext, access: WorkspaceAccess, state: ImportState, input: unknown): CommandResult<ImportOutcome> {
   const parsed = begin(access, "model.edit", importInput, input);
