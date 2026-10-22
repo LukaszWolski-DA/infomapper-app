@@ -344,6 +344,10 @@ mechanism as slice 2c's wider frame labels. Details in [slice-03a-acceptance.md]
 
 ### Live canvases without the view-state bar (slice 3b)
 
+**Closed in slice 6a** ([PRD](prd/slice-06a-view-state-bar.md), [acceptance](prd/slice-06a-acceptance.md)): the view-state bar starts with “Live: {name}” on a live canvas (no ×), and the
+Labeled filter is neither counted as filtered nor reset by “Show all” (S6A-04, S6A-03). The text below is kept as it was
+written.
+
 The prototype shows a live canvas's “Live: {name}” as the first chip of the view-state bar (not removable, not part of
 “Show all”), and a live canvas's Labeled row filter is not counted as “filtered” there and is left by “Show all”. The
 application has no view-state bar yet (D-39), so neither exists; a live canvas shows its tag icon on the tab and the
@@ -354,6 +358,9 @@ tile and its box in the overview.
   “filtered” nor reset by “Show all”.
 
 ### Focus without the view-state bar (slice 4b-1)
+
+**Closed in slice 6a** ([PRD](prd/slice-06a-view-state-bar.md), [acceptance](prd/slice-06a-acceptance.md)): “Show all” turns Focus off, and the “Focus” chip moved from the status bar to the
+view-state bar (S6A-03, S6A-07). The text below is kept as it was written.
 
 PRD item 22 turns Focus off with “Show everything” (the view reset). In the prototype that is the view-state bar's
 “Show all” (D-39), and the application has no view-state bar yet. Focus turns off from its toolbar button, its chip,
@@ -430,6 +437,10 @@ panels exist only on canvas pages.
 
 ### A remembered canvas view and a different left panel
 
+**Closed in slice 6a** ([PRD](prd/slice-06a-view-state-bar.md), [acceptance](prd/slice-06a-acceptance.md)): a view is saved with the canvas's left edge on the screen and corrected by the
+difference on open, in the one `setViewport` call (D-54; S6A-11). Views saved before slice 6a open as stored. The text
+below is kept as it was written.
+
 Each canvas remembers its last view in the browser, in the canvas's own coordinates (`infomapper:view:<canvas id>`).
 Hiding, showing or resizing the left panel moves the view so the model stays in place (PRD item 6), but a view saved
 with the left panel at one width and opened with it at another is shifted on the screen by the difference (264 px for
@@ -439,6 +450,12 @@ a hidden panel).
 
 ### The top bar on narrow windows
 
+**Closed in slice 6a** ([PRD](prd/slice-06a-view-state-bar.md), [acceptance](prd/slice-06a-acceptance.md)): measured in slice 6a, the tools were cut off from about 1,700 px (not 1,100 px as
+written below: the zoom group at 1,600 px, the working context, undo and zoom at 1,300 px). Now nothing is cut off from
+800 to 2,560 px with both panels shown: the prototype's label steps at 2,100, 1,880 and 1,300 px, and a “More” menu for
+Focus and the notation up to 1,200 px and the Entity, Frame, Note and Hand tools up to 1,100 px (S6A-10). The text below
+is kept as it was written.
+
 Below about 1,100 px the canvas page's top bar has more tools than room: the tools are cut off at their right end, the
 details panel's button and the user indicator stay visible (slice 5a, step 2). The canvas still zooms with the wheel
 and undoes with Ctrl+Z. Idea in `docs/ideas.md` (“A top bar that fits narrow windows”).
@@ -446,6 +463,9 @@ and undoes with Ctrl+Z. Idea in `docs/ideas.md` (“A top bar that fits narrow w
 - **Found** in slice 5a, step 2; left for a later slice. **Later:** not planned yet.
 
 ### The status bar has no “Open notes on canvas {n}”
+
+**Closed in slice 6a** ([PRD](prd/slice-06a-view-state-bar.md), [acceptance](prd/slice-06a-acceptance.md)): the status bar follows Requirements with “Open notes on canvas {n}”, counting open
+notes only, as the prototype (S6A-07). The text below is kept as it was written.
 
 The prototype's status bar (`renderStatus`) ends with “Open notes on canvas {n}” after Requirements; the application's
 stops at Requirements and the working context (`src/app/_panels/status-bar.tsx`).

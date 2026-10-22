@@ -2,18 +2,32 @@
 
 // The status bar under a canvas (prototype renderStatus, the parts of slice 1a): mapped attributes on this canvas,
 // mappings and drafts, type problems, relationships; the workspace's requirements and how many are covered (slice 4a,
-// from the server's requirement index, fresh after every write); Focus's chip while it is on (slice 4b-1); and the
-// working context with its item count (slice 3b).
+// from the server's requirement index, fresh after every write); the open notes on this canvas (slice 6a, from the
+// canvas's counts once it is mounted, the page's before); and the working context with its item count (slice 3b).
+// Focus's chip moved to the view-state bar in slice 6a.
 
 import { useMemo } from "react";
 import type { WorkspaceModel } from "@/domain/types";
-import { FocusChip } from "@/canvas/Focus";
+import { useValue } from "@/canvas/value-store";
+import { viewCounts } from "@/canvas/view-counts";
 import { WorkingContextStatus } from "../_components/working-context";
 import { indexModel } from "./model-index";
 import { canvasStatus } from "./stats";
 
-export function StatusBar({ model, entityIds, requirements }: { model: WorkspaceModel; entityIds: string[]; requirements: { count: number; covered: number } }) {
+export function StatusBar({
+  model,
+  entityIds,
+  requirements,
+  openNotes,
+}: {
+  model: WorkspaceModel;
+  entityIds: string[];
+  requirements: { count: number; covered: number };
+  /** Open notes on this canvas as the page read them, until the canvas publishes its own count. */
+  openNotes: number;
+}) {
   const s = useMemo(() => canvasStatus(indexModel(model), entityIds), [model, entityIds]);
+  const counts = useValue(viewCounts);
   return (
     <footer
       data-testid="bar-status"
@@ -37,7 +51,9 @@ export function StatusBar({ model, entityIds, requirements }: { model: Workspace
       <span data-testid="status-requirements">
         Requirements <b>{requirements.count}</b>, covered <b>{requirements.covered}</b>
       </span>
-      <FocusChip />
+      <span data-testid="status-notes">
+        Open notes on canvas <b>{counts?.openNotes ?? openNotes}</b>
+      </span>
       <WorkingContextStatus />
     </footer>
   );

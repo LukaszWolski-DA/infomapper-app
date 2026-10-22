@@ -1,10 +1,11 @@
 // Canvas commands: create, rename, and which projects a canvas belongs to (D-28); duplicate its layout, delete it,
-// and its look and layer mode (slice 2a, D-12, D-22).
+// and its look and layer mode (slice 2a, D-12, D-22); what hides things on it, removed (slice 6a, D-39).
 
 import { z } from "zod";
 import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound, staleVersion } from "../errors";
 import type { Uuid } from "../ids";
+import { isElementCard } from "../model/card-kinds";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
 import {
   CANVAS_BACKGROUNDS,
@@ -20,6 +21,7 @@ import {
   type ProjectCanvas,
 } from "../types";
 import { nameSchema, parseInput, uuidSchema, versionSchema } from "../validation";
+import { begin, done, nothingToChange } from "./shared";
 
 const isLive = <R extends { deleted_at: string | null; workspace_id: Uuid }>(row: R | null, workspaceId: Uuid): row is R =>
   row !== null && row.deleted_at === null && row.workspace_id === workspaceId;
@@ -416,3 +418,68 @@ export function applyLookToAllCanvases(
 }
 
 const sameLook = (a: CanvasLook, b: CanvasLook) => a.background === b.background && a.grid === b.grid && a.layer === b.layer;
+
+// ---- what hides things on a canvas, removed (slice 6a, D-39) ----
+
+const MAX_VIEW_ROWS = 500;
+const resetViewInput = z
+  .object({
+    canvasId: uuidSchema,
+    /** Every row filter to All; a live canvas keeps its Labeled filters (D-39). */
+    filters: z.boolean().optional(),
+    /** Every collapsed card expanded. */
+    expandCards: z.boolean().optional(),
+    /** Every collapsed frame expanded. */
+    expandFrames: z.boolean().optional(),
+    /** The canvas's cards and frames at the versions the user read. */
+    cards: z.array(z.object({ canvasItemId: uuidSchema, expectedVersion: versionSchema }).strict()).max(MAX_VIEW_ROWS),
+    frames: z.array(z.object({ frameId: uuidSchema, expectedVersion: versionSchema }).strict()).max(MAX_VIEW_ROWS),
+  })
+  .strict();
+export type ResetCanvasViewInput = z.input<typeof resetViewInput>;
+
+/**
+ * The view-state bar's filter and collapsed-card chips and the layout part of “Show all” (slice 6a): the canvas's row
+ * filters to All, its cards expanded and its frames expanded, each part when asked, in one change group (one undo step).
+ * All or nothing: one row it would change that the user did not read at its version refuses the whole write. Nothing to
+ * change writes nothing.
+ */
+export function resetCanvasView(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: { canvas: Canvas | null; frames: readonly Frame[]; items: readonly CanvasItem[] },
+  input: unknown,
+): CommandResult<{ versions: Record<Uuid, number>; cards: number; frames: number }> {
+  const parsed = begin(access, "canvas.edit_items", resetViewInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { canvasId, filters, expandCards, expandFrames } = parsed.data;
+  const ws = access.workspace.id;
+  if (!isLive(state.canvas, ws) || state.canvas.id !== canvasId) return fail(notFound("canvas"));
+  const live = !!state.canvas.live_label_id;
+  const sawFrames = new Map(parsed.data.frames.map((f) => [f.frameId, f.expectedVersion]));
+  const sawCards = new Map(parsed.data.cards.map((c) => [c.canvasItemId, c.expectedVersion]));
+  const writes: Write[] = [];
+  const versions: Record<Uuid, number> = {};
+  let frameCount = 0;
+  for (const before of state.frames) {
+    if (!expandFrames || !isLive(before, ws) || before.canvas_id !== canvasId || !before.collapsed) continue;
+    if (sawFrames.get(before.id) !== before.version) return fail(staleVersion());
+    const row = nextVersion(ctx, before, { collapsed: false });
+    writes.push({ kind: "update", table: "frame", before, row });
+    versions[row.id] = row.version;
+    frameCount++;
+  }
+  for (const before of state.items) {
+    if (!isLive(before, ws) || before.canvas_id !== canvasId || !isElementCard(before)) continue;
+    const patch: Partial<CanvasItem> = {};
+    if (filters && before.row_filter !== "all" && !(live && before.row_filter === "labeled")) patch.row_filter = "all";
+    if (expandCards && before.collapsed) patch.collapsed = false;
+    if (!Object.keys(patch).length) continue;
+    if (sawCards.get(before.id) !== before.version) return fail(staleVersion());
+    const row = nextVersion(ctx, before, patch);
+    writes.push({ kind: "update", table: "canvas_item", before, row });
+    versions[row.id] = row.version;
+  }
+  if (!writes.length) return fail(nothingToChange());
+  return done(ctx, access, { versions, cards: writes.length - frameCount, frames: frameCount }, writes);
+}

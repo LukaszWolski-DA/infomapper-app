@@ -6,6 +6,7 @@ import {
   fitFrameAction,
   moveOnCanvasAction,
   putInNewFrameAction,
+  resetCanvasViewAction,
   resizeFrameAction,
   setAllFramesCollapsedAction,
   setFrameCollapsedAction,
@@ -18,6 +19,7 @@ import { liveNoticesFor } from "@/app/_lib/live-notices";
 import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
 import { AppShell } from "@/app/_components/app-shell";
 import { MovedNotice } from "@/app/_components/moved-notice";
+import { ViewStateBar } from "@/app/_components/view-state-bar";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { WorkingContextButton, WorkingContextProvider } from "@/app/_components/working-context";
 import { loadProjectView } from "@/app/_lib/project-view";
@@ -35,6 +37,8 @@ import { FrameToolButton } from "@/canvas/FrameToolButton";
 import { buildLines } from "@/canvas/line-data";
 import { buildNotes } from "@/canvas/note-data";
 import { NoteToolButton } from "@/canvas/NoteToolButton";
+import { MoreTools } from "@/canvas/MoreTools";
+import { MORE_FOCUS, MORE_TOOLS } from "@/canvas/more-breakpoints";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
 import { EntityToolButton } from "@/canvas/EntityToolButton";
 import { HandToolButton } from "@/canvas/HandToolButton";
@@ -224,7 +228,16 @@ export default async function CanvasPage({
                 />
               ),
               openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId),
-              status: <StatusBar model={model} entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)} requirements={requirementCounts} />,
+              // `?diag=noviewbar` (measurement build only, slice 6a S6A-09): the page without the bar, to time a switch alone
+              viewState: diag.includes("noviewbar") ? undefined : <ViewStateBar editable={editable} live={liveLabel ? { labelName: liveLabel.name } : null} />,
+              status: (
+                <StatusBar
+                  model={model}
+                  entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)}
+                  requirements={requirementCounts}
+                  openNotes={noteRows.filter((n) => n.deleted_at === null && n.status === "open").length}
+                />
+              ),
             }}
           >
             {query.moved === "1" && <MovedNotice project={view.project.name} canvas={canvas.name} />}
@@ -260,6 +273,7 @@ export default async function CanvasPage({
                 arrangeIntoFrames: arrangeIntoFramesAction.bind(null, ws, canvasId),
                 setFrameCollapsed: setFrameCollapsedAction.bind(null, ws),
                 setAllFramesCollapsed: setAllFramesCollapsedAction.bind(null, ws, canvasId),
+                resetCanvasView: resetCanvasViewAction.bind(null, ws, canvasId),
               }}
               entityConcepts={Object.fromEntries(model.entities.map((e) => [e.id, e.concept_id]))}
               focusCardId={focusCardId}
@@ -306,17 +320,26 @@ export default async function CanvasPage({
   );
 }
 
+// On a narrow window Focus and the notation, then the four tools, leave the bar for “More” (slice 6a): each wrapper is
+// the tool's own element in the bar (`display: contents` until its breakpoint).
 const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolean }) => (
   <>
     <LayerSwitch />
-    <FocusButton />
-    {editable && <EntityToolButton />}
-    {editable && <FrameToolButton />}
-    {canNote && <NoteToolButton />}
-    <HandToolButton />
-    <NotationSwitch />
+    <span className={`contents ${MORE_FOCUS.inBar}`}>
+      <FocusButton />
+    </span>
+    <span className={`contents ${MORE_TOOLS.inBar}`}>
+      {editable && <EntityToolButton />}
+      {editable && <FrameToolButton />}
+      {canNote && <NoteToolButton />}
+      <HandToolButton />
+    </span>
+    <span className={`contents ${MORE_FOCUS.inBar}`}>
+      <NotationSwitch />
+    </span>
     <WorkingContextButton />
     <UndoButtons />
     <ZoomControls />
+    <MoreTools editable={editable} canNote={canNote} />
   </>
 );

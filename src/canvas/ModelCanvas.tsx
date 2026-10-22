@@ -104,6 +104,7 @@ import {
 import { relatedLines, type CanvasLines, type Selection } from "./line-data";
 import { useCanvasLook } from "./look";
 import { viewKey } from "./views";
+import { viewCounts } from "./view-counts";
 import LineLayer, { HoverLines } from "./LineLayer";
 import { OverlayLayer } from "./OverlayLayer";
 import { createValueStore } from "./value-store";
@@ -249,12 +250,20 @@ const toReqNode = (card: RequirementCardData, editable: boolean): ReqNodeT => ({
   style: { pointerEvents: "all" },
 });
 
-function readView(canvasId: string): Viewport | null {
+/**
+ * A remembered view: the canvas's coordinates, and since slice 6a where the canvas's left edge was on the screen when it
+ * was saved (`left`: the left panel's width, 0 when hidden or up to 1000 px wide). A view without it (saved before) is
+ * read as it is.
+ */
+type SavedView = Viewport & { left?: number };
+
+function readView(canvasId: string): SavedView | null {
   const raw = readPreference(viewKey(canvasId));
   if (!raw) return null;
   try {
-    const v = JSON.parse(raw) as Viewport;
-    return [v.x, v.y, v.zoom].every(Number.isFinite) && v.zoom >= MIN_ZOOM && v.zoom <= MAX_ZOOM ? v : null;
+    const v = JSON.parse(raw) as SavedView;
+    if (!([v.x, v.y, v.zoom].every(Number.isFinite) && v.zoom >= MIN_ZOOM && v.zoom <= MAX_ZOOM)) return null;
+    return Number.isFinite(v.left) ? v : { x: v.x, y: v.y, zoom: v.zoom };
   } catch {
     return null;
   }
@@ -391,8 +400,13 @@ export function ModelCanvas({
     [rf, storeApi],
   );
 
+  // saved with the canvas's left edge on the screen (slice 6a, D-54): opened beside another left panel, the view is
+  // moved by the difference, so the model stands where it stood
   const onMoveEnd = useCallback(
-    (_: unknown, v: Viewport) => writePreference(viewKey(canvasId), JSON.stringify(v)),
+    (_: unknown, v: Viewport) => {
+      const left = rootRef.current?.getBoundingClientRect().left;
+      writePreference(viewKey(canvasId), JSON.stringify(left === undefined ? v : { ...v, left: Math.round(left) }));
+    },
     [canvasId],
   );
 
@@ -1203,6 +1217,16 @@ export function ModelCanvas({
   const cardNotes = useMemo(() => countsOf(cardNotesKey), [cardNotesKey]);
   const frameNotesKey = useMemo(() => countsKey(frameNoteCounts(savedNotes, ui.hideResolved)), [savedNotes, ui.hideResolved]);
   const frameNotes = useMemo(() => countsOf(frameNotesKey), [frameNotesKey]);
+  // what the view-state bar and the status bar count (slice 6a): published as numbers, so the canvas never re-renders
+  // for them and they draw only when a number changes
+  const filteredCards = useMemo(() => cardData.filter((c) => c.rowFilter !== "all" && c.rowFilter !== "labeled").length, [cardData]);
+  const collapsedCards = useMemo(() => cardData.filter((c) => c.collapsed).length, [cardData]);
+  const resolvedNotes = useMemo(() => savedNotes.filter((n) => n.status === "resolved").length, [savedNotes]);
+  const openNotes = savedNotes.length - resolvedNotes;
+  useEffect(() => {
+    viewCounts.set({ filtered: filteredCards, collapsedCards, collapsedFrames: collapsedIds.size, resolvedNotes, openNotes });
+  }, [filteredCards, collapsedCards, collapsedIds.size, resolvedNotes, openNotes]);
+  useEffect(() => () => viewCounts.set(null), []);
   const counts = useMemo(() => memberCounts(cardData), [cardData]);
   /** What stands for each frame on the canvas: the frame, or its block (selection marks, slice 2c). */
   const frameRects = useMemo(() => new Map(frames.map((f) => [f.id, frameShape(f, counts)])), [frames, counts]);
@@ -1474,7 +1498,12 @@ export function ModelCanvas({
   useEffect(() => {
     if (ready || !sized) return;
     const { width, height } = storeApi.getState();
-    void rf.setViewport(readView(canvasId) ?? fitView(width, height));
+    const saved = readView(canvasId);
+    // the one view set on open: a view saved beside another left panel moves by the difference in the same call, so
+    // there is no second commit and no visible jump (slice 6a, item 13)
+    const left = Math.round(rootRef.current?.getBoundingClientRect().left ?? 0);
+    const view = saved ? { x: saved.x + (saved.left === undefined ? 0 : saved.left - left), y: saved.y, zoom: saved.zoom } : fitView(width, height);
+    void rf.setViewport(view);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the view can only be set once the pane has a size
     setReady(true);
   }, [ready, sized, storeApi, canvasId, rf, fitView]);
@@ -1623,6 +1652,7 @@ export function ModelCanvas({
       selectFrameCards: frameState.selectFrameCards,
       setFrameCollapsed: frameState.setCollapsed,
       setAllFramesCollapsed: frameState.setAllCollapsed,
+      resetView: frameState.resetView,
       bundleView: (key) => bundlesRef.current.find((b) => b.key === key) ?? null,
       noteView: noteState.noteView,
       newNote: noteState.newNote,
@@ -1673,7 +1703,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, shiftView, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, fit, shiftView, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store

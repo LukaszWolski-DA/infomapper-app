@@ -21,6 +21,7 @@ import {
   type FrameCanvasState,
   type MoveState,
 } from "@/domain/commands/frame";
+import { resetCanvasView } from "@/domain/commands/canvas";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { DataStore } from "@/data";
 import { runCommand, type ActionResult } from "../_lib/run-command";
@@ -129,6 +130,24 @@ export async function setFrameCollapsedAction(workspaceId: string, input: { fram
 /** “Collapse all” / “Expand all” in the canvas overview (slice 2c, item 8): every frame of the canvas, one change. */
 export async function setAllFramesCollapsedAction(workspaceId: string, canvasId: string, input: { frames: { frameId: string; expectedVersion: number }[]; collapsed: boolean }) {
   return refreshed(await onCanvas(workspaceId, canvasId, async (ctx, access, state) => setAllFramesCollapsed(ctx, access, state, { ...input, canvasId })));
+}
+
+/**
+ * The view-state bar (slice 6a): the canvas's row filters to All, its cards and frames expanded, the parts asked for, in
+ * one change; all or nothing on the versions read.
+ */
+export async function resetCanvasViewAction(
+  workspaceId: string,
+  canvasId: string,
+  input: {
+    filters?: boolean;
+    expandCards?: boolean;
+    expandFrames?: boolean;
+    cards: { canvasItemId: string; expectedVersion: number }[];
+    frames: { frameId: string; expectedVersion: number }[];
+  },
+) {
+  return refreshed(await onCanvas(workspaceId, canvasId, async (ctx, access, state) => resetCanvasView(ctx, access, state, { ...input, canvasId })));
 }
 
 /** The resize handle at a frame's bottom-right corner. */

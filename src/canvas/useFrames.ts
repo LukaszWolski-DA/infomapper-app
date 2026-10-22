@@ -74,6 +74,8 @@ export interface FrameWrites {
   }) => Promise<WriteResult<Versions & { movedToConcepts: number }>>;
   /** Collapses a frame into one block or expands it (slice 2c, D-07). */
   setFrameCollapsed: (input: { frameId: Uuid; expectedVersion: number; collapsed: boolean }) => Promise<WriteResult<{ frame: Frame }>>;
+  /** The view-state bar (slice 6a): row filters to All, cards and frames expanded, the parts asked for, one change. */
+  resetCanvasView: (input: ViewReset & { cards: CardRef[]; frames: { frameId: Uuid; expectedVersion: number }[] }) => Promise<WriteResult<Versions & { cards: number; frames: number }>>;
   /** “Collapse all” / “Expand all” (slice 2c, item 8): every frame of the canvas, one change. */
   setAllFramesCollapsed: (input: { frames: { frameId: Uuid; expectedVersion: number }[]; collapsed: boolean }) => Promise<WriteResult<Versions & { frames: number }>>;
   createFrame: (input: { x: number; y: number; width: number; height: number; cards: SizedRef[] }) => Promise<WriteResult<Versions & { frameId: Uuid; claimed: number }>>;
@@ -86,6 +88,13 @@ export interface FrameWrites {
     frames: { frameId: Uuid; expectedVersion: number }[];
     cards: SizedRef[];
   }) => Promise<WriteResult<Versions & { frames: number; built: Frame[]; cards: { id: Uuid; x: number; y: number; frameId: Uuid | null }[] }>>;
+}
+
+/** What the view-state bar removes in one change (slice 6a): row filters (a live canvas's Labeled kept), collapsed cards, collapsed frames. */
+export interface ViewReset {
+  filters?: boolean;
+  expandCards?: boolean;
+  expandFrames?: boolean;
 }
 
 export type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width" | "frameId">>;
@@ -847,6 +856,70 @@ export function useFrames(o: Options) {
     [editable, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast, setInTab],
   );
 
+  /**
+   * The view-state bar's filter and collapsed-card chips and the layout part of “Show all” (slice 6a): row filters to
+   * All (the Labeled filter, which only a live canvas shows, kept), cards and frames expanded, the parts asked for, in
+   * one change (one undo step). Shown at once; a refusal puts everything back with the domain's message. Reviewers and
+   * readers expand frames in this tab only and change nothing else. Resolves whether a step was saved.
+   */
+  const resetView = useCallback(
+    (parts: ViewReset): Promise<boolean> =>
+      new Promise((resolve) => {
+        if (!editable) {
+          if (parts.expandFrames && framesRef.current.some((f) => f.collapsed)) setInTab(framesRef.current.map((f) => f.id), false);
+          resolve(false);
+          return;
+        }
+        const show = new Map<Uuid, CardPatch>(), back = new Map<Uuid, CardPatch>();
+        for (const { data: { card: c } } of nodes()) {
+          const p: CardPatch = {}, u: CardPatch = {};
+          if (parts.filters && c.rowFilter !== "all" && c.rowFilter !== "labeled") {
+            p.rowFilter = "all";
+            u.rowFilter = c.rowFilter;
+          }
+          if (parts.expandCards && c.collapsed) {
+            p.collapsed = false;
+            u.collapsed = true;
+          }
+          if (!Object.keys(p).length) continue;
+          show.set(c.id, p);
+          back.set(c.id, u);
+        }
+        const expanding = parts.expandFrames ? framesRef.current.filter((f) => f.collapsed) : [];
+        if (!show.size && !expanding.length) {
+          resolve(false);
+          return;
+        }
+        for (const [id, p] of show) patchCard(id, p);
+        patchFrames(new Map(expanding.map((f) => [f.id, { collapsed: false }])));
+        const cardIds = nodes().map((n) => n.id), frameIds = framesRef.current.map((f) => f.id);
+        enqueueGroup([...cardIds, ...frameIds], async () => {
+          let result: WriteResult<Versions & { cards: number; frames: number }>;
+          try {
+            result = await writes.resetCanvasView({
+              ...parts,
+              cards: cardIds.map((id) => ({ canvasItemId: id, expectedVersion: ver(id) })),
+              frames: frameIds.map((id) => ({ frameId: id, expectedVersion: ver(id) })),
+            });
+          } catch {
+            result = FAILED;
+          }
+          if (!result.ok) {
+            for (const [id, u] of back) patchCard(id, u);
+            patchFrames(new Map(expanding.map((f) => [f.id, { collapsed: true }])));
+            toast(result.message, "refusal");
+            resolve(false);
+            return;
+          }
+          noteVersions(result.value.versions);
+          patchFrames(new Map(frameIds.filter((id) => id in result.value.versions).map((id) => [id, { version: result.value.versions[id]! }])));
+          undo()?.noteSaved();
+          resolve(true);
+        });
+      }),
+    [editable, nodes, patchCard, patchFrames, enqueueGroup, writes, ver, noteVersions, undo, toast, setInTab],
+  );
+
   const { selectCards } = o;
   const selectFrameCards = useCallback((frameId: Uuid) => selectCards(membersOf(frameId).map((n) => n.id)), [selectCards, membersOf]);
 
@@ -1021,5 +1094,6 @@ export function useFrames(o: Options) {
     putInNewFrame,
     setCollapsed,
     setAllCollapsed,
+    resetView,
   };
 }

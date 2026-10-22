@@ -1,6 +1,7 @@
 "use client";
 
-// Crow's foot / UML in the top bar (prototype data-not buttons): one setting for every canvas (D-22).
+// Crow's foot / UML in the top bar (prototype data-not buttons): one setting for every canvas (D-22). Short labels up to
+// 2,100 px; up to 1,200 px it is in “More” (slice 6a, `MoreTools`).
 
 import { useContext } from "react";
 import { CanvasUiCtx, type Notation } from "./context";
@@ -13,7 +14,7 @@ const OPTIONS: { value: Notation; label: string; short: string; title: string }[
 export function NotationSwitch() {
   const ui = useContext(CanvasUiCtx);
   return (
-    <div role="group" aria-label="Relationship notation" data-testid="switch-notation" className="hidden flex-none rounded-[7px] bg-im-hover p-0.5 sm:inline-flex">
+    <div role="group" aria-label="Relationship notation" data-testid="switch-notation" className="inline-flex flex-none rounded-[7px] bg-im-hover p-0.5">
       {OPTIONS.map((o) => (
         <button
           key={o.value}
@@ -24,8 +25,8 @@ export function NotationSwitch() {
           onClick={() => ui.setNotation(o.value)}
           className="h-[26px] whitespace-nowrap rounded-[5px] px-2.5 text-im-ink-2 aria-pressed:bg-im-surface aria-pressed:text-im-ink aria-pressed:shadow-[0_0_0_1px_var(--im-line),0_1px_2px_var(--im-shadow)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical"
         >
-          <span className="hidden xl:inline">{o.label}</span>
-          <span className="xl:hidden">{o.short}</span>
+          <span className="hidden min-[2101px]:inline">{o.label}</span>
+          <span className="min-[2101px]:hidden">{o.short}</span>
         </button>
       ))}
     </div>

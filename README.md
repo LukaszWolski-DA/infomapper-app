@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 4b-2 are merged; slice 5a (side panels) is in its closing step. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 6a are merged; slice 6b (back and forward, D-38) is next. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -33,11 +33,16 @@ it at once, Focus lighting the cards whose scope holds the focused element, and 
 shows most of a requirement; slice 5a's side panels: the toolbar's buttons at its two ends show and hide the object browser
 and the details panel, their inner edges resize them (a guide line while dragging, double-click to reset, the arrow
 keys), the layout is remembered per person, the model stays in place when the left panel changes, and up to 1000 px
-wide the panels slide over the canvas. Acceptance:
+wide the panels slide over the canvas; slice 6a's view-state bar: chips at the end of the breadcrumbs row for everything
+that hides or fades things on the canvas (Focus, the layer, row filters, collapsed cards and frames, hidden resolved
+notes, the active tool; a live canvas's “Live: {name}” first), each removed with its ×, “Show all” as one undo step for
+the layout part, chips that do not fit folded into “+{n}”, “Open notes on canvas {n}” in the status bar, a top bar that
+fits every width from 800 to 2,560 px (short labels, then “More” for Focus, the notation and the tools), and a
+remembered view that stays put beside another left panel. Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md).
 
 ## Getting started
 
@@ -84,6 +89,8 @@ Until the database slice (last, AD-31), data lives in a JSON file on the server 
 | `npm run measure:canvas -- --to-screen --only s4b2pans,c10,lasso,c08,s4b2focus,s4b2screen,s4b2drag --rounds 3 --no-build --against slice-04b1` | Slice 4b-2's closing sitting: S4B2-10 and S4B2-14's pans (`e2e/slice-04b2/S4B2-10.spec.ts`, both sides), C-10, the lasso and C-08 (both sides), S4B2-11 to S4B2-13 (this branch); `--prepare-only` first makes both builds |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b2/S4B2-15-layers.spec.ts` | S4B2-15's reads (slice 4b-2): drawing layers, their megapixels and viewport elements on “100 cards” and “Performance test – requirements”, and requirement cards moved over a frame; copy the spec into the reference worktree for `slice-04b1`'s side |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-05a/S5A-08.spec.ts` | Slice 5a's diagnosis to the screen: hiding and showing each side panel and a resize on release, on “Performance test” at 30 % and 100 % dense, with a LayerTree read (`test-results/S5A-08.json`) |
+| `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06a/S6A-09.spec.ts` | Slice 6a's diagnosis to the screen: Focus through its chip, “Show all” against the controls, a chip appearing (`HAND_ONLY=1`: only that pair), with a LayerTree read (`test-results/S6A-09.json`) |
+| `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06a/S6A-09-hand.spec.ts` | A chip appearing, phase by phase (script, style, layout, paint), with and without the bar (`test-results/S6A-09-hand.json`) |
 | `npx tsx scripts/to-screen.ts <folder>` | Analyses saved traces again (slice 4b-1): every switch to the screen (median, p95, max, the split into main thread, GPU raster and rest, the switches not settled) and every pan's presented frames |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts` | S3B-15 (a): the elements in the viewport of “Performance test” at 100 % and 30 %, frames expanded and collapsed; with `ELEMENTS_BASELINE=<file>` they must equal the previous tag's (`test-results/S3B-15-elements.json`) |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-live.spec.ts` | S3B-15 (c): pan and zoom at 100 % on PERF-2's live canvas against “Performance test”, in turns (`test-results/S3B-15-live.json`) |

@@ -170,12 +170,12 @@ export function WorkingContextButton() {
         {active ? (
           <>
             <span className="size-2 flex-none rounded-full bg-im-logical" aria-hidden />
-            <span className="max-w-[180px] truncate">Working on {active.name}</span>
+            <span className="max-w-[180px] truncate max-[1301px]:max-w-[100px] max-[1201px]:max-w-[56px] max-[1001px]:max-w-[40px]">Working on {active.name}</span>
           </>
         ) : (
           <>
             <TagIcon className="size-4" />
-            <span className="hidden min-[1400px]:inline">No working context</span>
+            <span className="hidden min-[1881px]:inline">No working context</span>
           </>
         )}
       </button>

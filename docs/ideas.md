@@ -138,7 +138,17 @@ Left out of slice 4b-2 on purpose (not in its PRD):
 
 ## A top bar that fits narrow windows (slice 5a, step 2)
 
+**Done in slice 6a**: the prototype's label steps and a “More” menu; nothing is cut off from 800 to 2,560 px (S6A-10).
+
 Below about 1,100 px the canvas page's top bar has more tools than room. Since slice 5a the tools are cut off at
 their right end (the details panel's button and the user indicator stay visible); before, the user indicator was cut
 off. The prototype shortens its labels at 2,100 and 1,300 px and hides some tools at 1,000 px (`.lf`, `.ls`,
 `.hide-l`, `.hide-s`, `.hide-m`). A later slice could do the same, or move the overflow into a “More” menu.
+
+## No fresh page after “Show all” when only cards change (slice 6a, step 3)
+
+`resetCanvasViewAction` asks for a fresh page after its write, as “Expand all” does. When only row filters and
+collapsed cards change, the canvas already shows the result, and the card's own filter and collapse buttons write
+without a fresh page. In S6A-09 that refresh made “Show all” with Focus and a filter about 90 ms slower to the screen
+than the same changes through the controls at 30 % (22 ms in the dense view). The action could skip the refresh when no
+frame changed.

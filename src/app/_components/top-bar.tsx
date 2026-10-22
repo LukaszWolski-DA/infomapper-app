@@ -1,6 +1,8 @@
 "use client";
 
 // The top bar as in the prototype: brand, Organization ▾ / Workspace ▾ / Project ▾ switchers and the user indicator.
+// Narrow windows (slice 6a): the prototype's steps at 2,100 (short labels, narrower switchers) and 1,300 px (no brand, no
+// path separators), each a class on the element itself (AD-24 rule 4: nothing on the page or its grid).
 // Canvas pages add their tools (slice 1a: zoom and fit) before the user indicator. Pages with side panels get the
 // buttons that show and hide them at the bar's two ends (slice 5a, prototype #tLeft, #tRight).
 
@@ -29,10 +31,10 @@ export function TopBar({ shell, tools, panelToggles = false }: { shell: ShellDat
   return (
     <header
       data-testid="bar-top"
-      className="flex h-12 min-w-0 flex-none items-center gap-2.5 overflow-hidden border-b border-im-line bg-im-surface px-2.5"
+      className="flex h-12 min-w-0 flex-none items-center gap-2.5 overflow-hidden border-b border-im-line bg-im-surface px-2.5 max-[1001px]:gap-1.5 max-[1001px]:px-1.5"
     >
       {panelToggles && <PanelToggle side="left" />}
-      <div className="mr-1.5 hidden whitespace-nowrap sm:block">
+      <div className="mr-1.5 whitespace-nowrap max-[1301px]:hidden">
         <b className="text-sm font-semibold">InfoMapper</b>
       </div>
       <OrganizationSwitcher shell={shell} />
@@ -41,22 +43,23 @@ export function TopBar({ shell, tools, panelToggles = false }: { shell: ShellDat
       <PathSep />
       <ProjectSwitcher shell={shell} />
       <div className="flex-1" />
-      {/* on a narrow window the tools are cut off, not the details panel's button and the user indicator (slice 5a) */}
-      {tools && <div className="flex min-w-0 items-center gap-2.5 overflow-hidden">{tools}</div>}
+      {/* the tools never shrink: the switchers' names shorten first, and the tools that do not fit move into “More”
+          at fixed widths (slice 6a), so nothing is cut off from 800 to 2,560 px */}
+      {tools && <div data-testid="bar-tools" className="flex flex-none items-center gap-2.5 max-[2101px]:gap-2 max-[1001px]:gap-1">{tools}</div>}
       {panelToggles && <PanelToggle side="right" />}
       <UserIndicator shell={shell} />
     </header>
   );
 }
 
-const PathSep = () => <span className="-mx-0.5 hidden text-im-ink-3 md:inline">/</span>;
+const PathSep = () => <span className="-mx-0.5 text-im-ink-3 max-[1301px]:hidden">/</span>;
 
 function SwitcherButton({ testId, title, children }: { testId: string; title: string; children: ReactNode }) {
   return (
     <DropdownMenuTrigger
       data-testid={testId}
       title={title}
-      className="inline-flex h-[30px] min-w-0 max-w-[260px] items-center gap-1.5 rounded-md px-2 font-medium text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover"
+      className="inline-flex h-[30px] min-w-[52px] max-w-[260px] items-center gap-1.5 rounded-md px-2 font-medium max-[2101px]:max-w-[150px] max-[2101px]:px-1.5 max-[1301px]:max-w-[110px] max-[1001px]:min-w-[44px] text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover"
     >
       <span className="min-w-0 truncate">{children}</span>
       <svg viewBox="0 0 16 16" className="size-3 flex-none fill-none stroke-current stroke-[1.6]" aria-hidden>
