@@ -138,6 +138,9 @@ function classification(name: string): "bk" | "pii" | undefined {
 export const NOT_READ_YET = (name: string, table: string) =>
   `Classification “${name}” on ${table} is not read yet: only Business key and PII are read for now.`;
 
+export const TYPE_KEPT = (type: string, column: string) =>
+  `Type “${type}” of ${column} is kept as written; the type check cannot judge mappings from this column.`;
+
 export function readStandard(text: string, fileName: string): StandardRead {
   const out: StandardRead = { fileName, errors: [], warnings: [], tables: [], columnCount: 0, delimiter: ",", fields: new Set() };
   const body = text.replace(/^﻿/, "");
@@ -232,6 +235,8 @@ export function readStandard(text: string, fileName: string): StandardRead {
     }
 
     const read = readColumnType(type);
+    // a type the reader cannot read is kept as written, never silently (step 2, answer 3)
+    if (!read.ok) out.warnings.push(TYPE_KEPT(type, `${schema}.${table}.${column}`));
     const columnType: ColumnType = read.ok ? read.type : { data_type: type.toLowerCase().replace(/\s+/g, " "), type_length: null, type_precision: null, type_scale: null };
     if (columnType.type_length === null && columnType.type_precision === null) {
       const length = readTypeParameter(get("length"), "length");

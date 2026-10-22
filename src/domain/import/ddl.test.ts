@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { MAX_LENGTH } from "../model/type-check";
 import { ddlSummaryText, ddlToStandard, readDdl, skippedText, tokenizeSql, typeString } from "./ddl";
-import type { StandardRead } from "./standard";
+import { TYPE_KEPT, type StandardRead } from "./standard";
 
 const sample = (name: string) => readFileSync(new URL(`./samples/${name}`, import.meta.url), "utf8");
 const table = (r: StandardRead, name: string) => r.tables.find((t) => t.name === name)!;
@@ -72,6 +72,7 @@ describe("readDdl: the samples (S7A-03)", () => {
     );
     expect(read.warnings).toEqual([
       "Line 31: view loyalty.v_balances skipped. A DDL script does not give the types of a view’s columns; use the catalog query or add the view to the standard.",
+      TYPE_KEPT("text[]", "loyalty.points_txn.tags"),
     ]);
   });
 

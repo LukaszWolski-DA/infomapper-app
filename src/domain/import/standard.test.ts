@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { MAX_LENGTH } from "../model/type-check";
-import { MAX_IMPORT_ROWS, NOT_READ_YET, readStandard, STANDARD_FIELDS, STANDARD_TEMPLATE, type StandardRead } from "./standard";
+import { MAX_IMPORT_ROWS, NOT_READ_YET, readStandard, STANDARD_FIELDS, STANDARD_TEMPLATE, TYPE_KEPT, type StandardRead } from "./standard";
 
 const sample = (name: string) => readFileSync(new URL(`./samples/${name}`, import.meta.url), "utf8");
 const HEAD = STANDARD_FIELDS.join(",");
@@ -143,11 +143,15 @@ describe("readStandard: reading rules (item 8)", () => {
     expect(typeOf(r, "t", "e")).toEqual(["varchar", 10, null, null]);
   });
 
-  it("keeps fractional seconds as precision; a type it cannot read stays as written", () => {
-    const r = ok("database,schema,table,column,data_type\nd,s,t,a,datetime2(7)\nd,s,t,b,timestamp(3)\nd,s,t,c,integer[]");
+  it("keeps fractional seconds as precision; a type it cannot read stays as written, with a warning", () => {
+    const r = ok("database,schema,table,column,data_type\nd,s,t,a,datetime2(7)\nd,s,t,b,timestamp(3)\nd,s,t,c,integer[]\nd,s,t,e,varchar(0)");
     expect(typeOf(r, "t", "a")).toEqual(["datetime2", null, 7, null]);
     expect(typeOf(r, "t", "b")).toEqual(["timestamp", null, 3, null]);
     expect(typeOf(r, "t", "c")).toEqual(["integer[]", null, null, null]);
+    expect(r.warnings).toEqual([TYPE_KEPT("integer[]", "s.t.c"), TYPE_KEPT("varchar(0)", "s.t.e")]);
+    expect(TYPE_KEPT("integer[]", "loyalty.points_txn.tags")).toBe(
+      "Type “integer[]” of loyalty.points_txn.tags is kept as written; the type check cannot judge mappings from this column.",
+    );
   });
 
   it("reads yes and no in their forms; nullable defaults to yes, and to no for a key", () => {
