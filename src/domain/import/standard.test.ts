@@ -110,10 +110,12 @@ describe("readStandard: the catalog queries' results (S7A-02, S7A-16's files)", 
     const r = ok(sample("hr_oracle_catalog.csv"));
     expect(typeOf(r, "EMPLOYEES", "EMP_ID")).toEqual(["number", null, 10, 0]);
     expect(typeOf(r, "EMPLOYEES", "SALARY")).toEqual(["number", null, 12, 2]);
-    expect(typeOf(r, "EMPLOYEES", "GRADE")).toEqual(["number", null, null, 0]);
     expect(typeOf(r, "EMPLOYEES", "EMP_NO")).toEqual(["varchar2", 10, null, null]);
     expect(typeOf(r, "EMPLOYEES", "UPDATED_AT")).toEqual(["timestamp with time zone", null, 6, null]);
-    expect(typeOf(r, "EMPLOYEES", "NOTES")).toEqual(["clob", null, null, null]);
+    // Oracle's INTEGER: NUMBER with scale 0 and no precision; a CLOB
+    const more = ok('"database","schema","table","column","data_type","precision","scale"\n"ORCL","HRLEG","T","GRADE","NUMBER","",0\n"ORCL","HRLEG","T","NOTES","CLOB","",""');
+    expect(typeOf(more, "T", "GRADE")).toEqual(["number", null, null, 0]);
+    expect(typeOf(more, "T", "NOTES")).toEqual(["clob", null, null, null]);
     expect(table(r, "EMPLOYEES")).toMatchObject({ comment: "Employees, current and former", rowCount: 2140 });
     expect(table(r, "EMPLOYEES").foreignKeys).toEqual([
       { name: "FK_EMP_DEPT", toSchema: "HRLEG", toTable: "DEPARTMENTS", pairs: [{ from: "DEPT_ID", to: "DEPT_ID" }] },

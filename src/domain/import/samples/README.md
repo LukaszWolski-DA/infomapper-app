@@ -13,7 +13,8 @@ the client bundle (`eslint.config.mjs`, "import samples"). The app has no sample
 | `hrleg_ddl.sql` | DDL, Oracle (DBMS_METADATA), database `ORCL` | prototype `DDL_SAMPLES.oracle` |
 | `crm_sqlserver_catalog.tsv` | the SQL Server catalog query's result as SSMS copies it (tabs, `NULL` cells): the demo CRM unchanged | S7A-16 |
 | `web_postgres_catalog.csv` | the PostgreSQL query's result as psql's `\copy … CSV HEADER` writes it: the demo WEB unchanged | S7A-16 |
-| `hr_oracle_catalog.csv` | the Oracle query's result as SQL Developer exports it (quoted, upper case) | S7A-16 |
+| `hr_oracle_catalog.csv` | the Oracle query's result as SQL Developer exports it (quoted, upper case): `hrleg_ddl.sql`'s tables | S7A-16, DDL then catalog |
+| `billing_sqlserver_catalog.tsv` | the SQL Server query's result for `billing.sql`'s database: its computed column's type and its view, which the script does not give | DDL then catalog |
 
 The first six were written from the prototype's own code (`toCSV`, `sampleRows`), so they match it byte for byte apart
 from a final line break.

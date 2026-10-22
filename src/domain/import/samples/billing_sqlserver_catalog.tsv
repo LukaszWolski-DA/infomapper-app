@@ -1,0 +1,17 @@
+database	schema	table	object_type	row_count	table_comment	column	ordinal	data_type	length	precision	scale	nullable	primary_key	fk_name	fk_ref_schema	fk_ref_table	fk_ref_column	column_comment	classifications
+billing	dbo	invoice	table	5210	Invoice header, one row per invoice	invoice_id	1	bigint	NULL	NULL	NULL	no	yes	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice	table	5210	Invoice header, one row per invoice	invoice_no	2	varchar	20	NULL	NULL	no	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice	table	5210	Invoice header, one row per invoice	cust_no	3	varchar	20	NULL	NULL	no	no	NULL	NULL	NULL	NULL	Customer number as in CRM	NULL
+billing	dbo	invoice	table	5210	Invoice header, one row per invoice	issued_on	4	date	NULL	NULL	NULL	no	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice	table	5210	Invoice header, one row per invoice	amount	5	decimal	NULL	12	2	no	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice	table	5210	Invoice header, one row per invoice	currency	6	char	3	NULL	NULL	no	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice	table	5210	Invoice header, one row per invoice	status	7	tinyint	NULL	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice	table	5210	Invoice header, one row per invoice	full_ref	8	varchar	24	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice_line	table	18233	NULL	invoice_id	1	bigint	NULL	NULL	NULL	no	yes	FK_invoice_line_invoice	dbo	invoice	invoice_id	NULL	NULL
+billing	dbo	invoice_line	table	18233	NULL	line_no	2	int	NULL	NULL	NULL	no	yes	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice_line	table	18233	NULL	item_code	3	varchar	30	NULL	NULL	no	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice_line	table	18233	NULL	qty	4	decimal	NULL	10	3	no	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice_line	table	18233	NULL	net_amount	5	decimal	NULL	12	2	no	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	invoice_line	table	18233	NULL	note	6	nvarchar	max	NULL	NULL	yes	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	v_open_invoices	view	NULL	NULL	invoice_id	1	bigint	NULL	NULL	NULL	no	no	NULL	NULL	NULL	NULL	NULL	NULL
+billing	dbo	v_open_invoices	view	NULL	NULL	amount	2	decimal	NULL	12	2	no	no	NULL	NULL	NULL	NULL	NULL	NULL

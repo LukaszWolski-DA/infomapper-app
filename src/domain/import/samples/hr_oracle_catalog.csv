@@ -7,6 +7,4 @@
 "ORCL","HRLEG","EMPLOYEES","table",2140,"Employees, current and former","HIRED_ON",4,"DATE","","","","yes","no","","","","","",""
 "ORCL","HRLEG","EMPLOYEES","table",2140,"Employees, current and former","SALARY",5,"NUMBER","",12,2,"yes","no","","","","","",""
 "ORCL","HRLEG","EMPLOYEES","table",2140,"Employees, current and former","DEPT_ID",6,"NUMBER","",10,0,"yes","no","FK_EMP_DEPT","HRLEG","DEPARTMENTS","DEPT_ID","",""
-"ORCL","HRLEG","EMPLOYEES","table",2140,"Employees, current and former","GRADE",7,"NUMBER","","",0,"yes","no","","","","","",""
-"ORCL","HRLEG","EMPLOYEES","table",2140,"Employees, current and former","UPDATED_AT",8,"TIMESTAMP(6) WITH TIME ZONE","","","","yes","no","","","","","",""
-"ORCL","HRLEG","EMPLOYEES","table",2140,"Employees, current and former","NOTES",9,"CLOB","","","","yes","no","","","","","",""
+"ORCL","HRLEG","EMPLOYEES","table",2140,"Employees, current and former","UPDATED_AT",7,"TIMESTAMP(6) WITH TIME ZONE","","","","yes","no","","","","","",""

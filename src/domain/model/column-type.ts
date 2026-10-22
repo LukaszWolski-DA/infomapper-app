@@ -6,7 +6,7 @@
 //   `varchar2(100 char)` → length 100 (Oracle's length unit is dropped)
 // Base types are stored in lower case with single spaces.
 
-import { MAX_LENGTH, physicalClass, type ColumnType } from "./type-check";
+import { formatColumnType, MAX_LENGTH, physicalClass, type ColumnType } from "./type-check";
 
 export type ColumnTypeRead =
   | { ok: true; type: ColumnType }
@@ -31,7 +31,15 @@ export const TYPE_ALIASES: Readonly<Record<string, string>> = {
   double: "double precision",
 };
 
-const WORDS ="[A-Za-z][A-Za-z0-9_]*(?:\\s+[A-Za-z][A-Za-z0-9_]*)*";
+/** The type a column has, spelled one way: what the import compares (`varchar(20)` and `VARCHAR(20)` are one type). */
+export const columnTypeKey = (c: ColumnType): string => {
+  const base = c.data_type.trim().toLowerCase().replace(/\s+/g, " ");
+  return formatColumnType({ ...c, data_type: TYPE_ALIASES[base] ?? base });
+};
+
+export const sameColumnType = (a: ColumnType, b: ColumnType): boolean => columnTypeKey(a) === columnTypeKey(b);
+
+const WORDS = "[A-Za-z][A-Za-z0-9_]*(?:\\s+[A-Za-z][A-Za-z0-9_]*)*";
 const TYPE = new RegExp(`^(${WORDS})\\s*(?:\\(([^()]*)\\))?((?:\\s+[A-Za-z][A-Za-z0-9_]*)*)$`);
 /** A number with Oracle's optional length unit, `max`, or SQL Server's -1. */
 const ARG = /^(?:(\d+)(?:\s+(?:char|byte))?|(max|-1))$/i;
