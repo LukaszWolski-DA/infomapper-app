@@ -594,6 +594,37 @@ templates are compiled. Its only path is `eslint-plugin-boundaries` 7.2.0 (dev, 
   `npm audit` again (expected: only the 11 from `braces`). Do not take the suggested downgrade.
 - **Decision (Łukasz, 13 October, slice 3b):** the plugin still has no fix (7.2.0; `@boundaries/elements` 3.1.1 still
   pins 4.7.9). The override comes as a separate small pull request after slice 3b's merge, from 19 October 2026.
+- **Status on 22 October 2026 (after slice 6b): still open, nothing changed.** `npm ls handlebars`: only
+  `eslint-plugin-boundaries` 7.2.0 → `handlebars` 4.7.9 and `@boundaries/elements` 3.1.1 → `handlebars` 4.7.9. What
+  changed since 13 October:
+  - `handlebars` 4.7.10 is now 17 days old, so the override's 14-day condition is met.
+  - `eslint-plugin-boundaries` 7.2.1 (21 October 2026) and `@boundaries/elements` 3.1.2 (21 October 2026) now pin
+    `handlebars` 4.7.10, a real upstream fix within the current major; they are 1 day old (14 days on 4 November).
+  - **Exposure: development and lint only.** `handlebars` is reached only from `eslint.config.mjs`; no file in `src/`,
+    `scripts/`, `tests/` or `e2e/` imports it, `eslint-plugin-boundaries` or `@boundaries/elements`. A fresh
+    `npm run build` on 22 October: no file under `.next/server` or `.next/static` (including the `*.nft.json` traces of
+    what a deployment ships) mentions `handlebars`.
+  - **Proposal (waiting for Łukasz):** now, add `"handlebars": "4.7.10"` to the existing `overrides` in `package.json`
+    (a plain top-level entry; it applies to both paths, and 4.7.10 is a patch release in the same line the plugin was
+    written against); from 4 November, update `eslint-plugin-boundaries` to `^7.2.1` and remove the override. Checks
+    as in the condition above.
+
+### `npm audit`: three further findings on 22 October 2026, one of them in `next` (not yet decided)
+
+On 22 October 2026 `npm audit` reports 15 findings (1 moderate, 10 high, 4 critical): the `braces` and `handlebars`
+ones above, and three new ones. Recorded here only; nothing changed, each needs Łukasz's decision.
+
+| Package | Advisories | Path | Exposure | Fixed in (published) |
+| --- | --- | --- | --- | --- |
+| `next` 16.3.8 (**production**) | [GHSA-2464-fhr4-w9xw](https://github.com/advisories/GHSA-2464-fhr4-w9xw) (critical, RCE in the image optimizer with SVG files), [GHSA-673q-mjm6-r5xr](https://github.com/advisories/GHSA-673q-mjm6-r5xr) (critical, RCE in `use cache` functions), [GHSA-p3m5-59mp-jv5r](https://github.com/advisories/GHSA-p3m5-59mp-jv5r) (DoS through server actions) | direct | the application server; `npm audit --omit=dev` reports this one only. The app uses neither `next/image` nor `use cache`, but it does use server actions, and nothing is deployed yet | 16.4.1 (14 October), 16.4.2 (15 October); no 16.3.x backport |
+| `vite` 8.3.2 (dev) | six advisories in Vite's dev server and `launch-editor` | `vitest` 5.0.3 | unit tests only; Vitest runs no dev server here | 8.3.3 (6 October) |
+| `ip-address` 10.7.3 (dev) | [GHSA-rxp7-6hxx-x8q5](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5) (moderate, DoS) | `shadcn` → `socks`, `@modelcontextprotocol/sdk` | the shadcn CLI only | 10.7.4 (11 October) |
+
+- `vite` 8.3.3 and `ip-address` 10.7.4 are older than 14 days and within the ranges already asked for, so
+  `npm audit fix` (without `--force`) would take them.
+- `next` 16.4.x is a minor update outside `package.json`'s exact `16.3.8` and younger than 14 days (16.4.2: from
+  29 October). Because the advisory is critical and in the production dependency, it may justify an exception; that
+  is Łukasz's call, and it needs a full e2e run.
 
 ### `npm` override: `fast-equals` 5.4.3 under `@tiptap/react` (slice 4a, step 2)
 
