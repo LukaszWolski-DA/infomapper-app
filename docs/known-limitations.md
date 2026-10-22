@@ -594,25 +594,25 @@ templates are compiled. Its only path is `eslint-plugin-boundaries` 7.2.0 (dev, 
   `npm audit` again (expected: only the 11 from `braces`). Do not take the suggested downgrade.
 - **Decision (Łukasz, 13 October, slice 3b):** the plugin still has no fix (7.2.0; `@boundaries/elements` 3.1.1 still
   pins 4.7.9). The override comes as a separate small pull request after slice 3b's merge, from 19 October 2026.
-- **Status on 22 October 2026 (after slice 6b): still open, nothing changed.** `npm ls handlebars`: only
-  `eslint-plugin-boundaries` 7.2.0 → `handlebars` 4.7.9 and `@boundaries/elements` 3.1.1 → `handlebars` 4.7.9. What
-  changed since 13 October:
-  - `handlebars` 4.7.10 is now 17 days old, so the override's 14-day condition is met.
-  - `eslint-plugin-boundaries` 7.2.1 (21 October 2026) and `@boundaries/elements` 3.1.2 (21 October 2026) now pin
-    `handlebars` 4.7.10, a real upstream fix within the current major; they are 1 day old (14 days on 4 November).
-  - **Exposure: development and lint only.** `handlebars` is reached only from `eslint.config.mjs`; no file in `src/`,
-    `scripts/`, `tests/` or `e2e/` imports it, `eslint-plugin-boundaries` or `@boundaries/elements`. A fresh
+- **Resolved on 22 October 2026 (Łukasz, after slice 6b): override added.** `package.json`'s `overrides` has
+  `"handlebars": "4.7.10"` (a plain top-level entry, 17 days old); `npm ls handlebars` shows 4.7.10 on both paths
+  (`eslint-plugin-boundaries` 7.2.0 and `@boundaries/elements` 3.1.1). The lock file changed only `handlebars`. Checks:
+  a deliberately broken layer rule (`domain` → `app` and `canvas`, `ui` → `canvas`) still fails lint with the plugin's
+  filled-in messages; lint, typecheck and unit tests (80 files, 1,045 tests) pass; `npm audit` no longer lists
+  `handlebars`.
+  - **Exposure was development and lint only.** `handlebars` is reached only from `eslint.config.mjs`; no file in
+    `src/`, `scripts/`, `tests/` or `e2e/` imports it, `eslint-plugin-boundaries` or `@boundaries/elements`. A fresh
     `npm run build` on 22 October: no file under `.next/server` or `.next/static` (including the `*.nft.json` traces of
     what a deployment ships) mentions `handlebars`.
-  - **Proposal (waiting for Łukasz):** now, add `"handlebars": "4.7.10"` to the existing `overrides` in `package.json`
-    (a plain top-level entry; it applies to both paths, and 4.7.10 is a patch release in the same line the plugin was
-    written against); from 4 November, update `eslint-plugin-boundaries` to `^7.2.1` and remove the override. Checks
-    as in the condition above.
+  - **Next (from 4 November 2026):** `eslint-plugin-boundaries` 7.2.1 and `@boundaries/elements` 3.1.2 (both
+    21 October) pin `handlebars` 4.7.10, the upstream fix within the current major. Once they are 14 days old, update the
+    plugin to `^7.2.1`, remove the `handlebars` override and repeat the checks above.
 
 ### `npm audit`: three further findings on 22 October 2026, one of them in `next` (not yet decided)
 
 On 22 October 2026 `npm audit` reports 15 findings (1 moderate, 10 high, 4 critical): the `braces` and `handlebars`
-ones above, and three new ones. Recorded here only; nothing changed, each needs Łukasz's decision.
+ones above, and three new ones. Recorded here only; nothing changed. After the `handlebars` override the same day:
+14 (1 moderate, 12 high, 1 critical; the plugin's two entries now count as high through `braces`).
 
 | Package | Advisories | Path | Exposure | Fixed in (published) |
 | --- | --- | --- | --- | --- |
@@ -620,11 +620,13 @@ ones above, and three new ones. Recorded here only; nothing changed, each needs 
 | `vite` 8.3.2 (dev) | six advisories in Vite's dev server and `launch-editor` | `vitest` 5.0.3 | unit tests only; Vitest runs no dev server here | 8.3.3 (6 October) |
 | `ip-address` 10.7.3 (dev) | [GHSA-rxp7-6hxx-x8q5](https://github.com/advisories/GHSA-rxp7-6hxx-x8q5) (moderate, DoS) | `shadcn` → `socks`, `@modelcontextprotocol/sdk` | the shadcn CLI only | 10.7.4 (11 October) |
 
-- `vite` 8.3.3 and `ip-address` 10.7.4 are older than 14 days and within the ranges already asked for, so
-  `npm audit fix` (without `--force`) would take them.
-- `next` 16.4.x is a minor update outside `package.json`'s exact `16.3.8` and younger than 14 days (16.4.2: from
-  29 October). Because the advisory is critical and in the production dependency, it may justify an exception; that
-  is Łukasz's call, and it needs a full e2e run.
+- **Not `npm audit fix`.** Without `--force` it would take the newest releases in range, several younger than 14 days
+  (`vite` 8.3.5, `eslint-plugin-boundaries` 7.2.1, `shadcn` 4.22.1, all 21 October). `vite` 8.3.3 is old enough but
+  only reachable through `vitest`, so taking it would need another override; `ip-address` 10.7.4 is 14 days old on
+  25 October. Both are development-only; update them with the next dependency pull request.
+- `next` 16.4.x is a minor update outside `package.json`'s exact `16.3.8` and younger than 14 days (16.4.1: from
+  28 October; 16.4.2: from 29 October). Planned as its own pull request from 29 October with a full e2e run, not inside
+  a slice. Because the advisory is critical and in the production dependency, an earlier exception is Łukasz's call.
 
 ### `npm` override: `fast-equals` 5.4.3 under `@tiptap/react` (slice 4a, step 2)
 
@@ -637,6 +639,9 @@ the 14 days the dependency rule asks for. `package.json` has `"overrides": { "@t
 - **Review on 22 October 2026** (5.4.4 is then 14 days old), together with the `handlebars` pull request: remove the
   override, `npm install`, check that `fast-equals` resolves to a release at least 14 days old, then lint, typecheck,
   unit tests and the editor's end-to-end tests.
+- **Reviewed on 22 October 2026: kept.** Without the override `^5.3.3` would now resolve to 5.4.5 (14 October 2026),
+  8 days old, so removing it would break the 14-day rule again. `fast-equals` stays at 5.4.3. **Review again from
+  28 October 2026** (5.4.5 is then 14 days old), with the `next` pull request, using the same steps.
 
 ## End-to-end tests (slice 1a, step 6)
 
