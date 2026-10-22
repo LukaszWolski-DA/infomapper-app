@@ -1,6 +1,6 @@
 # Slice 6a – Acceptance
 
-Status: **step 5 (closing): docs approved; the full e2e run and the manual acceptance next.** Branch `slice/06a-view-state-bar`, from `main` at the tag
+Status: **step 5 (closing): full e2e run done; waiting for Łukasz's manual acceptance and his merge command.** Branch `slice/06a-view-state-bar`, from `main` at the tag
 `slice-05a` (`93f0df7`). PRD: `docs/prd/slice-06a-view-state-bar.md`. The PRD stays as written; this file is its
 amendment (Łukasz, 21 October 2026).
 
@@ -620,3 +620,48 @@ Points 1–4 accepted.
   cannot edit the canvas see”; the fold sentence: “…chips that do not fit fold into “+{n}”, after the breadcrumbs above
   the current page have shrunk; its menu lists them with their ×, while “Live: {name}” and “Show all” stay visible.”).
   Both written into `docs/decisions.md`.
+
+### 5. The full e2e run (22 October 2026)
+
+`npm run e2e` from scratch, no dev server, the laptop quiet (Łukasz), S6A-09 and S6A-09-hand excluded as configured:
+**227 passed, 2 failed, 37.2 min** (11:31–12:08). Each failure run three times on its own:
+
+- **S6A-02** (“a chip's × does what its switch does…”): `EPERM: operation not permitted, rename …e2e-db.json.<id>.tmp
+  -> …e2e-db.json` in the local adapter's write (`src/data/local/file.ts`, after its retries), during the test's own
+  write: a Windows file lock, not the app. Alone: **3 of 3 passed**. A flake of the local adapter on Windows.
+- **S6A-08** (“a chip folding into “+{n}” and coming back…”): Focus off added 3 canvas and 3 miniature commits. Alone:
+  **3 of 3 passed**. The layer switch before it is saved on the server and can bring a fresh page; under the full run's
+  load it arrived inside the measured switch. Fixed in the test: `commitsOf` now waits until the commit counters have
+  not moved for 800 ms (was a fixed 400 ms pause) before it counts; S6A-08 then passed (3 tests).
+
+GitHub CI on the PR (check, migrations): passed.
+
+### 6. Manual acceptance (Łukasz)
+
+Start the app on the preview data (it has CR-23's live canvas):
+
+PowerShell:
+
+```powershell
+$env:INFOMAPPER_DEV_DB = ".data/preview-db.json"; npm run dev
+```
+
+bash:
+
+```bash
+INFOMAPPER_DEV_DB=.data/preview-db.json npm run dev
+```
+
+Sign in at http://localhost:3000/sign-in as Łukasz; open Retail Co – DWH › Customer 360 › Customer & orders, the window
+at least 1,600 px wide, both panels shown.
+
+| # | Do | Expected |
+| --- | --- | --- |
+| 1 | Press A (Frame tool) and draw a frame around Sales Order and Order Line; collapse it with the ˄ button on its name. | A block; the bar shows “1 frame collapsed” with ×. |
+| 2 | With nothing selected, untick “Show resolved notes on the canvas” in the right panel. Click Customer, press Focus, switch to Mappings, and click Customer's filter button twice (Unmapped). | Chips in this order: Focus · Mappings only · 1 card filtered · 1 frame collapsed · Resolved notes hidden, then “Show all”. The status bar has no Focus chip and ends with “Open notes on canvas 2”. |
+| 3 | Remove “1 card filtered” with its ×. | Customer shows all its rows; the chip goes; the others stay. |
+| 4 | Press “Show all”. Then Ctrl+Z (click an empty spot on the canvas first). | Every chip goes: Focus off, Everything, the frame expanded, the resolved note back; the toast “Showing everything on this canvas.” with Undo. Ctrl+Z collapses the frame again (“1 frame collapsed”); Focus, Mappings and the hidden notes do not come back (view state). |
+| 5 | Open the CR-23 tab (the live canvas). | “Live: CR-23” first, dashed, no ×; its Labeled filters are not counted, so there is no filter chip. (In the preview data two of its frames are collapsed: “2 frames collapsed”, no “Show all” for one chip.) Back on Customer & orders: no live chip. |
+| 6 | Narrow the window to 1,536 px, then to 1,100 px (browser window or DevTools' responsive mode). | 1,536: every tool in the bar as an icon, nothing cut off. 1,100: Focus, the notation and the Entity, Frame, Note and Hand tools have left the bar; “⋯” at the tools' end holds them; Hand tool from there gives the “Hand tool” chip. The layer switch, the working context, undo, zoom, the two panel buttons and your indicator stay in the bar. |
+| 7 | Back at full width, with four chips on and the window around 1,280 px, if they do not all fit. | The last chips fold into “+{n}” (its menu lists them with ×); “Show all” stays visible; the canvas does not move up or down. |
+| 8 | On Customer & orders pan the canvas a little and note where Customer stands. Hide the left panel with the toolbar's left button, then reload (F5). Show the panel again and reload. | Customer stays at the same place on the screen through each step. |

@@ -5,9 +5,23 @@
 import { expect, test, type Page } from "./fixtures";
 import { AROUND, canvasUrl, chip, chipOff, collapsedFrame, counters, openCanvas, signInAs, WHOLE_CO } from "./helpers";
 
-/** The canvas and miniature commits one action adds, once the page is quiet again. */
+/**
+ * Waits until the commit counters have not moved for 800 ms: a change saved on the server (the layer) may bring a fresh
+ * page late, and under a full run's load it once landed inside a measured switch (3 commits).
+ */
+async function quiet(page: Page) {
+  let last = JSON.stringify(await counters(page));
+  for (let i = 0; i < 20; i++) {
+    await page.waitForTimeout(800);
+    const now = JSON.stringify(await counters(page));
+    if (now === last) return;
+    last = now;
+  }
+}
+
+/** The canvas and miniature commits one action adds, from a quiet page to a quiet page. */
 async function commitsOf(page: Page, act: () => Promise<void>): Promise<{ canvas: number; miniature: number }> {
-  await page.waitForTimeout(400);
+  await quiet(page);
   const before = await counters(page);
   await act();
   await page.waitForTimeout(600);
