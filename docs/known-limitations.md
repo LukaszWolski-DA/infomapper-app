@@ -433,6 +433,37 @@ panels exist only on canvas pages.
 - **Slice 5a:** the empty panels follow the same layout as the canvas pages' (hidden, shown, widths, the toolbar's two
   buttons).
 
+## Back and forward (slice 6b)
+
+### Browsers without the Navigation API
+
+Back and Forward, Alt+←/→ and the selection places rest on the Navigation API (Baseline since January 2026: Chrome and
+Edge 102, Firefox 147, Safari 26.2). Where it is missing, the two buttons are hidden and the app's Alt+←/→ is off; the
+browser's own back and forward still walk the pages, and selections are not places.
+
+- **Accepted** by Łukasz in slice 6b, step 1 (answer 2): no fallback.
+
+### The mouse's back and forward buttons are tested by hand only
+
+The browser handles them (the app adds nothing). Playwright cannot press them, so no spec covers them; the manual
+acceptance does.
+
+- **Accepted** by Łukasz in slice 6b, step 1 (answer 7).
+
+### At most 50 entries per tab
+
+The browser's history is the one history; Chromium keeps at most 50 entries per tab (the prototype kept 120 places).
+Older entries drop off, and their places with them (pruned from `sessionStorage`).
+
+- **Accepted** by Łukasz with slice 6b's step 1 (the PRD's item 8: no cap of the app's own).
+
+### A reload starts without a selection
+
+A reload keeps the page and its entry, but the canvas opens without a selection (as before slice 6b). The entry keeps
+its place: Back and then Forward onto it select it again.
+
+- **Decided** in slice 6b, step 1 (item 5).
+
 ## Side panels (slice 5a)
 
 ### A remembered canvas view and a different left panel

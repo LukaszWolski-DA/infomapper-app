@@ -28,7 +28,7 @@ acceptance docs (for example, other lines not fading on a hover since 4p).
 | Area | Missing in the app | Planned |
 | --- | --- | --- |
 | Canvas | requirement cards and dashed traces; markers, coverage colours, Focus; the view-state bar; showing or hiding the side panels | 4b-1, 4b-2; panels: 5a (done); view-state bar: 6a (done) |
-| Panels and navigation | back and forward (Alt ←/→), history; requirement cards from panels | slice 6b (D-38); 4b-2 |
+| Panels and navigation | requirement cards from panels | 4b-2 |
 | Model | Data Vault 2.0 hints in the entity panel (hub, link, business key, satellites) | decision only (AD-08) |
 | Mappings | suggested mappings (the “Suggestions” mode, accept one or all strong matches); re-pointing a mapping to another attribute | – |
 | Sources | nothing found missing | – |
@@ -75,8 +75,21 @@ acceptance docs (for example, other lines not fading on a hover since 4p).
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Back and forward | Alt ←/→ and two buttons before the breadcrumbs; a history of up to 120 places (workspace, project, canvas, home screens, selection) | `navState`, `navRecord`, `navGo`, `renderNavBar` (`data-nav`) | slice 6b (D-38) |
+| Back and forward | Alt ←/→ and two buttons before the breadcrumbs; a history of up to 120 places (workspace, project, canvas, home screens, selection) | `navState`, `navRecord`, `navGo`, `renderNavBar` (`data-nav`) | 6b (done; differences below) |
 | Element panels: “Show its requirements” | places the cards of an element's requirements next to it | the card menu in `ctxFor` (`reqsFor`) | 4b-2 |
+
+**Back and forward: deliberate differences (slice 6b, `docs/prd/slice-06b-acceptance.md`):**
+- the browser's own history is the one history: the browser's back, the mouse's buttons, Alt+←/→ and the app's buttons
+  walk the same entries; no cap of the app's own (the browser's: 50 entries per tab in Chromium; the prototype 120);
+- a selection is a place only when it is one item: no place for a deselection, a multi-selection or a bundle (the
+  prototype records the first two as “nothing selected” and the third as a bundle);
+- the workspace home's tab is not a place (as the prototype); in the app the tabs replace the entry;
+- going back to a place centres it when it is off screen for cards and rows (as the prototype) and also for frames,
+  notes and requirement cards, at the same zoom;
+- a place that no longer exists shows the canvas without a selection and a toast naming what is gone (the prototype
+  skips gone pages and drops a gone selection silently); a canvas no longer in its project opens the project's first
+  canvas with the “moved” notice, and a project that no longer exists opens the workspace home with a toast;
+- the mouse's buttons are the browser's (the prototype intercepts them for its own list).
 
 **Present:**
 - the left panel's tabs, search, folding and “Only on this canvas”;

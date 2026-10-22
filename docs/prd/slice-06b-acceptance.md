@@ -1,6 +1,6 @@
 # Slice 6b – Acceptance
 
-Status: **step 3 (selection places, the diagnosis) done, waiting for Łukasz.** Branch `slice/06b-back-and-forward`, from `main` at
+Status: **step 4 (closing): docs done; waiting for Łukasz's approval of D-38 and his go for the full run.** Branch `slice/06b-back-and-forward`, from `main` at
 the tag `slice-06a` (`80241ef`). PRD: `docs/prd/slice-06b-back-and-forward.md`. The PRD stays as written; this file is
 its amendment (Łukasz, 22 October 2026).
 
@@ -355,3 +355,78 @@ elements; layout as dirty / total objects; forced = style or layout inside a scr
 Runs: lint, typecheck, unit tests (80 files, 1,045 tests) pass. The slice's specs and the earlier specs that select
 things, open details on purpose or arrive with a link (slices 1b, 2a, 2b, 3a, 4a, 4b-1, 4b-2, 5a, 6a and 6b whole):
 **159 passed, 24.4 min**. S6B-10 in the measurement build: passed, 5.4 min. S6B-browsers in Chromium: passed.
+
+Łukasz accepted step 3 (22 October 2026); the focus risk had been covered already. He ran `npx playwright install
+firefox webkit` from the project folder and asked for the smoke, and for two checks with no new switches.
+
+## Step 4: closing (22 October 2026)
+
+### The browsers smoke
+
+**Not run in Firefox and WebKit:** after Łukasz's install, `%LOCALAPPDATA%\ms-playwright` still holds only
+`chromium-1208`, `chromium-1243` and their headless shells (no `firefox-1543`, no `webkit-2359`, which Playwright 1.63
+asks for), and no other Playwright browser folder exists on the laptop (`PLAYWRIGHT_BROWSERS_PATH` unset). The install
+may have gone to another place or not finished. In Chromium the spec passes. *Proposal:* run it once more and check its
+last lines (`npx playwright install firefox webkit`), then `BROWSERS=1 npx playwright test
+e2e/slice-06b/S6B-browsers.spec.ts`; I run it as soon as the two folders are there.
+
+### Check 1: the background refresh's commits
+
+Dev server (`.data/e2e-db.json` with “Performance test”), development counters; four runs per view, each Back from
+“Performance test – requirements” onto “100 cards” (the canvas restored from Next's cache, then the refresh):
+
+| View | Canvas and miniature commits until the refresh's response | Commits the refresh's merge added |
+| --- | --- | --- |
+| 30 % around ent:23 | 5 and 6, in every run | 3 and 3, in every run |
+| 100 % dense | 5 and 6 (one run 8 and 9) | 3 and 3 (that run 0 and 0: its merge came before the response was read) |
+
+So the refresh adds **3 canvas and 3 miniature commits** after Back lands on another canvas, the same in both views; the
+view and the selection stay (S6B-10).
+
+### Check 2: Back to another canvas against its tab
+
+The same set-up, four runs each, the time from the click to the canvas ready on “100 cards” and to its last commit
+(a settled screen: 600 ms without a commit), development build (both sides alike; figures are diagnostic):
+
+| View | Back: ready / settled (ms) | Its tab: ready / settled (ms) |
+| --- | --- | --- |
+| 30 % | 3,657 / 3,645 · 4,023 / 4,012 · 3,041 / 3,030 · 4,035 / 4,024 | 5,608 · 4,843 · 5,977 · 4,580 (ready = settled) |
+| 100 % dense | 5,158 / 5,141 · 5,031 / 5,014 · 5,296 / 5,281 · 5,762 / 5,726 | 8,589 · 5,162 · 5,921 · 6,972 (ready = settled) |
+
+**Back is not slower:** it is ready about 1–2 s sooner at 30 % and as soon or sooner in the dense view (the canvas comes
+from Next's cache; the tab asks the server for the page). Its refresh's three commits land before the screen settles.
+A first version of this check measured the tab from the old canvas's ready flag (about 250 ms); with the page checked
+too, the figures above.
+
+### Docs
+
+- `docs/known-limitations.md`, new section “Back and forward (slice 6b)”: browsers without the Navigation API (buttons
+  hidden, our keys off, pages through the browser's own back); the mouse's buttons tested by hand only; at most 50
+  entries per tab (Chromium); a reload starts without a selection (the entry keeps its place: Back and Forward select it
+  again).
+- `docs/inventory-prototype-vs-app.md`: “Back and forward” done, with the deliberate differences (the browser's history,
+  no cap of the app's own; no place for a deselection, a multi-selection or a bundle; the tab not a place; centring also
+  for frames, notes and requirement cards; toasts for gone places; the mouse's buttons the browser's).
+- README: status and the slice's summary. CLAUDE.md: the commands (S6B-10, the browsers smoke), the e2e helpers, and a
+  “Back and forward” paragraph (pushes without a URL, places in `sessionStorage` under the entry key, never
+  `history.state`; the tab's one traversal watcher and why; the traverse-only blur and why; what a later slice must do
+  when it adds something selectable: place or not, centred or not, its existence check and its toast).
+- `docs/decisions.md`: not written yet; D-38's text below waits for Łukasz's approval.
+
+**D-38, proposed final wording** (replaces the current line):
+
+> **D-38** Back and forward walk one navigation history, the browser's own: the two buttons before the breadcrumbs,
+> Alt+←/→ outside text fields, the browser's back and the mouse's back and forward buttons; the breadcrumbs stay
+> clickable. A place is a workspace home, a project home, a canvas, or one item selected on a canvas (a card, a row, a
+> mapping, a relationship, a frame, a note, a requirement, a label, an element shown by its panel); panning and zooming,
+> the workspace home's tab, a deselection, several items, a bundle, view state and the side panels are not. A selection
+> is a history entry of its own without an address: its place is kept for the browser tab under the entry, not in the
+> URL, and a reload starts without a selection. Going back to a selection selects it as a click would, never opens a
+> hidden details panel (D-54), and centres it at the same zoom when it is off screen; one on another canvas opens that
+> canvas at its remembered view first. A place that no longer exists shows what still does, with a toast: the canvas
+> without a selection; for a canvas no longer in its project, the project's first canvas; for a project that no longer
+> exists, the workspace home. (Changed in slice 6b.)
+
+### Runs
+
+Lint, typecheck, unit tests (80 files, 1,045 tests) pass. Step 4 touched docs only, no code; the slice's specs: 13 passed, 6.5 min. The full run waits for Łukasz's approval of D-38 and his go.

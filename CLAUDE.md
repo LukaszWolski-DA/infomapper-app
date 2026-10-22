@@ -197,7 +197,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   the grips (`dragGrip`, `grip`, `guide`, `guideX`, `panelWidth`), read the canvas's width and a card's place on the
   screen (`expectCanvasWidth`, `cardAt`, `expectCardAt`), the layout cookie (`panelsCookie`) and the view's transform
   (`viewportTransform`). Slice 6a's read the view-state bar (`viewBar`, `chip`, `chipOff`, `chipTexts`, `expectChips`,
-  `breadcrumbsRow`) and set a card's row filter or collapse as test data (`setCard`). The undo history lives in the
+  `breadcrumbsRow`) and set a card's row filter or collapse as test data (`setCard`). Slice 6b's walk the history
+  (`backButton`, `forwardButton`, `altArrow`, `buttonsEnabled`, `expectAt`, `WS_HOME`, `projectPath`) and read the
+  selection from the details panel, hidden or not (`selected`, `expectSelected`, `clickCard`). The undo history lives in the
   server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
@@ -252,6 +254,20 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   (bars, rows, panels). When the canvas restyles in the same commit (a tool's class), the read forces that restyle (about
   20,000 elements in the dense view) and a layout of the page synchronously. Take sizes from a `ResizeObserver`, which
   reports after the browser's own layout. Later PRDs: say so for every element they add above the canvas.
+- **Back and forward** (slice 6b, D-38): the browser's own history is the only one. Pages are the entries Next.js
+  makes; a single selection on a canvas is an entry pushed **without a URL** (`history.pushState(null, "")`: no route, no
+  request, no render) and its place is kept in `sessionStorage` under the Navigation API's entry key
+  (`src/ui/history-places.ts`), **never in `history.state`**, which Next.js rewrites after every router update.
+  `src/app/_components/history-nav.tsx` draws Back and Forward (from `canGoBack`/`canGoForward`; hidden without the API),
+  handles Alt+←/→ outside text fields, and keeps the tab's one traversal watcher (`currententrychange`, “traverse”): a
+  listener on a page does not hear the traversal that leaves it (Next.js draws the next page first). It blurs a focused
+  text field **on traversals only** (the `navigate` event, `navigationType` “traverse”): a traversal blurs the field
+  itself when it starts and that blur never reaches the save, while a push (a selection) must not take the focus (a new
+  element's name is typed straight away). `src/canvas/SelectionHistory.tsx` records and applies places through
+  `ui.showPlace` (`ModelCanvas`), which selects as a click does, centres off-screen items at the same zoom and reports a
+  place that no longer exists. **A later slice that adds something selectable:** decide whether it is a place (a single
+  item usually is; extend `placeOf` if not), whether `showPlace` centres it (it has a place on the canvas) and how it
+  checks it still exists, and add its toast to `GONE` in `SelectionHistory.tsx`; its specs walk it back and forward.
 - **A few milliseconds: compare phase traces, not medians** (slice 6a, S6A-09): once a UI addition costs a few
   milliseconds, compare phase traces with and without it (script, style with its element count, layout with its dirty
   and total objects, paint, layerize; as `S6A-09-hand.spec.ts` does) rather than unprepared medians to the screen, whose
