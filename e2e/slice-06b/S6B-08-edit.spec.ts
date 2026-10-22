@@ -1,9 +1,9 @@
 // S6B-08, the edit in progress (slice 6b, Q5; Łukasz's step 1 answer 8): a details panel field with the focus and an
-// unsaved edit, then the browser's back: the field is blurred when the traversal starts (the Navigation API's `navigate`
+// unsaved edit, then the browser's back (onto the canvas's own entry, the card's selection being a place): the field is blurred when the traversal starts (the Navigation API's `navigate`
 // event), so the edit is saved; the browser's own blur at that moment would not reach the save.
 
 import { expect, test } from "./fixtures";
-import { canvasUrl, card, expectAt, loadModel, openCanvas, projectPath, signInAs, WHOLE_CO } from "./helpers";
+import { canvasUrl, card, expectAt, expectSelected, loadModel, openCanvas, projectPath, signInAs, WHOLE_CO } from "./helpers";
 
 test("S6B-08: an edit in a focused field is saved when Back leaves the page", async ({ page }) => {
   await signInAs(page, "Łukasz");
@@ -20,7 +20,8 @@ test("S6B-08: an edit in a focused field is saved when Back leaves the page", as
   await name.fill("Customer master");
   await expect(name).toBeFocused();
 
+  // selecting the card was a place: Back lands on the canvas without a selection, which removes the panel's field
   await page.goBack();
-  await expectAt(page, projectPath());
+  await expectSelected(page, "none");
   await expect.poll(async () => (await loadModel()).entities.some((e) => e.name === "Customer master")).toBe(true);
 });

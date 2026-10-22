@@ -2,7 +2,7 @@
 // view of the tab's history.
 
 import { expect, type Page } from "./fixtures";
-import { RETAIL, SEED_IDS } from "../slice-06a/helpers";
+import { card, RETAIL, SEED_IDS } from "../slice-06a/helpers";
 
 export * from "../slice-06a/helpers";
 
@@ -26,3 +26,28 @@ export async function altArrow(page: Page, key: "ArrowLeft" | "ArrowRight"): Pro
 
 /** Whether the buttons are enabled: [Back, Forward]. */
 export const buttonsEnabled = async (page: Page) => [await backButton(page).isEnabled(), await forwardButton(page).isEnabled()];
+
+/**
+ * What the details panel shows: `entity:<name>`, `table`, `mapping`, `relationship`, `frame:<name>`, `note`,
+ * `req:<key>`, `label:<name>`, or `none` (the canvas overview). It reads the panel even when the panel is hidden (a
+ * hidden panel stays in the page, inert).
+ */
+export const selected = (page: Page) =>
+  page.getByTestId("panel-inspector").evaluate((p) => {
+    const v = (id: string) => (p.querySelector(`[data-testid="${id}"]`) as HTMLInputElement | null)?.value;
+    if (p.querySelector("[data-testid='panel-entity']")) return `entity:${v("input-entity-name")}`;
+    if (p.querySelector("[data-testid='panel-source-table']")) return "table";
+    if (p.querySelector("[data-testid='panel-mapping']")) return "mapping";
+    if (p.querySelector("[data-testid='panel-relationship']")) return "relationship";
+    if (p.querySelector("[data-testid='panel-frame']")) return `frame:${v("input-frame-name")}`;
+    if (p.querySelector("[data-testid='panel-note']")) return "note";
+    if (p.querySelector("[data-testid='panel-requirement']")) return `req:${v("input-req-key")}`;
+    if (p.querySelector("[data-testid='panel-label']")) return `label:${v("input-label-name")}`;
+    return "none";
+  });
+
+/** Waits until the details panel shows `expected` (see `selected`). */
+export const expectSelected = (page: Page, expected: string) => expect.poll(() => selected(page)).toBe(expected);
+
+/** Clicks a card's header (selects it). */
+export const clickCard = (page: Page, name: string) => card(page, name).locator(".c-head .c-l2").click();

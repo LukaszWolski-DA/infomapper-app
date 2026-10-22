@@ -12,7 +12,7 @@
 
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useSyncExternalStore } from "react";
-import { navigationApi, prunePlaces } from "@/ui/history-places";
+import { navigationApi, prunePlaces, traversal } from "@/ui/history-places";
 
 /** "hidden" without the Navigation API, else whether Back and Forward can go: "00", "10", "01", "11". */
 function snapshot(): string {
@@ -52,11 +52,25 @@ export function historyStep(step: -1 | 1): void {
   else window.history.forward();
 }
 
-// The page a traversal left, kept outside React: the row (and this component) may be drawn anew for the page it lands
-// on. Set on `popstate` from the page shown before it (`lastPath`); the page drawn after it refreshes once when it is
-// another page.
+// What a traversal leaves and lands on, kept outside React and watched by one listener for the whole tab, not by the
+// row: Next.js may draw the page a traversal lands on before `popstate` reaches the page it left, and with it unmount
+// that page's listeners (measured in step 3). `currententrychange` with `navigationType` "traverse" comes from the
+// Navigation API itself. It notes the entry landed on (`traversal.key`: a canvas drawn for it applies its place) and the
+// page left (`leftPath`: the page drawn after it refreshes once when it is another page).
 let leftPath: string | null = null;
 let lastPath: string | null = null;
+let watching = false;
+
+function watchTraversals(): void {
+  const nav = navigationApi();
+  if (watching || !nav) return;
+  watching = true;
+  nav.addEventListener("currententrychange", (e) => {
+    if ((e as Event & { navigationType?: string }).navigationType !== "traverse") return;
+    traversal.key = nav.currentEntry?.key ?? null;
+    leftPath = leftPath ?? lastPath;
+  });
+}
 
 export function HistoryNav() {
   const state = useSyncExternalStore(subscribe, snapshot, () => "00");
@@ -66,6 +80,7 @@ export function HistoryNav() {
 
   useEffect(() => {
     if (hidden) return;
+    watchTraversals();
     const onKey = (e: KeyboardEvent) => {
       if (!e.altKey || e.ctrlKey || e.metaKey || e.shiftKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
       // in a text field the browser's own behaviour applies (Windows: back; macOS: a word)
@@ -83,16 +98,14 @@ export function HistoryNav() {
     const onNavigate = (e: Event) => {
       if ((e as Event & { navigationType?: string }).navigationType === "traverse") blurTextField();
     };
-    const onPop = () => {
-      blurTextField();
-      leftPath = leftPath ?? lastPath;
-    };
+    // a backstop for the blur, for traversals only (`popstate` never comes for a push)
+    const onPop = () => blurTextField();
     window.addEventListener("keydown", onKey, true);
-    window.addEventListener("popstate", onPop);
+    window.addEventListener("popstate", onPop, true);
     nav?.addEventListener("navigate", onNavigate);
     return () => {
       window.removeEventListener("keydown", onKey, true);
-      window.removeEventListener("popstate", onPop);
+      window.removeEventListener("popstate", onPop, true);
       nav?.removeEventListener("navigate", onNavigate);
     };
   }, [hidden]);

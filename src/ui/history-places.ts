@@ -23,6 +23,13 @@ export const navigationApi = (): NavigationLike | null =>
 
 const PREFIX = "infomapper:place:";
 
+/**
+ * The entry the last traversal (Back, Forward, the browser's or the mouse's buttons) landed on, set by the tab's one
+ * traversal watcher (`history-nav.tsx`, `currententrychange`). A canvas drawn for that entry, after leaving another page, applies its
+ * place; any other entry (a new navigation, a reload) does not.
+ */
+export const traversal: { key: string | null } = { key: null };
+
 /** What a history entry stands for beyond its page: a selection on a canvas (slice 6b, step 3). */
 export interface Place {
   /** The canvas the selection is on. */

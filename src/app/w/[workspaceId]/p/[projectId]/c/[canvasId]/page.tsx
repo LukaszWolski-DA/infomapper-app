@@ -46,6 +46,7 @@ import { FocusButton } from "@/canvas/Focus";
 import { LayerSwitch } from "@/canvas/LayerSwitch";
 import { CanvasLookProvider } from "@/canvas/look";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
+import { SelectionHistory } from "@/canvas/SelectionHistory";
 import { CanvasThrowHook, TestHooks } from "@/canvas/TestHooks";
 import { CanvasErrorBoundary } from "@/app/_components/canvas-error-boundary";
 import { NotationSwitch } from "@/canvas/NotationSwitch";
@@ -242,6 +243,8 @@ export default async function CanvasPage({
           >
             {query.moved === "1" && <MovedNotice project={view.project.name} canvas={canvas.name} />}
             <RememberLastCanvas projectId={projectId} canvasId={canvasId} />
+            {/* selections as places in the browser's history (slice 6b) */}
+            <SelectionHistory key={canvasId} canvasId={canvasId} labelIds={labels.filter((l) => l.deleted_at === null).map((l) => l.id)} />
             {/* the measuring hook (slice 4p): e2e dev server and measurement build only */}
             {areTestHooksOn() && <TestHooks indexData={{ model, requirements, requirementLinks }} />}
             {/* an error inside the canvas shows a message in its place; the panels and the top bar keep working (slice 4p) */}

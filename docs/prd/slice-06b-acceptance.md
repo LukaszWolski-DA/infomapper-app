@@ -1,6 +1,6 @@
 # Slice 6b – Acceptance
 
-Status: **step 2 (page places, the buttons, the keys) done, waiting for Łukasz.** Branch `slice/06b-back-and-forward`, from `main` at
+Status: **step 3 (selection places, the diagnosis) done, waiting for Łukasz.** Branch `slice/06b-back-and-forward`, from `main` at
 the tag `slice-06a` (`80241ef`). PRD: `docs/prd/slice-06b-back-and-forward.md`. The PRD stays as written; this file is
 its amendment (Łukasz, 22 October 2026).
 
@@ -275,3 +275,83 @@ Runs: lint, typecheck, unit tests (80 files, 1,045 tests) pass. The slice's spec
 what the step touched (slice 6a whole; S0-04, S0-06, S0-07, S0-10, S0-11 breadcrumbs, tabs and switchers; S2A-10,
 S2A-11, S3B-08, S3B-12, S3B-15 canvas tabs; S4B1-06; S5A-06; S4P-09 the not-found page): 35 passed, 1 failed
 (S6A-08's fold test, above), 6.1 min. No earlier spec uses `page.goBack()`.
+
+Łukasz accepted step 2 (22 October 2026), the S6A-08 change included. Firefox and WebKit installed by him; their smoke
+specs on demand only. The `navigate` blur is limited to traversals (`navigationType` "traverse"), and the `popstate`
+backstop fires for traversals only (it never comes for a `pushState`); a spec checks that a new entity's name field keeps
+the focus while its selection pushes a place.
+
+## Step 3: selection places, the diagnosis (22 October 2026)
+
+What changed:
+- **`src/canvas/SelectionHistory.tsx`** (on canvas pages): a single selection that is a place (a card, a row, a mapping,
+  a relationship, a frame, a note, a requirement, a label, an element) pushes an entry without a URL and is kept under the
+  new entry's key; the same place again records nothing; a deselection, several items and a bundle record nothing. A
+  selection made on arrival (`?card`, `?label`, `?req`, `?note`) is written into the page's own entry. Back or Forward
+  onto an entry applies its place, or nothing for the page's own entry; a traversal is never recorded again.
+- **`ui.showPlace`** (`ModelCanvas`): checks the place still exists, selects it as a click does (the details panel never
+  opens, D-54) and centres it at the same zoom when it is off screen: cards, rows by their card (a card in a collapsed
+  frame by its block), frames, notes, requirement cards. A gone place: nothing selected and a toast per kind (“That card
+  is no longer on this canvas.”, “That row …”, “That frame …”, “That note …”; “That mapping no longer exists.”, “That
+  relationship …”, “That requirement …”, “That label …”, “That element …”).
+- **`src/canvas/canvas-ready.ts`**: the canvas publishes its own `ready` (view set, nodes there) in a store, so a place
+  arriving with a traversal from another page is applied only once it can be found.
+- **Two things found while building it, both fixed:**
+  - Next.js draws the page a traversal lands on before `popstate` reaches the page it left (it starts at the
+    Navigation API's `navigate` event), so a listener on the page left never ran (measured: no `popstate` handler call
+    at all). The tab now has **one traversal watcher** at module level (`history-nav.tsx`, `currententrychange` with
+    `navigationType` "traverse"): it notes the entry landed on (`traversal.key` in `history-places.ts`; the canvas drawn
+    for it applies its place) and the page left (for the background refresh). Without it, Back across canvases and the
+    background refresh did not work.
+  - The `popstate` listeners that remain (the blur backstop, a step within one canvas) are registered in the capture
+    phase, ahead of Next.js's own.
+- **A deleted canvas** is the app's existing handling: Back restores it from Next's cache, the background refresh asks
+  the server, which sends the project's first canvas with the “moved” notice.
+- **Firefox and WebKit smoke** (`e2e/slice-06b/S6B-browsers.spec.ts`; `playwright.config.ts` adds the `firefox` and
+  `webkit` projects and runs the spec only with `BROWSERS=1`; CI and the full run stay Chromium-only). **Not run in
+  Firefox and WebKit:** Playwright 1.63 looks for `firefox-1543` and `webkit-2359` in
+  `%LOCALAPPDATA%\ms-playwright`, which holds only Chromium (`chromium-1208`, `chromium-1243`) on this laptop; in
+  Chromium the spec passes. *Proposal:* `npx playwright install firefox webkit` from the project folder (it installs
+  the builds this Playwright version expects), then `BROWSERS=1 npx playwright test e2e/slice-06b/S6B-browsers.spec.ts`.
+
+Tests (`e2e/slice-06b/`): S6B-02 (five places walked back in reverse, then the page's own entry; the same card twice,
+a deselection, a multi-selection and view state record none), S6B-02-focus (a new entity from the toolbox: its name typed
+without a click keeps the focus, saved with Enter, one place), S6B-03 (no route change, no RSC or action request; Back
+costs at most the click's canvas commits: measured 1 against 3), S6B-04 (a hidden details panel stays hidden; off screen:
+centred at the same zoom; on screen: the view stays ±1 px), S6B-05 (Back across canvases: the canvas at its remembered
+view, the card selected), S6B-06 (a card removed: no selection, the toast, Forward works; a deleted canvas: the project's
+first canvas with the notice, Forward works), S6B-08-edit updated (the card's selection is a place, so Back lands on the
+canvas without a selection, which removes the field: the edit is still saved).
+
+### S6B-10: the diagnosis (phase traces)
+
+Measurement build, headed Chrome, no laptop preparation (diagnostic), 7 traced switches each (medians, ms; style as
+elements; layout as dirty / total objects; forced = style or layout inside a script call):
+
+| Case | script | style | layout | paint | layerize | forced |
+| --- | --- | --- | --- | --- | --- | --- |
+| 30 % (ent:23, ent:28): a click on X | 29.7 | 2.5 (383) | 2.7 (347 / 7,444) | 6.9 | 5.8 | 2 |
+| 30 %: Back to X | 26.7 | 1.4 (310) | 2.7 (351 / 7,444) | 7.2 | 5.2 | 2 |
+| 100 % dense (src:29, src:1): a click on X | 72.2 | 5.0 (562) | 3.4 (241 / 27,623) | 19.6 | 9.7 | 2 |
+| 100 % dense: Back to X | 40.4 | 0.9 (212) | 2.5 (245 / 27,623) | 18.5 | 10.2 | 2 |
+| 30 %, X off screen: Back (centred) | 41.4 | 12.9 (718) | 12.6 (601 / 52,108) | 23.5 | 37.4 | 2 |
+| 30 %, X off screen: the left panel's click (select and centre) | 38.1 | 17.9 (548) | 11.5 (336 / 59,552) | 42.3 | 50.5 | 1 |
+| A button's state change (an entry pushed without a URL) | 0.1 | 0 | 0 | – | 0.01 | 0 |
+
+- **Back to a selection on the same canvas costs no more than a click** (script −3.0 ms at 30 %, −31.8 ms dense: a
+  click also runs its pointer handlers). Bar (≤ 2 ms more script): met. The canvas commits (S6B-03, development
+  counters): Back 1, the click 3.
+- **Off screen:** Back +3.3 ms script against the left panel's select-and-centre, with less style, paint and layerize;
+  both move the view the same way.
+- **A button's state change:** 0.1 ms of script, no style, no layout, nothing forced. The 2 forced style or layout
+  passes in both a click and Back are the selection's own (the details panel), present either way.
+- **The background refresh after Back to the canvas from the project home** (dense view, 5 runs): the refresh request
+  took 25, 33, 31, 66 and 39 ms; **the view and the selection were unchanged in 5 of 5** (the transform read when the
+  canvas was ready and after the refresh, the selection before leaving and after). The main thread in the 3 s after Back
+  (script 641.7, style 80.3, layout 83.6, paint 73.1 ms) is mostly the canvas page drawn from Next's cache; this trace
+  does not separate the refresh's merge from it. *Proposal:* accept as diagnostic; if Łukasz wants the refresh's own
+  share, a run with the refresh switched off by a measurement-only `DIAG` switch would give it.
+
+Runs: lint, typecheck, unit tests (80 files, 1,045 tests) pass. The slice's specs and the earlier specs that select
+things, open details on purpose or arrive with a link (slices 1b, 2a, 2b, 3a, 4a, 4b-1, 4b-2, 5a, 6a and 6b whole):
+**159 passed, 24.4 min**. S6B-10 in the measurement build: passed, 5.4 min. S6B-browsers in Chromium: passed.

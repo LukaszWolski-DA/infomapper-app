@@ -92,6 +92,7 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       place: (target, rows, options) => handle.current?.place(target, rows, options),
       remove: (cardId) => handle.current?.remove(cardId),
       centerOn: (cardId) => handle.current?.centerOn(cardId),
+      showPlace: (sel) => handle.current?.showPlace(sel) ?? null,
       freeSpot: () => handle.current?.freeSpot() ?? { x: 40, y: 40 },
       registerCanvas: (h) => {
         handle.current = h;

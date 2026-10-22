@@ -12,8 +12,10 @@ export default defineConfig({
   // in the measurement build
   // and the S4P-04 screenshots (slice 4p) run only when asked with SCREENS=1
   testIgnore: [
-    ...(E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts", "**/S4P-fading.spec.ts", "**/S4P-10-c08.spec.ts", "**/S4P-11-index.spec.ts", "**/S4B1-09.spec.ts", "**/S4B2-1[0-3].spec.ts", "**/S4B2-15-layers.spec.ts", "**/S5A-08.spec.ts", "**/S6A-09*.spec.ts"]),
+    ...(E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts", "**/S4P-fading.spec.ts", "**/S4P-10-c08.spec.ts", "**/S4P-11-index.spec.ts", "**/S4B1-09.spec.ts", "**/S4B2-1[0-3].spec.ts", "**/S4B2-15-layers.spec.ts", "**/S5A-08.spec.ts", "**/S6A-09*.spec.ts", "**/S6B-10.spec.ts"]),
     ...(process.env.SCREENS ? [] : ["**/*-screens.spec.ts"]),
+    // slice 6b's smoke for Firefox and WebKit runs only when asked (BROWSERS=1); CI and the full run stay Chromium-only
+    ...(process.env.BROWSERS ? [] : ["**/*-browsers.spec.ts"]),
   ],
   // The dev server compiles pages on first use, which can take a while.
   timeout: 60_000,
@@ -28,7 +30,16 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
   },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    // BROWSERS=1: the smoke specs (`*-browsers.spec.ts`) in Firefox and WebKit too
+    ...(process.env.BROWSERS
+      ? [
+          { name: "firefox", use: { ...devices["Desktop Firefox"] }, testMatch: "**/*-browsers.spec.ts" },
+          { name: "webkit", use: { ...devices["Desktop Safari"] }, testMatch: "**/*-browsers.spec.ts" },
+        ]
+      : []),
+  ],
   // Its own port and data file, so a running `npm run dev` and its data are left alone.
   webServer: E2E_PRODUCTION
     ? {
