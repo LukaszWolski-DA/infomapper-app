@@ -248,14 +248,21 @@ export function createLocalDataStore(file: string): DataStore {
 }
 
 async function applyToFile(file: string, writeSet: WriteSet): Promise<ApplyResult> {
-  const next = structuredClone(await readDbCached(file)) as DevDb;
+  // Copy on write (slice 7a): the cached file is frozen, so only the tables this write touches get new arrays; their
+  // written rows are new objects, every other row is shared with the cache.
+  const current = await readDbCached(file);
+  const next = { ...current } as DevDb;
+  const touched = new Set<DevTable>(writeSet.writes.map((w) => w.table));
+  const rowsOfNext = next as unknown as Record<DevTable, unknown[]>;
+  for (const table of touched) rowsOfNext[table] = [...(current[table] as readonly unknown[])];
   const index = new KeyIndex(next);
   for (const write of writeSet.writes) {
     const error = applyWrite(next, index, write);
     if (error) return { ok: false, error };
   }
-  next.change_event.push(...structuredClone(writeSet.events));
-  const violation = findViolation(next);
+  next.change_event = [...current.change_event, ...structuredClone(writeSet.events)];
+  // only what this write can have broken: the touched tables and the new change events
+  const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length });
   if (violation) return { ok: false, error: violationError(violation) };
   await writeDb(file, next);
   return { ok: true };

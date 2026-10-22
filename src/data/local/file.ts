@@ -110,7 +110,8 @@ export async function writeDb(file: string, db: DevDb): Promise<void> {
   assertNotProduction();
   await mkdir(path.dirname(file), { recursive: true });
   const temp = `${file}.${randomUUID()}.tmp`;
-  await writeFile(temp, JSON.stringify(db, null, 2) + "\n", "utf8");
+  // compact (slice 7a): after large imports the file is many MB, and indenting doubled its size and its writing time
+  await writeFile(temp, JSON.stringify(db) + "\n", "utf8");
   try {
     await withRetry(() => rename(temp, file));
   } catch (e) {

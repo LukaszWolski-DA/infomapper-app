@@ -424,23 +424,40 @@ export interface IntegrityViolation {
   detail: string;
 }
 
-/** Checks every table against its rules. Returns the first violation, or null. */
-export function findViolation(db: DevDb): IntegrityViolation | null {
-  const ids = new Map<DevTable, Set<string>>();
-  for (const table of TABLES) ids.set(table, new Set(rowsOf(db, table).map((r) => String(r.id))));
+/**
+ * Checks the tables against their rules. Returns the first violation, or null. With `scope` (a write, slice 7a): only
+ * the tables it touched, and of the change events only the new ones (the last `newEvents`) besides their keys. Rows of
+ * other tables cannot break: writes never take an id away (deletes are soft; removed link rows are no foreign key's
+ * target).
+ */
+export function findViolation(db: DevDb, scope?: { tables: ReadonlySet<DevTable>; newEvents: number }): IntegrityViolation | null {
+  const idsCache = new Map<DevTable, Set<string>>();
+  const ids = (table: DevTable) => {
+    let set = idsCache.get(table);
+    if (!set) {
+      set = new Set(rowsOf(db, table).map((r) => String(r.id)));
+      idsCache.set(table, set);
+    }
+    return set;
+  };
 
   for (const table of TABLES) {
+    const isEvents = table === "change_event";
+    if (scope && !isEvents && !scope.tables.has(table)) continue;
     const rules = RULES[table];
     const rows = rowsOf(db, table);
     const keys = new Set<string>();
-    for (const row of rows) {
+    const firstChecked = scope && isEvents ? rows.length - scope.newEvents : 0;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]!;
       const key = keyOf(table, row);
       if (keys.has(key)) return { kind: "duplicate_key", table, detail: `duplicate key ${key}` };
       keys.add(key);
+      if (i < firstChecked) continue;
       for (const [column, target] of Object.entries(rules.foreignKeys)) {
         const value = row[column];
         if (value === null || value === undefined) continue;
-        if (!ids.get(target)!.has(String(value))) {
+        if (!ids(target).has(String(value))) {
           return { kind: "foreign_key", table, detail: `${column} = ${String(value)} is not in ${target}` };
         }
       }
@@ -459,6 +476,7 @@ export function findViolation(db: DevDb): IntegrityViolation | null {
       }
     }
   }
+  if (scope && !["canvas", "canvas_item", "frame", "note"].some((t) => scope.tables.has(t as DevTable))) return null;
   return crossTableViolation(db);
 }
 
