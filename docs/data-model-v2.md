@@ -4,7 +4,7 @@ Version 2.0 · 2 October 2026 · replaces `INFOMAPPER_DATA_MODEL_v1_0.md` (the o
 
 This document describes every table of the new InfoMapper application: what it holds, its columns, keys and rules.
 The SQL is in `supabase/migrations/20261002000000_initial_schema.sql`. Behaviour is defined by the prototype
-(`docs/prototype/infomapper-model-prototype.html`); the decisions behind this model are listed at the end.
+(`docs/prototype/infomapper-prototype-with-sources.html`); the decisions behind this model are listed at the end.
 
 ---
 

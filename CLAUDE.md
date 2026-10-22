@@ -15,7 +15,7 @@ and docs in the repository are in English.
 
 | What | Where |
 | --- | --- |
-| How the product behaves | `docs/prototype/infomapper-model-prototype.html` (open it in a browser and use it) |
+| How the product behaves | `docs/prototype/infomapper-prototype-with-sources.html` (open it in a browser and use it) |
 | Why it behaves that way | `docs/decisions.md` (`D-xx` UX, `AD-xx` architecture) |
 | Tables, columns, rules | `docs/data-model-v2.md` and `supabase/migrations/` |
 | What to build now | `docs/prd/slice-XX-*.md`, the current slice only |

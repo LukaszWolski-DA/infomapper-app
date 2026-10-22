@@ -4,7 +4,7 @@ Condensed record of the decisions taken while designing the prototype (UX, `D-xx
 (architecture, `AD-xx`). Status as of 2 October 2026. The working documents with full discussion live in Claude;
 **this file is the copy the code follows**. When a decision changes, update this file in the same pull request.
 
-Behaviour reference: `docs/prototype/infomapper-model-prototype.html`. Data reference: `docs/data-model-v2.md`.
+Behaviour reference: `docs/prototype/infomapper-prototype-with-sources.html`. Data reference: `docs/data-model-v2.md`.
 
 ---
 

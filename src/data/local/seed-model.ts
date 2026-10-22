@@ -1,6 +1,7 @@
-// The demo model of the prototype (seed() in docs/prototype/infomapper-model-prototype.html): concepts, entities with
-// their attributes, source systems with tables and columns, mappings with statuses and rules, relationships, and the
-// cards on the two seeded canvases at the prototype's positions, without frames (frames come in slice 2).
+// The demo model of the prototype (seed() in docs/prototype/infomapper-prototype-with-sources.html): concepts,
+// entities with their attributes, source systems with tables and columns, mappings with statuses and rules,
+// relationships, and the cards on the two seeded canvases at the prototype's positions, without frames (frames come in
+// slice 2).
 
 import { createHash } from "node:crypto";
 import type { Uuid } from "@/domain/ids";
