@@ -27,13 +27,13 @@ acceptance docs (for example, other lines not fading on a hover since 4p).
 
 | Area | Missing in the app | Planned |
 | --- | --- | --- |
-| Canvas | requirement cards and dashed traces; markers, coverage colours, Focus; the view-state bar; showing or hiding the side panels | 4b-1, 4b-2, slice 6; panels: 5a (done) |
-| Panels and navigation | back and forward (Alt ←/→), history; requirement cards from panels | slice 6 (D-38); 4b-2 |
+| Canvas | requirement cards and dashed traces; markers, coverage colours, Focus; the view-state bar; showing or hiding the side panels | 4b-1, 4b-2; panels: 5a (done); view-state bar: 6a (done) |
+| Panels and navigation | back and forward (Alt ←/→), history; requirement cards from panels | slice 6b (D-38); 4b-2 |
 | Model | Data Vault 2.0 hints in the entity panel (hub, link, business key, satellites) | decision only (AD-08) |
 | Mappings | suggested mappings (the “Suggestions” mode, accept one or all strong matches); re-pointing a mapping to another attribute | – |
 | Sources | nothing found missing | – |
 | Requirements | markers, colours, Focus (4b-1); cards, traces, “Show its requirements”, “Place its card”, “Add all” (4b-2) | 4b-1, 4b-2 |
-| Labels and notes | rich text in notes; the view-state items for hidden notes and live canvases | known limitation, slice 6 |
+| Labels and notes | rich text in notes | known limitation |
 | Projects and workspace | baselines (create, compare, mapping specification, data dictionary); workspace export, export and delete, duplicate, transfer; new organization; deleting a project; editing a project's name and description on its home | baselines: decision only (AD-03, AD-14); the rest: – |
 | Settings and roles | inviting people, changing a role, removing a member | database (AD-04) |
 
@@ -46,7 +46,7 @@ acceptance docs (for example, other lines not fading on a hover since 4p).
 | Focus | toolbar toggle, “Focus on this” / “Turn Focus off” in the card menu, the “Focus” chip | `#tFocus`, `focusCtx`, `relatedOf`, the card menu in `ctxFor` | 4b-1 |
 | Requirement cards and trace lines | a requirement's card on the canvas, dashed lines to what it traces to, fading by Focus | `renderReqCards`, `reqTraces`, `reqActive`, `placeReqCards`, `showReqCard`, `dropReq` | 4b-2 |
 | Requirement card menu | “Edit description…”, “Remove from this canvas (keeps the requirement)” | `ctxFor` (requirement card) | 4b-2 |
-| View-state bar | chips for what hides or fades things (lens, Focus, layer, filters, collapsed cards and frames, hidden notes, tool, “Live: {name}”), each with ×, plus “Show all” | `viewState`, `renderNavBar` (`data-voff`, `data-vall`) | slice 6 (D-39) |
+| View-state bar | chips for what hides or fades things (lens, Focus, layer, filters, collapsed cards and frames, hidden notes, tool, “Live: {name}”), each with ×, plus “Show all” | `viewState`, `renderNavBar` (`data-voff`, `data-vall`) | 6a (done; differences below) |
 | Show or hide the side panels | toolbar buttons for the object browser and the details panel | `#tLeft`, `#tRight`, `applyPanels` | 5a (done; with resizing by the grips, `PANEL`, `.pgrip`) |
 
 **Present in the app and not listed:**
@@ -57,11 +57,25 @@ acceptance docs (for example, other lines not fading on a hover since 4p).
 - frames and their collapsing; bundles; layers; looks and grids;
 - the Overview with its miniature; zoom controls; notation (crow's foot / UML); undo and redo with the toasts' Undo.
 
+**View-state bar and top bar: deliberate differences (slice 6a, `docs/prd/slice-06a-acceptance.md`):**
+- no lens chip: slice 4b-1 removed the lens (a selected requirement colours, fades nothing; D-32);
+- no role or archived chip (the prototype's `Archived · read-only`, `{role} · …`, also on home pages): the user
+  indicator shows the role and “Archived”; the bar is on canvas pages only;
+- “Entity tool” has its chip text (the prototype's map has no entry for it and shows “undefined”); no chip while drawing
+  a relationship;
+- the row keeps its height and chips that do not fit fold into “+{n}”, with “Live: {name}” and “Show all” always
+  visible (the prototype clips the chips at the right, “Show all” first);
+- the filter and collapsed-card chips have no × for those who cannot edit;
+- “Show all” shows from two chips this person can remove (the prototype counts every item, the role chip too);
+- the top bar: the prototype's label steps at 2,100, 1,880 and 1,300 px, and instead of hiding Focus and the notation at
+  1,000 px, a “More” menu takes them up to 1,200 px and the Entity, Frame, Note and Hand tools up to 1,100 px;
+- a remembered canvas view is corrected for the left panel's width (D-54).
+
 ## Panels and navigation
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Back and forward | Alt ←/→ and two buttons before the breadcrumbs; a history of up to 120 places (workspace, project, canvas, home screens, selection) | `navState`, `navRecord`, `navGo`, `renderNavBar` (`data-nav`) | slice 6 (D-38) |
+| Back and forward | Alt ←/→ and two buttons before the breadcrumbs; a history of up to 120 places (workspace, project, canvas, home screens, selection) | `navState`, `navRecord`, `navGo`, `renderNavBar` (`data-nav`) | slice 6b (D-38) |
 | Element panels: “Show its requirements” | places the cards of an element's requirements next to it | the card menu in `ctxFor` (`reqsFor`) | 4b-2 |
 
 **Present:**
@@ -116,7 +130,7 @@ requirements; the status bar's figure.
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
 | Rich text in notes | “Edit with formatting…” on a note | the note menu in `ctxFor`; `openRichFor` | known limitation “Notes stay plain text” (slice 4a). D-42 lists notes among the rich texts. No slice named. |
-| View-state items for notes and live canvases | “Resolved notes hidden”, “Live: {name}” as chips | `viewState` | slice 6 (D-39) |
+| View-state items for notes and live canvases | “Resolved notes hidden”, “Live: {name}” as chips | `viewState` | 6a (done) |
 
 **Present:**
 - labels, the labels field and its suggestions, label marks, the label panel, pinning labels to a project;

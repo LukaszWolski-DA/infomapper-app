@@ -151,6 +151,8 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b1/S4B1-09.sp
 npm run measure:canvas -- --to-screen --only s4b2pans,c10,lasso,c08,s4b2focus,s4b2screen,s4b2drag --rounds 3 --no-build --against slice-04b1  # slice 4b-2's sitting
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b2/S4B2-15-layers.spec.ts # S4B2-15's layer and element reads
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-05a/S5A-08.spec.ts         # slice 5a: side panels to the screen, layers
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06a/S6A-09.spec.ts         # slice 6a: chips and "Show all" to the screen (HAND_ONLY=1: a chip appearing)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06a/S6A-09-hand.spec.ts    # slice 6a: a chip appearing, phase by phase
 SCREENS=<folder> npx playwright test e2e/slice-04b1/S4B1-06-screens.spec.ts               # slice 4b-1's coverage colour screenshots
 npx tsx scripts/measure-ab.ts                                 # S2A-14 pan and zoom: main and this branch in turns, dev and measurement build
 npm run measure:build && MEASURE=1 MEASURE_BUILD=production npx playwright test <spec>   # the same in the measurement build
@@ -192,7 +194,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   Slice 5a's switch the side panels (`togglePanel`, `toggle`, `panel`, `expectShown`, `expectHidden`), drag and read
   the grips (`dragGrip`, `grip`, `guide`, `guideX`, `panelWidth`), read the canvas's width and a card's place on the
   screen (`expectCanvasWidth`, `cardAt`, `expectCardAt`), the layout cookie (`panelsCookie`) and the view's transform
-  (`viewportTransform`). The undo history lives in the server's memory and is empty again after each reseed.
+  (`viewportTransform`). Slice 6a's read the view-state bar (`viewBar`, `chip`, `chipOff`, `chipTexts`, `expectChips`,
+  `breadcrumbsRow`) and set a card's row filter or collapse as test data (`setCard`). The undo history lives in the
+  server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
   with notes below 40 % zoom (a note measured while drawn plain once grew on every round), `S3B-15-idle.spec.ts` on a
@@ -228,6 +232,24 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   subscribe to the pane's size (S5A-07 checks zero commits). Never set a CSS variable or a page-wide class on an
   element that contains the canvas: it restyles every card (S5A-08 found 75–140 ms per switch in the dense view); the
   grid gets its columns directly. Actions that lead to details on purpose call `openDetails()`; a selection never does.
+  A canvas's remembered view (`infomapper:view:<canvas id>`) carries the canvas's left edge on the screen (`left`,
+  slice 6a); on open the one `setViewport` moves `x` by the difference, so a view opens in place beside another left
+  panel; a view without `left` opens as stored.
+- **View-state bar** (slice 6a, D-39): `src/app/_components/view-state-bar.tsx`, at the end of the breadcrumbs row on
+  canvas pages (`AppShell`'s `viewState`). It reads the canvas through stores and the canvas context (`focusOn`,
+  `viewCounts` in `src/canvas/view-counts.ts`, which `ModelCanvas` publishes from an effect, `ui.mode`), never re-renders
+  `ModelCanvas` (S6A-08), and never reads layout in a commit: the fold into “+{n}” takes its widths from a
+  `ResizeObserver` (`src/ui/fit-chips.ts`, 16 px hysteresis). The breadcrumbs row is `contain: strict` (static). The
+  filter and collapsed-card chips and the layout part of “Show all” are one undo step each through `resetCanvasView`
+  (`src/domain/commands/canvas.ts`). The top bar's narrow steps are classes on the tools' own elements; “More”
+  (`src/canvas/MoreTools.tsx`) takes Focus and the notation up to 1,200 px and the four tools up to 1,100 px
+  (`src/canvas/more-breakpoints.ts`, a plain module the server page and the client menu share). Tailwind's `min-[N]` and
+  `max-[N]` meet at N: the app writes the prototype's “up to N px” as `max-[N+1px]`.
+- **Nothing above the canvas reads layout during a commit** (slice 6a, S6A-09-hand): no `offsetWidth`,
+  `getBoundingClientRect` or similar in a render or a layout effect of anything that sits above or beside the canvas
+  (bars, rows, panels). When the canvas restyles in the same commit (a tool's class), the read forces that restyle (about
+  20,000 elements in the dense view) and a layout of the page synchronously. Take sizes from a `ResizeObserver`, which
+  reports after the browser's own layout. Later PRDs: say so for every element they add above the canvas.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only

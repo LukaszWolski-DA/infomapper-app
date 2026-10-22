@@ -1,6 +1,6 @@
 # Slice 6a – Acceptance
 
-Status: **step 4 (layout: the top bar, the remembered view) done, waiting for Łukasz.** Branch `slice/06a-view-state-bar`, from `main` at the tag
+Status: **step 5 (closing): points 1–4 done; waiting for Łukasz's approval of D-39 and D-54 and his go for the full run.** Branch `slice/06a-view-state-bar`, from `main` at the tag
 `slice-05a` (`93f0df7`). PRD: `docs/prd/slice-06a-view-state-bar.md`. The PRD stays as written; this file is its
 amendment (Łukasz, 21 October 2026).
 
@@ -514,3 +514,95 @@ is still hidden then, so there is no second commit and no visible jump. A view w
   S1A-06, S1B-07, S1B-14, S2A-07, S2A-08, S2A-10, S2A-11, S2A-13, S2B-01, S2B-12, S2B-13, S2C-06, S2C-09, S3A-06,
   S3A-11, S3A-13, S3B-01 to S3B-04, S3B-10, S3B-12, S4B1-06, S4B1-08, S4B2-03, S4B2-07, S4B2-09): **93 passed,
   14.5 min**; no earlier spec changed.
+
+Łukasz accepted step 4 (22 October 2026).
+
+## Step 5: closing (22 October 2026)
+
+### 1. The fold without reading layout in a commit
+
+`view-state-bar.tsx` no longer reads `offsetWidth` or `clientWidth`: a `ResizeObserver`, set up again when the chips or
+the page change, reports the row's width, its breadcrumbs and the hidden copy's chips after the browser's own layout,
+and the fold runs from those sizes (`fit-chips.ts` and its 16 px hysteresis unchanged). The state is now how many chips
+are folded from the end, so a chip that appears shows at once (clipped for a frame at most) and folds once measured;
+the first version kept a “shown” count, which held a new chip back for one frame and cost a second frame with a full
+layerize (24 against 10 ms dense in the trace), so it was changed before the figures below.
+
+`S6A-09-hand` (seven traced “Hand on” switches per case, medians in ms; layout as dirty / total objects):
+
+| Case | script | style | layout | layerize |
+| --- | --- | --- | --- | --- |
+| dense, with the bar, before (step 4, contained) | 102.3 | 69.8 | 4.1 (36 / 56,148), forced in the commit | 10.8 |
+| dense, with the bar, after | 31.8 | 94.6 | 1.4 (24 / 28,063) | 11.2 |
+| dense, without the bar | 29.8 | 91.1 | 0 | 10.9 |
+| 30 %, with the bar, before (step 4, contained) | 34.4 | 22.4 | 1.9 (36 / 15,578), forced in the commit | 14.8 |
+| 30 %, with the bar, after | 14.1 | 21.5 | 0.8 (24 / 7,778) | 15.7 |
+| 30 %, without the bar | 15.2 | 32.0 | 0 | 13.2 |
+
+The forced style is gone: with the bar, script equals the case without it (31.8 against 29.8 ms dense). What is left is
+one layout of 24 dirty objects in the browser's own frame step, 1.4 ms dense and 0.8 ms at 30 %.
+
+S6A-09's Hand pair (to the screen, median beyond the same switch without the bar; on / off):
+
+| | 30 % | 100 % dense |
+| --- | --- | --- |
+| Step 3 (no containment) | +7.2 / +0.5 | +14.7 / +3.7 |
+| Step 4 (`contain: strict`) | +2.3 / +1.1 | +10.1 / −0.6 |
+| Step 5, run 1 (ResizeObserver) | +10.2 / +17.8 | +1.2 / −0.2 |
+| Step 5, run 2 | +7.1 / +5.1 | +7.1 / +1.6 |
+
+The two step 5 runs of the same build differ by up to 12 ms (run 1's case without the bar at 30 % ran faster than in any
+earlier run: 64.3 / 53.9 against 70–73 / 60–66), while the phase trace shows the same main-thread work with and without
+the bar. I read the remaining difference as the sitting's noise (no laptop preparation, AD-24 “Measuring”), not a cost
+of the bar.
+
+### 2. The containment
+
+The “+{n}” menu renders in a portal (`DropdownMenuContent` wraps Radix's `DropdownMenu.Portal`,
+`src/ui/components/dropdown-menu.tsx`), outside the row; the chips', “Show all”'s and the breadcrumbs' tooltips are
+native `title` attributes, drawn by the browser outside the page. Nothing that opens from the row renders inside it, so
+`contain: strict` stays.
+
+### 3. Docs
+
+- `docs/known-limitations.md`: “Live canvases without the view-state bar”, “Focus without the view-state bar”, “A
+  remembered canvas view and a different left panel”, “The top bar on narrow windows” (with the measured figure, about
+  1,700 px, not 1,100) and “The status bar has no ‘Open notes on canvas {n}’” closed in slice 6a, the old text kept.
+- `docs/ideas.md`: “A top bar that fits narrow windows” done; “No fresh page after ‘Show all’ when only cards change”
+  added (step 3).
+- `docs/inventory-prototype-vs-app.md`: the view-state rows done; back and forward for 6b; the deliberate differences
+  (no lens chip, no role or archived chip, “Entity tool”, the fold into “+{n}”, “Show all” from two removable chips,
+  readers' chips without ×, “More” instead of hiding, the remembered view's correction).
+- README: the status and the slice's summary, the two measuring commands. CLAUDE.md: the two measuring commands, the
+  slice's e2e helpers, the remembered view, a “View-state bar” paragraph (the counts store, the bar reads stores, never
+  re-renders `ModelCanvas`, never reads layout in a commit; `resetCanvasView`; “More” and its breakpoints; Tailwind's
+  `max-[N+1px]`), and the lesson for later PRDs: **nothing above the canvas reads layout during a commit; use a
+  `ResizeObserver`**.
+- `docs/decisions.md`: not written yet; the texts below wait for Łukasz's approval.
+
+**D-39, proposed final wording** (replaces the current line):
+
+> **D-39** A view-state bar at the right end of a canvas page's breadcrumbs row shows everything that hides or fades
+> items on the canvas (Focus, layer, filters, collapsed cards, collapsed frames, hidden notes, active tool), each
+> removable with its ×, plus “Show all” from two chips the person can remove. A live canvas's “Live: {name}” chip comes
+> first, without ×, and its Labeled filter is not counted as filtered and is kept by “Show all”. The row's height never
+> changes: chips that do not fit fold into “+{n}”, whose menu lists them with their ×, while “Live: {name}” and “Show
+> all” stay visible. Removing the filters, the collapsed cards or the collapsed frames is one undo step, and so is what
+> “Show all” changes of them; Focus, the layer, hidden notes and the tool are view state outside undo. Who cannot edit
+> the canvas sees the filter and collapsed-card chips without ×. (Changed in slice 6a: no lens since slice 4b-1, D-32; no
+> role chip, the user indicator shows the role.)
+
+**D-54, proposed addition** (a sentence before the narrow-window part):
+
+> A canvas's remembered view is stored with the canvas's left edge on the screen (the left panel's width; 0 when it is
+> hidden or the window is up to 1000 px wide) and corrected by the difference when the canvas opens, in the same step
+> that sets the view, so the model stands where it stood; views saved before slice 6a open unchanged. (Added in slice
+> 6a.)
+
+### 4. Runs
+
+Lint, typecheck, unit tests (79 files, 1,040 tests) pass. The slice's specs (S6A-01 to S6A-08, S6A-10, S6A-11), S0-04
+and S0-11 (the breadcrumbs row) and S5A-06 (the bar at 1,000 px): **23 passed, 2.9 min**. In the measurement build:
+S6A-09-hand and S6A-09 with `HAND_ONLY=1` (twice), all passed.
+
+Next: one full e2e run on a quiet laptop, when Łukasz says so; then the manual acceptance.

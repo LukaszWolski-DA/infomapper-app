@@ -138,6 +138,8 @@ Left out of slice 4b-2 on purpose (not in its PRD):
 
 ## A top bar that fits narrow windows (slice 5a, step 2)
 
+**Done in slice 6a**: the prototype's label steps and a “More” menu; nothing is cut off from 800 to 2,560 px (S6A-10).
+
 Below about 1,100 px the canvas page's top bar has more tools than room. Since slice 5a the tools are cut off at
 their right end (the details panel's button and the user indicator stay visible); before, the user indicator was cut
 off. The prototype shortens its labels at 2,100 and 1,300 px and hides some tools at 1,000 px (`.lf`, `.ls`,

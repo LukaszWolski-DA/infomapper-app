@@ -8,9 +8,10 @@
 // the lens), no role chip (the user indicator shows it), no chip while drawing a relationship.
 // The bar reads the canvas through stores and the canvas context (`focusOn`, `viewCounts`, `ui.mode`), never through
 // `ModelCanvas`, so a chip appearing or going re-renders only the bar (S6A-08). The fold is measured on the bar's own
-// elements (AD-24 rule 4).
+// elements (AD-24 rule 4), by a ResizeObserver: nothing here reads layout during a commit.
 
-import { useCallback, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { usePathname } from "next/navigation";
+import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { CanvasUiCtx, type CanvasMode } from "@/canvas/context";
 import { focusOn } from "@/canvas/fade";
 import { useCanvasLook } from "@/canvas/look";
@@ -129,45 +130,65 @@ export function ViewStateBar({ editable, live }: { editable: boolean; live: { la
   const withShowAll = chips.filter((c) => c.off).length >= 2;
   const barRef = useRef<HTMLDivElement>(null);
   const measureRef = useRef<HTMLDivElement>(null);
-  const [shown, setShown] = useState(chips.length);
-  const shownRef = useRef(shown);
+  // how many chips are folded into “+{n}”, from the end: a chip that appears shows at once (clipped for a frame at most)
+  // and folds when the observer has measured it
+  const [folded, setFolded] = useState(0);
+  const foldedRef = useRef(folded);
   const key = `${chips.map((c) => `${c.text}${c.off ? "×" : ""}`).join("|")}${withShowAll ? "|all" : ""}`;
 
-  /** How many chips fit: the breadcrumbs keep their current crumb, the ones above it shrink first. */
+  /**
+   * How many chips fit: the breadcrumbs keep their current crumb, the ones above it shrink first. Every width comes from
+   * the ResizeObserver below (`sizes`), never from reading layout here: a chip that appears in the same commit as a
+   * canvas restyle (a tool's class) would otherwise force that restyle and a layout of the page inside the commit
+   * (S6A-09-hand, slice 6a step 4). A chip may show clipped for one frame before it folds; the row's height never changes.
+   */
+  const sizes = useRef(new Map<Element, number>());
   const fold = useCallback(() => {
     const bar = barRef.current, measure = measureRef.current;
     const row = bar?.parentElement;
-    if (!bar || !measure || !row) return;
+    const rowWidth = row ? sizes.current.get(row) : undefined;
+    if (!bar || !measure || !row || rowWidth === undefined) return;
+    const size = (el: Element) => sizes.current.get(el);
     let crumbs = 0;
-    const list = row.querySelector("ol");
-    if (list) {
-      const items = [...list.children] as HTMLElement[];
-      items.forEach((li, i) => (crumbs += (i ? CRUMB_GAP : 0) + (i === items.length - 1 || li.getAttribute("aria-hidden") ? li.offsetWidth : CRUMB_MIN)));
+    const items = [...(row.querySelector("ol")?.children ?? [])];
+    for (const [i, li] of items.entries()) {
+      const w = i === items.length - 1 || li.getAttribute("aria-hidden") ? size(li) : CRUMB_MIN;
+      if (w === undefined) return;
+      crumbs += (i ? CRUMB_GAP : 0) + w;
     }
-    const widths = [...measure.children].map((el) => (el as HTMLElement).offsetWidth);
-    const all = withShowAll ? widths.pop()! + CHIP_GAP : 0;
-    const plus = widths.pop() ?? 0;
-    const liveWidth = live ? widths.shift()! + CHIP_GAP : 0;
-    const room = row.clientWidth - ROW_PADDING - ROW_GAP - crumbs - liveWidth - all;
-    const k = fitChips({ widths, gap: CHIP_GAP, plus, room, shown: shownRef.current, hysteresis: HYSTERESIS });
-    shownRef.current = k;
-    setShown(k);
+    const widths = [...measure.children].map(size);
+    if (widths.some((w) => w === undefined)) return;
+    const known = widths as number[];
+    const all = withShowAll ? known.pop()! + CHIP_GAP : 0;
+    const plus = known.pop() ?? 0;
+    const liveWidth = live ? known.shift()! + CHIP_GAP : 0;
+    const room = rowWidth - ROW_PADDING - ROW_GAP - crumbs - liveWidth - all;
+    const n = known.length;
+    const k = fitChips({ widths: known, gap: CHIP_GAP, plus, room, shown: n - Math.min(foldedRef.current, n), hysteresis: HYSTERESIS });
+    foldedRef.current = n - k;
+    setFolded(n - k);
   }, [live, withShowAll]);
 
-  useLayoutEffect(() => {
-    shownRef.current = chips.length;
-    fold();
-  }, [key, fold, chips.length]);
-  useLayoutEffect(() => {
-    const row = barRef.current?.parentElement;
-    if (!row) return;
-    const observer = new ResizeObserver(() => fold());
+  // The row, its breadcrumbs and the chips at their natural widths (the hidden copy), observed again whenever the chips
+  // or the page change: observing reads nothing, and the observer reports each element's size after the browser's own
+  // layout, then the fold runs.
+  const pathname = usePathname();
+  useEffect(() => {
+    const row = barRef.current?.parentElement, measure = measureRef.current;
+    if (!row || !measure) return;
+    sizes.current = new Map();
+    const observer = new ResizeObserver((entries) => {
+      for (const e of entries) sizes.current.set(e.target, e.borderBoxSize[0]?.inlineSize ?? e.contentRect.width);
+      fold();
+    });
     observer.observe(row);
+    for (const el of [...(row.querySelector("ol")?.children ?? []), ...measure.children]) observer.observe(el);
     return () => observer.disconnect();
-  }, [fold]);
+  }, [key, fold, pathname]);
 
+  const shown = chips.length - Math.min(folded, chips.length);
   const visible = chips.slice(0, shown);
-  const folded = chips.slice(shown);
+  const inMore = chips.slice(shown);
   return (
     <div ref={barRef} data-testid="bar-view-state" className="relative ml-auto flex min-w-0 flex-none items-center gap-[5px]">
       {live && (
@@ -178,7 +199,7 @@ export function ViewStateBar({ editable, live }: { editable: boolean; live: { la
       {visible.map((c) => (
         <Chip key={c.id} chip={c} />
       ))}
-      {folded.length > 0 && <MoreChips chips={folded} />}
+      {inMore.length > 0 && <MoreChips chips={inMore} />}
       {withShowAll && (
         <button type="button" data-testid="button-view-show-all" title="Remove everything that hides or fades things on this canvas" onClick={showAll} className={showAllClass}>
           Show all
