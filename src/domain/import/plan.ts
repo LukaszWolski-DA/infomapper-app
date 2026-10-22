@@ -567,7 +567,7 @@ export function planCounts(plan: ImportPlan): ImportCounts {
   return counts;
 }
 
-const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
+const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
 
 /** “2 new tables, 5 new columns, 1 changed column, 1 renamed column, 3 missing from source, 1 new relationship” (item 28). */
 export function importSummary(k: ImportCounts): string {
@@ -576,7 +576,7 @@ export function importSummary(k: ImportCounts): string {
   if (k.columns_new) parts.push(plural(k.columns_new, "new column"));
   if (k.columns_changed) parts.push(plural(k.columns_changed, "changed column"));
   if (k.columns_renamed) parts.push(plural(k.columns_renamed, "renamed column"));
-  if (k.columns_missing) parts.push(`${k.columns_missing} missing from source`);
+  if (k.columns_missing) parts.push(`${k.columns_missing.toLocaleString("en-GB")} missing from source`);
   if (k.relationships_new) parts.push(plural(k.relationships_new, "new relationship"));
   return parts.join(", ") || "No changes";
 }

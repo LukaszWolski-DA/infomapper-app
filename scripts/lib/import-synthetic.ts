@@ -51,16 +51,34 @@ export function syntheticTables(tables: number, seed = 7): SyntheticTable[] {
   }));
 }
 
+/** What a re-import's file does to a column (section 6: 5 % changed, renamed or missing). */
+export type Mutation = "keep" | "change" | "rename" | "drop";
+
+/**
+ * The share of columns a re-import changes (2 %), renames (1.5 %) and drops (1.5 %): columns 3–9 of a table, picked
+ * by the column's place in the whole file, so the same columns every run.
+ */
+export function fivePercent(table: number, column: number): Mutation {
+  if (column < 3) return "keep";
+  const n = (table * 7 + (column - 3)) % 140; // 7 such columns per table
+  return n < 4 ? "change" : n < 7 ? "rename" : n < 10 ? "drop" : "keep";
+}
+
 /** The standard as the SQL Server catalog query gives it (length, precision and scale in their own columns). */
-export function syntheticStandard(tables: number, seed?: number): string {
+export function syntheticStandard(tables: number, seed?: number, mutate: (table: number, column: number) => Mutation = () => "keep"): string {
   const all = syntheticTables(tables, seed);
   const rows: (string | number)[][] = [[...STANDARD_FIELDS]];
   all.forEach((t, i) => {
     const parent = i > 0 ? all[i - 1]! : null;
     t.columns.forEach((c, n) => {
+      const m = mutate(i, n);
+      if (m === "drop") return;
       const fk = n === 2 && parent ? [`FK_${t.name}_${parent.name}`, parent.schema, parent.name, "id"] : ["", "", "", ""];
+      const name = m === "rename" ? `${c.name}_renamed` : c.name;
+      // a changed column gets a type of another class (a varchar becomes an int, anything else a varchar(60))
+      const [type, length, precision, scale] = m === "change" ? (c.type === "varchar" ? ["int", "", "", ""] : ["varchar", "60", "", ""]) : [c.type, c.length, c.precision, c.scale];
       rows.push([
-        "synth", t.schema, t.name, "table", "", 1000 + i, n === 0 ? `Synthetic table ${i}` : "", c.name, n + 1, c.type, c.length, c.precision, c.scale,
+        "synth", t.schema, t.name, "table", "", 1000 + i, n === 0 ? `Synthetic table ${i}` : "", name, n + 1, type, length, precision, scale,
         c.pk ? "no" : "yes", c.pk ? "yes" : "no", ...fk, n === 0 ? "The key" : "", n === 1 ? "BK" : "",
       ]);
     });
