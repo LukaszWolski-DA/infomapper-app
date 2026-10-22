@@ -1,6 +1,6 @@
 # Slice 7a – Acceptance
 
-Status: **step 2 done (22 October 2026); step 3 waits for Łukasz's go.** Branch
+Status: **step 3 done (22 October 2026); step 4 waits for Łukasz's go.** Branch
 `slice/07a-source-import`, from `main` at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as
 written; this file is its amendment (Łukasz, 22 October 2026).
 
@@ -625,3 +625,121 @@ others the old reader read the same way), so no seeded row changes.
 
 At 100,000 rows the standard is 7.7 MB, so the row limit, not the 20 MB, binds for files of this shape. The limit is
 proposed after steps 3 and 4 measure plan, apply and undo at both sizes (answer 13).
+
+## Łukasz's answers to step 2 (22 October 2026)
+
+Step 2 accepted. Decisions 1, 2, 4, 5 and 6 as taken. **Decision 3 changed:** a type the reader cannot parse is kept as
+written **with a warning** in the review ("Type “integer[]” of loyalty.points_txn.tags is kept as written; the type
+check cannot judge mappings from this column."): nothing the importer cannot judge may pass silently. **Decision 6:** a
+new criterion: a system imported from a DDL script and then from the matching catalog-query result shows no changes and
+sends no mapping to review. The DDL figure at 100,000 columns (1,772 ms) is fine for now; the limit is proposed after
+steps 3 and 4. "The destination stream closed early" is watched in step 4's full runs.
+
+## Step 3: the engine in the domain (22 October 2026)
+
+### What changed
+
+- **The reader's warning** for a type it cannot parse (`TYPE_KEPT`, decision 3); the DDL sample's `text[]` now has it.
+- **`src/domain/import/plan.ts`**, `buildPlan(model, read, target, choices)`: the plan of items 22–32, pure. Statuses
+  (new, changed, unchanged, missing, still missing, back, rename) for tables, columns and relationships; table meta and
+  row counts; positions among the unchanged columns (answer 11); a comment overwrite as a change (answer 8); P2 (only
+  the file's fields are compared); the scope rule (P4: "schemas" or "tables"); rename suggestions, choices and options
+  (P5: a new column paired once); the file's classifications when they differ (item 11, kept); relationships with the
+  unresolved-key warning (item 30) and those of a missing table (item 32); the mass warning (item 23); `planCounts`
+  and `importSummary` (item 28).
+- **P6 per input** (`planMappings`): for each mapping reading a column whose type or name changes, the type check runs
+  on every input before and after. Reasons: "type conflict, {column} into {attribute}" (only where an input did not
+  have the problem; a transform with a rule never has one, so only direct mappings, F1), "business key column changed
+  type, {before} → {after}", "its rule now reads {rule}" (whole words, ignoring case, one pass). An approved mapping
+  with a reason goes back to review; a draft or review mapping keeps its status and gets no reason (answer 6); its rule
+  is still rewritten. "Fits again" and the conflicts after the import are in the impact, for item 25.
+- **`src/domain/import/apply.ts`**, `applyPlan`: the changeset (new rows, and patches with the version read). Nothing is
+  deleted; missing sets `missing_since`, back clears it; unchanged rows get no patch; a sent-back mapping gets
+  `status: review`, no approval and its `review_reason`. Step 4 turns it into writes and change events.
+- **`src/domain/import/compare.ts`**: `planDigest` (statuses, changes, renames, mapping impacts, warnings, and the id
+  and version of every row the plan reads), `samePlan` (P8: an edit elsewhere does not refuse the import, one that
+  changes what it does does), `keptChoices` (scope and compare kept, rename choices kept where still offered),
+  `STALE_REVIEW` (P8's text).
+- **`columnTypeKey`, `sameColumnType`** (`column-type.ts`): types compared through `TYPE_ALIASES`, so `integer` and
+  `int`, `timestamp with time zone` and `timestamptz` are one type.
+- **Samples:** `billing_sqlserver_catalog.tsv` (the SQL Server query's result for `billing.sql`'s database);
+  `hr_oracle_catalog.csv` now matches `hrleg_ddl.sql` exactly (the scale-only `NUMBER` and `CLOB` checks moved inline).
+- **Test fixtures:** `src/domain/__fixtures__/import.ts` (`importInto`, `materialize`, `withMapping`…).
+- **Coverage (answer 9) is not in this step.** It needs `missing_since` on stored columns, which the data model gets in
+  step 4. Step 4 changes `countsForCoverage` and runs the coverage specs it touches, so step 3 is CI only.
+
+### Tests (unit)
+
+`plan.test.ts` and `compare.test.ts`, 46 tests:
+
+- a first import (S7A-04);
+- every sample and vendor file imported twice shows no changes and writes nothing (S7A-16); the same type spelled
+  another way is no change;
+- the CRM re-import with every column status, positions, meta, the file's classifications and the exact patches
+  (S7A-05); P2; a comment overwrite; a case-only rename;
+- missing, still missing and back for tables, columns and relationships;
+- scope and the mass warning (S7A-06);
+- renames, "removed", one column paired once, a rename that keeps a relationship (S7A-07);
+- P6: a direct mapping's type conflict, a business key change, a combined mapping's business key change and renamed
+  input with no type conflict, a draft keeping its status, "fits again", a missing input (S7A-08);
+- relationships; `rewriteRule`; P8.
+
+**DDL then catalog (decision 6):**
+
+- **Oracle** (`hrleg_ddl.sql`, then `hr_oracle_catalog.csv`): no changes, no mapping to review; the catalog's row counts
+  are written, not counted.
+- **SQL Server** (`billing.sql`, then `billing_sqlserver_catalog.tsv`): two differences remain, both real: the computed
+  column `full_ref` ("type: computed → varchar(24)": the script does not give its type) and the view `v_open_invoices`
+  (new: the script skips views with a warning). No mapping to review. See question 2.
+
+### Decisions I took (please check)
+
+1. **F22 as proposed in step 1:** a name that changes only in case is "changed: name Email → email"; a system with two
+   tables (or a table with two columns) that differ only in case stops the plan: "{system} has two tables that differ
+   only in case: {a} and {b}."
+2. **New texts:** "Name the new system." (an empty name), "That source system no longer exists." (a system deleted
+   meanwhile), and for a key that names a column the tables do not have: "Foreign key {name} on {table} names a column
+   that is not in {table}. Relationship skipped."
+3. **A key without target columns** points at the target's primary key in the standard too, as in the DDL channel.
+4. **A column that comes back** counts as a changed column in the summary (the prototype's count).
+5. **Requirement keys and canvases in item 25's impact** are not in the plan: the review takes them from the page's
+   data in step 5; they do not change what the import does.
+
+### Questions
+
+1. **The SQL Server catalog query returns no fractional seconds** (it gives `precision` only for decimal and numeric),
+   while an SSMS script writes `[datetime2](7)`. A system imported from a script and re-imported from the query would
+   show "type: datetime2(7) → datetime2" for every such column: a difference that is not real. The prototype's queries
+   are the source. Proposal: the SQL Server query also gives `c.scale` as `precision` for `datetime2`,
+   `datetimeoffset` and `time`; the PostgreSQL query gives the precision of `timestamp`, `timestamptz` and `time` from
+   `atttypmod`. Oracle's `data_type` already carries it. May I change the queries this way when the wizard takes them
+   in step 5?
+2. **The new criterion's wording** (decision 6), as S7A-17: "A system imported from a DDL script and re-imported from
+   the matching catalog-query result shows no changes apart from what a script cannot give (the type of a computed
+   column, views), and sends no mapping to review." Agreed?
+
+### How to check
+
+```
+npx vitest run src/domain/import
+npx tsx scripts/bench-import-plan.ts
+```
+
+### Runs
+
+`npm run lint`, `npm run typecheck`: pass. `npm test`: **86 files, 1,157 tests pass**. No e2e: the step changes no page
+(coverage moved to step 4).
+
+### Timings (Node, `scripts/bench-import-plan.ts`, median of 5 after a warm-up)
+
+A re-import against a system that holds the file, 5 % of the columns changed (2 %), renamed (1.5 %) or missing (1.5 %),
+a direct approved mapping on every tenth column.
+
+| Case | 20,000 columns, 2,000 mappings | 100,000 columns, 10,000 mappings | Bar |
+| --- | --- | --- | --- |
+| Plan the re-import | 107 ms (84–119) | 442 ms (425–480) | ≤ 2 s, met |
+| Apply (the changeset, no writes) | 27 ms | 135 ms | none (step 4 measures the writes) |
+| P8's digest | 25 ms | 145 ms | none |
+
+The plans: 400 changed, 300 renamed (all by suggestion), 300 missing and 15 mappings back to review at 20,000 columns;
+2,000, 1,500, 1,500 and 110 at 100,000.
