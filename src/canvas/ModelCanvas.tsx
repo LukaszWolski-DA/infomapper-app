@@ -104,7 +104,9 @@ import {
 import { relatedLines, type CanvasLines, type Selection } from "./line-data";
 import { useCanvasLook } from "./look";
 import { viewKey } from "./views";
+import type { PlaceGone } from "./context";
 import { viewCounts } from "./view-counts";
+import { canvasReady } from "./canvas-ready";
 import LineLayer, { HoverLines } from "./LineLayer";
 import { OverlayLayer } from "./OverlayLayer";
 import { createValueStore } from "./value-store";
@@ -1227,6 +1229,11 @@ export function ModelCanvas({
     viewCounts.set({ filtered: filteredCards, collapsedCards, collapsedFrames: collapsedIds.size, resolvedNotes, openNotes });
   }, [filteredCards, collapsedCards, collapsedIds.size, resolvedNotes, openNotes]);
   useEffect(() => () => viewCounts.set(null), []);
+  // ready for a place to be selected (slice 6b, `SelectionHistory`)
+  useEffect(() => {
+    canvasReady.set(ready);
+  }, [ready]);
+  useEffect(() => () => canvasReady.set(false), []);
   const counts = useMemo(() => memberCounts(cardData), [cardData]);
   /** What stands for each frame on the canvas: the frame, or its block (selection marks, slice 2c). */
   const frameRects = useMemo(() => new Map(frames.map((f) => [f.id, frameShape(f, counts)])), [frames, counts]);
@@ -1622,6 +1629,66 @@ export function ModelCanvas({
     await Promise.all([...queue.current.values()]);
   }, []);
 
+  /**
+   * Back or Forward onto a selection place (slice 6b, D-38): the place is selected as a click selects it (the details
+   * panel never opens, D-54) and, when it has a place on the canvas that is off screen, centred at the same zoom (cards,
+   * rows by their card, frames, notes, requirement cards; a card in a collapsed frame by its block). Returns what is gone
+   * when the place no longer exists; then nothing is selected.
+   */
+  const showPlace = useCallback(
+    (sel: Selection): PlaceGone | null => {
+      if (!sel || sel.t === "multi" || sel.t === "bundle") return null;
+      const model = fadeData?.model;
+      const cardRect = (n: CardNodeT): Rect =>
+        frameRectsNow().find(({ f }) => f.collapsed && f.id === n.data.card.frameId)?.r ?? { x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) };
+      let rect: Rect | null = null;
+      let gone: PlaceGone | null = null;
+      switch (sel.t) {
+        case "card":
+        case "row": {
+          const n = cardNodesOf(rf).find((c) => c.id === (sel.t === "card" ? sel.id : sel.cardId));
+          if (!n || (sel.t === "row" && !n.data.card.rows.some((r) => r.id === sel.id))) gone = sel.t;
+          else rect = cardRect(n);
+          break;
+        }
+        case "map":
+          if (model && !model.mappings.some((m) => m.id === sel.id)) gone = "map";
+          break;
+        case "rel":
+          if (model && !model.relationships.some((r) => r.id === sel.id)) gone = "rel";
+          break;
+        case "frame": {
+          const f = frameRectsNow().find(({ f }) => f.id === sel.id);
+          if (!f) gone = "frame";
+          else rect = f.r;
+          break;
+        }
+        case "note":
+          if (!notesNow().some((n) => n.id === sel.id)) gone = "note";
+          else rect = noteBoxesRef.current.find((b) => b.id === sel.id)?.rect ?? null;
+          break;
+        case "req": {
+          if (fadeData && !fadeData.requirements.some((r) => r.id === sel.id && r.deleted_at === null)) gone = "req";
+          const n = reqNodeOf(sel.id);
+          if (n) rect = { x: n.position.x, y: n.position.y, w: REQ_CARD.width, h: requirementCardHeight(n.data.card.nameLines) };
+          break;
+        }
+        case "element":
+          if (model && ![...model.entities, ...model.attributes, ...model.sourceTables, ...model.sourceColumns].some((e) => e.id === sel.id)) gone = "element";
+          break;
+      }
+      if (gone) {
+        select(null);
+        return gone;
+      }
+      select(sel);
+      const v = viewRect();
+      if (rect && (rect.x + rect.w < v.x || rect.x > v.x + v.w || rect.y + rect.h < v.y || rect.y > v.y + v.h)) centerOnRect(rect);
+      return null;
+    },
+    [fadeData, rf, frameRectsNow, notesNow, reqNodeOf, select, viewRect, centerOnRect],
+  );
+
   useEffect(() => {
     registerCanvas({
       fit,
@@ -1629,6 +1696,7 @@ export function ModelCanvas({
       place,
       remove,
       centerOn,
+      showPlace,
       freeSpot: () => freeSpot(viewRect(), occupied()),
       fitWidth,
       placeBeside: (cards, anchorCardId, side) => void placeBeside(cards, anchorCardId, side),
@@ -1703,7 +1771,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, shiftView, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store

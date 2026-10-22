@@ -86,6 +86,11 @@ export interface CanvasHandle {
   remove: (cardId: Uuid) => void;
   /** Moves the view so the card is in the middle. */
   centerOn: (cardId: Uuid) => void;
+  /**
+   * Back or Forward onto a selection place (slice 6b): selects it as a click would and centres it at the same zoom when
+   * it is off screen; returns what is gone when the place no longer exists (then nothing is selected).
+   */
+  showPlace: (sel: Selection) => PlaceGone | null;
   /** A free spot near the middle of the view for a new entity (D-46). */
   freeSpot: () => { x: number; y: number };
   /** Places an element with the top middle of its card at a canvas point (toolbox “Add an entity or table here”). */
@@ -186,6 +191,9 @@ export interface CanvasHandle {
   /** “Add to this canvas” on an entity or table panel without its card (item 16): the view's centre, upper third. */
   addToCanvas: (target: CardTarget, rows: number) => void;
 }
+
+/** A selection place that no longer exists, by kind (slice 6b, item 7: its toast). */
+export type PlaceGone = "card" | "row" | "map" | "rel" | "frame" | "note" | "req" | "label" | "element";
 
 /** A note as the panels list it (the card and frame panels, the canvas overview). */
 export interface NoteListItem {
@@ -367,6 +375,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   place: noop,
   remove: noop,
   centerOn: noop,
+  showPlace: () => null,
   freeSpot: () => ({ x: 0, y: 0 }),
   placeAt: noop,
   fitWidth: noop,

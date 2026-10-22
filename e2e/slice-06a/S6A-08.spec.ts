@@ -3,7 +3,7 @@
 // tool, collapsed frames. Counted in development (`__imCanvasCommits`, `__imMiniatureCommits`) once the page is quiet.
 
 import { expect, test, type Page } from "./fixtures";
-import { AROUND, canvasUrl, chip, chipOff, collapsedFrame, counters, openCanvas, signInAs, WHOLE_CO } from "./helpers";
+import { AROUND, canvasUrl, chip, chipOff, chipTexts, collapsedFrame, counters, openCanvas, signInAs, WHOLE_CO } from "./helpers";
 
 /**
  * Waits until the commit counters have not moved for 800 ms: a change saved on the server (the layer) may bring a fresh
@@ -89,25 +89,27 @@ test("S6A-08: a collapsed frame's chip × costs what “Expand all” costs", as
 });
 
 test("S6A-08: a chip folding into “+{n}” and coming back adds no canvas or miniature commit", async ({ page }) => {
-  // the default 1,280 px window: with three chips on, Focus's chip pushes the last one into “+{n}”
+  // the default 1,280 px window: with three chips on, the row folds; Focus's chip makes it fold again (which chips stay
+  // depends on their widths: since slice 6b the Back and Forward buttons take room too), and going restores the row
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), WHOLE_CO);
   await page.locator('[data-testid="switch-layer"] [data-layer="mappings"]').click();
   await page.getByTestId("checkbox-show-resolved").uncheck();
   await page.getByTestId("button-tool-hand").click();
   await expect(page.getByTestId("button-view-show-all")).toBeVisible();
-  const folded = async () => ((await chip(page, "more").count()) ? Number((await chip(page, "more").innerText()).slice(1)) : 0);
-  const before = await folded();
+  await expect(chip(page, "more")).toBeVisible();
+  const before = await chipTexts(page);
   const on = await commitsOf(page, async () => {
     await page.getByTestId("button-focus").click();
     await expect(chip(page, "focus")).toBeVisible();
-    await expect.poll(folded).toBe(before + 1);
+    await expect.poll(async () => (await chipTexts(page))[0]).toBe("Focus");
+    await expect(chip(page, "more")).toBeVisible();
   });
   expect(on).toEqual({ canvas: 0, miniature: 0 });
   const off = await commitsOf(page, async () => {
     await chipOff(page, "focus").click();
     await expect(chip(page, "focus")).toHaveCount(0);
-    await expect.poll(folded).toBe(before);
+    await expect.poll(() => chipTexts(page)).toEqual(before);
   });
   expect(off).toEqual({ canvas: 0, miniature: 0 });
 });

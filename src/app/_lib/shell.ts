@@ -6,6 +6,7 @@ import type { Uuid } from "@/domain/ids";
 import { can, checkCreateWorkspace, isArchived, isGuest } from "@/domain/permissions";
 import type { AppUser, WorkspaceRole } from "@/domain/types";
 import { nextCanvasFor } from "./next-canvas";
+import { workspaceHref } from "./paths";
 import { LAST_PROJECTS_COOKIE, parseLastProjects } from "./preferences";
 import { standingOf, type Standing } from "./roles";
 import { requireSessionUser } from "./session";
@@ -72,7 +73,9 @@ export async function loadShellFor(user: AppUser, where: Where): Promise<ShellDa
   let canvas: { id: Uuid; name: string } | null = null;
   if (where.projectId) {
     project = projectRows.find((p) => p.id === where.projectId) ?? null;
-    if (!project) notFound();
+    // a project that no longer exists (deleted, or never in this workspace) opens the workspace home with a toast, for
+    // every arrival: a typed address, a link, Back or Forward (slice 6b, step 1 answer 5)
+    if (!project) redirect(`${workspaceHref(workspace.id)}?gone=project`);
   } else {
     const remembered = parseLastProjects((await cookies()).get(LAST_PROJECTS_COOKIE)?.value)[workspace.id];
     project = projectRows.find((p) => p.id === remembered) ?? projectRows[0] ?? null;

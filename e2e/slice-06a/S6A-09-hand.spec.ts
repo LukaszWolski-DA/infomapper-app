@@ -8,9 +8,9 @@
 import { generate } from "../../src/data/local/large-generator";
 import { seedLargeData } from "../../src/data/local/dev-data";
 import { LARGE_IDS } from "../../src/data/local/seed-large";
-import type { TraceEvent } from "../../scripts/lib/to-screen";
 import { E2E_DB, E2E_PRODUCTION } from "../config";
 import { LARGE_URL, MEASURE, MEASURE_USE, saveResults } from "../slice-01b/measure";
+import { PHASE_CATEGORIES as CATEGORIES, median, phasesAfter } from "../measure/phases";
 import { PAUSE_MS, saveTrace, startTraceWith } from "../measure/trace";
 import { expect, test, type Page } from "./fixtures";
 import { signInAs } from "./helpers";
@@ -18,21 +18,6 @@ import { signInAs } from "./helpers";
 test.use(MEASURE_USE);
 
 const SWITCHES = Number(process.env.SWITCHES ?? 7);
-const CATEGORIES = ["devtools.timeline", "disabled-by-default-devtools.timeline", "blink.user_timing", "v8.execute"];
-const PHASES: Record<string, string> = {
-  FunctionCall: "script",
-  EventDispatch: "script",
-  TimerFire: "script",
-  FireAnimationFrame: "script",
-  RunMicrotasks: "script",
-  UpdateLayoutTree: "style",
-  Layout: "layout",
-  PrePaint: "prePaint",
-  Paint: "paint",
-  Layerize: "layerize",
-  Commit: "commit",
-};
-
 type View = { x: number; y: number; zoom: number };
 
 async function open(page: Page, view: View, diag = "") {
@@ -43,41 +28,6 @@ async function open(page: Page, view: View, diag = "") {
   await page.mouse.move(2, 400);
   await page.waitForTimeout(1500);
 }
-
-/** The main thread's phases in the 300 ms after the `hand-on` mark: time per phase and what style and layout touched. */
-function phasesOf(events: readonly TraceEvent[]) {
-  const mark = events.find((e) => e.name === "hand-on" && (e.ph === "R" || e.ph === "I" || e.ph === "i" || e.ph === "b" || e.ph === "n"));
-  if (!mark) return null;
-  const from = mark.ts, to = mark.ts + 300_000;
-  const main = events.filter((e) => e.pid === mark.pid && e.tid === mark.tid && e.ph === "X" && e.ts >= from && e.ts <= to);
-  const ms: Record<string, number> = {};
-  let styleElements = 0, layoutDirty = 0, layoutTotal = 0, paints = 0;
-  // only the outermost event of each phase counts (a nested FunctionCall inside EventDispatch is not added twice)
-  const open: { end: number; phase: string }[] = [];
-  for (const e of [...main].sort((a, b) => a.ts - b.ts)) {
-    const phase = PHASES[e.name];
-    if (!phase) continue;
-    while (open.length && open[open.length - 1]!.end <= e.ts) open.pop();
-    const inside = open.some((o) => o.phase === phase);
-    open.push({ end: e.ts + (e.dur ?? 0), phase });
-    if (inside) continue;
-    ms[phase] = (ms[phase] ?? 0) + (e.dur ?? 0) / 1000;
-    const args = (e.args ?? {}) as { elementCount?: number; beginData?: { dirtyObjects?: number; totalObjects?: number } };
-    if (e.name === "UpdateLayoutTree") styleElements += args.elementCount ?? 0;
-    if (e.name === "Layout") {
-      layoutDirty += args.beginData?.dirtyObjects ?? 0;
-      layoutTotal += args.beginData?.totalObjects ?? 0;
-    }
-    if (e.name === "Paint") paints++;
-  }
-  for (const k of Object.keys(ms)) ms[k] = +ms[k]!.toFixed(2);
-  return { ms, styleElements, layoutDirty, layoutTotal, paints };
-}
-
-const median = (xs: number[]) => {
-  const s = [...xs].sort((a, b) => a - b);
-  return s.length ? +s[Math.floor(s.length / 2)]!.toFixed(2) : 0;
-};
 
 test("S6A-09-hand: what a chip appearing costs, phase by phase, at 30 % and in the dense view", async ({ page, browser }) => {
   expect(E2E_PRODUCTION, "measurement build only (MEASURE_BUILD=production)").toBe(true);
@@ -97,7 +47,7 @@ test("S6A-09-hand: what a chip appearing costs, phase by phase, at 30 % and in t
     for (const diag of ["", "noviewbar"]) {
       const label = `${name}, ${diag ? "without the bar" : "with the bar"}`;
       await open(page, view, diag);
-      const runs: NonNullable<ReturnType<typeof phasesOf>>[] = [];
+      const runs: NonNullable<ReturnType<typeof phasesAfter>>[] = [];
       for (let k = 0; k < SWITCHES; k++) {
         await page.waitForTimeout(PAUSE_MS);
         const trace = await startTraceWith(page, CATEGORIES);
@@ -110,7 +60,7 @@ test("S6A-09-hand: what a chip appearing costs, phase by phase, at 30 % and in t
         await page.waitForTimeout(500);
         const events = await trace.stop();
         if (k === 0) saveTrace(`S6A-09-hand ${label}`, events, { kind: "phases" });
-        const p = phasesOf(events);
+        const p = phasesAfter(events, "hand-on");
         expect(p, `${label} ${k}: the mark in the trace`).not.toBeNull();
         runs.push(p!);
         await page.getByTestId("button-tool-hand").click();
