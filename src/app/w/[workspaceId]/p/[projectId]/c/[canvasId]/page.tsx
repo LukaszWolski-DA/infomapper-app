@@ -30,6 +30,7 @@ import { LeftPanel } from "@/app/_panels/left-panel";
 import { PanelsProvider } from "@/app/_panels/panels-context";
 import { StatusBar } from "@/app/_panels/status-bar";
 import { buildTree } from "@/app/_panels/tree-data";
+import { systemImports } from "@/app/_panels/import/system-imports";
 import { buildCards } from "@/canvas/card-data";
 import { buildRequirementCards } from "@/canvas/requirement-card-data";
 import { buildFrames, conceptsOf } from "@/canvas/frame-data";
@@ -234,6 +235,8 @@ export default async function CanvasPage({
                   liveCanvases={Object.fromEntries(canvases.filter((c) => c.live_label_id && c.deleted_at === null).map((c) => [c.live_label_id!, c.id]))}
                   live={liveLabel ? { labelId: liveLabel.id, labelName: liveLabel.name } : null}
                   canCreateCanvas={editable}
+                  imports={systemImports(imports, userName)}
+                  importData={importData}
                 />
               ),
               openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId),

@@ -87,9 +87,10 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
   const status = row.mappings === 0 ? "" : row.warn ? " warn" : " ok";
   return (
     <div
-      className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}`}
+      className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}${row.missing ? " gone" : ""}`}
       data-testid={kind === "ent" ? "row-attribute" : "row-column"}
       data-row={row.id}
+      title={row.missing ? "Missing from source" : undefined}
       aria-selected={selected || undefined}
     >
       <span className="key" title={row.pk || row.fk ? keyTitle(row) : undefined}>

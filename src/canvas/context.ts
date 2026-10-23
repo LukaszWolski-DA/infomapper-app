@@ -193,7 +193,7 @@ export interface CanvasHandle {
 }
 
 /** A selection place that no longer exists, by kind (slice 6b, item 7: its toast). */
-export type PlaceGone = "card" | "row" | "map" | "rel" | "frame" | "note" | "req" | "label" | "element";
+export type PlaceGone = "card" | "row" | "map" | "rel" | "frame" | "note" | "req" | "label" | "element" | "source_system";
 
 /** A note as the panels list it (the card and frame panels, the canvas overview). */
 export interface NoteListItem {

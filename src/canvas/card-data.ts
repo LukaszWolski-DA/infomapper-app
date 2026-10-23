@@ -34,6 +34,8 @@ export interface CardRow {
   labels: string | null;
   /** On a live canvas: the row carries the canvas's label, or one of its mappings does (bold, the Labeled filter; slice 3b). */
   relevant?: boolean;
+  /** A column missing from source (slice 7a, item 34): struck through and muted, a class on the row. */
+  missing?: true;
 }
 
 export interface CardData {
@@ -214,6 +216,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
           clip: false,
           labels: labelsOf(`source_column:${c.id}`),
           ...(live ? { relevant: live.relevantRows.has(c.id) } : {}),
+          ...(c.missing_since ? { missing: true as const } : {}),
         }));
       cards.push({
         ...base,

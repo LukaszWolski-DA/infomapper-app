@@ -16,8 +16,8 @@ export interface MapLineData {
   ruled: boolean;
   /** A type problem (D-01): orange line and a "!" chip. */
   warn: boolean;
-  /** Inputs whose source card is on this canvas, in rule order. */
-  inputs: { columnId: Uuid; cardId: Uuid }[];
+  /** Inputs whose source card is on this canvas, in rule order; `gone`: the column is missing from source (slice 7a). */
+  inputs: { columnId: Uuid; cardId: Uuid; gone?: true }[];
   /** How many inputs the mapping has in all; more than one draws the ƒ node (D-49). */
   inputCount: number;
   attributeId: Uuid;
@@ -72,7 +72,7 @@ export function buildLines(
     const columns = (inputsOf.get(m.id) ?? []).map((id) => columnById.get(id)).filter((c) => c !== undefined);
     const inputs = columns.flatMap((c) => {
       const source = tableCard.get(c.source_table_id);
-      return source ? [{ columnId: c.id, cardId: source }] : [];
+      return source ? [{ columnId: c.id, cardId: source, ...(c.missing_since ? { gone: true as const } : {}) }] : [];
     });
     if (!inputs.length) continue;
     mappings.push({
@@ -133,9 +133,10 @@ export type Selection =
   | { t: "req"; id: Uuid }
   /**
    * An element whose card is not on this canvas (slice 4a, the go-to links' fallback): its panel only; nothing on the
-   * canvas is selected or emphasised, the view does not move.
+   * canvas is selected or emphasised, the view does not move. A source system (slice 7a) has no card at all: it is
+   * always this kind.
    */
-  | { t: "element"; kind: "entity" | "attribute" | "source_table" | "source_column"; id: Uuid }
+  | { t: "element"; kind: "entity" | "attribute" | "source_table" | "source_column" | "source_system"; id: Uuid }
   | null;
 
 export interface Related {

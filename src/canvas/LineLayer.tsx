@@ -63,7 +63,8 @@ const MapPath = memo(
           <path key={`h${i}`} className="hit" d={d} />
         ))}
         {geom.paths.map((d, i) => (
-          <path key={`s${i}`} className="s" d={d} />
+          // a segment from a column missing from source: a class on the existing path (slice 7a, AD-24)
+          <path key={`s${i}`} className={geom.gone?.[i] ? "s gone" : "s"} d={d} />
         ))}
         {dots && geom.dots.map(([x, y], i) => <circle key={`e${i}`} className="end" cx={x} cy={y} r={2.6} />)}
         {geom.chip && (
@@ -340,7 +341,7 @@ function LineLayer({
       return (
         <MapPath
           key={l.id}
-          sig={`${geom.paths.join("")}|${dots}|${className}|${geom.chip?.text ?? ""}|${l.labels ?? ""}`}
+          sig={`${geom.paths.join("")}|${geom.gone?.join() ?? ""}|${dots}|${className}|${geom.chip?.text ?? ""}|${l.labels ?? ""}`}
           id={l.id}
           geom={geom}
           dots={dots}
@@ -381,7 +382,7 @@ function LineLayer({
         return (
           <MapPath
             key={b.key}
-            sig={`${geom.geom.paths.join("")}|${dots}|${className}|${geom.geom.chip?.text ?? ""}|${l.labels ?? ""}`}
+            sig={`${geom.geom.paths.join("")}|${geom.geom.gone?.join() ?? ""}|${dots}|${className}|${geom.geom.chip?.text ?? ""}|${l.labels ?? ""}`}
             id={l.id}
             geom={geom.geom}
             dots={dots}
@@ -545,7 +546,7 @@ export const LitLines = memo(function LitLines({
           const geom = mapGeom(l, lookup);
           if (!geom) return null;
           const className = `lnk map ${l.status}${l.warn ? " warn" : ""}${geom.part ? " part" : ""}${l.inputCount > 1 ? " combined" : ""}`;
-          return <MapPath key={l.id} sig={`${geom.paths.join("")}|${dots}|${className}|${geom.chip?.text ?? ""}|${l.labels ?? ""}`} id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
+          return <MapPath key={l.id} sig={`${geom.paths.join("")}|${geom.gone?.join() ?? ""}|${dots}|${className}|${geom.chip?.text ?? ""}|${l.labels ?? ""}`} id={l.id} geom={geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
         })}
       {bundles
         .filter((b) => b.ids.some((id) => (b.t === "map" ? maps : rels).has(id)))
@@ -555,7 +556,7 @@ export const LitLines = memo(function LitLines({
           if (geom.kind === "single") {
             const l = geom.line;
             const className = `lnk map ${l.status}${l.warn ? " warn" : ""}`;
-            return <MapPath key={b.key} sig={`${geom.geom.paths.join("")}|${dots}|${className}|${geom.geom.chip?.text ?? ""}|${l.labels ?? ""}`} id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
+            return <MapPath key={b.key} sig={`${geom.geom.paths.join("")}|${geom.geom.gone?.join() ?? ""}|${dots}|${className}|${geom.geom.chip?.text ?? ""}|${l.labels ?? ""}`} id={l.id} geom={geom.geom} dots={dots} labels={l.labels} className={className} onSelect={NOOP} />;
           }
           const className = geom.kind === "rel" ? "lnk rel bundle" : `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""}`;
           return <BundlePath key={b.key} sig={`${geom.d}|${className}|${geom.kind === "map" ? geom.count : geom.label}|${geom.width}`} bundleKey={b.key} geom={geom} className={className} onSelect={NOOP} />;

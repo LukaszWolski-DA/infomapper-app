@@ -78,6 +78,10 @@
 .im-canvas .card.src.ctx .c-head { background: linear-gradient(var(--im-physical), var(--im-physical)) top / 100% 3px no-repeat, var(--im-hover) }
 .im-canvas .card.ent.ctx .c-name { color: var(--im-ink-2); font-weight: 500 }
 .im-canvas .row.lab .nm { font-weight: 600 }
+/* a column missing from source (slice 7a, item 34; prototype .card .row.im-gone): its name struck through in the warning
+   colour; muted by colour, not opacity (AD-24: no opacity on repeated elements) */
+.im-canvas .row.gone { color: var(--im-ink-3) }
+.im-canvas .row.gone .nm { text-decoration: line-through; text-decoration-color: var(--im-warn) }
 /* working labels (slice 3a, prototype .lmark): a tag mark in rows and the table header, never a model tag (D-08) */
 /* one element: the outline tag (16 × 16, stroke 1.6, as the prototype's SVG) is a mask over the text colour */
 .im-canvas .lmark {
@@ -166,6 +170,9 @@
 .im-canvas .map.draft .s { stroke-dasharray: 6 4 }
 .im-canvas .map.review .s { stroke-dasharray: 10 3 2 3 }
 .im-canvas .map.warn .s { stroke: var(--im-warn) }
+/* from a column missing from source (slice 7a, item 34; prototype .lnk.map.gone .s): dotted and faded, by stroke opacity
+   on the path (AD-24: no opacity on repeated elements); a class on the segment of that input only (F29) */
+.im-canvas .map .s.gone { stroke-dasharray: 2 5; stroke-opacity: .5 }
 .im-canvas .map.part .s { stroke-opacity: .45 }
 .im-canvas .map .end { fill: var(--im-map) }
 .im-canvas .map.warn .end { fill: var(--im-warn) }

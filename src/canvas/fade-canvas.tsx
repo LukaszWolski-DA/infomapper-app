@@ -11,7 +11,7 @@ import type { Uuid } from "@/domain/ids";
 import { litRequirements, mergeLit, requirementFocusLit, targetLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import type { ScopeModel } from "@/domain/model/requirements";
-import type { Requirement, RequirementLink } from "@/domain/types";
+import type { Requirement, RequirementLink, WorkspaceModel } from "@/domain/types";
 import type { BlockNodeT } from "./BlockNode";
 import type { CardNodeT } from "./CardNode";
 import type { ReqNodeT } from "./RequirementCardNode";
@@ -19,9 +19,12 @@ import type { TraceData } from "./trace-data";
 import { fadeKey, focusTarget, useFadeRequest } from "./fade";
 import { cardWidth, LOD_ZOOM, ROW_H, rowEnd, type Rect } from "./geometry";
 
-/** What the canvas needs to work out a lit set: the live model and the requirements (the page has them). */
+/**
+ * What the canvas needs to work out a lit set: the live model and the requirements (the page has them). The source
+ * systems tell a history place of a system that is gone (slice 7a).
+ */
 export interface FadeData {
-  model: LitModel & ScopeModel;
+  model: LitModel & ScopeModel & Pick<WorkspaceModel, "sourceSystems">;
   requirements: readonly Requirement[];
   requirementLinks: readonly RequirementLink[];
 }

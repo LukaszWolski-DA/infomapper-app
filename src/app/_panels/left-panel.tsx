@@ -6,7 +6,9 @@
 // rename a concept by double-click, and its ⋯ menu (D-46, D-47). Sources tab: “New source table”. Requirements tab
 // (slice 4a): groups by kind with their coverage bars; a click opens the requirement's panel; slice 4b-2: “Only on
 // this canvas” and the on-canvas dot for requirement cards; editors drag a requirement onto an element to link it or
-// onto the canvas to place its card (items 17–19); “New requirement” for those who may edit.
+// onto the canvas to place its card (items 17–19); “New requirement” for those who may edit. Slice 7a: “Import
+// sources…” (item 20); a table missing from source struck through with a dot, a table with missing columns with the
+// dot (item 33); each system's open button selects the system and opens its panel.
 
 import { newCardHeight } from "@/canvas/geometry";
 import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
@@ -31,7 +33,8 @@ import { DeleteConceptDialog } from "./delete-concept-dialog";
 import { ImportWizard } from "./import/import-wizard";
 import type { ImportData } from "./import/wizard-model";
 import { NewSourceTableDialog } from "./new-source-table-dialog";
-import { usePanels } from "./panels-context";
+import { useImported } from "./import/use-imported";
+import { usePanels, type LeftTab } from "./panels-context";
 import { useSidePanels } from "../_components/side-panels";
 import { CoverageBar, coverageTitle, KindIcon, ReqDot } from "./requirement-ui";
 import { requirementNameFocus } from "./requirements-section";
@@ -55,7 +58,7 @@ const SHUT_KEY = "infomapper:tree-shut";
 const CANVAS_ONLY_KEY = "infomapper:tree-canvas-only";
 const PROJECT_ONLY_KEY = "infomapper:tree-project-only";
 
-type Tab = "model" | "sources" | "requirements";
+type Tab = LeftTab;
 const TAB_NAMES: Record<Tab, string> = { model: "Model", sources: "Sources", requirements: "Requirements" };
 
 export interface LeftPanelProps {
@@ -74,11 +77,11 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const { run } = useAction();
-  const { setNameFocus, setLastConcept } = usePanels();
+  const { setNameFocus, setLastConcept, leftTab: tab, setLeftTab: setTab } = usePanels();
+  const imported = useImported();
   // slice 5a (Q4): creating something whose name is typed in the details panel, and a requirement's click, open it
   // when hidden; an entity's or a table's click selects or places its card and, on a narrow screen, closes this panel
   const { openDetails, closeLeftOverlay } = useSidePanels();
-  const [tab, setTab] = useState<Tab>("model");
   const [q, setQ] = useState("");
   const [canvasOnly, setCanvasOnly] = useState(false);
   const [projectOnly, setProjectOnly] = useState(false);
@@ -328,17 +331,27 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     return [<div key="import">{importButton}</div>, ...systems.map(({ system: s, total, schemas }) => {
       const key = systemGroup(s.id);
       return (
-        <div key={s.id} data-testid="tree-system">
-          <GroupHead
-            open={isOpen(shut, key, q)}
-            count={total}
-            dot={<i className="size-2 flex-none rounded-[2px] bg-im-physical" />}
-            onClick={() => fold(key)}
-            sticky
-            testId="tree-system-head"
-          >
-            {s.name}
-          </GroupHead>
+        <div key={s.id} data-testid="tree-system" data-system-id={s.id}>
+          <div className="group/head sticky top-0 z-[2] flex items-center bg-im-panel">
+            <GroupHead open={isOpen(shut, key, q)} count={total} dot={<i className="size-2 flex-none rounded-[2px] bg-im-physical" />} onClick={() => fold(key)} testId="tree-system-head">
+              {s.name}
+            </GroupHead>
+            {/* the system's panel: counts, re-import and its imports (slice 7a, items 33, 38) */}
+            <button
+              type="button"
+              className={addClass}
+              title={`Open ${s.name}: imports`}
+              aria-label={`Open ${s.name}`}
+              data-testid="button-open-system"
+              onClick={() => {
+                closeLeftOverlay();
+                openDetails();
+                ui.select({ t: "element", kind: "source_system", id: s.id });
+              }}
+            >
+              <DotsIcon />
+            </button>
+          </div>
           {isOpen(shut, key, q) &&
             schemas.map(({ name, items }) => {
               const sub = schemaGroup(s.id, name);
@@ -362,7 +375,8 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                         kind="src"
                         name={t.name}
                         hint={hint}
-                        meta={`${t.fields.length} cols`}
+                        meta={t.meta}
+                        missing={t.missing ? "table" : t.columnsMissing ? "columns" : null}
                         presence={t.presence}
                         dragData={{ target: { sourceTableId: t.id }, rows: t.fields.length }}
                         onClick={() => open({ sourceTableId: t.id }, t.cardId, t.fields.length)}
@@ -533,7 +547,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
         </div>
       )}
       {addingTable && <NewSourceTableDialog workspaceId={workspaceId} systems={tree.systems.map((s) => s.name)} onClose={() => setAddingTable(false)} />}
-      {importing && importData && <ImportWizard workspaceId={workspaceId} data={importData} onClose={() => setImporting(false)} />}
+      {importing && importData && <ImportWizard workspaceId={workspaceId} data={importData} onClose={() => setImporting(false)} onImported={imported} />}
       {deleting && (
         <DeleteConceptDialog
           workspaceId={workspaceId}
@@ -605,11 +619,15 @@ const PRESENCE_TITLE: Record<Presence, string> = {
   none: "Click or drag to add to the canvas",
 };
 
+/** The tooltip's first sentence for a table missing from source, or with columns missing (slice 7a, item 33). */
+const MISSING_TITLE = { table: "Missing from source. ", columns: "Some columns are missing from source. " } as const;
+
 function TreeItem({
   kind,
   name,
   hint,
   meta,
+  missing = null,
   presence,
   dragData,
   onClick,
@@ -618,6 +636,7 @@ function TreeItem({
   name: string;
   hint: string | null;
   meta: string;
+  missing?: keyof typeof MISSING_TITLE | null;
   presence: Presence;
   dragData: { target: CardTarget; rows: number };
   onClick: () => void;
@@ -640,14 +659,18 @@ function TreeItem({
       draggable
       onDragStart={onDragStart}
       onClick={onClick}
-      title={PRESENCE_TITLE[presence]}
+      title={`${missing ? MISSING_TITLE[missing] : ""}${PRESENCE_TITLE[presence]}`}
       data-testid="tree-item"
       data-presence={presence}
+      data-missing={missing ?? undefined}
       className="flex w-full cursor-grab items-center gap-2 rounded-md py-[5px] pl-3.5 pr-2 text-left hover:bg-im-hover"
     >
       <span className={`size-[7px] flex-none rounded-full ${dot}`} />
       <span className="min-w-0 flex-1">
-        <span className={`block truncate ${kind === "src" ? "font-mono text-xs" : ""}`}>{name}</span>
+        <span className={`block truncate ${kind === "src" ? "font-mono text-xs" : ""}`}>
+          <span className={missing === "table" ? "line-through decoration-im-warn" : undefined}>{name}</span>
+          {missing && <span className="ml-1.5 inline-block size-1.5 rounded-full bg-im-warn align-middle" aria-label="missing from source" data-testid="dot-missing" />}
+        </span>
         {hint && <span className="block truncate text-[11px] text-im-ink-3">{hint}</span>}
       </span>
       <span className="flex-none text-[11px] text-im-ink-3">{meta}</span>

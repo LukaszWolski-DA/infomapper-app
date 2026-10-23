@@ -35,8 +35,13 @@ export interface TreeConcept {
 export interface TreeTable {
   id: Uuid;
   name: string;
-  /** Column names, for the search and the `n cols` count. */
+  /** Column names, for the search and the card's rows. */
   fields: string[];
+  /** The right side (slice 7a, item 33): “{format} file”, “view” or “{n} cols”. */
+  meta: string;
+  /** Missing from source (slice 7a): the table, or some of its columns. */
+  missing: boolean;
+  columnsMissing: boolean;
   presence: Presence;
   inProject: boolean;
   cardId: Uuid | null;
@@ -111,8 +116,12 @@ export function buildTree(
   const presence = (id: Uuid): Presence => (here.has(id) ? "here" : elsewhere.has(id) ? "elsewhere" : "none");
 
   const fieldsOf = new Map<Uuid, string[]>();
+  const columnsMissing = new Set<Uuid>();
   for (const a of model.attributes) fieldsOf.set(a.entity_id, [...(fieldsOf.get(a.entity_id) ?? []), a.name]);
-  for (const c of model.sourceColumns) fieldsOf.set(c.source_table_id, [...(fieldsOf.get(c.source_table_id) ?? []), c.name]);
+  for (const c of model.sourceColumns) {
+    fieldsOf.set(c.source_table_id, [...(fieldsOf.get(c.source_table_id) ?? []), c.name]);
+    if (c.missing_since) columnsMissing.add(c.source_table_id);
+  }
 
   const concepts = model.concepts.map<TreeConcept>((c) => ({
     id: c.id,
@@ -138,9 +147,21 @@ export function buildTree(
     for (const t of model.sourceTables) {
       if (t.source_system_id !== s.id) continue;
       const key = `${t.database_name}.${t.schema_name}`;
+      const fields = fieldsOf.get(t.id) ?? [];
+      const meta = t.object_type === "file" ? `${t.file_format ? `${t.file_format} ` : ""}file` : t.object_type === "view" ? "view" : `${fields.length} cols`;
       schemas.set(key, [
         ...(schemas.get(key) ?? []),
-        { id: t.id, name: t.name, fields: fieldsOf.get(t.id) ?? [], presence: presence(t.id), inProject: inProject.has(t.id), cardId: here.get(t.id) ?? null },
+        {
+          id: t.id,
+          name: t.name,
+          fields,
+          meta,
+          missing: !!t.missing_since,
+          columnsMissing: columnsMissing.has(t.id),
+          presence: presence(t.id),
+          inProject: inProject.has(t.id),
+          cardId: here.get(t.id) ?? null,
+        },
       ]);
     }
     return { id: s.id, name: s.name, schemas: [...schemas].map(([name, tables]) => ({ name, tables })) };
