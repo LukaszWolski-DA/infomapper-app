@@ -1,6 +1,6 @@
 "use client";
 
-// “New source table” (slice 1a, a simple manual entry until import, A-04): system, database, schema, name, and the
+// “New source table” (slice 1a; beside “Import sources…” since slice 7a): system, database, schema, name, and the
 // columns typed as lines like `cust_id int` or `email varchar(255)`. An existing system is reused by name. The new
 // table is placed on this canvas.
 
@@ -40,7 +40,7 @@ export function NewSourceTableDialog({ workspaceId, systems, onClose }: { worksp
       <DialogContent className="gap-0 border-im-line bg-im-surface text-[13px] text-im-ink" data-testid="dialog-new-source-table">
         <DialogTitle className="text-base font-semibold">New source table</DialogTitle>
         <DialogDescription className="mt-1 text-[12.5px] text-im-ink-2">
-          Describe a table by hand. Import from a database comes later.
+          Describe a table by hand, or import a whole system with “Import sources…”.
         </DialogDescription>
         <form onSubmit={(e) => void submit(e)} className="mt-3 grid gap-2.5">
           {field("System", "systemName", { list: "known-systems", placeholder: "e.g. CRM" })}

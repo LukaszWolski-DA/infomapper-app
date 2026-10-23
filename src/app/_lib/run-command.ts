@@ -20,7 +20,8 @@ import { getSessionUser } from "./session";
 /** What a server action returns to the browser: the value, or the domain's message to show in a toast. */
 export type ActionResult<T = undefined> =
   | { ok: true; value: T; live?: LiveOutcome }
-  | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected"; message: string };
+  /** `fields`: the domain's field messages, when it gave some (slice 7a: P8's refusal says `review: "stale"`). */
+  | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected"; message: string; fields?: Record<string, string> };
 
 /**
  * Runs one write (AD-23): the signed-in user, a fresh context, the domain command, then the live canvas rules (slice
@@ -39,7 +40,7 @@ export async function runCommand<T>(
   const once = async (): Promise<ActionResult<T>> => {
     const ctx: CommandContext = { actorId: user.id, now: new Date().toISOString(), newId: () => uuidv7() };
     const result = await build(ctx, store, user);
-    if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message };
+    if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message, ...(result.error.fields ? { fields: result.error.fields } : {}) };
     const workspaceId = result.writeSet.events[0]?.workspace_id;
     const contextLabelId = workspaceId ? parseContextCookie((await cookies()).get(contextCookieName(user.id, workspaceId))?.value)?.labelId : null;
     const completed = await withLiveCanvases(ctx, store, user, result.writeSet, { contextLabelId });

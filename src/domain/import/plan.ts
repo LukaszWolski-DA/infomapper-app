@@ -309,7 +309,9 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
     const taken = new Set<string>();
     for (const c of active) {
       const key = renameKeyOf(ft.key, c.name);
-      const wanted = choices.renames.has(key) ? choices.renames.get(key)! : (suggestion.get(c.id) ?? "");
+      // a choice of a new column the file no longer has does not apply (P8's refresh): the suggestion does
+      const chosen = choices.renames.get(key);
+      const wanted = chosen !== undefined && (chosen === "" || unmatched.some((f) => f.name === chosen)) ? chosen : (suggestion.get(c.id) ?? "");
       if (wanted && !taken.has(wanted) && unmatched.some((f) => f.name === wanted)) {
         pairOf.set(c.id, wanted);
         taken.add(wanted);

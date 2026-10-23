@@ -82,7 +82,7 @@ export default async function CanvasPage({
   // when the data is read: a page that arrives late must not put back an older state, nor hide a card, frame or note
   // created after it (slice 3a step 5, slice 3b step 1: `mergeFresh`)
   const readAt = new Date().toISOString();
-  const [model, allItems, canvases, workspace, history, projects, frameRows, labels, labelLinks, noteRows, users, requirements, requirementLinks] = await Promise.all([
+  const [model, allItems, canvases, workspace, history, projects, frameRows, labels, labelLinks, noteRows, users, requirements, requirementLinks, imports] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.canvases.list(ws),
@@ -96,6 +96,7 @@ export default async function CanvasPage({
     store.users.list(),
     store.requirements.list(ws),
     store.requirements.listLinks(ws),
+    store.model.listImports(ws),
   ]);
   // measurement-only switches (slice 2a diagnosis): only in the measurement-only production build (AD-31); slice 3a:
   // `nolabelmarks` draws no label mark (rows, headers, lines), `nonotes` no note
@@ -178,6 +179,13 @@ export default async function CanvasPage({
     const target = i.entity_id ?? i.source_table_id;
     if (target) (canvasesOf[target] ??= []).push(i.canvas_id);
   }
+  // the import wizard (slice 7a): the same objects the inspector gets, so the payload carries them once, and when each
+  // system was last imported (the list is newest first)
+  const lastImports: Record<string, string> = {};
+  for (const i of imports) lastImports[i.source_system_id] ??= i.created_at;
+  const importData = editable
+    ? { model, requirements, requirementLinks, canvasesOf, canvasNames: Object.fromEntries(canvases.map((c) => [c.id, c.name])), lastImports }
+    : undefined;
 
   return (
     <CanvasProvider userId={shell.user.id}>
@@ -199,7 +207,7 @@ export default async function CanvasPage({
               currentCanvasId: canvasId,
               renameOnOpen,
               tools: <CanvasTools editable={editable} canNote={canNote} />,
-              left: <LeftPanel workspaceId={ws} canvasId={canvasId} tree={tree} editable={editable} conceptFrames={conceptFrames} />,
+              left: <LeftPanel workspaceId={ws} canvasId={canvasId} tree={tree} editable={editable} conceptFrames={conceptFrames} importData={importData} />,
               right: (
                 <Inspector
                   workspaceId={ws}

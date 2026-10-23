@@ -28,6 +28,8 @@ import {
 } from "@/ui/components/dropdown-menu";
 import { useToast } from "@/ui/components/toast";
 import { DeleteConceptDialog } from "./delete-concept-dialog";
+import { ImportWizard } from "./import/import-wizard";
+import type { ImportData } from "./import/wizard-model";
 import { NewSourceTableDialog } from "./new-source-table-dialog";
 import { usePanels } from "./panels-context";
 import { useSidePanels } from "../_components/side-panels";
@@ -64,9 +66,11 @@ export interface LeftPanelProps {
   editable: boolean;
   /** How many concept frames each concept has on all canvases (slice 2b, the delete dialog). */
   conceptFrames?: Record<string, number>;
+  /** What the import wizard reads (slice 7a); without it there is no “Import sources…”. */
+  importData?: ImportData;
 }
 
-export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames = {} }: LeftPanelProps) {
+export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames = {}, importData }: LeftPanelProps) {
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const { run } = useAction();
@@ -83,6 +87,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   const [addingConcept, setAddingConcept] = useState(false);
   const [deleting, setDeleting] = useState<TreeConcept | null>(null);
   const [addingTable, setAddingTable] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   useEffect(() => {
     // Read once after mount: localStorage is not available on the server.
@@ -309,10 +314,18 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
       </button>
     </div>
   );
+  // “Import sources…” at the top of the Sources tab (slice 7a, item 20)
+  const importButton = editable && !searching && importData && (
+    <div className="px-2 pt-2.5">
+      <button type="button" className={smallButton} data-testid="button-import-sources" onClick={() => setImporting(true)}>
+        Import sources…
+      </button>
+    </div>
+  );
   const sourceTree = () => {
     const systems = filterSystems(tree.systems, filter);
-    if (!systems.length) return newTable || null;
-    return [...systems.map(({ system: s, total, schemas }) => {
+    if (!systems.length) return importButton || newTable ? [<div key="import">{importButton}</div>, <div key="new-table">{newTable}</div>] : null;
+    return [<div key="import">{importButton}</div>, ...systems.map(({ system: s, total, schemas }) => {
       const key = systemGroup(s.id);
       return (
         <div key={s.id} data-testid="tree-system">
@@ -520,6 +533,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
         </div>
       )}
       {addingTable && <NewSourceTableDialog workspaceId={workspaceId} systems={tree.systems.map((s) => s.name)} onClose={() => setAddingTable(false)} />}
+      {importing && importData && <ImportWizard workspaceId={workspaceId} data={importData} onClose={() => setImporting(false)} />}
       {deleting && (
         <DeleteConceptDialog
           workspaceId={workspaceId}

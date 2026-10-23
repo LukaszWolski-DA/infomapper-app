@@ -61,6 +61,7 @@ test("P8 (route): a review that no longer matches the system writes nothing and 
     ok: false,
     code: "conflict",
     message: "CRM changed since you opened this review. The review now shows the current state; check it and import again.",
+    fields: { review: "stale" },
   });
   expect(await createLocalDataStore(E2E_DB).model.listImports(RETAIL)).toEqual([]);
 });
