@@ -1,6 +1,6 @@
 # Slice 7a – Acceptance
 
-Status: **step 4 accepted (23 October 2026); the decision texts are under Łukasz's review, step 5 waits for them.** Branch
+Status: **step 5 done (23 October 2026); step 6 waits for Łukasz's go.** Branch
 `slice/07a-source-import`, from `main` at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as
 written; this file is its amendment (Łukasz, 22 October 2026).
 
@@ -943,3 +943,136 @@ about 0.11 and 0.16 ms per column here), within the 5 s bars.
   through a map; the same test takes well under a second. The figures above are unchanged (115, 399, 530 and 1,746 ms
   in a new run).
 - Unit tests: 830 domain tests pass; the route spec expects the new message.
+
+## Łukasz's answers on the decision texts (23 October 2026)
+
+Approved with two edits, in `docs/decisions.md` (`786bd61`): D-55's last sentence reads "The app has no sample files;
+for now one import takes up to 30,000 column rows (a limit of the local adapter, see known-limitations.md)." **The
+coverage sentence went into D-31** ("An approved mapping from a column missing from source covers no requirement"),
+which defines when a mapping covers a requirement; D-51 keeps the rest of its addition. **Relationships:** when no
+relationship matches by name, it is matched by from-table, to-table and column pairs, and a name-only difference is a
+change of name (`ddadf55`; unit test with a generated SQL Server name; `known-limitations.md` updated).
+
+## Step 5: the wizard (23 October 2026)
+
+### What changed
+
+- **"Import sources…"** at the top of the Sources tab (owners, admins, modelers; not archived) opens the wizard
+  (`src/app/_panels/import/`: `import-wizard.tsx`, `source-step.tsx`, `scope-step.tsx`, `review-step.tsx`,
+  `wizard-model.ts`, `catalog-queries.ts`). The page passes the model and requirement data as the same objects the
+  inspector gets (one copy in the payload), plus each system's last import.
+- **The dialog** (item 20): "Import sources into {target}", the three steps clickable when reachable, the footer note per
+  step, Back or Cancel, Next or "Import into {target}"; Esc and Cancel write nothing.
+- **Source** (items 14–19, 21): an existing system (sorted, "{n} tables · last import {date}" or "not imported yet",
+  "Find a system" above five) or a new one (a taken name, in any case, blocks Next with item 21's text); the four
+  channels, dbt disabled; the file drop zone; the catalog queries for SQL Server, PostgreSQL and Oracle with Copy and
+  how-to, Snowflake and Databricks "(later)" disabled, the result pasted ("Read it") or dropped; the DDL script pasted or
+  dropped, with Database and "Schema for unqualified names", what was read and skipped, the database and schema used,
+  "The translated standard" with Copy; what was read or the reader's error with "Choose another"; the standard's
+  description and `template.csv` with Copy. **No sample links** (P10).
+- **The catalog queries** come from the prototype's own text (a script), with fractional seconds added (step 3,
+  question 1): SQL Server's `precision` is `c.scale` for `datetime2`, `datetimeoffset` and `time`; PostgreSQL's is
+  `atttypmod` for `timestamp`, `timestamptz`, `time` and `timetz`.
+- **Scope** (items 22–23): tables by database and schema, groups half-checked when partly selected, column counts,
+  "{n} new" / "all new to {system}"; tables with case conflicts disabled with their reason; "What is missing from the
+  source?"; the missing-tables callout ("Not in the file: … with their mappings kept") or "Every table {system} has in
+  the selected schemas is in the file."; the mass warning with its button.
+- **Review** (items 24–27): the six filters with counts; the P8 callout; the P6 callout ("{n} approved mapping(s) go(es)
+  back to review after this import" with each reason); "The file matches what {system} has…"; a card per table (tag,
+  `schema.table`, "{format} file", a new table's comment, "{n} columns" or "rows a → b"); rows with tag, name ("old →
+  new" for a rename), what (type, PK/FK, not null, Business key / PII for a new column; "{field}: before → after"; "Back
+  in the source after being missing since {date}"; "Was {type}"; "position a → b"; "The file says …; your
+  classifications are kept.") and the impact ("Feeds {Entity.attribute} ({status})" with "; the mapping stays, on a
+  column that is gone", "; the mapping stays", "; goes back to review: …", "; type conflict: …", "; fits again, the mapping
+  can be approved", "; its rule now reads …", the requirement keys as tags, "On {canvases}"; "Not mapped"); the rename
+  choice ("What happened to {name}?", the suggestion marked and pre-selected, a paired column not offered twice);
+  "Show {n} unchanged columns" with positions; "Relationships between source tables" (a renamed key "old → new"); the
+  warnings (reading, DDL, classifications not read, types kept as written, tables left out, keys skipped).
+- **Import** (item 28): the upload route; the toast "Imported into {system}: {summary}" with Undo; the page's data
+  refreshed. **P8:** the route's refusal carries `fields.review`; the wizard stays on the review, shows P8's text,
+  refreshes the page's data and rebuilds the plan; the scope, the compare choice and the rename choices that still apply
+  are kept (a choice of a column the file no longer offers falls back to the suggestion, in the plan itself, so the
+  server and the browser agree).
+- **Texts** (step 1, answer 14): "New source table": "Describe a table by hand, or import a whole system with “Import
+  sources…”."; the empty workspace: "This workspace is empty. Next steps: import sources, create concepts and entities,
+  then set up projects and canvases."
+- **`runCommand`** passes the domain's field messages through (`ActionResult.fields`).
+
+### Decisions I took (please check)
+
+1. **A long review renders in parts:** 100 table cards, 50 rows per card and 200 relationships at first, each with a
+   "Show the next …" / "Show … more columns" button (F18). Measured below.
+2. **The prototype's "Shown later as a grey line between the table cards on a canvas"** for a new relationship is left
+   out: it promises a later feature (as "iteration 2" was, F24). A missing one reads "No longer declared in the source".
+3. **After an import the Sources tab stays; the system is not selected yet.** Selecting a system and its panel are
+   step 6 (items 38–39); the wizard already takes a pre-selected system for "Re-import {system}…".
+4. **P8's refusal shows in the review only**, not also as a toast; a toast shows any other refusal.
+5. **"Choose another"** in the DDL channel clears the script and its name and keeps the Database and schema fields (the
+   prototype kept the name: a pasted script was then called by the earlier file's name; found by S7A-03).
+6. **An attribute's requirement keys** in the impact: requirements linked to the attribute or to a mapping that fills
+   it (as its panel's Requirements section lists them).
+7. **Status words** in the impact: "draft", "in review", "approved".
+8. **Footer on step 1 without a file:** "Choose a file, or paste a query result." (the prototype's "a sample" removed,
+   P10).
+
+### Tests
+
+- `e2e/slice-07a/`: S7A-01 (2 tests: file channel, errors, warnings, a type kept; the standard and `template.csv`
+  with Copy), S7A-02 (query channel, the three queries with fractional seconds, Copy, how-to, a pasted SSMS result, a
+  dropped CSV, later ones disabled), S7A-03 (DDL channel), S7A-04 (2: a new system end to end; a taken name), S7A-05
+  (2: every status and the filter counts over two imports; P2 and a comment overwrite), S7A-06 (2: an unselected table;
+  "Only columns…" and the mass warning), S7A-07 (2: the suggested rename and "renamed to"; "removed"), S7A-08 (P6 before
+  and after, approving again clears the reason), S7A-09 (2: nothing before Import, Esc, Cancel, Undo; P8's refresh),
+  S7A-12 (3: reviewer, reader, archived), S7A-13 (no samples), S7A-17 (DDL then the catalog query), and step 4's
+  `S7A-04-route.spec.ts`. **All 23 passed** on their first run after two fixes in the specs (a hidden radio is clicked
+  by its label; Playwright's `toBeDisabled` does not see a disabled `<option>`) and one in the app (above, decision 5).
+- Unit tests: 87 files, 1,169 tests pass. Lint and typecheck pass.
+- **Seen in the browser** (development server on a fresh copy of the demo data): the dialog, the CRM file's review
+  (the P6 callout, a suggested rename, requirement keys and canvases in the impacts), the import and its toast, Undo
+  ("Undone: Import crm_snapshot_2026-10-20.csv"), the tree before and after.
+
+### The review's filters (S7A-14's review part, measurement build)
+
+`e2e/slice-07a/S7A-14-review.spec.ts` (`MEASURE=1 MEASURE_BUILD=production`): in the page, from the filter's click to
+the second animation frame after it, median of 5 (not slice 4b-1's traced method):
+
+| File | new | all | changed | missing | relationships |
+| --- | --- | --- | --- | --- | --- |
+| A first import of 20,000 columns (2,000 new tables) | 30 ms | 101 ms | 20 ms | 9 ms | 34 ms |
+| Its re-import, 5 % changed, renamed or missing | 16 ms | 144 ms | 49 ms | 51 ms | 13 ms |
+
+All within the 200 ms bar.
+
+### The full e2e run
+
+23 October 2026, 08:06–08:59, `npm run e2e` from scratch, no dev server running: **265 passed, 1 failed, 53.1 min**
+(19 more tests than step 4's run: slice 7a's specs).
+
+- **The failure: S0-10** (stopping and restarting the dev server) hit its 15-minute timeout. Its first server answered
+  404 for the canvas page it had just created (`.data/e2e-runs/S0-10-server-0.log`), so the test never reached the
+  restart. **Run three times on its own: 3 passed** (43.8, 47.1 and 50.0 s). A flake: the known case in
+  `known-limitations.md`, "e2e dev servers run without Turbopack's file-system cache", which names S0-10. Nothing in
+  slice 7a touches it.
+- “The destination stream closed early”: 48 times, between tests (the known message); the import specs end right after
+  a page refresh, which adds a few.
+
+### Open for step 6
+
+- **`datetime2` in the demo.** The SQL Server query now gives `datetime2` its precision (7 by default), while the demo
+  CRM's `created_ts` and `updated_ts` are `datetime2` without one (as typed in the seed), and so is S7A-16's
+  `crm_sqlserver_catalog.tsv`. A real catalog result would show "type: datetime2 → datetime2(7)" for them once: true
+  against what is stored, but surprising in the demo. Proposal for step 6: the demo seed's `datetime2` columns become
+  `datetime2(7)` and S7A-16's file gives precision 7, as the query does now.
+
+### How to check in the browser
+
+1. `npm run dev`, sign in as Łukasz, open "Customer & orders", the Sources tab, "Import sources…".
+2. CRM is pre-selected. Drop `src/domain/import/samples/crm_snapshot_2026-10-20.csv` (or choose it): "4 tables, 24
+   columns, 4 warnings". Next: the scope by schema (`crmprod.dbo`, `crmprod.stage`). Next: the review.
+3. In the review: the callout for Customer.customer_number going back to review; `dob → date_of_birth` suggested;
+   change "What happened to created_ts?" to `created_on` and see "its rule now reads CAST(created_on AS date)"; the
+   filters; the warnings at the end.
+4. "Import into CRM": the toast with Undo; the tree shows `customer_consents` and `crmprod.stage`. Click Undo: the tree
+   is as before.
+5. Also: "A query on the database" (switch the Database, Copy), "DDL scripts" (drop `samples/billing.sql`, open "The
+   translated standard"), "A new system" with the name "crm" (Next stays off), Esc.
