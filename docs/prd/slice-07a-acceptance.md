@@ -1,6 +1,6 @@
 # Slice 7a – Acceptance
 
-Status: **step 5 done (23 October 2026); step 6 waits for Łukasz's go.** Branch
+Status: **step 6 done (23 October 2026); step 7 waits for Łukasz's go.** Branch
 `slice/07a-source-import`, from `main` at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as
 written; this file is its amendment (Łukasz, 22 October 2026).
 
@@ -1154,3 +1154,144 @@ Written on 23 October 2026 for the session that continues with step 6.
   system link, "Missing from source since", columns with missing last, relationships via `ix.relationshipsOf`;
   `SourceColumnPanel`: "Missing from source since", the comment stays editable per answer 8);
   `src/app/_panels/mapping-panel.tsx` (`review_reason` under the status control, near `seg-mapping-status`).
+
+## Łukasz's answers to step 5 (23 October 2026)
+
+Step 5 accepted, on one condition: the paged review's filter counts and the P6 callout count the whole plan, not only
+what is rendered, and a test covers it (done in step 6: `S7A-14-counts.spec.ts`). **`datetime2` (open point):** the
+type reader treats a type without a parameter as the type with its default precision where the type's name tells the
+vendor unambiguously: `datetime2` and `datetimeoffset` 7 (SQL Server only), `timestamp` 6 (PostgreSQL and Oracle
+agree); where the default differs between vendors (`time`: 7 in SQL Server, 6 in PostgreSQL) the difference stays and
+shows as a change. Unit tests for each case; the seed and the S7A-16 file may change to `datetime2(7)`.
+
+## Step 6: statuses and panels (23 October 2026)
+
+### What changed
+
+- **The condition on step 5:** `e2e/slice-07a/S7A-14-counts.spec.ts` imports a synthetic system of 160 tables through
+  the route, gives two tables past the first 100 cards approved mappings on their business key, and re-imports with a
+  change in every table: 100 cards rendered, "Show the next 60 tables of 160", "all changes" and "changed" 162, and the
+  callout "2 approved mappings go back to review after this import" with both reasons, while neither table's card is
+  rendered. It runs in the normal e2e run.
+- **Default precision** (`DEFAULT_PRECISION`, `withDefaultPrecision`, `src/domain/model/column-type.ts`): `datetime2`
+  and `datetimeoffset` read as 7; `timestamp`, `timestamptz`, `timestamp with/without time zone` and Oracle's
+  `timestamp with local time zone` as 6; `time` keeps no default (`time` and `time(7)` differ). The comparison
+  (`columnTypeKey`) applies the same default, so a column stored without its precision before this step and
+  `datetime2(7)` from a file are one type. The standard's `precision` column replaces the default (`readStandard` reads
+  its own parameter columns whenever the type has none written). Unit tests in `column-type.test.ts`,
+  `standard.test.ts`, `ddl.test.ts`.
+- **Seed (answer 10):** Customer.email `string(120)`, first_name and last_name `string(50)`, segment_code
+  `string(3)`; the declared relationships `FK_order_line_order_header` and `FK_customer_addresses_customers`;
+  `created_ts` and `updated_ts` `datetime2(7)`, `web_users.registered_at` `timestamp(6)`. The SQL Server and PostgreSQL
+  catalog samples give the precision their queries return (7 and 6). No import is recorded: every system is "not
+  imported yet" (item 41). Unit test in `model-store.test.ts`.
+- **After an import (item 28):** `useImported` (`src/app/_panels/import/use-imported.ts`): the Sources tab, the
+  system selected, `openDetails()`. The left panel's tab now lives in `PanelsProvider` (`leftTab`), so "Re-import" on
+  the system panel can show the Sources tab too.
+- **The Sources tab (item 33):** a table missing from source struck through in the warning colour with a dot, tooltip
+  "Missing from source. …"; a table with missing columns gets the dot, "Some columns are missing from source. …"; the
+  right side reads "{format} file", "view" or "{n} cols"; each system has an open button ("Open {system}: imports",
+  shown on hover like the concepts' buttons).
+- **The canvas (item 34, AD-24, F29):** a missing column's row gets the class `gone` and the title "Missing from
+  source"; a mapping's segment from a missing column gets `s gone` (dotted, `stroke-opacity` .5); the ƒ node's line only
+  when every input is missing. Classes on existing elements only; bundles and blocks unchanged.
+- **Table panel (item 35):** "Source table / Source view / Source file ({format}) of {system}" with the system as a
+  link; `database.schema`; "{n} rows · From the source: {comment}"; "Missing from source since {date}"; columns with the
+  missing ones last, struck through, "missing" on the right; "Relationships between source tables" in both directions
+  ("cust_id → dbo.customers", "dbo.customer_addresses.cust_id → here", the name, "· missing"), a click goes to the other
+  table; "None known. They come from foreign keys in an import."
+- **Column panel (item 36):** "Missing from source since {date}". The comment stays the editable field (answer 8).
+- **Mapping panel (item 37):** under the status of a mapping in review with a reason: "An import sent it back to review:
+  {reason}."
+- **System panel (item 38,** `src/app/_panels/system-panel.tsx`): "Source system", the name, "{n} tables, {m} columns,
+  {k} mapped" and ", {x} missing from source" when there are any; "Re-import {system}…" for editors; "Imports": date
+  and time, source label, who, summary, newest first, or "No imports yet." The page passes every import
+  (`systemImports`, built on the server) and the wizard's data to the inspector.
+- **The system as a place (item 39):** `{ t: "element", kind: "source_system", id }`; `showPlace` never centres it and
+  reports it gone ("That source system no longer exists.", `GONE.source_system`) when the system is not in the model,
+  e.g. after its import was undone.
+
+### Decisions I took (please check)
+
+1. **Fractional seconds may be 0.** `datetime2(0)` and a `precision` column of 0 were refused as "zero" (a type kept as
+   written, with a warning); with the default in place a precision column of 0 would have read as 7. Now 0 is allowed
+   for date and time types only; lengths and number precisions still refuse 0.
+2. **The time-zone forms of `timestamp` get 6 as well** (`timestamptz`, `with time zone`, Oracle's `with local time
+   zone`): PostgreSQL and Oracle agree on them as on `timestamp`.
+3. **No opacity on rows and lines** (AD-24: no opacity on repeated elements): a missing row is muted by colour (ink-3)
+   with its name struck through in the warning colour; a line segment by `stroke-opacity`, as the dimmed lines are.
+   The PRD and the prototype say "reduced opacity".
+4. **Texts:** the mapping's "An import sent it back to review: {reason}."; dates as in the review
+   ("Missing from source since 2026-10-23"); imports as "23 Oct 2026, 09:44" (the server's local time).
+5. **The system panel shows the missing count only when there is one**, as the prototype does.
+6. **The table panel's path is now `database.schema`**; the system moved into the kind line (as the prototype). No spec
+   read the old path.
+7. **The DoD's CRM re-import now sends two approved mappings back to review:** `email_addr` widens to `varchar(255)`
+   and Customer.email is `string(120)` since answer 10, a type conflict on a direct mapping (P6). S7A-08 checks both.
+
+### Question
+
+1. **SQL Server's `timestamp` is not a date** (it is `rowversion`, binary(8)). The reader does not know the vendor, so
+   a SQL Server catalog result with a `timestamp` column now reads it as `timestamp(6)`. It compares the same on every
+   re-import (no false change) and its type check is the same as before; only the shown text gains "(6)". Leave it, or
+   should `timestamp` without a parameter stay without a default?
+
+### Tests
+
+- New: `S7A-10.spec.ts` (2: the tree, canvas, table and column marks and their going away; the mapping's reason),
+  `S7A-11.spec.ts` (3: the panel from the tree and from a table panel; Re-import, the Sources tab and the imports newest
+  first; Back and Forward, and the toast of a system whose import was undone), `S7A-14-counts.spec.ts`.
+- **Earlier specs changed** (all by the seed of answer 10 or the default precision): `S1A-09` (Customer.email at 100
+  adds one type problem, not two; the transform brings the count back to where it started), `S1A-13` (`issued_at
+  datetime2(7)`), `S2C-06` (the bundle of 8 holds `web_users.email`'s type problem: `warn`), `S7A-04` and
+  `S7A-04-route` (HR's relationships among the seeded ones), `S7A-05` ("1 new relationship": the seeded one comes back),
+  `S7A-08` (two send-backs). `e2e/slice-06b/helpers.ts`'s `selected` reads a system panel as `system:<name>`.
+- S2C-07 (the bundle panel counts the same type problem), found by the full run.
+- Specs of what the step touched, before the full run: slice 7a, slice 6b, and S1A-01, -09, -13, S1B-11, S2A-02, -06,
+  -08, S2B-07, -09, -11, S2C-04, -05, -06, S3A-02, -06, S4B1-04, -06, S4B2-03, -06, S4P-12, S6A-05, -07: 63 passed and 7
+  failed on the first run, the 7 above; after the changes all 13 tests of those files pass.
+- Lint and typecheck pass. `npm test`: 87 files, 1,174 tests pass.
+
+### The element-count guard (S7A-14)
+
+`S3B-15-elements.spec.ts` on "Performance test", measurement build, first on `slice-06b` (a worktree at the tag,
+`../infomapper-base-06b`), then on this branch with `ELEMENTS_BASELINE=.data/measure/s7a14-baseline/slice-06b.json`:
+
+| View | `slice-06b` page / viewport | this branch page / viewport |
+| --- | --- | --- |
+| 100 %, frames expanded | 20,785 / 19,305 | 20,826 / 19,305 |
+| 30 %, frames expanded | 5,988 / 4,508 | 6,029 / 4,508 |
+| 100 %, frames collapsed | 6,297 / 4,907 | 6,338 / 4,907 |
+| 30 %, frames collapsed | 2,855 / 1,465 | 2,896 / 1,465 |
+
+Every viewport count is equal. The whole page has 41 elements more in every view, outside the viewport; I have not
+traced which (the left panel and the page's data are the candidates).
+
+### The full e2e run
+
+23 October 2026, 10:28–11:12, `npm run e2e` from scratch: **271 passed, 1 failed, 44.3 min** (26 tests more than
+step 4's run, 6 more than step 5's).
+
+- **The failure: S2C-07**, the bundle panel's status counts: "9 approved, 2 in review, 2 draft, 1 with a type problem."
+  where the spec expected no type problem. Not a flake: the bundle holds `web_users.email` → Customer.email, a type
+  problem since the seed of answer 10; my search for specs affected by the seed missed this text. The spec now expects
+  it and passes (3 tests, run on its own after the fix).
+- **Not quite from scratch:** a development server on port 3000 (PID 26124, started 09:35, before this session) was
+  running during the run. It was not mine, so I left it; the run uses its own server on 3200 and its own build folder.
+- "The destination stream closed early": 45 times, between tests (the known message).
+
+### How to check in the browser
+
+1. `npm run reset-dev-data`, `npm run dev`, sign in as Łukasz, open "Customer & orders", the Sources tab.
+2. Hover CRM's header and click "⋯": the system panel ("2 tables, 15 columns, 7 mapped", "No imports yet.",
+   "Re-import CRM…").
+3. "Re-import CRM…", drop a copy of `src/domain/import/samples/crm_sqlserver_catalog.tsv` with the `email_addr` line
+   removed, Next, Next, "Import into CRM": the Sources tab, CRM's panel with the import and ", 1 missing from source";
+   on the canvas `email_addr` struck through and its line to Customer.email dotted; `customers` in the tree with the
+   dot and its tooltip.
+4. Click the `customers` card: the kind line, "182,340 rows", `email_addr` last with "missing", the relationship from
+   `customer_addresses`. Click `email_addr`: "Missing from source since …".
+5. Re-import with the full file: the marks are gone. Back and Forward walk through the system's panel.
+6. "Import sources…" with `crm_snapshot_2026-10-20.csv`: after the import, click `cust_no`, then
+   Customer.customer_number under "Feeds": "An import sent it back to review: business key column changed type,
+   varchar(20) → varchar(25)."
