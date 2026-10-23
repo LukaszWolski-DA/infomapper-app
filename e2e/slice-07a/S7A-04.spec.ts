@@ -15,7 +15,8 @@ test("S7A-04: HR into a new system “HR”: every table and column new; system,
   const hr = (await systemNamed("HR"))!;
   const model = await loadModel();
   expect(model.sourceTables.filter((t) => t.source_system_id === hr.id).map((t) => t.name).sort()).toEqual(["departments", "employees"]);
-  expect(model.sourceRelationships.map((r) => r.name).sort()).toEqual(["FK_employees_departments", "FK_employees_manager"]);
+  const hrTables = new Set(model.sourceTables.filter((t) => t.source_system_id === hr.id).map((t) => t.id)); // the seed has CRM's and ERP's too
+  expect(model.sourceRelationships.filter((r) => hrTables.has(r.source_table_id)).map((r) => r.name).sort()).toEqual(["FK_employees_departments", "FK_employees_manager"]);
   const [imp] = await imports(hr.id);
   expect(imp).toMatchObject({ channel: "file", source_label: "hr_snapshot_2026-10-20.csv", tables_new: 2, columns_new: 10, relationships_new: 2 });
   const events = await store().changeEvents.list(RETAIL);

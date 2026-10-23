@@ -48,7 +48,7 @@ test("S7A-05: re-importing CRM: new, changed, unchanged, missing and back, the t
   await expect(page.getByTestId("review-relationship")).toHaveCount(2);
   await expect(page.getByTestId("review-relationship").first()).toContainText("dbo.customer_addresses.cust_id→dbo.customers.cust_id");
 
-  await importNow(page, "Imported into CRM: 2 new tables, 11 new columns, 8 changed columns, 1 renamed column, 1 missing from source, 2 new relationships");
+  await importNow(page, "Imported into CRM: 2 new tables, 11 new columns, 8 changed columns, 1 renamed column, 1 missing from source, 1 new relationship"); // the other one is back (seeded, slice 7a step 6)
   expect((await column("customer_addresses", "city")).missing_since).toBeNull();
   expect((await column("customers", "segment")).missing_since).not.toBeNull(); // still missing
 });

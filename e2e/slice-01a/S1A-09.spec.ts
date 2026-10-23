@@ -14,12 +14,13 @@ test("S1A-09: type check: a varchar(255) column into a string(100) attribute is 
   const problems = page.getByTestId("status-type-problems").locator("b");
   const before = Number(await problems.textContent());
 
-  // email becomes string(100): web_users.email varchar(255) no longer fits (customers.email_addr varchar(120) neither)
+  // email becomes string(100): customers.email_addr varchar(120) no longer fits either; web_users.email varchar(255)
+  // has not fitted since slice 7a gave email its length 120 (step 1, answer 10), so one problem more, not two
   await card(page, "Customer").locator(`[data-row="${email.id}"]`).click();
   await page.getByTestId("input-type-length").fill("100");
   await page.getByTestId("input-type-length").press("Enter");
   await expect(card(page, "Customer").locator(`[data-row="${email.id}"]`)).toContainText("String(100)");
-  await expect(problems).toHaveText(String(before + 2));
+  await expect(problems).toHaveText(String(before + 1));
 
   await page.getByTestId("list-attribute-mappings").getByRole("button").filter({ hasText: "web_users.email" }).click();
   const panel = page.getByTestId("panel-mapping");
@@ -33,7 +34,7 @@ test("S1A-09: type check: a varchar(255) column into a string(100) attribute is 
   await rule.fill("LEFT(email, 100)");
   await rule.blur();
   await expect(panel.getByTestId("note-type-check")).toHaveText("The transformation rule handles the conversion.");
-  await expect(problems).toHaveText(String(before + 1));
+  await expect(problems).toHaveText(String(before));
   await expect(page.locator(`[data-mapping="${mapping.id}"]`)).not.toHaveClass(/\bwarn\b/);
   expect((await loadModel()).mappings.find((m) => m.id === mapping.id)).toMatchObject({ kind: "transform", rule_expression: "LEFT(email, 100)" });
 });

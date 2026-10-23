@@ -36,7 +36,8 @@ test("S7A-04 (route): HR into a new system through the upload route: one change 
   const model = await loadModel();
   const hr = model.sourceSystems.find((s) => s.name === "HR")!;
   expect(model.sourceTables.filter((t) => t.source_system_id === hr.id).map((t) => t.name).sort()).toEqual(["departments", "employees"]);
-  expect(model.sourceRelationships.map((r) => r.name).sort()).toEqual(["FK_employees_departments", "FK_employees_manager"]);
+  const hrTables = new Set(model.sourceTables.filter((t) => t.source_system_id === hr.id).map((t) => t.id)); // the seed has CRM's and ERP's too
+  expect(model.sourceRelationships.filter((r) => hrTables.has(r.source_table_id)).map((r) => r.name).sort()).toEqual(["FK_employees_departments", "FK_employees_manager"]);
   const imports = await createLocalDataStore(E2E_DB).model.listImports(RETAIL, hr.id);
   expect(imports).toHaveLength(1);
   expect(imports[0]).toMatchObject({ channel: "file", source_label: "hr_snapshot_2026-10-20.csv", tables_new: 2, columns_new: 10, relationships_new: 2 });
