@@ -97,16 +97,24 @@ const ATTRIBUTES: Record<string, [name: string, type: LogicalType, flags?: Flags
   ],
 };
 
+/** String lengths of attributes, as in the prototype's seed (slice 7a, step 1, answer 10). */
+const ATTRIBUTE_LENGTHS: Record<string, number> = {
+  "customer.email": 120,
+  "customer.first_name": 50,
+  "customer.last_name": 50,
+  "customer.segment_code": 3,
+};
+
 const TABLES: [key: string, system: string, database: string, schema: string, name: string, rows: number, columns: [string, string, Flags?][]][] = [
   ["customers", "CRM", "crmprod", "dbo", "customers", 182340, [
     ["cust_id", "int", "PK"], ["cust_no", "varchar(20)", "BK"], ["fname", "nvarchar(50)", "PII"], ["lname", "nvarchar(50)", "PII"],
-    ["email_addr", "varchar(120)", "PII"], ["dob", "date", "PII"], ["segment", "char(3)"], ["created_ts", "datetime2"], ["updated_ts", "datetime2"],
+    ["email_addr", "varchar(120)", "PII"], ["dob", "date", "PII"], ["segment", "char(3)"], ["created_ts", "datetime2(7)"], ["updated_ts", "datetime2(7)"],
   ]],
   ["addr", "CRM", "crmprod", "dbo", "customer_addresses", 240118, [
     ["addr_id", "int", "PK"], ["cust_id", "int", "FK"], ["street_line1", "nvarchar(100)", "PII"], ["city", "nvarchar(60)"], ["zip", "varchar(10)"], ["country_iso", "char(2)"],
   ]],
   ["webusers", "WEB", "shopdb", "public", "web_users", 96412, [
-    ["user_id", "uuid", "PK"], ["email", "varchar(255)", "PII"], ["cust_no", "varchar(20)", "BK"], ["registered_at", "timestamp"],
+    ["user_id", "uuid", "PK"], ["email", "varchar(255)", "PII"], ["cust_no", "varchar(20)", "BK"], ["registered_at", "timestamp(6)"],
   ]],
   ["ordhdr", "ERP", "erpdb", "sales", "order_header", 1204553, [
     ["ord_id", "bigint", "PK"], ["ord_no", "varchar(20)", "BK"], ["cust_ref", "varchar(20)"], ["ord_dt", "date"], ["ord_total", "decimal(12,2)"], ["curr", "char(3)"], ["ord_status", "tinyint"],
@@ -134,6 +142,12 @@ const MAPPINGS: [table: string, column: string, entity: string, attribute: strin
   ["ordhdr", "ord_total", "order", "total_amount"],
   ["ordhdr", "ord_status", "order", "status_code", "draft", "Decode with the ERP status dictionary (ref.order_status)"],
   ["ordline", "item_code", "line", "product_id", "draft"],
+];
+
+/** Declared relationships between source tables, as in the prototype's seed (slice 7a, step 1, answer 10). */
+const SOURCE_RELATIONSHIPS: [name: string, from: string, fromColumn: string, to: string, toColumn: string][] = [
+  ["FK_order_line_order_header", "ordline", "ord_id", "ordhdr", "ord_id"],
+  ["FK_customer_addresses_customers", "addr", "cust_id", "customers", "cust_id"],
 ];
 
 const RELATIONSHIPS: [from: string, to: string, label: string, toMin: 0 | 1][] = [
@@ -201,7 +215,7 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
         sort_order: i,
         data_type: type,
         custom_type: null,
-        type_length: null,
+        type_length: ATTRIBUTE_LENGTHS[`${key}.${attr}`] ?? null,
         type_precision: null,
         type_scale: null,
         is_primary_key: has(flags, "PK"),
@@ -251,6 +265,18 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
         missing_since: null,
       };
       db.source_column.push(column);
+    });
+  }
+
+  for (const [name, from, fromColumn, to, toColumn] of SOURCE_RELATIONSHIPS) {
+    const key = `source-relationship:${from}.${name}`;
+    db.source_relationship.push({ ...std(key), source_table_id: id(`table:${from}`), to_source_table_id: id(`table:${to}`), name, kind: "declared", missing_since: null });
+    db.source_relationship_column.push({
+      ...std(`${key}#0`),
+      source_relationship_id: id(key),
+      from_column_id: id(`column:${from}.${fromColumn}`),
+      to_column_id: id(`column:${to}.${toColumn}`),
+      sort_order: 0,
     });
   }
 

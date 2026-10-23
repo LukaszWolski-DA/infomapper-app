@@ -2,4 +2,4 @@ database,schema,table,object_type,row_count,table_comment,column,ordinal,data_ty
 shopdb,public,web_users,table,96412,,user_id,1,uuid,,,,no,yes,,,,,,
 shopdb,public,web_users,table,96412,,email,2,varchar,255,,,yes,no,,,,,,
 shopdb,public,web_users,table,96412,,cust_no,3,varchar,20,,,yes,no,,,,,,
-shopdb,public,web_users,table,96412,,registered_at,4,timestamp,,,,yes,no,,,,,,
+shopdb,public,web_users,table,96412,,registered_at,4,timestamp,,6,,yes,no,,,,,,
