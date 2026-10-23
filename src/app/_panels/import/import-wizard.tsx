@@ -93,7 +93,9 @@ export function ImportWizard({
     const { translation, read } = readDdl(ddl.text, { database: ddl.database, schema: ddl.schema, fileName: ddl.name });
     set({ ddl: { ...ddl, translation }, text: ddl.text, sourceLabel: ddl.name, read, scope: new Set(read.tables.map((t) => t.key)), renames: new Map(), stale: null });
   };
-  const clear = () => set({ text: "", sourceLabel: "", read: null, ddl: { ...s.ddl, translation: null }, scope: new Set(), renames: new Map(), stale: null });
+  /** “Choose another”: a new file or script; the DDL channel keeps its Database and schema fields. */
+  const clear = () =>
+    set({ text: "", sourceLabel: "", read: null, ddl: { ...emptyDdl, database: s.ddl.database, schema: s.ddl.schema }, scope: new Set(), renames: new Map(), stale: null });
 
   async function importNow() {
     if (!plan || !target || sending) return;
