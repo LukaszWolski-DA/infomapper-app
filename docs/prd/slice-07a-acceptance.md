@@ -1,6 +1,6 @@
 # Slice 7a – Acceptance
 
-Status: **step 4 done (22 October 2026); step 5 waits for Łukasz's go.** Branch
+Status: **step 4 accepted (23 October 2026); the decision texts are under Łukasz's review, step 5 waits for them.** Branch
 `slice/07a-source-import`, from `main` at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as
 written; this file is its amendment (Łukasz, 22 October 2026).
 
@@ -899,3 +899,47 @@ npx tsx scripts/bench-import-write.ts 20000
 1. **The size limit:** 30,000 column rows per import?
 2. **The card move after large imports:** option 1, 2 or 3?
 3. **The decision texts** above: approve, or change?
+
+## Łukasz's answers to step 4 (23 October 2026)
+
+Step 4 accepted as built: the case conflicts, the migration with the review reason only in review and row-level
+security on the three new tables, `data-model-v2.md`, format 6 with its upgrade, undo with the new tables, the delete
+cascade, the import command (permissions, P8, one change group, one undo step, P9), answers 6, 7 and 9, the upload
+route with its 25 MB limit and the proxy's, the speed fixes. "The destination stream closed early" is the known message;
+nothing to change.
+
+- **The slow writes after large imports: option 1, accepted.** Łukasz works incrementally and will not import whole
+  databases, so the local data file stays small in practice. In `known-limitations.md`: every write rewrites the whole
+  local data file (about 1 s per write after three 20,000-column imports); local adapter only, the Supabase adapter
+  writes only the changed rows. Option 3 (one file per table, change events appended) is in `ideas.md`.
+- **The size limit: 30,000 column rows per import, a temporary limit.** It comes from the local adapter's figures, not
+  from the importer; to be measured again when the Supabase adapter exists (`known-limitations.md`). Item 12's message:
+  "The file has {n} rows; one import takes up to 30,000. Split it by database or schema." The 20 MB text limit stays.
+- **The decision texts** (D-55, the D-51 and D-26 additions, step 4 above) are reviewed before they go into
+  `decisions.md`; step 5 waits for that.
+
+### The limit's figures
+
+| Figure (median of 5) | 20,000 column rows | 100,000 column rows | Bar |
+| --- | --- | --- | --- |
+| Read the standard | 113 ms | 539 ms | ≤ 1 s |
+| Translate and read a DDL script | 385 ms | 1,772 ms | ≤ 2 s |
+| Plan a re-import, 5 % changed | 107 ms | 442 ms | ≤ 2 s |
+| First import through the local adapter | 2,149 ms | **13,120 ms** | ≤ 5 s |
+| Re-import, 5 % changed | 1,085 ms | **7,907 ms** | ≤ 5 s |
+| Undo the first import | 2,502 ms | **16,354 ms** | ≤ 5 s |
+| Three imports | 128 MB data file | **out of memory** | |
+
+At 30,000 rows the write is expected at about 3.3 s and its undo at about 4.8 s (both grow with the rows written:
+about 0.11 and 0.16 ms per column here), within the 5 s bars.
+
+### After the answers (23 October 2026)
+
+- `MAX_IMPORT_ROWS` is 30,000 (`src/domain/import/standard.ts`); the reader takes `{ maxRows }` so the benchmarks
+  still read past it (`bench-import-read.ts`, `bench-import-plan.ts`); `bench-import-write.ts` imports through the
+  command, so it now measures 20,000 by default.
+- **Found by the new limit's test:** one table with tens of thousands of columns made the reader slow (it looked up
+  each row's column in the table's list): 30,001 columns in one table took about 20 s. Columns are now found by name
+  through a map; the same test takes well under a second. The figures above are unchanged (115, 399, 530 and 1,746 ms
+  in a new run).
+- Unit tests: 830 domain tests pass; the route spec expects the new message.

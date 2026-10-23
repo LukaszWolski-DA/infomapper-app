@@ -159,3 +159,12 @@ One import can send many approved mappings back to review (P6: a new type confli
 type, a renamed input in the rule). A button “Approve again all {n}” for the mappings one import sent back, with each
 one's reason shown before the click, would spare a solo modeller approving them one by one. It respects four-eyes: with
 four-eyes on, the person who ran the import cannot use it for those mappings (Łukasz, 22 October 2026).
+
+## One file per table in the local adapter (slice 7a, step 4)
+
+The local adapter (AD-29) writes the whole data file on every write; after three 20,000-column imports a card move
+takes about 1 s (`docs/known-limitations.md`). With one file per table and the change events appended to a file of their
+own rather than rewritten, a write would rewrite only the tables it touches: a card move would be well under 100 ms.
+About a day with a full e2e run (the e2e helpers that read the data file whole move to the store). Only if large imports
+are ever needed locally; the Supabase adapter writes only the changed rows anyway (Łukasz, 23 October 2026: option 1,
+accepted as it is).

@@ -3,7 +3,9 @@
 // Each write runs the server's steps (runCommand without Next.js): read the state from the store, the domain command,
 // the live canvas rules (`completeLiveWrites`), the adapter (`apply`, which writes the whole data file), the undo
 // history. On copies of the demo data in .data/measure/import-bench/ (git-ignored), never on dev-db.json.
-// One warm-up, then 5 rounds; median, fastest, slowest. Run: npx tsx scripts/bench-import-write.ts [20000|100000]
+// One warm-up, then 5 rounds; median, fastest, slowest. Run: npx tsx scripts/bench-import-write.ts [20000]
+// It imports through the command, so a size above the import limit (MAX_IMPORT_ROWS, 30,000) is refused; step 4's
+// 100,000-column figures were taken before the limit (docs/prd/slice-07a-acceptance.md).
 
 import { copyFile, mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
@@ -104,7 +106,7 @@ const timed = async (run: () => Promise<unknown>) => {
 };
 
 async function main() {
-  const sizes = process.argv[2] ? [Number(process.argv[2])] : [20_000, 100_000];
+  const sizes = process.argv[2] ? [Number(process.argv[2])] : [20_000];
   await mkdir(DIR, { recursive: true });
   const base = path.join(DIR, "base.json");
   await writeDb(base, buildSeed());

@@ -227,7 +227,8 @@ describe("readStandard: errors stop the import (item 9)", () => {
 
   it("more rows than one import takes (item 12)", () => {
     const text = `database,schema,table,column,data_type\n${Array.from({ length: MAX_IMPORT_ROWS + 1 }, (_, i) => `d,s,t,c${i},int`).join("\n")}`;
-    expect(readStandard(text, "x.csv").errors).toEqual(["The file has 100,001 rows; one import takes up to 100,000. Split it by database or schema."]);
+    expect(readStandard(text, "x.csv").errors).toEqual(["The file has 30,001 rows; one import takes up to 30,000. Split it by database or schema."]);
+    expect(readStandard(text, "x.csv", { maxRows: Infinity }).errors).toEqual([]);
   });
 });
 

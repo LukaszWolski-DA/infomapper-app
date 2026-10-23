@@ -64,8 +64,12 @@ export const STANDARD_TEMPLATE = toCsv([
   ["flat_files", "ref_data", "country_codes", "file", "xlsx", "", "Country list kept by Finance", "iso_code", "1", "string(2)", "", "", "", "no", "yes", "", "", "", "", "ISO 3166 alpha-2", "BK"],
 ]);
 
-/** Column rows one import takes (PRD item 12; the limit is set after step 2's figures, answer 13). */
-export const MAX_IMPORT_ROWS = 100_000;
+/**
+ * Column rows one import takes (PRD item 12), a temporary limit (Łukasz, step 4): it comes from the local adapter's
+ * write and undo times, not from the importer (reading and planning are fast at 100,000); to be measured again with the
+ * Supabase adapter (docs/known-limitations.md).
+ */
+export const MAX_IMPORT_ROWS = 30_000;
 
 export type StandardObjectType = "table" | "view" | "file";
 
@@ -141,7 +145,8 @@ export const NOT_READ_YET = (name: string, table: string) =>
 export const TYPE_KEPT = (type: string, column: string) =>
   `Type “${type}” of ${column} is kept as written; the type check cannot judge mappings from this column.`;
 
-export function readStandard(text: string, fileName: string): StandardRead {
+/** `maxRows`: the row limit; the benchmarks read past it (scripts/bench-import-*.ts). */
+export function readStandard(text: string, fileName: string, { maxRows = MAX_IMPORT_ROWS }: { maxRows?: number } = {}): StandardRead {
   const out: StandardRead = { fileName, errors: [], warnings: [], tables: [], columnCount: 0, delimiter: ",", fields: new Set() };
   const body = text.replace(/^﻿/, "");
   if (!body.trim()) {
@@ -161,8 +166,8 @@ export function readStandard(text: string, fileName: string): StandardRead {
     return out;
   }
   const dataRows = rows.length - 1;
-  if (dataRows > MAX_IMPORT_ROWS) {
-    out.errors.push(`The file has ${count(dataRows)} rows; one import takes up to ${count(MAX_IMPORT_ROWS)}. Split it by database or schema.`);
+  if (dataRows > maxRows) {
+    out.errors.push(`The file has ${count(dataRows)} rows; one import takes up to ${count(maxRows)}. Split it by database or schema.`);
     return out;
   }
   const index = new Map<StandardField, number>();
@@ -171,6 +176,8 @@ export function readStandard(text: string, fileName: string): StandardRead {
   });
   out.fields = new Set(index.keys());
   const byKey = new Map<string, StandardTable>();
+  /** Each table's columns by lower-case name: a wide table must not be searched once per row. */
+  const columnsByName = new Map<StandardTable, Map<string, StandardColumn>>();
   const notRead = new Set<string>();
 
   for (let r = 1; r < rows.length; r++) {
@@ -212,7 +219,8 @@ export function readStandard(text: string, fileName: string): StandardRead {
     }
     if (t.comment === null && get("table_comment")) t.comment = get("table_comment");
 
-    const existing = t.columns.find((c) => c.name.toLowerCase() === column.toLowerCase());
+    const names = columnsByName.get(t) ?? columnsByName.set(t, new Map()).get(t)!;
+    const existing = names.get(column.toLowerCase());
     const fkName = get("fk_name");
     if (fkName) {
       let fk = t.foreignKeys.find((f) => f.name.toLowerCase() === fkName.toLowerCase());
@@ -267,7 +275,7 @@ export function readStandard(text: string, fileName: string): StandardRead {
     const ordinal = get("ordinal");
     const isPrimaryKey = YES.test(get("primary_key"));
     const nullable = get("nullable");
-    t.columns.push({
+    const columnRead: StandardColumn = {
       name: column,
       ordinal: /^\d+$/.test(ordinal) ? Number(ordinal) : t.columns.length + 1,
       ...columnType,
@@ -279,7 +287,9 @@ export function readStandard(text: string, fileName: string): StandardRead {
       is_pii: isPii,
       classifications,
       line,
-    });
+    };
+    t.columns.push(columnRead);
+    names.set(column.toLowerCase(), columnRead);
     out.columnCount++;
   }
   // a table whose every row was skipped is not in the file

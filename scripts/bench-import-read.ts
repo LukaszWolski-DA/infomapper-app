@@ -30,11 +30,11 @@ for (const tables of [2_000, 10_000]) {
   const ddl = syntheticDdl(tables);
   console.log(`\n${tables.toLocaleString("en-GB")} tables: standard ${mb(standard)}, DDL ${mb(ddl)}`);
   time(`  read the standard`, 1_000, () => {
-    const r = readStandard(standard, "synthetic.csv");
+    const r = readStandard(standard, "synthetic.csv", { maxRows: Infinity }); // past the import limit on purpose
     return { columns: r.columnCount, errors: r.errors };
   });
   time(`  translate and read the DDL`, 2_000, () => {
-    const { read } = readDdl(ddl, { fileName: "synthetic.sql" });
+    const { read } = readDdl(ddl, { fileName: "synthetic.sql", maxRows: Infinity });
     return { columns: read.columnCount, errors: read.errors };
   });
 }

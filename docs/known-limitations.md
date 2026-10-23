@@ -683,3 +683,36 @@ pages), so the first tests do not wait for compiles.
   file was not the cause. Fix: stop the server, delete `.next/dev/cache/turbopack`, start it again (the first pages
   compile once more).
 - **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.
+
+## Source import (slice 7a)
+
+### Every write rewrites the whole local data file
+
+The local adapter (AD-29) writes the whole `.data/dev-db.json` on every write, so writes slow down after very large
+imports: about 1 s per write (a card move) after three 20,000-column imports, when the file is 128 MB (80 MB of it
+change events). Slice 7a, step 4 made the adapter copy only the tables a write touches, check only what a write can
+break and write the file without indentation (3.3 s before); the rest is writing the file itself.
+
+- **Accepted** (Łukasz, 23 October 2026): work is imported incrementally, not whole databases, so the file stays small
+  in practice. `npm run reset-dev-data` brings it back to the demo.
+- **Local adapter only:** the Supabase adapter writes only the changed rows. If large imports are ever needed locally:
+  `docs/ideas.md`, "One file per table in the local adapter".
+
+### One import takes up to 30,000 column rows (a temporary limit)
+
+Above it: "The file has {n} rows; one import takes up to 30,000. Split it by database or schema." A larger system is
+imported in parts, one database or schema at a time ("Only columns of the tables in the file"). The text of one import
+is limited to 20 MB, an upload to 25 MB.
+
+- **Why:** the local adapter's figures (slice 7a, step 4), not the importer's. Reading, translating, planning and the
+  P8 comparison are fast at 100,000 rows (read 0.5 s, translate a DDL script 1.8 s, plan 0.4 s); writing and undoing
+  through the local data file grow with the rows (at 20,000: import 2.1 s, undo 2.5 s; at 100,000: 13.1 s and 16.4 s,
+  and three such imports ran the process out of memory). Details: `docs/prd/slice-07a-acceptance.md`, step 4.
+- **Later:** measure again when the Supabase adapter exists (the database slice, AD-31), and raise the limit from those
+  figures.
+
+### Relationships between source tables follow the key's name
+
+A re-import matches a relationship by its foreign key's name on its table. A DDL script names an unnamed key
+`FK_{table}_{columns}`, a catalog query gives the database's own name (on SQL Server often generated), so importing a
+system through the other channel marks its relationships missing and adds them again (step 1, F30).

@@ -194,6 +194,8 @@ export interface DdlOptions {
   schema?: string;
   /** The script's file name, for the database when the script and the field name none. */
   fileName?: string;
+  /** The row limit of the translated standard (`readStandard`); the benchmarks read past it. */
+  maxRows?: number;
 }
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
@@ -525,6 +527,6 @@ export function readDdl(sql: string, opts: DdlOptions = {}): { translation: DdlT
     const read = readStandard("", fileName);
     return { translation, read: { ...read, errors: ["No CREATE TABLE statement was found in the script."], warnings: translation.warnings } };
   }
-  const read = readStandard(translation.standard, fileName);
+  const read = readStandard(translation.standard, fileName, { maxRows: opts.maxRows });
   return { translation, read: { ...read, warnings: [...translation.warnings, ...read.warnings] } };
 }

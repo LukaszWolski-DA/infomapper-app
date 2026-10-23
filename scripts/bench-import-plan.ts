@@ -31,7 +31,7 @@ function time<T>(label: string, bar: number | null, run: () => T): T {
 }
 
 for (const tables of [2_000, 10_000]) {
-  const first = readStandard(syntheticStandard(tables), "first.csv");
+  const first = readStandard(syntheticStandard(tables), "first.csv", { maxRows: Infinity }); // past the import limit on purpose
   let model: ImportModel = importInto(emptyModel(), first, { newName: "Synth" }).model;
   // a direct, approved mapping from every tenth column onto a string(50) attribute
   model = withEntity(model, "Target", [{ name: "value", type_length: 50 }]);
@@ -41,7 +41,7 @@ for (const tables of [2_000, 10_000]) {
   for (const c of mapped) mappings = withMapping(mappings, attribute, [c.id]).model;
   model = mappings;
 
-  const changed = readStandard(syntheticStandard(tables, undefined, fivePercent), "changed.csv");
+  const changed = readStandard(syntheticStandard(tables, undefined, fivePercent), "changed.csv", { maxRows: Infinity });
   const target = { systemId: model.systems[0]!.id };
   const choices: PlanChoices = { scope: new Set(changed.tables.map((t) => t.key)), compare: "schemas", renames: new Map() };
   console.log(`\n${first.columnCount.toLocaleString("en-GB")} columns in ${tables.toLocaleString("en-GB")} tables, ${mapped.length.toLocaleString("en-GB")} mappings`);

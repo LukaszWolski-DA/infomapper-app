@@ -73,7 +73,7 @@ test("the upload: a body above the proxy's default 10 MB arrives whole; above 25
   const text = `database,schema,table,column,data_type\n${rows.join("\n")}`;
   expect(Buffer.byteLength(text)).toBeGreaterThan(10 * 1024 * 1024);
   const { body } = await post(page, { target: { newName: "Big" }, channel: "file", sourceLabel: "big.csv", text, scope: ["x"], compare: "schemas", renames: [], fingerprint: "x" });
-  expect(body).toMatchObject({ ok: false, message: "The file has 150,000 rows; one import takes up to 100,000. Split it by database or schema." });
+  expect(body).toMatchObject({ ok: false, message: "The file has 150,000 rows; one import takes up to 30,000. Split it by database or schema." });
   const huge = await page.request.post(`/w/${RETAIL}/import`, { data: { text: "x".repeat(26 * 1024 * 1024) } });
   expect(huge.status()).toBe(413);
 });
