@@ -80,6 +80,8 @@ export interface PlanRelationship {
   toLabel: string;
   /** Column names, from-table → to-table, as the file declares them (empty for a missing one). */
   pairs: { from: string; to: string }[];
+  /** The stored name when the file names the same relationship differently (a name change, “changed”). */
+  renamedFrom: string | null;
   existing: ImportRelationship | null;
 }
 
@@ -450,6 +452,7 @@ function planRelationships(
   for (const ft of inScope) {
     const et = exByKey.get(ft.key);
     const fromNames = new Set(ft.columns.map((c) => lower(c.name)));
+    const declared: { fk: StandardTable["foreignKeys"][number]; toKey: string; resolved: { from: string; to: string }[] }[] = [];
     for (const fk of ft.foreignKeys) {
       const toKey = tableKey(ft.database, fk.toSchema, fk.toTable);
       if (blocked.has(toKey)) {
@@ -468,18 +471,44 @@ function planRelationships(
         warnings.push(`Foreign key ${fk.name} on ${label(ft)} names a column that is not in ${unknown.to && !target.names.has(lower(unknown.to)) ? `${fk.toSchema}.${fk.toTable}` : label(ft)}. Relationship skipped.`);
         continue;
       }
-      const resolved = pairs.map((p) => ({ from: p.from, to: target.names.get(lower(p.to))! }));
-      const er = et ? (relsFrom.get(et.id) ?? []).find((r) => lower(r.name) === lower(fk.name)) ?? null : null;
-      let status: RelationshipStatus = "new";
+      declared.push({ fk, toKey, resolved: pairs.map((p) => ({ from: p.from, to: target.names.get(lower(p.to))! })) });
+    }
+    // an existing relationship is matched by its key's name, else by what it joins (step 4: SQL Server generates the
+    // names of unnamed keys, so a DDL script and a catalog query can name one relationship differently)
+    const existingHere = et ? (relsFrom.get(et.id) ?? []) : [];
+    const pairsOf = (r: ImportRelationship) =>
+      [...r.columns].sort((a, b) => a.sort_order - b.sort_order).map((c) => `${lower(columnName.get(c.from_column_id) ?? "")}→${lower(columnName.get(c.to_column_id) ?? "")}`).join(",");
+    const targetOf = (r: ImportRelationship) => {
+      const t = tableById.get(r.to_source_table_id);
+      return t ? keyOfTable(t) : "";
+    };
+    const joins = (d: (typeof declared)[number]) => `${d.toKey}|${d.resolved.map((p) => `${lower(p.from)}→${lower(p.to)}`).join(",")}`;
+    const match = new Map<(typeof declared)[number], ImportRelationship>();
+    for (const d of declared) {
+      const er = existingHere.find((r) => !seen.has(r.id) && lower(r.name) === lower(d.fk.name));
       if (er) {
+        match.set(d, er);
         seen.add(er.id);
-        const toTable = tableById.get(er.to_source_table_id);
-        const before = [...er.columns].sort((a, b) => a.sort_order - b.sort_order).map((c) => `${lower(columnName.get(c.from_column_id) ?? "")}→${lower(columnName.get(c.to_column_id) ?? "")}`).join(",");
-        const after = resolved.map((p) => `${lower(p.from)}→${lower(p.to)}`).join(",");
-        const sameTarget = !!toTable && keyOfTable(toTable) === toKey;
-        status = er.missing_since ? "back" : before === after && sameTarget ? "unchanged" : "changed";
       }
-      out.push({ status, name: fk.name, fromKey: ft.key, toKey, fromLabel: label(ft), toLabel: `${fk.toSchema}.${fk.toTable}`, pairs: resolved, existing: er });
+    }
+    for (const d of declared) {
+      if (match.has(d)) continue;
+      const er = existingHere.find((r) => !seen.has(r.id) && `${targetOf(r)}|${pairsOf(r)}` === joins(d));
+      if (er) {
+        match.set(d, er);
+        seen.add(er.id);
+      }
+    }
+    for (const d of declared) {
+      const er = match.get(d) ?? null;
+      let status: RelationshipStatus = "new";
+      let renamedFrom: string | null = null;
+      if (er) {
+        const sameJoins = `${targetOf(er)}|${pairsOf(er)}` === joins(d);
+        if (er.name !== d.fk.name) renamedFrom = er.name;
+        status = er.missing_since ? "back" : sameJoins && !renamedFrom ? "unchanged" : "changed";
+      }
+      out.push({ status, name: d.fk.name, renamedFrom, fromKey: ft.key, toKey: d.toKey, fromLabel: label(ft), toLabel: `${d.fk.toSchema}.${d.fk.toTable}`, pairs: d.resolved, existing: er });
     }
   }
   // relationships the file no longer declares on its tables, and those of a missing table (item 32)
@@ -498,6 +527,7 @@ function planRelationships(
       fromLabel: `${from.schema_name}.${from.name}`,
       toLabel: to ? `${to.schema_name}.${to.name}` : "?",
       pairs: [],
+      renamedFrom: null,
       existing: r,
     });
   }

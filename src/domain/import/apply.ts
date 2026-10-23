@@ -73,7 +73,7 @@ export interface ImportChangeset {
   system: { id: Uuid; name: string; isNew: boolean };
   tables: { insert: NewTableRow[]; update: RowPatch<ImportTable>[] };
   columns: { insert: NewColumnRow[]; update: RowPatch<ImportColumn>[] };
-  relationships: { insert: NewRelationshipRow[]; update: RowPatch<{ to_source_table_id: Uuid; missing_since: Timestamp | null }>[] };
+  relationships: { insert: NewRelationshipRow[]; update: RowPatch<{ name: string; to_source_table_id: Uuid; missing_since: Timestamp | null }>[] };
   /** Column pairs of new relationships, and of changed ones (the old pairs are removed). */
   relationshipColumns: { insert: NewRelationshipColumnRow[]; remove: Uuid[] };
   mappings: RowPatch<ImportMapping>[];
@@ -213,7 +213,8 @@ export function applyPlan(model: ImportModel, plan: ImportPlan, ctx: ApplyContex
       continue;
     }
     const er = r.existing;
-    const patch: { to_source_table_id?: Uuid; missing_since?: Timestamp | null } = {};
+    const patch: { name?: string; to_source_table_id?: Uuid; missing_since?: Timestamp | null } = {};
+    if (er.name !== r.name) patch.name = r.name;
     if (er.to_source_table_id !== toId) patch.to_source_table_id = toId;
     if (er.missing_since) patch.missing_since = null;
     const old = [...er.columns].sort((a, b) => a.sort_order - b.sort_order);

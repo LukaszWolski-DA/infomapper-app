@@ -503,6 +503,26 @@ describe("relationships (item 30)", () => {
     expect(again.model.relationships[0]!.columns.map((c) => c.to_column_id)).toEqual([columnNamed(first.model, "a", "code").id]);
   });
 
+  it("a key named differently that joins the same columns is the same relationship, renamed (S7A-17)", () => {
+    // a DDL script names an unnamed key FK_{table}_{columns}; SQL Server's catalog gives the name it generated
+    const ddl = readDdl("CREATE TABLE [dbo].[a] ([id] int PRIMARY KEY);\nCREATE TABLE [dbo].[b] ([id] int PRIMARY KEY, [a_id] int REFERENCES [dbo].[a] ([id]));", {
+      fileName: "x.sql",
+      database: "d",
+    }).read;
+    const first = importInto(emptyModel(), ddl, { newName: "S" });
+    expect(first.model.relationships.map((r) => r.name)).toEqual(["FK_b_a_id"]);
+    const catalog = fk("d,dbo,a,id,1,int,yes,,,,\nd,dbo,b,id,1,int,yes,,,,\nd,dbo,b,a_id,2,int,no,FK__b__a_id__3B75D760,dbo,a,id");
+    const again = importInto(first.model, catalog, { systemId: systemNamed(first.model, "S").id });
+    expect(again.plan.relationships.map((r) => [r.name, r.status, r.renamedFrom])).toEqual([["FK__b__a_id__3B75D760", "changed", "FK_b_a_id"]]);
+    expect(again.changes.relationships.update.map((u) => u.patch)).toEqual([{ name: "FK__b__a_id__3B75D760" }]);
+    expect(again.changes.relationships.insert).toEqual([]);
+    expect(again.changes.relationshipColumns.insert).toEqual([]);
+    expect(again.model.relationships.map((r) => r.id)).toEqual(first.model.relationships.map((r) => r.id));
+    // a name match comes first: a key of that name joining other columns is changed, not a second relationship
+    const other = fk("d,dbo,a,id,1,int,yes,,,,\nd,dbo,a,code,2,int,no,,,,\nd,dbo,b,id,1,int,yes,,,,\nd,dbo,b,a_id,2,int,no,FK_b_a_id,dbo,a,code");
+    expect(importInto(first.model, other, { systemId: systemNamed(first.model, "S").id }).plan.relationships.map((r) => [r.status, r.renamedFrom])).toEqual([["changed", null]]);
+  });
+
   it("a key the file no longer declares is missing", () => {
     const first = importInto(emptyModel(), fk("d,s,a,id,1,int,yes,,,,\nd,s,b,a_id,1,int,no,FK_b_a,s,a,id"), { newName: "S" });
     const again = importInto(first.model, fk("d,s,a,id,1,int,yes,,,,\nd,s,b,a_id,1,int,no,,,,"), { systemId: systemNamed(first.model, "S").id });

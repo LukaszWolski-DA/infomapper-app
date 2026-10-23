@@ -711,8 +711,10 @@ is limited to 20 MB, an upload to 25 MB.
 - **Later:** measure again when the Supabase adapter exists (the database slice, AD-31), and raise the limit from those
   figures.
 
-### Relationships between source tables follow the key's name
+### Relationships between source tables: matched by name, then by what they join
 
-A re-import matches a relationship by its foreign key's name on its table. A DDL script names an unnamed key
-`FK_{table}_{columns}`, a catalog query gives the database's own name (on SQL Server often generated), so importing a
-system through the other channel marks its relationships missing and adds them again (step 1, F30).
+A re-import matches a relationship first by its foreign key's name on its table, then, when no name matches, by its
+target table and column pairs (slice 7a, step 4): a DDL script names an unnamed key `FK_{table}_{columns}`, SQL
+Server's catalog gives the name it generated, and the review shows the same relationship as one "changed" with its new
+name, not as a missing and a new one (S7A-17). What remains: two keys over the same columns to the same table, both
+renamed, are paired in file order.

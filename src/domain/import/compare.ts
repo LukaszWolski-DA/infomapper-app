@@ -35,7 +35,7 @@ export function planDigest(plan: ImportPlan): string {
         mappings: c.mappingIds,
       })),
     })),
-    relationships: plan.relationships.map((r) => ({ status: r.status, name: r.name, from: r.fromKey, to: r.toKey, pairs: r.pairs, existing: row(r.existing) })),
+    relationships: plan.relationships.map((r) => ({ status: r.status, name: r.name, renamedFrom: r.renamedFrom, from: r.fromKey, to: r.toKey, pairs: r.pairs, existing: row(r.existing) })),
     renames: plan.renames.map((r) => [r.key, r.choice, r.suggested, r.options]),
     mappings: plan.mappings.map((m) => ({ id: row({ id: m.mappingId, version: m.version }), status: m.status, back: m.sendsBack, reasons: m.reasons, conflicts: m.conflicts, fits: m.fitsAgain, rule: m.ruleAfter })),
     mass: plan.massWarning,
