@@ -13,6 +13,7 @@ import { day, impactOf, plural, reviewCounts, shownUnder, type impactIndex, type
 
 const PAGE_TABLES = 100;
 const PAGE_ROWS = 50;
+const PAGE_RELATIONSHIPS = 200;
 
 const TAG: Record<string, string> = {
   new: "bg-im-map-soft text-im-map",
@@ -51,6 +52,7 @@ export function ReviewStep({
   const [showUnchanged, setShowUnchanged] = useState<ReadonlySet<string>>(new Set());
   const [tablesShown, setTablesShown] = useState(PAGE_TABLES);
   const [rowsShown, setRowsShown] = useState<ReadonlyMap<string, number>>(new Map());
+  const [relationshipsShown, setRelationshipsShown] = useState(PAGE_RELATIONSHIPS);
   const n = reviewCounts(plan);
   const F = s.filter;
   const sendBacks = plan.mappings.filter((m) => m.sendsBack);
@@ -342,7 +344,7 @@ export function ReviewStep({
         <>
           <h3 className="mb-2 mt-5 text-[13px] font-semibold">Relationships between source tables</h3>
           <div className="overflow-hidden rounded-lg border border-im-line">
-            {rels.map((r) => (
+            {rels.slice(0, relationshipsShown).map((r) => (
               <div key={`${r.fromKey}|${r.name}`} className={`${rowClass} first:border-t-0`} data-testid="review-relationship" data-status={r.status}>
                 <span>
                   <Tag status={r.status} />
@@ -369,6 +371,13 @@ export function ReviewStep({
               </div>
             ))}
           </div>
+          {rels.length > relationshipsShown && (
+            <p className="mt-2">
+              <button type="button" className="text-im-logical underline" onClick={() => setRelationshipsShown(relationshipsShown + PAGE_RELATIONSHIPS)} data-testid="button-more-relationships">
+                Show the next {plural(Math.min(PAGE_RELATIONSHIPS, rels.length - relationshipsShown), "relationship")} of {rels.length.toLocaleString("en-GB")}
+              </button>
+            </p>
+          )}
         </>
       )}
       {F === "rel" && !rels.length && <p className="text-im-ink-3">Nothing of this kind.</p>}

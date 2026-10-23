@@ -12,7 +12,7 @@ export default defineConfig({
   // in the measurement build
   // and the S4P-04 screenshots (slice 4p) run only when asked with SCREENS=1
   testIgnore: [
-    ...(E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts", "**/S4P-fading.spec.ts", "**/S4P-10-c08.spec.ts", "**/S4P-11-index.spec.ts", "**/S4B1-09.spec.ts", "**/S4B2-1[0-3].spec.ts", "**/S4B2-15-layers.spec.ts", "**/S5A-08.spec.ts", "**/S6A-09*.spec.ts", "**/S6B-10.spec.ts"]),
+    ...(E2E_PRODUCTION ? [] : ["**/*-elements.spec.ts", "**/S3B-15-live.spec.ts", "**/S4P-fading.spec.ts", "**/S4P-10-c08.spec.ts", "**/S4P-11-index.spec.ts", "**/S4B1-09.spec.ts", "**/S4B2-1[0-3].spec.ts", "**/S4B2-15-layers.spec.ts", "**/S5A-08.spec.ts", "**/S6A-09*.spec.ts", "**/S6B-10.spec.ts", "**/S7A-14-review.spec.ts"]),
     ...(process.env.SCREENS ? [] : ["**/*-screens.spec.ts"]),
     // slice 6b's smoke for Firefox and WebKit runs only when asked (BROWSERS=1); CI and the full run stay Chromium-only
     ...(process.env.BROWSERS ? [] : ["**/*-browsers.spec.ts"]),
