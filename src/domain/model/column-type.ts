@@ -4,6 +4,8 @@
 //   `decimal(18,2)` → precision 18, scale 2 · one number of a non-text type is its precision: `datetime2(7)`,
 //   `float(53)`, `number(10)` · `timestamp(6) with time zone` → `timestamp with time zone`, precision 6
 //   `varchar2(100 char)` → length 100 (Oracle's length unit is dropped)
+//   `datetime2` → `datetime2(7)`, `timestamp` → `timestamp(6)`: a type without parameters has its default precision
+//   where the name tells it (DEFAULT_PRECISION)
 // Base types are stored in lower case with single spaces.
 
 import { formatColumnType, MAX_LENGTH, physicalClass, type ColumnType } from "./type-check";
@@ -31,10 +33,35 @@ export const TYPE_ALIASES: Readonly<Record<string, string>> = {
   double: "double precision",
 };
 
-/** The type a column has, spelled one way: what the import compares (`varchar(20)` and `VARCHAR(20)` are one type). */
+/**
+ * Fractional seconds of a type written without them, where its name tells one default (Łukasz, slice 7a, step 6):
+ * `datetime2` and `datetimeoffset` are SQL Server's only (7); PostgreSQL and Oracle agree on 6 for `timestamp` and its
+ * time-zone forms. `time` is left out: SQL Server's default is 7, PostgreSQL's 6, so `time` and `time(7)` stay
+ * different and a change between them shows.
+ */
+export const DEFAULT_PRECISION: Readonly<Record<string, number>> = {
+  datetime2: 7,
+  datetimeoffset: 7,
+  timestamp: 6,
+  timestamptz: 6,
+  "timestamp without time zone": 6,
+  "timestamp with time zone": 6,
+  "timestamp with local time zone": 6,
+};
+
+/** The type with its default precision when it has no parameters (DEFAULT_PRECISION). */
+export const withDefaultPrecision = (c: ColumnType): ColumnType =>
+  c.type_length === null && c.type_precision === null && c.type_scale === null && DEFAULT_PRECISION[c.data_type] !== undefined
+    ? { ...c, type_precision: DEFAULT_PRECISION[c.data_type]! }
+    : c;
+
+/**
+ * The type a column has, spelled one way: what the import compares (`varchar(20)` and `VARCHAR(20)` are one type; a
+ * `datetime2` stored before step 6 without its precision and `datetime2(7)` are one type).
+ */
 export const columnTypeKey = (c: ColumnType): string => {
   const base = c.data_type.trim().toLowerCase().replace(/\s+/g, " ");
-  return formatColumnType({ ...c, data_type: TYPE_ALIASES[base] ?? base });
+  return formatColumnType(withDefaultPrecision({ ...c, data_type: TYPE_ALIASES[base] ?? base }));
 };
 
 export const sameColumnType = (a: ColumnType, b: ColumnType): boolean => columnTypeKey(a) === columnTypeKey(b);
@@ -53,7 +80,7 @@ export function readColumnType(text: string): ColumnTypeRead {
   const [, base, rawArgs, suffix] = match;
   const dataType = words(`${base} ${suffix ?? ""}`);
   const none: ColumnType = { data_type: dataType, type_length: null, type_precision: null, type_scale: null };
-  if (rawArgs === undefined) return { ok: true, type: none };
+  if (rawArgs === undefined) return { ok: true, type: withDefaultPrecision(none) };
   const args = rawArgs.split(",").map((a) => ARG.exec(a.trim()));
   if (!args.length || args.length > 2 || args.some((a) => !a)) return { ok: false, reason: "unreadable" };
   const [first, second] = args as RegExpExecArray[];
@@ -66,19 +93,21 @@ export function readColumnType(text: string): ColumnTypeRead {
     if (b > a) return { ok: false, reason: "scale" };
     return { ok: true, type: { ...none, type_precision: a, type_scale: b } };
   }
-  if (a === 0) return { ok: false, reason: "zero" };
+  // fractional seconds may be 0 (`datetime2(0)`, `timestamp(0)`); a length or a number's precision may not
+  if (a === 0 && physicalClass(dataType) !== "temporal") return { ok: false, reason: "zero" };
   return { ok: true, type: physicalClass(dataType) === "text" ? { ...none, type_length: a } : { ...none, type_precision: a } };
 }
 
 /**
  * A length, precision or scale given in a column of its own (the import standard's `length`, `precision`, `scale`):
- * a whole number, or `max` / -1 for a length. Null when empty; undefined when it is not one.
+ * a whole number, or `max` / -1 for a length; fractional seconds (a date or time type's precision) and a scale may be
+ * 0. Null when empty; undefined when it is not one.
  */
-export function readTypeParameter(text: string, kind: "length" | "precision" | "scale"): number | null | undefined {
+export function readTypeParameter(text: string, kind: "length" | "precision" | "fractional seconds" | "scale"): number | null | undefined {
   const v = text.trim();
   if (!v) return null;
   if (kind === "length" && /^(max|-1)$/i.test(v)) return MAX_LENGTH;
   if (!/^\d+$/.test(v)) return undefined;
   const n = Number(v);
-  return kind !== "scale" && n === 0 ? undefined : n;
+  return (kind === "length" || kind === "precision") && n === 0 ? undefined : n;
 }

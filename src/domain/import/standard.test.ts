@@ -95,7 +95,7 @@ describe("readStandard: the catalog queries' results (S7A-02, S7A-16's files)", 
       ["customers", 182340, null],
     ]);
     expect(typeOf(r, "customers", "cust_no")).toEqual(["varchar", 20, null, null]);
-    expect(typeOf(r, "customers", "created_ts")).toEqual(["datetime2", null, null, null]);
+    expect(typeOf(r, "customers", "created_ts")).toEqual(["datetime2", null, 7, null]);
     expect(column(r, "customers", "fname")).toMatchObject({ comment: null, classifications: [] });
     expect(r.warnings).toEqual([]);
   });
@@ -143,6 +143,16 @@ describe("readStandard: reading rules (item 8)", () => {
     expect(typeOf(r, "t", "b")).toEqual(["varbinary", MAX_LENGTH, null, null]);
     expect(typeOf(r, "t", "c")).toEqual(["decimal", null, 18, 2]);
     expect(typeOf(r, "t", "e")).toEqual(["varchar", 10, null, null]);
+  });
+
+  it("gives datetime2 and timestamp their default precision; a precision column replaces it, 0 included (step 6)", () => {
+    const r = ok("database,schema,table,column,data_type,precision\nd,s,t,a,datetime2,\nd,s,t,b,datetime2,3\nd,s,t,c,datetime2,0\nd,s,t,e,timestamp,\nd,s,t,f,time,\nd,s,t,g,datetimeoffset(2),5");
+    expect(typeOf(r, "t", "a")).toEqual(["datetime2", null, 7, null]);
+    expect(typeOf(r, "t", "b")).toEqual(["datetime2", null, 3, null]);
+    expect(typeOf(r, "t", "c")).toEqual(["datetime2", null, 0, null]);
+    expect(typeOf(r, "t", "e")).toEqual(["timestamp", null, 6, null]);
+    expect(typeOf(r, "t", "f")).toEqual(["time", null, null, null]);
+    expect(typeOf(r, "t", "g")).toEqual(["datetimeoffset", null, 2, null]); // written in the type: the column is not read
   });
 
   it("keeps fractional seconds as precision; a type it cannot read stays as written, with a warning", () => {

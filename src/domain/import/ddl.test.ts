@@ -54,7 +54,7 @@ describe("readDdl: the samples (S7A-03)", () => {
       ["member_id", "int", null, null, null, false, true],
       ["card_no", "varchar", 16, null, null, false, false],
       ["cust_no", "varchar", 20, null, null, true, false],
-      ["joined_at", "timestamptz", null, null, null, false, false],
+      ["joined_at", "timestamptz", null, 6, null, false, false], // its default precision (step 6)
       ["tier", "text", null, null, null, true, false],
       ["points_balance", "numeric", null, 12, 0, true, false],
     ]);

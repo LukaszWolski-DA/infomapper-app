@@ -8,7 +8,7 @@
 // (P2). Types are read by `readColumnType`, as "New source table" reads them.
 
 import { readColumnType, readTypeParameter } from "../model/column-type";
-import type { ColumnType } from "../model/type-check";
+import { physicalClass, type ColumnType } from "../model/type-check";
 import { parseDelimited, toCsv, type Delimiter } from "./delimited";
 
 export const STANDARD_FIELDS = [
@@ -246,12 +246,13 @@ export function readStandard(text: string, fileName: string, { maxRows = MAX_IMP
     // a type the reader cannot read is kept as written, never silently (step 2, answer 3)
     if (!read.ok) out.warnings.push(TYPE_KEPT(type, `${schema}.${table}.${column}`));
     const columnType: ColumnType = read.ok ? read.type : { data_type: type.toLowerCase().replace(/\s+/g, " "), type_length: null, type_precision: null, type_scale: null };
-    if (columnType.type_length === null && columnType.type_precision === null) {
+    // parameters in their own columns when the type has none written (they replace a default precision)
+    if (!type.includes("(")) {
       const length = readTypeParameter(get("length"), "length");
-      const precision = readTypeParameter(get("precision"), "precision");
+      const precision = readTypeParameter(get("precision"), physicalClass(columnType.data_type) === "temporal" ? "fractional seconds" : "precision");
       const scale = readTypeParameter(get("scale"), "scale");
       if (length) columnType.type_length = length;
-      if (precision) {
+      if (typeof precision === "number") {
         columnType.type_precision = precision;
         if (typeof scale === "number" && scale <= precision) columnType.type_scale = scale;
       } else if (scale === 0) columnType.type_scale = 0; // Oracle's INTEGER: number with scale 0 and no precision
