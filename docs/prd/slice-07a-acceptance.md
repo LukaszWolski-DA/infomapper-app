@@ -1076,3 +1076,81 @@ All within the 200 ms bar.
    is as before.
 5. Also: "A query on the database" (switch the Database, Copy), "DDL scripts" (drop `samples/billing.sql`, open "The
    translated standard"), "A new system" with the name "crm" (Next stays off), Esc.
+
+## Handover after step 5 (22 October 2026)
+
+Written on 23 October 2026 for the session that continues with step 6.
+
+### State
+
+- Steps 1–5 done and recorded above; **step 6 not started**. Branch `slice/07a-source-import`, last commit before this
+  handover `a48310a` (docs: slice 7a step 5). Nothing pushed, no pull request.
+- **Waiting for Łukasz:** his answers to step 5's eight decisions and to the `datetime2(7)` proposal ("Open for step 6"
+  above). Step 6 starts on his go.
+
+### Only in the conversation so far (now written down)
+
+- **Step 6 also does the seed changes accepted in step 1** (answer 10): Customer.email `string(120)`, first_name and
+  last_name `string(50)`, and the source relationships `FK_order_line_order_header` and
+  `FK_customer_addresses_customers` (`src/data/local/seed-model.ts`). Then **check the earlier specs** that read types,
+  type problems or the status bar: the draft mapping `web_users.email` (`varchar(255)`) → Customer.email becomes a type
+  problem (accepted as intended): S1A-01, S1A-09, S2B-07 (frame chips' type count), S6A-07 (status bar), and any spec
+  counting "Type problems" or reading Customer's attribute types. If the `datetime2(7)` proposal is accepted, the seed's
+  `created_ts`, `updated_ts` and `crm_sqlserver_catalog.tsv` change with it.
+- **S7A-16's e2e** (unchanged SQL Server, PostgreSQL and Oracle files show no changes against the demo) waits for the
+  seeded relationships; its unit tests exist (`plan.test.ts`). **S7A-17's wording** is in Łukasz's answers to step 3.
+- **Step 6's other criteria:** S7A-10 (tree, canvas and panel marks), S7A-11 (system panel, history place), S7A-14's
+  element-count guard (`S3B-15-elements.spec.ts` on "Performance test" equal to `slice-06b`'s), S7A-15 at the close.
+- **Test files (item 41):** e2e builds the partial CRM file in `e2e/slice-07a/helpers.ts` (`crmPartial`); step 1 Q7's
+  `crm-changed.csv` was not needed (the prototype's CRM file and two imports cover every status, S7A-05).
+- **Closing (step 7) docs still to do:** `inventory-prototype-vs-app.md` rewritten for the new reference; `ideas.md`
+  (own headers in the standard; dbt, Snowflake, Databricks; relationships as grey lines on canvases);
+  `known-limitations.md` (no changes to resolve in 7a; an import cannot be undone after a server restart and a later
+  change to any imported row refuses its undo, F31); README and CLAUDE.md (slice state, the wizard and route, the
+  samples' place, the bench scripts `bench-import-read.ts`, `bench-import-plan.ts`, `bench-import-write.ts`).
+- **Known issues:** `experimental.proxyClientMaxBodySize` (`next.config.ts`) is an experimental Next.js option;
+  “The destination stream closed early” is printed more often (import specs end right after a refresh); S0-10 can hit
+  the known 404 flake; every write on the local data file slows after very large imports (accepted, option 1).
+
+### The code of steps 2–5
+
+- **Domain, readers:** `src/domain/model/column-type.ts` (`readColumnType`, `columnTypeKey`/`sameColumnType`,
+  `TYPE_ALIASES`), `type-check.ts` (`MAX_LENGTH` -1, `columnClass`), `src/domain/import/standard.ts` (`readStandard`,
+  `MAX_IMPORT_ROWS` 30,000, `STANDARD_TEMPLATE`, `TYPE_KEPT`, `NOT_READ_YET`), `delimited.ts`, `ddl.ts` (`readDdl`,
+  `ddlToStandard`, `skippedText`, `ddlSummaryText`), samples in `src/domain/import/samples/` (tests only, lint-guarded).
+- **Domain, engine:** `import/model.ts` (`ImportModel`, `relationshipsWithColumns`), `plan.ts` (`buildPlan` →
+  `ImportPlan` with `tables`, `relationships` incl. `renamedFrom`, `renames`, `mappings` (P6 impacts), `leftOut`,
+  `massWarning`; `planCounts`, `importSummary`), `apply.ts` (`applyPlan` → `ImportChangeset`), `compare.ts`
+  (`planDigest`, `planFingerprint`, `keptChoices`, `STALE_REVIEW`).
+- **Domain, command and rules:** `commands/import.ts` (`importSources`, `importStateOf`, `STALE_REVIEW_FIELD`),
+  `commands/source.ts` (`deleteSourceTable` takes relationships along, `relationshipsOfTable`),
+  `model/mapping-rules.ts` (`afterContentChange` clears `review_reason`; `isContentChange` counts an import's
+  send-back), `commands/mapping.ts` (`setMappingStatus` clears it), `model/requirements.ts` (missing input covers
+  nothing), `commands/undo.ts` (new tables, `review_reason` a status column), `changes.ts` (`labelNothing`).
+- **Data:** `src/data/local/schema.ts` (format 6, rules), `file.ts` (upgrade from 5; caches its own write; compact),
+  `store.ts` (`model.load` with `sourceRelationships`/`sourceRelationshipColumns`, `model.listImports`, `KeyIndex`,
+  scoped `findViolation`); migration `supabase/migrations/20261022220000_source_import.sql`.
+- **App:** the route `src/app/w/[workspaceId]/import/route.ts` → `src/app/_lib/import-sources.ts` (`runImport`);
+  `run-command.ts` passes `fields`; the wizard `src/app/_panels/import/` (`import-wizard.tsx` with props `systemId` and
+  `onImported`, `source-step.tsx`, `scope-step.tsx`, `review-step.tsx`, `wizard-model.ts`, `catalog-queries.ts`);
+  `left-panel.tsx` (`importData` prop, `button-import-sources`); the canvas page builds `importData` (`lastImports` from
+  `listImports`); `model-index.ts` has `relationshipsOf` (both directions).
+
+### Where step 6 plugs in
+
+- **Item 28 after an import:** `ImportWizard`'s `onImported(outcome)` is not passed by `LeftPanel` yet. Step 6: select
+  the system (`outcome.systemId`), keep the Sources tab, and call `openDetails()` (an action that leads to details on
+  purpose, CLAUDE.md "Side panels").
+- **The system as a selection (items 38–39, Q8):** add `"source_system"` to `{ t: "element", kind }` in
+  `src/canvas/line-data.ts`; `placeOf` in `SelectionHistory.tsx` then records it; `ui.showPlace` must not centre it and
+  must report it gone (`GONE`); a branch in `src/app/_panels/inspector.tsx` for the system panel (counts; "Re-import
+  {system}…" opens `ImportWizard` with `systemId`; "Imports" from `listImports`, which the page must pass per system).
+- **Tree (item 33):** `src/app/_panels/tree-data.ts` and `left-panel.tsx`'s `sourceTree` (missing marks and tooltips,
+  "{format} file" / "view" / "{n} cols", the system's open button).
+- **Canvas (item 34, AD-24: classes on existing elements only):** rows in `src/canvas/card-data.ts` (`buildCards`, a
+  column's `missing_since`), lines in `src/canvas/LineLayer.tsx` (`MappingLine`: one `path.s` per input; the class on
+  the missing input's segment, F29), styles in `canvas.css`; then the element-count guard.
+- **Panels (items 35–37):** `src/app/_panels/source-panels.tsx` (`SourceTablePanel`: kind line with file/view and the
+  system link, "Missing from source since", columns with missing last, relationships via `ix.relationshipsOf`;
+  `SourceColumnPanel`: "Missing from source since", the comment stays editable per answer 8);
+  `src/app/_panels/mapping-panel.tsx` (`review_reason` under the status control, near `seg-mapping-status`).
