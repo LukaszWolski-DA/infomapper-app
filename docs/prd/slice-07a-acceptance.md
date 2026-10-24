@@ -1,6 +1,6 @@
 # Slice 7a – Acceptance
 
-Status: **step 6 done (23 October 2026); step 7 waits for Łukasz's go.** Branch
+Status: **step 7 (closing) done but for the two full e2e runs (24 October 2026); merge and tag on Łukasz's command.** Branch
 `slice/07a-source-import`, from `main` at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as
 written; this file is its amendment (Łukasz, 22 October 2026).
 
@@ -1295,3 +1295,161 @@ step 4's run, 6 more than step 5's).
 6. "Import sources…" with `crm_snapshot_2026-10-20.csv`: after the import, click `cust_no`, then
    Customer.customer_number under "Feeds": "An import sent it back to review: business key column changed type,
    varchar(20) → varchar(25)."
+
+## Łukasz's answers to step 6 (24 October 2026)
+
+Step 6 accepted with its decisions: `datetime2(0)` readable, muted colour instead of opacity (AD-24 wins over the PRD's
+wording), the panel texts, `database.schema` as the table panel's path, the definition-of-done scenario with two
+mappings. The port-3000 server was Łukasz's. Remove `../infomapper-base-06b` at the close.
+
+**SQL Server's `timestamp`:** it is `rowversion`, not a date, so `timestamp(6)` misleads the modeller even without a
+false change. The channels that know the vendor translate it: the query channel for SQL Server's result, and the DDL
+channel when it recognises a SQL Server script; the type table treats `rowversion` as `binary(8)`. The file channel
+cannot tell the vendor and keeps today's behaviour, with a line in `known-limitations.md`. Unit tests for both channels.
+
+## Step 7: closing (24 October 2026)
+
+### `rowversion` (step 6's question)
+
+- `readStandard(text, name, { vendor })`: with `vendor: "sqlserver"` a `timestamp` reads as `rowversion`
+  (`sqlServerType`, `src/domain/import/standard.ts`). The wizard reads a query result with the database chosen and
+  reads it again when the choice changes; the upload sends `vendor`, and the command reads with it.
+- `ddlToStandard`: a script with SQL Server's signs (brackets, `GO`, `IDENTITY`: the same signs that make `dbo` the
+  unqualified schema) writes `timestamp` as `rowversion`.
+- The type check reads `rowversion` as `binary` (`CHECKED_AS`, `type-check.ts`): no date, number or text attribute
+  takes it, a custom `binary` attribute does.
+- **Found on the way: P8's digest did not hold a new column's type.** It held the new column's name only, since both
+  sides read the same text; a reader option (the vendor) can make them differ. The digest now holds what a new table
+  and a new column are written with, so the server refuses a plan that would write another type than the review showed.
+  Unit test: the server without the vendor refuses.
+- Unit tests: `standard.test.ts` (SQL Server, PostgreSQL, Oracle, a file), `ddl.test.ts` (a SQL Server script, a
+  PostgreSQL script, one without signs), `type-check.test.ts` (`rowversion`), `import.test.ts` (the server's read).
+- `known-limitations.md`: "SQL Server's `timestamp` read from a file is a date" (with `time`'s default).
+
+### The 41 elements outside the viewport
+
+Traced by counting every element outside `.react-flow__viewport` by its nearest test id and by tag, on `slice-06b` and
+on this branch (measurement build, "Performance test" at 100 %): all 41 were `<span>`s in `tree-item`. Step 6 wrapped
+every tree item's name in a span of its own for the strike-through, whether the table was missing or not, so every
+item in the left panel had one element more (41 items listed). **Fixed** (`add7b0a`): the strike-through is a class on
+the name's existing span, and only a missing mark adds its dot. After the fix the whole page's counts equal
+`slice-06b`'s too:
+
+| View | `slice-06b` page / viewport | this branch page / viewport |
+| --- | --- | --- |
+| 100 %, frames expanded | 20,785 / 19,305 | 20,785 / 19,305 |
+| 30 %, frames expanded | 5,988 / 4,508 | 5,988 / 4,508 |
+| 100 %, frames collapsed | 6,297 / 4,907 | 6,297 / 4,907 |
+| 30 %, frames collapsed | 2,855 / 1,465 | 2,855 / 1,465 |
+
+The baseline is `.data/measure/s7a14-baseline/slice-06b.json` (git-ignored); the worktree it came from is removed.
+
+### Docs
+
+- `README.md`: the status (slices 0 to 7a), what slice 7a brings, the test files for trying the import, the bench
+  scripts and the review's measuring spec.
+- `CLAUDE.md`: the import in "What this is"; the bench scripts, the review's spec and the element guard in the
+  commands; slice 7a's e2e helpers; a "Source import" note (domain code, the wizard, the upload route and P8's
+  fingerprint, the samples' lint rule, the classes on the canvas, the system as a place).
+- `docs/inventory-prototype-vs-app.md`: rewritten against `infomapper-prototype-with-sources.html`; "Sources" lists what
+  7b and 7c still miss, and slice 7a's deliberate differences.
+- `docs/known-limitations.md`, checked against steps 1–7: added "Imports raise no changes to resolve yet" (PRD section
+  9), "An import's undo: all or nothing, and not after a restart" (F31), "SQL Server's `timestamp` read from a file is a
+  date" (step 7), "The upload relies on an experimental Next.js option" (step 4), "Combined mappings never get a type
+  conflict" (F1). Already there: the slow writes after large imports (step 4, option 1), the 30,000-row limit, the
+  relationship matching (F30, `ddadf55`).
+- `docs/ideas.md`, checked against steps 1–7: added matching a file's own headers (PRD section 10), the dbt, Snowflake
+  and Databricks channels, relationships between source tables as lines on the canvas (step 5, decision 2). Already
+  there: "Approve again all {n}" (step 1), one file per table in the local adapter (step 4).
+
+### The acceptance criteria
+
+Each criterion against its spec. "Passed" is the latest run of that file; the closing full runs are below.
+
+| ID | Spec(s) | What it checks | Result |
+| --- | --- | --- | --- |
+| S7A-01 | `S7A-01.spec.ts` (2), `standard.test.ts` | the samples and the template read; aliases, delimiters, quotes, BOM, `NULL`; each error and warning with its text; the standard's description and `template.csv` with Copy | passed |
+| S7A-02 | `S7A-02.spec.ts`; `standard.test.ts`, `import.test.ts` (`rowversion`) | each vendor's query with Copy and how-to, fractional seconds in the queries; a pasted SSMS result with `NULL` cells; a dropped CSV; Snowflake, Databricks and dbt disabled | passed |
+| S7A-03 | `S7A-03.spec.ts`, `ddl.test.ts` | the three DDL samples; each skip and warning; database and schema rules; the translated standard copied | passed |
+| S7A-04 | `S7A-04.spec.ts` (2), `S7A-04-route.spec.ts` | HR into "HR": all new; system, tables, columns, relationships, `source_import`, one change group; a taken name blocks Next | passed |
+| S7A-05 | `S7A-05.spec.ts` (2) | new, changed, unchanged, missing and back columns, new and back relationships, table meta, filter counts; P2; a comment overwrite | passed. A missing relationship is covered by the first import of the same test (`crmPartial` marks `FK_customer_addresses_customers` missing) and by `S7A-10`'s table panel ("· missing") |
+| S7A-06 | `S7A-06.spec.ts` (2) | an unselected table untouched; "Only columns of the tables in the file"; the mass warning and its button | passed |
+| S7A-07 | `S7A-07.spec.ts` (2) | the suggestion pre-selected; "renamed to" keeps the id, mappings, **label and requirement link** (added in step 7: the title said so, the spec did not check it), flags; "removed"; one new column paired once | passed |
+| S7A-08 | `S7A-08.spec.ts` (2), `plan.test.ts` | a business key type change on a direct mapping, a type conflict, **a combined mapping with its business key input and its renamed input in the rule, rule rewritten, and a draft keeping its status** (added in step 7: before, only in unit tests); approving clears the reason; item 25's impact texts | passed |
+| S7A-09 | `S7A-09.spec.ts` (2), route P8, `import.test.ts` | nothing written before "Import into"; Cancel and Esc; one undo step restores everything; P8's refresh keeps the choices | passed |
+| S7A-10 | `S7A-10.spec.ts` (2) | the tree's marks and tooltips, the canvas row and line marks, the table, column and mapping panels; a column that comes back loses its marks | passed |
+| S7A-11 | `S7A-11.spec.ts` (3) | the panel from the tree and from a table panel; counts, Re-import, the imports newest first; the Sources tab after an import; Back and Forward; the toast of a system gone | passed |
+| S7A-12 | `S7A-12.spec.ts` (3), `S7A-04-route.spec.ts` (2) | reviewer, reader and archived workspace see no import action; **the server refuses the reader, the reviewer and an archived workspace** (reviewer and archived added in step 7) | passed |
+| S7A-13 | `S7A-13.spec.ts` | no sample links on any channel; the standard and `template.csv` there | passed |
+| S7A-14 | `bench-import-*.ts` (steps 2–4), `S7A-14-review.spec.ts`, `S7A-14-counts.spec.ts`, `S3B-15-elements.spec.ts` | the figures within the bars at the 30,000-row limit (step 4); the review's filters ≤ 200 ms (step 5); counts over the whole plan (step 6); element counts equal `slice-06b`'s | passed |
+| S7A-15 | CI, two full runs | lint, typecheck, unit tests (87 files, 1,179 tests), `npm run schema:check` (a throwaway Postgres 18.3: "29 tables, 382 columns"): pass. **Two full runs: not run yet** (below). Changed earlier tests: S1A-09, S1A-13, S2C-06, S2C-07 (seed and default precision, step 6), S1A-13 (`max`, step 2), the format tests of step 4, `e2e/slice-06b/helpers.ts`'s `selected` | open |
+| S7A-16 | `S7A-16.spec.ts` (**new in step 7**), `plan.test.ts` | the demo's CRM (SQL Server) and WEB (PostgreSQL) and HR from Oracle, unchanged, through the query channel: no changes, no mapping to review, "No changes" | passed |
+| S7A-17 | `S7A-17.spec.ts`, `plan.test.ts` | DDL then the catalog query: only the computed column's type and the view; no mapping to review | passed |
+
+### The two full runs
+
+**Not run.** A development server was still running when the runs were to start (port 3000, PID 26124, `npm run dev`
+with `next dev`, started 23 October 09:35). Stopping it was refused by the session's permission rules, and the runs need
+no dev server running (CLAUDE.md). They wait for that server to be stopped.
+
+## Manual acceptance (the definition of done)
+
+Start from fresh demo data, with no other server running:
+
+```
+npm run reset-dev-data
+npm run dev
+```
+
+Open http://localhost:3000, sign in as Łukasz, open Retail Co – DWH, the project Customer 360, the canvas "Customer &
+orders". The test files are in `src/domain/import/samples/`.
+
+1. **Sources tab.** Click "Sources". You see "Import sources…" at the top and the systems CRM, WEB, ERP. Hover CRM's
+   header and click "⋯": CRM's panel, "Source system", "2 tables, 15 columns, 7 mapped", "Re-import CRM…", Imports "No
+   imports yet."
+2. **HR into a new system.** "Import sources…" → "A new system", name "HR" → "A file" → drop or choose
+   `hr_snapshot_2026-10-20.csv`: "2 tables, 10 columns". Next: the scope shows `hrdb.dbo` with two tables. Next: the
+   review, filters "12 all changes", "10 new (2 tables)", "2 relationships"; "Relationships between source tables" lists
+   `FK_employees_departments` and `FK_employees_manager`. "Import into HR".
+   **You see:** the toast "Imported into HR: 2 new tables, 10 new columns, 2 new relationships" with Undo; the Sources
+   tab with HR and its two tables; HR's panel open with one import (date and time, `hr_snapshot_2026-10-20.csv`,
+   Łukasz, the summary). Click `employees` in the tree, then "Relationships between source tables" in its panel: both
+   relationships.
+3. **Re-import CRM.** Open CRM's panel ("⋯" on CRM) and click "Re-import CRM…" (CRM is pre-selected). Drop
+   `crm_snapshot_2026-10-20.csv`: "4 tables, 24 columns, 4 warnings". Next, Next.
+   **In the review you see:**
+   - the callout "2 approved mappings go back to review after this import": Customer.customer_number "business key
+     column changed type, varchar(20) → varchar(25)", Customer.email "type conflict, varchar(255) into string(120)";
+   - the filters: 21 all changes, "11 new (2 tables)", 4 changed, 3 "removed or renamed?", 2 missing from source, 1
+     relationship;
+   - "What happened to dob?" pre-set to "It was renamed to date_of_birth (suggested: same position and type)": keep it;
+   - "What happened to created_ts?" and "What happened to segment?" on "It was removed from the source": leave both;
+     `created_ts`'s impact reads "Feeds Customer.created_at (in review); the mapping stays, on a column that is gone";
+   - "Warnings": three classifications not read yet (TECH, Effective date, Load date) and "batch_ref has no data_type.
+     Column skipped."
+   "Import into CRM".
+   **You see:** the toast "Imported into CRM: 2 new tables, 11 new columns, 3 changed columns, 1 renamed column, 2
+   missing from source, 1 new relationship" with Undo; the Sources tab, CRM's panel with ", 2 missing from source" and
+   the import listed.
+4. **The missing column on the canvas.** On the `customers` card, `created_ts` and `segment` are struck through in the
+   warning colour, muted, with the tooltip "Missing from source"; the line from `created_ts` to Customer.created_at is
+   dotted and faded. In the tree, `customers` has the orange dot (tooltip "Some columns are missing from source. …").
+   Click `created_ts`: its panel says "Missing from source since {today}". Click the `customers` card's header: the
+   panel lists `created_ts` and `segment` last, struck through, "missing".
+5. **The mapping in review.** Click `cust_no` on the card, then Customer.customer_number under "Feeds": the mapping's
+   status is "In review" and below it "An import sent it back to review: business key column changed type, varchar(20)
+   → varchar(25)."
+6. **Undo.** Click Undo (the toolbar's, or the toast's if still open): the toast "Undone: Import
+   crm_snapshot_2026-10-20.csv". **You see** everything as before step 3: no strike-through on the card, `dob` back, no
+   `customer_consents` or `crmprod.stage` in the tree, the mapping approved again without a reason, CRM's panel without
+   the import ("2 tables, 15 columns, 7 mapped").
+7. **Billing from a DDL script.** "Import sources…" → "A new system", name "Billing" → "DDL scripts" → drop
+   `billing.sql`. **You see:** "billing.sql: 2 tables, 14 columns, 3 keys, 2 comments", the database `billing` and the
+   schema `dbo` used, "Skipped: 2 SET statements, 1 CREATE INDEX, 1 default, 1 other ALTER TABLE statement", and "The
+   translated standard" to open and copy. Next, Next: in "Warnings", "dbo.invoice.full_ref is a computed column; its type
+   is not in the DDL, so it is imported as “computed”…" and "view dbo.v_open_invoices skipped. A DDL script does not give
+   the types of a view’s columns…". "Import into Billing": "Imported into Billing: 2 new tables, 14 new columns, 1 new
+   relationship".
+8. **Back and Forward.** Click the Back button before the breadcrumbs a few times: the system panels and the items you
+   selected come back one by one, the latest first (a system has no place on the canvas, so the view does not move);
+   Forward walks the other way.
