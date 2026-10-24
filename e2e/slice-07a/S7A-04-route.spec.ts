@@ -12,6 +12,7 @@ import { readStandard } from "../../src/domain/import/standard";
 import { E2E_DB } from "../config";
 import { loadModel, RETAIL, signInAs } from "../slice-01a/helpers";
 import { expect, test } from "./fixtures";
+import { archive } from "./helpers";
 
 const sample = (name: string) => fs.readFileSync(path.resolve("src", "domain", "import", "samples", name), "utf8");
 
@@ -50,6 +51,17 @@ test("S7A-12 (route): a reader is refused by the server, and nothing is written"
   await signInAs(page, "Kasia Zielińska");
   const { body } = await post(page, await inputFor(sample("hr_snapshot_2026-10-20.csv"), { newName: "HR" }, "hr.csv"));
   expect(body).toMatchObject({ ok: false, code: "forbidden" });
+  expect((await loadModel()).sourceSystems.some((s) => s.name === "HR")).toBe(false);
+});
+
+test("S7A-12 (route): a reviewer, and the owner of an archived workspace, are refused by the server; nothing is written", async ({ page }) => {
+  await signInAs(page, "Piotr Wiśniewski");
+  const asReviewer = await post(page, await inputFor(sample("hr_snapshot_2026-10-20.csv"), { newName: "HR" }, "hr.csv"));
+  expect(asReviewer.body).toMatchObject({ ok: false, code: "forbidden" });
+  await archive();
+  await signInAs(page, "Łukasz");
+  const archived = await post(page, await inputFor(sample("hr_snapshot_2026-10-20.csv"), { newName: "HR" }, "hr.csv"));
+  expect(archived.body).toMatchObject({ ok: false });
   expect((await loadModel()).sourceSystems.some((s) => s.name === "HR")).toBe(false);
 });
 

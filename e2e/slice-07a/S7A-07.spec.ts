@@ -1,5 +1,13 @@
 import { expect, test } from "./fixtures";
-import { importNow, loadModel, openWizard, reviewFile, reviewRow, sample } from "./helpers";
+import { labelItem } from "../slice-03b/helpers";
+import { linkReq } from "../slice-04b2/helpers";
+import { importNow, loadModel, openWizard, RETAIL, reviewFile, reviewRow, sample, store } from "./helpers";
+
+/** The live label and requirement links on a column. */
+const linksOn = async (columnId: string) => ({
+  labels: (await store().labels.listLinks(RETAIL)).filter((k) => k.deleted_at === null && k.source_column_id === columnId).length,
+  requirements: (await store().requirements.listLinks(RETAIL)).filter((k) => k.deleted_at === null && k.source_column_id === columnId).length,
+});
 
 const columnsOf = async (table: string) => {
   const m = await loadModel();
@@ -12,6 +20,10 @@ test("S7A-07: the suggested rename is pre-selected; “renamed to” keeps the c
   const dob = before.cols.find((c) => c.name === "dob")!;
   const created = before.cols.find((c) => c.name === "created_ts")!;
   const createdMapping = before.m.mappingInputs.find((i) => i.source_column_id === created.id)!.mapping_id;
+  // a label and a requirement link on the column that is renamed
+  await labelItem("CR-23", { kind: "source_column", id: dob.id });
+  await linkReq("REQ-101", { kind: "source_column", id: dob.id });
+  expect(await linksOn(dob.id)).toEqual({ labels: 1, requirements: 1 });
 
   await openWizard(page);
   await reviewFile(page, { existing: "CRM" }, "crm.csv", sample("crm_snapshot_2026-10-20.csv"));
@@ -28,6 +40,7 @@ test("S7A-07: the suggested rename is pre-selected; “renamed to” keeps the c
 
   const after = await columnsOf("customers");
   expect(after.cols.find((c) => c.name === "date_of_birth")).toMatchObject({ id: dob.id, is_pii: dob.is_pii, missing_since: null });
+  expect(await linksOn(dob.id)).toEqual({ labels: 1, requirements: 1 });
   expect(after.cols.find((c) => c.name === "created_on")!.id).toBe(created.id);
   expect(after.m.mappingInputs.find((i) => i.mapping_id === createdMapping)!.source_column_id).toBe(created.id);
   expect(after.m.mappings.find((m) => m.id === createdMapping)).toMatchObject({ rule_expression: "CAST(created_on AS date)", status: "review", review_reason: null });

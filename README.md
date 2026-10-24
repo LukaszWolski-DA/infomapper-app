@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 6b are merged. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 7a are merged. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -41,11 +41,16 @@ fits every width from 800 to 2,560 px (short labels, then “More” for Focus, 
 remembered view that stays put beside another left panel; slice 6b's back and forward: two buttons before the
 breadcrumbs, Alt+←/→, the browser's back and the mouse's buttons walk one history, the browser's own, in which pages and
 single selections are places (going back selects the item, centres it when it is off screen and never opens a hidden
-details panel; a place that no longer exists says so). Acceptance:
+details panel; a place that no longer exists says so); slice 7a's source import: “Import sources…” describes a system
+from a file in InfoMapper's source standard, a catalog query's result (SQL Server, PostgreSQL, Oracle) or DDL scripts,
+and re-imports it; a review shows every new, changed, renamed, missing and returning table, column and relationship and
+the approved mappings that go back to review before anything is written, and the import is one undo step; missing
+tables and columns are marked in the Sources tab, on the canvas and in the panels, and each system has a panel with its
+imports. Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md).
 
 ## Getting started
 
@@ -60,7 +65,10 @@ npm run dev                       # http://localhost:3000
 
 Open http://localhost:3000 and pick a test user on the development sign-in page. The demo data mirrors the prototype,
 including its model (concepts Customer, Sales, Product, Reference data; sources CRM, WEB, ERP) on the canvases of
-Retail Co – DWH and Sales analytics, and the prototype's five requirements (REQ-101 to REQ-105) in Retail Co – DWH:
+Retail Co – DWH and Sales analytics, and the prototype's five requirements (REQ-101 to REQ-105) in Retail Co – DWH.
+The demo's sources record no import (“not imported yet”). To try the import, use the test files in
+`src/domain/import/samples/` (the prototype's CRM, HR and flat-file samples, its DDL scripts, and catalog-query results
+of the demo's systems; see the README there): “Import sources…” at the top of the Sources tab.
 
 | Organization | Workspace | People |
 | --- | --- | --- |
@@ -98,6 +106,8 @@ Until the database slice (last, AD-31), data lives in a JSON file on the server 
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts` | S3B-15 (a): the elements in the viewport of “Performance test” at 100 % and 30 %, frames expanded and collapsed; with `ELEMENTS_BASELINE=<file>` they must equal the previous tag's (`test-results/S3B-15-elements.json`) |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-03b/S3B-15-live.spec.ts` | S3B-15 (c): pan and zoom at 100 % on PERF-2's live canvas against “Performance test”, in turns (`test-results/S3B-15-live.json`) |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04a/S4A-14-elements.spec.ts` | S4A-14: the viewport counts of “Performance test” must equal `slice-03b`'s (`.data/measure/s4a14-baseline/slice-03b.json`, or `ELEMENTS_BASELINE=<file>`) |
+| `npx tsx scripts/bench-import-read.ts` / `bench-import-plan.ts` / `bench-import-write.ts` | Slice 7a's import figures on synthetic files: reading the standard and translating DDL (20,000 and 100,000 column rows), planning a re-import with 5 % changed, and writing, re-importing and undoing through the local adapter on a copy of the demo data (`bench-import-write.ts 20000`) |
+| `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07a/S7A-14-review.spec.ts` | Slice 7a: switching the review's filters on a 20,000-column file and its re-import (`test-results/S7A-14-review.json`) |
 | `npx tsx scripts/bench-requirement-index.ts` | Builds the requirement index 30 times on a synthetic model (500 requirements, 5,000 attributes, 2,000 mappings, 3,000 links) and prints the median (slice 4a, not a gate) |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-fading.spec.ts` | Slice 4p's fading scenarios on “Performance test” (Focus and four lenses, 100 % and 30 %, frames expanded and collapsed): switching on and off, pan and zoom with fading on and off (`test-results/S4P-fading.json`); `npm run measure:canvas` runs it on both sides |
 | `npx tsx scripts/measure-trials.ts --rounds 3 --against slice-04a --sides <ref,ref,…>` | Slice 4p's sitting for several trial branches against a reference, each in its own worktree, in turns (`--prepare-only`, `--no-build`, `--add-round`, `--drop`); summary in `.data/measure/trials-<time>/summary.md` |

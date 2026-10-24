@@ -718,3 +718,39 @@ target table and column pairs (slice 7a, step 4): a DDL script names an unnamed 
 Server's catalog gives the name it generated, and the review shows the same relationship as one "changed" with its new
 name, not as a missing and a new one (S7A-17). What remains: two keys over the same columns to the same table, both
 renamed, are paired in file order.
+
+### Imports raise no changes to resolve yet
+
+A slice 7a import marks what is missing from source and sends approved mappings back to review with their reasons, but
+it records no "changes to resolve" (retire, move mappings, delete, not needed…). Those, their counts in the tree, the
+status bar and the panels, and model consistency on the project home come with slice 7b, which decides whether it
+derives open changes from the statuses 7a stored or starts with an empty list (PRD 7a, section 9).
+
+### An import's undo: all or nothing, and not after a restart
+
+An import is one undo step (P7). Undo is refused as a whole ("This can't be undone because it was changed afterwards.")
+when any row the import wrote has changed since: a new column mapped, a business key set, a table renamed. The undo
+history lives in the server's memory ("The undo history lives in server memory" above), so an import cannot be undone
+after the server restarts. Approving a mapping again, or importing the previous file again, is the way back then.
+
+### SQL Server's `timestamp` read from a file is a date
+
+SQL Server's `timestamp` is `rowversion`, a row's version stamp (binary(8)), not a date. The query channel (with SQL
+Server chosen) and the DDL channel (a script with SQL Server's signs: brackets, `GO`, `IDENTITY`) write it as
+`rowversion` (slice 7a, step 7). A file in the standard does not say which database it comes from, so `timestamp` there
+is read as everywhere else: a date with 6 digits of fractional seconds (`timestamp(6)`, PostgreSQL's and Oracle's
+meaning). Write `rowversion` in such a file for a SQL Server column. The same holds for `time` without a parameter:
+SQL Server's default is 7 digits, PostgreSQL's 6, so it keeps no default and `time` against `time(7)` shows as a change.
+
+### The upload relies on an experimental Next.js option
+
+An import's text goes to `POST /w/{workspace}/import` (up to 25 MB). The proxy (`src/proxy.ts`) buffers request bodies
+up to 10 MB by default and cuts off the rest, so `next.config.ts` sets `experimental.proxyClientMaxBodySize: "25mb"`
+(slice 7a, step 4; `S7A-04-route.spec.ts` sends 12 MB and 26 MB). An upgrade of Next.js may rename or drop it; the spec
+fails if it does.
+
+### Combined mappings never get a type conflict
+
+A mapping with two or more inputs is a transformation with a rule, and a rule is never a type problem (D-01). So an
+import can send a combined mapping back to review for a business key column that changed type or a renamed input in its
+rule, but never for a type conflict; only direct mappings get that reason (slice 7a, step 1, F1).

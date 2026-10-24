@@ -5,8 +5,9 @@ Read this file at the start of every session. It is short on purpose; the detail
 ## What this is
 
 InfoMapper is a data-modeling application for data warehouse work. Business analysts model concepts, entities and
-attributes, describe physical source tables and columns, map columns to attributes, and trace requirements to all
-of it. One workspace holds one model; projects and canvases organise the work on it.
+attributes, describe physical source tables and columns (by hand, or imported and re-imported from a file, a catalog
+query's result or DDL scripts, slice 7a), map columns to attributes, and trace requirements to all of it. One workspace
+holds one model; projects and canvases organise the work on it.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -160,6 +161,11 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04b2/S4B2-15-la
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-05a/S5A-08.spec.ts         # slice 5a: side panels to the screen, layers
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06a/S6A-09.spec.ts         # slice 6a: chips and "Show all" to the screen (HAND_ONLY=1: a chip appearing)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06a/S6A-09-hand.spec.ts    # slice 6a: a chip appearing, phase by phase
+npx tsx scripts/bench-import-read.ts                          # slice 7a: read the standard, translate DDL (20,000 and 100,000 column rows)
+npx tsx scripts/bench-import-plan.ts                          # slice 7a: plan a re-import, 5 % changed (and P8's digest)
+npx tsx scripts/bench-import-write.ts 20000                   # slice 7a: import, re-import and undo through the local adapter, on a copy
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07a/S7A-14-review.spec.ts  # slice 7a: the review's filters on 20,000 columns
+MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7a14-baseline/slice-06b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7A-14's element guard
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06b/S6B-10.spec.ts         # slice 6b: selection places, the buttons, the background refresh, phase by phase
 BROWSERS=1 npx playwright test e2e/slice-06b/S6B-browsers.spec.ts                          # slice 6b: smoke in Chromium, Firefox and WebKit (on demand; needs `npx playwright install firefox webkit`)
 SCREENS=<folder> npx playwright test e2e/slice-04b1/S4B1-06-screens.spec.ts               # slice 4b-1's coverage colour screenshots
@@ -206,8 +212,12 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   (`viewportTransform`). Slice 6a's read the view-state bar (`viewBar`, `chip`, `chipOff`, `chipTexts`, `expectChips`,
   `breadcrumbsRow`) and set a card's row filter or collapse as test data (`setCard`). Slice 6b's walk the history
   (`backButton`, `forwardButton`, `altArrow`, `buttonsEnabled`, `expectAt`, `WS_HOME`, `projectPath`) and read the
-  selection from the details panel, hidden or not (`selected`, `expectSelected`, `clickCard`). The undo history lives in the
-  server's memory and is empty again after each reseed.
+  selection from the details panel, hidden or not (`selected`, `expectSelected`, `clickCard`; a system panel reads
+  `system:<name>` since slice 7a). Slice 7a's open the wizard (`openWizard`), pick its target (`target`), hand a file to
+  a drop zone (`giveFile`), go to the review (`reviewFile`), import (`importNow`), read the filters and rows
+  (`filterCount`, `reviewRow`), the test files (`sample`, from `src/domain/import/samples/`; `crmPartial`) and the
+  imports (`imports`, `systemNamed`). The undo history lives in the server's memory and is empty again after each
+  reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
   with notes below 40 % zoom (a note measured while drawn plain once grew on every round), `S3B-15-idle.spec.ts` on a
@@ -300,5 +310,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   `node_modules/next/dist/docs/` before using a Next.js API you have not used here yet (e.g. `proxy.ts`, not middleware).
 - shadcn/ui components go to `src/ui/components` (`npx shadcn add <name>`); colours come from the prototype palette in
   `src/app/globals.css` (`bg-im-surface`, `text-im-ink-2`, …).
+- **Source import** (slice 7a, D-55): the readers and the engine are pure domain code (`src/domain/import/`:
+  `standard.ts`, `ddl.ts`, `plan.ts`, `apply.ts`, `compare.ts`); the wizard (`src/app/_panels/import/`) reads and plans in
+  the browser; “Import into” sends the text and the choices to the upload route `POST /w/{workspace}/import`
+  (`src/app/_lib/import-sources.ts`, `runCommand` and `importSources`), where the server reads and plans again and writes
+  only when the plan's fingerprint matches the review's (P8). Anything that changes how a file is read (a reader's
+  option, such as the query channel's vendor) must be sent too, or the server plans differently and refuses. The test
+  files in `src/domain/import/samples/` are read only by tests (an ESLint rule; P10: no samples in the app). Missing
+  marks on the canvas are classes on existing elements (`row.gone`, `path.s.gone`; AD-24); a source system is a
+  selection `{ t: "element", kind: "source_system" }` and a history place (`GONE.source_system`).
 - Writes: a server action calls `runCommand()` (`src/app/_lib/run-command.ts`), which runs the domain command and
   applies its write set through the adapter; refusals come back with the domain's message and are shown as toasts.
