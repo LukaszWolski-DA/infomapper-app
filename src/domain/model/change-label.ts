@@ -14,6 +14,9 @@ const NOUN: Record<string, string> = {
   source_system: "source system",
   source_table: "source table",
   source_column: "column",
+  source_relationship: "relationship between source tables",
+  source_relationship_column: "relationship column",
+  source_import: "import",
   mapping: "mapping",
   mapping_input: "mapping input",
   canvas_item: "card",
@@ -67,6 +70,12 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function changeLabel(events: readonly ChangeEvent[]): string {
   if (events.length === 0) return "Change";
+  // slice 7a: an import, by its source (“Import crm_snapshot.csv”)
+  const imported = events.find((e) => e.object_type === "source_import" && e.operation !== "update");
+  if (imported) {
+    const label = String((imported.after_image ?? imported.before_image)?.source_label ?? "sources");
+    return imported.operation === "create" ? `Import ${label}` : imported.operation === "delete" ? `Undo import ${label}` : `Import ${label}`;
+  }
   const of = (table: string) => events.filter((e) => e.object_type === table);
 
   // Layout: one card changed in place.
@@ -162,7 +171,7 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
 
   // Mappings: status, split and merge (D-49).
   const mappings = of("mapping");
-  if (mappings.length === events.length && mappings.every((e) => e.operation === "update" && only(e, ["status", "approved_by", "approved_at"]))) {
+  if (mappings.length === events.length && mappings.every((e) => e.operation === "update" && only(e, ["status", "approved_by", "approved_at", "review_reason"]))) {
     return "Set mapping status";
   }
   const kept = mappings.some((e) => e.operation === "update");

@@ -27,6 +27,8 @@ const model: WorkspaceModel = {
   sourceTables: [sourceTable(), sourceTable({ id: ordersTable, schema_name: "stage", name: "orders" })],
   sourceColumns: [sourceColumn(ids.colCustId), sourceColumn(ids.colEmail), sourceColumn(ids.colFirstName)],
   mappings: [],
+  sourceRelationships: [],
+  sourceRelationshipColumns: [],
   mappingInputs: [],
 };
 const items = [

@@ -148,8 +148,16 @@ export function createLocalDataStore(file: string): DataStore {
           sourceColumns: of(db.source_column).sort((a, b) => a.source_table_id.localeCompare(b.source_table_id) || a.ordinal - b.ordinal),
           mappings: of(db.mapping),
           mappingInputs: of(db.mapping_input).sort((a, b) => a.mapping_id.localeCompare(b.mapping_id) || a.sort_order - b.sort_order),
+          sourceRelationships: of(db.source_relationship),
+          sourceRelationshipColumns: of(db.source_relationship_column).sort(
+            (a, b) => a.source_relationship_id.localeCompare(b.source_relationship_id) || a.sort_order - b.sort_order,
+          ),
         };
       },
+      listImports: async (workspaceId, sourceSystemId) =>
+        live((await load()).source_import)
+          .filter((i) => i.workspace_id === workspaceId && (sourceSystemId === undefined || i.source_system_id === sourceSystemId))
+          .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)),
       loadForUndo: async (workspaceId) => {
         const db = await load();
         const rows = {} as Record<string, unknown[]>;
@@ -240,38 +248,70 @@ export function createLocalDataStore(file: string): DataStore {
 }
 
 async function applyToFile(file: string, writeSet: WriteSet): Promise<ApplyResult> {
-  const next = structuredClone(await readDbCached(file)) as DevDb;
+  // Copy on write (slice 7a): the cached file is frozen, so only the tables this write touches get new arrays; their
+  // written rows are new objects, every other row is shared with the cache.
+  const current = await readDbCached(file);
+  const next = { ...current } as DevDb;
+  const touched = new Set<DevTable>(writeSet.writes.map((w) => w.table));
+  const rowsOfNext = next as unknown as Record<DevTable, unknown[]>;
+  for (const table of touched) rowsOfNext[table] = [...(current[table] as readonly unknown[])];
+  const index = new KeyIndex(next);
   for (const write of writeSet.writes) {
-    const error = applyWrite(next, write);
+    const error = applyWrite(next, index, write);
     if (error) return { ok: false, error };
   }
-  next.change_event.push(...structuredClone(writeSet.events));
-  const violation = findViolation(next);
+  next.change_event = [...current.change_event, ...structuredClone(writeSet.events)];
+  // only what this write can have broken: the touched tables and the new change events
+  const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length });
   if (violation) return { ok: false, error: violationError(violation) };
   await writeDb(file, next);
   return { ok: true };
 }
 
-function applyWrite(db: DevDb, write: Write): DomainError | null {
+/**
+ * Where each row of a table is, by key, built the first time a write touches the table (slice 7a: an import writes tens
+ * of thousands of rows; searching the table for each one was quadratic).
+ */
+class KeyIndex {
+  private readonly tables = new Map<DevTable, Map<string, number>>();
+  constructor(private readonly db: DevDb) {}
+  of(table: DevTable): Map<string, number> {
+    let index = this.tables.get(table);
+    if (!index) {
+      index = new Map(rowsOf(this.db, table).map((r, i) => [keyOf(table, r), i]));
+      this.tables.set(table, index);
+    }
+    return index;
+  }
+  /** After a row was removed from the middle: positions shift, so the table is indexed again on its next use. */
+  drop(table: DevTable): void {
+    this.tables.delete(table);
+  }
+}
+
+function applyWrite(db: DevDb, keys: KeyIndex, write: Write): DomainError | null {
   const table: DevTable = write.table;
   const rows = rowsOf(db, table);
+  const positions = keys.of(table);
 
   if (write.kind === "insert") {
     const row = write.row as unknown as AnyRow;
     const key = keyOf(table, row);
-    if (rows.some((r) => keyOf(table, r) === key)) return domainError("conflict", "This already exists.");
+    if (positions.has(key)) return domainError("conflict", "This already exists.");
+    positions.set(key, rows.length);
     rows.push(structuredClone(row));
     return null;
   }
 
   const before = write.before as unknown as AnyRow;
   const key = keyOf(table, before);
-  const index = rows.findIndex((r) => keyOf(table, r) === key);
-  if (index === -1) return notFound("record");
+  const index = positions.get(key);
+  if (index === undefined) return notFound("record");
   const stored = rows[index]!;
 
   if (write.kind === "remove") {
     rows.splice(index, 1);
+    keys.drop(table);
     return null;
   }
 

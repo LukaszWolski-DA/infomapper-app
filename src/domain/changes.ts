@@ -32,6 +32,11 @@ export interface WriteSet {
    * but only the moved attribute gets the active context's label.
    */
   mainTargets?: { kind: "entity" | "attribute" | "mapping"; id: Uuid }[];
+  /**
+   * The working context labels nothing in this group (slice 7a, P9: an import, including the mappings it sends back to
+   * review); its change events still record the context, as a layout change's do (D-26).
+   */
+  labelNothing?: boolean;
 }
 
 export type CommandResult<T = undefined> =

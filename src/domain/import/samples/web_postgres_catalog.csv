@@ -1,0 +1,5 @@
+database,schema,table,object_type,row_count,table_comment,column,ordinal,data_type,length,precision,scale,nullable,primary_key,fk_name,fk_ref_schema,fk_ref_table,fk_ref_column,column_comment,classifications
+shopdb,public,web_users,table,96412,,user_id,1,uuid,,,,no,yes,,,,,,
+shopdb,public,web_users,table,96412,,email,2,varchar,255,,,yes,no,,,,,,
+shopdb,public,web_users,table,96412,,cust_no,3,varchar,20,,,yes,no,,,,,,
+shopdb,public,web_users,table,96412,,registered_at,4,timestamp,,6,,yes,no,,,,,,

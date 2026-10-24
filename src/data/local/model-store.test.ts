@@ -95,14 +95,32 @@ describe("demo model (slice 1a PRD, demo data)", () => {
     expect(m.relationships).toHaveLength(5);
   });
 
-  it("has exactly the prototype's one type problem: item_code varchar(30) into Order Line.product_id integer", async () => {
+  it("has exactly the prototype's two type problems: item_code into Order Line.product_id, web_users.email into Customer.email", async () => {
+    // the second since slice 7a gave Customer.email its length 120 (step 1, answer 10): varchar(255) no longer fits
     const m = await store.model.load(RETAIL);
     const problems = m.mappings.filter((x) => {
       const attribute = m.attributes.find((a) => a.id === x.attribute_id)!;
       const columns = m.mappingInputs.filter((i) => i.mapping_id === x.id).map((i) => m.sourceColumns.find((c) => c.id === i.source_column_id)!);
       return !checkMappingTypes(x, attribute, columns).ok;
     });
-    expect(problems.map((x) => x.attribute_id)).toEqual([seedId(RETAIL, "attribute:line.product_id")]);
+    expect(problems.map((x) => x.attribute_id).sort()).toEqual([seedId(RETAIL, "attribute:customer.email"), seedId(RETAIL, "attribute:line.product_id")].sort());
+    expect(problems.find((x) => x.attribute_id === seedId(RETAIL, "attribute:customer.email"))!.status).toBe("draft");
+  });
+
+  it("has the prototype's attribute lengths, two source relationships and datetime2(7) (slice 7a, answer 10, step 6)", async () => {
+    const m = await store.model.load(RETAIL);
+    const customer = byName(m.entities, "Customer");
+    const length = (name: string) => m.attributes.find((a) => a.entity_id === customer.id && a.name === name)!.type_length;
+    expect([length("email"), length("first_name"), length("last_name"), length("segment_code"), length("customer_number")]).toEqual([120, 50, 50, 3, null]);
+    const tableOf = (id: string) => m.sourceTables.find((t) => t.id === id)!.name;
+    expect(m.sourceRelationships.map((r) => `${r.name}: ${tableOf(r.source_table_id)} → ${tableOf(r.to_source_table_id)}`).sort()).toEqual([
+      "FK_customer_addresses_customers: customer_addresses → customers",
+      "FK_order_line_order_header: order_line → order_header",
+    ]);
+    expect(m.sourceRelationshipColumns).toHaveLength(2);
+    expect(await store.model.listImports(RETAIL)).toEqual([]); // "not imported yet" (item 41)
+    const created = m.sourceColumns.find((c) => c.name === "created_ts")!;
+    expect([created.data_type, created.type_precision]).toEqual(["datetime2", 7]);
   });
 
   it("places the cards on the two canvases at the prototype's positions, without frames", async () => {

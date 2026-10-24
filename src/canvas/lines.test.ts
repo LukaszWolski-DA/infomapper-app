@@ -29,6 +29,8 @@ const model: WorkspaceModel = {
   sourceTables: [sourceTable()],
   sourceColumns: [sourceColumn(ids.colCustId), sourceColumn(ids.colEmail), sourceColumn(ids.colFirstName)],
   mappings: [mapping({ status: "approved", approved_at: "2026-10-01T00:00:00.000Z" }), combined],
+  sourceRelationships: [],
+  sourceRelationshipColumns: [],
   mappingInputs: [
     mappingInput(),
     mappingInput("01900000-0000-7000-8000-00000000b002", { mapping_id: combined.id, source_column_id: ids.colFirstName, sort_order: 1 }),

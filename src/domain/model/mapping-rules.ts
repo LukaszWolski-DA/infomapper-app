@@ -10,11 +10,12 @@ export const BACK_TO_REVIEW_MESSAGE = "This mapping was approved; your change se
 
 /**
  * D-51: changing an approved mapping's inputs, kind or rule sends it back to review and clears the approval, whether
- * four-eyes is on or not. Returns the extra columns for the mapping's next version and the message to show.
+ * four-eyes is on or not. Returns the extra columns for the mapping's next version and the message to show. Any content
+ * change also clears an import's review reason (slice 7a, step 1, answer 6).
  */
-export function afterContentChange(before: Pick<Mapping, "status">): { patch: Partial<Mapping>; notice: string | null } {
-  if (before.status !== "approved") return { patch: {}, notice: null };
-  return { patch: { status: "review", approved_by: null, approved_at: null }, notice: BACK_TO_REVIEW_MESSAGE };
+export function afterContentChange(before: Pick<Mapping, "status" | "review_reason">): { patch: Partial<Mapping>; notice: string | null } {
+  if (before.status !== "approved") return { patch: before.review_reason !== null ? { review_reason: null } : {}, notice: null };
+  return { patch: { status: "review", approved_by: null, approved_at: null, review_reason: null }, notice: BACK_TO_REVIEW_MESSAGE };
 }
 
 /**
@@ -56,6 +57,9 @@ function isContentChange(mappingId: Uuid, e: ChangeEvent): boolean {
   if (e.operation === "create") return true;
   const before = e.before_image ?? {};
   const after = e.after_image ?? {};
+  // slice 7a (step 1, answer 7): an import that sent the approved mapping back to review counts as its last editor, so
+  // with four-eyes on the person who imported does not approve it again
+  if (before.status === "approved" && after.status === "review" && typeof after.review_reason === "string") return true;
   return before.kind !== after.kind || before.rule_expression !== after.rule_expression;
 }
 

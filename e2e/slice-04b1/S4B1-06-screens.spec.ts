@@ -16,7 +16,7 @@ import { AROUND, collapsedFrame } from "../slice-02c/helpers";
 import { canvasUrl, openCanvas, openRequirement, signInAs } from "./helpers";
 
 const OUT = path.resolve("docs", "prd", "slice-04b1-screens", process.env.SCREENS === "1" ? "latest" : (process.env.SCREENS ?? "latest"));
-const PROTOTYPE = pathToFileURL(path.resolve("docs", "prototype", "infomapper-model-prototype.html")).href;
+const PROTOTYPE = pathToFileURL(path.resolve("docs", "prototype", "infomapper-prototype-with-sources.html")).href;
 
 test.use({ viewport: { width: 1536, height: 864 } });
 

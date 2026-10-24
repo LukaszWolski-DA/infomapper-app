@@ -2,8 +2,8 @@
 
 // The right panel (prototype #ins): shows and edits what is selected on the canvas: an entity, attribute, mapping,
 // relationship, source table or column, a frame (slice 2b), a bundle of lines (slice 2c), a working label or a note (slice 3a),
-// a requirement, or an element whose card is not on this canvas (slice 4a: the go-to links' fallback); with nothing
-// selected, an overview of this canvas.
+// a requirement, or an element whose card is not on this canvas (slice 4a: the go-to links' fallback), a source system
+// (slice 7a); with nothing selected, an overview of this canvas.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
@@ -19,12 +19,15 @@ import { NotePanel } from "./note-panel";
 import { useCanvasHost, type HostCard } from "./canvas-host";
 import type { PendingInput } from "./map-column";
 import { MappingPanel } from "./mapping-panel";
+import type { ImportData } from "./import/wizard-model";
+import type { SystemImport } from "./import/system-imports";
 import { indexModel, type ModelIndex } from "./model-index";
 import { OverviewPanel } from "./overview-panel";
 import { RelationshipPanel } from "./relationship-panel";
 import { RequirementPanel } from "./requirement-panel";
 import { SelectionPanel } from "./selection-panel";
 import { SourceColumnPanel, SourceTablePanel } from "./source-panels";
+import { SystemPanel } from "./system-panel";
 import type { TreeData } from "./tree-data";
 
 export interface InspectorProps {
@@ -68,6 +71,10 @@ export interface InspectorProps {
   live: { labelId: Uuid; labelName: string } | null;
   /** May create canvases (opening a new live canvas): owners, admins, modelers. */
   canCreateCanvas: boolean;
+  /** Every import of the workspace, newest first (slice 7a, the system panel). */
+  imports: SystemImport[];
+  /** What the import wizard reads, for “Re-import {system}…”; only for those who may edit. */
+  importData?: ImportData;
 }
 
 export interface CanvasPlace {
@@ -98,6 +105,8 @@ export interface PanelContext extends Omit<InspectorProps, "model" | "cards" | "
   goMapping: (mappingId: Uuid) => void;
   goColumn: (columnId: Uuid) => void;
   goTable: (tableId: Uuid) => void;
+  /** Opens a source system's panel (slice 7a). */
+  goSystem: (systemId: Uuid) => void;
   /** Opens a requirement's panel (slice 4a). */
   goRequirement: (requirementId: Uuid) => void;
   /** Opens a working label's panel (slice 3a). */
@@ -155,6 +164,7 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
         const card = cardOf(ix.column.get(columnId)?.source_table_id ?? "");
         ui.select(card ? { t: "row", cardId: card, id: columnId } : { t: "element", kind: "source_column", id: columnId });
       },
+      goSystem: (systemId) => ui.select({ t: "element", kind: "source_system", id: systemId }),
       goTable: (tableId) => {
         const card = cardOf(tableId);
         if (!card) return ui.select({ t: "element", kind: "source_table", id: tableId });
@@ -208,6 +218,8 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     body = <SourceTablePanel key={sel.id} table={ix.table.get(sel.id)!} cardId={cardOf(sel.id)} />;
   } else if (sel?.t === "element" && sel.kind === "source_column" && ix.column.has(sel.id)) {
     body = <SourceColumnPanel key={sel.id} column={ix.column.get(sel.id)!} />;
+  } else if (sel?.t === "element" && sel.kind === "source_system" && ix.model.sourceSystems.some((s) => s.id === sel.id)) {
+    body = <SystemPanel key={sel.id} system={ix.model.sourceSystems.find((s) => s.id === sel.id)!} />;
   } else if (sel?.t === "rel" && ix.model.relationships.some((r) => r.id === sel.id)) {
     body = <RelationshipPanel key={sel.id} relationship={ix.model.relationships.find((r) => r.id === sel.id)!} />;
   }

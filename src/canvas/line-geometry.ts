@@ -15,6 +15,11 @@ export const placedOf = (n: InternalNode | undefined): Placed | null =>
 export interface MapGeom {
   /** Input curves (to the attribute, or to the ƒ node of a combined mapping) and the ƒ node's line on. */
   paths: string[];
+  /**
+   * Per path: drawn as from a column missing from source (slice 7a, item 34, F29): an input curve whose column is
+   * missing, the ƒ node's line when every input is. Left out where nothing is missing.
+   */
+  gone?: boolean[];
   dots: [number, number][];
   chip: { x: number; y: number; text: string } | null;
   part: boolean;
@@ -29,17 +34,23 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
   if (!target) return null;
   const attr = rowEnd(target, line.attributeId);
   const inputs: End[] = [];
+  const gone: boolean[] = [];
   for (const i of line.inputs) {
     const p = placedOf(lookup.get(i.cardId));
-    if (p) inputs.push(rowEnd(p, i.columnId));
+    if (p) {
+      inputs.push(rowEnd(p, i.columnId));
+      gone.push(!!i.gone);
+    }
   }
   if (!inputs.length) return null;
+  const anyGone = gone.some(Boolean);
   const part = attr.hidden || inputs.some((e) => e.hidden);
   if (line.inputCount > 1) {
     const f = fNode(attr, inputs);
     const curves = inputs.map((e) => curve(e, f.end));
     return {
       paths: [...curves.map((c) => c.d), f.out],
+      ...(anyGone ? { gone: [...gone, gone.every(Boolean)] } : {}),
       dots: [...curves.map((c) => [c.p0.x, c.p0.y] as [number, number]), [f.to.x, f.to.y]],
       chip: { x: f.node.x, y: f.node.y, text: "ƒ" },
       part,
@@ -51,6 +62,7 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
   const text = line.warn ? "!" : line.ruled ? "ƒ" : "";
   return {
     paths: [g.d],
+    ...(anyGone ? { gone } : {}),
     dots: [
       [g.p0.x, g.p0.y],
       [g.p3.x, g.p3.y],

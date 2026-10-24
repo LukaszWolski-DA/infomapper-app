@@ -1,3 +1,5 @@
 * text=auto eol=lf
 *.png binary
 *.jpg binary
+# Import samples are test files whose bytes matter (line ends, BOM): keep them as written (slice 7a).
+src/domain/import/samples/** -text

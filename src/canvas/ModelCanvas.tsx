@@ -1674,7 +1674,10 @@ export function ModelCanvas({
           break;
         }
         case "element":
-          if (model && ![...model.entities, ...model.attributes, ...model.sourceTables, ...model.sourceColumns].some((e) => e.id === sel.id)) gone = "element";
+          // a source system (slice 7a) has no place on the canvas: its panel only, never centred
+          if (sel.kind === "source_system") {
+            if (model && !model.sourceSystems.some((s) => s.id === sel.id)) gone = "source_system";
+          } else if (model && ![...model.entities, ...model.attributes, ...model.sourceTables, ...model.sourceColumns].some((e) => e.id === sel.id)) gone = "element";
           break;
       }
       if (gone) {

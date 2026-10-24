@@ -121,8 +121,10 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
         schema_name: schema,
         name: card.name,
         object_type: "table",
+        file_format: null,
         row_count: null,
         comment: null,
+        missing_since: null,
       });
       const parsed = parseColumnLines(card.rows.map((r) => `${r.name} ${r.dataType}`).join("\n"));
       if (!parsed.ok) throw new Error(`Generated table ${card.name}: ${parsed.error.message}`);
@@ -141,6 +143,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
           is_pii: false,
           default_value: null,
           comment: null,
+          missing_since: null,
         });
       });
     } else {
@@ -204,6 +207,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
       note_text: null,
       approved_by: status === "approved" ? by : null,
       approved_at: status === "approved" ? at : null,
+      review_reason: null,
     });
     db.mapping_input.push({ ...std(`mapping:${m.id}#0`), mapping_id: id(`mapping:${m.id}`), source_column_id: rowIds.get(m.column)!, sort_order: 0 });
   });

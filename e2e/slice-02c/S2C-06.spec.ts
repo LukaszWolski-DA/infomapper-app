@@ -28,7 +28,8 @@ test("S2C-06: with two frames collapsed, the lines between them are one bundle w
   await expect(eight).toHaveCount(1);
   await expect(eight).toHaveAttribute("data-bundle", /^m\|f:[^|]+\|f:[^|]+$/);
   await expect(eight).not.toHaveClass(/\bdraft\b/);
-  await expect(eight).not.toHaveClass(/\bwarn\b/);
+  // web_users.email → Customer.email has had a type problem since slice 7a's seed (email string(120)): the bundle says so
+  await expect(eight).toHaveClass(/\bwarn\b/);
   // Tables → Sales Order: one line per attribute; order_line (in no frame) → Ends: a line of its own
   await expect(mappingLines(page, orders)).toHaveCount(1);
   await expect(mappingLines(page, itemCode)).toHaveCount(1);

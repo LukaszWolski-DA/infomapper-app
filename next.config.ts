@@ -7,7 +7,12 @@ const e2eServer = !!process.env.NEXT_DIST_DIR;
 
 const nextConfig: NextConfig = {
   distDir: process.env.NEXT_DIST_DIR ?? ".next",
-  experimental: { turbopackFileSystemCacheForDev: !e2eServer },
+  experimental: {
+    turbopackFileSystemCacheForDev: !e2eServer,
+    // The proxy (src/proxy.ts) buffers request bodies up to this size; an import's upload may be up to 25 MB (slice 7a,
+    // src/app/_lib/import-sources.ts). Above it the body would arrive cut off.
+    proxyClientMaxBodySize: "25mb",
+  },
 };
 
 export default nextConfig;

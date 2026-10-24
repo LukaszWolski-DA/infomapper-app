@@ -3,7 +3,9 @@
 // Source table and column panels (prototype insSource, insCol). A table: path, columns and where they go, the entities
 // it feeds, “Remove from this canvas”, delete (refused while a mapping reads one of its columns). A column: path,
 // type, BK and PII flags, comment, the mappings it feeds, and “Map to an attribute” (slice 1b, D-48). Name, type and
-// position come from the source.
+// position come from the source. Slice 7a (items 35, 36): the table's kind line with its system, its comment from the
+// source, “Missing from source since”, missing columns last and struck through, and its relationships between source
+// tables; a column's “Missing from source since”.
 
 import { useContext, useRef } from "react";
 import { deleteSourceTableAction, updateSourceColumnAction } from "@/app/_actions/model";
@@ -11,7 +13,7 @@ import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { formatColumnType } from "@/domain/model/type-check";
-import type { SourceColumn, SourceTable } from "@/domain/types";
+import type { SourceColumn, SourceRelationship, SourceTable } from "@/domain/types";
 import { STATUS_LABEL } from "./attribute-panel";
 import { Actions, buttonClass, ConfirmDelete, dangerClass, Field, Flag, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TextField, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
@@ -21,6 +23,25 @@ import { CardFrame } from "./card-frame";
 import { NotesHere } from "./notes-here";
 import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tablePath, typeCheckOf } from "./model-index";
 import { RequirementsSection } from "./requirements-section";
+import { day } from "./import/wizard-model";
+
+/** “Missing from source since 2026-10-23” (slice 7a; the review's date format). */
+function MissingSince({ since }: { since: string | null }) {
+  if (!since) return null;
+  return (
+    <p className="mt-1.5">
+      <span className="rounded bg-im-warn-soft px-1.5 py-px text-xs text-im-warn" data-testid="tag-missing">
+        Missing from source since {day(since)}
+      </span>
+    </p>
+  );
+}
+
+const KIND_OF: Record<SourceTable["object_type"], (t: SourceTable) => string> = {
+  table: () => "Source table",
+  view: () => "Source view",
+  file: (t) => `Source file${t.file_format ? ` (${t.file_format})` : ""}`,
+};
 
 /** `cardId` is null when the table has no card on this canvas (a go-to link's fallback, slice 4a). */
 export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; cardId: Uuid | null }) {
@@ -28,6 +49,12 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
   const ui = useContext(CanvasUiCtx);
   const { run } = useAction();
   const columns = p.ix.columnsOf.get(t.id) ?? [];
+  /** Missing columns last (slice 7a, item 35), otherwise in physical order. */
+  const listed = [...columns].sort((a, b) => Number(!!a.missing_since) - Number(!!b.missing_since) || a.ordinal - b.ordinal);
+  /** Relationships from and to the table: they go with it (slice 7a, D-47). */
+  const tableRelationships = p.ix.relationshipsOf.get(t.id) ?? [];
+  const relationships = tableRelationships.length;
+  const system = p.ix.model.sourceSystems.find((s) => s.id === t.source_system_id);
   const feeds = fedEntities(p.ix, t.id);
   /** Fed entities not on this canvas, to place on the right of the card (B-08). */
   const missing = feeds
@@ -46,18 +73,41 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
 
   return (
     <div data-testid="panel-source-table">
-      <Kind>Source table</Kind>
+      <Kind>
+        <span data-testid="source-table-kind">
+          {KIND_OF[t.object_type](t)} of{" "}
+          {system ? (
+            <button type="button" className="rounded-md bg-im-physical-soft px-1.5 py-px text-im-physical" onClick={() => p.goSystem(system.id)} data-testid="button-table-system">
+              {system.name}
+            </button>
+          ) : (
+            "?"
+          )}
+        </span>
+      </Kind>
       <h2 className="font-mono text-[15px] font-semibold leading-tight">{t.name}</h2>
       <p className="mt-1 font-mono text-im-ink-3" data-testid="source-table-path">
-        {tablePath(p.ix, t)}
+        {t.database_name}.{t.schema_name}
       </p>
-      {t.row_count !== null && <Hint>{t.row_count.toLocaleString("en")} rows</Hint>}
-      {t.comment && <Hint>{t.comment}</Hint>}
+      {(t.row_count !== null || t.comment) && (
+        <Hint>
+          <span data-testid="source-table-facts">
+            {t.row_count !== null && `${t.row_count.toLocaleString("en")} rows`}
+            {t.row_count !== null && t.comment && " · "}
+            {t.comment && (
+              <>
+                <span className="text-im-ink-3">From the source:</span> {t.comment}
+              </>
+            )}
+          </span>
+        </Hint>
+      )}
+      <MissingSince since={t.missing_since} />
       <ItemLabels target={{ kind: "source_table", id: t.id }} />
 
       <Fold title="Columns and where they go" count={columns.length}>
         <LongList
-          items={columns}
+          items={listed}
           testId="list-table-columns"
           text={(c) => `${c.name} ${goes(c).join(" ")}`}
           render={(c) => {
@@ -66,13 +116,27 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
               <Li
                 key={c.id}
                 onClick={() => ui.select(cardId ? { t: "row", cardId, id: c.id } : { t: "element", kind: "source_column", id: c.id })}
-                meta={targets.length ? targets.join(", ") : <span className="italic">not used</span>}
+                meta={c.missing_since ? "missing" : targets.length ? targets.join(", ") : <span className="italic">not used</span>}
+                testId={c.missing_since ? "column-missing" : undefined}
               >
-                <span className="font-mono text-xs">{c.name}</span>
+                <span className={`font-mono text-xs ${c.missing_since ? "line-through decoration-im-warn" : ""}`}>{c.name}</span>
               </Li>
             );
           }}
         />
+      </Fold>
+
+      <Fold title="Relationships between source tables" count={relationships}>
+        {relationships ? (
+          <LongList
+            items={tableRelationships}
+            testId="list-table-relationships"
+            text={(r) => r.name}
+            render={(r) => <RelationshipLi key={r.id} r={r} tableId={t.id} />}
+          />
+        ) : (
+          <Hint>None known. They come from foreign keys in an import.</Hint>
+        )}
       </Fold>
 
       <Fold title="Feeds entities" count={feeds.length}>
@@ -137,7 +201,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
             // With columns it still asks (slice 1b, item 13).
             <ConfirmDelete
               label="Delete table"
-              also={`${columns.length} column${columns.length === 1 ? "" : "s"}`}
+              also={[`${columns.length} column${columns.length === 1 ? "" : "s"}`, ...(relationships ? [`${relationships} relationship${relationships === 1 ? "" : "s"}`] : [])].join(", ")}
               onConfirm={() => void remove()}
               testId="button-delete-table"
             />
@@ -149,6 +213,27 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
         </Actions>
       )}
     </div>
+  );
+}
+
+/**
+ * A relationship of a table (prototype sourceBody): from it, “cust_id → dbo.customers” and its name; to it,
+ * “dbo.customer_addresses.cust_id → here”. A click goes to the table at the other end.
+ */
+function RelationshipLi({ r, tableId }: { r: SourceRelationship; tableId: string }) {
+  const p = usePanel();
+  const pairs = p.ix.model.sourceRelationshipColumns.filter((x) => x.source_relationship_id === r.id).sort((a, b) => a.sort_order - b.sort_order);
+  const name = (id: string) => p.ix.column.get(id)?.name ?? "?";
+  const path = (id: string) => {
+    const t = p.ix.table.get(id);
+    return t ? `${t.schema_name}.${t.name}` : "?";
+  };
+  const from = pairs.map((x) => name(x.from_column_id)).join(", ");
+  const outgoing = r.source_table_id === tableId;
+  return (
+    <Li onClick={() => p.goTable(outgoing ? r.to_source_table_id : r.source_table_id)} meta={`${r.name}${r.missing_since ? " · missing" : ""}`} testId="table-relationship">
+      <span className="font-mono text-xs">{outgoing ? `${from} → ${path(r.to_source_table_id)}` : `${path(r.source_table_id)}.${from} → here`}</span>
+    </Li>
   );
 }
 
@@ -189,6 +274,7 @@ export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
           {facts}
         </span>
       </Hint>
+      <MissingSince since={c.missing_since} />
       <Field label="Flags">
         <div className="flex flex-wrap gap-1.5" data-testid="flags-column">
           <Flag on={c.is_business_key} label="Business key" disabled={!p.editable} onToggle={() => save({ isBusinessKey: !c.is_business_key })} />

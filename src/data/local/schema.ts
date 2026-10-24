@@ -26,6 +26,9 @@ import type {
   Requirement,
   RequirementLink,
   SourceColumn,
+  SourceImport,
+  SourceRelationship,
+  SourceRelationshipColumn,
   SourceSystem,
   SourceTable,
   Workspace,
@@ -36,6 +39,7 @@ import {
   CHANGE_OPERATIONS,
   DOC_LANGUAGES,
   FRAME_KINDS,
+  IMPORT_CHANNELS,
   LIVE_LEVELS,
   LOGICAL_TYPES,
   MAPPING_KINDS,
@@ -49,16 +53,19 @@ import {
   REQUIREMENT_STATUSES,
   ROW_FILTERS,
   SOURCE_OBJECT_TYPES,
+  SOURCE_RELATIONSHIP_KINDS,
   STEREOTYPES,
   WORKSPACE_ROLES,
 } from "@/domain/types";
 
 /**
  * 2 = slice 1a (model tables), 3 = slice 2b (frames), 4 = slice 3a (labels, label links, project pins, notes), 5 = slice
- * 4a (requirements, requirement links). A format-2, 3 or 4 file is read as format 5 with the missing tables empty (it is
- * written back as 5 with the next write); an older file is refused with a hint to run "npm run reset-dev-data".
+ * 4a (requirements, requirement links), 6 = slice 7a (source relationships and imports; `file_format` and `missing_since`
+ * on sources, `review_reason` on mappings). A format-2 to 5 file is read as format 6 with the missing tables empty and
+ * the new columns null (it is written back as 6 with the next write); an older file is refused with a hint to run
+ * "npm run reset-dev-data".
  */
-export const DEV_DB_FORMAT = 5;
+export const DEV_DB_FORMAT = 6;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -77,6 +84,9 @@ export interface DevDb {
   source_system: SourceSystem[];
   source_table: SourceTable[];
   source_column: SourceColumn[];
+  source_relationship: SourceRelationship[];
+  source_relationship_column: SourceRelationshipColumn[];
+  source_import: SourceImport[];
   mapping: Mapping[];
   mapping_input: MappingInput[];
   requirement: Requirement[];
@@ -110,6 +120,9 @@ export const emptyDb = (): DevDb => ({
   source_system: [],
   source_table: [],
   source_column: [],
+  source_relationship: [],
+  source_relationship_column: [],
+  source_import: [],
   mapping: [],
   mapping_input: [],
   requirement: [],
@@ -230,6 +243,33 @@ export const RULES: Record<DevTable, TableRules> = {
     key: ["id"],
     foreignKeys: { ...model, source_table_id: "source_table" },
     unique: [{ columns: ["source_table_id", "name"], live: true }],
+    // slice 7a: -1 is max
+    checks: [{ name: "source_column_type_length_ck", test: (r) => r.type_length === null || r.type_length === -1 || (r.type_length as number) >= 1 }],
+  },
+  source_relationship: {
+    key: ["id"],
+    foreignKeys: { ...model, source_table_id: "source_table", to_source_table_id: "source_table" },
+    // source_relationship_name_uq: one name per from-table among live rows, in any case (slice 7a)
+    unique: [{ columns: ["source_table_id", "name"], live: true, lower: ["name"] }],
+    checks: [{ name: "source_relationship_kind_ck", test: oneOf(SOURCE_RELATIONSHIP_KINDS, "kind") }],
+  },
+  source_relationship_column: {
+    key: ["id"],
+    foreignKeys: { ...model, source_relationship_id: "source_relationship", from_column_id: "source_column", to_column_id: "source_column" },
+  },
+  source_import: {
+    key: ["id"],
+    foreignKeys: { ...model, source_system_id: "source_system" },
+    checks: [
+      { name: "source_import_channel_ck", test: oneOf(IMPORT_CHANNELS, "channel") },
+      {
+        name: "source_import_counts_ck",
+        test: (r) =>
+          ["tables_new", "columns_new", "columns_changed", "columns_renamed", "columns_missing", "relationships_new"].every(
+            (c) => Number.isInteger(r[c]) && (r[c] as number) >= 0,
+          ),
+      },
+    ],
   },
   mapping: {
     key: ["id"],
@@ -239,6 +279,8 @@ export const RULES: Record<DevTable, TableRules> = {
       { name: "mapping_status_ck", test: oneOf(MAPPING_STATUSES, "status") },
       { name: "mapping_rule_ck", test: (r) => r.kind === "direct" || isSet(r.rule_expression) },
       { name: "mapping_approval_ck", test: (r) => (r.status === "approved") === isSet(r.approved_at) },
+      // slice 7a: an import's reason belongs to a mapping in review
+      { name: "mapping_review_reason_ck", test: (r) => !isSet(r.review_reason) || r.status === "review" },
     ],
   },
   mapping_input: {
@@ -382,23 +424,40 @@ export interface IntegrityViolation {
   detail: string;
 }
 
-/** Checks every table against its rules. Returns the first violation, or null. */
-export function findViolation(db: DevDb): IntegrityViolation | null {
-  const ids = new Map<DevTable, Set<string>>();
-  for (const table of TABLES) ids.set(table, new Set(rowsOf(db, table).map((r) => String(r.id))));
+/**
+ * Checks the tables against their rules. Returns the first violation, or null. With `scope` (a write, slice 7a): only
+ * the tables it touched, and of the change events only the new ones (the last `newEvents`) besides their keys. Rows of
+ * other tables cannot break: writes never take an id away (deletes are soft; removed link rows are no foreign key's
+ * target).
+ */
+export function findViolation(db: DevDb, scope?: { tables: ReadonlySet<DevTable>; newEvents: number }): IntegrityViolation | null {
+  const idsCache = new Map<DevTable, Set<string>>();
+  const ids = (table: DevTable) => {
+    let set = idsCache.get(table);
+    if (!set) {
+      set = new Set(rowsOf(db, table).map((r) => String(r.id)));
+      idsCache.set(table, set);
+    }
+    return set;
+  };
 
   for (const table of TABLES) {
+    const isEvents = table === "change_event";
+    if (scope && !isEvents && !scope.tables.has(table)) continue;
     const rules = RULES[table];
     const rows = rowsOf(db, table);
     const keys = new Set<string>();
-    for (const row of rows) {
+    const firstChecked = scope && isEvents ? rows.length - scope.newEvents : 0;
+    for (let i = 0; i < rows.length; i++) {
+      const row = rows[i]!;
       const key = keyOf(table, row);
       if (keys.has(key)) return { kind: "duplicate_key", table, detail: `duplicate key ${key}` };
       keys.add(key);
+      if (i < firstChecked) continue;
       for (const [column, target] of Object.entries(rules.foreignKeys)) {
         const value = row[column];
         if (value === null || value === undefined) continue;
-        if (!ids.get(target)!.has(String(value))) {
+        if (!ids(target).has(String(value))) {
           return { kind: "foreign_key", table, detail: `${column} = ${String(value)} is not in ${target}` };
         }
       }
@@ -417,6 +476,7 @@ export function findViolation(db: DevDb): IntegrityViolation | null {
       }
     }
   }
+  if (scope && !["canvas", "canvas_item", "frame", "note"].some((t) => scope.tables.has(t as DevTable))) return null;
   return crossTableViolation(db);
 }
 

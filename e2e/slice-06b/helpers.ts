@@ -29,8 +29,8 @@ export const buttonsEnabled = async (page: Page) => [await backButton(page).isEn
 
 /**
  * What the details panel shows: `entity:<name>`, `table`, `mapping`, `relationship`, `frame:<name>`, `note`,
- * `req:<key>`, `label:<name>`, or `none` (the canvas overview). It reads the panel even when the panel is hidden (a
- * hidden panel stays in the page, inert).
+ * `req:<key>`, `label:<name>`, `system:<name>` (slice 7a), or `none` (the canvas overview). It reads the panel even
+ * when the panel is hidden (a hidden panel stays in the page, inert).
  */
 export const selected = (page: Page) =>
   page.getByTestId("panel-inspector").evaluate((p) => {
@@ -43,6 +43,8 @@ export const selected = (page: Page) =>
     if (p.querySelector("[data-testid='panel-note']")) return "note";
     if (p.querySelector("[data-testid='panel-requirement']")) return `req:${v("input-req-key")}`;
     if (p.querySelector("[data-testid='panel-label']")) return `label:${v("input-label-name")}`;
+    // slice 7a: a source system's panel
+    if (p.querySelector("[data-testid='panel-source-system']")) return `system:${p.querySelector("[data-testid='panel-source-system'] h2")?.textContent}`;
     return "none";
   });
 

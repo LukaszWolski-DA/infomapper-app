@@ -142,8 +142,8 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               </div>
               {stats.entities === 0 && stats.sourceTables === 0 && (
                 <Banner tone="info">
-                  This workspace is empty. Next steps: add sources (import comes with architecture area A-04), create
-                  concepts and entities, then set up projects and canvases.
+                  This workspace is empty. Next steps: import sources, create concepts and entities, then set up projects
+                  and canvases.
                 </Banner>
               )}
 

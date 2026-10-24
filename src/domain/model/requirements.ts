@@ -181,7 +181,9 @@ export function lookupModel(model: ScopeModel): ModelLookup {
   const counts = (m: Mapping): boolean => {
     if (m.status !== "approved") return false;
     const a = attribute.get(m.attribute_id);
-    return !!a && checkMappingTypes(m, a, inputsOf.get(m.id) ?? []).ok;
+    const inputs = inputsOf.get(m.id) ?? [];
+    // slice 7a (step 1, answer 9): a mapping from a column missing from source covers nothing
+    return !!a && !inputs.some((c) => c.missing_since !== null) && checkMappingTypes(m, a, inputs).ok;
   };
   const states = new Map<Uuid, AttributeCoverage>();
   const coverageOf = (attributeId: Uuid): AttributeCoverage => {
@@ -320,7 +322,8 @@ export function countsForCoverage(mapping: Mapping, model: ScopeModel): boolean 
   if (mapping.status !== "approved") return false;
   const lookup = lookupModel(model);
   const attribute = lookup.attribute.get(mapping.attribute_id);
-  return !!attribute && checkMappingTypes(mapping, attribute, lookup.inputsOf.get(mapping.id) ?? []).ok;
+  const inputs = lookup.inputsOf.get(mapping.id) ?? [];
+  return !!attribute && !inputs.some((c) => c.missing_since !== null) && checkMappingTypes(mapping, attribute, inputs).ok;
 }
 
 /** Coverage of one requirement (prototype `reqCoverage`, D-31), computed from the mappings on read. */

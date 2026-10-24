@@ -86,6 +86,7 @@ export function createMapping(
     note_text: null,
     approved_by: null,
     approved_at: null,
+    review_reason: null,
   };
   const first: MappingInput = {
     ...newRowColumns(ctx),
@@ -285,6 +286,8 @@ export function setMappingStatus(
     status,
     approved_by: status === "approved" ? ctx.actorId : null,
     approved_at: status === "approved" ? ctx.now : null,
+    // an import's reason is answered by any change of status (slice 7a, step 1, answer 6)
+    review_reason: null,
   });
   return done(ctx, access, { mapping: row }, [{ kind: "update", table: "mapping", before, row }]);
 }
@@ -350,6 +353,7 @@ export function splitMapping(
       note_text: null,
       approved_by: null,
       approved_at: null,
+      review_reason: null,
     };
     newMappingIds.push(mapping.id);
     writes.push(
@@ -411,7 +415,7 @@ export function mergeMappings(
     return fail(domainError("invalid", "Only mappings of the same attribute can be merged."));
   }
 
-  const row = nextVersion(ctx, target, { kind: "transform", rule_expression: ruleExpression, status: "review", approved_by: null, approved_at: null });
+  const row = nextVersion(ctx, target, { kind: "transform", rule_expression: ruleExpression, status: "review", approved_by: null, approved_at: null, review_reason: null });
   const columns = new Set<Uuid>();
   const writes: Write[] = [{ kind: "update", table: "mapping", before: target, row }];
   let order = 0;

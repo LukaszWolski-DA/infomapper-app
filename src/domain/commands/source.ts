@@ -19,6 +19,8 @@ import {
   type MappingInput,
   type Note,
   type SourceColumn,
+  type SourceRelationship,
+  type SourceRelationshipColumn,
   type SourceSystem,
   type SourceTable,
 } from "../types";
@@ -92,8 +94,10 @@ export function createSourceTable(
     schema_name: schemaName,
     name,
     object_type: objectType ?? "table",
+    file_format: null,
     row_count: null,
     comment: null,
+    missing_since: null,
   };
   writes.push({ kind: "insert", table: "source_table", row: table });
   columns.columns.forEach((c, i) => {
@@ -110,6 +114,7 @@ export function createSourceTable(
       is_pii: false,
       default_value: null,
       comment: null,
+      missing_since: null,
     };
     writes.push({ kind: "insert", table: "source_column", row: column });
   });
@@ -171,12 +176,28 @@ export interface DeleteSourceTableState {
   notes?: readonly Note[];
   /** The workspace's requirement links (slice 4a): those on the table and its columns go with them. */
   requirementLinks?: readonly RequirementLink[];
+  /** The workspace's source relationships and their column pairs (slice 7a): those from or to the table go with it. */
+  relationships?: readonly SourceRelationship[];
+  relationshipColumns?: readonly SourceRelationshipColumn[];
+}
+
+/** The live relationships from or to a table (slice 7a), with their live column pairs. */
+export function relationshipsOfTable(
+  workspaceId: Uuid,
+  tableId: Uuid,
+  relationships: readonly SourceRelationship[] = [],
+  relationshipColumns: readonly SourceRelationshipColumn[] = [],
+): { relationships: SourceRelationship[]; columns: SourceRelationshipColumn[] } {
+  const rels = relationships.filter((r) => isLive(r, workspaceId) && (r.source_table_id === tableId || r.to_source_table_id === tableId));
+  const ids = new Set(rels.map((r) => r.id));
+  return { relationships: rels, columns: relationshipColumns.filter((c) => isLive(c, workspaceId) && ids.has(c.source_relationship_id)) };
 }
 
 /**
  * Deletes a source table with its columns and its cards, only when no mapping reads any of its columns; otherwise
  * refuses and lists those mappings. The source system stays. Slice 3a: the label links on the table and its columns
- * go with them; notes pinned to its cards become free notes at their place.
+ * go with them; notes pinned to its cards become free notes at their place. Slice 7a: its relationships, in both
+ * directions, go with it.
  */
 export function deleteSourceTable(
   ctx: CommandContext,
@@ -213,7 +234,10 @@ export function deleteSourceTable(
   }
 
   const cards = state.canvasItems.filter((c) => isLive(c, workspaceId) && c.source_table_id === table.id);
+  const related = relationshipsOfTable(workspaceId, table.id, state.relationships, state.relationshipColumns);
   return done(ctx, access, { columns: columns.length }, [
+    ...related.columns.map((c) => softDelete(ctx, "source_relationship_column", c)),
+    ...related.relationships.map((r) => softDelete(ctx, "source_relationship", r)),
     ...cards.map((c) => softDelete(ctx, "canvas_item", c)),
     ...columns.map((c) => softDelete(ctx, "source_column", c)),
     softDelete(ctx, "source_table", table),

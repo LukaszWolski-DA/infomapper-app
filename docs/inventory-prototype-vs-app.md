@@ -1,186 +1,177 @@
-# Inventory: what the prototype has that the app does not (15 October 2026)
+# Inventory: what the prototype has that the app does not (24 October 2026)
 
-Written for Łukasz before slice 4b-1's step 2. It compares the frozen prototype
-(`docs/prototype/infomapper-model-prototype.html`) with the app on `slice/04b1-lens-focus` at `2589403` (`main` at the
-tag `slice-04p` plus docs).
+Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
+(the reference since 22 October 2026) with the app on `slice/07a-source-import`. The earlier inventory (15 October 2026,
+against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
-- **From the prototype's code:** its top-level functions, its context-menu entries (`add(…)`), its `data-do` / `data-wa`
-  / `data-bl` actions, its toolbar buttons, its view-state fields (`V.*`), its toasts and its keyboard handling.
-- **Against the app's source** (`src/`), by searching for each feature's wording, test id or command. Where a search
-  could not settle it, the code was read.
-- **Not from memory.** Items marked **(uncertain)** were not settled by reading the code. Check them in the app before
-  relying on them.
+- **The new prototype is the old one plus the source importer.** Slice 7a's step 1 compared the two files hunk by hunk
+  (`docs/prd/slice-07a-acceptance.md`, "Differences between the old and the new prototype outside the importer"):
+  the module `IMP` and its CSS, and changes in the main prototype listed there. Nothing else changed.
+- **Items of the earlier inventory** were updated from what the slices since then delivered (4b-1, 4b-2, 5a, 6a, 6b,
+  7a; their acceptance docs) and checked again in the app's source (`src/`) by their wording, test id or command.
+- **The importer's items** come from PRD 7a's sections 8 and 9 and the decisions of steps 1–7, checked against the code.
+- Items marked **(uncertain)** were not settled by reading the code.
 
-**What the "Planned" column means**
-- **4b-1 / 4b-2:** this slice or the next one, from their PRDs.
-- **Slice 6:** where earlier acceptance docs and `docs/known-limitations.md` put the navigation history and the
-  view-state bar (D-38, D-39).
-- **Database:** the database slice, last (AD-31), with real sign-in (AD-04).
-- **Decision only:** a decision in `docs/decisions.md` describes it, but no slice has it yet.
-- **–:** nothing found that plans it.
+**What the "Planned" column means:** **7b / 7c:** the next slices, from PRD 7a's section 9. **Database:** the database
+slice, last (AD-31), with real sign-in (AD-04). **Decision only:** a decision in `docs/decisions.md` describes it, but no
+slice has it yet. **Idea:** in `docs/ideas.md`. **–:** nothing found that plans it.
 
-**Out of scope here:** what the app has beyond the prototype, and the deliberate differences already recorded in
-acceptance docs (for example, other lines not fading on a hover since 4p).
+**Out of scope here:** what the app has beyond the prototype, and the deliberate differences recorded in acceptance
+docs (some are repeated below where they explain an item).
 
 ## Summary
 
 | Area | Missing in the app | Planned |
 | --- | --- | --- |
-| Canvas | requirement cards and dashed traces; markers, coverage colours, Focus; the view-state bar; showing or hiding the side panels | 4b-1, 4b-2; panels: 5a (done); view-state bar: 6a (done) |
-| Panels and navigation | requirement cards from panels | 4b-2 |
-| Model | Data Vault 2.0 hints in the entity panel (hub, link, business key, satellites) | decision only (AD-08) |
-| Mappings | suggested mappings (the “Suggestions” mode, accept one or all strong matches); re-pointing a mapping to another attribute | – |
-| Sources | nothing found missing | – |
-| Requirements | markers, colours, Focus (4b-1); cards, traces, “Show its requirements”, “Place its card”, “Add all” (4b-2) | 4b-1, 4b-2 |
+| Canvas | the "Changes" view (toolbar toggle, an import's changes lit, new and changed row marks) | 7b |
+| Panels and navigation | "Show its requirements (n)" in the row and card menus; editing a requirement's description from its card | idea |
+| Model | Data Vault 2.0 hints in the entity panel; the Data Vault reading of a source table | decision only (AD-08); 7c |
+| Mappings | suggested mappings; re-pointing a mapping to another attribute | – |
+| Sources | changes to resolve and their actions; classifications and notes on tables and columns; suggested classifications; the classification list; model consistency on the project home | 7b, 7c |
+| Requirements | the import review's requirement coverage box | 7b |
 | Labels and notes | rich text in notes | known limitation |
-| Projects and workspace | baselines (create, compare, mapping specification, data dictionary); workspace export, export and delete, duplicate, transfer; new organization; deleting a project; editing a project's name and description on its home | baselines: decision only (AD-03, AD-14); the rest: – |
-| Settings and roles | inviting people, changing a role, removing a member | database (AD-04) |
+| Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer; new organization; deleting a project; editing a project's name and description on its home | baselines: decision only (AD-03, AD-14); the rest: – |
+| Settings and roles | inviting people, changing a role, removing a member; the workspace's classification list | database (AD-04); 7c |
 
 ## Canvas
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Requirement markers on cards | a violet dot and a count in an entity's or table's header | `reqMark`, CSS `.rmark` | 4b-1 |
-| Coverage colours | a selected requirement's rows blue (covered) or orange (gap) | `applyHighlight`, CSS `.row.rq`, `.row.gap` | 4b-1 (without the prototype's fading) |
-| Focus | toolbar toggle, “Focus on this” / “Turn Focus off” in the card menu, the “Focus” chip | `#tFocus`, `focusCtx`, `relatedOf`, the card menu in `ctxFor` | 4b-1 |
-| Requirement cards and trace lines | a requirement's card on the canvas, dashed lines to what it traces to, fading by Focus | `renderReqCards`, `reqTraces`, `reqActive`, `placeReqCards`, `showReqCard`, `dropReq` | 4b-2 |
-| Requirement card menu | “Edit description…”, “Remove from this canvas (keeps the requirement)” | `ctxFor` (requirement card) | 4b-2 |
-| View-state bar | chips for what hides or fades things (lens, Focus, layer, filters, collapsed cards and frames, hidden notes, tool, “Live: {name}”), each with ×, plus “Show all” | `viewState`, `renderNavBar` (`data-voff`, `data-vall`) | 6a (done; differences below) |
-| Show or hide the side panels | toolbar buttons for the object browser and the details panel | `#tLeft`, `#tRight`, `applyPanels` | 5a (done; with resizing by the grips, `PANEL`, `.pgrip`) |
+| The "Changes" view | a toolbar toggle; an import's changes lit and the rest faded; a view-state chip; "Show what it touched on the canvas" on an import | `#tChg`, `chgSet`, `renderChgBar`, `IMP.hit` | 7b |
+| New and changed row marks | a bar on a row new or changed in an import, an attribute whose mapping is in review with a reason | CSS `.row.im-new`, `.row.im-chg`; the attribute row's `im-chg` | 7b |
+| Retired columns | a row at lower opacity for a column retired by a change to resolve | CSS `.row.im-old`, `.titem.im-old` | 7b |
 
-**Present in the app and not listed:**
-- the toolbox (right-click), including quick add with a “new entity” entry;
-- the Hand, Entity, Note and Frame tools; drawing relationships;
-- row and card actions: filters (Rows: All, Mapped, Unmapped, Keys, Labeled on live canvases), collapsing a card, fit
-  and reset widths, aligning, stacking and lining up;
-- frames and their collapsing; bundles; layers; looks and grids;
-- the Overview with its miniature; zoom controls; notation (crow's foot / UML); undo and redo with the toasts' Undo.
+**Present since the earlier inventory:** requirement markers, coverage colours and Focus (4b-1); requirement cards and
+trace lines (4b-2); showing, hiding and resizing the side panels (5a); the view-state bar and the narrow top bar (6a);
+a missing column's row and mapping line marks (7a).
 
-**View-state bar and top bar: deliberate differences (slice 6a, `docs/prd/slice-06a-acceptance.md`):**
-- no lens chip: slice 4b-1 removed the lens (a selected requirement colours, fades nothing; D-32);
-- no role or archived chip (the prototype's `Archived · read-only`, `{role} · …`, also on home pages): the user
-  indicator shows the role and “Archived”; the bar is on canvas pages only;
-- “Entity tool” has its chip text (the prototype's map has no entry for it and shows “undefined”); no chip while drawing
-  a relationship;
-- the row keeps its height and chips that do not fit fold into “+{n}”, with “Live: {name}” and “Show all” always
-  visible (the prototype clips the chips at the right, “Show all” first);
-- the filter and collapsed-card chips have no × for those who cannot edit;
-- “Show all” shows from two chips this person can remove (the prototype counts every item, the role chip too);
-- the top bar: the prototype's label steps at 2,100, 1,880 and 1,300 px, and instead of hiding Focus and the notation at
-  1,000 px, a “More” menu takes them up to 1,200 px and the Entity, Frame, Note and Hand tools up to 1,100 px;
-- a remembered canvas view is corrected for the left panel's width (D-54).
+**Deliberate differences:**
+- **Slice 7a:** a missing column's row is muted by colour, not by opacity, and a line segment by its stroke opacity
+  (AD-24: no opacity on repeated elements); on a combined mapping only the missing input's segment is marked (F29).
+- **Slice 6a** (view-state bar): no lens chip; no role or archived chip; chips that do not fit fold into "+{n}"; the
+  top bar's "More" menu (`docs/prd/slice-06a-acceptance.md`).
 
 ## Panels and navigation
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Back and forward | Alt ←/→ and two buttons before the breadcrumbs; a history of up to 120 places (workspace, project, canvas, home screens, selection) | `navState`, `navRecord`, `navGo`, `renderNavBar` (`data-nav`) | 6b (done; differences below) |
-| Element panels: “Show its requirements” | places the cards of an element's requirements next to it | the card menu in `ctxFor` (`reqsFor`) | 4b-2 |
+| "Show its requirements (n)" | places the cards of an element's requirements next to it, from the attribute row and card menus | `ctxFor` (`reqsFor`) | idea ("Requirement cards: what the prototype has besides") |
+| A requirement card's "Edit description…" and double-click | open the description editor from the card | `ctxFor` (requirement card) | idea (same entry) |
 
-**Back and forward: deliberate differences (slice 6b, `docs/prd/slice-06b-acceptance.md`):**
-- the browser's own history is the one history: the browser's back, the mouse's buttons, Alt+←/→ and the app's buttons
-  walk the same entries; no cap of the app's own (the browser's: 50 entries per tab in Chromium; the prototype 120);
-- a selection is a place only when it is one item: no place for a deselection, a multi-selection or a bundle (the
-  prototype records the first two as “nothing selected” and the third as a bundle);
-- the workspace home's tab is not a place (as the prototype); in the app the tabs replace the entry;
-- going back to a place centres it when it is off screen for cards and rows (as the prototype) and also for frames,
-  notes and requirement cards, at the same zoom;
-- a place that no longer exists shows the canvas without a selection and a toast naming what is gone (the prototype
-  skips gone pages and drops a gone selection silently); a canvas no longer in its project opens the project's first
-  canvas with the “moved” notice, and a project that no longer exists opens the workspace home with a toast;
-- the mouse's buttons are the browser's (the prototype intercepts them for its own list).
-
-**Present:**
-- the left panel's tabs, search, folding and “Only on this canvas”;
-- the inspector's sections with folding (D-35);
-- long lists with a filter and “Show all” (`fields.tsx`);
-- the breadcrumbs; the project and workspace switchers.
+**Present since the earlier inventory:** back and forward with Alt+←/→ (6b; differences in its acceptance doc); a
+source system's panel as a selection and a history place (7a).
 
 ## Model
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Data Vault 2.0 hints | in Data Vault 2.0 mode, the entity panel shows a section: hub or link name, business key (from columns marked BK), satellites by source system, unmapped attributes. Hints only. | `dvSection`, shown when `settings.dv2` is on | decision only (AD-08). The app has the mode's setting and its badge on the workspace home, but no hints. |
-| Mixed-systems hint for combined mappings | in Data Vault 2.0 mode, a combined mapping across source systems suggests a business rule in a later layer (D-50) | **(uncertain)**: not found as a separate function in the prototype; D-50 describes it | decision only |
+| Data Vault 2.0 hints | the entity panel's hub or link name, business key, satellites by source system, unmapped attributes | `dvSection` (`settings.dv2`) | decision only (AD-08) |
+| Mixed-systems hint for combined mappings | a combined mapping across source systems suggests a business rule in a later layer (D-50) | **(uncertain)**: no function of its own found | decision only |
 
-**Present:**
-- concepts (new, rename, delete with its dialog);
-- entities: create, stereotype, definition, delete with impact;
-- attributes: order, move, PII, business key;
-- relationships: name, cardinality, swap direction.
+**Not a gap:** the new prototype's attribute panel has a "Length" field for String attributes; the app has type
+parameters (AD-27).
 
 ## Mappings
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Suggested mappings | the toolbar's “Suggestions” mode: candidates for unmapped attributes on the canvas, from column and attribute names, table names and data types, drawn as dotted lines. The panel accepts one, rejects one, or accepts all strong matches (score ≥ 0.8 with fitting types) as drafts. | `#tSug`, `suggestions`, `insSuggest`, `data-do` `sug-ok`, `sug-no`, `sug-all`, `sug-close`; toast “Accepted {n} suggested mappings as drafts” | – |
-| Re-pointing a mapping | changing a mapping's attribute (or its column) in the mapping panel; a duplicate is refused (“That mapping already exists.”) | the inspector's `change` handler (`map.col`, `map.attr`); toast “Re-pointed to …” | –. The app changes a mapping's columns through its inputs (add and remove, D-49), but not its attribute. |
+| Suggested mappings | the "Suggestions" mode: candidates drawn as dotted lines, accept one, reject one or accept all strong matches | `#tSug`, `suggestions`, `insSuggest` | – |
+| Re-pointing a mapping | changing a mapping's attribute in its panel | the inspector's `change` handler (`map.attr`) | – |
 
-**Present:** dragging a column onto an attribute (with D-48's choice); “Map from a column…” / “Map to an attribute…”;
-new attribute from a column; combined mappings with an ƒ node; split and merge; statuses and approval; transformation
-rules; the type check.
+**Present:** as before (drag to map, combined mappings, split and merge, statuses, rules, the type check); since 7a the
+type check knows the Oracle and PostgreSQL names, `max` lengths and `rowversion`, and an import sends an approved mapping
+back to review with its reason, shown under its status (D-51).
 
 ## Sources
 
-Nothing found missing. Source systems, tables and columns, their panels, the BK and PII marks, “Add sources of
-selected entities” and placing feeding sources are in the app.
+Slice 7a brought the importer (`IMP`): the wizard with its three steps and four channels (dbt disabled, as the
+prototype), the engine, missing and back statuses, the import history, relationships between source tables, the Sources
+tab's marks, the table, column and system panels' sections listed in PRD 7a item 33–39.
+
+**Still missing:**
+
+| Item | What it is | Where in the prototype | Planned |
+| --- | --- | --- | --- |
+| Changes to resolve | per import, the changes it raises (kinds and severity), with actions: retire, move mappings, delete with what goes with it, map, not needed, split, approve again, leave in review; `retired_since`, `not_needed`, a mapping's `until` | `KIND`, `ACTS`, `issueAction`, `confirmPending`, `issuesHtml` | 7b |
+| Their counts | the open count on a system in the tree, "Source changes to resolve {n}" in the status bar, "Changes to resolve" and "To resolve" in the system, table and column panels | `sourcesTree` (`im-badge`), the status bar, `insSystem`, `sourceHead`, `colSections` | 7b |
+| The review's requirement coverage box and "{n} changes to resolve" callout | what the import does to requirement coverage, before importing | `stepReview` (`reqBox`, `issBox`) | 7b |
+| Model consistency on the project home | the project's open source changes and mappings in review | `consistency`, `consistencyHtml` | 7b |
+| Classifications on tables and columns | toggles from the workspace's list on the table and column panels; a re-import never changes them | `togs`, `sourceBody`, `colSections` | 7c |
+| Suggested classifications in the review | hints from names and keys | `plan.hints` | 7c |
+| Notes on tables and columns | the modeller's own note, separate from the source's comment | `sourceBody`, `colSections` (`data-imx-note`) | 7c |
+| The classification list | built-in, Data Vault and own classifications, by scope, in a settings dialog | `DEFAULT_CLASSES`, `renderSettings`, `#setDlg` | 7c |
+| Data Vault reading of a table | hub, link and satellite candidates from a table's keys and classifications | `dvReading` | 7c |
+| Relationships between source tables on the canvas | grey lines between table cards ("shown later" in the prototype) | the review's text only | idea |
+
+**Deliberate differences (slice 7a, PRD section 8 and `docs/prd/slice-07a-acceptance.md`):**
+- mappings have inputs (AD-26): conflicts, business key changes and rule rewrites are judged per input;
+- the server builds the plan again and writes only what the review showed; otherwise the review refreshes (P8);
+- no sample links in the app (P10); the samples are test files in `src/domain/import/samples/`;
+- only Business key and PII are read from the file's classifications, the others listed as not read yet (P11);
+- the column's comment stays editable and the review shows every overwrite (answer 8); the table panel shows the
+  source's comment as "From the source:";
+- a real date, time and person on each import; a size limit of 30,000 column rows per import (a limit of the local
+  adapter);
+- types keep their parameters (fractional seconds as precision; `datetime2` read as `datetime2(7)`, `timestamp` as
+  `timestamp(6)`; `max` as -1); SQL Server's `timestamp` is `rowversion` in the query and DDL channels;
+- the catalog queries return fractional seconds; the prototype's queries do not;
+- names that differ only in case leave their table out of the import with a reason;
+- a relationship is matched by name, then by what it joins;
+- after an import the system's panel opens with the Sources tab (an action that leads to details on purpose);
+- no "Reset the prototype's demo data" link (prototype only; `npm run reset-dev-data`);
+- "New source table" stays below "Import sources…" (answer 14).
 
 ## Requirements
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Lens on selecting a requirement | fading everything outside its scope | `focusCtx` (`V.sel.t === "req"`), the view-state chip “Lens: REQ-x” | changed in 4b-1: colours only, fading through Focus (D-32 changes) |
-| Markers, colours, Focus | as under Canvas | as under Canvas | 4b-1 |
-| Requirement cards, traces, “Place its card”, “Add all to this canvas”, dragging a requirement onto an element or the canvas | as under Canvas | `placeReqCards`, `linkReq`, `dropReq`, `data-do` `req-card`, `req-cards-all`, `req-uncard` | 4b-2 |
+| The import review's coverage box | as under Sources | `stepReview` (`reqBox`) | 7b |
 
-**Present:** the Requirements tab; the requirement panel (fields, rich-text description, Traces to, coverage, gaps);
-linking and unlinking from element panels; statuses with four-eyes; break-down (“Part of”); the project home's
-requirements; the status bar's figure.
+**Present since the earlier inventory:** markers, colours and Focus (4b-1); requirement cards, traces, "Place its card",
+"Add all to this canvas" and dragging a requirement onto an element or the canvas (4b-2); an approved mapping from a
+column missing from source covers no requirement (7a, D-31), as in the new prototype.
 
 ## Labels and notes
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Rich text in notes | “Edit with formatting…” on a note | the note menu in `ctxFor`; `openRichFor` | known limitation “Notes stay plain text” (slice 4a). D-42 lists notes among the rich texts. No slice named. |
-| View-state items for notes and live canvases | “Resolved notes hidden”, “Live: {name}” as chips | `viewState` | 6a (done) |
+| Rich text in notes | "Edit with formatting…" on a note | the note menu in `ctxFor`; `openRichFor` | known limitation "Notes stay plain text" |
 
-**Present:**
-- labels, the labels field and its suggestions, label marks, the label panel, pinning labels to a project;
-- live canvases; the working context;
-- notes (free and pinned, colours, resolved, hidden resolved notes, counts) and the Note tool.
+**Present:** labels and their marks, the label panel, pins, live canvases, the working context (an import labels
+nothing, D-26), notes, and their chips in the view-state bar (6a).
 
 ## Projects and workspace
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Baselines | a workspace home tab: a named frozen snapshot of the model (with a note). Per baseline: “Compare with now” (added, changed, removed), “Mapping specification” and “Data dictionary” documents as they were, delete. | `wsTab` “baselines”, `data-wa="baseline"`, `data-bl` `cmp`, `map`, `dict`, `del`; `diffModels`, `compareBaseline`, `docFromBaseline`, `showModal` | decision only (AD-03, AD-14) |
+| Baselines | a named frozen snapshot; "Compare with now", "Mapping specification", "Data dictionary", delete | `wsTab` "baselines", `diffModels`, `compareBaseline`, `docFromBaseline` | decision only (AD-03, AD-14) |
 | Workspace export | the whole workspace as one JSON file | `data-wa="export"` | – |
-| Export and delete a workspace | delete after showing the full export (Owner only); “Keep at least one workspace.” | `data-wa="delete"` | – (slice 0's PRD left deleting workspaces out) |
-| Duplicate a workspace | a copy of the workspace | `data-wa="dup"` | – **(uncertain** what the copy includes; its handler was not read) |
-| Transfer to another organization | hand the model over, e.g. to the client after the project (Owner only) | `data-wa="transfer"` | –. The app's role texts mention transferring, but there is no action. |
-| New organization | “Created {name} with an empty first workspace.” | the organization menu (`openOrgMenu`) | – |
-| Delete a project | “Deleted the project {name}…” | the project menu (`openProjMenu`) | – **(uncertain** where exactly the entry sits) |
-| A project's name and description on its home | editable fields on the project home | `renderHome`: `data-pf` `name`, `desc` | –. The app shows the description but has no editing. |
+| Export and delete a workspace | delete after showing the full export (Owner only) | `data-wa="delete"` | – |
+| Duplicate a workspace | a copy of the workspace | `data-wa="dup"` | – **(uncertain** what the copy includes) |
+| Transfer to another organization | hand the model over (Owner only) | `data-wa="transfer"` | – |
+| New organization | "Created {name} with an empty first workspace." | `openOrgMenu` | – |
+| Delete a project | "Deleted the project {name}…" | `openProjMenu` | – **(uncertain** where the entry sits) |
+| A project's name and description on its home | editable fields | `renderHome` (`data-pf`) | – |
+| Model consistency | as under Sources | `consistencyHtml` | 7b |
 
-**Present:**
-- workspaces: create, switch, archive and unarchive, the overview with statistics;
-- projects: create, home with tiles, labels, notes and requirements;
-- canvases: tabs, new, duplicate, delete, rename, adding a canvas to another project, the last opened canvas.
+**Present:** workspaces, projects and canvases as in the earlier inventory; the empty workspace's next steps name
+importing sources (7a).
 
 ## Settings and roles
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Inviting people | an e-mail and a role; guests from other organizations | the People tab, `data-wa="invite"`, toast “Enter an e-mail address.” | database (AD-04, real sign-in) |
-| Changing a role, removing a member | a role menu and “Remove” per member, for admins | the People tab (`data-role`, `data-rm`) | database **(uncertain**: no slice names it; it needs real accounts) |
+| Inviting people | an e-mail and a role; guests | the People tab, `data-wa="invite"` | database (AD-04) |
+| Changing a role, removing a member | per member, for admins | the People tab (`data-role`, `data-rm`) | database **(uncertain**: no slice names it) |
+| The classification list | as under Sources | `#setDlg` | 7c |
 
-**Present:**
-- the People tab (members, roles, guests, the table of what each role can do);
-- settings: name, client, description, documentation language, four-eyes, Data Vault 2.0 mode;
-- archived and read-only workspaces; reviewer and reader rights.
+**Present:** the People tab, settings (four-eyes, Data Vault 2.0 mode), archived and read-only workspaces; importing
+and re-importing only for owners, admins and modelers in a workspace that is not archived (7a, item 40).
 
 ## Not product features
 
-- **“Demo data restored”:** the prototype's own reset. The app has `npm run reset-dev-data` for development.
-- **“Signing out is not part of the prototype.”:** the app signs out.
+- **"Demo data restored" and "Reset the prototype's demo data":** the prototype's own reset. The app has
+  `npm run reset-dev-data`.
+- **The importer's sample links and its fixed date and person:** prototype only (P10, PRD 7a section 8).
+- **"Signing out is not part of the prototype.":** the app signs out.

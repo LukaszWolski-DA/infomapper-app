@@ -14,7 +14,16 @@ describe("parseColumnLines (S1A-13)", () => {
       { name: "email", data_type: "varchar", type_length: 255, type_precision: null, type_scale: null },
       { name: "amount", data_type: "decimal", type_length: null, type_precision: 18, type_scale: 2 },
       { name: "created", data_type: "datetime2", type_length: null, type_precision: 7, type_scale: null },
-      { name: "notes", data_type: "nvarchar", type_length: null, type_precision: null, type_scale: null },
+      { name: "notes", data_type: "nvarchar", type_length: -1, type_precision: null, type_scale: null },
+    ]);
+  });
+
+  it("reads types as the import does (slice 7a): max, Oracle's names and units, a parameter inside the name", () => {
+    expect(parsed("a varchar(MAX)\nb VARCHAR2(100 CHAR)\nc NUMBER(10,0)\nd TIMESTAMP(6) WITH TIME ZONE")).toEqual([
+      { name: "a", data_type: "varchar", type_length: -1, type_precision: null, type_scale: null },
+      { name: "b", data_type: "varchar2", type_length: 100, type_precision: null, type_scale: null },
+      { name: "c", data_type: "number", type_length: null, type_precision: 10, type_scale: 0 },
+      { name: "d", data_type: "timestamp with time zone", type_length: null, type_precision: 6, type_scale: null },
     ]);
   });
 

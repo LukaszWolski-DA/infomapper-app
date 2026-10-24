@@ -343,6 +343,12 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
           onChange={(status: MappingStatus) => void run(() => setMappingStatusAction(p.workspaceId, { ...ref, status }))}
         />
       </Field>
+      {/* why an import sent it back to review (slice 7a, item 37; D-51); cleared by any change of status or content */}
+      {m.status === "review" && m.review_reason && (
+        <Note warn testId="note-review-reason">
+          An import sent it back to review: {m.review_reason}.
+        </Note>
+      )}
       {fourEyesBlocks && <Note warn testId="note-four-eyes">{FOUR_EYES_MESSAGE}</Note>}
       <Field label="Note" htmlFor="f-note">
         <TextArea

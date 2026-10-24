@@ -152,3 +152,38 @@ collapsed cards change, the canvas already shows the result, and the card's own 
 without a fresh page. In S6A-09 that refresh made “Show all” with Focus and a filter about 90 ms slower to the screen
 than the same changes through the controls at 30 % (22 ms in the dense view). The action could skip the refresh when no
 frame changed.
+
+## “Approve again all {n}” after an import (slice 7a, step 1; for slice 7b)
+
+One import can send many approved mappings back to review (P6: a new type conflict, a business key column that changed
+type, a renamed input in the rule). A button “Approve again all {n}” for the mappings one import sent back, with each
+one's reason shown before the click, would spare a solo modeller approving them one by one. It respects four-eyes: with
+four-eyes on, the person who ran the import cannot use it for those mappings (Łukasz, 22 October 2026).
+
+## One file per table in the local adapter (slice 7a, step 4)
+
+The local adapter (AD-29) writes the whole data file on every write; after three 20,000-column imports a card move
+takes about 1 s (`docs/known-limitations.md`). With one file per table and the change events appended to a file of their
+own rather than rewritten, a write would rewrite only the tables it touches: a card move would be well under 100 ms.
+About a day with a full e2e run (the e2e helpers that read the data file whole move to the store). Only if large imports
+are ever needed locally; the Supabase adapter writes only the changed rows anyway (Łukasz, 23 October 2026: option 1,
+accepted as it is).
+
+## Matching a file's own headers to the standard (slice 7a, PRD section 10)
+
+The standard reads fixed column names and the prototype's aliases (`table_name`, `is_nullable`, `tags`…). A file
+with other headers gets "The file has no “{header}” column. Name the columns as in the standard below." A step that
+lets the modeller match the file's own headers to the standard's fields once, remembered per system, would spare
+renaming them in Excel.
+
+## The dbt, Snowflake and Databricks channels (slice 7a, PRD section 10)
+
+The wizard shows "dbt project" ("catalog.json, later"), "Snowflake (later)" and "Databricks (later)" disabled, as the
+prototype does. Each needs its catalog query or its file read into the standard, with the type names of that database
+in D-01's table and their fractional seconds (as SQL Server's and PostgreSQL's queries got in slice 7a, step 5).
+
+## Relationships between source tables as lines on the canvas (slice 7a, step 5)
+
+The prototype's review promised "Shown later as a grey line between the table cards on a canvas" for a new
+relationship; slice 7a left the sentence out. Lines between table cards for declared relationships, in the line layer
+(AD-24 rule 3), with their own layer switch, would show the source's structure next to the mappings.

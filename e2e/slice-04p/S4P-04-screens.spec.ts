@@ -23,7 +23,7 @@ import { expect, test, type Page } from "../slice-04a/fixtures";
 import { canvasUrl, ids, mappingId, openCanvas, requirementByKey, rowNamed, signInAs } from "../slice-04a/helpers";
 
 const OUT = path.resolve("docs", "prd", "slice-04p-screens", process.env.SCREENS === "1" ? "latest" : (process.env.SCREENS ?? "latest"));
-const PROTOTYPE = pathToFileURL(path.resolve("docs", "prototype", "infomapper-model-prototype.html")).href;
+const PROTOTYPE = pathToFileURL(path.resolve("docs", "prototype", "infomapper-prototype-with-sources.html")).href;
 const VIEWS = { "100": { x: 0, y: 0, zoom: 1 }, "30": { x: 40, y: 40, zoom: 0.3 } } as const;
 
 test.use({ viewport: { width: 1536, height: 864 } });

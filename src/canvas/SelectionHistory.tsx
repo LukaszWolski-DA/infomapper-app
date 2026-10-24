@@ -29,6 +29,8 @@ const GONE: Record<PlaceGone, string> = {
   req: "That requirement no longer exists.",
   label: "That label no longer exists.",
   element: "That element no longer exists.",
+  // slice 7a: a system disappears when the import that created it is undone
+  source_system: "That source system no longer exists.",
 };
 
 const ARRIVAL = ["card", "label", "req", "note"];

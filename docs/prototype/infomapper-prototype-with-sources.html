@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>InfoMapper – Model workspace prototype</title>
+<title>InfoMapper – Model workspace with sources (prototype)</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
@@ -796,6 +796,233 @@ footer .w b{color:var(--warn)}
   main.mleft #side,main.mright #insp{visibility:visible}
   .brand span,.hide-s{display:none}
 }
+:is(.iw,.imx) button{cursor:pointer}
+:is(.iw,.imx) svg.i{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;flex:none}
+:is(.iw,.imx) .mono{font-family:var(--mono);font-size:12px}
+:is(.iw,.imx) .muted{color:var(--ink-3)}
+:is(.iw,.imx) .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+@media (max-width:1000px){}
+:is(.iw,.imx) .btn{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);white-space:nowrap}
+:is(.iw,.imx) .btn:hover{background:var(--hover)}
+:is(.iw,.imx) .btn.primary{background:var(--logical);border-color:var(--logical);color:var(--surface)}
+:is(.iw,.imx) .btn.primary:hover{filter:brightness(1.08)}
+:is(.iw,.imx) .btn:disabled{opacity:.45;cursor:default;filter:none}
+:is(.iw,.imx) .btn.small{height:26px;padding:0 8px;font-size:12px}
+:is(.iw,.imx) .link{border:0;background:none;padding:0;color:var(--logical);text-decoration:underline;text-underline-offset:2px}
+:is(.iw,.imx) .scroll{overflow-x:auto;border:1px solid var(--line);border-radius:8px}
+:is(.iw,.imx) table.grid{border-collapse:collapse;width:100%;min-width:640px}
+:is(.iw,.imx) .grid th,:is(.iw,.imx) .grid td{padding:6px 10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
+:is(.iw,.imx) .grid th{font-weight:500;color:var(--ink-3);font-size:12px;background:var(--panel)}
+:is(.iw,.imx) .grid tr:last-child td{border-bottom:0}
+:is(.iw,.imx) .grid tr.missing td{color:var(--ink-3)}
+:is(.iw,.imx) .grid tr.missing td.cn{text-decoration:line-through;text-decoration-color:var(--warn)}
+:is(.iw,.imx) .grid tr.recent td:first-child{box-shadow:inset 3px 0 0 var(--map)}
+:is(.iw,.imx) .keys{display:inline-flex;gap:4px}
+:is(.iw,.imx) .k{font:500 10px/16px var(--mono);padding:0 4px;border-radius:3px;background:var(--physical-soft);color:var(--physical)}
+:is(.iw,.imx) .chip{display:inline-flex;align-items:center;gap:4px;height:20px;padding:0 7px;border-radius:10px;font-size:11.5px;background:var(--hover);color:var(--ink-2);white-space:nowrap}
+:is(.iw,.imx) .chip.cls{background:var(--physical-soft);color:var(--physical)}
+:is(.iw,.imx) .chip.dv{box-shadow:inset 0 0 0 1px var(--physical)}
+:is(.iw,.imx) .chips{display:inline-flex;flex-wrap:wrap;gap:4px}
+:is(.iw,.imx) .tag{display:inline-flex;align-items:center;height:18px;padding:0 6px;border-radius:4px;font-size:11px;font-weight:500;white-space:nowrap}
+:is(.iw,.imx) .tag.new{background:var(--map-soft);color:var(--map)}
+:is(.iw,.imx) .tag.changed,:is(.iw,.imx) .tag.rename,:is(.iw,.imx) .tag.back{background:var(--logical-soft);color:var(--logical)}
+:is(.iw,.imx) .tag.missing{background:var(--warn-soft);color:var(--warn)}
+:is(.iw,.imx) .tag.unchanged{background:var(--hover);color:var(--ink-3)}
+:is(.iw,.imx) .tag.req{background:var(--req-soft);color:var(--req-ink)}
+:is(.iw,.imx) .maps{color:var(--map);font-size:12px}
+:is(.iw,.imx) .maps.review{color:var(--ink-2)}
+dialog.wiz.iw{width:min(980px,calc(100vw - 32px));height:min(760px,calc(100vh - 32px));padding:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 20px 60px var(--shadow)}
+dialog.wiz.iw[open]{display:grid;grid-template-rows:auto 1fr auto}
+dialog.wiz.iw::backdrop{background:rgba(16,22,30,.42)}
+@media (max-width:700px){dialog.wiz.iw{width:100vw;height:100vh;max-width:100vw;max-height:100vh;border-radius:0;margin:0}}
+:is(.iw,.imx) .whead{display:flex;align-items:center;gap:12px;padding:14px 18px 12px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+:is(.iw,.imx) .whead h2{margin:0;font-size:15px;font-weight:600;flex:1;min-width:200px}
+:is(.iw,.imx) .steps{display:flex;gap:4px;list-style:none;margin:0;padding:0}
+:is(.iw,.imx) .steps button{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 10px 0 6px;border:0;border-radius:14px;background:transparent;color:var(--ink-3)}
+:is(.iw,.imx) .steps button .num{display:inline-grid;place-items:center;width:18px;height:18px;border-radius:50%;border:1px solid currentColor;font-size:11px}
+:is(.iw,.imx) .steps button[aria-current="step"]{background:var(--logical-soft);color:var(--logical)}
+:is(.iw,.imx) .steps button.done{color:var(--ink-2)}
+:is(.iw,.imx) .steps button.done .num{background:var(--ink-2);border-color:var(--ink-2);color:var(--surface)}
+:is(.iw,.imx) .steps button:disabled{cursor:default;opacity:.55}
+:is(.iw,.imx) .wbody{overflow:auto;padding:18px 20px 24px;min-height:0}
+:is(.iw,.imx) .wfoot{display:flex;align-items:center;gap:8px;padding:12px 18px;border-top:1px solid var(--line);background:var(--panel)}
+:is(.iw,.imx) .wfoot .note{flex:1;color:var(--ink-3);font-size:12px;min-width:0}
+:is(.iw,.imx) fieldset{border:0;margin:0 0 18px;padding:0}
+:is(.iw,.imx) legend{font-weight:600;margin-bottom:8px;padding:0}
+:is(.iw,.imx) .opts{display:flex;flex-wrap:wrap;gap:8px}
+:is(.iw,.imx) .opt{display:flex;align-items:flex-start;gap:8px;padding:9px 12px;border:1px solid var(--line);border-radius:8px;min-width:170px;cursor:pointer;background:var(--surface)}
+:is(.iw,.imx) .opt:has(input:checked){border-color:var(--logical);background:var(--logical-soft)}
+:is(.iw,.imx) .opt:has(input:disabled){opacity:.5;cursor:default}
+:is(.iw,.imx) .opt small{display:block;color:var(--ink-3)}
+:is(.iw,.imx) .opt input{margin-top:3px}
+:is(.iw,.imx) input[type=text],:is(.iw,.imx) select,:is(.iw,.imx) textarea{border:1px solid var(--line);border-radius:6px;background:var(--surface);padding:6px 8px}
+:is(.iw,.imx) textarea.code{width:100%;min-height:140px;font:12px/1.5 var(--mono);resize:vertical;white-space:pre;overflow:auto}
+:is(.iw,.imx) .drop{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;min-height:120px;border:1.5px dashed var(--line);border-radius:8px;padding:16px;text-align:center;color:var(--ink-2)}
+:is(.iw,.imx) .drop.over{border-color:var(--logical);background:var(--logical-soft)}
+:is(.iw,.imx) .loaded{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;border-radius:8px;background:var(--map-soft);color:var(--ink)}
+:is(.iw,.imx) .err{padding:10px 12px;border-radius:8px;background:var(--warn-soft);color:var(--ink);margin:10px 0}
+:is(.iw,.imx) .err b{color:var(--warn)}
+:is(.iw,.imx) .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px}
+@media (max-width:820px){:is(.iw,.imx) .two{grid-template-columns:1fr}}
+:is(.iw,.imx) details.std summary{cursor:pointer;color:var(--logical)}
+:is(.iw,.imx) details.std table{margin-top:8px}
+:is(.iw,.imx) .hint{color:var(--ink-3);font-size:12px;margin:4px 0 0}
+:is(.iw,.imx) .scope{list-style:none;margin:0;padding:0;border:1px solid var(--line);border-radius:8px}
+:is(.iw,.imx) .scope>li{border-bottom:1px solid var(--line);padding:8px 12px}
+:is(.iw,.imx) .scope>li:last-child{border-bottom:0}
+:is(.iw,.imx) .scope ul{list-style:none;margin:6px 0 0;padding:0 0 0 26px;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:2px 12px}
+:is(.iw,.imx) .scope label{display:flex;align-items:center;gap:8px}
+:is(.iw,.imx) .callout{border-left:3px solid var(--logical);background:var(--logical-soft);padding:9px 12px;border-radius:0 6px 6px 0;margin:12px 0;color:var(--ink)}
+:is(.iw,.imx) .callout.warn{border-color:var(--warn);background:var(--warn-soft)}
+:is(.iw,.imx) .counts{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 14px}
+:is(.iw,.imx) .counts button{display:inline-flex;align-items:center;gap:6px;height:30px;padding:0 10px;border:1px solid var(--line);border-radius:15px;background:var(--surface);color:var(--ink-2)}
+:is(.iw,.imx) .counts button b{color:var(--ink);font-weight:600}
+:is(.iw,.imx) .counts button[aria-pressed="true"]{border-color:var(--logical);background:var(--logical-soft);color:var(--logical)}
+:is(.iw,.imx) .counts button[aria-pressed="true"] b{color:var(--logical)}
+:is(.iw,.imx) .rq{border:1px solid var(--req);border-radius:8px;padding:10px 12px;margin:0 0 16px;background:var(--surface)}
+:is(.iw,.imx) .rq h4{margin:0 0 6px;font-size:13px;color:var(--req-ink)}
+:is(.iw,.imx) .rq ul{margin:0;padding:0;list-style:none}
+:is(.iw,.imx) .rq li{padding:4px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:baseline}
+:is(.iw,.imx) .rq .why{color:var(--ink-2);font-size:12px}
+:is(.iw,.imx) .tcard{border:1px solid var(--line);border-radius:8px;margin:0 0 10px;overflow:hidden}
+:is(.iw,.imx) .tcard>header{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 12px;background:var(--panel)}
+:is(.iw,.imx) .tcard>header .tn{font-weight:600}
+:is(.iw,.imx) .tcard>header .sum{color:var(--ink-3);font-size:12px;margin-left:auto}
+:is(.iw,.imx) .crow{display:grid;grid-template-columns:86px minmax(130px,1fr) minmax(160px,1.3fr) minmax(180px,1.6fr);gap:4px 12px;padding:7px 12px;border-top:1px solid var(--line);align-items:start}
+@media (max-width:820px){:is(.iw,.imx) .crow{grid-template-columns:86px 1fr}
+:is(.iw,.imx) .crow>.imp,:is(.iw,.imx) .crow>.what{grid-column:2}}
+:is(.iw,.imx) .crow .what{color:var(--ink-2)}
+:is(.iw,.imx) .crow .imp{font-size:12px;color:var(--ink-2)}
+:is(.iw,.imx) .crow .imp .c{color:var(--warn)}
+:is(.iw,.imx) .arrow{color:var(--ink-3);margin:0 4px}
+:is(.iw,.imx) .decide{grid-column:2 / -1;display:flex;flex-wrap:wrap;gap:6px 16px;padding:6px 10px;border-radius:6px;background:var(--logical-soft)}
+:is(.iw,.imx) .decide label{display:flex;gap:6px;align-items:center}
+:is(.iw,.imx) .more{padding:6px 12px;border-top:1px solid var(--line)}
+:is(.iw,.imx) .sect{margin:20px 0 8px;font-size:13px;font-weight:600}
+:is(.iw,.imx) .hintrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:6px 0;border-bottom:1px solid var(--line)}
+:is(.iw,.imx) .grid tbody tr{cursor:pointer}
+:is(.iw,.imx) .grid tbody tr:hover td{background:var(--hover)}
+:is(.iw,.imx) .grid tbody tr.sel td{background:var(--logical-soft)}
+:is(.iw,.imx) .grid td.ck{width:30px;padding-right:0}
+:is(.iw,.imx) .grid td.nt{max-width:240px;color:var(--ink-2);font-size:12px}
+:is(.iw,.imx) .togs{display:flex;flex-wrap:wrap;gap:5px}
+:is(.iw,.imx) .tog{display:inline-flex;align-items:center;gap:4px;height:26px;padding:0 10px;border:1px solid var(--line);border-radius:13px;background:var(--surface);color:var(--ink-2);font-size:12px}
+:is(.iw,.imx) .tog:hover{border-color:var(--ink-3)}
+:is(.iw,.imx) .tog[aria-pressed="true"]{background:var(--physical-soft);border-color:var(--physical);color:var(--physical)}
+:is(.iw,.imx) .tog[aria-pressed="mixed"]{border-style:dashed;border-color:var(--physical);color:var(--physical)}
+:is(.iw,.imx) dl.facts{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:0}
+:is(.iw,.imx) dl.facts dt{color:var(--ink-3)}
+:is(.iw,.imx) dl.facts dd{margin:0}
+:is(.iw,.imx) .reading{list-style:none;margin:0;padding:0}
+:is(.iw,.imx) .reading li{padding:6px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+:is(.iw,.imx) .reading li b{font-weight:600}
+dialog.set.iw{width:min(640px,calc(100vw - 32px));max-height:calc(100vh - 32px);padding:0;border:1px solid var(--line);border-radius:10px;background:var(--surface);color:var(--ink);box-shadow:0 20px 60px var(--shadow)}
+dialog.set.iw::backdrop{background:rgba(16,22,30,.42)}
+:is(.iw,.imx) .setbody{padding:4px 20px 18px;overflow:auto;max-height:calc(100vh - 150px)}
+:is(.iw,.imx) .clist{list-style:none;margin:0 0 8px;padding:0;border:1px solid var(--line);border-radius:8px}
+:is(.iw,.imx) .clist li{display:flex;align-items:center;gap:10px;padding:6px 10px;border-bottom:1px solid var(--line);min-height:38px}
+:is(.iw,.imx) .clist li:last-child{border-bottom:0}
+:is(.iw,.imx) .clist .nm{flex:1;min-width:0}
+:is(.iw,.imx) .clist input[type=text]{width:100%}
+:is(.iw,.imx) .addrow{display:flex;gap:8px;margin-bottom:18px}
+:is(.iw,.imx) .addrow input{flex:1}
+:is(.iw,.imx) .issue{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0 0 8px;background:var(--surface);max-width:860px}
+:is(.iw,.imx) .issue.high{border-left:3px solid var(--warn)}
+:is(.iw,.imx) .issue header{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+:is(.iw,.imx) .issue header b{font-weight:600}
+:is(.iw,.imx) .issue .det{margin:4px 0 0;color:var(--ink-2)}
+:is(.iw,.imx) .issue .imp2{margin:4px 0 0;font-size:12px;color:var(--ink-2)}
+:is(.iw,.imx) .issue .acts{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+:is(.iw,.imx) .issue .pend{margin-top:10px;padding:10px 12px;border-radius:6px;background:var(--panel);display:grid;gap:8px}
+:is(.iw,.imx) .issue .pend select{max-width:100%}
+:is(.iw,.imx) .tag.high{background:var(--warn);color:var(--surface)}
+:is(.iw,.imx) .tag.normal{background:var(--hover);color:var(--ink-2)}
+:is(.iw,.imx) details.resolved summary{cursor:pointer;color:var(--ink-2);margin:6px 0}
+:is(.iw,.imx) details.resolved li{font-size:12.5px}
+:is(.iw,.imx) .grid tr.retired td{color:var(--ink-3)}
+:is(.iw,.imx) .reason{display:block;font-size:11.5px;color:var(--warn)}
+:is(.iw,.imx) .chip.cls{background:var(--physical-soft);color:var(--physical)}
+
+/* sources merged from the Source importer */
+.imx textarea{width:100%;min-height:84px;resize:vertical;border:1px solid var(--line);border-radius:6px;background:var(--surface);color:var(--ink);padding:6px 8px;font:inherit}
+.imx h3{margin:16px 0 6px}
+.imx .hist{list-style:none;margin:0;padding:0}.imx .hist li{padding:7px 0;border-bottom:1px solid var(--line);font-size:12.5px}
+.imx .li.im-gone .n{text-decoration:line-through;text-decoration-color:var(--warn)}
+.imx .k{font:500 10px/16px var(--mono);padding:0 4px;border-radius:3px;background:var(--physical-soft);color:var(--physical)}
+.im-bar{padding:6px 10px 8px}
+.im-badge{display:inline-grid;place-items:center;min-width:16px;height:16px;padding:0 4px;border-radius:8px;background:var(--warn);color:var(--surface);font-size:10.5px;font-weight:600;margin-left:4px}
+.im-dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--warn);margin-left:6px;vertical-align:middle}
+.titem.im-gone .n{text-decoration:line-through;text-decoration-color:var(--warn)}
+.titem.im-old .n{opacity:.55}
+.card .row.im-gone{opacity:.55}.card .row.im-gone .nm,.card .row.im-gone .nmw{text-decoration:line-through;text-decoration-color:var(--warn)}
+.card .row.im-old{opacity:.45}
+.card .row.im-new{box-shadow:inset 3px 0 0 var(--map)}
+.card .row.im-chg{box-shadow:inset 3px 0 0 var(--warn)}
+.lnk.map.gone .s{stroke-dasharray:2 5;opacity:.5}
+dialog.wiz.iw,dialog.set.iw{font:13px/1.45 var(--sans)}
+.im-cons{margin:18px 0 6px;max-width:900px}
+dialog.wiz.iw{width:min(920px,calc(100vw - 32px))}
+.iw .col1{max-width:760px;margin:0 auto}
+.iw .wsec{margin:0 0 22px}
+.iw .wh{font-size:13px;font-weight:600;margin:0 0 10px}
+.iw h4.sub{font-size:12.5px;font-weight:600;margin:16px 0 8px}
+.iw .seg2{display:inline-flex;padding:2px;border-radius:8px;background:var(--hover);margin-bottom:10px}
+.iw .seg2 label{position:relative;cursor:pointer}
+.iw .seg2 input{position:absolute;opacity:0;pointer-events:none}
+.iw .seg2 span{display:inline-block;padding:5px 14px;border-radius:6px;color:var(--ink-2)}
+.iw .seg2 input:checked+span{background:var(--surface);color:var(--ink);box-shadow:0 0 0 1px var(--line),0 1px 2px var(--shadow)}
+.iw .seg2 input:focus-visible+span{outline:2px solid var(--logical);outline-offset:1px}
+.iw .pick{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface)}
+.iw .pick-f{display:flex;align-items:center;gap:8px;padding:6px 10px;border-bottom:1px solid var(--line);color:var(--ink-3)}
+.iw .pick-f input{flex:1;border:0;padding:4px 0;background:transparent;outline:none}
+.iw .pick-l{max-height:232px;overflow-y:auto}
+.iw .pick-r{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:10px;padding:9px 12px;border-bottom:1px solid var(--line);cursor:pointer}
+.iw .pick-r:last-child{border-bottom:0}
+.iw .pick-r:hover{background:var(--hover)}
+.iw .pick-r:has(input:checked){background:var(--logical-soft)}
+.iw .pick-n{font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iw .pick-m{color:var(--ink-3);font-size:12px;white-space:nowrap}
+.iw .chs{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px}
+.iw .ch{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border:1px solid var(--line);border-radius:8px;cursor:pointer;background:var(--surface);min-width:0}
+.iw .ch input{position:absolute;opacity:0;pointer-events:none}
+.iw .ch svg{margin-top:2px;color:var(--ink-3)}
+.iw .ch b{display:block;font-weight:600}
+.iw .ch small{display:block;color:var(--ink-3);font-size:12px}
+.iw .ch:hover{border-color:var(--ink-3)}
+.iw .ch:has(input:checked){border-color:var(--logical);background:var(--logical-soft)}
+.iw .ch:has(input:checked) svg{color:var(--logical)}
+.iw .ch:has(input:focus-visible){outline:2px solid var(--logical);outline-offset:1px}
+.iw .ch.off{opacity:.5;cursor:default}
+.iw .fld2{display:flex;flex-direction:column;gap:5px;margin:0 0 12px;min-width:0}
+.iw .fld2>label{font-weight:500}
+.iw .wide{width:100%;height:34px}
+.iw .row2{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px;margin-top:12px}
+.iw .codebox{border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--surface);margin:0 0 6px}
+.iw .codehead{display:flex;align-items:center;gap:10px;padding:6px 8px 6px 12px;background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+.iw .codehead .muted{font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.iw .codehead .sp{flex:1}
+.iw .codebox textarea.code{display:block;width:100%;border:0;border-radius:0;min-height:0;resize:vertical;white-space:pre;overflow:auto;background:var(--surface);padding:10px 12px}
+.iw .drop.slim{min-height:56px;flex-direction:row;margin-top:8px}
+.iw .loaded{min-width:0}
+.iw .lname{display:flex;flex-direction:column;min-width:0;flex:1}
+.iw .lname b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.iw .lname span{color:var(--ink-2);font-size:12.5px}
+.iw .ell{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.iw .scope label{min-width:0}
+.iw .crow>*{min-width:0;overflow-wrap:anywhere}
+.iw .tcard>header .tn{overflow-wrap:anywhere}
+.iw .whead h2{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.im-cgrp{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:0 0 8px;background:var(--surface)}
+.im-cgrp.high{border-left:3px solid var(--warn)}
+.im-ch{display:flex;gap:8px;align-items:center;margin-bottom:4px}
+body.im-chgmode #cards .card:not(.im-hit){opacity:.18}
+body.im-chgmode #cards .card.im-hit .row:not(.im-hit){opacity:.35}
+body.im-chgmode #lines .lnk:not(.im-hit){opacity:.08}
+body.im-chgmode #lines .lnk.map.im-hit .s{stroke-width:2.6px}
+#imChgBar{position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:40;display:flex;gap:10px;align-items:center;padding:6px 10px 6px 12px;border-radius:8px;background:var(--surface);border:1px solid var(--warn);box-shadow:0 4px 16px var(--shadow);font-size:12.5px;white-space:nowrap;max-width:calc(100% - 20px)}
+#imChgBar[hidden]{display:none}
+#imChgBar select{max-width:260px}
+
 </style>
 </head>
 <body>
@@ -812,6 +1039,8 @@ footer .w b{color:var(--warn)}
   </div>
   <button class="tb hide-s" id="tFocus" aria-pressed="false" title="Fade everything not connected to the selection">
     <svg class="i" viewBox="0 0 16 16"><circle cx="8" cy="8" r="2.5"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2"/></svg><span class="hide-m">Focus</span></button>
+  <button class="tb hide-s" id="tChg" aria-pressed="false" title="Changes: show only what source changes touch">
+    <svg class="i" viewBox="0 0 16 16"><path d="M8 2l6 11H2z"/><path d="M8 6.5v3M8 11.3v.2"/></svg><span class="hide-m">Changes</span></button>
   <button class="tb" id="tHand" aria-pressed="false" title="Hand tool (H): drag anywhere to move the canvas. V or Esc returns to selecting">
     <svg class="i" viewBox="0 0 16 16"><path d="M5 8.5V3.8a1 1 0 012 0V7.5M7 7V2.8a1 1 0 012 0V7M9 7V3.3a1 1 0 012 0V8M11 6.5a1 1 0 012 0V10a4.5 4.5 0 01-4.5 4.5h-.6a4 4 0 01-3.2-1.6L2.6 10a1 1 0 011.5-1.3L5 9.6"/></svg><span class="hide-s hide-m">Hand</span></button>
   <button class="tb" id="tEnt" aria-pressed="false" title="Entity tool (E): click on the canvas to create a new entity there">
@@ -927,6 +1156,8 @@ footer .w b{color:var(--warn)}
 </div></div>
 <div id="toast" role="status" aria-live="polite"><span id="toastMsg"></span><button id="toastUndo">Undo</button></div>
 
+<dialog class="wiz iw" id="wiz" aria-labelledby="wizTitle"></dialog>
+<dialog class="set iw" id="setDlg" aria-labelledby="setTitle"></dialog>
 <script>
 "use strict";
 /* =========================================================
@@ -1086,7 +1317,10 @@ function seed() {
     ...["first_name", "last_name", "email", "birth_date"].map(a => ({reqId:"req_105", t:"attr", id:"latr_customer_" + a}))
   ];
   diagrams[0].reqs = {req_104:{x:-1, y:-1}};       // placed next to the Sales frame after the first layout
-  return {version:2, concepts, entities, attributes, sources, mappings, relationships, diagrams, labels, labelLinks, projects, requirements, reqLinks};
+  attributes.forEach(a => { const L = {latr_customer_email:120, latr_customer_first_name:50, latr_customer_last_name:50, latr_customer_segment_code:3}[a.id]; if (L) a.length = String(L); });
+  const srcRelations = [{id:"rel_ordline_hdr", name:"FK_order_line_order_header", fromTableId:"src_ordline", fromCols:["src_ordline__ord_id"], toTableId:"src_ordhdr", toCols:["src_ordhdr__ord_id"], kind:"declared", missingSince:null},
+    {id:"rel_addr_cust", name:"FK_customer_addresses_customers", fromTableId:"src_addr", fromCols:["src_addr__cust_id"], toTableId:"src_customers", toCols:["src_customers__cust_id"], kind:"declared", missingSince:null}];
+  return {version:2, concepts, entities, attributes, sources, mappings, relationships, diagrams, labels, labelLinks, projects, requirements, reqLinks, srcRelations};
 }
 
 /* =========================================================
@@ -1104,6 +1338,9 @@ const onOther = (k, id) => S.diagrams.some(d => d.id !== V.dia && d[k][id]);
 
 function idx() {
   I = {con:{}, ent:{}, attr:{}, attrsOf:{}, src:{}, col:{}, colSrc:{}, mA:{}, mC:{}, map:{}, rel:{}};
+  S.systems ||= []; S.issues ||= []; S.imports ||= []; S.srcRelations ||= []; S.classes ||= [];
+  for (const s of S.sources) if (s.system && !S.systems.some(x => x.name === s.system)) S.systems.push({id:"sys_" + String(s.system).toLowerCase().replace(/\W+/g, "_") + "_" + S.systems.length, name:s.system});
+  I.sys = Object.fromEntries(S.systems.map(x => [x.id, x]));
   S.concepts.forEach(c => { if (String(c.color).toUpperCase() === "#7A4FD0") c.color = "#0F8B8D"; I.con[c.id] = c; });   // violet is reserved for requirements
   S.entities.forEach(e => { I.ent[e.id] = e; I.attrsOf[e.id] = []; });
   S.attributes.forEach(a => { I.attr[a.id] = a; (I.attrsOf[a.entityId] ||= []).push(a); });
@@ -1156,7 +1393,7 @@ function fixSel() {
   idx();
   normProjects();
   const s = V.sel; if (!s || s.t === "multi") return;
-  const ok = {entity:I.ent, source:I.src, attr:I.attr, col:I.col, map:I.map, rel:I.rel, frame:Object.fromEntries((CV().frames || []).map(f => [f.id, f])), note:Object.fromEntries((CV().notes || []).map(n => [n.id, n])), req:I.req, bundle:V.bundles || {}, label:I.lbl}[s.t]?.[s.id];
+  const ok = {system:I.sys, entity:I.ent, source:I.src, attr:I.attr, col:I.col, map:I.map, rel:I.rel, frame:Object.fromEntries((CV().frames || []).map(f => [f.id, f])), note:Object.fromEntries((CV().notes || []).map(n => [n.id, n])), req:I.req, bundle:V.bundles || {}, label:I.lbl}[s.t]?.[s.id];
   if (!ok) V.sel = null;
 }
 function save() {
@@ -1190,16 +1427,31 @@ const baseOf = t => String(t).toLowerCase().split("(")[0].trim();
 const PHYS = {varchar:"String",nvarchar:"String",char:"String",nchar:"String",text:"String",uuid:"String",uniqueidentifier:"String",
   int:"Integer",bigint:"Integer",smallint:"Integer",tinyint:"Integer",decimal:"Decimal",numeric:"Decimal",float:"Decimal",money:"Decimal",
   bit:"Boolean",boolean:"Boolean",date:"Date",datetime:"Date",datetime2:"Date",timestamp:"Date",json:"JSON",jsonb:"JSON"};
-const logicalOf = t => PHYS[baseOf(t)] || "String";
+Object.assign(PHYS, {varchar2:"String", nvarchar2:"String", clob:"String", nclob:"String", string:"String", character:"String", "character varying":"String",
+  integer:"Integer", serial:"Integer", bigserial:"Integer", decimal:"Decimal", real:"Decimal", "double precision":"Decimal", binary_double:"Decimal", binary_float:"Decimal",
+  timestamptz:"Date", "timestamp with time zone":"Date", "timestamp without time zone":"Date", datetimeoffset:"Date", datetime:"Date", time:"Date", bool:"Boolean"});
+function logicalOf(t) {
+  const b = baseOf(t);
+  if (b === "number") { const m = String(t).match(/\(\s*\d+\s*(?:,\s*(\d+))?/); return m && (!m[1] || +m[1] === 0) ? "Integer" : "Decimal"; }
+  return PHYS[b] || PHYS[b.split(" ")[0]] || "String";
+}
 function typeCheck(m) {
   const c = I.col[m.columnId], a = I.attr[m.attributeId];
   if (!c || !a) return {ok:true, msg:""};
-  const from = logicalOf(c.dataType), to = a.dataType || "String";
-  if (from === to) return {ok:true, msg:`${c.dataType} fits ${to}.`};
-  if (from === "Integer" && to === "Decimal") return {ok:true, msg:`${c.dataType} widens to Decimal without loss.`};
-  if (to === "String") return {ok:true, msg:`${c.dataType} will be carried as text.`};
-  if (m.kind === "transform" && m.rule.trim()) return {ok:true, msg:`${c.dataType} to ${to}: the transformation rule handles the conversion.`};
-  return {ok:false, msg:`${c.dataType} does not fit ${to}. Add a transformation rule or change the attribute's data type.`};
+  return typeIssue(c.dataType, a, m);
+}
+/* One check for the canvas, the inspector and the importer: the physical type of the column against the modelling type of the attribute. */
+function typeIssue(phys, a, m) {
+  const from = logicalOf(phys), to = a.dataType || "String", L = +a.length || 0, tl = to + (L ? `(${L})` : "");
+  if (m.kind === "transform" && String(m.rule || "").trim()) return {ok:true, msg:`${phys} to ${tl}: the transformation rule handles the conversion.`};
+  if (to === "String" && L && from === "String") {
+    const mm = String(phys).match(/\(\s*(max|-1|\d+)/i), len = mm ? (/^(max|-1)$/i.test(mm[1]) ? Infinity : +mm[1]) : null;
+    if (len != null && len > L) return {ok:false, msg:`${phys} is longer than ${tl}. Widen the attribute or add a transformation rule.`, short:`${phys} into ${tl}`};
+  }
+  if (from === to) return {ok:true, msg:`${phys} fits ${tl}.`};
+  if (from === "Integer" && to === "Decimal") return {ok:true, msg:`${phys} widens to Decimal without loss.`};
+  if (to === "String") return {ok:true, msg:`${phys} will be carried as text.`};
+  return {ok:false, msg:`${phys} does not fit ${tl}. Add a transformation rule or change the attribute's data type.`, short:`${phys} into ${tl}`};
 }
 const colLabel = id => { const c = I.col[id]; return c ? I.src[I.colSrc[id]].name + "." + c.name : "?"; };
 const attrLabel = id => { const a = I.attr[id]; return a ? I.ent[a.entityId].name + "." + a.name : "?"; };
@@ -1429,17 +1681,20 @@ function attrRow(a) {
   const st = !ms.length ? "" : warn ? "warn" : "ok";
   const title = !ms.length ? "Not mapped yet" : ms.map(m => "from " + colLabel(m.columnId)).join("\n");
   const lid = CV().live?.labelId, lab = lid && rowRelevant("ent", a.id, lid);
-  return `<div class="row${isSel("attr", a.id) ? " sel" : ""}${lab ? " lab" : ""}" data-rk="attr" data-rid="${esc(a.id)}"><span class="hnd l"></span>
+  const chg = ms.some(m => m.status === "review" && m.reviewReason);
+  return `<div class="row${isSel("attr", a.id) ? " sel" : ""}${lab ? " lab" : ""}${chg ? " im-chg" : ""}${IMP.hit("attrs", a.id)}" data-rk="attr" data-rid="${esc(a.id)}"><span class="hnd l"></span>
 ${keyBadges(a)}
 ${nmSplit(a.name)}${a.isPII ? '<span class="tag pii" title="Personal data">PII</span>' : ""}
-${lmark("attr", a.id)}${(I.reqOf["attr:" + a.id] || []).length ? `<span class="rdot" title="Requirements: ${esc(I.reqOf["attr:" + a.id].map(r => r.key).join(", "))}"></span>` : ""}<span class="dt">${esc(a.dataType || "–")}</span><span class="st ${st}${ms.length > 1 ? " n" : ""}" title="${esc(title)}">${ms.length > 1 ? ms.length : ""}</span><span class="hnd r"></span></div>`;
+${lmark("attr", a.id)}${(I.reqOf["attr:" + a.id] || []).length ? `<span class="rdot" title="Requirements: ${esc(I.reqOf["attr:" + a.id].map(r => r.key).join(", "))}"></span>` : ""}<span class="dt">${esc((a.dataType || "–") + (a.length ? `(${a.length})` : ""))}</span><span class="st ${st}${ms.length > 1 ? " n" : ""}" title="${esc(title)}">${ms.length > 1 ? ms.length : ""}</span><span class="hnd r"></span></div>`;
 }
 function colRow(c) {
   const ms = I.mC[c.id] || [], warn = ms.some(m => !typeCheck(m).ok);
   const st = !ms.length ? "" : warn ? "warn" : "ok";
   const title = !ms.length ? "Not used yet" : ms.map(m => "to " + attrLabel(m.attributeId)).join("\n");
   const lidC = CV().live?.labelId, labC = lidC && rowRelevant("src", c.id, lidC);
-  return `<div class="row${isSel("col", c.id) ? " sel" : ""}${labC ? " lab" : ""}" data-rk="col" data-rid="${esc(c.id)}"><span class="hnd l"></span>
+  const open = (S.issues || []).filter(i => i.status === "open" && i.colId === c.id);
+  const mk = c.retiredSince ? " im-old" : c.missingSince ? " im-gone" : open.some(i => i.kind !== "newcol") ? " im-chg" : open.length ? " im-new" : "";
+  return `<div class="row${isSel("col", c.id) ? " sel" : ""}${labC ? " lab" : ""}${mk}${IMP.hit("cols", c.id)}" title="${c.retiredSince ? "Retired: historical" : c.missingSince ? "Missing from source" : open.length ? "Changed in the source: see the table's changes to resolve" : ""}" data-rk="col" data-rid="${esc(c.id)}"><span class="hnd l"></span>
 ${keyBadges(c)}
 ${nmSplit(c.name)}${(c.tags || []).includes("BK") ? '<span class="tag bk" title="Business key">BK</span>' : ""}${lmark("col", c.id)}${(I.reqOf["col:" + c.id] || []).length ? `<span class="rdot" title="Requirements: ${esc(I.reqOf["col:" + c.id].map(r => r.key).join(", "))}"></span>` : ""}
 <span class="dt">${esc(c.dataType)}</span><span class="st ${st}${ms.length > 1 ? " n" : ""}" title="${esc(title)}">${ms.length > 1 ? ms.length : ""}</span><span class="hnd r"></span></div>`;
@@ -1454,7 +1709,7 @@ function entCard(id) {
   const rows = rowsOf("ent", id);
   const lid = CV().live?.labelId, ctx = lid && !(I.lblOf["entity:" + id] || []).some(l => l.id === lid);
   const dual = rows.some(x => x.isPrimaryKey && x.isForeignKey);
-  return `<div class="card ent${isSel("entity", id) ? " sel" : ""}${L.c ? " collapsed" : ""}${ctx ? " ctx" : ""}${dual ? " dualkeys" : ""}" data-kind="ent" data-id="${id}" style="left:${L.x}px;top:${L.y}px;width:${wOf(L)}px;--cc:${con?.color || "#889"}"${ctx ? ` title="Context: the entity itself is not labeled ${esc(I.lbl[lid]?.name)}, only some of its attributes are"` : ""}>
+  return `<div class="card ent${IMP.hit("ents", id)}${isSel("entity", id) ? " sel" : ""}${L.c ? " collapsed" : ""}${ctx ? " ctx" : ""}${dual ? " dualkeys" : ""}" data-kind="ent" data-id="${id}" style="left:${L.x}px;top:${L.y}px;width:${wOf(L)}px;--cc:${con?.color || "#889"}"${ctx ? ` title="Context: the entity itself is not labeled ${esc(I.lbl[lid]?.name)}, only some of its attributes are"` : ""}>
 <div class="c-rs" title="Drag to change the width; double-click to fit the names"></div><div class="c-head"><div class="c-l1"><span class="stereo">${esc(e.stereotype || "Object")}</span><span>${ctx ? "context only" : "in " + esc(con?.name || "–")}</span>${lmark("entity", id)}${noteMark("ent:" + id)}${reqMark("ent", id)}
 <span class="c-tools"><button class="ib" data-act="relate" title="Draw a relationship from this entity">${IC.rel}</button>${tools(L)}</span></div>
 <div class="c-l2"><span class="c-name">${esc(e.name)}</span><span class="cov" title="${mapped} of ${attrs.length} attributes mapped"><i style="width:${attrs.length ? mapped / attrs.length * 100 : 0}%"></i></span><span class="cov-t">${mapped}/${attrs.length}</span></div></div>
@@ -1466,7 +1721,7 @@ function srcCard(id) {
   const rows = rowsOf("src", id);
   const dual = rows.some(x => x.isPrimaryKey && x.isForeignKey);
   const lid = CV().live?.labelId, ctx = lid && !hasLbl("src", id, lid);
-  return `<div class="card src${isSel("source", id) ? " sel" : ""}${L.c ? " collapsed" : ""}${dual ? " dualkeys" : ""}${ctx ? " ctx" : ""}" data-kind="src" data-id="${id}" style="left:${L.x}px;top:${L.y}px;width:${wOf(L)}px"${ctx ? ` title="Context: the table itself is not labeled ${esc(I.lbl[lid]?.name)}, only some of its columns or mappings are"` : ""}>
+  return `<div class="card src${IMP.hit("tabs", id)}${isSel("source", id) ? " sel" : ""}${L.c ? " collapsed" : ""}${dual ? " dualkeys" : ""}${ctx ? " ctx" : ""}" data-kind="src" data-id="${id}" style="left:${L.x}px;top:${L.y}px;width:${wOf(L)}px"${ctx ? ` title="Context: the table itself is not labeled ${esc(I.lbl[lid]?.name)}, only some of its columns or mappings are"` : ""}>
 <div class="c-rs" title="Drag to change the width; double-click to fit the names"></div><div class="c-head"><div class="c-l1"><span class="path">${esc(srcPath(s))}</span>${lmark("src", id)}${noteMark("src:" + id)}${reqMark("src", id)}<span class="c-tools">${tools(L)}</span></div>
 <div class="c-l2"><span class="c-name">${esc(s.name)}</span><span class="cov" title="${used} of ${s.columns.length} columns used"><i style="width:${used / s.columns.length * 100}%"></i></span><span class="cov-t">${used}/${s.columns.length}</span></div></div>
 ${L.c ? "" : `<div class="c-body">${rows.length ? rows.map(colRow).join("") : `<div class="row empty">Nothing matches “${FL[L.f]}”</div>`}</div>`}</div>`;
@@ -1480,6 +1735,7 @@ function renderCards() {
   $("#empty").classList.toggle("show", !h);
   renderNotes();
   renderReqCards();
+  IMP.renderChgBar();
   applyHighlight();
   applyMulti();
   scheduleMini();
@@ -1517,7 +1773,7 @@ function renderLines() {
       const g = curve(b.a, b.z), r = n > 9 ? 10 : 8.5;
       if (n === 1) {   // a single mapping keeps its own identity: status style, ƒ / ! chip, selectable as a mapping
         const m = ms[0], tc = typeCheck(m), chip = !tc.ok ? "!" : m.kind === "transform" ? "ƒ" : "";
-        bun += `<g class="lnk map ${m.status}${tc.ok ? "" : " warn"}${isSel("map", m.id) ? " sel" : ""}${act && act.maps.has(m.id) ? " hl" : ""}" data-t="map" data-id="${m.id}">
+        bun += `<g class="lnk map ${m.status}${I.col[m.columnId]?.missingSince ? " gone" : ""}${IMP.hit("maps", m.id)}${tc.ok ? "" : " warn"}${isSel("map", m.id) ? " sel" : ""}${act && act.maps.has(m.id) ? " hl" : ""}" data-t="map" data-id="${m.id}">
 <path class="hit" d="${g.d}"/><path class="s" d="${g.d}"/><circle class="end" cx="${g.p0.x}" cy="${g.p0.y}" r="2.6"/><circle class="end" cx="${g.p3.x}" cy="${g.p3.y}" r="2.6"/>
 ${chip ? `<g class="chip"><circle cx="${g.mid.x}" cy="${g.mid.y}" r="8"/><text x="${g.mid.x}" y="${g.mid.y}">${chip}</text></g>` : ""}</g>`;
         continue;
@@ -1547,7 +1803,7 @@ ${chip ? `<g class="chip"><circle cx="${g.mid.x}" cy="${g.mid.y}" r="8"/><text x
       const tc = typeCheck(m);
       const chip = !tc.ok ? "!" : m.kind === "transform" ? "ƒ" : "";
       const lidL = CV().live?.labelId, ctxl = lidL && !hasLbl("map", m.id, lidL), tagged = (I.lblOf["map:" + m.id] || []).length;
-      map += `<g class="lnk map ${m.status}${tc.ok ? "" : " warn"}${g.part ? " part" : ""}${ctxl ? " ctxline" : ""}${isSel("map", m.id) ? " sel" : ""}${act && act.maps.has(m.id) ? " hl" : ""}" data-t="map" data-id="${m.id}">${tagged ? `<title>Labels: ${esc(I.lblOf["map:" + m.id].map(l => l.name).join(", "))}</title>` : ""}
+      map += `<g class="lnk map ${m.status}${I.col[m.columnId]?.missingSince ? " gone" : ""}${IMP.hit("maps", m.id)}${tc.ok ? "" : " warn"}${g.part ? " part" : ""}${ctxl ? " ctxline" : ""}${isSel("map", m.id) ? " sel" : ""}${act && act.maps.has(m.id) ? " hl" : ""}" data-t="map" data-id="${m.id}">${tagged ? `<title>Labels: ${esc(I.lblOf["map:" + m.id].map(l => l.name).join(", "))}</title>` : ""}
 <path class="hit" d="${g.d}"/><path class="s" d="${g.d}"/><circle class="end" cx="${g.p0.x}" cy="${g.p0.y}" r="2.6"/><circle class="end" cx="${g.p3.x}" cy="${g.p3.y}" r="2.6"/>
 ${chip ? `<g class="chip"><circle cx="${g.mid.x}" cy="${g.mid.y}" r="8"/><text x="${g.mid.x}" y="${g.mid.y}">${chip}</text></g>` : ""}${tagged ? lineTag(g.q) : ""}</g>`;
     }
@@ -1604,27 +1860,7 @@ function renderSide() {
   } else if (V.tab === "reqs") {
     h = reqTree(q);
   } else {
-    const groups = {};
-    S.sources.forEach(s => ((groups[s.system] ||= {})[s.database + "." + s.schema] ||= []).push(s));
-    for (const sys in groups) {
-      let sh = "", total = 0;
-      for (const sc in groups[sys]) {
-        const items = groups[sys][sc].filter(s => keepItem("src", s.id)).map(s => {
-          const nameHit = !q || s.name.toLowerCase().includes(q);
-          const fHit = q && !nameHit ? s.columns.find(c => c.name.toLowerCase().includes(q)) : null;
-          if (!nameHit && !fHit) return "";
-          return `<button class="titem p${onCanvas("src", s.id) ? " oncanvas" : onOther("src", s.id) ? " elsewhere" : ""}" draggable="true" data-add="src:${s.id}" title="${onCanvas("src", s.id) ? "On this canvas. Click to show it." : onOther("src", s.id) ? "On another canvas. Click or drag to add it here too." : "Click or drag to add to the canvas"}">
-<span class="on"></span><span class="n">${esc(s.name)}${fHit ? `<span class="hint">column ${esc(fHit.name)}</span>` : ""}</span><span class="m">${s.columns.length} cols</span></button>`;
-        }).filter(Boolean);
-        if (!items.length) continue;
-        total += items.length;
-        const key = "src:" + sys + "/" + sc;
-        sh += grpHead(key, esc(sc), items.length, true) + (grpOpen(key) ? items.join("") : "");
-      }
-      if (!total) continue;
-      const key = "src:" + sys;
-      h += grpHead(key, esc(sys), total, false, `<i style="background:var(--physical);width:8px;height:8px;border-radius:2px;flex:none"></i>`) + (grpOpen(key) ? sh : "");
-    }
+    h = IMP.sourcesTree(q);
   }
   $("#tree").innerHTML = h || `<p style="padding:12px;color:var(--ink-3)">${V.q.trim() ? `Nothing matches “${esc(V.q)}”.` : V.canvasOnly ? "Nothing of this kind on this canvas yet." : "Nothing here yet."}</p>`;
 }
@@ -1742,6 +1978,7 @@ function insAttr(a) {
 <div class="fld"><label for="f-an">Name</label><input id="f-an" data-f="attr.name" value="${esc(a.name)}"></div>
 ${attrPosition(a)}
 <div class="fld"><label for="f-at">Data type</label><select id="f-at" data-f="attr.dataType">${LTYPES.map(t => `<option${t === a.dataType ? " selected" : ""}>${t}</option>`).join("")}</select></div>
+${(a.dataType || "String") === "String" ? `<div class="fld"><label for="f-al">Length</label><input id="f-al" data-f="attr.length" inputmode="numeric" value="${esc(a.length || "")}" placeholder="Optional, e.g. 120"></div>` : ""}
 <div class="fld"><label>Flags</label><div class="flags">${[["isPrimaryKey", "Primary key"], ["isForeignKey", "Foreign key"], ["isPII", "Personal data"], ["isNullable", "Can be empty"]].map(([k, l]) =>
     `<button class="flag" data-set="attr.flag" data-v="${k}" aria-pressed="${!!a[k]}">${l}</button>`).join("")}</div></div>
 ${richField("Definition", a.description, "What this attribute means for the business. Click to write it.", "attr:" + a.id)}
@@ -1758,6 +1995,7 @@ function insCol(c) {
   return `<div class="kind">Column of <button class="pill p" style="display:inline;padding:1px 6px" data-go="source:${s.id}"><span class="mono">${esc(s.name)}</span></button></div>
 <h2 class="mono" style="font-size:15px">${esc(c.name)}</h2>
 <p><span class="mono">${esc(c.dataType)}</span>${c.nullable ? ", nullable" : ", required"}${c.isPrimaryKey ? ", primary key" : ""}${(c.tags || []).length ? ", tagged " + c.tags.join(", ") : ""}</p>
+${IMP.colSections(c)}
 <h3>Feeds</h3>
 ${ms.length ? `<div class="list">${ms.map(m => `<button class="li" data-go="map:${m.id}">${statusDot(m)}<span class="n">${esc(attrLabel(m.attributeId))}</span><span class="m">${STATUS[m.status]}</span></button>`).join("")}</div>`
     : `<p>Not used yet. Drag it onto an attribute, or onto an entity's header to create a new attribute from it.</p>`}
@@ -1787,11 +2025,7 @@ ${dvSection(e)}${reqSection("entity", e.id)}${notesHere("ent:" + e.id)}${canvasL
 <div class="actions">${onCanvas("ent", e.id) ? `<button class="btn" data-do="remove-card">Remove from this canvas</button>` : `<button class="btn" data-do="add-card">Add to this canvas</button>`}${wsPerm() === "full" ? `<button class="btn danger" data-delent="${e.id}">Delete from model…</button>` : ""}</div>`;
 }
 function insSource(s) {
-  return `<div class="kind">Source table</div><h2 class="mono" style="font-size:15px">${esc(s.name)}</h2>
-<p class="mono" style="color:var(--ink-3)">${esc(srcPath(s))}</p><p>${s.rowCount ? s.rowCount.toLocaleString("en") + " rows" : ""}</p>
-${labelField("src", s.id)}
-<h3>Columns and where they go</h3><div class="list">${s.columns.map(c => { const ms = I.mC[c.id] || [];
-    return `<button class="li" data-go="col:${esc(c.id)}"><span class="n mono">${esc(c.name)}</span>${ms.length ? `<span class="m">${esc(ms.map(m => attrLabel(m.attributeId)).join(", "))}</span>` : `<span class="m un">not used</span>`}</button>`; }).join("")}</div>
+  return `${IMP.sourceHead(s)}${labelField("src", s.id)}${IMP.sourceBody(s)}
 ${feedSection("src", s.id)}
 ${reqSection("src", s.id)}${notesHere("src:" + s.id)}${canvasList("src", s.id)}${frameInfo("src", s.id)}
 <div class="actions">${onCanvas("src", s.id) ? `<button class="btn" data-do="remove-card">Remove from this canvas</button>` : `<button class="btn" data-do="add-card">Add to this canvas</button>`}</div>`;
@@ -1830,6 +2064,7 @@ function renderInspector() {
   else if (s.t === "col") h = insCol(I.col[s.id]);
   else if (s.t === "entity") h = insEntity(I.ent[s.id]);
   else if (s.t === "source") h = insSource(I.src[s.id]);
+  else if (s.t === "system") h = IMP.insSystem(s.id);
   else if (s.t === "rel") h = insRel(I.rel[s.id]);
   else if (s.t === "frame") h = insFrame(frameById(s.id));
   else if (s.t === "bundle") h = insBundle(V.bundles?.[s.id]);
@@ -1851,7 +2086,7 @@ function renderStatus() {
   const warn = S.mappings.filter(m => !typeCheck(m).ok).length;
   const drafts = S.mappings.filter(m => m.status === "draft").length;
   $("#status").innerHTML = `<span>Mapped attributes on canvas <b>${mp} of ${tot}</b></span><span>Mappings <b>${S.mappings.length}</b>, drafts <b>${drafts}</b></span>
-<span class="${warn ? "w" : ""}">Type problems <b>${warn}</b></span><span>Relationships <b>${S.relationships.length}</b></span><span>Requirements <b>${S.requirements.length}</b>, covered <b>${S.requirements.filter(r => reqCoverage(r.id).done).length}</b></span><span>Open notes on canvas <b>${(CV().notes || []).filter(n => !n.resolved).length}</b></span>${V.ctxLabel && I.lbl[V.ctxLabel] ? `<span class="ctxw">Working on <b>${esc(I.lbl[V.ctxLabel].name)}</b>, items labeled <b>${I.lblCnt[V.ctxLabel] || 0}</b></span>` : ""}`;
+<span class="${warn ? "w" : ""}">Type problems <b>${warn}</b></span><span>Relationships <b>${S.relationships.length}</b></span><span>Requirements <b>${S.requirements.length}</b>, covered <b>${S.requirements.filter(r => reqCoverage(r.id).done).length}</b></span><span>Open notes on canvas <b>${(CV().notes || []).filter(n => !n.resolved).length}</b></span>${IMP.openIssueCount() ? `<span class="w">Source changes to resolve <b>${IMP.openIssueCount()}</b></span>` : ""}${V.ctxLabel && I.lbl[V.ctxLabel] ? `<span class="ctxw">Working on <b>${esc(I.lbl[V.ctxLabel].name)}</b>, items labeled <b>${I.lblCnt[V.ctxLabel] || 0}</b></span>` : ""}`;
   const n = suggestions().length;
   $("#sugN").textContent = n; $("#sugN").style.display = n ? "" : "none";
   $("#tUndo").disabled = !undoStack.length; $("#tRedo").disabled = !redoStack.length;
@@ -3695,6 +3930,7 @@ function renderHome() {
 <input class="ph-name" data-pf="name" value="${esc(p.name)}" aria-label="Project name">
 <textarea class="ph-desc" data-pf="desc" rows="1" placeholder="What is this project about?" aria-label="Project description">${esc(p.desc || "")}</textarea>
 <div class="ph-stats"><span><b>${cs.length}</b> canvas${cs.length === 1 ? "" : "es"}</span><span><b>${ents.size}</b> entit${ents.size === 1 ? "y" : "ies"}</span><span><b>${srcs.size}</b> source table${srcs.size === 1 ? "" : "s"}</span><span><b>${mp}</b> of <b>${at}</b> attributes mapped</span><span><b>${notes.length}</b> open note${notes.length === 1 ? "" : "s"}</span><span><b>${rqs.length}</b> requirement${rqs.length === 1 ? "" : "s"}, <b>${rqDone}</b> covered</span></div>
+${IMP.consistencyHtml(p)}
 <h3>Canvases</h3><div class="tiles">${tiles}
 <button class="tile add" data-hnew><div><svg class="i" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9"/></svg>New canvas</div></button>
 ${outside.length ? `<button class="tile add" data-hadd><div><svg class="i" viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg>Add a canvas from another project</div></button>` : ""}</div>
@@ -3812,7 +4048,7 @@ function reqScope(rid) {
 }
 function reqCoverage(rid) {
   const sc = reqScope(rid), attrs = [...sc.attrs];
-  const ok = attrs.filter(a => (I.mA[a] || []).some(m => m.status === "approved" && typeCheck(m).ok));
+  const ok = attrs.filter(a => (I.mA[a] || []).some(m => m.status === "approved" && typeCheck(m).ok && !I.col[m.columnId]?.missingSince));
   const draft = attrs.filter(a => !ok.includes(a) && (I.mA[a] || []).length);
   const none = attrs.filter(a => !(I.mA[a] || []).length);
   return {total:attrs.length, ok:ok.length, draft, none, done:attrs.length > 0 && ok.length === attrs.length};
@@ -5033,6 +5269,1911 @@ $("#mini .mini-h").addEventListener("dblclick", toggleMini);
 /* The canvas moves only through V.px/V.py; stop the browser from scrolling the viewport (e.g. when focusing a card off-screen). */
 vp.addEventListener("scroll", () => { vp.scrollLeft = 0; vp.scrollTop = 0; });
 window.addEventListener("resize", () => applyT());
+
+/* =========================================================
+   Sources and import (merged from the Source importer prototype).
+   The importer engine works on its own shape of the model; toImp and
+   fromImp translate, so every import and every decision is one undo step.
+   ========================================================= */
+const IMP = (() => {
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const fmtN = n => n == null ? "–" : Number(n).toLocaleString("en-GB");
+const plural = (n, one, many) => `${n} ${n === 1 ? one : (many || one + "s")}`;
+let seq = 0;
+const uid = p => p + "_" + Date.now().toString(36) + (++seq).toString(36) + Math.random().toString(36).slice(2, 5);
+const TODAY = "2026-10-21";
+const ui = {pending:null};
+const dv2 = () => !!(curWs().settings || {}).dv2;
+let MODEL = null;
+const DEFAULT_CLASSES = [
+  {code:"BK",   name:"Business key", scope:"column"},
+  {code:"PII",  name:"PII", scope:"column"},
+  {code:"TECH", name:"Technical / audit", scope:"column"},
+  {code:"LDTS", name:"Load date", scope:"column"},
+  {code:"RSRC", name:"Record source", scope:"column"},
+  {code:"LK",   name:"Link key", dv:true, scope:"column"},
+  {code:"DCK",  name:"Dependent child key", dv:true, scope:"column"},
+  {code:"DK",   name:"Driving key", dv:true, scope:"column"},
+  {code:"MAK",  name:"Multi-active key", dv:true, scope:"column"},
+  {code:"EFF",  name:"Effective date", dv:true, scope:"column"},
+  {code:"T_MASTER", name:"Master data", scope:"table"},
+  {code:"T_TXN",    name:"Transactions", scope:"table"},
+  {code:"T_REF",    name:"Reference / code list", scope:"table"},
+  {code:"T_STG",    name:"Staging", scope:"table"},
+  {code:"T_LOG",    name:"Log / audit", scope:"table"},
+  {code:"T_HIST",   name:"History (SCD2)", scope:"table"},
+  {code:"T_HUB",    name:"Hub candidate", dv:true, scope:"table"},
+  {code:"T_LNK",    name:"Link candidate", dv:true, scope:"table"},
+  {code:"T_SAT",    name:"Satellite source", dv:true, scope:"table"}
+].map(c => ({...c, builtin:true}));
+/* The workspace list (AD-08 conventions): built-in ones plus the workspace's own. */
+let CLASSES = [...DEFAULT_CLASSES];
+let CLS = {};
+function indexClasses() { CLASSES = [...DEFAULT_CLASSES, ...((S && S.classes) || [])]; CLS = Object.fromEntries(CLASSES.map(c => [c.code, c])); }
+indexClasses();
+const norm = s => String(s ?? "").toLowerCase().replace(/[\s_\-\/]+/g, "");
+function classOf(text) {
+  const t = norm(text);
+  if (!t) return null;
+  const c = CLASSES.find(c => c.scope === "column" && (norm(c.code) === t || norm(c.name) === t));
+  return c ? c.code : undefined;
+}
+function parseTypeStr(str) {
+  const m = String(str || "").trim().match(/^([a-zA-Z0-9_ ]+?)\s*(?:\(\s*([^)]*)\s*\))?$/);
+  if (!m) return {dataType:String(str || "").trim().toLowerCase(), length:null, precision:null, scale:null};
+  const base = m[1].trim().toLowerCase();
+  const args = (m[2] || "").split(",").map(s => s.trim()).filter(Boolean);
+  const t = {dataType:base, length:null, precision:null, scale:null};
+  if (/^(decimal|numeric|number)$/.test(base)) { if (args[0]) t.precision = +args[0]; if (args[1]) t.scale = +args[1]; }
+  else if (/^(timestamp|datetime2|time|datetimeoffset)/.test(base)) { /* fractional seconds, not a length */ }
+  else if (args[0]) t.length = /^(max|-1)$/i.test(args[0]) ? "max" : +args[0];
+  return t;
+}
+function fmtType(c) {
+  if (!c) return "";
+  if (c.precision != null) return `${c.dataType}(${c.precision}${c.scale != null ? "," + c.scale : ""})`;
+  if (c.length != null) return `${c.dataType}(${c.length})`;
+  return c.dataType;
+}
+/* =========================================================
+   Sample files and the SQL Server catalog query
+   ========================================================= */
+const STD_HEADERS = ["database","schema","table","object_type","file_format","row_count","table_comment","column","ordinal","data_type",
+  "length","precision","scale","nullable","primary_key","fk_name","fk_ref_schema","fk_ref_table","fk_ref_column","column_comment","classifications"];
+const STD_INFO = [
+  ["database","yes","Database name, e.g. crmprod"],
+  ["schema","yes","Schema name, e.g. dbo"],
+  ["table","yes","Table or view name"],
+  ["object_type","","table, view or file (default table)"],
+  ["file_format","","For a file: xlsx, csv, txt, json, xml, parquet… as you call it"],
+  ["row_count","","Number of rows"],
+  ["table_comment","","Comment from the source"],
+  ["column","yes","Column name"],
+  ["ordinal","","Physical position (default: file order)"],
+  ["data_type","yes","As in the source; varchar(20) or varchar with length 20"],
+  ["length, precision, scale","","When not in data_type"],
+  ["nullable","","yes / no (default yes)"],
+  ["primary_key","","yes / no"],
+  ["fk_name, fk_ref_schema, fk_ref_table, fk_ref_column","","A foreign key: one row per column of the key"],
+  ["column_comment","","Comment from the source"],
+  ["classifications","","Codes or names separated by ;  e.g. BK;PII"]
+];
+function toCSV(rows) {
+  const q = v => { const s = v == null ? "" : String(v); return /[",;\n\t]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+  return rows.map(r => r.map(q).join(",")).join("\n");
+}
+function sampleRows(spec) {
+  const out = [STD_HEADERS];
+  spec.forEach(t => t.cols.forEach((c, i) => {
+    const [name, type, opts = {}] = c;
+    out.push([t.db, t.schema, t.name, t.type || "table", t.format || "", t.rows ?? "", i === 0 ? (t.comment || "") : "", name, i + 1, type, "", "", "",
+      opts.pk ? "no" : (opts.nullable === false ? "no" : "yes"), opts.pk ? "yes" : "no",
+      opts.fk ? opts.fk[0] : "", opts.fk ? opts.fk[1] : "", opts.fk ? opts.fk[2] : "", opts.fk ? opts.fk[3] : "",
+      opts.comment || "", opts.cls || ""]);
+  }));
+  return out;
+}
+const SAMPLE_CRM = toCSV(sampleRows([
+  {db:"crmprod", schema:"dbo", name:"customers", rows:184120, comment:"Customer master", cols:[
+    ["cust_id","int",{pk:true}], ["cust_no","varchar(25)",{nullable:false, comment:"Customer number shown to the customer", cls:"BK"}],
+    ["fname","nvarchar(50)",{cls:"PII"}], ["lname","nvarchar(50)",{cls:"PII"}], ["email_addr","varchar(255)",{cls:"PII"}],
+    ["date_of_birth","date",{cls:"PII"}], ["updated_ts","datetime2",{cls:"TECH"}], ["consent_flag","bit"],
+    ["created_on","datetime2"], ["customer_segment","varchar(3)"]]},
+  {db:"crmprod", schema:"dbo", name:"customer_addresses", rows:241002, cols:[
+    ["addr_id","int",{pk:true}], ["cust_id","int",{fk:["FK_customer_addresses_customers","dbo","customers","cust_id"]}],
+    ["street_line1","nvarchar(100)",{cls:"PII"}], ["city","nvarchar(80)"], ["zip","varchar(10)"], ["country_iso","char(2)"]]},
+  {db:"crmprod", schema:"dbo", name:"customer_consents", rows:310877, comment:"Marketing consents per channel", cols:[
+    ["consent_id","int",{pk:true}], ["cust_id","int",{nullable:false, fk:["FK_customer_consents_customers","dbo","customers","cust_id"]}],
+    ["channel","varchar(10)",{nullable:false}], ["granted_at","datetime2",{nullable:false, cls:"Effective date"}], ["revoked_at","datetime2"]]},
+  {db:"crmprod", schema:"stage", name:"customers_load", rows:0, comment:"Nightly load buffer", cols:[
+    ["load_id","bigint",{pk:true}], ["payload","nvarchar(max)"], ["loaded_at","datetime2",{cls:"Load date"}], ["batch_ref",""]]}
+]));
+const SAMPLE_HR = toCSV(sampleRows([
+  {db:"hrdb", schema:"dbo", name:"employees", rows:2140, comment:"Current and former employees", cols:[
+    ["emp_id","int",{pk:true}], ["emp_no","varchar(10)",{nullable:false, cls:"BK"}], ["first_name","nvarchar(50)",{cls:"PII"}],
+    ["last_name","nvarchar(50)",{cls:"PII"}], ["dept_id","int",{fk:["FK_employees_departments","dbo","departments","dept_id"]}],
+    ["manager_id","int",{fk:["FK_employees_manager","dbo","employees","emp_id"]}], ["hired_on","date"]]},
+  {db:"hrdb", schema:"dbo", name:"departments", rows:38, cols:[
+    ["dept_id","int",{pk:true}], ["dept_code","varchar(10)",{nullable:false, cls:"BK"}], ["dept_name","nvarchar(100)"]]}
+]));
+const SAMPLE_FILES = toCSV(sampleRows([
+  {db:"flat_files", schema:"ref_data", name:"country_codes", type:"file", format:"xlsx", comment:"Country list kept by Finance on SharePoint", cols:[
+    ["iso_code","string(2)",{pk:true, comment:"ISO 3166 alpha-2", cls:"BK"}], ["country_name","string(100)",{nullable:false}], ["region","string(30)"], ["eu_member","boolean"]]},
+  {db:"flat_files", schema:"ref_data", name:"fx_rates", type:"file", format:"csv", comment:"Daily rates from the treasury export, semicolon separated", cols:[
+    ["rate_date","date",{nullable:false, cls:"Effective date"}], ["currency","string(3)",{nullable:false, cls:"BK"}], ["rate_to_pln","decimal(18,6)",{nullable:false}]]},
+  {db:"flat_files", schema:"ref_data", name:"product_hierarchy", type:"file", format:"json", comment:"Product tree from the PIM, flattened to one row per product", cols:[
+    ["product_code","string(30)",{nullable:false, cls:"BK"}], ["category.code","string(10)"], ["category.name","string(100)"], ["brand","string(50)"]]},
+  {db:"flat_files", schema:"ref_data", name:"sales_targets", type:"file", format:"txt", comment:"Fixed-width file from the planning tool", cols:[
+    ["target_month","string(6)",{nullable:false, comment:"YYYYMM"}], ["region","string(30)",{nullable:false}], ["target_amount","decimal(14,2)"]]}
+]));
+const SQL_SERVER = `-- InfoMapper source snapshot, standard v1, SQL Server 2016+
+-- Run it in the database you want to import, then save the result
+-- with headers as CSV (or copy it with headers and paste it here).
+SELECT
+  DB_NAME()                                   AS [database],
+  s.name                                      AS [schema],
+  o.name                                      AS [table],
+  CASE o.type WHEN 'U' THEN 'table' ELSE 'view' END AS object_type,
+  (SELECT SUM(p.rows) FROM sys.partitions p
+    WHERE p.object_id = o.object_id AND p.index_id IN (0, 1)) AS row_count,
+  CAST(tep.value AS nvarchar(4000))           AS table_comment,
+  c.name                                      AS [column],
+  c.column_id                                 AS ordinal,
+  t.name                                      AS data_type,
+  CASE WHEN t.name IN ('varchar','char','varbinary','binary')
+         THEN IIF(c.max_length = -1, 'max', CAST(c.max_length AS varchar(10)))
+       WHEN t.name IN ('nvarchar','nchar')
+         THEN IIF(c.max_length = -1, 'max', CAST(c.max_length / 2 AS varchar(10)))
+  END                                         AS length,
+  IIF(t.name IN ('decimal','numeric'), c.precision, NULL) AS precision,
+  IIF(t.name IN ('decimal','numeric'), c.scale, NULL)     AS scale,
+  IIF(c.is_nullable = 1, 'yes', 'no')         AS nullable,
+  IIF(pk.column_id IS NULL, 'no', 'yes')      AS primary_key,
+  fk.fk_name, fk.fk_ref_schema, fk.fk_ref_table, fk.fk_ref_column,
+  CAST(cep.value AS nvarchar(4000))           AS column_comment,
+  CAST(NULL AS nvarchar(200))                 AS classifications
+FROM sys.objects o
+JOIN sys.schemas s ON s.schema_id = o.schema_id
+JOIN sys.columns c ON c.object_id = o.object_id
+JOIN sys.types   t ON t.user_type_id = c.user_type_id
+LEFT JOIN (SELECT ic.object_id, ic.column_id
+             FROM sys.indexes i
+             JOIN sys.index_columns ic ON ic.object_id = i.object_id AND ic.index_id = i.index_id
+            WHERE i.is_primary_key = 1) pk
+       ON pk.object_id = c.object_id AND pk.column_id = c.column_id
+OUTER APPLY (SELECT f.name AS fk_name, rs.name AS fk_ref_schema,
+                    ro.name AS fk_ref_table, rc.name AS fk_ref_column
+               FROM sys.foreign_key_columns fkc
+               JOIN sys.foreign_keys f ON f.object_id = fkc.constraint_object_id
+               JOIN sys.objects ro ON ro.object_id = fkc.referenced_object_id
+               JOIN sys.schemas rs ON rs.schema_id = ro.schema_id
+               JOIN sys.columns rc ON rc.object_id = fkc.referenced_object_id
+                                  AND rc.column_id = fkc.referenced_column_id
+              WHERE fkc.parent_object_id = c.object_id
+                AND fkc.parent_column_id = c.column_id) fk
+LEFT JOIN sys.extended_properties tep
+       ON tep.class = 1 AND tep.major_id = o.object_id AND tep.minor_id = 0 AND tep.name = 'MS_Description'
+LEFT JOIN sys.extended_properties cep
+       ON cep.class = 1 AND cep.major_id = o.object_id AND cep.minor_id = c.column_id AND cep.name = 'MS_Description'
+WHERE o.type IN ('U', 'V') AND o.is_ms_shipped = 0
+ORDER BY s.name, o.name, c.column_id;
+-- A column in two foreign keys gives two rows; the importer reads each as part of its key.`;
+
+const SQL_POSTGRES = `-- InfoMapper source snapshot, standard v1, PostgreSQL 12+
+-- Run it in the database you want to import. Narrow the schemas in WHERE if needed.
+-- psql: \\copy ( <this query without the semicolon> ) TO 'snapshot.csv' CSV HEADER
+SELECT
+  current_database()                              AS "database",
+  ns.nspname                                      AS "schema",
+  cls.relname                                     AS "table",
+  CASE WHEN cls.relkind IN ('v', 'm') THEN 'view' ELSE 'table' END AS object_type,
+  CASE WHEN cls.relkind IN ('v', 'm') OR cls.reltuples < 0 THEN NULL
+       ELSE cls.reltuples::bigint END             AS row_count,
+  obj_description(cls.oid, 'pg_class')            AS table_comment,
+  a.attname                                       AS "column",
+  row_number() OVER (PARTITION BY cls.oid ORDER BY a.attnum) AS ordinal,
+  CASE t.typname
+       WHEN 'varchar' THEN 'varchar'   WHEN 'bpchar' THEN 'char'
+       WHEN 'int2' THEN 'smallint'     WHEN 'int4' THEN 'int'      WHEN 'int8' THEN 'bigint'
+       WHEN 'float4' THEN 'real'       WHEN 'float8' THEN 'double precision'
+       WHEN 'bool' THEN 'boolean'      WHEN 'timestamptz' THEN 'timestamptz'
+       ELSE CASE WHEN t.typcategory = 'A' THEN format_type(a.atttypid, NULL) ELSE t.typname END
+  END                                             AS data_type,
+  CASE WHEN t.typname IN ('varchar', 'bpchar') AND a.atttypmod > 0 THEN a.atttypmod - 4 END AS length,
+  CASE WHEN t.typname = 'numeric' AND a.atttypmod > 0 THEN ((a.atttypmod - 4) >> 16) & 65535 END AS "precision",
+  CASE WHEN t.typname = 'numeric' AND a.atttypmod > 0 THEN (a.atttypmod - 4) & 65535 END AS scale,
+  CASE WHEN a.attnotnull THEN 'no' ELSE 'yes' END AS nullable,
+  CASE WHEN EXISTS (SELECT 1 FROM pg_catalog.pg_constraint p
+                     WHERE p.conrelid = cls.oid AND p.contype = 'p' AND a.attnum = ANY (p.conkey))
+       THEN 'yes' ELSE 'no' END                   AS primary_key,
+  fk.fk_name, fk.fk_ref_schema, fk.fk_ref_table, fk.fk_ref_column,
+  col_description(cls.oid, a.attnum)              AS column_comment,
+  NULL::text                                      AS classifications
+FROM pg_catalog.pg_class cls
+JOIN pg_catalog.pg_namespace ns ON ns.oid = cls.relnamespace
+JOIN pg_catalog.pg_attribute a  ON a.attrelid = cls.oid AND a.attnum > 0 AND NOT a.attisdropped
+JOIN pg_catalog.pg_type t       ON t.oid = a.atttypid
+LEFT JOIN LATERAL (
+  SELECT con.conname AS fk_name, rns.nspname AS fk_ref_schema, rcl.relname AS fk_ref_table, ra.attname AS fk_ref_column
+    FROM pg_catalog.pg_constraint con
+    CROSS JOIN LATERAL unnest(con.conkey, con.confkey) AS k(src, ref)
+    JOIN pg_catalog.pg_class rcl     ON rcl.oid = con.confrelid
+    JOIN pg_catalog.pg_namespace rns ON rns.oid = rcl.relnamespace
+    JOIN pg_catalog.pg_attribute ra  ON ra.attrelid = con.confrelid AND ra.attnum = k.ref
+   WHERE con.contype = 'f' AND con.conrelid = cls.oid AND k.src = a.attnum
+) fk ON true
+WHERE cls.relkind IN ('r', 'p', 'v', 'm', 'f')
+  AND ns.nspname NOT IN ('pg_catalog', 'information_schema')
+  AND ns.nspname NOT LIKE 'pg_toast%'
+  AND NOT cls.relispartition
+ORDER BY ns.nspname, cls.relname, a.attnum;
+-- A column in two foreign keys gives two rows; the importer reads each as part of its key.`;
+const SQL_ORACLE = `-- InfoMapper source snapshot, standard v1, Oracle 12c+
+-- Put your schemas in the WHERE clause, run it in SQL Developer or DBeaver,
+-- and export the result with headers as CSV.
+-- row_count comes from optimizer statistics and can be out of date.
+SELECT
+  SYS_CONTEXT('USERENV', 'DB_NAME')            AS "database",
+  c.owner                                      AS "schema",
+  c.table_name                                 AS "table",
+  CASE WHEN v.view_name IS NULL THEN 'table' ELSE 'view' END AS "object_type",
+  t.num_rows                                   AS "row_count",
+  tc.comments                                  AS "table_comment",
+  c.column_name                                AS "column",
+  c.column_id                                  AS "ordinal",
+  c.data_type                                  AS "data_type",
+  CASE WHEN c.data_type IN ('VARCHAR2', 'NVARCHAR2', 'CHAR', 'NCHAR') THEN c.char_length
+       WHEN c.data_type = 'RAW' THEN c.data_length END AS "length",
+  CASE WHEN c.data_type = 'NUMBER' THEN c.data_precision END AS "precision",
+  CASE WHEN c.data_type = 'NUMBER' THEN c.data_scale END     AS "scale",
+  CASE c.nullable WHEN 'Y' THEN 'yes' ELSE 'no' END          AS "nullable",
+  CASE WHEN pk.column_name IS NULL THEN 'no' ELSE 'yes' END  AS "primary_key",
+  fk.fk_name                                   AS "fk_name",
+  fk.fk_ref_schema                             AS "fk_ref_schema",
+  fk.fk_ref_table                              AS "fk_ref_table",
+  fk.fk_ref_column                             AS "fk_ref_column",
+  cc.comments                                  AS "column_comment",
+  CAST(NULL AS VARCHAR2(200))                  AS "classifications"
+FROM all_tab_columns c
+LEFT JOIN all_tables t       ON t.owner = c.owner AND t.table_name = c.table_name
+LEFT JOIN all_views v        ON v.owner = c.owner AND v.view_name = c.table_name
+LEFT JOIN all_tab_comments tc ON tc.owner = c.owner AND tc.table_name = c.table_name
+LEFT JOIN all_col_comments cc ON cc.owner = c.owner AND cc.table_name = c.table_name
+                             AND cc.column_name = c.column_name
+LEFT JOIN (SELECT pc.owner, pc.table_name, pc.column_name
+             FROM all_constraints p
+             JOIN all_cons_columns pc ON pc.owner = p.owner AND pc.constraint_name = p.constraint_name
+            WHERE p.constraint_type = 'P') pk
+       ON pk.owner = c.owner AND pk.table_name = c.table_name AND pk.column_name = c.column_name
+LEFT JOIN (SELECT fc.owner, fc.table_name, fc.column_name, f.constraint_name AS fk_name,
+                  rc.owner AS fk_ref_schema, rc.table_name AS fk_ref_table, rc.column_name AS fk_ref_column
+             FROM all_constraints f
+             JOIN all_cons_columns fc ON fc.owner = f.owner AND fc.constraint_name = f.constraint_name
+             JOIN all_cons_columns rc ON rc.owner = f.r_owner AND rc.constraint_name = f.r_constraint_name
+                                     AND rc.position = fc.position
+            WHERE f.constraint_type = 'R') fk
+       ON fk.owner = c.owner AND fk.table_name = c.table_name AND fk.column_name = c.column_name
+WHERE c.owner IN ('CRM')                -- your schemas
+  AND c.table_name NOT LIKE 'BIN$%'
+ORDER BY c.owner, c.table_name, c.column_id;
+-- A column in two foreign keys gives two rows; the importer reads each as part of its key.`;
+const VENDORS = {
+  sqlserver:{name:"SQL Server", sql:SQL_SERVER, how:"Run it in SSMS or DBeaver in the database you import. Save the grid with headers as CSV, or copy it with headers and paste it."},
+  postgres:{name:"PostgreSQL", sql:SQL_POSTGRES, how:"Run it in DBeaver or pgAdmin and export as CSV, or in psql: \\copy ( the query without its semicolon ) TO 'snapshot.csv' CSV HEADER."},
+  oracle:{name:"Oracle", sql:SQL_ORACLE, how:"Put your schemas in the WHERE clause first. Run it in SQL Developer or DBeaver and export the result with headers as CSV."}
+};
+
+/* =========================================================
+   DDL channel: translates CREATE TABLE scripts into the standard.
+   It reads tables, columns, keys and comments; everything else is skipped.
+   ========================================================= */
+function tokenizeSQL(sql) {
+  const toks = []; const n = sql.length; let i = 0, line = 1;
+  const lines = sql.split("\n");
+  const lineIs = (ln, re) => re.test((lines[ln - 1] || "").trim());
+  while (i < n) {
+    const ch = sql[i];
+    if (ch === "\n") { line++; i++; continue; }
+    if (/\s/.test(ch)) { i++; continue; }
+    if (ch === "-" && sql[i + 1] === "-") { while (i < n && sql[i] !== "\n") i++; continue; }
+    if (ch === "/" && sql[i + 1] === "*") { const j = sql.indexOf("*/", i + 2), end = j < 0 ? n : j + 2; line += (sql.slice(i, end).match(/\n/g) || []).length; i = end; continue; }
+    if (ch === "'" || (/[NnEe]/.test(ch) && sql[i + 1] === "'" && !/[\w$#]/.test(sql[i - 1] || ""))) {
+      let j = ch === "'" ? i + 1 : i + 2, v = "";
+      while (j < n) { if (sql[j] === "'") { if (sql[j + 1] === "'") { v += "'"; j += 2; continue; } break; } if (sql[j] === "\n") line++; v += sql[j]; j++; }
+      toks.push({t:"str", v, line}); i = j + 1; continue;
+    }
+    if (ch === '"' || ch === "[" || ch === "`") {
+      const close = ch === "[" ? "]" : ch; let j = i + 1, v = "";
+      while (j < n && sql[j] !== close) { v += sql[j]; j++; }
+      toks.push({t:"id", v, q:true, line}); i = j + 1; continue;
+    }
+    if (/[A-Za-z_#@$\u00C0-\u024F]/.test(ch)) {
+      let j = i; while (j < n && /[\w#@$\u00C0-\u024F]/.test(sql[j])) j++;
+      const v = sql.slice(i, j);
+      if (/^go$/i.test(v) && lineIs(line, /^go\s*(\d+)?$/i)) toks.push({t:"sep", line});
+      else toks.push({t:"id", v, line});
+      i = j; continue;
+    }
+    if (/[0-9]/.test(ch)) { let j = i; while (j < n && /[0-9.]/.test(sql[j])) j++; toks.push({t:"num", v:sql.slice(i, j), line}); i = j; continue; }
+    if (ch === ";" || (ch === "/" && lineIs(line, /^\/$/))) { toks.push({t:"sep", line}); i++; continue; }
+    toks.push({t:"p", v:ch, line}); i++;
+  }
+  return toks;
+}
+const kwIs = (tk, w) => !!tk && tk.t === "id" && !tk.q && tk.v.toUpperCase() === w;
+const isP = (tk, v) => !!tk && tk.t === "p" && tk.v === v;
+function matchParen(e, k) { let d = 0; for (let j = k; j < e.length; j++) { if (isP(e[j], "(")) d++; else if (isP(e[j], ")")) { d--; if (!d) return j; } } return -1; }
+function readName(e, k) { const parts = []; while (k < e.length && e[k].t === "id") { parts.push(e[k].v); k++; if (isP(e[k], ".")) k++; else break; } return {parts, k}; }
+function parenIdents(e, k) {
+  while (k < e.length && !isP(e[k], "(")) k++;
+  const end = matchParen(e, k), cols = [];
+  for (let j = k + 1; j < end; j++) if (e[j].t === "id" && !(kwIs(e[j], "ASC") || kwIs(e[j], "DESC"))) cols.push(e[j].v);
+  return {cols, k:end + 1};
+}
+const TYPE_STOP = new Set(["NOT","NULL","PRIMARY","REFERENCES","DEFAULT","IDENTITY","CONSTRAINT","COLLATE","GENERATED","CHECK","UNIQUE",
+  "AUTO_INCREMENT","AUTOINCREMENT","ENABLE","DISABLE","ROWGUIDCOL","SPARSE","FILESTREAM","ENCRYPTED","MASKED","COMMENT","ON","AS","KEY","CHARSET","VISIBLE","INVISIBLE"]);
+const TYPE_ALIAS = {"character varying":"varchar", "character":"char", "int4":"int", "int8":"bigint", "int2":"smallint", "integer":"int",
+  "timestamp without time zone":"timestamp", "timestamp with time zone":"timestamptz", "time without time zone":"time", "bool":"boolean", "double":"double precision"};
+function typeString(words, args) {
+  let base = words.map(w => w.toLowerCase()).join(" ").replace(/\s+\[\]/g, "[]");
+  base = TYPE_ALIAS[base] || base;
+  if (!args || /^(timestamp|timestamptz|time|datetime2|datetimeoffset)/.test(base)) return base;
+  const nums = args.filter(t => t.t === "num" || isP(t, "*") || (t.t === "id" && /^max$/i.test(t.v))).map(t => isP(t, "*") ? "38" : t.v.toLowerCase());
+  if (!nums.length) return base;
+  if (/^(number|numeric|decimal|dec)$/.test(base)) return `${base}(${nums[0]}${nums[1] != null ? "," + nums[1] : ""})`;
+  return `${base}(${nums[0]})`;
+}
+
+function ddlToStandard(sql, opts = {}) {
+  const toks = tokenizeSQL(sql);
+  const stmts = []; let cur = [];
+  for (const t of toks) { if (t.t === "sep") { if (cur.length) stmts.push(cur); cur = []; } else cur.push(t); }
+  if (cur.length) stmts.push(cur);
+  const guessSchema = /\[dbo\]|\bGO\b|IDENTITY\s*\(/i.test(sql) ? "dbo" : /::|\bOWNER TO\b|\bSERIAL\b|\bpublic\./i.test(sql) ? "public" : "";
+  const defSchema = (opts.schema || "").trim() || guessSchema || "default";
+  let curDb = (opts.database || "").trim() || "";
+  const usedDbs = new Set();
+  const tables = new Map(), order = [], pks = [], fks = [], comments = [], warnings = [];
+  const summary = {tables:0, columns:0, keys:0, comments:0, skipped:{}};
+  const skip = what => summary.skipped[what] = (summary.skipped[what] || 0) + 1;
+  const resolve = parts => {
+    const p = [...parts];
+    const name = p.pop(), schema = p.pop() || defSchema, db = p.pop() || curDb || "database";
+    usedDbs.add(db);
+    return {db, schema, name, key:`${db}|${schema}|${name}`.toLowerCase()};
+  };
+  const findTable = parts => { const r = resolve(parts); return tables.get(r.key) || [...tables.values()].find(t => t.schema.toLowerCase() === r.schema.toLowerCase() && t.name.toLowerCase() === r.name.toLowerCase()); };
+
+  function parseColumn(e, t, line) {
+    const col = {name:e[0].v, words:[], args:null, nullable:true, pk:false, comment:"", fks:[], computed:false};
+    let k = 1;
+    if (kwIs(e[1], "AS")) { col.computed = true; warnings.push(`Line ${line}: ${t.schema}.${t.name}.${col.name} is a computed column; its type is not in the DDL, so it is imported as “computed”. Set the type in the standard if you need it.`); return col; }
+    while (k < e.length) {
+      const tk = e[k];
+      if (tk.t === "id" && tk.q && tk.v === "" && col.words.length) { col.words[col.words.length - 1] += "[]"; k++; continue; }
+      if (tk.t === "id" && (tk.q || !TYPE_STOP.has(tk.v.toUpperCase()))) { col.words.push(tk.v); k++; continue; }
+      if (isP(tk, "(") && col.args === null && col.words.length) { const end = matchParen(e, k); col.args = e.slice(k + 1, end); k = end + 1; continue; }
+      break;
+    }
+    let cname = null;
+    for (; k < e.length; k++) {
+      const u = e[k].t === "id" && !e[k].q ? e[k].v.toUpperCase() : null;
+      if (u === "NOT" && kwIs(e[k + 1], "NULL")) { col.nullable = false; k++; }
+      else if (u === "NULL") col.nullable = true;
+      else if (u === "PRIMARY" && kwIs(e[k + 1], "KEY")) { col.pk = true; col.nullable = false; k++; }
+      else if (u === "CONSTRAINT" && e[k + 1]) { cname = e[k + 1].v; k++; }
+      else if (u === "REFERENCES") {
+        const r = readName(e, k + 1); let toCols = [];
+        if (isP(e[r.k], "(")) toCols = parenIdents(e, r.k).cols;
+        col.fks.push({name:cname || `FK_${t.name}_${col.name}`, toParts:r.parts, toCols}); cname = null;
+      }
+      else if (u === "COMMENT" && e[k + 1] && e[k + 1].t === "str") { col.comment = e[k + 1].v; k++; }
+      else if (isP(e[k], "(")) { const end = matchParen(e, k); if (end > k) k = end; }
+    }
+    return col;
+  }
+  function tableConstraint(e, t, line) {
+    let j = 0, cname = null;
+    if (kwIs(e[0], "CONSTRAINT")) { cname = e[1] && e[1].v; j = 2; }
+    if (kwIs(e[j], "PRIMARY") && kwIs(e[j + 1], "KEY")) { pks.push({table:t, cols:parenIdents(e, j + 2).cols}); return true; }
+    if (kwIs(e[j], "FOREIGN") && kwIs(e[j + 1], "KEY")) {
+      const p = parenIdents(e, j + 2); let k = p.k;
+      while (k < e.length && !kwIs(e[k], "REFERENCES")) k++;
+      const r = readName(e, k + 1);
+      fks.push({table:t, name:cname || `FK_${t.name}_${p.cols.join("_")}`, cols:p.cols, toParts:r.parts, toCols:isP(e[r.k], "(") ? parenIdents(e, r.k).cols : [], line});
+      return true;
+    }
+    if (["UNIQUE","CHECK","INDEX","KEY","FULLTEXT","SPATIAL","EXCLUDE","PERIOD"].some(w => kwIs(e[j], w))) { skip("unique, check and index clauses"); return true; }
+    return !!cname;
+  }
+  function splitTop(e, from, to) {
+    const out = []; let cur2 = [], d = 0;
+    for (let j = from; j < to; j++) {
+      if (isP(e[j], "(")) d++; else if (isP(e[j], ")")) d--;
+      if (d === 0 && isP(e[j], ",")) { out.push(cur2); cur2 = []; } else cur2.push(e[j]);
+    }
+    if (cur2.length) out.push(cur2);
+    return out;
+  }
+  function addColumnTo(t, el, line) {
+    const col = parseColumn(el, t, line);
+    if (t.cols.some(c => c.name.toLowerCase() === col.name.toLowerCase())) { warnings.push(`Line ${line}: ${t.name}.${col.name} is defined twice; the second definition is skipped.`); return; }
+    t.cols.push(col); summary.columns++;
+    if (col.pk) pks.push({table:t, cols:[col.name]});
+    for (const f of col.fks) fks.push({table:t, name:f.name, cols:[col.name], toParts:f.toParts, toCols:f.toCols, line});
+  }
+
+  for (const e of stmts) {
+    const line = e[0].line;
+    let k = 0;
+    if (kwIs(e[0], "USE")) { curDb = e[1] ? e[1].v : curDb; continue; }
+    if (kwIs(e[0], "CREATE")) {
+      k = 1;
+      while (k < e.length && ["OR","REPLACE","ALTER","UNIQUE","CLUSTERED","NONCLUSTERED","BITMAP","GLOBAL","LOCAL","TEMPORARY","TEMP","UNLOGGED","FORCE","NOFORCE","EDITIONABLE","NONEDITIONABLE","PRIVATE","SHARDED","DUPLICATED","MATERIALIZED"].some(w => kwIs(e[k], w))) k++;
+      if (kwIs(e[k], "VIEW")) { const r = readName(e, k + 1); warnings.push(`Line ${line}: view ${r.parts.join(".")} skipped. A DDL script does not give the types of a view’s columns; use the catalog query or add the view to the standard.`); continue; }
+      if (!kwIs(e[k], "TABLE")) { skip(`CREATE ${(e[k] && e[k].v || "").toUpperCase()}`); continue; }
+      k++;
+      if (kwIs(e[k], "IF")) k += 3;
+      const r = readName(e, k); k = r.k;
+      const n = resolve(r.parts);
+      if (!isP(e[k], "(")) { warnings.push(`Line ${line}: ${n.schema}.${n.name} is created from a query (CREATE TABLE … AS SELECT); its columns are not in the DDL. Table skipped.`); continue; }
+      if (tables.has(n.key)) { warnings.push(`Line ${line}: ${n.schema}.${n.name} is created twice; the second CREATE TABLE is skipped.`); continue; }
+      const end = matchParen(e, k);
+      if (end < 0) { warnings.push(`Line ${line}: the parentheses of ${n.schema}.${n.name} do not close. Table skipped.`); continue; }
+      const t = {...n, cols:[], comment:""}; tables.set(n.key, t); order.push(t); summary.tables++;
+      for (const el of splitTop(e, k + 1, end)) {
+        if (!el.length) continue;
+        if (tableConstraint(el, t, line)) continue;
+        if (el[0].t !== "id") continue;
+        addColumnTo(t, el, el[0].line);
+      }
+      continue;
+    }
+    if (kwIs(e[0], "ALTER") && kwIs(e[1], "TABLE")) {
+      k = 2; if (kwIs(e[k], "IF")) k += 2; if (kwIs(e[k], "ONLY")) k++;
+      const r = readName(e, k); k = r.k;
+      if (kwIs(e[k], "WITH")) k += 2;
+      if (!kwIs(e[k], "ADD")) { skip("other ALTER TABLE statements"); continue; }
+      k++;
+      const t = findTable(r.parts);
+      if (!t) { warnings.push(`Line ${line}: ALTER TABLE on ${r.parts.join(".")}, which this script does not create. Skipped.`); continue; }
+      const rest = e.slice(k);
+      if (kwIs(rest[0], "DEFAULT")) { skip("defaults"); continue; }
+      if (kwIs(rest[0], "COLUMN")) rest.shift();
+      if (isP(rest[0], "(")) { for (const el of splitTop(rest, 1, matchParen(rest, 0))) if (!tableConstraint(el, t, line) && el[0] && el[0].t === "id") addColumnTo(t, el, line); continue; }
+      if (tableConstraint(rest, t, line)) continue;
+      if (rest[0] && rest[0].t === "id") addColumnTo(t, rest, line);
+      continue;
+    }
+    if (kwIs(e[0], "COMMENT") && kwIs(e[1], "ON")) {
+      const what = (e[2] && e[2].v || "").toUpperCase();
+      const r = readName(e, 3);
+      const str = e.slice(r.k).find(x => x.t === "str");
+      if (!str) continue;
+      if (what === "TABLE") comments.push({parts:r.parts, col:null, text:str.v});
+      else if (what === "COLUMN") { const p = [...r.parts]; const c = p.pop(); comments.push({parts:p, col:c, text:str.v}); }
+      continue;
+    }
+    if ((kwIs(e[0], "EXEC") || kwIs(e[0], "EXECUTE")) && e.some(x => x.t === "id" && /^sp_addextendedproperty$/i.test(x.v))) {
+      const named = {}, positional = [];
+      for (let j = 0; j < e.length; j++) {
+        if (e[j].t === "id" && e[j].v.startsWith("@") && isP(e[j + 1], "=") && e[j + 2]) { named[e[j].v.slice(1).toLowerCase()] = e[j + 2].v; j += 2; }
+        else if (e[j].t === "str") positional.push(e[j].v);
+      }
+      const a = Object.keys(named).length ? named : {name:positional[0], value:positional[1], level0name:positional[3], level1name:positional[5], level2type:positional[6], level2name:positional[7]};
+      if (String(a.name).toLowerCase() !== "ms_description") { skip("other extended properties"); continue; }
+      const parts = [a.level0name, a.level1name].filter(Boolean);
+      comments.push({parts, col:(String(a.level2type || "").toUpperCase() === "COLUMN") ? a.level2name : null, text:a.value || ""});
+      continue;
+    }
+    const w = (e[0] && e[0].v || "").toUpperCase();
+    skip(["SET","GRANT","REVOKE","INSERT","DROP","PRINT","DECLARE","BEGIN","IF"].includes(w) ? w + " statements" : "other statements");
+  }
+
+  for (const p of pks) for (const c of p.cols) { const col = p.table.cols.find(x => x.name.toLowerCase() === c.toLowerCase()); if (col) { col.pk = true; col.nullable = false; } }
+  summary.keys += pks.length;
+  for (const f of fks) {
+    const target = findTable(f.toParts);
+    let toCols = f.toCols;
+    if (!toCols.length && target) toCols = target.cols.filter(c => c.pk).map(c => c.name);
+    const toSchema = target ? target.schema : resolve(f.toParts).schema, toTable = target ? target.name : f.toParts[f.toParts.length - 1];
+    f.cols.forEach((c, i) => { const col = f.table.cols.find(x => x.name.toLowerCase() === c.toLowerCase()); if (col && !col.fkRefs) col.fkRefs = []; if (col) col.fkRefs.push({name:f.name, toSchema, toTable, toCol:toCols[i] || ""}); });
+    summary.keys++;
+  }
+  for (const c of comments) {
+    const t = findTable(c.parts); if (!t) continue;
+    if (!c.col) t.comment = c.text; else { const col = t.cols.find(x => x.name.toLowerCase() === c.col.toLowerCase()); if (col) col.comment = c.text; }
+    summary.comments++;
+  }
+
+  const rows = [STD_HEADERS];
+  for (const t of order) t.cols.forEach((c, i) => {
+    const type = c.computed ? "computed" : typeString(c.words, c.args);
+    const base = [t.db, t.schema, t.name, "table", "", "", i === 0 ? t.comment : "", c.name, i + 1, type, "", "", "", c.nullable ? "yes" : "no", c.pk ? "yes" : "no"];
+    const refs = c.fkRefs && c.fkRefs.length ? c.fkRefs : [null];
+    refs.forEach((f, n) => rows.push([...base, f ? f.name : "", f ? f.toSchema : "", f ? f.toTable : "", f ? f.toCol : "", n === 0 ? c.comment : "", ""]));
+  });
+  return {csv:toCSV(rows), warnings, summary, databases:[...usedDbs], defSchema};
+}
+
+const DDL_SAMPLES = {
+  mssql:{label:"SQL Server (SSMS script)", system:"Billing", file:"billing.sql", db:"", text:`USE [billing]
+GO
+/****** Object:  Table [dbo].[invoice]    Script Date: 21.10.2026 10:12:44 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[invoice](
+	[invoice_id] [bigint] IDENTITY(1,1) NOT NULL,
+	[invoice_no] [varchar](20) NOT NULL,
+	[cust_no] [varchar](20) NOT NULL,
+	[issued_on] [date] NOT NULL,
+	[amount] [decimal](12, 2) NOT NULL,
+	[currency] [char](3) NOT NULL,
+	[status] [tinyint] NULL,
+	[full_ref]  AS ([invoice_no]+'/'+[currency]),
+ CONSTRAINT [PK_invoice] PRIMARY KEY CLUSTERED 
+(
+	[invoice_id] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+CREATE TABLE [dbo].[invoice_line](
+	[invoice_id] [bigint] NOT NULL,
+	[line_no] [int] NOT NULL,
+	[item_code] [varchar](30) NOT NULL,
+	[qty] [decimal](10, 3) NOT NULL,
+	[net_amount] [decimal](12, 2) NOT NULL,
+	[note] [nvarchar](max) NULL,
+ CONSTRAINT [PK_invoice_line] PRIMARY KEY CLUSTERED ([invoice_id] ASC, [line_no] ASC)
+) ON [PRIMARY] TEXTIMAGE_ON [PRIMARY]
+GO
+CREATE NONCLUSTERED INDEX [IX_invoice_cust] ON [dbo].[invoice] ([cust_no] ASC)
+GO
+ALTER TABLE [dbo].[invoice] ADD  DEFAULT ((0)) FOR [status]
+GO
+ALTER TABLE [dbo].[invoice_line]  WITH CHECK ADD  CONSTRAINT [FK_invoice_line_invoice] FOREIGN KEY([invoice_id])
+REFERENCES [dbo].[invoice] ([invoice_id])
+GO
+ALTER TABLE [dbo].[invoice_line] CHECK CONSTRAINT [FK_invoice_line_invoice]
+GO
+EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'Invoice header, one row per invoice' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'invoice'
+GO
+EXEC sys.sp_addextendedproperty @name=N'MS_Description', @value=N'Customer number as in CRM' , @level0type=N'SCHEMA',@level0name=N'dbo', @level1type=N'TABLE',@level1name=N'invoice', @level2type=N'COLUMN',@level2name=N'cust_no'
+GO
+CREATE VIEW [dbo].[v_open_invoices] AS SELECT invoice_id, amount FROM dbo.invoice WHERE status = 1
+GO
+`},
+  postgres:{label:"PostgreSQL (pg_dump)", system:"Loyalty", file:"loyalty_schema.sql", db:"loyaltydb", text:`--
+-- PostgreSQL database dump
+--
+SET statement_timeout = 0;
+SET client_encoding = 'UTF8';
+CREATE SCHEMA loyalty;
+CREATE TABLE loyalty.member (
+    member_id integer NOT NULL,
+    card_no character varying(16) NOT NULL,
+    cust_no character varying(20),
+    joined_at timestamp with time zone DEFAULT now() NOT NULL,
+    tier text DEFAULT 'basic'::text,
+    points_balance numeric(12,0) DEFAULT 0
+);
+ALTER TABLE loyalty.member OWNER TO app;
+COMMENT ON TABLE loyalty.member IS 'Loyalty programme members';
+COMMENT ON COLUMN loyalty.member.card_no IS 'Number printed on the card';
+CREATE SEQUENCE loyalty.member_member_id_seq
+    AS integer
+    START WITH 1
+    INCREMENT BY 1;
+ALTER TABLE ONLY loyalty.member ALTER COLUMN member_id SET DEFAULT nextval('loyalty.member_member_id_seq'::regclass);
+CREATE TABLE loyalty.points_txn (
+    txn_id bigint NOT NULL,
+    member_id integer NOT NULL,
+    booked_at timestamp(3) without time zone NOT NULL,
+    points integer NOT NULL,
+    reason character(4),
+    tags text[]
+);
+CREATE VIEW loyalty.v_balances AS
+ SELECT member_id, sum(points) AS points FROM loyalty.points_txn GROUP BY member_id;
+ALTER TABLE ONLY loyalty.member
+    ADD CONSTRAINT member_pkey PRIMARY KEY (member_id);
+ALTER TABLE ONLY loyalty.points_txn
+    ADD CONSTRAINT points_txn_pkey PRIMARY KEY (txn_id);
+CREATE INDEX points_txn_member_idx ON loyalty.points_txn USING btree (member_id);
+ALTER TABLE ONLY loyalty.points_txn
+    ADD CONSTRAINT points_txn_member_fk FOREIGN KEY (member_id) REFERENCES loyalty.member(member_id);
+GRANT SELECT ON TABLE loyalty.member TO reporting;
+`},
+  oracle:{label:"Oracle (DBMS_METADATA)", system:"HR legacy", file:"hrleg_ddl.sql", db:"ORCL", text:`  CREATE TABLE "HRLEG"."DEPARTMENTS" 
+   (	"DEPT_ID" NUMBER(10,0) NOT NULL ENABLE, 
+	"DEPT_NAME" VARCHAR2(100 CHAR), 
+	 CONSTRAINT "PK_DEPARTMENTS" PRIMARY KEY ("DEPT_ID")
+  USING INDEX PCTFREE 10 INITRANS 2 MAXTRANS 255 COMPUTE STATISTICS 
+  TABLESPACE "USERS"  ENABLE
+   ) SEGMENT CREATION IMMEDIATE 
+  PCTFREE 10 PCTUSED 40 INITRANS 1 MAXTRANS 255 
+ NOCOMPRESS LOGGING
+  TABLESPACE "USERS" ;
+
+  CREATE TABLE "HRLEG"."EMPLOYEES" 
+   (	"EMP_ID" NUMBER(10,0) NOT NULL ENABLE, 
+	"EMP_NO" VARCHAR2(10 CHAR) NOT NULL ENABLE, 
+	"LAST_NAME" VARCHAR2(50 BYTE), 
+	"HIRED_ON" DATE, 
+	"SALARY" NUMBER(12,2), 
+	"DEPT_ID" NUMBER(10,0), 
+	"UPDATED_AT" TIMESTAMP (6) WITH TIME ZONE, 
+	 CONSTRAINT "PK_EMPLOYEES" PRIMARY KEY ("EMP_ID")
+  USING INDEX PCTFREE 10 INITRANS 2 TABLESPACE "USERS"  ENABLE, 
+	 CONSTRAINT "FK_EMP_DEPT" FOREIGN KEY ("DEPT_ID")
+	  REFERENCES "HRLEG"."DEPARTMENTS" ("DEPT_ID") ENABLE
+   ) SEGMENT CREATION IMMEDIATE 
+  TABLESPACE "USERS" ;
+
+   COMMENT ON COLUMN "HRLEG"."EMPLOYEES"."EMP_NO" IS 'Personnel number';
+   COMMENT ON TABLE "HRLEG"."EMPLOYEES"  IS 'Employees, current and former';
+`}
+};
+
+/* =========================================================
+   Reading the standard
+   ========================================================= */
+function parseDelimited(text) {
+  const first = text.split(/\r?\n/, 1)[0] || "";
+  const counts = {",":0, ";":0, "\t":0};
+  let inQ = false;
+  for (const ch of first) { if (ch === '"') inQ = !inQ; else if (!inQ && ch in counts) counts[ch]++; }
+  const delim = Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0];
+  const rows = []; let row = [], f = "", q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { f += '"'; i++; } else q = false; }
+      else f += ch;
+    } else if (ch === '"' && f === "") q = true;
+    else if (ch === delim) { row.push(f); f = ""; }
+    else if (ch === "\n" || ch === "\r") { if (ch === "\r" && text[i + 1] === "\n") i++; row.push(f); rows.push(row); row = []; f = ""; }
+    else f += ch;
+  }
+  if (f !== "" || row.length) { row.push(f); rows.push(row); }
+  return {rows:rows.filter(r => r.some(c => c.trim() !== "")), delim};
+}
+const ALIASES = {database_name:"database", db:"database", schema_name:"schema", table_name:"table", object:"table",
+  column_name:"column", type:"data_type", datatype:"data_type", is_nullable:"nullable", pk:"primary_key",
+  is_primary_key:"primary_key", position:"ordinal", ordinal_position:"ordinal", comment:"column_comment", tags:"classifications"};
+const yes = v => /^(yes|y|true|1|t)$/i.test(String(v).trim());
+const num = v => { const s = String(v ?? "").trim(); if (s === "" || /^null$/i.test(s)) return null; const n = Number(s.replace(/\s/g, "")); return Number.isFinite(n) ? n : undefined; };
+
+function conflict(col, attr, mapping) {
+  if (!col || !attr) return null;
+  const t = typeIssue(fmtType(col), attr, mapping);
+  return t.ok ? null : t.short;
+}
+function readStandard(text, fileName) {
+  const res = {fileName, errors:[], warnings:[], tables:new Map(), rowCount:0, delim:","};
+  if (!text || !text.trim()) { res.errors.push("The file is empty."); return res; }
+  const {rows, delim} = parseDelimited(text.replace(/^\uFEFF/, ""));
+  res.delim = delim;
+  const head = rows[0].map(h => { const k = h.trim().toLowerCase().replace(/[\s\-]+/g, "_").replace(/^\[|\]$/g, ""); return ALIASES[k] || k; });
+  const missing = ["database","schema","table","column","data_type"].filter(h => !head.includes(h));
+  if (missing.length) {
+    res.errors.push(`The file has no ${missing.map(h => "“" + h + "”").join(", ")} column. Name the columns as in the standard below; matching your own headers comes in iteration 2.`);
+    return res;
+  }
+  const ix = Object.fromEntries(head.map((h, i) => [h, i]));
+  res.has = new Set(head);   /* optional fields the file leaves out are never compared or overwritten */
+  const get = (r, k) => { const v = (ix[k] != null ? (r[ix[k]] ?? "") : "").trim(); return /^null$/i.test(v) ? "" : v; };  /* SSMS copies empty cells as NULL */
+  for (let n = 1; n < rows.length; n++) {
+    const r = rows[n], line = n + 1;
+    const db = get(r, "database"), schema = get(r, "schema"), table = get(r, "table"), col = get(r, "column"), type = get(r, "data_type");
+    if (!db || !schema || !table || !col) { res.warnings.push(`Row ${line}: database, schema, table and column are required. Row skipped.`); continue; }
+    if (!type) { res.warnings.push(`Row ${line}: ${schema}.${table}.${col} has no data_type. Column skipped.`); continue; }
+    const key = `${db}|${schema}|${table}`.toLowerCase();
+    let t = res.tables.get(key);
+    if (!t) {
+      const ot = (get(r, "object_type") || "table").toLowerCase(), ff = get(r, "file_format").toLowerCase().replace(/^\./, "");
+      t = {key, database:db, schema, name:table, objectType:ot === "view" ? "view" : (ot === "file" || ff) ? "file" : "table", fileFormat:ff, rowCount:null, comment:"", cols:[], fks:new Map()};
+      res.tables.set(key, t);
+    }
+    const rc = num(get(r, "row_count")); if (rc != null) t.rowCount = rc;
+    const tc = get(r, "table_comment"); if (tc) t.comment = tc;
+    const pt = parseTypeStr(type);
+    const len = get(r, "length"), pr = num(get(r, "precision")), sc = num(get(r, "scale"));
+    if (len && pt.length == null) pt.length = /^(max|-1)$/i.test(len) ? "max" : (num(len) ?? null);
+    if (pr != null && pt.precision == null) pt.precision = pr;
+    if (sc != null && pt.scale == null) pt.scale = sc;
+    const existing = t.cols.find(c => c.name.toLowerCase() === col.toLowerCase());
+    const fkName = get(r, "fk_name");
+    if (fkName) {
+      const fk = t.fks.get(fkName) || {name:fkName, toSchema:get(r, "fk_ref_schema") || schema, toTable:get(r, "fk_ref_table"), pairs:[]};
+      fk.pairs.push([col, get(r, "fk_ref_column")]);
+      t.fks.set(fkName, fk);
+    }
+    if (existing) {
+      if (fkName) { existing.fk = true; continue; }
+      res.warnings.push(`Row ${line}: ${schema}.${table}.${col} appears twice. Second row skipped.`); continue;
+    }
+    const classes = [];
+    get(r, "classifications").split(/[;|]/).map(s => s.trim()).filter(Boolean).forEach(s => {
+      const c = classOf(s);
+      if (c === undefined) res.warnings.push(`Row ${line}: unknown classification “${s}” on ${table}.${col}, ignored. Add it under Classifications to use it.`);
+      else if (c && !classes.includes(c)) classes.push(c);
+    });
+    const ord = num(get(r, "ordinal"));
+    const nl = get(r, "nullable");
+    t.cols.push({name:col, ordinal:ord ?? t.cols.length + 1, ...pt, nullable:nl === "" ? !yes(get(r, "primary_key")) : yes(nl),
+      pk:yes(get(r, "primary_key")), fk:!!fkName, comment:get(r, "column_comment"), classes, line});
+    res.rowCount++;
+  }
+  if (!res.tables.size && !res.errors.length) res.errors.push("The file has no usable rows.");
+  return res;
+}
+
+/* =========================================================
+   The engine: plan (compare) and apply. One mechanism for the
+   first import and every re-import.
+   ========================================================= */
+const keyOf = t => `${t.database}|${t.schema}|${t.name}`.toLowerCase();
+const schemaKey = (db, s) => `${db}|${s}`.toLowerCase();
+const clone = o => structuredClone(o);
+
+/* What the source owns on a column; classifications and notes are the modeller's (A-04, question 4). */
+function diffCols(ec, fc, has = new Set(STD_HEADERS)) {
+  const ch = [];
+  if (fmtType(ec) !== fmtType(fc)) ch.push(["type", fmtType(ec), fmtType(fc)]);
+  if (has.has("nullable") && ec.nullable !== fc.nullable) ch.push(["nullable", ec.nullable ? "yes" : "no", fc.nullable ? "yes" : "no"]);
+  if (has.has("primary_key") && ec.pk !== fc.pk) ch.push(["primary key", ec.pk ? "yes" : "no", fc.pk ? "yes" : "no"]);
+  if (has.has("fk_name") && ec.fk !== fc.fk) ch.push(["foreign key", ec.fk ? "yes" : "no", fc.fk ? "yes" : "no"]);
+  if (has.has("column_comment") && (ec.comment || "") !== (fc.comment || "")) ch.push(["comment", ec.comment || "–", fc.comment || "–"]);
+  return ch;
+}
+function buildPlan(model, parsed, target, scope, decisions) {
+  const has = parsed.has || new Set(STD_HEADERS);
+  const plan = {target, tables:[], relations:[], hints:[], warnings:[...parsed.warnings], renames:[], has};
+  const sysId = target.systemId;
+  const existing = sysId ? model.tables.filter(t => t.systemId === sysId) : [];
+  const exByKey = new Map(existing.map(t => [keyOf(t), t]));
+  const colsOf = id => model.columns.filter(c => c.tableId === id).sort((a, b) => a.ordinal - b.ordinal);
+  const inScope = [...parsed.tables.values()].filter(t => scope.has(t.key));
+  const schemasInScope = new Set(inScope.map(t => schemaKey(t.database, t.schema)));
+
+  for (const ft of inScope) {
+    const et = exByKey.get(ft.key);
+    const tp = {key:ft.key, file:ft, existing:et || null, status:et ? "unchanged" : "new", meta:[], cols:[]};
+    if (et) {
+      if (et.missingSince) { tp.status = "back"; }
+      if (has.has("table_comment") && (et.comment || "") !== (ft.comment || "")) tp.meta.push(["comment", et.comment || "–", ft.comment || "–"]);
+      if (has.has("file_format") && (et.fileFormat || "") !== (ft.fileFormat || "")) tp.meta.push(["file format", et.fileFormat || "–", ft.fileFormat || "–"]);
+      if (has.has("object_type") && et.objectType !== ft.objectType) tp.meta.push(["object type", et.objectType, ft.objectType]);
+      tp.rows = [et.rowCount, ft.rowCount];
+      const ecols = colsOf(et.id);
+      const used = new Set();
+      const unmatchedFile = [];
+      for (const fc of ft.cols) {
+        const ec = ecols.find(c => c.name.toLowerCase() === fc.name.toLowerCase());
+        if (!ec) { unmatchedFile.push(fc); continue; }
+        used.add(ec.id);
+        const ch = diffCols(ec, fc, has);
+        const clsNote = fc.classes.length && fc.classes.join(";") !== ec.classes.join(";") ? fc.classes : null;
+        tp.cols.push({status:ec.missingSince ? "back" : (ch.length ? "changed" : "unchanged"), existing:ec, file:fc, changes:ch, clsNote});
+      }
+      const gone = ecols.filter(c => !used.has(c.id));
+      /* Renames: a suggestion where position and type agree; the modeller can pair any gone column with any new one. */
+      const active = gone.filter(c => !c.missingSince);
+      const sugg = new Map();
+      for (const fc of unmatchedFile) {
+        const cand = active.find(c => ![...sugg.keys()].includes(c.id) && c.ordinal === fc.ordinal && fmtType(c) === fmtType(fc));
+        if (cand) sugg.set(cand.id, fc.name);
+      }
+      const pairOf = new Map(), taken = new Set();
+      for (const c of active) {
+        const id = `${ft.key}|${c.name}`.toLowerCase();
+        const v = decisions.has(id) ? decisions.get(id) : (sugg.get(c.id) || "");
+        if (v && !taken.has(v) && unmatchedFile.some(f => f.name === v)) { pairOf.set(c.id, v); taken.add(v); }
+        if (unmatchedFile.length) plan.renames.push({id, fromId:c.id, from:c.name, choice:pairOf.get(c.id) || "", suggested:sugg.get(c.id) || "", options:unmatchedFile.map(f => f.name)});
+      }
+      for (const fc of unmatchedFile) {
+        const ec = active.find(c => pairOf.get(c.id) === fc.name);
+        if (ec) tp.cols.push({status:"rename", existing:ec, file:fc, changes:diffCols(ec, fc, has), renameId:`${ft.key}|${ec.name}`.toLowerCase()});
+        else tp.cols.push({status:"new", existing:null, file:fc, changes:[]});
+      }
+      for (const ec of gone) {
+        if (pairOf.has(ec.id)) continue;
+        const r = plan.renames.find(x => x.fromId === ec.id);
+        tp.cols.push({status:ec.missingSince ? "stillmissing" : "missing", existing:ec, file:null, changes:[], renameId:r ? r.id : null});
+      }
+      tp.cols.sort((a, b) => (a.file ? a.file.ordinal : 1000 + a.existing.ordinal) - (b.file ? b.file.ordinal : 1000 + b.existing.ordinal));
+      if (tp.status !== "back" && (tp.meta.length || tp.cols.some(c => !["unchanged","stillmissing"].includes(c.status)))) tp.status = "changed";
+    } else {
+      tp.cols = ft.cols.map(fc => ({status:"new", existing:null, file:fc, changes:[]}));
+    }
+    plan.tables.push(tp);
+  }
+  /* Tables of the system in a schema that came in, but not in the file: missing.
+     Only schemas in scope count, so a partial file never marks the rest missing. */
+  for (const et of existing) {
+    if (target.compare === "tables") break;
+    const k = keyOf(et);
+    if (parsed.tables.has(k) && !scope.has(k)) continue;
+    if (parsed.tables.has(k)) continue;
+    if (!schemasInScope.has(schemaKey(et.database, et.schema))) continue;
+    plan.tables.push({key:k, file:null, existing:et, status:et.missingSince ? "stillmissing" : "missing", meta:[],
+      cols:colsOf(et.id).map(ec => ({status:ec.missingSince ? "stillmissing" : "missing", existing:ec, file:null, changes:[]}))});
+  }
+
+  /* Relationships between source tables, from the file's foreign keys */
+  const fileKeys = new Set(inScope.map(t => t.key));
+  for (const ft of inScope) {
+    const et = exByKey.get(ft.key);
+    for (const fk of ft.fks.values()) {
+      const toKey = `${ft.database}|${fk.toSchema}|${fk.toTable}`.toLowerCase();
+      const resolvable = fileKeys.has(toKey) || exByKey.has(toKey);
+      if (!resolvable) { plan.warnings.push(`Foreign key ${fk.name} on ${ft.schema}.${ft.name} refers to ${fk.toSchema}.${fk.toTable}, which is neither in this file nor in the system. Relationship skipped.`); continue; }
+      const er = et ? model.relations.find(r => r.fromTableId === et.id && r.name.toLowerCase() === fk.name.toLowerCase()) : null;
+      let status = "new";
+      if (er) {
+        const cname = id => (model.columns.find(c => c.id === id) || {}).name;
+        const before = er.fromCols.map((c, i) => cname(c) + "→" + cname(er.toCols[i])).join(", ").toLowerCase();
+        const after = fk.pairs.map(p => p[0] + "→" + p[1]).join(", ").toLowerCase();
+        status = er.missingSince ? "back" : (before === after ? "unchanged" : "changed");
+      }
+      plan.relations.push({status, name:fk.name, fromKey:ft.key, fromLabel:`${ft.schema}.${ft.name}`, toKey, toLabel:`${fk.toSchema}.${fk.toTable}`, pairs:fk.pairs, existing:er});
+    }
+    if (et) for (const er of model.relations.filter(r => r.fromTableId === et.id && !er_inFile(r, ft))) {
+      const to = model.tables.find(t => t.id === er.toTableId);
+      plan.relations.push({status:er.missingSince ? "stillmissing" : "missing", name:er.name, fromKey:ft.key, fromLabel:`${ft.schema}.${ft.name}`, toLabel:to ? `${to.schema}.${to.name}` : "?", pairs:[], existing:er});
+    }
+  }
+  function er_inFile(r, ft) { return [...ft.fks.keys()].some(n => n.toLowerCase() === r.name.toLowerCase()); }
+
+  /* Classification hints for new columns: suggestions only (AD-08) */
+  for (const tp of plan.tables) for (const c of tp.cols) {
+    if (c.status !== "new") continue;
+    const pkCount = tp.file.cols.filter(x => x.pk).length;
+    if (c.file.pk && pkCount === 1 && !c.file.classes.length && !tp.file.cols.some(x => x.classes.includes("BK")))
+      plan.hints.push({id:`${tp.key}|${c.file.name}|BK`, tableKey:tp.key, col:c.file.name, code:"BK", why:"the only primary key column, and the table has no business key", label:`${tp.file.schema}.${tp.file.name}.${c.file.name}`});
+    if (c.file.fk && !c.file.pk && !c.file.classes.length && target.dv2)
+      plan.hints.push({id:`${tp.key}|${c.file.name}|LK`, tableKey:tp.key, col:c.file.name, code:"LK", why:"a foreign key: a candidate for a link between hubs", label:`${tp.file.schema}.${tp.file.name}.${c.file.name}`});
+  }
+  return plan;
+}
+
+function applyPlan(model, plan, acceptedHints, meta) {
+  const m = clone(model); m.issues ||= [];
+  const recent = {tables:new Set(), cols:new Set()};
+  let sysId = plan.target.systemId;
+  if (!sysId) { sysId = uid("sys"); m.systems.push({id:sysId, name:plan.target.newName}); }
+  const impId = uid("imp");
+  const tIdByKey = new Map(m.tables.filter(t => t.systemId === sysId).map(t => [keyOf(t), t.id]));
+  const counts = {tablesNew:0, colsNew:0, changed:0, missing:0, renamed:0, relNew:0, toResolve:0, high:0};
+  const issue = o => { m.issues.push({id:uid("iss"), systemId:sysId, importId:impId, at:TODAY, status:"open", resolution:"", ...o}); counts.toResolve++; if (o.severity === "high") counts.high++; };
+  const settle = (f, text) => m.issues.filter(i => i.status === "open" && f(i)).forEach(i => Object.assign(i, {status:"resolved", resolution:text, resolvedAt:TODAY}));
+  const approvedOn = id => m.mappings.some(mp => mp.columnId === id && mp.status === "approved");
+  const attrLabel = id => { const a = m.attributes.find(x => x.id === id); return a ? `${a.entity}.${a.name}` : "?"; };
+  const ruleRe = name => new RegExp("\\b" + name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\b", "g");
+  for (const tp of plan.tables) {
+    if (!tp.file) {
+      if (tp.status === "missing") {
+        const t = m.tables.find(x => x.id === tp.existing.id); t.missingSince = TODAY;
+        const cols = tp.cols.filter(c => c.status === "missing").map(c => m.columns.find(x => x.id === c.existing.id));
+        cols.forEach(c => { c.missingSince = TODAY; counts.missing++; });
+        issue({kind:"missingtable", severity:cols.some(c => approvedOn(c.id)) ? "high" : "normal", tableId:t.id, label:`${t.schema}.${t.name}`,
+          detail:`Not in the file. Its ${plural(cols.length, "column")} are marked missing from source.`});
+      }
+      continue;
+    }
+    let t;
+    if (tp.existing) {
+      t = m.tables.find(x => x.id === tp.existing.id);
+      if (plan.has.has("table_comment")) t.comment = tp.file.comment;
+      if (plan.has.has("object_type")) t.objectType = tp.file.objectType;
+      if (plan.has.has("file_format")) t.fileFormat = tp.file.fileFormat;
+      if (t.missingSince) settle(i => i.tableId === t.id && i.kind === "missingtable", `Back in the source on ${TODAY}`);
+      t.missingSince = null; t.retiredSince = null;
+      if (tp.file.rowCount != null) t.rowCount = tp.file.rowCount;
+      if (tp.status === "changed" || tp.status === "back") recent.tables.add(t.id);
+    } else {
+      t = {id:uid("src"), systemId:sysId, database:tp.file.database, schema:tp.file.schema, name:tp.file.name, objectType:tp.file.objectType, fileFormat:tp.file.fileFormat || "", rowCount:tp.file.rowCount, comment:tp.file.comment, missingSince:null, classes:[], note:""};
+      m.tables.push(t); tIdByKey.set(tp.key, t.id); recent.tables.add(t.id); counts.tablesNew++;
+      issue({kind:"newtable", severity:"normal", tableId:t.id, label:`${t.schema}.${t.name}`, detail:`New in the source, ${plural(tp.cols.length, "column")} with no mapping yet.`});
+    }
+    for (const c of tp.cols) {
+      const src = {ordinal:c.file?.ordinal, dataType:c.file?.dataType, length:c.file?.length, precision:c.file?.precision, scale:c.file?.scale,
+        nullable:c.file?.nullable, pk:c.file?.pk, fk:c.file?.fk, comment:c.file?.comment || ""};
+      if (c.status === "new") {
+        const classes = [...c.file.classes];
+        for (const h of plan.hints) if (h.tableKey === tp.key && h.col === c.file.name && acceptedHints.has(h.id) && !classes.includes(h.code)) classes.push(h.code);
+        const nc = {id:uid("col"), tableId:t.id, name:c.file.name, ...src, classes, missingSince:null, note:""};
+        m.columns.push(nc); recent.cols.add(nc.id); counts.colsNew++;
+        if (tp.existing) issue({kind:"newcol", severity:"normal", tableId:t.id, colId:nc.id, label:`${t.schema}.${t.name}.${nc.name}`, detail:`New in the source, ${fmtType(nc)}.`});
+      } else if (c.status === "missing") {
+        const ec = m.columns.find(x => x.id === c.existing.id); ec.missingSince = TODAY; counts.missing++;
+        settle(i => i.colId === ec.id && i.kind === "newcol", `Left the source on ${TODAY} before a decision`);
+        const n = m.mappings.filter(mp => mp.columnId === ec.id).length;
+        issue({kind:"missingcol", severity:approvedOn(ec.id) ? "high" : "normal", tableId:t.id, colId:ec.id, label:`${t.schema}.${t.name}.${ec.name}`,
+          detail:`Not in the file. Was ${fmtType(ec)}${n ? `, with ${plural(n, "mapping")}` : ""}.`});
+      } else if (c.existing && c.file) {
+        const ec = m.columns.find(x => x.id === c.existing.id);
+        const prev = {...ec};
+        const keep = {nullable:"nullable", pk:"primary_key", fk:"fk_name", comment:"column_comment"};
+        for (const [f, h] of Object.entries(keep)) if (!plan.has.has(h)) delete src[f];
+        Object.assign(ec, src, {name:c.file.name, missingSince:null, retiredSince:null});       /* classifications and notes stay the modeller's */
+        if (prev.missingSince) settle(i => i.colId === ec.id, `Back in the source on ${TODAY}`);
+        if (c.status === "unchanged") continue;
+        recent.cols.add(ec.id); c.status === "rename" ? counts.renamed++ : counts.changed++;
+        /* The rule for mappings when their source changes (extends D-51) */
+        const isBK = ec.classes.includes("BK"), typeChanged = fmtType(prev) !== fmtType(ec);
+        let raised = false;
+        for (const mp of m.mappings.filter(x => x.columnId === ec.id)) {
+          const attr = m.attributes.find(a => a.id === mp.attributeId);
+          const reasons = []; let kind = null, sev = "normal";
+          const cNow = conflict(ec, attr, mp), cBefore = conflict(prev, attr, mp);
+          if (cNow && !cBefore) { reasons.push(`type conflict, ${cNow}`); kind = "conflict"; sev = "high"; }
+          if (isBK && typeChanged) { reasons.push(`business key column changed type, ${fmtType(prev)} → ${fmtType(ec)}`); kind ||= "bk"; sev = "high"; }
+          if (prev.name !== ec.name && mp.rule && ruleRe(prev.name).test(mp.rule)) { mp.rule = mp.rule.replace(ruleRe(prev.name), ec.name); reasons.push(`its rule now reads ${mp.rule}`); kind ||= "rule"; }
+          if (!reasons.length) continue;
+          const was = mp.status;
+          if (was === "approved") { mp.status = "review"; mp.reviewReason = reasons.join("; "); }
+          issue({kind, severity:sev, tableId:t.id, colId:ec.id, mappingId:mp.id, label:`${t.schema}.${t.name}.${ec.name}`,
+            detail:`${was === "approved" ? `The approved mapping to ${attrLabel(mp.attributeId)} went back to review` : `The mapping to ${attrLabel(mp.attributeId)} (${was})`}: ${reasons.join("; ")}.`});
+          raised = true;
+        }
+        if (isBK && typeChanged && !raised) issue({kind:"bk", severity:"high", tableId:t.id, colId:ec.id, label:`${t.schema}.${t.name}.${ec.name}`,
+          detail:`Business key column changed type, ${fmtType(prev)} → ${fmtType(ec)}. Hash keys built on it change too.`});
+      }
+    }
+  }
+  const colId = (tid, name) => (m.columns.find(c => c.tableId === tid && c.name.toLowerCase() === String(name).toLowerCase()) || {}).id;
+  for (const r of plan.relations) {
+    if (r.status === "missing") { m.relations.find(x => x.id === r.existing.id).missingSince = TODAY; continue; }
+    if (r.status === "unchanged" || r.status === "stillmissing") continue;
+    const from = tIdByKey.get(r.fromKey), to = tIdByKey.get(r.toKey);
+    if (!from || !to) continue;
+    const rel = {name:r.name, fromTableId:from, fromCols:r.pairs.map(p => colId(from, p[0])), toTableId:to, toCols:r.pairs.map(p => colId(to, p[1])), kind:"declared", missingSince:null};
+    if (r.existing) Object.assign(m.relations.find(x => x.id === r.existing.id), rel);
+    else { m.relations.push({id:uid("rel"), ...rel}); counts.relNew++; }
+  }
+  m.imports.unshift({id:impId, systemId:sysId, at:meta.at, source:meta.source, by:"Łukasz", counts});
+  return {model:m, recent, counts, systemId:sysId};
+}
+
+function mapLine(o) {
+  return `<div class="maps ${o.mp.status === "approved" ? "" : "review"}">→ ${esc(o.label)} <span class="muted">(${o.mp.status}${o.mp.until ? `, until ${o.mp.until}` : ""})</span>${o.mp.reviewReason && o.mp.status === "review" ? `<span class="reason">${esc(o.mp.reviewReason)}</span>` : ""}</div>`;
+}
+function mappingsOn(m, colId) {
+  return m.mappings.filter(mp => mp.columnId === colId).map(mp => {
+    const a = m.attributes.find(x => x.id === mp.attributeId);
+    return {mp, a, label:a ? `${a.entity}.${a.name}` : "?"};
+  });
+}
+function reqsOfAttr(m, aid) {
+  return (I.reqOf["attr:" + aid] || []).map(r => r.key);
+}
+function reqsOfAttrOld(m, aid) {
+  /* direct links only, as an attribute's panel lists them (D-34); entity-level effects show in the coverage box */
+  return m.reqs.filter(r => r.items.some(it => it.t === "attr" && it.id === aid)).map(r => r.key);
+}
+function canvasesOf(m, tid) { return m.canvases.filter(c => c.tables.includes(tid)).map(c => c.name); }
+function classChips(codes) {
+  return `<span class="chips">${codes.filter(c => CLS[c] && (!CLS[c].dv || dv2())).map(c => `<span class="chip cls ${CLS[c].dv ? "dv" : ""}" title="${esc(CLS[c].name)}">${esc(CLS[c].name)}</span>`).join("")}</span>`;
+}
+
+function importSummary(k) {
+  const p = [];
+  if (k.tablesNew) p.push(plural(k.tablesNew, "new table"));
+  if (k.colsNew) p.push(plural(k.colsNew, "new column"));
+  if (k.changed) p.push(plural(k.changed, "changed column"));
+  if (k.renamed) p.push(plural(k.renamed, "renamed column"));
+  if (k.missing) p.push(`${k.missing} missing from source`);
+  if (k.relNew) p.push(plural(k.relNew, "new relationship"));
+  if (k.toResolve) p.push(`${k.toResolve} to resolve${k.high ? ` (${k.high} high)` : ""}`);
+  return p.join(", ") || "No changes";
+}
+/* =========================================================
+   Changes to resolve: every source change that needs a decision
+   ========================================================= */
+const KIND = {
+  missingcol:  {title:"Column left the source", short:"columns that left"},
+  missingtable:{title:"Table left the source", short:"a table that left"},
+  newcol:      {title:"New column to decide", short:"new columns"},
+  newtable:    {title:"New table to decide", short:"new tables"},
+  conflict:    {title:"Mapping no longer fits the source", short:"type conflicts"},
+  bk:          {title:"Business key column changed", short:"business key changes"},
+  rule:        {title:"Rule updated for a renamed column", short:"updated rules"}
+};
+const ACTS = {
+  missingcol:[["retire","Retire: keep as historical"],["repoint","Move its mappings…"],["delete","Delete…"]],
+  missingtable:[["retire","Retire: keep as historical"],["delete","Delete…"]],
+  newcol:[["map","Map to an attribute…"],["notneeded","Not needed"]],
+  newtable:[["notneeded","None of it is needed"],["split","Decide column by column"]],
+  conflict:[["approve","Approve the mapping again"],["ack","Leave it in review"]],
+  bk:[["approve","Approve the mapping again"],["ack","Leave it in review"]],
+  rule:[["approve","Approve the mapping again"],["ack","Leave it in review"]]
+};
+const openIssues = sysId => MODEL.issues.filter(i => i.status === "open" && i.systemId === sysId);
+function issuesHtml(list, inTable) {
+  const open = list.filter(i => i.status === "open").sort((a, b) => (a.severity === "high" ? 0 : 1) - (b.severity === "high" ? 0 : 1));
+  const done = list.filter(i => i.status === "resolved");
+  return `${open.length ? open.map(i => issueCard(i, inTable)).join("") : `<p class="muted">Nothing to resolve.</p>`}
+    ${done.length && !inTable ? `<details class="resolved"><summary>${plural(done.length, "resolved change")}</summary><ul class="hist">${done.map(i => `<li><b>${esc(KIND[i.kind].title)}</b> · <span class="mono">${esc(i.label)}</span><br><span class="muted">${esc(i.resolution)} · ${esc(i.resolvedAt)}</span></li>`).join("")}</ul></details>` : ""}`;
+}
+function issueImpact(i) {
+  const lines = [];
+  if (i.colId) for (const o of mappingsOn(MODEL, i.colId)) {
+    const reqs = reqsOfAttr(MODEL, o.a.id);
+    lines.push(`Feeds ${esc(o.label)} (${o.mp.status})${reqs.length ? " " + reqs.map(k => `<span class="tag req">${k}</span>`).join(" ") : ""}`);
+  }
+  if (i.kind === "missingtable") {
+    const n = MODEL.mappings.filter(mp => MODEL.columns.some(c => c.id === mp.columnId && c.tableId === i.tableId)).length;
+    lines.push(n ? `${plural(n, "mapping")} on its columns` : "No mappings on its columns");
+  }
+  const can = i.tableId ? canvasesOf(MODEL, i.tableId) : [];
+  if (can.length) lines.push(`On ${can.map(esc).join(", ")}`);
+  return lines.length ? `<div class="imp2">${lines.join(" · ")}</div>` : "";
+}
+function issueCard(i) {
+  const okApprove = i.mappingId && (() => { const mp = MODEL.mappings.find(x => x.id === i.mappingId); if (!mp || mp.status === "approved") return false;
+    const c = MODEL.columns.find(x => x.id === mp.columnId); return c && !conflict(c, MODEL.attributes.find(a => a.id === mp.attributeId), mp); })();
+  const acts = ACTS[i.kind].filter(([a]) => a !== "approve" || okApprove);
+  const pend = ui.pending && ui.pending.id === i.id ? pendingHtml(i) : "";
+  return `<article class="issue ${i.severity}"><header><span class="tag ${i.severity}">${i.severity === "high" ? "High" : "Normal"}</span><b>${esc(KIND[i.kind].title)}</b>
+      <button class="link mono" data-go="source:${i.tableId}">${esc(i.label)}</button><span class="muted" style="font-size:12px">${esc(i.at)}</span></header>
+    <p class="det">${esc(i.detail)}</p>${issueImpact(i)}
+    ${pend || `<div class="acts">${acts.map(([a, l]) => `<button class="btn small" data-imact="${a}" data-imiss="${i.id}">${l}</button>`).join("")}</div>`}</article>`;
+}
+function pendingHtml(i) {
+  const act = ui.pending.act;
+  if (act === "repoint") {
+    const col = MODEL.columns.find(c => c.id === i.colId);
+    const sysTabs = MODEL.tables.filter(t => t.systemId === i.systemId && !t.missingSince);
+    const groups = [...sysTabs].sort((a, b) => (a.id === col.tableId ? -1 : 0) - (b.id === col.tableId ? -1 : 0)).map(t => {
+      const cs = MODEL.columns.filter(c => c.tableId === t.id && !c.missingSince).sort((a, b) => a.ordinal - b.ordinal);
+      return `<optgroup label="${esc(t.schema + "." + t.name)}">${cs.map(c => `<option value="${c.id}">${esc(c.name)} · ${esc(fmtType(c))}</option>`).join("")}</optgroup>`;
+    }).join("");
+    const n = MODEL.mappings.filter(mp => mp.columnId === col.id).length;
+    return `<div class="pend"><label>Move ${plural(n, "mapping")} from <span class="mono">${esc(col.name)}</span> to <select id="pendPick">${groups}</select></label>
+      <span class="muted">Moved approved mappings go back to review; the old column is retired.</span>
+      <div class="acts" style="margin:0"><button class="btn primary small" data-imconfirm>Move</button><button class="btn small" data-imcancel>Cancel</button></div></div>`;
+  }
+  if (act === "map") {
+    const col = MODEL.columns.find(c => c.id === i.colId);
+    return `<div class="pend"><label>Map <span class="mono">${esc(col.name)}</span> to <select id="pendPick">${[...new Set(MODEL.attributes.map(a => a.entity))].map(e => `<optgroup label="${esc(e)}">${MODEL.attributes.filter(a => a.entity === e).map(a => `<option value="${a.id}">${esc(a.name)} · ${esc(a.type)}${a.length ? "(" + a.length + ")" : ""}</option>`).join("")}</optgroup>`).join("")}</select></label>
+      <span class="muted">The mapping starts as a draft.</span>
+      <div class="acts" style="margin:0"><button class="btn primary small" data-imconfirm>Map</button><button class="btn small" data-imcancel>Cancel</button></div></div>`;
+  }
+  /* delete: show what goes with it before anything happens (as D-47) */
+  const sim = clone(MODEL); deleteObj(sim, i);
+  const covB = covOfS(S), covA = covFromImp(sim);
+  const colIds = i.kind === "missingtable" ? MODEL.columns.filter(c => c.tableId === i.tableId).map(c => c.id) : [i.colId];
+  const maps = MODEL.mappings.filter(mp => colIds.includes(mp.columnId)).map(mp => { const a = MODEL.attributes.find(x => x.id === mp.attributeId); return `${a.entity}.${a.name} (${mp.status})`; });
+  const reqs = S.requirements.filter(r => covB[r.key] && covA[r.key] && covB[r.key].ok !== covA[r.key].ok);
+  const rels = MODEL.relations.filter(r => colIds.some(id => r.fromCols.includes(id) || r.toCols.includes(id))).length;
+  return `<div class="pend"><b>Delete ${i.kind === "missingtable" ? "the table" : "the column"} <span class="mono">${esc(i.label)}</span> with:</b>
+    <span>${maps.length ? plural(maps.length, "mapping") + ": " + maps.map(esc).join(", ") : "no mappings"}${rels ? `; ${plural(rels, "relationship")}` : ""}${i.kind === "missingtable" ? `; ${plural(colIds.length, "column")}` : ""}</span>
+    ${reqs.length ? `<span>${reqs.map(r => `<span class="tag req">${r.key}</span> ${covB[r.key].ok} of ${covB[r.key].n} → ${covA[r.key].ok} of ${covA[r.key].n}`).join("; ")}</span>` : `<span class="muted">No requirement’s coverage changes.</span>`}
+    <span class="muted">Retiring keeps the history instead; in Data Vault the column stays in its satellite.</span>
+    <div class="acts" style="margin:0"><button class="btn small" data-imconfirm style="border-color:var(--warn);color:var(--warn)">Delete</button><button class="btn small" data-imcancel>Cancel</button></div></div>`;
+}
+function deleteObj(m, i) {
+  const colIds = i.kind === "missingtable" ? m.columns.filter(c => c.tableId === i.tableId).map(c => c.id) : [i.colId];
+  m.mappings = m.mappings.filter(mp => !colIds.includes(mp.columnId));
+  m.relations = m.relations.filter(r => !colIds.some(id => r.fromCols.includes(id) || r.toCols.includes(id)));
+  m.columns = m.columns.filter(c => !colIds.includes(c.id));
+  if (i.kind === "missingtable") { m.tables = m.tables.filter(t => t.id !== i.tableId); m.canvases.forEach(cv => cv.tables = cv.tables.filter(x => x !== i.tableId)); }
+  return colIds.length;
+}
+function resolveIssue(id, text, fn) {
+  ui.pending = null;
+  const m = snapModel(), i = m.issues.find(x => x.id === id);
+  fn(i);
+  for (const x of m.issues) if (x.id === id || (x.status === "open" && fn.alsoSettles && fn.alsoSettles(x)))
+    Object.assign(x, {status:"resolved", resolution:text, resolvedAt:TODAY});
+  mutate(() => { fromImp(m, S); if (fn.after) fn.after(); });
+  toast(`${text}: ${i.label}`, true);
+}
+function issueAction(id, act) {
+  snapModel();
+  const i = MODEL.issues.find(x => x.id === id); if (!i) return;
+  if (act === "repoint" || act === "map" || act === "delete") { ui.pending = {id, act}; renderInspector(); return; }
+  const col = () => MODEL.columns.find(c => c.id === i.colId);
+  if (act === "retire") return resolveIssue(id, "Retired: kept as historical", () => {
+    const cols = i.kind === "missingtable" ? MODEL.columns.filter(c => c.tableId === i.tableId && c.missingSince) : [col()];
+    if (i.kind === "missingtable") MODEL.tables.find(t => t.id === i.tableId).retiredSince = TODAY;
+    for (const c of cols) { c.retiredSince = TODAY; MODEL.mappings.filter(mp => mp.columnId === c.id).forEach(mp => mp.until = c.missingSince); }
+  });
+  if (act === "notneeded") return resolveIssue(id, "Marked not needed", () => {
+    (i.kind === "newtable" ? MODEL.columns.filter(c => c.tableId === i.tableId) : [col()]).forEach(c => c.notNeeded = true);
+  });
+  if (act === "split") return resolveIssue(id, "Split into one decision per column", () => {
+    const t = MODEL.tables.find(x => x.id === i.tableId);
+    MODEL.columns.filter(c => c.tableId === t.id).sort((a, b) => a.ordinal - b.ordinal).forEach(c => MODEL.issues.push({id:uid("iss"), systemId:i.systemId, importId:i.importId, at:TODAY,
+      status:"open", resolution:"", kind:"newcol", severity:"normal", tableId:t.id, colId:c.id, label:`${t.schema}.${t.name}.${c.name}`, detail:`New in the source, ${fmtType(c)}.`}));
+  });
+  if (act === "ack") return resolveIssue(id, "Left in review", () => {});
+  if (act === "approve") return resolveIssue(id, "Approved again", () => { const mp = MODEL.mappings.find(x => x.id === i.mappingId); mp.status = "approved"; mp.reviewReason = null; });
+}
+function confirmPending() {
+  snapModel();
+  const {id, act} = ui.pending, i = MODEL.issues.find(x => x.id === id);
+  const pick = (document.querySelector("#pendPick") || {}).value;
+  if (act === "repoint") {
+    const target = MODEL.columns.find(c => c.id === pick), from = MODEL.columns.find(c => c.id === i.colId);
+    const t = MODEL.tables.find(x => x.id === target.tableId);
+    const f = () => {
+      MODEL.mappings.filter(mp => mp.columnId === from.id).forEach(mp => {
+        mp.columnId = target.id;
+        if (mp.status === "approved") { mp.status = "review"; mp.reviewReason = `moved from ${from.name} after it left the source`; }
+        if (mp.rule) mp.rule = mp.rule.replace(new RegExp("\\b" + from.name + "\\b", "g"), target.name);
+      });
+      MODEL.columns.find(c => c.id === from.id).retiredSince = TODAY;
+    };
+    f.alsoSettles = x => x.kind === "newcol" && x.colId === target.id;   /* the new column is decided by the move */
+    return resolveIssue(id, `Mappings moved to ${t.name}.${target.name}`, f);
+  }
+  if (act === "map") {
+    const a = MODEL.attributes.find(x => x.id === pick);
+    return resolveIssue(id, `Mapped to ${a.entity}.${a.name} (draft)`, () => MODEL.mappings.push({id:uid("map"), columnId:i.colId, attributeId:a.id, status:"draft", kind:"direct", rule:"", reviewReason:null, until:null}));
+  }
+  if (act === "delete") {
+    const f = () => deleteObj(MODEL, i);
+    f.alsoSettles = x => x.tableId === i.tableId && (i.kind === "missingtable" || x.colId === i.colId);
+    if (i.kind === "missingtable") f.after = () => { if (V.sel && V.sel.id === i.tableId) V.sel = {t:"system", id:i.systemId}; };
+    else f.after = () => { if (V.sel && V.sel.id === i.colId) V.sel = {t:"source", id:i.tableId}; };
+    resolveIssue(id, `Deleted`, f);
+  }
+}
+
+/* Hints only (AD-08): what the classifications suggest; nothing is created. */
+function dvReading(t) {
+  const cols = MODEL.columns.filter(c => c.tableId === t.id && !c.missingSince);
+  const names = list => list.map(c => `<span class="mono">${esc(c.name)}</span>`).join(", ");
+  const by = code => cols.filter(c => c.classes.includes(code));
+  const tn = id => { const x = MODEL.tables.find(y => y.id === id); return x ? x.name : "?"; };
+  const out = [];
+  const bk = by("BK"), lk = by("LK"), dck = by("DCK"), dk = by("DK"), mak = by("MAK"), eff = by("EFF"), pii = by("PII");
+  const rels = MODEL.relations.filter(r => r.fromTableId === t.id && !r.missingSince);
+  if (bk.length) out.push(`<b>Hub</b> on ${names(bk)}`);
+  else if ((t.classes || []).includes("T_HUB")) out.push(`<b>Marked as a hub candidate</b>, but no column is a business key yet`);
+  for (const r of rels) {
+    const fc = r.fromCols.map(id => cols.find(c => c.id === id)).filter(Boolean);
+    out.push(`<b>Link</b> to ${esc(tn(r.toTableId))} via ${names(fc)}${fc.some(c => c.classes.includes("LK")) ? "" : ` <span class="muted">(foreign key; not marked Link key)</span>`}`);
+  }
+  const lkNoRel = lk.filter(c => !rels.some(r => r.fromCols.includes(c.id)));
+  if (lkNoRel.length) out.push(`<b>Link key</b> ${names(lkNoRel)} <span class="muted">with no relationship known: which table does it point to?</span>`);
+  if (dck.length) out.push(`<b>Dependent child key</b> ${names(dck)}: part of the link’s or satellite’s key, not a hub`);
+  if (dk.length) out.push(`<b>Driving key</b> ${names(dk)}: an effectivity satellite on the link tracks it`);
+  if (mak.length) out.push(`<b>Multi-active satellite</b> keyed by ${names(mak)}`);
+  if (eff.length) out.push(`<b>Effective-dated</b> by ${names(eff)}`);
+  const keyish = new Set([...bk, ...lk, ...dck, ...dk, ...mak, ...by("TECH"), ...by("LDTS"), ...by("RSRC")].map(c => c.id));
+  const desc = cols.filter(c => !keyish.has(c.id) && !c.pk && !c.fk);
+  const descPii = desc.filter(c => c.classes.includes("PII"));
+  if (desc.length) out.push(`<b>Satellite</b> with ${plural(desc.length, "descriptive column")}${descPii.length ? `; ${descPii.length} PII: consider a separate satellite for ${names(descPii)}` : ""}`);
+  if (!out.length) return `<p class="muted" style="margin:0">Classify columns (Business key, Link key…) to see what this table suggests.</p>`;
+  return `<ul class="reading">${out.map(x => `<li>${x}</li>`).join("")}</ul><p class="hint">Hints from the classifications and the source’s keys; nothing is created.</p>`;
+}
+
+/* =========================================================
+   The wizard
+   ========================================================= */
+const W = {};
+const dlg = $("#wiz");
+dlg.addEventListener("cancel", e => { e.preventDefault(); closeWizard(); });
+dlg.addEventListener("click", e => { if (e.target === dlg) closeWizard(); });
+function closeWizard() { dlg.close(); }
+
+function openWizard(opts) {
+  indexClasses(); snapModel();
+  Object.assign(W, {step:1, systemId:opts.systemId || (opts.newName ? null : MODEL.systems[0]?.id), newName:opts.newName || "",
+    mode:opts.newName ? "new" : "existing", channel:opts.channel || "file", vendor:opts.vendor || "sqlserver", ddl:{text:"", db:"", schema:"", name:"", result:null}, text:"", fileName:"", parsed:null,
+    scope:new Set(), decisions:new Map(), hintsOff:new Set(), filter:"all", showUnchanged:new Set(), compare:"schemas"});
+  if (opts.sample) loadSample(opts.sample);
+  if (opts.ddlSample) { const d = DDL_SAMPLES[opts.ddlSample]; Object.assign(W.ddl, {text:d.text, db:d.db, schema:"", name:d.file}); readDDL(); }
+  dlg.showModal();
+  renderWizard();
+}
+function loadSample(which) {
+  W.text = which === "crm" ? SAMPLE_CRM : which === "files" ? SAMPLE_FILES : SAMPLE_HR;
+  W.fileName = which === "crm" ? "crm_snapshot_2026-10-20.csv" : which === "files" ? "reference_files.csv" : "hr_snapshot_2026-10-20.csv";
+  readText();
+}
+function readDDL() {
+  const res = ddlToStandard(W.ddl.text, {database:W.ddl.db || (W.ddl.name ? W.ddl.name.replace(/\.[^.]+$/, "") : ""), schema:W.ddl.schema});
+  W.ddl.result = res;
+  W.text = res.summary.tables ? res.csv : "";
+  W.fileName = `${W.ddl.name || "DDL script"} (translated)`;
+  readText();
+  if (W.parsed) W.parsed.warnings.unshift(...res.warnings);
+  else W.parsed = {fileName:W.fileName, errors:["No CREATE TABLE statement was found in the script."], warnings:res.warnings, tables:new Map(), rowCount:0};
+}
+function readText() {
+  W.parsed = W.text.trim() ? readStandard(W.text, W.fileName || "pasted result") : null;
+  W.scope = new Set(W.parsed ? [...W.parsed.tables.keys()] : []);
+  W.decisions = new Map(); W.hintsOff = new Set();
+}
+const targetName = () => W.mode === "new" ? (W.newName.trim() || "the new system") : (MODEL.systems.find(s => s.id === W.systemId) || {}).name;
+function canGo(step) {
+  if (step <= 1) return true;
+  const okTarget = W.mode === "existing" ? !!W.systemId : !!W.newName.trim() && !MODEL.systems.some(s => s.name.toLowerCase() === W.newName.trim().toLowerCase());
+  const okFile = W.parsed && !W.parsed.errors.length && W.parsed.tables.size;
+  if (step === 2) return okTarget && okFile;
+  return okTarget && okFile && W.scope.size > 0;
+}
+function currentPlan() {
+  return buildPlan(MODEL, W.parsed, {systemId:W.mode === "existing" ? W.systemId : null, newName:W.newName.trim(), dv2:dv2(), compare:W.compare}, W.scope, W.decisions);
+}
+
+function renderWizard() {
+  const steps = [["Source"], ["Scope"], ["Review changes"]];
+  dlg.innerHTML = `
+  <div class="whead">
+    <h2 id="wizTitle">Import sources into ${esc(targetName() || "…")}</h2>
+    <ol class="steps">${steps.map(([l], i) => `<li><button data-step="${i + 1}" ${W.step === i + 1 ? 'aria-current="step"' : ""} class="${W.step > i + 1 ? "done" : ""}" ${canGo(i + 1) ? "" : "disabled"}><span class="num">${i + 1}</span>${l}</button></li>`).join("")}</ol>
+    <button class="tb" data-close aria-label="Close"><svg class="i" viewBox="0 0 16 16"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+  </div>
+  <div class="wbody" id="wbody">${W.step === 1 ? stepSource() : W.step === 2 ? stepScope() : stepReview()}</div>
+  <div class="wfoot">
+    <span class="note">${footNote()}</span>
+    ${W.step > 1 ? `<button class="btn" data-go="${W.step - 1}">Back</button>` : `<button class="btn" data-close>Cancel</button>`}
+    ${W.step < 3 ? `<button class="btn primary" data-go="${W.step + 1}" ${canGo(W.step + 1) ? "" : "disabled"}>Next</button>`
+      : `<button class="btn primary" data-apply ${canGo(3) ? "" : "disabled"}>Import into ${esc(targetName())}</button>`}
+  </div>`;
+  wireWizard();
+}
+function footNote() {
+  if (W.step === 1) {
+    if (W.mode === "new" && W.newName.trim() && MODEL.systems.some(s => s.name.toLowerCase() === W.newName.trim().toLowerCase())) return `A system named ${esc(W.newName.trim())} already exists. Pick it under “An existing system”.`;
+    if (!W.parsed) return W.channel === "ddl" ? "Paste or drop a script, then read it." : "Choose a file, a sample, or paste a query result.";
+    if (W.parsed.errors.length) return "Fix the file to continue.";
+    return `Read ${plural(W.parsed.tables.size, "table")} and ${plural(W.parsed.rowCount, "column")} from ${esc(W.parsed.fileName)}.`;
+  }
+  if (W.step === 2) return `${plural(W.scope.size, "table")} of ${W.parsed.tables.size} selected.`;
+  return "Nothing is written until you import. The import is one undo step.";
+}
+
+function stepSource() {
+  const p = W.parsed;
+  const fileState = p ? (p.errors.length
+      ? `<div class="err"><b>The file can’t be read.</b> ${p.errors.map(esc).join(" ")}</div>`
+      : `<div class="loaded"><svg class="i" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></svg><span class="lname"><b title="${esc(p.fileName)}">${esc(p.fileName)}</b><span>${plural(p.tables.size, "table")}, ${plural(p.rowCount, "column")}${p.warnings.length ? `, ${plural(p.warnings.length, "warning")} (shown in the review)` : ""}</span></span><button class="btn small" data-clear>Choose another</button></div>`)
+    : "";
+  const lastImp = id => { const i = (MODEL.imports || []).find(x => x.systemId === id); return i ? "last import " + i.at.slice(0, 10) : "not imported yet"; };
+  const many = MODEL.systems.length > 5;
+  const sysList = `<div class="pick">${many ? `<div class="pick-f"><svg class="i" viewBox="0 0 16 16"><circle cx="7" cy="7" r="4.5"/><path d="M10.5 10.5l3 3"/></svg><input type="text" id="sysFilter" placeholder="Find a system" aria-label="Find a system"></div>` : ""}
+    <div class="pick-l" role="radiogroup" aria-label="Source system">${[...MODEL.systems].sort((x, y) => x.name.localeCompare(y.name)).map(x => { const n = MODEL.tables.filter(t => t.systemId === x.id).length;
+      return `<label class="pick-r" data-name="${esc(x.name.toLowerCase())}"><input type="radio" name="sys" value="${x.id}" ${x.id === W.systemId ? "checked" : ""}><span class="pick-n" title="${esc(x.name)}">${esc(x.name)}</span><span class="pick-m">${plural(n, "table")} · ${lastImp(x.id)}</span></label>`; }).join("")}</div></div>`;
+  const fileIn = `${p ? fileState : `<label class="drop" id="drop"><svg class="i" viewBox="0 0 16 16" style="width:22px;height:22px"><path d="M8 10.5v-8M4.5 6L8 2.5 11.5 6M2.5 10.5v3h11v-3"/></svg>
+      <span>Drop a CSV file here, or <u>choose one</u></span><span class="muted" style="font-size:12px">Comma, semicolon or tab separated; one row per column</span>
+      <input type="file" id="fileIn" accept=".csv,.tsv,.txt,text/csv" class="sr"></label>`}
+    <p class="hint">No file at hand? <button class="link" data-sample="crm">Use the CRM sample</button> or <button class="link" data-sample="hr">the HR sample</button>.</p>`;
+  const v = VENDORS[W.vendor];
+  const queryIn = `
+    <div class="fld2"><label for="vendor">Database</label>
+      <select id="vendor" class="wide">${Object.entries(VENDORS).map(([k, x]) => `<option value="${k}" ${W.vendor === k ? "selected" : ""}>${x.name}</option>`).join("")}<option disabled>Snowflake (later)</option><option disabled>Databricks (later)</option></select></div>
+    <div class="codebox"><div class="codehead"><span class="mono">catalog_query.sql</span><span class="muted">${esc(v.name)} · reads only the catalog, never your data</span><span class="sp"></span><button class="btn small" data-copy="sqlText">Copy</button></div>
+      <textarea class="code" id="sqlText" readonly wrap="off" spellcheck="false" rows="14" aria-label="Catalog query for ${esc(v.name)}">${esc(v.sql)}</textarea></div>
+    <p class="hint">${esc(v.how)}</p>
+    <h4 class="sub">The result</h4>
+    ${p ? fileState : `<div class="codebox"><div class="codehead"><span class="muted">Paste the result with its header row</span><span class="sp"></span><button class="btn small" id="pasteRead">Read it</button></div>
+      <textarea class="code" id="pasteIn" wrap="off" spellcheck="false" rows="6" placeholder="database,schema,table,column,data_type,…" aria-label="The query result"></textarea></div>
+      <label class="drop slim" id="drop"><span>Or drop the saved CSV here, or <u>choose it</u></span><input type="file" id="fileIn" accept=".csv,.tsv,.txt,text/csv" class="sr"></label>`}`;
+  const CH = [
+    ["file", "A file", "CSV in InfoMapper’s standard", '<path d="M4 1.5h5l3 3v10H4z"/><path d="M9 1.5v3h3"/>'],
+    ["query", "A query on the database", "We give the query; you run it", '<ellipse cx="8" cy="4" rx="5" ry="2"/><path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4"/>'],
+    ["ddl", "DDL scripts", "CREATE TABLE scripts, translated to the standard", '<path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5"/>'],
+    ["dbt", "dbt project", "catalog.json, later", '<path d="M3 3h10v10H3z"/><path d="M3 8h10M8 3v10"/>']];
+  return `<div class="col1">
+  <section class="wsec"><h3 class="wh">Into which system?</h3>
+    <div class="seg2" role="radiogroup" aria-label="Target">
+      <label><input type="radio" name="tgt" value="existing" ${W.mode === "existing" ? "checked" : ""}><span>An existing system</span></label>
+      <label><input type="radio" name="tgt" value="new" ${W.mode === "new" ? "checked" : ""}><span>A new system</span></label></div>
+    ${W.mode === "existing" ? sysList : `<div class="fld2"><label for="newName">Name of the new system</label><input type="text" id="newName" class="wide" placeholder="e.g. HR or Salesforce EMEA production" value="${esc(W.newName)}"><span class="hint">Everything in the file will be new.</span></div>`}
+  </section>
+  <section class="wsec"><h3 class="wh">Where does the description come from?</h3>
+    <div class="chs" role="radiogroup" aria-label="Channel">${CH.map(([k, t, d, ic]) => `<label class="ch${k === "dbt" ? " off" : ""}"><input type="radio" name="ch" value="${k}" ${W.channel === k ? "checked" : ""} ${k === "dbt" ? "disabled" : ""}><svg class="i" viewBox="0 0 16 16">${ic}</svg><span><b>${t}</b><small>${d}</small></span></label>`).join("")}</div>
+  </section>
+  <section class="wsec">${W.channel === "file" ? fileIn : W.channel === "ddl" ? ddlIn() : queryIn}</section>
+  <details class="std"><summary>InfoMapper’s source standard (v1)</summary>
+    <p class="hint">One row per column. Names of the columns as below; order does not matter. Other columns are ignored.</p>
+    <p class="hint">Flat files (Excel, CSV, TXT, JSON…) are described the same way: a made-up database and schema such as flat_files and ref_data, object_type file, the format in file_format, and the columns and types you know. Types may be logical: string(2), decimal(18,6), date.</p>
+    <div class="scroll"><table class="grid" style="min-width:560px"><thead><tr><th>Column</th><th>Required</th><th>What it holds</th></tr></thead><tbody>
+    ${STD_INFO.map(r => `<tr><td class="mono">${esc(r[0])}</td><td>${r[1]}</td><td>${esc(r[2])}</td></tr>`).join("")}</tbody></table></div>
+    <div class="codebox" style="margin-top:10px"><div class="codehead"><span class="mono">template.csv</span><span class="muted">header row, a database table and a flat file</span><span class="sp"></span><button class="btn small" data-copy="tplText">Copy</button></div>
+    <textarea class="code" id="tplText" readonly wrap="off" spellcheck="false" rows="3">${esc(toCSV([STD_HEADERS, ["crmprod","dbo","customers","table","","184120","Customer master","cust_no","2","varchar(20)","","","","no","no","","","","","Customer number","BK"],
+      ["flat_files","ref_data","country_codes","file","xlsx","","Country list kept by Finance","iso_code","1","string(2)","","","","no","yes","","","","","ISO 3166 alpha-2","BK"]]))}</textarea></div>
+  </details></div>`;
+}
+
+function ddlIn() {
+  const p = W.parsed, r = W.ddl.result;
+  if (p && r) {
+    const sk = Object.entries(r.summary.skipped);
+    return `${p.errors.length ? `<div class="err"><b>Nothing to import.</b> ${p.errors.map(esc).join(" ")}</div>` : `<div class="loaded"><svg class="i" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7"/></svg>
+        <span><b>${esc(W.ddl.name || "DDL script")}</b>: ${plural(r.summary.tables, "table")}, ${plural(r.summary.columns, "column")}, ${plural(r.summary.keys, "key")}, ${plural(r.summary.comments, "comment")}${r.warnings.length ? `, ${plural(r.warnings.length, "warning")} (shown in the review)` : ""}</span>
+        <button class="link" data-ddlclear>Choose another</button></div>`}
+      <p class="hint">Database <b class="mono">${esc(r.databases.join(", ") || "–")}</b>, schema for unqualified names <b class="mono">${esc(r.defSchema)}</b>.${sk.length ? ` Skipped: ${sk.map(([k, v]) => `${v} ${esc(k)}`).join(", ")}.` : ""}</p>
+      <details class="std"><summary>The translated standard</summary>
+        <p class="hint">This is what the importer reads. If something is off, copy it, fix it in Excel or an editor and import it as a file.</p>
+        <textarea class="code" id="ddlCsv" readonly style="min-height:160px">${esc(r.csv)}</textarea>
+        <p><button class="btn small" data-copy="ddlCsv">Copy the standard</button></p></details>`;
+  }
+  return `<div class="codebox"><div class="codehead"><span class="mono">${esc(W.ddl.name || "script.sql")}</span><span class="muted">CREATE TABLE, ALTER TABLE … ADD, COMMENT ON, MS_Description</span><span class="sp"></span><button class="btn small primary" id="ddlRead">Read the script</button></div>
+      <textarea class="code" id="ddlIn" wrap="off" spellcheck="false" rows="12" placeholder="Paste an SSMS script, pg_dump --schema-only or DBMS_METADATA output" aria-label="The DDL script">${esc(W.ddl.text)}</textarea></div>
+    <label class="drop slim" id="ddlDrop"><span>Or drop a .sql file here, or <u>choose one</u></span><input type="file" id="ddlFile" accept=".sql,.ddl,.txt" class="sr"></label>
+    <p class="hint">Samples: ${Object.entries(DDL_SAMPLES).map(([k, d]) => `<button class="link" data-ddlsample="${k}">${esc(d.label)}</button>`).join(" · ")}</p>
+    <div class="row2">
+      <div class="fld2"><label for="ddlDb">Database</label><input type="text" id="ddlDb" class="wide" value="${esc(W.ddl.db)}" placeholder="From USE, or the file name"><span class="hint">For a script without USE or three-part names.</span></div>
+      <div class="fld2"><label for="ddlSchema">Schema for unqualified names</label><input type="text" id="ddlSchema" class="wide" value="${esc(W.ddl.schema)}" placeholder="Guessed: dbo or public"><span class="hint">For tables named without a schema.</span></div>
+    </div>
+    <p class="hint">Views are skipped (DDL does not give their column types), and so are indexes, sequences, grants and storage clauses.</p>`;
+}
+
+function stepScope() {
+  const p = W.parsed;
+  const byDbSchema = new Map();
+  for (const t of p.tables.values()) { const k = t.database + "." + t.schema; if (!byDbSchema.has(k)) byDbSchema.set(k, []); byDbSchema.get(k).push(t); }
+  const plan = currentPlan();
+  const willMiss = plan.tables.filter(t => t.status === "missing");
+  const sysTables = W.mode === "existing" ? MODEL.tables.filter(t => t.systemId === W.systemId) : [];
+  const known = k => sysTables.some(t => keyOf(t) === k);
+  return `
+  <p style="margin:0 0 12px;max-width:72ch">Choose what this import covers. Tables and columns that are not in the file are marked “missing from source” only inside the schemas you import, so a partial file never touches the rest of ${esc(targetName())}.</p>
+  <ul class="scope">${[...byDbSchema.entries()].map(([k, tabs]) => {
+    const all = tabs.every(t => W.scope.has(t.key)), some = tabs.some(t => W.scope.has(t.key));
+    const fresh = tabs.filter(t => !known(t.key)).length;
+    return `<li><label><input type="checkbox" data-schema="${esc(k)}" ${all ? "checked" : ""} ${!all && some ? 'data-mixed="1"' : ""}><b class="mono">${esc(k)}</b>
+      <span class="muted">${plural(tabs.length, "table")}${W.mode === "existing" ? (fresh === tabs.length ? ", all new to " + esc(targetName()) : fresh ? `, ${fresh} new` : "") : ""}</span></label>
+      <ul>${tabs.map(t => `<li><label><input type="checkbox" data-table="${esc(t.key)}" ${W.scope.has(t.key) ? "checked" : ""}><span class="mono ell" title="${esc(t.name)}">${esc(t.name)}</span><span class="muted">${t.cols.length}</span></label></li>`).join("")}</ul></li>`;
+  }).join("")}</ul>
+  ${W.mode === "existing" ? `<fieldset style="margin:16px 0 0"><legend>What is missing from the source?</legend>
+    <div class="opts">
+      <label class="opt"><input type="radio" name="cmp" value="schemas" ${W.compare === "schemas" ? "checked" : ""}><span>Anything in the imported schemas that is not in the file<small>For a full snapshot of a schema</small></span></label>
+      <label class="opt"><input type="radio" name="cmp" value="tables" ${W.compare === "tables" ? "checked" : ""}><span>Only columns of the tables in the file<small>For a file with a few tables</small></span></label>
+    </div></fieldset>` : ""}
+  ${massWarn(plan)}
+  ${willMiss.length ? `<div class="callout warn"><b>Not in the file:</b> ${willMiss.map(t => `<span class="mono">${esc(t.existing.schema)}.${esc(t.existing.name)}</span>`).join(", ")}. ${willMiss.length === 1 ? "It" : "They"} will be marked missing from source, with ${willMiss.length === 1 ? "its" : "their"} mappings kept.</div>`
+    : W.mode === "existing" && W.compare === "schemas" ? `<div class="callout">Every table ${esc(targetName())} has in the selected schemas is in the file.</div>` : ""}`;
+}
+/* A file that would mark more than half of a system missing is more likely partial than a real change. */
+function massWarn(plan) {
+  if (W.mode !== "existing") return "";
+  const sysCols = MODEL.columns.filter(c => !c.missingSince && MODEL.tables.some(t => t.id === c.tableId && t.systemId === W.systemId)).length;
+  const miss = plan.tables.flatMap(t => t.cols).filter(c => c.status === "missing").length;
+  if (!sysCols || miss <= sysCols / 2) return "";
+  return `<div class="callout warn"><b>This import would mark ${miss} of ${sysCols} columns of ${esc(targetName())} missing from source.</b> If the file holds only part of the system, compare only the tables in the file.
+    ${W.compare === "schemas" ? `<p style="margin:8px 0 0"><button class="btn small" data-narrow>Compare only the tables in the file</button></p>` : ""}</div>`;
+}
+
+function stepReview() {
+  const plan = currentPlan();
+  W.plan = plan;
+  const accepted = new Set(plan.hints.filter(h => !W.hintsOff.has(h.id)).map(h => h.id));
+  const after = applyPlan(MODEL, plan, accepted, {at:"", source:""}).model;
+  const covB = covOfS(S), covA = covFromImp(after);
+  const reqDelta = S.requirements.filter(r => covB[r.key] && covA[r.key] && covB[r.key].ok !== covA[r.key].ok);
+  const colIn = (m, id) => m.columns.find(c => c.id === id);
+
+  /* why a requirement moved: the columns behind its items */
+  const reasons = r => {
+    const out = [];
+    for (const aid of reqScope(r.id).attrs) for (const mp of MODEL.mappings.filter(x => x.attributeId === aid && x.status === "approved")) {
+      const b = colIn(MODEL, mp.columnId), a = colIn(after, mp.columnId), at = MODEL.attributes.find(x => x.id === aid), am = after.mappings.find(x => x.id === mp.id);
+      if (!b || !a || !at) continue;
+      if (a.missingSince && !b.missingSince) out.push(`${b.name} missing from source`);
+      else if (am && am.status !== "approved") out.push(`${at.name}: mapping back to review${am.reviewReason ? ", " + am.reviewReason : ""}`);
+    }
+    return [...new Set(out)].join("; ");
+  };
+
+  const all = plan.tables.flatMap(t => t.cols);
+  const n = {
+    tablesNew:plan.tables.filter(t => t.status === "new").length,
+    colsNew:all.filter(c => c.status === "new").length,
+    changed:all.filter(c => c.status === "changed" || c.status === "back").length + plan.tables.filter(t => t.meta.length).length,
+    rename:plan.renames.length,
+    missing:all.filter(c => c.status === "missing").length,
+    rel:plan.relations.filter(r => r.status !== "unchanged" && r.status !== "stillmissing").length,
+    unchanged:all.filter(c => c.status === "unchanged").length
+  };
+  const F = W.filter;
+  const btn = (k, label, v) => `<button data-filter="${k}" aria-pressed="${F === k}"><b>${v}</b> ${label}</button>`;
+  const counts = `<div class="counts" role="group" aria-label="Show">
+    ${btn("all", "all changes", n.colsNew + n.changed + n.rename + n.missing + n.rel)}
+    ${btn("new", n.tablesNew ? `new (${plural(n.tablesNew, "table")})` : "new columns", n.colsNew)}
+    ${btn("changed", "changed", n.changed)}
+    ${btn("rename", "removed or renamed?", n.rename)}
+    ${btn("missing", "missing from source", n.missing)}
+    ${btn("rel", "relationships", n.rel)}
+  </div>`;
+
+  const showCol = c => {
+    if (c.status === "unchanged" || c.status === "stillmissing") return false;
+    if (F === "all") return true;
+    if (F === "new") return c.status === "new" && !c.renameId;
+    if (F === "changed") return c.status === "changed" || c.status === "back";
+    if (F === "rename") return !!c.renameId || c.status === "rename";
+    if (F === "missing") return c.status === "missing";
+    return false;
+  };
+  const impact = c => {
+    if (!c.existing) return "";
+    const parts = [];
+    for (const o of mappingsOn(MODEL, c.existing.id)) {
+      const ac = colIn(after, c.existing.id);
+      const conf = ac && !ac.missingSince ? conflict(ac, o.a, o.mp) : null;
+      const reqs = reqsOfAttr(MODEL, o.a.id);
+      let txt = `Feeds <b>${esc(o.label)}</b> (${o.mp.status})`;
+      const am = after.mappings.find(x => x.id === o.mp.id);
+      if (c.status === "missing") txt += `; the mapping stays, on a column that is gone`;
+      else if (c.status === "rename") txt += `; the mapping stays`;
+      if (am && am.status !== o.mp.status) txt += `; <span class="c">goes back to review: ${esc(am.reviewReason)}</span>`;
+      else if (conf) txt += `; <span class="c">type conflict: ${esc(conf)}</span>`;
+      else if (conflict(c.existing, o.a, o.mp)) txt += `; fits again, the mapping can be approved`;
+      if (am && am.rule !== o.mp.rule && am.status === o.mp.status) txt += `; its rule now reads <span class="mono">${esc(am.rule)}</span>`;
+      if (reqs.length) txt += `; ${reqs.map(k => `<span class="tag req">${k}</span>`).join(" ")}`;
+      parts.push(`<div>${txt}</div>`);
+    }
+    const can = canvasesOf(MODEL, c.existing.tableId);
+    if (parts.length && can.length && c.status !== "unchanged") parts.push(`<div class="muted">On ${can.map(esc).join(", ")}</div>`);
+    return parts.join("") || (c.status === "missing" ? `<span class="muted">Not mapped</span>` : "");
+  };
+  const what = c => {
+    if (c.status === "new") return `<span class="mono">${esc(fmtType(c.file))}</span>${c.file.pk ? ' <span class="k">PK</span>' : ""}${c.file.fk ? ' <span class="k">FK</span>' : ""} ${c.file.nullable ? "" : '<span class="muted">not null</span>'} ${classChips(c.file.classes)}`;
+    if (c.status === "missing") return `<span class="muted">Was ${esc(fmtType(c.existing))}</span>`;
+    const ch = c.changes.map(([f, b, a]) => `${f}: <span class="mono">${esc(b)}</span><span class="arrow">→</span><span class="mono">${esc(a)}</span>`).join("<br>");
+    if (c.status === "rename" && !c.changes.length) return `<span class="muted">Same type and position</span>`;
+    const back = c.status === "back" ? `Back in the source after being missing since ${esc(c.existing.missingSince)}` : "";
+    const cls = c.clsNote ? `<div class="muted" style="font-size:12px">The file says ${esc(c.clsNote.map(x => CLS[x]?.name || x).join(", "))}; your classifications are kept.</div>` : "";
+    return [back, ch].filter(Boolean).join("<br>") + cls;
+  };
+  const label = {new:"new", changed:"changed", missing:"missing", rename:"renamed", back:"back"};
+  const rowOf = (tp, c) => {
+    const name = c.file ? c.file.name : c.existing.name;
+    const r = c.renameId ? plan.renames.find(x => x.id === c.renameId) : null;
+    const decide = r && (c.status === "rename" || c.status === "missing") ? (() => {
+      const opts = r.options.filter(o => o === r.choice || !plan.renames.some(x => x !== r && x.choice === o));
+      return `<div class="decide"><label>What happened to <b class="mono">${esc(r.from)}</b>?
+        <select data-rename="${esc(r.id)}"><option value="">It was removed from the source</option>${opts.map(o => `<option value="${esc(o)}" ${o === r.choice ? "selected" : ""}>It was renamed to ${esc(o)}${o === r.suggested ? " (suggested: same position and type)" : ""}</option>`).join("")}</select></label>
+        <span class="muted">A rename keeps its mappings, classifications and notes.</span></div>`; })() : "";
+    return `<div class="crow"><span><span class="tag ${c.status}">${label[c.status]}</span></span>
+      <span class="mono">${c.status === "rename" ? `${esc(c.existing.name)}<span class="arrow">→</span>${esc(name)}` : esc(name)}</span>
+      <span class="what">${what(c)}</span><span class="imp">${impact(c)}</span>${decide}</div>`;
+  };
+  const tcards = plan.tables.filter(tp => tp.status !== "stillmissing").map(tp => {
+    const vis = tp.cols.filter(showCol);
+    const metaVis = (F === "all" || F === "changed") && tp.meta.length;
+    if (!vis.length && !metaVis && !(F === "all" && tp.status === "missing")) return "";
+    const nm = tp.file ? `${tp.file.schema}.${tp.file.name}` : `${tp.existing.schema}.${tp.existing.name}`;
+    const unchanged = tp.cols.filter(c => c.status === "unchanged");
+    const showU = W.showUnchanged.has(tp.key);
+    const rows = tp.rows && tp.rows[0] !== tp.rows[1] && tp.rows[1] != null ? `rows ${fmtN(tp.rows[0])} → ${fmtN(tp.rows[1])}` : "";
+    const tStat = tp.status === "unchanged" ? "changed" : tp.status;
+    return `<section class="tcard"><header><span class="tag ${tStat}">${tp.status === "new" ? "new table" : tp.status === "missing" ? "missing table" : tp.status === "back" ? "back" : "changed"}</span>
+        <span class="tn mono">${esc(nm)}</span>${tp.file?.objectType === "file" ? `<span class="chip">${esc(tp.file.fileFormat || "")} file</span>` : ""}${tp.file?.comment && tp.status === "new" ? `<span class="muted">${esc(tp.file.comment)}</span>` : ""}
+        <span class="sum">${tp.status === "new" ? plural(tp.cols.length, "column") : rows}</span></header>
+      ${metaVis ? tp.meta.map(([f, b, a]) => `<div class="crow"><span><span class="tag changed">table</span></span><span>${esc(f)}</span><span class="what"><span class="mono">${esc(b)}</span><span class="arrow">→</span><span class="mono">${esc(a)}</span></span><span></span></div>`).join("") : ""}
+      ${vis.map(c => rowOf(tp, c)).join("")}
+      ${unchanged.length && F === "all" ? `<div class="more"><button class="link" data-unch="${esc(tp.key)}">${showU ? "Hide" : "Show"} ${plural(unchanged.length, "unchanged column")}</button></div>
+        ${showU ? unchanged.map(c => `<div class="crow"><span><span class="tag unchanged">same</span></span><span class="mono">${esc(c.existing.name)}</span><span class="what mono">${esc(fmtType(c.existing))}</span><span class="imp">${mappingsOn(MODEL, c.existing.id).map(o => "→ " + esc(o.label)).join("<br>")}</span></div>`).join("") : ""}` : ""}
+    </section>`;
+  }).join("");
+
+  const rels = plan.relations.filter(r => r.status !== "unchanged" && r.status !== "stillmissing");
+  const relHtml = (F === "all" || F === "rel") && rels.length ? `<div class="sect">Relationships between source tables</div>
+    <div class="tcard">${rels.map(r => `<div class="crow"><span><span class="tag ${r.status}">${r.status}</span></span><span class="mono">${esc(r.name)}</span>
+      <span class="what mono">${esc(r.fromLabel)}${r.pairs.length ? "." + esc(r.pairs.map(p => p[0]).join(", ")) : ""}<span class="arrow">→</span>${esc(r.toLabel)}${r.pairs.length ? "." + esc(r.pairs.map(p => p[1]).join(", ")) : ""}</span>
+      <span class="imp">${r.status === "new" ? "Shown later as a grey line between the table cards on a canvas" : r.status === "missing" ? "No longer declared in the source" : ""}</span></div>`).join("")}</div>` : "";
+
+  const hints = (F === "all" || F === "new") && plan.hints.length ? `<div class="sect">Suggested classifications</div>
+    <p class="hint" style="margin:-4px 0 6px">Suggestions only. Untick what does not fit; you can change classifications on the column later.</p>
+    ${plan.hints.map(h => `<label class="hintrow"><input type="checkbox" data-hint="${esc(h.id)}" ${W.hintsOff.has(h.id) ? "" : "checked"}><span class="mono">${esc(h.label)}</span>${classChips([h.code])}<span class="muted">${esc(h.why)}</span></label>`).join("")}` : "";
+
+  const warns = plan.warnings.length && F === "all" ? `<div class="sect">Warnings</div><div class="callout warn" style="margin-top:0"><ul style="margin:0;padding-left:18px">${plan.warnings.map(w => `<li>${esc(w)}</li>`).join("")}</ul></div>` : "";
+
+  const reqBox = reqDelta.length ? `<div class="rq"><h4>Requirements whose coverage changes</h4><ul>${reqDelta.map(r =>
+      `<li><span class="tag req">${esc(r.key)}</span><span>${esc(r.name)}</span><span class="mono">${covB[r.key].ok} of ${covB[r.key].n}<span class="arrow">→</span>${covA[r.key].ok} of ${covA[r.key].n}</span><span class="why">${esc(reasons(r))}</span></li>`).join("")}</ul></div>`
+    : (W.mode === "existing" ? `<div class="callout">No requirement’s coverage changes.</div>` : "");
+
+  const nothing = !(n.colsNew + n.changed + n.rename + n.missing + n.rel);
+  const newIss = (after.issues || []).filter(i => i.status === "open" && !MODEL.issues.some(j => j.id === i.id));
+  const hi = newIss.filter(i => i.severity === "high").length;
+  const issBox = newIss.length ? `<div class="callout ${hi ? "warn" : ""}">After the import, <b>${plural(newIss.length, "change")} to resolve</b>${hi ? `, ${hi} of them high` : ""}. They wait on ${esc(targetName())}’s page until you decide: ${[...new Set(newIss.map(i => KIND[i.kind].short))].join(", ")}.</div>` : "";
+  return `${counts}${reqBox}${issBox}
+    ${nothing ? `<div class="empty">The file matches what ${esc(targetName())} has. Importing only records the import and updates row counts.</div>` : ""}
+    ${tcards || (nothing ? "" : `<p class="muted">Nothing of this kind.</p>`)}${relHtml}${hints}${warns}`;
+}
+
+function wireWizard() {
+  dlg.querySelectorAll("[data-close]").forEach(b => b.onclick = closeWizard);
+  dlg.querySelectorAll("[data-step],[data-go]").forEach(b => b.onclick = () => { const s = +(b.dataset.step || b.dataset.go); if (canGo(s)) { W.step = s; renderWizard(); } });
+  dlg.querySelectorAll('input[name="tgt"]').forEach(r => r.onchange = () => { W.mode = r.value; if (W.mode === "existing" && !W.systemId) W.systemId = MODEL.systems[0]?.id; renderWizard(); });
+  const ss = dlg.querySelector("#sysSel"); if (ss) ss.onchange = () => { W.systemId = ss.value; renderWizard(); };
+  dlg.querySelectorAll('input[name="sys"]').forEach(r => r.onchange = () => { W.systemId = r.value; keepScroll(renderWizard); });
+  const sf = dlg.querySelector("#sysFilter"); if (sf) sf.oninput = () => { const q = sf.value.trim().toLowerCase(); dlg.querySelectorAll(".pick-r").forEach(r => r.hidden = q && !r.dataset.name.includes(q)); };
+  const nn = dlg.querySelector("#newName");
+  if (nn) nn.oninput = () => { W.newName = nn.value; dlg.querySelector("#wizTitle").textContent = "Import sources into " + targetName();
+    dlg.querySelector(".wfoot .note").innerHTML = footNote(); const nx = dlg.querySelector(".wfoot [data-go='2']"); if (nx) nx.disabled = !canGo(2);
+    dlg.querySelectorAll("[data-step]").forEach(b => b.disabled = !canGo(+b.dataset.step)); };
+  dlg.querySelectorAll('input[name="ch"]').forEach(r => r.onchange = () => { W.channel = r.value; renderWizard(); });
+  const di = dlg.querySelector("#ddlIn"); if (di) di.oninput = () => { W.ddl.text = di.value; };
+  ["ddlDb", "ddlSchema"].forEach(id => { const x = dlg.querySelector("#" + id); if (x) x.oninput = () => { W.ddl[id === "ddlDb" ? "db" : "schema"] = x.value; }; });
+  const dr = dlg.querySelector("#ddlRead"); if (dr) dr.onclick = () => { if (!W.ddl.text.trim()) return dlg.querySelector("#ddlIn").focus(); if (!W.ddl.name) W.ddl.name = "pasted script"; readDDL(); renderWizard(); };
+  dlg.querySelectorAll("[data-ddlsample]").forEach(b => b.onclick = () => { const d = DDL_SAMPLES[b.dataset.ddlsample];
+    Object.assign(W.ddl, {text:d.text, db:d.db, schema:"", name:d.file}); if (W.mode === "new" && !W.newName.trim()) W.newName = d.system; readDDL(); renderWizard(); });
+  const dc = dlg.querySelector("[data-ddlclear]"); if (dc) dc.onclick = () => { W.ddl.result = null; W.parsed = null; W.text = ""; renderWizard(); };
+  const df = dlg.querySelector("#ddlFile"), dd = dlg.querySelector("#ddlDrop");
+  const takeDDL = file => { if (!file) return; const rd = new FileReader(); rd.onload = () => { Object.assign(W.ddl, {text:String(rd.result), name:file.name}); readDDL(); renderWizard(); }; rd.readAsText(file); };
+  if (df) df.onchange = () => takeDDL(df.files[0]);
+  if (dd) { dd.ondragover = e => { e.preventDefault(); dd.classList.add("over"); }; dd.ondragleave = () => dd.classList.remove("over"); dd.ondrop = e => { e.preventDefault(); dd.classList.remove("over"); takeDDL(e.dataTransfer.files[0]); }; }
+  const vs = dlg.querySelector("#vendor"); if (vs) vs.onchange = () => { W.vendor = vs.value; renderWizard(); };
+  dlg.querySelectorAll("[data-sample]").forEach(b => b.onclick = () => { loadSample(b.dataset.sample); renderWizard(); });
+  const clr = dlg.querySelector("[data-clear]"); if (clr) clr.onclick = () => { W.text = ""; W.fileName = ""; W.parsed = null; renderWizard(); };
+  dlg.querySelectorAll("[data-copy]").forEach(b => b.onclick = async () => {
+    const ta = dlg.querySelector("#" + b.dataset.copy);
+    try { await navigator.clipboard.writeText(ta.value); } catch { ta.focus(); ta.select(); try { document.execCommand("copy"); } catch {} }
+    b.textContent = "Copied";
+  });
+  const fi = dlg.querySelector("#fileIn"), drop = dlg.querySelector("#drop");
+  const take = file => { if (!file) return; const rd = new FileReader(); rd.onload = () => { W.text = String(rd.result); W.fileName = file.name; readText(); renderWizard(); }; rd.readAsText(file); };
+  if (fi) fi.onchange = () => take(fi.files[0]);
+  if (drop) {
+    drop.ondragover = e => { e.preventDefault(); drop.classList.add("over"); };
+    drop.ondragleave = () => drop.classList.remove("over");
+    drop.ondrop = e => { e.preventDefault(); drop.classList.remove("over"); take(e.dataTransfer.files[0]); };
+  }
+  const pr = dlg.querySelector("#pasteRead");
+  if (pr) pr.onclick = () => { W.text = dlg.querySelector("#pasteIn").value; W.fileName = "pasted query result"; readText(); renderWizard(); };
+  dlg.querySelectorAll("[data-schema]").forEach(cb => {
+    if (cb.dataset.mixed) cb.indeterminate = true;
+    cb.onchange = () => { for (const t of W.parsed.tables.values()) if (t.database + "." + t.schema === cb.dataset.schema) cb.checked ? W.scope.add(t.key) : W.scope.delete(t.key); renderWizard(); };
+  });
+  dlg.querySelectorAll("[data-table]").forEach(cb => cb.onchange = () => { cb.checked ? W.scope.add(cb.dataset.table) : W.scope.delete(cb.dataset.table); renderWizard(); });
+  dlg.querySelectorAll("[data-filter]").forEach(b => b.onclick = () => { W.filter = b.dataset.filter; keepScroll(renderWizard); });
+  dlg.querySelectorAll("[data-rename]").forEach(r => r.onchange = () => { W.decisions.set(r.dataset.rename, r.value); keepScroll(renderWizard); });
+  dlg.querySelectorAll("[data-hint]").forEach(cb => cb.onchange = () => { cb.checked ? W.hintsOff.delete(cb.dataset.hint) : W.hintsOff.add(cb.dataset.hint); });
+  dlg.querySelectorAll("[data-unch]").forEach(b => b.onclick = () => { const k = b.dataset.unch; W.showUnchanged.has(k) ? W.showUnchanged.delete(k) : W.showUnchanged.add(k); keepScroll(renderWizard); });
+  const ap = dlg.querySelector("[data-apply]"); if (ap) ap.onclick = doImport;
+  dlg.querySelectorAll('input[name="cmp"]').forEach(r => r.onchange = () => { W.compare = r.value; renderWizard(); });
+  const nw = dlg.querySelector("[data-narrow]"); if (nw) nw.onclick = () => { W.compare = "tables"; renderWizard(); };
+}
+function keepScroll(fn) { const y = dlg.querySelector("#wbody").scrollTop; fn(); dlg.querySelector("#wbody").scrollTop = y; }
+
+function doImport() {
+  const plan = currentPlan();
+  const accepted = new Set(plan.hints.filter(h => !W.hintsOff.has(h.id)).map(h => h.id));
+  const now = new Date();
+  const at = `${TODAY} ${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  const res = applyPlan(MODEL, plan, accepted, {at, source:W.parsed.fileName});
+  const name = targetName();
+  mutate(() => { fromImp(res.model, S); V.tab = "sources"; V.sel = {t:"system", id:res.systemId}; V.home = false; V.wsHome = false; });
+  dlg.close();
+  toast(`Imported into ${name}: ${importSummary(res.counts)}`, true);
+}
+/* ---------- translation between the workspace model and the engine ---------- */
+function toImp(Sx) {
+  const sysId = name => (Sx.systems.find(x => x.name === name) || {}).id;
+  const entName = id => (Sx.entities.find(e => e.id === id) || {}).name;
+  return {
+    systems:Sx.systems.map(x => ({id:x.id, name:x.name})),
+    tables:Sx.sources.map(s => ({id:s.id, systemId:sysId(s.system), database:s.database, schema:s.schema, name:s.name, objectType:s.objectType || "table",
+      fileFormat:s.fileFormat || "", rowCount:s.rowCount ?? null, comment:s.comment || "", missingSince:s.missingSince || null, retiredSince:s.retiredSince || null,
+      classes:[...(s.classes || [])], note:s.note || ""})),
+    columns:Sx.sources.flatMap(s => s.columns.map((c, i) => ({id:c.id, tableId:s.id, name:c.name, ordinal:c.ordinal || i + 1, ...parseTypeStr(c.dataType),
+      nullable:c.nullable !== false, pk:!!c.isPrimaryKey, fk:!!c.isForeignKey, comment:c.comment || "", classes:[...(c.tags || [])], note:c.note || "",
+      missingSince:c.missingSince || null, retiredSince:c.retiredSince || null, notNeeded:!!c.notNeeded}))),
+    relations:clone(Sx.srcRelations || []),
+    attributes:Sx.attributes.map(a => ({id:a.id, entity:entName(a.entityId), name:a.name, dataType:a.dataType, length:a.length || null})),
+    mappings:Sx.mappings.map(m => ({id:m.id, columnId:m.columnId, attributeId:m.attributeId, status:m.status, kind:m.kind, rule:m.rule || "", reviewReason:m.reviewReason || null, until:m.until || null})),
+    canvases:Sx.diagrams.map(d => ({name:d.name, tables:Object.keys(d.src || {})})),
+    imports:clone(Sx.imports || []), issues:clone(Sx.issues || [])
+  };
+}
+function fromImp(m, Sx) {
+  const oldSrc = Object.fromEntries(Sx.sources.map(s => [s.id, s]));
+  const sysName = id => (m.systems.find(x => x.id === id) || {}).name;
+  Sx.systems = m.systems.map(x => ({...(Sx.systems.find(y => y.id === x.id) || {}), ...x}));
+  Sx.sources = m.tables.map(t => {
+    const old = oldSrc[t.id] || {}, oldCols = Object.fromEntries((old.columns || []).map(c => [c.id, c]));
+    const cols = m.columns.filter(c => c.tableId === t.id).sort((a, b) => a.ordinal - b.ordinal).map(c => ({...(oldCols[c.id] || {}),
+      id:c.id, name:c.name, dataType:fmtType(c), nullable:!!c.nullable, isPrimaryKey:!!c.pk, isForeignKey:!!c.fk, tags:[...(c.classes || [])],
+      comment:c.comment || "", note:c.note || "", ordinal:c.ordinal, missingSince:c.missingSince || null, retiredSince:c.retiredSince || null, notNeeded:!!c.notNeeded}));
+    return {...old, id:t.id, system:sysName(t.systemId), database:t.database, schema:t.schema, name:t.name, objectType:t.objectType || "table",
+      fileFormat:t.fileFormat || "", rowCount:t.rowCount, comment:t.comment || "", missingSince:t.missingSince || null, retiredSince:t.retiredSince || null,
+      classes:[...(t.classes || [])], note:t.note || "", columns:cols};
+  });
+  const mm = Object.fromEntries(m.mappings.map(x => [x.id, x]));
+  Sx.mappings = Sx.mappings.filter(x => mm[x.id]).map(x => ({...x, columnId:mm[x.id].columnId, status:mm[x.id].status, rule:mm[x.id].rule,
+    reviewReason:mm[x.id].reviewReason || null, until:mm[x.id].until || null}));
+  for (const x of m.mappings) if (!Sx.mappings.some(y => y.id === x.id))
+    Sx.mappings.push({id:x.id, columnId:x.columnId, attributeId:x.attributeId, kind:x.kind || "direct", rule:x.rule || "", status:x.status || "draft", note:""});
+  Sx.srcRelations = clone(m.relations); Sx.imports = clone(m.imports); Sx.issues = clone(m.issues);
+  for (const d of Sx.diagrams) for (const k in (d.src || {})) if (!oldSrc[k] || !Sx.sources.some(s => s.id === k)) delete d.src[k];
+  return Sx;
+}
+function snapModel() { MODEL = toImp(S); return MODEL; }
+/* Requirement coverage of another state of the model, computed by the main prototype's own rules */
+function covOfS(Sx) {
+  const S0 = S, I0 = I; const out = {};
+  try { S = Sx; idx(); for (const r of S.requirements) { const k = reqCoverage(r.id); out[r.key] = {ok:k.ok, n:k.total}; } }
+  finally { S = S0; I = I0; }
+  return out;
+}
+const covFromImp = m => covOfS(fromImp(m, clone(S)));
+
+/* ---------- the Sources tab ---------- */
+function sourcesTree(q) {
+  indexClasses();
+  const perm = wsPerm() === "full";
+  let h = perm ? `<div class="imx im-bar"><button class="btn small" data-imx-import>${'<svg class="i" viewBox="0 0 16 16"><path d="M8 2.5v8M4.5 7L8 10.5 11.5 7M2.5 13.5h11"/></svg>'}Import sources…</button></div>` : "";
+  for (const sys of [...S.systems].sort((a, b) => a.name.localeCompare(b.name))) {
+    const tabs = S.sources.filter(s => s.system === sys.name);
+    const open = (S.issues || []).filter(i => i.status === "open" && i.systemId === sys.id).length;
+    const byS = {};
+    tabs.forEach(s => (byS[s.database + "." + s.schema] ||= []).push(s));
+    let sh = "", total = 0;
+    for (const sc of Object.keys(byS).sort()) {
+      const items = byS[sc].filter(s => keepItem("src", s.id)).sort((a, b) => a.name.localeCompare(b.name)).map(s => {
+        const nameHit = !q || s.name.toLowerCase().includes(q);
+        const fHit = q && !nameHit ? s.columns.find(c => c.name.toLowerCase().includes(q)) : null;
+        if (!nameHit && !fHit) return "";
+        const gone = s.missingSince && !s.retiredSince, old = s.retiredSince, colGone = s.columns.some(c => c.missingSince && !c.retiredSince);
+        const meta = s.objectType === "file" ? `${esc(s.fileFormat || "")} file` : s.objectType === "view" ? "view" : `${s.columns.length} cols`;
+        return `<button class="titem p${onCanvas("src", s.id) ? " oncanvas" : onOther("src", s.id) ? " elsewhere" : ""}${gone ? " im-gone" : old ? " im-old" : ""}" draggable="true" data-add="src:${s.id}" title="${gone ? "Missing from source. " : old ? "Retired, historical. " : colGone ? "Some columns are missing from source. " : ""}${onCanvas("src", s.id) ? "On this canvas. Click to show it." : "Click or drag to add to the canvas"}">
+<span class="on"></span><span class="n">${esc(s.name)}${fHit ? `<span class="hint">column ${esc(fHit.name)}</span>` : ""}${colGone || gone ? '<span class="im-dot" aria-label="missing from source"></span>' : ""}</span><span class="m">${meta}</span></button>`;
+      }).filter(Boolean);
+      if (!items.length) continue;
+      total += items.length;
+      const key = "src:" + sys.name + "/" + sc;
+      sh += grpHead(key, esc(sc), items.length, true) + (grpOpen(key) ? items.join("") : "");
+    }
+    if (!total && (q || V.canvasOnly || V.projOnly)) continue;
+    const key = "src:" + sys.name;
+    h += `<div class="tgrp-wrap">${grpHead(key, esc(sys.name) + (open ? ` <span class="im-badge" title="${plural(open, "change")} to resolve">${open}</span>` : ""), total, false, `<i style="background:var(--physical);width:8px;height:8px;border-radius:2px;flex:none"></i>`)}<button class="tgrp-add" data-imx-sys="${sys.id}" title="Open ${esc(sys.name)}: imports and changes to resolve" aria-label="Open ${esc(sys.name)}">⋯</button></div>` + (grpOpen(key) ? (sh || `<div class="tnone">No tables yet.</div>`) : "");
+  }
+  return h + `<div class="imx" style="padding:14px 12px"><button class="link" data-imx-reset style="font-size:12px;color:var(--ink-3)">Reset the prototype’s demo data</button></div>`;
+}
+
+/* ---------- inspector: system, table, column ---------- */
+function togs(scope, has, id) {
+  const groups = [["General", c => !c.dv && c.builtin], ["Data Vault 2.0", c => c.dv && dv2()], ["This workspace", c => !c.builtin]];
+  const can = wsPerm() === "full";
+  return groups.map(([label, f]) => {
+    const list = CLASSES.filter(c => c.scope === scope && f(c));
+    if (!list.length) return "";
+    return `<div style="margin:0 0 8px"><div class="muted" style="font-size:11.5px;margin-bottom:4px">${label}</div><div class="togs">${list.map(c =>
+      `<button class="tog" data-imx-tog="${esc(c.code)}" data-imx-on="${scope}" data-imx-id="${esc(id)}" aria-pressed="${has(c.code)}" ${can ? "" : "disabled"}>${esc(c.name)}</button>`).join("")}</div></div>`;
+  }).join("");
+}
+function insSystem(id) {
+  indexClasses(); snapModel();
+  const sys = S.systems.find(x => x.id === id);
+  const tabs = S.sources.filter(s => s.system === sys.name);
+  const cols = tabs.flatMap(s => s.columns);
+  const mapped = cols.filter(c => (I.mC[c.id] || []).length).length;
+  const imps = (S.imports || []).filter(i => i.systemId === id);
+  const open = (S.issues || []).filter(i => i.status === "open" && i.systemId === id);
+  return `<div class="imx"><div class="kind">Source system</div><h2>${esc(sys.name)}</h2>
+<p>${plural(tabs.length, "table")}, ${plural(cols.length, "column")}, ${mapped} mapped${cols.some(c => c.missingSince && !c.retiredSince) ? `, <span class="tag missing">${cols.filter(c => c.missingSince && !c.retiredSince).length} missing from source</span>` : ""}</p>
+${wsPerm() === "full" ? `<div class="actions" style="margin:10px 0 4px"><button class="btn primary small" data-imx-reimport="${id}">Re-import ${esc(sys.name)}…</button></div>` : ""}
+<h3>Changes to resolve${open.length ? ` (${open.length})` : ""}</h3>
+${issuesHtml(MODEL.issues.filter(i => i.systemId === id))}
+<h3>Imports</h3>
+${imps.length ? `<ul class="hist">${imps.map(i => `<li><b>${esc(i.at)}</b> · ${esc(i.source)} · ${esc(i.by)}<br><span class="muted">${importSummary(i.counts)}</span><br><button class="link" data-imx-showimp="${i.id}">Show what it touched on the canvas</button></li>`).join("")}</ul>`
+  : `<p class="muted">No imports yet. These tables came with the demo workspace.</p>`}</div>`;
+}
+function sourceHead(s) {
+  indexClasses(); snapModel();
+  const sys = S.systems.find(x => x.name === s.system);
+  const open = MODEL.issues.filter(i => i.status === "open" && i.tableId === s.id);
+  return `<div class="imx"><div class="kind">${s.objectType === "file" ? `Source file${s.fileFormat ? ` (${esc(s.fileFormat)})` : ""}` : s.objectType === "view" ? "Source view" : "Source table"} of <button class="pill p" style="display:inline;padding:1px 6px" data-imx-sys="${sys ? sys.id : ""}">${esc(s.system)}</button></div>
+<h2 class="mono" style="font-size:15px">${esc(s.name)}</h2>
+<p class="mono" style="color:var(--ink-3)">${esc(s.database)}.${esc(s.schema)}</p>
+<p>${s.rowCount != null ? fmtN(s.rowCount) + " rows" : ""}${s.comment ? `${s.rowCount != null ? " · " : ""}<span class="muted">From the source:</span> ${esc(s.comment)}` : ""}</p>
+${s.retiredSince ? `<p><span class="tag unchanged">Retired: historical since ${esc(s.missingSince)}</span></p>` : s.missingSince ? `<p><span class="tag missing">Missing from source since ${esc(s.missingSince)}</span></p>` : ""}
+${open.length ? `<h3>To resolve</h3>${issuesHtml(open, true)}` : ""}</div>`;
+}
+function sourceBody(s) {
+  const name = id => { const c = s.columns.find(x => x.id === id) || S.sources.flatMap(x => x.columns).find(x => x.id === id); return c ? c.name : "?"; };
+  const tname = id => { const x = S.sources.find(t => t.id === id); return x ? `${x.schema}.${x.name}` : "?"; };
+  const rels = (S.srcRelations || []).filter(r => r.fromTableId === s.id || r.toTableId === s.id);
+  const sorted = [...s.columns].sort((a, b) => (a.missingSince ? 1 : 0) - (b.missingSince ? 1 : 0));
+  return `<div class="imx">
+<h3>Classifications</h3>${togs("table", code => String((s.classes || []).includes(code)), s.id)}<p class="hint"><button class="link" data-imx-opencls>Edit the list…</button></p>
+<h3><label for="imx-tnote">Note</label></h3><textarea id="imx-tnote" data-imx-note="table:${s.id}" placeholder="What this table holds, who owns it, how it is loaded" ${wsPerm() === "full" ? "" : "readonly"}>${esc(s.note || "")}</textarea>
+<p class="hint">Saved when you leave the field. Separate from the source’s comment.</p>
+<h3>Columns and where they go</h3><div class="list">${sorted.map(c => { const ms = I.mC[c.id] || [];
+  return `<button class="li${c.missingSince ? " im-gone" : ""}" data-go="col:${esc(c.id)}"><span class="n mono">${esc(c.name)} <span class="muted" style="font-weight:400">${esc(c.dataType)}</span>${c.isPrimaryKey ? ' <span class="k">PK</span>' : ""}${c.isForeignKey ? ' <span class="k">FK</span>' : ""}</span>
+<span class="m">${c.retiredSince ? "retired" : c.missingSince ? "missing" : ms.length ? esc(ms.map(m => attrLabel(m.attributeId)).join(", ")) : c.notNeeded ? "not needed" : `<span class="un">not used</span>`}</span></button>`; }).join("")}</div>
+<h3>Relationships between source tables</h3>
+${rels.length ? `<div class="list">${rels.map(r => r.fromTableId === s.id
+  ? `<button class="li" data-go="source:${r.toTableId}"><span class="n mono">${r.fromCols.map(name).map(esc).join(", ")} → ${esc(tname(r.toTableId))}</span><span class="m">${esc(r.name)}${r.missingSince ? " · missing" : ""}</span></button>`
+  : `<button class="li" data-go="source:${r.fromTableId}"><span class="n mono">${esc(tname(r.fromTableId))}.${r.fromCols.map(name).map(esc).join(", ")} → here</span><span class="m">${esc(r.name)}</span></button>`).join("")}</div>`
+  : `<p class="muted">None known. They come from foreign keys in an import.</p>`}
+${dv2() ? `<h3>Data Vault reading</h3>${dvReading(toImp(S).tables.find(t => t.id === s.id))}` : ""}</div>`;
+}
+function colSections(c) {
+  indexClasses(); snapModel();
+  const open = MODEL.issues.filter(i => i.status === "open" && i.colId === c.id);
+  return `<div class="imx">
+${c.retiredSince ? `<p><span class="tag unchanged">Retired: historical since ${esc(c.missingSince)}</span></p>` : c.missingSince ? `<p><span class="tag missing">Missing from source since ${esc(c.missingSince)}</span></p>` : ""}
+${c.notNeeded ? `<p><span class="tag unchanged">Marked not needed</span></p>` : ""}
+${c.comment ? `<p><span class="muted">From the source:</span> ${esc(c.comment)}</p>` : ""}
+${open.length ? `<h3>To resolve</h3>${issuesHtml(open, true)}` : ""}
+<h3>Classifications</h3>${togs("column", code => String((c.tags || []).includes(code)), c.id)}<p class="hint">Yours: a re-import never changes them. <button class="link" data-imx-opencls>Edit the list…</button></p>
+<h3><label for="imx-cnote">Note</label></h3><textarea id="imx-cnote" data-imx-note="col:${c.id}" placeholder="What a modeller should know: meaning, quirks, which values to expect" ${wsPerm() === "full" ? "" : "readonly"}>${esc(c.note || "")}</textarea>
+<p class="hint">Saved when you leave the field.</p></div>`;
+}
+
+/* ---------- the classification list (workspace convention, AD-08) ---------- */
+const setDlg = $("#setDlg");
+setDlg.addEventListener("click", e => { if (e.target === setDlg) setDlg.close(); });
+function openSettings() { renderSettings(); if (!setDlg.open) setDlg.showModal(); }
+function renderSettings() {
+  indexClasses();
+  const used = code => S.sources.reduce((n, s) => n + ((s.classes || []).includes(code) ? 1 : 0) + s.columns.filter(c => (c.tags || []).includes(code)).length, 0);
+  const can = wsPerm() === "full";
+  const sect = (scope, title) => `<h3 style="margin-top:14px">${title}</h3>
+    <ul class="clist">${CLASSES.filter(c => c.scope === scope).map(c => `<li>
+      <span class="nm">${c.builtin || !can ? `${esc(c.name)} ${c.dv ? '<span class="chip cls dv">Data Vault 2.0</span>' : ""}` : `<input type="text" data-rn="${esc(c.code)}" value="${esc(c.name)}" aria-label="Name">`}</span>
+      <span class="muted" style="font-size:12px;white-space:nowrap">${used(c.code) ? "used " + used(c.code) + "×" : "unused"}</span>
+      ${c.builtin ? `<span class="muted" style="font-size:12px">built in</span>` : can ? `<button class="btn small" data-rm="${esc(c.code)}">Remove</button>` : ""}</li>`).join("")}</ul>
+    ${can ? `<div class="addrow"><input type="text" id="add_${scope}" placeholder="New ${scope} classification, e.g. ${scope === "column" ? "Hash candidate" : "Golden source"}"><button class="btn small" data-add="${scope}">Add</button></div>` : ""}`;
+  setDlg.innerHTML = `<div class="whead"><h2 id="setTitle">Classifications</h2><button class="tb" data-setclose aria-label="Close" style="border:0;background:none;cursor:pointer;color:var(--ink-2)">✕</button></div>
+    <div class="setbody"><p class="hint" style="margin-top:12px">One list for the workspace. Data Vault ones show while Data Vault 2.0 mode is on in the workspace settings. An import file may use any of these names in its classifications column.</p>
+    ${sect("column", "For columns")}${sect("table", "For tables")}</div>`;
+  setDlg.querySelector("[data-setclose]").onclick = () => setDlg.close();
+  setDlg.querySelectorAll("[data-add]").forEach(b => b.onclick = () => {
+    const inp = setDlg.querySelector("#add_" + b.dataset.add), name = inp.value.trim();
+    if (!name) return inp.focus();
+    if (CLASSES.some(c => c.scope === b.dataset.add && norm(c.name) === norm(name))) { inp.setCustomValidity("That name is taken"); inp.reportValidity(); return; }
+    mutate(() => { (S.classes ||= []).push({code:"X_" + norm(name).toUpperCase() + "_" + Date.now().toString(36), name, scope:b.dataset.add, builtin:false}); });
+    renderSettings();
+  });
+  setDlg.querySelectorAll("[data-rn]").forEach(inp => inp.onchange = () => {
+    const c = S.classes.find(x => x.code === inp.dataset.rn), name = inp.value.trim();
+    if (!name || name === c.name) { inp.value = c.name; return; }
+    mutate(() => { S.classes.find(x => x.code === c.code).name = name; });
+    renderSettings();
+  });
+  setDlg.querySelectorAll("[data-rm]").forEach(b => b.onclick = () => {
+    const c = S.classes.find(x => x.code === b.dataset.rm), n = used(c.code);
+    if (n && !confirm(`${c.name} is used ${n}×. Remove it from the list and from those ${c.scope}s?`)) return;
+    mutate(() => {
+      S.classes = S.classes.filter(x => x.code !== c.code);
+      S.sources.forEach(s => { s.classes = (s.classes || []).filter(y => y !== c.code); s.columns.forEach(x => x.tags = (x.tags || []).filter(y => y !== c.code)); });
+    });
+    renderSettings();
+  });
+}
+
+/* ---------- events ---------- */
+document.addEventListener("click", ev => {
+  const t = ev.target;
+  const imp = t.closest("[data-imx-import]"); if (imp) { ev.stopPropagation(); openWizard({}); return; }
+  const re = t.closest("[data-imx-reimport]"); if (re) { ev.stopPropagation(); openWizard({systemId:re.dataset.imxReimport}); return; }
+  const sy = t.closest("[data-imx-sys]"); if (sy && sy.dataset.imxSys) { ev.stopPropagation(); ev.preventDefault(); V.home = false; select({t:"system", id:sy.dataset.imxSys}); return; }
+  if (t.closest("[data-imx-opencls]")) { ev.stopPropagation(); openSettings(); return; }
+  const tg = t.closest("[data-imx-tog]");
+  if (tg) {
+    ev.stopPropagation();
+    const code = tg.dataset.imxTog, id = tg.dataset.imxId;
+    if (tg.dataset.imxOn === "table") mutate(() => { const s = S.sources.find(x => x.id === id); s.classes = (s.classes || []).includes(code) ? s.classes.filter(x => x !== code) : [...(s.classes || []), code]; });
+    else mutate(() => { const c = S.sources.flatMap(x => x.columns).find(x => x.id === id); c.tags = (c.tags || []).includes(code) ? c.tags.filter(x => x !== code) : [...(c.tags || []), code]; });
+    return;
+  }
+  const ab = t.closest("[data-imact]"); if (ab) { ev.stopPropagation(); issueAction(ab.dataset.imiss, ab.dataset.imact); return; }
+  if (t.closest("[data-imconfirm]")) { ev.stopPropagation(); confirmPending(); return; }
+  if (t.closest("[data-imcancel]")) { ev.stopPropagation(); ui.pending = null; renderInspector(); return; }
+}, true);
+document.addEventListener("change", ev => {
+  const n = ev.target.closest && ev.target.closest("[data-imx-note]");
+  if (!n) return;
+  ev.stopPropagation();
+  const v = n.value.replace(/\s+$/, ""), [kind, id] = n.dataset.imxNote.split(":");
+  const obj = kind === "table" ? S.sources.find(x => x.id === id) : S.sources.flatMap(x => x.columns).find(x => x.id === id);
+  if (!obj || (obj.note || "") === v) return;
+  mutate(() => { (kind === "table" ? S.sources.find(x => x.id === id) : S.sources.flatMap(x => x.columns).find(x => x.id === id)).note = v; });
+  toast(v ? `Note saved on ${obj.name}` : `Note removed from ${obj.name}`, true);
+}, true);
+
+
+/* ---------- stage 2: model consistency (independent of imports) ---------- */
+function consistency(proj) {
+  const inScope = proj ? (() => { const cs = projCanvases(proj), srcs = new Set(), ents = new Set();
+    cs.forEach(d => { Object.keys(d.src).forEach(x => srcs.add(x)); Object.keys(d.ent).forEach(x => ents.add(x)); });
+    return m => srcs.has(I.colSrc[m.columnId]) || ents.has(I.attr[m.attributeId]?.entityId); })() : () => true;
+  const maps = S.mappings.filter(m => I.col[m.columnId] && I.attr[m.attributeId] && inScope(m));
+  const col = m => I.col[m.columnId];
+  const gone = maps.filter(m => col(m).missingSince && !col(m).retiredSince);
+  const conflicts = maps.filter(m => !typeCheck(m).ok);
+  const review = maps.filter(m => m.status === "review" && m.reviewReason);
+  const attrIds = [...new Set(maps.map(m => m.attributeId))];
+  const noSource = attrIds.filter(a => (I.mA[a] || []).length && (I.mA[a] || []).every(m => I.col[m.columnId]?.missingSince));
+  /* only what can change coverage: approved mappings in conflict, mappings sent back to review, sources that left */
+  const touched = new Set([...gone, ...conflicts.filter(m => m.status === "approved"), ...review].map(m => m.attributeId).concat(noSource));
+  const reqs = (proj ? projReqs(proj) : S.requirements).filter(r => [...reqScope(r.id).attrs].some(a => touched.has(a)));
+  const systems = S.systems.map(x => ({sys:x, n:(S.issues || []).filter(i => i.status === "open" && i.systemId === x.id).length})).filter(x => x.n);
+  return {gone, conflicts, review, noSource, reqs, systems, total:gone.length + conflicts.length + review.length + noSource.length};
+}
+function consistencyHtml(proj) {
+  const c = consistency(proj);
+  const mapLi = (m, extra) => `<button class="li" data-imx-go="map:${m.id}"><span class="n mono">${esc(colLabel(m.columnId))} → ${esc(attrLabel(m.attributeId))}</span><span class="m">${esc(extra)}</span></button>`;
+  const grp = (title, n, sev, body, hint) => n ? `<div class="im-cgrp ${sev}"><div class="im-ch"><span class="tag ${sev}">${sev === "high" ? "High" : "Normal"}</span><b>${title}</b><span class="muted">${n}</span></div>${hint ? `<p class="hint" style="margin:2px 0 6px">${hint}</p>` : ""}<div class="list">${body}</div></div>` : "";
+  const ok = !c.total && !c.systems.length;
+  return `<div class="imx im-cons"><h3>Model consistency${ok ? "" : ` <span class="im-badge">${c.total + c.systems.reduce((n, x) => n + x.n, 0)}</span>`}</h3>
+${ok ? `<p class="muted">Mappings, types and sources agree. Nothing to look at.</p>` : ""}
+${grp("Mappings on columns that left the source", c.gone.length, c.gone.some(m => m.status === "approved") ? "high" : "normal", c.gone.map(m => mapLi(m, `${STATUS[m.status]}, missing since ${col0(m).missingSince}`)).join(""), "Retire the column, move the mapping or delete it from the source’s changes.")}
+${grp("Attributes without an active source", c.noSource.length, c.noSource.some(a => (I.reqOf["attr:" + a] || []).length || c.reqs.length) ? "high" : "normal", c.noSource.map(a => `<button class="li" data-imx-go="attr:${a}"><span class="n">${esc(attrLabel(a))}</span><span class="m">${(I.mA[a] || []).some(m => I.col[m.columnId]?.retiredSince) ? "historical source only" : "its columns left the source"}</span></button>`).join(""), "No new data reaches them.")}
+${grp("Type conflicts", c.conflicts.length, c.conflicts.some(m => m.status === "approved") ? "high" : "normal", c.conflicts.map(m => mapLi(m, `${STATUS[m.status]}: ${typeCheck(m).short || typeCheck(m).msg}`)).join(""), "The source’s physical type does not fit the attribute’s modelling type.")}
+${grp("Mappings back in review after a source change", c.review.length, "normal", c.review.map(m => mapLi(m, m.reviewReason)).join(""))}
+${c.reqs.length ? `<div class="im-cgrp"><div class="im-ch"><span class="tag req">Requirements</span><b>Affected requirements</b><span class="muted">${c.reqs.length}</span></div><div class="list">${c.reqs.map(r => { const k = reqCoverage(r.id); return `<button class="li reqli" data-hreq="${r.id}"><span class="k">${esc(r.key)}</span><span class="n">${esc(r.name)}</span><span class="m">${k.ok}/${k.total} covered</span></button>`; }).join("")}</div></div>` : ""}
+${c.systems.length ? `<div class="im-cgrp"><div class="im-ch"><b>Source changes to resolve</b></div><div class="list">${c.systems.map(x => `<button class="li" data-imx-sys="${x.sys.id}"><span class="n">${esc(x.sys.name)}</span><span class="m">${plural(x.n, "change")} to decide</span></button>`).join("")}</div></div>` : ""}</div>`;
+}
+const col0 = m => I.col[m.columnId] || {};
+function goTo(t, id) {
+  const src = t === "map" ? I.colSrc[I.map[id]?.columnId] : t === "col" ? I.colSrc[id] : t === "source" ? id : null;
+  const ent = t === "map" ? I.attr[I.map[id]?.attributeId]?.entityId : t === "attr" ? I.attr[id]?.entityId : null;
+  const cs = projCanvases();
+  const best = cs.find(d => (src && d.src[src]) && (!ent || d.ent[ent])) || cs.find(d => (src && d.src[src]) || (ent && d.ent[ent]));
+  if (best) openCanvasFromHome(best.id); else { V.home = false; V.wsHome = false; rebuild(); }
+  select({t, id});
+  setTimeout(() => { if (t === "map") { if (src && onCanvas("src", src)) centerOn("src", src); } else centerOnSel(); }, 30);
+}
+
+/* ---------- stage 2: the Changes layer on the canvas ---------- */
+function chgSet() {
+  if (!V.chg) return null;
+  const iss = V.chg === "open" ? (S.issues || []).filter(i => i.status === "open") : (S.issues || []).filter(i => i.importId === V.chg);
+  const cols = new Set(), tabs = new Set(), maps = new Set();
+  for (const i of iss) {
+    if (i.colId) cols.add(i.colId);
+    if (i.tableId) tabs.add(i.tableId);
+    if (i.mappingId) maps.add(i.mappingId);
+    if (i.kind === "missingtable" || i.kind === "newtable") (I.src[i.tableId]?.columns || []).forEach(c => cols.add(c.id));
+  }
+  if (V.chg === "open") {
+    S.sources.forEach(s => s.columns.forEach(c => { if (c.missingSince && !c.retiredSince) { cols.add(c.id); tabs.add(s.id); } }));
+    S.mappings.forEach(m => { if (m.status === "review" && m.reviewReason) maps.add(m.id); });
+  }
+  S.mappings.forEach(m => { if (cols.has(m.columnId)) maps.add(m.id); });
+  const attrs = new Set(), ents = new Set();
+  maps.forEach(id => { const m = I.map[id]; if (!m) return; attrs.add(m.attributeId); cols.add(m.columnId); tabs.add(I.colSrc[m.columnId]); ents.add(I.attr[m.attributeId]?.entityId); });
+  cols.forEach(id => I.colSrc[id] && tabs.add(I.colSrc[id]));
+  return {cols, tabs, maps, attrs, ents, n:iss.length};
+}
+let chgCache = null;
+function hit(kind, id) {
+  if (!V.chg) return "";
+  if (!chgCache) { chgCache = chgSet(); setTimeout(() => chgCache = null, 0); }
+  return chgCache && chgCache[kind].has(id) ? " im-hit" : "";
+}
+function renderChgBar() {
+  document.body.classList.toggle("im-chgmode", !!V.chg);
+  const b = $("#tChg"); if (b) b.setAttribute("aria-pressed", !!V.chg);
+  let bar = $("#imChgBar");
+  if (!bar) { bar = document.createElement("div"); bar.id = "imChgBar"; bar.className = "imx"; $("#viewport").appendChild(bar); }
+  if (!V.chg || V.home || V.wsHome) { bar.hidden = true; return; }
+  const set = chgSet(), imps = (S.imports || []);
+  const sysName = id => (S.systems.find(x => x.id === id) || {}).name || "";
+  bar.hidden = false;
+  bar.innerHTML = `<b>Changes</b><select id="imChgSel" aria-label="Which changes"><option value="open" ${V.chg === "open" ? "selected" : ""}>All open changes</option>${imps.map(i => `<option value="${i.id}" ${V.chg === i.id ? "selected" : ""}>Import into ${esc(sysName(i.systemId))}, ${esc(i.at)}, ${esc(i.source)}</option>`).join("")}</select>
+    <span class="muted">${set.tabs.size ? `${plural(set.tabs.size, "table")}, ${plural(set.maps.size, "mapping")}, ${plural(set.attrs.size, "attribute")}` : "Nothing on record"}</span><button class="link" data-imx-chgoff>Close</button>`;
+  bar.querySelector("#imChgSel").onchange = e => { V.chg = e.target.value; chgCache = null; renderCards(); renderLines(); };
+}
+document.addEventListener("click", ev => {
+  const t = ev.target;
+  if (t.closest("#tChg")) { ev.stopPropagation(); V.chg = V.chg ? null : "open"; chgCache = null; renderCards(); renderLines(); return; }
+  if (t.closest("[data-imx-chgoff]")) { ev.stopPropagation(); V.chg = null; chgCache = null; renderCards(); renderLines(); return; }
+  const si = t.closest("[data-imx-showimp]"); if (si) { ev.stopPropagation(); V.chg = si.dataset.imxShowimp; chgCache = null; const cs = projCanvases(); if (V.home || V.wsHome) openCanvasFromHome(V.dia || cs[0]?.id); renderCards(); renderLines(); return; }
+  const g = t.closest("[data-imx-go]"); if (g) { ev.stopPropagation(); ev.preventDefault(); const [k, id] = g.dataset.imxGo.split(":"); goTo(k, id); return; }
+  if (t.closest("[data-imx-reset]")) { ev.stopPropagation(); if (confirm("Forget every change in this prototype and start again from the demo workspaces?")) { try { localStorage.removeItem(KEY); } catch (e) {} location.reload(); } return; }
+}, true);
+
+return {_dev:{toCSV, sampleRows, SAMPLE_CRM, W, readText, renderWizard}, openWizard, sourcesTree, insSystem, sourceHead, sourceBody, colSections, consistencyHtml, hit, renderChgBar, openIssueCount:() => (S.issues || []).filter(i => i.status === "open").length};
+})();
+
 
 /* =========================================================
    Boot

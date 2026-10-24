@@ -23,8 +23,8 @@ test("S1A-13: “New source table” with columns typed as lines creates the tab
     /card_id\s*int/,
     /email\s*varchar\(255\)/,
     /balance\s*decimal\(18,2\)/,
-    /notes\s*nvarchar/,
-    /issued_at\s*datetime2/,
+    /notes\s*nvarchar\(max\)/, // max stored as -1, always shown as max (slice 7a)
+    /issued_at\s*datetime2\(7\)/, // its default precision (slice 7a, step 6)
   ]);
   await expect(treeItem(page, "loyalty_cards")).toHaveAttribute("data-presence", "here");
   await expect(treeItem(page, "loyalty_cards")).toContainText("5 cols");
@@ -38,8 +38,8 @@ test("S1A-13: “New source table” with columns typed as lines creates the tab
     [1, "card_id", "int", null, null, null],
     [2, "email", "varchar", 255, null, null],
     [3, "balance", "decimal", null, 18, 2],
-    [4, "notes", "nvarchar", null, null, null],
-    [5, "issued_at", "datetime2", null, null, null],
+    [4, "notes", "nvarchar", -1, null, null],
+    [5, "issued_at", "datetime2", null, 7, null],
   ]);
 
   // a line that is not a column is refused with the line number

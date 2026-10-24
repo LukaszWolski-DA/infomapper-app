@@ -28,7 +28,8 @@ test("S2C-07: clicking a bundle opens its panel: counts by status, the mappings 
   await expect(panel).toContainText("Bundled mappings");
   await expect(panel.getByRole("heading", { level: 2 })).toHaveText("13 mappings");
   await expect(panel).toContainText("From Tables (collapsed frame) to People (collapsed frame).");
-  await expect(panel.getByTestId("bundle-status-counts")).toHaveText("9 approved, 2 in review, 2 draft.");
+  // web_users.email → Customer.email has had a type problem since slice 7a's seed (email string(120))
+  await expect(panel.getByTestId("bundle-status-counts")).toHaveText("9 approved, 2 in review, 2 draft, 1 with a type problem.");
   await expect(panel.getByText("Into Customer", { exact: true })).toBeVisible();
   await expect(panel.getByText("Into Sales Order", { exact: true })).toBeVisible();
   await expect(panel.getByTestId("item-bundle-mapping")).toHaveCount(13);

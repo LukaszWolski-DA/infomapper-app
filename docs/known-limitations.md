@@ -683,3 +683,74 @@ pages), so the first tests do not wait for compiles.
   file was not the cause. Fix: stop the server, delete `.next/dev/cache/turbopack`, start it again (the first pages
   compile once more).
 - **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.
+
+## Source import (slice 7a)
+
+### Every write rewrites the whole local data file
+
+The local adapter (AD-29) writes the whole `.data/dev-db.json` on every write, so writes slow down after very large
+imports: about 1 s per write (a card move) after three 20,000-column imports, when the file is 128 MB (80 MB of it
+change events). Slice 7a, step 4 made the adapter copy only the tables a write touches, check only what a write can
+break and write the file without indentation (3.3 s before); the rest is writing the file itself.
+
+- **Accepted** (Łukasz, 23 October 2026): work is imported incrementally, not whole databases, so the file stays small
+  in practice. `npm run reset-dev-data` brings it back to the demo.
+- **Local adapter only:** the Supabase adapter writes only the changed rows. If large imports are ever needed locally:
+  `docs/ideas.md`, "One file per table in the local adapter".
+
+### One import takes up to 30,000 column rows (a temporary limit)
+
+Above it: "The file has {n} rows; one import takes up to 30,000. Split it by database or schema." A larger system is
+imported in parts, one database or schema at a time ("Only columns of the tables in the file"). The text of one import
+is limited to 20 MB, an upload to 25 MB.
+
+- **Why:** the local adapter's figures (slice 7a, step 4), not the importer's. Reading, translating, planning and the
+  P8 comparison are fast at 100,000 rows (read 0.5 s, translate a DDL script 1.8 s, plan 0.4 s); writing and undoing
+  through the local data file grow with the rows (at 20,000: import 2.1 s, undo 2.5 s; at 100,000: 13.1 s and 16.4 s,
+  and three such imports ran the process out of memory). Details: `docs/prd/slice-07a-acceptance.md`, step 4.
+- **Later:** measure again when the Supabase adapter exists (the database slice, AD-31), and raise the limit from those
+  figures.
+
+### Relationships between source tables: matched by name, then by what they join
+
+A re-import matches a relationship first by its foreign key's name on its table, then, when no name matches, by its
+target table and column pairs (slice 7a, step 4): a DDL script names an unnamed key `FK_{table}_{columns}`, SQL
+Server's catalog gives the name it generated, and the review shows the same relationship as one "changed" with its new
+name, not as a missing and a new one (S7A-17). What remains: two keys over the same columns to the same table, both
+renamed, are paired in file order.
+
+### Imports raise no changes to resolve yet
+
+A slice 7a import marks what is missing from source and sends approved mappings back to review with their reasons, but
+it records no "changes to resolve" (retire, move mappings, delete, not needed…). Those, their counts in the tree, the
+status bar and the panels, and model consistency on the project home come with slice 7b, which decides whether it
+derives open changes from the statuses 7a stored or starts with an empty list (PRD 7a, section 9).
+
+### An import's undo: all or nothing, and not after a restart
+
+An import is one undo step (P7). Undo is refused as a whole ("This can't be undone because it was changed afterwards.")
+when any row the import wrote has changed since: a new column mapped, a business key set, a table renamed. The undo
+history lives in the server's memory ("The undo history lives in server memory" above), so an import cannot be undone
+after the server restarts. Approving a mapping again, or importing the previous file again, is the way back then.
+
+### SQL Server's `timestamp` read from a file is a date
+
+SQL Server's `timestamp` is `rowversion`, a row's version stamp (binary(8)), not a date. The query channel (with SQL
+Server chosen) and the DDL channel (a script with SQL Server's signs: brackets, `GO`, `IDENTITY`) write it as
+`rowversion` (slice 7a, step 7). A file in the standard does not say which database it comes from, so `timestamp` there
+is read as everywhere else: a date with 6 digits of fractional seconds (`timestamp(6)`, PostgreSQL's and Oracle's
+meaning). Write `rowversion` in such a file for a SQL Server column. The same holds for `time` without a parameter:
+SQL Server's default is 7 digits, PostgreSQL's 6, so it keeps no default and `time` against `time(7)` shows as a change.
+
+### The upload relies on an experimental Next.js option
+
+An import's text goes to `POST /w/{workspace}/import` (up to 25 MB). The proxy (`src/proxy.ts`) buffers request bodies
+up to 10 MB by default and cuts off the rest, so `next.config.ts` sets `experimental.proxyClientMaxBodySize: "25mb"`
+(slice 7a, step 4; `S7A-04-route.spec.ts` sends 12 MB and 26 MB). An upgrade of Next.js may rename or drop it; the spec
+fails if it does.
+
+### Combined mappings never get a type conflict
+
+A mapping with two or more inputs is a transformation with a rule, and a rule is never a type problem (D-01). So an
+import can send a combined mapping back to review for a business key column that changed type or a renamed input in its
+rule, but never for a type conflict; only direct mappings get that reason (slice 7a, step 1, F1).

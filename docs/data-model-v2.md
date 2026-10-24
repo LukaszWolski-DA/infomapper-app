@@ -4,7 +4,7 @@ Version 2.0 · 2 October 2026 · replaces `INFOMAPPER_DATA_MODEL_v1_0.md` (the o
 
 This document describes every table of the new InfoMapper application: what it holds, its columns, keys and rules.
 The SQL is in `supabase/migrations/20261002000000_initial_schema.sql`. Behaviour is defined by the prototype
-(`docs/prototype/infomapper-model-prototype.html`); the decisions behind this model are listed at the end.
+(`docs/prototype/infomapper-prototype-with-sources.html`); the decisions behind this model are listed at the end.
 
 ---
 
@@ -238,9 +238,11 @@ Database and schema are fields of the table, not tables of their own (AD-10).
 | `database_name` | text | no | e.g. `crmprod` |
 | `schema_name` | text | no | e.g. `dbo` |
 | `name` | text | no | unique per system + database + schema among non-deleted rows |
-| `object_type` | text | no | `table`, `view` |
+| `object_type` | text | no | `table`, `view`, `file` (a flat file described like a table, slice 7a) |
+| `file_format` | text | yes | for a file: `xlsx`, `csv`, `json`… as the import file calls it (slice 7a) |
 | `row_count` | bigint | yes | |
-| `comment` | text | yes | |
+| `comment` | text | yes | from the source |
+| `missing_since` | timestamptz | yes | not in the last import that judged it (slice 7a, P3): a status, not a delete; cleared when it comes back |
 
 ### `source_column`
 | Column | Type | Null | Notes |
@@ -250,11 +252,54 @@ Database and schema are fields of the table, not tables of their own (AD-10).
 | `name` | text | no | unique per table among non-deleted rows |
 | `ordinal` | integer | no | physical position, never reordered by users (D-36) |
 | `data_type` | text | no | physical type as in the source, e.g. `varchar`, `decimal` |
-| `type_length`, `type_precision`, `type_scale` | integer | yes | |
+| `type_length`, `type_precision`, `type_scale` | integer | yes | `type_length` -1 is `max` (`nvarchar(max)`), always shown as `max` (slice 7a); one number of a non-text type is its precision (`datetime2(7)`) |
 | `is_nullable`, `is_primary_key`, `is_foreign_key` | boolean | no | |
 | `is_business_key` | boolean | no | column classification BK |
 | `is_pii` | boolean | no | column classification PII |
 | `default_value`, `comment` | text | yes | |
+| `missing_since` | timestamptz | yes | as on `source_table` (slice 7a) |
+
+The source owns a column's name, position, type, nullable, keys and comment, and a re-import updates them; the modeller
+owns the classifications, which a re-import never changes (slice 7a, P1). A field an import file leaves out is never
+compared or overwritten (P2).
+
+### `source_relationship`
+A foreign key between two source tables, from an import (slice 7a). Shown in the table panels; not drawn on canvases.
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `source_table_id` | uuid | no | FK `source_table`, the table with the key |
+| `to_source_table_id` | uuid | no | FK `source_table`, the table it refers to (may be the same) |
+| `name` | text | no | the key's name; unique per from-table among non-deleted rows, in any case |
+| `kind` | text | no | `declared` (from an import's foreign keys); room for later kinds |
+| `missing_since` | timestamptz | yes | as on `source_table` |
+
+### `source_relationship_column`
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `source_relationship_id` | uuid | no | FK `source_relationship` |
+| `from_column_id`, `to_column_id` | uuid | no | FK `source_column`, a column of each table |
+| `sort_order` | integer | no | position in the key |
+
+### `source_import`
+One import into a source system (slice 7a): who and when are `created_by` and `created_at`. One import is one change
+group and one undo step; undoing it soft-deletes this row with everything it wrote.
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `source_system_id` | uuid | no | FK `source_system` |
+| `channel` | text | no | `file`, `query`, `ddl` |
+| `source_label` | text | no | the file's name, “pasted query result” or “{script} (translated)” |
+| `tables_new`, `columns_new`, `columns_changed`, `columns_renamed`, `columns_missing`, `relationships_new` | integer | no | the import's summary; `columns_missing` includes the columns of a missing table |
+
+**The import format (D-13):** InfoMapper's source standard v1, one row per column with the columns `database`,
+`schema`, `table`, `object_type`, `file_format`, `row_count`, `table_comment`, `column`, `ordinal`, `data_type`,
+`length`, `precision`, `scale`, `nullable`, `primary_key`, `fk_name`, `fk_ref_schema`, `fk_ref_table`, `fk_ref_column`,
+`column_comment`, `classifications` (`database`, `schema`, `table`, `column` and `data_type` required). The reading rules
+are `src/domain/import/standard.ts`; DDL scripts are translated into it (`ddl.ts`).
 
 ---
 
@@ -273,6 +318,7 @@ It is a model object, independent of any canvas (D-02).
 | `status` | text | no | `draft`, `review`, `approved` |
 | `note_html`, `note_text` | text | yes | why, open questions |
 | `approved_by`, `approved_at` | uuid, timestamptz | yes | set when status becomes `approved`; four-eyes checked by the domain (AD-06) |
+| `review_reason` | text | yes | why an import sent the approved mapping back to review (slice 7a, P6); only while in review, cleared on any change of status or content |
 
 ### `mapping_input`
 | Column | Type | Null | Notes |
@@ -461,7 +507,10 @@ because they are business logic or must work on any database:
 - Permissions per role (AD-05), archive read-only (AD-09), four-eyes approval (AD-06).
 - Mapping input counts (section 6) and type checking.
 - Duplicate-name warnings for entities (B-25); concept deletion moves entities first (D-47).
-- Soft-delete cascades and the impact preview before deleting an entity (D-47).
+- Soft-delete cascades and the impact preview before deleting an entity (D-47); a deleted source table takes its
+  relationships in both directions with it (slice 7a).
+- Source import (slice 7a): matching, statuses, rename choices, the scope of missing (P4), and when a mapping goes back
+  to review (P6); the plan is rebuilt on the server and must do what the review showed (P8).
 - Requirement parents without cycles at any depth, and a deleted requirement brought back only while no other
   requirement uses its key (slice 4a).
 - Requirement coverage and scope (D-31), live label canvas membership (D-10, D-25), auto-labeling in an active
