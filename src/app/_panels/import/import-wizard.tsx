@@ -83,10 +83,19 @@ export function ImportWizard({
   const index = useMemo(() => impactIndex(data), [data]);
   const name = targetName(s, model);
 
-  /** A file or a paste read as the standard (items 14, 15); all its tables in scope. */
-  const takeText = (text: string, label: string) => {
-    const read = readStandard(text, label);
+  /**
+   * A file or a paste read as the standard (items 14, 15); all its tables in scope. A query's result is read with its
+   * database (SQL Server's `timestamp` is `rowversion`, step 7), as the server reads it again.
+   */
+  const readText = (text: string, label: string, vendor: WizardState["vendor"] | null) => {
+    const read = readStandard(text, label, vendor ? { vendor } : {});
     set({ text, sourceLabel: label, read, scope: new Set(read.tables.map((t) => t.key)), renames: new Map(), stale: null });
+  };
+  const takeText = (text: string, label: string) => readText(text, label, s.channel === "query" ? s.vendor : null);
+  /** Another database for a result already read: read it again with that one. */
+  const setStep1 = (patch: Partial<WizardState>) => {
+    set(patch);
+    if (patch.vendor && patch.vendor !== s.vendor && s.channel === "query" && s.text) readText(s.text, s.sourceLabel, patch.vendor);
   };
   /** A DDL script translated and read (items 16–18). */
   const readScript = (ddl: WizardState["ddl"]) => {
@@ -111,6 +120,7 @@ export function ImportWizard({
           sourceLabel: s.sourceLabel,
           text: s.text,
           ...(s.channel === "ddl" ? { ddl: { database: s.ddl.database, schema: s.ddl.schema } } : {}),
+          ...(s.channel === "query" ? { vendor: s.vendor } : {}),
           scope: [...s.scope],
           compare: s.compare,
           renames: [...s.renames],
@@ -141,7 +151,7 @@ export function ImportWizard({
   const go = (step: Step) => canGo(step, s, model, plan) && set({ step });
   const body =
     s.step === 1 ? (
-      <SourceStep s={s} set={set} model={model} lastImports={data.lastImports} takeText={takeText} readScript={readScript} clear={clear} />
+      <SourceStep s={s} set={setStep1} model={model} lastImports={data.lastImports} takeText={takeText} readScript={readScript} clear={clear} />
     ) : s.step === 2 ? (
       <ScopeStep s={s} set={set} model={model} plan={plan} systemName={name} />
     ) : plan ? (

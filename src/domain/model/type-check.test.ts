@@ -48,6 +48,15 @@ const TABLE: [AttributeType, string[], string[]][] = [
   [attr("custom", { custom_type: "geography" }), ["geography"], ["varchar", "geometry"]],
 ];
 
+describe("rowversion (step 7)", () => {
+  it("is checked as binary(8): no date, no number, no text; a custom binary type takes it", () => {
+    for (const a of [attr("date"), attr("datetime"), attr("integer"), attr("string")]) expect(fits(a, col("rowversion")), a.data_type).toBe(false);
+    expect(fits(attr("custom", { custom_type: "binary" }), col("rowversion"))).toBe(true);
+    expect(physicalClass("rowversion")).toBe(physicalClass("binary"));
+    expect(formatColumnType(col("rowversion"))).toBe("rowversion");
+  });
+});
+
 describe("type check table (D-01, AD-27)", () => {
   for (const [a, ok, bad] of TABLE) {
     it(`${formatAttributeType(a)} accepts ${ok.join(", ")} and refuses ${bad.join(", ")}`, () => {

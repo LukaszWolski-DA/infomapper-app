@@ -11,6 +11,22 @@ const types = (r: StandardRead, t: string) =>
   table(r, t).columns.map((c) => [c.name, c.data_type, c.type_length, c.type_precision, c.type_scale, c.is_nullable, c.is_primary_key]);
 const one = (sql: string, opts = {}) => readDdl(sql, opts);
 
+describe("readDdl: SQL Server's timestamp (step 7)", () => {
+  it("writes timestamp as rowversion in a script with SQL Server's signs", () => {
+    const { translation, read } = one("CREATE TABLE [dbo].[t] (\n  [id] [int] NOT NULL,\n  [ver] [timestamp] NOT NULL,\n  [at] [datetime2](3) NULL\n)\nGO");
+    expect(translation.defaultSchema).toBe("dbo");
+    expect(column(read, "t", "ver")).toMatchObject({ data_type: "rowversion", type_precision: null });
+    expect(column(read, "t", "at")).toMatchObject({ data_type: "datetime2", type_precision: 3 });
+  });
+
+  it("keeps timestamp a date in a PostgreSQL script and in a script without signs", () => {
+    const pg = one("CREATE TABLE public.t (id serial PRIMARY KEY, at timestamp NOT NULL);");
+    expect(column(pg.read, "t", "at")).toMatchObject({ data_type: "timestamp", type_precision: 6 });
+    const plain = one("CREATE TABLE t (id int, at timestamp);", { schema: "s" });
+    expect(column(plain.read, "t", "at")).toMatchObject({ data_type: "timestamp", type_precision: 6 });
+  });
+});
+
 describe("readDdl: the samples (S7A-03)", () => {
   it("reads the SQL Server script: USE, GO, brackets, a computed column, keys, extended properties, a skipped view", () => {
     const { translation, read } = readDdl(sample("billing.sql"), { fileName: "billing.sql" });

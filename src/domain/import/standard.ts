@@ -145,8 +145,26 @@ export const NOT_READ_YET = (name: string, table: string) =>
 export const TYPE_KEPT = (type: string, column: string) =>
   `Type “${type}” of ${column} is kept as written; the type check cannot judge mappings from this column.`;
 
-/** `maxRows`: the row limit; the benchmarks read past it (scripts/bench-import-*.ts). */
-export function readStandard(text: string, fileName: string, { maxRows = MAX_IMPORT_ROWS }: { maxRows?: number } = {}): StandardRead {
+/** The database a catalog query's result comes from: the query channel knows it, a file in the standard does not. */
+export const CATALOG_VENDORS = ["sqlserver", "postgres", "oracle"] as const;
+export type CatalogVendor = (typeof CATALOG_VENDORS)[number];
+
+/**
+ * SQL Server's `timestamp` is `rowversion`, a row's version stamp, not a date (Łukasz, step 7). The channels that know
+ * the vendor write it as `rowversion`: the query channel for SQL Server's result, the DDL channel for a script with
+ * SQL Server's signs. A file in the standard keeps `timestamp` (known-limitations.md).
+ */
+export const sqlServerType = (type: string): string => (/^timestamp$/i.test(type.trim()) ? "rowversion" : type);
+
+/**
+ * `maxRows`: the row limit; the benchmarks read past it (scripts/bench-import-*.ts). `vendor`: the database of a
+ * catalog query's result (the query channel).
+ */
+export function readStandard(
+  text: string,
+  fileName: string,
+  { maxRows = MAX_IMPORT_ROWS, vendor }: { maxRows?: number; vendor?: CatalogVendor } = {},
+): StandardRead {
   const out: StandardRead = { fileName, errors: [], warnings: [], tables: [], columnCount: 0, delimiter: ",", fields: new Set() };
   const body = text.replace(/^﻿/, "");
   if (!body.trim()) {
@@ -187,7 +205,8 @@ export function readStandard(text: string, fileName: string, { maxRows = MAX_IMP
       const v = i === undefined ? "" : (cells[i] ?? "").trim();
       return /^null$/i.test(v) ? "" : v; // SSMS copies empty cells as NULL
     };
-    const database = get("database"), schema = get("schema"), table = get("table"), column = get("column"), type = get("data_type");
+    const database = get("database"), schema = get("schema"), table = get("table"), column = get("column");
+    const type = vendor === "sqlserver" ? sqlServerType(get("data_type")) : get("data_type");
     if (!database || !schema || !table || !column) {
       out.warnings.push(`Row ${line}: database, schema, table and column are required. Row skipped.`);
       continue;

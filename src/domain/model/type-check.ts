@@ -32,10 +32,16 @@ const CLASS_OF = new Map<string, PhysicalClass>(
 /** Digits an integer column can hold, to check it against a decimal's integer part. */
 const INTEGER_DIGITS: Record<string, number> = { tinyint: 3, smallint: 5, int2: 5, int: 10, integer: 10, int4: 10, serial: 10, bigint: 19, int8: 19, bigserial: 19 };
 
+/** Types the check reads as another one: SQL Server's `rowversion` is `binary(8)` (step 7). */
+const CHECKED_AS: Readonly<Record<string, string>> = { rowversion: "binary" };
+
 /** The base name of a physical type: lower case, without parameters (`VARCHAR(50)` → `varchar`). */
 export const baseType = (dataType: string): string => dataType.toLowerCase().split("(")[0]!.trim().replace(/\s+/g, " ");
 
-export const physicalClass = (dataType: string): PhysicalClass => CLASS_OF.get(baseType(dataType)) ?? "other";
+/** The base name the check compares: `rowversion` reads as `binary`. */
+const checkedBase = (dataType: string): string => CHECKED_AS[baseType(dataType)] ?? baseType(dataType);
+
+export const physicalClass = (dataType: string): PhysicalClass => CLASS_OF.get(checkedBase(dataType)) ?? "other";
 
 export type ColumnType = Pick<SourceColumn, "data_type" | "type_length" | "type_precision" | "type_scale">;
 
@@ -110,7 +116,7 @@ export function checkColumnType(attribute: AttributeType, column: ColumnType): T
     case "json":
       return cls === "json" || cls === "text" ? fits : mismatch;
     case "custom":
-      return attribute.custom_type !== null && baseType(column.data_type) === baseType(attribute.custom_type) ? fits : mismatch;
+      return attribute.custom_type !== null && checkedBase(column.data_type) === baseType(attribute.custom_type) ? fits : mismatch;
   }
 }
 

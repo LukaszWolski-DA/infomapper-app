@@ -139,6 +139,19 @@ describe("importSources (items 28, 40; P7, P8)", () => {
     expect(db.source_import[0]).toMatchObject({ channel: "file", source_label: "crm.csv", tables_new: 2, columns_new: 15, relationships_new: 1, created_by: ids.actor });
   });
 
+  it("the query channel: the server reads SQL Server's timestamp as rowversion, as the review did (step 7)", () => {
+    const db0 = emptyDb();
+    const text = "database,schema,table,column,data_type\nd,dbo,t,ver,timestamp";
+    const read = readStandard(text, "pasted query result", { vendor: "sqlserver" });
+    const choices = allOf(read, {});
+    const plan = buildPlan(stateOf(db0).model, read, { newName: "Billing" }, choices);
+    const input = { ...inputFor(db0, text, { newName: "Billing" }, {}, "pasted query result"), channel: "query" as const, vendor: "sqlserver" as const, fingerprint: planFingerprint(plan) };
+    const result = okSet(importSources(ctxOf(), as("modeler"), stateOf(db0), input));
+    expect(applyTo(db0, result).source_column[0]).toMatchObject({ name: "ver", data_type: "rowversion" });
+    // without the vendor the server plans timestamp(6): not what the review showed, so nothing is written (P8)
+    expect(importSources(ctxOf(), as("modeler"), stateOf(db0), { ...input, vendor: undefined }).ok).toBe(false);
+  });
+
   it("refuses readers and reviewers, and an archived workspace; the server refuses before it reads", () => {
     const db = emptyDb();
     const input = inputFor(db, sample("hr_snapshot_2026-10-20.csv"), { newName: "HR" });

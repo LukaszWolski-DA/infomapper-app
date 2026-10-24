@@ -6,11 +6,12 @@
 // a table or column defined twice, parentheses that do not close, ALTER TABLE on a table the script does not create).
 // Database: from USE or three-part names, else the Database field, else the file name without its extension.
 // Unqualified schema: the field, else `dbo` (SQL Server signs) or `public` (PostgreSQL signs), else `default`.
-// Unlike the prototype, a type keeps its parameter: `datetime2(7)` stays (step 1, answer 4).
+// Unlike the prototype, a type keeps its parameter: `datetime2(7)` stays (step 1, answer 4). A script with SQL Server's
+// signs writes `timestamp` as `rowversion` (`sqlServerType`, step 7).
 
 import { TYPE_ALIASES } from "../model/column-type";
 import { toCsv } from "./delimited";
-import { readStandard, STANDARD_FIELDS, type StandardRead } from "./standard";
+import { readStandard, sqlServerType, STANDARD_FIELDS, type StandardRead } from "./standard";
 
 type Token =
   | { t: "id"; v: string; q: boolean; line: number }
@@ -211,7 +212,8 @@ export function ddlToStandard(sql: string, opts: DdlOptions = {}): DdlTranslatio
     } else cur.push(t);
   }
   if (cur.length) stmts.push(cur);
-  const guessSchema = /\[dbo\]|\bGO\b|IDENTITY\s*\(/i.test(sql) ? "dbo" : /::|\bOWNER TO\b|\bSERIAL\b|\bpublic\./i.test(sql) ? "public" : "";
+  const sqlServer = /\[dbo\]|\bGO\b|IDENTITY\s*\(/i.test(sql);
+  const guessSchema = sqlServer ? "dbo" : /::|\bOWNER TO\b|\bSERIAL\b|\bpublic\./i.test(sql) ? "public" : "";
   const defaultSchema = (opts.schema ?? "").trim() || guessSchema || "default";
   let curDb = (opts.database ?? "").trim() || (opts.fileName ?? "").trim().replace(/\.[^.]+$/, "");
   const usedDbs = new Set<string>();
@@ -495,7 +497,8 @@ export function ddlToStandard(sql: string, opts: DdlOptions = {}): DdlTranslatio
   const rows: (string | number)[][] = [[...STANDARD_FIELDS]];
   for (const t of order) {
     t.cols.forEach((c, i) => {
-      const type = c.computed ? "computed" : typeString(c.words, c.args);
+      const written = c.computed ? "computed" : typeString(c.words, c.args);
+      const type = sqlServer ? sqlServerType(written) : written;
       const base = [t.db, t.schema, t.name, "table", "", "", i === 0 ? t.comment : "", c.name, i + 1, type, "", "", "", c.nullable ? "yes" : "no", c.pk ? "yes" : "no"];
       const refs = c.fkRefs.length ? c.fkRefs : [null];
       refs.forEach((f, n) => rows.push([...base, f?.name ?? "", f?.toSchema ?? "", f?.toTable ?? "", f?.toCol ?? "", n === 0 ? c.comment : "", ""]));

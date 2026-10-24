@@ -1,15 +1,21 @@
 // P8, a review never goes stale silently (slice 7a; step 1, answer 12): the server builds the plan again from the same
 // text and choices, and writes only when it does what the review showed. `planDigest` is what the review showed, in a
-// form two plans can be compared by: every status and change, every rename, every mapping's impact, the warnings, and
-// the id and version of every row the import reads for them. An edit elsewhere in the workspace does not change it;
-// anything that changes what the import does, does. `keptChoices` is what a refreshed review keeps.
+// form two plans can be compared by: every status and change, every rename, every mapping's impact, the warnings, the
+// id and version of every row the import reads for them, and what a new table or column is written with (step 7: the
+// reader's vendor, which the review and the server must read alike, decides a new column's type). An edit elsewhere in
+// the workspace does not change it; anything that changes what the import does, does. `keptChoices` is what a refreshed
+// review keeps.
 
 import type { ImportPlan, PlanChoices } from "./plan";
+import type { StandardColumn } from "./standard";
 
 export const STALE_REVIEW = (system: string) =>
   `${system} changed since you opened this review. The review now shows the current state; check it and import again.`;
 
 const row = (r: { id: string; version: number } | null) => (r ? `${r.id}@${r.version}` : null);
+
+/** A new column as it is written: everything but the file's line. */
+const newColumn = (c: StandardColumn) => ({ ...c, line: 0 });
 
 export function planDigest(plan: ImportPlan): string {
   return JSON.stringify({
@@ -22,12 +28,13 @@ export function planDigest(plan: ImportPlan): string {
       key: t.key,
       status: t.status,
       existing: row(t.existing),
+      file: t.status === "new" && t.file ? { type: t.file.objectType, format: t.file.fileFormat, comment: t.file.comment } : null,
       meta: t.meta,
       rows: t.rows,
       columns: t.columns.map((c) => ({
         status: c.status,
         existing: row(c.existing),
-        file: c.file?.name ?? null,
+        file: c.status === "new" && c.file ? newColumn(c.file) : (c.file?.name ?? null),
         changes: c.changes,
         position: c.position,
         rename: c.renameKey,

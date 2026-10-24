@@ -13,7 +13,7 @@ import { planFingerprint, STALE_REVIEW } from "../import/compare";
 import { readDdl } from "../import/ddl";
 import { relationshipsWithColumns, type ImportModel } from "../import/model";
 import { buildPlan, importSummary, type ImportCounts, type ImportTarget } from "../import/plan";
-import { MAX_IMPORT_ROWS, readStandard } from "../import/standard";
+import { CATALOG_VENDORS, MAX_IMPORT_ROWS, readStandard } from "../import/standard";
 import type { WorkspaceAccess } from "../permissions";
 import {
   IMPORT_CHANNELS,
@@ -40,6 +40,8 @@ const importInput = z
     /** The file's name, “pasted query result”, or the script's name for the DDL channel. */
     sourceLabel: z.string().trim().min(1).max(500),
     text: z.string().max(MAX_IMPORT_TEXT, "The file is too large for one import. Split it by database or schema."),
+    /** The query channel's database: SQL Server's `timestamp` is read as `rowversion` (step 7). */
+    vendor: z.enum(CATALOG_VENDORS).optional(),
     /** The DDL channel's fields (item 16). */
     ddl: z.object({ database: z.string().max(500).optional(), schema: z.string().max(500).optional() }).strict().optional(),
     scope: z.array(z.string().max(2000)).max(MAX_IMPORT_ROWS),
@@ -98,7 +100,7 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
   const read =
     i.channel === "ddl"
       ? readDdl(i.text, { database: i.ddl?.database, schema: i.ddl?.schema, fileName: i.sourceLabel }).read
-      : readStandard(i.text, i.sourceLabel);
+      : readStandard(i.text, i.sourceLabel, i.channel === "query" ? { vendor: i.vendor } : {});
   if (read.errors.length) return fail(domainError("invalid", read.errors[0]!));
   if (!i.scope.length) return fail(domainError("invalid", "Select at least one table to import."));
   const target: ImportTarget = "systemId" in i.target ? { systemId: i.target.systemId } : { newName: i.target.newName };

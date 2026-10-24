@@ -155,6 +155,17 @@ describe("readStandard: reading rules (item 8)", () => {
     expect(typeOf(r, "t", "g")).toEqual(["datetimeoffset", null, 2, null]); // written in the type: the column is not read
   });
 
+  it("reads SQL Server's timestamp as rowversion when the query channel says SQL Server; a file keeps timestamp (step 7)", () => {
+    const text = "database,schema,table,column,data_type\nd,dbo,t,ver,timestamp\nd,dbo,t,at,datetime2";
+    const sqlServer = readStandard(text, "pasted query result", { vendor: "sqlserver" });
+    expect(typeOf(sqlServer, "t", "ver")).toEqual(["rowversion", null, null, null]);
+    expect(typeOf(sqlServer, "t", "at")).toEqual(["datetime2", null, 7, null]);
+    // PostgreSQL's and Oracle's timestamp is a date with fractional seconds
+    for (const vendor of ["postgres", "oracle"] as const) expect(typeOf(readStandard(text, "q", { vendor }), "t", "ver")).toEqual(["timestamp", null, 6, null]);
+    // a file in the standard cannot tell the vendor (known-limitations.md)
+    expect(typeOf(ok(text), "t", "ver")).toEqual(["timestamp", null, 6, null]);
+  });
+
   it("keeps fractional seconds as precision; a type it cannot read stays as written, with a warning", () => {
     const r = ok("database,schema,table,column,data_type\nd,s,t,a,datetime2(7)\nd,s,t,b,timestamp(3)\nd,s,t,c,integer[]\nd,s,t,e,varchar(0)");
     expect(typeOf(r, "t", "a")).toEqual(["datetime2", null, 7, null]);
