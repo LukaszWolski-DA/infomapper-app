@@ -667,8 +667,9 @@ function TreeItem({
     >
       <span className={`size-[7px] flex-none rounded-full ${dot}`} />
       <span className="min-w-0 flex-1">
-        <span className={`block truncate ${kind === "src" ? "font-mono text-xs" : ""}`}>
-          <span className={missing === "table" ? "line-through decoration-im-warn" : undefined}>{name}</span>
+        {/* the strike-through is a class on the name's own span; only a missing mark adds an element (the dot) */}
+        <span className={`block truncate ${kind === "src" ? "font-mono text-xs" : ""} ${missing === "table" ? "line-through decoration-im-warn" : ""}`}>
+          {name}
           {missing && <span className="ml-1.5 inline-block size-1.5 rounded-full bg-im-warn align-middle" aria-label="missing from source" data-testid="dot-missing" />}
         </span>
         {hint && <span className="block truncate text-[11px] text-im-ink-3">{hint}</span>}
