@@ -1,6 +1,6 @@
 # Slice 7a – Acceptance
 
-Status: **step 7 (closing) done but for the two full e2e runs (24 October 2026); merge and tag on Łukasz's command.** Branch
+Status: **accepted (24 October 2026); merged into `main` and tagged `slice-07a`.** Branch
 `slice/07a-source-import`, from `main` at `576c614`. PRD: `docs/prd/slice-07a-source-import.md`. The PRD stays as
 written; this file is its amendment (Łukasz, 22 October 2026).
 
@@ -1382,15 +1382,22 @@ Each criterion against its spec. "Passed" is the latest run of that file; the cl
 | S7A-12 | `S7A-12.spec.ts` (3), `S7A-04-route.spec.ts` (2) | reviewer, reader and archived workspace see no import action; **the server refuses the reader, the reviewer and an archived workspace** (reviewer and archived added in step 7) | passed |
 | S7A-13 | `S7A-13.spec.ts` | no sample links on any channel; the standard and `template.csv` there | passed |
 | S7A-14 | `bench-import-*.ts` (steps 2–4), `S7A-14-review.spec.ts`, `S7A-14-counts.spec.ts`, `S3B-15-elements.spec.ts` | the figures within the bars at the 30,000-row limit (step 4); the review's filters ≤ 200 ms (step 5); counts over the whole plan (step 6); element counts equal `slice-06b`'s | passed |
-| S7A-15 | CI, two full runs | lint, typecheck, unit tests (87 files, 1,179 tests), `npm run schema:check` (a throwaway Postgres 18.3: "29 tables, 382 columns"): pass. **Two full runs: not run yet** (below). Changed earlier tests: S1A-09, S1A-13, S2C-06, S2C-07 (seed and default precision, step 6), S1A-13 (`max`, step 2), the format tests of step 4, `e2e/slice-06b/helpers.ts`'s `selected` | open |
+| S7A-15 | CI, two full runs | lint, typecheck, unit tests (87 files, 1,179 tests), `npm run schema:check` (a throwaway Postgres 18.3: "29 tables, 382 columns"): pass. Two full runs in a row: 275 passed each (below). Changed earlier tests: S1A-09, S1A-13, S2C-06, S2C-07 (seed and default precision, step 6), S1A-13 (`max`, step 2), the format tests of step 4, `e2e/slice-06b/helpers.ts`'s `selected` | passed |
 | S7A-16 | `S7A-16.spec.ts` (**new in step 7**), `plan.test.ts` | the demo's CRM (SQL Server) and WEB (PostgreSQL) and HR from Oracle, unchanged, through the query channel: no changes, no mapping to review, "No changes" | passed |
 | S7A-17 | `S7A-17.spec.ts`, `plan.test.ts` | DDL then the catalog query: only the computed column's type and the view; no mapping to review | passed |
 
 ### The two full runs
 
-**Not run.** A development server was still running when the runs were to start (port 3000, PID 26124, `npm run dev`
-with `next dev`, started 23 October 09:35). Stopping it was refused by the session's permission rules, and the runs need
-no dev server running (CLAUDE.md). They wait for that server to be stopped.
+24 October 2026, `npm run e2e` from scratch, one after the other:
+
+| Run | Time | Result | "The destination stream closed early" |
+| --- | --- | --- | --- |
+| 1 | 09:50–10:35, **44.5 min** | **275 passed, 0 failed** | 43 times, between tests (the known message) |
+| 2 | 10:35–11:22, **47.0 min** | **275 passed, 0 failed** | 44 times |
+
+**Not quite from scratch:** Łukasz's development server on port 3000 (PID 26124, `npm run dev`, started 23 October) was
+running during both runs. Stopping it was refused by the session's permission rules; Łukasz asked to finish the tests
+and merge. The runs use their own server on port 3200 and their own build folder (`.next-e2e`), as step 6's run did.
 
 ## Manual acceptance (the definition of done)
 
@@ -1453,3 +1460,8 @@ orders". The test files are in `src/domain/import/samples/`.
 8. **Back and Forward.** Click the Back button before the breadcrumbs a few times: the system panels and the items you
    selected come back one by one, the latest first (a system has no place on the canvas, so the view does not move);
    Forward walks the other way.
+
+## Łukasz's manual acceptance (24 October 2026)
+
+**Passed.** Łukasz ran the definition-of-done scenario above. Merged on his command: the branch into `main` through its
+pull request, as earlier slices, and tagged `slice-07a`.
