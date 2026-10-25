@@ -746,3 +746,142 @@ npx tsx scripts/bench-import-plan.ts --limit
   cascade together with step 4's form.
 - The worktree `../infomapper-base-07a` stays for step 3's write figure (A/B against the tag); its `node_modules` is a
   junction, removed with `rmdir` before `git worktree remove`.
+
+## Łukasz's answers to step 2 (25 October 2026)
+
+Step 2 accepted, with the plan timing and the text list. Two texts changed: the business key change without a mapping
+is **"Acknowledge"**, resolution **"Acknowledged: hash keys built on it change"** (half a year later the history must
+still say why it mattered); the change a delete acts on reads **"Deleted from the model"** (not "left the source").
+Decisions 1–10 as taken: "Delete table" keeps refusing mapped tables until step 4's D-47 form; the import showed "to
+resolve" without storing it until step 3. The worktree `../infomapper-base-07a` stays for step 3 and goes at the close.
+
+## Step 3: data and the commands (25 October 2026)
+
+### What changed
+
+- **Texts:** "Acknowledge" / "Acknowledged: hash keys built on it change"; "Deleted from the model" (step 2's answers).
+- **Migration** `supabase/migrations/20261025220000_source_changes.sql`: `retired_since` on `source_table` and
+  `source_column` (only on what left the source: a CHECK), `not_needed` on `source_column`, `changes_raised` and
+  `changes_high` on `source_import` (in its counts CHECK), the table `source_change` with CHECKs for its kind, severity
+  and status, a resolved change's three columns together, and the object each kind names (F5), indexes, row-level
+  security. No `valid_until` (Q10), no derivation (F1). `npm run schema:check` on a throwaway Postgres 18.3: "The schema
+  matches the domain: 30 tables, 408 columns".
+- **Local data file format 7** (`src/data/local/schema.ts`, `file.ts`): `source_change` with the same rules; the upgrade
+  (`upgradeDb`) reads formats 2–6 as 7, and from 6 runs `deriveSourceChanges` (F1, F2, Q3): the derived changes get
+  their change events, one change group per workspace, each signed by the person who ran the import, no undo step; the
+  file is written back at once, so the derived rows keep their ids. `model.listChanges`.
+- **Undo** (`undo.ts`): `source_change` is undoable; its parents are its system and import only (F5); settling a
+  mapping change (status, resolution, who, when) needs `mapping.set_status`, so a reviewer undoes their own
+  approve-again (Q6). **Undo labels** (`change-label.ts`): "Retire {label}", "Move the mappings of {label}", "Delete
+  {label}", "Map {label}", "Mark {label} not needed", "Decide {label} column by column", "Approve again {label}" or
+  "Approve {n} mappings again", "Leave {label} in review", "Acknowledge {label}", "Mark {column} as needed" / "not
+  needed". A group whose changes only settle as a side effect keeps its own label.
+- **The import** (`importSources`) stores the changes it raises and the settlements, in its change group;
+  `importStateOf` takes the workspace's changes; the upload route and the wizard pass them (the canvas page loads
+  `listChanges` into `importData`), so the review and the server plan alike (P8).
+- **The commands** (`src/domain/commands/source-change.ts`): `retireChange`, `moveChangeMappings`, `deleteChangeObject`,
+  `mapChangeColumn`, `markChangeNotNeeded`, `splitChange`, `acknowledgeChange`, `approveChangeAgain`,
+  `leaveChangeInReview`, `approveImportAgain` (the count the person saw must match, or stale), `markColumnNeeded`.
+  Permissions per F22: approve again, leave in review and approve all need `mapping.set_status` (reviewers too); the
+  others `model.edit`; the archive refuses all; the change's version is checked. Four-eyes from `lastContentEditor`.
+  Server actions in `src/app/_actions/source-change.ts` (step 4's panels call them).
+- **The settle rule** (`settleAfterWrites`, `src/domain/source-changes/settle.ts`): instead of changing a dozen commands,
+  `runCommand` runs it after every command, in its change group, as it runs the live canvas rules
+  (`withSettledChanges`, `src/app/_lib/run-command.ts`). It reads the writes: a mapping deleted (with its entity, its
+  attribute, by itself, or merged into another), a source table or column deleted (the table panel's delete included), a
+  status set in the mapping panel (only the status columns, and no input in the same group, so an input change of an
+  approved mapping is not taken for the panel's), an input removed, a column given a mapping (a new input or an input
+  pointed at it: the D-48 drag, the attribute panel, merge). An import's writes get none. It reads the changes and the
+  model only when the writes touch those tables and the workspace has an open change.
+
+### Tests
+
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: **92 files, 1,231 tests pass** (19 new):
+  `commands/source-change.test.ts` (9: one change group and its undo label, roles and the archive, stale, four-eyes, undo
+  of a delete and of a split, a reviewer's own undo, "Approve again all" with its count, mark as needed),
+  `settle.test.ts` (7 more: `settleAfterWrites` on the real commands' writes: the panel's status, deletes of a mapping,
+  an attribute and an entity, a merge, an input removed, a column mapped, the table panel's delete),
+  `commands/import.test.ts` (1: stored changes and events, a later import settles them, undo in order),
+  `requirement-store.test.ts` (1: a format-6 file's derived change, its event, written back once, no rule broken).
+- **Earlier tests changed:** the format tests expect 7 (`requirement-store.test.ts`, `working-layer-store.test.ts`);
+  the hand-built row sets of `undo.test.ts` and `frame.test.ts` list `source_change`; `compare-schema.test.ts` lists it.
+- **e2e, the specs the step touches** (63 tests, 9.7 min): all of `e2e/slice-07a/` (the import); S0-09; S1A-08, S1A-10,
+  S1A-11, S1A-12 (D-51, four-eyes, the reviewer); S1B-05, S1B-07, S1B-11, S1B-12, S1B-13 (deletes, merge, split, drags);
+  S3A-12; S3B-03, S3B-04 (deletes on live canvases); S4A-01, S4A-08, S4A-10, S4A-12, S4A-13, S2C-11, S4B1-01, -03, -05,
+  -06, -08, S4B2-01, -08, -12 (coverage, requirement links on deletes). **62 passed, 1 failed: S7A-05**, not a flake: its
+  two toasts now end with the changes to resolve ("…, 2 to resolve" after the partial file; "…, 8 to resolve (2 high)"
+  after the CRM file: 2 new tables, 3 new columns, 1 column that left, 2 mappings sent back). Spec updated (`0145ad0`);
+  then **3 of 3 passed** on its own (44, 48, 44 s).
+
+### The write timing (section 6)
+
+`npx tsx scripts/bench-import-write.ts 20000` (the server's steps through the local adapter, on copies of the demo
+data; median of 5 after a warm-up), against the worktree at `slice-07a` in the same sitting, three rounds each side,
+alternating. The bench reads the open changes as the server does now.
+
+| Figure, 20,000 columns | `slice-07a` (3 rounds → median) | this branch (3 rounds → median) | Change | Bar |
+| --- | --- | --- | --- | --- |
+| First import, with change events | 2,115, 2,109, 2,290 → **2,115 ms** | 2,136, 2,181, 2,186 → **2,181 ms** | +3 % | ≤ 10 %: met |
+| Re-import, 5 % changed, renamed or missing | 1,093, 1,106, 1,232 → **1,106 ms** | 1,117, 1,172, 1,154 → **1,154 ms** | +4 % | ≤ 10 %: met |
+| Undo the re-import | 506, 517, 571 → **517 ms** | 562, 549, 556 → **556 ms** | +8 % | ≤ 10 %: met |
+| Undo the first import | 2,481, 2,451, 2,609 → **2,481 ms** | 2,508, 2,537, 2,483 → **2,508 ms** | +1 % | ≤ 10 %: met |
+| Move a card after three large imports | 1,128, 1,137, 1,549 → **1,137 ms** | 1,318, 1,157, 1,150 → **1,157 ms** | +2 % | 7a's known miss (accepted, option 1) |
+
+The re-import raises 300 changes (the columns that leave; the synthetic system has no mappings); the data file is
+47 MB after both imports instead of 44, 133 MB after three instead of 128. The undo of the re-import grows most (+39 ms):
+it writes the 300 changes back too.
+
+### Proposed decision texts (for docs/decisions.md, after your approval)
+
+> - **D-56** Changes to resolve (slice 7b). Every source change that needs a decision becomes a change to resolve,
+>   stored as it was found (kind, severity, the object, a label that survives a rename or a delete, a detail) and
+>   settled with a resolution, who and when; resolved changes stay as the system's history. The kinds: a column or a
+>   table left the source; a new column or table in a system imported before; and, for a mapping the import sent back
+>   from approved, a type conflict, a business key column that changed type or a rule rewritten for a renamed column.
+>   A business key column that changed type with no such mapping is a change of its own. High when an approved mapping
+>   is affected or a business key changes type; normal otherwise. The review shows the changes and the requirements
+>   whose coverage changes before the import; afterwards they wait on the system's and table's panels, counted in the
+>   tree and the status bar. Every action shows what it does first and is one undo step: retire keeps a table or
+>   column as historical (a mapping is historical only when every input is retired; a retired input shows "until" the
+>   day it left); delete removes it from the model with its mappings, relationships and cards after showing them and
+>   the coverage change (D-47); move points the inputs that read the column at another; map to an attribute (a draft);
+>   not needed, which "Mark as needed" takes back; decide a new table column by column; approve the mapping again,
+>   only when it fits the source and following four-eyes; leave it in review; acknowledge a business key change. "Approve
+>   again all" approves the mappings one import sent back that fit and that the person may approve, and lists the others
+>   apart with the reason. A change settles itself when the source settles it (back in the source, gone before a
+>   decision) or when its object is deleted or its question answered elsewhere, each time with a resolution that says so;
+>   nothing is dropped silently. Reviewers approve again, leave in review and approve all; the other actions are for
+>   owners, admins and modelers. The changes slice 7a's imports left were derived when slice 7b was installed. The
+>   project home's model consistency and the canvas's Changes view show what source changes touch; the Changes view
+>   only fades, it changes no data or layout.
+>
+> - **D-55** (added) … An import raises the changes to resolve it finds and settles those the source settles (D-56); a
+>   table or column that comes back is no longer retired.
+>
+> - **D-51** (added) … Moving a mapping's input to another column after its column left the source, and deleting a
+>   column that is one input of a combined mapping, send an approved mapping back to review with the reason ("moved from
+>   {column} after it left the source", "{column} was deleted from the source"). A change to resolve about a mapping is
+>   settled by setting the mapping's status in its panel.
+>
+> - **D-31** (added) … A retired column has left the source, so its mappings cover no requirement either.
+>
+> - **D-39** (added) … The Changes view has a chip of its own. The Changes view and Focus exclude each other: turning one
+>   on turns the other off, and the chip says which one is on; "Show all" turns the Changes view off.
+
+### How to check
+
+```
+npx vitest run src/domain/source-changes src/domain/commands/source-change.test.ts src/domain/commands/import.test.ts src/data
+npx playwright test e2e/slice-07a
+npx tsx scripts/bench-import-write.ts 20000
+```
+
+No page shows the changes yet (step 4). In the browser, an import's toast now ends with "{n} to resolve ({h} high)";
+a data file from slice 7a is upgraded on the first read (`.data/dev-db.json` gets format 7 and its derived changes).
+
+### Open for step 4
+
+- The panels, the review's two callouts, the tree, the status bar, the canvas row marks, the forms; "Delete table" on
+  the cascade with its D-47 form (then `deleteSourceTable`'s refusal and its unit test go).
+- `withSettledChanges` runs in `runCommand` only; the benchmark's own server steps (`bench-import-write.ts`) do not run
+  it (imports get none anyway).
