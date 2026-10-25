@@ -885,3 +885,140 @@ a data file from slice 7a is upgraded on the first read (`.data/dev-db.json` get
   the cascade with its D-47 form (then `deleteSourceTable`'s refusal and its unit test go).
 - `withSettledChanges` runs in `runCommand` only; the benchmark's own server steps (`bench-import-write.ts`) do not run
   it (imports get none anyway).
+
+## Łukasz's answers to step 3 (25 October 2026)
+
+Step 3 accepted, with the timings and the S7A-05 spec update. The decision texts approved with one edit: in the D-51
+addition, "{column} was deleted from the source" becomes **"{column} was deleted from the model"** (the modeller deletes
+it from the model, not from the source; consistent with "Deleted from the model"). The code's text changed with it
+(`DELETED_INPUT_REASON`, `546c023`); the texts are in `docs/decisions.md` (`a5a6d3e`): D-56 new, D-55, D-51, D-31 and
+D-39 extended.
+
+## Handover after step 3 (25 October 2026)
+
+Written for the session that continues with step 4.
+
+### State
+
+- Steps 1–3 done and accepted. Branch `slice/07b-source-changes`, last commits: `546c023` (the reason text), `a5a6d3e`
+  (decisions), then this handover. Nothing pushed, no pull request.
+- CI green at step 3's close: lint, typecheck, `npm test` 92 files, 1,230 tests; `npm run schema:check` passes. The e2e
+  specs step 3 touched pass (S7A-05 updated). No full e2e run yet in this slice.
+- **Step 4** (PRD items 9, 17, 20–24): the review's two callouts, the system and table panels with the change cards,
+  the pending forms and the history, "Approve again all", the tree, the status bar, the canvas row marks, the panels'
+  retired and not-needed texts, and "Delete table" on the cascade with its D-47 form. One full e2e run after it
+  (answer 18).
+
+### Only in this conversation so far (now written down)
+
+- **Texts:** every resolution, settlement and form text is in `src/domain/source-changes/texts.ts` and listed in "Every
+  resolution and settlement text" (step 2), with step 2's and step 3's changes: "Acknowledge" / "Acknowledged: hash
+  keys built on it change", "Deleted from the model", "{column} was deleted from the model". The mapping panel's reason
+  line becomes "Sent back to review after a source change: {reason}." (F9, accepted with the other recommendations).
+- **The open points accepted after step 1:** the Move form says before the click when an input is removed ("…; the
+  input from {old} is removed."); a combined mapping with one retired input shows "until {date}" on that input and its
+  line segment the title "Retired: historical", type problems only through live inputs; "Approve again all" with
+  four-eyes on lists "These don't fit the source yet:" first, then the four-eyes list, a mapping in both only under the
+  first.
+- **The worktree `../infomapper-base-07a`** (the tag, for A/B timings) stays until the close. Its `node_modules` is a
+  junction to this checkout's: remove it with `cmd /c rmdir ..\infomapper-base-07a\node_modules` **before**
+  `git worktree remove ../infomapper-base-07a`, or the real `node_modules` goes with it.
+- **The data file:** a format-6 `.data/dev-db.json` is upgraded on its first read and written back as 7 with its derived
+  changes. The e2e data is reseeded from the seed, which records no import, so e2e starts with no changes.
+- **Tooling on this machine:** Python on Windows writes CRLF in text mode; edit files with `newline=""` (the repository
+  is LF). Long Bash heredocs with apostrophes sometimes break in this shell; the Edit and Write tools are safer.
+- **Step 5 later:** model consistency, the Changes view (exclusive with Focus, whole cards lit, a chip; F17, F18), the
+  URL parameters `?map=`, `?row=`, `?system=` (F15), "Show what it touched" only on canvas pages (F16), `seed:large`
+  gaining an import with changes for the Changes view's figure (question 17). Per-row fading is in `docs/ideas.md`.
+
+### What step 4 calls (server actions, `src/app/_actions/source-change.ts`)
+
+Each returns `ActionResult<ChangeOutcome>` with `{ resolution, label }` for the toast "{resolution}: {label}" with Undo
+(`useAction`'s `run(…, { undoable: true })`, as other actions). Inputs carry the change's id and version:
+
+| Card action | Server action | Input |
+| --- | --- | --- |
+| Retire: keep as historical | `retireChangeAction` | `{ changeId, expectedVersion }` |
+| Move its mappings… → Move | `moveChangeMappingsAction` | `+ targetColumnId` |
+| Delete… → Delete | `deleteChangeObjectAction` | `{ changeId, expectedVersion }` |
+| Map to an attribute… → Map | `mapChangeColumnAction` | `+ attributeId` |
+| Not needed / None of it is needed | `markChangeNotNeededAction` | `{ changeId, expectedVersion }` |
+| Decide column by column | `splitChangeAction` | `{ changeId, expectedVersion }` |
+| Approve the mapping again | `approveChangeAgainAction` | `{ changeId, expectedVersion }` |
+| Leave it in review | `leaveChangeInReviewAction` | `{ changeId, expectedVersion }` |
+| Acknowledge | `acknowledgeChangeAction` | `{ changeId, expectedVersion }` |
+| Approve again all {n} → Approve {n} | `approveImportAgainAction` | `{ importId, count }`: the {n} shown; another count is refused as stale |
+| Mark as needed (column panel) | `markColumnNeededAction` | `{ sourceColumnId, expectedVersion }` |
+
+What the panels compute in the browser, from the domain (pure, no server call):
+
+- **Which buttons:** `actionsFor(rows, change)` (`source-changes/actions.ts`); labels `ACTION_LABEL`, a new table's
+  "Not needed" reads `NONE_NEEDED_LABEL`. Who sees them: approve, leave in review and "Approve again all" need
+  `mapping.set_status` (reviewers too); every other action, acknowledge included, needs `model.edit`. The page already
+  knows the person's rights (`editable`, and the mapping panel's status rights).
+- **The pending forms:** Move: `moveTargets(rows, change)` (groups, same table first, `name · type`) and
+  `movePlan(rows, change, targetId)` (per mapping: back to review, the rule after, `note` when an input is removed;
+  `MOVE_HINT` under the select). Map: attributes by entity (the existing `GroupedSelect`), `MAP_HINT`. Delete:
+  `sourceDeleteCascade` and `sourceDeleteImpact` (below).
+- **"Approve again all":** `approveAllPlan(rows, importId, workspace, actorId, authorOf)` gives `approve`, `notFit`
+  (with `why`) and `refused`; `NOT_FIT_HEAD`, `FOUR_EYES_HEAD`. With four-eyes on, `authorOf` reads the page's
+  `contentAuthors` (the canvas page computes them when four-eyes is on).
+- **Card texts:** `KIND_TITLE`, the change's `detail`, `object_label`, the date (`isoDate(created_at)`); resolved:
+  `resolution`, `resolved_by`, `resolved_at`. Order: `byPriority` (high first). The impact line ("Feeds
+  {Entity.attribute} ({status})" with requirement keys, "{n} mappings on its columns", "On {canvases}") is the review's
+  `impactOf` way (`src/app/_panels/import/wizard-model.ts`) over the page's data.
+- **Historical:** `isRetired`, `untilOf(column)`, `isHistorical(inputs)`, `mappingUntil(inputs)`, `inputColumnsOf`
+  (`source-changes/rules.ts`).
+
+### Where step 4 plugs in
+
+- **The data on the page:** the canvas page (`src/app/w/[workspaceId]/p/[projectId]/c/[canvasId]/page.tsx`) already
+  loads `sourceChanges` (`store.model.listChanges`) and passes it to the wizard (`importData.changes`). Pass it to the
+  inspector, the left panel's tree and the status bar too; `model.sourceTables` / `sourceColumns` carry
+  `retired_since` and `not_needed`.
+- **The review's callouts (item 9):** `src/app/_panels/import/review-step.tsx`. The changes callout:
+  `raisedCallout(plan.raises, systemName)` (warning style when one is high). The coverage callout: `coverageDelta(
+  requirements, requirementLinks, scopeModelOf(state.model), scopeModelOf(materialize(state.model, applied.changes,
+  ctx)))` with `applyPlan` on the plan (any `newId`; ids do not matter for coverage), `coverageChangeText(d)` and
+  `d.why`; on a re-import with none: `NO_COVERAGE_CHANGE`. Both over the whole plan (7a step 5's condition). Measured:
+  95 ms at the 30,000-row limit (step 2); memoise on the plan.
+- **System panel (items 17, 20):** `src/app/_panels/system-panel.tsx`: "Changes to resolve ({n})" with the open cards
+  (`byPriority`), "Nothing to resolve.", "{n} resolved changes" folded (resolution, who, when); per import in
+  "Imports", "Approve again all {n}" when its open mapping changes have mappings in review; "Show what it touched on the
+  canvas" is step 5. **Table panel (item 21):** `SourceTablePanel` in `src/app/_panels/source-panels.tsx`, its open
+  changes without the history; the kind line's "Retired: historical since {date}" (`untilOf`); the columns list's right
+  side "retired" / "not needed" (prototype order: retired, missing, mapped, not needed, not used). **Column panel:**
+  `SourceColumnPanel` in the same file: "Retired: historical since {date}", "Marked not needed" and "Mark as needed".
+  **Mapping panel:** `src/app/_panels/mapping-panel.tsx:349`, the reason line's new text (F9) and "until {date}" on a
+  retired input.
+- **The label link** on a card (Q9): a column kind selects the column (its row if its table's card is on the canvas,
+  else `{ t: "element", kind: "source_column", id }`), a table kind the table; a deleted object's label is plain text.
+- **The tree (item 22):** `src/app/_panels/tree-data.ts` (`buildTree`: tables get `missing`; add `retired` and the
+  system's open count) and `left-panel.tsx`'s `sourceTree` (a retired table struck through in grey, tooltip "Retired,
+  historical."; the system's count). Slice 7a's lesson: no new element per tree item (41 extra spans, `add7b0a`); the
+  count is one element per system.
+- **The status bar (item 23):** `src/app/_panels/status-bar.tsx`: "Source changes to resolve {n}" in the warning style,
+  only while one is open (prototype), next to `status-type-problems`; test id `status-source-changes`.
+- **Canvas row marks (item 24, AD-24):** `src/canvas/card-data.ts` (`buildCards` sets `missing` from `missing_since`,
+  line 219): add `retired` (class `old`, title "Retired: historical"), `fresh` for an open `new_column` (class `new`) and
+  `changed` for another open change on the column (class `chg`), as the prototype's `colRow` (`im-old` wins over
+  `im-gone`, then `im-chg`, then `im-new`). Classes on the existing row element, styles in `src/canvas/canvas.css`; the
+  line segment of a retired input keeps `s gone` and gains the title. Then the element-count guard
+  (`S3B-15-elements.spec.ts` against `slice-07a`'s baseline, which needs a `slice-07a` measurement build; the worktree
+  above serves).
+- **"Delete table" on the cascade, with its D-47 form (Q7):** today `deleteSourceTable` (`src/domain/commands/source.ts`)
+  refuses mapped tables and the panel's `ConfirmDelete` (`source-panels.tsx`, around line 200) lists columns and
+  relationships. Step 4: `deleteSourceTable` builds its writes with `sourceDeleteCascade(rows, { tableId })` and
+  `sourceDeleteEdits(ctx, rows, cascade)` (no change acted on; open changes settle as "Settled: the table was deleted"
+  through the cascade), its server action (`deleteSourceTableAction`, `src/app/_actions/model.ts`) loads the rows a delete
+  reads (as `stateOf` in `_actions/source-change.ts`); the form shows `sourceDeleteImpact(rows, cascade, { canvases,
+  requirements, requirementLinks })`: "Delete the table {label} with:" its mappings (attribute, status, "deleted" or
+  "loses this input"), relationships, columns, canvas cards (canvases), each requirement whose coverage changes
+  ("{key} {a} of {n} → {b} of {n}", `coverageChangeText`) or `NO_COVERAGE_CHANGE`, and `DELETE_RETIRE_HINT` when the
+  table left the source; Delete and Cancel. The entity delete dialog (`src/app/_panels/delete-entity-dialog.tsx`,
+  `entityImpact`) is the pattern. The change card's "Delete…" shows the same impact in its pending form and calls
+  `deleteChangeObjectAction`. The unit test "refuses while a mapping reads one of its columns" (`source.test.ts:124`)
+  changes with it.
+- **e2e for step 4:** `e2e/slice-07b/`, one file per criterion (S7B-02, -04 to -11 and -15's page parts), from the
+  slice 7a helpers (`openWizard`, `giveFile`, `importNow`, `sample`, `crmPartial`); the CRM file after `crmPartial`
+  raises 8 changes (2 high), which is the definition of done's scenario.
