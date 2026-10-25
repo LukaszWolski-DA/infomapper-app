@@ -796,7 +796,7 @@ resolve" without storing it until step 3. The worktree `../infomapper-base-07a` 
 
 ### Tests
 
-- `npm run lint`, `npm run typecheck`: pass. `npm test`: **92 files, 1,231 tests pass** (19 new):
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: **92 files, 1,230 tests pass** (18 new):
   `commands/source-change.test.ts` (9: one change group and its undo label, roles and the archive, stale, four-eyes, undo
   of a delete and of a split, a reviewer's own undo, "Approve again all" with its count, mark as needed),
   `settle.test.ts` (7 more: `settleAfterWrites` on the real commands' writes: the panel's status, deletes of a mapping,
