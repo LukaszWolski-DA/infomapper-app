@@ -6,8 +6,9 @@ Read this file at the start of every session. It is short on purpose; the detail
 
 InfoMapper is a data-modeling application for data warehouse work. Business analysts model concepts, entities and
 attributes, describe physical source tables and columns (by hand, or imported and re-imported from a file, a catalog
-query's result or DDL scripts, slice 7a), map columns to attributes, and trace requirements to all of it. One workspace
-holds one model; projects and canvases organise the work on it.
+query's result or DDL scripts, slice 7a), map columns to attributes, and trace requirements to all of it. A re-import
+turns every source change that needs a decision into a change to resolve, settled on the system's panel with one undo
+step per action (slice 7b, D-56). One workspace holds one model; projects and canvases organise the work on it.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -322,5 +323,13 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   files in `src/domain/import/samples/` are read only by tests (an ESLint rule; P10: no samples in the app). Missing
   marks on the canvas are classes on existing elements (`row.gone`, `path.s.gone`; AD-24); a source system is a
   selection `{ t: "element", kind: "source_system" }` and a history place (`GONE.source_system`).
+- **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
+  (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
+  `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a
+  resolution (`settle.ts`), never silently. The cards are `src/app/_panels/source-changes.tsx`. Historical means every
+  input retired (`isHistorical`): out of coverage, type problems and model consistency. Model consistency
+  (`consistency.ts`) is computed on the project home's every load; its lines open objects with `?map=`, `?row=`,
+  `?system=`. The Changes view (`src/canvas/Changes.tsx`, `changes-view.ts`; what it lights: `touched.ts`) is a fade
+  request like Focus, and the two turn each other off; each driver clears only its own request (`lit:changes:` keys).
 - Writes: a server action calls `runCommand()` (`src/app/_lib/run-command.ts`), which runs the domain command and
   applies its write set through the adapter; refusals come back with the domain's message and are shown as toasts.

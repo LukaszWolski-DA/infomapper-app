@@ -1,6 +1,6 @@
 # Slice 7b – Acceptance
 
-Status: **step 5 done (25 October 2026), waiting for Łukasz; a figure missed its bar (see step 5).** Branch `slice/07b-source-changes`, from
+Status: **step 6, the closing, done (25 October 2026); Łukasz's manual acceptance next.** Branch `slice/07b-source-changes`, from
 `main` at `dd072b6` (tag `slice-07a`). PRD: `docs/prd/slice-07b-source-changes.md`. The PRD stays as written; this file
 is its amendment.
 
@@ -1287,15 +1287,12 @@ screen, median / p95, ms):
 | 30 % | 74.7 / 133.0 | 24.0 / 32.5 | 37.6 / 56.8 | 64.6 / 78.3 | 50.9 / 73.8 | 18.0 / 22.1 |
 
 - **≤ 100 ms to the screen: met** in every case (medians).
-- **Within 10 % of Focus: missed.** Turning the view on: +14 % at 100 % (41.4 against 36.2), **+47 % at 30 %** (74.7
-  against 50.9); off: +5 % and +33 % (24.0 against 18.0, 6 ms). The split at 30 %, on: main thread 25.2 ms against
-  Focus's 17.7, raster 42.1 against 26.8. The two do not light the same: all open changes light 22 cards spread over
-  the canvas; Focus on ent:23 lights its neighbours. More holes in the veil and more lit lines mean more to raster
-  after the switch; the main thread's extra is the bar and the chip appearing (above the canvas, no layout read in a
-  commit) and the lit set's computation. Per the PRD, a miss stops the step: **your decision**. Options: (a) accept
-  the ≤ 100 ms bar alone, since the lit sets differ, (b) let me compare against Focus on a selection that lights about
-  as many cards (a frame or a multi-selection of the 22), or (c) let me take phase traces of the 30 % case (script,
-  style, layout, paint, layerize, as S6A-09-hand does) to find what to cut.
+- **Compared with Focus (information, Łukasz's answer to step 5):** the PRD's bar is Focus's absolute bar from slice
+  4b-1 (≤ 100 ms), met at 74.7 ms; “within 10 % of Focus” was step 1's proposal, not the bar. Turning the view on
+  took +14 % at 100 % (41.4 against 36.2) and +47 % at 30 % (74.7 against 50.9); off +5 % and +33 % (24.0 against
+  18.0). The split at 30 %, on: main thread 25.2 ms against 17.7, raster 42.1 against 26.8. The two light different
+  amounts of the canvas: all open changes light 22 cards spread over it, Focus on ent:23 lights one entity's
+  neighbours, so the veil has more holes and more lit lines to raster. No further measurement.
 
 ### How to check in the browser
 
@@ -1308,3 +1305,107 @@ screen, median / p95, ms):
   per import; Focus turns it off and back; “Show what it touched on the canvas” under each import in CRM's panel.
 - With four-eyes on (workspace settings): CRM's card for `cust_no` shows “Approve the mapping again” disabled with the
   reason; the import's entry reads “Review the 2 sent back…”.
+
+## Łukasz's answers to step 5 (25 October 2026)
+
+Step 5 accepted. The Changes view's bar is Focus's absolute bar from slice 4b-1 (≤ 100 ms), met at 74.7 ms; the
+comparison with Focus stays as information, with its reason (above), and no further measurement. The decisions
+accepted: the second four-eyes wording, “without an active source” high only when an affected requirement covers the
+attribute, the warning colour on the button, the chip with the date only, the seed flag for the figures.
+
+## Step 6: the closing (25 October 2026)
+
+### Docs (PRD section 10)
+
+- **README:** the status (7b waits for acceptance on its branch), what slice 7b brings, its acceptance link, the new
+  commands (`bench-consistency.ts`, `seed:large -- --changes`, `S7B-16-changes.spec.ts`).
+- **CLAUDE.md:** changes to resolve in “What this is”, and a paragraph on where they live (raising, settling, cards,
+  historical, model consistency, the Changes view's fade keys); the commands added in step 5.
+- **`docs/inventory-prototype-vs-app.md`:** every 7b item removed; “Sources” lists only 7c's (classifications, notes,
+  suggested classifications, the classification list, the Data Vault reading) and the idea of relationship lines.
+- **`docs/known-limitations.md`:** “Imports raise no changes to resolve yet” removed; the import's undo explains a
+  resolution in between (F13); a new section “Changes to resolve”: the derived changes are no undo step, model
+  consistency lists every line, it is fresh on each load, the Changes view lights whole cards (and its figure against
+  Focus).
+- **`docs/ideas.md`:** “Approve again all {n}” removed (done); section 9's “not planned yet”: a change as a history
+  place, telling the others about new changes, resolving changes from the Changes view's bar. (“Per-row fading in the
+  Changes view” was added in step 1.)
+- `docs/decisions.md` and `docs/data-model-v2.md` were changed in step 3, with your approval of the texts.
+
+### Acceptance criteria
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S7B-01 | `S7B-01.spec.ts`; `raise.test.ts` | met: five kinds from the wizard with severity, label, detail, the toast's and the stored counts, none on a first import; `table_left` also in S7B-04/-06; `rule_updated` unit-tested only (the test files do not raise it; as in step 4) |
+| S7B-02 | `S7B-02.spec.ts` (2) | met: both callouts over the whole plan; “No requirement’s coverage changes.” on an unchanged re-import |
+| S7B-03 | `S7B-03.spec.ts` (2); `raise.test.ts` | met |
+| S7B-04 | `S7B-04.spec.ts` (2) | met: column and table, the grey marks, `until`, coverage |
+| S7B-05 | `S7B-05.spec.ts` | met: direct and combined (that input only), reason, rule, retired, target settled |
+| S7B-06 | `S7B-06.spec.ts` (3) | met: the form before anything, Cancel, Delete, the table panel's same cascade |
+| S7B-07 | `S7B-07.spec.ts` | met |
+| S7B-08 | `S7B-08.spec.ts` (2) | met, with step 4's answer 1 (disabled with the reason) |
+| S7B-09 | `S7B-09.spec.ts` (2) | met, with step 4's answer 2; one undo step |
+| S7B-10 | `S7B-10.spec.ts`; bulk in S7B-09 | met |
+| S7B-11 | `S7B-11.spec.ts` (2) | met |
+| S7B-12 | `S7B-12.spec.ts`; `derive.test.ts` | met |
+| S7B-13 | `S7B-13.spec.ts` (4); `consistency.test.ts` | met |
+| S7B-14 | `S7B-14.spec.ts` (4); `consistency.test.ts` (touched) | met; “from a home page” through model consistency's system line (F16) |
+| S7B-15 | `S7B-15.spec.ts`; readers in S7B-13, -14 | met: reviewer, reader, archived, the server refuses; a reader sees consistency and the view (the reviewer's view of them is not a separate test) |
+| S7B-16 | `S7B-16-changes.spec.ts`, `S3B-15-elements.spec.ts`, `bench-*.ts` | met (step 5's figures; the comparison with Focus as information) |
+| S7B-17 | CI and the two runs below | see below. Earlier e2e specs changed (`git diff slice-07a -- e2e`): S7A-05 (step 3, the summaries' “to resolve”) and S7A-10 (step 4, the mapping panel's reason line); none in step 5. Earlier unit tests changed: `tree-data`, `canvas`, `requirement-store`, `working-layer-store` (format 7), `frame`, `undo`, `compare-schema` (`source_change`), `import`, `plan`, `source` (the delete's cascade) |
+
+### Manual acceptance: the definition of done (PRD section 5)
+
+**Prepare** (with no e2e run going), in the repository on `slice/07b-source-changes`:
+
+```
+npm run reset-dev-data
+node -e "const fs=require('fs');fs.writeFileSync('.data/crm_partial.tsv',fs.readFileSync('src/domain/import/samples/crm_sqlserver_catalog.tsv','utf8').split(/\r?\n/).filter(l=>!/\tsegment\t/.test(l)&&!/\tcustomer_addresses\t/.test(l)).join('\r\n'))"
+npm run dev
+```
+
+The second line writes CRM's catalog file without `customers.segment` and `customer_addresses` to
+`.data/crm_partial.tsv` (git-ignored), so that two columns have left the source by the end: one to retire, one to
+move. Open http://localhost:3000, pick **Łukasz**, Retail Co – DWH, Customer 360, the canvas Customer & orders.
+
+1. **First import.** Sources tab, CRM's ⋯ button: CRM's panel. “Re-import CRM…”, drop `.data/crm_partial.tsv`, go to
+   the review, import. *See:* the toast “Imported into CRM: 7 missing from source, 2 to resolve”; the tree shows **2**
+   next to CRM.
+2. **The re-import with the changed file.** “Re-import CRM…” again with
+   `src/domain/import/samples/crm_snapshot_2026-10-20.csv`; at the review, *read the two callouts* above the tables:
+   “Requirements whose coverage changes” (REQ-102 among them, “{a} of {n} → {b} of {n}” with why) and “After the import,
+   8 changes to resolve, 2 of them high. They wait on CRM’s page until you decide: …” in the warning style. Import.
+3. **After the import.** *See:* the toast ends “8 to resolve (2 high)”; the tree shows **9** next to CRM; the status bar
+   “Source changes to resolve **9**” in the warning style; CRM's panel “Changes to resolve (9)”, the two high cards
+   first (`cust_no` business key changed, `email_addr` mapping no longer fits); on the canvas, the customers card marks
+   `consent_flag` and `customer_segment` new, `created_ts` and `segment` missing.
+4. **Retire a column that left.** On the `dbo.customers.segment` card: “Retire: keep as historical”. *See:* “Retired:
+   kept as historical: dbo.customers.segment” with Undo; the row grey on the canvas with the title “Retired: historical”;
+   the column panel “Retired: historical since {today}”; the change under “{n} resolved changes” with you and the time.
+5. **Move another's mapping to its renamed column.** On `dbo.customers.created_ts`: “Move its mappings…”, choose
+   `created_on`. *See before the click:* the hint that moved approved mappings go back to review and the old column is
+   retired, and the rule after the move. Move. *See:* “Mappings moved to customers.created_on: dbo.customers.created_ts”;
+   the `created_on` new-column change settled with it.
+6. **Not needed, then needed again.** On `dbo.customers.customer_segment`: “Not needed”. *See:* “Marked not needed: …”;
+   the table panel's columns list says “not needed”. Open the column (its row): “Marked not needed” and “Mark as
+   needed”; click it. *See:* “Marked as needed: customer_segment”.
+7. **Approve one mapping again.** First open “Review the 2 sent back…” under the CRM snapshot import in “Imports”:
+   `Customer.customer_number` to approve, `Customer.email` under “These don't fit the source yet:” with its type
+   conflict, and the button “Approve 1”. Cancel. On the `dbo.customers.cust_no` card: “Approve the mapping again”.
+   *See:* “Approved again: dbo.customers.cust_no”.
+8. **“Approve again all” for the rest.** “Review the 1 sent back…”: `Customer.email` listed under “don't fit” and
+   “Approve 0” disabled, since it does not fit the source (P8 wins over P9; step 1, Q11). Cancel, and on the
+   `email_addr` card choose “Leave it in review”. *See:* “Left in review: dbo.customers.email_addr”. (To see the
+   four-eyes case: switch four-eyes on in the workspace settings; your own import's mappings then show “Approve the
+   mapping again” disabled with “Someone else approves this: your import sent it back, and four-eyes is on.”)
+9. **Model consistency.** The Home tab. *See:* “Model consistency” with its badge between the stats and Canvases: type
+   conflicts (`customers.email_addr → Customer.email`, in review, and the seed's own two), mappings back in review after a
+   source change (with their reasons), affected requirements with “{a}/{n} covered”, and “CRM {n} changes to decide”.
+   Click a line: the canvas opens with that mapping, attribute or CRM's panel selected.
+10. **The Changes view for the import.** In CRM's panel, under the snapshot import: “Show what it touched on the
+    canvas”. *See:* the bar “Changes”, the select on that import, “{n} tables, {m} mappings, {k} attributes”, the rest of
+    the canvas faded, the chip “Changes: import into CRM, {date}” in the breadcrumbs row. Switch the select to “All open
+    changes”, then click Focus: the Changes view turns off and the chip says Focus. Turn Changes on again and Close.
+11. **Undo the last action.** Undo in the top bar (or Ctrl+Z). *See:* the toast's Undo or the button takes back
+    “Left in review”: the `email_addr` change is open again in “Changes to resolve”, and the count in the tree and the
+    status bar goes up by one.
