@@ -12,7 +12,7 @@ import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
 import type { CardData } from "./card-data";
 import { CanvasUiCtx } from "./context";
-import { focusOn, requestFade, type FocusTarget } from "./fade";
+import { currentFade, fadeKey, focusOn, requestFade, type FocusTarget } from "./fade";
 import type { Selection } from "./line-data";
 import { useValue } from "./value-store";
 
@@ -78,13 +78,14 @@ export const FocusDriver = memo(function FocusDriver({ target, canvasId }: { tar
   // nothing (`requestFade`)
   useEffect(() => {
     if (on) requestFade(target ? { focus: target } : null);
-    else if (was.current) requestFade(null);
+    // the Changes view may own the request by now (slice 7b: they exclude each other): clear only Focus's own
+    else if (was.current && !fadeKey(currentFade()).startsWith("lit:changes:")) requestFade(null);
     was.current = on;
   }, [on, target]);
   useEffect(
     () => () => {
       focusOn.set(false);
-      requestFade(null);
+      if (!fadeKey(currentFade()).startsWith("lit:changes:")) requestFade(null);
     },
     [canvasId],
   );

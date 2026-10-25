@@ -2,10 +2,13 @@
 
 // The source system's panel (slice 7a, item 38; prototype insSystem): its counts, “Re-import {system}…” for those who
 // may edit, its changes to resolve with the resolved history (slice 7b, item 20), and its imports, newest first, each
-// with “Approve again all {n}” while mappings it sent back wait in review (item 17). Opened from the Sources tab's open
+// with “Show what it touched on the canvas” (the Changes view for it, item 26) and “Review the {n} sent back…” while
+// mappings it sent back wait in review (item 17). Opened from the Sources tab's open
 // button, a table panel's system link, after an import, and by Back and Forward (a history place, item 39).
 
 import { useState } from "react";
+import { changesImport } from "@/canvas/changes-import";
+import { changesOn } from "@/canvas/changes-view";
 import type { SourceSystem } from "@/domain/types";
 import { Fold, Hint, Kind, primaryClass } from "./fields";
 import { ImportWizard } from "./import/import-wizard";
@@ -58,6 +61,19 @@ export function SystemPanel({ system: s }: { system: SourceSystem }) {
                 <b>{i.at}</b> · {i.label} · {i.by}
                 <br />
                 <span className="text-im-ink-3">{i.summary}</span>
+                <br />
+                {/* the Changes view for this import (slice 7b, item 26; F16: the panel shows only on canvas pages) */}
+                <button
+                  type="button"
+                  className="text-xs text-im-logical hover:underline"
+                  onClick={() => {
+                    const v = changesImport(i.id, s.name, i.at, i.label);
+                    changesOn.set({ sel: v.id, chip: v.chip });
+                  }}
+                  data-testid="button-show-touched"
+                >
+                  Show what it touched on the canvas
+                </button>
                 <ApproveAgainAll importId={i.id} />
               </li>
             ))}

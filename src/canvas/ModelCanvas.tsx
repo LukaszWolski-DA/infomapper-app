@@ -71,6 +71,8 @@ import FrameLayer, { type FramePart } from "./FrameLayer";
 import { useFrames, type CardPatch, type FrameWrites, type ReqMover } from "./useFrames";
 import HoverOverlay from "./HoverOverlay";
 import { CoverageLayer } from "./CoverageLayer";
+import { ChangesBar, ChangesDriver } from "./Changes";
+import type { ChangesImport } from "./changes-import";
 import { FocusDriver, focusTargetOf } from "./Focus";
 import FadeLayer from "./FadeLayer";
 import { useRequirementIndex, type FadeData, type FadeNote } from "./fade-canvas";
@@ -125,6 +127,7 @@ const NO_DIAGNOSIS: Diagnosis = {};
 const NO_FRAMES: FrameData[] = [];
 const NO_CONCEPTS: Record<string, string> = {};
 const NO_NOTES: NoteData[] = [];
+const NO_IMPORTS: ChangesImport[] = [];
 
 /** How far the grid layer reaches past the pane: the largest grid step (Lines at the highest zoom). Also in canvas.css. */
 const GRID_BLEED = 32 * MAX_ZOOM;
@@ -170,6 +173,14 @@ export interface ModelCanvasProps {
   focusRequirementId?: string | null;
   /** A note asked for on arrival (the project home's open notes, slice 3a): selected and in view. */
   focusNoteId?: string | null;
+  /**
+   * `?map=`, `?row=`, `?system=` (slice 7b, F15; the project home's model consistency): a mapping, a row (or the
+   * element when its card is not here) or a source system, selected on arrival; a mapping and a row are brought into
+   * view by their card (a mapping by its source's card, else its entity's; prototype `goTo`).
+   */
+  focusSelection?: Selection;
+  /** The imports the Changes view's select offers, newest first (slice 7b, item 26). */
+  changeImports?: readonly ChangesImport[];
   /** Measurement-only switches (only the measurement-only production build passes them). */
   diagnosis?: Diagnosis;
   /** What fading needs to work out what it lights (slice 4p): the live model and the requirements. */
@@ -295,6 +306,8 @@ export function ModelCanvas({
   focusLabelId,
   focusRequirementId,
   focusNoteId,
+  focusSelection,
+  changeImports,
   diagnosis = NO_DIAGNOSIS,
   fadeData,
   notes: initialNotes = NO_NOTES,
@@ -793,6 +806,30 @@ export function ModelCanvas({
     select({ t: "req", id: focusRequirementId });
     window.history.replaceState(null, "", window.location.pathname);
   }, [ready, focusRequirementId, select]);
+
+  const focusedSelection = useRef(false);
+  useEffect(() => {
+    if (!ready || !focusSelection || focusedSelection.current) return;
+    focusedSelection.current = true;
+    select(focusSelection);
+    const cardId =
+      focusSelection.t === "row"
+        ? focusSelection.cardId
+        : focusSelection.t === "map"
+          ? (() => {
+              const model = fadeData?.model;
+              const m = model?.mappings.find((x) => x.id === focusSelection.id);
+              if (!model || !m) return undefined;
+              const columns = new Set(model.mappingInputs.filter((i) => i.mapping_id === m.id && i.deleted_at === null).map((i) => i.source_column_id));
+              const tables = new Set(model.sourceColumns.filter((c) => columns.has(c.id)).map((c) => c.source_table_id));
+              const entity = model.attributes.find((a) => a.id === m.attribute_id)?.entity_id;
+              const cards = cardNodesOf(rf).map((n) => n.data.card);
+              return (cards.find((c) => c.kind === "src" && tables.has(c.targetId)) ?? cards.find((c) => c.kind === "ent" && c.targetId === entity))?.id;
+            })()
+          : undefined;
+    if (cardId) centerOn(cardId);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [ready, focusSelection, fadeData, rf, select, centerOn]);
 
   const cardOf = useCallback(
     (t: CardTarget) =>
@@ -2154,10 +2191,12 @@ export function ModelCanvas({
             <DropTargetMark store={dropStore} lines={bundled ?? lines} bundles={bundled?.bundles} blocks={blocks} mapsById={mapsById} />
           </OverlayLayer>
           <FocusDriver target={focusTarget} canvasId={canvasId} />
+          <ChangesDriver data={fadeData} canvasId={canvasId} />
           {draft && <DraftLine draft={draft} />}
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>
         {asking && <ConceptQuestion question={asking.question} onAnswer={asking.answer} kind={asking.kind} />}
+        <ChangesBar imports={changeImports ?? NO_IMPORTS} />
         {nodes.length === 0 && frames.length === 0 && (
           <div className="im-empty" data-testid="canvas-empty">
             <div>
