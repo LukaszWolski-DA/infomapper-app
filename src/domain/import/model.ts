@@ -1,9 +1,9 @@
 // What the import engine reads (slice 7a, step 3): the workspace's sources, their relationships, and the mappings that
-// read them, with the attributes and entities they feed. The rows are the domain's; a relationship comes with its
+// read them, with the attributes and entities they feed, and the changes to resolve (slice 7b). The rows are the domain's; a relationship comes with its
 // column pairs (`relationshipsWithColumns` puts them together).
 
 import type { Uuid } from "../ids";
-import type { Attribute, Entity, Mapping, MappingInput, SourceColumn, SourceRelationship, SourceRelationshipColumn, SourceSystem, SourceTable, Timestamp } from "../types";
+import type { Attribute, Entity, Mapping, MappingInput, SourceChange, SourceColumn, SourceRelationship, SourceRelationshipColumn, SourceSystem, SourceTable, Timestamp } from "../types";
 
 export type ImportTable = SourceTable;
 export type ImportColumn = SourceColumn;
@@ -31,6 +31,8 @@ export interface ImportModel {
   mappingInputs: readonly MappingInput[];
   attributes: readonly Attribute[];
   entities: readonly Entity[];
+  /** The workspace's changes to resolve (slice 7b): an import settles the open ones the source settles (P7). */
+  changes?: readonly SourceChange[];
 }
 
 /** The engine's view of stored rows: each live relationship with its live column pairs. */

@@ -243,7 +243,7 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
       file_format: null,
       row_count: rows,
       comment: null,
-      missing_since: null,
+      missing_since: null, retired_since: null,
     };
     db.source_table.push(table);
     const parsed = parseColumnLines(columns.map(([n, t]) => `${n} ${t}`).join("\n"));
@@ -262,7 +262,7 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
         is_pii: has(flags, "PII"),
         default_value: null,
         comment: null,
-        missing_since: null,
+        missing_since: null, retired_since: null, not_needed: false,
       };
       db.source_column.push(column);
     });

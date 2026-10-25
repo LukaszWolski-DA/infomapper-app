@@ -98,6 +98,7 @@ export function createSourceTable(
     row_count: null,
     comment: null,
     missing_since: null,
+    retired_since: null,
   };
   writes.push({ kind: "insert", table: "source_table", row: table });
   columns.columns.forEach((c, i) => {
@@ -115,6 +116,8 @@ export function createSourceTable(
       default_value: null,
       comment: null,
       missing_since: null,
+      retired_since: null,
+      not_needed: false,
     };
     writes.push({ kind: "insert", table: "source_column", row: column });
   });

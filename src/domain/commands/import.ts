@@ -120,11 +120,11 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
     writes.push({ kind: "insert", table: "source_system", row: system });
   }
   for (const t of c.tables.insert) {
-    const row: SourceTable = { ...newRowColumns(ctx), ...t, workspace_id: ws, missing_since: null };
+    const row: SourceTable = { ...newRowColumns(ctx), ...t, workspace_id: ws, missing_since: null, retired_since: null };
     writes.push({ kind: "insert", table: "source_table", row });
   }
   for (const col of c.columns.insert) {
-    const row: SourceColumn = { ...newRowColumns(ctx), ...col, workspace_id: ws, default_value: null, missing_since: null };
+    const row: SourceColumn = { ...newRowColumns(ctx), ...col, workspace_id: ws, default_value: null, missing_since: null, retired_since: null, not_needed: false };
     writes.push({ kind: "insert", table: "source_column", row });
   }
   const byId = <R extends { id: Uuid }>(rows: readonly R[]) => new Map(rows.map((r) => [r.id, r]));
@@ -162,8 +162,10 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
     const row: SourceRelationshipColumn = { ...newRowColumns(ctx), ...p, workspace_id: ws };
     writes.push({ kind: "insert", table: "source_relationship_column", row });
   }
+  // slice 7b: the changes it raises and settles (`c.changes`) are written from step 3, with the `source_change` table
   const record: SourceImport = {
     ...newRowColumns(ctx),
+    id: c.importId,
     workspace_id: ws,
     source_system_id: c.system.id,
     channel: i.channel,

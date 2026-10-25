@@ -46,6 +46,10 @@ export function planDigest(plan: ImportPlan): string {
     renames: plan.renames.map((r) => [r.key, r.choice, r.suggested, r.options]),
     mappings: plan.mappings.map((m) => ({ id: row({ id: m.mappingId, version: m.version }), status: m.status, back: m.sendsBack, reasons: m.reasons, conflicts: m.conflicts, fits: m.fitsAgain, rule: m.ruleAfter })),
     mass: plan.massWarning,
+    // slice 7b: what it raises, and the open changes it settles at the version read (a change resolved meanwhile
+    // refuses the import)
+    raises: plan.raises,
+    settles: plan.settles.map((s) => [row({ id: s.changeId, version: s.version }), s.why]),
   });
 }
 

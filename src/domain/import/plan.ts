@@ -11,11 +11,16 @@
 //   not have, an input marked business key changes type, or a renamed input is named in its rule (rewritten).
 //   Position changes are written and shown among the unchanged columns (step 1, answer 11); a comment the file would
 //   overwrite shows as a change (answer 8).
+//   Changes to resolve (slice 7b, P1, P4, P7; prototype `issue(...)` and `settle(...)` in `applyPlan`): what the import
+//   raises (`raises`) and which open changes the source settles (`settles`) are part of the plan, so the review shows
+//   them and P8 compares them. A first import of a system raises none; mapping changes only for mappings the import
+//   sends back from approved (step 1, Q13).
 
 import type { Uuid } from "../ids";
 import { columnTypeKey, sameColumnType } from "../model/column-type";
 import { checkMappingTypes, formatAttributeType, formatColumnType, type ColumnType } from "../model/type-check";
-import type { Attribute, MappingStatus } from "../types";
+import { DETAIL } from "../source-changes/texts";
+import type { Attribute, MappingStatus, SourceChange, SourceChangeKind, SourceChangeSeverity } from "../types";
 import type { ImportColumn, ImportMapping, ImportModel, ImportRelationship, ImportTable } from "./model";
 import { tableKey, type StandardColumn, type StandardField, type StandardRead, type StandardTable } from "./standard";
 
@@ -116,6 +121,32 @@ export interface MappingImpact {
   fitsAgain: Uuid[];
   /** The rule after renamed inputs are rewritten; null when it stays. */
   ruleAfter: string | null;
+  /** The change it raises when sent back (slice 7b): type conflict before business key before rule (prototype). */
+  kind: "type_conflict" | "business_key_changed" | "rule_updated" | null;
+  /** The first input the import changes; the change names it. */
+  columnId: Uuid | null;
+}
+
+/** A change to resolve the import raises (slice 7b, item 6); new tables and columns get their ids when applied. */
+export interface PlannedRaise {
+  kind: SourceChangeKind;
+  severity: SourceChangeSeverity;
+  tableKey: string;
+  /** The existing table, or null for a new one (found by `tableKey` when applied). */
+  tableId: Uuid | null;
+  /** The existing column; a new column is named by `columnName`. */
+  columnId: Uuid | null;
+  columnName: string | null;
+  mappingId: Uuid | null;
+  objectLabel: string;
+  detail: string;
+}
+
+/** An open change the source settles (P7): its column or table is back, or a new one left before a decision. */
+export interface PlannedSettle {
+  changeId: Uuid;
+  version: number;
+  why: "back" | "left_before_decision";
 }
 
 export interface ImportPlan {
@@ -136,6 +167,10 @@ export interface ImportPlan {
   mappings: MappingImpact[];
   /** Item 23: more than half of the system's present columns would be marked missing. */
   massWarning: { missing: number; present: number } | null;
+  /** Changes to resolve it raises, in table order, then the mappings it sends back (slice 7b). */
+  raises: PlannedRaise[];
+  /** Open changes the source settles (slice 7b, P7). */
+  settles: PlannedSettle[];
 }
 
 const lower = (s: string) => s.toLowerCase();
@@ -413,7 +448,98 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
     if (present && missing > present / 2) massWarning = { missing, present };
   }
 
-  return { target, systemName, errors, warnings, fields, compare: choices.compare, leftOut, tables, relationships, renames, mappings, massWarning };
+  const { raises, settles } = planChanges(model, systemId, tables, mappings, liveMappings, mappingsOfColumn);
+  return { target, systemName, errors, warnings, fields, compare: choices.compare, leftOut, tables, relationships, renames, mappings, massWarning, raises, settles };
+}
+
+const isOpenChange = (c: SourceChange) => c.deleted_at === null && c.status === "open";
+
+/**
+ * What the import raises and settles (slice 7b, items 6–7; prototype `applyPlan`). Raised in an existing system only:
+ * a table not in the file (`table_left`, high when one of its columns has an approved mapping); a column not in the file
+ * of a table that is (`column_left`, high with an approved mapping on it); a new table (`new_table`); a new column in an
+ * existing table (`new_column`); per mapping sent back from approved, its first reason's kind (high, unless only its rule
+ * was rewritten); a business key column whose type changed and raised no mapping change (`business_key_changed`, high).
+ * Settled: a table's or column's “left” change when it is back; a “new” change when it leaves before a decision.
+ */
+function planChanges(
+  model: ImportModel,
+  systemId: Uuid | null,
+  tables: readonly PlanTable[],
+  mappings: readonly MappingImpact[],
+  liveMappings: ReadonlyMap<Uuid, ImportMapping>,
+  mappingsOfColumn: ReadonlyMap<Uuid, Uuid[]>,
+): { raises: PlannedRaise[]; settles: PlannedSettle[] } {
+  const raises: PlannedRaise[] = [];
+  const settles: PlannedSettle[] = [];
+  if (!systemId) return { raises, settles };
+  const open = (model.changes ?? []).filter((c) => isOpenChange(c) && c.source_system_id === systemId);
+  const settled = new Set<Uuid>();
+  const settleWhere = (match: (c: SourceChange) => boolean, why: PlannedSettle["why"]) => {
+    for (const c of open) {
+      if (!match(c) || settled.has(c.id)) continue;
+      settled.add(c.id);
+      settles.push({ changeId: c.id, version: c.version, why });
+    }
+  };
+  const mappingsOn = (columnId: Uuid) => (mappingsOfColumn.get(columnId) ?? []).flatMap((id) => liveMappings.get(id) ?? []);
+  const approvedOn = (columnId: Uuid) => mappingsOn(columnId).some((m) => m.status === "approved");
+  const sentBack = mappings.filter((m) => m.sendsBack);
+  const raisedOn = new Set(sentBack.map((m) => m.columnId));
+  const placeOf = new Map<Uuid, { tableKey: string; tableId: Uuid; label: string }>();
+
+  for (const t of tables) {
+    const tableLabel = `${t.file?.schema ?? t.existing!.schema_name}.${t.file?.name ?? t.existing!.name}`;
+    const tableId = t.existing?.id ?? null;
+    const base = { tableKey: t.key, tableId, columnId: null, columnName: null, mappingId: null };
+    if (t.status === "missing") {
+      const gone = t.columns.filter((c) => c.status === "missing");
+      raises.push({ ...base, kind: "table_left", severity: gone.some((c) => approvedOn(c.existing!.id)) ? "high" : "normal", objectLabel: tableLabel, detail: DETAIL.tableLeft(gone.length) });
+      settleWhere((c) => c.kind === "new_table" && c.source_table_id === tableId, "left_before_decision");
+    } else if (t.status === "new") {
+      raises.push({ ...base, kind: "new_table", severity: "normal", objectLabel: tableLabel, detail: DETAIL.newTable(t.columns.length) });
+      continue;
+    } else if (t.status === "back") {
+      settleWhere((c) => c.kind === "table_left" && c.source_table_id === tableId, "back");
+    }
+    for (const c of t.columns) {
+      if (c.status === "unchanged" || c.status === "still_missing") continue;
+      const columnName = c.file?.name ?? c.existing!.name;
+      const label = `${tableLabel}.${columnName}`;
+      if (c.existing && raisedOn.has(c.existing.id)) placeOf.set(c.existing.id, { tableKey: t.key, tableId: tableId!, label });
+      if (c.status === "missing") {
+        const id = c.existing!.id;
+        settleWhere((x) => x.kind === "new_column" && x.source_column_id === id, "left_before_decision");
+        if (t.status !== "missing") {
+          raises.push({ ...base, kind: "column_left", severity: approvedOn(id) ? "high" : "normal", columnId: id, objectLabel: label, detail: DETAIL.columnLeft(formatColumnType(c.existing!), mappingsOn(id).length) });
+        }
+      } else if (c.status === "new" && t.existing) {
+        raises.push({ ...base, kind: "new_column", severity: "normal", columnName, objectLabel: label, detail: DETAIL.newColumn(formatColumnType(c.file!)) });
+      } else if (c.status === "back") {
+        const id = c.existing!.id;
+        settleWhere((x) => x.kind === "column_left" && x.source_column_id === id, "back");
+      }
+      // a business key column whose type changed and raised no mapping change (the prototype's second `bk`)
+      if (c.existing && c.file && c.existing.is_business_key && !raisedOn.has(c.existing.id) && columnTypeKey(c.existing) !== columnTypeKey(c.file)) {
+        raises.push({ ...base, kind: "business_key_changed", severity: "high", columnId: c.existing.id, objectLabel: label, detail: DETAIL.businessKeyChanged(formatColumnType(c.existing), formatColumnType(c.file)) });
+      }
+    }
+  }
+  for (const m of sentBack) {
+    const place = m.columnId ? placeOf.get(m.columnId) : undefined;
+    raises.push({
+      kind: m.kind!,
+      severity: m.kind === "rule_updated" ? "normal" : "high",
+      tableKey: place?.tableKey ?? "",
+      tableId: place?.tableId ?? null,
+      columnId: m.columnId,
+      columnName: null,
+      mappingId: m.mappingId,
+      objectLabel: place?.label ?? m.label,
+      detail: DETAIL.mappingSentBack(m.label, m.reasons),
+    });
+  }
+  return { raises, settles };
 }
 
 function planRelationships(
@@ -570,15 +696,20 @@ function planMappings(model: ImportModel, tables: readonly PlanTable[], liveMapp
     const problemAfter = new Set(checkAfter.problems.map((p) => p.source_column_id));
     const reasons: string[] = [];
     const conflicts: MappingImpact["conflicts"] = [];
+    let conflict = false, businessKey = false;
     for (const id of inputs) {
       const a = after.get(id);
       const col = afterCols.find((c) => c.id === id)!;
       const short = `${formatColumnType(col)} into ${formatAttributeType(attribute)}`;
       if (problemAfter.has(id)) conflicts.push({ columnId: id, short });
       if (!a) continue;
-      if (problemAfter.has(id) && !problemBefore.has(id)) reasons.push(`type conflict, ${short}`);
+      if (problemAfter.has(id) && !problemBefore.has(id)) {
+        reasons.push(`type conflict, ${short}`);
+        conflict = true;
+      }
       if (a.before.is_business_key && columnTypeKey(a.before) !== columnTypeKey(a.type)) {
         reasons.push(`business key column changed type, ${formatColumnType(a.before)} → ${formatColumnType(a.type)}`);
+        businessKey = true;
       }
     }
     if (ruleAfter) reasons.push(`its rule now reads ${ruleAfter}`);
@@ -596,6 +727,8 @@ function planMappings(model: ImportModel, tables: readonly PlanTable[], liveMapp
       conflicts,
       fitsAgain,
       ruleAfter,
+      kind: conflict ? "type_conflict" : businessKey ? "business_key_changed" : ruleAfter ? "rule_updated" : null,
+      columnId: inputs.find((id) => after.has(id)) ?? null,
     });
   }
   return out;
@@ -609,10 +742,22 @@ export interface ImportCounts {
   columns_renamed: number;
   columns_missing: number;
   relationships_new: number;
+  /** Changes to resolve it raises, and the high ones among them (slice 7b, item 8). */
+  changes_raised: number;
+  changes_high: number;
 }
 
 export function planCounts(plan: ImportPlan): ImportCounts {
-  const counts: ImportCounts = { tables_new: 0, columns_new: 0, columns_changed: 0, columns_renamed: 0, columns_missing: 0, relationships_new: 0 };
+  const counts: ImportCounts = {
+    tables_new: 0,
+    columns_new: 0,
+    columns_changed: 0,
+    columns_renamed: 0,
+    columns_missing: 0,
+    relationships_new: 0,
+    changes_raised: plan.raises.length,
+    changes_high: plan.raises.filter((r) => r.severity === "high").length,
+  };
   for (const t of plan.tables) {
     if (t.status === "new") counts.tables_new++;
     for (const c of t.columns) {
@@ -628,7 +773,10 @@ export function planCounts(plan: ImportPlan): ImportCounts {
 
 const plural = (n: number, one: string, many = `${one}s`) => `${n.toLocaleString("en-GB")} ${n === 1 ? one : many}`;
 
-/** “2 new tables, 5 new columns, 1 changed column, 1 renamed column, 3 missing from source, 1 new relationship” (item 28). */
+/**
+ * “2 new tables, 5 new columns, 1 changed column, 1 renamed column, 3 missing from source, 1 new relationship” (item 28),
+ * then “4 to resolve (2 high)” (slice 7b, item 8).
+ */
 export function importSummary(k: ImportCounts): string {
   const parts: string[] = [];
   if (k.tables_new) parts.push(plural(k.tables_new, "new table"));
@@ -637,5 +785,6 @@ export function importSummary(k: ImportCounts): string {
   if (k.columns_renamed) parts.push(plural(k.columns_renamed, "renamed column"));
   if (k.columns_missing) parts.push(`${k.columns_missing.toLocaleString("en-GB")} missing from source`);
   if (k.relationships_new) parts.push(plural(k.relationships_new, "new relationship"));
+  if (k.changes_raised) parts.push(`${k.changes_raised.toLocaleString("en-GB")} to resolve${k.changes_high ? ` (${k.changes_high.toLocaleString("en-GB")} high)` : ""}`);
   return parts.join(", ") || "No changes";
 }
