@@ -13,6 +13,11 @@ import { canvasUrl, crmPartial, expectToast, loadModel, openCanvas, RETAIL, samp
 
 export { asPerson, setFourEyes } from "../slice-04a/helpers";
 export { undo } from "../slice-03a/helpers";
+export { mappingLine, row, treeItem } from "../slice-01a/helpers";
+export { filterCount, imports, importNow, openWizard, reviewFile, systemNamed } from "../slice-07a/helpers";
+
+/** Today as the changes write their dates (ISO, UTC). */
+export const today = () => new Date().toISOString().slice(0, 10);
 export { canvasUrl, crmPartial, expectToast, loadModel, openCanvas, RETAIL, sample, SEED_IDS, signInAs, store };
 
 /**

@@ -82,7 +82,7 @@ test("S7A-10: a mapping an import sent back to review shows the reason under its
   await importNow(page, /^Imported into CRM: /);
   await row(page, "customers", seedId(RETAIL, "column:customers.cust_no")).click();
   await page.getByTestId("panel-source-column").getByRole("button", { name: /Customer\.customer_number/ }).click();
-  await expect(page.getByTestId("note-review-reason")).toHaveText("An import sent it back to review: business key column changed type, varchar(20) → varchar(25).");
+  await expect(page.getByTestId("note-review-reason")).toHaveText("Sent back to review after a source change: business key column changed type, varchar(20) → varchar(25).");
   // a mapping in review without a reason (the seed's dob → birth_date, renamed by the import) shows none
   await row(page, "customers", seedId(RETAIL, "column:customers.dob")).click();
   await page.getByTestId("panel-source-column").getByRole("button", { name: /Customer\.birth_date/ }).click();

@@ -13,7 +13,7 @@ import {
   sourceSystem,
   sourceTable,
 } from "@/domain/__fixtures__/domain";
-import type { WorkspaceModel } from "@/domain/types";
+import type { SourceChange, WorkspaceModel } from "@/domain/types";
 import { buildCards, visibleRows, type CardData } from "./card-data";
 import { besideAnchor, besideSpots, cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, newCardHeight, stackSpot, zoomAround } from "./geometry";
 import { splitName } from "./names";
@@ -255,5 +255,49 @@ describe("auto-scroll while dragging (edgePush)", () => {
     expect(near).toBeGreaterThan(0);
     expect(near).toBeLessThan(EDGE_SPEED);
     expect(edgePush({ x: 80, y: 300 }, box).x).toBeGreaterThan(EDGE_SPEED);
+  });
+});
+
+describe("buildCards: source changes (slice 7b, item 24)", () => {
+  const change = (kind: SourceChange["kind"], columnId: string, status: SourceChange["status"] = "open"): SourceChange => ({
+    id: `01900000-0000-7000-8000-0000000d${columnId.slice(-4)}${kind.length}`,
+    workspace_id: ids.ws,
+    version: 1,
+    created_at: NOW,
+    created_by: ids.someoneElse,
+    updated_at: NOW,
+    updated_by: ids.someoneElse,
+    deleted_at: null,
+    source_system_id: ids.crm,
+    source_import_id: ids.crm,
+    kind,
+    severity: "normal",
+    status,
+    source_table_id: ids.crmCustomer,
+    source_column_id: columnId,
+    mapping_id: null,
+    object_label: "dbo.customer.x",
+    detail: "",
+    resolution: status === "resolved" ? "Noted" : null,
+    resolved_by: status === "resolved" ? ids.someoneElse : null,
+    resolved_at: status === "resolved" ? NOW : null,
+  });
+  const rows = (m: WorkspaceModel, changes: SourceChange[]) => buildCards(m, items, undefined, null, changes).find((c) => c.kind === "src")!.rows;
+
+  it("marks a retired column old (over missing), an open new column new, another open change chg; resolved changes mark nothing", () => {
+    const retired = { ...model, sourceColumns: model.sourceColumns.map((c) => (c.id === ids.colEmail ? { ...c, missing_since: NOW, retired_since: NOW } : c)) };
+    const r = rows(retired, [change("new_column", ids.colCustId), change("column_left", ids.colEmail), change("type_conflict", ids.colFirstName), change("new_column", ids.colFirstName)]);
+    expect(r.map((x) => [x.name, x.retired ?? false, x.missing ?? false, x.change ?? null])).toEqual([
+      ["cust_id", false, false, "new"],
+      ["email", true, false, null],
+      ["first_name", false, false, "chg"],
+    ]);
+    expect(rows(model, [change("new_column", ids.colCustId, "resolved")]).every((x) => !x.change)).toBe(true);
+  });
+
+  it("takes type problems only through live inputs: a retired input is historical (Q10)", () => {
+    const retired = { ...model, sourceColumns: model.sourceColumns.map((c) => (c.id === ids.colFirstName ? { ...c, missing_since: NOW, retired_since: NOW } : c)) };
+    expect(buildCards(model, items).find((c) => c.kind === "ent")!.rows[0]!.warn).toBe(true);
+    expect(buildCards(retired, items).find((c) => c.kind === "ent")!.rows[0]!.warn).toBe(false);
   });
 });
