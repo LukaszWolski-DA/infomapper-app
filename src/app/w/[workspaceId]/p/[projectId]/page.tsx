@@ -7,7 +7,9 @@ import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { projectLabels, type ProjectLabelContext } from "@/domain/model/labels";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
+import { modelConsistency } from "@/domain/source-changes/consistency";
 import type { CanvasItem, WorkspaceModel } from "@/domain/types";
+import { ProjectConsistency } from "./_components/project-consistency";
 import { ProjectLabels } from "./_components/project-labels";
 import { ProjectNotes } from "./_components/project-notes";
 import { ProjectRequirements } from "./_components/project-requirements";
@@ -27,7 +29,8 @@ function labelContext(model: WorkspaceModel, items: readonly CanvasItem[]): Proj
 }
 
 // Project home (D-29): the project's canvases as tiles; the labels used on them and pinned to the project, and the
-// number and list of their open notes (slice 3a); the requirements whose scope touches its canvases (slice 4a).
+// number and list of their open notes (slice 3a); the requirements whose scope touches its canvases (slice 4a); model
+// consistency (slice 7b, item 25).
 export default async function ProjectHomePage({ params }: PageProps<"/w/[workspaceId]/p/[projectId]">) {
   const { workspaceId, projectId } = await params;
   const shell = await loadShell({ workspaceId, projectId });
@@ -35,7 +38,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   const n = view.canvases.length;
   const store = getDataStore();
   const ws = shell.workspace.id;
-  const [model, items, labels, links, pins, notes, frames, allCanvases, requirements, requirementLinks] = await Promise.all([
+  const [model, items, labels, links, pins, notes, frames, allCanvases, requirements, requirementLinks, sourceChanges] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.labels.list(ws),
@@ -46,6 +49,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
     store.canvases.list(ws),
     store.requirements.list(ws),
     store.requirements.listLinks(ws),
+    store.model.listChanges(ws),
   ]);
   // labels with a live canvas (slice 3b): “Open live canvas” instead of “Open as live canvas”
   const withLive = new Set(allCanvases.filter((c) => c.deleted_at === null && c.live_label_id).map((c) => c.live_label_id!));
@@ -62,8 +66,14 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   });
 
   // Requirements whose scope touches the project's canvases (slice 4a): one index for the page
-  const projectReqs = projectRequirements(buildRequirementIndex(requirements, requirementLinks, model), items, view.canvases.map((c) => c.id));
+  const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
+  const projectReqs = projectRequirements(requirementIndex, items, view.canvases.map((c) => c.id));
   const reqCovered = projectReqs.filter((r) => r.done).length;
+
+  // Model consistency (slice 7b, item 25): computed on every load; each line opens its object on a canvas (F15)
+  const consistency = modelConsistency(model, items, view.canvases.map((c) => c.id), requirementIndex, projectReqs, sourceChanges);
+  const firstCanvasId = view.canvases[0]!.id;
+  const consistencyHref = (canvasId: string, query: string) => `${canvasHref(ws, view.project.id, canvasId || firstCanvasId)}?${query}`;
 
   // Open notes: canvas by canvas in tab order; each opens its canvas with the note selected (S3A-05)
   const openNotes = projectOpenNotes(notes, view.canvases, items, frames, model).map((n) => ({
@@ -98,6 +108,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
               <b>{projectReqs.length}</b> requirement{projectReqs.length === 1 ? "" : "s"}, <b>{reqCovered}</b> covered
             </span>
           </div>
+          <ProjectConsistency consistency={consistency} href={consistencyHref} />
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Canvases</h3>
           <CanvasTiles view={view} />
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Requirements</h3>
