@@ -30,6 +30,9 @@ import {
 import type { Uuid } from "@/domain/ids";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 import type { WorkspaceAccess } from "@/domain/permissions";
+import { sourceDeleteCascade, sourceDeleteImpact, type SourceDeleteImpact } from "@/domain/source-changes/delete";
+import { getDataStore } from "@/data";
+import { getSessionUser } from "../_lib/session";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
@@ -132,4 +135,22 @@ export async function approveImportAgainAction(workspaceId: string, input: Appro
 
 export async function markColumnNeededAction(workspaceId: string, input: MarkNeededInput): Promise<ActionResult<{ name: string }>> {
   return changeCommand(workspaceId, (ctx, access, state) => markColumnNeeded(ctx, access, { column: state.columns.find((c) => c.id === input?.sourceColumnId) ?? null }, input));
+}
+
+/**
+ * What a delete of a source table or column takes with it, before anything happens (D-47, item 13; step 1 answer Q7):
+ * read on the server, where every canvas's cards and the requirements are, for the change's “Delete…” and the table
+ * panel's “Delete table”. Reading needs membership only; the delete itself checks the rights.
+ */
+export async function sourceDeleteImpactAction(workspaceId: string, target: { tableId: string } | { columnId: string }): Promise<ActionResult<SourceDeleteImpact>> {
+  const user = await getSessionUser();
+  if (!user) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const store = getDataStore();
+  const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
+  if (!workspace || !(await store.workspaces.getMember(workspace.id, user.id))) return { ok: false, code: "not_found", message: NOT_FOUND.error.message };
+  const [state, canvases, requirements] = await Promise.all([stateOf(store, workspace.id), store.canvases.list(workspace.id), store.requirements.list(workspace.id)]);
+  const rows = { ...state, relationships: state.relationships ?? [], relationshipColumns: state.relationshipColumns ?? [], canvasItems: state.canvasItems ?? [] };
+  const cascade = target && typeof target === "object" ? sourceDeleteCascade(rows, "tableId" in target ? { tableId: target.tableId } : { columnId: target.columnId }) : null;
+  if (!cascade) return { ok: false, code: "not_found", message: "This table or column does not exist any more." };
+  return { ok: true, value: sourceDeleteImpact(rows, cascade, { canvases, requirements, requirementLinks: state.requirementLinks ?? [] }) };
 }

@@ -23,6 +23,7 @@ import type { ActionResult } from "@/app/_lib/run-command";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { FOUR_EYES_MESSAGE } from "@/domain/model/mapping-rules";
+import { untilOf } from "@/domain/source-changes/rules";
 import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
@@ -252,6 +253,12 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
                 <span className={`flex-none font-mono text-[11px] ${problem ? "text-im-warn" : "text-im-ink-3"}`} title={problem?.message}>
                   {c ? formatColumnType(c) : ""}
                 </span>
+                {/* a retired input is historical, until the day its column left the source (slice 7b, Q10) */}
+                {c && untilOf(c) && (
+                  <span className="flex-none text-[11px] text-im-ink-3" title="Retired: historical" data-testid="input-until">
+                    until {untilOf(c)}
+                  </span>
+                )}
                 {p.editable && (
                   <>
                     <button type="button" className={iconButton} aria-label="Move up" disabled={index === 0} onClick={() => move(index, -1)}>
@@ -343,10 +350,10 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
           onChange={(status: MappingStatus) => void run(() => setMappingStatusAction(p.workspaceId, { ...ref, status }))}
         />
       </Field>
-      {/* why an import sent it back to review (slice 7a, item 37; D-51); cleared by any change of status or content */}
+      {/* why an import or a source change sent it back to review (slice 7a, item 37; 7b, F9; D-51); cleared by any change of status or content */}
       {m.status === "review" && m.review_reason && (
         <Note warn testId="note-review-reason">
-          An import sent it back to review: {m.review_reason}.
+          Sent back to review after a source change: {m.review_reason}.
         </Note>
       )}
       {fourEyesBlocks && <Note warn testId="note-four-eyes">{FOUR_EYES_MESSAGE}</Note>}

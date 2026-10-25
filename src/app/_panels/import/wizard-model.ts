@@ -1,7 +1,11 @@
 // The import wizard's state and the texts it derives (slice 7a, PRD items 20–27; prototype `W`, `canGo`, `footNote`,
 // `targetName`, and the review's `impact`). Pure functions over the page's data; the dialog is `import-wizard.tsx`.
 
+import { applyPlan } from "@/domain/import/apply";
 import type { DdlTranslation } from "@/domain/import/ddl";
+import { materialize } from "@/domain/import/materialize";
+import type { ImportModel } from "@/domain/import/model";
+import { coverageDelta, scopeModelOf, type CoverageDelta } from "@/domain/source-changes/coverage";
 import type { ImportPlan, ImportTarget, MissingScope, PlanColumn } from "@/domain/import/plan";
 import type { StandardRead } from "@/domain/import/standard";
 import type { Requirement, RequirementLink, SourceChange, WorkspaceModel } from "@/domain/types";
@@ -99,8 +103,23 @@ export interface ImpactLine {
   requirementKeys: string[];
 }
 
+/**
+ * Requirements whose coverage the import changes (slice 7b, item 9, Q3): the requirement index on the model before and
+ * on the model as the plan leaves it, over the whole plan (not only what the review renders). Ids of new rows do not
+ * matter for coverage, so the review makes its own.
+ */
+export function planCoverage(model: ImportModel, plan: ImportPlan, data: Pick<ImportData, "requirements" | "requirementLinks">): CoverageDelta[] {
+  if (!data.requirements.some((r) => r.deleted_at === null)) return [];
+  const now = new Date().toISOString();
+  let n = 0;
+  const applied = applyPlan(model, plan, { actorId: "review", now, newId: () => `review-${++n}` });
+  if (!applied.ok) return [];
+  const after = materialize(model, applied.changes, { workspaceId: "review", actorId: "review", now });
+  return coverageDelta(data.requirements, data.requirementLinks, scopeModelOf(model), scopeModelOf(after));
+}
+
 /** Lookups the review's impact needs, built once per model. */
-export function impactIndex(data: ImportData) {
+export function impactIndex(data: Pick<ImportData, "model" | "requirements" | "requirementLinks">) {
   const attribute = new Map(data.model.attributes.map((a) => [a.id, a]));
   const entity = new Map(data.model.entities.map((e) => [e.id, e]));
   const mapping = new Map(data.model.mappings.map((m) => [m.id, m]));

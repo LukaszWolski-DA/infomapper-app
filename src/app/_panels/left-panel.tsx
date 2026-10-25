@@ -335,12 +335,22 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
           <div className="group/head sticky top-0 z-[2] flex items-center bg-im-panel">
             <GroupHead open={isOpen(shut, key, q)} count={total} dot={<i className="size-2 flex-none rounded-[2px] bg-im-physical" />} onClick={() => fold(key)} testId="tree-system-head">
               {s.name}
+              {/* its open changes to resolve (slice 7b, item 22): one element per system */}
+              {s.openChanges > 0 && (
+                <span
+                  className="ml-1 inline-grid h-4 min-w-4 place-items-center rounded-lg bg-im-warn px-1 text-[10.5px] font-semibold text-im-surface"
+                  title={`${s.openChanges} change${s.openChanges === 1 ? "" : "s"} to resolve`}
+                  data-testid="tree-system-changes"
+                >
+                  {s.openChanges}
+                </span>
+              )}
             </GroupHead>
-            {/* the system's panel: counts, re-import and its imports (slice 7a, items 33, 38) */}
+            {/* the system's panel: counts, re-import, changes to resolve and its imports (slice 7a, items 33, 38; 7b) */}
             <button
               type="button"
               className={addClass}
-              title={`Open ${s.name}: imports`}
+              title={`Open ${s.name}: imports and changes to resolve`}
               aria-label={`Open ${s.name}`}
               data-testid="button-open-system"
               onClick={() => {
@@ -376,7 +386,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                         name={t.name}
                         hint={hint}
                         meta={t.meta}
-                        missing={t.missing ? "table" : t.columnsMissing ? "columns" : null}
+                        missing={t.retired ? "retired" : t.missing ? "table" : t.columnsMissing ? "columns" : null}
                         presence={t.presence}
                         dragData={{ target: { sourceTableId: t.id }, rows: t.fields.length }}
                         onClick={() => open({ sourceTableId: t.id }, t.cardId, t.fields.length)}
@@ -620,7 +630,7 @@ const PRESENCE_TITLE: Record<Presence, string> = {
 };
 
 /** The tooltip's first sentence for a table missing from source, or with columns missing (slice 7a, item 33). */
-const MISSING_TITLE = { table: "Missing from source. ", columns: "Some columns are missing from source. " } as const;
+const MISSING_TITLE = { table: "Missing from source. ", columns: "Some columns are missing from source. ", retired: "Retired, historical. " } as const;
 
 function TreeItem({
   kind,
@@ -668,9 +678,11 @@ function TreeItem({
       <span className={`size-[7px] flex-none rounded-full ${dot}`} />
       <span className="min-w-0 flex-1">
         {/* the strike-through is a class on the name's own span; only a missing mark adds an element (the dot) */}
-        <span className={`block truncate ${kind === "src" ? "font-mono text-xs" : ""} ${missing === "table" ? "line-through decoration-im-warn" : ""}`}>
+        <span
+          className={`block truncate ${kind === "src" ? "font-mono text-xs" : ""} ${missing === "table" ? "line-through decoration-im-warn" : missing === "retired" ? "text-im-ink-3 line-through decoration-im-ink-3" : ""}`}
+        >
           {name}
-          {missing && <span className="ml-1.5 inline-block size-1.5 rounded-full bg-im-warn align-middle" aria-label="missing from source" data-testid="dot-missing" />}
+          {(missing === "table" || missing === "columns") && <span className="ml-1.5 inline-block size-1.5 rounded-full bg-im-warn align-middle" aria-label="missing from source" data-testid="dot-missing" />}
         </span>
         {hint && <span className="block truncate text-[11px] text-im-ink-3">{hint}</span>}
       </span>

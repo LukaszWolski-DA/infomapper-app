@@ -5,7 +5,7 @@ import type { Uuid } from "@/domain/ids";
 import { rowShown } from "@/domain/model/card-size";
 import type { CardSubject } from "@/domain/model/frames";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
-import type { CanvasItem, LiveLevel, RowFilter, WorkspaceModel } from "@/domain/types";
+import type { CanvasItem, LiveLevel, RowFilter, SourceChange, WorkspaceModel } from "@/domain/types";
 import { lineNeedsClip, rowNeedsClip, titleNeedsClip } from "./text-fit";
 
 export type CardKind = "ent" | "src";
@@ -36,6 +36,13 @@ export interface CardRow {
   relevant?: boolean;
   /** A column missing from source (slice 7a, item 34): struck through and muted, a class on the row. */
   missing?: true;
+  /** A retired column (slice 7b, item 24): grey, “Retired: historical”; wins over `missing`. */
+  retired?: true;
+  /**
+   * An open change to resolve on the column (slice 7b, item 24; prototype `colRow`): `new` for a new column to decide,
+   * `chg` for any other open change. A class on the row; `retired` and `missing` win.
+   */
+  change?: "new" | "chg";
 }
 
 export interface CardData {
@@ -107,7 +114,14 @@ export interface LiveCards {
 }
 
 /** The cards of one canvas, in drawing order (sources first, as in the prototype). */
-export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], labelNames: LabelNames = NO_LABELS, live: LiveCards | null = null): CardData[] {
+export function buildCards(
+  model: WorkspaceModel,
+  items: readonly CanvasItem[],
+  labelNames: LabelNames = NO_LABELS,
+  live: LiveCards | null = null,
+  /** The workspace's changes to resolve (slice 7b): the open ones mark their columns. */
+  changes: readonly SourceChange[] = [],
+): CardData[] {
   const labelsOf = (key: string) => labelNames.get(key)?.join(", ") || null;
   const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
   const columnById = new Map(model.sourceColumns.map((c) => [c.id, c]));
@@ -116,6 +130,13 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
   const tableById = new Map(model.sourceTables.map((t) => [t.id, t]));
   const systemById = new Map(model.sourceSystems.map((s) => [s.id, s]));
   const columnTable = (columnId: Uuid) => tableById.get(columnById.get(columnId)?.source_table_id ?? "");
+  // open changes by column (slice 7b, item 24): another kind wins over a new column's
+  const changeOf = new Map<Uuid, "new" | "chg">();
+  for (const c of changes) {
+    if (c.status !== "open" || c.deleted_at !== null || !c.source_column_id) continue;
+    if (c.kind !== "new_column") changeOf.set(c.source_column_id, "chg");
+    else if (!changeOf.has(c.source_column_id)) changeOf.set(c.source_column_id, "new");
+  }
 
   const inputsOf = new Map<Uuid, Uuid[]>();
   for (const i of model.mappingInputs) inputsOf.set(i.mapping_id, [...(inputsOf.get(i.mapping_id) ?? []), i.source_column_id]);
@@ -135,7 +156,8 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
     const attribute = attributeById.get(m.attribute_id);
     if (!attribute) continue;
     const columns = (inputsOf.get(m.id) ?? []).map((id) => columnById.get(id)).filter((c) => c !== undefined);
-    const warn = !checkMappingTypes(m, attribute, columns).ok;
+    // a retired input is historical: type problems come only through the live ones (slice 7b, Q10)
+    const warn = !checkMappingTypes(m, attribute, columns.filter((c) => !c.retired_since)).ok;
     const attrLabel = `${entityById.get(attribute.entity_id)?.name ?? "?"}.${attribute.name}`;
     const link = { id: m.id, warn, draft: m.status === "draft" };
     note(attribute.id, warn, `from ${columns.map((c) => `${columnTable(c.id)?.name ?? "?"}.${c.name}`).join(" + ")}`, link);
@@ -216,7 +238,7 @@ export function buildCards(model: WorkspaceModel, items: readonly CanvasItem[], 
           clip: false,
           labels: labelsOf(`source_column:${c.id}`),
           ...(live ? { relevant: live.relevantRows.has(c.id) } : {}),
-          ...(c.missing_since ? { missing: true as const } : {}),
+          ...(c.retired_since ? { retired: true as const } : c.missing_since ? { missing: true as const } : changeOf.has(c.id) ? { change: changeOf.get(c.id)! } : {}),
         }));
       cards.push({
         ...base,

@@ -4,11 +4,15 @@
 // a card per table with a row per column (what changes and what it touches), the rename choices, the relationships
 // between source tables, the warnings, the mappings that go back to review (P6), and P8's refresh. Everything here is
 // what the import will write; nothing is written before “Import into”. A long review renders in parts (“Show the next
-// … tables”, “Show … more columns”) so a large file keeps the dialog responsive.
+// … tables”, “Show … more columns”) so a large file keeps the dialog responsive. Slice 7b (item 9; prototype `reqBox`,
+// `issBox`): above the tables, the requirements whose coverage changes and the changes to resolve the import raises,
+// both over the whole plan.
 
 import { useState } from "react";
 import { formatColumnType } from "@/domain/model/type-check";
 import type { ImportPlan, PlanColumn, PlanTable } from "@/domain/import/plan";
+import { coverageChangeText, type CoverageDelta } from "@/domain/source-changes/coverage";
+import { NO_COVERAGE_CHANGE, raisedCallout } from "@/domain/source-changes/texts";
 import { day, impactOf, plural, reviewCounts, shownUnder, type impactIndex, type ImportData, type ReviewFilter, type WizardState } from "./wizard-model";
 
 const PAGE_TABLES = 100;
@@ -41,6 +45,7 @@ export function ReviewStep({
   data,
   index,
   systemName,
+  coverage,
 }: {
   s: WizardState;
   set: (patch: Partial<WizardState>) => void;
@@ -48,6 +53,8 @@ export function ReviewStep({
   data: ImportData;
   index: ReturnType<typeof impactIndex>;
   systemName: string;
+  /** Requirements whose coverage the import changes (slice 7b). */
+  coverage: readonly CoverageDelta[];
 }) {
   const [showUnchanged, setShowUnchanged] = useState<ReadonlySet<string>>(new Set());
   const [tablesShown, setTablesShown] = useState(PAGE_TABLES);
@@ -56,6 +63,9 @@ export function ReviewStep({
   const n = reviewCounts(plan);
   const F = s.filter;
   const sendBacks = plan.mappings.filter((m) => m.sendsBack);
+  const raised = raisedCallout(plan.raises, systemName);
+  const raisedHigh = plan.raises.some((r) => r.severity === "high");
+  const requirementName = new Map(data.requirements.map((r) => [r.id, r.name]));
 
   const filters: [ReviewFilter, string, number][] = [
     ["all", "all changes", n.all],
@@ -227,6 +237,32 @@ export function ReviewStep({
           </button>
         ))}
       </div>
+      {coverage.length > 0 ? (
+        <div className="mb-4 rounded-lg border border-im-req bg-im-surface px-3 py-2.5" data-testid="callout-coverage">
+          <h4 className="mb-1.5 font-semibold text-im-req-ink">Requirements whose coverage changes</h4>
+          <ul>
+            {coverage.map((d) => (
+              <li key={d.requirement.id} className="flex flex-wrap items-baseline gap-x-2.5 py-1" data-testid="coverage-change">
+                <span className="rounded bg-im-req-soft px-1.5 text-[11px] font-medium text-im-req-ink">{d.requirement.key}</span>
+                <span>{requirementName.get(d.requirement.id) ?? d.requirement.name}</span>
+                <span className="font-mono">{coverageChangeText(d)}</span>
+                {d.why.length > 0 && <span className="text-xs text-im-ink-2">{d.why.join("; ")}</span>}
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        s.mode === "existing" && (
+          <div className={`${callout} border-im-logical bg-im-logical-soft`} data-testid="callout-coverage">
+            {NO_COVERAGE_CHANGE}
+          </div>
+        )
+      )}
+      {raised && (
+        <div className={`${callout} ${raisedHigh ? "border-im-warn bg-im-warn-soft" : "border-im-logical bg-im-logical-soft"}`} data-testid="callout-changes" data-high={raisedHigh || undefined}>
+          {raised}
+        </div>
+      )}
       {sendBacks.length > 0 && (
         <div className={`${callout} border-im-warn bg-im-warn-soft`} data-testid="callout-send-back">
           <b>

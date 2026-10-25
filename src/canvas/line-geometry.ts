@@ -20,6 +20,8 @@ export interface MapGeom {
    * missing, the ƒ node's line when every input is. Left out where nothing is missing.
    */
   gone?: boolean[];
+  /** Per path: from a retired column (slice 7b): titled “Retired: historical”. Left out where nothing is retired. */
+  old?: boolean[];
   dots: [number, number][];
   chip: { x: number; y: number; text: string } | null;
   part: boolean;
@@ -35,15 +37,18 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
   const attr = rowEnd(target, line.attributeId);
   const inputs: End[] = [];
   const gone: boolean[] = [];
+  const old: boolean[] = [];
   for (const i of line.inputs) {
     const p = placedOf(lookup.get(i.cardId));
     if (p) {
       inputs.push(rowEnd(p, i.columnId));
       gone.push(!!i.gone);
+      old.push(!!i.old);
     }
   }
   if (!inputs.length) return null;
   const anyGone = gone.some(Boolean);
+  const anyOld = old.some(Boolean);
   const part = attr.hidden || inputs.some((e) => e.hidden);
   if (line.inputCount > 1) {
     const f = fNode(attr, inputs);
@@ -51,6 +56,7 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
     return {
       paths: [...curves.map((c) => c.d), f.out],
       ...(anyGone ? { gone: [...gone, gone.every(Boolean)] } : {}),
+      ...(anyOld ? { old: [...old, old.every(Boolean)] } : {}),
       dots: [...curves.map((c) => [c.p0.x, c.p0.y] as [number, number]), [f.to.x, f.to.y]],
       chip: { x: f.node.x, y: f.node.y, text: "ƒ" },
       part,
@@ -63,6 +69,7 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
   return {
     paths: [g.d],
     ...(anyGone ? { gone } : {}),
+    ...(anyOld ? { old } : {}),
     dots: [
       [g.p0.x, g.p0.y],
       [g.p3.x, g.p3.y],

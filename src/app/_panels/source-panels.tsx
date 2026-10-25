@@ -5,17 +5,20 @@
 // type, BK and PII flags, comment, the mappings it feeds, and “Map to an attribute” (slice 1b, D-48). Name, type and
 // position come from the source. Slice 7a (items 35, 36): the table's kind line with its system, its comment from the
 // source, “Missing from source since”, missing columns last and struck through, and its relationships between source
-// tables; a column's “Missing from source since”.
+// tables; a column's “Missing from source since”. Slice 7b (items 13, 18, 21, 24): “Retired: historical since”, the
+// table's open changes to resolve, the columns list's “retired” and “not needed”, a column's “Mark as needed”, and
+// “Delete table…” on the same cascade and form as a change's “Delete…” (D-47, Q7), now also for mapped tables.
 
-import { useContext, useRef } from "react";
+import { useContext, useRef, useState } from "react";
 import { deleteSourceTableAction, updateSourceColumnAction } from "@/app/_actions/model";
+import { markColumnNeededAction } from "@/app/_actions/source-change";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { formatColumnType } from "@/domain/model/type-check";
 import type { SourceColumn, SourceRelationship, SourceTable } from "@/domain/types";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, ConfirmDelete, dangerClass, Field, Flag, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TextField, TypeDot } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, Flag, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TextField, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
@@ -24,14 +27,27 @@ import { NotesHere } from "./notes-here";
 import { attributeLabel, attributeOptions, fedEntities, mappingsOfColumn, tablePath, typeCheckOf } from "./model-index";
 import { RequirementsSection } from "./requirements-section";
 import { day } from "./import/wizard-model";
+import { ChangesList, SourceDeleteForm } from "./source-changes";
 
-/** “Missing from source since 2026-10-23” (slice 7a; the review's date format). */
-function MissingSince({ since }: { since: string | null }) {
-  if (!since) return null;
+/**
+ * “Missing from source since 2026-10-23” (slice 7a; the review's date format); a retired one “Retired: historical since
+ * {the day it left}” (slice 7b, prototype `tag unchanged`).
+ */
+function MissingSince({ of: x }: { of: { missing_since: string | null; retired_since: string | null } }) {
+  if (x.retired_since) {
+    return (
+      <p className="mt-1.5">
+        <span className="rounded bg-im-hover px-1.5 py-px text-xs text-im-ink-3" data-testid="tag-retired">
+          Retired: historical since {day(x.missing_since ?? x.retired_since)}
+        </span>
+      </p>
+    );
+  }
+  if (!x.missing_since) return null;
   return (
     <p className="mt-1.5">
       <span className="rounded bg-im-warn-soft px-1.5 py-px text-xs text-im-warn" data-testid="tag-missing">
-        Missing from source since {day(since)}
+        Missing from source since {day(x.missing_since)}
       </span>
     </p>
   );
@@ -47,8 +63,10 @@ const KIND_OF: Record<SourceTable["object_type"], (t: SourceTable) => string> = 
 export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; cardId: Uuid | null }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
-  const { run } = useAction();
+  const { run, pending } = useAction();
+  const [deleting, setDeleting] = useState(false);
   const columns = p.ix.columnsOf.get(t.id) ?? [];
+  const changes = p.changes.filter((c) => c.source_table_id === t.id && c.deleted_at === null && c.status === "open");
   /** Missing columns last (slice 7a, item 35), otherwise in physical order. */
   const listed = [...columns].sort((a, b) => Number(!!a.missing_since) - Number(!!b.missing_since) || a.ordinal - b.ordinal);
   /** Relationships from and to the table: they go with it (slice 7a, D-47). */
@@ -68,7 +86,10 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
       columns.length ? `Deleted ${t.name} with its ${columns.length} column${columns.length === 1 ? "" : "s"}.` : `Deleted ${t.name}.`,
       { undoable: true },
     );
-    if (result.ok) ui.select(null);
+    if (result.ok) {
+      setDeleting(false);
+      ui.select(null);
+    }
   }
 
   return (
@@ -102,7 +123,12 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
           </span>
         </Hint>
       )}
-      <MissingSince since={t.missing_since} />
+      <MissingSince of={t} />
+      {changes.length > 0 && (
+        <Fold title={`To resolve (${changes.length})`} testId="section-table-changes">
+          <ChangesList changes={changes} history={false} />
+        </Fold>
+      )}
       <ItemLabels target={{ kind: "source_table", id: t.id }} />
 
       <Fold title="Columns and where they go" count={columns.length}>
@@ -116,10 +142,11 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
               <Li
                 key={c.id}
                 onClick={() => ui.select(cardId ? { t: "row", cardId, id: c.id } : { t: "element", kind: "source_column", id: c.id })}
-                meta={c.missing_since ? "missing" : targets.length ? targets.join(", ") : <span className="italic">not used</span>}
-                testId={c.missing_since ? "column-missing" : undefined}
+                // prototype order (slice 7b, F23): retired, missing, mapped, not needed, not used
+                meta={c.retired_since ? "retired" : c.missing_since ? "missing" : targets.length ? targets.join(", ") : c.not_needed ? "not needed" : <span className="italic">not used</span>}
+                testId={c.retired_since ? "column-retired" : c.missing_since ? "column-missing" : undefined}
               >
-                <span className={`font-mono text-xs ${c.missing_since ? "line-through decoration-im-warn" : ""}`}>{c.name}</span>
+                <span className={`font-mono text-xs ${c.retired_since ? "text-im-ink-3 line-through decoration-im-ink-3" : c.missing_since ? "line-through decoration-im-warn" : ""}`}>{c.name}</span>
               </Li>
             );
           }}
@@ -197,20 +224,14 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
               Add to this canvas
             </button>
           )}
-          {columns.length ? (
-            // With columns it still asks (slice 1b, item 13).
-            <ConfirmDelete
-              label="Delete table"
-              also={[`${columns.length} column${columns.length === 1 ? "" : "s"}`, ...(relationships ? [`${relationships} relationship${relationships === 1 ? "" : "s"}`] : [])].join(", ")}
-              onConfirm={() => void remove()}
-              testId="button-delete-table"
-            />
-          ) : (
-            <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-table">
-              Delete table
-            </button>
-          )}
+          {/* what goes with it first, as a change's “Delete…” (slice 7b, D-47, Q7) */}
+          <button type="button" className={dangerClass} onClick={() => setDeleting(true)} disabled={deleting} data-testid="button-delete-table">
+            Delete table…
+          </button>
         </Actions>
+      )}
+      {p.editable && deleting && (
+        <SourceDeleteForm target={{ tableId: t.id }} retireHint={!!t.missing_since} pending={pending} onCancel={() => setDeleting(false)} onDelete={() => void remove()} />
       )}
     </div>
   );
@@ -244,6 +265,7 @@ export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
   const table = p.ix.table.get(c.source_table_id)!;
   const mappings = mappingsOfColumn(p.ix, c.id);
   const ref = { sourceColumnId: c.id, expectedVersion: c.version };
+  const markNeeded = () => void run(() => markColumnNeededAction(p.workspaceId, ref), ({ name }) => `Marked as needed: ${name}`, { undoable: true });
   /** Where the D-48 choice opens: under the attribute picker. */
   const mapAt = useRef({ x: 0, y: 0 });
   const save = (change: { isBusinessKey?: boolean; isPii?: boolean; comment?: string | null }) =>
@@ -274,7 +296,20 @@ export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
           {facts}
         </span>
       </Hint>
-      <MissingSince since={c.missing_since} />
+      <MissingSince of={c} />
+      {/* “not needed” is never final (slice 7b, P10) */}
+      {c.not_needed && (
+        <p className="mt-1.5 flex flex-wrap items-center gap-2">
+          <span className="rounded bg-im-hover px-1.5 py-px text-xs text-im-ink-3" data-testid="tag-not-needed">
+            Marked not needed
+          </span>
+          {p.editable && (
+            <button type="button" className={smallButtonClass} onClick={markNeeded} data-testid="button-mark-needed">
+              Mark as needed
+            </button>
+          )}
+        </p>
+      )}
       <Field label="Flags">
         <div className="flex flex-wrap gap-1.5" data-testid="flags-column">
           <Flag on={c.is_business_key} label="Business key" disabled={!p.editable} onToggle={() => save({ isBusinessKey: !c.is_business_key })} />

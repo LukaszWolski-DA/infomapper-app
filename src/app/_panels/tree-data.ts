@@ -4,7 +4,7 @@
 import type { Uuid } from "@/domain/ids";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
 import { coverageParts } from "@/domain/model/requirements";
-import { REQUIREMENT_KINDS, type CanvasItem, type RequirementKind, type WorkspaceModel } from "@/domain/types";
+import { REQUIREMENT_KINDS, type CanvasItem, type RequirementKind, type SourceChange, type WorkspaceModel } from "@/domain/types";
 
 /** Where an element has cards: on this canvas (filled dot), only on other canvases (ring), or nowhere. */
 export type Presence = "here" | "elsewhere" | "none";
@@ -39,9 +39,11 @@ export interface TreeTable {
   fields: string[];
   /** The right side (slice 7a, item 33): “{format} file”, “view” or “{n} cols”. */
   meta: string;
-  /** Missing from source (slice 7a): the table, or some of its columns. */
+  /** Missing from source (slice 7a): the table, or some of its columns; a retired one is not missing but historical (7b). */
   missing: boolean;
   columnsMissing: boolean;
+  /** Retired, historical (slice 7b, item 22): struck through in grey. */
+  retired: boolean;
   presence: Presence;
   inProject: boolean;
   cardId: Uuid | null;
@@ -56,6 +58,8 @@ export interface TreeSchema {
 export interface TreeSystem {
   id: Uuid;
   name: string;
+  /** Its open changes to resolve (slice 7b, item 22). */
+  openChanges: number;
   schemas: TreeSchema[];
 }
 
@@ -96,6 +100,8 @@ export function buildTree(
   canvasId: Uuid,
   projectCanvasIds: readonly Uuid[],
   requirements?: RequirementIndex,
+  /** The workspace's changes to resolve (slice 7b): each system's open count. */
+  changes: readonly SourceChange[] = [],
 ): TreeData {
   const here = new Map<Uuid, Uuid>(), elsewhere = new Set<Uuid>(), inProject = new Set<Uuid>();
   const projectCanvases = new Set(projectCanvasIds);
@@ -120,7 +126,7 @@ export function buildTree(
   for (const a of model.attributes) fieldsOf.set(a.entity_id, [...(fieldsOf.get(a.entity_id) ?? []), a.name]);
   for (const c of model.sourceColumns) {
     fieldsOf.set(c.source_table_id, [...(fieldsOf.get(c.source_table_id) ?? []), c.name]);
-    if (c.missing_since) columnsMissing.add(c.source_table_id);
+    if (c.missing_since && !c.retired_since) columnsMissing.add(c.source_table_id);
   }
 
   const concepts = model.concepts.map<TreeConcept>((c) => ({
@@ -142,6 +148,8 @@ export function buildTree(
       })),
   }));
 
+  const openBySystem = new Map<Uuid, number>();
+  for (const c of changes) if (c.status === "open" && c.deleted_at === null) openBySystem.set(c.source_system_id, (openBySystem.get(c.source_system_id) ?? 0) + 1);
   const systems = model.sourceSystems.map<TreeSystem>((s) => {
     const schemas = new Map<string, TreeTable[]>();
     for (const t of model.sourceTables) {
@@ -156,15 +164,16 @@ export function buildTree(
           name: t.name,
           fields,
           meta,
-          missing: !!t.missing_since,
+          missing: !!t.missing_since && !t.retired_since,
           columnsMissing: columnsMissing.has(t.id),
+          retired: !!t.retired_since,
           presence: presence(t.id),
           inProject: inProject.has(t.id),
           cardId: here.get(t.id) ?? null,
         },
       ]);
     }
-    return { id: s.id, name: s.name, schemas: [...schemas].map(([name, tables]) => ({ name, tables })) };
+    return { id: s.id, name: s.name, openChanges: openBySystem.get(s.id) ?? 0, schemas: [...schemas].map(([name, tables]) => ({ name, tables })) };
   });
 
   const reqs = (requirements?.requirements ?? []).map<TreeRequirement>((r) => {

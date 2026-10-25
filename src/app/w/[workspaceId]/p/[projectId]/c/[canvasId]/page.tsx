@@ -121,7 +121,7 @@ export default async function CanvasPage({
   const liveLinks = liveLabel ? labelLinks.filter((k) => k.deleted_at === null) : [];
   const membership = liveLabel ? liveMembership(liveLabel.id, { ...model, links: liveLinks }) : null;
   const liveMappings = liveLabel ? new Set(liveLinks.filter((k) => k.label_id === liveLabel.id && k.mapping_id).map((k) => k.mapping_id!)) : null;
-  const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId), labelNames,     liveLabel && membership
+  const cards = buildCards(model, items.filter((i) => i.canvas_id === canvasId), labelNames, liveLabel && membership
       ? {
           labelName: liveLabel.name,
           relevantRows: membership.relevantRows,
@@ -131,13 +131,14 @@ export default async function CanvasPage({
           },
         }
       : null,
+    sourceChanges,
   );
   // requirements (slice 4a): the index is built once per page here for the left panel; the panels build theirs once
   // per data version in the browser
   const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
   // requirement cards (slice 4b-2): this canvas's cards with a requirement, drawn from the same index
   const requirementCards = buildRequirementCards(items.filter((i) => i.canvas_id === canvasId), requirementIndex);
-  const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id), requirementIndex);
+  const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id), requirementIndex, sourceChanges);
   // the status bar's requirements for the whole workspace (PRD item 31), and who last changed each requirement's content
   // for the panel's four-eyes hint (AD-06; only with four-eyes on, the server checks again)
   const requirementCounts = { count: requirementIndex.requirements.length, covered: requirementIndex.coveredCount };
@@ -238,6 +239,8 @@ export default async function CanvasPage({
                   canCreateCanvas={editable}
                   imports={systemImports(imports, userName)}
                   importData={importData}
+                  changes={sourceChanges}
+                  people={Object.fromEntries(users.map((u) => [u.id, u.display_name]))}
                 />
               ),
               openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId),
@@ -249,6 +252,7 @@ export default async function CanvasPage({
                   entityIds={cards.filter((c) => c.kind === "ent").map((c) => c.targetId)}
                   requirements={requirementCounts}
                   openNotes={noteRows.filter((n) => n.deleted_at === null && n.status === "open").length}
+                  sourceChanges={sourceChanges.filter((c) => c.deleted_at === null && c.status === "open").length}
                 />
               ),
             }}
