@@ -1,6 +1,6 @@
 # Slice 7b – Acceptance
 
-Status: **step 1 answered (25 October 2026); step 2 waits for Łukasz's go.** Branch `slice/07b-source-changes`, from
+Status: **step 4 done (25 October 2026); step 5 waits for Łukasz's go.** Branch `slice/07b-source-changes`, from
 `main` at `dd072b6` (tag `slice-07a`). PRD: `docs/prd/slice-07b-source-changes.md`. The PRD stays as written; this file
 is its amendment.
 
@@ -1022,3 +1022,66 @@ What the panels compute in the browser, from the domain (pure, no server call):
 - **e2e for step 4:** `e2e/slice-07b/`, one file per criterion (S7B-02, -04 to -11 and -15's page parts), from the
   slice 7a helpers (`openWizard`, `giveFile`, `importNow`, `sample`, `crmPartial`); the CRM file after `crmPartial`
   raises 8 changes (2 high), which is the definition of done's scenario.
+
+## Step 4: the review, the list and the actions (25 October 2026)
+
+### What changed
+
+- **The review** (`review-step.tsx`, item 9): above the tables, "Requirements whose coverage changes" (key, name,
+  "{a} of {n} → {b} of {n}", why) or, on a re-import, "No requirement’s coverage changes."; then "After the import, {n}
+  changes to resolve, {h} of them high. …" (warning style when one is high). Both read the whole plan:
+  `planCoverage` (`wizard-model.ts`: `applyPlan`, `materialize`, `coverageDelta`), built once per plan at step 3.
+- **Change cards** (`src/app/_panels/source-changes.tsx`): severity, title, the label as a link to its column or table
+  (plain text once the object is gone), the date, the detail, the impact ("Feeds {Entity.attribute} ({status})" with
+  requirement keys, "{n} mappings on its columns", "On {canvases}") and the actions (`actionsFor`; approve and leave for
+  those with the status right, the rest for editors). Move, Map and Delete open a form in the card first. Every action
+  ends with "{resolution}: {label}" and Undo.
+- **System panel**: "Changes to resolve ({n})", "Nothing to resolve.", "{n} resolved changes" folded (resolution, who,
+  when, newest first); per import "Approve again all {n}" with its lists ("These don't fit the source yet:" first, then
+  the four-eyes list) and "Approve {k}". **Table panel**: "To resolve ({n})" with its open changes; "Retired: historical
+  since {date}"; the columns list "retired" / "not needed" (prototype order). **Column panel**: the retired tag, "Marked
+  not needed" with "Mark as needed". **Mapping panel**: "until {date}" on a retired input; the reason line "Sent back to
+  review after a source change: {reason}." (F9).
+- **Delete** (Q7): `deleteSourceTable` now runs `sourceDeleteCascade` (mapped tables included; the refusal and its unit
+  test are gone). The D-47 form (`SourceDeleteForm`) reads the impact on the server (`sourceDeleteImpactAction`) and is
+  the same in a change's "Delete…" and the table panel's "Delete table…".
+- **Tree**: the system's open count (one element per system); a retired table grey and struck through, "Retired,
+  historical." (no missing dot). **Status bar**: "Source changes to resolve {n}" in the warning style while one is open.
+- **Canvas** (AD-24): row classes `old` (retired, wins), `gone`, `chg`, `new`; a retired input's line segment keeps
+  `s gone` and gets a `<title>` "Retired: historical" (an element only on such a segment). Type problems count only
+  live inputs (`typeCheckOf`, the card and line warnings), as answered on Q10.
+
+### Decisions I took (please check)
+
+1. **"Delete table…" shows the form inside the panel**, under the buttons, as a change's "Delete…" does in its card,
+   instead of a dialog like the entity's: one form in both places.
+2. **The delete form's impact is read on the server** (every canvas's cards, the requirements), like the entity
+   delete's; reading needs membership only. The table panel's delete settles its open changes through the settle rule
+   of step 3 ("Settled: the table was deleted"), not the cascade's own (no change is acted on).
+3. **"Approve the mapping again" shows for the importer with four-eyes on**; the server refuses with the four-eyes
+   message (as in the mapping panel). "Approve again all" says it before the click instead (its list).
+4. **"Approve again all {n}"** counts every mapping the import sent back that is still in review; the form's button
+   says how many it approves ("Approve 1"), disabled at 0.
+5. **Texts:** the table panel's section is "To resolve ({n})" (prototype); "Mark as needed"'s toast is "Marked as
+   needed: {column}"; a retired column's tag uses the day it left ("historical since" = `missing_since`).
+6. **The coverage callout** shows only on a re-import (as the prototype); a new system shows none.
+
+### Tests
+
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: **92 files, 1,233 tests** (3 new: the row marks and live-input
+  type problems in `canvas.test.ts`, the tree's count and retired table in `tree-data.test.ts`; `source.test.ts`'s
+  refusal test became the cascade's).
+- `e2e/slice-07b/`: S7B-01 to -12 and -15, 21 tests. First run 20 passed; S7B-03 failed in the spec (it reloaded the page
+  and expected the system panel still open); fixed, then **3 of 3 passed**.
+- **Earlier spec changed:** S7A-10 reads the mapping panel's new reason line (F9).
+- **One full e2e run** (`npm run e2e`, from scratch, no dev server): **296 passed, 0 failed, 59.6 min** (17:10–18:10).
+- **Not done in this step:** the element-count guard (`S3B-15-elements.spec.ts` against `slice-07a`). "Performance
+  test" has no changes and no retired column, so no element is added there; I measure it with step 5's Changes view.
+
+### How to check in the browser
+
+`npm run dev`, sign in as Łukasz, Retail Co – DWH, Customer & orders. Re-import CRM twice from the Sources tab: first
+`crm_sqlserver_catalog.tsv` without the `segment` and `customer_addresses` lines, then `crm_snapshot_2026-10-20.csv`; read
+the review's two callouts. Then: the tree's "9" and the status bar; CRM's panel (high first); retire `segment`, move
+`created_ts` to `created_on` (the form shows the rule), mark `customer_segment` not needed and back in its column panel,
+approve `cust_no` again or use "Approve again all 2", open "Delete table…" on customers and cancel; Undo after each.
