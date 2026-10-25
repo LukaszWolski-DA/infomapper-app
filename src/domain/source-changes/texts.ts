@@ -35,7 +35,7 @@ export const SOURCE_CHANGE_ACTIONS = [
   "split",
   "approve",
   "leave",
-  "noted",
+  "acknowledge",
 ] as const;
 export type SourceChangeAction = (typeof SOURCE_CHANGE_ACTIONS)[number];
 
@@ -49,7 +49,7 @@ export const ACTION_LABEL: Record<SourceChangeAction, string> = {
   split: "Decide column by column",
   approve: "Approve the mapping again",
   leave: "Leave it in review",
-  noted: "Noted",
+  acknowledge: "Acknowledge",
 };
 /** A new table's “Not needed” reads differently. */
 export const NONE_NEEDED_LABEL = "None of it is needed";
@@ -87,13 +87,13 @@ export function raisedCallout(raised: readonly { kind: SourceChangeKind; severit
 export const RESOLUTION = {
   retired: "Retired: kept as historical",
   moved: (table: string, column: string) => `Mappings moved to ${table}.${column}`,
-  deleted: "Deleted",
+  deleted: "Deleted from the model",
   mapped: (attribute: string) => `Mapped to ${attribute} (draft)`,
   notNeeded: "Marked not needed",
   split: "Split into one decision per column",
   approved: "Approved again",
   leftInReview: "Left in review",
-  noted: "Noted",
+  acknowledged: "Acknowledged: hash keys built on it change",
 } as const;
 
 /** By an import (P7). */

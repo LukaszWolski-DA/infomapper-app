@@ -2,7 +2,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getDataStore, type DataStore } from "@/data";
-import type { CommandContext, CommandResult, WriteSet } from "@/domain/changes";
+import { buildWriteSet, type CommandContext, type CommandResult, type WriteSet } from "@/domain/changes";
 import { completeLiveWrites, touchesLiveCanvases, type LiveOutcome } from "@/domain/commands/live";
 import { CONTEXT_LABEL_GONE, contextTargets } from "@/domain/model/live";
 import { isUndoable } from "@/domain/commands/undo";
@@ -10,6 +10,8 @@ import type { DomainErrorCode } from "@/domain/errors";
 import { uuidv7 } from "@/domain/ids";
 import { changeLabel } from "@/domain/model/change-label";
 import { recordChange } from "@/domain/model/undo-history";
+import { isOpen } from "@/domain/source-changes/rules";
+import { settleAfterWrites } from "@/domain/source-changes/settle";
 import type { AppUser } from "@/domain/types";
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
 import { retryWhenStale } from "./fresh-retry";
@@ -24,11 +26,12 @@ export type ActionResult<T = undefined> =
   | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected"; message: string; fields?: Record<string, string> };
 
 /**
- * Runs one write (AD-23): the signed-in user, a fresh context, the domain command, then the live canvas rules (slice
- * 3b: what labels mark and what live canvases hold, in the same change group; `completeLiveWrites`), then the adapter
- * applies the rows and change events together, and the change group goes into the person's undo history (slice 1b).
- * Refusals come back with the domain's message. With `freshOnStale`, a write refused as stale is built again from fresh
- * data (slice 4a: the requirement key counter, `fresh-retry.ts`).
+ * Runs one write (AD-23): the signed-in user, a fresh context, the domain command, then the changes to resolve it
+ * settles (slice 7b, Q12: a deleted object, a status set in the mapping panel, a column mapped; `settleAfterWrites`),
+ * then the live canvas rules (slice 3b: what labels mark and what live canvases hold, in the same change group;
+ * `completeLiveWrites`), then the adapter applies the rows and change events together, and the change group goes into
+ * the person's undo history (slice 1b). Refusals come back with the domain's message. With `freshOnStale`, a write
+ * refused as stale is built again from fresh data (slice 4a: the requirement key counter, `fresh-retry.ts`).
  */
 export async function runCommand<T>(
   build: (ctx: CommandContext, store: DataStore, user: AppUser) => Promise<CommandResult<T>>,
@@ -43,7 +46,8 @@ export async function runCommand<T>(
     if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message, ...(result.error.fields ? { fields: result.error.fields } : {}) };
     const workspaceId = result.writeSet.events[0]?.workspace_id;
     const contextLabelId = workspaceId ? parseContextCookie((await cookies()).get(contextCookieName(user.id, workspaceId))?.value)?.labelId : null;
-    const completed = await withLiveCanvases(ctx, store, user, result.writeSet, { contextLabelId });
+    const settled = await withSettledChanges(ctx, store, result.writeSet);
+    const completed = await withLiveCanvases(ctx, store, user, settled, { contextLabelId });
     if (!completed.ok) {
       // the context's label is gone: a fresh page lets the browser switch the context off (slice 3b, PRD item 3)
       if (completed.error.message === CONTEXT_LABEL_GONE) revalidatePath("/", "layout");
@@ -89,7 +93,23 @@ export async function withLiveCanvases(
   return completeLiveWrites(ctx, access, state, writeSet, { revert: options.revert, contextLabelId });
 }
 
+/** The tables whose writes can settle a change to resolve (slice 7b, `settleAfterWrites`). */
+const SETTLING_TABLES = new Set(["entity", "attribute", "mapping", "mapping_input", "source_table", "source_column"]);
+
+/** The write set with the open changes it settles, in its change group; read only when it may settle one. */
+export async function withSettledChanges(ctx: CommandContext, store: DataStore, writeSet: WriteSet): Promise<WriteSet> {
+  const workspaceId = writeSet.events[0]?.workspace_id;
+  if (!workspaceId || writeSet.labelNothing || !writeSet.writes.some((w) => SETTLING_TABLES.has(w.table))) return writeSet;
+  const changes = await store.model.listChanges(workspaceId);
+  if (!changes.some(isOpen)) return writeSet;
+  const extra = settleAfterWrites(ctx, writeSet.writes, changes, await store.model.load(workspaceId));
+  if (!extra.length) return writeSet;
+  const rebuilt = buildWriteSet(ctx, workspaceId, [...writeSet.writes, ...extra]);
+  return { ...writeSet, writes: rebuilt.writes, events: rebuilt.events.map((e) => ({ ...e, change_group_id: writeSet.changeGroupId })) };
+}
+
 const EMPTY_LIVE_STATE = {
+
   entities: [],
   attributes: [],
   sourceTables: [],

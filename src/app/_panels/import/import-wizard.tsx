@@ -72,7 +72,7 @@ export function ImportWizard({
   const set = (patch: Partial<WizardState>) => setState((x) => ({ ...x, ...patch }));
   const [sending, setSending] = useState(false);
 
-  const state = useMemo(() => importStateOf(model), [model]);
+  const state = useMemo(() => importStateOf(model, data.changes), [model, data.changes]);
   const target = targetOf(s);
   const plan = useMemo(() => {
     if (!s.read || s.read.errors.length || !target) return null;

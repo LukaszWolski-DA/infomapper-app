@@ -44,6 +44,7 @@ export const UNDOABLE_TABLES = [
   "source_relationship",
   "source_relationship_column",
   "source_import",
+  "source_change",
   "mapping",
   "mapping_input",
   "canvas_item",
@@ -73,6 +74,8 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   source_relationship: [["source_table_id", "source_table"], ["to_source_table_id", "source_table"]],
   source_relationship_column: [["source_relationship_id", "source_relationship"], ["from_column_id", "source_column"], ["to_column_id", "source_column"]],
   source_import: [["source_system_id", "source_system"]],
+  // slice 7b (F5): its table, column and mapping ids are only what it names; they stay when those are deleted
+  source_change: [["source_system_id", "source_system"], ["source_import_id", "source_import"]],
   mapping: [["attribute_id", "attribute"]],
   mapping_input: [["mapping_id", "mapping"], ["source_column_id", "source_column"]],
   canvas_item: [["canvas_id", "canvas"], ["entity_id", "entity"], ["source_table_id", "source_table"], ["requirement_id", "requirement"], ["frame_id", "frame"]],
@@ -140,12 +143,15 @@ export function isUndoable(events: readonly ChangeEvent[]): boolean {
 }
 // slice 7a: approving clears an import's `review_reason`, so a reviewer's approval may change it too
 const STATUS_COLUMNS = new Set(["status", "approved_by", "approved_at", "review_reason"]);
+/** Slice 7b: settling a change writes only these; a mapping change settled so is a reviewer's answer to a review. */
+const SETTLE_COLUMNS = new Set(["status", "resolution", "resolved_by", "resolved_at"]);
+const MAPPING_CHANGE_KINDS = new Set(["type_conflict", "business_key_changed", "rule_updated"]);
 
 /** Whether an update changed only status columns (a reviewer's approval). */
-function statusOnly(e: ChangeEvent): boolean {
+function statusOnly(e: ChangeEvent, columns: ReadonlySet<string> = STATUS_COLUMNS): boolean {
   if (!e.before_image || !e.after_image) return false;
   const changed = Object.keys({ ...e.before_image, ...e.after_image }).filter((k) => !BOOKKEEPING.has(k) && !sameValue(e.before_image![k], e.after_image![k]));
-  return changed.length > 0 && changed.every((k) => STATUS_COLUMNS.has(k));
+  return changed.length > 0 && changed.every((k) => columns.has(k));
 }
 
 /**
@@ -156,6 +162,10 @@ function actionFor(e: ChangeEvent): WorkspaceAction {
   switch (e.object_type) {
     case "mapping":
       return statusOnly(e) ? "mapping.set_status" : "model.edit";
+    case "source_change":
+      // a reviewer approves again or leaves a mapping in review (F22): settling a mapping change is theirs to undo
+      return statusOnly(e, SETTLE_COLUMNS) && MAPPING_CHANGE_KINDS.has(String((e.after_image ?? e.before_image)?.kind)) ? "mapping.set_status" : "model.edit";
+
     case "requirement":
       return statusOnly(e) ? "requirement.set_status" : "requirement.edit";
     case "requirement_link":

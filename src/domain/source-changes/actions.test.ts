@@ -20,7 +20,7 @@ import {
   movePlan,
   moveMappings,
   moveTargets,
-  noted,
+  acknowledge,
   retire,
   type ActionResult,
 } from "./actions";
@@ -186,7 +186,7 @@ describe("delete (item 13, Q4, Q7, S7B-06)", () => {
     expect(after.mappings.find((m) => m.id === s.mappings.label)).toMatchObject({ deleted_at: null, status: "review", review_reason: "segment was deleted from the source" });
     expect(inputColumnsOf(s.mappings.label, after.mappingInputs, after.columns).map((x) => x.name)).toEqual(["email"]);
     expect(columnNamed(after, "customers", "segment").deleted_at).toBe(NOW);
-    expect(changeIn(after, c.id).resolution).toBe("Deleted");
+    expect(changeIn(after, c.id).resolution).toBe("Deleted from the model");
   });
 
   it("the coverage line: a present column's approved mapping deleted", () => {
@@ -218,7 +218,7 @@ describe("delete (item 13, Q4, Q7, S7B-06)", () => {
     expect(result.edits.filter((e) => e.kind === "update" && (e.table === "source_relationship" || e.table === "source_relationship_column")).length).toBe(2);
     const after = applyEdits(model, result.edits);
     expect(tableNamed(after, "orders").deleted_at).toBe(NOW);
-    expect(changeIn(after, c.id).resolution).toBe("Deleted");
+    expect(changeIn(after, c.id).resolution).toBe("Deleted from the model");
     expect(changeIn(after, own.id).resolution).toBe("Settled: the table was deleted");
   });
 });
@@ -285,7 +285,7 @@ describe("approve again and leave in review (item 16, P8, S7B-08)", () => {
     expect(approveAgain(ctx(), rowsOf(s.model), c.id, ws(true), ids.someoneElse).ok).toBe(true);
   });
 
-  it("leave it in review settles only the change; a business key change without a mapping is noted", () => {
+  it("leave it in review settles only the change; a business key change without a mapping is acknowledged", () => {
     const s = scenario();
     const c = s.change("dbo.customers.email");
     const result = leaveInReview(ctx(), rowsOf(s.model), c.id);
@@ -294,8 +294,8 @@ describe("approve again and leave in review (item 16, P8, S7B-08)", () => {
     expect(changeIn(applyEdits(s.model, result.edits), c.id).resolution).toBe("Left in review");
     const loose: SourceChange = { ...s.change("dbo.customers.cust_no"), id: importId(), mapping_id: null };
     const model = { ...s.model, changes: [...s.model.changes!, loose] };
-    expect(actionsFor(rowsOf(model), loose)).toEqual(["noted"]);
-    expect(changeIn(applied(model, noted(ctx(), rowsOf(model), loose.id)), loose.id).resolution).toBe("Noted");
+    expect(actionsFor(rowsOf(model), loose)).toEqual(["acknowledge"]);
+    expect(changeIn(applied(model, acknowledge(ctx(), rowsOf(model), loose.id)), loose.id).resolution).toBe("Acknowledged: hash keys built on it change");
   });
 });
 

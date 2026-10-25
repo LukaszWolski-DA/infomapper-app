@@ -25,6 +25,7 @@ import type {
   Relationship,
   Requirement,
   RequirementLink,
+  SourceChange,
   SourceColumn,
   SourceImport,
   SourceRelationship,
@@ -52,6 +53,9 @@ import {
   REQUIREMENT_SEVERITIES,
   REQUIREMENT_STATUSES,
   ROW_FILTERS,
+  SOURCE_CHANGE_KINDS,
+  SOURCE_CHANGE_SEVERITIES,
+  SOURCE_CHANGE_STATUSES,
   SOURCE_OBJECT_TYPES,
   SOURCE_RELATIONSHIP_KINDS,
   STEREOTYPES,
@@ -61,11 +65,12 @@ import {
 /**
  * 2 = slice 1a (model tables), 3 = slice 2b (frames), 4 = slice 3a (labels, label links, project pins, notes), 5 = slice
  * 4a (requirements, requirement links), 6 = slice 7a (source relationships and imports; `file_format` and `missing_since`
- * on sources, `review_reason` on mappings). A format-2 to 5 file is read as format 6 with the missing tables empty and
- * the new columns null (it is written back as 6 with the next write); an older file is refused with a hint to run
- * "npm run reset-dev-data".
+ * on sources, `review_reason` on mappings), 7 = slice 7b (changes to resolve; `retired_since` on sources, `not_needed`
+ * on columns, two counts on imports). A format-2 to 6 file is read as format 7 with the missing tables empty and the new
+ * columns null (false, 0); a format-6 file also gets the open changes its imports leave (`deriveSourceChanges`, F1). It
+ * is written back as 7 with the next write; an older file is refused with a hint to run "npm run reset-dev-data".
  */
-export const DEV_DB_FORMAT = 6;
+export const DEV_DB_FORMAT = 7;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -87,6 +92,7 @@ export interface DevDb {
   source_relationship: SourceRelationship[];
   source_relationship_column: SourceRelationshipColumn[];
   source_import: SourceImport[];
+  source_change: SourceChange[];
   mapping: Mapping[];
   mapping_input: MappingInput[];
   requirement: Requirement[];
@@ -123,6 +129,7 @@ export const emptyDb = (): DevDb => ({
   source_relationship: [],
   source_relationship_column: [],
   source_import: [],
+  source_change: [],
   mapping: [],
   mapping_input: [],
   requirement: [],
@@ -237,14 +244,21 @@ export const RULES: Record<DevTable, TableRules> = {
     key: ["id"],
     foreignKeys: { ...model, source_system_id: "source_system" },
     unique: [{ columns: ["source_system_id", "database_name", "schema_name", "name"], live: true }],
-    checks: [{ name: "source_table_object_type_ck", test: oneOf(SOURCE_OBJECT_TYPES, "object_type") }],
+    checks: [
+      { name: "source_table_object_type_ck", test: oneOf(SOURCE_OBJECT_TYPES, "object_type") },
+      { name: "source_table_retired_ck", test: (r) => !isSet(r.retired_since) || isSet(r.missing_since) },
+    ],
   },
   source_column: {
     key: ["id"],
     foreignKeys: { ...model, source_table_id: "source_table" },
     unique: [{ columns: ["source_table_id", "name"], live: true }],
-    // slice 7a: -1 is max
-    checks: [{ name: "source_column_type_length_ck", test: (r) => r.type_length === null || r.type_length === -1 || (r.type_length as number) >= 1 }],
+    checks: [
+      // slice 7a: -1 is max
+      { name: "source_column_type_length_ck", test: (r) => r.type_length === null || r.type_length === -1 || (r.type_length as number) >= 1 },
+      // slice 7b: only what left the source is retired
+      { name: "source_column_retired_ck", test: (r) => !isSet(r.retired_since) || isSet(r.missing_since) },
+    ],
   },
   source_relationship: {
     key: ["id"],
@@ -265,13 +279,45 @@ export const RULES: Record<DevTable, TableRules> = {
       {
         name: "source_import_counts_ck",
         test: (r) =>
-          ["tables_new", "columns_new", "columns_changed", "columns_renamed", "columns_missing", "relationships_new"].every(
+          ["tables_new", "columns_new", "columns_changed", "columns_renamed", "columns_missing", "relationships_new", "changes_raised", "changes_high"].every(
             (c) => Number.isInteger(r[c]) && (r[c] as number) >= 0,
           ),
       },
     ],
   },
+  // slice 7b: a change to resolve names the objects its kind is about, and a resolved one says how, who and when
+  source_change: {
+    key: ["id"],
+    foreignKeys: {
+      ...model,
+      source_system_id: "source_system",
+      source_import_id: "source_import",
+      source_table_id: "source_table",
+      source_column_id: "source_column",
+      mapping_id: "mapping",
+      resolved_by: "app_user",
+    },
+    checks: [
+      { name: "source_change_kind_ck", test: oneOf(SOURCE_CHANGE_KINDS, "kind") },
+      { name: "source_change_severity_ck", test: oneOf(SOURCE_CHANGE_SEVERITIES, "severity") },
+      { name: "source_change_status_ck", test: oneOf(SOURCE_CHANGE_STATUSES, "status") },
+      {
+        name: "source_change_resolved_ck",
+        test: (r) => (r.status === "resolved") === (isSet(r.resolution) && isSet(r.resolved_by) && isSet(r.resolved_at)),
+      },
+      {
+        name: "source_change_object_ck",
+        test: (r) =>
+          r.kind === "table_left" || r.kind === "new_table"
+            ? isSet(r.source_table_id) && !isSet(r.source_column_id) && !isSet(r.mapping_id)
+            : r.kind === "column_left" || r.kind === "new_column" || r.kind === "business_key_changed"
+              ? isSet(r.source_column_id) && (r.kind === "business_key_changed" || !isSet(r.mapping_id))
+              : isSet(r.mapping_id),
+      },
+    ],
+  },
   mapping: {
+
     key: ["id"],
     foreignKeys: { ...model, attribute_id: "attribute", approved_by: "app_user" },
     checks: [

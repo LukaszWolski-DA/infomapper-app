@@ -538,6 +538,7 @@ export interface WritableRows {
   source_relationship: SourceRelationship;
   source_relationship_column: SourceRelationshipColumn;
   source_import: SourceImport;
+  source_change: SourceChange;
   mapping: Mapping;
   mapping_input: MappingInput;
   requirement: Requirement;

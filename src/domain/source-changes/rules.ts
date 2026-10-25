@@ -1,6 +1,6 @@
 // Rules of changes to resolve (slice 7b, P3–P8; step 1 answers Q6, Q10, Q12, Q13): which kinds are about a mapping,
 // how a change is raised and settled, when a mapping fits the source again, and when an input or a mapping is
-// historical. Pure; the commands (step 3) turn the edits into writes with their change events.
+// historical. Pure; the commands (`commands/source-change.ts`) write the edits with their change events.
 //   Historical (Q10): an input is historical when its column is retired; a mapping only when every input is. Its
 //   “until” is the column's `missing_since` (the day it left the source). A column that comes back loses both statuses,
 //   so nothing more is stored.
@@ -8,19 +8,12 @@
 import { nextVersion, newRowColumns, type CommandContext, type Write } from "../changes";
 import type { Uuid } from "../ids";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "../model/type-check";
-import type { Attribute, Mapping, MappingInput, SourceChange, SourceChangeKind, SourceChangeSeverity, SourceColumn, Timestamp, WritableRows } from "../types";
+import type { Attribute, Mapping, MappingInput, SourceChange, SourceChangeKind, SourceChangeSeverity, SourceColumn, Timestamp } from "../types";
 import { INPUT_MISSING, isoDate } from "./texts";
 
-/** The rows a change's action may write: the commands' tables and `source_change` (registered in step 3). */
-export interface ChangeRows extends WritableRows {
-  source_change: SourceChange;
-}
+/** A row a change's action writes (a `Write`; the name stays from step 2, when `source_change` was not writable yet). */
+export type Edit = Write;
 
-/** A row a change's action writes: what commands write, plus changes to resolve. */
-export type Edit =
-  | Write
-  | { kind: "insert"; table: "source_change"; row: SourceChange }
-  | { kind: "update"; table: "source_change"; before: SourceChange; row: SourceChange };
 
 export const MAPPING_KINDS: ReadonlySet<SourceChangeKind> = new Set(["type_conflict", "business_key_changed", "rule_updated"]);
 export const isMappingKind = (kind: SourceChangeKind): boolean => MAPPING_KINDS.has(kind);

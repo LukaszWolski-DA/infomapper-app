@@ -3,6 +3,8 @@
 // review showed (`planFingerprint`, answer 12). One command, one change group with a change event per written row, one
 // undo step (P7); the import is recorded in `source_import`. Owners, admins and modelers, in a workspace that is not
 // archived (AD-05, AD-09). The working context labels nothing an import writes (P9).
+// Slice 7b: the import writes the changes to resolve it raises and settles the open ones the source settles (P7), in
+// the same change group; their versions are part of P8's fingerprint.
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
@@ -18,6 +20,7 @@ import type { WorkspaceAccess } from "../permissions";
 import {
   IMPORT_CHANNELS,
   type Mapping,
+  type SourceChange,
   type SourceColumn,
   type SourceImport,
   type SourceRelationship,
@@ -75,8 +78,8 @@ export interface ImportState {
   relationshipColumns: readonly SourceRelationshipColumn[];
 }
 
-/** The command's state from the workspace's live model. */
-export const importStateOf = (model: WorkspaceModel): ImportState => ({
+/** The command's state from the workspace's live model and its changes to resolve (slice 7b). */
+export const importStateOf = (model: WorkspaceModel, changes: readonly SourceChange[] = []): ImportState => ({
   model: {
     systems: model.sourceSystems,
     tables: model.sourceTables,
@@ -86,6 +89,7 @@ export const importStateOf = (model: WorkspaceModel): ImportState => ({
     mappingInputs: model.mappingInputs,
     attributes: model.attributes,
     entities: model.entities,
+    changes,
   },
   relationships: model.sourceRelationships,
   relationshipColumns: model.sourceRelationshipColumns,
@@ -129,7 +133,7 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
   }
   const byId = <R extends { id: Uuid }>(rows: readonly R[]) => new Map(rows.map((r) => [r.id, r]));
   /** A patch on the row as read; a row that moved on meanwhile refuses the write (AD-12). */
-  const update = <T extends "source_table" | "source_column" | "source_relationship" | "mapping">(
+  const update = <T extends "source_table" | "source_column" | "source_relationship" | "mapping" | "source_change">(
     table: T,
     rows: ReadonlyMap<Uuid, WritableRows[T]>,
     patches: readonly RowPatch<WritableRows[T]>[],
@@ -146,7 +150,8 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
     update("source_table", byId(state.model.tables), c.tables.update) &&
     update("source_column", byId(state.model.columns), c.columns.update) &&
     update("source_relationship", relationships, c.relationships.update as RowPatch<SourceRelationship>[]) &&
-    update("mapping", byId<Mapping>(state.model.mappings), c.mappings);
+    update("mapping", byId<Mapping>(state.model.mappings), c.mappings) &&
+    update("source_change", byId<SourceChange>(state.model.changes ?? []), c.changes.update);
   if (!ok) return fail(staleVersion());
   for (const r of c.relationships.insert) {
     const row: SourceRelationship = { ...newRowColumns(ctx), ...r, workspace_id: ws, missing_since: null };
@@ -162,7 +167,6 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
     const row: SourceRelationshipColumn = { ...newRowColumns(ctx), ...p, workspace_id: ws };
     writes.push({ kind: "insert", table: "source_relationship_column", row });
   }
-  // slice 7b: the changes it raises and settles (`c.changes`) are written from step 3, with the `source_change` table
   const record: SourceImport = {
     ...newRowColumns(ctx),
     id: c.importId,
@@ -173,6 +177,11 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
     ...c.counts,
   };
   writes.push({ kind: "insert", table: "source_import", row: record });
+  for (const r of c.changes.insert) {
+    const row: SourceChange = { ...newRowColumns(ctx), ...r, workspace_id: ws, status: "open", resolution: null, resolved_by: null, resolved_at: null };
+    writes.push({ kind: "insert", table: "source_change", row });
+  }
+
 
   const result = done(
     ctx,

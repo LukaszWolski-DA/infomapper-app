@@ -4,7 +4,7 @@
 import type { DdlTranslation } from "@/domain/import/ddl";
 import type { ImportPlan, ImportTarget, MissingScope, PlanColumn } from "@/domain/import/plan";
 import type { StandardRead } from "@/domain/import/standard";
-import type { Requirement, RequirementLink, WorkspaceModel } from "@/domain/types";
+import type { Requirement, RequirementLink, SourceChange, WorkspaceModel } from "@/domain/types";
 import type { Vendor } from "./catalog-queries";
 
 /** What the wizard reads from the page: the same objects the inspector gets, plus each system's last import. */
@@ -15,6 +15,8 @@ export interface ImportData {
   /** The canvases each table is on (by table id), and the canvases' names. */
   canvasesOf: Readonly<Record<string, readonly string[]>>;
   canvasNames: Readonly<Record<string, string>>;
+  /** The workspace's changes to resolve (slice 7b): the plan settles open ones, and P8 compares them. */
+  changes: readonly SourceChange[];
   /** When each system was last imported (ISO time), by system id. */
   lastImports: Readonly<Record<string, string>>;
 }

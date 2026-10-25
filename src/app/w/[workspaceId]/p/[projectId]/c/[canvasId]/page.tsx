@@ -83,7 +83,7 @@ export default async function CanvasPage({
   // when the data is read: a page that arrives late must not put back an older state, nor hide a card, frame or note
   // created after it (slice 3a step 5, slice 3b step 1: `mergeFresh`)
   const readAt = new Date().toISOString();
-  const [model, allItems, canvases, workspace, history, projects, frameRows, labels, labelLinks, noteRows, users, requirements, requirementLinks, imports] = await Promise.all([
+  const [model, allItems, canvases, workspace, history, projects, frameRows, labels, labelLinks, noteRows, users, requirements, requirementLinks, imports, sourceChanges] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.canvases.list(ws),
@@ -98,6 +98,7 @@ export default async function CanvasPage({
     store.requirements.list(ws),
     store.requirements.listLinks(ws),
     store.model.listImports(ws),
+    store.model.listChanges(ws),
   ]);
   // measurement-only switches (slice 2a diagnosis): only in the measurement-only production build (AD-31); slice 3a:
   // `nolabelmarks` draws no label mark (rows, headers, lines), `nonotes` no note
@@ -185,7 +186,7 @@ export default async function CanvasPage({
   const lastImports: Record<string, string> = {};
   for (const i of imports) lastImports[i.source_system_id] ??= i.created_at;
   const importData = editable
-    ? { model, requirements, requirementLinks, canvasesOf, canvasNames: Object.fromEntries(canvases.map((c) => [c.id, c.name])), lastImports }
+    ? { model, requirements, requirementLinks, canvasesOf, canvasNames: Object.fromEntries(canvases.map((c) => [c.id, c.name])), lastImports, changes: sourceChanges }
     : undefined;
 
   return (

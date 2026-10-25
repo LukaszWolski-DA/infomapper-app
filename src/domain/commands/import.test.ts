@@ -9,7 +9,7 @@ import { buildPlan, type ImportTarget, type PlanChoices } from "../import/plan";
 import { readStandard } from "../import/standard";
 import { lastContentEditor } from "../model/mapping-rules";
 import { countsForCoverage } from "../model/requirements";
-import type { Attribute, ChangeEvent, Entity, Mapping, MappingInput, SourceColumn, SourceRelationship, SourceRelationshipColumn, SourceTable, WorkspaceRole } from "../types";
+import type { Attribute, ChangeEvent, Entity, Mapping, MappingInput, SourceChange, SourceColumn, SourceRelationship, SourceRelationshipColumn, SourceTable, WorkspaceRole } from "../types";
 import { importSources, STALE_REVIEW_FIELD, type ImportState } from "./import";
 import { setMappingStatus, updateMapping } from "./mapping";
 import { deleteSourceTable } from "./source";
@@ -48,6 +48,7 @@ function stateOf(db: Db): ImportState {
     mappingInputs: live(db.mapping_input),
     attributes: live(db.attribute),
     entities: live(db.entity),
+    changes: live(db.source_change),
   };
   return { model, relationships, relationshipColumns };
 }
@@ -206,6 +207,31 @@ describe("importSources (items 28, 40; P7, P8)", () => {
     for (const t of ["source_table", "source_column", "source_relationship", "source_relationship_column", "mapping", "source_import"] as const) {
       expect(comparable(back[t]), t).toEqual(comparable(db[t]));
     }
+  });
+
+  it("slice 7b: the import stores the changes it raises with their events; a later import settles them; undo takes them back", () => {
+    const first = firstImport();
+    const db = withEmailMapping(first.db);
+    const system = db.source_system[0]!.id as string;
+    const result = okSet(importSources(ctxOf(), as("modeler"), stateOf(db), inputFor(db, sample("crm_snapshot_2026-10-20.csv"), { systemId: system }, {}, "crm_snapshot.csv")));
+    const after = applyTo(db, result);
+    const changes = after.source_change as unknown as SourceChange[];
+    expect(changes.length).toBe(result.value.counts.changes_raised);
+    expect(changes.every((c) => c.status === "open" && c.source_import_id === result.value.importId && c.created_by === ids.actor)).toBe(true);
+    expect(result.events.filter((e) => e.object_type === "source_change").length).toBe(changes.length);
+    expect(result.value.summary).toMatch(/, \d+ to resolve \(\d+ high\)$/);
+    // the full file again: what left is back, what was new and is gone left before a decision
+    const again = okSet(importSources(ctxOf(), as("modeler"), stateOf(after), inputFor(after, sample("crm_sqlserver_catalog.tsv"), { systemId: system })));
+    const settled = (applyTo(after, again).source_change as unknown as SourceChange[]).filter((c) => c.status === "resolved");
+    expect(settled.length).toBeGreaterThan(0);
+    expect(settled.every((c) => /^(Back in the source|Left the source) on \d{4}-\d{2}-\d{2}/.test(c.resolution!) && c.resolved_by === ids.actor)).toBe(true);
+    // undoing the first re-import is refused now (its changes were settled since, 7a's all or nothing); undoing the
+    // second, then the first, works
+    expect(revertChangeGroup(ctxOf(), as("modeler"), { events: result.events, rows: applyTo(after, again) as unknown as WorkspaceRows }, "undo").ok).toBe(false);
+    const undoAgain = okSet(revertChangeGroup(ctxOf(), as("modeler"), { events: again.events, rows: applyTo(after, again) as unknown as WorkspaceRows }, "undo"));
+    const back = applyTo(applyTo(after, again), undoAgain);
+    const undoFirst = okSet(revertChangeGroup(ctxOf(), as("modeler"), { events: result.events, rows: back as unknown as WorkspaceRows }, "undo"));
+    expect((applyTo(back, undoFirst).source_change as unknown as SourceChange[]).every((c) => c.deleted_at !== null)).toBe(true);
   });
 
   it("four-eyes (answer 7): the person who imported is the last editor of a mapping the import sent back", () => {

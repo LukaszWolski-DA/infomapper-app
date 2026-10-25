@@ -91,7 +91,7 @@ export function actionsFor(rows: ChangeActionRows, change: SourceChange): Source
     case "new_table":
       return ["not_needed", "split"];
     default:
-      if (!change.mapping_id) return ["noted"];
+      if (!change.mapping_id) return ["acknowledge"];
       return canApproveAgain(rows, change) ? ["approve", "leave"] : ["leave"];
   }
 }
@@ -306,7 +306,7 @@ export function markAsNeeded(ctx: CommandContext, column: SourceColumn): { ok: t
   return { ok: true, edits: [{ kind: "update", table: "source_column", before: column, row: nextVersion(ctx, column, { not_needed: false }) }] };
 }
 
-// ---- approve again, leave in review, noted (item 16, P8) ----
+// ---- approve again, leave in review, acknowledge (item 16, P8) ----
 
 export function approveAgain(ctx: CommandContext, rows: ChangeActionRows, changeId: Uuid, workspace: Workspace, contentAuthorId: Uuid): ActionResult {
   const got = openChange(rows, changeId, ["type_conflict", "business_key_changed", "rule_updated"]);
@@ -331,12 +331,12 @@ export function leaveInReview(ctx: CommandContext, rows: ChangeActionRows, chang
   return { ok: true, edits: settle(ctx, [got.change], () => true, RESOLUTION.leftInReview), resolution: RESOLUTION.leftInReview, change: got.change };
 }
 
-/** A business key change with no mapping on the column: the modeller takes note (step 2; see the acceptance doc). */
-export function noted(ctx: CommandContext, rows: ChangeActionRows, changeId: Uuid): ActionResult {
+/** A business key change with no mapping on the column: the modeller acknowledges it (step 2, Łukasz: the history says why). */
+export function acknowledge(ctx: CommandContext, rows: ChangeActionRows, changeId: Uuid): ActionResult {
   const got = openChange(rows, changeId, ["business_key_changed"]);
   if (!got.ok) return got;
   if (got.change.mapping_id) return refuse(CHANGE_RESOLVED);
-  return { ok: true, edits: settle(ctx, [got.change], () => true, RESOLUTION.noted), resolution: RESOLUTION.noted, change: got.change };
+  return { ok: true, edits: settle(ctx, [got.change], () => true, RESOLUTION.acknowledged), resolution: RESOLUTION.acknowledged, change: got.change };
 }
 
 // ---- approve again all {n} (item 17, P9, Q11) ----
