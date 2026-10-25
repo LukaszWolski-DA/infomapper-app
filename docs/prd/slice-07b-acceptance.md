@@ -558,3 +558,191 @@ Each with my recommendation; a short answer is enough.
     CI plus the specs it touches (import, coverage, D-51, the source delete if question 7b changes it) and one full run,
     since it changes the data file's format and the import's summary; steps 4 and 5 one full run each; two at the close.
     *Recommend: as written.*
+
+## Łukasz's answers on the open points (25 October 2026)
+
+All as read in "Left open by the answers" and "The recommendations checked against the principle": the Move form says
+the old input is removed before the click; derived changes are no undo step and say "Raised when slice 7b was
+installed."; a resolution and its import's undo follow 7a's all-or-nothing rule; the extra settlement cases in the
+"Settled: …" form; a combined mapping with one retired input shows "until {date}" on that input and the segment's title
+"Retired: historical", type problems only through live inputs; "Approve again all" with four-eyes on lists "don't fit"
+first, a mapping in both only there; "no mapping yet" as read; the decision texts quoted in step 3. F1 and F2 both
+stand.
+
+## Step 2: the domain (25 October 2026)
+
+### What changed
+
+Pure domain code; nothing is written to the data file and no page changes (step 3 brings the commands, step 4 the
+pages).
+
+- **Types** (`src/domain/types.ts`): `SourceChange` with its kinds, severities and statuses (F4: `object_label`);
+  `retired_since` on `source_table` and `source_column`, `not_needed` on `source_column`; `changes_raised` and
+  `changes_high` on `source_import`. Every row builder fills them (seeds, fixtures, "New source table", the import).
+  No `valid_until` (Q10). `source_change` is not in `WritableRows` yet: the actions return `Edit`s (a `Write` or a
+  `source_change` row), which step 3 registers with the data file.
+- **The import engine** (`src/domain/import/`): `ImportModel` takes the workspace's changes; `buildPlan` returns
+  `raises` and `settles` (`planChanges`); `MappingImpact` carries the kind of change a send-back raises and the input it
+  names; `applyPlan` makes the import's id and returns the raised rows and the settled patches (resolution, who, when),
+  and clears `retired_since` with `missing_since` when a table or column is back; `planCounts` and `importSummary` add
+  "{n} to resolve ({h} high)"; `planDigest` holds the raises and the settled changes at their versions (F12).
+  `materialize` moved from the test fixtures into `src/domain/import/materialize.ts` (Q3).
+- **Changes to resolve** (`src/domain/source-changes/`):
+  - `texts.ts`: every title, detail, button, resolution and settlement text (the list below), and the review's callout
+    (`raisedCallout`).
+  - `rules.ts`: `Edit`, `newChange`, `settle`, open and priority order, historical inputs and mappings (`isRetired`,
+    `untilOf`, `isHistorical`, `mappingUntil`), `fitsSource` (P8: no input missing and the type check passes),
+    `approvalColumns`.
+  - `coverage.ts`: `coverageDelta` (two requirement indexes, before and after, with why) and `scopeModelOf`.
+  - `delete.ts`: `sourceDeleteCascade`, `sourceDeleteEdits`, `sourceDeleteImpact` for a table or a column (Q4, Q7).
+  - `actions.ts`: `actionsFor`, `retire`, `moveTargets`, `movePlan`, `moveMappings`, `deleteForChange`,
+    `mapToAttribute`, `markNotNeeded`, `decideColumnByColumn`, `markAsNeeded`, `approveAgain`, `leaveInReview`,
+    `noted`, `approveAllPlan`, `approveAllEdits`.
+  - `settle.ts`: the settle rules step 3 calls from the other commands (Q12).
+  - `derive.ts`: `deriveSourceChanges` for the format-7 upgrade, and `kindOfReason`.
+- **Earlier tests changed:** `plan.test.ts`, two expectations: the CRM re-import's counts gain `changes_raised: 9,
+  changes_high: 2`, and the missing table's summary gains ", 2 to resolve". The 7a e2e specs that read an import's
+  summary change in step 3, when the command writes the changes.
+
+### Decisions I took (please check)
+
+1. **"Delete table" in the panel keeps refusing mapped tables until step 4.** The new cascade exists, but the panel's
+   command switches to it only together with its D-47 form, so the app never deletes a mapping without showing it first.
+2. **A business key change with no mapping on the column** (the prototype's second `bk`) gets one action, **"Noted"**
+   (resolution "Noted"). The PRD's "Approve again · Leave it in review" needs a mapping. Please confirm the word.
+3. **Delete's resolutions:** the change acted on reads "Deleted"; other open changes on the same object "Settled: the
+   column was deleted" (or table).
+4. **Retiring a table** retires its missing columns and settles their own earlier "column left" changes with "Settled:
+   the table was retired".
+5. **Approving again** (one or all) also settles any other open change on the same mapping: "Settled: the mapping was
+   approved again".
+6. **"Decide column by column"** raises a change only for columns with no mapping yet that are still in the source (as
+   Q3's reading for derived changes).
+7. **Move targets:** the system's present columns, the change's table first, then the others by name; never the column
+   itself or a column or table missing from source.
+8. **The import settles more than item 7 names:** a table that leaves settles its own open "new table" change, and a
+   column that leaves inside a missing table settles its "new column" change ("Left the source on {date} before a
+   decision"). A column that leaves with its table raises no "column left" of its own (the prototype's rule).
+9. **The mapping panel's status settlement** uses the panel's words: "Settled: the mapping's status was set to Draft in
+   its panel" (or In review).
+10. **Derivation:** a derived change is dated and signed as its import (`created_at`, `created_by`), so its card shows
+    the import's date; a missing column whose table left at the same moment gets no change of its own.
+
+### Every resolution and settlement text
+
+From `src/domain/source-changes/texts.ts`; `{date}` is the ISO date (`2026-10-25`).
+
+| When | Text |
+| --- | --- |
+| Retire (column or table) | Retired: kept as historical |
+| Move its mappings | Mappings moved to {table}.{column} |
+| Delete (the change acted on) | Deleted |
+| Map to an attribute | Mapped to {Entity}.{attribute} (draft) |
+| Not needed / None of it is needed | Marked not needed |
+| Decide column by column | Split into one decision per column |
+| Approve the mapping again (one, or all) | Approved again |
+| Leave it in review | Left in review |
+| Noted (business key change without a mapping, decision 2) | Noted |
+| An import: the column or table is back | Back in the source on {date} |
+| An import: a new column or table left before a decision | Left the source on {date} before a decision |
+| Deleted elsewhere (entity, attribute, mapping, column, table) | Settled: the {entity, attribute, mapping, column or table} was deleted |
+| Merged into another mapping | Settled: the mapping was merged into another |
+| Approved in the mapping panel | Settled: the mapping was approved in its panel |
+| Another status in the mapping panel | Settled: the mapping's status was set to {Draft or In review} in its panel |
+| An input removed from the mapping | Settled: {column} no longer feeds the mapping |
+| A new column mapped by a drag or the attribute panel | Settled: mapped to {Entity}.{attribute} ({draft, in review or approved}) |
+| A new column a Move mapped onto | Settled: mappings moved here from {old column} |
+| A column's own change when its table is retired | Settled: the table was retired |
+| Another open change on a mapping approved again | Settled: the mapping was approved again |
+
+The other texts, for reading in one place:
+
+| What | Text |
+| --- | --- |
+| Titles | Column left the source · Table left the source · New column to decide · New table to decide · Mapping no longer fits the source · Business key column changed · Rule updated for a renamed column |
+| Kinds in the review's callout | columns that left · a table that left · new columns · new tables · type conflicts · business key changes · updated rules |
+| Buttons | Retire: keep as historical · Move its mappings… · Delete… · Map to an attribute… · Not needed (a table: None of it is needed) · Decide column by column · Approve the mapping again · Leave it in review · Noted |
+| Details at import | Not in the file. Its {n} columns are marked missing from source. · Not in the file. Was {type}, with {n} mappings. · New in the source, {n} columns with no mapping yet. · New in the source, {type}. · The approved mapping to {Entity.attribute} went back to review: {reasons}. · Business key column changed type, {before} → {after}. Hash keys built on it change too. |
+| Derived (P2), added to the detail | Raised when slice 7b was installed. |
+| The review's callout (item 9) | After the import, {n} changes to resolve, {h} of them high. They wait on {system}’s page until you decide: {kinds}. |
+| The import summary (item 8) | …, {n} to resolve ({h} high) |
+| Move form | Moved approved mappings go back to review; the old column is retired. · {Entity.attribute} already reads {target}; the input from {old} is removed. |
+| Move refused | {Entity.attribute} already has a mapping from {target}. Delete this one instead. |
+| A moved mapping's review reason | moved from {old} after it left the source |
+| Map form | The mapping starts as a draft. |
+| Delete: a combined mapping's review reason | {column} was deleted from the source |
+| Delete form | Retiring keeps the history instead; in Data Vault the column stays in its satellite. · No requirement’s coverage changes. |
+| Approve again all | These don't fit the source yet: · You changed or imported these last, so someone else has to approve them. |
+| Refusals | This change is already resolved. · This mapping is no longer in review. · This mapping does not fit the source yet, so it cannot be approved again. · That mapping already exists. · Choose a column of the system that is in the source. |
+| Why a coverage changes | {column} missing from source · {attribute}: mapping back to review, {reason} · {attribute}: mapping deleted · {attribute}: type conflict |
+
+### Tests
+
+`npm run lint`, `npm run typecheck`: pass. `npm test`: **91 files, 1,212 tests pass** (33 new, in
+`src/domain/source-changes/`: `raise.test.ts` 7, `actions.test.ts` 19, `settle.test.ts` 4, `derive.test.ts` 3). One
+scenario serves them all (`src/domain/__fixtures__/source-changes.ts`): CRM with customers and orders, approved,
+combined and draft mappings, and a re-import in which a business key widens, an approved mapping gets a type conflict,
+two columns and a table leave, and two columns and a table are new.
+
+| Criterion | What the unit tests check |
+| --- | --- |
+| S7B-01 | a first import raises none; each kind with severity, label, detail; the counts and the summary; drafts raise no mapping change (Q13); a business key change without a mapping; a rule rewritten |
+| S7B-02 | the callout; coverage before and after over the whole model, with why |
+| S7B-03 | back settles "left" and clears `retired_since`; a new column that leaves settles; P8 refuses a plan whose settled change was resolved meanwhile |
+| S7B-04 | retire a column and a table; historical inputs and mappings, "until" (Q10) |
+| S7B-05 | move: direct and combined, approved to review with the reason, rule rewritten, a draft stays a draft, the old input dropped, a duplicate refused, the target's change settled |
+| S7B-06 | delete a column and a table: what goes, the impact with relationships and coverage, every change settled |
+| S7B-07 | map, not needed (column, table), decide column by column, mark as needed |
+| S7B-08 | approve again only when it fits; four-eyes refuses the last editor and accepts someone else; leave in review; noted |
+| S7B-09 | approve again all: don't fit first, four-eyes apart, the approvals and their settlements |
+| S7B-12 | the derivation equals what the engine raises for the same import, dated and signed by it, marked; mapped new columns left out; the kind from the reason's words |
+| Q12 | every settlement elsewhere, and none twice |
+
+Not yet: S7B-10 (undo) and S7B-15 (roles) need the commands (step 3).
+
+### The plan timing (section 6)
+
+`npx tsx scripts/bench-import-plan.ts` (Node, median of 5 after a warm-up), against the tag `slice-07a` in the same
+sitting: three rounds each side, alternating (a worktree at the tag, `../infomapper-base-07a`, its `node_modules` a
+junction to this one). The synthetic re-import: 5 % of the columns changed, renamed or missing, a direct approved mapping
+on every tenth column.
+
+| Figure | `slice-07a` (3 rounds) | this branch (3 rounds) | Change | Bar |
+| --- | --- | --- | --- | --- |
+| Plan, 20,000 columns | 108, 105, 109 ms → **108** | 127, 104, 111 ms → **111** | +3 % | ≤ 10 %: met |
+| Apply, 20,000 columns | 26, 27, 26 ms → **26** | 25, 32, 30 ms → **30** | +4 ms | |
+| Plan and apply, 20,000 | **134** | **141** | +5 % | ≤ 10 %: met |
+| Plan, 100,000 columns | 461, 515, 458 ms → **461** | 471, 479, 475 ms → **475** | +3 % | ≤ 10 %: met |
+| Apply, 100,000 columns | 129, 131, 132 ms → **131** | 131, 132, 136 ms → **132** | +1 % | |
+
+The plan raises 315 changes (115 high) at 20,000 columns and 1,610 (610 high) at 100,000. A first sitting before a fix
+measured +11 % on the plan: the raising built a label for every column of the system; it now skips unchanged columns.
+
+**Coverage before and after** (the review's callout, Q3; a variant with one attribute per mapped column and 500
+requirements of four attribute links each; `materialize` plus two requirement indexes):
+
+| Columns | Median (fastest–slowest) | Bar |
+| --- | --- | --- |
+| 20,000 | 80 ms (66–111) | ≤ 100 ms: met |
+| 30,000 (the import limit, `--limit`) | 95 ms (79–148) | ≤ 100 ms: met, close |
+| 100,000 (above the limit) | 311 ms (301–325) | missed; no import can be this large |
+
+The review builds it once per plan (a rename choice rebuilds the plan). At the limit it is close to the bar; if step 4's
+review feels slow, the "after" index can be limited to the requirements whose scope holds an affected attribute.
+
+### How to check
+
+```
+npx vitest run src/domain/source-changes src/domain/import
+npx tsx scripts/bench-import-plan.ts
+npx tsx scripts/bench-import-plan.ts --limit
+```
+
+### Open for step 3
+
+- Register `source_change` (`WritableRows`, the data file's format 7 with the derivation, undo's tables, parents and
+  `actionFor`), the migration, and the commands around the actions (permissions per F22, versions, change events, undo
+  labels); the import writes its changes; the settle rules called from the other commands; `deleteSourceTable` on the
+  cascade together with step 4's form.
+- The worktree `../infomapper-base-07a` stays for step 3's write figure (A/B against the tag); its `node_modules` is a
+  junction, removed with `rmdir` before `git worktree remove`.
