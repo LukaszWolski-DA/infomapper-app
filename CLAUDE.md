@@ -166,6 +166,9 @@ npx tsx scripts/bench-import-plan.ts                          # slice 7a: plan a
 npx tsx scripts/bench-import-write.ts 20000                   # slice 7a: import, re-import and undo through the local adapter, on a copy
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07a/S7A-14-review.spec.ts  # slice 7a: the review's filters on 20,000 columns
 MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7a14-baseline/slice-06b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7A-14's element guard
+npx tsx scripts/bench-consistency.ts                          # slice 7b: model consistency on 20,000 columns, 5 % changed (bar 50 ms)
+npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06b/S6B-10.spec.ts         # slice 6b: selection places, the buttons, the background refresh, phase by phase
 BROWSERS=1 npx playwright test e2e/slice-06b/S6B-browsers.spec.ts                          # slice 6b: smoke in Chromium, Firefox and WebKit (on demand; needs `npx playwright install firefox webkit`)
 SCREENS=<folder> npx playwright test e2e/slice-04b1/S4B1-06-screens.spec.ts               # slice 4b-1's coverage colour screenshots

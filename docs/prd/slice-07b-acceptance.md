@@ -1,6 +1,6 @@
 # Slice 7b – Acceptance
 
-Status: **step 4 accepted (25 October 2026); step 5 next, in a new session.** Branch `slice/07b-source-changes`, from
+Status: **step 5 done (25 October 2026), waiting for Łukasz; a figure missed its bar (see step 5).** Branch `slice/07b-source-changes`, from
 `main` at `dd072b6` (tag `slice-07a`). PRD: `docs/prd/slice-07b-source-changes.md`. The PRD stays as written; this file
 is its amendment.
 
@@ -1172,3 +1172,139 @@ Written for the session that continues with step 5.
   within 10 % of Focus in the same sitting (measurement build, slice 4b-1's to-screen method), `seed:large` gaining a
   recorded import with changes on about 10 % of its tables (question 17), and the element-count guard against
   `slice-07a`. Then one full e2e run.
+
+## Step 5: model consistency and the Changes view (25 October 2026)
+
+### First: the two changes to step 4
+
+- **Four-eyes on a card** (answer 1): when four-eyes is on and this person changed the mapping last, “Approve the
+  mapping again” shows disabled with the reason under the buttons: “Someone else approves this: your import sent it
+  back, and four-eyes is on.” (or “… you changed it last, …” when the last change was not the import; the page knows
+  who imported, `SystemImport.byId`). The server still refuses. S7B-08 checks the disabled button and the text.
+- **“Review the {n} sent back…”** (answer 2): the entry counts every mapping the import sent back that is still in
+  review and opens the list; only the confirm button counts what it approves (“Approve {k}”, disabled at 0). S7B-09
+  checks both texts.
+
+### What changed
+
+- **Model consistency** (item 25; `src/domain/source-changes/consistency.ts`, the home's
+  `_components/project-consistency.tsx`): between the stats line and Canvases, computed on every load of the project
+  home (a server component, so it is live after any action). Groups as the prototype: mappings on columns that left the
+  source (high when one is approved), attributes without an active source (“its columns left the source” or
+  “historical source only”), type conflicts (high when one is approved), mappings back in review after a source change
+  (with the reason), affected requirements (key, name, “{a}/{n} covered”) and source changes to resolve per system
+  (“{n} changes to decide”, workspace-wide). The badge counts the listed mappings and attributes plus the open changes;
+  with nothing: “Mappings, types and sources agree. Nothing to look at.” Historical mappings (every input retired) are
+  neither left-the-source nor type conflicts.
+- **Opening from the home** (F15): each line is a link to the canvas `modelConsistency` picks (the first project
+  canvas with both ends' cards, else one end's, else the first) with `?map=`, `?row=` (an attribute; its element panel
+  when its card is not there) or `?system=`; requirements open as the Requirements list does (`?req=`). The canvas page
+  turns them into `focusSelection` (`arrivalSelection`), `ModelCanvas` selects it once ready, centres a mapping's
+  source card (else its entity's) or the row's card, and drops the parameter; the details panel opens. `SelectionHistory`
+  treats them as arrival parameters.
+- **The Changes view** (items 26–27): the toolbar button “Changes” after Focus (into “More” at Focus's step; the menu
+  has a “Changes” item next to Focus), the bar over the canvas (“Changes”, the select “All open changes” / “Import into
+  {system}, {date, time}, {source}”, “{n} tables, {m} mappings, {k} attributes” or “Nothing on record”, Close), the
+  chip “Changes: all open” / “Changes: import into {system}, {date}” with ×, and “Show all” turns it off. State in
+  `src/canvas/changes-view.ts` (a value store, momentary), `ChangesDriver` next to `FocusDriver` turns it into a
+  `{ lit, key }` fade request (`touchedBy` in `src/domain/source-changes/touched.ts`, the prototype's `chgSet`; the key
+  holds the lit ids, so a change in the data re-fades). It and Focus turn each other off (two store subscriptions); each
+  driver clears only its own request. Whole cards stay lit, no rows (F18). No canvas or miniature commit when switching
+  (S7B-14 checks it).
+- **“Show what it touched on the canvas”** under each import in the system panel turns the view on for that import
+  (F16: the panel is on canvas pages only; from a home page the way is model consistency's system line).
+- **`seed:large -- --changes`** (question 17, `src/data/local/seed-large-changes.ts`): an import into each system of
+  “Performance test” through the domain; 16 changes on 9 of its 60 tables (7 new columns, 7 columns left, 1 of them
+  high, 2 tables left, both high). Without the flag the workspace is as before, so the element guard compares like
+  with like.
+
+### Decisions I took (please check)
+
+1. **The four-eyes reason has two wordings:** your answer's text when this person's import sent the mapping back,
+   “… you changed it last, …” when the last change was someone's edit after the import.
+2. **“Attributes without an active source” is high** when one of its attributes is in an affected requirement's scope
+   (the prototype makes it high whenever any requirement is affected at all).
+3. **An attribute without an active source** counts every mapping of the attribute, retired inputs included (“no new
+   data reaches it”); “historical source only” when one of its mappings is historical. A combined mapping with one
+   retired input and the other present is neither “left the source” nor without a source.
+4. **A system's line** opens on the first project canvas with one of its tables (else the first canvas); the
+   requirements open as the home's Requirements list does.
+5. **The Changes button** is coloured in the warning colour while on (the bar's border, as the prototype's); Focus's
+   is blue. The chip shows the import's date, the select its date and time and the file.
+6. **`seed:large -- --changes`** is a flag, not part of every `seed:large`, so the element guard compares
+   “Performance test” as slice 7a counted it; S7B-16 seeds it with the flag.
+
+### Tests
+
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: **93 files, 1,242 tests** (9 new in `consistency.test.ts`:
+  the groups and severities, the scope, the canvas each line opens on, live after retiring, the requirements, all
+  well, and what the Changes view touches for all open changes and one import).
+- `e2e/slice-07b/`: **S7B-13** (4 tests: the groups, hints and badge; each line opening its object with approve and
+  retire changing the home; the scope and the all-well text; a reader), **S7B-14** (4 tests: the button, bar, select,
+  counts, fade, chip and Close with nothing stored changed and no canvas or miniature commit; Focus and the Changes view
+  turning each other off, ×, “Show all”, a reload; “Show what it touched” reached from the home; every role and
+  “Nothing on record”). S7B-08 and S7B-09 changed for the two step-4 answers. First run: S7B-13 failed twice in the spec
+  (the attribute's name is in an input; approving in the panel settles its change, so the count is 7, not 8), then 3 of
+  3 passed; S7B-08, -09, -14, -15 passed first time.
+- **Earlier specs the step touches** (the More menu, Focus, the view-state bar, the home, the system panel, history
+  places, S4P-12, S4B1-13): slice 6a and 6b whole, S0-02, -04, -07, S3A-05, S4B1-06, -08, -13, S4B2-07, -09, S5A-02,
+  S7A-11: **51 passed**. No earlier spec changed.
+- **S7B-16** is a measurement spec (`S7B-16-changes.spec.ts`, left out of the normal run like the other measuring
+  specs).
+- **One full e2e run** (`npm run e2e`, from scratch, no dev server running): **304 passed, 0 failed, 1.1 h**.
+
+### Figures (section 6)
+
+**Model consistency's computation** (`npx tsx scripts/bench-consistency.ts`, Node): 20,000 columns, 300 missing from
+source, 2,000 approved mappings, 315 changes raised, 500 requirements: **median 23.4 ms** (fastest 21.4, slowest
+31.5), bar 50 ms **met**. The requirement index the page builds anyway: 27.9 ms. (The synthetic file lists 1,619 type
+conflicts, as its attributes are all string(50); a real project lists far fewer lines.)
+
+**The project home's load** (information, measurement build, “Performance test” with its 16 changes, 7 loads):
+median response end 226.9 ms, DOMContentLoaded 302.5 ms. Mostly the local adapter's read of the whole file.
+
+**Element counts** (`S3B-15-elements.spec.ts`, measurement build; baseline from a `slice-07a` worktree with its own
+`npm ci`, `.data/measure/s7b16-baseline/slice-07a.json`):
+
+| View | `slice-07a` page / viewport | this branch page / viewport |
+| --- | --- | --- |
+| 100 %, frames expanded | 20,785 / 19,305 | 20,790 / 19,305 |
+| 30 %, frames expanded | 5,988 / 4,508 | 5,993 / 4,508 |
+| 100 %, frames collapsed | 6,297 / 4,907 | 6,302 / 4,907 |
+| 30 %, frames collapsed | 2,855 / 1,465 | 2,860 / 1,465 |
+
+The viewport is equal in all four views (the guard passes). The whole page has **+5 in each view: the Changes
+button** (button, svg, two paths, the label span). Nothing else: the tree's badge, the status bar's span and the bar
+appear only with changes, which “Performance test” has none of without `--changes`.
+
+**The Changes view to the screen** (`S7B-16-changes.spec.ts`, measurement build, “Performance test” with
+`--changes`, around ent:23, frames expanded, 10 switches each from a settled screen, traced, one sitting; to the
+screen, median / p95, ms):
+
+| View | Changes on | Changes off | Select: import | Select: all open | Focus on | Focus off |
+| --- | --- | --- | --- | --- | --- | --- |
+| 100 % | 41.4 / 102.9 | 23.7 / 32.4 | 30.5 / 45.7 | 37.8 / 55.2 | 36.2 / 46.4 | 22.5 / 25.3 |
+| 30 % | 74.7 / 133.0 | 24.0 / 32.5 | 37.6 / 56.8 | 64.6 / 78.3 | 50.9 / 73.8 | 18.0 / 22.1 |
+
+- **≤ 100 ms to the screen: met** in every case (medians).
+- **Within 10 % of Focus: missed.** Turning the view on: +14 % at 100 % (41.4 against 36.2), **+47 % at 30 %** (74.7
+  against 50.9); off: +5 % and +33 % (24.0 against 18.0, 6 ms). The split at 30 %, on: main thread 25.2 ms against
+  Focus's 17.7, raster 42.1 against 26.8. The two do not light the same: all open changes light 22 cards spread over
+  the canvas; Focus on ent:23 lights its neighbours. More holes in the veil and more lit lines mean more to raster
+  after the switch; the main thread's extra is the bar and the chip appearing (above the canvas, no layout read in a
+  commit) and the lit set's computation. Per the PRD, a miss stops the step: **your decision**. Options: (a) accept
+  the ≤ 100 ms bar alone, since the lit sets differ, (b) let me compare against Focus on a selection that lights about
+  as many cards (a frame or a multi-selection of the 22), or (c) let me take phase traces of the 30 % case (script,
+  style, layout, paint, layerize, as S6A-09-hand does) to find what to cut.
+
+### How to check in the browser
+
+`npm run dev`, sign in as Łukasz, Retail Co – DWH. Re-import CRM twice as in step 4 (first
+`crm_sqlserver_catalog.tsv` without the `segment` and `customer_addresses` lines, then `crm_snapshot_2026-10-20.csv`).
+- Customer 360's home: “Model consistency 16” between the stats and Canvases; click a mapping line (the mapping's
+  panel on Customer & orders), the attribute line, the CRM line (CRM's panel). Approve `email_addr → email` in its
+  panel or retire `created_ts` in CRM's panel, then the Home tab: the lines and counts change.
+- On the canvas: the triangle button after Focus (“Changes” on a wide window): the bar, the fade, the chip; the select
+  per import; Focus turns it off and back; “Show what it touched on the canvas” under each import in CRM's panel.
+- With four-eyes on (workspace settings): CRM's card for `cust_no` shows “Approve the mapping again” disabled with the
+  reason; the import's entry reads “Review the 2 sent back…”.
