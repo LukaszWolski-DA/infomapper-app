@@ -34,6 +34,7 @@ import { byPriority, isOpen } from "@/domain/source-changes/rules";
 import {
   ACTION_LABEL,
   DELETE_RETIRE_HINT,
+  FOUR_EYES_CARD,
   FOUR_EYES_HEAD,
   isoDate,
   KIND_TITLE,
@@ -42,6 +43,7 @@ import {
   NO_COVERAGE_CHANGE,
   NONE_NEEDED_LABEL,
   NOT_FIT_HEAD,
+  REVIEW_SENT_BACK,
   STATUS_WORD,
   type SourceChangeAction,
 } from "@/domain/source-changes/texts";
@@ -186,6 +188,10 @@ function ChangeCard({ change: c, keys }: { change: SourceChange; keys: ReadonlyM
   const finish = (r: ActionResult<ChangeOutcome>) => {
     if (r.ok) setForm(null);
   };
+  // four-eyes (Łukasz's step 4 answer 1): a button the server would refuse shows disabled with the reason, as the
+  // mapping panel's approval (`fourEyesBlocks` there); the server still checks
+  const blocked = acts.includes("approve") && p.fourEyes && !!c.mapping_id && p.contentAuthors[c.mapping_id] === p.userId;
+  const byImport = blocked && p.imports.some((i) => i.id === c.source_import_id && i.byId === p.userId);
 
   const column = c.source_column_id ? p.ix.column.get(c.source_column_id) : undefined;
   const table = c.source_table_id ? p.ix.table.get(c.source_table_id) : undefined;
@@ -236,11 +242,23 @@ function ChangeCard({ change: c, keys }: { change: SourceChange; keys: ReadonlyM
       {!form && acts.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1.5">
           {acts.map((a) => (
-            <button key={a} type="button" className={smallButtonClass} disabled={pending} onClick={() => act(a)} data-testid={`change-action-${a}`}>
+            <button
+              key={a}
+              type="button"
+              className={`${smallButtonClass} disabled:opacity-50`}
+              disabled={pending || (a === "approve" && blocked)}
+              onClick={() => act(a)}
+              data-testid={`change-action-${a}`}
+            >
               {a === "not_needed" && c.kind === "new_table" ? NONE_NEEDED_LABEL : ACTION_LABEL[a]}
             </button>
           ))}
         </div>
+      )}
+      {!form && blocked && (
+        <p className="mt-1.5 text-xs text-im-warn" data-testid="change-four-eyes">
+          {FOUR_EYES_CARD(byImport)}
+        </p>
       )}
     </article>
   );
@@ -437,9 +455,10 @@ export function SourceDeleteForm({
 }
 
 /**
- * “Approve again all {n}” for one import (item 17, P9, Q11): the mappings it sent back that are still in review. First
- * the list with their reasons, those that don't fit the source listed apart first, then those four-eyes keeps from this
- * person; then “Approve {n}” for the rest, one undo step. `{n}` on the button counts all of them.
+ * “Approve again all {n}” for one import (item 17, P9, Q11): the mappings it sent back that are still in review. The
+ * entry “Review the {n} sent back…” counts all of them and opens the list (Łukasz's step 4 answer 2): their reasons,
+ * those that don't fit the source listed apart first, then those four-eyes keeps from this person; only the confirm
+ * button “Approve {k}” counts what it approves, one undo step, disabled at 0.
  */
 export function ApproveAgainAll({ importId }: { importId: Uuid }) {
   const p = usePanel();
@@ -456,7 +475,7 @@ export function ApproveAgainAll({ importId }: { importId: Uuid }) {
   if (!open) {
     return (
       <button type="button" className={`${smallButtonClass} mt-1 block`} onClick={() => setOpen(true)} data-testid="button-approve-all">
-        Approve again all {total}
+        {REVIEW_SENT_BACK(total)}
       </button>
     );
   }

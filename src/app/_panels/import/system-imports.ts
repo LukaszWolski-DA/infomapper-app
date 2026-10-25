@@ -12,6 +12,8 @@ export interface SystemImport {
   at: string;
   label: string;
   by: string;
+  /** Who imported (slice 7b: the card's four-eyes reason). */
+  byId: string;
   /** “2 new tables, 5 new columns, …” or “No changes” (item 28). */
   summary: string;
 }
@@ -23,5 +25,5 @@ const when = (iso: string) => {
 
 /** `imports` newest first, as `model.listImports` gives them. */
 export function systemImports(imports: readonly SourceImport[], userName: (id: string) => string): SystemImport[] {
-  return imports.map((i) => ({ id: i.id, systemId: i.source_system_id, at: when(i.created_at), label: i.source_label, by: userName(i.created_by), summary: importSummary(i) }));
+  return imports.map((i) => ({ id: i.id, systemId: i.source_system_id, at: when(i.created_at), label: i.source_label, by: userName(i.created_by), byId: i.created_by, summary: importSummary(i) }));
 }

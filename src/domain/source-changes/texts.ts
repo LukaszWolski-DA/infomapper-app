@@ -134,6 +134,11 @@ export const DELETE_RETIRE_HINT = "Retiring keeps the history instead; in Data V
 export const NO_COVERAGE_CHANGE = "No requirement’s coverage changes.";
 export const NOT_FIT_HEAD = "These don't fit the source yet:";
 export const FOUR_EYES_HEAD = "You changed or imported these last, so someone else has to approve them.";
+/** Why a card's “Approve the mapping again” is disabled under four-eyes (Łukasz's step 4 answer 1). */
+export const FOUR_EYES_CARD = (byImport: boolean) =>
+  `Someone else approves this: ${byImport ? "your import sent it back" : "you changed it last"}, and four-eyes is on.`;
+/** The system panel's entry to “Approve again all” for one import (Łukasz's step 4 answer 2). */
+export const REVIEW_SENT_BACK = (n: number) => `Review the ${n} sent back…`;
 export const NOT_IN_REVIEW = "This mapping is no longer in review.";
 export const DOES_NOT_FIT = "This mapping does not fit the source yet, so it cannot be approved again.";
 export const CHANGE_RESOLVED = "This change is already resolved.";

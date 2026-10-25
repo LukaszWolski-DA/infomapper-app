@@ -1,8 +1,9 @@
 // S7B-09: Approve again all {n} (P9, item 17; step 1 answer Q11): the list with the reasons before approving; the
 // mappings that don't fit listed apart first and left in review; with four-eyes on, those this person may not approve
-// listed apart; one undo step.
+// listed apart; one undo step. The entry reads “Review the {n} sent back…” and only the confirm button counts what it
+// approves (Łukasz's step 4 answer 2).
 
-import { FOUR_EYES_HEAD, NOT_FIT_HEAD } from "../../src/domain/source-changes/texts";
+import { FOUR_EYES_HEAD, NOT_FIT_HEAD, REVIEW_SENT_BACK } from "../../src/domain/source-changes/texts";
 import { expect, test } from "./fixtures";
 import { crmChanges, expectToast, loadModel, openSystem, SEED_IDS, setFourEyes, undo } from "./helpers";
 
@@ -16,9 +17,11 @@ const entry = (page: import("@playwright/test").Page) => page.getByTestId("impor
 test("S7B-09: approve again all lists the mappings with their reasons, leaves those that don't fit, and undoes in one step", async ({ page }) => {
   await crmChanges();
   await openSystem(page);
+  await expect(entry(page).getByTestId("button-approve-all")).toHaveText(REVIEW_SENT_BACK(2));
   await entry(page).getByTestId("button-approve-all").click();
   await expect(entry(page).getByTestId("button-approve-all")).toHaveCount(0);
   const form = entry(page).getByTestId("form-approve-all");
+  await expect(form.getByTestId("button-approve-all-confirm")).toHaveText("Approve 1");
   await expect(form.getByTestId("approve-all-entry")).toHaveText(["Customer.customer_number: business key column changed type, varchar(20) → varchar(25)"]);
   await expect(form.getByTestId("approve-all-not-fit")).toContainText(NOT_FIT_HEAD);
   await expect(form.getByTestId("approve-all-not-fit")).toContainText("Customer.email: type conflict, varchar(255) into string(120)");
