@@ -1,6 +1,6 @@
 # Slice 7b – Acceptance
 
-Status: **step 4 done (25 October 2026); step 5 waits for Łukasz's go.** Branch `slice/07b-source-changes`, from
+Status: **step 4 accepted (25 October 2026); step 5 next, in a new session.** Branch `slice/07b-source-changes`, from
 `main` at `dd072b6` (tag `slice-07a`). PRD: `docs/prd/slice-07b-source-changes.md`. The PRD stays as written; this file
 is its amendment.
 
@@ -1085,3 +1085,90 @@ What the panels compute in the browser, from the domain (pure, no server call):
 the review's two callouts. Then: the tree's "9" and the status bar; CRM's panel (high first); retire `segment`, move
 `created_ts` to `created_on` (the form shows the rule), mark `customer_segment` not needed and back in its column panel,
 approve `cust_no` again or use "Approve again all 2", open "Delete table…" on customers and cancel; Undo after each.
+
+## Łukasz's answers to step 4 (25 October 2026)
+
+Step 4 accepted, with decisions 1, 2, 5 and 6 as taken (the delete form inside the panel, the impact read on the
+server, the texts, the coverage callout only on a re-import) and the element-count guard moved to step 5. Two changes,
+both from the principle that the modeller sees what will happen before it happens:
+
+1. **Four-eyes on a card** (replaces decision 3): a button the server will refuse is not offered as if it works. When
+   the person may not approve, "Approve the mapping again" shows disabled with the reason, e.g. "Someone else approves
+   this: your import sent it back, and four-eyes is on.", as the mapping panel's approval behaves under four-eyes.
+2. **"Approve again all {n}"** (replaces decision 4): the label does not promise more than the click does. The entry
+   reads "Review the {n} sent back…" and opens the list; only the confirm button counts what it approves
+   ("Approve {k}", disabled at 0).
+
+## Handover after step 4 (25 October 2026)
+
+Written for the session that continues with step 5.
+
+### State
+
+- Steps 1–4 done and accepted. Branch `slice/07b-source-changes`; step 4's commits `517e571` (Delete table on the
+  cascade), `5f7a3d7` (the pages), `5b3afb4` (the tests), `95c11cf` (step 4's write-up), then this handover. Nothing
+  pushed, no pull request.
+- CI green at step 4's close: lint, typecheck, `npm test` 92 files, 1,233 tests. `e2e/slice-07b/` has S7B-01 to -12 and
+  -15 (21 tests). One full e2e run: 296 passed, 59.6 min.
+- The worktree `../infomapper-base-07a` (the tag) still stays for the A/B figures; remove its `node_modules` junction
+  with `cmd /c rmdir ..\infomapper-base-07a\node_modules` **before** `git worktree remove`.
+
+### First in step 5: the two changes above
+
+1. **The card's approve under four-eyes** (`ChangeCard` in `src/app/_panels/source-changes.tsx`): the page knows the
+   authors already (`p.fourEyes`, `p.contentAuthors[mappingId]`, `p.userId`; the mapping panel's rule is
+   `fourEyesBlocks`, `mapping-panel.tsx:202`). When it blocks, render `change-action-approve` disabled with the reason
+   (a line under the buttons, as the mapping panel shows `note-four-eyes`); the server still refuses. Put the text in
+   `src/domain/source-changes/texts.ts`. S7B-08's four-eyes test changes: Łukasz sees the button disabled with the
+   reason instead of clicking it and getting the refusal toast.
+2. **"Review the {n} sent back…"** (`ApproveAgainAll`, same file): the entry button's text; the form's confirm stays
+   "Approve {k}", disabled at 0. S7B-09 clicks `button-approve-all` (test id unchanged; assert its new text there).
+   Then re-run S7B-08, -09 and -15 (a failing one three times on its own).
+
+### Only in this conversation so far (now written down)
+
+- **Test data in e2e:** `e2e/slice-07b/helpers.ts` writes imports through the domain as the upload route does
+  (`importAs`, no undo step); `crmChanges()` is the definition of done's two CRM files and leaves 9 open changes (2
+  high). `card(page, kind, label)` and `act(...)` drive the cards; `openSystem(page, user)` opens CRM's panel. After a
+  `page.reload()` the system panel is not open any more (a selection is not kept across a reload): open it again.
+- **A verify data file for the browser:** the preview config `infomapper-verify` in `.claude/launch.json` reads
+  `.data/verify-db.json`; seed it with the same two imports as `crmChanges()` (a scratch script; nothing committed).
+  Stop the preview server before any Playwright run.
+- **Shell on this machine:** `cat > file` without a heredoc waits on stdin and hangs a Bash call, and long heredocs
+  with apostrophes break. Write files with the Write or Edit tools.
+- **Not done:** the element-count guard (`S3B-15-elements.spec.ts` against `slice-07a`), now in step 5. Step 4 adds no
+  element on "Performance test" (no changes, nothing retired): the tree's badge, the status bar's span and a retired
+  segment's `<title>` appear only with changes.
+
+### What step 5 needs (PRD items 25–27; step 1 answers F15–F18, Q6)
+
+- **The fade layer and Focus:** one slot, `requestFade` in `src/canvas/fade.ts` (`FadeRequest`: `{ focus }` or
+  `{ lit, key }`; it compares keys only, so the key must change with the data, e.g. `changes:<open|import id>:<data
+  version>`). `focusOn` (a value store, `fade.ts:74`) is Focus's switch; `FocusDriver` (`src/canvas/Focus.tsx:74`)
+  writes the request from it and the selection. The Changes view: a value store of its own (momentary, like Focus,
+  D-22) and a `ChangesDriver` next to `FocusDriver`; turning one on turns the other off (Q6). Nothing may re-render
+  `ModelCanvas` (S4P-12, S4B1-06 count commits). The lit set (F18): touched tables and entities → their cards, touched
+  mappings → their lines, a block lit when a member is, a bundle when one of its mappings is; whole cards stay lit and
+  the rows keep step 4's classes. The prototype's `chgSet` defines "touched" (item 27); the page has the rows
+  (`p.changes`, `isOpen`, `missing_since`, `review_reason`).
+- **The toolbar button "Changes":** after Focus (`FocusButton`, `Focus.tsx:102`), into "More" at Focus's step
+  (`src/canvas/more-breakpoints.ts`, `src/canvas/MoreTools.tsx`); a class switch only, nothing reads layout in a commit.
+- **The view-state bar** (`src/app/_components/view-state-bar.tsx`): the chips are built around line 48 (`focusOn`
+  gives the Focus chip); add "Changes: all open" / "Changes: import into {system}, {date}" with ×. "Show all" turns
+  Focus off at line 99: turn the Changes view off there too.
+- **The view's own bar** ("Changes", the select per import, "{n} tables, {m} mappings, {k} attributes" or "Nothing on
+  record", Close): it sits above the canvas, so CLAUDE.md's rule applies (no layout read in a render or layout effect).
+- **"Show what it touched on the canvas":** in the system panel's imports list (`src/app/_panels/system-panel.tsx`,
+  each `import-entry`), only on canvas pages (F16); it turns the view on for that import.
+- **The project home's "Model consistency"** (`src/app/w/[workspaceId]/p/[projectId]/page.tsx`): between the stats
+  line and "Canvases" (line ~101). The page has the project's sets (`projectStats`, `projectRequirements`, `items`,
+  `view.canvases`) and loads the model and requirements; add `store.model.listChanges`. Each line opens its object on
+  the best canvas (F15): the canvas page reads `?card=`, `?label=`, `?req=`, `?note=` (around line 156 of
+  `c/[canvasId]/page.tsx`) and `SelectionHistory`'s `ARRIVAL` (`src/canvas/SelectionHistory.tsx:36`); add `?map=`,
+  `?row=`, `?system=` there (the system's panel opens with `openDetails`). Historical mappings (every input retired)
+  stay out of type problems and consistency (`isHistorical`, `src/domain/source-changes/rules.ts`).
+- **Figures (section 6, as planned):** consistency's computation ≤ 50 ms in Node (a new `scripts/bench-consistency.ts`),
+  the home page's load as information, the Changes view on and off and switching the import ≤ 100 ms to the screen and
+  within 10 % of Focus in the same sitting (measurement build, slice 4b-1's to-screen method), `seed:large` gaining a
+  recorded import with changes on about 10 % of its tables (question 17), and the element-count guard against
+  `slice-07a`. Then one full e2e run.
