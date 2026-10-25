@@ -258,11 +258,14 @@ export async function updateSourceColumnAction(workspaceId: string, input: Updat
   });
 }
 
-/** Deletes a table with its columns, cards and label links; refused while a mapping reads one of its columns. */
+/**
+ * Deletes a table from the model with its columns, cards, relationships, links and the mappings that read it (slice 7b,
+ * Q7: the same cascade as a change's “Delete…”); the panel shows it all first (`sourceDeleteImpactAction`).
+ */
 export async function deleteSourceTableAction(
   workspaceId: string,
   input: { sourceTableId: string; expectedVersion: number },
-): Promise<ActionResult<{ columns: number }>> {
+): Promise<ActionResult<{ columns: number; mappings: number }>> {
   return modelCommand(workspaceId, async (ctx, access, model, store) => {
     const ws = access.workspace.id;
     const [canvasItems, labelLinks, notes, requirementLinks] = await Promise.all([
