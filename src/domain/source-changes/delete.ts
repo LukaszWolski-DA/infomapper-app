@@ -2,7 +2,7 @@
 // “Delete…” and the table panel's “Delete table”, and the impact its confirmation shows before anything happens.
 //   - A mapping whose every input goes is deleted with its inputs and the label and requirement links on it; a mapping
 //     that keeps other inputs loses only those inputs (D-49), and an approved one goes back to review (D-51) with the
-//     reason “{column} was deleted from the source”.
+//     reason “{column} was deleted from the model”.
 //   - A source relationship with a column pair on a deleted column goes whole; a table's relationships go in both
 //     directions (slice 7a).
 //   - Label and requirement links on the table and its columns go; a table's cards go and notes pinned to them become

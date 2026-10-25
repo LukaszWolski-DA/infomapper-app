@@ -183,7 +183,7 @@ describe("delete (item 13, Q4, Q7, S7B-06)", () => {
     const result = deleteForChange(ctx(), rows, c.id);
     const after = applied(s.model, result);
     expect(after.mappings.find((m) => m.id === s.mappings.segment)!.deleted_at).toBe(NOW);
-    expect(after.mappings.find((m) => m.id === s.mappings.label)).toMatchObject({ deleted_at: null, status: "review", review_reason: "segment was deleted from the source" });
+    expect(after.mappings.find((m) => m.id === s.mappings.label)).toMatchObject({ deleted_at: null, status: "review", review_reason: "segment was deleted from the model" });
     expect(inputColumnsOf(s.mappings.label, after.mappingInputs, after.columns).map((x) => x.name)).toEqual(["email"]);
     expect(columnNamed(after, "customers", "segment").deleted_at).toBe(NOW);
     expect(changeIn(after, c.id).resolution).toBe("Deleted from the model");

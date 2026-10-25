@@ -129,7 +129,7 @@ export const MOVED_REASON = (from: string) => `moved from ${from} after it left 
 export const MOVE_DROPS_INPUT = (attribute: string, target: string, from: string) => `${attribute} already reads ${target}; the input from ${from} is removed.`;
 export const MOVE_DUPLICATE = (attribute: string, target: string) => `${attribute} already has a mapping from ${target}. Delete this one instead.`;
 export const MAP_HINT = "The mapping starts as a draft.";
-export const DELETED_INPUT_REASON = (column: string) => `${column} was deleted from the source`;
+export const DELETED_INPUT_REASON = (column: string) => `${column} was deleted from the model`;
 export const DELETE_RETIRE_HINT = "Retiring keeps the history instead; in Data Vault the column stays in its satellite.";
 export const NO_COVERAGE_CHANGE = "No requirement’s coverage changes.";
 export const NOT_FIT_HEAD = "These don't fit the source yet:";

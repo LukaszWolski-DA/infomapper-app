@@ -670,7 +670,7 @@ The other texts, for reading in one place:
 | Move refused | {Entity.attribute} already has a mapping from {target}. Delete this one instead. |
 | A moved mapping's review reason | moved from {old} after it left the source |
 | Map form | The mapping starts as a draft. |
-| Delete: a combined mapping's review reason | {column} was deleted from the source |
+| Delete: a combined mapping's review reason | {column} was deleted from the model (step 3's answers) |
 | Delete form | Retiring keeps the history instead; in Data Vault the column stays in its satellite. · No requirement’s coverage changes. |
 | Approve again all | These don't fit the source yet: · You changed or imported these last, so someone else has to approve them. |
 | Refusals | This change is already resolved. · This mapping is no longer in review. · This mapping does not fit the source yet, so it cannot be approved again. · That mapping already exists. · Choose a column of the system that is in the source. |
