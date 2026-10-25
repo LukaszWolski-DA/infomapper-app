@@ -160,6 +160,13 @@ type, a renamed input in the rule). A button “Approve again all {n}” for the
 one's reason shown before the click, would spare a solo modeller approving them one by one. It respects four-eyes: with
 four-eyes on, the person who ran the import cannot use it for those mappings (Łukasz, 22 October 2026).
 
+## Per-row fading in the Changes view (slice 7b, step 1)
+
+The prototype's Changes view dims the untouched rows inside a touched card (`body.im-chgmode .card.im-hit
+.row:not(.im-hit)`). The app's fade layer (F4, AD-24) has holes per card, block and note, so slice 7b keeps touched cards
+lit as a whole and marks the touched rows with the existing row classes. Per-row holes would add a subpath per row to
+the veil; to be measured against Focus's switching before it is built (Łukasz, 25 October 2026).
+
 ## One file per table in the local adapter (slice 7a, step 4)
 
 The local adapter (AD-29) writes the whole data file on every write; after three 20,000-column imports a card move

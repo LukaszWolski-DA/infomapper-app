@@ -1,8 +1,85 @@
 # Slice 7b – Acceptance
 
-Status: **step 1 (the critical review), waiting for Łukasz's answers.** Branch `slice/07b-source-changes`, from `main`
-at `dd072b6` (tag `slice-07a`). PRD: `docs/prd/slice-07b-source-changes.md`. The PRD stays as written; this file is its
-amendment.
+Status: **step 1 answered (25 October 2026); step 2 waits for Łukasz's go.** Branch `slice/07b-source-changes`, from
+`main` at `dd072b6` (tag `slice-07a`). PRD: `docs/prd/slice-07b-source-changes.md`. The PRD stays as written; this file
+is its amendment.
+
+## Łukasz's answers to step 1 (25 October 2026)
+
+The principle stays: the modeller stays in control and sees what will happen before it happens; nothing changes
+silently; everything can be undone.
+
+- **Q7, delete:** a new cascade with a confirmation form (D-47) for a source table and a source column, listing
+  mappings, relationships, columns, canvas cards and the coverage change before anything happens. “Delete table” in the
+  table panel uses the same cascade: one path, not two.
+- **Q10, `valid_until`:** worked out from the inputs, not stored. A mapping is historical only when all its inputs are
+  retired; a combined mapping with one retired input shows that input as historical (“until {date}” from the column).
+  Coming back clears it by itself.
+- **Q11, “Approve again all”:** skips mappings that do not fit the source (P8 wins over P9), listed apart with their
+  reason (“These don't fit the source yet: …”), so the modeller sees why they were left in review.
+- **Q12, settling elsewhere:** when the object of an open change is deleted (entity, attribute, mapping, column, table,
+  merge) or the change is decided elsewhere (approving in the mapping panel), the change settles, its resolution saying
+  where it came from (“Settled: the mapping was approved in its panel”, “Settled: the attribute was deleted”). Never
+  silently dropped (P7).
+- **Q13:** mapping changes are raised only for mappings the import sent back from approved. Drafts and mappings already
+  in review that get a new conflict or a rewritten rule show in the review's impact and in model consistency, not as
+  changes to resolve.
+- **Q6:** the Changes view and Focus turn each other off; the chip says which one is on. Touched cards stay lit as a
+  whole; the rows are marked with the existing classes. Per-row fading in the Changes view goes to `docs/ideas.md`
+  (done).
+- **Q3:** new tables and columns are derived from 7a's imports, only those with no mapping yet.
+- **The other questions:** the recommendations accepted, including the derivation in the local data file's upgrade to
+  format 7 (F1; the answer named it F2, which is `source_import_id` always set, accepted too), `object_label` (F4), the
+  URL parameters (F15) and “Show what it touched” only on canvas pages (F16). Any recommendation that conflicts with the
+  principle is not applied but listed.
+- **Section 6's figures** as planned.
+
+### The recommendations checked against the principle
+
+None conflicts with it. Three come close; each holds as follows, and steps 2–5 build them that way:
+
+1. **Move onto a column the combined mapping already reads (question 8):** the old input is removed rather than
+   re-pointed. That holds only if the Move form says so before the click (“{Entity.attribute} already reads {target}; the
+   input from {old} is removed.”), as it says that approved mappings go back to review. Built that way.
+2. **The derived changes are no undo step (F1):** the upgrade is not a person's action and changes nothing in the model;
+   it only adds open changes, each visibly marked “Raised when slice 7b was installed.” and resolvable (and every
+   resolution undoable). Nothing is changed silently or irreversibly.
+3. **Resolving a change blocks its import's undo (F13):** both stay undoable in order: undoing the resolution first
+   brings the change back as the import left it, and then the import can be undone. Only a resolution by someone else
+   blocks it, which is 7a's “all or nothing” rule; `known-limitations.md` says so (step 6).
+
+### Left open by the answers
+
+1. **The settlement texts (Q12).** Your two examples set the form “Settled: …”. My list of where a change settles (F8)
+   has more cases than the answer names: `removeMappingInput` (a column no longer feeds the mapping), a status other than
+   approved set in the mapping panel, and a new column mapped by any path (drag on the canvas, D-48, or the attribute
+   panel). I take them as covered (“decided elsewhere”) with: “Settled: the mapping was approved in its panel”,
+   “Settled: the mapping was set to {status} in its panel”, “Settled: {column} no longer feeds the mapping”, “Settled:
+   mapped to {Entity.attribute} ({status})”, “Settled: the {entity|attribute|mapping|column|table} was deleted”,
+   “Settled: the mapping was merged into another”. Step 2 lists every text in one place for you to check.
+2. **A combined mapping with one retired input:** the input shows “until {date}” in the panel and its line segment the
+   title “Retired: historical” (classes on the existing segment, AD-24). Its coverage is already none (any missing input,
+   D-31); it still counts as a type problem only through its live inputs. Say if it should count differently.
+3. **“Approve again all” with four-eyes on:** two lists apart, the ones that don't fit (“These don't fit the source yet:
+   …”) and the ones this person may not approve (P9's text). A mapping that is both is listed once, under “don't fit”.
+4. **Derived new columns (Q3):** “no mapping yet” read as no live mapping input and not missing from source; a derived
+   new table: none of its columns mapped.
+5. **The decision texts** (D-56 and the D-55, D-51, D-31, D-39 additions) come quoted for your approval in step 3.
+
+### What step 2 starts with
+
+The domain only (PRD items 6–8, 10–18; no data file, no page; CI):
+
+1. `source_change` as a domain type and its rules (kinds, severities, which object each kind names, a resolved change's
+   fields; F4, F5), the derived “historical” of an input and a mapping (Q10).
+2. The import engine: `ImportModel` with the system's open changes; `buildPlan` returns what it raises and settles
+   (items 6–7, Q13); `applyPlan` writes them; the summary and the two counts (item 8); P8's digest with them (F12);
+   `materialize` moved from the test fixtures into the domain, and coverage before and after for the review (Q3).
+3. The cascades and their impact (Q4, Q7): `sourceColumnCascade`, the table's extended one, coverage before and after.
+4. The actions as pure commands (items 10–18), the settle helper and its calls in the other commands (Q12), the Move
+   rules (Q5, question 8), approve again and the bulk approval with four-eyes and “fits” (Q6, Q11).
+5. The derivation for format 7 as a pure function (`deriveSourceChanges`, Q1, Q3, F1, F2).
+6. Unit tests per kind, action and settlement; `bench-import-plan.ts` with raising and coverage (section 6).
 
 ## Step 1: start checks (25 October 2026)
 
