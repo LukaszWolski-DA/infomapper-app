@@ -852,3 +852,115 @@ message; the decision texts above once you approve them (written in step 6 with 
   9's list):** a system author for upgrades (e.g. "InfoMapper upgrade").
 - **Live columns only:** yes. To `docs/known-limitations.md`: a deleted column brought back by undo keeps a hand-typed
   comment in "From the source:".
+
+## Step 4: the panels and the dialog (26 October 2026)
+
+Commits `429bfa8` (the decisions and two known limitations), `1ad4020` (the panels, the dialog, the settings),
+`428ac86` (the specs). Lint, typecheck and unit tests pass (98 files, 1,301 tests: the three tests of
+`updateSourceColumn` went with it). Small-slice regime: the slice's specs and the touched earlier specs, no full run.
+
+### What changed
+
+- **`docs/decisions.md`:** D-57 added; D-51, D-55, D-56, AD-08 and AD-28 as approved. **`docs/known-limitations.md`:** who
+  signs the upgrade (with the data model slice's system author), and a deleted column brought back by undo keeping a
+  hand-typed comment.
+- **Column panel** (`src/app/_panels/source-panels.tsx`, F22's order): "From the source: {comment}" read-only after the
+  facts (only when there is a comment, as on tables); the Classifications section where the flags stood; the Note where
+  the comment stood. Step 3's two flag buttons are gone.
+- **Table panel:** Classifications and Note after Labels, before "Columns and where they go"; the note's hint "Separate
+  from the source’s comment."
+- **The Classifications section** (`src/app/_panels/classifications.tsx`, `ClassificationsSection`): one toggle per live
+  classification of the scope, in the groups General, Data Vault 2.0 (only in Data Vault 2.0 mode) and This workspace;
+  "Yours: a re-import never changes them." (columns) and "Edit the list…". Toggles are disabled for reviewers, readers and
+  in an archive; each is one undo step, named "Set {classification} on {object}".
+- **The note** (`SourceNote`): a text area saved on blur, plain text (`setSourceNoteAction`), the toasts "Note saved on
+  {name}" / "Note removed from {name}" with Undo; read-only for reviewers, readers and in an archive.
+- **The Classifications dialog** (`ClassificationsDialog`): the prototype's text; "For columns" and "For tables", each
+  row with its name (an input to rename, Enter or leaving the field saves), the "Data Vault 2.0" chip, "used {n}×" /
+  "unused", "built in", Remove; "New column classification, e.g. Hash candidate" / "New table classification, e.g. Golden
+  source" with Add; "That name is taken" under the field (checked in the browser, refused by the server too); the
+  rename hint; a used classification's Remove opens the form (uses listed with a filter and "Show all" past 20, what
+  stops, the open business key changes that settle, Cancel, Remove); an unused one goes at once; "Removed built-in
+  classifications" with Restore. Data Vault ones always show (F21). Read-only: names as text, no Add, Remove or Restore.
+- **`updateSourceColumn` and its action are gone** (item 16): with the comment read-only it changed nothing any more.
+- **Workspace settings:** F17's methodology text; switching the mode off says F16's message with the uses counted on the
+  workspace page (`dataVaultUses`).
+- No history place: opening the dialog and toggling push nothing (they are no selection). Nothing above the canvas reads
+  layout: the section and the dialog have no size reads.
+
+### Decisions I took (please check)
+
+1. **Toasts for the list:** "Removed {name} from the list." and "Restored {name}." with Undo (destructive or bringing
+   back, as the app's other removals); adding and renaming show no toast (the list shows it at once); toggles show none
+   (as step 3's flags and the prototype).
+2. **An unused classification is removed at once**, without the form (item 10: "When it is used, a confirmation first");
+   Undo brings it back.
+3. **The removal form's texts:** "{name} is used on {t} table(s) and {c} column(s)." (singular when 1), the uses as
+   `schema.table` / `schema.table.column`, the "what stops" text, "{n} open business key change(s) without a mapping
+   settle(s).", and "You can undo it right after." (as the entity's delete form).
+4. **The dialog takes the focus itself** when it opens (Radix would focus the first name with its text selected, so a
+   keystroke would rename Business key), and **its Escape closes only the dialog**: the canvas's own Escape cleared the
+   selection behind it and closed the panel. The other dialogs (delete entity, import) may have the same Escape effect;
+   not changed here.
+5. **Colours as the prototype:** a pressed toggle and the Data Vault chip in the physical colour (`.tog[aria-pressed]`,
+   `.chip.cls`), not the logical one the old flags used.
+6. **The removed list shows "for columns" / "for tables"** beside each name, so two removed ones of the same name in the two
+   scopes can be told apart.
+7. **The note's field carries `data-version`** (as the requirement panel does), so specs wait for the stored version
+   before the next edit.
+
+### Tests
+
+New: `e2e/slice-07c/` with `fixtures.ts`, `helpers.ts` (`openColumn`, `openTable`, `toggle`, `groups`, `openList`,
+`listRow`, `classesOf`, `classification`, `setDataVault`, `expectPressed`) and seven specs, 13 tests, all passing (2.7–3.4
+min for the folder):
+
+| Spec | What it checks |
+| --- | --- |
+| `S7C-03.spec.ts` (3) | a column's and a table's classification set and cleared, each undone; the groups; the Data Vault group only in the mode; disabled for Piotr and Kasia, their direct calls refused |
+| `S7C-04.spec.ts` (1, the panels' part) | the list's sections, chips, uses and "built in"; an own one added; taken names refused (another's name, a code, any spacing); the same name for tables allowed; a built-in and an own one renamed; the panel shows the new names, Business key still pressed |
+| `S7C-05.spec.ts` (2) | Personal data's form: its 6 uses, what stops; Cancel changes nothing; Remove takes the links; Undo brings both back; removed again and restored: empty; an unused one removed at once; Business key's form names what stops |
+| `S7C-07.spec.ts` (2) | a table's and a column's note saved with its toast, Undo, cleared with its toast; markup stored escaped; read-only for Piotr and Kasia |
+| `S7C-08.spec.ts` (1) | the source's comment read-only; a re-import's overwrite in the review; the note left alone |
+| `S7C-09.spec.ts` (2, the settings' and panels' part) | the methodology text; off with 2 uses: the message, hidden, kept; on: shown again; off with none: the short message |
+| `S7C-13.spec.ts` (2) | reviewer and reader: list, toggles and note read-only, their direct calls refused (toggle, note, add); an archived workspace the same for the owner |
+
+Earlier specs run because the step touches what they use (the source panels, the settings, the comment): S0-06, S0-09,
+S1B-04, S1B-11, S2A-01, S2A-02, S2A-12, S3A-02, S3A-10, S4A-06, S4A-07, S4B1-02, S4B1-04, S4B2-05, S7A-05, S7A-09,
+S7A-10, S7B-04, S7B-05, S7B-06, S7B-11: 29 tests, all passing after two changes:
+
+| Spec | Change | Why |
+| --- | --- | --- |
+| `S7A-05.spec.ts` | the stored comment comes from an earlier import with another comment, not from typing one | the comment is the source's and read-only (P9); `updateSourceColumn` is gone |
+| `S7A-09.spec.ts` | "meanwhile" Anna clears `cust_no`'s Business key (it was: typed a comment); the refreshed review says "The file says Business key; your classifications are kept." | the same; the visible line is also what tells the test the review was rebuilt (a note change showed nothing, and the second click came too early: run three times on its own after the change, 3 × passed) |
+
+No earlier spec used the column panel's flag buttons or its comment field (slice 1a and 1b tested them in unit tests).
+
+### How to check in the browser
+
+As **Łukasz**:
+
+1. `npm run dev` (your data file is upgraded on the first read, step 3), sign in as Łukasz, open Customer 360 →
+   "Customer & orders", click `cust_no` on the `customers` card.
+2. The column panel: the facts, then "From the source: Customer number shown to the customer" if your data has it,
+   "Classifications" with General (Business key pressed), "Yours: a re-import never changes them. Edit the list…", then
+   "Note".
+3. Click Technical / audit: pressed; Ctrl+Z: "Undone: Set Technical / audit on cust_no".
+4. Write a note and click elsewhere: "Note saved on cust_no" with Undo.
+5. Click the `customers` chip at the top: the table panel has Classifications (Master data…) and Note after Labels.
+6. "Edit the list…": add "Golden source" under For tables; it appears under "This workspace" in the table panel.
+   Rename Business key to "Klucz biznesowy"; the column panel shows it, still pressed. Remove Personal data: the form
+   lists its columns and what stops; Cancel; Remove; Ctrl+Z brings it back. Remove Load date (unused): it goes at once
+   and shows under "Removed built-in classifications" with Restore.
+7. Workspace page → Settings: the new methodology text; tick Data Vault 2.0 mode, back on the canvas the Data Vault 2.0
+   group shows; set Link key on `cust_no`; untick the mode: "Data Vault 2.0 mode is off. 1 Data Vault classification on a
+   table or column stays stored and shows again when the mode is on."
+
+As **a reviewer** (Piotr Wiśniewski): the same column shows the toggles disabled and the note read-only; "Edit the
+list…" shows the list with names as text and no Add, Remove or Restore.
+
+### Questions for Łukasz
+
+1. Decisions 1–3: the toasts, removing an unused one at once, and the removal form's texts?
+2. Decision 4: should the other dialogs (delete entity, import) also keep Escape from clearing the selection? It is a
+   one-line change in each, outside this slice's items, so I left them; or an idea for `docs/ideas.md`.
