@@ -22,7 +22,8 @@ test("S7A-04: HR into a new system “HR”: every table and column new; system,
   const events = await store().changeEvents.list(RETAIL);
   const group = events.filter((e) => e.change_group_id === events.find((x) => x.object_type === "source_import")!.change_group_id);
   expect(new Set(group.map((e) => e.object_type))).toEqual(
-    new Set(["source_system", "source_table", "source_column", "source_relationship", "source_relationship_column", "source_import"]),
+    // slice 7c: the file's classifications are links, written in the same group
+    new Set(["source_system", "source_table", "source_column", "source_relationship", "source_relationship_column", "source_import", "classification_link"]),
   );
   // the tree shows the new system
   await expect(page.getByTestId("tree-system").filter({ hasText: "HR" })).toBeVisible();
