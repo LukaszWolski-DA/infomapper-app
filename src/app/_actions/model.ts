@@ -161,11 +161,11 @@ export async function createAttributeFromColumnAction(
   workspaceId: string,
   input: { entityId: string; sourceColumnId: string },
 ): Promise<ActionResult<{ attributeId: string; mappingId: string; createdAttribute: boolean }>> {
-  return modelCommand(workspaceId, (ctx, access, { entities, attributes, sourceColumns, mappings, mappingInputs }) =>
+  return modelCommand(workspaceId, (ctx, access, { entities, attributes, sourceColumns, mappings, mappingInputs, classifications, classificationLinks }) =>
     createAttributeFromColumn(
       ctx,
       access,
-      { entity: byId(entities, input?.entityId), attributes, column: byId(sourceColumns, input?.sourceColumnId), mappings, mappingInputs },
+      { entity: byId(entities, input?.entityId), attributes, column: byId(sourceColumns, input?.sourceColumnId), mappings, mappingInputs, classifications, classificationLinks },
       input,
     ),
   );

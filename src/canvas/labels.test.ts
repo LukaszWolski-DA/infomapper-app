@@ -36,6 +36,8 @@ const model: WorkspaceModel = {
   mappings: [mapping()],
   sourceRelationships: [],
   sourceRelationshipColumns: [],
+  classifications: [],
+  classificationLinks: [],
   mappingInputs: [mappingInput()],
 };
 const labels = [label(labelCr23), label(labelJira), label("01900000-0000-7000-8000-00000000a103", { name: "Gone", deleted_at: NOW })];

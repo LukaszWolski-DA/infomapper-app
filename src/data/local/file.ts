@@ -62,6 +62,12 @@ export async function readDb(file: string): Promise<DevDb> {
  * change group per workspace, each event signed by the person who ran the import; no undo step.
  */
 export function upgradeDb(db: DevDb, now: string, newId: () => string): void {
+  // slice 7c, step 2: the classification tables and the notes, empty, until step 3's format 8 (built-in rows, the flags
+  // turned into links)
+  db.classification ??= [];
+  db.classification_link ??= [];
+  for (const t of db.source_table ?? []) Object.assign(t, { note_html: t.note_html ?? null, note_text: t.note_text ?? null });
+  for (const c of db.source_column ?? []) Object.assign(c, { note_html: c.note_html ?? null, note_text: c.note_text ?? null });
   if ((db.format as number) === 2) Object.assign(db, { format: 3, frame: [] });
   if ((db.format as number) === 3) Object.assign(db, { format: 4, label: [], label_link: [], project_pinned_label: [], note: [] });
   if ((db.format as number) === 4) Object.assign(db, { format: 5, requirement: [], requirement_link: [] });

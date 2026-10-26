@@ -3,7 +3,7 @@
 // after the import from it, and the tests read it.
 
 import type { Uuid } from "../ids";
-import type { SourceChange, SourceSystem, Timestamp } from "../types";
+import type { ClassificationLink, SourceChange, SourceSystem, Timestamp } from "../types";
 import type { ImportChangeset } from "./apply";
 import type { ImportColumn, ImportModel, ImportRelationship, ImportTable } from "./model";
 
@@ -32,11 +32,12 @@ export function materialize(model: ImportModel, c: ImportChangeset, ctx: Materia
   const systems: SourceSystem[] = c.system.isNew ? [...model.systems, { ...standard(c.system.id), name: c.system.name, description: null }] : [...model.systems];
   const tables: ImportTable[] = [
     ...patch(model.tables, c.tables.update),
-    ...c.tables.insert.map((t) => ({ ...standard(t.id), ...t, missing_since: null, retired_since: null })),
+    ...c.tables.insert.map((t) => ({ ...standard(t.id), ...t, missing_since: null, retired_since: null, note_html: null, note_text: null })),
   ];
   const columns: ImportColumn[] = [
     ...patch(model.columns, c.columns.update),
-    ...c.columns.insert.map((x) => ({ ...standard(x.id), ...x, default_value: null, missing_since: null, retired_since: null, not_needed: false })),
+    // the two flags until step 3 drops them (slice 7c: classifications are links)
+    ...c.columns.insert.map((x) => ({ ...standard(x.id), ...x, is_business_key: false, is_pii: false, default_value: null, missing_since: null, retired_since: null, not_needed: false, note_html: null, note_text: null })),
   ];
   const removed = new Set(c.relationshipColumns.remove);
   const pairsOf = (relationshipId: string) =>
@@ -63,5 +64,9 @@ export function materialize(model: ImportModel, c: ImportChangeset, ctx: Materia
     ...patch(model.changes ?? [], c.changes.update),
     ...c.changes.insert.map((x) => ({ ...standard(x.id), ...x, status: "open" as const, resolution: null, resolved_by: null, resolved_at: null })),
   ];
-  return { ...model, systems, tables, columns, relationships, mappings: patch(model.mappings, c.mappings), changes };
+  const classificationLinks: ClassificationLink[] = [
+    ...(model.classificationLinks ?? []),
+    ...c.classificationLinks.insert.map((l) => ({ ...standard(l.id), ...l, source_table_id: null })),
+  ];
+  return { ...model, systems, tables, columns, relationships, mappings: patch(model.mappings, c.mappings), changes, classificationLinks };
 }

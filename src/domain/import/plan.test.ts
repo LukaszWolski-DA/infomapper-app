@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   allOf,
   attributeNamed,
+  classify,
+  codesOf,
   columnNamed,
   editColumn,
   emptyModel,
@@ -40,7 +42,7 @@ function demoCrm() {
 /** The demo CRM with the demo's mappings on customers (seed-model.ts) and Customer's attributes with step 1's lengths. */
 function demoCrmWithMappings() {
   let model = demoCrm();
-  model = { ...model, columns: model.columns.map((c) => (c.name === "cust_no" ? { ...c, is_business_key: true } : c)) };
+  model = classify(model, columnNamed(model, "customers", "cust_no").id, "BK");
   model = withEntity(model, "Customer", [
     { name: "customer_number", type_length: 20 },
     { name: "email", type_length: 120 },
@@ -80,9 +82,9 @@ describe("a first import (S7A-04)", () => {
     expect(changes.columns.insert).toHaveLength(10);
     expect(changes.relationships.insert).toHaveLength(2);
     expect(importSummary(changes.counts)).toBe("2 new tables, 10 new columns, 2 new relationships");
-    // BK and PII from the file on new columns (P11)
-    expect(columnNamed(model, "employees", "emp_no")).toMatchObject({ is_business_key: true, is_pii: false });
-    expect(columnNamed(model, "employees", "first_name")).toMatchObject({ is_pii: true });
+    // the file's classifications on new columns (slice 7c: links, matched by code)
+    expect(codesOf(model, columnNamed(model, "employees", "emp_no").id)).toEqual(["BK"]);
+    expect(codesOf(model, columnNamed(model, "employees", "first_name").id)).toEqual(["PII"]);
     const manager = model.relationships.find((r) => r.name === "FK_employees_manager")!;
     expect(manager.source_table_id).toBe(manager.to_source_table_id);
     expect(manager.columns.map((p) => [p.from_column_id, p.to_column_id])).toEqual([
@@ -189,7 +191,7 @@ describe("a re-import of a changed file (S7A-05)", () => {
       ["FK_customer_consents_customers", "new"],
     ]);
     // the file's classifications differ from the column's: shown, kept (item 11, P1)
-    expect(planColumn(plan, "customers", "email_addr").fileClassifications).toEqual(["PII"]);
+    expect(planColumn(plan, "customers", "email_addr").fileClassifications).toEqual(["Personal data"]);
     expect(planColumn(plan, "customers", "cust_no").fileClassifications).toBeNull();
     expect(plan.warnings).toContain("Row 26: stage.customers_load.batch_ref has no data_type. Column skipped.");
     expect(planCounts(plan)).toEqual({ tables_new: 2, columns_new: 11, columns_changed: 3, columns_renamed: 1, columns_missing: 2, relationships_new: 1, changes_raised: 9, changes_high: 2 });
@@ -440,7 +442,7 @@ describe("mappings when their source changes (P6, S7A-08)", () => {
     const setUp = demoCrmWithMappings();
     const ids = setUp.ids;
     let model = setUp.model;
-    model = { ...model, columns: model.columns.map((c) => (c.name === "fname" ? { ...c, is_business_key: true } : c)) };
+    model = classify(model, columnNamed(model, "customers", "fname").id, "BK");
     const file = csv(
       "crmprod,dbo,customers,cust_id,1,int,no,yes,\ncrmprod,dbo,customers,fname,2,nvarchar(80),yes,no,\ncrmprod,dbo,customers,last_name,3,int,yes,no,",
     );

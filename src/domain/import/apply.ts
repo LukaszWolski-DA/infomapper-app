@@ -6,6 +6,8 @@
 // a rule is rewritten whatever the mapping's status.
 // Slice 7b: the import's id is made here, so the changes it raises can name it; raised changes are new open rows,
 // settled ones get their resolution, who and when (P7); a table or column that is back loses `retired_since` too.
+// Slice 7c: a new column gets a classification link for each classification the file named (matched by the plan) and
+// each suggestion left ticked (P7); a re-import never changes an existing column's classifications (D-55).
 
 import type { Uuid } from "../ids";
 import { sameColumnType } from "../model/column-type";
@@ -54,9 +56,14 @@ export interface NewColumnRow {
   is_nullable: boolean;
   is_primary_key: boolean;
   is_foreign_key: boolean;
-  is_business_key: boolean;
-  is_pii: boolean;
   comment: string | null;
+}
+
+/** A classification on a new column (slice 7c). */
+export interface NewClassificationLinkRow {
+  id: Uuid;
+  classification_id: Uuid;
+  source_column_id: Uuid;
 }
 
 export interface NewRelationshipRow {
@@ -94,6 +101,8 @@ export interface ImportChangeset {
   mappings: RowPatch<ImportMapping>[];
   /** Changes to resolve raised, and open ones settled (slice 7b, P7). */
   changes: { insert: NewChangeRow[]; update: RowPatch<SourceChange>[] };
+  /** Classifications of new columns: the file's and the ticked suggestions (slice 7c). */
+  classificationLinks: { insert: NewClassificationLinkRow[] };
   counts: ImportCounts;
 }
 
@@ -113,6 +122,7 @@ export function applyPlan(model: ImportModel, plan: ImportPlan, ctx: ApplyContex
     relationshipColumns: { insert: [], remove: [] },
     mappings: [],
     changes: { insert: [], update: [] },
+    classificationLinks: { insert: [] },
     counts: planCounts(plan),
   };
 
@@ -187,11 +197,13 @@ export function applyPlan(model: ImportModel, plan: ImportPlan, ctx: ApplyContex
           is_nullable: fc.is_nullable,
           is_primary_key: fc.is_primary_key,
           is_foreign_key: fc.is_foreign_key,
-          // P11: Business key and PII from the file on a new column; a re-import never changes them (P1)
-          is_business_key: fc.is_business_key,
-          is_pii: fc.is_pii,
           comment: fc.comment,
         });
+        // the file's classifications and the ticked suggestions (slice 7c); a re-import never changes them (D-55)
+        const ticked = plan.hints.filter((h) => h.on && h.tableKey === t.key && h.column === fc.name).map((h) => h.classificationId);
+        for (const classificationId of new Set([...c.classificationIds, ...ticked])) {
+          changes.classificationLinks.insert.push({ id: ctx.newId(), classification_id: classificationId, source_column_id: id });
+        }
         continue;
       }
       const ec = c.existing;

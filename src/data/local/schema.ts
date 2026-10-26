@@ -9,6 +9,8 @@ import type {
   Canvas,
   CanvasItem,
   ChangeEvent,
+  Classification,
+  ClassificationLink,
   Concept,
   Entity,
   Frame,
@@ -38,6 +40,8 @@ import type {
 import {
   CARDINALITY_MAX,
   CHANGE_OPERATIONS,
+  CLASSIFICATION_ORIGINS,
+  CLASSIFICATION_SCOPES,
   DOC_LANGUAGES,
   FRAME_KINDS,
   IMPORT_CHANNELS,
@@ -93,6 +97,8 @@ export interface DevDb {
   source_relationship_column: SourceRelationshipColumn[];
   source_import: SourceImport[];
   source_change: SourceChange[];
+  classification: Classification[];
+  classification_link: ClassificationLink[];
   mapping: Mapping[];
   mapping_input: MappingInput[];
   requirement: Requirement[];
@@ -130,6 +136,8 @@ export const emptyDb = (): DevDb => ({
   source_relationship_column: [],
   source_import: [],
   source_change: [],
+  classification: [],
+  classification_link: [],
   mapping: [],
   mapping_input: [],
   requirement: [],
@@ -315,6 +323,29 @@ export const RULES: Record<DevTable, TableRules> = {
               : isSet(r.mapping_id),
       },
     ],
+  },
+  // slice 7c: the classification list (P3) and classifications on sources (AD-15)
+  classification: {
+    key: ["id"],
+    foreignKeys: model,
+    unique: [
+      { columns: ["workspace_id", "code"], where: (r) => isSet(r.code) },
+      { columns: ["workspace_id", "scope", "name_key"], live: true },
+    ],
+    checks: [
+      { name: "classification_scope_ck", test: oneOf(CLASSIFICATION_SCOPES, "scope") },
+      { name: "classification_origin_ck", test: oneOf(CLASSIFICATION_ORIGINS, "origin") },
+      { name: "classification_code_ck", test: (r) => (r.origin === "own") === !isSet(r.code) },
+    ],
+  },
+  classification_link: {
+    key: ["id"],
+    foreignKeys: { ...model, classification_id: "classification", source_table_id: "source_table", source_column_id: "source_column" },
+    unique: [
+      { columns: ["classification_id", "source_table_id"], live: true, where: (r) => isSet(r.source_table_id) },
+      { columns: ["classification_id", "source_column_id"], live: true, where: (r) => isSet(r.source_column_id) },
+    ],
+    checks: [{ name: "classification_link_one_target_ck", test: (r) => [r.source_table_id, r.source_column_id].filter(isSet).length === 1 }],
   },
   mapping: {
 

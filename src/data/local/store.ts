@@ -152,6 +152,9 @@ export function createLocalDataStore(file: string): DataStore {
           sourceRelationshipColumns: of(db.source_relationship_column).sort(
             (a, b) => a.source_relationship_id.localeCompare(b.source_relationship_id) || a.sort_order - b.sort_order,
           ),
+          // slice 7c: the list with its removed rows (a removed built-in one can be restored), live links only
+          classifications: db.classification.filter((c) => c.workspace_id === workspaceId),
+          classificationLinks: of(db.classification_link),
         };
       },
       listImports: async (workspaceId, sourceSystemId) =>

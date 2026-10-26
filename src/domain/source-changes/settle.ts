@@ -10,13 +10,17 @@
 //     feeds the mapping”;
 //   - a column mapped by any other path (`createMapping`, `addMappingInput`, a drag on the canvas, D-48): its new-column
 //     change, “Settled: mapped to {Entity.attribute} ({status})”;
-//   - a source table or column deleted (`deleteSourceTable`; the change's “Delete…” settles its own).
+//   - a source table or column deleted (`deleteSourceTable`; the change's “Delete…” settles its own);
+//   - slice 7c (Q7): a business key change without a mapping, when its column loses the Business key classification,
+//     “Settled: {column} is no longer a business key”, or when Business key is removed from the list, “Settled: the
+//     classification {name} was removed”. A mapping's business key change stays open: its question is the mapping's
+//     review.
 // `settleAfterWrites` reads them from any command's writes (step 3): the server runs it after the command, in the same
 // change group, as it runs the live canvas rules, so no command needs to know about changes to resolve.
 
 import type { CommandContext, Write } from "../changes";
 import type { Uuid } from "../ids";
-import type { Attribute, Entity, Mapping, MappingInput, MappingStatus, SourceChange, SourceColumn } from "../types";
+import type { Attribute, Classification, ClassificationLink, Entity, Mapping, MappingInput, MappingStatus, SourceChange, SourceColumn } from "../types";
 import { isMappingKind, isOpen, settle, type Edit } from "./rules";
 import { SETTLED, STATUS_WORD } from "./texts";
 
@@ -48,12 +52,22 @@ export function settleMappedColumn(ctx: CommandContext, changes: readonly Source
   return settle(ctx, changes, (c) => c.kind === "new_column" && c.source_column_id === columnId, SETTLED.mappedElsewhere(attribute, STATUS_WORD[status]));
 }
 
+/** An open business key change without a mapping on one of the columns (Q7). */
+const isColumnBusinessKeyChange = (columnIds: ReadonlySet<Uuid>) => (c: SourceChange) =>
+  c.kind === "business_key_changed" && c.mapping_id === null && c.source_column_id !== null && columnIds.has(c.source_column_id);
+
+/** How many open business key changes settle when these columns lose Business key (the removal form's count). */
+export const businessKeySettlements = (changes: readonly SourceChange[], columnIds: ReadonlySet<Uuid>): number =>
+  changes.filter((c) => isOpen(c) && isColumnBusinessKeyChange(columnIds)(c)).length;
+
 /** Names the settlements need: the workspace's live model before the write. */
 export interface SettleNames {
   entities: readonly Entity[];
   attributes: readonly Attribute[];
   mappings: readonly Mapping[];
   sourceColumns: readonly SourceColumn[];
+  /** The classification list (slice 7c): which removed link was a Business key. */
+  classifications?: readonly Classification[];
 }
 
 const BOOKKEEPING = new Set(["version", "updated_at", "updated_by"]);
@@ -112,6 +126,18 @@ export function settleAfterWrites(ctx: CommandContext, writes: readonly Write[],
   if (goneTables.size || goneColumns.size) {
     take(settle(ctx, open, (c) => !!c.source_table_id && goneTables.has(c.source_table_id) && !c.source_column_id && !c.mapping_id, SETTLED.deleted("table")));
     take(settle(ctx, open, (c) => !!c.source_column_id && goneColumns.has(c.source_column_id), SETTLED.deleted(goneTables.size ? "table" : "column")));
+  }
+  // columns that lose Business key (slice 7c, Q7): a toggle, or the classification removed with its links
+  const goneLinks = deletedOf("classification_link").map((w) => w.before as ClassificationLink);
+  if (goneLinks.length) {
+    const removed = new Map(deletedOf("classification").map((w) => [w.before.id, w.before as Classification]));
+    const classification = new Map((names.classifications ?? []).map((c) => [c.id, c]));
+    for (const l of goneLinks) {
+      const c = removed.get(l.classification_id) ?? classification.get(l.classification_id);
+      if (c?.code !== "BK" || !l.source_column_id) continue;
+      const text = removed.has(c.id) ? SETTLED.classificationRemoved(c.name) : SETTLED.noLongerBusinessKey(column.get(l.source_column_id)?.name ?? "the column");
+      take(settle(ctx, open, isColumnBusinessKeyChange(new Set([l.source_column_id])), text));
+    }
   }
   // a status set in the mapping panel: only the status changed, and no input with it (an input change of an approved
   // mapping writes the same columns on the mapping, D-51)

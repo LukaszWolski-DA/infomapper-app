@@ -3,7 +3,9 @@
 // result feeds the review (step 3's plan) and the server reads the same text again (P8).
 //   Errors stop the import: an empty file, a missing required column, no usable rows, too many rows.
 //   Warnings do not: a row without names (skipped), a column without a type (skipped), a column twice (second row
-//   skipped), a classification other than Business key and PII (P11: listed, not read).
+//   skipped).
+//   Classifications are kept as the file writes them (slice 7c, answer F9): the plan matches them against the
+//   workspace's list, which the reader does not know.
 // `fields` is the set of standard columns the file has: a field the file leaves out is never compared or overwritten
 // (P2). Types are read by `readColumnType`, as "New source table" reads them.
 
@@ -80,10 +82,7 @@ export interface StandardColumn extends ColumnType {
   is_primary_key: boolean;
   is_foreign_key: boolean;
   comment: string | null;
-  /** P11: only these two are read in 7a. */
-  is_business_key: boolean;
-  is_pii: boolean;
-  /** The classifications read, as the file names them (for the review's "The file says …"). */
+  /** The file's classification values as written, split on `;` and `|`, each once (slice 7c: the plan matches them). */
   classifications: string[];
   /** The file's line of the column's first row. */
   line: number;
@@ -130,17 +129,6 @@ export const tableKey = (database: string, schema: string, table: string): strin
 const YES = /^(yes|y|true|1|t)$/i;
 const count = (n: number) => n.toLocaleString("en-GB");
 const normalise = (s: string) => s.toLowerCase().replace(/[\s_\-/]+/g, "");
-
-/** Business key and PII by code or name (P11); undefined for any other classification. */
-function classification(name: string): "bk" | "pii" | undefined {
-  const k = normalise(name);
-  if (k === "bk" || k === "businesskey") return "bk";
-  if (k === "pii" || k === "personaldata") return "pii";
-  return undefined;
-}
-
-export const NOT_READ_YET = (name: string, table: string) =>
-  `Classification “${name}” on ${table} is not read yet: only Business key and PII are read for now.`;
 
 export const TYPE_KEPT = (type: string, column: string) =>
   `Type “${type}” of ${column} is kept as written; the type check cannot judge mappings from this column.`;
@@ -196,7 +184,6 @@ export function readStandard(
   const byKey = new Map<string, StandardTable>();
   /** Each table's columns by lower-case name: a wide table must not be searched once per row. */
   const columnsByName = new Map<StandardTable, Map<string, StandardColumn>>();
-  const notRead = new Set<string>();
 
   for (let r = 1; r < rows.length; r++) {
     const { cells, line } = rows[r]!;
@@ -278,18 +265,12 @@ export function readStandard(
     }
 
     const classifications: string[] = [];
-    let isBusinessKey = false, isPii = false;
-    for (const name of get("classifications").split(/[;|]/).map((s) => s.trim()).filter(Boolean)) {
-      const c = classification(name);
-      if (c === "bk") isBusinessKey = true;
-      else if (c === "pii") isPii = true;
-      else {
-        const seen = `${key}|${normalise(name)}`;
-        if (!notRead.has(seen)) out.warnings.push(NOT_READ_YET(name, `${schema}.${table}`));
-        notRead.add(seen);
-        continue;
-      }
-      if (!classifications.includes(name)) classifications.push(name);
+    const seenValues = new Set<string>();
+    for (const value of get("classifications").split(/[;|]/).map((s) => s.trim()).filter(Boolean)) {
+      const k = normalise(value);
+      if (!k || seenValues.has(k)) continue;
+      seenValues.add(k);
+      classifications.push(value);
     }
 
     const ordinal = get("ordinal");
@@ -303,8 +284,6 @@ export function readStandard(
       is_primary_key: isPrimaryKey,
       is_foreign_key: !!fkName,
       comment: get("column_comment") || null,
-      is_business_key: isBusinessKey,
-      is_pii: isPii,
       classifications,
       line,
     };

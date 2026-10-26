@@ -5,6 +5,8 @@
 // reader's vendor, which the review and the server must read alike, decides a new column's type). An edit elsewhere in
 // the workspace does not change it; anything that changes what the import does, does. `keptChoices` is what a refreshed
 // review keeps.
+// Slice 7c (answer F11): each column's matched classifications and “The file says …” names, and every suggestion with
+// whether it is ticked; the unticked ones are a choice the refreshed review keeps.
 
 import type { ImportPlan, PlanChoices } from "./plan";
 import type { StandardColumn } from "./standard";
@@ -39,6 +41,7 @@ export function planDigest(plan: ImportPlan): string {
         position: c.position,
         rename: c.renameKey,
         classifications: c.fileClassifications,
+        matched: c.classificationIds,
         mappings: c.mappingIds,
       })),
     })),
@@ -50,6 +53,7 @@ export function planDigest(plan: ImportPlan): string {
     // refuses the import)
     raises: plan.raises,
     settles: plan.settles.map((s) => [row({ id: s.changeId, version: s.version }), s.why]),
+    hints: plan.hints.map((h) => [h.id, h.classificationId, h.on]),
   });
 }
 
@@ -80,7 +84,8 @@ export function planFingerprint(plan: ImportPlan): string {
 
 /**
  * The choices a refreshed review keeps (P8): the scope and the compare choice as they were (the file has not changed),
- * and each rename choice whose gone column is still offered with the chosen new column (or “removed”).
+ * each rename choice whose gone column is still offered with the chosen new column (or “removed”), and each unticked
+ * suggestion still offered (slice 7c).
  */
 export function keptChoices(choices: PlanChoices, rebuilt: ImportPlan): PlanChoices {
   const offered = new Map(rebuilt.renames.map((r) => [r.key, r]));
@@ -89,5 +94,7 @@ export function keptChoices(choices: PlanChoices, rebuilt: ImportPlan): PlanChoi
     const r = offered.get(key);
     if (r && (choice === "" || r.options.includes(choice))) renames.set(key, choice);
   }
-  return { scope: choices.scope, compare: choices.compare, renames };
+  const offeredHints = new Set(rebuilt.hints.map((h) => h.id));
+  const hintsOff = new Set([...(choices.hintsOff ?? [])].filter((id) => offeredHints.has(id)));
+  return { scope: choices.scope, compare: choices.compare, renames, hintsOff };
 }

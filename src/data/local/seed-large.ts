@@ -124,6 +124,8 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
         file_format: null,
         row_count: null,
         comment: null,
+        note_html: null,
+        note_text: null,
         missing_since: null, retired_since: null,
       });
       const parsed = parseColumnLines(card.rows.map((r) => `${r.name} ${r.dataType}`).join("\n"));
@@ -143,6 +145,8 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
           is_pii: false,
           default_value: null,
           comment: null,
+          note_html: null,
+          note_text: null,
           missing_since: null, retired_since: null, not_needed: false,
         });
       });

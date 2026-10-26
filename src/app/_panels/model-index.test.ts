@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   attribute,
+  builtins,
   concept,
   entity,
+  fixtureLinks,
   ids,
   mapping,
   mappingInput,
@@ -28,6 +30,8 @@ const model: WorkspaceModel = {
   mappings: [mapping(), mapping({ id: idMap, attribute_id: ids.customerId, kind: "transform", rule_expression: null })],
   sourceRelationships: [],
   sourceRelationshipColumns: [],
+  classifications: builtins(),
+  classificationLinks: fixtureLinks(),
   mappingInputs: [
     mappingInput(),
     mappingInput("01900000-0000-7000-8000-00000000b003", { mapping_id: idMap, source_column_id: ids.colFirstName, sort_order: 1 }),

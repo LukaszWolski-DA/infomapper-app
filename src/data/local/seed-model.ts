@@ -243,6 +243,8 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
       file_format: null,
       row_count: rows,
       comment: null,
+      note_html: null,
+      note_text: null,
       missing_since: null, retired_since: null,
     };
     db.source_table.push(table);
@@ -262,6 +264,8 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
         is_pii: has(flags, "PII"),
         default_value: null,
         comment: null,
+        note_html: null,
+        note_text: null,
         missing_since: null, retired_since: null, not_needed: false,
       };
       db.source_column.push(column);

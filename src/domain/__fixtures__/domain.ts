@@ -1,6 +1,7 @@
 // Test fixtures for domain unit tests. Not used by application code.
 
 import type { CommandContext } from "../changes";
+import { BUILTIN_CLASSIFICATIONS, normClassification, type ClassificationCode } from "../model/classifications";
 import type { WorkspaceAccess } from "../permissions";
 import {
   DEFAULT_CANVAS_LOOK,
@@ -8,6 +9,8 @@ import {
   type Canvas,
   type CanvasItem,
   type ChangeEvent,
+  type Classification,
+  type ClassificationLink,
   type Concept,
   type Entity,
   type Frame,
@@ -259,7 +262,7 @@ export const sourceTable = (over: Partial<SourceTable> = {}): SourceTable => ({
   file_format: null,
   row_count: null,
   comment: null,
-  missing_since: null, retired_since: null,
+  missing_since: null, retired_since: null, note_html: null, note_text: null,
   ...over,
 });
 
@@ -280,7 +283,7 @@ export const sourceColumn = (id: string = ids.colEmail, over: Partial<SourceColu
   is_pii: id !== ids.colCustId,
   default_value: null,
   comment: null,
-  missing_since: null, retired_since: null, not_needed: false,
+  missing_since: null, retired_since: null, not_needed: false, note_html: null, note_text: null,
   ...over,
 });
 
@@ -441,3 +444,54 @@ export const requirementLink = (id: string = ids.reqLink1, over: Partial<Require
   source_column_id: null,
   ...over,
 });
+
+// ---- Classifications (slice 7c) ----
+
+/** The workspace's 19 built-in classifications, ids `01900000-0000-7000-8000-c000000000NN` in the list's order. */
+export const builtins = (): Classification[] =>
+  BUILTIN_CLASSIFICATIONS.map((b, i) => ({
+    id: `01900000-0000-7000-8000-c${String(i + 1).padStart(11, "0")}`,
+    ...ws,
+    code: b.code,
+    name: b.name,
+    name_key: normClassification(b.name),
+    scope: b.scope,
+    origin: b.origin,
+  }));
+
+/** One built-in classification of `builtins()` by its code. */
+export const builtin = (code: ClassificationCode, over: Partial<Classification> = {}): Classification => ({ ...builtins().find((c) => c.code === code)!, ...over });
+
+/** An own classification. */
+export const ownClassification = (id: string, name: string, scope: Classification["scope"] = "column", over: Partial<Classification> = {}): Classification => ({
+  id,
+  ...ws,
+  code: null,
+  name,
+  name_key: normClassification(name),
+  scope,
+  origin: "own",
+  ...over,
+});
+
+let nextLinkId = 0;
+/** A classification on a column (`{ columnId }`) or a table (`{ tableId }`); ids count up from `…-d1…`. */
+export const classificationLink = (
+  classification: Classification | ClassificationCode,
+  target: { columnId: string } | { tableId: string },
+  over: Partial<ClassificationLink> = {},
+): ClassificationLink => ({
+  id: `01900000-0000-7000-8000-d1${String(++nextLinkId).padStart(10, "0")}`,
+  ...ws,
+  classification_id: typeof classification === "string" ? builtin(classification).id : classification.id,
+  source_table_id: "tableId" in target ? target.tableId : null,
+  source_column_id: "columnId" in target ? target.columnId : null,
+  ...over,
+});
+
+/** What the fixture columns' old flags said: cust_id a business key, email and first_name personal data. */
+export const fixtureLinks = (): ClassificationLink[] => [
+  classificationLink("BK", { columnId: ids.colCustId }),
+  classificationLink("PII", { columnId: ids.colEmail }),
+  classificationLink("PII", { columnId: ids.colFirstName }),
+];

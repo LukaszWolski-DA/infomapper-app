@@ -1,9 +1,11 @@
 // What the import engine reads (slice 7a, step 3): the workspace's sources, their relationships, and the mappings that
 // read them, with the attributes and entities they feed, and the changes to resolve (slice 7b). The rows are the domain's; a relationship comes with its
-// column pairs (`relationshipsWithColumns` puts them together).
+// column pairs (`relationshipsWithColumns` puts them together). Slice 7c: the classification list and its links (the file's
+// values are matched against the list, the business key rules read the links) and whether Data Vault 2.0 mode is on (the
+// Link key suggestion).
 
 import type { Uuid } from "../ids";
-import type { Attribute, Entity, Mapping, MappingInput, SourceChange, SourceColumn, SourceRelationship, SourceRelationshipColumn, SourceSystem, SourceTable, Timestamp } from "../types";
+import type { Attribute, Classification, ClassificationLink, Entity, Mapping, MappingInput, SourceChange, SourceColumn, SourceRelationship, SourceRelationshipColumn, SourceSystem, SourceTable, Timestamp } from "../types";
 
 export type ImportTable = SourceTable;
 export type ImportColumn = SourceColumn;
@@ -33,6 +35,11 @@ export interface ImportModel {
   entities: readonly Entity[];
   /** The workspace's changes to resolve (slice 7b): an import settles the open ones the source settles (P7). */
   changes?: readonly SourceChange[];
+  /** The workspace's classification list and live links (slice 7c). */
+  classifications?: readonly Classification[];
+  classificationLinks?: readonly ClassificationLink[];
+  /** Data Vault 2.0 mode (slice 7c, P7): the Link key suggestion is offered only then. */
+  dataVault?: boolean;
 }
 
 /** The engine's view of stored rows: each live relationship with its live column pairs. */

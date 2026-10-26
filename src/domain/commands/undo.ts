@@ -14,6 +14,8 @@
 // Slice 4a: requirements and requirement links are undo steps. Creating a requirement also raises the workspace's key
 // counter; that write is never reverted (a key is not given out twice), and alone it is not an undo step. A step that
 // would bring back a requirement whose key another live requirement uses by then is refused (Łukasz, step 0).
+// Slice 7c: classifications and their links are undo steps; a link whose classification, table or column is deleted
+// cannot come back alone (`PARENTS`).
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
@@ -45,6 +47,8 @@ export const UNDOABLE_TABLES = [
   "source_relationship_column",
   "source_import",
   "source_change",
+  "classification",
+  "classification_link",
   "mapping",
   "mapping_input",
   "canvas_item",
@@ -76,6 +80,7 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   source_import: [["source_system_id", "source_system"]],
   // slice 7b (F5): its table, column and mapping ids are only what it names; they stay when those are deleted
   source_change: [["source_system_id", "source_system"], ["source_import_id", "source_import"]],
+  classification_link: [["classification_id", "classification"], ["source_table_id", "source_table"], ["source_column_id", "source_column"]],
   mapping: [["attribute_id", "attribute"]],
   mapping_input: [["mapping_id", "mapping"], ["source_column_id", "source_column"]],
   canvas_item: [["canvas_id", "canvas"], ["entity_id", "entity"], ["source_table_id", "source_table"], ["requirement_id", "requirement"], ["frame_id", "frame"]],
@@ -268,7 +273,7 @@ export function revertChangeGroup(
   }
 
   if (!consistent(after, touched)) return fail(refused());
-  const keyClash = requirementKeyClash(after, touched);
+  const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched);
   if (keyClash) return fail(keyClash);
   const writeSet = buildWriteSet(ctx, workspaceId, writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
@@ -355,6 +360,19 @@ function requirementKeyClash(rows: Map<UndoableTable, Map<string, AnyRow>>, touc
     if (requirements.some((o) => o.id !== row.id && requirementKey(String(o.key)) === k)) {
       return domainError("conflict", wasLive ? keyTakenMessage(String(row.key)) : restoreKeyTakenMessage(String(row.key)));
     }
+  }
+  return null;
+}
+
+/** Slice 7c: a classification live after the revert whose name another live one of its scope has (answer F10). */
+export const CLASSIFICATION_NAME_CLASH = (name: string) => `This can't be undone: another classification is called ${name} now.`;
+function classificationNameClash(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: readonly { table: UndoableTable; key: string }[]): DomainError | null {
+  const live = [...rows.get("classification")!.values()].filter((r) => r.deleted_at === null);
+  for (const { table, key } of touched) {
+    if (table !== "classification") continue;
+    const row = rows.get("classification")!.get(key);
+    if (!row || row.deleted_at !== null) continue;
+    if (live.some((o) => o.id !== row.id && o.scope === row.scope && o.name_key === row.name_key)) return domainError("conflict", CLASSIFICATION_NAME_CLASH(String(row.name)));
   }
   return null;
 }

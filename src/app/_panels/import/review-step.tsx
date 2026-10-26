@@ -66,6 +66,7 @@ export function ReviewStep({
   const raised = raisedCallout(plan.raises, systemName);
   const raisedHigh = plan.raises.some((r) => r.severity === "high");
   const requirementName = new Map(data.requirements.map((r) => [r.id, r.name]));
+  const classificationName = new Map(data.model.classifications.map((c) => [c.id, c.name]));
 
   const filters: [ReviewFilter, string, number][] = [
     ["all", "all changes", n.all],
@@ -82,8 +83,12 @@ export function ReviewStep({
       return (
         <>
           <span className="font-mono">{formatColumnType(f)}</span> {f.is_primary_key && <Key>PK</Key>} {f.is_foreign_key && <Key>FK</Key>} {!f.is_nullable && <span className="text-im-ink-3">not null</span>}{" "}
-          {f.is_business_key && <span className="rounded-[10px] bg-im-physical-soft px-1.5 text-[11.5px] text-im-physical">Business key</span>}{" "}
-          {f.is_pii && <span className="rounded-[10px] bg-im-physical-soft px-1.5 text-[11.5px] text-im-physical">PII</span>}
+          {/* slice 7c: the classifications the file's values matched (step 5 adds the Data Vault marks) */}
+          {c.classificationIds.map((id) => (
+            <span key={id} className="mr-1 rounded-[10px] bg-im-physical-soft px-1.5 text-[11.5px] text-im-physical">
+              {classificationName.get(id) ?? "?"}
+            </span>
+          ))}
         </>
       );
     }

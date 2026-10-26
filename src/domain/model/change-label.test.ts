@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attribute, canvasItem, entity, frame, ids, makeCtx, mapping, mappingInput, requirement, requirementLink, workspace } from "../__fixtures__/domain";
+import { attribute, builtin, canvasItem, classificationLink, entity, frame, ids, makeCtx, mapping, mappingInput, ownClassification, requirement, requirementLink, sourceColumn, workspace } from "../__fixtures__/domain";
 import { buildWriteSet, nextVersion, type Write } from "../changes";
 import { changeCanvasId, changeLabel } from "./change-label";
 
@@ -100,5 +100,24 @@ describe("change labels for frames (slice 2b)", () => {
 
   it("finds the canvas of a frame step", () => {
     expect(changeCanvasId(events([update("frame", frame(), { name: "Orders" })]))).toBe(ids.canvas1);
+  });
+});
+
+describe("change labels for classifications and source notes (slice 7c)", () => {
+  const golden = ownClassification("01900000-0000-7000-8000-c100000000c1", "Golden source", "table");
+  const link = classificationLink(golden, { tableId: ids.crmCustomer });
+
+  it("names the list's changes by the classification's name", () => {
+    expect(changeLabel(events([{ kind: "insert", table: "classification", row: golden }]))).toBe("Add classification Golden source");
+    expect(changeLabel(events([update("classification", golden, { name: "Golden", name_key: "golden" })]))).toBe("Rename classification Golden source");
+    expect(changeLabel(events([deleted("classification_link", link), deleted("classification", golden)]))).toBe("Remove classification Golden source");
+    const removed = { ...builtin("BK"), deleted_at: "2026-10-01T08:00:00.000Z" };
+    expect(changeLabel(events([update("classification", removed, { deleted_at: null })]))).toBe("Restore classification Business key");
+  });
+
+  it("names a toggle, also with the changes it settles, and a note", () => {
+    expect(changeLabel(events([{ kind: "insert", table: "classification_link", row: link }]))).toBe("Set classification");
+    expect(changeLabel(events([deleted("classification_link", link)]))).toBe("Clear classification");
+    expect(changeLabel(events([update("source_column", sourceColumn(ids.colEmail), { note_html: "<p>x</p>", note_text: "x" })]))).toBe("Edit note on email");
   });
 });

@@ -5,12 +5,13 @@ import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
+import { indexOf } from "../model/classifications";
 import { plainTextPair } from "../model/plain-text";
 import { sanitizeRich } from "../model/rich-text";
 import { attributeNamedAfter } from "../model/mapping-choice";
 import { logicalTypeOf } from "../model/type-check";
 import type { WorkspaceAccess } from "../permissions";
-import { LOGICAL_TYPES, type Attribute, type AttributeType, type Entity, type LabelLink, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
+import { LOGICAL_TYPES, type Attribute, type AttributeType, type Classification, type ClassificationLink, type Entity, type LabelLink, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { linksOnItems, softDeleteLinks } from "./label";
 import { softDeleteRequirementLinks } from "./requirement";
@@ -222,11 +223,15 @@ export interface CreateAttributeFromColumnState {
   /** Live mappings of the entity's attributes and their inputs, to refuse the same mapping twice. */
   mappings: readonly Mapping[];
   mappingInputs: readonly MappingInput[];
+  /** The classification list and links (slice 7c): the column's Personal data (`PII`). */
+  classifications?: readonly Classification[];
+  classificationLinks?: readonly ClassificationLink[];
 }
 
 /**
  * A column dropped on an entity card's header: a new attribute at the end, named after the column, with the matching
- * logical type and parameters (`logicalTypeOf`), the column's PII flag, nullability and comment as in the prototype,
+ * logical type and parameters (`logicalTypeOf`), the column's Personal data (the `PII` classification, slice 7c),
+ * nullability and comment (the source's; the modeller's note is not copied, slice 7c answer F8) as in the prototype,
  * and a direct mapping from the column, in one change group. If the entity already has an attribute of that name
  * (ignoring case), the column is mapped to it instead, as the prototype does.
  */
@@ -267,7 +272,7 @@ export function createAttributeFromColumn(
     is_primary_key: false,
     is_foreign_key: false,
     is_business_key: false,
-    is_pii: column.row.is_pii,
+    is_pii: indexOf(state).has(column.row.id, "PII"),
     is_nullable: column.row.is_nullable,
     definition_html: html,
     definition_text: text,

@@ -18,6 +18,8 @@ const NOUN: Record<string, string> = {
   source_relationship_column: "relationship column",
   source_import: "import",
   source_change: "change to resolve",
+  classification: "classification",
+  classification_link: "classification",
   mapping: "mapping",
   mapping_input: "mapping input",
   canvas_item: "card",
@@ -52,6 +54,8 @@ const PRIORITY = [
   "note",
   "requirement",
   "requirement_link",
+  "classification",
+  "classification_link",
 ];
 
 /** A change's resolution (texts.ts, `RESOLUTION`) and the undo label of the action that wrote it. */
@@ -147,6 +151,23 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
     return cards.length > 1 ? "Move cards" : "Move card";
   }
   if (frames.filter((e) => e.operation === "create").length > 1) return "Arrange into frames";
+
+  // Classifications (slice 7c): the list's add, rename, remove and restore; one set or cleared on a table or column (a
+  // cleared Business key may settle changes to resolve in the same group, Q7); a source's note
+  const classifications = of("classification");
+  const classLinks = of("classification_link");
+  const settles = of("source_change").filter((e) => e.operation === "update");
+  if (classifications.length === 1 && classifications.length + classLinks.length + settles.length === events.length) {
+    const e = classifications[0]!;
+    const name = String((e.after_image ?? e.before_image)?.name ?? "");
+    if (e.operation === "create") return `Add classification ${name}`;
+    if (e.operation === "delete") return `Remove classification ${name}`;
+    if (e.operation === "restore") return `Restore classification ${name}`;
+    if (only(e, ["name", "name_key"])) return `Rename classification ${String(e.before_image?.name ?? "")}`;
+  }
+  if (classLinks.length === 1 && classLinks.length + settles.length === events.length) return classLinks[0]!.operation === "create" ? "Set classification" : "Clear classification";
+  const sources = [...of("source_table"), ...of("source_column")];
+  if (sources.length === 1 && sources.length === events.length && only(sources[0]!, ["note_html", "note_text"])) return `Edit note on ${String(sources[0]!.after_image?.name ?? "")}`;
 
   // Labels (slice 3a): put on or taken off an item, with a new label or not.
   const links = of("label_link");

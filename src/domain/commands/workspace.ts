@@ -1,9 +1,10 @@
 // Workspace commands: create, edit settings, archive, unarchive (AD-09).
 
 import { z } from "zod";
-import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, type CommandResult } from "../changes";
+import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { notFound, staleVersion } from "../errors";
 import type { Uuid } from "../ids";
+import { builtinClassificationRows } from "../model/classifications";
 import { checkCreateWorkspace, checkPermission, type WorkspaceAccess } from "../permissions";
 import {
   DEFAULT_CANVAS_LOOK,
@@ -34,7 +35,7 @@ export interface CreateWorkspaceState {
 
 /**
  * Creates an empty workspace in the organization with the creator as owner,
- * one project "First project" and one canvas "First canvas" in it.
+ * one project "First project" and one canvas "First canvas" in it, and the built-in classifications (slice 7c, item 4).
  */
 export function createWorkspace(
   ctx: CommandContext,
@@ -100,6 +101,7 @@ export function createWorkspace(
       { kind: "insert", table: "project", row: project },
       { kind: "insert", table: "canvas", row: canvas },
       { kind: "insert", table: "project_canvas", row: link },
+      ...builtinClassificationRows(ctx, workspace.id).map((row): Write => ({ kind: "insert", table: "classification", row })),
     ]),
   };
 }

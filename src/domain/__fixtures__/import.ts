@@ -6,7 +6,8 @@ import type { ImportColumn, ImportMapping, ImportModel } from "../import/model";
 import { buildPlan, type ImportPlan, type ImportTarget, type PlanChoices } from "../import/plan";
 import type { StandardRead } from "../import/standard";
 import type { Attribute, Entity, MappingInput, MappingStatus } from "../types";
-import { ids, T0 } from "./domain";
+import type { ClassificationCode } from "../model/classifications";
+import { builtins, classificationLink, ids, T0 } from "./domain";
 
 let next = 0;
 /** Ids that count up: 01900000-0000-7000-8000-a000000000NN. */
@@ -24,7 +25,20 @@ const standard = (id: string) => ({
   deleted_at: null,
 });
 
-export const emptyModel = (): ImportModel => ({ systems: [], tables: [], columns: [], relationships: [], mappings: [], mappingInputs: [], attributes: [], entities: [], changes: [] });
+/** A workspace with no sources and the built-in classification list (slice 7c). */
+export const emptyModel = (): ImportModel => ({
+  systems: [],
+  tables: [],
+  columns: [],
+  relationships: [],
+  mappings: [],
+  mappingInputs: [],
+  attributes: [],
+  entities: [],
+  changes: [],
+  classifications: builtins(),
+  classificationLinks: [],
+});
 
 /** Who runs the fixtures' imports. */
 export const IMPORTER = ids.someoneElse;
@@ -108,6 +122,24 @@ export function withMapping(
 export function editColumn(model: ImportModel, id: string, patch: Partial<ImportColumn>): ImportModel {
   return { ...model, columns: model.columns.map((c) => (c.id === id ? { ...c, ...patch, version: c.version + 1 } : c)) };
 }
+
+/** A classification set on a column by hand (slice 7c): a new link, the column's version unchanged. */
+export const classify = (model: ImportModel, columnId: string, code: ClassificationCode): ImportModel => ({
+  ...model,
+  classificationLinks: [...(model.classificationLinks ?? []), classificationLink(model.classifications!.find((c) => c.code === code)!, { columnId })],
+});
+
+/** A classification cleared on a column by hand (slice 7c). */
+export const unclassify = (model: ImportModel, columnId: string, code: ClassificationCode): ImportModel => {
+  const c = model.classifications!.find((x) => x.code === code)!;
+  return { ...model, classificationLinks: (model.classificationLinks ?? []).filter((l) => !(l.source_column_id === columnId && l.classification_id === c.id)) };
+};
+
+/** The codes of a column's classifications. */
+export const codesOf = (model: ImportModel, columnId: string): string[] => {
+  const byId = new Map((model.classifications ?? []).map((c) => [c.id, c]));
+  return (model.classificationLinks ?? []).filter((l) => l.deleted_at === null && l.source_column_id === columnId).map((l) => byId.get(l.classification_id)?.code ?? byId.get(l.classification_id)?.name ?? "?").sort();
+};
 
 export const attributeNamed = (model: ImportModel, name: string) => model.attributes.find((a) => a.name === name)!;
 
