@@ -684,3 +684,159 @@ for your approval, and one full e2e run (P13).
   columns, so the column panel's business key and personal data checkboxes switch in step 3 to the toggle command (BK
   and PII links). Step 4 replaces them with the full Classifications section.
 - **Decisions 3, 7, 9:** as built.
+
+## Step 3: data, upgrade and commands (26 October 2026)
+
+Commits `2ca4f5d` (the migration and the data model), `bb9fd4d` (format 8, the actions, the panel, the texts),
+`3806dca` (the known limitation), `ce0e5c8` (three specs). Lint, typecheck and unit tests pass (98 files, 1,304 tests);
+`npm run schema:check` passes on a throwaway Postgres 18 (32 tables, 434 columns); one full e2e run (below).
+
+### What changed
+
+- **Your three texts** (answers to step 2): `WHAT_STOPS.BK`; the import's two warnings; the undo history's "Set
+  {classification} on {object}" and "Clear {classification} from {object}". Change events carry no names, so the toggle
+  names its own step (`WriteSet.label`, used by `runCommand` before `changeLabel`); the object is named as "Edit note on
+  {name}" and "Mark {name} not needed" name it, by its name.
+- **The migration** `supabase/migrations/20261026200000_classifications.sql`: `classification`, `classification_link`
+  (RLS on both), their checks and unique indexes, `note_html`/`note_text` on `source_table` and `source_column`, and the
+  two flags dropped; F5's header comment. **`docs/data-model-v2.md`**: the two tables, the notes, the dropped flags and
+  the upgrade (and `retired_since`/`not_needed`, which 7b had not written there).
+- **Format 8** (`src/data/local/schema.ts`, `file.ts`, new `upgrade-8.ts`): the 19 rows in every workspace that lacks
+  them, the flags as Business key and Personal data links and dropped, the hand-typed column comments moved into empty
+  notes by Q4's rule, one change group per workspace signed by its creator (a create per row and link, an update per
+  moved comment), the report `.data/upgrade-8-<file>.txt` (column paths only) and one log line; written back at once.
+- **Every path that creates a workspace writes the 19 rows**: `createWorkspace` (step 2), the demo seed (`seed.ts`,
+  `addBuiltinClassifications` in `seed-model.ts`), `seed:large`, the upgrade.
+- **The flags are gone** from `SourceColumn`: `createSourceTable`, the import and the fixtures write none;
+  `updateSourceColumn` keeps only the comment (step 4 makes it read-only); the canvas's BK badge and the Keys filter
+  read the index in `buildCards`.
+- **Server actions** (`src/app/_actions/classification.ts`): add, rename, remove, restore, set (the toggle), the note,
+  and `classificationImpactAction` (a read for the removal form). The commands check the role and the archive (item
+  12); the delete actions pass the classification links (F18); `SETTLING_TABLES` includes the two tables, so a toggle or
+  a removal settles business key changes (Q7).
+- **The column panel's two checkboxes** (decision 2's condition) toggle the Business key and Personal data links, under
+  the classifications' current names; a removed one is not offered. Step 4 replaces them with the Classifications
+  section.
+- **The seeds**: the demo's BK and PII flags are links; `seed:large` (F15) has Personal data, Technical / audit, Load
+  date, Link key and Dependent child key on one column in ten and a table classification on one table in five, no
+  Business key.
+- **The wizard plans with the workspace's Data Vault mode** (`ImportData.dataVault` from the canvas page), as the server
+  does; without it every import in a Data Vault workspace would have been refused as stale.
+- **`docs/known-limitations.md`**: F6's line under "The undo history lives in server memory".
+
+### Decisions I took (please check)
+
+1. **The toggle's undo label** comes from the command (`WriteSet.label`), not from `changeLabel`, because the link's
+   change event carries ids only. Only toggles use it.
+2. **The upgrade's change group per workspace is signed by the workspace's creator** (`workspace.created_by`), as 7b
+   signed derived changes with the importer.
+3. **The upgrade moves comments only on live columns**; a deleted column keeps its comment.
+4. **`seed:large`'s classifications** use five column codes and five table codes in turn (deterministic), none with a
+   canvas mark.
+5. **The wizard's Data Vault mode** was wired in step 3 (planned for step 5), because without it the app would not be in
+   one consistent state for Data Vault workspaces (decision 2's condition).
+6. **`npm run schema:check`** ran on a local Postgres 18 (CI uses 17), started in the scratchpad and deleted afterwards.
+
+### The upgrade's figures on `seed:large`
+
+A data file written by `slice-07b` (`npm run seed:large -- --changes` in a temporary worktree: 4 workspaces, 1,528
+columns, 8 business key and 12 personal data flags, 97 change events, 2.5 MB), upgraded by this branch's `upgradeDb`, one
+discarded run and five counted: **median 8.8 ms** (fastest 6.3, slowest 11.8); 76 built-in rows, 20 links, 0 comments
+moved, no rule broken (`findViolation` null). On a copy of your own `.data/dev-db.json` (format 6, so 6 → 7 → 8): 57
+built-in rows, 22 links, no hand-typed comment; your file itself is untouched.
+
+### The full e2e run
+
+`npm run e2e`, from scratch, no dev server running: **53 min 47 s; 303 passed, 3 failed**. The three failures were what
+step 3 changes, not flakes, and each now passes (the three files: 8 tests, 1.1 min):
+
+| Spec | Why it failed | Change |
+| --- | --- | --- |
+| `S7A-04-route.spec.ts` (HR through the upload route) | the import's change group has 4 more events: the file's classifications (emp_no, dept_code Business key; first_name, last_name Personal data) | 18 → 18 + 4 events |
+| `S7A-04.spec.ts` (HR into a new system) | the group's object types include `classification_link` | added to the expected set |
+| `S7B-12.spec.ts` (a format-6 file) | the file is written back as format 8 | 7 → 8 |
+
+The specs that failed in between (step 2) pass again: S7A-01 (changed in step 3: "1 warning", and no TECH warning,
+because TECH, Effective date and Load date are classifications of the list now), S7A-07 (changed: the rename keeps the
+column's classifications, read from the index), S7A-08, S7A-10, S7B-01, S7B-02, S7B-09, S7B-13 (unchanged). The run's
+"[WebServer] ⨯ Error: The destination stream closed early." lines (52) were there before (51 in slice 7b's last run).
+
+### Proposed decision texts (for `docs/decisions.md`, after your approval)
+
+**New: D-57 Classifications and notes (slice 7c).**
+
+> - **D-57** Classifications and notes (slice 7c). A workspace keeps one list of classifications for its source tables
+>   and columns: 19 built in from its creation (general ones and Data Vault 2.0 ones; Effective date is general; the
+>   code PII is named "Personal data") and its own. Every one can be renamed and removed and own ones added; a removed
+>   built-in one can be restored, empty, while its name is free. Built-in classifications keep a fixed code (BK, PII,
+>   LK…) that the app's rules read, so a renamed one keeps working and a removed one is absent; the rules' own texts
+>   name the role, not the classification. Names are unique per scope against every name and built-in code, compared
+>   ignoring case, spaces, `_`, `-` and `/`; a new name is also the name an import file must use. Removing one shows
+>   first where it is used and, for a built-in one a rule reads, what stops, and takes its links with it; each change is
+>   one undo step. A business key change without a mapping settles when its column loses Business key or Business key
+>   is removed. Owners, admins and modelers edit the list and set classifications from the table and column panels;
+>   reviewers, readers and an archived workspace see them read-only. With Data Vault 2.0 mode off, Data Vault
+>   classifications stay stored and are hidden in the panels and the reading; switching the mode off says how many
+>   uses stay stored. Classifications are links (AD-15, AD-18), read through one index per load; on the canvas only
+>   source rows' BK badge and the Keys filter read them (the PII badge belongs to attributes). Tables and columns have
+>   the modeller's note, plain text like a mapping's note, apart from the source's comment, which is read-only. When
+>   slice 7c was installed, the columns' business key and personal data flags became classifications and the column
+>   comments no import had written moved into the columns' notes, listed in a report. Classifications on attributes
+>   and the entity panel's Data Vault hints are not part of it.
+
+**D-55**, three changes:
+
+> - replace "the comment stays editable, and the review shows every overwrite" with "the comment is the source's and
+>   read-only (the modeller writes a note, D-57), and the review shows every overwrite";
+> - replace "The modeller owns the classifications: a re-import never changes them." with "The modeller owns the
+>   classifications and the note: a re-import never changes them. The import reads every classification a file names,
+>   by code or current name; an unknown value, or a table classification named on a column, is warned about once per
+>   value and table and ignored; a new column is written with what matched; when the file differs from a column's
+>   classifications the review says so and keeps the modeller's. For new columns the file does not classify, the review
+>   suggests Business key (the only primary key column of a table with no business key, in the file or stored) and, in
+>   Data Vault 2.0 mode, Link key (a foreign key that is not a primary key); an unticked suggestion is not written, and
+>   the suggestions are part of what the review showed.";
+> - end: "(Extended in slices 7b and 7c.)"
+
+**D-51**: replace "an input marked business key changes type" with "an input with the Business key classification
+(code BK, D-57) changes type"; end "(Extended in slices 7a, 7b and 7c.)"
+
+**D-56**: after "A business key column that changed type with no such mapping is a change of its own." add "A business
+key column is one with the Business key classification (code BK); such a change settles when its column loses the
+classification or the classification is removed (D-57)."; end "(Extended in slice 7c.)"
+
+**AD-08**:
+
+> - **AD-08** Optional Data Vault 2.0 mode per workspace: hints only, nothing enforced. In the mode, the Data Vault
+>   classifications show in the panels, the import suggests Link key, and a source table panel shows its Data Vault
+>   reading (hub, links, link keys, dependent child, driving and multi-active keys, effective dating, satellites with
+>   personal data apart), read from the classifications and the source's keys; nothing is created. (Extended in slice
+>   7c.)
+
+**AD-28**:
+
+> - **AD-28** Business key is also an attribute property, suggested from input columns with the Business key
+>   classification (code BK, D-57).
+
+### How to check in the browser
+
+1. Stop any dev server, then `npm run dev`. Your `.data/dev-db.json` (format 6 now) is upgraded on the first read: the
+   server log says "Slice 7c upgrade: moved 0 hand-typed column comments into notes; see .data/upgrade-8-dev-db.txt",
+   and that file lists what it wrote. (A copy upgraded the same way here: 57 rows, 22 links, nothing moved.)
+2. Sign in as Łukasz, open Customer 360 → "Customer & orders". On the `customers` card `cust_no` still has its BK
+   badge; the Keys filter still shows it.
+3. Click `cust_no`: "Flags" shows **Business key** pressed and **Personal data** not; click Personal data, then Ctrl+Z:
+   the toast says "Undone: Set Personal data on cust_no" (checked here).
+4. Click `fname`: Personal data pressed. Drag `fname` onto an entity's header: the new attribute is personal data.
+5. Sign in as Piotr (reviewer): the two buttons are disabled.
+
+### Open for step 4
+
+The panels' Classifications sections and notes, the list dialog, the read-only comment and the Data Vault mode
+message; the decision texts above once you approve them (written in step 6 with the other docs, or now, as you say).
+
+### Questions for Łukasz
+
+1. The decision texts above: approve, or change any?
+2. Decision 5: the wizard's Data Vault mode in step 3 rather than step 5, fine?
+3. Should the decision texts go into `docs/decisions.md` in step 4 already, or with the docs in step 6?
