@@ -964,3 +964,16 @@ list…" shows the list with names as text and no Add, Remove or Restore.
 1. Decisions 1–3: the toasts, removing an unused one at once, and the removal form's texts?
 2. Decision 4: should the other dialogs (delete entity, import) also keep Escape from clearing the selection? It is a
    one-line change in each, outside this slice's items, so I left them; or an idea for `docs/ideas.md`.
+
+## Łukasz's answers to step 4 (26 October 2026)
+
+- **Toasts:** as built.
+- **Removing an unused classification at once:** changed. The removal form shows whenever the classification is in use
+  **or** is a built-in one that a rule reads (it then shows "unused" and what stops). Own unused ones and built-in ones no
+  rule reads are removed at once, with the toast and Undo. Reason: removing an unused Business key still stops the
+  suggestions in later imports and on attributes; the modeller must see that first.
+- **The form's texts:** approved, with "{n} open business key changes without a mapping will be settled." (future tense;
+  singular when 1).
+- **Escape in the other dialogs:** not changed in this slice. A line in `docs/known-limitations.md` names the dialogs whose
+  Escape also clears the canvas selection or closes the panel behind them.
+- **Focus, colours, removing `updateSourceColumn`:** as built.
