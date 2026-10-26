@@ -1100,3 +1100,114 @@ As **Łukasz**, `npm run dev`, Customer 360 → "Customer & orders", Sources tab
 - **`COMMITS=1`:** as built; add the command to CLAUDE.md and README.
 - **Moving a card after three large imports** (1,473 ms on 7c vs 1,230 ms on slice-07b): accepted; add it to
   `docs/known-limitations.md` with both figures, as a limit of the local adapter's data file, for the database slice.
+
+## Handover after step 5 (26 October 2026)
+
+Written so a new session can finish the slice without the conversation that built steps 1–5. Read CLAUDE.md, then this
+file from "Łukasz's answers to step 1" on.
+
+### State
+
+- Branch `slice/07c-classifications`, from tag `slice-07b` (`408c3c0`). Last commit before this section: `385a8f7`
+  ("docs: slice 7c: Łukasz's answers to step 5"). Nothing is pushed; no PR exists.
+- Done: steps 1–5 (review, domain, data and commands, panels and dialog, import and reading), each with Łukasz's answers
+  above. Open: the four changes in "Łukasz's answers to step 5", then step 6 (docs, one full e2e run, Łukasz's manual
+  acceptance; merge only on his command; tag `slice-07c`).
+- Last checks: lint, typecheck, `npm test` (98 files, 1,301 tests) green; `e2e/slice-07c/` 26 passed (+1 on demand);
+  `e2e/slice-07a/` and `e2e/slice-07b/` 64 passed; the last full e2e run was step 3's (303 passed, 3 failed and fixed).
+- Your own `.data/dev-db.json` is still format 6 and is upgraded to 8 on the next `npm run dev` (report beside it). A copy
+  upgraded here lives in `.data/verify-db.json` (the `infomapper-verify` entry of `.claude/launch.json`).
+
+### Only in the conversation so far (now written down)
+
+- **`docs/ideas.md` has nothing from 7c yet** (step 6): a panel-only write that does not redraw the canvas (answer F4);
+  rich text for all notes at once, mappings, tables and columns (answer F7); and PRD section 9's ideas: built-in names
+  per the workspace's documentation language, a `table_classifications` column in the source standard, Data Vault hints
+  in the entity panel (P12), readings that use Link candidate and Satellite source, own classifications with a code.
+- **PRD section 9's list for the data model slice** gains (answers to steps 1 and 3): F5 (moving the flags' data and
+  seeding the built-in rows in a real database), F20 (`origin` carries both "built-in or own" and the group), a system
+  author for upgrades ("InfoMapper upgrade"). Write them where step 6 lists the data model slice's items (the docs plan
+  above names no file; `docs/known-limitations.md` already mentions the system author).
+- **`docs/known-limitations.md`, still to change in step 6:** "An import's undo: all or nothing" says "a business key set"
+  blocks an import's undo; since 7c a classification on a column the import only updated does not (it is a link, the
+  column row is untouched), while on a column the import created the undo is still refused (Q10). And the card move
+  above (answers to step 5).
+- **`docs/inventory-prototype-vs-app.md`** (step 6): "Sources" lists only section 9's ideas; the Model row keeps entity
+  panel hints as decision only.
+- **README and CLAUDE.md** (step 6): the slice's status line; classifications in "What this is"; a short note on the
+  index and the codes the rules read (`src/domain/model/classifications.ts`); the 7c e2e helpers (list below); the
+  commands `COMMITS=1 npx playwright test e2e/slice-07c/S7C-14-commits.spec.ts` and `npm run seed:large` now carrying
+  classifications; `bench-import-write.ts`'s `ONLY_REMOVE=1`; the element baseline file
+  `.data/measure/s7c14-baseline/slice-07b.json`.
+- **Working notes for this machine:** a `slice-07b` worktree for A/B figures goes in `.data/wt-07b` (git-ignored) and
+  needs its own `npm ci` (Turbopack refuses a `node_modules` link pointing outside the project); remove it with
+  `git worktree remove --force .data/wt-07b`. Scratch probes from step 5 are in `.data/measure/up8/` (not code). In this
+  environment the Bash tool mangles backslashes inside heredocs: write files with the Write tool, and keep a file's
+  CRLF/LF when editing with a script (`newline=''`).
+- The S7A-14-review and S7B-16 measuring specs (headed, `MEASURE=1`) were not run in 7c; nothing in them changed.
+
+### Where the code of steps 2–5 lives
+
+| What | Where |
+| --- | --- |
+| Codes, built-in list, names rule, index, what stops, Data Vault texts | `src/domain/model/classifications.ts` (`CLASSIFICATION_CODES`, `BUILTIN_CLASSIFICATIONS`, `normClassification`, `nameTakenBy`, `classificationIndex`/`indexOf` with `has(id, code)`, `WHAT_STOPS`/`whatStops`, `DATA_VAULT_MODE_TEXT`, `dataVaultUses`, `dataVaultOffMessage`, `builtinClassificationRows`) |
+| Types | `src/domain/types.ts` (`Classification`, `ClassificationLink`, `note_html`/`note_text` on `SourceTable`/`SourceColumn`, `WorkspaceModel.classifications`/`classificationLinks`, `WritableRows`) |
+| List, toggle commands; impact; cascade helper | `src/domain/commands/classification.ts` (`addClassification`, `renameClassification`, `classificationImpact`, `removeClassification`, `restoreClassification`, `setClassification` with its undo label via `WriteSet.label`, `linksOnSources`) |
+| Note command | `src/domain/commands/source.ts` (`setSourceNote`, `NOTE_SAVED`, `NOTE_REMOVED`); `updateSourceColumn` is gone |
+| Settlements (Q7) | `src/domain/source-changes/settle.ts` (`settleAfterWrites`'s classification rule, `businessKeySettlements`), texts in `texts.ts` (`SETTLED.noLongerBusinessKey`, `classificationRemoved`); `SETTLING_TABLES` in `src/app/_lib/run-command.ts` includes the two tables |
+| Undo | `src/domain/commands/undo.ts` (tables, `PARENTS`, `classificationNameClash`); labels in `src/domain/model/change-label.ts`; `WriteSet.label` in `src/domain/changes.ts`, used by `remember` in `run-command.ts` |
+| Delete cascade | `src/domain/source-changes/delete.ts` (`SourceDeleteRows.classificationLinks`, `sourceDeleteEdits`) |
+| Rules by code | `mapping-rules.ts` `suggestsBusinessKey`; `attribute.ts` `createAttributeFromColumn`; `import/plan.ts` (`planChanges`, `planMappings`); canvas BK badge in `src/canvas/card-data.ts` `buildCards` |
+| The import | `import/standard.ts` (raw values), `import/plan.ts` (`planClassifications`, `matcherOf`, `fileSays`, `ClassificationHint`, `HINT_WHY`, `UNKNOWN_CLASSIFICATION`, `TABLE_CLASSIFICATION_ON_COLUMN`, `NO_CLASSIFICATIONS`), `import/apply.ts` (`classificationLinks.insert`), `import/compare.ts` (digest, `keptChoices` with `hintsOff`), `import/materialize.ts`, `import/model.ts` (`dataVault`), `commands/import.ts` (`hintsOff` input, the server's `dv2_mode`) |
+| The reading | `src/domain/model/data-vault-reading.ts` (`dataVaultReading`, `readingText`, `READING_EMPTY`, `READING_FOOTER`) |
+| Local adapter and format 8 | `src/data/local/schema.ts` (`DEV_DB_FORMAT = 8`, `RULES`), `src/data/local/upgrade-8.ts` (`upgradeTo8`, `upgradeReportText`), `src/data/local/file.ts` (`upgradeDb`, the report file and log line in `readDb`), `src/data/local/store.ts` (`model.load`) |
+| Seeds | `src/data/local/seed-model.ts` (`addBuiltinClassifications`, `addSeedClassificationLink`), `seed.ts`, `seed-large.ts` (F15) |
+| Migration and data model | `supabase/migrations/20261026200000_classifications.sql`, `docs/data-model-v2.md` |
+| Server actions | `src/app/_actions/classification.ts` (add, rename, remove, restore, set, note, `classificationImpactAction`) |
+| Panels, section, note, dialog, reading UI | `src/app/_panels/classifications.tsx` (`ClassificationsSection`, `SourceNote`, `ClassificationsDialog` with `ListSection`, `Row`, `RemoveForm`, `DataVaultReading`); wired in `src/app/_panels/source-panels.tsx`; `dataVault` reaches the panels through `InspectorProps` (`inspector.tsx`) from the canvas page |
+| The review and the wizard | `src/app/_panels/import/review-step.tsx` (`ClassChip`, the suggestions section, `review-file-says`), `import-wizard.tsx` (`hintsOff`, `importStateOf(…, data.dataVault)`), `wizard-model.ts` (`WizardState.hintsOff`, `ImportData.dataVault`, `shownUnder`) |
+| Settings | `src/app/w/[workspaceId]/_components/settings-form.tsx` (text, `dataVaultOffMessage`), uses counted in `src/app/w/[workspaceId]/page.tsx` |
+
+**Spec helpers** (`e2e/slice-07c/helpers.ts`): `openColumn`, `openTable` (through a column's panel), `toggle`, `groups`,
+`expectPressed`, `openList`, `listRow`, `classesOf` (codes, or names for own ones), `classification`, `columnId`,
+`tableId`, `setDataVault`, `fileOf` (a file in the standard), `asLukasz`, `classify`, `renameBuiltin`, `removeBuiltin`;
+re-exports `importAs`, `openWizard`, `reviewFile`, `reviewRow`, `importNow`, `undo`, `archive`, `captureActionId`,
+`callActionDirectly`. `S7C-12.spec.ts` has a local `setColumn` (missing, retired, not needed as test data).
+
+### Where the open changes and step 6 plug in
+
+1. **"The file says …" not counted** (answers to step 5): the review's counts are `reviewCounts` in
+   `src/app/_panels/import/wizard-model.ts` (counts by status; an unchanged column is not counted today), the filters'
+   numbers come from it, the import's counts are `planCounts` in `src/domain/import/plan.ts` (by status: unchanged not
+   counted) and the summary `importSummary`; `applyPlan` writes no patch for an unchanged column (classifications are
+   never written for existing columns). Expected: already as asked; prove it with a unit test (`planCounts` and
+   `applyPlan` on a re-import that differs only in classifications: zero changed columns, no column patch, no link) and
+   an e2e line in `S7C-10.spec.ts`'s second test (the filters' counts and the import's toast "No changes" or the same
+   summary as without the classification).
+2. **The reading's look** (AD-20): `DataVaultReading` in `src/app/_panels/classifications.tsx` renders `readingText`
+   strings. Render from the structured `ReadingLine` instead (kinds in `data-vault-reading.ts`): the role (`Hub`, `Link`,
+   `Link key`, `Dependent child key`, `Driving key`, `Multi-active satellite`, `Effective-dated`, `Satellite`, "Marked as a
+   hub candidate") in bold, column and table names in `font-mono`; keep `readingText` for the text and the specs
+   (`S7C-12.spec.ts` compares `dv-reading-line` texts, which must stay the same).
+3. **`COMMITS=1`** in CLAUDE.md's command list and README's table (the line above).
+4. **The card move** in `docs/known-limitations.md` (both figures, a limit of the local adapter's data file, for the
+   database slice), next to slice 7a's entry on the move after three large imports.
+5. **Step 6** (PRD section 4, step 6; section 10): the docs listed under "Only in the conversation so far"; one full
+   e2e run (`npm run e2e` from scratch, no dev server running; a failing test run three times on its own; report the
+   time); a "Step 6" section here with the manual acceptance scenario (PRD section 5's definition of done) for Łukasz;
+   merge only on his command, then tag `slice-07c`.
+
+### How to run the slice's checks
+
+```
+npm run lint && npm run typecheck && npm test
+npx playwright test e2e/slice-07c                       # 26 tests, about 5 min (no dev server running)
+npx playwright test e2e/slice-07a e2e/slice-07b         # the review, wizard and business key specs, about 8 min
+COMMITS=1 npx playwright test e2e/slice-07c/S7C-14-commits.spec.ts   # canvas commits per toggle (3 on both tags)
+npx tsx scripts/bench-import-plan.ts --no-coverage      # the index and the plan (bars: 20 ms; within 10 % of slice-07b)
+npx tsx scripts/bench-import-write.ts 20000             # writes, undos, the removal of Business key (bar 1 s)
+ONLY_REMOVE=1 npx tsx scripts/bench-import-write.ts 20000            # only the removal
+npm run measure:build && MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts
+```
+
+A/B against `slice-07b`: run the same script in `.data/wt-07b` (see the working notes) in turns, as step 5 did.
