@@ -1354,6 +1354,29 @@ attribute, the warning colour on the button, the chip with the date only, the se
 | S7B-16 | `S7B-16-changes.spec.ts`, `S3B-15-elements.spec.ts`, `bench-*.ts` | met (step 5's figures; the comparison with Focus as information) |
 | S7B-17 | CI and the two runs below | see below. Earlier e2e specs changed (`git diff slice-07a -- e2e`): S7A-05 (step 3, the summaries' “to resolve”) and S7A-10 (step 4, the mapping panel's reason line); none in step 5. Earlier unit tests changed: `tree-data`, `canvas`, `requirement-store`, `working-layer-store` (format 7), `frame`, `undo`, `compare-schema` (`source_change`), `import`, `plan`, `source` (the delete's cascade) |
 
+### Two full e2e runs in a row
+
+CI first: lint, typecheck, `npm test` 93 files, 1,242 tests pass. Each run from scratch, with no dev server running
+before it.
+
+- **First pair (25–26 October), disturbed:** run 1, 303 passed, 1 failed (S4B2-06), 59.2 min. Run 2, 301 passed, 3
+  failed (S7A-05, two S7B-14 tests), 59.7 min. Windows changed the time zone two minutes into run 2, from UTC+1 to
+  UTC+8 (China Standard Time; the System log shows it at 21:28 UTC), so the dev server and the test workers disagreed
+  on the local date. S7B-14 compared the chip's date with one formatted in the test process; it now reads the date
+  from the server-rendered select (`23fed74`). The laptop then slept 7.5 hours during the reruns. On their own,
+  S4B2-06, S7A-05 and S7B-14 each passed 3 of 3 (S7A-05's sitting interrupted by the sleep was run again).
+- **Second pair (26 October, UTC+8 throughout):** run 3, **304 passed, 0 failed, 56.8 min**; run 4, **303 passed, 1
+  failed, 55.2 min**: S4B2-06 again, the same step (“Move card” expected when dragging REQ-101 onto its own card just
+  placed; the hint read “Place card”). On its own it passed 3 of 3 (41.7, 41.9, 59.5 s).
+- **S4B2-06 is a flake under the full run, and new:** it failed in 2 of the 4 closing runs and never in slice 7a's two
+  closing runs or this slice's step 4 and 5 full runs. The step drags onto a requirement card placed a moment before;
+  the hint reads “Place card” when the drop target is not yet the card. Step 5 changed nothing in requirement drops; it
+  adds two components to `ModelCanvas` (the Changes driver and bar, both idle when off). Not investigated further
+  (your decision: a deflake of the spec, waiting for the placed card on the canvas before the second drag, or a look at
+  the drop target's timing).
+- **The worktree `../infomapper-base-07a`** was clean at `dd072b6` and is removed (`git worktree remove`); its baseline
+  is kept in `.data/measure/s7b16-baseline/slice-07a.json`.
+
 ### Manual acceptance: the definition of done (PRD section 5)
 
 **Prepare** (with no e2e run going), in the repository on `slice/07b-source-changes`:
@@ -1409,3 +1432,7 @@ move. Open http://localhost:3000, pick **Łukasz**, Retail Co – DWH, Customer 
 11. **Undo the last action.** Undo in the top bar (or Ctrl+Z). *See:* the toast's Undo or the button takes back
     “Left in review”: the `email_addr` change is open again in “Changes to resolve”, and the count in the tree and the
     status bar goes up by one.
+
+**Checked in the browser before handing over** (a freshly seeded copy with the two imports): steps 7, 8 and 11 read as
+written (“Review the 2 sent back…”, then “Review the 1 sent back…” with `Customer.email` under “These don't fit the
+source yet:” and “Approve 0” disabled; Undo of “Left in review” brings the change back, 7 → 8 in the status bar).
