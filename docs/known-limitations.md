@@ -542,6 +542,11 @@ the demo data is replaced: steps whose change group is no longer in the change l
 - **Slice 7c (F6):** a step recorded before the local data file's upgrade to format 8 that touched a source column
   carries the column's old business key and personal data flags in its images, so undoing or redoing it is refused
   ("changed afterwards"); nothing wrong is written. A server restart empties the history anyway.
+- **Slice 7c (who signs the upgrade):** the rows and change events slice 7c's upgrade wrote are signed by the
+  workspace's creator; a future "last changed by" must recognise them as the upgrade's. The data model slice decides on a
+  system author for upgrades (e.g. "InfoMapper upgrade").
+- **Slice 7c (live columns only):** the upgrade moved hand-typed comments into notes on live columns only. A deleted
+  column brought back by undo keeps a hand-typed comment, shown as "From the source:".
 
 ### No undo outside canvases (slice 3a, step 0)
 
