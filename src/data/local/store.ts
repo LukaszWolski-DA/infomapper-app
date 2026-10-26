@@ -158,7 +158,12 @@ export function createLocalDataStore(file: string): DataStore {
         live((await load()).source_import)
           .filter((i) => i.workspace_id === workspaceId && (sourceSystemId === undefined || i.source_system_id === sourceSystemId))
           .sort((a, b) => b.created_at.localeCompare(a.created_at) || b.id.localeCompare(a.id)),
+      listChanges: async (workspaceId) =>
+        live((await load()).source_change)
+          .filter((c) => c.workspace_id === workspaceId)
+          .sort((a, b) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id)),
       loadForUndo: async (workspaceId) => {
+
         const db = await load();
         const rows = {} as Record<string, unknown[]>;
         for (const table of UNDOABLE_TABLES) rows[table] = (db[table] as readonly { workspace_id: Uuid }[]).filter((r) => r.workspace_id === workspaceId);

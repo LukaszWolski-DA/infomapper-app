@@ -16,8 +16,11 @@ export interface MapLineData {
   ruled: boolean;
   /** A type problem (D-01): orange line and a "!" chip. */
   warn: boolean;
-  /** Inputs whose source card is on this canvas, in rule order; `gone`: the column is missing from source (slice 7a). */
-  inputs: { columnId: Uuid; cardId: Uuid; gone?: true }[];
+  /**
+   * Inputs whose source card is on this canvas, in rule order; `gone`: the column is missing from source (slice 7a);
+   * `old`: it is retired as well (slice 7b, the segment's title “Retired: historical”).
+   */
+  inputs: { columnId: Uuid; cardId: Uuid; gone?: true; old?: true }[];
   /** How many inputs the mapping has in all; more than one draws the ƒ node (D-49). */
   inputCount: number;
   attributeId: Uuid;
@@ -72,7 +75,7 @@ export function buildLines(
     const columns = (inputsOf.get(m.id) ?? []).map((id) => columnById.get(id)).filter((c) => c !== undefined);
     const inputs = columns.flatMap((c) => {
       const source = tableCard.get(c.source_table_id);
-      return source ? [{ columnId: c.id, cardId: source, ...(c.missing_since ? { gone: true as const } : {}) }] : [];
+      return source ? [{ columnId: c.id, cardId: source, ...(c.missing_since ? { gone: true as const } : {}), ...(c.retired_since ? { old: true as const } : {}) }] : [];
     });
     if (!inputs.length) continue;
     mappings.push({
@@ -80,7 +83,7 @@ export function buildLines(
       status: m.status,
       kind: m.kind,
       ruled: m.kind === "transform" && !!m.rule_expression?.trim(),
-      warn: !checkMappingTypes(m, attribute, columns).ok,
+      warn: !checkMappingTypes(m, attribute, columns.filter((c) => !c.retired_since)).ok,
       inputs,
       inputCount: columns.length,
       attributeId: attribute.id,

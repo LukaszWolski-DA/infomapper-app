@@ -5,13 +5,14 @@ import {
   concept,
   entity,
   ids,
+  NOW,
   requirement,
   requirementLink,
   sourceColumn,
   sourceSystem,
   sourceTable,
 } from "@/domain/__fixtures__/domain";
-import type { WorkspaceModel } from "@/domain/types";
+import type { SourceChange, WorkspaceModel } from "@/domain/types";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import { allGroups, buildTree, filterConcepts, filterRequirements, filterSystems, isOpen, type TreeFilter } from "./tree-data";
 
@@ -143,5 +144,18 @@ describe("the Requirements tab (slice 4a, PRD items 20, 22)", () => {
 
   it("folds its groups by kind", () => {
     expect(allGroups(tree, "requirements")).toEqual(["req:need", "req:data", "req:business_rule", "req:dq_rule", "req:non_functional"]);
+  });
+});
+
+describe("buildTree: source changes (slice 7b, item 22)", () => {
+  it("counts a system's open changes and marks a retired table historical, not missing", () => {
+    const open = { workspace_id: ids.ws, source_system_id: ids.crm, status: "open", deleted_at: null } as SourceChange;
+    const changes = [open, { ...open }, { ...open, status: "resolved" }, { ...open, deleted_at: NOW }] as SourceChange[];
+    const retired = { ...model, sourceTables: model.sourceTables.map((t) => (t.id === ordersTable ? { ...t, missing_since: NOW, retired_since: NOW } : t)) };
+    const t = buildTree(retired, items, ids.canvas1, [ids.canvas1], undefined, changes);
+    expect(t.systems[0]!.openChanges).toBe(2);
+    const orders = t.systems[0]!.schemas[1]!.tables[0]!;
+    expect([orders.retired, orders.missing]).toEqual([true, false]);
+    expect(tree.systems[0]!.openChanges).toBe(0);
   });
 });

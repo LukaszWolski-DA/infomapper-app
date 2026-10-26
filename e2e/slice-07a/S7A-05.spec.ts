@@ -13,7 +13,7 @@ test("S7A-05: re-importing CRM: new, changed, unchanged, missing and back, the t
   await openWizard(page);
   await reviewFile(page, { existing: "CRM" }, "crm_partial.tsv", crmPartial());
   await expect(page.getByTestId("review-table").filter({ hasText: "dbo.customer_addresses" })).toHaveAttribute("data-status", "missing");
-  await importNow(page, "Imported into CRM: 7 missing from source");
+  await importNow(page, "Imported into CRM: 7 missing from source, 2 to resolve"); // a table and a column that left (slice 7b)
   expect((await column("customers", "segment")).missing_since).not.toBeNull();
 
   // then the changed CRM file
@@ -48,7 +48,7 @@ test("S7A-05: re-importing CRM: new, changed, unchanged, missing and back, the t
   await expect(page.getByTestId("review-relationship")).toHaveCount(2);
   await expect(page.getByTestId("review-relationship").first()).toContainText("dbo.customer_addresses.cust_id→dbo.customers.cust_id");
 
-  await importNow(page, "Imported into CRM: 2 new tables, 11 new columns, 8 changed columns, 1 renamed column, 1 missing from source, 1 new relationship"); // the other one is back (seeded, slice 7a step 6)
+  await importNow(page, "Imported into CRM: 2 new tables, 11 new columns, 8 changed columns, 1 renamed column, 1 missing from source, 1 new relationship, 8 to resolve (2 high)"); // the other one is back (seeded, slice 7a step 6); slice 7b: 2 new tables, 3 new columns, 1 column that left, 2 mappings sent back
   expect((await column("customer_addresses", "city")).missing_since).toBeNull();
   expect((await column("customers", "segment")).missing_since).not.toBeNull(); // still missing
 });

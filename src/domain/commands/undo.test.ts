@@ -67,6 +67,7 @@ function seed(): Rows {
     source_relationship: [],
     source_relationship_column: [],
     source_import: [],
+    source_change: [],
     mapping: [mapping()],
     mapping_input: [mappingInput()],
     canvas_item: [canvasItem(ids.itemCustomer), canvasItem(ids.itemCrmCustomer)],

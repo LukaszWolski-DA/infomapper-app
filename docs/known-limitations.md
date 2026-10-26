@@ -684,6 +684,14 @@ pages), so the first tests do not wait for compiles.
   compile once more).
 - **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.
 
+### S7A-04-route's development sign-in timed out once (a known flake)
+
+In slice 7b's closing (run 5 of 26 October 2026), “P8 (route): a review that no longer matches the system writes
+nothing and says so” (`e2e/slice-07a/S7A-04-route.spec.ts`) failed at its first line, the development sign-in: after
+the click on Łukasz the top bar did not show within 15 s. That is before any slice code runs. It happened in 1 of 9
+full runs logged since slice 7a's close, and the file passed 3 of 3 on its own. Recorded as a known flake (Łukasz, 26
+October 2026); if it comes back, look at the sign-in redirect's timing under a long run.
+
 ## Source import (slice 7a)
 
 ### Every write rewrites the whole local data file
@@ -719,19 +727,15 @@ Server's catalog gives the name it generated, and the review shows the same rela
 name, not as a missing and a new one (S7A-17). What remains: two keys over the same columns to the same table, both
 renamed, are paired in file order.
 
-### Imports raise no changes to resolve yet
-
-A slice 7a import marks what is missing from source and sends approved mappings back to review with their reasons, but
-it records no "changes to resolve" (retire, move mappings, delete, not needed…). Those, their counts in the tree, the
-status bar and the panels, and model consistency on the project home come with slice 7b, which decides whether it
-derives open changes from the statuses 7a stored or starts with an empty list (PRD 7a, section 9).
-
 ### An import's undo: all or nothing, and not after a restart
 
 An import is one undo step (P7). Undo is refused as a whole ("This can't be undone because it was changed afterwards.")
 when any row the import wrote has changed since: a new column mapped, a business key set, a table renamed. The undo
 history lives in the server's memory ("The undo history lives in server memory" above), so an import cannot be undone
 after the server restarts. Approving a mapping again, or importing the previous file again, is the way back then.
+Since slice 7b, resolving one of the import's changes to resolve writes rows the import wrote: undoing the resolution
+first brings the change back as the import left it, and then the import can be undone. A resolution by someone else
+blocks the import's undo, as any later change does (step 1, F13).
 
 ### SQL Server's `timestamp` read from a file is a date
 
@@ -754,3 +758,31 @@ fails if it does.
 A mapping with two or more inputs is a transformation with a rule, and a rule is never a type problem (D-01). So an
 import can send a combined mapping back to review for a business key column that changed type or a renamed input in its
 rule, but never for a type conflict; only direct mappings get that reason (slice 7a, step 1, F1).
+
+## Changes to resolve (slice 7b)
+
+### The changes derived at the upgrade are no undo step
+
+The local data file's upgrade to format 7 derived open changes from what slice 7a's imports stored (missing columns and
+tables, mappings sent back to review, new tables and columns with no mapping yet), each saying “Raised when slice 7b was
+installed.” The upgrade is not a person's action, so it has no undo step; every resolution of such a change is undoable
+(step 1, F1). A new table or column a 7a import created and someone has mapped since is not derived as new.
+
+### Model consistency lists every line
+
+The project home's model consistency lists every mapping and attribute it finds, with no folding or limit. On a real
+project that is a handful of lines; a project with thousands of type conflicts (the synthetic 20,000-column file of
+`bench-consistency.ts` has 1,619, as all its attributes are string(50)) would list them all. The computation stays at
+about 23 ms there; the page grows with the list.
+
+### Model consistency is fresh on each load, not while the home is open
+
+The home computes model consistency when it loads; a change made by someone else while the home stays open shows on the
+next load. Every action in this browser happens on a canvas, so going back to the home always shows its result.
+
+### The Changes view lights whole cards
+
+Touched cards stay lit as a whole; the touched rows inside them carry the row marks (new, changed, retired, missing),
+and untouched rows are not dimmed as in the prototype (`docs/ideas.md`, “Per-row fading in the Changes view”).
+Switching the view on with many cards lit costs more than Focus on one entity: 74.7 ms to the screen at 30 % on
+“Performance test” with 22 cards lit, against 50.9 ms for Focus on ent:23 (within the 100 ms bar; step 5).

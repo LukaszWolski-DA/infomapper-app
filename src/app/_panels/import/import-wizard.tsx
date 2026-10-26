@@ -22,7 +22,7 @@ import { buttonClass, primaryClass } from "../fields";
 import { ReviewStep } from "./review-step";
 import { ScopeStep } from "./scope-step";
 import { SourceStep } from "./source-step";
-import { canGo, footNote, impactIndex, targetName, targetOf, type ImportData, type Step, type WizardState } from "./wizard-model";
+import { canGo, footNote, impactIndex, planCoverage, targetName, targetOf, type ImportData, type Step, type WizardState } from "./wizard-model";
 
 const STEPS: [Step, string][] = [
   [1, "Source"],
@@ -72,7 +72,7 @@ export function ImportWizard({
   const set = (patch: Partial<WizardState>) => setState((x) => ({ ...x, ...patch }));
   const [sending, setSending] = useState(false);
 
-  const state = useMemo(() => importStateOf(model), [model]);
+  const state = useMemo(() => importStateOf(model, data.changes), [model, data.changes]);
   const target = targetOf(s);
   const plan = useMemo(() => {
     if (!s.read || s.read.errors.length || !target) return null;
@@ -81,6 +81,8 @@ export function ImportWizard({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [state, s.read, s.mode, s.systemId, s.newName, s.scope, s.compare, s.renames]);
   const index = useMemo(() => impactIndex(data), [data]);
+  // the review's coverage callout (slice 7b, item 9): once per plan, about 95 ms at the 30,000-row limit (step 2)
+  const coverage = useMemo(() => (plan && s.step === 3 ? planCoverage(state.model, plan, data) : []), [plan, s.step, state, data]);
   const name = targetName(s, model);
 
   /**
@@ -155,7 +157,7 @@ export function ImportWizard({
     ) : s.step === 2 ? (
       <ScopeStep s={s} set={set} model={model} plan={plan} systemName={name} />
     ) : plan ? (
-      <ReviewStep s={s} set={set} plan={plan} data={data} index={index} systemName={name} />
+      <ReviewStep s={s} set={set} plan={plan} data={data} index={index} systemName={name} coverage={coverage} />
     ) : null;
 
   return (

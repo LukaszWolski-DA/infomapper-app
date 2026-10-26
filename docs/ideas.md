@@ -153,12 +153,12 @@ without a fresh page. In S6A-09 that refresh made “Show all” with Focus and 
 than the same changes through the controls at 30 % (22 ms in the dense view). The action could skip the refresh when no
 frame changed.
 
-## “Approve again all {n}” after an import (slice 7a, step 1; for slice 7b)
+## Per-row fading in the Changes view (slice 7b, step 1)
 
-One import can send many approved mappings back to review (P6: a new type conflict, a business key column that changed
-type, a renamed input in the rule). A button “Approve again all {n}” for the mappings one import sent back, with each
-one's reason shown before the click, would spare a solo modeller approving them one by one. It respects four-eyes: with
-four-eyes on, the person who ran the import cannot use it for those mappings (Łukasz, 22 October 2026).
+The prototype's Changes view dims the untouched rows inside a touched card (`body.im-chgmode .card.im-hit
+.row:not(.im-hit)`). The app's fade layer (F4, AD-24) has holes per card, block and note, so slice 7b keeps touched cards
+lit as a whole and marks the touched rows with the existing row classes. Per-row holes would add a subpath per row to
+the veil; to be measured against Focus's switching before it is built (Łukasz, 25 October 2026).
 
 ## One file per table in the local adapter (slice 7a, step 4)
 
@@ -187,3 +187,26 @@ in D-01's table and their fractional seconds (as SQL Server's and PostgreSQL's q
 The prototype's review promised "Shown later as a grey line between the table cards on a canvas" for a new
 relationship; slice 7a left the sentence out. Lines between table cards for declared relationships, in the line layer
 (AD-24 rule 3), with their own layer switch, would show the source's structure next to the mappings.
+
+## A change to resolve as its own history place (slice 7b, PRD section 9)
+
+A change is a card on the system's and table's panels, not a place of its own: Back after acting on one returns to the
+panel, not to the change. Making it a place (D-38) would let a link open one change directly, e.g. from a notification.
+
+## Telling the others about new changes to resolve (slice 7b, PRD section 9)
+
+An import's changes wait on the system's panel, counted in the tree and the status bar, for whoever opens them. A
+notice to the other people of the workspace (the modellers who own the affected mappings) would bring them sooner.
+
+## Resolving changes from the Changes view's bar (slice 7b, PRD section 9)
+
+The Changes view only fades (P11). Acting on the lit changes from its bar, without opening the system's panel, would
+shorten the way from seeing what a change touches to settling it.
+
+## A requirement card placed by a drop shows at once (slice 7b, step 6)
+
+A requirement dropped on empty canvas gets its card only when the page's refreshed server data arrives after the
+action (`placeReqCards` adds no node of its own; `revalidatePath` brings it). Under load that gap was about 2 s
+(S4B2-06 with 4× CPU throttling), and a second drop in it tries to place a second card, which the server refuses (one
+card per requirement and canvas). Showing the card on the canvas at once (an optimistic node, kept or dropped when the
+action answers) would close the gap (Łukasz, 26 October 2026).

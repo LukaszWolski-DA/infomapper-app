@@ -6,8 +6,9 @@ Read this file at the start of every session. It is short on purpose; the detail
 
 InfoMapper is a data-modeling application for data warehouse work. Business analysts model concepts, entities and
 attributes, describe physical source tables and columns (by hand, or imported and re-imported from a file, a catalog
-query's result or DDL scripts, slice 7a), map columns to attributes, and trace requirements to all of it. One workspace
-holds one model; projects and canvases organise the work on it.
+query's result or DDL scripts, slice 7a), map columns to attributes, and trace requirements to all of it. A re-import
+turns every source change that needs a decision into a change to resolve, settled on the system's panel with one undo
+step per action (slice 7b, D-56). One workspace holds one model; projects and canvases organise the work on it.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -166,6 +167,9 @@ npx tsx scripts/bench-import-plan.ts                          # slice 7a: plan a
 npx tsx scripts/bench-import-write.ts 20000                   # slice 7a: import, re-import and undo through the local adapter, on a copy
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07a/S7A-14-review.spec.ts  # slice 7a: the review's filters on 20,000 columns
 MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7a14-baseline/slice-06b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7A-14's element guard
+npx tsx scripts/bench-consistency.ts                          # slice 7b: model consistency on 20,000 columns, 5 % changed (bar 50 ms)
+npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06b/S6B-10.spec.ts         # slice 6b: selection places, the buttons, the background refresh, phase by phase
 BROWSERS=1 npx playwright test e2e/slice-06b/S6B-browsers.spec.ts                          # slice 6b: smoke in Chromium, Firefox and WebKit (on demand; needs `npx playwright install firefox webkit`)
 SCREENS=<folder> npx playwright test e2e/slice-04b1/S4B1-06-screens.spec.ts               # slice 4b-1's coverage colour screenshots
@@ -319,5 +323,13 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   files in `src/domain/import/samples/` are read only by tests (an ESLint rule; P10: no samples in the app). Missing
   marks on the canvas are classes on existing elements (`row.gone`, `path.s.gone`; AD-24); a source system is a
   selection `{ t: "element", kind: "source_system" }` and a history place (`GONE.source_system`).
+- **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
+  (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
+  `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a
+  resolution (`settle.ts`), never silently. The cards are `src/app/_panels/source-changes.tsx`. Historical means every
+  input retired (`isHistorical`): out of coverage, type problems and model consistency. Model consistency
+  (`consistency.ts`) is computed on the project home's every load; its lines open objects with `?map=`, `?row=`,
+  `?system=`. The Changes view (`src/canvas/Changes.tsx`, `changes-view.ts`; what it lights: `touched.ts`) is a fade
+  request like Focus, and the two turn each other off; each driver clears only its own request (`lit:changes:` keys).
 - Writes: a server action calls `runCommand()` (`src/app/_lib/run-command.ts`), which runs the domain command and
   applies its write set through the adapter; refusals come back with the domain's message and are shown as toasts.

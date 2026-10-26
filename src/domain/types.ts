@@ -163,6 +163,8 @@ export interface SourceTable extends StandardColumns {
   comment: string | null;
   /** Not in the last import that judged it (slice 7a, P3): a status, not a delete. */
   missing_since: Timestamp | null;
+  /** Kept as historical after it left the source (slice 7b, P6); cleared when it comes back. */
+  retired_since: Timestamp | null;
 }
 
 export interface SourceColumn extends StandardColumns {
@@ -184,6 +186,10 @@ export interface SourceColumn extends StandardColumns {
   comment: string | null;
   /** Not in the last import that judged it (slice 7a, P3). */
   missing_since: Timestamp | null;
+  /** Kept as historical after it left the source (slice 7b, P6); cleared when it comes back. */
+  retired_since: Timestamp | null;
+  /** The modeller decided the column is not needed (slice 7b, P10); “Mark as needed” takes it back. */
+  not_needed: boolean;
 }
 
 /** Closed list (slice 7a): foreign keys an import declares; room for later kinds. */
@@ -225,6 +231,44 @@ export interface SourceImport extends StandardColumns {
   columns_renamed: number;
   columns_missing: number;
   relationships_new: number;
+  /** Changes to resolve the import raised, and how many of them are high (slice 7b, item 8). */
+  changes_raised: number;
+  changes_high: number;
+}
+
+// ---- Changes to resolve (slice 7b) ----
+
+/** What a source change is about (slice 7b, P4). */
+export const SOURCE_CHANGE_KINDS = ["column_left", "table_left", "new_column", "new_table", "type_conflict", "business_key_changed", "rule_updated"] as const;
+export type SourceChangeKind = (typeof SOURCE_CHANGE_KINDS)[number];
+
+export const SOURCE_CHANGE_SEVERITIES = ["high", "normal"] as const;
+export type SourceChangeSeverity = (typeof SOURCE_CHANGE_SEVERITIES)[number];
+
+export const SOURCE_CHANGE_STATUSES = ["open", "resolved"] as const;
+export type SourceChangeStatus = (typeof SOURCE_CHANGE_STATUSES)[number];
+
+/**
+ * A change to resolve (slice 7b, P3): what an import found that needs a decision, stored as it was at the time, and
+ * how it was settled. The object's ids stay when the object is deleted (soft deletes); `object_label` names it then.
+ */
+export interface SourceChange extends StandardColumns {
+  source_system_id: Uuid;
+  /** The import that raised it; “Decide column by column” keeps the table change's import. */
+  source_import_id: Uuid;
+  kind: SourceChangeKind;
+  severity: SourceChangeSeverity;
+  status: SourceChangeStatus;
+  source_table_id: Uuid | null;
+  source_column_id: Uuid | null;
+  mapping_id: Uuid | null;
+  /** `dbo.customers.email_addr`, as it was named when raised. */
+  object_label: string;
+  /** The text written when it was raised. */
+  detail: string;
+  resolution: string | null;
+  resolved_by: Uuid | null;
+  resolved_at: Timestamp | null;
 }
 
 // ---- Mappings (data model section 6, AD-26) ----
@@ -494,6 +538,7 @@ export interface WritableRows {
   source_relationship: SourceRelationship;
   source_relationship_column: SourceRelationshipColumn;
   source_import: SourceImport;
+  source_change: SourceChange;
   mapping: Mapping;
   mapping_input: MappingInput;
   requirement: Requirement;

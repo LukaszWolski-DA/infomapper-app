@@ -23,6 +23,7 @@ import type {
   ProjectPinnedLabel,
   Requirement,
   RequirementLink,
+  SourceChange,
   SourceImport,
   Workspace,
   WorkspaceMember,
@@ -74,7 +75,10 @@ export interface ModelRepository {
   loadForUndo(workspaceId: Uuid): Promise<WorkspaceRows>;
   /** The live imports of the workspace (slice 7a), newest first; of one system when given. */
   listImports(workspaceId: Uuid, sourceSystemId?: Uuid): Promise<SourceImport[]>;
+  /** The workspace's live changes to resolve (slice 7b), open and resolved, oldest first. */
+  listChanges(workspaceId: Uuid): Promise<SourceChange[]>;
 }
+
 
 export interface CanvasItemRepository {
   get(workspaceId: Uuid, canvasItemId: Uuid): Promise<CanvasItem | null>;

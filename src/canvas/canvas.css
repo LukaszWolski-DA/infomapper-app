@@ -82,6 +82,12 @@
    colour; muted by colour, not opacity (AD-24: no opacity on repeated elements) */
 .im-canvas .row.gone { color: var(--im-ink-3) }
 .im-canvas .row.gone .nm { text-decoration: line-through; text-decoration-color: var(--im-warn) }
+/* slice 7b, item 24 (prototype .im-old, .im-new, .im-chg): a retired column in grey; a column with an open change to
+   resolve marked at its left edge, new in the mapping colour, changed in the warning colour. Classes on the row only. */
+.im-canvas .row.old { color: var(--im-ink-3) }
+.im-canvas .row.old .nm { text-decoration: line-through; text-decoration-color: var(--im-ink-3) }
+.im-canvas .row.new { box-shadow: inset 3px 0 0 var(--im-map) }
+.im-canvas .row.chg { box-shadow: inset 3px 0 0 var(--im-warn) }
 /* working labels (slice 3a, prototype .lmark): a tag mark in rows and the table header, never a model tag (D-08) */
 /* one element: the outline tag (16 × 16, stroke 1.6, as the prototype's SVG) is a mask over the text colour */
 .im-canvas .lmark {

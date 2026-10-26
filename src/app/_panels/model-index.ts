@@ -81,10 +81,11 @@ export const inputColumns = (ix: ModelIndex, mappingId: Uuid): SourceColumn[] =>
 export const inputsLabel = (ix: ModelIndex, mappingId: Uuid): string =>
   (ix.inputsOf.get(mappingId) ?? []).map((i) => columnLabel(ix, i.source_column_id)).join(", ");
 
+/** The type check through the live inputs: a retired input is historical (slice 7b, Q10). */
 export function typeCheckOf(ix: ModelIndex, m: Mapping): MappingTypeCheck {
   const a = ix.attribute.get(m.attribute_id);
   if (!a) return { ok: true, message: "", problems: [] };
-  return checkMappingTypes(m, a, inputColumns(ix, m.id));
+  return checkMappingTypes(m, a, inputColumns(ix, m.id).filter((c) => !c.retired_since));
 }
 
 /** The input columns marked BK that make the panel suggest the business-key flag (AD-28); empty when not. */

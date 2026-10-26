@@ -22,6 +22,7 @@ import {
   openCanvas,
   openRequirementsTab,
   pointOnLine,
+  reqCard,
   reqCardData,
   requirementByKey,
   requirementRow,
@@ -164,6 +165,9 @@ test("S4B2-06: dragging a requirement links it to a row, a column, an entity, a 
   await expect.poll(async () => !!(await reqCardData("REQ-101"))).toBe(true);
   await expect(page.getByTestId("input-req-key")).toHaveValue("REQ-101");
   const placed = (await reqCardData("REQ-101"))!;
+  // the card shows once the page's fresh data arrives (no card before the server has it); dragging onto it before that
+  // is a drop on empty canvas, “Place card” (slice 7b's closing runs, under load)
+  await expect(reqCard(page, "REQ-101")).toBeVisible();
   await openRequirementsTab(page);
   // on the card itself, 40 px left and down: still a place, so the card moves there
   await dragRequirement(page, "REQ-101", { x: spot.x - 40, y: spot.y + 40 }, "Move card");

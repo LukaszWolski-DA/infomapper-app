@@ -4,7 +4,7 @@
 // Selecting one item pushes an entry without a URL (`history.pushState(null, "")`: no route, no request, no render) and
 // keeps the selection in the places store under the new entry's key (`history-places.ts`); the same item again records
 // nothing, and so do a deselection, a multi-selection and a bundle. A selection made on arrival (`?card`, `?label`,
-// `?req`, `?note`) belongs to the page's own entry. Back or Forward onto an entry selects its place (`ui.showPlace`:
+// `?req`, `?note`; slice 7b: `?map`, `?row`, `?system`) belongs to the page's own entry. Back or Forward onto an entry selects its place (`ui.showPlace`:
 // as a click, never opening the details panel, centred when off screen), or nothing for the page's own entry; a place
 // that no longer exists becomes the canvas without a selection and a toast. A traversal to a place on another canvas
 // lets the route change first; the canvas drawn after it applies the place once it is mounted. A reload starts without a
@@ -33,7 +33,7 @@ const GONE: Record<PlaceGone, string> = {
   source_system: "That source system no longer exists.",
 };
 
-const ARRIVAL = ["card", "label", "req", "note"];
+const ARRIVAL = ["card", "label", "req", "note", "map", "row", "system"];
 
 /** The place a selection stands for, or null when it is not one (nothing, several items, a bundle). */
 const placeOf = (canvasId: string, sel: Selection): Place | null => (!sel || sel.t === "multi" || sel.t === "bundle" ? null : { canvasId, sel });

@@ -1,7 +1,8 @@
-# Inventory: what the prototype has that the app does not (24 October 2026)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 7b's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
-(the reference since 22 October 2026) with the app on `slice/07a-source-import`. The earlier inventory (15 October 2026,
+(the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
+every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -13,7 +14,7 @@ against `infomapper-model-prototype.html` at slice 4b-1's start) is in git histo
 - **The importer's items** come from PRD 7a's sections 8 and 9 and the decisions of steps 1–7, checked against the code.
 - Items marked **(uncertain)** were not settled by reading the code.
 
-**What the "Planned" column means:** **7b / 7c:** the next slices, from PRD 7a's section 9. **Database:** the database
+**What the "Planned" column means:** **7c:** the next slice, from PRD 7a's section 9. **Database:** the database
 slice, last (AD-31), with real sign-in (AD-04). **Decision only:** a decision in `docs/decisions.md` describes it, but no
 slice has it yet. **Idea:** in `docs/ideas.md`. **–:** nothing found that plans it.
 
@@ -24,23 +25,18 @@ docs (some are repeated below where they explain an item).
 
 | Area | Missing in the app | Planned |
 | --- | --- | --- |
-| Canvas | the "Changes" view (toolbar toggle, an import's changes lit, new and changed row marks) | 7b |
 | Panels and navigation | "Show its requirements (n)" in the row and card menus; editing a requirement's description from its card | idea |
 | Model | Data Vault 2.0 hints in the entity panel; the Data Vault reading of a source table | decision only (AD-08); 7c |
 | Mappings | suggested mappings; re-pointing a mapping to another attribute | – |
-| Sources | changes to resolve and their actions; classifications and notes on tables and columns; suggested classifications; the classification list; model consistency on the project home | 7b, 7c |
-| Requirements | the import review's requirement coverage box | 7b |
+| Sources | classifications and notes on tables and columns; suggested classifications; the classification list; the Data Vault reading | 7c |
 | Labels and notes | rich text in notes | known limitation |
 | Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer; new organization; deleting a project; editing a project's name and description on its home | baselines: decision only (AD-03, AD-14); the rest: – |
 | Settings and roles | inviting people, changing a role, removing a member; the workspace's classification list | database (AD-04); 7c |
 
 ## Canvas
 
-| Item | What it is | Where in the prototype | Planned |
-| --- | --- | --- | --- |
-| The "Changes" view | a toolbar toggle; an import's changes lit and the rest faded; a view-state chip; "Show what it touched on the canvas" on an import | `#tChg`, `chgSet`, `renderChgBar`, `IMP.hit` | 7b |
-| New and changed row marks | a bar on a row new or changed in an import, an attribute whose mapping is in review with a reason | CSS `.row.im-new`, `.row.im-chg`; the attribute row's `im-chg` | 7b |
-| Retired columns | a row at lower opacity for a column retired by a change to resolve | CSS `.row.im-old`, `.titem.im-old` | 7b |
+Nothing missing since slice 7b, which brought the Changes view (a fade with its bar and chip, D-39), the new,
+changed and retired row marks.
 
 **Present since the earlier inventory:** requirement markers, coverage colours and Focus (4b-1); requirement cards and
 trace lines (4b-2); showing, hiding and resizing the side panels (5a); the view-state bar and the narrow top bar (6a);
@@ -87,16 +83,14 @@ back to review with its reason, shown under its status (D-51).
 
 Slice 7a brought the importer (`IMP`): the wizard with its three steps and four channels (dbt disabled, as the
 prototype), the engine, missing and back statuses, the import history, relationships between source tables, the Sources
-tab's marks, the table, column and system panels' sections listed in PRD 7a item 33–39.
+tab's marks, the table, column and system panels' sections listed in PRD 7a item 33–39. Slice 7b brought the changes
+to resolve with their actions, counts and history, the review's two callouts, retired and not needed, and model
+consistency on the project home (D-56).
 
-**Still missing:**
+**Still missing (slice 7c, and one idea):**
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Changes to resolve | per import, the changes it raises (kinds and severity), with actions: retire, move mappings, delete with what goes with it, map, not needed, split, approve again, leave in review; `retired_since`, `not_needed`, a mapping's `until` | `KIND`, `ACTS`, `issueAction`, `confirmPending`, `issuesHtml` | 7b |
-| Their counts | the open count on a system in the tree, "Source changes to resolve {n}" in the status bar, "Changes to resolve" and "To resolve" in the system, table and column panels | `sourcesTree` (`im-badge`), the status bar, `insSystem`, `sourceHead`, `colSections` | 7b |
-| The review's requirement coverage box and "{n} changes to resolve" callout | what the import does to requirement coverage, before importing | `stepReview` (`reqBox`, `issBox`) | 7b |
-| Model consistency on the project home | the project's open source changes and mappings in review | `consistency`, `consistencyHtml` | 7b |
 | Classifications on tables and columns | toggles from the workspace's list on the table and column panels; a re-import never changes them | `togs`, `sourceBody`, `colSections` | 7c |
 | Suggested classifications in the review | hints from names and keys | `plan.hints` | 7c |
 | Notes on tables and columns | the modeller's own note, separate from the source's comment | `sourceBody`, `colSections` (`data-imx-note`) | 7c |
@@ -124,9 +118,7 @@ tab's marks, the table, column and system panels' sections listed in PRD 7a item
 
 ## Requirements
 
-| Item | What it is | Where in the prototype | Planned |
-| --- | --- | --- | --- |
-| The import review's coverage box | as under Sources | `stepReview` (`reqBox`) | 7b |
+Nothing missing since slice 7b (the review's coverage callout).
 
 **Present since the earlier inventory:** markers, colours and Focus (4b-1); requirement cards, traces, "Place its card",
 "Add all to this canvas" and dragging a requirement onto an element or the canvas (4b-2); an approved mapping from a
@@ -153,7 +145,6 @@ nothing, D-26), notes, and their chips in the view-state bar (6a).
 | New organization | "Created {name} with an empty first workspace." | `openOrgMenu` | – |
 | Delete a project | "Deleted the project {name}…" | `openProjMenu` | – **(uncertain** where the entry sits) |
 | A project's name and description on its home | editable fields | `renderHome` (`data-pf`) | – |
-| Model consistency | as under Sources | `consistencyHtml` | 7b |
 
 **Present:** workspaces, projects and canvases as in the earlier inventory; the empty workspace's next steps name
 importing sources (7a).

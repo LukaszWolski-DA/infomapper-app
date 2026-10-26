@@ -11,7 +11,7 @@ import type { Uuid } from "@/domain/ids";
 import { litRequirements, mergeLit, requirementFocusLit, targetLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import type { ScopeModel } from "@/domain/model/requirements";
-import type { Requirement, RequirementLink, WorkspaceModel } from "@/domain/types";
+import type { Requirement, RequirementLink, SourceChange, WorkspaceModel } from "@/domain/types";
 import type { BlockNodeT } from "./BlockNode";
 import type { CardNodeT } from "./CardNode";
 import type { ReqNodeT } from "./RequirementCardNode";
@@ -27,6 +27,8 @@ export interface FadeData {
   model: LitModel & ScopeModel & Pick<WorkspaceModel, "sourceSystems">;
   requirements: readonly Requirement[];
   requirementLinks: readonly RequirementLink[];
+  /** The workspace's changes to resolve, for the Changes view (slice 7b, `ChangesDriver`). */
+  changes?: readonly SourceChange[];
 }
 
 /** A note as fading sees it: where it is drawn and the card it is pinned to. */

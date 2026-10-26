@@ -94,7 +94,7 @@ describe("a first import (S7A-04)", () => {
     const model = demoCrm();
     const plan = buildPlan(model, read("hr_snapshot_2026-10-20.csv"), { newName: " crm " }, allOf(read("hr_snapshot_2026-10-20.csv")));
     expect(plan.errors).toEqual(["A system named crm already exists. Pick it under “An existing system”."]);
-    expect(applyPlan(model, plan, { now: LATER, newId: () => "x" })).toEqual({ ok: false, errors: plan.errors });
+    expect(applyPlan(model, plan, { actorId: "u", now: LATER, newId: () => "x" })).toEqual({ ok: false, errors: plan.errors });
   });
 });
 
@@ -192,7 +192,7 @@ describe("a re-import of a changed file (S7A-05)", () => {
     expect(planColumn(plan, "customers", "email_addr").fileClassifications).toEqual(["PII"]);
     expect(planColumn(plan, "customers", "cust_no").fileClassifications).toBeNull();
     expect(plan.warnings).toContain("Row 26: stage.customers_load.batch_ref has no data_type. Column skipped.");
-    expect(planCounts(plan)).toEqual({ tables_new: 2, columns_new: 11, columns_changed: 3, columns_renamed: 1, columns_missing: 2, relationships_new: 1 });
+    expect(planCounts(plan)).toEqual({ tables_new: 2, columns_new: 11, columns_changed: 3, columns_renamed: 1, columns_missing: 2, relationships_new: 1, changes_raised: 9, changes_high: 2 });
   });
 
   it("writes only what changed: positions, changed fields, missing_since; nothing for unchanged columns", () => {
@@ -289,7 +289,7 @@ describe("missing and back (P3, item 32)", () => {
     expect(missing.model.columns.filter((c) => c.missing_since).length).toBe(3);
     expect(missing.model.relationships[0]!.missing_since).toBe(LATER);
     expect(missing.model.tables.length).toBe(2); // nothing deleted
-    expect(importSummary(missing.changes.counts)).toBe("3 missing from source");
+    expect(importSummary(missing.changes.counts)).toBe("3 missing from source, 2 to resolve"); // a table and a column that left (slice 7b)
   });
 
   it("still missing on the next import, back when found again", () => {

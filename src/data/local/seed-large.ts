@@ -124,7 +124,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
         file_format: null,
         row_count: null,
         comment: null,
-        missing_since: null,
+        missing_since: null, retired_since: null,
       });
       const parsed = parseColumnLines(card.rows.map((r) => `${r.name} ${r.dataType}`).join("\n"));
       if (!parsed.ok) throw new Error(`Generated table ${card.name}: ${parsed.error.message}`);
@@ -143,7 +143,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
           is_pii: false,
           default_value: null,
           comment: null,
-          missing_since: null,
+          missing_since: null, retired_since: null, not_needed: false,
         });
       });
     } else {

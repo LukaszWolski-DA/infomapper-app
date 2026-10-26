@@ -31,7 +31,7 @@ export function syntheticIndexInput() {
     definition_html: null,
     definition_text: null,
   }));
-  const sourceTables: SourceTable[] = Array.from({ length: TABLES }, (_, i) => ({ ...std(id("t", i)), source_system_id: "s", database_name: "db", schema_name: "dbo", name: `t${i}`, object_type: "table", file_format: null, row_count: null, comment: null, missing_since: null }));
+  const sourceTables: SourceTable[] = Array.from({ length: TABLES }, (_, i) => ({ ...std(id("t", i)), source_system_id: "s", database_name: "db", schema_name: "dbo", name: `t${i}`, object_type: "table", file_format: null, row_count: null, comment: null, missing_since: null, retired_since: null }));
   const sourceColumns: SourceColumn[] = Array.from({ length: COLUMNS }, (_, i) => ({
     ...std(id("col", i)),
     source_table_id: id("t", i % TABLES),
@@ -48,7 +48,7 @@ export function syntheticIndexInput() {
     is_pii: false,
     default_value: null,
     comment: null,
-    missing_since: null,
+    missing_since: null, retired_since: null, not_needed: false,
   }));
   const mappings: Mapping[] = Array.from({ length: MAPPINGS }, (_, i) => ({
     ...std(id("m", i)),

@@ -82,15 +82,18 @@ function keyTitle(r: CardRow) {
   return r.pk ? "Primary key" : "Foreign key";
 }
 
+/** A column with an open change to resolve (slice 7b, prototype `colRow`). */
+const CHANGED_TITLE = "Changed in the source: see the table's changes to resolve";
+
 function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; selected: boolean }) {
   const { head, tail } = splitName(row.name);
   const status = row.mappings === 0 ? "" : row.warn ? " warn" : " ok";
   return (
     <div
-      className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}${row.missing ? " gone" : ""}`}
+      className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}${row.retired ? " old" : row.missing ? " gone" : row.change ? ` ${row.change}` : ""}`}
       data-testid={kind === "ent" ? "row-attribute" : "row-column"}
       data-row={row.id}
-      title={row.missing ? "Missing from source" : undefined}
+      title={row.retired ? "Retired: historical" : row.missing ? "Missing from source" : row.change ? CHANGED_TITLE : undefined}
       aria-selected={selected || undefined}
     >
       <span className="key" title={row.pk || row.fk ? keyTitle(row) : undefined}>

@@ -4,7 +4,8 @@
 // mappings and drafts, type problems, relationships; the workspace's requirements and how many are covered (slice 4a,
 // from the server's requirement index, fresh after every write); the open notes on this canvas (slice 6a, from the
 // canvas's counts once it is mounted, the page's before); and the working context with its item count (slice 3b).
-// Focus's chip moved to the view-state bar in slice 6a.
+// Focus's chip moved to the view-state bar in slice 6a. Slice 7b (item 23): the workspace's open changes to resolve, in
+// the warning style, only while one is open.
 
 import { useMemo } from "react";
 import type { WorkspaceModel } from "@/domain/types";
@@ -19,12 +20,15 @@ export function StatusBar({
   entityIds,
   requirements,
   openNotes,
+  sourceChanges,
 }: {
   model: WorkspaceModel;
   entityIds: string[];
   requirements: { count: number; covered: number };
   /** Open notes on this canvas as the page read them, until the canvas publishes its own count. */
   openNotes: number;
+  /** Open changes to resolve in the workspace (slice 7b). */
+  sourceChanges: number;
 }) {
   const s = useMemo(() => canvasStatus(indexModel(model), entityIds), [model, entityIds]);
   const counts = useValue(viewCounts);
@@ -54,6 +58,11 @@ export function StatusBar({
       <span data-testid="status-notes">
         Open notes on canvas <b>{counts?.openNotes ?? openNotes}</b>
       </span>
+      {sourceChanges > 0 && (
+        <span data-testid="status-source-changes" className="[&_b]:!text-im-warn">
+          Source changes to resolve <b>{sourceChanges}</b>
+        </span>
+      )}
       <WorkingContextStatus />
     </footer>
   );

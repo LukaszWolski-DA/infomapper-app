@@ -5,7 +5,8 @@
 // history. On copies of the demo data in .data/measure/import-bench/ (git-ignored), never on dev-db.json.
 // One warm-up, then 5 rounds; median, fastest, slowest. Run: npx tsx scripts/bench-import-write.ts [20000]
 // It imports through the command, so a size above the import limit (MAX_IMPORT_ROWS, 30,000) is refused; step 4's
-// 100,000-column figures were taken before the limit (docs/prd/slice-07a-acceptance.md).
+// 100,000-column figures were taken before the limit (docs/prd/slice-07a-acceptance.md). Slice 7b, step 3: the import
+// also stores the changes it raises (bar: within 10 % of slice 7a's, against the tag in the same sitting).
 
 import { copyFile, mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
@@ -62,7 +63,8 @@ async function serverWrite<T>(store: DataStore, build: (ctx: CommandContext, acc
 
 async function importFile(store: DataStore, text: string, target: ImportTarget, name: string): Promise<WriteSet> {
   const writeSet = await serverWrite(store, async (ctx, access) => {
-    const state = importStateOf(await store.model.load(WS));
+    // slice 7b: the open changes too, as the server reads them (`import-sources.ts`)
+    const state = importStateOf(await store.model.load(WS), await store.model.listChanges(WS));
     const read = readStandard(text, name);
     const scope = read.tables.map((t) => t.key);
     const plan = buildPlan(state.model, read, target, { scope: new Set(scope), compare: "schemas", renames: new Map() });

@@ -1,20 +1,33 @@
-// Applying an import's plan (slice 7a, PRD items 28–32; prototype `applyPlan` without its changes to resolve, 7b):
+// Applying an import's plan (slice 7a, PRD items 28–32; prototype `applyPlan`, its changes to resolve since slice 7b):
 // the rows the import writes, as new rows and patches of existing ones. Pure; step 4's command turns the changeset
 // into writes with their change events in one change group (P7). Unchanged rows get no patch (item 6); a position
 // change does (answer 11). Nothing is deleted (P3): missing is `missing_since`, and back clears it.
 // A mapping that goes back to review (P6) loses its approval and gets its `review_reason` (answer 6); a renamed input in
 // a rule is rewritten whatever the mapping's status.
+// Slice 7b: the import's id is made here, so the changes it raises can name it; raised changes are new open rows,
+// settled ones get their resolution, who and when (P7); a table or column that is back loses `retired_since` too.
 
 import type { Uuid } from "../ids";
 import { sameColumnType } from "../model/column-type";
-import type { Timestamp } from "../types";
+import type { RaisedChange } from "../source-changes/rules";
+import { isoDate, SETTLED_BY_IMPORT } from "../source-changes/texts";
+import type { SourceChange, Timestamp } from "../types";
 import type { ImportColumn, ImportMapping, ImportModel, ImportTable } from "./model";
 import { planCounts, type ImportCounts, type ImportPlan } from "./plan";
 import type { StandardObjectType } from "./standard";
 
 export interface ApplyContext {
+  /** Who imports: the changes the import settles name them (P7). */
+  actorId: Uuid;
   now: Timestamp;
   newId: () => Uuid;
+}
+
+/** A change to resolve the import raises, with its id (slice 7b). */
+export interface NewChangeRow extends RaisedChange {
+  id: Uuid;
+  source_system_id: Uuid;
+  source_import_id: Uuid;
 }
 
 export interface NewTableRow {
@@ -71,12 +84,16 @@ export interface RowPatch<T> {
 
 export interface ImportChangeset {
   system: { id: Uuid; name: string; isNew: boolean };
+  /** The `source_import` row's id (slice 7b). */
+  importId: Uuid;
   tables: { insert: NewTableRow[]; update: RowPatch<ImportTable>[] };
   columns: { insert: NewColumnRow[]; update: RowPatch<ImportColumn>[] };
   relationships: { insert: NewRelationshipRow[]; update: RowPatch<{ name: string; to_source_table_id: Uuid; missing_since: Timestamp | null }>[] };
   /** Column pairs of new relationships, and of changed ones (the old pairs are removed). */
   relationshipColumns: { insert: NewRelationshipColumnRow[]; remove: Uuid[] };
   mappings: RowPatch<ImportMapping>[];
+  /** Changes to resolve raised, and open ones settled (slice 7b, P7). */
+  changes: { insert: NewChangeRow[]; update: RowPatch<SourceChange>[] };
   counts: ImportCounts;
 }
 
@@ -89,11 +106,13 @@ export function applyPlan(model: ImportModel, plan: ImportPlan, ctx: ApplyContex
   const systemId = "systemId" in plan.target ? plan.target.systemId : ctx.newId();
   const changes: ImportChangeset = {
     system: { id: systemId, name: plan.systemName, isNew },
+    importId: ctx.newId(),
     tables: { insert: [], update: [] },
     columns: { insert: [], update: [] },
     relationships: { insert: [], update: [] },
     relationshipColumns: { insert: [], remove: [] },
     mappings: [],
+    changes: { insert: [], update: [] },
     counts: planCounts(plan),
   };
 
@@ -127,6 +146,7 @@ export function applyPlan(model: ImportModel, plan: ImportPlan, ctx: ApplyContex
       if (fields.has("object_type") && et.object_type !== ft.objectType) patch.object_type = ft.objectType;
       if (t.rows) patch.row_count = t.rows.after;
       if (et.missing_since) patch.missing_since = null;
+      if (et.retired_since) patch.retired_since = null;
       if (Object.keys(patch).length) changes.tables.update.push({ id: et.id, version: et.version, patch });
     } else {
       tableId = ctx.newId();
@@ -185,6 +205,7 @@ export function applyPlan(model: ImportModel, plan: ImportPlan, ctx: ApplyContex
       if (fields.has("fk_name") && ec.is_foreign_key !== fc.is_foreign_key) patch.is_foreign_key = fc.is_foreign_key;
       if (fields.has("column_comment") && (ec.comment ?? null) !== fc.comment) patch.comment = fc.comment;
       if (ec.missing_since) patch.missing_since = null;
+      if (ec.retired_since) patch.retired_since = null;
       if (Object.keys(patch).length) changes.columns.update.push({ id: ec.id, version: ec.version, patch });
     }
   }
@@ -232,6 +253,29 @@ export function applyPlan(model: ImportModel, plan: ImportPlan, ctx: ApplyContex
     if (m.ruleAfter !== null) patch.rule_expression = m.ruleAfter;
     if (m.sendsBack) Object.assign(patch, { status: "review", approved_by: null, approved_at: null, review_reason: m.reasons.join("; ") });
     if (Object.keys(patch).length) changes.mappings.push({ id: m.mappingId, version: m.version, patch });
+  }
+
+  // changes to resolve (slice 7b): raised with the ids of new tables and columns, settled with the import's date
+  for (const r of plan.raises) {
+    const tableId = r.tableId ?? tableIdByKey.get(r.tableKey) ?? null;
+    const columnId = r.columnId ?? (r.columnName !== null && tableId ? (columnIds.get(tableId)?.get(lower(r.columnName)) ?? null) : null);
+    changes.changes.insert.push({
+      id: ctx.newId(),
+      source_system_id: systemId,
+      source_import_id: changes.importId,
+      kind: r.kind,
+      severity: r.severity,
+      source_table_id: tableId,
+      source_column_id: columnId,
+      mapping_id: r.mappingId,
+      object_label: r.objectLabel,
+      detail: r.detail,
+    });
+  }
+  const date = isoDate(ctx.now);
+  for (const s of plan.settles) {
+    const resolution = s.why === "back" ? SETTLED_BY_IMPORT.back(date) : SETTLED_BY_IMPORT.leftBeforeDecision(date);
+    changes.changes.update.push({ id: s.changeId, version: s.version, patch: { status: "resolved", resolution, resolved_by: ctx.actorId, resolved_at: ctx.now } });
   }
   return { ok: true, changes };
 }

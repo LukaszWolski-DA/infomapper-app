@@ -1,10 +1,11 @@
 // Test fixtures for the import engine (slice 7a, step 3). Not used by application code.
 
 import { applyPlan, type ImportChangeset } from "../import/apply";
-import type { ImportColumn, ImportMapping, ImportModel, ImportRelationship, ImportTable } from "../import/model";
+import { materialize as materializeIn } from "../import/materialize";
+import type { ImportColumn, ImportMapping, ImportModel } from "../import/model";
 import { buildPlan, type ImportPlan, type ImportTarget, type PlanChoices } from "../import/plan";
 import type { StandardRead } from "../import/standard";
-import type { Attribute, Entity, MappingInput, MappingStatus, SourceSystem } from "../types";
+import type { Attribute, Entity, MappingInput, MappingStatus } from "../types";
 import { ids, T0 } from "./domain";
 
 let next = 0;
@@ -23,7 +24,10 @@ const standard = (id: string) => ({
   deleted_at: null,
 });
 
-export const emptyModel = (): ImportModel => ({ systems: [], tables: [], columns: [], relationships: [], mappings: [], mappingInputs: [], attributes: [], entities: [] });
+export const emptyModel = (): ImportModel => ({ systems: [], tables: [], columns: [], relationships: [], mappings: [], mappingInputs: [], attributes: [], entities: [], changes: [] });
+
+/** Who runs the fixtures' imports. */
+export const IMPORTER = ids.someoneElse;
 
 export const allOf = (read: StandardRead, over: Partial<PlanChoices> = {}): PlanChoices => ({
   scope: new Set(read.tables.map((t) => t.key)),
@@ -32,36 +36,15 @@ export const allOf = (read: StandardRead, over: Partial<PlanChoices> = {}): Plan
   ...over,
 });
 
-/** The model after a changeset, as the command will write it: new rows at version 1, patched rows one version up. */
-export function materialize(model: ImportModel, c: ImportChangeset): ImportModel {
-  const patch = <R extends { id: string; version: number }>(rows: readonly R[], patches: readonly { id: string; patch: Partial<R> }[]): R[] => {
-    const byId = new Map(patches.map((p) => [p.id, p.patch]));
-    return rows.map((r) => (byId.has(r.id) ? { ...r, ...byId.get(r.id), version: r.version + 1 } : r));
-  };
-  const systems: SourceSystem[] = c.system.isNew ? [...model.systems, { ...standard(c.system.id), name: c.system.name, description: null }] : [...model.systems];
-  const tables: ImportTable[] = [
-    ...patch(model.tables, c.tables.update),
-    ...c.tables.insert.map((t) => ({ ...standard(t.id), ...t, missing_since: null })),
-  ];
-  const columns: ImportColumn[] = [
-    ...patch(model.columns, c.columns.update),
-    ...c.columns.insert.map((x) => ({ ...standard(x.id), ...x, default_value: null, missing_since: null })),
-  ];
-  const removed = new Set(c.relationshipColumns.remove);
-  const pairsOf = (relationshipId: string) =>
-    c.relationshipColumns.insert.filter((p) => p.source_relationship_id === relationshipId).map((p) => ({ id: p.id, from_column_id: p.from_column_id, to_column_id: p.to_column_id, sort_order: p.sort_order }));
-  const relationships: ImportRelationship[] = [
-    ...patch<ImportRelationship>(model.relationships, c.relationships.update as { id: string; patch: Partial<ImportRelationship> }[]).map((r) => ({ ...r, columns: [...r.columns.filter((p) => !removed.has(p.id)), ...pairsOf(r.id)] })),
-    ...c.relationships.insert.map((r) => ({ id: r.id, version: 1, deleted_at: null, source_table_id: r.source_table_id, to_source_table_id: r.to_source_table_id, name: r.name, missing_since: null, columns: pairsOf(r.id) })),
-  ];
-  return { ...model, systems, tables, columns, relationships, mappings: patch(model.mappings, c.mappings) };
-}
+/** The model after a changeset, as the command will write it (the domain's `materialize`, the fixtures' people and time). */
+export const materialize = (model: ImportModel, c: ImportChangeset): ImportModel => materializeIn(model, c, { workspaceId: ids.ws, actorId: ids.someoneElse, now: T0 });
 
 /** Plans and applies an import; throws on errors. */
 export function importInto(model: ImportModel, read: StandardRead, target: ImportTarget, choices: PlanChoices = allOf(read)) {
   if (read.errors.length) throw new Error(read.errors.join(" "));
   const plan = buildPlan(model, read, target, choices);
-  const applied = applyPlan(model, plan, { now: LATER, newId: importId });
+  const applied = applyPlan(model, plan, { actorId: IMPORTER, now: LATER, newId: importId });
+
   if (!applied.ok) throw new Error(applied.errors.join(" "));
   return { plan, changes: applied.changes, model: materialize(model, applied.changes) };
 }

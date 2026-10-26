@@ -16,7 +16,8 @@ export async function runImport(workspaceId: string, input: unknown): Promise<Ac
     const workspace = await store.workspaces.get(workspaceId);
     if (!workspace) return { ok: false, error: { code: "not_found", message: "This workspace does not exist." } };
     const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
-    return importSources(ctx, access, importStateOf(await store.model.load(workspace.id)), input);
+    const [model, changes] = await Promise.all([store.model.load(workspace.id), store.model.listChanges(workspace.id)]);
+    return importSources(ctx, access, importStateOf(model, changes), input);
   });
   if (result.ok) revalidatePath("/", "layout");
   return result;

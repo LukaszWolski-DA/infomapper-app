@@ -6,13 +6,14 @@
 // chips that do not fit fold into “+{n}” from the end, whose menu lists them; the breadcrumbs shrink first (Łukasz's
 // step 1 answer 3). “Show all” ends the bar, always visible, from two removable chips. No lens chip (slice 4b-1 removed
 // the lens), no role chip (the user indicator shows it), no chip while drawing a relationship.
-// The bar reads the canvas through stores and the canvas context (`focusOn`, `viewCounts`, `ui.mode`), never through
+// The bar reads the canvas through stores and the canvas context (`focusOn`, `changesOn`, `viewCounts`, `ui.mode`), never through
 // `ModelCanvas`, so a chip appearing or going re-renders only the bar (S6A-08). The fold is measured on the bar's own
 // elements (AD-24 rule 4), by a ResizeObserver: nothing here reads layout during a commit.
 
 import { usePathname } from "next/navigation";
 import { useCallback, useContext, useEffect, useRef, useState, type ReactNode } from "react";
 import { CanvasUiCtx, type CanvasMode } from "@/canvas/context";
+import { changesOn } from "@/canvas/changes-view";
 import { focusOn } from "@/canvas/fade";
 import { useCanvasLook } from "@/canvas/look";
 import { useValue } from "@/canvas/value-store";
@@ -46,9 +47,12 @@ export function useViewChips(editable: boolean): ViewChip[] {
   const ui = useContext(CanvasUiCtx);
   const look = useCanvasLook();
   const focus = useValue(focusOn);
+  const changes = useValue(changesOn);
   const counts = useValue(viewCounts);
   const chips: ViewChip[] = [];
   if (focus) chips.push({ id: "focus", text: "Focus", title: "Everything not connected to the selection is faded", off: () => focusOn.set(false) });
+  // the Changes view (slice 7b, D-39): it and Focus exclude each other, so at most one of the two chips shows
+  if (changes) chips.push({ id: "changes", text: `Changes: ${changes.chip}`, title: "Everything source changes do not touch is faded", off: () => changesOn.set(null) });
   const layer = look?.look.layer ?? "all";
   if (layer !== "all")
     chips.push({
@@ -86,7 +90,7 @@ export function useViewChips(editable: boolean): ViewChip[] {
 }
 
 /**
- * “Show all” (slice 6a, item 5 as amended; prototype `data-vall`): turns off Focus, the layer, hidden notes and the tool
+ * “Show all” (slice 6a, item 5 as amended; prototype `data-vall`): turns off Focus, the Changes view (slice 7b), the layer, hidden notes and the tool
  * in the browser, and sends the layout part (filters, collapsed cards and frames) as one change, one undo step, only
  * when something changes; the toast offers Undo when that step exists. Reviewers and readers remove only what they may:
  * frames expand in their tab. A live canvas's Labeled filter stays.
@@ -97,6 +101,7 @@ function useShowAll(): () => void {
   const toast = useToast();
   return useCallback(() => {
     focusOn.set(false);
+    changesOn.set(null);
     if (look && look.look.layer !== "all") look.setLook({ layer: "all" });
     if (ui.hideResolved) ui.setHideResolved(false);
     if (ui.mode) ui.setMode(null);

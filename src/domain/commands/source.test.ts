@@ -115,13 +115,13 @@ describe("deleteSourceTable", () => {
   it("deletes a table no mapping reads, with its columns and its cards, in one change group", () => {
     const r = deleteSourceTable(makeCtx(), access("modeler"), free, ref);
     if (!r.ok) throw new Error(r.error.message);
-    expect(r.value).toEqual({ columns: 3 });
+    expect(r.value).toEqual({ columns: 3, mappings: 0 });
     expect(r.writeSet.writes.map((w) => w.table)).toEqual(["canvas_item", "source_column", "source_column", "source_column", "source_table"]);
     expect(r.writeSet.writes[0]).toMatchObject({ row: { id: ids.itemCrmCustomer, deleted_at: NOW } });
     expect(r.writeSet.events.every((e) => e.operation === "delete" && e.change_group_id === r.writeSet.changeGroupId)).toBe(true);
   });
 
-  it("refuses while a mapping reads one of its columns, and lists the mappings", () => {
+  it("deletes the mappings that read its columns with it (slice 7b, Q7: one cascade with the change's Delete…)", () => {
     const custMap = mapping({ id: "01900000-0000-7000-8000-00000000a002", attribute_id: ids.customerId });
     const used = {
       ...free,
@@ -130,10 +130,18 @@ describe("deleteSourceTable", () => {
       attributes: [attribute(ids.email), attribute(ids.customerId)],
       entities: [entity(ids.customer)],
     };
-    expect(deleteSourceTable(makeCtx(), access("owner"), used, ref)).toMatchObject({
-      ok: false,
-      error: { code: "conflict", message: "Remove its mappings first. cust_id → Customer.customer_id; email → Customer.email." },
-    });
+    const r = deleteSourceTable(makeCtx(), access("owner"), used, ref);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toEqual({ columns: 3, mappings: 2 });
+    const deleted = r.writeSet.writes.filter((w) => w.table === "mapping" || w.table === "mapping_input").map((w) => [w.table, w.row.id, w.row.deleted_at]);
+    expect(deleted).toEqual(
+      expect.arrayContaining([
+        ["mapping", ids.mapEmail, NOW],
+        ["mapping", custMap.id, NOW],
+        ["mapping_input", ids.inEmail, NOW],
+        ["mapping_input", "01900000-0000-7000-8000-00000000b002", NOW],
+      ]),
+    );
   });
 
   it("ignores deleted mappings and inputs", () => {

@@ -3,6 +3,9 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
+import { uuidv7 } from "@/domain/ids";
+import { deriveSourceChanges } from "@/domain/source-changes/derive";
+import type { ChangeEvent } from "@/domain/types";
 import { isLocalModeAllowed } from "./measure-mode";
 import { DEV_DB_FORMAT, type DevDb } from "./schema";
 
@@ -42,22 +45,68 @@ export async function readDb(file: string): Promise<DevDb> {
     throw e;
   }
   const db = JSON.parse(text) as DevDb;
-  // Formats 2 (before frames), 3 (before labels and notes) and 4 (before requirements) differ only by the missing tables;
-  // 5 (before source imports) also by the new columns, null on every row.
+  const was = db.format as number;
+  upgradeDb(db, new Date().toISOString(), () => uuidv7());
+  if (db.format !== DEV_DB_FORMAT) {
+    throw new Error(`${file} has format ${String(db.format)}, expected ${DEV_DB_FORMAT}. Run "npm run reset-dev-data".`);
+  }
+  // the derived changes get their ids once (slice 7b): written back at once, so every later read sees the same rows
+  if (was >= 2 && was < 7) await writeDb(file, db);
+  return db;
+}
+
+/**
+ * Upgrades an older file in place. Formats 2 (before frames), 3 (before labels and notes) and 4 (before requirements)
+ * differ only by the missing tables; 5 (before source imports) and 6 (before changes to resolve) also by the new columns,
+ * null (false, 0) on every row. From 6, the open changes slice 7a's imports leave are derived (slice 7b, P2, F1): one
+ * change group per workspace, each event signed by the person who ran the import; no undo step.
+ */
+export function upgradeDb(db: DevDb, now: string, newId: () => string): void {
   if ((db.format as number) === 2) Object.assign(db, { format: 3, frame: [] });
   if ((db.format as number) === 3) Object.assign(db, { format: 4, label: [], label_link: [], project_pinned_label: [], note: [] });
   if ((db.format as number) === 4) Object.assign(db, { format: 5, requirement: [], requirement_link: [] });
   if ((db.format as number) === 5) {
-    Object.assign(db, { format: DEV_DB_FORMAT, source_relationship: [], source_relationship_column: [], source_import: [] });
+    Object.assign(db, { format: 6, source_relationship: [], source_relationship_column: [], source_import: [] });
     for (const t of db.source_table) Object.assign(t, { file_format: t.file_format ?? null, missing_since: t.missing_since ?? null });
     for (const c of db.source_column) c.missing_since ??= null;
     for (const m of db.mapping) m.review_reason ??= null;
   }
-  if (db.format !== DEV_DB_FORMAT) {
-    throw new Error(`${file} has format ${String(db.format)}, expected ${DEV_DB_FORMAT}. Run "npm run reset-dev-data".`);
+  if ((db.format as number) === 6) {
+    for (const t of db.source_table) t.retired_since ??= null;
+    for (const c of db.source_column) Object.assign(c, { retired_since: c.retired_since ?? null, not_needed: c.not_needed ?? false });
+    for (const i of db.source_import) Object.assign(i, { changes_raised: i.changes_raised ?? 0, changes_high: i.changes_high ?? 0 });
+    const derived = deriveSourceChanges(
+      {
+        systems: db.source_system,
+        tables: db.source_table,
+        columns: db.source_column,
+        imports: db.source_import,
+        mappings: db.mapping,
+        mappingInputs: db.mapping_input,
+        attributes: db.attribute,
+        entities: db.entity,
+        events: db.change_event,
+      },
+      newId,
+    );
+    const groups = new Map<string, string>();
+    const events: ChangeEvent[] = derived.map((c) => ({
+      id: newId(),
+      workspace_id: c.workspace_id,
+      change_group_id: groups.get(c.workspace_id) ?? groups.set(c.workspace_id, newId()).get(c.workspace_id)!,
+      occurred_at: now,
+      user_id: c.created_by,
+      object_type: "source_change",
+      object_id: c.id,
+      operation: "create",
+      before_image: null,
+      after_image: structuredClone(c) as unknown as ChangeEvent["after_image"],
+      context_label_id: null,
+    }));
+    Object.assign(db, { format: DEV_DB_FORMAT, source_change: derived, change_event: [...db.change_event, ...events] });
   }
-  return db;
 }
+
 
 // The last read of each file, kept until the file changes on disk (S1A-14: reading and parsing the whole file on
 // every repository call took about half of the canvas page's server time). Frozen, so a caller cannot change it.

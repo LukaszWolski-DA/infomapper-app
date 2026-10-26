@@ -17,6 +17,7 @@ const NOUN: Record<string, string> = {
   source_relationship: "relationship between source tables",
   source_relationship_column: "relationship column",
   source_import: "import",
+  source_change: "change to resolve",
   mapping: "mapping",
   mapping_input: "mapping input",
   canvas_item: "card",
@@ -53,7 +54,20 @@ const PRIORITY = [
   "requirement_link",
 ];
 
+/** A change's resolution (texts.ts, `RESOLUTION`) and the undo label of the action that wrote it. */
+const ACTION_OF: readonly (readonly [string, (label: string) => string])[] = [
+  ["Retired: kept as historical", (l) => `Retire ${l}`],
+  ["Mappings moved to ", (l) => `Move the mappings of ${l}`],
+  ["Deleted from the model", (l) => `Delete ${l}`],
+  ["Mapped to ", (l) => `Map ${l}`],
+  ["Marked not needed", (l) => `Mark ${l} not needed`],
+  ["Split into one decision per column", (l) => `Decide ${l} column by column`],
+  ["Left in review", (l) => `Leave ${l} in review`],
+  ["Acknowledged: ", (l) => `Acknowledge ${l}`],
+];
+
 const BOOKKEEPING = new Set(["version", "updated_at", "updated_by"]);
+
 
 /** The columns an update changed, bookkeeping aside. */
 function changed(e: ChangeEvent): string[] {
@@ -77,6 +91,23 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
     return imported.operation === "create" ? `Import ${label}` : imported.operation === "delete" ? `Undo import ${label}` : `Import ${label}`;
   }
   const of = (table: string) => events.filter((e) => e.object_type === table);
+
+  // slice 7b: an action on a change to resolve, by what it did to its object (“Retire dbo.customers.segment”); a
+  // change settled as a side effect (“Settled: …”) leaves the group its own label
+  const settled = of("source_change").filter((e) => e.before_image?.status === "open" && e.after_image?.status === "resolved");
+  const acted = settled.filter((e) => !String(e.after_image?.resolution).startsWith("Settled: "));
+  if (acted.length) {
+    const resolution = String(acted[0]!.after_image!.resolution);
+    const label = String(acted[0]!.after_image!.object_label);
+    if (resolution === "Approved again") return acted.length > 1 ? `Approve ${acted.length} mappings again` : `Approve again ${label}`;
+    const verb = ACTION_OF.find(([start]) => resolution.startsWith(start));
+    if (verb) return verb[1](label);
+  }
+  const columns = of("source_column");
+  if (columns.length === events.length && columns.every((e) => e.operation === "update" && only(e, ["not_needed"]))) {
+    const name = String(columns[0]!.after_image!.name);
+    return columns[0]!.after_image!.not_needed ? `Mark ${name} not needed` : `Mark ${name} as needed`;
+  }
 
   // Layout: one card changed in place.
   const cards = of("canvas_item");

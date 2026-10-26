@@ -195,7 +195,7 @@ describe("file format", () => {
     await writeFile(file, JSON.stringify(old), "utf8");
     expect(await store.requirements.list(RETAIL)).toEqual([]);
     expect(await store.requirements.listLinks(RETAIL)).toEqual([]);
-    expect((await readDb(file)).format).toBe(6);
+    expect((await readDb(file)).format).toBe(7);
   });
 
   it("reads a slice 4a to 6b file (format 5) as one without source imports, the new columns null (slice 7a)", async () => {
@@ -204,17 +204,52 @@ describe("file format", () => {
     const old: Record<string, unknown> = {
       ...db,
       format: 5,
-      source_table: strip(db.source_table, ["file_format", "missing_since"]),
-      source_column: strip(db.source_column, ["missing_since"]),
+      source_table: strip(db.source_table, ["file_format", "missing_since", "retired_since"]),
+      source_column: strip(db.source_column, ["missing_since", "retired_since", "not_needed"]),
       mapping: strip(db.mapping, ["review_reason"]),
     };
-    for (const t of ["source_relationship", "source_relationship_column", "source_import"]) delete old[t];
+    for (const t of ["source_relationship", "source_relationship_column", "source_import", "source_change"]) delete old[t];
     await writeFile(file, JSON.stringify(old), "utf8");
     const upgraded = await readDb(file);
-    expect(upgraded.format).toBe(6);
+    expect(upgraded.format).toBe(7);
     expect([upgraded.source_relationship, upgraded.source_relationship_column, upgraded.source_import]).toEqual([[], [], []]);
     expect(upgraded.source_table.every((t) => t.file_format === null && t.missing_since === null)).toBe(true);
     expect(upgraded.source_column.every((c) => c.missing_since === null)).toBe(true);
     expect(upgraded.mapping.every((m) => m.review_reason === null)).toBe(true);
+    expect(upgraded.source_change).toEqual([]);
+    expect(upgraded.source_column.every((c) => c.retired_since === null && c.not_needed === false)).toBe(true);
+  });
+
+  it("reads a slice 7a file (format 6) with the open changes its imports leave, once, written back as 7 (slice 7b, P2, F1)", async () => {
+    const db = await readDb(file);
+    const strip = <R extends object>(rows: R[], keys: string[]) => rows.map((r) => Object.fromEntries(Object.entries(r).filter(([k]) => !keys.includes(k))));
+    // CRM re-imported at AT without customers.segment: missing since then, the import recorded
+    const AT = "2026-10-24T09:00:00.000Z";
+    const segment = db.source_column.find((c) => c.name === "segment")!;
+    const crm = db.source_table.find((t) => t.id === segment.source_table_id)!.source_system_id;
+    const imp = { id: uuidv7(), workspace_id: RETAIL, version: 1, created_at: AT, created_by: SEED_IDS.userLukasz, updated_at: AT, updated_by: SEED_IDS.userLukasz, deleted_at: null, source_system_id: crm, channel: "file", source_label: "crm.csv", tables_new: 0, columns_new: 0, columns_changed: 0, columns_renamed: 0, columns_missing: 1, relationships_new: 0 };
+    const old: Record<string, unknown> = {
+      ...db,
+      format: 6,
+      source_table: strip(db.source_table, ["retired_since"]),
+      source_column: strip(db.source_column, ["retired_since", "not_needed"]).map((c) => (c.id === segment.id ? { ...c, missing_since: AT } : c)),
+      source_import: [imp],
+    };
+    delete old.source_change;
+    await writeFile(file, JSON.stringify(old), "utf8");
+    const upgraded = await readDb(file);
+    expect(upgraded.source_change.map((c) => [c.kind, c.object_label, c.source_import_id, c.created_by, c.created_at, c.status])).toEqual([
+      ["column_left", "dbo.customers.segment", imp.id, SEED_IDS.userLukasz, AT, "open"],
+    ]);
+    expect(upgraded.source_change[0]!.detail).toBe("Not in the file. Was char(3). Raised when slice 7b was installed.");
+    expect(upgraded.source_import[0]).toMatchObject({ changes_raised: 0, changes_high: 0 });
+    const event = upgraded.change_event.find((e) => e.object_type === "source_change")!;
+    expect(event).toMatchObject({ object_id: upgraded.source_change[0]!.id, operation: "create", user_id: SEED_IDS.userLukasz });
+    // written back at once: the next read sees the same rows, and the file breaks no rule
+    const again = await readDb(file);
+    expect(again.format).toBe(7);
+    expect(again.source_change.map((c) => c.id)).toEqual(upgraded.source_change.map((c) => c.id));
+    expect(findViolation(again)).toBeNull();
+    expect((await store.model.listChanges(RETAIL)).map((c) => c.kind)).toEqual(["column_left"]);
   });
 });

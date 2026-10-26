@@ -259,7 +259,7 @@ export const sourceTable = (over: Partial<SourceTable> = {}): SourceTable => ({
   file_format: null,
   row_count: null,
   comment: null,
-  missing_since: null,
+  missing_since: null, retired_since: null,
   ...over,
 });
 
@@ -280,7 +280,7 @@ export const sourceColumn = (id: string = ids.colEmail, over: Partial<SourceColu
   is_pii: id !== ids.colCustId,
   default_value: null,
   comment: null,
-  missing_since: null,
+  missing_since: null, retired_since: null, not_needed: false,
   ...over,
 });
 

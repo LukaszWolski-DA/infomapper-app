@@ -25,10 +25,8 @@ import {
   type SourceTable,
 } from "../types";
 import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
-import { linksOnItems, softDeleteLinks } from "./label";
-import { softDeleteRequirementLinks } from "./requirement";
-import { releaseNotes } from "./note";
-import { begin, current, done, isLive, nothingToChange, softDelete } from "./shared";
+import { sourceDeleteCascade, sourceDeleteEdits, type SourceDeleteRows } from "../source-changes/delete";
+import { begin, current, done, isLive, nothingToChange } from "./shared";
 
 const createSourceTableInput = z
   .object({
@@ -98,6 +96,7 @@ export function createSourceTable(
     row_count: null,
     comment: null,
     missing_since: null,
+    retired_since: null,
   };
   writes.push({ kind: "insert", table: "source_table", row: table });
   columns.columns.forEach((c, i) => {
@@ -115,6 +114,8 @@ export function createSourceTable(
       default_value: null,
       comment: null,
       missing_since: null,
+      retired_since: null,
+      not_needed: false,
     };
     writes.push({ kind: "insert", table: "source_column", row: column });
   });
@@ -194,55 +195,39 @@ export function relationshipsOfTable(
 }
 
 /**
- * Deletes a source table with its columns and its cards, only when no mapping reads any of its columns; otherwise
- * refuses and lists those mappings. The source system stays. Slice 3a: the label links on the table and its columns
- * go with them; notes pinned to its cards become free notes at their place. Slice 7a: its relationships, in both
- * directions, go with it.
+ * Deletes a source table from the model with everything that goes with it (slice 7b, Q7: the change's “Delete…” and
+ * this are one cascade, `sourceDeleteCascade`): its columns, cards, relationships in both directions, the label and
+ * requirement links on them, and the mappings that read its columns (a combined mapping that keeps other inputs loses
+ * only these, D-49, and an approved one goes back to review, D-51). Notes pinned to its cards become free notes. The
+ * panel shows all of it first (D-47). The open changes on it settle through `runCommand`'s settle rule (Q12). Until
+ * slice 7b it refused while a mapping read one of its columns.
  */
 export function deleteSourceTable(
   ctx: CommandContext,
   access: WorkspaceAccess,
   state: DeleteSourceTableState,
   input: unknown,
-): CommandResult<{ columns: number }> {
+): CommandResult<{ columns: number; mappings: number }> {
   const parsed = begin(access, "model.edit", deleteSourceTableInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const got = current(state.table, access, parsed.data.sourceTableId, parsed.data.expectedVersion, "source table");
   if (!got.ok) return fail(got.error);
-  const table = got.row;
   const workspaceId = access.workspace.id;
-  const columns = state.columns.filter((c) => isLive(c, workspaceId) && c.source_table_id === table.id);
-  const columnById = new Map(columns.map((c) => [c.id, c]));
-  const liveMappings = new Map(state.mappings.filter((m) => isLive(m, workspaceId)).map((m) => [m.id, m]));
-  const used = state.mappingInputs.filter(
-    (i) => isLive(i, workspaceId) && columnById.has(i.source_column_id) && liveMappings.has(i.mapping_id),
-  );
-
-  if (used.length) {
-    const attributes = new Map(state.attributes.map((a) => [a.id, a]));
-    const entities = new Map(state.entities.map((e) => [e.id, e]));
-    const list = [
-      ...new Set(
-        used.map((i) => {
-          const attribute = attributes.get(liveMappings.get(i.mapping_id)!.attribute_id);
-          const target = attribute ? `${entities.get(attribute.entity_id)?.name ?? "?"}.${attribute.name}` : "?";
-          return `${columnById.get(i.source_column_id)!.name} → ${target}`;
-        }),
-      ),
-    ].sort();
-    return fail(domainError("conflict", `Remove its mappings first. ${list.join("; ")}.`, { mappings: list.join("\n") }));
-  }
-
-  const cards = state.canvasItems.filter((c) => isLive(c, workspaceId) && c.source_table_id === table.id);
-  const related = relationshipsOfTable(workspaceId, table.id, state.relationships, state.relationshipColumns);
-  return done(ctx, access, { columns: columns.length }, [
-    ...related.columns.map((c) => softDelete(ctx, "source_relationship_column", c)),
-    ...related.relationships.map((r) => softDelete(ctx, "source_relationship", r)),
-    ...cards.map((c) => softDelete(ctx, "canvas_item", c)),
-    ...columns.map((c) => softDelete(ctx, "source_column", c)),
-    softDelete(ctx, "source_table", table),
-    ...softDeleteLinks(ctx, linksOnItems(state.labelLinks, [{ kind: "source_table", id: table.id }, ...columns.map((c) => ({ kind: "source_column" as const, id: c.id }))])),
-    ...softDeleteRequirementLinks(ctx, state.requirementLinks, [{ kind: "source_table", id: table.id }, ...columns.map((c) => ({ kind: "source_column" as const, id: c.id }))]),
-    ...releaseNotes(ctx, state.notes, { items: cards, frames: [] }, { cardIds: cards.map((c) => c.id) }),
-  ]);
+  const mine = <R extends { workspace_id: Uuid; deleted_at: string | null }>(rows: readonly R[] | undefined): R[] => (rows ?? []).filter((r) => isLive(r, workspaceId));
+  const rows: SourceDeleteRows = {
+    tables: [got.row],
+    columns: mine(state.columns),
+    mappings: mine(state.mappings),
+    mappingInputs: mine(state.mappingInputs),
+    attributes: state.attributes,
+    entities: state.entities,
+    relationships: mine(state.relationships),
+    relationshipColumns: mine(state.relationshipColumns),
+    canvasItems: mine(state.canvasItems),
+    notes: state.notes,
+    labelLinks: state.labelLinks,
+    requirementLinks: state.requirementLinks,
+  };
+  const cascade = sourceDeleteCascade(rows, { tableId: got.row.id })!;
+  return done(ctx, access, { columns: cascade.columns.length, mappings: cascade.mappings.length + cascade.narrowed.length }, sourceDeleteEdits(ctx, rows, cascade));
 }

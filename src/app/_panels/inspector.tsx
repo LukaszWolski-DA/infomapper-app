@@ -3,13 +3,13 @@
 // The right panel (prototype #ins): shows and edits what is selected on the canvas: an entity, attribute, mapping,
 // relationship, source table or column, a frame (slice 2b), a bundle of lines (slice 2c), a working label or a note (slice 3a),
 // a requirement, or an element whose card is not on this canvas (slice 4a: the go-to links' fallback), a source system
-// (slice 7a); with nothing selected, an overview of this canvas.
+// (slice 7a, with its changes to resolve since 7b); with nothing selected, an overview of this canvas.
 
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { buildRequirementIndex, type RequirementIndex } from "@/domain/model/requirement-index";
-import type { Label, LabelLink, Requirement, RequirementLink, WorkspaceModel } from "@/domain/types";
+import type { Label, LabelLink, Requirement, RequirementLink, SourceChange, WorkspaceModel } from "@/domain/types";
 import { AttributePanel } from "./attribute-panel";
 import { BundlePanel } from "./bundle-panel";
 import { EntityPanel } from "./entity-panel";
@@ -75,6 +75,10 @@ export interface InspectorProps {
   imports: SystemImport[];
   /** What the import wizard reads, for “Re-import {system}…”; only for those who may edit. */
   importData?: ImportData;
+  /** The workspace's changes to resolve, open and resolved (slice 7b). */
+  changes: SourceChange[];
+  /** People's names by id: who resolved a change (slice 7b). */
+  people: Record<Uuid, string>;
 }
 
 export interface CanvasPlace {

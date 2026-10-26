@@ -1,7 +1,7 @@
 "use client";
 
 // “More” (⋯) at the right end of the canvas tools (slice 6a, item 9; Łukasz's step 1 answer 7): on a narrow window the
-// tools that do not fit leave the bar and are here instead. Up to 1,200 px Focus and the notation switch (the prototype
+// tools that do not fit leave the bar and are here instead. Up to 1,200 px Focus, the Changes view (slice 7b) and the notation switch (the prototype
 // hides them at 1,000 px, but the app has no other place for the notation and only card menus for Focus); up to 1,100 px
 // also the Entity, Frame, Note and Hand tools (they keep their keys and the toolbox). Widths measured in step 4. Each
 // tool's own element carries its breakpoint (`more-breakpoints.ts`), and so does each menu item; nothing is set on
@@ -22,6 +22,7 @@ import {
 import { useToast } from "@/ui/components/toast";
 import { ENTITY_TOOL_HINT, FRAME_TOOL_HINT, HAND_TOOL_HINT, NOTE_TOOL_HINT } from "./CanvasModes";
 import { CanvasUiCtx, type Notation } from "./context";
+import { CHANGES_TITLE, changesOn, toggleChanges } from "./changes-view";
 import { focusOn } from "./fade";
 import { MORE_FOCUS, MORE_TOOLS } from "./more-breakpoints";
 import { toggleFocus } from "./Focus";
@@ -46,6 +47,7 @@ export function MoreTools({ editable, canNote }: { editable: boolean; canNote: b
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const focus = useValue(focusOn);
+  const changes = !!useValue(changesOn);
   const tools = TOOLS.filter((t) => t.who === "all" || (t.who === "edit" ? editable : canNote));
   return (
     <DropdownMenu>
@@ -74,6 +76,9 @@ export function MoreTools({ editable, canNote }: { editable: boolean; canNote: b
           className={itemClass}
         >
           Focus
+        </DropdownMenuCheckboxItem>
+        <DropdownMenuCheckboxItem data-testid="more-changes" checked={changes} onCheckedChange={toggleChanges} title={CHANGES_TITLE} className={itemClass}>
+          Changes
         </DropdownMenuCheckboxItem>
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
         <DropdownMenuLabel className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold text-im-ink-2">Relationship notation</DropdownMenuLabel>
