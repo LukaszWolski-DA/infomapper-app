@@ -1,10 +1,11 @@
 // S7B-01: raising (PRD items 6–8). Re-importing CRM through the wizard raises the changes to resolve with their
 // severity, label and detail; the toast and the stored import carry the counts; a first import of a new system raises
-// none. Each kind's rules (rule_updated included, which the test files do not raise) are unit-tested in
-// `src/domain/source-changes/raise.test.ts`.
+// none. A rename the modeller picks in the review raises rule_updated for an approved mapping whose rule names the
+// column (Łukasz's answer to step 6). Each kind's rules are unit-tested in `src/domain/source-changes/raise.test.ts`.
 
+import { setMappingStatus } from "../../src/domain/commands/mapping";
 import { expect, test } from "./fixtures";
-import { card, crmPartial, imports, importNow, loadChanges, openWizard, reviewFile, sample, systemNamed } from "./helpers";
+import { asPerson, card, crmPartial, imports, importNow, loadChanges, loadModel, openWizard, reviewFile, reviewRow, sample, SEED_IDS, systemNamed } from "./helpers";
 
 test("S7B-01: a re-import raises each change with its severity, label and detail; the counts are stored; a first import raises none", async ({ page }) => {
   await openWizard(page);
@@ -43,4 +44,32 @@ test("S7B-01: a re-import raises each change with its severity, label and detail
   const hr = (await systemNamed("HR test"))!;
   expect((await loadChanges()).filter((c) => c.source_system_id === hr.id)).toHaveLength(0);
   expect((await imports(hr.id))[0]).toMatchObject({ changes_raised: 0, changes_high: 0 });
+});
+
+test("S7B-01: renaming a column an approved mapping's rule names raises “Rule updated for a renamed column”", async ({ page }) => {
+  // the seed's Customer.created_at ← customers.created_ts, rule CAST(created_ts AS date), approved by Piotr
+  const before = await loadModel();
+  const created = before.sourceColumns.find((c) => c.name === "created_ts")!;
+  const mappingId = before.mappingInputs.find((i) => i.source_column_id === created.id && i.deleted_at === null)!.mapping_id;
+  const m = before.mappings.find((x) => x.id === mappingId)!;
+  expect(m.rule_expression).toBe("CAST(created_ts AS date)");
+  await asPerson(SEED_IDS.userPiotr, (ctx, access) =>
+    setMappingStatus(ctx, access, { mapping: m, contentAuthorId: SEED_IDS.userAnna }, { mappingId: m.id, expectedVersion: m.version, status: "approved" }),
+  );
+
+  // the changed CRM file, with created_ts renamed to created_on in the review
+  await openWizard(page);
+  await reviewFile(page, { existing: "CRM" }, "crm_snapshot_2026-10-20.csv", sample("crm_snapshot_2026-10-20.csv"));
+  await page.locator('[data-testid="select-rename"][data-key="crmprod|dbo|customers|created_ts"]').selectOption("created_on");
+  await expect(reviewRow(page, "created_on")).toContainText("its rule now reads CAST(created_on AS date)");
+  await importNow(page, /to resolve/);
+
+  const change = (await loadChanges()).find((c) => c.kind === "rule_updated")!;
+  expect(change).toMatchObject({ severity: "normal", status: "open", mapping_id: mappingId, source_column_id: created.id });
+  expect((await loadModel()).mappings.find((x) => x.id === mappingId)).toMatchObject({ status: "review", rule_expression: "CAST(created_on AS date)" });
+  const rule = card(page, "rule_updated", change.object_label);
+  await expect(rule.getByTestId("change-title")).toHaveText("Rule updated for a renamed column");
+  await expect(rule.getByTestId("change-detail")).toHaveText("The approved mapping to Customer.created_at went back to review: its rule now reads CAST(created_on AS date).");
+  await expect(rule).toHaveAttribute("data-severity", "normal");
+  await expect(rule.getByTestId("change-action-approve")).toBeVisible();
 });
