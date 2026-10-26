@@ -3,7 +3,11 @@
 // (by code or name), and Data Vault 2.0 mode switched as test data.
 
 import { expect, type Page } from "@playwright/test";
-import { buildWriteSet } from "../../src/domain/changes";
+import { buildWriteSet, type CommandContext, type CommandResult } from "../../src/domain/changes";
+import { removeClassification, renameClassification, setClassification } from "../../src/domain/commands/classification";
+import type { ClassificationCode } from "../../src/domain/model/classifications";
+import type { WorkspaceAccess } from "../../src/domain/permissions";
+import { asPerson as asPersonImpl } from "../slice-04a/helpers";
 import { uuidv7 } from "../../src/domain/ids";
 import { indexOf } from "../../src/domain/model/classifications";
 import { canvasUrl, expectToast, loadModel, openCanvas, RETAIL, SEED_IDS, signInAs, store } from "../slice-07a/helpers";
@@ -91,3 +95,45 @@ export async function expectPressed(page: Page, name: string, pressed: boolean) 
 }
 
 export { expectToast as toast };
+
+/** A file in the source standard (one row per column; ordinals count per table). */
+export const HEAD = "database,schema,table,column,ordinal,data_type,nullable,primary_key,fk_name,fk_ref_schema,fk_ref_table,fk_ref_column,classifications";
+type Row = [table: string, column: string, type: string, opts?: { pk?: boolean; fk?: [string, string]; cls?: string }];
+export function fileOf(rows: Row[], database = "d", schema = "s"): string {
+  const ordinal = new Map<string, number>();
+  const lines = rows.map(([table, column, type, o = {}]) => {
+    const n = (ordinal.get(table) ?? 0) + 1;
+    ordinal.set(table, n);
+    const fk = o.fk ? `FK_${table}_${o.fk[0]},${schema},${o.fk[0]},${o.fk[1]}` : ",,,";
+    return `${database},${schema},${table},${column},${n},${type},yes,${o.pk ? "yes" : "no"},${fk},"${o.cls ?? ""}"`;
+  });
+  return [HEAD, ...lines].join("\n");
+}
+
+type Model = Awaited<ReturnType<typeof loadModel>>;
+type Command<T> = (ctx: CommandContext, access: WorkspaceAccess) => CommandResult<T>;
+
+/** Test data through the domain, as Łukasz, on the model as it is now (the undo history is not touched). */
+export async function asLukasz<T>(build: (m: Model) => Command<T>): Promise<T> {
+  return asPersonImpl(SEED_IDS.userLukasz, build(await loadModel()));
+}
+
+/** A built-in classification set on or cleared from a column or table, as Łukasz. */
+export const classify = (code: ClassificationCode, target: { kind: "source_column" | "source_table"; id: string }, on = true) =>
+  asLukasz((m) => (ctx, access) =>
+    setClassification(ctx, access, { classifications: m.classifications, links: m.classificationLinks, tables: m.sourceTables, columns: m.sourceColumns }, { classificationId: m.classifications.find((c) => c.code === code)!.id, target, on }),
+  );
+
+/** A built-in classification renamed, as Łukasz. */
+export const renameBuiltin = (code: ClassificationCode, name: string) =>
+  asLukasz((m) => (ctx, access) => {
+    const c = m.classifications.find((x) => x.code === code)!;
+    return renameClassification(ctx, access, m, { classificationId: c.id, expectedVersion: c.version, name });
+  });
+
+/** A built-in classification removed with its links, as Łukasz. */
+export const removeBuiltin = (code: ClassificationCode) =>
+  asLukasz((m) => (ctx, access) => {
+    const c = m.classifications.find((x) => x.code === code)!;
+    return removeClassification(ctx, access, { classifications: m.classifications, links: m.classificationLinks }, { classificationId: c.id, expectedVersion: c.version });
+  });

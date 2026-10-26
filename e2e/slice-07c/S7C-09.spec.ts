@@ -1,9 +1,10 @@
-// S7C-09 (the settings' and panels' part; the reading comes with step 5): Data Vault 2.0 mode switched off, the Data
-// Vault classifications are hidden and stay stored, the message names their uses; switched on, they show again.
+// S7C-09: Data Vault 2.0 mode switched off, the Data Vault classifications are hidden and stay stored, the message
+// names their uses; switched on, they show again; the reading shows only in the mode. (In the review, Data Vault values
+// read with the mode off are marked: S7C-10.)
 
 import { setClassification } from "../../src/domain/commands/classification";
 import { expect, test } from "./fixtures";
-import { asPerson, classesOf, classification, columnId, expectToast, groups, openColumn, RETAIL, SEED_IDS, setDataVault, signInAs, store, tableId, toggle } from "./helpers";
+import { asPerson, classesOf, classification, columnId, expectToast, groups, openColumn, openTable, RETAIL, SEED_IDS, setDataVault, signInAs, store, tableId, toggle } from "./helpers";
 
 test("S7C-09: off hides the Data Vault classifications and keeps them, the message counts them; on shows them again", async ({ page }) => {
   await setDataVault(true);
@@ -46,3 +47,11 @@ test("S7C-09: with no Data Vault classification in use, switching off says only 
   await expectToast(page, "Data Vault 2.0 mode is off.");
 });
 
+
+test("S7C-09 (the reading's part): the Data Vault reading shows only in the mode", async ({ page }) => {
+  await openTable(page, "customers", "cust_no");
+  await expect(page.getByTestId("section-dv-reading")).toHaveCount(0);
+  await setDataVault(true);
+  await openTable(page, "customers", "cust_no");
+  await expect(page.getByTestId("section-dv-reading").getByTestId("dv-reading-line").first()).toHaveText("Hub on cust_no");
+});

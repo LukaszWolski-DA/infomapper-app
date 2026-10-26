@@ -1,8 +1,8 @@
-// S7C-04 (the panels' part; the import's part comes with step 5): an own classification added; a built-in and an own
-// one renamed; a taken name refused; the new name shows in the panels.
+// S7C-04: an own classification added; a built-in and an own one renamed; a taken name refused; the new name shows in the
+// panels and the review; an import matches the new name and the built-in's code.
 
 import { expect, test } from "./fixtures";
-import { classesOf, columnId, expectPressed, groups, listRow, loadModel, openColumn, openList, toggle } from "./helpers";
+import { classesOf, columnId, expectPressed, fileOf, groups, listRow, loadModel, openColumn, openList, renameBuiltin, reviewFile, reviewRow, toggle } from "./helpers";
 
 test("S7C-04: add an own classification, rename a built-in and an own one; the panels show the new names", async ({ page }) => {
   await openColumn(page, "customers", "cust_no");
@@ -57,4 +57,28 @@ test("S7C-04: add an own classification, rename a built-in and an own one; the p
   await toggle(page, "Hash key candidate").click();
   await expectPressed(page, "Hash key candidate", true);
   await expect.poll(async () => classesOf(await columnId("customers", "cust_no"))).toEqual(["BK", "Hash key candidate"]);
+});
+
+test("S7C-04 (the import's part): an import matches a renamed built-in's new name and its code, and an own one's name", async ({ page }) => {
+  await renameBuiltin("BK", "Klucz biznesowy");
+  await openColumn(page, "customers", "cust_no");
+  await openList(page);
+  const dialog = page.getByTestId("dialog-classifications");
+  await dialog.getByTestId("input-new-column-classification").fill("Hash candidate");
+  await dialog.getByTestId("button-add-column-classification").click();
+  await expect(listRow(page, "Hash candidate")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await page.getByTestId("tab-sources").click();
+  await page.getByTestId("button-import-sources").click();
+  const file = fileOf([
+    ["t", "a", "int", { pk: true, cls: "Klucz biznesowy" }],
+    ["t", "b", "int", { cls: "bk" }],
+    ["t", "c", "int", { cls: "hash candidate" }],
+    ["t", "d", "int", { cls: "Business key" }],
+  ]);
+  await reviewFile(page, { new: "Renamed feed" }, "renamed.csv", file);
+  await expect(reviewRow(page, "a").getByTestId("review-classification")).toHaveText(["Klucz biznesowy"]);
+  await expect(reviewRow(page, "b").getByTestId("review-classification")).toHaveText(["Klucz biznesowy"]);
+  await expect(reviewRow(page, "c").getByTestId("review-classification")).toHaveText(["Hash candidate"]);
+  await expect(page.getByTestId("review-warnings")).toContainText("Unknown classification “Business key” on s.t.d (row 5), ignored.");
 });
