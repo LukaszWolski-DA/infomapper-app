@@ -9,7 +9,8 @@
 // table's open changes to resolve, the columns list's “retired” and “not needed”, a column's “Mark as needed”, and
 // “Delete table…” on the same cascade and form as a change's “Delete…” (D-47, Q7), now also for mapped tables.
 // Slice 7c (items 13–16, F22): a table's and a column's Classifications section and Note; a column's comment is the
-// source's, read-only ("From the source:", P9), as a table's.
+// source's, read-only ("From the source:", P9), as a table's. In Data Vault 2.0 mode the table panel shows its Data Vault
+// reading after its relationships (item 21, AD-08): hints only.
 
 import { useContext, useRef, useState } from "react";
 import { deleteSourceTableAction } from "@/app/_actions/model";
@@ -20,7 +21,7 @@ import type { Uuid } from "@/domain/ids";
 import { formatColumnType } from "@/domain/model/type-check";
 import type { SourceColumn, SourceRelationship, SourceTable } from "@/domain/types";
 import { STATUS_LABEL } from "./attribute-panel";
-import { ClassificationsSection, SourceNote } from "./classifications";
+import { ClassificationsSection, DataVaultReading, SourceNote } from "./classifications";
 import { Actions, buttonClass, dangerClass, Field, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
@@ -177,6 +178,7 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
           <Hint>None known. They come from foreign keys in an import.</Hint>
         )}
       </Fold>
+      {p.dataVault && <DataVaultReading table={t} />}
 
       <Fold title="Feeds entities" count={feeds.length}>
         {feeds.length ? (

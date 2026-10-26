@@ -46,6 +46,8 @@ export interface WizardState {
   scope: ReadonlySet<string>;
   compare: MissingScope;
   renames: ReadonlyMap<string, string>;
+  /** Suggested classifications the modeller unticked (slice 7c, P7); sent with the choices, part of the fingerprint. */
+  hintsOff: ReadonlySet<string>;
   filter: ReviewFilter;
   /** P8: the server refused because the system changed; the review shows this until the next import. */
   stale: string | null;
@@ -184,9 +186,13 @@ export function reviewCounts(plan: ImportPlan) {
   return { ...n, all: n.new + n.changed + n.rename + n.missing + n.rel };
 }
 
-/** Whether a column's row shows under a filter (prototype `showCol`). */
+/**
+ * Whether a column's row shows under a filter (prototype `showCol`). Slice 7c: an unchanged column whose file names other
+ * classifications shows under "all", so "The file says …" is never folded away with the unchanged columns.
+ */
 export function shownUnder(filter: ReviewFilter, c: PlanColumn): boolean {
-  if (c.status === "unchanged" || c.status === "still_missing") return false;
+  if (c.status === "unchanged") return filter === "all" && !!c.fileClassifications;
+  if (c.status === "still_missing") return false;
   switch (filter) {
     case "all":
       return true;

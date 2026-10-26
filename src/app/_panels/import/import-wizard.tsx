@@ -66,6 +66,7 @@ export function ImportWizard({
     scope: new Set(),
     compare: "schemas",
     renames: new Map(),
+    hintsOff: new Set(),
     filter: "all",
     stale: null,
   }));
@@ -76,10 +77,10 @@ export function ImportWizard({
   const target = targetOf(s);
   const plan = useMemo(() => {
     if (!s.read || s.read.errors.length || !target) return null;
-    return buildPlan(state.model, s.read, target, { scope: s.scope, compare: s.compare, renames: s.renames });
+    return buildPlan(state.model, s.read, target, { scope: s.scope, compare: s.compare, renames: s.renames, hintsOff: s.hintsOff });
     // the target's identity, not the object, decides
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, s.read, s.mode, s.systemId, s.newName, s.scope, s.compare, s.renames]);
+  }, [state, s.read, s.mode, s.systemId, s.newName, s.scope, s.compare, s.renames, s.hintsOff]);
   const index = useMemo(() => impactIndex(data), [data]);
   // the review's coverage callout (slice 7b, item 9): once per plan, about 95 ms at the 30,000-row limit (step 2)
   const coverage = useMemo(() => (plan && s.step === 3 ? planCoverage(state.model, plan, data) : []), [plan, s.step, state, data]);
@@ -91,7 +92,7 @@ export function ImportWizard({
    */
   const readText = (text: string, label: string, vendor: WizardState["vendor"] | null) => {
     const read = readStandard(text, label, vendor ? { vendor } : {});
-    set({ text, sourceLabel: label, read, scope: new Set(read.tables.map((t) => t.key)), renames: new Map(), stale: null });
+    set({ text, sourceLabel: label, read, scope: new Set(read.tables.map((t) => t.key)), renames: new Map(), hintsOff: new Set(), stale: null });
   };
   const takeText = (text: string, label: string) => readText(text, label, s.channel === "query" ? s.vendor : null);
   /** Another database for a result already read: read it again with that one. */
@@ -102,11 +103,11 @@ export function ImportWizard({
   /** A DDL script translated and read (items 16–18). */
   const readScript = (ddl: WizardState["ddl"]) => {
     const { translation, read } = readDdl(ddl.text, { database: ddl.database, schema: ddl.schema, fileName: ddl.name });
-    set({ ddl: { ...ddl, translation }, text: ddl.text, sourceLabel: ddl.name, read, scope: new Set(read.tables.map((t) => t.key)), renames: new Map(), stale: null });
+    set({ ddl: { ...ddl, translation }, text: ddl.text, sourceLabel: ddl.name, read, scope: new Set(read.tables.map((t) => t.key)), renames: new Map(), hintsOff: new Set(), stale: null });
   };
   /** “Choose another”: a new file or script; the DDL channel keeps its Database and schema fields. */
   const clear = () =>
-    set({ text: "", sourceLabel: "", read: null, ddl: { ...emptyDdl, database: s.ddl.database, schema: s.ddl.schema }, scope: new Set(), renames: new Map(), stale: null });
+    set({ text: "", sourceLabel: "", read: null, ddl: { ...emptyDdl, database: s.ddl.database, schema: s.ddl.schema }, scope: new Set(), renames: new Map(), hintsOff: new Set(), stale: null });
 
   async function importNow() {
     if (!plan || !target || sending) return;
@@ -126,6 +127,7 @@ export function ImportWizard({
           scope: [...s.scope],
           compare: s.compare,
           renames: [...s.renames],
+          hintsOff: [...s.hintsOff],
           fingerprint: planFingerprint(plan),
         }),
       });

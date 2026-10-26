@@ -21,10 +21,11 @@ import { useAction } from "@/app/_components/use-action";
 import { classificationImpact, type ClassificationImpact } from "@/domain/commands/classification";
 import type { Uuid } from "@/domain/ids";
 import { byListOrder, groupOf, isDataVault, nameTakenBy, TAKEN_NAME, whatStops } from "@/domain/model/classifications";
-import type { Classification, ClassificationScope } from "@/domain/types";
+import { dataVaultReading, READING_EMPTY, READING_FOOTER, readingText } from "@/domain/model/data-vault-reading";
+import type { Classification, ClassificationScope, SourceTable } from "@/domain/types";
 import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
-import { buttonClass, dangerClass, Field, Hint, inputClass, LongList, Li, smallButtonClass, TextArea } from "./fields";
+import { buttonClass, dangerClass, Field, Fold, Hint, inputClass, LongList, Li, smallButtonClass, TextArea } from "./fields";
 import { usePanel } from "./inspector";
 
 type Target = { kind: "source_table" | "source_column"; id: Uuid };
@@ -104,6 +105,43 @@ export function SourceNote({ target, name, version, value, placeholder, hint }: 
       />
       {hint && <Hint>{hint}</Hint>}
     </Field>
+  );
+}
+
+/** A table's Data Vault reading (item 21, P10, AD-08; prototype `dvReading`): hints from its classifications and keys. */
+export function DataVaultReading({ table }: { table: SourceTable }) {
+  const p = usePanel();
+  const lines = useMemo(
+    () =>
+      dataVaultReading(
+        {
+          table,
+          columns: p.ix.columnsOf.get(table.id) ?? [],
+          relationships: p.ix.relationshipsOf.get(table.id) ?? [],
+          relationshipColumns: p.ix.model.sourceRelationshipColumns,
+          tableName: (id) => p.ix.table.get(id)?.name ?? "?",
+        },
+        p.ix.classes,
+      ).map(readingText),
+    [table, p.ix],
+  );
+  return (
+    <Fold title="Data Vault reading" testId="section-dv-reading">
+      {lines.length ? (
+        <>
+          <ul className="list-disc pl-[18px]">
+            {lines.map((l) => (
+              <li key={l} data-testid="dv-reading-line">
+                {l}
+              </li>
+            ))}
+          </ul>
+          <Hint>{READING_FOOTER}</Hint>
+        </>
+      ) : (
+        <Hint>{READING_EMPTY}</Hint>
+      )}
+    </Fold>
   );
 }
 

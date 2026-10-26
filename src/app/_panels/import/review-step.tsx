@@ -7,10 +7,15 @@
 // … tables”, “Show … more columns”) so a large file keeps the dialog responsive. Slice 7b (item 9; prototype `reqBox`,
 // `issBox`): above the tables, the requirements whose coverage changes and the changes to resolve the import raises,
 // both over the whole plan.
+// Slice 7c (items 19, 20): a new column's classifications as chips, a Data Vault one marked (and, with the mode off,
+// "hidden while Data Vault 2.0 mode is off"); "The file says …; your classifications are kept."; the "Suggested
+// classifications", ticked by default, the unticked ones sent with the choices.
 
 import { useState } from "react";
 import { formatColumnType } from "@/domain/model/type-check";
-import type { ImportPlan, PlanColumn, PlanTable } from "@/domain/import/plan";
+import type { ClassificationHint, ImportPlan, PlanColumn, PlanTable } from "@/domain/import/plan";
+import { isDataVault } from "@/domain/model/classifications";
+import type { Classification } from "@/domain/types";
 import { coverageChangeText, type CoverageDelta } from "@/domain/source-changes/coverage";
 import { NO_COVERAGE_CHANGE, raisedCallout } from "@/domain/source-changes/texts";
 import { day, impactOf, plural, reviewCounts, shownUnder, type impactIndex, type ImportData, type ReviewFilter, type WizardState } from "./wizard-model";
@@ -37,6 +42,25 @@ const Arrow = () => <span className="mx-1 text-im-ink-3">→</span>;
 const Key = ({ children }: { children: string }) => <span className="rounded-[3px] bg-im-physical-soft px-1 font-mono text-[10px] text-im-physical">{children}</span>;
 const rowClass = "grid grid-cols-[86px_minmax(130px,1fr)] gap-x-3 gap-y-1 border-t border-im-line px-3 py-[7px] md:grid-cols-[86px_minmax(130px,1fr)_minmax(160px,1.3fr)_minmax(180px,1.6fr)]";
 const callout = "my-3 rounded-r-md border-l-[3px] px-3 py-2";
+const chip = "mr-1 inline-block rounded-[10px] bg-im-physical-soft px-1.5 text-[11.5px] text-im-physical";
+
+/** A classification as a chip (prototype `classChips`); a Data Vault one marked, and hidden with the mode off (P5). */
+function ClassChip({ c, dataVault }: { c: Classification | undefined; dataVault: boolean }) {
+  if (!c) return null;
+  return (
+    <span className="mr-1 inline-flex flex-wrap items-center gap-1" data-testid="review-classification">
+      <span className={chip}>{c.name}</span>
+      {isDataVault(c) && (
+        <>
+          <span className={`${chip} opacity-80`} data-testid="chip-data-vault">
+            Data Vault 2.0
+          </span>
+          {!dataVault && <span className="text-[11.5px] text-im-ink-3">hidden while Data Vault 2.0 mode is off</span>}
+        </>
+      )}
+    </span>
+  );
+}
 
 export function ReviewStep({
   s,
@@ -66,7 +90,14 @@ export function ReviewStep({
   const raised = raisedCallout(plan.raises, systemName);
   const raisedHigh = plan.raises.some((r) => r.severity === "high");
   const requirementName = new Map(data.requirements.map((r) => [r.id, r.name]));
-  const classificationName = new Map(data.model.classifications.map((c) => [c.id, c.name]));
+  const classificationById = new Map(data.model.classifications.map((c) => [c.id, c]));
+  const hints = plan.hints;
+  const tick = (h: ClassificationHint, on: boolean) => {
+    const off = new Set(s.hintsOff);
+    if (on) off.delete(h.id);
+    else off.add(h.id);
+    set({ hintsOff: off });
+  };
 
   const filters: [ReviewFilter, string, number][] = [
     ["all", "all changes", n.all],
@@ -83,11 +114,9 @@ export function ReviewStep({
       return (
         <>
           <span className="font-mono">{formatColumnType(f)}</span> {f.is_primary_key && <Key>PK</Key>} {f.is_foreign_key && <Key>FK</Key>} {!f.is_nullable && <span className="text-im-ink-3">not null</span>}{" "}
-          {/* slice 7c: the classifications the file's values matched (step 5 adds the Data Vault marks) */}
+          {/* slice 7c: the classifications the file's values matched */}
           {c.classificationIds.map((id) => (
-            <span key={id} className="mr-1 rounded-[10px] bg-im-physical-soft px-1.5 text-[11.5px] text-im-physical">
-              {classificationName.get(id) ?? "?"}
-            </span>
+            <ClassChip key={id} c={classificationById.get(id)} dataVault={data.dataVault} />
           ))}
         </>
       );
@@ -119,7 +148,11 @@ export function ReviewStep({
         {lines.map((l, i) => (
           <div key={i}>{l}</div>
         ))}
-        {c.fileClassifications && <div className="text-xs text-im-ink-3">The file says {c.fileClassifications.join(", ")}; your classifications are kept.</div>}
+        {c.fileClassifications && (
+          <div className="text-xs text-im-ink-3" data-testid="review-file-says">
+            The file says {c.fileClassifications.join(", ")}; your classifications are kept.
+          </div>
+        )}
       </>
     );
   };
@@ -289,7 +322,7 @@ export function ReviewStep({
       )}
       {visibleCards.slice(0, tablesShown).map(({ t, rows, meta }) => {
         const name = t.file ? `${t.file.schema}.${t.file.name}` : `${t.existing!.schema_name}.${t.existing!.name}`;
-        const unchanged = t.columns.filter((c) => c.status === "unchanged");
+        const unchanged = t.columns.filter((c) => c.status === "unchanged" && !rows.includes(c));
         const open = showUnchanged.has(t.key);
         const limit = rowsShown.get(t.key) ?? PAGE_ROWS;
         const header = t.status === "new" ? "new table" : t.status === "missing" ? "missing table" : t.status === "back" ? "back" : "changed";
@@ -422,6 +455,22 @@ export function ReviewStep({
         </>
       )}
       {F === "rel" && !rels.length && <p className="text-im-ink-3">Nothing of this kind.</p>}
+      {(F === "all" || F === "new") && hints.length > 0 && (
+        <>
+          <h3 className="mb-1 mt-5 text-[13px] font-semibold">Suggested classifications</h3>
+          <p className="mb-2 text-xs text-im-ink-3">Suggestions only. Untick what does not fit; you can change classifications on the column later.</p>
+          <div className="flex flex-col gap-1" data-testid="review-suggestions">
+            {hints.map((h) => (
+              <label key={h.id} className="flex flex-wrap items-center gap-2" data-testid="review-suggestion" data-hint={h.id}>
+                <input type="checkbox" checked={h.on} onChange={(e) => tick(h, e.currentTarget.checked)} data-testid="checkbox-suggestion" />
+                <span className="font-mono text-xs">{h.label}</span>
+                <ClassChip c={classificationById.get(h.classificationId)} dataVault={data.dataVault} />
+                <span className="text-xs text-im-ink-3">{h.why}</span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
       {F === "all" && plan.warnings.length > 0 && (
         <>
           <h3 className="mb-2 mt-5 text-[13px] font-semibold">Warnings</h3>

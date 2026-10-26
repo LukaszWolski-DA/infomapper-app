@@ -74,7 +74,7 @@ export interface PlanColumn {
    */
   fileClassifications: string[] | null;
   /** The live classifications the file's values matched, in list order (slice 7c): a new column is written with them. */
-  classificationIds: Uuid[];
+  classificationIds: readonly Uuid[];
   /** Live mappings reading the column (`ImportPlan.mappings` has their impact). */
   mappingIds: Uuid[];
 }
@@ -218,6 +218,8 @@ export interface ImportPlan {
 }
 
 const lower = (s: string) => s.toLowerCase();
+/** Shared by every column the file classifies with nothing (most of them): no array per column. */
+const NO_CLASSIFICATIONS: readonly Uuid[] = Object.freeze([]);
 const yesNo = (b: boolean) => (b ? "yes" : "no");
 const isLive = (r: { deleted_at: string | null }) => r.deleted_at === null;
 const renameKeyOf = (key: string, column: string) => `${key}|${lower(column)}`;
@@ -362,7 +364,7 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
         existing: null,
         meta: [],
         rows: null,
-        columns: ft.columns.map((fc) => ({ status: "new", existing: null, file: fc, changes: [], position: null, renameKey: null, fileClassifications: null, classificationIds: [], mappingIds: [] })),
+        columns: ft.columns.map((fc) => ({ status: "new", existing: null, file: fc, changes: [], position: null, renameKey: null, fileClassifications: null, classificationIds: NO_CLASSIFICATIONS, mappingIds: [] })),
       });
       continue;
     }
@@ -387,7 +389,7 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
         position: ec.ordinal !== fc.ordinal ? { before: ec.ordinal, after: fc.ordinal } : null,
         renameKey: null,
         fileClassifications: null,
-        classificationIds: [],
+        classificationIds: NO_CLASSIFICATIONS,
         mappingIds: mappingIdsOf(ec.id),
       });
     }
@@ -441,11 +443,11 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
           position: ec.ordinal !== fc.ordinal ? { before: ec.ordinal, after: fc.ordinal } : null,
           renameKey: renameKeyOf(ft.key, ec.name),
           fileClassifications: null,
-          classificationIds: [],
+          classificationIds: NO_CLASSIFICATIONS,
           mappingIds: mappingIdsOf(ec.id),
         });
       } else {
-        columns.push({ status: "new", existing: null, file: fc, changes: [], position: null, renameKey: null, fileClassifications: null, classificationIds: [], mappingIds: [] });
+        columns.push({ status: "new", existing: null, file: fc, changes: [], position: null, renameKey: null, fileClassifications: null, classificationIds: NO_CLASSIFICATIONS, mappingIds: [] });
       }
     }
     for (const ec of gone) {
@@ -458,7 +460,7 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
         position: null,
         renameKey: ec.missing_since || !unmatched.length ? null : renameKeyOf(ft.key, ec.name),
         fileClassifications: null,
-        classificationIds: [],
+        classificationIds: NO_CLASSIFICATIONS,
         mappingIds: mappingIdsOf(ec.id),
       });
     }
@@ -497,7 +499,7 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
           position: null,
           renameKey: null,
           fileClassifications: null,
-          classificationIds: [],
+          classificationIds: NO_CLASSIFICATIONS,
           mappingIds: mappingIdsOf(ec.id),
         })),
       });
