@@ -14,7 +14,7 @@ import {
   sourceSystem,
   sourceTable,
 } from "../__fixtures__/domain";
-import { createSourceTable, deleteSourceTable, NOTE_REMOVED, NOTE_SAVED, setSourceNote, updateSourceColumn } from "./source";
+import { createSourceTable, deleteSourceTable, NOTE_REMOVED, NOTE_SAVED, setSourceNote } from "./source";
 
 const input = { systemName: "crm", databaseName: "crmprod", schemaName: "dbo", name: "address", columns: "addr_id int\nline1 varchar(255)\namount decimal(18,2)" };
 const state = { systems: [sourceSystem()], tables: [sourceTable()] };
@@ -65,38 +65,6 @@ describe("createSourceTable (S1A-13)", () => {
     expect(createSourceTable(makeCtx(), access("owner"), state, { ...input, schemaName: "" })).toMatchObject({ ok: false, error: { code: "invalid" } });
     expect(createSourceTable(makeCtx(), access("reviewer"), state, input)).toMatchObject({ ok: false, error: { code: "forbidden" } });
     expect(createSourceTable(makeCtx(), access("owner", archived), state, input)).toMatchObject({ ok: false, error: { code: "archived" } });
-  });
-});
-
-describe("updateSourceColumn", () => {
-  const ref = { sourceColumnId: ids.colEmail, expectedVersion: 1 };
-  const state = { column: sourceColumn(ids.colEmail) };
-
-  it("changes the comment (slice 7c: Business key and Personal data are classifications)", () => {
-    expect(updateSourceColumn(makeCtx(), access("modeler"), state, { ...ref, comment: " Main address " })).toMatchObject({
-      ok: true,
-      value: { column: { comment: "Main address", version: 2 } },
-    });
-    expect(updateSourceColumn(makeCtx(), access("modeler"), state, { ...ref, isPii: true })).toMatchObject({ ok: false, error: { code: "invalid" } });
-    expect(updateSourceColumn(makeCtx(), access("modeler"), { column: sourceColumn(ids.colEmail, { comment: "x" }) }, { ...ref, comment: "" })).toMatchObject({
-      ok: true,
-      value: { column: { comment: null } },
-    });
-  });
-
-  it("does not change name, type or other flags", () => {
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, name: "mail" })).toMatchObject({ ok: false, error: { code: "invalid" } });
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, isPrimaryKey: true })).toMatchObject({ ok: false, error: { code: "invalid" } });
-  });
-
-  it("refuses no change, a stale version, reviewers and an archived workspace", () => {
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, comment: null })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { sourceColumnId: ids.colEmail, expectedVersion: 3, comment: "x" })).toMatchObject({
-      ok: false,
-      error: { code: "stale_version" },
-    });
-    expect(updateSourceColumn(makeCtx(), access("reviewer"), state, { ...ref, comment: "x" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
-    expect(updateSourceColumn(makeCtx(), access("admin", archived), state, { ...ref, comment: "x" })).toMatchObject({ ok: false, error: { code: "archived" } });
   });
 });
 

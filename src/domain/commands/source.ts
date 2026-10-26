@@ -28,7 +28,7 @@ import {
   type SourceSystem,
   type SourceTable,
 } from "../types";
-import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
+import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { sourceDeleteCascade, sourceDeleteEdits, type SourceDeleteRows } from "../source-changes/delete";
 import { plainTextPair } from "../model/plain-text";
 import { begin, current, done, isLive, nothingToChange, plainTextSchema } from "./shared";
@@ -127,37 +127,6 @@ export function createSourceTable(
     writes.push({ kind: "insert", table: "source_column", row: column });
   });
   return done(ctx, access, { sourceTableId: table.id, sourceSystemId: systemId, createdSystem }, writes);
-}
-
-// ---- column comment ----
-
-const updateSourceColumnInput = z
-  .object({
-    sourceColumnId: uuidSchema,
-    expectedVersion: versionSchema,
-    comment: optionalTextSchema.optional(),
-  })
-  .strict();
-export type UpdateSourceColumnInput = z.input<typeof updateSourceColumnInput>;
-
-/** The comment (slice 7c: the flags are classifications). Name, type and position come from the source and stay. */
-export function updateSourceColumn(
-  ctx: CommandContext,
-  access: WorkspaceAccess,
-  state: { column: SourceColumn | null },
-  input: unknown,
-): CommandResult<{ column: SourceColumn }> {
-  const parsed = begin(access, "model.edit", updateSourceColumnInput, input);
-  if (!parsed.ok) return fail(parsed.error);
-  const { sourceColumnId, expectedVersion, comment } = parsed.data;
-  const got = current(state.column, access, sourceColumnId, expectedVersion, "source column");
-  if (!got.ok) return fail(got.error);
-  const before = got.row;
-  const patch: Partial<SourceColumn> = {};
-  if (comment !== undefined && comment !== before.comment) patch.comment = comment;
-  if (Object.keys(patch).length === 0) return fail(nothingToChange());
-  const row = nextVersion(ctx, before, patch);
-  return done(ctx, access, { column: row }, [{ kind: "update", table: "source_column", before, row }]);
 }
 
 // ---- the modeller's note (slice 7c, P8, item 15) ----

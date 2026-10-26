@@ -1,3 +1,4 @@
+import { dataVaultUses, indexOf } from "@/domain/model/classifications";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { AppShell } from "@/app/_components/app-shell";
@@ -252,6 +253,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
             <SettingsForm
               key={workspace.version}
               editable={can(access, "workspace.edit_settings")}
+              dataVaultUses={dataVaultUses(indexOf(model))}
               initial={{
                 workspaceId: workspace.id,
                 version: workspace.version,

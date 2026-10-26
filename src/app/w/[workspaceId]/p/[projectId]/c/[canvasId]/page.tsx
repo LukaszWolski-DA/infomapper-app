@@ -250,6 +250,7 @@ export default async function CanvasPage({
                   importData={importData}
                   changes={sourceChanges}
                   people={Object.fromEntries(users.map((u) => [u.id, u.display_name]))}
+                  dataVault={!!workspace?.dv2_mode}
                 />
               ),
               openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId || focusSelection),

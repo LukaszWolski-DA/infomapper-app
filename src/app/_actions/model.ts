@@ -11,7 +11,7 @@ import { addAttribute, createAttributeFromColumn, deleteAttribute, reorderAttrib
 import { createConcept, deleteConcept, renameConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity, type UpdateEntityInput } from "@/domain/commands/entity";
 import { createRelationship, deleteRelationship, swapRelationship, updateRelationship, type UpdateRelationshipInput } from "@/domain/commands/relationship";
-import { createSourceTable, deleteSourceTable, updateSourceColumn, type CreateSourceTableInput, type UpdateSourceColumnInput } from "@/domain/commands/source";
+import { createSourceTable, deleteSourceTable, type CreateSourceTableInput } from "@/domain/commands/source";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceModel } from "@/domain/types";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
@@ -251,13 +251,6 @@ export async function createSourceTableAction(
 }
 
 /** BK and PII flags and the comment of a column. */
-export async function updateSourceColumnAction(workspaceId: string, input: UpdateSourceColumnInput): Promise<ActionResult<null>> {
-  return modelCommand(workspaceId, (ctx, access, { sourceColumns }) => {
-    const result = updateSourceColumn(ctx, access, { column: byId(sourceColumns, input?.sourceColumnId) }, input);
-    return result.ok ? { ...result, value: null } : result;
-  });
-}
-
 /**
  * Deletes a table from the model with its columns, cards, relationships, links and the mappings that read it (slice 7b,
  * Q7: the same cascade as a change's “Delete…”); the panel shows it all first (`sourceDeleteImpactAction`).

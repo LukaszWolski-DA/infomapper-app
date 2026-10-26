@@ -8,12 +8,11 @@
 // tables; a column's “Missing from source since”. Slice 7b (items 13, 18, 21, 24): “Retired: historical since”, the
 // table's open changes to resolve, the columns list's “retired” and “not needed”, a column's “Mark as needed”, and
 // “Delete table…” on the same cascade and form as a change's “Delete…” (D-47, Q7), now also for mapped tables.
-// Slice 7c, step 3: the column's two flags are the classifications Business key and Personal data (links, by their
-// current names; a removed one is not offered); step 4 replaces them with the Classifications section.
+// Slice 7c (items 13–16, F22): a table's and a column's Classifications section and Note; a column's comment is the
+// source's, read-only ("From the source:", P9), as a table's.
 
 import { useContext, useRef, useState } from "react";
-import { setClassificationAction } from "@/app/_actions/classification";
-import { deleteSourceTableAction, updateSourceColumnAction } from "@/app/_actions/model";
+import { deleteSourceTableAction } from "@/app/_actions/model";
 import { markColumnNeededAction } from "@/app/_actions/source-change";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
@@ -21,7 +20,8 @@ import type { Uuid } from "@/domain/ids";
 import { formatColumnType } from "@/domain/model/type-check";
 import type { SourceColumn, SourceRelationship, SourceTable } from "@/domain/types";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, dangerClass, Field, Flag, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TextField, TypeDot } from "./fields";
+import { ClassificationsSection, SourceNote } from "./classifications";
+import { Actions, buttonClass, dangerClass, Field, Fold, GroupedSelect, Hint, Kind, Li, LongList, smallButtonClass, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
@@ -133,6 +133,15 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
         </Fold>
       )}
       <ItemLabels target={{ kind: "source_table", id: t.id }} />
+      <ClassificationsSection target={{ kind: "source_table", id: t.id }} />
+      <SourceNote
+        target={{ kind: "source_table", id: t.id }}
+        name={t.name}
+        version={t.version}
+        value={t.note_text}
+        placeholder="What this table holds, who owns it, how it is loaded"
+        hint="Separate from the source’s comment."
+      />
 
       <Fold title="Columns and where they go" count={columns.length}>
         <LongList
@@ -271,13 +280,6 @@ export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
   const markNeeded = () => void run(() => markColumnNeededAction(p.workspaceId, ref), ({ name }) => `Marked as needed: ${name}`, { undoable: true });
   /** Where the D-48 choice opens: under the attribute picker. */
   const mapAt = useRef({ x: 0, y: 0 });
-  const save = (change: { comment?: string | null }) => void run(() => updateSourceColumnAction(p.workspaceId, { ...ref, ...change }));
-  const flags = (["BK", "PII"] as const).flatMap((code) => {
-    const k = p.ix.classes.byCode.get(code);
-    return k ? [{ code, classification: k, on: p.ix.classes.has(c.id, code) }] : [];
-  });
-  const toggle = (classificationId: string, on: boolean) =>
-    void run(() => setClassificationAction(p.workspaceId, { classificationId, target: { kind: "source_column", id: c.id }, on }));
 
   const facts = [formatColumnType(c), c.is_nullable ? "nullable" : "required", c.is_primary_key ? "primary key" : null, c.is_foreign_key ? "foreign key" : null]
     .filter(Boolean)
@@ -304,6 +306,13 @@ export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
           {facts}
         </span>
       </Hint>
+      {c.comment && (
+        <Hint>
+          <span data-testid="source-column-comment">
+            <span className="text-im-ink-3">From the source:</span> {c.comment}
+          </span>
+        </Hint>
+      )}
       <MissingSince of={c} />
       {/* “not needed” is never final (slice 7b, P10) */}
       {c.not_needed && (
@@ -318,23 +327,14 @@ export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
           )}
         </p>
       )}
-      <Field label="Flags">
-        <div className="flex flex-wrap gap-1.5" data-testid="flags-column">
-          {flags.map((f) => (
-            <Flag key={f.code} on={f.on} label={f.classification.name} disabled={!p.editable} onToggle={() => toggle(f.classification.id, !f.on)} />
-          ))}
-        </div>
-      </Field>
-      <Field label="Comment" htmlFor="f-cc">
-        <TextField
-          key={`${c.id}:${c.version}`}
-          id="f-cc"
-          value={c.comment ?? ""}
-          readOnly={!p.editable}
-          onSave={(comment) => save({ comment: comment || null })}
-          testId="input-column-comment"
-        />
-      </Field>
+      <ClassificationsSection target={{ kind: "source_column", id: c.id }} />
+      <SourceNote
+        target={{ kind: "source_column", id: c.id }}
+        name={c.name}
+        version={c.version}
+        value={c.note_text}
+        placeholder="What a modeller should know: meaning, quirks, which values to expect"
+      />
 
       <Fold title="Feeds" count={mappings.length}>
         {mappings.length ? (

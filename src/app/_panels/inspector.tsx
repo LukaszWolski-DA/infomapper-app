@@ -79,6 +79,8 @@ export interface InspectorProps {
   changes: SourceChange[];
   /** People's names by id: who resolved a change (slice 7b). */
   people: Record<Uuid, string>;
+  /** Data Vault 2.0 mode (slice 7c, P5): the Data Vault classifications show in the panels only then. */
+  dataVault: boolean;
 }
 
 export interface CanvasPlace {

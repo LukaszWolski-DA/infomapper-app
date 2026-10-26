@@ -2,8 +2,11 @@
 
 // Workspace settings as in the prototype: each field saves when it changes (no Save button).
 // Every save sends the version this page read; a stale version is refused with the domain's message (AD-12).
+// Slice 7c (item 17, answers F16, F17): the methodology text names the source table panels; switching Data Vault 2.0
+// mode off says how many uses of Data Vault classifications stay stored.
 
 import { useRef, useState } from "react";
+import { DATA_VAULT_MODE_TEXT, dataVaultOffMessage } from "@/domain/model/classifications";
 import type { DocLanguage } from "@/domain/types";
 import { updateWorkspaceSettingsAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
@@ -27,9 +30,8 @@ const LANGUAGES: [DocLanguage, string][] = [
 
 type Patch = Partial<Omit<SettingsValues, "workspaceId" | "version">>;
 
-const SAVED_MESSAGE = (patch: Patch): string => {
-  if (patch.dv2Mode !== undefined)
-    return patch.dv2Mode ? "Data Vault 2.0 mode is on." : "Data Vault 2.0 mode is off.";
+const SAVED_MESSAGE = (patch: Patch, dataVaultUses: number): string => {
+  if (patch.dv2Mode !== undefined) return patch.dv2Mode ? "Data Vault 2.0 mode is on." : dataVaultOffMessage(dataVaultUses);
   if (patch.fourEyes !== undefined) return patch.fourEyes ? "Four-eyes approval is on." : "Four-eyes approval is off.";
   return "Settings saved.";
 };
@@ -37,7 +39,8 @@ const SAVED_MESSAGE = (patch: Patch): string => {
 const fieldClass =
   "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 disabled:opacity-60 disabled:cursor-default";
 
-export function SettingsForm({ initial, editable }: { initial: SettingsValues; editable: boolean }) {
+/** `dataVaultUses`: the workspace's uses of Data Vault classifications (answer F16), for the mode-off message. */
+export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial: SettingsValues; editable: boolean; dataVaultUses?: number }) {
   const { run } = useAction();
   const [version, setVersion] = useState(initial.version);
   const saved = useRef<SettingsValues>(initial);
@@ -45,7 +48,7 @@ export function SettingsForm({ initial, editable }: { initial: SettingsValues; e
   async function save(patch: Patch, revert: () => void) {
     const result = await run(
       () => updateWorkspaceSettingsAction({ workspaceId: initial.workspaceId, expectedVersion: version, ...patch }),
-      SAVED_MESSAGE(patch),
+      SAVED_MESSAGE(patch, dataVaultUses),
     );
     if (result.ok) {
       setVersion(result.value.version);
@@ -131,9 +134,8 @@ export function SettingsForm({ initial, editable }: { initial: SettingsValues; e
 
       <div className="rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]">
         <h4 className="m-0 mb-1 text-[13.5px] font-semibold">Methodology</h4>
-        <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">
-          InfoMapper is methodology-neutral. The Data Vault 2.0 mode adds hints (hubs, business keys, satellites by
-          source) to entity panels; nothing is generated or enforced.
+        <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2" data-testid="text-methodology">
+          {DATA_VAULT_MODE_TEXT}
         </p>
         <label className="flex items-center gap-2">
           <input
