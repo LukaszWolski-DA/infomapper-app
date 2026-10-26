@@ -1,6 +1,6 @@
 # Slice 7b – Acceptance
 
-Status: **step 6, the closing, done (25 October 2026); Łukasz's manual acceptance next.** Branch `slice/07b-source-changes`, from
+Status: **step 6 accepted except S4B2-06 (26 October 2026); its investigation and two partial criteria closed below.** Branch `slice/07b-source-changes`, from
 `main` at `dd072b6` (tag `slice-07a`). PRD: `docs/prd/slice-07b-source-changes.md`. The PRD stays as written; this file
 is its amendment.
 
@@ -1436,3 +1436,68 @@ move. Open http://localhost:3000, pick **Łukasz**, Retail Co – DWH, Customer 
 **Checked in the browser before handing over** (a freshly seeded copy with the two imports): steps 7, 8 and 11 read as
 written (“Review the 2 sent back…”, then “Review the 1 sent back…” with `Customer.email` under “These don't fit the
 source yet:” and “Approve 0” disabled; Undo of “Left in review” brings the change back, 7 → 8 in the status bar).
+
+## Łukasz's answers to step 6 (26 October 2026)
+
+Step 6 accepted except S4B2-06, to be treated as a possible regression and investigated (time-boxed, about 2 hours),
+first ruling the time-zone hours in or out. The manual acceptance is done. Windows' automatic time zone was turned off
+and set back to Warsaw (UTC+01:00); the S7B-14 fix stays. Close the two partial criteria: `rule_updated` end to end, and
+a reviewer on model consistency and the Changes view (S7B-15). Then two full e2e runs in a row.
+
+## Step 6 follow-up: S4B2-06 and the two criteria (26 October 2026)
+
+### The time-zone hours: ruled out
+
+Windows' automatic time zone flipped six times, not once (System log, Kernel-General event 22, UTC): 25 October 09:39
+(with the winter-time switch, -120 → -60, then -60 → -480), 14:31, 18:07, 19:42, 21:28, and 26 October 07:41. S4B2-06
+ran about 38 minutes into run 1 (20:26–21:26 UTC), so about 21:07 UTC, inside the stable UTC+1 window from 19:42 to
+21:28; and about 38 minutes into run 4 (07:10–08:05 UTC), so about 07:48 UTC, six minutes after the 07:41 flip, not
+across it. Nothing in a requirement drop reads a date or the time zone. Run 2's failures (S7A-05, S7B-14) did run in a
+time zone that changed two minutes after its server started.
+
+### S4B2-06: the test, not the app
+
+- **What fails:** after REQ-101 is dropped on empty canvas, the test drags it onto its own card 40 px left and down and
+  expects “Move card”; it reads “Place card”.
+- **Reproduced** with 4× CPU throttling through CDP (`Emulation.setCPUThrottlingRate`) in a temporary copy of the spec:
+  **3 of 3 fail on this branch, 3 of 3 on `116264d` (before step 5) and 3 of 3 at the tag `slice-07a`**. So not a
+  regression of this slice: an older race that load brings out (the closing runs were slower than the earlier ones).
+- **The cause** (temporary instrumentation of `dropTargetFor`, not committed): at the second drag the canvas's
+  requirement nodes held only REQ-104's seeded card; REQ-101's card was stored but not on the canvas yet. A placed
+  requirement card appears only when the page's fresh data arrives after the action (`placeReqCards` adds no node of
+  its own; `revalidatePath` brings it); under 4× throttling that was about 2 s after the toast. The test waited for the
+  toast, the data file and the panel, not for the card on the canvas. Until the card shows, the point is empty canvas,
+  and “Place card” is the right hint for what the screen shows.
+- **The fix** (`05d0a04`): the spec waits for REQ-101's card on the canvas (`reqCard`) before the second drag. With it,
+  **3 of 3 pass under 4× throttling**, and the spec passes unthrottled.
+- **Not changed in the app.** A drop during that second would place a second card, which the server refuses (one card
+  per requirement and canvas). Showing the card at once (an optimistic node, as cards placed from the left panel?) would
+  close the gap for people too; not in this slice's scope, so not done. Say if it should go to `docs/ideas.md`.
+
+### The two partial criteria
+
+- **S7B-01, `rule_updated` end to end:** a new test approves the seed's `Customer.created_at ← customers.created_ts`
+  (rule `CAST(created_ts AS date)`), re-imports `crm_snapshot_2026-10-20.csv` through the wizard, picks “It was renamed
+  to created_on” in the review (which shows “its rule now reads CAST(created_on AS date)”) and imports. Checked: one
+  `rule_updated` change, normal, open, on the mapping and the column; the mapping in review with the rewritten rule; the
+  card “Rule updated for a renamed column” with the detail “The approved mapping to Customer.created_at went back to
+  review: its rule now reads CAST(created_on AS date).” and “Approve the mapping again”. The test file is the sample;
+  the rename is the modeller's choice in the review (D-55).
+- **S7B-15, a reviewer:** a new test signs in as Piotr: model consistency on the home with its groups and CRM's line,
+  links only (no button or field); the line opens CRM's panel with no model action and no “Re-import”; “Show what it
+  touched on the canvas” turns the view on (“3 tables, 3 mappings, 3 attributes”), Close, the toolbar button and the
+  chip; the model unchanged afterwards.
+- Both files: 3 of 3. `npm test`: 93 files, 1,242 tests. Lint and typecheck pass.
+
+### Two full e2e runs in a row (26 October, UTC+1 throughout)
+
+With the S4B2-06 fix and the two new tests (306 tests), each from scratch with no dev server running:
+
+- **Run 5: 305 passed, 1 failed, 1.0 h** (09:05–10:06 UTC). The failure: “P8 (route): a review that no longer
+  matches the system writes nothing and says so” (`e2e/slice-07a/S7A-04-route.spec.ts`), at its first line, the
+  development sign-in (`signInAs`): after the click on Łukasz the top bar did not show within 15 s. Nothing of the
+  slice runs before that point. On its own: **3 of 3 passed** (the whole file, 5 tests each). It never failed in the
+  other eight full runs logged since slice 7a's close. Not investigated further; not recorded as a known flake (your
+  call).
+- **Run 6: 306 passed, 0 failed, 1.0 h** (10:06–11:09 UTC).
+- S4B2-06 passed in both.
