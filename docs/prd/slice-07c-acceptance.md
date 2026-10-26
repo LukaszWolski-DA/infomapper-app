@@ -666,3 +666,21 @@ for your approval, and one full e2e run (P13).
 3. Decision 3: should an unknown value stop the Business key suggestion for its column (the file did name something)?
 4. Decision 9: "with personal data" in the reading's satellite line, instead of the prototype's "PII"?
 5. Decision 7: restore for built-in ones only?
+
+## Łukasz's answers to step 2 (26 October 2026)
+
+- **The texts:** approved, with three changes:
+  1. What stops, Business key: "Without it, the app no longer: suggests business keys on attributes; sends approved
+     mappings back when a business key column changes type; raises business key changes on import; suggests business
+     keys in the import; shows the BK badge on source rows or keeps them in the Keys filter; shows a hub in the Data
+     Vault reading."
+  2. Undo labels: "Set {classification} on {object}" and "Clear {classification} from {object}" (the classification's
+     current name; the object as the other labels name it).
+  3. Import warnings: "Unknown classification “{value}” on {schema}.{table}.{column} (row {n}; {k} more rows in this
+     table), ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it." and
+     "“{value}” is a table classification; ignored on {schema}.{table}.{column} (row {n}; {k} more rows in this
+     table)." Without {k} when there are none.
+- **Decision 2:** yes, on one condition: after step 3 the app is in one consistent state. Step 3 drops the flag
+  columns, so the column panel's business key and personal data checkboxes switch in step 3 to the toggle command (BK
+  and PII links). Step 4 replaces them with the full Classifications section.
+- **Decisions 3, 7, 9:** as built.
