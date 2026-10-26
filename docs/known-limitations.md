@@ -539,6 +539,9 @@ the demo data is replaced: steps whose change group is no longer in the change l
 - **Accepted** for the local adapter: one development server, one user at a time in practice.
 - **The database slice (last, AD-31):** decide whether the history must survive a restart (and several server instances). If it must,
   keep it in the database next to `change_event`.
+- **Slice 7c (F6):** a step recorded before the local data file's upgrade to format 8 that touched a source column
+  carries the column's old business key and personal data flags in its images, so undoing or redoing it is refused
+  ("changed afterwards"); nothing wrong is written. A server restart empties the history anyway.
 
 ### No undo outside canvases (slice 3a, step 0)
 
