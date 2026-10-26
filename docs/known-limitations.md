@@ -684,6 +684,14 @@ pages), so the first tests do not wait for compiles.
   compile once more).
 - **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.
 
+### S7A-04-route's development sign-in timed out once (a known flake)
+
+In slice 7b's closing (run 5 of 26 October 2026), “P8 (route): a review that no longer matches the system writes
+nothing and says so” (`e2e/slice-07a/S7A-04-route.spec.ts`) failed at its first line, the development sign-in: after
+the click on Łukasz the top bar did not show within 15 s. That is before any slice code runs. It happened in 1 of 9
+full runs logged since slice 7a's close, and the file passed 3 of 3 on its own. Recorded as a known flake (Łukasz, 26
+October 2026); if it comes back, look at the sign-in redirect's timing under a long run.
+
 ## Source import (slice 7a)
 
 ### Every write rewrites the whole local data file

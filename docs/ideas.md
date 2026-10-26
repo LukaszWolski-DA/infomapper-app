@@ -202,3 +202,11 @@ notice to the other people of the workspace (the modellers who own the affected 
 
 The Changes view only fades (P11). Acting on the lit changes from its bar, without opening the system's panel, would
 shorten the way from seeing what a change touches to settling it.
+
+## A requirement card placed by a drop shows at once (slice 7b, step 6)
+
+A requirement dropped on empty canvas gets its card only when the page's refreshed server data arrives after the
+action (`placeReqCards` adds no node of its own; `revalidatePath` brings it). Under load that gap was about 2 s
+(S4B2-06 with 4× CPU throttling), and a second drop in it tries to place a second card, which the server refuses (one
+card per requirement and canvas). Showing the card on the canvas at once (an optimistic node, kept or dropped when the
+action answers) would close the gap (Łukasz, 26 October 2026).

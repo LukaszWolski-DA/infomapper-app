@@ -1,6 +1,6 @@
 # Slice 7b – Acceptance
 
-Status: **step 6 accepted except S4B2-06 (26 October 2026); its investigation and two partial criteria closed below.** Branch `slice/07b-source-changes`, from
+Status: **accepted (26 October 2026); merged into `main` and tagged `slice-07b`.** Branch `slice/07b-source-changes`, from
 `main` at `dd072b6` (tag `slice-07a`). PRD: `docs/prd/slice-07b-source-changes.md`. The PRD stays as written; this file
 is its amendment.
 
@@ -1501,3 +1501,11 @@ With the S4B2-06 fix and the two new tests (306 tests), each from scratch with n
   call).
 - **Run 6: 306 passed, 0 failed, 1.0 h** (10:06–11:09 UTC).
 - S4B2-06 passed in both.
+
+## Łukasz's answers after the follow-up (26 October 2026)
+
+S4B2-06's spec fix and the two new tests accepted. The optimistic requirement card goes to `docs/ideas.md`, and
+S7A-04-route's sign-in timeout to `docs/known-limitations.md` as a known flake with its facts (both done).
+
+**Manual acceptance of slice 7b: passed, 26 October 2026** (Łukasz, the definition of done's scenario above). Merged
+into `main` and tagged `slice-07b`.
