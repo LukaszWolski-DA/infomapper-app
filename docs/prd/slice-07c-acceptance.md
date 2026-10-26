@@ -1089,3 +1089,14 @@ As **Łukasz**, `npm run dev`, Customer 360 → "Customer & orders", Sources tab
 1. Decision 1: an unchanged column with "The file says …" shown under "all changes" (otherwise the line never shows on a
    re-import that differs only in classifications)?
 2. Decision 3: plain-text reading lines as built, or the prototype's bold role and monospace names?
+
+## Łukasz's answers to step 5 (26 October 2026)
+
+- **"The file says …" rows always visible:** yes, on one condition: such a row is not counted as a change, neither in the
+  review's counts and the filters' numbers nor in the import's summary and `source_import` counts, as slice 7a's
+  "position {a} → {b}" (the import writes nothing there). Check it and fix it if needed, with a test.
+- **The Data Vault reading:** match the prototype's look (AD-20): the role in bold, column and table names in monospace;
+  texts unchanged.
+- **`COMMITS=1`:** as built; add the command to CLAUDE.md and README.
+- **Moving a card after three large imports** (1,473 ms on 7c vs 1,230 ms on slice-07b): accepted; add it to
+  `docs/known-limitations.md` with both figures, as a limit of the local adapter's data file, for the database slice.
