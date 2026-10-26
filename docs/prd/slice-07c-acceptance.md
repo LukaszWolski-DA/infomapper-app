@@ -1,8 +1,60 @@
 # Slice 7c – Acceptance
 
-Status: **step 1 (critical review), waiting for Łukasz's answers.** Branch `slice/07c-classifications`, from `main` at
-`408c3c0` (tag `slice-07b`). PRD: `docs/prd/slice-07c-classifications.md`. The PRD stays as written; this file is its
-amendment.
+Status: **step 2 (the domain).** Branch `slice/07c-classifications`, from `main` at `408c3c0` (tag `slice-07b`). PRD:
+`docs/prd/slice-07c-classifications.md`. The PRD stays as written; this file is its amendment.
+
+## Łukasz's answers to step 1 (26 October 2026)
+
+The principle stays: the modeller stays in control and sees what will happen before it happens; nothing changes
+silently; everything can be undone. Any recommendation that conflicts with it is not applied but listed.
+
+- **F1, F3:** yes. Rules read codes only (one domain module of codes). Texts about a rule keep naming the role
+  ("business key"); only the dialog, the panels, the chips and the review show a classification's current name. One
+  "what stops" text per built-in classification that a rule reads, all listed in step 2's report for approval. Built-ins
+  no rule reads get no extra text.
+- **F2:** yes. P11, item 6, item 10 and S7C-02/06 read as "the BK badge on source rows" (from the index) and "the PII
+  badge on attribute rows" (unchanged).
+- **F4:** relative bars: a classification toggle adds the same canvas commits as slice-07b's flag toggle, measured on
+  both tags; the BK toggle shows the badge on its row. No new per-card counter. To `docs/ideas.md`: a panel-only write
+  that does not redraw the canvas.
+- **F14:** the built-in `PII`'s default name is **"Personal data"** (code `PII`), so a file's "PII" and "Personal data"
+  both match and the panel label stays. A difference from the prototype (section 8's list below).
+- **F7:** notes are plain text like the mapping's note (`plainTextPair` into `note_html`/`note_text`, a text area saved
+  on blur, the PRD's toasts). S7C-07 checks that markup is stored escaped. To `docs/ideas.md`: rich text for all notes at
+  once (mappings, tables, columns).
+- **F16:** count uses (links of Data Vault classifications). **F17:** the new settings text as proposed.
+- **Q7:** yes. Column-level business key changes settle with "Settled: {column} is no longer a business key" and
+  "Settled: the classification {name} was removed"; undo reopens them. Mapping-level changes stay open.
+- **Q8:** the attribute suggestion's text stays as it is.
+- **Q4:** the upgrade's report as a file in `.data/` plus one log line, column paths only; every move is also a change
+  event.
+- **F9–F13:** all as proposed: matching in the plan; names unique against names and codes per scope, removed built-ins
+  included; restore refused while its name is taken, with the proposed text; the fingerprint's additions; the business
+  key suggestion also checks live stored columns; one warning per value and table, and the
+  table-classification-on-a-column warning.
+- **F15:** `seed:large` without BK links; the element guard stays "equal to slice-07b".
+- **F8:** "Create attribute from column" keeps copying only the source's comment; the note is not copied.
+- **F5, F6, F18–F22:** accepted as recommended. F6: one line in `docs/known-limitations.md`.
+- **For the data model slice (PRD section 9's list):** F5 (moving the flags' data and seeding the built-in rows in a
+  real database) and F20 (`origin` carries both "built-in or own" and the group).
+
+### Section 8's differences from the prototype, amended
+
+- The built-in `PII` is named "Personal data" (the app's panel label since slice 1a); the prototype names it "PII". A
+  file's "PII" (the code) and "Personal data" (the name) both match.
+
+### The recommendations checked against the principle
+
+None of the accepted recommendations conflicts with it. Four come close and hold as follows:
+
+1. **Q4, moving hand-typed comments in the upgrade** is no undo step (as slice 7b's derivation): it is not a person's
+   action. Every move is a change event in the upgrade's change group and listed in the report; nothing is lost (the
+   text moves into the note, which was empty).
+2. **F6:** undo steps recorded before the upgrade that touch a column are refused ("changed afterwards"). Nothing wrong
+   is written; the history lives in server memory and is empty after a restart anyway. Known-limitations says so.
+3. **F18:** a deleted table's or column's classification links go with it without being listed in the delete form; the
+   delete is one undo step and undoing it brings them back.
+4. **F10:** a restore whose name is taken is refused with a message saying why; nothing happens silently.
 
 ## Step 1: start checks (26 October 2026)
 
@@ -397,7 +449,7 @@ after "Relationships between source tables" (item 21).
 | Own classification's code | `X_{NAME}_{time}` | – | none (null); matched by name only (section 9 idea) |
 | Column panel | "Classifications" toggles in three groups, "Yours: a re-import never changes them.", "Edit the list…", Note | "Flags": Business key, Personal data; editable Comment | as the prototype; comment read-only (P9) |
 | Table panel | Classifications, Note, columns, relationships, Data Vault reading | no classifications, no note | as the prototype, in the app's order (F22) |
-| PII label | "PII" | "Personal data" (column panel, attribute badge's title) | the built-in's name "PII" (question 4) |
+| PII label | "PII" | "Personal data" (column panel, attribute badge's title) | the built-in's name "Personal data", code `PII` (answer F14) |
 | Notes | plain textarea, saved on change, toast | – | plain text as mappings (F7), toast |
 | Remove with uses | `confirm("… is used n×")` | – | impact form with uses and stopped rules (D-47, deliberate) |
 | The list dialog | built-ins as plain text | – | every name an input |
