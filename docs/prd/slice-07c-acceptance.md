@@ -511,3 +511,158 @@ Nothing new above the canvas: the panels' sections live in the details panel bes
 12. **F8:** "Create attribute from column" keeps copying only the source's comment?
 
 The other findings (F5, F6, F10's details, F18–F22) are recommendations I apply unless you say otherwise.
+
+## Step 2: the domain (26 October 2026)
+
+Commits `71aa9c3` (the bench) and `45771f8` (the domain). Lint, typecheck and unit tests pass: 97 files, 1,299 tests
+(56 new, 1,243 before).
+
+### What changed
+
+- **Codes and the built-in list** (`src/domain/model/classifications.ts`): `CLASSIFICATION_CODES`, the 19 built-in
+  classifications (Effective date general; code `PII` named "Personal data", answer F14), `normClassification`, the name
+  rule `nameTakenBy` (names and codes per scope, removed built-ins' codes included, F10), `fitsScope`, the panels'
+  groups, the "what stops" texts (`WHAT_STOPS`, F3), the Data Vault mode texts (F16, F17) and **the index**:
+  `classificationIndex(list, links)` → `of(id)`, `has(id, code)`, `linkOf`, `uses`, built once per load (P11).
+- **Types** (`src/domain/types.ts`): `Classification`, `ClassificationLink`, `note_html`/`note_text` on `SourceTable` and
+  `SourceColumn`, both tables in `WritableRows` and `WorkspaceModel` (`classifications` with removed rows, live links).
+- **Commands** (`src/domain/commands/classification.ts`): `addClassification`, `renameClassification`,
+  `classificationImpact` (uses, what stops, the business key changes that settle) and `removeClassification`,
+  `restoreClassification`, `setClassification` (one toggle; set again is a new row, F19), `linksOnSources`.
+  `setSourceNote` in `source.ts` (plain text through `plainTextPair`, F7; the two toasts). `createWorkspace` writes the
+  19 rows in its change group (item 4).
+- **Cascade** (F18): `sourceDeleteEdits` (`source-changes/delete.ts`) soft-deletes the classification links of a deleted
+  table and its columns; `deleteSourceTable` and the change's "Delete…" pass them.
+- **Settlements** (Q7, `source-changes/settle.ts`): `settleAfterWrites` settles an open business key change without a
+  mapping when its column loses Business key ("Settled: {column} is no longer a business key") or Business key is
+  removed ("Settled: the classification {name} was removed"); a deleted column settles by its deletion first; mapping
+  changes stay open. `businessKeySettlements` counts them for the removal form.
+- **Undo** (`commands/undo.ts`): both tables are undo steps, `classification_link`'s parents are checked, and an undo that
+  would bring back a classification whose name another one has now is refused (new text below). Undo labels in
+  `model/change-label.ts`.
+- **Every domain reader of the old flags switched**: `suggestsBusinessKey` (AD-28) takes column ids and the index;
+  `createAttributeFromColumn` copies Personal data from the `PII` link; the plan's two business key rules (D-51's
+  send-back, D-56's change without a mapping) read `has(id, "BK")`.
+- **The import** (`import/standard.ts`, `plan.ts`, `apply.ts`, `compare.ts`, `materialize.ts`, `model.ts`,
+  `commands/import.ts`): the reader keeps the file's values as written (F9; `NOT_READ_YET` and its two booleans are
+  gone); the plan matches them to live column classifications by code or name, writes the warnings (F13), fills each
+  column's `classificationIds` and "The file says …" names, and offers the suggestions (`hints`, F12). New columns get a
+  link per matched classification and per ticked suggestion. The digest records the matched ids, the file-says names and
+  every suggestion with its tick (F11); `keptChoices` keeps the unticked ones still offered. The server plans with the
+  workspace's Data Vault mode (`access.workspace.dv2_mode`), never the browser's; the route's input takes `hintsOff`.
+- **The Data Vault reading** (`model/data-vault-reading.ts`): `dataVaultReading(input, index)` returns structured lines,
+  `readingText` the prototype's words.
+
+**Outside the domain, only what the types needed:** the local adapter knows the two tables (`DevDb`, `emptyDb`,
+`RULES`: unique code, unique name per scope among live rows, one live link per classification and object, exactly one
+target), `upgradeDb` fills them empty and the notes with null on read (no format change), `store.model.load` returns
+them; the seeds and the synthetic model write the two note fields; `ModelIndex` builds the index and `businessKeyHint`
+uses it; `createAttributeFromColumnAction` passes the list; the review step's two chips ("Business key", "PII") became
+one chip per matched classification.
+
+### Decisions I took (please check)
+
+1. **The two flags stay on `SourceColumn` until step 3** (its upgrade turns them into links and drops them); no domain
+   rule reads them. `updateSourceColumn` keeps `isBusinessKey`, `isPii` and `comment` until step 4 replaces the column
+   panel's flags and comment field; it is the only domain code that still writes the flags.
+2. **Until step 3 the running app is between two states:** the local data file has no classification rows, so the
+   domain's business key rules, the BK suggestion and the Personal data copy see nothing, while the canvas and the
+   panels still read the old flags. Step 2 runs no e2e (PRD); specs that would fail now (S7A-01's "not read yet",
+   S7A-08 and the 7b specs on business key send-backs) come back with step 3's upgrade and step 5's review. Nothing is
+   pushed, so `schema:check` (no migration yet) does not run.
+3. **An unknown value does not count as classifying a column for the suggestions:** a primary key column whose only
+   value is unknown still gets the Business key suggestion (the value is warned about).
+4. **One warning per value and table, for both warnings**, in the form of slice 7a's row warnings: "Row {n}: … (and {k}
+   more rows of {schema.table})". The table-classification warning is deduplicated the same way (your text, with the row
+   added).
+5. **"The file says …"** only when the file's values matched at least one classification, compared as sets, shown by
+   current names. Matching runs only for the tables in scope.
+6. **"The table has no business key"** (F12) = no column of the file matched Business key and no stored column that
+   stays in the source (not missing) has it.
+7. **Restore** refuses an own classification (an own one comes back only by undo, as the PRD lists only built-in ones
+   under "Removed built-in classifications").
+8. **Names:** up to 80 characters, at least one letter or digit (`norm` not empty).
+9. **The Data Vault reading:** a relationship none of whose columns is left is left out; links in relationship-name
+   order; the satellite line says "with personal data" where the prototype says "PII" (the classification is "Personal
+   data" now, and the line names the role).
+10. **The settings text** keeps its first sentence, "InfoMapper is methodology-neutral.", before F17's text.
+11. **The removal form's settlement count** (`settles`) comes from the same rule `settleAfterWrites` applies, so the form
+    can say how many open business key changes settle before the click.
+
+### Every new user-facing text
+
+| Where | Text |
+| --- | --- |
+| What stops: Business key | Without it, the app no longer suggests business keys on attributes, sends approved mappings back when a business key column changes type, raises business key changes on import, suggests business keys in the import, filters keys by it or shows the BK badge on source rows, and the Data Vault reading shows no hub. |
+| What stops: Personal data | Without it, the app no longer copies personal data to attributes created from a column or shows a separate personal data satellite in the Data Vault reading. |
+| What stops: Technical / audit, Load date, Record source | Without it, the Data Vault reading counts these columns as descriptive columns of a satellite. |
+| What stops: Effective date | Without it, the Data Vault reading no longer shows what a table is effective-dated by. |
+| What stops: Link key | Without it, the import no longer suggests link keys, and the Data Vault reading no longer marks link keys or asks about link keys with no relationship. |
+| What stops: Dependent child key | Without it, the Data Vault reading no longer shows dependent child keys and counts these columns as descriptive. |
+| What stops: Driving key | Without it, the Data Vault reading no longer shows driving keys and counts these columns as descriptive. |
+| What stops: Multi-active key | Without it, the Data Vault reading no longer shows multi-active satellites and counts these columns as descriptive. |
+| What stops: Hub candidate | Without it, the Data Vault reading no longer notes a hub candidate that has no business key column yet. |
+| What stops: the other eight built-ins, own ones | (none) |
+| Import warning | Row {n}: unknown classification “{value}” on {schema}.{table}.{column}, ignored (and {k} more rows of {schema}.{table}). Add it under Classifications to use it. |
+| Import warning | Row {n}: “{value}” is a table classification; ignored on {schema}.{table}.{column} (and {k} more rows of {schema}.{table}). |
+| Suggestion's reason | the only primary key column, and the table has no business key / a foreign key: a candidate for a link between hubs |
+| Settlement | Settled: {column} is no longer a business key |
+| Settlement | Settled: the classification {name} was removed |
+| Settings (methodology) | InfoMapper is methodology-neutral. The Data Vault 2.0 mode adds Data Vault classifications and a Data Vault reading to source table panels (hubs, links, satellites); nothing is generated or enforced. |
+| Mode off | Data Vault 2.0 mode is off. {n} Data Vault classifications on tables and columns stay stored and show again when the mode is on. (1: "… 1 Data Vault classification on a table or column stays stored and shows again …"; 0: "Data Vault 2.0 mode is off.") |
+| Toasts | Note saved on {name} / Note removed from {name} |
+| Refusals | That name is taken · Rename {other} first: {name} is taken. · Only built-in classifications can be restored. · It is in the list already. · {name} is a table classification. / {name} is a column classification. · It is marked {name} already. · This can't be undone: another classification is called {name} now. · Enter a name. · This name is too long. |
+| Undo labels | Add classification {name} · Rename classification {name} · Remove classification {name} · Restore classification {name} · Set classification · Clear classification · Edit note on {name} |
+| Data Vault reading | Hub on {columns} · Marked as a hub candidate, but no column is a business key yet · Link to {table} via {columns} (foreign key; not marked Link key) · Link key {columns} with no relationship known: which table does it point to? · Dependent child key {columns}: part of the link’s or satellite’s key, not a hub · Driving key {columns}: an effectivity satellite on the link tracks it · Multi-active satellite keyed by {columns} · Effective-dated by {columns} · Satellite with {n} descriptive columns; {k} with personal data: consider a separate satellite for {columns} · empty: Classify columns (Business key, Link key…) to see what this table suggests. · footer: Hints from the classifications and the source’s keys; nothing is created. |
+
+### Tests
+
+New files: `model/classifications.test.ts` (11: the list, names, the index, what stops, Data Vault mode),
+`commands/classification.test.ts` (14: add, rename, remove and its impact, restore, toggles, roles and archive),
+`import/classifications.test.ts` (14: matching, the warnings, renamed and removed classifications, re-import keeps,
+suggestions with F12 and Data Vault mode, ticks and the fingerprint, the business key rules by code, the command with the
+server's mode), `model/data-vault-reading.test.ts` (5: every line, what is left out, empty, codes). Added to:
+`settle.test.ts` (4: Q7's settlements, a mapping change open, the cascade), `undo.test.ts` (3: removal and toggle undone,
+the name clash), `source.test.ts` (3: notes, escaping, roles), `change-label.test.ts` (2), `mapping-rules.test.ts` and
+`attribute.test.ts` (rules follow the code; the old flag is not read).
+
+Changed earlier tests, with the reason: `standard.test.ts` (the reader keeps raw values; no "not read yet"),
+`plan.test.ts` (business keys set as links; new columns' classifications as links; the file-says name is "Personal
+data"), `workspace.test.ts` (the 19 rows in the creation's group), `model-index.test.ts` (the index), the model and undo
+row literals of seven test files (the two new arrays), `compare-schema.test.ts` (the two new tables).
+
+### The plan timing against slice-07b (section 6)
+
+`npx tsx scripts/bench-import-plan.ts --no-coverage`, this branch and `slice-07b` (a temporary worktree, removed
+afterwards) in turns, three turns each, after a first pair of turns that led to one change (the suggestions' business
+key check runs only for tables with a candidate column). Median of each turn's median:
+
+| Plan the re-import | slice-07b | slice 7c | Bar |
+| --- | --- | --- | --- |
+| 20,000 columns (2,000 tables) | 122 ms (122, 113, 131) | 130 ms (130, 132, 130) | +7 %, within 10 % |
+| 100,000 columns (10,000 tables) | 532 ms (504, 532, 538) | 530 ms (537, 530, 510) | level |
+| The classification index, 2,000 / 10,000 links | – | 1 ms / 2 ms | under 20 ms |
+
+The synthetic file classifies one column per table (BK), so matching runs on 10 % of the rows; suggestions find no
+candidate (every table has a business key). The write figures come with step 3.
+
+### How to check
+
+- `npm test` (or `npx vitest run src/domain/model/classifications.test.ts src/domain/commands/classification.test.ts
+  src/domain/import/classifications.test.ts src/domain/model/data-vault-reading.test.ts`).
+- `npx tsx scripts/bench-import-plan.ts --no-coverage` for the plan and the index.
+- Nothing to see in the app yet (decision 2).
+
+### Open for step 3
+
+The migration, the local data file's format 8 and its upgrade (the 19 rows, the flags as links, P9's comments, the
+report), the server actions, the seeds (`seed:large` without BK links, F15), dropping the two flags, the decision texts
+for your approval, and one full e2e run (P13).
+
+### Questions for Łukasz
+
+1. The texts above: approve, or change any?
+2. Decision 2: is the in-between state until step 3 fine, given that no e2e runs before then?
+3. Decision 3: should an unknown value stop the Business key suggestion for its column (the file did name something)?
+4. Decision 9: "with personal data" in the reading's satellite line, instead of the prototype's "PII"?
+5. Decision 7: restore for built-in ones only?
