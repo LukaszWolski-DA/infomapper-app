@@ -977,3 +977,115 @@ list…" shows the list with names as text and no Add, Remove or Restore.
 - **Escape in the other dialogs:** not changed in this slice. A line in `docs/known-limitations.md` names the dialogs whose
   Escape also clears the canvas selection or closes the panel behind them.
 - **Focus, colours, removing `updateSourceColumn`:** as built.
+
+## Step 5: the import and the Data Vault reading (26 October 2026)
+
+Commits `30554c1` (step 4's answers: the removal form), `62653db` (the review, the reading, the benches), `27564a5` (the
+specs). Lint, typecheck and unit tests pass (98 files, 1,301 tests). Small-slice regime: the slice's specs and the touched
+earlier specs, no full run.
+
+### First: the removal form (answers to step 4)
+
+- The form shows when the classification is in use **or** is a built-in one a rule reads (`whatStops`); then it says
+  "{name} is unused." with what stops. Own unused ones and built-in ones no rule reads go at once, with the toast and
+  Undo. "{n} open business key change(s) without a mapping will be settled."
+- `S7C-05.spec.ts`: Business key in use, Load date unused (the form, "unused", what stops), Staging and an own one removed
+  at once; a second test takes Business key off its four columns and shows the form for the unused Business key.
+- `docs/known-limitations.md` names the dialogs whose Escape also clears the canvas selection: "Delete {entity} from the
+  model?", "Delete the concept {name}?", "New source table", "Import sources into {system}". The Classifications
+  dialog also keeps the canvas's one-letter shortcuts (F, M, E, H, A, N, V) to itself now; with the focus on the dialog
+  (step 4's decision 4) they reached the canvas.
+
+### What changed (step 5)
+
+- **The review** (`src/app/_panels/import/review-step.tsx`): a new column's classifications as chips; a Data Vault one
+  with the "Data Vault 2.0" chip and, with the mode off, "hidden while Data Vault 2.0 mode is off"; "The file says …;
+  your classifications are kept." (`review-file-says`); the warnings as approved; "Suggested classifications" with
+  "Suggestions only. Untick what does not fit; you can change classifications on the column later.", one ticked checkbox
+  per suggestion with the column, the chip and the reason, under the filters "all changes" and "new".
+- **The wizard** (`import-wizard.tsx`, `wizard-model.ts`): `hintsOff` in its state, part of the plan, sent to the upload
+  route, cleared with a new file; a tick changes the plan at once, so the import still matches the review.
+- **The Data Vault reading** in the table panel in Data Vault 2.0 mode, after "Relationships between source tables"
+  (`DataVaultReading` in `classifications.tsx`, the domain's `dataVaultReading` and its texts).
+- **The plan** shares one empty `classificationIds` array between the columns the file does not classify (section 6:
+  20,000 fresh arrays per plan cost about 10 ms at 20,000 columns).
+- **The benches:** `bench-import-plan.ts` times the index (step 2); `bench-import-write.ts` times removing Business key
+  from the import's 2,000 columns (`ONLY_REMOVE=1` for only that).
+
+### Decisions I took (please check)
+
+1. **An unchanged column whose file names other classifications shows under "all changes"** (`shownUnder`), with its
+   "The file says …" line, and is no longer folded into "Show {n} unchanged columns". Before, a re-import that differs
+   only in classifications showed nothing at all (the table counted as unchanged and was hidden), so the line the PRD
+   asks for never appeared. The counts on the filters do not change (it is no change of the source).
+2. **Suggestions show under "all changes" and "new"**, after the tables and relationships and before the warnings (the
+   prototype's place).
+3. **The reading's lines are plain text** (the approved texts), one bullet each; the prototype sets the role in bold
+   and the names in a monospace font. A visual detail for step 6 if you want it.
+4. **The canvas-commit figure runs on demand** (`COMMITS=1`, `S7C-14-commits.spec.ts`, skipped otherwise), on both tags
+   with the same steps; it finds the old flag buttons on slice-07b and the toggles here.
+5. **The slice-07b worktree for the figures got its own `npm ci`**: Turbopack refuses a `node_modules` link pointing
+   outside the project. The worktree lived in `.data/` (git-ignored) and was removed afterwards.
+
+### Tests
+
+New in `e2e/slice-07c/` (26 tests in the folder, all passing, 4.3–5.0 min):
+
+| Spec | What it checks |
+| --- | --- |
+| `S7C-06.spec.ts` (3) | with Business key removed: no suggestion on `customer_number`, no BK badge, no send-back or business key change in the CRM re-import's review, no Business key suggestion for a new system; restored and set again: all four back; the seed's state as the reference |
+| `S7C-10.spec.ts` (2) | codes and names of the list matched in any case and spelling, an own one by name; the table classification and the unknown value warned once per table; Link key read with the mode off and marked; what matched written; the CRM file's TECH, Effective date, Load date read without warning; a re-import calling `fname` Technical / audit says so and keeps Personal data |
+| `S7C-11.spec.ts` (3) | Business key (only primary key, no business key) and Link key (Data Vault mode, foreign key not primary) suggested, all ticked, the texts; Link key unticked and not written, the others written; the import's undo takes the links; no Link key without the mode; Load date renamed meanwhile: the review refreshes and warns about "Load date" |
+| `S7C-12.spec.ts` (2) | every line on `customers` and `customer_addresses` (hub, link unmarked and marked, link key with no relationship, dependent child, driving, multi-active, effective-dated, satellite with personal data apart); missing, retired and not needed columns left out; a renamed Business key still read; the empty text; no reading without the mode |
+| `S7C-04.spec.ts` (+1, the import's part) | an import matches a renamed Business key by its new name and by `BK`, an own one by name; the old name is unknown |
+| `S7C-09.spec.ts` (+1, the reading's part) | the reading only in Data Vault 2.0 mode |
+| `S7C-14-commits.spec.ts` (1, on demand) | section 6's commit count |
+
+Earlier specs this step touches: all of `e2e/slice-07a/` and `e2e/slice-07b/` (the review, the wizard, the business key
+specs): **64 passed, 7.8 min**, no change needed. S7A-05 and S7A-07 again after the last plan change: passed.
+
+### Section 6's figures (S7C-14, as amended by F4)
+
+| What | How | Bar | Result |
+| --- | --- | --- | --- |
+| Viewport elements, "Performance test", four views | `S3B-15-elements.spec.ts` in the measurement build, baseline taken from a `slice-07b` measurement build the same evening (`.data/measure/s7c14-baseline/slice-07b.json`) | equal | **equal**: 30 % expanded 4,508, 100 % expanded 19,305, 30 % collapsed 1,465, 100 % collapsed 4,907 (page 5,993 / 20,790 / 2,860 / 6,302) |
+| A classification toggle without a canvas mark (Personal data) | `S7C-14-commits.spec.ts`, 6 toggles, on both tags | as slice-07b's flag toggle | **3 commits per toggle on both** |
+| Business key toggled (the BK badge on the row) | the same | as slice-07b's | **3 commits per toggle on both** |
+| The classification index | `bench-import-plan.ts`, 20,000 columns, 10 % classified (2,000 links), median of 5 | under 20 ms | **1 ms** (2 ms at 100,000 columns) |
+| Planning a re-import, 20,000 columns | `bench-import-plan.ts`, five turns each side after the change above | within 10 % of slice-07b | **120 vs 114 ms, +5 %** (100,000: 497 vs 474 ms, +5 %) |
+| Writing: first import, 20,000 columns | `bench-import-write.ts 20000`, three turns each side | within 10 % | **2,434 vs 2,247 ms, +8 %** (the import now writes 2,000 links and their events too; the file is 49 MB instead of 47) |
+| Writing: re-import, 5 % changed | the same | within 10 % | **1,242 vs 1,159 ms, +7 %** |
+| Undo the re-import / the first import | the same | within 10 % | **613 vs 587 ms, +4 %** / **2,798 vs 2,689 ms, +4 %** |
+| Removing a classification used on 2,000 columns | `bench-import-write.ts` (Business key on 2,004 columns), through the local adapter, one change group | under 1 s | **549–567 ms** |
+| The data upgrade on `seed:large` | step 3 | reported | 8.8 ms |
+
+Not one of this slice's bars, reported because the write bench prints it: "move a card after three large imports" was
+1,230 ms on slice-07b and 1,473 ms here (+20 %; slice 7a's bar of 500 ms is missed on both, known-limitations.md); the
+three imports' data file is larger by the links and their change events.
+
+Before the shared empty array the 20,000-column plan was +15 % (eight turns: 130 vs 113 ms); my first probe blamed the
+classification step for 38 ms, which turned out to be the probe's own warm-up order: the step itself costs about 5 ms
+(index 0.5 ms, matching and suggestions 4 ms).
+
+### How to check in the browser
+
+As **Łukasz**, `npm run dev`, Customer 360 → "Customer & orders", Sources tab:
+
+1. **An import with suggestions:** "Import sources…", "A new system" named "Feed", paste or drop a file in the standard
+   with a table whose only primary key column has no classification (e.g. `d,s,t,id,1,int,no,yes,,,,,` and
+   `d,s,t,name,2,varchar(20),yes,no,,,,,`). The review shows "Suggested classifications" with `s.t.id`, "Business
+   key", "the only primary key column, and the table has no business key", ticked. Untick it, import: `id` has no
+   classification; import again with it ticked: Business key.
+2. **A re-import with "The file says …":** import `crm_snapshot_2026-10-20.csv` into CRM (from
+   `src/domain/import/samples/`); then change `fname`'s classification in a copy of the file from `PII` to `TECH` and
+   import it again: the `fname` row says "The file says Technical / audit; your classifications are kept."; after the
+   import `fname` is still Personal data.
+3. **The reading in Data Vault mode:** workspace page → Settings → tick Data Vault 2.0 mode; back on the canvas click the
+   `customers` card: "Data Vault reading" after the relationships says "Hub on cust_no" and the satellite line; set Link
+   key on `customer_addresses.cust_id` and its reading's first line loses "(foreign key; not marked Link key)".
+
+### Questions for Łukasz
+
+1. Decision 1: an unchanged column with "The file says …" shown under "all changes" (otherwise the line never shows on a
+   re-import that differs only in classifications)?
+2. Decision 3: plain-text reading lines as built, or the prototype's bold role and monospace names?
