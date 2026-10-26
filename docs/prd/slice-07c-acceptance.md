@@ -840,3 +840,15 @@ message; the decision texts above once you approve them (written in step 6 with 
 1. The decision texts above: approve, or change any?
 2. Decision 5: the wizard's Data Vault mode in step 3 rather than step 5, fine?
 3. Should the decision texts go into `docs/decisions.md` in step 4 already, or with the docs in step 6?
+
+## Łukasz's answers to step 3 (26 October 2026)
+
+- **The decision texts** (new D-57; D-55, D-51, D-56, AD-08, AD-28 as quoted): approved as written; written into
+  `docs/decisions.md` as step 4's first commit.
+- **Decision 5** (the wizard's Data Vault mode in step 3): yes.
+- **Who signs the upgrade:** the workspace's creator stays, since it shows nowhere today. To
+  `docs/known-limitations.md`: "The rows and change events slice 7c's upgrade wrote are signed by the workspace's
+  creator; a future 'last changed by' must recognise them as the upgrade's." **For the data model slice (PRD section
+  9's list):** a system author for upgrades (e.g. "InfoMapper upgrade").
+- **Live columns only:** yes. To `docs/known-limitations.md`: a deleted column brought back by undo keeps a hand-typed
+  comment in "From the source:".
