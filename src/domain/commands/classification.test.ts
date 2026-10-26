@@ -138,6 +138,8 @@ describe("set and clear a classification on a table or column (items 13, 14, S7C
     const r = setClassification(makeCtx(), access("modeler"), state(), { classificationId: builtin("TECH").id, target: { kind: "source_column", id: ids.colEmail }, on: true });
     expect(writes(r)).toEqual([expect.objectContaining({ kind: "insert", table: "classification_link", row: expect.objectContaining({ source_column_id: ids.colEmail, source_table_id: null }) })]);
     expect(r.ok && r.value).toEqual({ name: "Technical / audit", objectName: "email", on: true });
+    // the undo history's name (Łukasz, step 2)
+    expect(r.ok && r.writeSet.label).toBe("Set Technical / audit on email");
     const t = setClassification(makeCtx(), access("modeler"), state(), { classificationId: golden.id, target: { kind: "source_table", id: ids.crmCustomer }, on: true });
     expect(writes(t)[0]).toMatchObject({ row: { source_table_id: ids.crmCustomer, source_column_id: null, classification_id: golden.id } });
   });
@@ -145,6 +147,7 @@ describe("set and clear a classification on a table or column (items 13, 14, S7C
   it("clears one: its live link soft-deleted", () => {
     const r = setClassification(makeCtx(), access("modeler"), state(), { classificationId: builtin("BK").id, target: { kind: "source_column", id: ids.colCustId }, on: false });
     expect(writes(r)).toEqual([expect.objectContaining({ kind: "update", table: "classification_link", row: expect.objectContaining({ deleted_at: NOW }) })]);
+    expect(r.ok && r.writeSet.label).toBe("Clear Business key from cust_id");
   });
 
   it("refuses the wrong scope, a removed classification, a set one set again and nothing to clear", () => {

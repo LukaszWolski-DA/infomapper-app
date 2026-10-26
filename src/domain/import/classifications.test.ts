@@ -51,12 +51,12 @@ describe("reading the file's classifications (P6, S7C-10)", () => {
   it("warns once per unknown value and table, and about a table classification on a column, and ignores both (F13)", () => {
     const plan = buildPlan(withOwn(), FILE, { newName: "S" }, allOf(FILE));
     expect(plan.warnings).toEqual([
-      "Row 5: “Master data” is a table classification; ignored on s.t.d.",
-      "Row 6: unknown classification “XYZ” on s.t.e, ignored (and 1 more row of s.t). Add it under Classifications to use it.",
-      "Row 8: unknown classification “XYZ” on s.u.a, ignored. Add it under Classifications to use it.",
+      "“Master data” is a table classification; ignored on s.t.d (row 5).",
+      "Unknown classification “XYZ” on s.t.e (row 6; 1 more row in this table), ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.",
+      "Unknown classification “XYZ” on s.u.a (row 8), ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.",
     ]);
-    expect(UNKNOWN_CLASSIFICATION(2, "Q", "s.t.a", 2, "s.t")).toBe("Row 2: unknown classification “Q” on s.t.a, ignored (and 2 more rows of s.t). Add it under Classifications to use it.");
-    expect(TABLE_CLASSIFICATION_ON_COLUMN(2, "Staging", "s.t.a", 0, "s.t")).toBe("Row 2: “Staging” is a table classification; ignored on s.t.a.");
+    expect(UNKNOWN_CLASSIFICATION(2, "Q", "s.t.a", 2)).toBe("Unknown classification “Q” on s.t.a (row 2; 2 more rows in this table), ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.");
+    expect(TABLE_CLASSIFICATION_ON_COLUMN(2, "Staging", "s.t.a", 0)).toBe("“Staging” is a table classification; ignored on s.t.a (row 2).");
     expect(column(plan, "t", "d").classificationIds).toEqual([]);
     expect(column(plan, "t", "e").classificationIds).toEqual([]);
   });
@@ -83,14 +83,14 @@ describe("reading the file's classifications (P6, S7C-10)", () => {
     const plan = buildPlan(model, file, { newName: "S" }, allOf(file));
     expect(column(plan, "t", "a").classificationIds.map(nameOf(model))).toEqual(["Klucz biznesowy"]);
     expect(column(plan, "t", "b").classificationIds.map(nameOf(model))).toEqual(["Klucz biznesowy"]);
-    expect(plan.warnings).toEqual(["Row 4: unknown classification “Business key” on s.t.c, ignored. Add it under Classifications to use it."]);
+    expect(plan.warnings).toEqual([UNKNOWN_CLASSIFICATION(4, "Business key", "s.t.c", 0)]);
   });
 
   it("a removed classification is unknown, by code and by name (S7C-06)", () => {
     const model: ImportModel = { ...emptyModel(), classifications: builtins().map((c) => (c.code === "BK" ? { ...c, deleted_at: NOW } : c)) };
     const file = fileOf([["t", "a", "int", { pk: true, cls: "BK" }]]);
     const plan = buildPlan(model, file, { newName: "S" }, allOf(file));
-    expect(plan.warnings).toEqual(["Row 2: unknown classification “BK” on s.t.a, ignored. Add it under Classifications to use it."]);
+    expect(plan.warnings).toEqual([UNKNOWN_CLASSIFICATION(2, "BK", "s.t.a", 0)]);
     // and no business key is suggested: a suggestion needs its classification in the list
     expect(plan.hints).toEqual([]);
   });

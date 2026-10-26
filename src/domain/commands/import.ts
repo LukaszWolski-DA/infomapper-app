@@ -137,8 +137,7 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
     writes.push({ kind: "insert", table: "source_table", row });
   }
   for (const col of c.columns.insert) {
-    // the two flags until step 3 drops them (slice 7c: classifications are links)
-    const row: SourceColumn = { ...newRowColumns(ctx), ...col, workspace_id: ws, is_business_key: false, is_pii: false, default_value: null, missing_since: null, retired_since: null, not_needed: false, note_html: null, note_text: null };
+    const row: SourceColumn = { ...newRowColumns(ctx), ...col, workspace_id: ws, default_value: null, missing_since: null, retired_since: null, not_needed: false, note_html: null, note_text: null };
     writes.push({ kind: "insert", table: "source_column", row });
   }
   for (const l of c.classificationLinks.insert) {

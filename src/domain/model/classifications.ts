@@ -204,7 +204,7 @@ export const indexOf = (model: { classifications?: readonly Classification[]; cl
  * current name (answer F1). Built-in ones no rule reads have none.
  */
 export const WHAT_STOPS: Partial<Record<ClassificationCode, string>> = {
-  BK: "Without it, the app no longer suggests business keys on attributes, sends approved mappings back when a business key column changes type, raises business key changes on import, suggests business keys in the import, filters keys by it or shows the BK badge on source rows, and the Data Vault reading shows no hub.",
+  BK: "Without it, the app no longer: suggests business keys on attributes; sends approved mappings back when a business key column changes type; raises business key changes on import; suggests business keys in the import; shows the BK badge on source rows or keeps them in the Keys filter; shows a hub in the Data Vault reading.",
   PII: "Without it, the app no longer copies personal data to attributes created from a column or shows a separate personal data satellite in the Data Vault reading.",
   TECH: "Without it, the Data Vault reading counts these columns as descriptive columns of a satellite.",
   LDTS: "Without it, the Data Vault reading counts these columns as descriptive columns of a satellite.",

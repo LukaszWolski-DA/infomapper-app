@@ -183,12 +183,6 @@ export interface SourceColumn extends StandardColumns {
   is_nullable: boolean;
   is_primary_key: boolean;
   is_foreign_key: boolean;
-  /**
-   * Slice 7c: classifications are `classification_link` rows; no domain rule reads these two any more
-   * (`model/classifications.ts`). They stay until step 3's data upgrade turns them into links and drops them.
-   */
-  is_business_key: boolean;
-  is_pii: boolean;
   default_value: string | null;
   comment: string | null;
   /** Not in the last import that judged it (slice 7a, P3). */

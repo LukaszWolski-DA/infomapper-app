@@ -72,11 +72,12 @@ describe("updateSourceColumn", () => {
   const ref = { sourceColumnId: ids.colEmail, expectedVersion: 1 };
   const state = { column: sourceColumn(ids.colEmail) };
 
-  it("changes BK, PII and the comment", () => {
-    expect(updateSourceColumn(makeCtx(), access("modeler"), state, { ...ref, isBusinessKey: true, isPii: false, comment: " Main address " })).toMatchObject({
+  it("changes the comment (slice 7c: Business key and Personal data are classifications)", () => {
+    expect(updateSourceColumn(makeCtx(), access("modeler"), state, { ...ref, comment: " Main address " })).toMatchObject({
       ok: true,
-      value: { column: { is_business_key: true, is_pii: false, comment: "Main address", version: 2 } },
+      value: { column: { comment: "Main address", version: 2 } },
     });
+    expect(updateSourceColumn(makeCtx(), access("modeler"), state, { ...ref, isPii: true })).toMatchObject({ ok: false, error: { code: "invalid" } });
     expect(updateSourceColumn(makeCtx(), access("modeler"), { column: sourceColumn(ids.colEmail, { comment: "x" }) }, { ...ref, comment: "" })).toMatchObject({
       ok: true,
       value: { column: { comment: null } },
@@ -89,13 +90,13 @@ describe("updateSourceColumn", () => {
   });
 
   it("refuses no change, a stale version, reviewers and an archived workspace", () => {
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, isPii: true })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { sourceColumnId: ids.colEmail, expectedVersion: 3, isPii: false })).toMatchObject({
+    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, comment: null })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(updateSourceColumn(makeCtx(), access("owner"), state, { sourceColumnId: ids.colEmail, expectedVersion: 3, comment: "x" })).toMatchObject({
       ok: false,
       error: { code: "stale_version" },
     });
-    expect(updateSourceColumn(makeCtx(), access("reviewer"), state, { ...ref, isPii: false })).toMatchObject({ ok: false, error: { code: "forbidden" } });
-    expect(updateSourceColumn(makeCtx(), access("admin", archived), state, { ...ref, isPii: false })).toMatchObject({ ok: false, error: { code: "archived" } });
+    expect(updateSourceColumn(makeCtx(), access("reviewer"), state, { ...ref, comment: "x" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(updateSourceColumn(makeCtx(), access("admin", archived), state, { ...ref, comment: "x" })).toMatchObject({ ok: false, error: { code: "archived" } });
   });
 });
 

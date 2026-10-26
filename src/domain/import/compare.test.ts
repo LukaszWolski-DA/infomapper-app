@@ -22,10 +22,10 @@ describe("P8: the plan rebuilt on the server against the one the review showed (
     expect(samePlan(shown, buildPlan(model, changed, target, allOf(changed)))).toBe(true);
   });
 
-  it("an edit elsewhere (another system, an unread column's flag) does not make it stale", () => {
+  it("an edit elsewhere (another system's column) does not make it stale", () => {
     const { model, target, shown } = setUp();
     const hrColumn = model.columns.find((c) => c.name === "emp_no")!;
-    expect(samePlan(shown, buildPlan(editColumn(model, hrColumn.id, { is_pii: true }), changed, target, allOf(changed)))).toBe(true);
+    expect(samePlan(shown, buildPlan(editColumn(model, hrColumn.id, { comment: "Typed elsewhere" }), changed, target, allOf(changed)))).toBe(true);
   });
 
   it("an edit to a column the import reads makes it stale", () => {

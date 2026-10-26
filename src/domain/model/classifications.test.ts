@@ -128,8 +128,9 @@ describe("what stops when a built-in one is removed (item 10, answers F1, F3)", 
 
   it("names the role, not the current name (answer F1)", () => {
     expect(whatStops(builtin("BK", { name: "Klucz biznesowy" }))).toBe(WHAT_STOPS.BK);
-    expect(WHAT_STOPS.BK).toContain("suggests business keys on attributes");
-    expect(WHAT_STOPS.BK).toContain("BK badge on source rows");
+    expect(WHAT_STOPS.BK).toBe(
+      "Without it, the app no longer: suggests business keys on attributes; sends approved mappings back when a business key column changes type; raises business key changes on import; suggests business keys in the import; shows the BK badge on source rows or keeps them in the Keys filter; shows a hub in the Data Vault reading.",
+    );
   });
 });
 

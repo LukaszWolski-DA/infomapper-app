@@ -279,8 +279,6 @@ export const sourceColumn = (id: string = ids.colEmail, over: Partial<SourceColu
   is_nullable: id !== ids.colCustId,
   is_primary_key: id === ids.colCustId,
   is_foreign_key: false,
-  is_business_key: id === ids.colCustId,
-  is_pii: id !== ids.colCustId,
   default_value: null,
   comment: null,
   missing_since: null, retired_since: null, not_needed: false, note_html: null, note_text: null,

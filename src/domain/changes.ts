@@ -37,6 +37,11 @@ export interface WriteSet {
    * review); its change events still record the context, as a layout change's do (D-26).
    */
   labelNothing?: boolean;
+  /**
+   * The undo history's name for the step when the change events cannot give it (slice 7c: a classification set on a
+   * column names both, “Set Business key on cust_no”); otherwise `changeLabel` reads the events.
+   */
+  label?: string;
 }
 
 export type CommandResult<T = undefined> =

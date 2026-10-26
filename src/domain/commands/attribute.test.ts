@@ -106,7 +106,6 @@ describe("createAttributeFromColumn (a column dropped on an entity's header, sli
     type_length: null,
     type_precision: 18,
     type_scale: 2,
-    is_pii: false,
     is_nullable: false,
     comment: "Unit price, net",
   });
@@ -155,9 +154,6 @@ describe("createAttributeFromColumn (a column dropped on an entity's header, sli
     const removed = builtins().map((c) => (c.code === "PII" ? { ...c, deleted_at: NOW } : c));
     const r2 = createAttributeFromColumn(makeCtx(), access("owner"), { ...withLinks, classifications: removed }, input);
     expect(r2.ok && r2.writeSet.writes[0]).toMatchObject({ row: { is_pii: false } });
-    // the column's old flag is no longer read
-    const r3 = createAttributeFromColumn(makeCtx(), access("owner"), { ...state, column: sourceColumn(ids.colFirstName, { is_pii: true }) }, input);
-    expect(r3.ok && r3.writeSet.writes[0]).toMatchObject({ row: { is_pii: false } });
   });
 
   it("maps the column to an attribute of the same name (ignoring case) instead of adding another", () => {

@@ -8,8 +8,11 @@
 // tables; a column's “Missing from source since”. Slice 7b (items 13, 18, 21, 24): “Retired: historical since”, the
 // table's open changes to resolve, the columns list's “retired” and “not needed”, a column's “Mark as needed”, and
 // “Delete table…” on the same cascade and form as a change's “Delete…” (D-47, Q7), now also for mapped tables.
+// Slice 7c, step 3: the column's two flags are the classifications Business key and Personal data (links, by their
+// current names; a removed one is not offered); step 4 replaces them with the Classifications section.
 
 import { useContext, useRef, useState } from "react";
+import { setClassificationAction } from "@/app/_actions/classification";
 import { deleteSourceTableAction, updateSourceColumnAction } from "@/app/_actions/model";
 import { markColumnNeededAction } from "@/app/_actions/source-change";
 import { useAction } from "@/app/_components/use-action";
@@ -268,8 +271,13 @@ export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
   const markNeeded = () => void run(() => markColumnNeededAction(p.workspaceId, ref), ({ name }) => `Marked as needed: ${name}`, { undoable: true });
   /** Where the D-48 choice opens: under the attribute picker. */
   const mapAt = useRef({ x: 0, y: 0 });
-  const save = (change: { isBusinessKey?: boolean; isPii?: boolean; comment?: string | null }) =>
-    void run(() => updateSourceColumnAction(p.workspaceId, { ...ref, ...change }));
+  const save = (change: { comment?: string | null }) => void run(() => updateSourceColumnAction(p.workspaceId, { ...ref, ...change }));
+  const flags = (["BK", "PII"] as const).flatMap((code) => {
+    const k = p.ix.classes.byCode.get(code);
+    return k ? [{ code, classification: k, on: p.ix.classes.has(c.id, code) }] : [];
+  });
+  const toggle = (classificationId: string, on: boolean) =>
+    void run(() => setClassificationAction(p.workspaceId, { classificationId, target: { kind: "source_column", id: c.id }, on }));
 
   const facts = [formatColumnType(c), c.is_nullable ? "nullable" : "required", c.is_primary_key ? "primary key" : null, c.is_foreign_key ? "foreign key" : null]
     .filter(Boolean)
@@ -312,8 +320,9 @@ export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
       )}
       <Field label="Flags">
         <div className="flex flex-wrap gap-1.5" data-testid="flags-column">
-          <Flag on={c.is_business_key} label="Business key" disabled={!p.editable} onToggle={() => save({ isBusinessKey: !c.is_business_key })} />
-          <Flag on={c.is_pii} label="Personal data" disabled={!p.editable} onToggle={() => save({ isPii: !c.is_pii })} />
+          {flags.map((f) => (
+            <Flag key={f.code} on={f.on} label={f.classification.name} disabled={!p.editable} onToggle={() => toggle(f.classification.id, !f.on)} />
+          ))}
         </div>
       </Field>
       <Field label="Comment" htmlFor="f-cc">

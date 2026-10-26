@@ -177,6 +177,15 @@ export interface SetClassificationState {
 
 export const WRONG_SCOPE = (name: string, scope: "table" | "column") => `${name} is a ${scope} classification.`;
 
+/** The undo history's names for a toggle (Łukasz, step 2): the classification's current name and the object's name. */
+export const SET_LABEL = (classification: string, object: string) => `Set ${classification} on ${object}`;
+export const CLEAR_LABEL = (classification: string, object: string) => `Clear ${classification} from ${object}`;
+
+const named = <T,>(r: CommandResult<T>, label: string): CommandResult<T> => {
+  if (r.ok) r.writeSet.label = label;
+  return r;
+};
+
 /** One toggle: a new link, or the live link soft-deleted (answer F19: a set again is a new row). */
 export function setClassification(ctx: CommandContext, access: WorkspaceAccess, state: SetClassificationState, input: unknown): CommandResult<{ name: string; objectName: string; on: boolean }> {
   const parsed = begin(access, "model.edit", setInput, input);
@@ -199,10 +208,10 @@ export function setClassification(ctx: CommandContext, access: WorkspaceAccess, 
       source_table_id: target.kind === "source_table" ? target.id : null,
       source_column_id: target.kind === "source_column" ? target.id : null,
     };
-    return done(ctx, access, { name: c.name, objectName: object.name, on }, [{ kind: "insert", table: "classification_link", row }]);
+    return named(done(ctx, access, { name: c.name, objectName: object.name, on }, [{ kind: "insert", table: "classification_link", row }]), SET_LABEL(c.name, object.name));
   }
   if (!link) return fail(domainError("invalid", "Nothing to change."));
-  return done(ctx, access, { name: c.name, objectName: object.name, on }, [softDelete(ctx, "classification_link", link)]);
+  return named(done(ctx, access, { name: c.name, objectName: object.name, on }, [softDelete(ctx, "classification_link", link)]), CLEAR_LABEL(c.name, object.name));
 }
 
 /** The classification links on the given tables and columns (the delete cascade, answer F18). */

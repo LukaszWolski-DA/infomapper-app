@@ -23,6 +23,8 @@ export interface ImportData {
   changes: readonly SourceChange[];
   /** When each system was last imported (ISO time), by system id. */
   lastImports: Readonly<Record<string, string>>;
+  /** Data Vault 2.0 mode (slice 7c): the plan offers Link key suggestions only then, as the server's does. */
+  dataVault: boolean;
 }
 
 export type Channel = "file" | "query" | "ddl";

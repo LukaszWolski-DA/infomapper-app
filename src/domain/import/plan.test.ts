@@ -365,14 +365,17 @@ describe("renames (P5, S7A-07)", () => {
     ]);
   });
 
-  it("a rename keeps the column's id, its mappings and its BK and PII; its rule is rewritten", () => {
+  it("a rename keeps the column's id, its mappings and its classifications; its rule is rewritten", () => {
     const { model, ids } = demoCrmWithMappings();
     const file = read("crm_snapshot_2026-10-20.csv");
     const key = "crmprod|dbo|customers|created_ts";
     const { plan, model: after } = importInto(model, file, { systemId: systemNamed(model, "CRM").id }, allOf(file, { renames: new Map([[key, "created_on"]]) }));
     expect(planColumn(plan, "customers", "created_on")).toMatchObject({ status: "rename", renameKey: key });
     expect(columnNamed(after, "customers", "created_on").id).toBe(columnNamed(model, "customers", "created_ts").id);
-    expect(columnNamed(after, "customers", "date_of_birth")).toMatchObject({ id: columnNamed(model, "customers", "dob").id, is_pii: false });
+    const dob = columnNamed(model, "customers", "dob").id;
+    expect(columnNamed(after, "customers", "date_of_birth").id).toBe(dob);
+    // slice 7c: classifications are links on the column, so the rename keeps them (and the file's PII is not applied)
+    expect(codesOf(after, dob)).toEqual(codesOf(model, dob));
     // the mapping in review keeps its status; its rule now names the new column (P6)
     const created = after.mappings.find((m) => m.id === ids.created)!;
     expect(created).toMatchObject({ status: "review", rule_expression: "CAST(created_on AS date)", review_reason: null });

@@ -3,6 +3,7 @@
 
 import type { Uuid } from "@/domain/ids";
 import { rowShown } from "@/domain/model/card-size";
+import { indexOf } from "@/domain/model/classifications";
 import type { CardSubject } from "@/domain/model/frames";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
 import type { CanvasItem, LiveLevel, RowFilter, SourceChange, WorkspaceModel } from "@/domain/types";
@@ -130,6 +131,8 @@ export function buildCards(
   const tableById = new Map(model.sourceTables.map((t) => [t.id, t]));
   const systemById = new Map(model.sourceSystems.map((s) => [s.id, s]));
   const columnTable = (columnId: Uuid) => tableById.get(columnById.get(columnId)?.source_table_id ?? "");
+  // a source row's BK badge and the Keys filter read the Business key classification (slice 7c, P11): one index per build
+  const classes = indexOf(model);
   // open changes by column (slice 7b, item 24): another kind wins over a new column's
   const changeOf = new Map<Uuid, "new" | "chg">();
   for (const c of changes) {
@@ -233,7 +236,7 @@ export function buildCards(
           pk: c.is_primary_key,
           fk: c.is_foreign_key,
           pii: false,
-          bk: c.is_business_key,
+          bk: classes.has(c.id, "BK"),
           ...rowState(c.id, "Not used yet"),
           clip: false,
           labels: labelsOf(`source_column:${c.id}`),

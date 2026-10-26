@@ -291,6 +291,7 @@ export async function deleteSourceTableAction(
         requirementLinks,
         relationships: model.sourceRelationships,
         relationshipColumns: model.sourceRelationshipColumns,
+        classificationLinks: model.classificationLinks,
       },
       input,
     );

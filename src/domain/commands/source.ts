@@ -2,7 +2,8 @@
 // as lines), the column classification (BK, PII) and comment, and deleting a table no mapping reads from.
 // Import of sources comes later.
 // Slice 7c: the modeller's note on a table or column (`setSourceNote`, P8: plain text as a mapping's note, AD-17).
-// Classifications are `commands/classification.ts`; `updateSourceColumn` goes with the column panel's flags in step 4.
+// Classifications are `commands/classification.ts` (the flags BK and PII became links); `updateSourceColumn` keeps the
+// comment until the column panel shows it read-only (step 4, P9).
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
@@ -115,8 +116,6 @@ export function createSourceTable(
       is_nullable: true,
       is_primary_key: false,
       is_foreign_key: false,
-      is_business_key: false,
-      is_pii: false,
       default_value: null,
       comment: null,
       missing_since: null,
@@ -130,20 +129,18 @@ export function createSourceTable(
   return done(ctx, access, { sourceTableId: table.id, sourceSystemId: systemId, createdSystem }, writes);
 }
 
-// ---- column classification and comment ----
+// ---- column comment ----
 
 const updateSourceColumnInput = z
   .object({
     sourceColumnId: uuidSchema,
     expectedVersion: versionSchema,
-    isBusinessKey: z.boolean().optional(),
-    isPii: z.boolean().optional(),
     comment: optionalTextSchema.optional(),
   })
   .strict();
 export type UpdateSourceColumnInput = z.input<typeof updateSourceColumnInput>;
 
-/** BK and PII flags and the comment. Name, type and position come from the source and stay as they are. */
+/** The comment (slice 7c: the flags are classifications). Name, type and position come from the source and stay. */
 export function updateSourceColumn(
   ctx: CommandContext,
   access: WorkspaceAccess,
@@ -152,13 +149,11 @@ export function updateSourceColumn(
 ): CommandResult<{ column: SourceColumn }> {
   const parsed = begin(access, "model.edit", updateSourceColumnInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { sourceColumnId, expectedVersion, isBusinessKey, isPii, comment } = parsed.data;
+  const { sourceColumnId, expectedVersion, comment } = parsed.data;
   const got = current(state.column, access, sourceColumnId, expectedVersion, "source column");
   if (!got.ok) return fail(got.error);
   const before = got.row;
   const patch: Partial<SourceColumn> = {};
-  if (isBusinessKey !== undefined && isBusinessKey !== before.is_business_key) patch.is_business_key = isBusinessKey;
-  if (isPii !== undefined && isPii !== before.is_pii) patch.is_pii = isPii;
   if (comment !== undefined && comment !== before.comment) patch.comment = comment;
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
   const row = nextVersion(ctx, before, patch);

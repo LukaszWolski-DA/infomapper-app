@@ -177,12 +177,12 @@ export const HINT_WHY = {
   LK: "a foreign key: a candidate for a link between hubs",
 } as const;
 
-/** One warning per value and table (answer F13). */
-const more = (n: number, table: string) => (n ? ` (and ${n.toLocaleString("en-GB")} more row${n === 1 ? "" : "s"} of ${table})` : "");
-export const UNKNOWN_CLASSIFICATION = (row: number, value: string, column: string, others: number, table: string) =>
-  `Row ${row}: unknown classification “${value}” on ${column}, ignored${more(others, table)}. Add it under Classifications to use it.`;
-export const TABLE_CLASSIFICATION_ON_COLUMN = (row: number, value: string, column: string, others: number, table: string) =>
-  `Row ${row}: “${value}” is a table classification; ignored on ${column}${more(others, table)}.`;
+/** One warning per value and table (answer F13; Łukasz's texts, step 2). */
+const where = (row: number, n: number) => `(row ${row}${n ? `; ${n.toLocaleString("en-GB")} more row${n === 1 ? "" : "s"} in this table` : ""})`;
+export const UNKNOWN_CLASSIFICATION = (row: number, value: string, column: string, others: number) =>
+  `Unknown classification “${value}” on ${column} ${where(row, others)}, ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.`;
+export const TABLE_CLASSIFICATION_ON_COLUMN = (row: number, value: string, column: string, others: number) =>
+  `“${value}” is a table classification; ignored on ${column} ${where(row, others)}.`;
 
 /** An open change the source settles (P7): its column or table is back, or a new one left before a decision. */
 export interface PlannedSettle {
@@ -552,7 +552,7 @@ function planClassifications(cls: ClassificationIndex, dataVault: boolean, table
       c.classificationIds = ids.sort((a, b) => order.get(a)! - order.get(b)!);
       if (c.existing) c.fileClassifications = fileSays(cls, c.existing.id, c.classificationIds);
     }
-    for (const o of odd.values()) warnings.push((o.kind === "table" ? TABLE_CLASSIFICATION_ON_COLUMN : UNKNOWN_CLASSIFICATION)(o.row, o.value, o.column, o.others, tableLabel));
+    for (const o of odd.values()) warnings.push((o.kind === "table" ? TABLE_CLASSIFICATION_ON_COLUMN : UNKNOWN_CLASSIFICATION)(o.row, o.value, o.column, o.others));
 
     // suggestions for the new columns the file does not classify
     const candidates = t.columns.filter((c) => c.status === "new" && c.file && !c.classificationIds.length);
