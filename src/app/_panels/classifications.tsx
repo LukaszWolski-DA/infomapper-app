@@ -20,7 +20,7 @@ import {
 import { useAction } from "@/app/_components/use-action";
 import { classificationImpact, type ClassificationImpact } from "@/domain/commands/classification";
 import type { Uuid } from "@/domain/ids";
-import { byListOrder, groupOf, isDataVault, nameTakenBy, TAKEN_NAME } from "@/domain/model/classifications";
+import { byListOrder, groupOf, isDataVault, nameTakenBy, TAKEN_NAME, whatStops } from "@/domain/model/classifications";
 import type { Classification, ClassificationScope } from "@/domain/types";
 import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
@@ -127,9 +127,10 @@ export function ClassificationsDialog({ onClose }: { onClose: () => void }) {
     const r = await run(() => removeClassificationAction(p.workspaceId, { classificationId: c.id, expectedVersion: c.version }), (v) => `Removed ${v.name} from the list.`, { undoable: true });
     if (r.ok) setRemoving(null);
   };
+  /** The form first when it is in use or a rule reads it (Łukasz, step 4); otherwise at once, with Undo. */
   const askRemove = (c: Classification) => {
     const u = p.ix.classes.uses(c.id);
-    if (u.tables.length + u.columns.length === 0) void remove(c);
+    if (u.tables.length + u.columns.length === 0 && !whatStops(c)) void remove(c);
     else setRemoving(c);
   };
   const restore = (c: Classification) =>
@@ -142,6 +143,8 @@ export function ClassificationsDialog({ onClose }: { onClose: () => void }) {
         data-testid="dialog-classifications"
         // Escape closes the list only: the canvas's own Escape would clear the selection behind it
         onEscapeKeyDown={(e) => e.stopPropagation()}
+        // and the canvas's one-letter shortcuts (F, M, E…) stay with the canvas while the list has the focus
+        onKeyDown={(e) => e.stopPropagation()}
         // the dialog itself takes the focus, not the first name (a keystroke would rename Business key)
         onOpenAutoFocus={(e) => {
           e.preventDefault();
@@ -308,11 +311,13 @@ function RemoveForm({ classification: c, impact, pending, onCancel, onRemove }: 
   return (
     <div className="mt-4" data-testid="form-remove-classification">
       <p className="font-medium" data-testid="remove-classification-uses">
-        {c.name} is used on {plural(impact.tables.length, "table")} and {plural(impact.columns.length, "column")}.
+        {uses.length ? `${c.name} is used on ${plural(impact.tables.length, "table")} and ${plural(impact.columns.length, "column")}.` : `${c.name} is unused.`}
       </p>
-      <div className="mt-2">
-        <LongList items={uses} text={(x) => x.label} testId="list-classification-uses" render={(x) => <Li key={x.id} testId="classification-use"><span className="font-mono text-xs">{x.label}</span></Li>} />
-      </div>
+      {uses.length > 0 && (
+        <div className="mt-2">
+          <LongList items={uses} text={(x) => x.label} testId="list-classification-uses" render={(x) => <Li key={x.id} testId="classification-use"><span className="font-mono text-xs">{x.label}</span></Li>} />
+        </div>
+      )}
       {impact.stops && (
         <p className="mt-2.5 text-im-ink-2" data-testid="remove-classification-stops">
           {impact.stops}
@@ -320,7 +325,7 @@ function RemoveForm({ classification: c, impact, pending, onCancel, onRemove }: 
       )}
       {impact.settles > 0 && (
         <p className="mt-2 text-im-ink-2" data-testid="remove-classification-settles">
-          {plural(impact.settles, "open business key change")} without a mapping {impact.settles === 1 ? "settles" : "settle"}.
+          {plural(impact.settles, "open business key change")} without a mapping will be settled.
         </p>
       )}
       <p className="mt-2 text-[12px] text-im-ink-3">You can undo it right after.</p>

@@ -545,6 +545,11 @@ the demo data is replaced: steps whose change group is no longer in the change l
 - **Slice 7c (who signs the upgrade):** the rows and change events slice 7c's upgrade wrote are signed by the
   workspace's creator; a future "last changed by" must recognise them as the upgrade's. The data model slice decides on a
   system author for upgrades (e.g. "InfoMapper upgrade").
+- **Slice 7c (Escape in dialogs):** the canvas listens for Escape and its one-letter shortcuts (F, M, E, H, A, N, V) on
+  the whole window. In the dialogs "Delete {entity} from the model?", "Delete the concept {name}?", "New source table" and "Import
+  sources into {system}", Escape closes the dialog and also clears the canvas selection, which closes the panel behind it, and a letter
+  pressed outside a text field acts on the canvas. The Classifications dialog (slice 7c) keeps both to itself; the
+  others are left as they are (Łukasz, step 4).
 - **Slice 7c (live columns only):** the upgrade moved hand-typed comments into notes on live columns only. A deleted
   column brought back by undo keeps a hand-typed comment, shown as "From the source:".
 
