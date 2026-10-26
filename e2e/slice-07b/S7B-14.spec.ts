@@ -18,10 +18,10 @@ const stored = async () => {
   const [items, canvases, model] = await Promise.all([s.canvasItems.list(RETAIL), s.canvases.list(RETAIL), loadModel()]);
   return JSON.stringify([items, canvases, model]);
 };
-const dateOf = async (label: string) => {
-  const imports = await store().model.listImports(RETAIL);
-  const i = imports.find((x) => x.source_label === label)!;
-  return new Date(i.created_at).toLocaleString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+/** The chip's date: the date in the select's option for that import, as the server wrote it (“Import into CRM, 25 Oct 2026, 09:44, …”). */
+const dateOf = async (page: Page, label: string) => {
+  const text = await page.getByTestId("select-changes").locator("option").filter({ hasText: label }).textContent();
+  return /^Import into CRM, ([^,]+),/.exec(text ?? "")![1]!;
 };
 
 test("S7B-14: the button, the bar, the select per import, the counts, the fade, the chip and Close; nothing stored changes", async ({ page }) => {
@@ -49,7 +49,7 @@ test("S7B-14: the button, the bar, the select per import, the counts, the fade, 
   await expect(counts(page)).toHaveText("2 tables, 0 mappings, 0 attributes");
   await expect(fade(page)).toHaveAttribute("data-fade", new RegExp(`^lit:changes:${partial}:`));
   await expect(fade(page)).toHaveAttribute("data-lit-cards", "1");
-  await expect(chip(page)).toContainText(`Changes: import into CRM, ${await dateOf("crm_partial.tsv")}`);
+  await expect(chip(page)).toContainText(`Changes: import into CRM, ${await dateOf(page, "crm_partial.tsv")}`);
 
   await page.getByTestId("button-changes-close").click();
   await expect(bar(page)).toHaveCount(0);
@@ -111,7 +111,7 @@ test("S7B-14: “Show what it touched on the canvas” from the system panel, re
   const snapshot = (await store().model.listImports(RETAIL)).find((i) => i.source_label === "crm_snapshot_2026-10-20.csv")!;
   await expect(page.getByTestId("select-changes")).toHaveValue(snapshot.id);
   await expect(counts(page)).toHaveText("3 tables, 3 mappings, 3 attributes");
-  await expect(chip(page)).toContainText(`Changes: import into CRM, ${await dateOf("crm_snapshot_2026-10-20.csv")}`);
+  await expect(chip(page)).toContainText(`Changes: import into CRM, ${await dateOf(page, "crm_snapshot_2026-10-20.csv")}`);
 });
 
 test("S7B-14: every role has the Changes view; with nothing on record everything fades", async ({ page }) => {
