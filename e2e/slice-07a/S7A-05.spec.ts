@@ -67,7 +67,8 @@ test("S7A-05: P2: a file without column_comment changes no comment; a comment th
   await page.getByTestId("button-import-sources").click();
   await reviewFile(page, { existing: "CRM" }, "crm_no_comments.tsv", withoutComments);
   await expect(page.getByTestId("review-row").filter({ hasText: "cust_no" })).toHaveCount(0);
-  await importNow(page, /^Imported into CRM: /);
+  // its own toast: the first import's "Imported into CRM: …" may still be shown (a flake in slice 7c's closing)
+  await importNow(page, "Imported into CRM: No changes");
   expect((await column("customers", "cust_no")).comment).toBe("Customer number, old text");
 
   // with comments: the file's (empty) comment would overwrite it, shown as a change
