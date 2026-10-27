@@ -1,6 +1,6 @@
 # Slice 8 – Acceptance
 
-Status: **step 4 (the start page and signing in), in progress.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
+Status: **step 4 (the start page and signing in) done, waiting for Łukasz.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
 `slice-07c`). PRD: `docs/prd/slice-08-organizations.md`. The PRD stays as written; this file is its amendment.
 
 ## Answers from Łukasz (step 1) (27 October 2026)
@@ -985,3 +985,112 @@ slice's specs for items 1–9 and the full e2e run (P1).
   organization's workspaces, people or names, and pages send the browser only the people of the workspace shown." The
   notes to AD-01, AD-04 and AD-05 are approved as quoted. All four are in `docs/decisions.md` (D-58 after D-57; each
   note appended to its decision as "Note (slice 8): …").
+
+## Step 4: the start page and signing in (27 October 2026)
+
+Commits: `1f6f1d5` (D-58 and the notes to AD-01, AD-04, AD-05 in `docs/decisions.md`, on their own) and this step's.
+
+### What changed
+
+- **`/sign-in`** (`src/app/sign-in/page.tsx`, `start-forms.tsx`): "Sign in" and "Create an organization" side by side,
+  and below them the development list with its banner, unchanged (its test ids too). With `?org={id}` the page shows
+  that organization's form instead of the two paths (item 3).
+  - **Sign in** (item 2): e-mail → the organizations it has a workspace in ("1 workspace" / "{n} workspaces", or
+    "guest", F21; a single organization skips the step) → that organization's password; Back at each step.
+  - **The link's form** (items 3, 4): the organization's name, e-mail and password in one step. Reached from a locked
+    page, the e-mail is filled in from the session on the server (nothing personal goes into the address).
+  - **Create an organization** (items 6–8): the six fields (first workspace "First workspace"), Continue shows the
+    summary with Back (keeps every field, writes nothing) and Create; the server's field messages show under their
+    fields; Create lands on the new workspace home with the toast.
+- **The lock in the pages (F3):** `loadShell` reads the session; a member's page of a locked organization redirects to
+  `/sign-in?org={id}&next={path}`; a non-member still gets the 404 (S0-11). After the password the action returns to
+  `next` only when `safeReturnPath` accepts it (F14).
+- **The landing (F13)** (`src/app/page.tsx`): the last used workspace, else the first, among the unlocked
+  organizations; with none unlocked, the first organization's link form.
+- **The switcher (F15):** a locked organization's item has a lock icon with the tooltip "Asks for the password once";
+  choosing it opens its workspace, whose page asks for the password. The icon is drawn only while the menu is open, and
+  nothing reads layout.
+- **"New organization…"** (item 9, `src/app/_components/new-organization-dialog.tsx`): an item at the end of the
+  organization menu opens a dialog with the organization's name, the password twice and the first workspace's name;
+  Continue shows the summary with Back and Create; Create opens the new organization, unlocked, with the toast.
+- **`requireSessionUser`** is gone (the pages read `getSession()` through `loadShell` and `Landing`).
+- **F10's test** (`src/app/_lib/people.test.ts`): `workspacePeople`, which both pages call, never returns a user of
+  another organization (Anna and Piotr for Sales analytics, Marek for Bank X), and keeps a removed member who has
+  change events in the workspace.
+- **e2e:** `signInWithPassword` in `e2e/slice-08/helpers.ts`; `e2e/slice-08/fixtures.ts` (fresh seed per test); specs
+  S8-01 to S8-07 and S8-13.
+
+### Earlier specs touched
+
+Two changed, for step 3's format 9 (step 3 ran only slice 0's specs, so the full run here found them):
+`S7B-12.spec.ts` and `S7C-02.spec.ts` read the upgraded file's format, 8, and now read 9, as slice 7c changed them
+from 7 to 8. S0-01's new case (an unsigned cookie with a known id) came with step 3. Through behaviour,
+the step touches S0-01 (the sign-in page gains the two paths above the list; the list and its test ids are unchanged),
+S0-02 (the organization menu gains "New organization…" with its own test id; the development list unlocks
+everything, so no lock shows) and S0-11 (a non-member's 404 is unchanged); all pass in the full run below.
+
+### Decisions I took (please check)
+
+1. **A locked page goes to the link's form** (`/sign-in?org=…&next=…`), not to a separate unlock page: it is the same
+   form (item 4).
+2. **The start page's heading** is "InfoMapper"; the development list's heading became "Sign in as a test user" (was
+   "Sign in to InfoMapper"), as the page now has two other ways in. The banner and "Choose who you want to be." stay.
+3. **Field messages** show under their field; other refusals ("No organization uses this e-mail address.", "That
+   password does not open {organization}.") under the form, not as toasts, so they stay while the person types.
+4. **"New organization…"** is the last item of the organization menu, after a separator, for every signed-in person
+   (as the prototype offers it to everyone).
+5. **Landing with no unlocked organization** opens the link's form of the person's first organization (a session that
+   has unlocked nothing comes only from a password sign-in whose organization lost all their workspaces since).
+
+### Figures
+
+| What | Result | Bar |
+| --- | --- | --- |
+| Viewport elements on a canvas page (`S3B-15-elements.spec.ts`, measurement build, `ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json`) | viewport 4,508 / 19,305 / 1,465 / 4,907: equal in all four views. Page totals 5,994 / 20,791 / 2,861 / 6,303, one more than the baseline in each, outside the viewport | equal: passes |
+
+### The runs
+
+- `npx playwright test e2e/slice-08`: 10 passed in 1.6 min (first run).
+- Full e2e run (`npm run e2e`, from scratch, no dev server running): 342 passed, 1 skipped, 4 failed, in 1 h 30 min
+  (5,432 s).
+  - `S7B-12` and `S7C-02`: they expected format 8 (above); fixed, both pass (57 s).
+  - `S0-10` (the first sign-in on the cold restarted server did not show the top bar within 15 s) and `S1B-12` (the test's
+    60 s ran out at a Ctrl+Z): each run three times on its own, 3 of 3 passed (S0-10 87–88 s, S1B-12 54–58 s): flakes
+    of the long run, not bugs.
+- `npm run lint` and `npm run typecheck` pass; `npm test`: 107 files, 1,373 tests passed (1,371 before, +2 in `people.test.ts`).
+
+### Manual checklist for Łukasz (S8-01 to S8-07)
+
+Start with `npm run reset-dev-data`, then `npm run dev`, and open http://localhost:3000. The password of InfoMate and
+Retail Co is `demo-pass`.
+
+1. **S8-01** Signed out, open any address: you land on the start page with "Sign in" and "Create an organization"
+   side by side and the test users' list below. Clicking Łukasz in the list signs in as before.
+2. **S8-02** Sign out. Under "Create an organization", press Continue with empty fields, then with a bad e-mail, a
+   7-character password and two different passwords: each message under its field. Fill in "Test Org", your name, a
+   new e-mail, a password twice; Continue shows the summary. Back keeps everything; Continue, Create: the workspace home
+   of "First workspace" with "Created Test Org with an empty first workspace."
+3. **S8-03** Sign out. Create an organization with `lukasz@infomate.pl`: the hint to sign in and use the
+   organization menu, and nothing is created.
+4. **S8-04** Sign out. Sign in with `nobody@example.com`: "No organization uses this e-mail address." With
+   `lukasz@infomate.pl`: InfoMate (its workspace count) and Retail Co (guest), and Test Org not among them. A wrong
+   password: "That password does not open InfoMate."; `demo-pass`: your last used InfoMate workspace.
+5. **S8-05** Signed out, open `/sign-in?org=` with Retail Co's id (from its workspace's switcher link, or
+   `01a0f9e9-2006-7178-8cdf-249f50cfcf87`): "Sign in to Retail Co" with e-mail and password together. Anna's e-mail is
+   refused like an unknown one; `m.lis@retailco.com` with `demo-pass` opens Sales analytics.
+6. **S8-06** Signed in to InfoMate with the password (step 4), open the organization menu: Retail Co has the lock
+   with "Asks for the password once". Choose it: Retail Co's form with your e-mail filled in; `demo-pass` brings you to
+   Sales analytics. Switch back and forth: no more passwords. Sign out: both ask again.
+7. **S8-07** Signed in, organization menu → "New organization…": the dialog's checks, the summary, Back, Create:
+   the new organization opens with the toast and no lock, and you are its owner (its People tab).
+
+### Open for step 5
+
+The People tab's additions (Add a person, the role select, Remove with its confirmation) and the Organization access
+box (the link with Copy, changing the password), with S8-08 to S8-12, the touched earlier specs (slice 0's People and
+role specs) and CI.
+
+### Questions for Łukasz
+
+1. Decisions 2 and 4: the start page's and the list's headings, and "New organization…" at the end of the menu?
+2. The page totals one higher than the baseline outside the viewport: look into it in step 6, or accept?

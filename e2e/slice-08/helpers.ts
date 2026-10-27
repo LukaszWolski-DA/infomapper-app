@@ -1,5 +1,6 @@
-// Slice 8's test data, written as the server writes it (through the domain and the local adapter). Signing in with a
-// password (`signInWithPassword`) drives the start page and comes with it in step 4.
+// Slice 8's helpers: signing in with a password through the start page (`signInWithPassword`), and test data written as
+// the server writes it, through the domain and the local adapter (`createOrganization`, `addPerson`).
+import { expect, type Page } from "@playwright/test";
 import { createLocalDataStore } from "../../src/data/local/store";
 import { DEMO_PASSWORD, DEMO_PASSWORD_HASH } from "../../src/data/local/demo-password";
 import { scryptHasher } from "../../src/data/password";
@@ -10,6 +11,28 @@ import type { WorkspaceRole } from "../../src/domain/types";
 import { E2E_DB } from "../config";
 
 export { DEMO_PASSWORD };
+export { expectToast, SEED_IDS, signInAs, signOutViaMenu } from "../slice-00/helpers";
+
+/**
+ * Signs in through the start page's "Sign in" path: the e-mail, the organization when the person has several, the
+ * password; waits for the workspace page.
+ */
+export async function signInWithPassword(page: Page, email: string, organization?: string, password: string = DEMO_PASSWORD) {
+  await page.goto("/sign-in");
+  const panel = page.getByTestId("panel-sign-in");
+  await panel.getByTestId("input-sign-in-email").fill(email);
+  await panel.getByTestId("button-sign-in-continue").click();
+  const list = panel.getByTestId("list-sign-in-organizations");
+  const field = panel.getByTestId("input-sign-in-password");
+  await expect(list.or(field)).toBeVisible();
+  if (await list.isVisible()) {
+    if (!organization) throw new Error(`${email} has several organizations: name one`);
+    await list.getByTestId("button-sign-in-organization").filter({ hasText: organization }).click();
+  }
+  await field.fill(password);
+  await panel.getByTestId("button-sign-in").click();
+  await expect(page.getByTestId("bar-top")).toBeVisible();
+}
 
 const store = () => createLocalDataStore(E2E_DB);
 

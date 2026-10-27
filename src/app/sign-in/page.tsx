@@ -2,18 +2,33 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
 import { getDataStore } from "@/data";
+import { isUuid } from "@/domain/ids";
 import { signInAsDevUser } from "../_actions/session";
 import { isDevSignInEnabled } from "../_lib/dev-session";
+import { getSession } from "../_lib/session";
+import { CreateOrganizationForm, OrganizationLinkForm, SignInSteps } from "./start-forms";
 
 export const metadata: Metadata = { title: "Sign in · InfoMapper" };
 
-export default async function SignInPage() {
+/**
+ * The start page (slice 8, D-58): "Sign in" and "Create an organization" side by side, or, with `?org=`, the
+ * organization's link form (also where a locked organization's pages send, with `next`). Below them, in development
+ * only, the list of test users as before.
+ */
+export default async function SignInPage({ searchParams }: PageProps<"/sign-in">) {
   // Decided per request, not at build time: the measurement-only build (AD-31) is built like a normal production build
   // and only differs in how it is started.
   await connection();
   if (!isDevSignInEnabled()) notFound();
 
   const store = getDataStore();
+  const params = await searchParams;
+  const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : null);
+  const orgId = one(params.org);
+  const organization = isUuid(orgId) ? await store.organizations.get(orgId) : null;
+  const next = one(params.next);
+  // a locked organization's form has the signed-in person's e-mail filled in (item 4); nothing personal in the address
+  const email = organization ? ((await getSession())?.user.email ?? "") : "";
   const users = await store.users.list();
   const people = await Promise.all(
     users.map(async (user) => {
@@ -31,6 +46,17 @@ export default async function SignInPage() {
 
   return (
     <main data-testid="page-sign-in" className="flex flex-1 flex-col items-center justify-center gap-6 p-6">
+      <h1 className="text-lg font-semibold">InfoMapper</h1>
+      {organization ? (
+        <div className="w-full max-w-md">
+          <OrganizationLinkForm organization={{ id: organization.id, name: organization.name }} email={email} next={next} />
+        </div>
+      ) : (
+        <div className="flex w-full max-w-3xl flex-col items-start gap-4 md:flex-row">
+          <SignInSteps next={next} />
+          <CreateOrganizationForm />
+        </div>
+      )}
       <div
         data-testid="banner-dev-sign-in"
         role="status"
@@ -39,7 +65,7 @@ export default async function SignInPage() {
         <b className="font-semibold">Development sign-in.</b> Pick a test user. This page does not exist in production.
       </div>
       <div className="w-full max-w-md">
-        <h1 className="mb-1 text-lg font-semibold">Sign in to InfoMapper</h1>
+        <h2 className="mb-1 text-[15px] font-semibold">Sign in as a test user</h2>
         <p className="mb-4 text-muted-foreground">Choose who you want to be.</p>
         <ul className="divide-y rounded-md border" data-testid="list-dev-users">
           {people.map(({ user, organizations }) => (

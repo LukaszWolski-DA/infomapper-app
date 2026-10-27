@@ -1,6 +1,5 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { redirect } from "next/navigation";
 import { getDataStore } from "@/data";
 import { sessionSecret } from "@/data/local/session-secret";
 import type { Uuid } from "@/domain/ids";
@@ -27,13 +26,6 @@ export async function getSession(): Promise<Session | null> {
 /** The signed-in user, or null. */
 export async function getSessionUser(): Promise<AppUser | null> {
   return (await getSession())?.user ?? null;
-}
-
-/** The signed-in user; without a valid session, redirects to /sign-in. */
-export async function requireSessionUser(): Promise<AppUser> {
-  const user = await getSessionUser();
-  if (!user) redirect("/sign-in");
-  return user;
 }
 
 /** Starts or replaces the session (a server action only: cookies cannot be written while a page renders). */

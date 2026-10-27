@@ -76,7 +76,8 @@ test("S7C-02: a format-7 file's flags become classifications and show as before;
   await expect(page.getByTestId("panel-source-column").locator("h2")).toHaveText("cust_no");
   expect(fs.existsSync(REPORT)).toBe(true);
   expect(await whatShows(page)).toEqual(before);
-  expect((JSON.parse(fs.readFileSync(E2E_DB, "utf8")) as { format: number }).format).toBe(8);
+  // format 9 since slice 8
+  expect((JSON.parse(fs.readFileSync(E2E_DB, "utf8")) as { format: number }).format).toBe(9);
   expect(await classesOf(custNo)).toEqual(["BK"]);
   expect(await classesOf(fname)).toEqual(["PII"]);
 

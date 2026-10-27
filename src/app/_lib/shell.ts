@@ -9,13 +9,14 @@ import { nextCanvasFor } from "./next-canvas";
 import { workspaceHref } from "./paths";
 import { LAST_PROJECTS_COOKIE, parseLastProjects } from "./preferences";
 import { standingOf, type Standing } from "./roles";
-import { requireSessionUser } from "./session";
+import { getSession } from "./session";
 
 /** Everything the top bar and breadcrumbs show. Plain data, safe to pass to client components. */
 export interface ShellData {
   user: { id: Uuid; name: string; email: string; homeOrganizations: string[] };
   organization: { id: Uuid; name: string };
-  organizations: { id: Uuid; name: string; guest: boolean; workspaceCount: number; firstWorkspaceId: Uuid | null }[];
+  /** `locked`: not yet unlocked in this session; choosing it asks for its password once (slice 8, item 5). */
+  organizations: { id: Uuid; name: string; guest: boolean; workspaceCount: number; firstWorkspaceId: Uuid | null; locked: boolean }[];
   workspace: { id: Uuid; name: string; archived: boolean };
   /** Workspaces of the current organization the user is a member of. */
   workspaces: { id: Uuid; name: string; archived: boolean; role: WorkspaceRole }[];
@@ -38,17 +39,25 @@ interface Where {
   canvasId?: string;
 }
 
-/** Loads the shell for a workspace page. Not a member, or unknown ids: 404. */
+/**
+ * Loads the shell for a workspace page. Not a member, or unknown ids: 404 (S0-11). A member's page of an organization
+ * this session has not unlocked asks for its password and comes back here afterwards (slice 8, item 4, F3).
+ */
 export async function loadShell(where: Where): Promise<ShellData> {
-  const user = await requireSessionUser();
-  return loadShellFor(user, where);
+  const session = await getSession();
+  if (!session) redirect("/sign-in");
+  return loadShellFor(session.user, where, session.unlocked);
 }
 
-export async function loadShellFor(user: AppUser, where: Where): Promise<ShellData> {
+export async function loadShellFor(user: AppUser, where: Where, unlocked: ReadonlySet<Uuid>): Promise<ShellData> {
   const store = getDataStore();
   const workspace = await store.workspaces.get(where.workspaceId);
   const member = workspace && (await store.workspaces.getMember(workspace.id, user.id));
   if (!workspace || !member) notFound();
+  if (!unlocked.has(workspace.organization_id)) {
+    const path = `/w/${workspace.id}${where.projectId ? `/p/${where.projectId}` : ""}${where.canvasId ? `/c/${where.canvasId}` : ""}`;
+    redirect(`/sign-in?org=${workspace.organization_id}&next=${encodeURIComponent(path)}`);
+  }
 
   const [organizations, myWorkspaces, myOrgMemberships, projects] = await Promise.all([
     store.organizations.listForUser(user.id),
@@ -112,7 +121,14 @@ export async function loadShellFor(user: AppUser, where: Where): Promise<ShellDa
     organization: { id: organization.id, name: organization.name },
     organizations: organizations.map((o) => {
       const mine = myWorkspaces.filter((w) => w.organization_id === o.id);
-      return { id: o.id, name: o.name, guest: !homeOrgIds.has(o.id), workspaceCount: mine.length, firstWorkspaceId: mine[0]?.id ?? null };
+      return {
+        id: o.id,
+        name: o.name,
+        guest: !homeOrgIds.has(o.id),
+        workspaceCount: mine.length,
+        firstWorkspaceId: mine[0]?.id ?? null,
+        locked: !unlocked.has(o.id),
+      };
     }),
     workspace: { id: workspace.id, name: workspace.name, archived },
     workspaces: workspacesHere.map((w, i) => ({ id: w.id, name: w.name, archived: isArchived(w), role: roles[i]!.role })),

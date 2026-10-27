@@ -1,7 +1,8 @@
 // Runs before every page request:
 // - the measurement-only production build (AD-31) answers this machine only;
 // - optimistic session check: without a session cookie, every page except /sign-in redirects there
-//   (the real check, user exists and development only, runs on the server in requireSessionUser());
+//   (the real check, user exists and development only, runs on the server in getSession(): a signed cookie,
+//   a known user, development only; slice 8);
 // - remembers the last used workspace and project per workspace (AD-07) in preference cookies: on page loads only,
 //   and only when the value changes. A cookie written during a server action makes Next.js refresh the page
 //   (x-action-revalidated), so writing them on every request refreshed every page after every action, even a

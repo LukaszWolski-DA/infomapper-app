@@ -1,4 +1,3 @@
-import "server-only";
 import type { DataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import type { AppUser } from "@/domain/types";
