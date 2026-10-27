@@ -20,6 +20,7 @@ import type {
   MappingInput,
   Note,
   Organization,
+  OrganizationAccess,
   OrganizationMember,
   Project,
   ProjectCanvas,
@@ -83,6 +84,7 @@ export interface DevDb {
   app_user: AppUser[];
   organization: Organization[];
   organization_member: OrganizationMember[];
+  organization_access: OrganizationAccess[];
   workspace: Workspace[];
   workspace_member: WorkspaceMember[];
   project: Project[];
@@ -122,6 +124,7 @@ export const emptyDb = (): DevDb => ({
   app_user: [],
   organization: [],
   organization_member: [],
+  organization_access: [],
   workspace: [],
   workspace_member: [],
   project: [],
@@ -195,6 +198,10 @@ export const RULES: Record<DevTable, TableRules> = {
     key: ["organization_id", "user_id"],
     foreignKeys: { organization_id: "organization", user_id: "app_user" },
     checks: [{ name: "organization_member_role_ck", test: oneOf(ORGANIZATION_ROLES, "role") }],
+  },
+  organization_access: {
+    key: ["organization_id"],
+    foreignKeys: { organization_id: "organization", changed_by: "app_user" },
   },
   workspace: {
     key: ["id"],

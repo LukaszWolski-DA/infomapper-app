@@ -72,6 +72,8 @@ export async function readDb(file: string): Promise<DevDb> {
  * classifications and notes (slice 7c, `upgrade-8.ts`); its report comes back for the caller to write.
  */
 export function upgradeDb(db: DevDb, now: string, newId: () => string): Upgrade8Report | null {
+  // slice 8, step 2: the table exists before its format (9, step 3), which gives the demo organizations their password
+  (db as Partial<DevDb>).organization_access ??= [];
   if ((db.format as number) === 2) Object.assign(db, { format: 3, frame: [] });
   if ((db.format as number) === 3) Object.assign(db, { format: 4, label: [], label_link: [], project_pinned_label: [], note: [] });
   if ((db.format as number) === 4) Object.assign(db, { format: 5, requirement: [], requirement_link: [] });

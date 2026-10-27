@@ -50,10 +50,28 @@ export function createWorkspace(
   if (!parsed.ok) return fail(parsed.error);
   if (parsed.data.organizationId !== organization.id) return fail(notFound("organization"));
 
+  const rows = newWorkspaceRows(ctx, organization.id, parsed.data.name);
+  return {
+    ok: true,
+    value: { workspaceId: rows.workspaceId, projectId: rows.projectId, canvasId: rows.canvasId },
+    writeSet: buildWriteSet(ctx, rows.workspaceId, rows.writes),
+  };
+}
+
+/**
+ * A new workspace's rows, with the actor as its owner: the workspace, the membership, "First project" with "First
+ * canvas" and the built-in classifications. Shared by `createWorkspace` and creating an organization (slice 8, Q3, F6),
+ * which writes them in its own change group.
+ */
+export function newWorkspaceRows(
+  ctx: CommandContext,
+  organizationId: Uuid,
+  name: string,
+): { workspaceId: Uuid; projectId: Uuid; canvasId: Uuid; writes: Write[] } {
   const workspace: Workspace = {
     ...newRowColumns(ctx),
-    organization_id: organization.id,
-    name: parsed.data.name,
+    organization_id: organizationId,
+    name,
     client_name: null,
     description: null,
     doc_language: "en",
@@ -93,16 +111,17 @@ export function createWorkspace(
   };
 
   return {
-    ok: true,
-    value: { workspaceId: workspace.id, projectId: project.id, canvasId: canvas.id },
-    writeSet: buildWriteSet(ctx, workspace.id, [
+    workspaceId: workspace.id,
+    projectId: project.id,
+    canvasId: canvas.id,
+    writes: [
       { kind: "insert", table: "workspace", row: workspace },
       { kind: "insert", table: "workspace_member", row: member },
       { kind: "insert", table: "project", row: project },
       { kind: "insert", table: "canvas", row: canvas },
       { kind: "insert", table: "project_canvas", row: link },
       ...builtinClassificationRows(ctx, workspace.id).map((row): Write => ({ kind: "insert", table: "classification", row })),
-    ]),
+    ],
   };
 }
 

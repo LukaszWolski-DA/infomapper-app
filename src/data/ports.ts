@@ -37,6 +37,16 @@ export interface UserRepository {
   get(userId: Uuid): Promise<AppUser | null>;
 }
 
+/**
+ * Hashing and checking organization passwords (slice 8, F19). Server only: the adapter (scrypt from `node:crypto`,
+ * `src/data/password.ts`, step 3) stores parameters, salt and key in one string and compares in constant time. The
+ * domain never calls it; its commands take the hash as opaque input. Neither the password nor the hash is ever logged.
+ */
+export interface PasswordHasher {
+  hash(password: string): Promise<string>;
+  verify(password: string, stored: string): Promise<boolean>;
+}
+
 export interface OrganizationRepository {
   get(organizationId: Uuid): Promise<Organization | null>;
   /** Organizations the user is a member of, or a guest in through a workspace membership. */

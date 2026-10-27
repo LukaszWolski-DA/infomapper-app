@@ -1,9 +1,9 @@
 // What each workspace role may do (AD-05), the archive (AD-09) and guests (AD-01).
-// Actions of slices 0 to 4a; later slices add theirs.
+// Actions of slices 0 to 4a; later slices add theirs (slice 8: people, and the organization's access below).
 
 import { ARCHIVED_MESSAGE, domainError, notFound, type DomainError } from "./errors";
 import type { Uuid } from "./ids";
-import type { OrganizationMember, Workspace, WorkspaceMember, WorkspaceRole } from "./types";
+import type { Organization, OrganizationMember, Workspace, WorkspaceMember, WorkspaceRole } from "./types";
 
 export const WORKSPACE_ACTIONS = [
   "workspace.view",
@@ -23,6 +23,7 @@ export const WORKSPACE_ACTIONS = [
   "note.edit",
   "requirement.edit",
   "requirement.set_status",
+  "people.edit",
 ] as const;
 export type WorkspaceAction = (typeof WORKSPACE_ACTIONS)[number];
 
@@ -52,6 +53,8 @@ export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]>
   "note.edit": ["owner", "admin", "modeler", "reviewer"],
   "requirement.edit": EDITORS,
   "requirement.set_status": ["owner", "admin", "modeler", "reviewer"],
+  // adding people, changing their role and removing them (slice 8, P6); who may touch an owner is the people commands'
+  "people.edit": ["owner", "admin"],
 };
 
 /** Actions that remain possible while the workspace is archived (AD-09). */
@@ -75,6 +78,7 @@ const ACTION_TEXT: Record<WorkspaceAction, string> = {
   "note.edit": "change notes",
   "requirement.edit": "change requirements",
   "requirement.set_status": "change requirements",
+  "people.edit": "change who has access",
 };
 
 /** Refusals worded for the role rather than the action (slice 4a, PRD item 12). */
@@ -122,6 +126,26 @@ export function checkCreateWorkspace(
 ): DomainError | null {
   if (!organizationMember || organizationMember.organization_id !== organizationId) {
     return domainError("forbidden", "Only members of this organization can create workspaces in it.");
+  }
+  return null;
+}
+
+/**
+ * Changing an organization's password (slice 8, P8): its owners and admins, by their organization role whatever their
+ * role in the workspace whose People tab they use; never from an archived workspace, whose log is read-only (F17).
+ */
+export function checkOrganizationAccess(
+  access: WorkspaceAccess,
+  organization: Organization,
+  organizationMember: OrganizationMember | null,
+): DomainError | null {
+  const denied = checkPermission(access, "workspace.view");
+  if (denied) return denied;
+  if (access.workspace.organization_id !== organization.id || organization.deleted_at !== null) return notFound("organization");
+  if (isArchived(access.workspace)) return domainError("archived", ARCHIVED_MESSAGE);
+  const role = organizationMember?.organization_id === organization.id ? organizationMember.role : null;
+  if (role !== "owner" && role !== "admin") {
+    return domainError("forbidden", `Only the owners and admins of ${organization.name} can change its password.`);
   }
   return null;
 }

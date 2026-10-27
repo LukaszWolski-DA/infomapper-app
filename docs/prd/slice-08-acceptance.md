@@ -1,8 +1,81 @@
 # Slice 8 – Acceptance
 
-Status: **step 1 (critical review), waiting for Łukasz's answers.** Branch `slice/08-organizations`, from `main` at
-`bbc16c5` (tag `slice-07c`). PRD: `docs/prd/slice-08-organizations.md`. The PRD stays as written; this file is its
-amendment.
+Status: **step 2 (the domain), waiting for Łukasz.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
+`slice-07c`). PRD: `docs/prd/slice-08-organizations.md`. The PRD stays as written; this file is its amendment.
+
+## Answers from Łukasz (step 1) (27 October 2026)
+
+These answers and the accepted findings amend the PRD.
+
+1. **F1:** yes, a signed session cookie; the secret from `INFOMAPPER_SESSION_SECRET`, else `.data/session-secret` made
+   once. The secret file must be git-ignored. *Checked:* `.gitignore` line 22 ignores `.data/` as a whole
+   (`git check-ignore -v .data/session-secret` → `.gitignore:22:.data/`).
+2. **F5:** yes, a separate table `organization_access`.
+3. **F6:** yes, keep "First project" and "First canvas". "No project" is dropped from P5, and item 7's summary says so
+   (the text below).
+4. **F8:** yes. "Belongs" = has a workspace there, for signing in and unlocking; `organization_member` keeps the role
+   and the home/guest distinction; the seed's guests stay guests; people added in slice 8 get a `member` row.
+5. **F9:** refuse. An organization owner cannot be removed from their last workspace in that organization: "{name} owns
+   {organization}, so they keep at least one workspace there." Admins and members leave the organization as P7 says.
+6. **F10:** yes, fixed in this slice with `workspacePeople(store, workspaceId)`. People of another organization never
+   reach the browser; removed people who have change events in the workspace keep their names in history.
+7. **F11:** yes. The name is shown only if the person is already in this organization; otherwise "already has an
+   account; they keep their own name."
+8. **F12:** yes. Admins cannot change or remove owners; nobody changes or removes their own row; the server refuses
+   both.
+9. **F17:** yes, no password change from an archived workspace.
+10. **F18:** yes, the format 9 upgrade writes no change events; one server log line instead.
+11. **F15:** yes, unlocking from the switcher goes through the page's redirect; no dialog in the top bar; the lock icon
+    stays.
+12. **Section 6:** yes, provided the PRD's bars stay (verifying a password under 200 ms, creating an organization under
+    1 s) and +10 ms applies per reseed. Step 2's report quotes section 6's final table.
+
+The other findings (F2, F3, F4, F7, F13, F14 and the ones not answered above: F16, F19, F20, F21) are accepted as
+recommended.
+
+### The PRD as amended
+
+| PRD place | Amended to |
+| --- | --- |
+| P5, item 8 | The first workspace has "First project" with "First canvas" and the 19 built-in classifications (F6); no "no project". |
+| Item 7 | The summary names "a first project and canvas" (text list in step 2). |
+| P7 | "Belongs" = has a workspace there (sign-in, the link, unlocking). Adding a person writes a `member` row when they have none in the organization; removing them from their last workspace there deletes their row (admins and members). An organization's owner cannot be removed from their last workspace there (F9). The seed's guests stay guests (F8). |
+| P9, items 14, 18 | A table `organization_access` (`organization_id`, `access_hash`, `changed_at`, `changed_by`, `version`) instead of two columns (F5). |
+| Item 4 | The session is a signed cookie with the unlocked organizations (F1). The lock sits at five places (F3). `next` returns only to a page of the organization's workspaces (F14). |
+| Item 2 | AD-07 per organization: the last workspace cookie when it lies in the chosen organization, else its first workspace (F13). |
+| Item 5 | No dialog: the switcher links as today and the page redirects to the link's form; the lock icon and its tooltip stay (F15). |
+| Item 10 | An existing account's name is shown only when the person already has a workspace in this organization (F11). |
+| Items 11, 12 | Admins cannot change or remove owners; nobody changes or removes their own row (F12). |
+| Item 13 | No password change from an archived workspace (F17). |
+| Item 18 | The upgrade writes no change events; one log line (F18). |
+| Section 6 | The PRD's bars stay; a reseed bar of +10 ms is added (F7). The final table is in step 2's report below. |
+| `/sign-in` and the e2e fixtures | Creating an organization from the start page runs through `runCommandAs` (F2); the development list keeps signing in as before. |
+
+### Where each finding goes
+
+| Finding | Step | What |
+| --- | --- | --- |
+| F1 | 3 | The signed cookie, the secret, `getSession()`; S0-01's fourth case (an unsigned cookie with a known id). |
+| F2 | 3 | `runCommandAs` and the start page's server action; the `app_user` e-mail conflict mapped to the domain's text. |
+| F3 | 3, 4 | `runCommand`, `undoRedoAction` and the three impact reads (3); `loadShellFor`'s redirect and `Landing` (4). |
+| F4 | 2, 3 | The domain's half in step 2 (`WritableRows`, `LINK_TABLES`, `objectId`); the adapter's removal tests in `store.test.ts` (3). |
+| F5 | 2, 3 | The type, `WritableRows` and the adapter's empty table in step 2; the migration, the data model and `getAccessHash` (3). |
+| F6 | 2 | `newWorkspaceRows`, shared by `createWorkspace` and creating an organization. |
+| F7 | 3 | The precomputed `demo-pass` hash in the seed and the upgrade, with its unit test; the reseed bar. |
+| F8 | 2, 4 | The membership rows in adding and removing (2); "belongs" in the sign-in steps (4). |
+| F9 | 2 | The refusal in `removePerson`. |
+| F10 | 3 | `workspacePeople(store, workspaceId)` for the canvas page and the workspace page, with its unit test. |
+| F11 | 2, 5 | The summary and toast texts (2); the People tab (5). |
+| F12 | 2, 5 | The rules (2); owners' rows as text for admins and the new role wording (5). |
+| F13 | 4 | The landing after signing in and unlocking. |
+| F14 | 2, 4 | `safeReturnPath`, a pure function (2); used by the unlock form (4). |
+| F15 | 4 | The switcher's lock icon and the redirect. |
+| F16 | 6 | The known limitation and D-58 name D-29 as the precedent (decision texts quoted in step 3). |
+| F17 | 2, 5 | The refusal (2); the box hidden in an archived workspace (5). |
+| F18 | 3 | The format 9 upgrade: no change events, one log line. |
+| F19 | 2, 3 | The `PasswordHasher` interface in `src/data/ports.ts` (2); the scrypt adapter in `src/data/password.ts` (3). |
+| F20 | 3, 6 | D-58's text (3); the known limitation (6). |
+| F21 | 4, 6 | "guest" in the sign-in step's list (4); the known limitation (6). |
 
 ## Step 1: start checks (27 October 2026)
 
@@ -553,3 +626,159 @@ The benches go into README's command table and CLAUDE.md's command list in step 
 10. **F18:** the format 9 upgrade writes no change events?
 11. **F15:** unlocking from the switcher through the page's redirect, with no dialog in the top bar?
 12. **Section 6:** the bars above, including the reseed bar (+10 ms)?
+
+## Step 2: the domain (27 October 2026)
+
+Lint (36 s), typecheck (8 s) and unit tests pass: 103 files, 1,353 tests in 17 s (4 new files, 49 new tests; 99 files
+and 1,304 tests before). No e2e run in this step (PRD: step 4 has the full run).
+
+### What changed
+
+- **Types** (`src/domain/types.ts`): `OrganizationAccess` (F5). `WritableRows` gains `app_user`, `organization`,
+  `organization_member` and `organization_access`; `LINK_TABLES` gains `workspace_member` and `organization_member`, so a
+  removal is a `remove` write with a null after image (F4).
+- **Change sets** (`src/domain/changes.ts`): `objectId` names the person for both membership tables and the
+  organization for `organization_access`. `SECRET_COLUMNS` (`organization_access.access_hash`): both images carry
+  `"(changed)"` or `"(unchanged)"`, never the hash (Q4, item 15).
+- **Permissions** (`src/domain/permissions.ts`): `people.edit` for owners and admins (refusal "As a {role} you cannot
+  change who has access."; the archive refuses it as every change). `checkOrganizationAccess`: the organization's owners
+  and admins, by their organization role, as members of the workspace whose People tab is used, never from an archived
+  workspace (F17).
+- **Workspaces** (`commands/workspace.ts`): `newWorkspaceRows` extracted from `createWorkspace` (Q3, F6); the command
+  writes the same rows as before.
+- **Organizations** (`commands/organization.ts`):
+  - `checkCreateOrganizationForm` and `checkNewOrganizationForm`: the form's checks and the summary (items 6, 7, 9),
+    writing nothing; `checkNewPassword` (at least 8 characters, both equal); `normalizeEmail` and `emailSchema`.
+  - `createOrganization` (the start page, item 8): the person, the organization, its access, the owner's organization
+    membership and the first workspace's rows, in one change group in that workspace. `ctx.actorId` is the new person's
+    id (F2). An e-mail with an account is refused with the hint.
+  - `createOrganizationForUser` ("New organization…", item 9): the same without the person.
+  - `changeOrganizationPassword` (item 13): updates, or for an organization without one inserts, the access row;
+    `expectedVersion` is the access row's version, or null.
+  - The commands take the hash as opaque input; the password never enters them (F19).
+- **People** (`commands/people.ts`):
+  - `checkAddPerson` and `addPerson` (item 10, F8, F11): Admin to Reader (default Modeler); the account if new, a
+    `member` row in the organization if the person has none there, and the workspace membership. The summary and the
+    toast name the account's name only when the person already has a workspace in this organization.
+  - `changeRole` (item 11, F12).
+  - `checkRemovePerson` and `removePerson` (item 12, P7, F9, F12): the confirmation's lines; from their last workspace in
+    the organization, an admin's or member's organization row goes too; the organization's owner is refused.
+  - `ROLE_LABEL` moved here; `src/app/_lib/roles.ts` re-exports it, so the app's labels and the domain's texts are one
+    list.
+- **The return path** (`src/domain/return-path.ts`, F14): `safeReturnPath(next, organizationWorkspaceIds)` accepts only
+  `/w/{id}`, `/w/{id}/p/{id}` and `/w/{id}/p/{id}/c/{id}` with an optional query of plain characters, for a workspace of
+  that organization.
+- **The password port** (`src/data/ports.ts`, F19): `PasswordHasher { hash, verify }`, an interface only; the scrypt
+  adapter comes in step 3.
+
+**Outside the domain, only what the types needed:** the local adapter knows `organization_access` (`DevDb`,
+`emptyDb`, `RULES`: key `organization_id`, foreign keys to `organization` and `app_user`); `upgradeDb` adds the table
+empty to a file that lacks it, with no format change (format 9 and `demo-pass` are step 3's); `compare-schema.test.ts`
+lists the new table.
+
+### Decisions I took (please check)
+
+1. **The table exists before its format.** Until step 3 no organization has a password and nothing reads one; the app
+   behaves as on `slice-07c`. Nothing is pushed, so `schema:check` (no migration yet) does not run.
+2. **The start page's actor** is the person being created: the caller makes the id and passes it as `ctx.actorId`, so
+   every change event of the creation is signed by them (F2).
+3. **Lengths:** a password up to 200 characters (it bounds the hashing work a typed password can ask for), names up to
+   200, an e-mail address up to 254. Each has a text below.
+4. **The marker on a new row:** a created access row's after image says `"(changed)"`.
+5. **"Already in this organization" for F11** follows answer 4: the person has a live workspace there. A person with an
+   organization row but no workspace there (the seed's Kasia in Retail Co) is shown by e-mail only.
+6. **Adding a guest of this organization** (the seed's Łukasz to another Retail Co workspace) writes a `member` row for
+   them, as answer 4 says for everyone added in slice 8. From then on Łukasz is a Retail Co member, also in Sales
+   analytics, where S0-03 shows him as a guest today. No spec does this; see question 2.
+7. **Removing a guest from their last workspace** shows the "they leave {organization} too" line (they no longer
+   belong, answer 4) and deletes no organization row (they have none).
+8. **Choosing the same role** is refused: "{name} is {role} already." The select will not send it; the server text is a
+   defence.
+9. **The last-owner check** stays in both commands although "nobody changes their own row" makes it unreachable through
+   the page (an owner can only demote another owner, so at least two exist). It guards the server.
+10. **The password box** needs a membership of the workspace (it sits on that workspace's page) besides the organization
+    role.
+11. **Field messages:** the password rule goes on the field `password`, "The passwords differ." on `passwordAgain`, the
+    account refusal on `email`, so the forms can show each next to its field.
+
+### Every new or changed user-facing text
+
+Texts used in later steps are listed too, so the whole slice's wording is approved once. "Step" says where it appears.
+
+| Where | Text | Step |
+| --- | --- | --- |
+| Form checks | Enter the organization's name. · Enter your name. · Enter the first workspace's name. · Enter a name. (adding a person) · This name is too long. | 2, 4, 5 |
+| Form checks | Enter an e-mail address. (the prototype's) · Enter a valid e-mail address. · This e-mail address is too long. | 2, 4, 5 |
+| Form checks | The password needs at least 8 characters. · The passwords differ. · This password is too long. | 2, 4, 5 |
+| Account refusal | This e-mail address already has an account. Sign in and create the organization from the organization menu. | 2, 4 |
+| Create summary (start page) | You are creating the organization {organization} with you ({name}, {e-mail}) as its owner, and the empty workspace {workspace} with a first project and canvas and the 19 built-in classifications. People sign in to {organization} with its link and this password. | 2, 4 |
+| Create summary (menu) | You are creating the organization {organization} with you as its owner, and the empty workspace {workspace} with a first project and canvas and the 19 built-in classifications. People sign in to {organization} with its link and this password. | 2, 4 |
+| Create toast | Created {organization} with an empty first workspace. (the prototype's) | 2, 4 |
+| Add summary, new account | {name} ({e-mail}) gets the role {role} in {workspace}. They sign in with the link of {organization} and its password. | 2, 5 |
+| Add summary, account in this organization | {account name} ({e-mail}) gets the role {role} in {workspace}. They sign in with the link of {organization} and its password. / {e-mail} already has an account as {account name}; that name stays. | 2, 5 |
+| Add summary, account from elsewhere (F11) | {e-mail} gets the role {role} in {workspace}. They sign in with the link of {organization} and its password. / {e-mail} already has an account; they keep their own name. | 2, 5 |
+| Add refusal | {name} is already in {workspace}. | 2, 5 |
+| Add toast | Added {name} to {workspace} as {role}. (F11: Added {e-mail} to {workspace} as {role}.) | 2, 5 |
+| Role change | {name} is now {role}. (the prototype's) · {name} is {role} already. | 2, 5 |
+| Removal confirmation | {name} loses access to {workspace}. / They are in no other workspace of {organization}, so they leave {organization} too. | 2, 5 |
+| Removal toast | {name} no longer has access. (the prototype's) | 2, 5 |
+| People refusals | {workspace} needs at least one owner. · You cannot change your own role. · You cannot remove yourself. · Only an owner can make someone an owner. · Only an owner can change an owner's role. · Only an owner can remove an owner. · {name} owns {organization}, so they keep at least one workspace there. (yours, F9) | 2, 5 |
+| Role refusal | As a modeler / a reviewer / a reader you cannot change who has access. | 2 |
+| Password change | Only the owners and admins of {organization} can change its password. · People who are signed in stay signed in; the next sign-in needs the new password. · Changed the password of {organization}. · Link copied. | 2, 5 |
+| Role texts (F12), changed | Admin, "You can …" (`ROLE_CAN.admin`): "You can edit the model, approve, add people, change their roles and change settings." (was "… approve, invite people and change settings.") | 5 |
+| Role texts (F12), changed | The role table's Admin row, "People and settings": "add people, roles (not owners), settings" (was "invite, roles, settings") | 5 |
+| Sign-in | Sign in · Create an organization · No organization uses this e-mail address. · That password does not open {organization}. · {n} workspaces / guest (the organization step's list, F21) | 4 |
+| Lock | Asks for the password once (the switcher's tooltip) · Unlock {organization} first: open it and enter its password. (a write into a locked organization, F3) | 3, 4 |
+| Upgrade log line | Slice 8 upgrade: {n} organizations got the development password (see README). | 3 |
+
+### Tests
+
+New files: `commands/organization.test.ts` (13: the form's checks and their fields, the account refusal, both
+summaries, the creation's rows and change group with the marker, the menu's creation, the password change with its
+marker, first password, stale form, roles, archive, another organization), `commands/people.test.ts` (18: adding a new
+person, an account of this organization, an account from elsewhere with its name hidden, someone already in, the roles
+offered, roles and archive, the form's checks; changing a role with F12's rules, own row, last owner; removing with the
+last-workspace line for members and admins, a guest, F9, F12, own row, last owner, roles and archive),
+`return-path.test.ts` (3: the workspace's pages, another organization, 16 unsafe paths), `changes.test.ts` (4: the
+marker on update and insert, unchanged, the row untouched; membership removals).
+
+Added to: `permissions.test.ts` (11: the matrix gains `people.edit` for each of the five roles, plus 6: the people
+refusal, the archive, the password change's roles, membership, organization and archive).
+
+Changed earlier tests, with the reason: `tests/schema/compare-schema.test.ts` (the stored tables include
+`organization_access`). `workspace.test.ts` is unchanged and passes on the extracted rows.
+
+### Section 6's figures (the final table, as approved)
+
+| What | How | Bar |
+| --- | --- | --- |
+| Verifying a password | `scripts/bench-password.ts`: the scrypt adapter's `verify`, 20 runs after 2 warm-ups, median and max, with the parameters printed | median under 200 ms (the PRD's bar); reported with the parameters |
+| Creating an organization | `scripts/bench-create-organization.ts`: the command plus hashing through the local adapter on a copy of the demo data, 5 runs, median; once more on a copy with `seed:large`'s workspace | under 1 s on the demo data (the PRD's bar); the large file reported |
+| Reseeding for e2e (F7) | time `resetDevData()` 20 times on this branch and on `slice-07c` (a worktree), median | no more than +10 ms per reseed |
+| Viewport elements on a canvas page | `S3B-15-elements.spec.ts` with `ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json` | equal |
+| Nothing above the canvas reads layout | the lock icon sits in the closed menu; review in step 4 | no new read (CLAUDE.md) |
+
+Step 2 has nothing to measure: the commands are pure, and hashing and the reseed come with step 3.
+
+### How to check
+
+- `npm test`, or only this step's files: `npx vitest run src/domain/commands/organization.test.ts
+  src/domain/commands/people.test.ts src/domain/return-path.test.ts src/domain/changes.test.ts
+  src/domain/permissions.test.ts`.
+- Nothing to see in the app yet (decision 1).
+
+### Open for step 3
+
+The migration, the data model, the format 9 upgrade with the precomputed `demo-pass` hash (F7, F18), the scrypt adapter
+and its bench, the signed session (F1), `runCommandAs` (F2), the lock in `runCommand`, undo and the impact reads (F3),
+the adapter's removal tests (F4), `getAccessHash` (F5), `workspacePeople` (F10), the server actions, the seeds and the
+e2e helpers, and the decision texts for approval.
+
+### Questions for Łukasz
+
+1. The texts above: approve, or change any? In particular F12's two role texts.
+2. Decision 6: adding a guest of this organization makes them a member (answer 4 read literally). Keep that, or keep
+   guests as guests when they are added to another workspace of the same organization?
+3. Decision 5: is "has a workspace here" the right test for showing an existing account's name (Kasia in Retail Co is
+   shown by e-mail only)?
+4. Decision 3: the 200-character password limit, with its text?
