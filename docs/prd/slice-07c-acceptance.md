@@ -1,6 +1,6 @@
 # Slice 7c – Acceptance
 
-Status: **step 2 (the domain).** Branch `slice/07c-classifications`, from `main` at `408c3c0` (tag `slice-07b`). PRD:
+Status: **step 6 (closing): waiting for the manual acceptance.** Branch `slice/07c-classifications`, from `main` at `408c3c0` (tag `slice-07b`). PRD:
 `docs/prd/slice-07c-classifications.md`. The PRD stays as written; this file is its amendment.
 
 ## Łukasz's answers to step 1 (26 October 2026)
@@ -1211,3 +1211,171 @@ npm run measure:build && MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.d
 ```
 
 A/B against `slice-07b`: run the same script in `.data/wt-07b` (see the working notes) in turns, as step 5 did.
+
+## Step 6: closing (27 October 2026)
+
+Commits `223e824` ("The file says …" not counted), `848c0c1` (the reading's look), `6673f46` (the docs),
+the next commit (S7C-01 and S7C-02's specs, this section). Lint, typecheck and unit tests pass (99 files, 1,303 tests).
+
+### The two changes from the answers to step 5
+
+- **"The file says …" rows are shown, not counted.** Checked: the review's filter counts (`reviewCounts`), the import's
+  counts and summary (`planCounts`, `importSummary`) and the `source_import` row's counts count only new, changed,
+  renamed and missing columns; an unchanged column with a "file says" line is none of them, and `applyPlan` writes no
+  patch and no link for it. Nothing needed fixing there. One visible slip was fixed: a table shown only for such rows
+  had the header tag "changed" (`review-step.tsx` mapped an unchanged table to it); it now says "same" (the tag an
+  unchanged column has). The "nothing" callout ("The file matches what CRM has. Importing only records the import and
+  updates row counts.") shows above such rows, which is true: the import writes nothing for them. Tests: a unit test
+  in `import/classifications.test.ts` (no counts, "No changes", no column patch, no link) and a new
+  `src/app/_panels/import/wizard-model.test.ts` (every filter counts 0, the row shows under "all changes" only); in
+  `S7C-10.spec.ts`'s second test, all six filters read 0, the table's header says "same", the toast is "Imported into
+  CRM: No changes" and the `source_import` row counts nothing.
+- **The Data Vault reading looks like the prototype** (AD-20): `DataVaultReading` renders the structured lines; the
+  role in bold (`font-semibold`, the prototype's `b{font-weight:600}`), column and table names in monospace (12 px),
+  the asides "(foreign key; not marked Link key)" and "with no relationship known: …" muted, one ruled row per line
+  without bullets and 12.5 px text (the prototype's `.reading li`). The texts are `readingText`'s, word for word
+  (`S7C-12.spec.ts` unchanged, passing). One difference: the prototype sets a link's target table in plain text; your
+  answer asked for table names in monospace too, so it is.
+
+### Docs
+
+- **`docs/ideas.md`:** a panel-only write that does not redraw the canvas (F4); rich text for all notes at once (F7);
+  built-in names per documentation language; a `table_classifications` column in the source standard; Data Vault hints
+  in the entity panel (P12); readings that use Link candidate and Satellite source; own classifications with a code;
+  and a **"Data model slice"** heading with PRD section 9's list as amended (below).
+- **`docs/inventory-prototype-vs-app.md`:** updated at 7c's close; "Sources" lists nothing missing but the ideas
+  (relationships on the canvas, readings with Link candidate and Satellite source); slice 7c's deliberate differences;
+  the summary's Model row (entity panel hints: idea) and Settings row (the list is done).
+- **`docs/known-limitations.md`:** the import's undo (a classification on a column the import only updated no longer
+  blocks it; on a column it created it still does); the card move after three large imports (1,473 ms on 7c, 1,230 ms
+  on `slice-07b`, a limit of the local data file, for the database slice); a panel-only write commits the canvas three
+  times as any write (F4). Checked once more and still true: F6 (old undo steps on columns after the upgrade), who signs
+  the upgrade, Escape in the four other dialogs, live columns only; "The PII tag" contrast row (attribute rows).
+- **README:** the status ("slice 7c … waits for its acceptance on its branch"), what 7c brought, its acceptance link,
+  the bench line, `COMMITS=1`, the element guard, `seed:large`'s classifications.
+- **CLAUDE.md:** classifications and notes in "What this is"; a "Classifications" note (the codes module, the index
+  built once per load, rules read codes only, the BK badge the only mark, format 8 and its report, plain-text notes,
+  the read-only comment); the 7c helpers; the bench lines, `COMMITS=1` and the element guard.
+- **`docs/decisions.md` and `docs/data-model-v2.md`:** checked against steps 4–6; nothing they say changed. D-57's
+  "Removing one shows first where it is used and, for a built-in one a rule reads, what stops" already covers step 4's
+  answer (the form also for an unused built-in a rule reads). No change proposed.
+
+### For the data model slice (PRD section 9, as amended)
+
+Also in `docs/ideas.md` under "Data model slice":
+
+- whether attributes get classifications too (then `attribute.is_business_key` and `is_pii` become links and AD-28 a
+  suggestion of the Business key classification);
+- one pattern for `requirement_link`, `label_link` and `classification_link`;
+- baselines and export with classifications;
+- indexes at enterprise scale;
+- F5: moving the flags' data and seeding the 19 built-in rows in a real database (the migration is DDL only);
+- F20: `classification.origin` carries both "built in or own" and the group;
+- a system author for upgrades (e.g. "InfoMapper upgrade").
+
+### The acceptance criteria
+
+| ID | Spec files (`e2e/slice-07c/`) and unit tests | Result |
+| --- | --- | --- |
+| S7C-01 | `S7C-01.spec.ts` (2, new in step 6: a workspace made from the switcher holds the 19 in its creation's change group; the demo workspaces hold them); `model/classifications.test.ts`, `commands/workspace.test.ts`, `upgrade-8.test.ts` | passed (3 of 3) |
+| S7C-02 | `S7C-02.spec.ts` (1, new in step 6: a format-7 file read by the server; the BK badge, the Keys filter, the attribute's suggestion and the column panels as before; a hand-typed comment in the note; the report lists the column, not the text); `upgrade-8.test.ts`, `canvas.test.ts` | passed (3 of 3) |
+| S7C-03 | `S7C-03.spec.ts` (3) | passed |
+| S7C-04 | `S7C-04.spec.ts` (2: the panels' part, the import's part) | passed |
+| S7C-05 | `S7C-05.spec.ts` (3) | passed |
+| S7C-06 | `S7C-06.spec.ts` (3); unit tests per rule: `mapping-rules.test.ts`, `attribute.test.ts`, `import/classifications.test.ts`, `settle.test.ts`, `canvas.test.ts` | passed |
+| S7C-07 | `S7C-07.spec.ts` (2) | passed |
+| S7C-08 | `S7C-08.spec.ts` (1) | passed |
+| S7C-09 | `S7C-09.spec.ts` (3) | passed |
+| S7C-10 | `S7C-10.spec.ts` (2; the second also checks that "The file says …" counts nothing) | passed |
+| S7C-11 | `S7C-11.spec.ts` (3) | passed |
+| S7C-12 | `S7C-12.spec.ts` (2) | passed |
+| S7C-13 | `S7C-13.spec.ts` (2) | passed |
+| S7C-14 | `S7C-14-commits.spec.ts` (on demand, `COMMITS=1`), `e2e/slice-03b/S3B-15-elements.spec.ts` against `slice-07b`, the benches (step 5's table) | passed in step 5: elements equal; 3 commits per toggle on both tags; index 1 ms; plan +5 %; writes +4 to +8 %; removal 549–567 ms |
+| S7C-15 | CI and the full runs below; changed earlier tests: `S7A-04-route`, `S7A-04`, `S7B-12` (step 3: the import writes links, format 8), `S7A-01`, `S7A-07` (step 3: TECH and the others read; classifications from the index), `S7A-05`, `S7A-09` (step 4: the comment read-only) | passed: CI green; the full run 332 passed, 1 skipped |
+
+### The full e2e run
+
+`npm run e2e`, from scratch, no dev server running, before S7C-01 and S7C-02's specs existed: **61 min 5 s; 332
+passed, 1 skipped** (`S7C-14-commits.spec.ts`, on demand), none failed, no flake. The run's "[WebServer] ⨯ Error: The
+destination stream closed early." lines (51) were there before (52 in step 3's run).
+
+The two specs written after it, on their own: `S7C-01.spec.ts` failed once on my own mistake (the change log's
+operation is "create", not "insert"), then passed 3 of 3; `S7C-02.spec.ts` passed 3 of 3. With them the slice's folder
+has 30 tests (+1 on demand).
+
+### Manual acceptance: the definition of done (PRD section 5, for what was built)
+
+**Prepare** (no e2e run going, no other dev server), in the repository on `slice/07c-classifications`:
+
+1. *(Optional, your own data.)* `npm run dev` once with your current `.data/dev-db.json` (format 6): the server log says
+   "Slice 7c upgrade: moved {n} hand-typed column comments into notes; see .data/upgrade-8-dev-db.txt", and that file
+   lists them (column paths only). Stop the server.
+2. Then:
+
+```
+npm run reset-dev-data
+node -e "const fs=require('fs');fs.writeFileSync('.data/crm_fname_tech.csv',fs.readFileSync('src/domain/import/samples/crm_snapshot_2026-10-20.csv','utf8').split(/\r?\n/).map(l=>l.includes(',customers,')&&l.includes(',fname,')?l.replace(/PII$/,'TECH'):l).join('\n'))"
+node -e "require('fs').writeFileSync('.data/shop.csv',['database,schema,table,column,ordinal,data_type,nullable,primary_key,fk_name,fk_ref_schema,fk_ref_table,fk_ref_column,classifications','shop,dbo,customers,customer_id,1,int,no,yes,,,,,','shop,dbo,customers,name,2,varchar(50),yes,no,,,,,','shop,dbo,orders,order_id,1,int,no,yes,,,,,','shop,dbo,orders,customer_id,2,int,yes,no,FK_orders_customers,dbo,customers,customer_id,'].join('\n'))"
+npm run dev
+```
+
+The first `node` line writes CRM's snapshot with `fname` classified `TECH` instead of `PII` (`.data/crm_fname_tech.csv`);
+the second a new system's file with two tables and no classifications (`.data/shop.csv`). Both are git-ignored. Open
+http://localhost:3000, pick **Łukasz**, Retail Co – DWH, Customer 360, the canvas Customer & orders.
+
+1. **The flags are classifications.** Click `cust_no` on the `customers` card. *See:* the row's **BK** badge (source rows
+   carry only BK; PII is an attribute badge); the column panel: the facts, "Classifications" with **General** and
+   **Business key** pressed, "Yours: a re-import never changes them." and "Edit the list…", then "Note". Click `fname`:
+   **Personal data** pressed (the built-in PII is named "Personal data").
+2. **A table classification of your own.** In the column panel click `customers` (the table): Classifications (Master
+   data … History (SCD2)) and Note after Labels. "Edit the list…": the dialog "Classifications" with "For columns" (10)
+   and "For tables" (9), "used 4×" beside Business key. Under For tables type "Golden source", Add. Close. *See:* a group
+   **This workspace** with Golden source in the table panel; click it: pressed. Ctrl+Z: *see* "Undone: Set Golden source
+   on customers", not pressed; Ctrl+Shift+Z sets it again.
+3. **Notes.** In the table panel's Note write "Owned by the CRM team" and click elsewhere. *See:* "Note saved on
+   customers" with Undo. Open `cust_no`, write "Shown on invoices <b>bold?</b>", click elsewhere: "Note saved on
+   cust_no"; the text stays as typed (plain text: the tags are not bold). Ctrl+Z: *see* "Undone: Edit note on cust_no"
+   and the note empty again; the table's note stays.
+4. **Rename Business key.** "Edit the list…", put the cursor in Business key's name, type "Klucz biznesowy", Enter.
+   *See:* under the list "A new name is also the name an import file must use; for built-in ones the code (e.g. BK)
+   keeps working."; close; `cust_no`'s panel shows **Klucz biznesowy** pressed, and the BK badge stays on the row.
+5. **Remove it, read what stops, cancel.** "Edit the list…", Remove beside Klucz biznesowy. *See:* "Klucz biznesowy is
+   used on 0 tables and 4 columns." with the four columns, "Without it, the app no longer: suggests business keys on
+   attributes; sends approved mappings back when a business key column changes type; raises business key changes on
+   import; suggests business keys in the import; shows the BK badge on source rows or keeps them in the Keys filter;
+   shows a hub in the Data Vault reading." and "You can undo it right after." Cancel: nothing changes.
+6. **An unused built-in.** Remove beside **Load date** (unused). *See:* the form anyway, "Load date is unused." and
+   "Without it, the Data Vault reading counts these columns as descriptive columns of a satellite."; Cancel. Remove
+   beside **Staging** (For tables; unused, no rule reads it): it goes at once, the toast "Removed Staging from the
+   list." with Undo, and Staging under "Removed built-in classifications" with Restore; Restore: "Restored Staging.".
+7. **Data Vault 2.0 mode and the reading.** Workspace page → Settings: *see* "InfoMapper is methodology-neutral. The Data
+   Vault 2.0 mode adds Data Vault classifications and a Data Vault reading to source table panels (hubs, links,
+   satellites); nothing is generated or enforced."; tick Data Vault 2.0 mode. Back on the canvas open `customers`' table
+   panel: a **Data Vault 2.0** group (Hub candidate, Link candidate, Satellite source) and, after "Relationships between
+   source tables", **Data Vault reading**: "**Hub** on `cust_no`" (still read under the new name: rules read the code)
+   and "**Satellite** with … descriptive columns; 4 with personal data: consider a separate satellite for `fname`,
+   `lname`, `email_addr`, `dob`", the footer "Hints from the classifications and the source’s keys; nothing is
+   created." Roles bold, names in monospace. In the relationships click `customer_addresses`: its reading starts
+   "**Link** to `customers` via `cust_id` (foreign key; not marked Link key)", the aside grey. In its columns click
+   `cust_id`, press **Link key**, back to `customer_addresses`: the line is "**Link** to `customers` via `cust_id`".
+8. **Re-import CRM with a different classification.** Sources tab, CRM's ⋯ button: CRM's panel, "Re-import CRM…" with
+   `src/domain/import/samples/crm_snapshot_2026-10-20.csv`, import (this brings CRM in line with the file; ignore its
+   changes). Then "Re-import CRM…" again with `.data/crm_fname_tech.csv`. *See:* every filter reads **0**, the
+   "customers" table's tag says **same**, and the `fname` row says "The file says Technical / audit; your
+   classifications are kept." Import: the toast "Imported into CRM: No changes". `fname` is still Personal data.
+9. **A new system with suggestions.** "Import sources…", a new system named "Shop", drop `.data/shop.csv`, go to the
+   review. *See:* "Suggested classifications" with "Suggestions only. Untick what does not fit; you can change
+   classifications on the column later." and three ticked rows: `dbo.customers.customer_id` and `dbo.orders.order_id`
+   **Klucz biznesowy** ("the only primary key column, and the table has no business key"), `dbo.orders.customer_id`
+   **Link key** with its "Data Vault 2.0" chip ("a foreign key: a candidate for a link between hubs"). Untick Link key;
+   Import: "Imported into Shop: 2 new tables, 4 new columns, 1 new relationship".
+10. **Ticked set, unticked not.** In the Sources tab open Shop → `orders` → `order_id`: Klucz biznesowy pressed;
+    `customer_id`: Link key not pressed.
+11. **Undo the import.** Ctrl+Z: *see* "Undone: Import …"; Shop is gone from the Sources tab, with its classifications.
+12. **Mode off.** Settings: untick Data Vault 2.0 mode: *see* "Data Vault 2.0 mode is off. 1 Data Vault classification on
+    a table or column stays stored and shows again when the mode is on." (`cust_id`'s Link key); the canvas's panels
+    show no Data Vault group and no reading.
+13. **Read-only.** Sign in as **Piotr Wiśniewski** (reviewer): `cust_no`'s toggles disabled, the note read-only, "Edit
+    the list…" shows names as text with no Add, Remove or Restore.
+
+Merge only on your command after this; then tag `slice-07c`.
