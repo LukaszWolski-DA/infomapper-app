@@ -65,6 +65,7 @@ import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import { lastRequirementEditor } from "@/domain/model/requirements";
 import { RememberLastCanvas } from "@/app/_lib/last-canvas";
 import type { WorkspaceModel } from "@/domain/types";
+import { workspacePeople } from "@/app/_lib/people";
 
 // Canvas page: tabs, the left panel (model and sources), the model canvas and the right panel (slice 1a); the Entity
 // tool and Undo and Redo in the top bar (slice 1b); the Hand tool, a selection of several cards, the canvas's look and
@@ -98,7 +99,7 @@ export default async function CanvasPage({
     store.labels.list(ws),
     store.labels.listLinks(ws),
     store.notes.listOfCanvas(ws, canvasId),
-    store.users.list(),
+    workspacePeople(store, workspaceId),
     store.requirements.list(ws),
     store.requirements.listLinks(ws),
     store.model.listImports(ws),

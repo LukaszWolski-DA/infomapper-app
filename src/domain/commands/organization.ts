@@ -17,6 +17,9 @@ export const FIRST_WORKSPACE_NAME = "First workspace";
 export const PASSWORD_MIN_LENGTH = 8;
 /** Long enough for any passphrase; bounds the hashing work a typed password can ask for. */
 export const PASSWORD_MAX_LENGTH = 200;
+/** This slice's new forms only; existing renames keep slice 0's "no maximum length". */
+export const NAME_MAX_LENGTH = 200;
+export const EMAIL_MAX_LENGTH = 254;
 
 // ---- the form's checks ----
 
@@ -29,12 +32,22 @@ export const normalizeEmail = (raw: string): string => raw.trim().toLowerCase();
 export const emailSchema = z
   .string()
   .transform(normalizeEmail)
-  .pipe(z.string().min(1, "Enter an e-mail address.").max(254, "This e-mail address is too long.").regex(EMAIL_FORM, "Enter a valid e-mail address."));
+  .pipe(
+    z
+      .string()
+      .min(1, "Enter an e-mail address.")
+      .max(EMAIL_MAX_LENGTH, `This e-mail address is too long; use at most ${EMAIL_MAX_LENGTH} characters.`)
+      .regex(EMAIL_FORM, "Enter a valid e-mail address."),
+  );
 
-const named = (empty: string) => z.string().trim().min(1, empty).max(200, "This name is too long.");
-const organizationNameSchema = named("Enter the organization's name.");
-const personNameSchema = named("Enter your name.");
-const workspaceNameSchema = named("Enter the first workspace's name.");
+const NAME_TOO_LONG = `This name is too long; use at most ${NAME_MAX_LENGTH} characters.`;
+const PASSWORD_TOO_LONG = `This password is too long; use at most ${PASSWORD_MAX_LENGTH} characters.`;
+
+/** A name in this slice's new forms: trimmed, not empty, at most 200 characters (existing renames have no maximum). */
+export const newFormName = (empty: string) => z.string().trim().min(1, empty).max(NAME_MAX_LENGTH, NAME_TOO_LONG);
+const organizationNameSchema = newFormName("Enter the organization's name.");
+const personNameSchema = newFormName("Enter your name.");
+const workspaceNameSchema = newFormName("Enter the first workspace's name.");
 /** The hash the server's adapter made; the domain only checks that there is one. */
 const accessHashSchema = z.string().min(1);
 
@@ -47,7 +60,7 @@ export function checkNewPassword(password: string, again: string): DomainError |
     return domainError("invalid", `The password needs at least ${PASSWORD_MIN_LENGTH} characters.`, { password: `The password needs at least ${PASSWORD_MIN_LENGTH} characters.` });
   }
   if (password.length > PASSWORD_MAX_LENGTH) {
-    return domainError("invalid", "This password is too long.", { password: "This password is too long." });
+    return domainError("invalid", PASSWORD_TOO_LONG, { password: PASSWORD_TOO_LONG });
   }
   if (password !== again) return domainError("invalid", "The passwords differ.", { passwordAgain: "The passwords differ." });
   return null;
@@ -113,8 +126,8 @@ export function checkNewOrganizationForm(input: unknown): { ok: true; summary: s
 export function createOrganizationSummary(organization: string, workspace: string, you: { name: string; email: string } | null): string {
   const owner = you ? `with you (${you.name}, ${you.email}) as its owner` : "with you as its owner";
   return (
-    `You are creating the organization ${organization} ${owner}, and the empty workspace ${workspace} with a first ` +
-    `project and canvas and the ${BUILTIN_CLASSIFICATIONS.length} built-in classifications. People sign in to ` +
+    `You are creating the organization ${organization} ${owner}, and the workspace ${workspace} with an empty first ` +
+    `project and canvas, and the ${BUILTIN_CLASSIFICATIONS.length} built-in classifications. People sign in to ` +
     `${organization} with its link and this password.`
   );
 }

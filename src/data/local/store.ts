@@ -82,6 +82,13 @@ export function createLocalDataStore(file: string): DataStore {
     users: {
       list: async () => (await load()).app_user,
       get: async (userId) => (await load()).app_user.find((u) => u.id === userId) ?? null,
+      getByEmail: async (email) => (await load()).app_user.find((u) => u.email === email) ?? null,
+      listForWorkspace: async (workspaceId) => {
+        const db = await load();
+        const ids = new Set(db.workspace_member.filter((m) => m.workspace_id === workspaceId).map((m) => m.user_id));
+        for (const e of db.change_event) if (e.workspace_id === workspaceId) ids.add(e.user_id);
+        return db.app_user.filter((u) => ids.has(u.id));
+      },
     },
 
     organizations: {
@@ -101,6 +108,8 @@ export function createLocalDataStore(file: string): DataStore {
         const wanted = new Set(userIds);
         return (await load()).organization_member.filter((m) => wanted.has(m.user_id));
       },
+      getAccess: async (organizationId) =>
+        (await load()).organization_access.find((a) => a.organization_id === organizationId) ?? null,
     },
 
     workspaces: {

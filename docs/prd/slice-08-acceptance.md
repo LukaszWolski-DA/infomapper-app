@@ -1,6 +1,6 @@
 # Slice 8 – Acceptance
 
-Status: **step 2 (the domain), waiting for Łukasz.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
+Status: **step 3 (data, session and server), waiting for Łukasz.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
 `slice-07c`). PRD: `docs/prd/slice-08-organizations.md`. The PRD stays as written; this file is its amendment.
 
 ## Answers from Łukasz (step 1) (27 October 2026)
@@ -802,9 +802,177 @@ organization's name, the person's name and the first workspace's name when creat
 (`src/domain/validation.ts`) is unchanged, so `createWorkspace` and every existing rename keep slice 0's "no maximum
 length". (Requirement names keep slice 4a's 300.)
 
+### The texts (27 October 2026)
+
+All texts of step 2's table are approved, with five changes, made in the domain and its tests:
+
+1. Both create summaries: "…and the workspace {workspace} with an empty first project and canvas, and the 19 built-in
+   classifications."
+2. Role change: "{name} is already {role}."
+3. Length checks name the limit: "This name is too long; use at most 200 characters.", "This password is too long; use
+   at most 200 characters.", "This e-mail address is too long; use at most 254 characters."
+4. The organization step's list (step 4): "1 workspace" / "{n} workspaces".
+5. People changes in an archived workspace use slice 0's archive text, not a new one: **"This workspace is archived, so
+   it is read-only."** It is `ARCHIVED_MESSAGE` in `src/domain/errors.ts` (commit `9b3cab2`, "feat: domain foundation for
+   slice 0"), returned by `checkPermission` for every action but viewing and unarchiving. `people.edit` goes through
+   `checkPermission`, and `checkOrganizationAccess` returns the same constant, so adding, changing, removing and the
+   password change all use it; step 2 added no archive text.
+
 ### Changes after these answers
 
 - `addPerson` writes the `member` row only when the account has neither a row in this organization nor a workspace
   there; `addPersonPreview` shows the name when the account has either.
 - `people.test.ts`: two new tests (a guest stays a guest and is named; a member row without a workspace is named), 20 in
   all. Lint, typecheck and unit tests pass: 103 files, 1,355 tests.
+
+## Step 3: data, session and server (27 October 2026)
+
+Lint (82 s), typecheck (17 s) and unit tests pass: 106 files, 1,371 tests in 28 s (3 new files, 16 new tests; 103 files
+and 1,355 tests after step 2). Slice 0's e2e specs: 21 passed in 4.2 min (one new case in S0-01).
+
+### What changed
+
+- **Texts** (answers to step 2): the create summaries, "{name} is already {role}.", and the length checks with their
+  limits, in the domain and its tests. People changes in an archived workspace already use slice 0's
+  `ARCHIVED_MESSAGE` (see the answers above).
+- **Migration** `supabase/migrations/20261027200000_organization_access.sql` (DDL only): the table
+  `organization_access` (F5) with row level security on and no policies.
+- **Local adapter, format 9** (`schema.ts`, `file.ts`): `organization_access` with its rules; a format-8 file gives
+  every organization without a password the precomputed `demo-pass` hash, writes no change events (F18), is written back
+  at once and logs one line, "Slice 8 upgrade: {n} organizations got the development password (see README)." (no
+  password, no hash). Step 2's stopgap (the table filled on read without a format) is gone.
+- **Write rules (F4):** removals of `workspace_member` and `organization_member` and the versioned update of
+  `organization_access` go through the adapter's existing key and version checks (tested in
+  `organization-store.test.ts`).
+- **Reads:** `users.getByEmail`, `users.listForWorkspace` (members and authors, F10), `organizations.getAccess` (the
+  only read that carries the hash, server only).
+- **The scrypt adapter** (`src/data/password.ts`, F19): `scryptHasher` behind `PasswordHasher`, N = 2^15, r = 8, p = 1,
+  16-byte salt, 32-byte key, `maxmem` 64 MiB; `scrypt$15$8$1$<salt>$<key>`; `timingSafeEqual`; it refuses malformed
+  strings and parameters it would never write.
+- **The demo password (F7):** `src/data/local/demo-password.ts` holds `demo-pass`'s hash with a fixed salt; the seed
+  and the upgrade write it, and `password.test.ts` checks it against the password with the adapter.
+- **The session (F1)** (`src/app/_lib/dev-session.ts`, `session.ts`, `src/data/local/session-secret.ts`): the cookie
+  keeps its name and is `base64url(payload).base64url(HMAC-SHA256)`, payload `{ v, u, o, at }`, checked in constant
+  time. The secret is `INFOMAPPER_SESSION_SECRET` (at least 32 characters, in `.env.example`) or `.data/session-secret`,
+  made once (`.data/` is git-ignored). `getSession()` returns the person and the unlocked organizations;
+  `getSessionUser()` stays for the pages; `writeSession()` signs a new cookie. Production still refuses the cookie and
+  `/sign-in` (`isLocalModeAllowed`, unchanged; tested).
+- **The development list** unlocks every organization the test user reaches (`signInAsDevUser`), so every existing spec
+  signs in as before.
+- **The lock (F3), step 3's places:** `runCommand` refuses a write into an organization the session has not unlocked
+  ("Unlock {organization} first: open it and enter its password."; a write that creates an organization is allowed and
+  unlocks it), and so do `undoRedoAction`, the three impact reads (`entityImpactAction`, `classificationImpactAction`,
+  `sourceDeleteImpactAction`) and the people previews. `src/app/_lib/unlock.ts`, tested.
+- **`runCommandAs` (F2)** in `run-command.ts`: the start page's write without a session; no live canvases, settling or
+  undo history; an e-mail address taken meanwhile comes back as the domain's account refusal.
+- **Server actions** (their callers come in steps 4 and 5):
+  - `_actions/session.ts`: `organizationsForEmailAction` (the sign-in's organization step: the organizations the e-mail
+    has a workspace in, with the count or "guest"), `signInWithPasswordAction` (signs in to, or unlocks, one
+    organization; lands on `next` when `safeReturnPath` accepts it, else on the last workspace when it lies there, else
+    the first: F13's rule, in the action).
+  - `_actions/organization.ts`: the start page's preview and create (hash, `runCommandAs`, a session with the new
+    organization unlocked), the menu's preview and create (unlocks the new organization), the password change.
+  - `_actions/people.ts`: preview and add, change a role, preview and remove; all through `runCommand`.
+- **F10:** `workspacePeople(store, workspaceId)` (`src/app/_lib/people.ts`) replaces `users.list()` on the canvas page
+  and the workspace page. The note action's single author name and the development list (`/sign-in`, development only,
+  F20) are the remaining `users.list()` readers.
+- **e2e:** `e2e/slice-08/helpers.ts` with `createOrganization` and `addPerson` (test data through the domain and the
+  adapter, as `asPerson` does); S0-01 gains "an unsigned cookie with a known user's id is not a session".
+- **Benches:** `scripts/bench-password.ts`, `scripts/bench-reseed.ts`, `scripts/bench-create-organization.ts`.
+
+### Where the step 3 findings are
+
+| Finding | Done in step 3 | Left |
+| --- | --- | --- |
+| F1 | signed cookie, secret, `getSession`, S0-01's new case | – |
+| F2 | `runCommandAs`, `createOrganizationAction` | the start page (4) |
+| F3 | `runCommand`, undo, the three impact reads, the people previews | `loadShellFor`'s redirect and `Landing` (4) |
+| F4 | adapter removals and the versioned access update, tested | – |
+| F5 | migration, adapter table, `getAccess` | `docs/data-model-v2.md` (6, with Łukasz) |
+| F7 | precomputed hash in the seed and the upgrade, its test, the reseed bench | – |
+| F10 | `workspacePeople` on the canvas and workspace pages, tested in the adapter | – |
+| F13 | the rule inside `signInWithPasswordAction` | `Landing` for a session with locked organizations (4) |
+| F18 | no change events, one log line | – |
+| F19 | `scryptHasher` | – |
+| F20 | the decision text below | the known limitation (6) |
+
+### Decisions I took (please check)
+
+1. **`signInWithPassword` (the e2e helper) comes with step 4.** It must drive the start page (a server action's id is
+   only known from a click, `captureActionId`), and the page is step 4's. `createOrganization` and `addPerson` are test
+   data through the domain, as slice 4a's `asPerson`.
+2. **A password sign-in as another person** replaces the session (only that organization unlocked); as the same person
+   it adds the organization.
+3. **A write that creates an organization** passes the lock (it is new, and creating it unlocks it).
+4. **The upgrade's access rows** are signed (`changed_by`) by each organization's creator, as slice 7c's upgrade signed
+   its rows; `changed_at` is the upgrade's time.
+5. **`docs/data-model-v2.md` and the README's `demo-pass` line** wait for step 6 with the other docs: the data model
+   changes only with Łukasz, and both read better once the decision texts are approved.
+6. **The secret file** is written with `wx` (exclusive create), so the e2e server and a test process starting together
+   end up with the same secret.
+7. **`src/app/_lib/unlock.ts`** has no `server-only` import, so its unit test can import it; it touches only the
+   repository interface.
+
+### Section 6's figures
+
+| What | Result | Bar |
+| --- | --- | --- |
+| Verifying a password (`bench-password.ts`, N = 2^15, r = 8, p = 1) | median 123.5 ms, max 126.1 ms (20 runs); again 123.6 / 129.9 ms | median under 200 ms: passes |
+| Creating an organization (`bench-create-organization.ts`, demo data) | median 135.5 ms, max 143.9 ms (5 runs) | under 1 s: passes |
+| Reseeding for e2e (`bench-reseed.ts`, three turns against `slice-07c` in a temporary worktree, removed afterwards) | slice-07c 11.9 / 11.7 / 11.6 ms; slice 8 10.7 / 11.9 / 11.4 ms (medians of 20) | at most +10 ms: level (−0.2 ms, median of medians) |
+| Viewport elements on a canvas page | not run: step 3 adds no canvas element (the people list is data) | equal (step 4 or 6) |
+
+### Proposed decision texts (for `docs/decisions.md`, after your approval)
+
+**D-58 Organizations and sign-in (slice 8).** InfoMapper starts from nothing: on the start page a person creates an
+organization, with themselves as its owner and a workspace with an empty first project and canvas and the 19 built-in
+classifications, or signs in. Signing in asks for the e-mail address, then the organizations it has a workspace in (a
+list of all organizations is never shown), then the chosen organization's password; an organization's link opens its
+sign-in directly. A session unlocks each organization with its password once; until then its pages ask for the
+password and the server refuses writes into it, so adding someone to a second organization never opens the first. A
+signed-in person creates further organizations from the organization menu. Workspace owners and admins add people
+(name, e-mail, role Admin to Reader), change roles and remove people, each after a summary; only an owner gives, takes
+or changes the Owner role, nobody changes or removes their own row, a workspace keeps at least one owner, and an
+organization's owner keeps at least one workspace there. A person belongs to an organization while they have a
+workspace in it; removing a member or an admin from their last one ends their membership, and guests stay guests. An
+existing account keeps its name, shown only to an organization it is already linked to. The organization's owners and
+admins see its link and change its password from a People tab; people who are signed in stay signed in. People changes
+and password changes are change events in the workspace's log, never with the hash; like a pin (D-29) they are not undo
+steps. An archived workspace refuses people and password changes. Everything here runs on the local adapter in
+development only (AD-29, AD-31): one shared password per organization, an e-mail address reveals its organizations, a
+password change keeps sessions, no limit on failed sign-ins, and the development list of test users still signs in as
+anyone, so the silo is a rehearsal of what the database slice makes real.
+
+**Note to AD-01:** Until guests from other organizations are built (later, `docs/ideas.md`), a guest is a workspace
+member without a row in the workspace's organization; slice 8 adds no new guests, and adding a guest to another
+workspace of the same organization keeps them a guest (D-58).
+
+**Note to AD-04:** Until the database slice, sign-in in development is an organization's shared password, scrypt on the
+server, with a signed session cookie that carries the organizations unlocked in it (D-58); Supabase Auth with a password
+per person replaces it.
+
+**Note to AD-05:** Owners and admins add people, change roles and remove people; only an owner gives, takes or changes
+the Owner role, and nobody changes or removes their own row (slice 8, D-58).
+
+### How to check
+
+- `npm test`; the step's own files: `npx vitest run src/data/password.test.ts src/data/local/organization-store.test.ts
+  src/app/_lib/dev-session.test.ts src/app/_lib/unlock.test.ts`.
+- `npx playwright test e2e/slice-00` (no dev server of your own running).
+- The benches: `npx tsx scripts/bench-password.ts`, `npx tsx scripts/bench-create-organization.ts`,
+  `npx tsx scripts/bench-reseed.ts`.
+- In the app (`npm run dev`): an existing `.data/dev-db.json` is upgraded on first read, with the log line; signing in
+  through the development list works as before; in the browser's devtools, replacing the cookie's value with a user id
+  signs you out.
+
+### Open for step 4
+
+The start page (two paths, the organization step, the link's form), `loadShellFor`'s redirect to the link's form with
+`next`, `Landing` among unlocked organizations, the switcher's lock, "New organization…", `signInWithPassword`, the
+slice's specs for items 1–9 and the full e2e run (P1).
+
+### Questions for Łukasz
+
+1. The decision texts above: approve, or change any?
+2. Decision 1: `signInWithPassword` in step 4, with the page?
+3. Decision 5: `docs/data-model-v2.md` and the README line in step 6?

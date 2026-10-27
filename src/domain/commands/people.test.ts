@@ -160,7 +160,7 @@ describe("changeRole (item 11, F12)", () => {
   });
 
   it("refuses an unchanged role, someone not in the workspace, and roles without people rights", () => {
-    expect(changeRole(makeCtx(), state, input("modeler"))).toMatchObject({ ok: false, error: { message: "Anna Nowak is Modeler already." } });
+    expect(changeRole(makeCtx(), state, input("modeler"))).toMatchObject({ ok: false, error: { message: "Anna Nowak is already Modeler." } });
     expect(changeRole(makeCtx(), { ...state, members: [row(ids.actor, "owner")] }, input("reader"))).toMatchObject({ ok: false, error: { code: "not_found" } });
     expect(changeRole(makeCtx(), { ...state, access: access("modeler") }, input("reader"))).toMatchObject({ ok: false, error: { code: "forbidden" } });
   });

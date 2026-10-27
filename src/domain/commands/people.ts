@@ -16,7 +16,7 @@ import type { Uuid } from "../ids";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
 import { WORKSPACE_ROLES, type AppUser, type Organization, type OrganizationMember, type WorkspaceMember, type WorkspaceRole } from "../types";
 import { parseInput, uuidSchema } from "../validation";
-import { emailSchema } from "./organization";
+import { emailSchema, newFormName } from "./organization";
 
 /** How roles are named in texts (the prototype's labels; the app's role select and badges use the same). */
 export const ROLE_LABEL: Record<WorkspaceRole, string> = {
@@ -43,7 +43,7 @@ export const OWNER_ONLY_REMOVE_MESSAGE = "Only an owner can remove an owner.";
 const addPersonInput = z
   .object({
     workspaceId: uuidSchema,
-    name: z.string().trim().min(1, "Enter a name.").max(200, "This name is too long."),
+    name: newFormName("Enter a name."),
     email: emailSchema,
     role: z.enum(ADDABLE_ROLES),
   })
@@ -196,7 +196,7 @@ export function changeRole(ctx: CommandContext, state: PersonState, input: unkno
   const row = members.find((m) => m.user_id === p.userId && m.workspace_id === access.workspace.id);
   if (!row || !person || person.id !== p.userId) return fail(notFound("person"));
   if (row.user_id === ctx.actorId) return fail(domainError("forbidden", OWN_ROLE_MESSAGE));
-  if (row.role === p.role) return fail(domainError("invalid", `${person.display_name} is ${ROLE_LABEL[p.role]} already.`));
+  if (row.role === p.role) return fail(domainError("invalid", `${person.display_name} is already ${ROLE_LABEL[p.role]}.`));
 
   const actorIsOwner = access.member?.role === "owner";
   if (row.role === "owner" && !actorIsOwner) return fail(domainError("forbidden", OWNER_ONLY_CHANGE_MESSAGE));

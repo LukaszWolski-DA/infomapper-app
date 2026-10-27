@@ -13,6 +13,7 @@ import { can } from "@/domain/permissions";
 import { ArchiveBox, UnarchiveButton } from "./_components/lifecycle";
 import { NewProjectTile } from "./_components/new-project-tile";
 import { SettingsForm } from "./_components/settings-form";
+import { workspacePeople } from "@/app/_lib/people";
 
 const TABS = ["overview", "people", "settings"] as const;
 type Tab = (typeof TABS)[number];
@@ -28,7 +29,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const workspace = (await store.workspaces.get(workspaceId))!;
   const [members, users, projects, model, requirements, requirementLinks] = await Promise.all([
     store.workspaces.listMembers(workspaceId),
-    store.users.list(),
+    workspacePeople(store, workspaceId),
     store.projects.list(workspaceId),
     store.model.load(workspaceId),
     store.requirements.list(workspaceId),

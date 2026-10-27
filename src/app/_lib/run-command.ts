@@ -7,6 +7,7 @@ import { completeLiveWrites, touchesLiveCanvases, type LiveOutcome } from "@/dom
 import { CONTEXT_LABEL_GONE, contextTargets } from "@/domain/model/live";
 import { isUndoable } from "@/domain/commands/undo";
 import type { DomainErrorCode } from "@/domain/errors";
+import { ACCOUNT_EXISTS_MESSAGE } from "@/domain/commands/organization";
 import { uuidv7 } from "@/domain/ids";
 import { changeLabel } from "@/domain/model/change-label";
 import { recordChange } from "@/domain/model/undo-history";
@@ -17,7 +18,8 @@ import { contextCookieName, parseContextCookie } from "@/ui/working-context-cook
 import { retryWhenStale } from "./fresh-retry";
 import { recordLiveNotices } from "./live-notices";
 import { loadLiveState } from "./live-state";
-import { getSessionUser } from "./session";
+import { getSession } from "./session";
+import { lockedRefusal, organizationOfWrite } from "./unlock";
 
 /** What a server action returns to the browser: the value, or the domain's message to show in a toast. */
 export type ActionResult<T = undefined> =
@@ -31,19 +33,26 @@ export type ActionResult<T = undefined> =
  * then the live canvas rules (slice 3b: what labels mark and what live canvases hold, in the same change group;
  * `completeLiveWrites`), then the adapter applies the rows and change events together, and the change group goes into
  * the person's undo history (slice 1b). Refusals come back with the domain's message. With `freshOnStale`, a write
- * refused as stale is built again from fresh data (slice 4a: the requirement key counter, `fresh-retry.ts`).
+ * refused as stale is built again from fresh data (slice 4a: the requirement key counter, `fresh-retry.ts`). A write
+ * into an organization this session has not unlocked is refused before anything is applied (slice 8, F3).
  */
 export async function runCommand<T>(
   build: (ctx: CommandContext, store: DataStore, user: AppUser) => Promise<CommandResult<T>>,
   options: { freshOnStale?: boolean } = {},
 ): Promise<ActionResult<T>> {
-  const user = await getSessionUser();
-  if (!user) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const session = await getSession();
+  if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const { user } = session;
   const store = getDataStore();
   const once = async (): Promise<ActionResult<T>> => {
     const ctx: CommandContext = { actorId: user.id, now: new Date().toISOString(), newId: () => uuidv7() };
     const result = await build(ctx, store, user);
     if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message, ...(result.error.fields ? { fields: result.error.fields } : {}) };
+    const organizationId = await organizationOfWrite(store, result.writeSet);
+    if (organizationId && organizationId !== "new") {
+      const locked = await lockedRefusal(store, session.unlocked, organizationId);
+      if (locked) return locked;
+    }
     const workspaceId = result.writeSet.events[0]?.workspace_id;
     const contextLabelId = workspaceId ? parseContextCookie((await cookies()).get(contextCookieName(user.id, workspaceId))?.value)?.labelId : null;
     const settled = await withSettledChanges(ctx, store, result.writeSet);
@@ -63,6 +72,35 @@ export async function runCommand<T>(
     return options.freshOnStale ? await retryWhenStale(once, (r) => !r.ok && r.code === "stale_version") : await once();
   } catch (e) {
     // No row content in the log (personal data, rich text): only what kind of error it was.
+    console.error("Write failed:", e instanceof Error ? `${e.name}: ${e.message}` : "unknown error");
+    return { ok: false, code: "unexpected", message: "Something went wrong. Nothing was saved." };
+  }
+}
+
+/**
+ * Runs a write without a session (slice 8, F2): creating an organization from the start page, where the actor is the
+ * person the command creates (`actorId`, made by the caller). No live canvases or changes to resolve can be involved
+ * (a new workspace has none), and nothing goes into an undo history. An e-mail address taken meanwhile by another write
+ * comes back as the domain's refusal.
+ */
+export async function runCommandAs<T>(
+  actorId: string,
+  build: (ctx: CommandContext, store: DataStore) => Promise<CommandResult<T>>,
+): Promise<ActionResult<T>> {
+  const store = getDataStore();
+  try {
+    const ctx: CommandContext = { actorId, now: new Date().toISOString(), newId: () => uuidv7() };
+    const result = await build(ctx, store);
+    if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message, ...(result.error.fields ? { fields: result.error.fields } : {}) };
+    const applied = await store.apply(result.writeSet);
+    if (!applied.ok) {
+      if (applied.error.code === "conflict" && applied.error.message.includes("app_user")) {
+        return { ok: false, code: "conflict", message: ACCOUNT_EXISTS_MESSAGE, fields: { email: ACCOUNT_EXISTS_MESSAGE } };
+      }
+      return { ok: false, code: applied.error.code, message: applied.error.message };
+    }
+    return { ok: true, value: result.value };
+  } catch (e) {
     console.error("Write failed:", e instanceof Error ? `${e.name}: ${e.message}` : "unknown error");
     return { ok: false, code: "unexpected", message: "Something went wrong. Nothing was saved." };
   }

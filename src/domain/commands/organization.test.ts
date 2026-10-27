@@ -51,7 +51,9 @@ describe("the form's checks (item 6)", () => {
     expect(problem({ email: "jan@example" })).toBe("Enter a valid e-mail address.");
     expect(problem({ password: "short", passwordAgain: "short" })).toBe("The password needs at least 8 characters.");
     expect(problem({ passwordAgain: "correct horsE" })).toBe("The passwords differ.");
-    expect(problem({ password: "x".repeat(201), passwordAgain: "x".repeat(201) })).toBe("This password is too long.");
+    expect(problem({ password: "x".repeat(201), passwordAgain: "x".repeat(201) })).toBe("This password is too long; use at most 200 characters.");
+    expect(problem({ name: "x".repeat(201) })).toBe("This name is too long; use at most 200 characters.");
+    expect(problem({ email: `${"x".repeat(250)}@a.pl` })).toBe("This e-mail address is too long; use at most 254 characters.");
   });
 
   it("puts the password problems on their fields", () => {
@@ -69,12 +71,12 @@ describe("the form's checks (item 6)", () => {
     expect(checkCreateOrganizationForm({ accountWithEmail: null }, form)).toEqual({
       ok: true,
       summary:
-        "You are creating the organization Test Org with you (Jan Test, jan@example.com) as its owner, and the empty " +
-        "workspace First workspace with a first project and canvas and the 19 built-in classifications. People sign in " +
-        "to Test Org with its link and this password.",
+        "You are creating the organization Test Org with you (Jan Test, jan@example.com) as its owner, and the " +
+        "workspace First workspace with an empty first project and canvas, and the 19 built-in classifications. People " +
+        "sign in to Test Org with its link and this password.",
     });
     const fromMenu = checkNewOrganizationForm({ organizationName: "Second Org", workspaceName: "Main", password: "12345678", passwordAgain: "12345678" });
-    expect(fromMenu).toMatchObject({ ok: true, summary: expect.stringContaining("Second Org with you as its owner, and the empty workspace Main") });
+    expect(fromMenu).toMatchObject({ ok: true, summary: expect.stringContaining("Second Org with you as its owner, and the workspace Main with an empty first project") });
   });
 });
 

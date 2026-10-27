@@ -26,7 +26,8 @@ import { setSourceNote, type SetSourceNoteInput } from "@/domain/commands/source
 import type { Uuid } from "@/domain/ids";
 import { checkPermission, type WorkspaceAccess } from "@/domain/permissions";
 import type { Classification, WorkspaceModel } from "@/domain/types";
-import { getSessionUser } from "../_lib/session";
+import { getSession } from "../_lib/session";
+import { lockedRefusal } from "../_lib/unlock";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
@@ -81,11 +82,14 @@ export async function setSourceNoteAction(workspaceId: string, input: SetSourceN
 
 /** What removing a classification takes with it, for the form before the click (item 10, D-47); a read, no write. */
 export async function classificationImpactAction(workspaceId: string, classificationId: string): Promise<ActionResult<ClassificationImpact>> {
-  const user = await getSessionUser();
-  if (!user) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const session = await getSession();
+  if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const { user } = session;
   const store = getDataStore();
   const access = await loadAccess(store, workspaceId, user.id);
   if (!access) return { ok: false, code: "not_found", message: "This workspace does not exist." };
+  const locked = await lockedRefusal(store, session.unlocked, access.workspace.organization_id);
+  if (locked) return locked;
   const denied = checkPermission(access, "workspace.view");
   if (denied) return { ok: false, code: denied.code, message: denied.message };
   const [model, changes] = await Promise.all([store.model.load(access.workspace.id), store.model.listChanges(access.workspace.id)]);
