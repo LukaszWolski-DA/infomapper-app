@@ -1395,3 +1395,30 @@ Merge only on your command after this; then tag `slice-07c`.
 Also: run `S7A-14-review` once in the measurement build against `slice-07b`'s figure, since step 5 changed the
 review (S7B-16 is not needed); run the slice's specs, the touched earlier specs (the review) and CI after the change.
 Then stop: Łukasz does the manual acceptance, including step 0 on his own data file.
+
+## After the answers to step 6 (27 October 2026)
+
+Commits `c5b76fc` (the answers), `238e4f6` (the callout, its tests, the two differences from the prototype under
+"Section 8's differences from the prototype, amended").
+
+- **The callout:** `nothingText` in `wizard-model.ts`; with "The file says …" rows it reads "The file matches what
+  {system} has, apart from classifications, which stay yours. Importing only records the import and updates row
+  counts."; without them as before (`S7A-16.spec.ts` unchanged). Tests: `wizard-model.test.ts` (both texts) and
+  `S7C-10.spec.ts` (the callout on the CRM re-import).
+- **CI:** lint, typecheck, unit tests pass (99 files, 1,304 tests).
+- **The specs:** `e2e/slice-07c`, `e2e/slice-07a`, `e2e/slice-07b` together, 14 min 28 s: 92 passed, 1 skipped (on
+  demand), 1 failed: `S7A-05.spec.ts`'s second test, whose dialog stayed open after the toast. On its own 3 of 3 passed
+  (1.1 min, 48.5 s, 49.4 s): a flake. Likely cause: the test imports into CRM twice, and `importNow`'s toast pattern
+  `/^Imported into CRM: /` can match the first import's toast, still shown, so the second import got only the 15 s of
+  the dialog check under the run's load. Not changed.
+- **`S7A-14-review` in the measurement build**, once per side, this branch first, `slice-07b` in a worktree with its
+  own build (removed afterwards). Median of 5 switches, in-page (click to the second frame, untraced), bar 200 ms:
+
+| File | Filter | slice-07b | slice 7c |
+| --- | --- | --- | --- |
+| First import, 20,000 columns | new / all / changed / missing / relationships | 26 / 125 / 22 / 7 / 41 ms | 21 / 104 / 19 / 9 / 36 ms |
+| Re-import, 5 % changed | new / all / changed / missing / relationships | 16 / 163 / 57 / 61 / 14 ms | 17 / 147 / 50 / 51 / 12 ms |
+
+  Every median within the bar on both sides, and 7c level with or below `slice-07b` (the differences are within one
+  run's spread; slice 7a's own figures were 101 and 144 ms for "all"). The slowest single switch: 224 ms on 7c, 230 ms on
+  `slice-07b` ("all" on the re-import).
