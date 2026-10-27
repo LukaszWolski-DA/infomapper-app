@@ -128,7 +128,7 @@ describe("a re-import never changes classifications (D-55, item 19, S7C-10)", ()
     ]);
     const { plan, changes } = importInto(model, again, { systemId: systemNamed(model, "S").id });
     expect(column(plan, "t", "b")).toMatchObject({ status: "unchanged", fileClassifications: ["Technical / audit"] });
-    expect(plan.tables[0].status).toBe("unchanged");
+    expect(plan.tables[0]!.status).toBe("unchanged");
     expect(changes.counts).toEqual({ tables_new: 0, columns_new: 0, columns_changed: 0, columns_renamed: 0, columns_missing: 0, relationships_new: 0, changes_raised: 0, changes_high: 0 });
     expect(importSummary(changes.counts)).toBe("No changes");
     expect(changes.tables.update.filter((u) => Object.keys(u.patch).some((k) => k !== "row_count"))).toEqual([]);

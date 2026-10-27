@@ -21,7 +21,7 @@ import { useAction } from "@/app/_components/use-action";
 import { classificationImpact, type ClassificationImpact } from "@/domain/commands/classification";
 import type { Uuid } from "@/domain/ids";
 import { byListOrder, groupOf, isDataVault, nameTakenBy, TAKEN_NAME, whatStops } from "@/domain/model/classifications";
-import { dataVaultReading, READING_EMPTY, READING_FOOTER, readingText } from "@/domain/model/data-vault-reading";
+import { dataVaultReading, READING_EMPTY, READING_FOOTER, readingText, type ReadingLine } from "@/domain/model/data-vault-reading";
 import type { Classification, ClassificationScope, SourceTable } from "@/domain/types";
 import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
@@ -122,17 +122,17 @@ export function DataVaultReading({ table }: { table: SourceTable }) {
           tableName: (id) => p.ix.table.get(id)?.name ?? "?",
         },
         p.ix.classes,
-      ).map(readingText),
+      ),
     [table, p.ix],
   );
   return (
     <Fold title="Data Vault reading" testId="section-dv-reading">
       {lines.length ? (
         <>
-          <ul className="list-disc pl-[18px]">
+          <ul>
             {lines.map((l) => (
-              <li key={l} data-testid="dv-reading-line">
-                {l}
+              <li key={readingText(l)} className="border-b border-im-line py-1.5 text-[12.5px]" data-testid="dv-reading-line">
+                <Reading line={l} />
               </li>
             ))}
           </ul>
@@ -143,6 +143,44 @@ export function DataVaultReading({ table }: { table: SourceTable }) {
       )}
     </Fold>
   );
+}
+
+/** Column and table names in a monospace font, as the prototype's `names`. */
+function Names({ names }: { names: readonly string[] }) {
+  return names.map((n, i) => (
+    <span key={n}>
+      {i > 0 && ", "}
+      <span className="font-mono text-xs">{n}</span>
+    </span>
+  ));
+}
+
+/**
+ * A reading line as the prototype draws it (AD-20; answers to step 5): the role in bold, names in monospace, the asides
+ * muted. Its text is `readingText`'s, word for word.
+ */
+function Reading({ line: l }: { line: ReadingLine }) {
+  const muted = "text-im-ink-3";
+  switch (l.kind) {
+    case "hub":
+      return <><b className="font-semibold">Hub</b> on <Names names={l.columns} /></>;
+    case "hub_candidate":
+      return <><b className="font-semibold">Marked as a hub candidate</b>, but no column is a business key yet</>;
+    case "link":
+      return <><b className="font-semibold">Link</b> to <span className="font-mono text-xs">{l.to}</span> via <Names names={l.columns} />{!l.markedLinkKey && <> <span className={muted}>(foreign key; not marked Link key)</span></>}</>;
+    case "link_key_without_relationship":
+      return <><b className="font-semibold">Link key</b> <Names names={l.columns} /> <span className={muted}>with no relationship known: which table does it point to?</span></>;
+    case "dependent_child_key":
+      return <><b className="font-semibold">Dependent child key</b> <Names names={l.columns} />: part of the link’s or satellite’s key, not a hub</>;
+    case "driving_key":
+      return <><b className="font-semibold">Driving key</b> <Names names={l.columns} />: an effectivity satellite on the link tracks it</>;
+    case "multi_active":
+      return <><b className="font-semibold">Multi-active satellite</b> keyed by <Names names={l.columns} /></>;
+    case "effective_dated":
+      return <><b className="font-semibold">Effective-dated</b> by <Names names={l.columns} /></>;
+    case "satellite":
+      return <><b className="font-semibold">Satellite</b> with {l.descriptive} descriptive column{l.descriptive === 1 ? "" : "s"}{l.personalData.length > 0 && <>; {l.personalData.length} with personal data: consider a separate satellite for <Names names={l.personalData} /></>}</>;
+  }
 }
 
 /** The workspace's classification list (items 7–12; prototype `#setDlg`). Data Vault ones always show (answer F21). */

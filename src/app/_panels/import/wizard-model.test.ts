@@ -11,7 +11,7 @@ describe("a re-import that differs only in classifications", () => {
   it("shows the column under all changes, and counts nothing on any filter", () => {
     const { model } = importInto(emptyModel(), file("PII"), { newName: "S" });
     const { plan } = importInto(model, file("TECH"), { systemId: systemNamed(model, "S").id });
-    const b = plan.tables[0].columns.find((c) => c.existing?.name === "b")!;
+    const b = plan.tables[0]!.columns.find((c) => c.existing?.name === "b")!;
     expect(b.fileClassifications).toEqual(["Technical / audit"]);
     expect(reviewCounts(plan)).toEqual({ tablesNew: 0, new: 0, changed: 0, rename: 0, missing: 0, rel: 0, all: 0 });
     expect(shownUnder("all", b)).toBe(true);
