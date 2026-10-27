@@ -1,6 +1,6 @@
 # Slice 7c – Acceptance
 
-Status: **step 6 (closing): waiting for the manual acceptance.** Branch `slice/07c-classifications`, from `main` at `408c3c0` (tag `slice-07b`). PRD:
+Status: **accepted (27 October 2026).** Branch `slice/07c-classifications`, from `main` at `408c3c0` (tag `slice-07b`). PRD:
 `docs/prd/slice-07c-classifications.md`. The PRD stays as written; this file is its amendment.
 
 ## Łukasz's answers to step 1 (26 October 2026)
@@ -1432,3 +1432,13 @@ Commits `c5b76fc` (the answers), `238e4f6` (the callout, its tests, the two diff
   `.data/dev-db.json` is still format 6 and is upgraded on the next `npm run dev` that reads it; a copy of it upgraded in
   step 3 gave 57 built-in rows, 22 links and nothing moved.
 - **Remarks:** none.
+
+## The full end-to-end run before the merge (27 October 2026)
+
+- After S7A-05's fix (`e0bf070`; the second import waits for its own toast, "Imported into CRM: No changes"): the file
+  ran three times on its own, 3/3 passed.
+- One full run (`npm run e2e`, from scratch, no dev server running): **335 passed, 1 skipped (S7C-14-commits, on demand
+  only), 0 failed, 0 flaky, in 60 min 59 s.** No test needed three runs on its own.
+- A first attempt stopped before any test ran: Playwright timed out after 120 s waiting for its web server (2 min 56 s in
+  all; no busy ports, no processes left). The second attempt, started at once without changes, is the run above; the
+  first compile of a cold `.next-e2e` folder is the likely cause.
