@@ -18,7 +18,7 @@ import { isDataVault } from "@/domain/model/classifications";
 import type { Classification } from "@/domain/types";
 import { coverageChangeText, type CoverageDelta } from "@/domain/source-changes/coverage";
 import { NO_COVERAGE_CHANGE, raisedCallout } from "@/domain/source-changes/texts";
-import { day, impactOf, plural, reviewCounts, shownUnder, type impactIndex, type ImportData, type ReviewFilter, type WizardState } from "./wizard-model";
+import { day, impactOf, nothingText, plural, reviewCounts, shownUnder, type impactIndex, type ImportData, type ReviewFilter, type WizardState } from "./wizard-model";
 
 const PAGE_TABLES = 100;
 const PAGE_ROWS = 50;
@@ -317,7 +317,7 @@ export function ReviewStep({
       )}
       {nothing && (
         <div className={`${callout} border-im-logical bg-im-logical-soft`} data-testid="review-nothing">
-          The file matches what {systemName} has. Importing only records the import and updates row counts.
+          {nothingText(systemName, plan.tables.some((t) => t.columns.some((c) => !!c.fileClassifications)))}
         </div>
       )}
       {visibleCards.slice(0, tablesShown).map(({ t, rows, meta }) => {

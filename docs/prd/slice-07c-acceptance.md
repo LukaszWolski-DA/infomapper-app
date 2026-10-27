@@ -42,6 +42,11 @@ silently; everything can be undone. Any recommendation that conflicts with it is
 
 - The built-in `PII` is named "Personal data" (the app's panel label since slice 1a); the prototype names it "PII". A
   file's "PII" (the code) and "Personal data" (the name) both match.
+- The Data Vault reading sets a link's target table in monospace, like the column names; the prototype sets it in plain
+  text (answers to step 6).
+- When a re-import changes nothing but some columns' file classifications differ, the review's callout says "The file
+  matches what {system} has, apart from classifications, which stay yours. …" (answers to step 6); the prototype has no
+  such case.
 
 ### The recommendations checked against the principle
 

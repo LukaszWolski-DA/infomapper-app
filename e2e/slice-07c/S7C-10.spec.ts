@@ -67,6 +67,7 @@ test("S7C-10: the CRM file's TECH, Effective date and Load date are read; a re-i
   // the row is shown, not counted (answers to step 5): no filter counts it, its table is "same", the import counts nothing
   for (const f of ["all", "new", "changed", "rename", "missing", "rel"]) expect(await filterCount(page, f)).toBe(0);
   await expect(page.locator('[data-testid="review-table"][data-key$="customers"] header')).toContainText("same");
+  await expect(page.getByTestId("review-nothing")).toHaveText("The file matches what CRM has, apart from classifications, which stay yours. Importing only records the import and updates row counts.");
   await importNow(page, "Imported into CRM: No changes");
   const last = (await imports((await systemNamed("CRM"))!.id)).at(0)!;
   expect(last).toMatchObject({ source_label: "crm_again.csv", tables_new: 0, columns_new: 0, columns_changed: 0, columns_renamed: 0, columns_missing: 0, relationships_new: 0 });

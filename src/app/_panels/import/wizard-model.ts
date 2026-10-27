@@ -209,5 +209,13 @@ export function shownUnder(filter: ReviewFilter, c: PlanColumn): boolean {
   }
 }
 
+/**
+ * The review's callout when the import changes nothing (slice 7a). Slice 7c (answers to step 6): when the file names
+ * other classifications than a column has, those rows show and the callout says they stay the modeller's.
+ */
+export function nothingText(systemName: string, fileSaysOther: boolean): string {
+  return `The file matches what ${systemName} has${fileSaysOther ? ", apart from classifications, which stay yours" : ""}. Importing only records the import and updates row counts.`;
+}
+
 /** `2026-10-22` from an ISO time. */
 export const day = (iso: string | null | undefined) => (iso ? iso.slice(0, 10) : "");
