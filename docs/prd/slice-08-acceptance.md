@@ -1,6 +1,6 @@
 # Slice 8 – Acceptance
 
-Status: **step 3 (data, session and server), waiting for Łukasz.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
+Status: **step 4 (the start page and signing in), in progress.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
 `slice-07c`). PRD: `docs/prd/slice-08-organizations.md`. The PRD stays as written; this file is its amendment.
 
 ## Answers from Łukasz (step 1) (27 October 2026)
@@ -976,3 +976,12 @@ slice's specs for items 1–9 and the full e2e run (P1).
 1. The decision texts above: approve, or change any?
 2. Decision 1: `signInWithPassword` in step 4, with the page?
 3. Decision 5: `docs/data-model-v2.md` and the README line in step 6?
+
+## Answers from Łukasz (step 3) (27 October 2026)
+
+- Step 3 is approved.
+- `signInWithPassword` in step 4, and `docs/data-model-v2.md` and the README's `demo-pass` line in step 6: agreed.
+- D-58 is approved with one sentence added after the first: "Organizations are silos: nobody sees another
+  organization's workspaces, people or names, and pages send the browser only the people of the workspace shown." The
+  notes to AD-01, AD-04 and AD-05 are approved as quoted. All four are in `docs/decisions.md` (D-58 after D-57; each
+  note appended to its decision as "Note (slice 8): …").
