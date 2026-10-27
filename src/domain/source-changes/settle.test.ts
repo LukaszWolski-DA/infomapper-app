@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { CommandContext, CommandResult, Write } from "../changes";
 import { access } from "../__fixtures__/domain";
-import { attributeNamed, columnNamed, importId } from "../__fixtures__/import";
-import { ACTOR, applyEdits, crmAfterReimport } from "../__fixtures__/source-changes";
+import { allOf, attributeNamed, classify, columnNamed, importId, importInto, tableNamed } from "../__fixtures__/import";
+import { ACTOR, applyEdits, CHANGED, crmAfterReimport, crmWithMappings } from "../__fixtures__/source-changes";
+import { removeClassification, setClassification } from "../commands/classification";
 import { deleteAttribute } from "../commands/attribute";
 import { deleteEntity } from "../commands/entity";
 import { createMapping, deleteMapping, mergeMappings, removeMappingInput, setMappingStatus } from "../commands/mapping";
@@ -126,5 +127,69 @@ describe("settled by any command's writes (settleAfterWrites, Q12)", () => {
   it("nothing for an import's own writes (it settles by the source, P7)", () => {
     const s = crmAfterReimport();
     expect(settleAfterWrites(ctx, [{ kind: "insert", table: "source_import", row: {} as never }], s.model.changes!, names(s.model))).toEqual([]);
+  });
+});
+
+describe("columns that lose Business key (slice 7c, Q7)", () => {
+  const modeler = access("modeler");
+  /** CRM after the re-import with cust_no's mapping a draft: a business key change without a mapping stays open. */
+  function withColumnChange() {
+    const base = crmWithMappings();
+    const model = { ...base.model, mappings: base.model.mappings.map((m) => (m.id === base.mappings.custNo ? { ...m, status: "draft" as const, approved_by: null, approved_at: null } : m)) };
+    const after = importInto(model, CHANGED, { systemId: base.systemId }, allOf(CHANGED)).model;
+    const change = after.changes!.find((c) => c.kind === "business_key_changed")!;
+    expect(change).toMatchObject({ mapping_id: null, status: "open" });
+    return { model: after, change, custNo: columnNamed(after, "customers", "cust_no") };
+  }
+  const settleNames = (m: ImportModel) => ({ entities: m.entities, attributes: m.attributes, mappings: m.mappings, sourceColumns: m.columns, classifications: m.classifications });
+  const resolutions = (m: ImportModel, writes: Write[]) =>
+    settleAfterWrites(ctx, writes, m.changes!, settleNames(m)).map((e) => [(e as { row: SourceChange }).row.kind, (e as { row: SourceChange }).row.mapping_id, (e as { row: SourceChange }).row.resolution]);
+  const toggle = (m: ImportModel, columnId: string, code: string, on: boolean) => {
+    const r = setClassification(ctx, modeler, { classifications: m.classifications!, links: m.classificationLinks!, tables: m.tables, columns: m.columns }, {
+      classificationId: m.classifications!.find((c) => c.code === code)!.id,
+      target: { kind: "source_column", id: columnId },
+      on,
+    });
+    if (!r.ok) throw new Error(r.error.message);
+    return r.writeSet.writes;
+  };
+
+  it("a toggle off settles the column's business key change without a mapping", () => {
+    const { model, custNo } = withColumnChange();
+    expect(resolutions(model, toggle(model, custNo.id, "BK", false))).toEqual([["business_key_changed", null, "Settled: cust_no is no longer a business key"]]);
+  });
+
+  it("removing Business key from the list settles it with the classification's name", () => {
+    const { model } = withColumnChange();
+    const bk = model.classifications!.find((c) => c.code === "BK")!;
+    const r = removeClassification(ctx, modeler, { classifications: model.classifications!, links: model.classificationLinks! }, { classificationId: bk.id, expectedVersion: bk.version });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(resolutions(model, r.writeSet.writes)).toEqual([["business_key_changed", null, "Settled: the classification Business key was removed"]]);
+  });
+
+  it("a mapping's business key change stays open; another classification settles nothing", () => {
+    const s = crmAfterReimport();
+    const custNo = columnNamed(s.model, "customers", "cust_no");
+    expect(s.model.changes!.some((c) => c.kind === "business_key_changed" && c.mapping_id !== null && c.status === "open")).toBe(true);
+    expect(resolutions(s.model, toggle(s.model, custNo.id, "BK", false))).toEqual([]);
+    const { model, change } = withColumnChange();
+    const linked = classify(model, change.source_column_id!, "PII");
+    expect(resolutions(linked, toggle(linked, change.source_column_id!, "PII", false))).toEqual([]);
+  });
+
+  it("a deleted column settles by its deletion, and its classification links go with it (answer F18)", () => {
+    const { model } = withColumnChange();
+    const customers = tableNamed(model, "customers");
+    const r = deleteSourceTable(
+      ctx,
+      modeler,
+      { table: customers, columns: model.columns, canvasItems: [], mappings: model.mappings, mappingInputs: model.mappingInputs, attributes: model.attributes, entities: model.entities, classificationLinks: model.classificationLinks },
+      { sourceTableId: customers.id, expectedVersion: customers.version },
+    );
+    if (!r.ok) throw new Error(r.error.message);
+    const goneLinks = r.writeSet.writes.filter((w) => w.table === "classification_link");
+    expect(goneLinks.length).toBe(model.classificationLinks!.filter((l) => model.columns.some((c) => c.id === l.source_column_id && c.source_table_id === customers.id)).length);
+    expect(goneLinks.length).toBeGreaterThan(0);
+    expect(resolutions(model, r.writeSet.writes).filter(([kind]) => kind === "business_key_changed")).toEqual([["business_key_changed", null, "Settled: the table was deleted"]]);
   });
 });

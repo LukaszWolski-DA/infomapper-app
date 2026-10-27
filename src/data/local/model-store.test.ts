@@ -11,6 +11,7 @@ import { createEntity, deleteEntity } from "@/domain/commands/entity";
 import { createFrame } from "@/domain/commands/frame";
 import { addMappingInput, setMappingStatus } from "@/domain/commands/mapping";
 import { uuidv7 } from "@/domain/ids";
+import { indexOf } from "@/domain/model/classifications";
 import { frameOfCard } from "@/domain/model/frames";
 import { noteFrameAt } from "@/domain/model/notes";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
@@ -80,8 +81,12 @@ describe("demo model (slice 1a PRD, demo data)", () => {
     const headerCols = m.sourceColumns.filter((c) => c.source_table_id === header.id);
     expect(headerCols.map((c) => c.name)).toEqual(["ord_id", "ord_no", "cust_ref", "ord_dt", "ord_total", "curr", "ord_status"]);
     expect(byName(headerCols, "ord_total")).toMatchObject({ data_type: "decimal", type_precision: 12, type_scale: 2 });
-    expect(byName(headerCols, "ord_no")).toMatchObject({ is_business_key: true, data_type: "varchar", type_length: 20 });
-    expect(m.sourceColumns.filter((c) => c.is_business_key).map((c) => c.name).sort()).toEqual(["cust_no", "cust_no", "item_code", "ord_no"]);
+    expect(byName(headerCols, "ord_no")).toMatchObject({ data_type: "varchar", type_length: 20 });
+    // slice 7c: the prototype's BK flags are Business key links, the 19 built-in classifications are there
+    const classes = indexOf(m);
+    expect(m.classifications.filter((c) => c.deleted_at === null)).toHaveLength(19);
+    expect(m.sourceColumns.filter((c) => classes.has(c.id, "BK")).map((c) => c.name).sort()).toEqual(["cust_no", "cust_no", "item_code", "ord_no"]);
+    expect(m.sourceColumns.filter((c) => classes.has(c.id, "PII")).map((c) => c.name).sort()).toEqual(["dob", "email", "email_addr", "fname", "lname", "street_line1"]);
 
     expect(m.mappings).toHaveLength(14);
     expect(m.mappingInputs).toHaveLength(14);
@@ -174,8 +179,10 @@ describe("demo model (slice 1a PRD, demo data)", () => {
     // Different rows: ids are derived per workspace.
     expect(sales.entities.map((e) => e.id)).not.toContain(seedId(RETAIL, "entity:customer"));
 
+    // Bank X: no model, only its built-in classification list (slice 7c)
     const bank = await store.model.load(SEED_IDS.wsBankX);
-    expect(Object.values(bank).every((rows) => rows.length === 0)).toBe(true);
+    expect(Object.entries(bank).every(([k, rows]) => k === "classifications" || rows.length === 0)).toBe(true);
+    expect(bank.classifications).toHaveLength(19);
   });
 
   it("keeps the same ids on every seed", () => {

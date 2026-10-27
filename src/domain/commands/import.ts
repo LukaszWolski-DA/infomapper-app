@@ -5,6 +5,8 @@
 // archived (AD-05, AD-09). The working context labels nothing an import writes (P9).
 // Slice 7b: the import writes the changes to resolve it raises and settles the open ones the source settles (P7), in
 // the same change group; their versions are part of P8's fingerprint.
+// Slice 7c: the plan reads the workspace's classification list and Data Vault 2.0 mode (the server's, never the
+// browser's); the unticked suggestions come with the choices (P7) and new columns get their classification links.
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
@@ -19,6 +21,7 @@ import { CATALOG_VENDORS, MAX_IMPORT_ROWS, readStandard } from "../import/standa
 import type { WorkspaceAccess } from "../permissions";
 import {
   IMPORT_CHANNELS,
+  type ClassificationLink,
   type Mapping,
   type SourceChange,
   type SourceColumn,
@@ -50,6 +53,8 @@ const importInput = z
     scope: z.array(z.string().max(2000)).max(MAX_IMPORT_ROWS),
     compare: z.enum(["schemas", "tables"]),
     renames: z.array(z.tuple([z.string().max(2000), z.string().max(1000)])).max(MAX_IMPORT_ROWS),
+    /** Suggested classifications the modeller unticked (slice 7c, P7). */
+    hintsOff: z.array(z.string().max(4000)).max(MAX_IMPORT_ROWS).optional(),
     /** `planFingerprint` of the plan the review showed (P8). */
     fingerprint: z.string().min(1).max(100),
   })
@@ -78,8 +83,8 @@ export interface ImportState {
   relationshipColumns: readonly SourceRelationshipColumn[];
 }
 
-/** The command's state from the workspace's live model and its changes to resolve (slice 7b). */
-export const importStateOf = (model: WorkspaceModel, changes: readonly SourceChange[] = []): ImportState => ({
+/** The command's state from the workspace's live model and its changes to resolve (slice 7b); Data Vault mode (7c). */
+export const importStateOf = (model: WorkspaceModel, changes: readonly SourceChange[] = [], dataVault = false): ImportState => ({
   model: {
     systems: model.sourceSystems,
     tables: model.sourceTables,
@@ -90,6 +95,9 @@ export const importStateOf = (model: WorkspaceModel, changes: readonly SourceCha
     attributes: model.attributes,
     entities: model.entities,
     changes,
+    classifications: model.classifications,
+    classificationLinks: model.classificationLinks,
+    dataVault,
   },
   relationships: model.sourceRelationships,
   relationshipColumns: model.sourceRelationshipColumns,
@@ -108,13 +116,14 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
   if (read.errors.length) return fail(domainError("invalid", read.errors[0]!));
   if (!i.scope.length) return fail(domainError("invalid", "Select at least one table to import."));
   const target: ImportTarget = "systemId" in i.target ? { systemId: i.target.systemId } : { newName: i.target.newName };
-  const plan = buildPlan(state.model, read, target, { scope: new Set(i.scope), compare: i.compare, renames: new Map(i.renames) });
+  const model: ImportModel = { ...state.model, dataVault: access.workspace.dv2_mode };
+  const plan = buildPlan(model, read, target, { scope: new Set(i.scope), compare: i.compare, renames: new Map(i.renames), hintsOff: new Set(i.hintsOff ?? []) });
   if (plan.errors.length) return fail(domainError("conflict", plan.errors[0]!));
   // P8: write only what the review showed
   if (planFingerprint(plan) !== i.fingerprint) {
     return fail(domainError("conflict", STALE_REVIEW(plan.systemName), { [STALE_REVIEW_FIELD]: "stale" }));
   }
-  const applied = applyPlan(state.model, plan, ctx);
+  const applied = applyPlan(model, plan, ctx);
   if (!applied.ok) return fail(domainError("conflict", applied.errors[0]!));
   const c = applied.changes;
 
@@ -124,12 +133,16 @@ export function importSources(ctx: CommandContext, access: WorkspaceAccess, stat
     writes.push({ kind: "insert", table: "source_system", row: system });
   }
   for (const t of c.tables.insert) {
-    const row: SourceTable = { ...newRowColumns(ctx), ...t, workspace_id: ws, missing_since: null, retired_since: null };
+    const row: SourceTable = { ...newRowColumns(ctx), ...t, workspace_id: ws, missing_since: null, retired_since: null, note_html: null, note_text: null };
     writes.push({ kind: "insert", table: "source_table", row });
   }
   for (const col of c.columns.insert) {
-    const row: SourceColumn = { ...newRowColumns(ctx), ...col, workspace_id: ws, default_value: null, missing_since: null, retired_since: null, not_needed: false };
+    const row: SourceColumn = { ...newRowColumns(ctx), ...col, workspace_id: ws, default_value: null, missing_since: null, retired_since: null, not_needed: false, note_html: null, note_text: null };
     writes.push({ kind: "insert", table: "source_column", row });
+  }
+  for (const l of c.classificationLinks.insert) {
+    const row: ClassificationLink = { ...newRowColumns(ctx), ...l, workspace_id: ws, source_table_id: null };
+    writes.push({ kind: "insert", table: "classification_link", row });
   }
   const byId = <R extends { id: Uuid }>(rows: readonly R[]) => new Map(rows.map((r) => [r.id, r]));
   /** A patch on the row as read; a row that moved on meanwhile refuses the write (AD-12). */

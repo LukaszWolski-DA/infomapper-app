@@ -9,6 +9,8 @@ import type {
   Canvas,
   CanvasItem,
   ChangeEvent,
+  Classification,
+  ClassificationLink,
   Concept,
   Entity,
   Frame,
@@ -38,6 +40,8 @@ import type {
 import {
   CARDINALITY_MAX,
   CHANGE_OPERATIONS,
+  CLASSIFICATION_ORIGINS,
+  CLASSIFICATION_SCOPES,
   DOC_LANGUAGES,
   FRAME_KINDS,
   IMPORT_CHANNELS,
@@ -66,11 +70,13 @@ import {
  * 2 = slice 1a (model tables), 3 = slice 2b (frames), 4 = slice 3a (labels, label links, project pins, notes), 5 = slice
  * 4a (requirements, requirement links), 6 = slice 7a (source relationships and imports; `file_format` and `missing_since`
  * on sources, `review_reason` on mappings), 7 = slice 7b (changes to resolve; `retired_since` on sources, `not_needed`
- * on columns, two counts on imports). A format-2 to 6 file is read as format 7 with the missing tables empty and the new
- * columns null (false, 0); a format-6 file also gets the open changes its imports leave (`deriveSourceChanges`, F1). It
- * is written back as 7 with the next write; an older file is refused with a hint to run "npm run reset-dev-data".
+ * on columns, two counts on imports), 8 = slice 7c (classifications and their links, notes on tables and columns; the
+ * columns' business key and personal data flags dropped). A format-2 to 7 file is read as format 8 with the missing
+ * tables empty and the new columns null (false, 0); a format-6 file also gets the open changes its imports leave
+ * (`deriveSourceChanges`, F1), a format-7 file the classifications its flags said and its hand-typed comments as notes
+ * (`upgrade-8.ts`). It is written back at once; an older file is refused with a hint to run "npm run reset-dev-data".
  */
-export const DEV_DB_FORMAT = 7;
+export const DEV_DB_FORMAT = 8;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -93,6 +99,8 @@ export interface DevDb {
   source_relationship_column: SourceRelationshipColumn[];
   source_import: SourceImport[];
   source_change: SourceChange[];
+  classification: Classification[];
+  classification_link: ClassificationLink[];
   mapping: Mapping[];
   mapping_input: MappingInput[];
   requirement: Requirement[];
@@ -130,6 +138,8 @@ export const emptyDb = (): DevDb => ({
   source_relationship_column: [],
   source_import: [],
   source_change: [],
+  classification: [],
+  classification_link: [],
   mapping: [],
   mapping_input: [],
   requirement: [],
@@ -315,6 +325,29 @@ export const RULES: Record<DevTable, TableRules> = {
               : isSet(r.mapping_id),
       },
     ],
+  },
+  // slice 7c: the classification list (P3) and classifications on sources (AD-15)
+  classification: {
+    key: ["id"],
+    foreignKeys: model,
+    unique: [
+      { columns: ["workspace_id", "code"], where: (r) => isSet(r.code) },
+      { columns: ["workspace_id", "scope", "name_key"], live: true },
+    ],
+    checks: [
+      { name: "classification_scope_ck", test: oneOf(CLASSIFICATION_SCOPES, "scope") },
+      { name: "classification_origin_ck", test: oneOf(CLASSIFICATION_ORIGINS, "origin") },
+      { name: "classification_code_ck", test: (r) => (r.origin === "own") === !isSet(r.code) },
+    ],
+  },
+  classification_link: {
+    key: ["id"],
+    foreignKeys: { ...model, classification_id: "classification", source_table_id: "source_table", source_column_id: "source_column" },
+    unique: [
+      { columns: ["classification_id", "source_table_id"], live: true, where: (r) => isSet(r.source_table_id) },
+      { columns: ["classification_id", "source_column_id"], live: true, where: (r) => isSet(r.source_column_id) },
+    ],
+    checks: [{ name: "classification_link_one_target_ck", test: (r) => [r.source_table_id, r.source_column_id].filter(isSet).length === 1 }],
   },
   mapping: {
 

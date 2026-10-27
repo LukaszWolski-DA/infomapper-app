@@ -94,7 +94,7 @@ export async function withLiveCanvases(
 }
 
 /** The tables whose writes can settle a change to resolve (slice 7b, `settleAfterWrites`). */
-const SETTLING_TABLES = new Set(["entity", "attribute", "mapping", "mapping_input", "source_table", "source_column"]);
+const SETTLING_TABLES = new Set(["entity", "attribute", "mapping", "mapping_input", "source_table", "source_column", "classification", "classification_link"]);
 
 /** The write set with the open changes it settles, in its change group; read only when it may settle one. */
 export async function withSettledChanges(ctx: CommandContext, store: DataStore, writeSet: WriteSet): Promise<WriteSet> {
@@ -130,6 +130,6 @@ const EMPTY_LIVE_STATE = {
 async function remember(store: DataStore, userId: AppUser["id"], writeSet: WriteSet): Promise<void> {
   const workspaceId = writeSet.events[0]?.workspace_id;
   if (!workspaceId || !isUndoable(writeSet.events)) return;
-  const step = { changeGroupId: writeSet.changeGroupId, label: changeLabel(writeSet.events), events: writeSet.events };
+  const step = { changeGroupId: writeSet.changeGroupId, label: writeSet.label ?? changeLabel(writeSet.events), events: writeSet.events };
   await store.undoHistory.update(workspaceId, userId, (h) => recordChange(h, step));
 }

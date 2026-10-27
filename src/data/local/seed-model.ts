@@ -5,6 +5,7 @@
 
 import { createHash } from "node:crypto";
 import type { Uuid } from "@/domain/ids";
+import { BUILTIN_CLASSIFICATIONS, normClassification, type ClassificationCode } from "@/domain/model/classifications";
 import { parseColumnLines } from "@/domain/model/column-lines";
 import { plainTextPair } from "@/domain/model/plain-text";
 import type {
@@ -24,6 +25,45 @@ import type { DevDb } from "./schema";
  * A fixed id for a seed row, derived from its workspace and a readable key (`entity:customer`), so ids stay the same
  * after "npm run reset-dev-data" and tests can name rows. Shaped like the other seed ids (UUID v7 layout).
  */
+/** The 19 built-in classifications of a seeded workspace (slice 7c, item 4), with stable ids. */
+export function addBuiltinClassifications(db: DevDb, workspaceId: Uuid, by: Uuid, at: string): void {
+  for (const b of BUILTIN_CLASSIFICATIONS) {
+    db.classification.push({
+      id: seedId(workspaceId, `classification:${b.code}`),
+      workspace_id: workspaceId,
+      version: 1,
+      created_at: at,
+      created_by: by,
+      updated_at: at,
+      updated_by: by,
+      deleted_at: null,
+      code: b.code,
+      name: b.name,
+      name_key: normClassification(b.name),
+      scope: b.scope,
+      origin: b.origin,
+    });
+  }
+}
+
+/** A built-in classification on a seeded table or column (slice 7c). */
+export function addSeedClassificationLink(db: DevDb, workspaceId: Uuid, by: Uuid, at: string, code: ClassificationCode, target: { columnId: Uuid } | { tableId: Uuid }): void {
+  const object = "columnId" in target ? target.columnId : target.tableId;
+  db.classification_link.push({
+    id: seedId(workspaceId, `classification-link:${object}:${code}`),
+    workspace_id: workspaceId,
+    version: 1,
+    created_at: at,
+    created_by: by,
+    updated_at: at,
+    updated_by: by,
+    deleted_at: null,
+    classification_id: seedId(workspaceId, `classification:${code}`),
+    source_table_id: "tableId" in target ? target.tableId : null,
+    source_column_id: "columnId" in target ? target.columnId : null,
+  });
+}
+
 export function seedId(workspaceId: Uuid, key: string): Uuid {
   const h = createHash("sha1").update(`${workspaceId}/${key}`).digest("hex");
   const variant = "89ab"[parseInt(h[7]!, 16) & 3];
@@ -243,6 +283,8 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
       file_format: null,
       row_count: rows,
       comment: null,
+      note_html: null,
+      note_text: null,
       missing_since: null, retired_since: null,
     };
     db.source_table.push(table);
@@ -258,13 +300,15 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
         is_nullable: !has(flags, "PK"),
         is_primary_key: has(flags, "PK"),
         is_foreign_key: has(flags, "FK"),
-        is_business_key: has(flags, "BK"),
-        is_pii: has(flags, "PII"),
         default_value: null,
         comment: null,
+        note_html: null,
+        note_text: null,
         missing_since: null, retired_since: null, not_needed: false,
       };
       db.source_column.push(column);
+      // the prototype's BK and PII flags are classifications (slice 7c)
+      for (const code of ["BK", "PII"] as const) if (has(flags, code)) addSeedClassificationLink(db, o.workspaceId, o.authorId, o.at, code, { columnId: column.id });
     });
   }
 

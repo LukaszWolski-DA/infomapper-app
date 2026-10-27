@@ -539,6 +539,23 @@ the demo data is replaced: steps whose change group is no longer in the change l
 - **Accepted** for the local adapter: one development server, one user at a time in practice.
 - **The database slice (last, AD-31):** decide whether the history must survive a restart (and several server instances). If it must,
   keep it in the database next to `change_event`.
+- **Slice 7c (F6):** a step recorded before the local data file's upgrade to format 8 that touched a source column
+  carries the column's old business key and personal data flags in its images, so undoing or redoing it is refused
+  ("changed afterwards"); nothing wrong is written. A server restart empties the history anyway.
+- **Slice 7c (who signs the upgrade):** the rows and change events slice 7c's upgrade wrote are signed by the
+  workspace's creator; a future "last changed by" must recognise them as the upgrade's. The data model slice decides on a
+  system author for upgrades (e.g. "InfoMapper upgrade").
+- **Slice 7c (Escape in dialogs):** the canvas listens for Escape and its one-letter shortcuts (F, M, E, H, A, N, V) on
+  the whole window. In the dialogs "Delete {entity} from the model?", "Delete the concept {name}?", "New source table" and "Import
+  sources into {system}", Escape closes the dialog and also clears the canvas selection, which closes the panel behind it, and a letter
+  pressed outside a text field acts on the canvas. The Classifications dialog (slice 7c) keeps both to itself; the
+  others are left as they are (Łukasz, step 4).
+- **Slice 7c (canvas commits on a panel-only write):** setting or clearing a classification, or saving a note, commits
+  the canvas three times, as every write does (the page's refreshed data reaches `ModelCanvas`), although only a
+  Business key toggle changes what it draws (the BK badge). Measured equal to slice 7b's flag toggle (3 and 3,
+  `S7C-14-commits.spec.ts`, answer F4). `docs/ideas.md`: "A panel-only write that does not redraw the canvas".
+- **Slice 7c (live columns only):** the upgrade moved hand-typed comments into notes on live columns only. A deleted
+  column brought back by undo keeps a hand-typed comment, shown as "From the source:".
 
 ### No undo outside canvases (slice 3a, step 0)
 
@@ -681,7 +698,10 @@ pages), so the first tests do not wait for compiles.
 - **`npm run dev` can hit it too** (slice 4a): after a dev server on `.next` was stopped by force (a closed terminal, an
   ended session), the next one answered 404 for every project and canvas page while the workspace page worked; the data
   file was not the cause. Fix: stop the server, delete `.next/dev/cache/turbopack`, start it again (the first pages
-  compile once more).
+  compile once more). Slice 7c's closing saw another symptom of it: the canvas page failed with "Cannot convert
+  undefined or null to object" at `src/domain/commands/classification.ts` (`CLASSIFICATION_SCOPES` from `types.ts`
+  still undefined), although `src/domain` has no import cycle and the same code and data opened the canvas on a server
+  with a fresh build folder. The same fix applies.
 - **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.
 
 ### S7A-04-route's development sign-in timed out once (a known flake)
@@ -705,6 +725,10 @@ break and write the file without indentation (3.3 s before); the rest is writing
   in practice. `npm run reset-dev-data` brings it back to the demo.
 - **Local adapter only:** the Supabase adapter writes only the changed rows. If large imports are ever needed locally:
   `docs/ideas.md`, "One file per table in the local adapter".
+- **Slice 7c:** the same card move after three 20,000-column imports takes 1,473 ms on slice 7c against 1,230 ms on
+  `slice-07b` (`bench-import-write.ts 20000`, step 5): each import now also writes its classification links and their
+  change events, so the data file is larger (49 MB instead of 47 MB per import). A limit of the local adapter's data
+  file, accepted (Łukasz, step 5); for the database slice.
 
 ### One import takes up to 30,000 column rows (a temporary limit)
 
@@ -730,12 +754,16 @@ renamed, are paired in file order.
 ### An import's undo: all or nothing, and not after a restart
 
 An import is one undo step (P7). Undo is refused as a whole ("This can't be undone because it was changed afterwards.")
-when any row the import wrote has changed since: a new column mapped, a business key set, a table renamed. The undo
+when any row the import wrote has changed since: a new column mapped, a table renamed. The undo
 history lives in the server's memory ("The undo history lives in server memory" above), so an import cannot be undone
 after the server restarts. Approving a mapping again, or importing the previous file again, is the way back then.
 Since slice 7b, resolving one of the import's changes to resolve writes rows the import wrote: undoing the resolution
 first brings the change back as the import left it, and then the import can be undone. A resolution by someone else
 blocks the import's undo, as any later change does (step 1, F13).
+Since slice 7c a classification is a link of its own, not a field of the column: setting or clearing one on a column the
+import only updated no longer blocks the undo (the column row is untouched). On a column the import created it still
+does: the undo would delete the column and leave a live link to it, which the undo's consistency check refuses with the
+same message.
 
 ### SQL Server's `timestamp` read from a file is a date
 

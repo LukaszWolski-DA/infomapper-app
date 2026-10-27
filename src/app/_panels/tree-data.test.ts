@@ -30,6 +30,8 @@ const model: WorkspaceModel = {
   mappings: [],
   sourceRelationships: [],
   sourceRelationshipColumns: [],
+  classifications: [],
+  classificationLinks: [],
   mappingInputs: [],
 };
 const items = [

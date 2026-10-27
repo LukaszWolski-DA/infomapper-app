@@ -8,6 +8,7 @@ import { deriveSourceChanges } from "@/domain/source-changes/derive";
 import type { ChangeEvent } from "@/domain/types";
 import { isLocalModeAllowed } from "./measure-mode";
 import { DEV_DB_FORMAT, type DevDb } from "./schema";
+import { upgradeReportText, upgradeTo8, type Upgrade8Report } from "./upgrade-8";
 
 /** Where the file lives: INFOMAPPER_DEV_DB if set (tests), else .data/dev-db.json in the project. */
 export function devDbPath(): string {
@@ -46,12 +47,20 @@ export async function readDb(file: string): Promise<DevDb> {
   }
   const db = JSON.parse(text) as DevDb;
   const was = db.format as number;
-  upgradeDb(db, new Date().toISOString(), () => uuidv7());
+  const now = new Date().toISOString();
+  const report = upgradeDb(db, now, () => uuidv7());
   if (db.format !== DEV_DB_FORMAT) {
     throw new Error(`${file} has format ${String(db.format)}, expected ${DEV_DB_FORMAT}. Run "npm run reset-dev-data".`);
   }
-  // the derived changes get their ids once (slice 7b): written back at once, so every later read sees the same rows
-  if (was >= 2 && was < 7) await writeDb(file, db);
+  // the derived changes and the classifications get their ids once (slices 7b, 7c): written back at once, so every
+  // later read sees the same rows
+  if (was >= 2 && was < 8) await writeDb(file, db);
+  if (report) {
+    // slice 7c (Q4): the moved comments' columns in a file beside the data, one line in the server's log
+    const out = path.join(path.dirname(file), `upgrade-8-${path.basename(file, ".json")}.txt`);
+    await writeFile(out, upgradeReportText(report, now), "utf8");
+    console.log(`Slice 7c upgrade: moved ${report.moved.length} hand-typed column comments into notes; see ${path.relative(process.cwd(), out)}`);
+  }
   return db;
 }
 
@@ -59,9 +68,10 @@ export async function readDb(file: string): Promise<DevDb> {
  * Upgrades an older file in place. Formats 2 (before frames), 3 (before labels and notes) and 4 (before requirements)
  * differ only by the missing tables; 5 (before source imports) and 6 (before changes to resolve) also by the new columns,
  * null (false, 0) on every row. From 6, the open changes slice 7a's imports leave are derived (slice 7b, P2, F1): one
- * change group per workspace, each event signed by the person who ran the import; no undo step.
+ * change group per workspace, each event signed by the person who ran the import; no undo step. From 7, the
+ * classifications and notes (slice 7c, `upgrade-8.ts`); its report comes back for the caller to write.
  */
-export function upgradeDb(db: DevDb, now: string, newId: () => string): void {
+export function upgradeDb(db: DevDb, now: string, newId: () => string): Upgrade8Report | null {
   if ((db.format as number) === 2) Object.assign(db, { format: 3, frame: [] });
   if ((db.format as number) === 3) Object.assign(db, { format: 4, label: [], label_link: [], project_pinned_label: [], note: [] });
   if ((db.format as number) === 4) Object.assign(db, { format: 5, requirement: [], requirement_link: [] });
@@ -103,8 +113,14 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): void {
       after_image: structuredClone(c) as unknown as ChangeEvent["after_image"],
       context_label_id: null,
     }));
-    Object.assign(db, { format: DEV_DB_FORMAT, source_change: derived, change_event: [...db.change_event, ...events] });
+    Object.assign(db, { format: 7, source_change: derived, change_event: [...db.change_event, ...events] });
   }
+  if ((db.format as number) === 7) {
+    const report = upgradeTo8(db, now, newId);
+    Object.assign(db, { format: DEV_DB_FORMAT });
+    return report;
+  }
+  return null;
 }
 
 

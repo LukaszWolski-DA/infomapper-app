@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { access, archived, attribute, entity, ids, makeCtx, mapping, mappingInput, NOW, sourceColumn } from "../__fixtures__/domain";
+import { access, archived, attribute, builtins, entity, fixtureLinks, ids, makeCtx, mapping, mappingInput, NOW, sourceColumn } from "../__fixtures__/domain";
 import type { Attribute } from "../types";
 import { addAttribute, createAttributeFromColumn, deleteAttribute, reorderAttribute, updateAttribute } from "./attribute";
 
@@ -106,7 +106,6 @@ describe("createAttributeFromColumn (a column dropped on an entity's header, sli
     type_length: null,
     type_precision: 18,
     type_scale: 2,
-    is_pii: false,
     is_nullable: false,
     comment: "Unit price, net",
   });
@@ -145,11 +144,16 @@ describe("createAttributeFromColumn (a column dropped on an entity's header, sli
     expect(r.writeSet.events).toHaveLength(3);
   });
 
-  it("takes the column's PII flag and nullability, as the prototype does", () => {
-    const r = createAttributeFromColumn(makeCtx(), access("owner"), { ...state, column: sourceColumn(ids.colFirstName) }, input);
+  it("takes the column's Personal data and nullability, as the prototype does (slice 7c: the PII classification)", () => {
+    const withLinks = { ...state, column: sourceColumn(ids.colFirstName), classifications: builtins(), classificationLinks: fixtureLinks() };
+    const r = createAttributeFromColumn(makeCtx(), access("owner"), withLinks, input);
     expect(r.ok && r.writeSet.writes[0]).toMatchObject({
       row: { name: "first_name", data_type: "string", type_length: 50, is_pii: true, is_nullable: true, definition_text: null },
     });
+    // Personal data removed from the list: nothing is copied (S7C-06)
+    const removed = builtins().map((c) => (c.code === "PII" ? { ...c, deleted_at: NOW } : c));
+    const r2 = createAttributeFromColumn(makeCtx(), access("owner"), { ...withLinks, classifications: removed }, input);
+    expect(r2.ok && r2.writeSet.writes[0]).toMatchObject({ row: { is_pii: false } });
   });
 
   it("maps the column to an attribute of the same name (ignoring case) instead of adding another", () => {

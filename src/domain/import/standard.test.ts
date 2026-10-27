@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { MAX_LENGTH } from "../model/type-check";
-import { MAX_IMPORT_ROWS, NOT_READ_YET, readStandard, STANDARD_FIELDS, STANDARD_TEMPLATE, TYPE_KEPT, type StandardRead } from "./standard";
+import { MAX_IMPORT_ROWS, readStandard, STANDARD_FIELDS, STANDARD_TEMPLATE, TYPE_KEPT, type StandardRead } from "./standard";
 
 const sample = (name: string) => readFileSync(new URL(`./samples/${name}`, import.meta.url), "utf8");
 const HEAD = STANDARD_FIELDS.join(",");
@@ -32,24 +32,18 @@ describe("readStandard: the samples (S7A-01)", () => {
     expect(column(r, "customers", "cust_no")).toMatchObject({
       type_length: 25,
       is_nullable: false,
-      is_business_key: true,
-      is_pii: false,
       classifications: ["BK"],
       comment: "Customer number shown to the customer",
     });
-    expect(column(r, "customers", "email_addr")).toMatchObject({ is_pii: true, type_length: 255 });
+    expect(column(r, "customers", "email_addr")).toMatchObject({ classifications: ["PII"], type_length: 255 });
     expect(typeOf(r, "customers_load", "payload")).toEqual(["nvarchar", MAX_LENGTH, null, null]);
     expect(column(r, "customer_addresses", "cust_id")).toMatchObject({ is_foreign_key: true });
     expect(table(r, "customer_addresses").foreignKeys).toEqual([
       { name: "FK_customer_addresses_customers", toSchema: "dbo", toTable: "customers", pairs: [{ from: "cust_id", to: "cust_id" }] },
     ]);
-    // P11: only Business key and PII are read; the others are listed once per table
-    expect(r.warnings).toEqual([
-      NOT_READ_YET("TECH", "dbo.customers"),
-      NOT_READ_YET("Effective date", "dbo.customer_consents"),
-      NOT_READ_YET("Load date", "stage.customers_load"),
-      "Row 26: stage.customers_load.batch_ref has no data_type. Column skipped.",
-    ]);
+    // slice 7c: every classification is kept as written (the plan matches them), so no warning for TECH and the rest
+    expect(column(r, "customers", "updated_ts")).toMatchObject({ classifications: ["TECH"] });
+    expect(r.warnings).toEqual(["Row 26: stage.customers_load.batch_ref has no data_type. Column skipped."]);
   });
 
   it("reads the HR sample, with a foreign key to its own table", () => {
@@ -73,14 +67,15 @@ describe("readStandard: the samples (S7A-01)", () => {
     expect(typeOf(r, "country_codes", "iso_code")).toEqual(["string", 2, null, null]);
     expect(typeOf(r, "fx_rates", "rate_to_pln")).toEqual(["decimal", null, 18, 6]);
     expect(column(r, "product_hierarchy", "category.code")).toMatchObject({ type_length: 10 });
-    expect(r.warnings).toEqual([NOT_READ_YET("Effective date", "ref_data.fx_rates")]);
+    expect(r.warnings).toEqual([]);
+    expect(column(r, "fx_rates", "rate_date")).toMatchObject({ classifications: ["Effective date"] });
   });
 
   it("reads the template", () => {
     const r = ok(STANDARD_TEMPLATE);
-    expect(r.tables.map((t) => [t.name, t.objectType, t.comment, t.columns.map((c) => [c.name, c.ordinal, c.is_business_key])])).toEqual([
-      ["customers", "table", "Customer master", [["cust_no", 2, true]]],
-      ["country_codes", "file", "Country list kept by Finance", [["iso_code", 1, true]]],
+    expect(r.tables.map((t) => [t.name, t.objectType, t.comment, t.columns.map((c) => [c.name, c.ordinal, c.classifications])])).toEqual([
+      ["customers", "table", "Customer master", [["cust_no", 2, ["BK"]]]],
+      ["country_codes", "file", "Country list kept by Finance", [["iso_code", 1, ["BK"]]]],
     ]);
   });
 });
@@ -127,7 +122,7 @@ describe("readStandard: reading rules (item 8)", () => {
   it("matches headers ignoring case and spaces, with the aliases, in any order; other columns are ignored", () => {
     const r = ok("Column_Name;Table Name;Schema_Name;DB;Type;Is Nullable;PK;Ordinal Position;Comment;Tags;Owner\nid;t;s;d;int;no;yes;3;The key;BK;Ann");
     expect(r.delimiter).toBe(";");
-    expect(column(r, "t", "id")).toMatchObject({ ordinal: 3, is_nullable: false, is_primary_key: true, comment: "The key", is_business_key: true });
+    expect(column(r, "t", "id")).toMatchObject({ ordinal: 3, is_nullable: false, is_primary_key: true, comment: "The key", classifications: ["BK"] });
     expect([...r.fields].sort()).toEqual(["classifications", "column", "column_comment", "data_type", "database", "nullable", "ordinal", "primary_key", "schema", "table"]);
   });
 
@@ -218,9 +213,9 @@ describe("readStandard: reading rules (item 8)", () => {
     expect(table(r, "t").foreignKeys).toEqual([{ name: "FK_t_u", toSchema: "x", toTable: "u", pairs: [{ from: "a", to: "ua" }, { from: "b", to: "ub" }] }]);
   });
 
-  it("reads classifications by code or name, separated by ; or |", () => {
-    const r = ok('database,schema,table,column,data_type,classifications\nd,s,t,a,int,"BK; PII"\nd,s,t,b,int,Business key|personal data\nd,s,t,c,int,pii');
-    expect(table(r, "t").columns.map((c) => [c.is_business_key, c.is_pii])).toEqual([[true, true], [true, true], [false, true]]);
+  it("keeps classifications as written, separated by ; or |, each once (slice 7c: the plan matches them)", () => {
+    const r = ok('database,schema,table,column,data_type,classifications\nd,s,t,a,int,"BK; PII"\nd,s,t,b,int,Business key|personal data|Personal_Data\nd,s,t,c,int,pii');
+    expect(table(r, "t").columns.map((c) => c.classifications)).toEqual([["BK", "PII"], ["Business key", "personal data"], ["pii"]]);
   });
 });
 
@@ -276,11 +271,11 @@ describe("readStandard: warnings do not stop it (item 10, P11)", () => {
     expect(r.warnings).toEqual(["Row 5: database, schema, table and column are required. Row skipped."]);
   });
 
-  it("a classification other than Business key and PII: listed once per table, not read (P11)", () => {
-    const r = ok("database,schema,table,column,data_type,classifications\nd,s,t,a,int,TECH\nd,s,t,b,int,tech;BK\nd,s,u,a,int,TECH");
-    expect(r.warnings).toEqual([NOT_READ_YET("TECH", "s.t"), NOT_READ_YET("TECH", "s.u")]);
-    expect(NOT_READ_YET("TECH", "s.t")).toBe("Classification “TECH” on s.t is not read yet: only Business key and PII are read for now.");
-    expect(column(r, "t", "b")).toMatchObject({ is_business_key: true, classifications: ["BK"] });
+  it("any classification is kept with no warning (slice 7c: slice 7a's “not read yet” is gone)", () => {
+    const r = ok("database,schema,table,column,data_type,classifications\nd,s,t,a,int,TECH\nd,s,t,b,int,tech;BK\nd,s,u,a,int,Whatever");
+    expect(r.warnings).toEqual([]);
+    expect(column(r, "t", "b")).toMatchObject({ classifications: ["tech", "BK"] });
+    expect(column(r, "u", "a")).toMatchObject({ classifications: ["Whatever"] });
   });
 });
 

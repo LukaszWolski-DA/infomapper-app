@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { attribute, changeEvent, ids, mapping, mappingInput, sourceColumn, workspace } from "../__fixtures__/domain";
+import { attribute, builtins, changeEvent, fixtureLinks, ids, mapping, mappingInput, NOW, workspace } from "../__fixtures__/domain";
+import { classificationIndex } from "./classifications";
 import { checkFourEyes, checkMappingShape, FOUR_EYES_MESSAGE, lastContentEditor, suggestsBusinessKey } from "./mapping-rules";
 
 const NOW_LATER = "2026-10-02T09:00:00.000Z";
@@ -78,13 +79,22 @@ describe("checkFourEyes (AD-06)", () => {
   });
 });
 
-describe("suggestsBusinessKey (AD-28)", () => {
-  it("suggests the flag when an input column is marked BK", () => {
-    expect(suggestsBusinessKey(attribute(ids.customerId), [sourceColumn(ids.colCustId)])).toBe(true);
+describe("suggestsBusinessKey (AD-28; slice 7c: by the Business key classification's code)", () => {
+  const index = classificationIndex(builtins(), fixtureLinks());
+
+  it("suggests the flag when an input column has the Business key classification", () => {
+    expect(suggestsBusinessKey(attribute(ids.customerId), [ids.colCustId], index)).toBe(true);
   });
 
-  it("does not suggest it when no input is BK or the attribute already is one", () => {
-    expect(suggestsBusinessKey(attribute(ids.email), [sourceColumn(ids.colEmail)])).toBe(false);
-    expect(suggestsBusinessKey(attribute(ids.customerId, { is_business_key: true }), [sourceColumn(ids.colCustId)])).toBe(false);
+  it("does not suggest it when no input is a business key or the attribute already is one", () => {
+    expect(suggestsBusinessKey(attribute(ids.email), [ids.colEmail], index)).toBe(false);
+    expect(suggestsBusinessKey(attribute(ids.customerId, { is_business_key: true }), [ids.colCustId], index)).toBe(false);
+  });
+
+  it("follows the code: a renamed Business key still suggests, a removed one does not (S7C-06)", () => {
+    const renamed = builtins().map((c) => (c.code === "BK" ? { ...c, name: "Klucz biznesowy", name_key: "kluczbiznesowy" } : c));
+    expect(suggestsBusinessKey(attribute(ids.customerId), [ids.colCustId], classificationIndex(renamed, fixtureLinks()))).toBe(true);
+    const removed = builtins().map((c) => (c.code === "BK" ? { ...c, deleted_at: NOW } : c));
+    expect(suggestsBusinessKey(attribute(ids.customerId), [ids.colCustId], classificationIndex(removed, fixtureLinks()))).toBe(false);
   });
 });

@@ -14,7 +14,7 @@ import {
   sourceSystem,
   sourceTable,
 } from "../__fixtures__/domain";
-import { createSourceTable, deleteSourceTable, updateSourceColumn } from "./source";
+import { createSourceTable, deleteSourceTable, NOTE_REMOVED, NOTE_SAVED, setSourceNote } from "./source";
 
 const input = { systemName: "crm", databaseName: "crmprod", schemaName: "dbo", name: "address", columns: "addr_id int\nline1 varchar(255)\namount decimal(18,2)" };
 const state = { systems: [sourceSystem()], tables: [sourceTable()] };
@@ -65,37 +65,6 @@ describe("createSourceTable (S1A-13)", () => {
     expect(createSourceTable(makeCtx(), access("owner"), state, { ...input, schemaName: "" })).toMatchObject({ ok: false, error: { code: "invalid" } });
     expect(createSourceTable(makeCtx(), access("reviewer"), state, input)).toMatchObject({ ok: false, error: { code: "forbidden" } });
     expect(createSourceTable(makeCtx(), access("owner", archived), state, input)).toMatchObject({ ok: false, error: { code: "archived" } });
-  });
-});
-
-describe("updateSourceColumn", () => {
-  const ref = { sourceColumnId: ids.colEmail, expectedVersion: 1 };
-  const state = { column: sourceColumn(ids.colEmail) };
-
-  it("changes BK, PII and the comment", () => {
-    expect(updateSourceColumn(makeCtx(), access("modeler"), state, { ...ref, isBusinessKey: true, isPii: false, comment: " Main address " })).toMatchObject({
-      ok: true,
-      value: { column: { is_business_key: true, is_pii: false, comment: "Main address", version: 2 } },
-    });
-    expect(updateSourceColumn(makeCtx(), access("modeler"), { column: sourceColumn(ids.colEmail, { comment: "x" }) }, { ...ref, comment: "" })).toMatchObject({
-      ok: true,
-      value: { column: { comment: null } },
-    });
-  });
-
-  it("does not change name, type or other flags", () => {
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, name: "mail" })).toMatchObject({ ok: false, error: { code: "invalid" } });
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, isPrimaryKey: true })).toMatchObject({ ok: false, error: { code: "invalid" } });
-  });
-
-  it("refuses no change, a stale version, reviewers and an archived workspace", () => {
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { ...ref, isPii: true })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
-    expect(updateSourceColumn(makeCtx(), access("owner"), state, { sourceColumnId: ids.colEmail, expectedVersion: 3, isPii: false })).toMatchObject({
-      ok: false,
-      error: { code: "stale_version" },
-    });
-    expect(updateSourceColumn(makeCtx(), access("reviewer"), state, { ...ref, isPii: false })).toMatchObject({ ok: false, error: { code: "forbidden" } });
-    expect(updateSourceColumn(makeCtx(), access("admin", archived), state, { ...ref, isPii: false })).toMatchObject({ ok: false, error: { code: "archived" } });
   });
 });
 
@@ -158,5 +127,36 @@ describe("deleteSourceTable", () => {
     });
     expect(deleteSourceTable(makeCtx(), access("reviewer"), free, ref)).toMatchObject({ ok: false, error: { code: "forbidden" } });
     expect(deleteSourceTable(makeCtx(), access("owner", archived), free, ref)).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
+
+describe("the modeller's note on a table or column (slice 7c, P8, item 15, S7C-07)", () => {
+  const table = sourceTable();
+  const column = sourceColumn(ids.colEmail);
+
+  it("saves a note as plain text, markup stored escaped, as a mapping's note is", () => {
+    const r = setSourceNote(makeCtx(), access("modeler"), { column }, { target: { kind: "source_column", id: column.id }, expectedVersion: 1, note: "Values <b>A</b> & B\n\nsecond" });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toEqual({ name: "email", removed: false });
+    expect(r.writeSet.writes).toEqual([
+      expect.objectContaining({ kind: "update", table: "source_column", row: expect.objectContaining({ note_text: "Values <b>A</b> & B\n\nsecond", note_html: "<p>Values &lt;b&gt;A&lt;/b&gt; &amp; B</p><p>second</p>", version: 2 }) }),
+    ]);
+    expect(NOTE_SAVED("email")).toBe("Note saved on email");
+  });
+
+  it("clears a note on a table; refuses nothing to change and a stale version", () => {
+    const noted = { ...table, note_html: "<p>Owned by Finance</p>", note_text: "Owned by Finance" };
+    const r = setSourceNote(makeCtx(), access("owner"), { table: noted }, { target: { kind: "source_table", id: table.id }, expectedVersion: 1, note: "  " });
+    expect(r.ok && r.value).toEqual({ name: "customer", removed: true });
+    expect(r.ok && r.writeSet.writes[0]).toMatchObject({ row: { note_html: null, note_text: null } });
+    expect(NOTE_REMOVED("customer")).toBe("Note removed from customer");
+    expect(setSourceNote(makeCtx(), access("owner"), { table: noted }, { target: { kind: "source_table", id: table.id }, expectedVersion: 1, note: "Owned by Finance" })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(setSourceNote(makeCtx(), access("owner"), { table: noted }, { target: { kind: "source_table", id: table.id }, expectedVersion: 4, note: "x" })).toMatchObject({ ok: false, error: { code: "stale_version" } });
+  });
+
+  it("is read-only for reviewers, readers and in an archive (S7C-13)", () => {
+    for (const a of [access("reviewer"), access("reader"), access("owner", archived)]) {
+      expect(setSourceNote(makeCtx(), a, { column }, { target: { kind: "source_column", id: column.id }, expectedVersion: 1, note: "x" }).ok).toBe(false);
+    }
   });
 });

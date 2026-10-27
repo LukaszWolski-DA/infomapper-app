@@ -25,11 +25,12 @@ test("S7A-01: the file channel reads the standard (counts, warnings), shows each
 
   // the CRM test file: tables, columns and warnings (shown in the review)
   await giveFile(page, "import-file", "crm_snapshot_2026-10-20.csv", sample("crm_snapshot_2026-10-20.csv"));
-  await expect(page.getByTestId("import-loaded")).toContainText("crm_snapshot_2026-10-20.csv4 tables, 24 columns, 4 warnings (shown in the review)");
+  // slice 7c: TECH, Effective date and Load date are classifications of the list now, so only the missing type warns
+  await expect(page.getByTestId("import-loaded")).toContainText("crm_snapshot_2026-10-20.csv4 tables, 24 columns, 1 warning (shown in the review)");
   await expect(page.getByTestId("wizard-note")).toHaveText("Read 4 tables and 24 columns from crm_snapshot_2026-10-20.csv.");
   await next(page);
   await next(page);
-  await expect(page.getByTestId("review-warnings")).toContainText("Classification “TECH” on dbo.customers is not read yet: only Business key and PII are read for now.");
+  await expect(page.getByTestId("review-warnings")).not.toContainText("TECH");
   await expect(page.getByTestId("review-warnings")).toContainText("Row 26: stage.customers_load.batch_ref has no data_type. Column skipped.");
 
   // a type the importer cannot read is kept, with its warning (step 2, decision 3)

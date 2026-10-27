@@ -1,4 +1,4 @@
-import { updateSourceColumn } from "../../src/domain/commands/source";
+import { setClassification } from "../../src/domain/commands/classification";
 import { expect, test } from "./fixtures";
 import { asPerson, expectToast, imports, loadModel, openWizard, reviewFile, reviewRow, sample, SEED_IDS } from "./helpers";
 
@@ -39,17 +39,19 @@ test("S7A-09: P8: a change to the system between review and import writes nothin
   await openWizard(page);
   await reviewFile(page, { existing: "CRM" }, "crm.csv", sample("crm_snapshot_2026-10-20.csv"));
   await page.locator('[data-testid="select-rename"][data-key="crmprod|dbo|customers|created_ts"]').selectOption("created_on");
-  // meanwhile someone edits a column the import reads
+  // meanwhile someone changes a column the import reads (slice 7c: clears its Business key; the comment is the source's, P9)
   const m = await loadModel();
   const custNo = m.sourceColumns.find((c) => c.name === "cust_no" && m.sourceTables.find((t) => t.id === c.source_table_id)!.name === "customers")!;
-  await asPerson(SEED_IDS.userAnna, (ctx, access) => updateSourceColumn(ctx, access, { column: custNo }, { sourceColumnId: custNo.id, expectedVersion: custNo.version, comment: "Meanwhile" }));
+  const bk = m.classifications.find((c) => c.code === "BK")!;
+  const state = { classifications: m.classifications, links: m.classificationLinks, tables: m.sourceTables, columns: m.sourceColumns };
+  await asPerson(SEED_IDS.userAnna, (ctx, access) => setClassification(ctx, access, state, { classificationId: bk.id, target: { kind: "source_column", id: custNo.id }, on: false }));
 
   await page.getByTestId("button-wizard-import").click();
   await expect(page.getByTestId("callout-stale")).toHaveText("CRM changed since you opened this review. The review now shows the current state; check it and import again.");
   await expect(page.getByTestId("dialog-import")).toBeVisible();
   expect(await imports()).toEqual([]);
   // the review shows the current state and keeps the rename choice
-  await expect(reviewRow(page, "cust_no")).toContainText("comment: Meanwhile→Customer number shown to the customer");
+  await expect(reviewRow(page, "cust_no")).toContainText("The file says Business key; your classifications are kept.");
   await expect(page.locator('[data-testid="select-rename"][data-key="crmprod|dbo|customers|created_ts"]')).toHaveValue("created_on");
   await page.getByTestId("button-wizard-import").click();
   await expectToast(page, /^Imported into CRM: /, 15_000);

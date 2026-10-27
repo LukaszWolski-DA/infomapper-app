@@ -11,7 +11,7 @@ import {
   type WorkspaceRole,
 } from "@/domain/types";
 import { emptyDb, findViolation, type DevDb } from "./schema";
-import { addDemoModel, DEMO_LAYOUT } from "./seed-model";
+import { addBuiltinClassifications, addDemoModel, DEMO_LAYOUT } from "./seed-model";
 import { addDemoRequirementCard, addDemoRequirements, DEMO_REQUIREMENT_KEY_NEXT } from "./seed-requirements";
 import { addDemoWorkingLayer } from "./seed-working-layer";
 
@@ -98,6 +98,7 @@ export function buildSeed(now: Date = new Date()): DevDb {
       ...audit(by),
     };
     db.workspace.push(ws);
+    addBuiltinClassifications(db, ws.id, users[by].id, at);
     for (const [m, role] of members) {
       db.workspace_member.push({ workspace_id: ws.id, user_id: users[m].id, role, added_by: users[by].id, created_at: at });
     }

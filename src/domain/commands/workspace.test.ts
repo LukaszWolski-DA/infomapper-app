@@ -14,7 +14,7 @@ import {
 describe("createWorkspace", () => {
   const state = { organization: organization(), organizationMember: organizationMember() };
 
-  it("creates the workspace, the creator as owner, a first project and a first canvas in one change group", () => {
+  it("creates the workspace, the creator as owner, a first project, a first canvas and the built-in classifications in one change group", () => {
     const ctx = makeCtx();
     const r = createWorkspace(ctx, state, { organizationId: ids.org, name: "  Insurance DWH " });
     if (!r.ok) throw new Error(r.error.message);
@@ -26,6 +26,7 @@ describe("createWorkspace", () => {
       "insert:project",
       "insert:canvas",
       "insert:project_canvas",
+      ...Array<string>(19).fill("insert:classification"),
     ]);
     const [ws, mem, proj, canv, link] = writes.map((w) => (w.kind === "insert" ? w.row : null)) as never[];
     expect(ws).toMatchObject({
@@ -47,7 +48,7 @@ describe("createWorkspace", () => {
     expect(canv).toMatchObject({ id: r.value.canvasId, workspace_id: r.value.workspaceId, name: FIRST_CANVAS_NAME });
     expect(link).toMatchObject({ project_id: r.value.projectId, canvas_id: r.value.canvasId, sort_order: 0 });
 
-    expect(events).toHaveLength(5);
+    expect(events).toHaveLength(24);
     for (const e of events) {
       expect(e).toMatchObject({
         change_group_id: changeGroupId,

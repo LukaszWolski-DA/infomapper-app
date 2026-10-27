@@ -24,6 +24,8 @@ erDiagram
   WORKSPACE ||--o{ SOURCE_SYSTEM : contains
   SOURCE_SYSTEM ||--o{ SOURCE_TABLE : has
   SOURCE_TABLE ||--o{ SOURCE_COLUMN : has
+  WORKSPACE ||--o{ CLASSIFICATION : lists
+  CLASSIFICATION ||--o{ CLASSIFICATION_LINK : marks
   ATTRIBUTE ||--o{ MAPPING : "is fed by"
   MAPPING ||--|{ MAPPING_INPUT : reads
   SOURCE_COLUMN ||--o{ MAPPING_INPUT : "is read by"
@@ -44,7 +46,7 @@ Table groups (AD-10):
 | --- | --- |
 | Tenancy and access | `app_user`, `organization`, `organization_member`, `workspace`, `workspace_member`, `invitation` |
 | Model | `concept`, `entity`, `attribute`, `relationship` |
-| Sources | `source_system`, `source_table`, `source_column` |
+| Sources | `source_system`, `source_table`, `source_column`, `source_relationship`, `source_relationship_column`, `source_import`, `source_change`, `classification`, `classification_link` |
 | Mappings | `mapping`, `mapping_input` |
 | Requirements | `requirement`, `requirement_link` |
 | Working layer | `label`, `label_link`, `note` |
@@ -243,6 +245,8 @@ Database and schema are fields of the table, not tables of their own (AD-10).
 | `row_count` | bigint | yes | |
 | `comment` | text | yes | from the source |
 | `missing_since` | timestamptz | yes | not in the last import that judged it (slice 7a, P3): a status, not a delete; cleared when it comes back |
+| `retired_since` | timestamptz | yes | kept as historical after it left the source (slice 7b); cleared when it comes back |
+| `note_html`, `note_text` | text | yes | the modeller's own note, plain text (slice 7c, P8, AD-17); separate from the source's comment |
 
 ### `source_column`
 | Column | Type | Null | Notes |
@@ -254,14 +258,40 @@ Database and schema are fields of the table, not tables of their own (AD-10).
 | `data_type` | text | no | physical type as in the source, e.g. `varchar`, `decimal` |
 | `type_length`, `type_precision`, `type_scale` | integer | yes | `type_length` -1 is `max` (`nvarchar(max)`), always shown as `max` (slice 7a); one number of a non-text type is its precision (`datetime2(7)`) |
 | `is_nullable`, `is_primary_key`, `is_foreign_key` | boolean | no | |
-| `is_business_key` | boolean | no | column classification BK |
-| `is_pii` | boolean | no | column classification PII |
-| `default_value`, `comment` | text | yes | |
+| `default_value`, `comment` | text | yes | the comment is the source's, read-only (slice 7c, P9) |
 | `missing_since` | timestamptz | yes | as on `source_table` (slice 7a) |
+| `retired_since` | timestamptz | yes | as on `source_table` (slice 7b) |
+| `not_needed` | boolean | no | the modeller decided the column is not needed (slice 7b) |
+| `note_html`, `note_text` | text | yes | the modeller's own note, plain text (slice 7c, P8, AD-17) |
 
 The source owns a column's name, position, type, nullable, keys and comment, and a re-import updates them; the modeller
-owns the classifications, which a re-import never changes (slice 7a, P1). A field an import file leaves out is never
-compared or overwritten (P2).
+owns the classifications and the note, which a re-import never changes (slice 7a, P1; slice 7c). A field an import
+file leaves out is never compared or overwritten (P2). Slice 7c dropped `is_business_key` and `is_pii`: they are the
+classifications Business key (`BK`) and Personal data (`PII`) now; the local data file's upgrade to format 8 turned
+every flag into a link and moved every column comment no import wrote into the column's empty note.
+
+### `classification`
+The workspace's classification list (slice 7c, P1–P3). Every workspace has the 19 built-in ones from its creation
+(`src/domain/model/classifications.ts`); a workspace adds its own. Every one can be renamed and removed; a removed
+built-in one can be restored, empty.
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `code` | text | yes | set for built-in ones (`BK`, `PII`, `TECH`, `LDTS`, `RSRC`, `EFF`, `LK`, `DCK`, `DK`, `MAK`, `T_MASTER`, `T_TXN`, `T_REF`, `T_STG`, `T_LOG`, `T_HIST`, `T_HUB`, `T_LNK`, `T_SAT`), never changed; the app's rules read it; unique per workspace; null for own ones |
+| `name` | text | no | what people see and what an import file may name; unique per workspace and scope among non-deleted rows, compared through `name_key`, and never another built-in's code of the scope |
+| `name_key` | text | no | the name in lower case without spaces, `_`, `-` and `/`; written by the server |
+| `scope` | text | no | `column`, `table` |
+| `origin` | text | no | `builtin` (the General group), `data_vault` (shown only in Data Vault 2.0 mode), `own` (code null) |
+
+### `classification_link`
+One classification on one source table or column (AD-15), as `label_link` is for labels.
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `classification_id` | uuid | no | FK `classification` |
+| `source_table_id`, `source_column_id` | uuid | yes | exactly one set, of the classification's scope (checked by the domain); one live link per classification and object |
 
 ### `source_relationship`
 A foreign key between two source tables, from an import (slice 7a). Shown in the table panels; not drawn on canvases.
@@ -511,6 +541,8 @@ because they are business logic or must work on any database:
   relationships in both directions with it (slice 7a).
 - Source import (slice 7a): matching, statuses, rename choices, the scope of missing (P4), and when a mapping goes back
   to review (P6); the plan is rebuilt on the server and must do what the review showed (P8).
+- Classifications (slice 7c): a link fits its classification's scope; names unique against names and codes per scope;
+  a removed built-in one is restored only while its name is free; the rules read codes, through one index per load.
 - Requirement parents without cycles at any depth, and a deleted requirement brought back only while no other
   requirement uses its key (slice 4a).
 - Requirement coverage and scope (D-31), live label canvas membership (D-10, D-25), auto-labeling in an active

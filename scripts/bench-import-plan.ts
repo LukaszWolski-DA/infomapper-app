@@ -6,6 +6,9 @@
 // against the tag in the same sitting); and the review's coverage before and after (Q3): the model as the import
 // leaves it and two requirement indexes, on a variant with one attribute per mapping and 500 requirements of four
 // attribute links each (bar: 100 ms).
+// Slice 7c, step 2: the plan matches the file's classifications against the list and offers suggestions (bar: within
+// 10 % of slice 7b's, in turns in the same sitting); and the classification index on the model (one Business key per
+// table: 10 % of the columns classified; bar 20 ms).
 // Run: npx tsx scripts/bench-import-plan.ts
 
 import { performance } from "node:perf_hooks";
@@ -15,6 +18,7 @@ import { planDigest } from "../src/domain/import/compare";
 import type { ImportModel } from "../src/domain/import/model";
 import { materialize } from "../src/domain/import/materialize";
 import { buildPlan, importSummary, planCounts, type PlanChoices } from "../src/domain/import/plan";
+import { indexOf } from "../src/domain/model/classifications";
 import { coverageDelta, scopeModelOf } from "../src/domain/source-changes/coverage";
 import type { Requirement, RequirementLink } from "../src/domain/types";
 import { readStandard } from "../src/domain/import/standard";
@@ -52,6 +56,7 @@ for (const tables of process.argv.includes("--limit") ? [3_000] : [2_000, 10_000
   const target = { systemId: model.systems[0]!.id };
   const choices: PlanChoices = { scope: new Set(changed.tables.map((t) => t.key)), compare: "schemas", renames: new Map() };
   console.log(`\n${first.columnCount.toLocaleString("en-GB")} columns in ${tables.toLocaleString("en-GB")} tables, ${mapped.length.toLocaleString("en-GB")} mappings`);
+  time(`the classification index (${(model.classificationLinks ?? []).length.toLocaleString("en-GB")} links)`, 20, () => indexOf(model));
   const plan = time("plan the re-import", 2_000, () => buildPlan(model, changed, target, choices));
   const counts = planCounts(plan);
   console.log(`    ${importSummary(counts)}; ${plan.mappings.filter((m) => m.sendsBack).length} mappings back to review`);

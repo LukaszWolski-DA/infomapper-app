@@ -1,4 +1,5 @@
 import { expect, test } from "./fixtures";
+import { indexOf } from "../../src/domain/model/classifications";
 import { labelItem } from "../slice-03b/helpers";
 import { linkReq } from "../slice-04b2/helpers";
 import { importNow, loadModel, openWizard, RETAIL, reviewFile, reviewRow, sample, store } from "./helpers";
@@ -9,13 +10,16 @@ const linksOn = async (columnId: string) => ({
   requirements: (await store().requirements.listLinks(RETAIL)).filter((k) => k.deleted_at === null && k.source_column_id === columnId).length,
 });
 
+/** The codes of a column's classifications (slice 7c). */
+const classesOf = (m: Awaited<ReturnType<typeof loadModel>>, columnId: string) => indexOf(m).of(columnId).map((c) => c.code);
+
 const columnsOf = async (table: string) => {
   const m = await loadModel();
   const t = m.sourceTables.find((x) => x.name === table)!;
   return { m, cols: m.sourceColumns.filter((c) => c.source_table_id === t.id) };
 };
 
-test("S7A-07: the suggested rename is pre-selected; “renamed to” keeps the column, its mappings, labels, requirement links and flags; one new column is paired once", async ({ page }) => {
+test("S7A-07: the suggested rename is pre-selected; “renamed to” keeps the column, its mappings, labels, requirement links and classifications; one new column is paired once", async ({ page }) => {
   const before = await columnsOf("customers");
   const dob = before.cols.find((c) => c.name === "dob")!;
   const created = before.cols.find((c) => c.name === "created_ts")!;
@@ -39,7 +43,10 @@ test("S7A-07: the suggested rename is pre-selected; “renamed to” keeps the c
   await importNow(page, /1 changed column|renamed column/);
 
   const after = await columnsOf("customers");
-  expect(after.cols.find((c) => c.name === "date_of_birth")).toMatchObject({ id: dob.id, is_pii: dob.is_pii, missing_since: null });
+  expect(after.cols.find((c) => c.name === "date_of_birth")).toMatchObject({ id: dob.id, missing_since: null });
+  // slice 7c: its classifications are links on the same column, so the rename keeps them (dob is Personal data in the seed)
+  expect(classesOf(after.m, dob.id)).toEqual(classesOf(before.m, dob.id));
+  expect(classesOf(after.m, dob.id)).toEqual(["PII"]);
   expect(await linksOn(dob.id)).toEqual({ labels: 1, requirements: 1 });
   expect(after.cols.find((c) => c.name === "created_on")!.id).toBe(created.id);
   expect(after.m.mappingInputs.find((i) => i.mapping_id === createdMapping)!.source_column_id).toBe(created.id);

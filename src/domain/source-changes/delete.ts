@@ -12,6 +12,7 @@
 // Soft deletes only; the ids stay, so undo writes the rows back (AD-12, AD-13).
 
 import { nextVersion, type CommandContext } from "../changes";
+import { linksOnSources } from "../commands/classification";
 import { linksOnItems, softDeleteLinks } from "../commands/label";
 import { releaseNotes } from "../commands/note";
 import { softDeleteRequirementLinks } from "../commands/requirement";
@@ -23,6 +24,7 @@ import type {
   Attribute,
   Canvas,
   CanvasItem,
+  ClassificationLink,
   Entity,
   Frame,
   LabelLink,
@@ -57,6 +59,8 @@ export interface SourceDeleteRows {
   notes?: readonly Note[];
   labelLinks?: readonly LabelLink[];
   requirementLinks?: readonly RequirementLink[];
+  /** Slice 7c (answer F18): the classification links on the table and its columns go with them. */
+  classificationLinks?: readonly ClassificationLink[];
   changes?: readonly SourceChange[];
 }
 
@@ -154,6 +158,8 @@ export function sourceDeleteEdits(ctx: CommandContext, rows: SourceDeleteRows, c
   const sourceTargets = [...(cascade.table ? [{ kind: "source_table" as const, id: cascade.table.id }] : []), ...cascade.columns.map((c) => ({ kind: "source_column" as const, id: c.id }))];
   edits.push(...softDeleteLinks(ctx, linksOnItems(rows.labelLinks, [...mappingTargets, ...sourceTargets])));
   edits.push(...softDeleteRequirementLinks(ctx, rows.requirementLinks, [...mappingTargets, ...sourceTargets]));
+  const goneTables = new Set(cascade.table ? [cascade.table.id] : []);
+  edits.push(...linksOnSources(rows.classificationLinks, goneTables, new Set(cascade.columns.map((c) => c.id))).map((l) => softDelete(ctx, "classification_link", l)));
   edits.push(...cascade.relationshipColumns.map((p) => softDelete(ctx, "source_relationship_column", p)));
   edits.push(...cascade.relationships.map((r) => softDelete(ctx, "source_relationship", r)));
   edits.push(...cascade.canvasItems.map((c) => softDelete(ctx, "canvas_item", c)));

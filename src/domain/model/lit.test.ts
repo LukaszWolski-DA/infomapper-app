@@ -20,6 +20,8 @@ function model(mappings: Mapping[] = [mapping()], inputs: MappingInput[] = [mapp
     mappings,
     sourceRelationships: [],
     sourceRelationshipColumns: [],
+    classifications: [],
+    classificationLinks: [],
     mappingInputs: inputs,
   };
 }

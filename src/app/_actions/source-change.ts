@@ -63,6 +63,7 @@ async function stateOf(store: DataStore, workspaceId: Uuid): Promise<SourceChang
     notes,
     labelLinks,
     requirementLinks,
+    classificationLinks: model.classificationLinks,
   };
 }
 

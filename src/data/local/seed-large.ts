@@ -18,7 +18,16 @@ import { addLargeRequirementCards } from "./seed-large-requirement-cards";
 import { addLargeRequirements } from "./seed-large-requirements";
 import { addLargeWorkingLayer } from "./seed-large-working-layer";
 import { SEED_IDS } from "./seed";
-import { seedId } from "./seed-model";
+import { addBuiltinClassifications, addSeedClassificationLink, seedId } from "./seed-model";
+import type { ClassificationCode } from "@/domain/model/classifications";
+
+/**
+ * Slice 7c (answer F15): classifications at size without a canvas mark, so the element guard stays equal to slice 7b's:
+ * one column in ten gets one of these (no Business key, whose BK badge is an element), one table in five one of the
+ * table classifications.
+ */
+const LARGE_COLUMN_CLASSES: readonly ClassificationCode[] = ["PII", "TECH", "LDTS", "LK", "DCK"];
+const LARGE_TABLE_CLASSES: readonly ClassificationCode[] = ["T_MASTER", "T_TXN", "T_REF", "T_HUB", "T_SAT"];
 
 export const LARGE_IDS = {
   workspace: "01a0f9e9-2012-7a40-9c1d-5e1f0a7e5701",
@@ -73,6 +82,8 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
     ...audit,
   });
   db.workspace_member.push({ workspace_id: ws, user_id: by, role: "owner", added_by: by, created_at: at });
+  addBuiltinClassifications(db, ws, by, at);
+  let columnsSeen = 0, tablesSeen = 0;
   db.project.push({ id: LARGE_IDS.project, workspace_id: ws, name: "Performance", description: null, ...audit });
   db.canvas.push({ id: LARGE_IDS.canvas, workspace_id: ws, name: "100 cards", live_label_id: null, look: { ...DEFAULT_CANVAS_LOOK }, ...audit });
   db.project_canvas.push({ project_id: LARGE_IDS.project, canvas_id: LARGE_IDS.canvas, workspace_id: ws, sort_order: 0, added_at: at, added_by: by });
@@ -124,8 +135,11 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
         file_format: null,
         row_count: null,
         comment: null,
+        note_html: null,
+        note_text: null,
         missing_since: null, retired_since: null,
       });
+      if (tablesSeen++ % 5 === 2) addSeedClassificationLink(db, ws, by, at, LARGE_TABLE_CLASSES[Math.floor(tablesSeen / 5) % LARGE_TABLE_CLASSES.length]!, { tableId });
       const parsed = parseColumnLines(card.rows.map((r) => `${r.name} ${r.dataType}`).join("\n"));
       if (!parsed.ok) throw new Error(`Generated table ${card.name}: ${parsed.error.message}`);
       parsed.columns.forEach((c, i) => {
@@ -139,12 +153,13 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
           is_nullable: !row.pk,
           is_primary_key: !!row.pk,
           is_foreign_key: !!row.fk,
-          is_business_key: false,
-          is_pii: false,
           default_value: null,
           comment: null,
+          note_html: null,
+          note_text: null,
           missing_since: null, retired_since: null, not_needed: false,
         });
+        if (columnsSeen++ % 10 === 3) addSeedClassificationLink(db, ws, by, at, LARGE_COLUMN_CLASSES[Math.floor(columnsSeen / 10) % LARGE_COLUMN_CLASSES.length]!, { columnId: id(`column:${row.id}`) });
       });
     } else {
       const entityId = id(`entity:${card.id}`);

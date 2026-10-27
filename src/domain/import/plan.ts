@@ -15,12 +15,21 @@
 //   raises (`raises`) and which open changes the source settles (`settles`) are part of the plan, so the review shows
 //   them and P8 compares them. A first import of a system raises none; mapping changes only for mappings the import
 //   sends back from approved (step 1, Q13).
+//   Classifications (slice 7c, P6, P7; answers F9, F11–F13): each value of the file's `classifications` is matched to a
+//   live column classification of the workspace's list by code or current name (`normClassification`); a new column is
+//   written with what matched, an existing column keeps the modeller's and the review says when the file differs
+//   (“The file says …”). An unknown value, and a table classification named on a column, is a warning, one per value
+//   and table. Suggestions (`hints`) for new columns the file does not classify: Business key for the only primary key
+//   column of a table with no business key (in the file or among its stored columns), Link key in Data Vault 2.0 mode
+//   for a foreign key that is not a primary key; each needs its classification in the list. The business key rules
+//   read the Business key classification's links by its code.
 
 import type { Uuid } from "../ids";
+import { indexOf, normClassification, type ClassificationIndex } from "../model/classifications";
 import { columnTypeKey, sameColumnType } from "../model/column-type";
 import { checkMappingTypes, formatAttributeType, formatColumnType, type ColumnType } from "../model/type-check";
 import { DETAIL } from "../source-changes/texts";
-import type { Attribute, MappingStatus, SourceChange, SourceChangeKind, SourceChangeSeverity } from "../types";
+import type { Attribute, Classification, MappingStatus, SourceChange, SourceChangeKind, SourceChangeSeverity } from "../types";
 import type { ImportColumn, ImportMapping, ImportModel, ImportRelationship, ImportTable } from "./model";
 import { tableKey, type StandardColumn, type StandardField, type StandardRead, type StandardTable } from "./standard";
 
@@ -35,6 +44,8 @@ export interface PlanChoices {
   compare: MissingScope;
   /** Rename choices by gone column (`RenameChoice.key`): the new column's name, or "" for “removed”. Absent: the suggestion. */
   renames: ReadonlyMap<string, string>;
+  /** Suggested classifications the modeller unticked (`ClassificationHint.id`, slice 7c, P7). */
+  hintsOff?: ReadonlySet<string>;
 }
 
 export type TableStatus = "new" | "changed" | "unchanged" | "missing" | "still_missing" | "back";
@@ -57,8 +68,13 @@ export interface PlanColumn {
   position: { before: number; after: number } | null;
   /** The rename choice this column belongs to: the gone column's key. */
   renameKey: string | null;
-  /** The file's Business key / PII when they differ from the column's (item 11: “your classifications are kept”). */
+  /**
+   * The file's classifications, by their current names, when they differ from an existing column's (item 11: “your
+   * classifications are kept”; slice 7c: the whole list). Null for a new column and when the file names none.
+   */
   fileClassifications: string[] | null;
+  /** The live classifications the file's values matched, in list order (slice 7c): a new column is written with them. */
+  classificationIds: readonly Uuid[];
   /** Live mappings reading the column (`ImportPlan.mappings` has their impact). */
   mappingIds: Uuid[];
 }
@@ -142,6 +158,32 @@ export interface PlannedRaise {
   detail: string;
 }
 
+/** A suggested classification for a new column (slice 7c, P7; prototype `plan.hints`); ticked unless in `hintsOff`. */
+export interface ClassificationHint {
+  /** `{table key}|{column name in lower case}|{code}`. */
+  id: string;
+  tableKey: string;
+  column: string;
+  code: "BK" | "LK";
+  classificationId: Uuid;
+  /** `schema.table.column` */
+  label: string;
+  why: string;
+  on: boolean;
+}
+
+export const HINT_WHY = {
+  BK: "the only primary key column, and the table has no business key",
+  LK: "a foreign key: a candidate for a link between hubs",
+} as const;
+
+/** One warning per value and table (answer F13; Łukasz's texts, step 2). */
+const where = (row: number, n: number) => `(row ${row}${n ? `; ${n.toLocaleString("en-GB")} more row${n === 1 ? "" : "s"} in this table` : ""})`;
+export const UNKNOWN_CLASSIFICATION = (row: number, value: string, column: string, others: number) =>
+  `Unknown classification “${value}” on ${column} ${where(row, others)}, ignored. Add it to the classification list (“Edit the list…” in a table or column panel) to use it.`;
+export const TABLE_CLASSIFICATION_ON_COLUMN = (row: number, value: string, column: string, others: number) =>
+  `“${value}” is a table classification; ignored on ${column} ${where(row, others)}.`;
+
 /** An open change the source settles (P7): its column or table is back, or a new one left before a decision. */
 export interface PlannedSettle {
   changeId: Uuid;
@@ -171,9 +213,13 @@ export interface ImportPlan {
   raises: PlannedRaise[];
   /** Open changes the source settles (slice 7b, P7). */
   settles: PlannedSettle[];
+  /** Suggested classifications for new columns (slice 7c, P7). */
+  hints: ClassificationHint[];
 }
 
 const lower = (s: string) => s.toLowerCase();
+/** Shared by every column the file classifies with nothing (most of them): no array per column. */
+const NO_CLASSIFICATIONS: readonly Uuid[] = Object.freeze([]);
 const yesNo = (b: boolean) => (b ? "yes" : "no");
 const isLive = (r: { deleted_at: string | null }) => r.deleted_at === null;
 const renameKeyOf = (key: string, column: string) => `${key}|${lower(column)}`;
@@ -199,10 +245,28 @@ function tableMeta(e: ImportTable, f: StandardTable, fields: ReadonlySet<Standar
   return out;
 }
 
-/** The file's Business key / PII names when they differ from the column's flags (item 11). */
-function classificationNote(e: ImportColumn, f: StandardColumn, fields: ReadonlySet<StandardField>): string[] | null {
-  if (!fields.has("classifications") || !f.classifications.length) return null;
-  return f.is_business_key !== e.is_business_key || f.is_pii !== e.is_pii ? f.classifications : null;
+/** The file's values matched to the list (slice 7c, P6): live classifications by code and by name, per scope. */
+interface Matcher {
+  column: ReadonlyMap<string, Classification>;
+  table: ReadonlyMap<string, Classification>;
+}
+
+function matcherOf(cls: ClassificationIndex): Matcher {
+  const column = new Map<string, Classification>(), table = new Map<string, Classification>();
+  for (const c of cls.list) {
+    const m = c.scope === "column" ? column : table;
+    m.set(c.name_key, c);
+    if (c.code !== null) m.set(normClassification(c.code), c);
+  }
+  return { column, table };
+}
+
+/** The file's classifications by name when they differ from the column's (item 11), else null. */
+function fileSays(cls: ClassificationIndex, columnId: Uuid, matched: readonly Uuid[]): string[] | null {
+  if (!matched.length) return null;
+  const mine = new Set(cls.of(columnId).map((c) => c.id));
+  const same = mine.size === matched.length && matched.every((id) => mine.has(id));
+  return same ? null : matched.map((id) => cls.byId.get(id)!.name);
 }
 
 const escapeRegExp = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
@@ -300,7 +364,7 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
         existing: null,
         meta: [],
         rows: null,
-        columns: ft.columns.map((fc) => ({ status: "new", existing: null, file: fc, changes: [], position: null, renameKey: null, fileClassifications: null, mappingIds: [] })),
+        columns: ft.columns.map((fc) => ({ status: "new", existing: null, file: fc, changes: [], position: null, renameKey: null, fileClassifications: null, classificationIds: NO_CLASSIFICATIONS, mappingIds: [] })),
       });
       continue;
     }
@@ -324,7 +388,8 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
         changes,
         position: ec.ordinal !== fc.ordinal ? { before: ec.ordinal, after: fc.ordinal } : null,
         renameKey: null,
-        fileClassifications: classificationNote(ec, fc, fields),
+        fileClassifications: null,
+        classificationIds: NO_CLASSIFICATIONS,
         mappingIds: mappingIdsOf(ec.id),
       });
     }
@@ -377,11 +442,12 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
           changes: columnChanges(ec, fc, fields),
           position: ec.ordinal !== fc.ordinal ? { before: ec.ordinal, after: fc.ordinal } : null,
           renameKey: renameKeyOf(ft.key, ec.name),
-          fileClassifications: classificationNote(ec, fc, fields),
+          fileClassifications: null,
+          classificationIds: NO_CLASSIFICATIONS,
           mappingIds: mappingIdsOf(ec.id),
         });
       } else {
-        columns.push({ status: "new", existing: null, file: fc, changes: [], position: null, renameKey: null, fileClassifications: null, mappingIds: [] });
+        columns.push({ status: "new", existing: null, file: fc, changes: [], position: null, renameKey: null, fileClassifications: null, classificationIds: NO_CLASSIFICATIONS, mappingIds: [] });
       }
     }
     for (const ec of gone) {
@@ -394,6 +460,7 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
         position: null,
         renameKey: ec.missing_since || !unmatched.length ? null : renameKeyOf(ft.key, ec.name),
         fileClassifications: null,
+        classificationIds: NO_CLASSIFICATIONS,
         mappingIds: mappingIdsOf(ec.id),
       });
     }
@@ -432,14 +499,17 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
           position: null,
           renameKey: null,
           fileClassifications: null,
+          classificationIds: NO_CLASSIFICATIONS,
           mappingIds: mappingIdsOf(ec.id),
         })),
       });
     }
   }
 
+  const cls = indexOf(model);
+  const hints = planClassifications(cls, model.dataVault ?? false, tables, warnings, choices.hintsOff);
   const relationships = planRelationships(model, inScope, exByKey, colsOf, tables, warnings, blocked);
-  const mappings = planMappings(model, tables, liveMappings, inputsOf);
+  const mappings = planMappings(model, cls, tables, liveMappings, inputsOf);
 
   let massWarning: ImportPlan["massWarning"] = null;
   if (systemId) {
@@ -448,8 +518,64 @@ export function buildPlan(model: ImportModel, read: StandardRead, target: Import
     if (present && missing > present / 2) massWarning = { missing, present };
   }
 
-  const { raises, settles } = planChanges(model, systemId, tables, mappings, liveMappings, mappingsOfColumn);
-  return { target, systemName, errors, warnings, fields, compare: choices.compare, leftOut, tables, relationships, renames, mappings, massWarning, raises, settles };
+  const { raises, settles } = planChanges(model, cls, systemId, tables, mappings, liveMappings, mappingsOfColumn);
+  return { target, systemName, errors, warnings, fields, compare: choices.compare, leftOut, tables, relationships, renames, mappings, massWarning, raises, settles, hints };
+}
+
+/**
+ * The file's classifications matched for every column in the file (slice 7c, P6), the warnings for values that match no
+ * column classification (one per value and table, F13), and the suggestions for new columns (P7, F12). Fills each
+ * column's `classificationIds` and `fileClassifications`.
+ */
+function planClassifications(cls: ClassificationIndex, dataVault: boolean, tables: PlanTable[], warnings: string[], hintsOff: ReadonlySet<string> | undefined): ClassificationHint[] {
+  const match = matcherOf(cls);
+  const order = new Map(cls.list.map((c, i) => [c.id, i]));
+  const hints: ClassificationHint[] = [];
+  const bk = cls.byCode.get("BK"), lk = cls.byCode.get("LK");
+  for (const t of tables) {
+    if (!t.file) continue;
+    const tableLabel = `${t.file.schema}.${t.file.name}`;
+    const odd = new Map<string, { kind: "unknown" | "table"; row: number; value: string; column: string; others: number }>();
+    for (const c of t.columns) {
+      if (!c.file || !c.file.classifications.length) continue;
+      const ids: Uuid[] = [];
+      for (const value of c.file.classifications) {
+        const k = normClassification(value);
+        const hit = match.column.get(k);
+        if (hit) {
+          if (!ids.includes(hit.id)) ids.push(hit.id);
+          continue;
+        }
+        const kind = match.table.has(k) ? "table" : "unknown";
+        const seen = odd.get(`${kind}|${k}`);
+        if (seen) seen.others++;
+        else odd.set(`${kind}|${k}`, { kind, row: c.file.line, value, column: `${tableLabel}.${c.file.name}`, others: 0 });
+      }
+      c.classificationIds = ids.sort((a, b) => order.get(a)! - order.get(b)!);
+      if (c.existing) c.fileClassifications = fileSays(cls, c.existing.id, c.classificationIds);
+    }
+    for (const o of odd.values()) warnings.push((o.kind === "table" ? TABLE_CLASSIFICATION_ON_COLUMN : UNKNOWN_CLASSIFICATION)(o.row, o.value, o.column, o.others));
+
+    // suggestions for the new columns the file does not classify
+    const candidates = t.columns.filter((c) => c.status === "new" && c.file && !c.classificationIds.length);
+    if (!candidates.length) continue;
+    const primaryKeys = t.file.columns.filter((c) => c.is_primary_key).length;
+    const hasBusinessKey =
+      !!bk &&
+      t.columns.some(
+        (c) => (c.file && c.classificationIds.includes(bk.id)) || (c.existing && c.status !== "missing" && c.status !== "still_missing" && cls.has(c.existing.id, "BK")),
+      );
+    for (const c of candidates) {
+      const fc = c.file!;
+      const hint = (code: "BK" | "LK", classification: Classification) => {
+        const id = `${t.key}|${fc.name.toLowerCase()}|${code}`;
+        hints.push({ id, tableKey: t.key, column: fc.name, code, classificationId: classification.id, label: `${tableLabel}.${fc.name}`, why: HINT_WHY[code], on: !hintsOff?.has(id) });
+      };
+      if (bk && fc.is_primary_key && primaryKeys === 1 && !hasBusinessKey) hint("BK", bk);
+      if (lk && dataVault && fc.is_foreign_key && !fc.is_primary_key) hint("LK", lk);
+    }
+  }
+  return hints;
 }
 
 const isOpenChange = (c: SourceChange) => c.deleted_at === null && c.status === "open";
@@ -464,6 +590,7 @@ const isOpenChange = (c: SourceChange) => c.deleted_at === null && c.status === 
  */
 function planChanges(
   model: ImportModel,
+  cls: ClassificationIndex,
   systemId: Uuid | null,
   tables: readonly PlanTable[],
   mappings: readonly MappingImpact[],
@@ -520,7 +647,7 @@ function planChanges(
         settleWhere((x) => x.kind === "column_left" && x.source_column_id === id, "back");
       }
       // a business key column whose type changed and raised no mapping change (the prototype's second `bk`)
-      if (c.existing && c.file && c.existing.is_business_key && !raisedOn.has(c.existing.id) && columnTypeKey(c.existing) !== columnTypeKey(c.file)) {
+      if (c.existing && c.file && cls.has(c.existing.id, "BK") && !raisedOn.has(c.existing.id) && columnTypeKey(c.existing) !== columnTypeKey(c.file)) {
         raises.push({ ...base, kind: "business_key_changed", severity: "high", columnId: c.existing.id, objectLabel: label, detail: DETAIL.businessKeyChanged(formatColumnType(c.existing), formatColumnType(c.file)) });
       }
     }
@@ -662,7 +789,7 @@ function planRelationships(
   return out;
 }
 
-function planMappings(model: ImportModel, tables: readonly PlanTable[], liveMappings: ReadonlyMap<Uuid, ImportMapping>, inputsOf: ReadonlyMap<Uuid, Uuid[]>): MappingImpact[] {
+function planMappings(model: ImportModel, cls: ClassificationIndex, tables: readonly PlanTable[], liveMappings: ReadonlyMap<Uuid, ImportMapping>, inputsOf: ReadonlyMap<Uuid, Uuid[]>): MappingImpact[] {
   // the columns whose type or name the import changes
   const after = new Map<Uuid, { type: ColumnType; name: string; before: ImportColumn }>();
   for (const t of tables) {
@@ -707,7 +834,7 @@ function planMappings(model: ImportModel, tables: readonly PlanTable[], liveMapp
         reasons.push(`type conflict, ${short}`);
         conflict = true;
       }
-      if (a.before.is_business_key && columnTypeKey(a.before) !== columnTypeKey(a.type)) {
+      if (cls.has(a.before.id, "BK") && columnTypeKey(a.before) !== columnTypeKey(a.type)) {
         reasons.push(`business key column changed type, ${formatColumnType(a.before)} → ${formatColumnType(a.type)}`);
         businessKey = true;
       }

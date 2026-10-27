@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
 import {
   attribute,
+  builtins,
   canvasItem,
+  classificationLink,
   concept,
   entity,
+  fixtureLinks,
   ids,
   mapping,
   mappingInput,
@@ -32,6 +35,9 @@ const model: WorkspaceModel = {
   mappings: [mapping(), firstNameMap],
   sourceRelationships: [],
   sourceRelationshipColumns: [],
+  // cust_id is a business key, email and first_name personal data (slice 7c: links)
+  classifications: builtins(),
+  classificationLinks: fixtureLinks(),
   mappingInputs: [mappingInput(), mappingInput("01900000-0000-7000-8000-00000000b002", { mapping_id: firstNameMap.id, source_column_id: ids.colFirstName })],
 };
 const items = [
@@ -299,5 +305,21 @@ describe("buildCards: source changes (slice 7b, item 24)", () => {
     const retired = { ...model, sourceColumns: model.sourceColumns.map((c) => (c.id === ids.colFirstName ? { ...c, missing_since: NOW, retired_since: NOW } : c)) };
     expect(buildCards(model, items).find((c) => c.kind === "ent")!.rows[0]!.warn).toBe(true);
     expect(buildCards(retired, items).find((c) => c.kind === "ent")!.rows[0]!.warn).toBe(false);
+  });
+});
+
+describe("buildCards: the BK badge and the Keys filter read the Business key classification (slice 7c, P11, S7C-02, S7C-06)", () => {
+  const withBk = (list = builtins()) => ({ ...model, classifications: list, classificationLinks: [classificationLink("BK", { columnId: ids.colFirstName }), classificationLink("PII", { columnId: ids.colEmail })] });
+  const source = (m: WorkspaceModel) => buildCards(m, items).find((c) => c.name === "customer")!;
+
+  it("a source row is BK when its column has the classification; Keys shows it; Personal data marks no source row", () => {
+    const s = source(withBk());
+    expect(s.rows.map((r) => [r.name, r.bk, r.pii])).toEqual([["cust_id", false, false], ["email", false, false], ["first_name", true, false]]);
+    expect(visibleRows({ ...s, rowFilter: "keys" }).map((r) => r.name)).toEqual(["cust_id", "first_name"]);
+  });
+
+  it("a renamed Business key keeps the badge; a removed one takes it away", () => {
+    expect(source(withBk(builtins().map((c) => (c.code === "BK" ? { ...c, name: "Klucz biznesowy" } : c)))).rows[2]!.bk).toBe(true);
+    expect(source(withBk(builtins().map((c) => (c.code === "BK" ? { ...c, deleted_at: NOW } : c)))).rows[2]!.bk).toBe(false);
   });
 });

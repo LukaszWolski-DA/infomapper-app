@@ -3,10 +3,13 @@ import {
   access,
   archived,
   attribute,
+  builtin,
+  builtins,
   canvas,
   canvasItem,
   concept,
   entity,
+  fixtureLinks,
   frame,
   ids,
   label,
@@ -17,6 +20,7 @@ import {
   mappingInput,
   note,
   NOW,
+  ownClassification,
   pin,
   project,
   relationship,
@@ -37,7 +41,9 @@ import { createNote, updateNote } from "./note";
 import { changeLabel } from "../model/change-label";
 import { deleteMapping, mergeMappings, setMappingStatus } from "./mapping";
 import { createRelationship, deleteRelationship } from "./relationship";
+import { addClassification, removeClassification, setClassification } from "./classification";
 import {
+  CLASSIFICATION_NAME_CLASH,
   isUndoable,
   NOT_UNDOABLE_MESSAGE,
   REDO_REFUSED_MESSAGE,
@@ -78,6 +84,8 @@ function seed(): Rows {
     note: [],
     requirement: [],
     requirement_link: [],
+    classification: [],
+    classification_link: [],
   };
 }
 
@@ -667,5 +675,43 @@ describe("the working layer (slice 3a)", () => {
     const afterRemove = apply(rows, removed);
     const labelGone = { ...afterRemove, label: afterRemove.label.map((l) => ({ ...l, deleted_at: NOW })) };
     expect(revertChangeGroup(makeCtx(), modeler, { events: removed.events, rows: labelGone }, "undo")).toMatchObject({ ok: false, error: { message: UNDO_REFUSED_MESSAGE } });
+  });
+});
+
+describe("classifications (slice 7c): each change is one undo step", () => {
+  const withList = (): Rows => ({ ...seed(), classification: builtins(), classification_link: fixtureLinks() });
+  const listOf = (rows: Rows) => rows.classification as never;
+  const linksOf = (rows: Rows) => rows.classification_link as never;
+
+  it("undoing a removal brings the classification and its links back", () => {
+    const rows = withList();
+    const pii = builtin("PII");
+    const { undone, afterUndo } = doAndUndo(rows, (r) => ok(removeClassification(ctx, modeler, { classifications: listOf(r), links: linksOf(r) }, { classificationId: pii.id, expectedVersion: 1 })));
+    expect(undone.ok).toBe(true);
+    expect(find(afterUndo, "classification", pii.id).deleted_at).toBeNull();
+    expect((afterUndo.classification_link as { classification_id: string; deleted_at: string | null }[]).filter((l) => l.classification_id === pii.id && l.deleted_at === null)).toHaveLength(2);
+  });
+
+  it("undoing a toggle takes the link away again", () => {
+    const rows = withList();
+    const tech = builtin("TECH");
+    const { undone, afterUndo } = doAndUndo(rows, (r) =>
+      ok(setClassification(ctx, modeler, { classifications: listOf(r), links: linksOf(r), tables: r.source_table, columns: r.source_column }, { classificationId: tech.id, target: { kind: "source_column", id: ids.colEmail }, on: true })),
+    );
+    expect(undone.ok).toBe(true);
+    expect((afterUndo.classification_link as { classification_id: string; deleted_at: string | null }[]).filter((l) => l.classification_id === tech.id && l.deleted_at === null)).toEqual([]);
+  });
+
+  it("refuses to bring back a removed classification whose name another one has now (answer F10)", () => {
+    const own = ownClassification("01900000-0000-7000-8000-c100000000b1", "Hash candidate");
+    const rows: Rows = { ...withList(), classification: [...builtins(), own] };
+    const removed = ok(removeClassification(makeCtx(), modeler, { classifications: listOf(rows), links: linksOf(rows) }, { classificationId: own.id, expectedVersion: 1 }));
+    const afterRemove = apply(rows, removed);
+    const added = ok(addClassification(makeCtx(ids.someoneElse), modeler, { classifications: listOf(afterRemove) }, { scope: "column", name: "hash candidate" }));
+    const afterAdd = apply(afterRemove, added);
+    expect(revertChangeGroup(makeCtx(), modeler, { events: removed.events, rows: afterAdd }, "undo")).toMatchObject({
+      ok: false,
+      error: { code: "conflict", message: CLASSIFICATION_NAME_CLASH("Hash candidate") },
+    });
   });
 });

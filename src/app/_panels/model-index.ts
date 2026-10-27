@@ -3,6 +3,7 @@
 // sources. Pure TypeScript, built once per model in the browser.
 
 import type { Uuid } from "@/domain/ids";
+import { indexOf, type ClassificationIndex } from "@/domain/model/classifications";
 import { suggestsBusinessKey } from "@/domain/model/mapping-rules";
 import { checkMappingTypes, formatAttributeType, formatColumnType, type MappingTypeCheck } from "@/domain/model/type-check";
 import type { Attribute, Entity, Mapping, MappingInput, SourceColumn, SourceRelationship, SourceTable, WorkspaceModel } from "@/domain/types";
@@ -22,6 +23,8 @@ export interface ModelIndex {
   relationshipsOf: Map<Uuid, SourceRelationship[]>;
   mappingsOf: Map<Uuid, Mapping[]>;
   inputsOf: Map<Uuid, MappingInput[]>;
+  /** Classifications of tables and columns (slice 7c, item 6): built once per model. */
+  classes: ClassificationIndex;
 }
 
 const push = <K, V>(m: Map<K, V[]>, k: K, v: V) => m.set(k, [...(m.get(k) ?? []), v]);
@@ -52,6 +55,7 @@ export function indexModel(model: WorkspaceModel): ModelIndex {
     relationshipsOf,
     mappingsOf,
     inputsOf,
+    classes: indexOf(model),
   };
 }
 
@@ -88,10 +92,10 @@ export function typeCheckOf(ix: ModelIndex, m: Mapping): MappingTypeCheck {
   return checkMappingTypes(m, a, inputColumns(ix, m.id).filter((c) => !c.retired_since));
 }
 
-/** The input columns marked BK that make the panel suggest the business-key flag (AD-28); empty when not. */
+/** The input columns with the Business key classification that make the panel suggest the flag (AD-28); empty when not. */
 export function businessKeyHint(ix: ModelIndex, a: Attribute): SourceColumn[] {
   const columns = (ix.mappingsOf.get(a.id) ?? []).flatMap((m) => inputColumns(ix, m.id));
-  return suggestsBusinessKey(a, columns) ? columns.filter((c) => c.is_business_key) : [];
+  return suggestsBusinessKey(a, columns.map((c) => c.id), ix.classes) ? columns.filter((c) => ix.classes.has(c.id, "BK")) : [];
 }
 
 /** Source tables that feed an entity, with the number of mappings that read from each (prototype feeds). */

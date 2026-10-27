@@ -663,6 +663,8 @@ function rowsOf(items: CanvasItem[], frames: Frame[], entities: Entity[] = model
     note: [],
     requirement: [],
     requirement_link: [],
+    classification: [],
+    classification_link: [],
   };
 }
 

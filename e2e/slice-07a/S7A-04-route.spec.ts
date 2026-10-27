@@ -44,7 +44,9 @@ test("S7A-04 (route): HR into a new system through the upload route: one change 
   expect(imports[0]).toMatchObject({ channel: "file", source_label: "hr_snapshot_2026-10-20.csv", tables_new: 2, columns_new: 10, relationships_new: 2 });
   const events = (await createLocalDataStore(E2E_DB).changeEvents.list(RETAIL)).filter((e) => e.object_type === "source_import");
   const group = (await createLocalDataStore(E2E_DB).changeEvents.list(RETAIL)).filter((e) => e.change_group_id === events[0]!.change_group_id);
-  expect(group).toHaveLength(1 + 2 + 10 + 2 + 2 + 1); // system, tables, columns, relationships, their columns, the import
+  // system, tables, columns, relationships, their columns, the import; slice 7c: the file's classifications (emp_no and
+  // dept_code Business key, first_name and last_name Personal data)
+  expect(group).toHaveLength(1 + 2 + 10 + 2 + 2 + 1 + 4);
 });
 
 test("S7A-12 (route): a reader is refused by the server, and nothing is written", async ({ page }) => {

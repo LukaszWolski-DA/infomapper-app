@@ -7,6 +7,9 @@
 // It imports through the command, so a size above the import limit (MAX_IMPORT_ROWS, 30,000) is refused; step 4's
 // 100,000-column figures were taken before the limit (docs/prd/slice-07a-acceptance.md). Slice 7b, step 3: the import
 // also stores the changes it raises (bar: within 10 % of slice 7a's, against the tag in the same sitting).
+// Slice 7c, step 5: the import also writes the file's classifications (one Business key per table: 2,000 links at 20,000
+// columns); and removing Business key, used on those columns, in one change group (bar: 1 s). `ONLY_REMOVE=1` runs
+// only that.
 
 import { copyFile, mkdir, rm, stat } from "node:fs/promises";
 import path from "node:path";
@@ -16,6 +19,7 @@ import { buildSeed, SEED_IDS, SEED_USERS } from "../src/data/local/seed";
 import { createLocalDataStore } from "../src/data/local/store";
 import type { DataStore } from "../src/data/ports";
 import type { CommandContext, CommandResult, WriteSet } from "../src/domain/changes";
+import { removeClassification } from "../src/domain/commands/classification";
 import { importSources, importStateOf } from "../src/domain/commands/import";
 import { completeLiveWrites, touchesLiveCanvases } from "../src/domain/commands/live";
 import { moveOnCanvas } from "../src/domain/commands/frame";
@@ -118,7 +122,7 @@ async function main() {
     const changed = syntheticStandard(tables, undefined, fivePercent);
     console.log(`\n${columns.toLocaleString("en-GB")} columns (${tables.toLocaleString("en-GB")} tables); the demo data around them`);
     const t = { first: [] as number[], again: [] as number[], undoAgain: [] as number[], undoFirst: [] as number[] };
-    for (let round = 0; round <= (process.env.ONLY_MOVE === "1" ? -1 : ROUNDS); round++) {
+    for (let round = 0; round <= (process.env.ONLY_MOVE === "1" || process.env.ONLY_REMOVE === "1" ? -1 : ROUNDS); round++) {
       const file = path.join(DIR, `work-${columns}.json`);
       await copyFile(base, file);
       const store = createLocalDataStore(file);
@@ -141,12 +145,41 @@ async function main() {
       t.undoAgain.push(c);
       t.undoFirst.push(d);
     }
-    if (process.env.ONLY_MOVE !== "1") {
+    if (process.env.ONLY_MOVE !== "1" && process.env.ONLY_REMOVE !== "1") {
     report("first import (every row new), with change events", 5_000, t.first);
     report("re-import, 5 % changed, renamed or missing", 5_000, t.again);
     report("undo the re-import", 5_000, t.undoAgain);
     report("undo the first import", 5_000, t.undoFirst);
     }
+
+    // slice 7c: Business key removed while the import's 2,000 columns (and the demo's 4) have it, one change group
+    if (process.env.ONLY_MOVE !== "1") {
+      const removal: number[] = [];
+      for (let round = 0; round <= ROUNDS; round++) {
+        const file = path.join(DIR, `remove-${columns}.json`);
+        await copyFile(base, file);
+        const store = createLocalDataStore(file);
+        await importFile(store, first, { newName: "Synth" }, "synthetic.csv");
+        const before = await store.model.load(WS);
+        const bk = before.classifications.find((c) => c.code === "BK")!;
+        let links = 0;
+        const r = await timed(() =>
+          serverWrite(store, async (ctx, access) => {
+            const m = await store.model.load(WS);
+            const result = removeClassification(ctx, access, { classifications: m.classifications, links: m.classificationLinks }, { classificationId: bk.id, expectedVersion: bk.version });
+            links = result.ok ? result.value.columns : 0;
+            return result;
+          }),
+        );
+        if (round === 0) {
+          console.log(`  Business key removed from ${links.toLocaleString("en-GB")} columns`);
+          continue;
+        }
+        removal.push(r);
+      }
+      report("remove a classification used on 2,000 columns, one change group", 1_000, removal);
+    }
+    if (process.env.ONLY_REMOVE === "1") continue;
 
     // a card move after three large imports (step 1, F10)
     const file = path.join(DIR, `three-${columns}.json`);

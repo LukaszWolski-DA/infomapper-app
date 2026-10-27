@@ -1,6 +1,9 @@
 // Sources in slice 1a: “New source table” (a simple manual entry: system, database, schema, name, and the columns typed
 // as lines), the column classification (BK, PII) and comment, and deleting a table no mapping reads from.
 // Import of sources comes later.
+// Slice 7c: the modeller's note on a table or column (`setSourceNote`, P8: plain text as a mapping's note, AD-17).
+// Classifications are `commands/classification.ts` (the flags BK and PII became links); `updateSourceColumn` keeps the
+// comment until the column panel shows it read-only (step 4, P9).
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
@@ -12,6 +15,7 @@ import {
   SOURCE_OBJECT_TYPES,
   type Attribute,
   type CanvasItem,
+  type ClassificationLink,
   type Entity,
   type LabelLink,
   type RequirementLink,
@@ -24,9 +28,10 @@ import {
   type SourceSystem,
   type SourceTable,
 } from "../types";
-import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
+import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { sourceDeleteCascade, sourceDeleteEdits, type SourceDeleteRows } from "../source-changes/delete";
-import { begin, current, done, isLive, nothingToChange } from "./shared";
+import { plainTextPair } from "../model/plain-text";
+import { begin, current, done, isLive, nothingToChange, plainTextSchema } from "./shared";
 
 const createSourceTableInput = z
   .object({
@@ -97,6 +102,8 @@ export function createSourceTable(
     comment: null,
     missing_since: null,
     retired_since: null,
+    note_html: null,
+    note_text: null,
   };
   writes.push({ kind: "insert", table: "source_table", row: table });
   columns.columns.forEach((c, i) => {
@@ -109,52 +116,60 @@ export function createSourceTable(
       is_nullable: true,
       is_primary_key: false,
       is_foreign_key: false,
-      is_business_key: false,
-      is_pii: false,
       default_value: null,
       comment: null,
       missing_since: null,
       retired_since: null,
       not_needed: false,
+      note_html: null,
+      note_text: null,
     };
     writes.push({ kind: "insert", table: "source_column", row: column });
   });
   return done(ctx, access, { sourceTableId: table.id, sourceSystemId: systemId, createdSystem }, writes);
 }
 
-// ---- column classification and comment ----
+// ---- the modeller's note (slice 7c, P8, item 15) ----
 
-const updateSourceColumnInput = z
+const setSourceNoteInput = z
   .object({
-    sourceColumnId: uuidSchema,
+    target: z.object({ kind: z.enum(["source_table", "source_column"]), id: uuidSchema }).strict(),
     expectedVersion: versionSchema,
-    isBusinessKey: z.boolean().optional(),
-    isPii: z.boolean().optional(),
-    comment: optionalTextSchema.optional(),
+    note: plainTextSchema,
   })
   .strict();
-export type UpdateSourceColumnInput = z.input<typeof updateSourceColumnInput>;
+export type SetSourceNoteInput = z.input<typeof setSourceNoteInput>;
 
-/** BK and PII flags and the comment. Name, type and position come from the source and stay as they are. */
-export function updateSourceColumn(
+/** The toasts (item 15). */
+export const NOTE_SAVED = (name: string) => `Note saved on ${name}`;
+export const NOTE_REMOVED = (name: string) => `Note removed from ${name}`;
+
+/**
+ * A table's or column's note, saved as a mapping's note is (`plainTextPair`): the text as typed, its HTML escaped, so
+ * markup is stored as text. An empty note clears it.
+ */
+export function setSourceNote(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: { column: SourceColumn | null },
+  state: { table?: SourceTable | null; column?: SourceColumn | null },
   input: unknown,
-): CommandResult<{ column: SourceColumn }> {
-  const parsed = begin(access, "model.edit", updateSourceColumnInput, input);
+): CommandResult<{ name: string; removed: boolean }> {
+  const parsed = begin(access, "model.edit", setSourceNoteInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { sourceColumnId, expectedVersion, isBusinessKey, isPii, comment } = parsed.data;
-  const got = current(state.column, access, sourceColumnId, expectedVersion, "source column");
+  const { target, expectedVersion, note } = parsed.data;
+  const { html, text } = plainTextPair(note);
+  if (target.kind === "source_table") {
+    const got = current(state.table, access, target.id, expectedVersion, "source table");
+    if (!got.ok) return fail(got.error);
+    if (text === got.row.note_text) return fail(nothingToChange());
+    const row = nextVersion(ctx, got.row, { note_html: html, note_text: text });
+    return done(ctx, access, { name: row.name, removed: text === null }, [{ kind: "update", table: "source_table", before: got.row, row }]);
+  }
+  const got = current(state.column, access, target.id, expectedVersion, "source column");
   if (!got.ok) return fail(got.error);
-  const before = got.row;
-  const patch: Partial<SourceColumn> = {};
-  if (isBusinessKey !== undefined && isBusinessKey !== before.is_business_key) patch.is_business_key = isBusinessKey;
-  if (isPii !== undefined && isPii !== before.is_pii) patch.is_pii = isPii;
-  if (comment !== undefined && comment !== before.comment) patch.comment = comment;
-  if (Object.keys(patch).length === 0) return fail(nothingToChange());
-  const row = nextVersion(ctx, before, patch);
-  return done(ctx, access, { column: row }, [{ kind: "update", table: "source_column", before, row }]);
+  if (text === got.row.note_text) return fail(nothingToChange());
+  const row = nextVersion(ctx, got.row, { note_html: html, note_text: text });
+  return done(ctx, access, { name: row.name, removed: text === null }, [{ kind: "update", table: "source_column", before: got.row, row }]);
 }
 
 // ---- delete a table ----
@@ -177,6 +192,8 @@ export interface DeleteSourceTableState {
   notes?: readonly Note[];
   /** The workspace's requirement links (slice 4a): those on the table and its columns go with them. */
   requirementLinks?: readonly RequirementLink[];
+  /** The workspace's classification links (slice 7c): those on the table and its columns go with them. */
+  classificationLinks?: readonly ClassificationLink[];
   /** The workspace's source relationships and their column pairs (slice 7a): those from or to the table go with it. */
   relationships?: readonly SourceRelationship[];
   relationshipColumns?: readonly SourceRelationshipColumn[];
@@ -227,6 +244,7 @@ export function deleteSourceTable(
     notes: state.notes,
     labelLinks: state.labelLinks,
     requirementLinks: state.requirementLinks,
+    classificationLinks: state.classificationLinks,
   };
   const cascade = sourceDeleteCascade(rows, { tableId: got.row.id })!;
   return done(ctx, access, { columns: cascade.columns.length, mappings: cascade.mappings.length + cascade.narrowed.length }, sourceDeleteEdits(ctx, rows, cascade));

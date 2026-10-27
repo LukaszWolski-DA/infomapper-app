@@ -1,6 +1,5 @@
-import { updateSourceColumn } from "../../src/domain/commands/source";
 import { expect, test } from "./fixtures";
-import { asPerson, crmPartial, filterCount, importNow, loadModel, openWizard, reviewFile, reviewRow, sample, SEED_IDS } from "./helpers";
+import { crmPartial, filterCount, importNow, loadModel, openWizard, reviewFile, reviewRow, sample } from "./helpers";
 
 const column = async (table: string, name: string) => {
   const m = await loadModel();
@@ -54,20 +53,26 @@ test("S7A-05: re-importing CRM: new, changed, unchanged, missing and back, the t
 });
 
 test("S7A-05: P2: a file without column_comment changes no comment; a comment the file would overwrite is a change (answer 8)", async ({ page }) => {
-  const custNo = await column("customers", "cust_no");
-  await asPerson(SEED_IDS.userLukasz, (ctx, access) => updateSourceColumn(ctx, access, { column: custNo }, { sourceColumnId: custNo.id, expectedVersion: custNo.version, comment: "Typed by hand" }));
-  // the SQL Server result without its column_comment column
+  // slice 7c (P9): a comment is only ever the source's, so an earlier import writes the one a later file differs from
   const rows = sample("crm_sqlserver_catalog.tsv").split(/\r?\n/).filter(Boolean).map((l) => l.split("\t"));
   const drop = rows[0]!.indexOf("column_comment");
-  const withoutComments = rows.map((r) => r.filter((_, i) => i !== drop).join("\t")).join("\n");
+  const name = rows[0]!.indexOf("column"), table = rows[0]!.indexOf("table");
+  const withOldComment = rows.map((r) => (r[table] === "customers" && r[name] === "cust_no" ? r.map((v, i) => (i === drop ? "Customer number, old text" : v)) : r).join("\t")).join("\n");
   await openWizard(page);
+  await reviewFile(page, { existing: "CRM" }, "crm_old.tsv", withOldComment);
+  await importNow(page, /^Imported into CRM: /);
+  expect((await column("customers", "cust_no")).comment).toBe("Customer number, old text");
+  // the SQL Server result without its column_comment column
+  const withoutComments = rows.map((r) => r.filter((_, i) => i !== drop).join("\t")).join("\n");
+  await page.getByTestId("button-import-sources").click();
   await reviewFile(page, { existing: "CRM" }, "crm_no_comments.tsv", withoutComments);
   await expect(page.getByTestId("review-row").filter({ hasText: "cust_no" })).toHaveCount(0);
-  await importNow(page, /^Imported into CRM: /);
-  expect((await column("customers", "cust_no")).comment).toBe("Typed by hand");
+  // its own toast: the first import's "Imported into CRM: …" may still be shown (a flake in slice 7c's closing)
+  await importNow(page, "Imported into CRM: No changes");
+  expect((await column("customers", "cust_no")).comment).toBe("Customer number, old text");
 
   // with comments: the file's (empty) comment would overwrite it, shown as a change
   await page.getByTestId("button-import-sources").click();
   await reviewFile(page, { existing: "CRM" }, "crm.tsv", sample("crm_sqlserver_catalog.tsv"));
-  await expect(reviewRow(page, "cust_no")).toContainText("comment: Typed by hand→–");
+  await expect(reviewRow(page, "cust_no")).toContainText("comment: Customer number, old text→–");
 });

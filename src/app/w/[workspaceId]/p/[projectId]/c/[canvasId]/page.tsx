@@ -196,7 +196,7 @@ export default async function CanvasPage({
   const systemName = new Map(model.sourceSystems.map((s) => [s.id, s.name]));
   const changeImports = systemImports(imports, userName).map((i) => changesImport(i.id, systemName.get(i.systemId) ?? "?", i.at, i.label));
   const importData = editable
-    ? { model, requirements, requirementLinks, canvasesOf, canvasNames: Object.fromEntries(canvases.map((c) => [c.id, c.name])), lastImports, changes: sourceChanges }
+    ? { model, requirements, requirementLinks, canvasesOf, canvasNames: Object.fromEntries(canvases.map((c) => [c.id, c.name])), lastImports, changes: sourceChanges, dataVault: !!workspace?.dv2_mode }
     : undefined;
 
   return (
@@ -250,6 +250,7 @@ export default async function CanvasPage({
                   importData={importData}
                   changes={sourceChanges}
                   people={Object.fromEntries(users.map((u) => [u.id, u.display_name]))}
+                  dataVault={!!workspace?.dv2_mode}
                 />
               ),
               openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId || focusSelection),

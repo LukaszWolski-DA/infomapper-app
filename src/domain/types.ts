@@ -165,6 +165,9 @@ export interface SourceTable extends StandardColumns {
   missing_since: Timestamp | null;
   /** Kept as historical after it left the source (slice 7b, P6); cleared when it comes back. */
   retired_since: Timestamp | null;
+  /** The modeller's own note, plain text (slice 7c, P8, AD-17): separate from the source's comment. */
+  note_html: string | null;
+  note_text: string | null;
 }
 
 export interface SourceColumn extends StandardColumns {
@@ -180,8 +183,6 @@ export interface SourceColumn extends StandardColumns {
   is_nullable: boolean;
   is_primary_key: boolean;
   is_foreign_key: boolean;
-  is_business_key: boolean;
-  is_pii: boolean;
   default_value: string | null;
   comment: string | null;
   /** Not in the last import that judged it (slice 7a, P3). */
@@ -190,6 +191,38 @@ export interface SourceColumn extends StandardColumns {
   retired_since: Timestamp | null;
   /** The modeller decided the column is not needed (slice 7b, P10); “Mark as needed” takes it back. */
   not_needed: boolean;
+  /** The modeller's own note, plain text (slice 7c, P8, AD-17). */
+  note_html: string | null;
+  note_text: string | null;
+}
+
+// ---- Classifications (slice 7c, P1–P3) ----
+
+export const CLASSIFICATION_SCOPES = ["column", "table"] as const;
+export type ClassificationScope = (typeof CLASSIFICATION_SCOPES)[number];
+
+/** Built in (General group), built in for Data Vault 2.0, or the workspace's own (P3). */
+export const CLASSIFICATION_ORIGINS = ["builtin", "data_vault", "own"] as const;
+export type ClassificationOrigin = (typeof CLASSIFICATION_ORIGINS)[number];
+
+/**
+ * One entry of the workspace's classification list (P3). A built-in one has a `code` the rules read (`BK`, `PII`…),
+ * fixed for good; renaming changes only `name`. `name_key` is the normalized name the server writes (`norm`), unique per
+ * workspace and scope among live rows. Removed ones are soft-deleted; restoring a built-in one brings the same row back.
+ */
+export interface Classification extends StandardColumns {
+  code: string | null;
+  name: string;
+  name_key: string;
+  scope: ClassificationScope;
+  origin: ClassificationOrigin;
+}
+
+/** One classification on one source table or column (AD-15): exactly one of the two is set. */
+export interface ClassificationLink extends StandardColumns {
+  classification_id: Uuid;
+  source_table_id: Uuid | null;
+  source_column_id: Uuid | null;
 }
 
 /** Closed list (slice 7a): foreign keys an import declares; room for later kinds. */
@@ -317,6 +350,10 @@ export interface WorkspaceModel {
   sourceRelationships: SourceRelationship[];
   /** Per relationship in key order (sort_order). */
   sourceRelationshipColumns: SourceRelationshipColumn[];
+  /** The workspace's classification list, removed ones included (slice 7c: a removed built-in one can be restored). */
+  classifications: Classification[];
+  /** Live links only. */
+  classificationLinks: ClassificationLink[];
 }
 
 // ---- Requirements (data model section 7, slice 4a) ----
@@ -539,6 +576,8 @@ export interface WritableRows {
   source_relationship_column: SourceRelationshipColumn;
   source_import: SourceImport;
   source_change: SourceChange;
+  classification: Classification;
+  classification_link: ClassificationLink;
   mapping: Mapping;
   mapping_input: MappingInput;
   requirement: Requirement;

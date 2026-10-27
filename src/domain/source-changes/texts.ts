@@ -117,6 +117,10 @@ export const SETTLED = {
   movedHere: (from: string) => `Settled: mappings moved here from ${from}`,
   tableRetired: "Settled: the table was retired",
   approvedAgain: "Settled: the mapping was approved again",
+  /** Slice 7c, Q7: a business key change without a mapping, when its column loses Business key. */
+  noLongerBusinessKey: (column: string) => `Settled: ${column} is no longer a business key`,
+  /** Slice 7c, Q7: … when the classification itself is removed from the list. */
+  classificationRemoved: (name: string) => `Settled: the classification ${name} was removed`,
 } as const;
 
 /** A mapping's status as the panels word it (slice 7a, step 5, decision 7). */

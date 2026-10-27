@@ -3,7 +3,8 @@
 
 import { domainError, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
-import type { Attribute, ChangeEvent, Mapping, MappingKind, SourceColumn, Workspace } from "../types";
+import type { Attribute, ChangeEvent, Mapping, MappingKind, Workspace } from "../types";
+import type { ClassificationIndex } from "./classifications";
 
 export const FOUR_EYES_MESSAGE = "Four-eyes is on: someone else has to approve your change.";
 export const BACK_TO_REVIEW_MESSAGE = "This mapping was approved; your change sends it back to review.";
@@ -69,6 +70,10 @@ export function checkFourEyes(workspace: Workspace, actorId: Uuid, contentAuthor
   return null;
 }
 
-/** The panel suggests the business-key flag when an input column is marked BK and the attribute is not yet (AD-28). */
-export const suggestsBusinessKey = (attribute: Pick<Attribute, "is_business_key">, inputColumns: readonly Pick<SourceColumn, "is_business_key">[]): boolean =>
-  !attribute.is_business_key && inputColumns.some((c) => c.is_business_key);
+/**
+ * The panel suggests the business-key flag when an input column has the Business key classification and the attribute
+ * is not one yet (AD-28; slice 7c: by the code `BK`, so a renamed classification keeps working and a removed one
+ * suggests nothing).
+ */
+export const suggestsBusinessKey = (attribute: Pick<Attribute, "is_business_key">, inputColumnIds: readonly Uuid[], index: Pick<ClassificationIndex, "has">): boolean =>
+  !attribute.is_business_key && inputColumnIds.some((id) => index.has(id, "BK"));
