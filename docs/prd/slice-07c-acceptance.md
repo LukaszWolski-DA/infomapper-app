@@ -1422,3 +1422,13 @@ Commits `c5b76fc` (the answers), `238e4f6` (the callout, its tests, the two diff
   Every median within the bar on both sides, and 7c level with or below `slice-07b` (the differences are within one
   run's spread; slice 7a's own figures were 101 and 144 ms for "all"). The slowest single switch: 224 ms on 7c, 230 ms on
   `slice-07b` ("all" on the re-import).
+
+## Łukasz's manual acceptance (27 October 2026)
+
+- **Result:** accepted, no remarks.
+- **Step 0 on his own data file:** the dev server he ran read `.data/preview-db.json` (the launch configuration's data
+  file) and upgraded it to format 8; its report `.data/upgrade-8-preview-db.txt` says "57 built-in classifications
+  written, 20 Business key and Personal data flags turned into classifications. No hand-typed column comment to move."
+  `.data/dev-db.json` is still format 6 and is upgraded on the next `npm run dev` that reads it; a copy of it upgraded in
+  step 3 gave 57 built-in rows, 22 links and nothing moved.
+- **Remarks:** none.
