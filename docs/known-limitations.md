@@ -698,7 +698,10 @@ pages), so the first tests do not wait for compiles.
 - **`npm run dev` can hit it too** (slice 4a): after a dev server on `.next` was stopped by force (a closed terminal, an
   ended session), the next one answered 404 for every project and canvas page while the workspace page worked; the data
   file was not the cause. Fix: stop the server, delete `.next/dev/cache/turbopack`, start it again (the first pages
-  compile once more).
+  compile once more). Slice 7c's closing saw another symptom of it: the canvas page failed with "Cannot convert
+  undefined or null to object" at `src/domain/commands/classification.ts` (`CLASSIFICATION_SCOPES` from `types.ts`
+  still undefined), although `src/domain` has no import cycle and the same code and data opened the canvas on a server
+  with a fresh build folder. The same fix applies.
 - **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.
 
 ### S7A-04-route's development sign-in timed out once (a known flake)
