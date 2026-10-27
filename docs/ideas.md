@@ -210,3 +210,60 @@ action (`placeReqCards` adds no node of its own; `revalidatePath` brings it). Un
 (S4B2-06 with 4× CPU throttling), and a second drop in it tries to place a second card, which the server refuses (one
 card per requirement and canvas). Showing the card on the canvas at once (an optimistic node, kept or dropped when the
 action answers) would close the gap (Łukasz, 26 October 2026).
+
+## A panel-only write that does not redraw the canvas (slice 7c, answer F4)
+
+A classification toggle, a note or any other write that changes nothing the canvas draws still commits the canvas three
+times, as every write does: the page's refreshed server data reaches `ModelCanvas` whole. A write that knows it touches
+only a panel (no card, row, line or mark reads what it changed) could refresh the panel's data alone and leave the
+canvas's props as they were. Slice 7c measured the toggle against slice 7b's flag toggle (3 commits on both) instead.
+
+## Rich text for all notes at once (slice 7c, answer F7)
+
+The notes on mappings, source tables and source columns are plain text (`plainTextPair` into `note_html`/`note_text`),
+while descriptions are rich text (AD-17, D-42). Moving all three notes to the rich-text editor together would keep them
+alike; doing one alone would make the panels differ.
+
+## Built-in classification names per documentation language (slice 7c, PRD section 9)
+
+The 19 built-in classifications get English default names ("Business key", "Personal data", …). A workspace documented
+in another language renames them by hand (P1). Default names per the workspace's documentation language would save it;
+the codes the rules read stay the same.
+
+## A `table_classifications` column in the source standard (slice 7c, PRD section 9)
+
+The import reads column classifications only (P6); table classifications are set by hand. A `table_classifications`
+column, read from the table's first row, would let a catalog export carry them too, with the same matching and warnings.
+
+## Data Vault hints in the entity panel (slice 7c, P12)
+
+The prototype's `dvSection` shows, in Data Vault 2.0 mode, an entity's hub or link name, its business key, its
+satellites by source system and its unmapped attributes. Slice 7c built only the source table's Data Vault reading
+(AD-08 lists both).
+
+## Readings that use Link candidate and Satellite source (slice 7c, PRD section 9)
+
+The prototype lists the table classifications Link candidate (`T_LNK`) and Satellite source (`T_SAT`) but its reading
+never reads them; neither does the app's. A reading could, for example, ask about a Link candidate that has fewer than
+two relationships, or name a Satellite source's parent hub.
+
+## Own classifications with a code (slice 7c, PRD section 9)
+
+An import file names an own classification by its current name only; only built-in ones have a code that survives a
+rename. An optional code on own classifications would let a team keep its files stable while renaming in the app.
+
+## Data model slice
+
+What slice 7c leaves for the data model review (PRD 7c section 9, amended by Łukasz's answers to steps 1 and 3):
+
+- **Classifications on attributes:** whether attributes get classifications too; then `attribute.is_business_key` and
+  `is_pii` become links and AD-28 a suggestion of the Business key classification.
+- **One link pattern** for `requirement_link`, `label_link` and `classification_link`.
+- **Baselines and export** with classifications (and notes).
+- **Indexes** at enterprise scale.
+- **F5:** moving the flags' data and seeding the 19 built-in rows in a real database (the migration
+  `20261026200000_classifications.sql` is DDL only; the local adapter's format 8 did the data part).
+- **F20:** `classification.origin` carries both "built in or own" and the group (`builtin`, `data_vault`, `own`); a
+  restored or renamed built-in keeps it. Two columns may read better.
+- **A system author for upgrades** (e.g. "InfoMapper upgrade"): the rows and change events slice 7c's upgrade wrote are
+  signed by the workspace's creator (known limitation).

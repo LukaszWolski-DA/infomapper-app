@@ -550,6 +550,10 @@ the demo data is replaced: steps whose change group is no longer in the change l
   sources into {system}", Escape closes the dialog and also clears the canvas selection, which closes the panel behind it, and a letter
   pressed outside a text field acts on the canvas. The Classifications dialog (slice 7c) keeps both to itself; the
   others are left as they are (Łukasz, step 4).
+- **Slice 7c (canvas commits on a panel-only write):** setting or clearing a classification, or saving a note, commits
+  the canvas three times, as every write does (the page's refreshed data reaches `ModelCanvas`), although only a
+  Business key toggle changes what it draws (the BK badge). Measured equal to slice 7b's flag toggle (3 and 3,
+  `S7C-14-commits.spec.ts`, answer F4). `docs/ideas.md`: "A panel-only write that does not redraw the canvas".
 - **Slice 7c (live columns only):** the upgrade moved hand-typed comments into notes on live columns only. A deleted
   column brought back by undo keeps a hand-typed comment, shown as "From the source:".
 
@@ -718,6 +722,10 @@ break and write the file without indentation (3.3 s before); the rest is writing
   in practice. `npm run reset-dev-data` brings it back to the demo.
 - **Local adapter only:** the Supabase adapter writes only the changed rows. If large imports are ever needed locally:
   `docs/ideas.md`, "One file per table in the local adapter".
+- **Slice 7c:** the same card move after three 20,000-column imports takes 1,473 ms on slice 7c against 1,230 ms on
+  `slice-07b` (`bench-import-write.ts 20000`, step 5): each import now also writes its classification links and their
+  change events, so the data file is larger (49 MB instead of 47 MB per import). A limit of the local adapter's data
+  file, accepted (Łukasz, step 5); for the database slice.
 
 ### One import takes up to 30,000 column rows (a temporary limit)
 
@@ -743,12 +751,16 @@ renamed, are paired in file order.
 ### An import's undo: all or nothing, and not after a restart
 
 An import is one undo step (P7). Undo is refused as a whole ("This can't be undone because it was changed afterwards.")
-when any row the import wrote has changed since: a new column mapped, a business key set, a table renamed. The undo
+when any row the import wrote has changed since: a new column mapped, a table renamed. The undo
 history lives in the server's memory ("The undo history lives in server memory" above), so an import cannot be undone
 after the server restarts. Approving a mapping again, or importing the previous file again, is the way back then.
 Since slice 7b, resolving one of the import's changes to resolve writes rows the import wrote: undoing the resolution
 first brings the change back as the import left it, and then the import can be undone. A resolution by someone else
 blocks the import's undo, as any later change does (step 1, F13).
+Since slice 7c a classification is a link of its own, not a field of the column: setting or clearing one on a column the
+import only updated no longer blocks the undo (the column row is untouched). On a column the import created it still
+does: the undo would delete the column and leave a live link to it, which the undo's consistency check refuses with the
+same message.
 
 ### SQL Server's `timestamp` read from a file is a date
 

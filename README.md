@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 7b are merged. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 7b are merged; slice 7c (classifications, notes and the Data Vault reading) waits for its acceptance on its branch. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -52,11 +52,16 @@ rewritten rule) waits on the system's and the table's panels, counted in the tre
 that show their consequences first and are one undo step each (retire as historical, move the mappings, delete with
 what goes with it and the coverage change, map, not needed, approve again under four-eyes, approve again all), the
 review's callouts before the import, model consistency on the project home and the canvas's Changes view, which fades
-what source changes do not touch. Acceptance:
+what source changes do not touch; slice 7c's classifications and notes: one list of classifications per workspace (19
+built in, general and Data Vault 2.0 ones, and its own; each renamed, removed with its uses and what stops shown first,
+and restored), toggled on table and column panels, read by the app's rules through their fixed codes (BK, PII, LK…),
+the modeller's note on tables and columns beside the source's read-only comment, an import that reads every
+classification a file names, suggests Business key and Link key and never changes the modeller's on a re-import, and,
+in Data Vault 2.0 mode, a table's Data Vault reading (hub, links, satellites; hints only). Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md).
 
 ## Getting started
 
@@ -97,7 +102,7 @@ Until the database slice (last, AD-31), data lives in a JSON file on the server 
 | `npm run e2e` | Playwright end-to-end tests (`e2e/`). Starts its own dev server on port 3200 with `.data/e2e-db.json`, freshly seeded before every test, so it runs next to `npm run dev` |
 | `npm run seed` | Creates the demo data in `.data/dev-db.json` if it does not exist yet |
 | `npm run reset-dev-data` | Replaces `.data/dev-db.json` with fresh demo data |
-| `npm run seed:large` | Adds the workspace “Performance test” for Łukasz (the canvas spike's 100-card data set, with 8 frames since slice 2b, and labels and 24 notes since slice 3a, and PERF-2's live canvas since slice 3b, and since slice 4b-2 the canvas “Performance test – requirements”: the same layout with 12 requirement cards and 126 trace lines) to `.data/dev-db.json`; a file that has it already is left alone (`npm run reset-dev-data` first) |
+| `npm run seed:large` | Adds the workspace “Performance test” for Łukasz (the canvas spike's 100-card data set, with 8 frames since slice 2b, and labels and 24 notes since slice 3a, and PERF-2's live canvas since slice 3b, and since slice 4b-2 the canvas “Performance test – requirements”: the same layout with 12 requirement cards and 126 trace lines; since slice 7c classifications without a canvas mark on one column in ten and one table in five) to `.data/dev-db.json`; a file that has it already is left alone (`npm run reset-dev-data` first) |
 | `MEASURE=1 npx playwright test e2e/slice-01a/S1A-14.spec.ts` | The canvas performance measurement (S1A-14) in installed Google Chrome, headed; results in `test-results/S1A-14.json` |
 | `MEASURE=1 npx playwright test e2e/slice-01b/S1B-09.spec.ts` | Card resize on “Performance test” (C-09), same way; results in `test-results/S1B-09.json` |
 | `MEASURE=1 npx playwright test e2e/slice-01b/S1B-10.spec.ts` | Hover delay (C-10) and three pan-and-zoom runs against slice 1a's median, same way; results in `test-results/S1B-10.json` |
@@ -117,6 +122,9 @@ Until the database slice (last, AD-31), data lives in a JSON file on the server 
 | `npx tsx scripts/bench-consistency.ts` | Slice 7b: model consistency's computation after a re-import of 20,000 columns with 5 % changed (bar 50 ms) |
 | `npm run seed:large -- --changes` | Slice 7b: `seed:large` plus an import into each system of “Performance test” with 16 changes to resolve on 9 of its 60 tables (the Changes view's figure; without the flag the workspace stays as the element guard counts it) |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts` | Slice 7b: the Changes view on and off, its select and Focus to the screen at 100 % and 30 %, and the project home's load (`test-results/S7B-16.json`, `S7B-16-home.json`) |
+| `npx tsx scripts/bench-import-plan.ts --no-coverage` / `bench-import-write.ts 20000` | Slice 7c: the plan with classifications and suggestions, and the classification index (bar 20 ms); the write bench also removes Business key from 2,000 columns (bar 1 s; `ONLY_REMOVE=1` for only that) |
+| `COMMITS=1 npx playwright test e2e/slice-07c/S7C-14-commits.spec.ts` | Slice 7c: canvas commits per classification toggle (Personal data, Business key), on demand; run it on both tags to compare (3 per toggle on `slice-07b` and 7c) |
+| `MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts` | Slice 7c's element guard (S7C-14): the viewport counts of “Performance test” equal `slice-07b`'s |
 | `npx tsx scripts/bench-requirement-index.ts` | Builds the requirement index 30 times on a synthetic model (500 requirements, 5,000 attributes, 2,000 mappings, 3,000 links) and prints the median (slice 4a, not a gate) |
 | `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-fading.spec.ts` | Slice 4p's fading scenarios on “Performance test” (Focus and four lenses, 100 % and 30 %, frames expanded and collapsed): switching on and off, pan and zoom with fading on and off (`test-results/S4P-fading.json`); `npm run measure:canvas` runs it on both sides |
 | `npx tsx scripts/measure-trials.ts --rounds 3 --against slice-04a --sides <ref,ref,…>` | Slice 4p's sitting for several trial branches against a reference, each in its own worktree, in turns (`--prepare-only`, `--no-build`, `--add-round`, `--drop`); summary in `.data/measure/trials-<time>/summary.md` |

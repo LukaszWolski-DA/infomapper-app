@@ -1,8 +1,9 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 7b's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 7c's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
-every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`). The earlier inventory (15 October 2026,
+every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
+(27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -14,7 +15,7 @@ against `infomapper-model-prototype.html` at slice 4b-1's start) is in git histo
 - **The importer's items** come from PRD 7a's sections 8 and 9 and the decisions of steps 1–7, checked against the code.
 - Items marked **(uncertain)** were not settled by reading the code.
 
-**What the "Planned" column means:** **7c:** the next slice, from PRD 7a's section 9. **Database:** the database
+**What the "Planned" column means:** **Database:** the database
 slice, last (AD-31), with real sign-in (AD-04). **Decision only:** a decision in `docs/decisions.md` describes it, but no
 slice has it yet. **Idea:** in `docs/ideas.md`. **–:** nothing found that plans it.
 
@@ -26,12 +27,12 @@ docs (some are repeated below where they explain an item).
 | Area | Missing in the app | Planned |
 | --- | --- | --- |
 | Panels and navigation | "Show its requirements (n)" in the row and card menus; editing a requirement's description from its card | idea |
-| Model | Data Vault 2.0 hints in the entity panel; the Data Vault reading of a source table | decision only (AD-08); 7c |
+| Model | Data Vault 2.0 hints in the entity panel | idea (P12 of slice 7c; AD-08) |
 | Mappings | suggested mappings; re-pointing a mapping to another attribute | – |
-| Sources | classifications and notes on tables and columns; suggested classifications; the classification list; the Data Vault reading | 7c |
+| Sources | only ideas: relationships between source tables on the canvas; slice 7c's ideas (see Sources) | idea |
 | Labels and notes | rich text in notes | known limitation |
 | Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer; new organization; deleting a project; editing a project's name and description on its home | baselines: decision only (AD-03, AD-14); the rest: – |
-| Settings and roles | inviting people, changing a role, removing a member; the workspace's classification list | database (AD-04); 7c |
+| Settings and roles | inviting people, changing a role, removing a member | database (AD-04) |
 
 ## Canvas
 
@@ -62,7 +63,7 @@ source system's panel as a selection and a history place (7a).
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Data Vault 2.0 hints | the entity panel's hub or link name, business key, satellites by source system, unmapped attributes | `dvSection` (`settings.dv2`) | decision only (AD-08) |
+| Data Vault 2.0 hints | the entity panel's hub or link name, business key, satellites by source system, unmapped attributes | `dvSection` (`settings.dv2`) | idea ("Data Vault hints in the entity panel"; not part of 7c, P12) |
 | Mixed-systems hint for combined mappings | a combined mapping across source systems suggests a business rule in a later layer (D-50) | **(uncertain)**: no function of its own found | decision only |
 
 **Not a gap:** the new prototype's attribute panel has a "Length" field for String attributes; the app has type
@@ -87,24 +88,26 @@ tab's marks, the table, column and system panels' sections listed in PRD 7a item
 to resolve with their actions, counts and history, the review's two callouts, retired and not needed, and model
 consistency on the project home (D-56).
 
-**Still missing (slice 7c, and one idea):**
+Slice 7c brought classifications and notes on tables and columns, the workspace's classification list, the import
+reading every classification and suggesting some, and the Data Vault reading of a source table (D-57).
+
+**Still missing (ideas only):**
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Classifications on tables and columns | toggles from the workspace's list on the table and column panels; a re-import never changes them | `togs`, `sourceBody`, `colSections` | 7c |
-| Suggested classifications in the review | hints from names and keys | `plan.hints` | 7c |
-| Notes on tables and columns | the modeller's own note, separate from the source's comment | `sourceBody`, `colSections` (`data-imx-note`) | 7c |
-| The classification list | built-in, Data Vault and own classifications, by scope, in a settings dialog | `DEFAULT_CLASSES`, `renderSettings`, `#setDlg` | 7c |
-| Data Vault reading of a table | hub, link and satellite candidates from a table's keys and classifications | `dvReading` | 7c |
 | Relationships between source tables on the canvas | grey lines between table cards ("shown later" in the prototype) | the review's text only | idea |
+| Readings that use Link candidate and Satellite source | the prototype lists both table classifications; its reading reads neither | `DEFAULT_CLASSES` | idea |
+
+Beyond the prototype, slice 7c's other ideas are in `docs/ideas.md`: a panel-only write that does not redraw the canvas,
+rich text for all notes at once, built-in names per documentation language, a `table_classifications` column in the
+source standard, own classifications with a code (and, under Model, the entity panel's Data Vault hints).
 
 **Deliberate differences (slice 7a, PRD section 8 and `docs/prd/slice-07a-acceptance.md`):**
 - mappings have inputs (AD-26): conflicts, business key changes and rule rewrites are judged per input;
 - the server builds the plan again and writes only what the review showed; otherwise the review refreshes (P8);
 - no sample links in the app (P10); the samples are test files in `src/domain/import/samples/`;
-- only Business key and PII are read from the file's classifications, the others listed as not read yet (P11);
-- the column's comment stays editable and the review shows every overwrite (answer 8); the table panel shows the
-  source's comment as "From the source:";
+- the column's comment is the source's and read-only, "From the source:", as on tables (slice 7c, P9; it was editable in
+  7a, answer 8); the review shows every overwrite;
 - a real date, time and person on each import; a size limit of 30,000 column rows per import (a limit of the local
   adapter);
 - types keep their parameters (fractional seconds as precision; `datetime2` read as `datetime2(7)`, `timestamp` as
@@ -115,6 +118,33 @@ consistency on the project home (D-56).
 - after an import the system's panel opens with the Sources tab (an action that leads to details on purpose);
 - no "Reset the prototype's demo data" link (prototype only; `npm run reset-dev-data`);
 - "New source table" stays below "Import sources…" (answer 14).
+
+**Deliberate differences (slice 7c, PRD section 8 and `docs/prd/slice-07c-acceptance.md`):**
+- built-in classifications can be renamed, removed and restored (P1); the rules read their fixed codes, so a renamed one
+  keeps working and a removed one is absent; the prototype fixes them;
+- Effective date is a general classification, not a Data Vault one (P2);
+- the built-in `PII` is named "Personal data" (the app's label since slice 1a); a file's "PII" and "Personal data" both
+  match (answer F14);
+- classifications are rows and links (AD-15, AD-18), not code arrays on the objects;
+- removing a classification in use, or a built-in one a rule reads, shows its uses and what stops first, and is one
+  undo step (D-47); the prototype asks with `confirm()`;
+- notes are plain text, saved as a mapping's note (answer F7), as in the prototype; hand-typed column comments moved
+  into notes when slice 7c was installed, listed in the upgrade's report (P9, Q4);
+- only source rows carry the BK badge, read from the classifications; the PII badge stays on attribute rows (answer
+  F2), as in the prototype;
+- Data Vault values in a file are read and marked in the review while the mode is off (P5); the prototype reads them
+  silently;
+- switching Data Vault 2.0 mode off says how many Data Vault classifications stay stored; the settings text names the
+  table panels' reading, not entity panel hints (answers F16, F17);
+- the import's warnings come once per value and table (answer F13); a table classification named on a column is warned
+  about and ignored;
+- the Business key suggestion also checks the table's stored columns (answer F12); the suggestions' ticks are part of
+  what the review showed (slice 7a, P8);
+- a column whose file names other classifications shows under "all changes" with "The file says …" and counts as no
+  change; its table reads "same" (answers to step 5);
+- the Data Vault reading also leaves out retired and not needed columns, and says "with personal data" where the
+  prototype says "PII";
+- every write follows the app's roles, archive and change log; the prototype has one permission check.
 
 ## Requirements
 
@@ -155,7 +185,6 @@ importing sources (7a).
 | --- | --- | --- | --- |
 | Inviting people | an e-mail and a role; guests | the People tab, `data-wa="invite"` | database (AD-04) |
 | Changing a role, removing a member | per member, for admins | the People tab (`data-role`, `data-rm`) | database **(uncertain**: no slice names it) |
-| The classification list | as under Sources | `#setDlg` | 7c |
 
 **Present:** the People tab, settings (four-eyes, Data Vault 2.0 mode), archived and read-only workspaces; importing
 and re-importing only for owners, admins and modelers in a workspace that is not archived (7a, item 40).
