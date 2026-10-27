@@ -4,9 +4,10 @@
 // step (P10).
 //
 // Organization membership (P7 as answered, F8): a person belongs to an organization while they have a workspace in
-// it. `organization_member` keeps the organization role and the home/guest distinction: adding someone without a row
-// in this organization writes one as `member`; removing someone from their last workspace there deletes it, except for
-// the organization's owner, who keeps a workspace (F9).
+// it. `organization_member` keeps the organization role and the home/guest distinction: adding a new person, or an
+// account with no link to this organization yet, writes a `member` row; a guest added to another workspace stays a
+// guest (step 2's answer 2); removing someone from their last workspace there deletes their row, except for the
+// organization's owner, who keeps a workspace (F9).
 
 import { z } from "zod";
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
@@ -76,13 +77,13 @@ export function checkAddPerson(state: AddPersonState, input: unknown): { ok: tru
 
 /**
  * Adds a person to the workspace (item 10): the account if the e-mail has none, a `member` row in the organization if
- * they have no row there, and the workspace membership.
+ * they have no link to it yet (no row, no workspace there; a guest stays a guest), and the workspace membership.
  */
 export function addPerson(ctx: CommandContext, state: AddPersonState, input: unknown): CommandResult<{ userId: Uuid } & AddPersonPreview> {
   const checked = checkAdd(state, input);
   if (!checked.ok) return checked;
   const { p, organization, preview } = checked;
-  const { access, account, accountOrganizationMember } = state;
+  const { access, account, accountOrganizationMember, accountWorkspaceIds } = state;
 
   const writes: Write[] = [];
   let userId: Uuid;
@@ -93,7 +94,8 @@ export function addPerson(ctx: CommandContext, state: AddPersonState, input: unk
     writes.push({ kind: "insert", table: "app_user", row: user });
     userId = user.id;
   }
-  if (!accountOrganizationMember) {
+  // a guest of this organization (a workspace here, no row) stays a guest
+  if (!accountOrganizationMember && accountWorkspaceIds.length === 0) {
     writes.push({ kind: "insert", table: "organization_member", row: { organization_id: organization.id, user_id: userId, role: "member", created_at: ctx.now } });
   }
   writes.push({
@@ -128,14 +130,15 @@ function checkAdd(state: AddPersonState, input: unknown) {
     role: p.role,
     workspace,
     organization: organization.name,
-    account: account ? { name: account.display_name, belongs: accountWorkspaceIds.length > 0 } : null,
+    account: account ? { name: account.display_name, linked: accountOrganizationMember !== null || accountWorkspaceIds.length > 0 } : null,
   });
   return { ok: true as const, p, organization, preview };
 }
 
 /**
- * The summary and the toast (item 10, F11): an existing account keeps its name, which is shown only when that person
- * already has a workspace in this organization; otherwise the texts name the e-mail address.
+ * The summary and the toast (item 10, F11; step 2's answer 3): an existing account keeps its name, which is shown only
+ * when that person has a link to this organization (a row in it or a workspace there); otherwise the texts name the
+ * e-mail address.
  */
 export function addPersonPreview(a: {
   typedName: string;
@@ -143,7 +146,7 @@ export function addPersonPreview(a: {
   role: WorkspaceRole;
   workspace: string;
   organization: string;
-  account: { name: string; belongs: boolean } | null;
+  account: { name: string; linked: boolean } | null;
 }): AddPersonPreview {
   const role = ROLE_LABEL[a.role];
   const signIn = `They sign in with the link of ${a.organization} and its password.`;
@@ -153,7 +156,7 @@ export function addPersonPreview(a: {
       toast: `Added ${a.typedName} to ${a.workspace} as ${role}.`,
     };
   }
-  if (a.account.belongs) {
+  if (a.account.linked) {
     return {
       summary: [
         `${a.account.name} (${a.email}) gets the role ${role} in ${a.workspace}. ${signIn}`,

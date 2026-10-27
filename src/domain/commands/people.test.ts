@@ -63,6 +63,22 @@ describe("addPerson (item 10)", () => {
     expect(r.value.toast).toBe("Added Anna Nowak to Retail Co – DWH as Reviewer.");
   });
 
+  it("a guest of this organization stays a guest: only the workspace membership, and the name is shown (step 2's answers 2, 3)", () => {
+    const guest = { ...state, account: anna, accountWorkspaceIds: [otherWs] };
+    const r = addPerson(makeCtx(), guest, { ...input, email: "anna@infomate.pl" });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["workspace_member"]);
+    expect(r.value.toast).toBe("Added Anna Nowak to Retail Co – DWH as Reviewer.");
+  });
+
+  it("a member of the organization without a workspace there is shown by name (Kasia in Retail Co, answer 3)", () => {
+    const rowOnly = { ...state, account: anna, accountOrganizationMember: organizationMember({ user_id: anna.id }), accountWorkspaceIds: [] };
+    const r = addPerson(makeCtx(), rowOnly, { ...input, email: "anna@infomate.pl" });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["workspace_member"]);
+    expect(r.value.summary[1]).toBe("anna@infomate.pl already has an account as Anna Nowak; that name stays.");
+  });
+
   it("an account from another organization: its name stays hidden (F11), and it becomes a member here", () => {
     const stranger = { ...state, account: anna };
     const preview = checkAddPerson(stranger, { ...input, email: "anna@infomate.pl" });

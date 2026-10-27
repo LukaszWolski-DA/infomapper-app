@@ -782,3 +782,29 @@ e2e helpers, and the decision texts for approval.
 3. Decision 5: is "has a workspace here" the right test for showing an existing account's name (Kasia in Retail Co is
    shown by e-mail only)?
 4. Decision 3: the 200-character password limit, with its text?
+
+## Answers from Łukasz (step 2) (27 October 2026)
+
+1. **Texts:** F12's two admin texts are approved ("You can edit the model, approve, add people, change their roles and
+   change settings."; the role table's Admin row "add people, roles (not owners), settings"). The other texts wait for
+   his answer after he has read the step 2 table.
+2. **Guests stay guests.** Adding a guest of this organization (a workspace here, no `organization_member` row) to
+   another of its workspaces adds only the workspace membership. A `member` row goes to new people and to accounts from
+   other organizations added here for the first time. This replaces decision 6.
+3. **An existing account's name is shown** when the person has any link to this organization: an `organization_member`
+   row or a workspace in it. Kasia's name shows in Retail Co. This replaces decision 5; the summary row "account in this
+   organization" in the text table means "linked to this organization".
+4. **Passwords:** at least 8 and at most 200 characters, with the texts as listed.
+
+**The name limit.** The 200-character limit ("This name is too long.") applies only to this slice's new forms: the
+organization's name, the person's name and the first workspace's name when creating an organization
+(`commands/organization.ts`, `named`), and the person's name in "Add a person" (`commands/people.ts`). `nameSchema`
+(`src/domain/validation.ts`) is unchanged, so `createWorkspace` and every existing rename keep slice 0's "no maximum
+length". (Requirement names keep slice 4a's 300.)
+
+### Changes after these answers
+
+- `addPerson` writes the `member` row only when the account has neither a row in this organization nor a workspace
+  there; `addPersonPreview` shows the name when the account has either.
+- `people.test.ts`: two new tests (a guest stays a guest and is named; a member row without a workspace is named), 20 in
+  all. Lint, typecheck and unit tests pass: 103 files, 1,355 tests.
