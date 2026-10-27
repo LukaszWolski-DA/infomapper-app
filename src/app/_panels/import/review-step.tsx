@@ -325,11 +325,12 @@ export function ReviewStep({
         const unchanged = t.columns.filter((c) => c.status === "unchanged" && !rows.includes(c));
         const open = showUnchanged.has(t.key);
         const limit = rowsShown.get(t.key) ?? PAGE_ROWS;
-        const header = t.status === "new" ? "new table" : t.status === "missing" ? "missing table" : t.status === "back" ? "back" : "changed";
+        // an unchanged table shows only for "The file says …" rows, which are no change (slice 7c, answers to step 5)
+        const header = t.status === "new" ? "new table" : t.status === "missing" ? "missing table" : t.status === "back" ? "back" : t.status === "unchanged" ? "same" : "changed";
         return (
           <section key={t.key} className="mb-2.5 overflow-hidden rounded-lg border border-im-line" data-testid="review-table" data-key={t.key} data-status={t.status}>
             <header className="flex flex-wrap items-center gap-2 bg-im-panel px-3 py-2">
-              <Tag status={t.status === "unchanged" ? "changed" : t.status}>{header}</Tag>
+              <Tag status={t.status}>{header}</Tag>
               <span className="font-mono font-semibold">{name}</span>
               {t.file?.objectType === "file" && <span className="rounded-[10px] bg-im-hover px-1.5 text-[11.5px] text-im-ink-2">{t.file.fileFormat ?? ""} file</span>}
               {t.file?.comment && t.status === "new" && <span className="text-im-ink-3">{t.file.comment}</span>}

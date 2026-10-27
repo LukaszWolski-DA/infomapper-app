@@ -5,7 +5,7 @@ import { allOf, classify, codesOf, columnNamed, emptyModel, importId, importInto
 import { CHANGED, crmWithMappings } from "../__fixtures__/source-changes";
 import { importSources, importStateOf } from "../commands/import";
 import type { ImportModel } from "./model";
-import { buildPlan, HINT_WHY, TABLE_CLASSIFICATION_ON_COLUMN, UNKNOWN_CLASSIFICATION, type ImportPlan } from "./plan";
+import { buildPlan, HINT_WHY, importSummary, TABLE_CLASSIFICATION_ON_COLUMN, UNKNOWN_CLASSIFICATION, type ImportPlan } from "./plan";
 import { keptChoices, planFingerprint } from "./compare";
 import { readStandard } from "./standard";
 
@@ -114,6 +114,26 @@ describe("a re-import never changes classifications (D-55, item 19, S7C-10)", ()
     // only the new column gets links
     expect(changes.classificationLinks.insert.map((l) => l.source_column_id)).toEqual([columnNamed(after, "t", "c").id]);
     expect(codesOf(after, columnNamed(after, "t", "b").id)).toEqual(["PII"]);
+  });
+
+  it("a re-import that differs only in classifications counts no change and writes nothing to the columns (answers to step 5)", () => {
+    const first = fileOf([
+      ["t", "a", "int", { pk: true, cls: "BK" }],
+      ["t", "b", "int", { cls: "PII" }],
+    ]);
+    const { model } = importInto(emptyModel(), first, { newName: "S" });
+    const again = fileOf([
+      ["t", "a", "int", { pk: true, cls: "BK" }],
+      ["t", "b", "int", { cls: "TECH" }],
+    ]);
+    const { plan, changes } = importInto(model, again, { systemId: systemNamed(model, "S").id });
+    expect(column(plan, "t", "b")).toMatchObject({ status: "unchanged", fileClassifications: ["Technical / audit"] });
+    expect(plan.tables[0].status).toBe("unchanged");
+    expect(changes.counts).toEqual({ tables_new: 0, columns_new: 0, columns_changed: 0, columns_renamed: 0, columns_missing: 0, relationships_new: 0, changes_raised: 0, changes_high: 0 });
+    expect(importSummary(changes.counts)).toBe("No changes");
+    expect(changes.tables.update.filter((u) => Object.keys(u.patch).some((k) => k !== "row_count"))).toEqual([]);
+    expect(changes.columns).toEqual({ insert: [], update: [] });
+    expect(changes.classificationLinks.insert).toEqual([]);
   });
 });
 

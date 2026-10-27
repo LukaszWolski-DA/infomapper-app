@@ -3,6 +3,7 @@
 // changes classifications and says "The file says …; your classifications are kept."
 
 import { expect, test } from "./fixtures";
+import { filterCount, imports, systemNamed } from "../slice-07a/helpers";
 import { classesOf, fileOf, importNow, loadModel, openWizard, reviewFile, reviewRow, sample } from "./helpers";
 
 const columnOf = async (system: string, table: string, column: string) => {
@@ -63,6 +64,11 @@ test("S7C-10: the CRM file's TECH, Effective date and Load date are read; a re-i
   await reviewFile(page, { existing: "CRM" }, "crm_again.csv", crmWithFnameTech());
   // fname is unchanged otherwise, and still shown: its file says something else
   await expect(page.locator('[data-testid="review-row"][data-column="fname"]').getByTestId("review-file-says")).toHaveText("The file says Technical / audit; your classifications are kept.");
-  await importNow(page, /^Imported into CRM: /);
+  // the row is shown, not counted (answers to step 5): no filter counts it, its table is "same", the import counts nothing
+  for (const f of ["all", "new", "changed", "rename", "missing", "rel"]) expect(await filterCount(page, f)).toBe(0);
+  await expect(page.locator('[data-testid="review-table"][data-key$="customers"] header')).toContainText("same");
+  await importNow(page, "Imported into CRM: No changes");
+  const last = (await imports((await systemNamed("CRM"))!.id)).at(0)!;
+  expect(last).toMatchObject({ source_label: "crm_again.csv", tables_new: 0, columns_new: 0, columns_changed: 0, columns_renamed: 0, columns_missing: 0, relationships_new: 0 });
   expect(await classesOf(fname)).toEqual(before);
 });
