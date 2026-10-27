@@ -1379,3 +1379,14 @@ http://localhost:3000, pick **Łukasz**, Retail Co – DWH, Customer 360, the ca
     the list…" shows names as text with no Add, Remove or Restore.
 
 Merge only on your command after this; then tag `slice-07c`.
+
+## Łukasz's answers to step 6 (27 October 2026)
+
+1. **The reading's target table in monospace:** keep it. Add it to the differences from the prototype.
+2. **The "matches" callout:** keep it, but when "The file says …" rows exist it reads "The file matches what {system}
+   has, apart from classifications, which stay yours. Importing only records the import…" (the rest of the sentence
+   unchanged). Add a test.
+
+Also: run `S7A-14-review` once in the measurement build against `slice-07b`'s figure, since step 5 changed the
+review (S7B-16 is not needed); run the slice's specs, the touched earlier specs (the review) and CI after the change.
+Then stop: Łukasz does the manual acceptance, including step 0 on his own data file.
