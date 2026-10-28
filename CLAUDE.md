@@ -11,7 +11,9 @@ turns every source change that needs a decision into a change to resolve, settle
 step per action (slice 7b, D-56). Source tables and columns carry the workspace's classifications (built-in ones with
 fixed codes the rules read, and the workspace's own) and the modeller's notes; an import reads and suggests
 classifications, and in Data Vault 2.0 mode a table panel shows its Data Vault reading (slice 7c, D-57). One workspace
-holds one model; projects and canvases organise the work on it.
+holds one model; projects and canvases organise the work on it. Organizations are silos: in development people sign in
+with an organization's shared password or the test users' list, create organizations, and owners and admins add,
+change and remove people (slice 8, D-58).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -105,6 +107,14 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   the merge. The PRD says which kind a slice is.
 - Use `data-testid` attributes for elements tests need; name them after the components (e.g. `card-entity`,
   `panel-inspector`, `nav-breadcrumbs`).
+- **Łukasz's test model** (since slice 8's manual acceptance, 28 October 2026): the organization KB with the workspace
+  "Kanton Basel" in his `.data/dev-db.json` is a real business model he builds by hand to test and give feedback; later
+  acceptance sessions use it. Never run `npm run reset-dev-data` on that file without a fresh backup and his OK; back it
+  up on request and before a slice that changes the local file's format (`.data/backups/dev-db-<yyyymmdd-hhmm>.json`,
+  the newest also `.data/backups/kb-model-latest.json`; git-ignored). It holds his real e-mail and KB's password hash,
+  so it is never committed as it is. **Planned after slice 8's merge:** KB alone as an anonymised fixture in the
+  repository (the e-mail at `example.com`, the password `demo-pass`) with a command that loads it into
+  `.data/dev-db.json`, refreshed from his file after later test sessions.
 
 ## Security
 
@@ -174,7 +184,7 @@ npx tsx scripts/bench-consistency.ts                          # slice 7b: model 
 npx tsx scripts/bench-import-plan.ts --no-coverage            # slice 7c: the plan with classifications and the classification index (bar 20 ms)
 ONLY_REMOVE=1 npx tsx scripts/bench-import-write.ts 20000     # slice 7c: only removing Business key from 2,000 columns (bar 1 s); without it the whole write bench
 COMMITS=1 npx playwright test e2e/slice-07c/S7C-14-commits.spec.ts   # slice 7c: canvas commits per classification toggle (on demand; 3 on slice-07b and 7c)
-MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7C-14's element guard
+MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7C-14's element guard; slice 8 too (page total +1, see below)
 npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06b/S6B-10.spec.ts         # slice 6b: selection places, the buttons, the background refresh, phase by phase
@@ -231,7 +241,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   and read the classification toggles (`toggle`, `groups`, `expectPressed`), open the list dialog and read a row
   (`openList`, `listRow`), read and write classifications as test data (`classesOf`, `classification`, `classify`,
   `renameBuiltin`, `removeBuiltin`, `columnId`, `tableId`), switch Data Vault 2.0 mode (`setDataVault`) and write a
-  file in the standard (`fileOf`). The undo history lives in the server's memory and is empty again after each
+  file in the standard (`fileOf`). Slice 8's sign in through the start page with an organization's password
+  (`signInWithPassword`; the demo password is `DEMO_PASSWORD`, `demo-pass`), write an organization, a person or a role
+  as test data through the domain (`createOrganization`, `addPerson`, `changeRoleAs`) and open the People tab
+  (`openPeople`, `personRow`); the earlier slices' helpers keep signing in through the test users' list (`signInAs`),
+  which unlocks every organization. The undo history lives in the server's memory and is empty again after each
   reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
@@ -313,7 +327,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   `nonotes`, `nolabelmarks`) work only in that measurement build (`isMeasurementBuild()`, `INFOMAPPER_MEASURE=1`); a dev
   or normal production run ignores them. Every element in the viewport costs paint and layerize time on each pan and
   zoom frame: keep repeated marks to one element (slice 3a's label marks are CSS masks); `S3B-15-elements.spec.ts`
-  counts them against the previous tag. A sitting is balanced (`--rounds 2`, each side first once) and starts with one
+  counts them against the previous tag. It compares the viewport's counts; the page totals it prints include `<head>`.
+  **Since slice 8 the page total is one higher than `slice-07b`'s baseline** (5,994 / 20,791 / 2,861 / 6,303): one more
+  JavaScript chunk's `<script>` in `<head>` (the top bar's new code), nothing drawn (Łukasz, slice 8 step 5); read a
+  later total against that. A sitting is balanced (`--rounds 2`, each side first once) and starts with one
   discarded warm-up run after the builds, before the counted rounds (e.g. `npm run measure:canvas -- --prepare-only`,
   then one `--quick --rounds 1` sitting that is not counted): the first side measured after the builds ran slow in
   slice 3b, and the laptop's state drifted within a sitting in slice 3a (`docs/prd/slice-03b-acceptance.md`).
@@ -352,5 +369,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   wrote the 19 rows per workspace, turned the flags into links and moved hand-typed column comments into notes; it lists
   them in `.data/upgrade-8-<file>.txt` (column paths only) with one log line. Notes are plain text like a mapping's
   (`setSourceNote`); a column's comment is the source's and read-only.
+- **Session and unlocked organizations** (slice 8, D-58, F1, F3): the session is a signed cookie
+  (`src/app/_lib/dev-session.ts`, HMAC with `INFOMAPPER_SESSION_SECRET` or `.data/session-secret`) holding the person
+  and the organizations unlocked in it; `getSession()` (`src/app/_lib/session.ts`) refuses an unsigned or edited
+  cookie. The test users' list unlocks every organization of that user; a password unlocks one. A page of a locked
+  organization the person belongs to redirects to its link's form (`loadShell`), then back to the page if
+  `safeReturnPath` accepts it (F14); `runCommand`, undo and the impact reads refuse a locked organization's writes
+  ("Unlock {organization} first: …"). "Belongs" means has a workspace there. The hash lives in `organization_access`
+  only, never reaches the browser and never a change event (`SECRET_COLUMNS`); pages send only the shown workspace's
+  people (`workspacePeople`, F10). The last owner is checked again inside the local adapter's write.
 - Writes: a server action calls `runCommand()` (`src/app/_lib/run-command.ts`), which runs the domain command and
   applies its write set through the adapter; refusals come back with the domain's message and are shown as toasts.

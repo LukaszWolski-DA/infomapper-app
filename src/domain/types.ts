@@ -57,6 +57,20 @@ export interface OrganizationMember {
   created_at: Timestamp;
 }
 
+/**
+ * An organization's password for signing in during development (slice 8, F5): a table of its own, so the hash never
+ * travels with an organization row. Read only on the server; its change events carry a marker instead of the hash
+ * (`SECRET_COLUMNS`).
+ */
+export interface OrganizationAccess {
+  organization_id: Uuid;
+  /** scrypt parameters, salt and key in one string, made by the server's password adapter; opaque to the domain. */
+  access_hash: string;
+  changed_at: Timestamp;
+  changed_by: Uuid;
+  version: number;
+}
+
 export interface Workspace extends VersionedColumns {
   organization_id: Uuid;
   name: string;
@@ -560,6 +574,10 @@ export interface ChangeEvent {
 
 /** The tables a command may write, with their row types. */
 export interface WritableRows {
+  app_user: AppUser;
+  organization: Organization;
+  organization_member: OrganizationMember;
+  organization_access: OrganizationAccess;
   workspace: Workspace;
   workspace_member: WorkspaceMember;
   project: Project;
@@ -591,6 +609,9 @@ export interface WritableRows {
 }
 export type WritableTable = keyof WritableRows;
 
-/** Link tables without an id or `deleted_at`: their rows are removed, not soft-deleted (data model, change_event). */
-export const LINK_TABLES = ["project_canvas", "project_pinned_label"] as const;
+/**
+ * Link tables without an id or `deleted_at`: their rows are removed, not soft-deleted (data model, change_event). The
+ * two membership tables since slice 8 (a person removed from a workspace or an organization, F4).
+ */
+export const LINK_TABLES = ["project_canvas", "project_pinned_label", "workspace_member", "organization_member"] as const;
 export type LinkTable = (typeof LINK_TABLES)[number];

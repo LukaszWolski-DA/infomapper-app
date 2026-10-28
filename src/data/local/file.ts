@@ -7,6 +7,7 @@ import { uuidv7 } from "@/domain/ids";
 import { deriveSourceChanges } from "@/domain/source-changes/derive";
 import type { ChangeEvent } from "@/domain/types";
 import { isLocalModeAllowed } from "./measure-mode";
+import { DEMO_PASSWORD_HASH } from "./demo-password";
 import { DEV_DB_FORMAT, type DevDb } from "./schema";
 import { upgradeReportText, upgradeTo8, type Upgrade8Report } from "./upgrade-8";
 
@@ -48,19 +49,21 @@ export async function readDb(file: string): Promise<DevDb> {
   const db = JSON.parse(text) as DevDb;
   const was = db.format as number;
   const now = new Date().toISOString();
-  const report = upgradeDb(db, now, () => uuidv7());
+  const { report, passwordsGiven } = upgradeDb(db, now, () => uuidv7());
   if (db.format !== DEV_DB_FORMAT) {
     throw new Error(`${file} has format ${String(db.format)}, expected ${DEV_DB_FORMAT}. Run "npm run reset-dev-data".`);
   }
   // the derived changes and the classifications get their ids once (slices 7b, 7c): written back at once, so every
   // later read sees the same rows
-  if (was >= 2 && was < 8) await writeDb(file, db);
+  if (was >= 2 && was < 9) await writeDb(file, db);
   if (report) {
     // slice 7c (Q4): the moved comments' columns in a file beside the data, one line in the server's log
     const out = path.join(path.dirname(file), `upgrade-8-${path.basename(file, ".json")}.txt`);
     await writeFile(out, upgradeReportText(report, now), "utf8");
     console.log(`Slice 7c upgrade: moved ${report.moved.length} hand-typed column comments into notes; see ${path.relative(process.cwd(), out)}`);
   }
+  // slice 8 (item 18, F18): one line, no password and no hash
+  if (passwordsGiven > 0) console.log(`Slice 8 upgrade: ${passwordsGiven} organization${passwordsGiven === 1 ? "" : "s"} got the development password (see README).`);
   return db;
 }
 
@@ -69,9 +72,12 @@ export async function readDb(file: string): Promise<DevDb> {
  * differ only by the missing tables; 5 (before source imports) and 6 (before changes to resolve) also by the new columns,
  * null (false, 0) on every row. From 6, the open changes slice 7a's imports leave are derived (slice 7b, P2, F1): one
  * change group per workspace, each event signed by the person who ran the import; no undo step. From 7, the
- * classifications and notes (slice 7c, `upgrade-8.ts`); its report comes back for the caller to write.
+ * classifications and notes (slice 7c, `upgrade-8.ts`); its report comes back for the caller to write. From 8, every
+ * organization without a password gets the development password `demo-pass` (slice 8, F7: the seed's precomputed hash;
+ * F18: no change events); the count comes back for the caller's log line.
  */
-export function upgradeDb(db: DevDb, now: string, newId: () => string): Upgrade8Report | null {
+export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number } {
+  let report: Upgrade8Report | null = null;
   if ((db.format as number) === 2) Object.assign(db, { format: 3, frame: [] });
   if ((db.format as number) === 3) Object.assign(db, { format: 4, label: [], label_link: [], project_pinned_label: [], note: [] });
   if ((db.format as number) === 4) Object.assign(db, { format: 5, requirement: [], requirement_link: [] });
@@ -116,11 +122,22 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): Upgrade8
     Object.assign(db, { format: 7, source_change: derived, change_event: [...db.change_event, ...events] });
   }
   if ((db.format as number) === 7) {
-    const report = upgradeTo8(db, now, newId);
-    Object.assign(db, { format: DEV_DB_FORMAT });
-    return report;
+    report = upgradeTo8(db, now, newId);
+    Object.assign(db, { format: 8 });
   }
-  return null;
+  let passwordsGiven = 0;
+  if ((db.format as number) === 8) {
+    const access = (db as Partial<DevDb>).organization_access ?? [];
+    const has = new Set(access.map((a) => a.organization_id));
+    for (const o of db.organization) {
+      if (has.has(o.id)) continue;
+      // signed by the organization's creator, as every audit column of the demo data
+      access.push({ organization_id: o.id, access_hash: DEMO_PASSWORD_HASH, changed_at: now, changed_by: o.created_by, version: 1 });
+      passwordsGiven++;
+    }
+    Object.assign(db, { format: DEV_DB_FORMAT, organization_access: access });
+  }
+  return { report, passwordsGiven };
 }
 
 

@@ -2,17 +2,12 @@
 
 import type { WorkspaceRole } from "@/domain/types";
 
-export const ROLE_LABEL: Record<WorkspaceRole, string> = {
-  owner: "Owner",
-  admin: "Admin",
-  modeler: "Modeler",
-  reviewer: "Reviewer",
-  reader: "Reader",
-};
+// the domain's people commands name roles in their texts the same way (slice 8)
+export { ROLE_LABEL } from "@/domain/commands/people";
 
 export const ROLE_CAN: Record<WorkspaceRole, string> = {
   owner: "You can do everything here, including deleting or transferring the workspace.",
-  admin: "You can edit the model, approve, invite people and change settings.",
+  admin: "You can edit the model, approve, add people, change their roles and change settings.",
   modeler: "You can edit the model and canvases. Approving is for reviewers and admins.",
   reviewer: "You can approve mappings and requirements and add notes, but not edit the model.",
   reader: "You can only read this workspace.",

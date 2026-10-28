@@ -53,7 +53,7 @@ export const fail = (error: DomainError): { ok: false; error: DomainError } => (
 /**
  * The object a change event is about. Tables with an `id` use it; link tables without one use the
  * key that names the moved thing: the canvas for project_canvas, the label for project_pinned_label, the user for
- * workspace_member.
+ * workspace_member and organization_member, the organization for organization_access.
  */
 function objectId(write: Write): Uuid {
   switch (write.table) {
@@ -62,10 +62,36 @@ function objectId(write: Write): Uuid {
     case "project_pinned_label":
       return write.kind === "insert" ? write.row.label_id : write.before.label_id;
     case "workspace_member":
+    case "organization_member":
       return write.kind === "insert" ? write.row.user_id : write.before.user_id;
+    case "organization_access":
+      return write.kind === "insert" ? write.row.organization_id : write.before.organization_id;
     default:
       return write.kind === "insert" ? write.row.id : write.before.id;
   }
+}
+
+/**
+ * Columns whose value never goes into a change event's images (slice 8, item 15, Q4): the images carry
+ * `SECRET_CHANGED` or `SECRET_UNCHANGED` instead, so the history says that a password changed but never holds it.
+ */
+export const SECRET_COLUMNS: Partial<Record<WritableTable, readonly string[]>> = {
+  organization_access: ["access_hash"],
+};
+export const SECRET_CHANGED = "(changed)";
+export const SECRET_UNCHANGED = "(unchanged)";
+
+function images(write: Write): { before: RowImage | null; after: RowImage | null } {
+  const before = write.kind === "insert" ? null : image(write.before);
+  // A removed link row has no after state (data model, change_event).
+  const after = write.kind === "remove" ? null : image(write.row);
+  for (const column of SECRET_COLUMNS[write.table] ?? []) {
+    const changed = !before || !after || before[column] !== after[column];
+    const marker = changed ? SECRET_CHANGED : SECRET_UNCHANGED;
+    if (before) before[column] = marker;
+    if (after) after[column] = marker;
+  }
+  return { before, after };
 }
 
 function operation(write: Write): ChangeOperation {
@@ -83,20 +109,22 @@ const image = (row: object): RowImage => structuredClone(row) as RowImage;
 /** Builds the write set for one user action: one change event per written row, one change group. */
 export function buildWriteSet(ctx: CommandContext, workspaceId: Uuid, writes: Write[]): WriteSet {
   const changeGroupId = ctx.newId();
-  const events: ChangeEvent[] = writes.map((write) => ({
-    id: ctx.newId(),
-    workspace_id: workspaceId,
-    change_group_id: changeGroupId,
-    occurred_at: ctx.now,
-    user_id: ctx.actorId,
-    object_type: write.table,
-    object_id: objectId(write),
-    operation: operation(write),
-    before_image: write.kind === "insert" ? null : image(write.before),
-    // A removed link row has no after state (data model, change_event).
-    after_image: write.kind === "remove" ? null : image(write.row),
-    context_label_id: null,
-  }));
+  const events: ChangeEvent[] = writes.map((write) => {
+    const { before, after } = images(write);
+    return {
+      id: ctx.newId(),
+      workspace_id: workspaceId,
+      change_group_id: changeGroupId,
+      occurred_at: ctx.now,
+      user_id: ctx.actorId,
+      object_type: write.table,
+      object_id: objectId(write),
+      operation: operation(write),
+      before_image: before,
+      after_image: after,
+      context_label_id: null,
+    };
+  });
   return { changeGroupId, writes, events };
 }
 

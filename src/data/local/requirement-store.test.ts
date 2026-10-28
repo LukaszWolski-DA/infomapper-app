@@ -195,7 +195,7 @@ describe("file format", () => {
     await writeFile(file, JSON.stringify(old), "utf8");
     expect(await store.requirements.list(RETAIL)).toEqual([]);
     expect(await store.requirements.listLinks(RETAIL)).toEqual([]);
-    expect((await readDb(file)).format).toBe(8);
+    expect((await readDb(file)).format).toBe(9);
   });
 
   it("reads a slice 4a to 6b file (format 5) as one without source imports, the new columns null (slice 7a)", async () => {
@@ -211,7 +211,7 @@ describe("file format", () => {
     for (const t of ["source_relationship", "source_relationship_column", "source_import", "source_change"]) delete old[t];
     await writeFile(file, JSON.stringify(old), "utf8");
     const upgraded = await readDb(file);
-    expect(upgraded.format).toBe(8);
+    expect(upgraded.format).toBe(9);
     expect([upgraded.source_relationship, upgraded.source_relationship_column, upgraded.source_import]).toEqual([[], [], []]);
     expect(upgraded.source_table.every((t) => t.file_format === null && t.missing_since === null)).toBe(true);
     expect(upgraded.source_column.every((c) => c.missing_since === null)).toBe(true);
@@ -247,7 +247,7 @@ describe("file format", () => {
     expect(event).toMatchObject({ object_id: upgraded.source_change[0]!.id, operation: "create", user_id: SEED_IDS.userLukasz });
     // written back at once: the next read sees the same rows, and the file breaks no rule
     const again = await readDb(file);
-    expect(again.format).toBe(8);
+    expect(again.format).toBe(9);
     expect(again.source_change.map((c) => c.id)).toEqual(upgraded.source_change.map((c) => c.id));
     expect(findViolation(again)).toBeNull();
     expect((await store.model.listChanges(RETAIL)).map((c) => c.kind)).toEqual(["column_left"]);

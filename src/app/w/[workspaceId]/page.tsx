@@ -1,5 +1,6 @@
 import { dataVaultUses, indexOf } from "@/domain/model/classifications";
 import Link from "next/link";
+import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { AppShell } from "@/app/_components/app-shell";
 import { GoneNotice } from "@/app/_components/gone-notice";
@@ -12,7 +13,9 @@ import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import { can } from "@/domain/permissions";
 import { ArchiveBox, UnarchiveButton } from "./_components/lifecycle";
 import { NewProjectTile } from "./_components/new-project-tile";
+import { AddPersonBox, OrganizationAccessBox, RemovePersonButton, RoleSelect } from "./_components/people";
 import { SettingsForm } from "./_components/settings-form";
+import { workspacePeople } from "@/app/_lib/people";
 
 const TABS = ["overview", "people", "settings"] as const;
 type Tab = (typeof TABS)[number];
@@ -28,7 +31,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const workspace = (await store.workspaces.get(workspaceId))!;
   const [members, users, projects, model, requirements, requirementLinks] = await Promise.all([
     store.workspaces.listMembers(workspaceId),
-    store.users.list(),
+    workspacePeople(store, workspaceId),
     store.projects.list(workspaceId),
     store.model.load(workspaceId),
     store.requirements.list(workspaceId),
@@ -45,6 +48,15 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const isOwner = shell.role === "owner";
   const isAdmin = isOwner || shell.role === "admin";
   const roleLabel = ROLE_LABEL[shell.role] + (shell.guest ? " · guest" : "");
+  // People (slice 8, items 10–13): owners and admins change people, not in an archived workspace; an admin leaves owners
+  // alone and nobody changes their own row (F12). The access box is for the organization's owners and admins (F17).
+  const managesPeople = can(access, "people.edit");
+  const mayChange = (userId: string, role: string) => managesPeople && userId !== shell.user.id && (isOwner || role !== "owner");
+  const organizationRole = (await store.organizations.getMember(workspace.organization_id, shell.user.id))?.role;
+  const organizationAccess =
+    !archived && (organizationRole === "owner" || organizationRole === "admin")
+      ? { version: (await store.organizations.getAccess(workspace.organization_id))?.version ?? null, link: await organizationLink(workspace.organization_id) }
+      : null;
 
   const people = members.map((m) => {
     const user = users.find((u) => u.id === m.user_id)!;
@@ -199,6 +211,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                   <tr>
                     <Th>Person</Th>
                     <Th>Role</Th>
+                    {managesPeople && <Th>{null}</Th>}
                   </tr>
                 </thead>
                 <tbody>
@@ -216,11 +229,24 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                           </>
                         )}
                       </Td>
-                      <Td>{ROLE_LABEL[role]}</Td>
+                      <Td>
+                        {mayChange(user.id, role) ? (
+                          <RoleSelect workspaceId={workspace.id} userId={user.id} name={user.display_name} role={role} ownerOffered={isOwner} />
+                        ) : (
+                          <span data-testid="text-person-role">{ROLE_LABEL[role]}</span>
+                        )}
+                      </Td>
+                      {managesPeople && (
+                        <Td className="text-right">
+                          {mayChange(user.id, role) && <RemovePersonButton workspaceId={workspace.id} userId={user.id} name={user.display_name} />}
+                        </Td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
+              {managesPeople && <AddPersonBox workspaceId={workspace.id} />}
+              {organizationAccess && <OrganizationAccessBox workspaceId={workspace.id} link={organizationAccess.link} version={organizationAccess.version} />}
               <H3>What each role can do</H3>
               <table className="w-full border-collapse text-[13px]">
                 <thead>
@@ -233,7 +259,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                 <tbody>
                   {[
                     ["Owner", "edit", "yes", "yes", "everything, incl. delete and transfer"],
-                    ["Admin", "edit", "yes", "yes", "invite, roles, settings"],
+                    ["Admin", "edit", "yes", "yes", "add people, roles (not owners), settings"],
                     ["Modeler", "edit", "no", "yes", "no"],
                     ["Reviewer", "read, comment", "yes", "notes", "no"],
                     ["Reader", "read", "no", "no", "no"],
@@ -270,6 +296,12 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
       </div>
     </AppShell>
   );
+}
+
+/** The organization's sign-in link (item 13), on the host this page was asked for. */
+async function organizationLink(organizationId: string) {
+  const h = await headers();
+  return `${h.get("x-forwarded-proto") ?? "http"}://${h.get("host")}/sign-in?org=${organizationId}`;
 }
 
 function initials(name: string) {
@@ -323,6 +355,6 @@ const H3 = ({ children }: { children: ReactNode }) => (
 const Th = ({ children }: { children: ReactNode }) => (
   <th className="border-b border-im-line px-2.5 py-2 text-left text-[11.5px] font-semibold text-im-ink-3">{children}</th>
 );
-const Td = ({ children }: { children: ReactNode }) => (
-  <td className="border-b border-im-line px-2.5 py-2 text-left">{children}</td>
+const Td = ({ children, className }: { children: ReactNode; className?: string }) => (
+  <td className={"border-b border-im-line px-2.5 py-2 " + (className ?? "text-left")}>{children}</td>
 );

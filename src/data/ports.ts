@@ -17,6 +17,7 @@ import type {
   LabelLink,
   Note,
   Organization,
+  OrganizationAccess,
   OrganizationMember,
   Project,
   ProjectCanvas,
@@ -35,6 +36,23 @@ export type { WorkspaceModel } from "@/domain/types";
 export interface UserRepository {
   list(): Promise<AppUser[]>;
   get(userId: Uuid): Promise<AppUser | null>;
+  /** The account with this e-mail address (compared as stored: trimmed, lower case), or null. */
+  getByEmail(email: string): Promise<AppUser | null>;
+  /**
+   * The people a workspace's pages may name (slice 8, F10): its members and everyone with a change event in it, removed
+   * people included, so earlier work keeps its author's name. Never anyone else.
+   */
+  listForWorkspace(workspaceId: Uuid): Promise<AppUser[]>;
+}
+
+/**
+ * Hashing and checking organization passwords (slice 8, F19). Server only: the adapter (scrypt from `node:crypto`,
+ * `src/data/password.ts`, step 3) stores parameters, salt and key in one string and compares in constant time. The
+ * domain never calls it; its commands take the hash as opaque input. Neither the password nor the hash is ever logged.
+ */
+export interface PasswordHasher {
+  hash(password: string): Promise<string>;
+  verify(password: string, stored: string): Promise<boolean>;
 }
 
 export interface OrganizationRepository {
@@ -44,6 +62,11 @@ export interface OrganizationRepository {
   getMember(organizationId: Uuid, userId: Uuid): Promise<OrganizationMember | null>;
   /** All organization memberships of the given users (to tell guests apart). */
   listMembershipsOfUsers(userIds: readonly Uuid[]): Promise<OrganizationMember[]>;
+  /**
+   * The organization's access row with its password hash (slice 8, F5). Server only: the hash never goes into page
+   * data, an action's result or a log line.
+   */
+  getAccess(organizationId: Uuid): Promise<OrganizationAccess | null>;
 }
 
 export interface WorkspaceRepository {

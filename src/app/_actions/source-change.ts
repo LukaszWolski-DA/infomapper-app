@@ -32,7 +32,8 @@ import { lastContentEditor } from "@/domain/model/mapping-rules";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { sourceDeleteCascade, sourceDeleteImpact, type SourceDeleteImpact } from "@/domain/source-changes/delete";
 import { getDataStore } from "@/data";
-import { getSessionUser } from "../_lib/session";
+import { getSession } from "../_lib/session";
+import { lockedRefusal } from "../_lib/unlock";
 import { runCommand, type ActionResult } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
@@ -144,11 +145,14 @@ export async function markColumnNeededAction(workspaceId: string, input: MarkNee
  * panel's “Delete table”. Reading needs membership only; the delete itself checks the rights.
  */
 export async function sourceDeleteImpactAction(workspaceId: string, target: { tableId: string } | { columnId: string }): Promise<ActionResult<SourceDeleteImpact>> {
-  const user = await getSessionUser();
-  if (!user) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const session = await getSession();
+  if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const { user } = session;
   const store = getDataStore();
   const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
   if (!workspace || !(await store.workspaces.getMember(workspace.id, user.id))) return { ok: false, code: "not_found", message: NOT_FOUND.error.message };
+  const locked = await lockedRefusal(store, session.unlocked, workspace.organization_id);
+  if (locked) return locked;
   const [state, canvases, requirements] = await Promise.all([stateOf(store, workspace.id), store.canvases.list(workspace.id), store.requirements.list(workspace.id)]);
   const rows = { ...state, relationships: state.relationships ?? [], relationshipColumns: state.relationshipColumns ?? [], canvasItems: state.canvasItems ?? [] };
   const cascade = target && typeof target === "object" ? sourceDeleteCascade(rows, "tableId" in target ? { tableId: target.tableId } : { columnId: target.columnId }) : null;

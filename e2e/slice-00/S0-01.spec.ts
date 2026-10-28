@@ -30,3 +30,9 @@ test("S0-01: a cookie with an unknown user is not a session", async ({ page, con
   await page.goto("/");
   await expect(page).toHaveURL(/\/sign-in$/);
 });
+
+test("S0-01: an unsigned cookie with a known user's id is not a session (slice 8, F1)", async ({ page, context, baseURL }) => {
+  await context.addCookies([{ name: "infomapper_dev_session", value: SEED_IDS.userLukasz, url: baseURL! }]);
+  await page.goto("/");
+  await expect(page).toHaveURL(/\/sign-in$/);
+});

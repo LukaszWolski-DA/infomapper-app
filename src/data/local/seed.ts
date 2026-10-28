@@ -11,6 +11,7 @@ import {
   type WorkspaceRole,
 } from "@/domain/types";
 import { emptyDb, findViolation, type DevDb } from "./schema";
+import { DEMO_PASSWORD_HASH } from "./demo-password";
 import { addBuiltinClassifications, addDemoModel, DEMO_LAYOUT } from "./seed-model";
 import { addDemoRequirementCard, addDemoRequirements, DEMO_REQUIREMENT_KEY_NEXT } from "./seed-requirements";
 import { addDemoWorkingLayer } from "./seed-working-layer";
@@ -70,6 +71,8 @@ export function buildSeed(now: Date = new Date()): DevDb {
   const organization = (id: Uuid, name: string, members: [SeedUser, OrganizationRole][]) => {
     const org = { id, name, ...audit("lukasz") };
     db.organization.push(org);
+    // the development password demo-pass, precomputed (slice 8, F7; README)
+    db.organization_access.push({ organization_id: org.id, access_hash: DEMO_PASSWORD_HASH, changed_at: at, changed_by: org.created_by, version: 1 });
     for (const [m, role] of members) {
       db.organization_member.push({ organization_id: org.id, user_id: users[m].id, role, created_at: at });
     }

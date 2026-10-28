@@ -26,7 +26,8 @@ import {
 } from "@/domain/model/undo-history";
 import { rememberNextCanvas } from "../_lib/next-canvas";
 import { withLiveCanvases, type ActionResult } from "../_lib/run-command";
-import { getSessionUser } from "../_lib/session";
+import { getSession } from "../_lib/session";
+import { lockedRefusal } from "../_lib/unlock";
 
 export interface UndoState {
   canUndo: boolean;
@@ -49,12 +50,15 @@ export async function undoAction(
   mode: "undo" | "redo",
   open?: { projectId: string; canvasId: string },
 ): Promise<ActionResult<UndoOutcome>> {
-  const user = await getSessionUser();
-  if (!user) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const session = await getSession();
+  if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
+  const { user } = session;
   if (mode !== "undo" && mode !== "redo") return { ok: false, code: "invalid", message: "Undo or redo?" };
   const store = getDataStore();
   const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
   if (!workspace) return { ok: false, code: "not_found", message: "This workspace does not exist." };
+  const locked = await lockedRefusal(store, session.unlocked, workspace.organization_id);
+  if (locked) return locked;
   const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
 
   try {

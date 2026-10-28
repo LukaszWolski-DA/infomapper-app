@@ -1,9 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 7c's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 8's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
-(27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`). The earlier inventory (15 October 2026,
+(27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
+slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
+them in their development form (`docs/prd/slice-08-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -31,8 +33,8 @@ docs (some are repeated below where they explain an item).
 | Mappings | suggested mappings; re-pointing a mapping to another attribute | – |
 | Sources | only ideas: relationships between source tables on the canvas; slice 7c's ideas (see Sources) | idea |
 | Labels and notes | rich text in notes | known limitation |
-| Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer; new organization; deleting a project; editing a project's name and description on its home | baselines: decision only (AD-03, AD-14); the rest: – |
-| Settings and roles | inviting people, changing a role, removing a member | database (AD-04) |
+| Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer; deleting a project; editing a project's name and description on its home | baselines: decision only (AD-03, AD-14); the rest: – |
+| Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
 
 ## Canvas
 
@@ -172,22 +174,30 @@ nothing, D-26), notes, and their chips in the view-state bar (6a).
 | Export and delete a workspace | delete after showing the full export (Owner only) | `data-wa="delete"` | – |
 | Duplicate a workspace | a copy of the workspace | `data-wa="dup"` | – **(uncertain** what the copy includes) |
 | Transfer to another organization | hand the model over (Owner only) | `data-wa="transfer"` | – |
-| New organization | "Created {name} with an empty first workspace." | `openOrgMenu` | – |
 | Delete a project | "Deleted the project {name}…" | `openProjMenu` | – **(uncertain** where the entry sits) |
 | A project's name and description on its home | editable fields | `renderHome` (`data-pf`) | – |
 
 **Present:** workspaces, projects and canvases as in the earlier inventory; the empty workspace's next steps name
-importing sources (7a).
+importing sources (7a); "New organization…" in the organization menu (slice 8, item 9), with a password, the first
+workspace's name and a summary; the new workspace keeps "First project" and "First canvas" (F6) and has no concept
+"General".
 
 ## Settings and roles
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Inviting people | an e-mail and a role; guests | the People tab, `data-wa="invite"` | database (AD-04) |
-| Changing a role, removing a member | per member, for admins | the People tab (`data-role`, `data-rm`) | database **(uncertain**: no slice names it) |
+| Inviting people | an e-mail and a role, an invitation e-mail, a pending row; guests from the e-mail's domain | the People tab, `data-wa="invite"` | database (AD-04); guests from other organizations: idea (AD-01) |
 
 **Present:** the People tab, settings (four-eyes, Data Vault 2.0 mode), archived and read-only workspaces; importing
-and re-importing only for owners, admins and modelers in a workspace that is not archived (7a, item 40).
+and re-importing only for owners, admins and modelers in a workspace that is not archived (7a, item 40). Since slice 8,
+in the development form (D-58): "Add a person" (name, e-mail, role, a summary; the account at once, reached through the
+organization's link and password), the role select and Remove per member for owners and admins, and the "Organization
+access" box (the link, changing the password).
+
+**Deliberate differences (slice 8, PRD section 8):** a start page with signing in and creating an organization; adding
+makes the account at once instead of an invitation; Remove asks first and says when the person leaves the organization;
+the last owner keeps the role, only an owner gives or takes Owner, an admin cannot change or remove an owner, and nobody
+changes their own row (F12); every people change follows the app's roles, archive and change log.
 
 ## Not product features
 

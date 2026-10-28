@@ -15,6 +15,17 @@ moment can therefore both pass the check and leave a canvas or project without i
 - **The database slice (last, AD-31):** check this rule in the same transaction as the write (e.g. lock the project's and the canvas's
   `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed.
 
+### The last owner under concurrent writes (slice 8; fixed in the local adapter)
+
+A workspace keeps at least one owner. The domain counts the owners from what the command read; two owners removing or
+demoting each other at the same moment write different `workspace_member` rows, which no version check sees. The local
+adapter counts the owners again inside its serialised write and refuses the second write ("{workspace} needs at least
+one owner."; `workspaceWithoutOwner` in `src/data/local/store.ts`, tested with two concurrent removals and two
+concurrent demotions).
+
+- **The database slice (last, AD-31):** the same check in the write's transaction (lock or read again the workspace's
+  members under a serialisable transaction), as for "at least one canvas" above.
+
 ### A late fresh page could show an older state (slice 3a step 5; fixed for notes, frames and cards in slice 3b)
 
 After a write the canvas takes the server's fresh page. A page started by one write can read the data before a later
@@ -814,3 +825,44 @@ Touched cards stay lit as a whole; the touched rows inside them carry the row ma
 and untouched rows are not dimmed as in the prototype (`docs/ideas.md`, “Per-row fading in the Changes view”).
 Switching the view on with many cards lit costs more than Focus on one entity: 74.7 ms to the screen at 30 % on
 “Performance test” with 22 cards lit, against 50.9 ms for Focus on ent:23 (within the 100 ms bar; step 5).
+
+## Organizations and sign-in (slice 8)
+
+Slice 8's sign-in is a development form (D-58; AD-04's note): it exists only where the development sign-in does, and a
+production build refuses it as it refuses the local adapter. The database slice (last, AD-31) replaces it with real
+accounts (Supabase Auth, a password per person, AD-04).
+
+### One shared password per organization
+
+Everyone in an organization signs in with the organization's password, typed with their own e-mail address. Anyone who
+knows it and a member's e-mail signs in as that member. Accepted for development only; the database slice gives each
+person their own password.
+
+### An e-mail address reveals its organizations
+
+The sign-in's second step lists the organizations an e-mail address belongs to (with "1 workspace", "{n} workspaces" or
+"guest"), before any password (P3, F21). Anyone who types a member's address learns their organizations' names. The
+database slice signs a person in first and shows their organizations after.
+
+### A password change keeps sessions
+
+"Change the password" says so: people who are signed in stay signed in; only the next sign-in needs the new password.
+Sessions are signed cookies (`src/app/_lib/dev-session.ts`) with no record on the server to revoke. The database slice:
+signing out other sessions on a password change.
+
+### No limit on failed sign-ins
+
+A wrong password is answered at once, as often as it is tried; only scrypt's cost (about 124 ms per try, slice 8's
+bench) slows guessing. The database slice: limits on failed sign-ins (PRD section 9).
+
+### The organization's link comes from the request's host
+
+The "Organization access" box builds the link from the host this page was asked for (`x-forwarded-proto`, else
+`http`). Right in development; behind a proxy or in production the link must come from a configured base URL
+(`docs/ideas.md`, the database slice).
+
+### Seed rows lose their author's name when the author is removed
+
+A removed person's name stays in history through their change events (F10: `workspacePeople` lists a workspace's
+members and the authors of its change events). The seed writes rows without change events, so a seed note or approval
+by someone removed later shows "someone" instead of their name; anything written in the app has its events.

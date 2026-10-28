@@ -20,6 +20,7 @@ import type {
   MappingInput,
   Note,
   Organization,
+  OrganizationAccess,
   OrganizationMember,
   Project,
   ProjectCanvas,
@@ -71,18 +72,21 @@ import {
  * 4a (requirements, requirement links), 6 = slice 7a (source relationships and imports; `file_format` and `missing_since`
  * on sources, `review_reason` on mappings), 7 = slice 7b (changes to resolve; `retired_since` on sources, `not_needed`
  * on columns, two counts on imports), 8 = slice 7c (classifications and their links, notes on tables and columns; the
- * columns' business key and personal data flags dropped). A format-2 to 7 file is read as format 8 with the missing
- * tables empty and the new columns null (false, 0); a format-6 file also gets the open changes its imports leave
- * (`deriveSourceChanges`, F1), a format-7 file the classifications its flags said and its hand-typed comments as notes
- * (`upgrade-8.ts`). It is written back at once; an older file is refused with a hint to run "npm run reset-dev-data".
+ * columns' business key and personal data flags dropped), 9 = slice 8 (organization access: every organization's
+ * development password). A format-2 to 8 file is read as format 9 with the missing tables empty and the new columns null
+ * (false, 0); a format-6 file also gets the open changes its imports leave (`deriveSourceChanges`, F1), a format-7 file
+ * the classifications its flags said and its hand-typed comments as notes (`upgrade-8.ts`), a format-8 file the
+ * password `demo-pass` for every organization (F7, F18: no change events, one log line). It is written back at once; an
+ * older file is refused with a hint to run "npm run reset-dev-data".
  */
-export const DEV_DB_FORMAT = 8;
+export const DEV_DB_FORMAT = 9;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
   app_user: AppUser[];
   organization: Organization[];
   organization_member: OrganizationMember[];
+  organization_access: OrganizationAccess[];
   workspace: Workspace[];
   workspace_member: WorkspaceMember[];
   project: Project[];
@@ -122,6 +126,7 @@ export const emptyDb = (): DevDb => ({
   app_user: [],
   organization: [],
   organization_member: [],
+  organization_access: [],
   workspace: [],
   workspace_member: [],
   project: [],
@@ -195,6 +200,10 @@ export const RULES: Record<DevTable, TableRules> = {
     key: ["organization_id", "user_id"],
     foreignKeys: { organization_id: "organization", user_id: "app_user" },
     checks: [{ name: "organization_member_role_ck", test: oneOf(ORGANIZATION_ROLES, "role") }],
+  },
+  organization_access: {
+    key: ["organization_id"],
+    foreignKeys: { organization_id: "organization", changed_by: "app_user" },
   },
   workspace: {
     key: ["id"],

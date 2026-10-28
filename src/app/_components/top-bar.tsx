@@ -8,7 +8,8 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { ReactNode } from "react";
+import { Lock } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { cn } from "@/ui/lib/utils";
 import {
   DropdownMenu,
@@ -25,6 +26,7 @@ import type { ActionResult } from "../_lib/run-command";
 import type { ShellData } from "../_lib/shell";
 import { projectHref, workspaceHref } from "../_lib/paths";
 import { ROLE_CAN, ROLE_LABEL } from "../_lib/roles";
+import { NewOrganizationDialog } from "./new-organization-dialog";
 import { PanelToggle } from "./side-panels";
 
 export function TopBar({ shell, tools, panelToggles = false }: { shell: ShellData; tools?: ReactNode; panelToggles?: boolean }) {
@@ -79,20 +81,28 @@ function MenuLink({
   href,
   current,
   hint,
+  locked,
   testId,
   children,
 }: {
   href: string;
   current?: boolean;
   hint?: string;
+  /** An organization not yet unlocked in this session: its page asks for the password (slice 8, item 5, F15). */
+  locked?: boolean;
   testId?: string;
   children: ReactNode;
 }) {
   return (
     <DropdownMenuItem asChild className={itemClass}>
-      <Link href={href} data-testid={testId} aria-current={current ? "true" : undefined}>
+      <Link href={href} data-testid={testId} aria-current={current ? "true" : undefined} data-locked={locked ? "true" : undefined}>
         <span className="truncate">{children}</span>
         <span className="flex items-center gap-2">
+          {locked && (
+            <span title="Asks for the password once" aria-label="Asks for the password once" data-testid="icon-locked" className="text-im-ink-3">
+              <Lock className="size-3" aria-hidden />
+            </span>
+          )}
           {hint && <kbd className="text-[10.5px] font-normal text-im-ink-3">{hint}</kbd>}
           {current && <span className="font-semibold text-im-logical">✓</span>}
         </span>
@@ -102,28 +112,37 @@ function MenuLink({
 }
 
 function OrganizationSwitcher({ shell }: { shell: ShellData }) {
+  const [creating, setCreating] = useState(false);
   return (
-    <DropdownMenu>
-      <SwitcherButton testId="switcher-organization" title="Switch organization">
-        {shell.organization.name}
-      </SwitcherButton>
-      <DropdownMenuContent align="start" className={menuClass}>
-        <DropdownMenuLabel className={sectionClass}>Organizations</DropdownMenuLabel>
-        {shell.organizations.map((o) =>
-          o.firstWorkspaceId ? (
-            <MenuLink
-              key={o.id}
-              href={workspaceHref(o.firstWorkspaceId)}
-              current={o.id === shell.organization.id}
-              hint={o.guest ? "guest" : `${o.workspaceCount} workspace${o.workspaceCount === 1 ? "" : "s"}`}
-              testId="menu-item-organization"
-            >
-              {o.name}
-            </MenuLink>
-          ) : null,
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <>
+      <DropdownMenu>
+        <SwitcherButton testId="switcher-organization" title="Switch organization">
+          {shell.organization.name}
+        </SwitcherButton>
+        <DropdownMenuContent align="start" className={menuClass}>
+          <DropdownMenuLabel className={sectionClass}>Organizations</DropdownMenuLabel>
+          {shell.organizations.map((o) =>
+            o.firstWorkspaceId ? (
+              <MenuLink
+                key={o.id}
+                href={workspaceHref(o.firstWorkspaceId)}
+                current={o.id === shell.organization.id}
+                hint={o.guest ? "guest" : `${o.workspaceCount} workspace${o.workspaceCount === 1 ? "" : "s"}`}
+                locked={o.locked}
+                testId="menu-item-organization"
+              >
+                {o.name}
+              </MenuLink>
+            ) : null,
+          )}
+          <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+          <DropdownMenuItem className={itemClass} data-testid="menu-item-new-organization" onSelect={() => setCreating(true)}>
+            New organization…
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {creating && <NewOrganizationDialog onClose={() => setCreating(false)} />}
+    </>
   );
 }
 

@@ -1,7 +1,15 @@
 import { describe, expect, it } from "vitest";
-import { access, archived, ids, organizationMember, workspace } from "./__fixtures__/domain";
+import { access, archived, ids, organization, organizationMember, workspace } from "./__fixtures__/domain";
 import { ARCHIVED_MESSAGE } from "./errors";
-import { can, checkCreateWorkspace, checkPermission, isGuest, WORKSPACE_ACTIONS, type WorkspaceAction } from "./permissions";
+import {
+  can,
+  checkCreateWorkspace,
+  checkOrganizationAccess,
+  checkPermission,
+  isGuest,
+  WORKSPACE_ACTIONS,
+  type WorkspaceAction,
+} from "./permissions";
 import { WORKSPACE_ROLES, type WorkspaceRole } from "./types";
 
 // Expected matrix (AD-05, prototype "What each role can do").
@@ -10,7 +18,7 @@ const expected: Record<WorkspaceRole, WorkspaceAction[]> = {
   admin: [
     "workspace.view", "workspace.edit_settings", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects",
     "canvas.edit_items", "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
-    "requirement.edit", "requirement.set_status",
+    "requirement.edit", "requirement.set_status", "people.edit",
   ],
   modeler: [
     "workspace.view", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects", "canvas.edit_items",
@@ -116,5 +124,42 @@ describe("guests (AD-01)", () => {
   it("a member of another organization only is a guest", () => {
     expect(isGuest(ws, ids.actor, [organizationMember({ organization_id: ids.otherOrg })])).toBe(true);
     expect(isGuest(ws, ids.actor, [])).toBe(true);
+  });
+});
+
+describe("people (slice 8)", () => {
+  it("modelers, reviewers and readers are told they cannot change who has access", () => {
+    expect(checkPermission(access("modeler"), "people.edit")?.message).toBe("As a modeler you cannot change who has access.");
+    expect(checkPermission(access("reader"), "people.edit")?.message).toBe("As a reader you cannot change who has access.");
+  });
+
+  it("an archived workspace refuses people changes (AD-09)", () => {
+    expect(checkPermission(access("owner", archived), "people.edit")?.message).toBe(ARCHIVED_MESSAGE);
+  });
+});
+
+describe("changing the organization's password (slice 8, P8, F17)", () => {
+  const org = organization();
+
+  it("is for the organization's owners and admins, whatever their role in the workspace", () => {
+    for (const role of ["owner", "admin"] as const) {
+      expect(checkOrganizationAccess(access("reader"), org, organizationMember({ role }))).toBeNull();
+    }
+  });
+
+  it("is refused to its members, to guests and to people of another organization", () => {
+    const text = "Only the owners and admins of InfoMate can change its password.";
+    expect(checkOrganizationAccess(access("owner"), org, organizationMember({ role: "member" }))?.message).toBe(text);
+    expect(checkOrganizationAccess(access("owner"), org, null)?.message).toBe(text);
+    expect(checkOrganizationAccess(access("owner"), org, organizationMember({ role: "owner", organization_id: ids.otherOrg }))?.message).toBe(text);
+  });
+
+  it("needs a membership of the workspace, which must belong to the organization", () => {
+    expect(checkOrganizationAccess(access(null), org, organizationMember({ role: "owner" }))?.code).toBe("forbidden");
+    expect(checkOrganizationAccess(access("owner", { organization_id: ids.otherOrg }), org, organizationMember({ role: "owner" }))?.code).toBe("not_found");
+  });
+
+  it("is refused from an archived workspace", () => {
+    expect(checkOrganizationAccess(access("owner", archived), org, organizationMember({ role: "owner" }))?.message).toBe(ARCHIVED_MESSAGE);
   });
 });
