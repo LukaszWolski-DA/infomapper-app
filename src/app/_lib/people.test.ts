@@ -35,15 +35,16 @@ describe("the people a workspace's pages receive (slice 8, F10, D-58)", () => {
   });
 
   it("keep a removed person whose work is in the workspace's history", async () => {
-    const ws = (await store.workspaces.get(SEED_IDS.wsSales))!;
-    const marek = await store.workspaces.getMember(ws.id, SEED_IDS.userMarek);
-    const ctx = { actorId: SEED_IDS.userMarek, now: new Date().toISOString(), newId: () => uuidv7() };
-    const project = createProject(ctx, { workspace: ws, member: marek }, { workspaceId: ws.id, name: "History" });
+    // Anna, a modeler in Retail Co – DWH, creates a project, then leaves (the owner stays)
+    const ws = (await store.workspaces.get(SEED_IDS.wsRetailDwh))!;
+    const anna = await store.workspaces.getMember(ws.id, SEED_IDS.userAnna);
+    const ctx = { actorId: SEED_IDS.userAnna, now: new Date().toISOString(), newId: () => uuidv7() };
+    const project = createProject(ctx, { workspace: ws, member: anna }, { workspaceId: ws.id, name: "History" });
     if (!project.ok) throw new Error(project.error.message);
     expect(await store.apply(project.writeSet)).toEqual({ ok: true });
-    // Marek leaves the workspace (test data: the row removed as removePerson does)
-    const removal = buildWriteSet(ctx, ws.id, [{ kind: "remove", table: "workspace_member", before: marek! }]);
+    // test data: the row removed as removePerson does
+    const removal = buildWriteSet(ctx, ws.id, [{ kind: "remove", table: "workspace_member", before: anna! }]);
     expect(await store.apply(removal)).toEqual({ ok: true });
-    expect(await ids(SEED_IDS.wsSales)).toContain(SEED_IDS.userMarek);
+    expect(await ids(SEED_IDS.wsRetailDwh)).toContain(SEED_IDS.userAnna);
   });
 });

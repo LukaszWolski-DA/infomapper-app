@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildWriteSet, type CommandContext } from "@/domain/changes";
 import { createOrganization } from "@/domain/commands/organization";
-import { addPerson, removePerson } from "@/domain/commands/people";
+import { addPerson, changeRole, removePerson } from "@/domain/commands/people";
 import { STALE_VERSION_MESSAGE } from "@/domain/errors";
 import { uuidv7 } from "@/domain/ids";
 import type { DataStore } from "../ports";
@@ -169,5 +169,57 @@ describe("writing a whole file keeps the new table", () => {
     const db = await readDb(file);
     await writeDb(file, structuredClone(db));
     expect((await readDb(file)).organization_access).toEqual(db.organization_access);
+  });
+});
+
+describe("the last owner under concurrent writes (slice 8, step 5's answer)", () => {
+  const { userLukasz: lukasz, userAnna: anna, wsRetailDwh: ws } = SEED_IDS;
+
+  /** Retail Co – DWH with two owners, Łukasz and Anna; the state each of them reads before writing. */
+  async function twoOwners() {
+    const before = await stateOf(lukasz);
+    const made = changeRole(ctxFor(lukasz), before, { workspaceId: ws, userId: anna, role: "owner" });
+    if (!made.ok) throw new Error(made.error.message);
+    expect(await store.apply(made.writeSet)).toEqual({ ok: true });
+  }
+
+  async function stateOf(actor: string, personId = actor === lukasz ? anna : lukasz) {
+    const workspace = (await store.workspaces.get(ws))!;
+    const person = (await store.users.get(personId))!;
+    const organization = await store.organizations.get(workspace.organization_id);
+    return {
+      access: { workspace, member: await store.workspaces.getMember(ws, actor) },
+      person,
+      members: await store.workspaces.listMembers(ws),
+      organization,
+      personOrganizationMember: await store.organizations.getMember(workspace.organization_id, person.id),
+      personOtherWorkspaceIds: (await store.workspaces.listForUser(person.id)).filter((w) => w.organization_id === workspace.organization_id && w.id !== ws).map((w) => w.id),
+    };
+  }
+
+  const owners = async () => (await readDb(file)).workspace_member.filter((m) => m.workspace_id === ws && m.role === "owner").map((m) => m.user_id);
+
+  it("two owners removing each other at once: one removal goes through, the other is refused, one owner stays", async () => {
+    await twoOwners();
+    // both read before either writes: each sees two owners
+    const [byLukasz, byAnna] = [await stateOf(lukasz), await stateOf(anna)];
+    const a = removePerson(ctxFor(lukasz), byLukasz, { workspaceId: ws, userId: anna });
+    const b = removePerson(ctxFor(anna), byAnna, { workspaceId: ws, userId: lukasz });
+    if (!a.ok || !b.ok) throw new Error("both removals pass the domain's check");
+    const results = await Promise.all([store.apply(a.writeSet), store.apply(b.writeSet)]);
+    expect(results).toEqual([{ ok: true }, { ok: false, error: expect.objectContaining({ code: "invalid", message: "Retail Co – DWH needs at least one owner." }) }]);
+    expect(await owners()).toEqual([lukasz]);
+  });
+
+  it("two owners demoting each other at once: one owner stays", async () => {
+    await twoOwners();
+    const [byLukasz, byAnna] = [await stateOf(lukasz), await stateOf(anna)];
+    const a = changeRole(ctxFor(lukasz), byLukasz, { workspaceId: ws, userId: anna, role: "admin" });
+    const b = changeRole(ctxFor(anna), byAnna, { workspaceId: ws, userId: lukasz, role: "admin" });
+    if (!a.ok || !b.ok) throw new Error("both changes pass the domain's check");
+    const results = await Promise.all([store.apply(b.writeSet), store.apply(a.writeSet)]);
+    expect(results[0]).toEqual({ ok: true });
+    expect(results[1]).toMatchObject({ ok: false, error: { message: "Retail Co – DWH needs at least one owner." } });
+    expect(await owners()).toEqual([anna]);
   });
 });

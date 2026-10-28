@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 7b are merged; slice 7c (classifications, notes and the Data Vault reading) waits for its acceptance on its branch. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 7c are merged; slice 8 (organizations and sign-in) waits for its acceptance on its branch. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -57,11 +57,15 @@ built in, general and Data Vault 2.0 ones, and its own; each renamed, removed wi
 and restored), toggled on table and column panels, read by the app's rules through their fixed codes (BK, PII, LK…),
 the modeller's note on tables and columns beside the source's read-only comment, an import that reads every
 classification a file names, suggests Business key and Link key and never changes the modeller's on a re-import, and,
-in Data Vault 2.0 mode, a table's Data Vault reading (hub, links, satellites; hints only). Acceptance:
+in Data Vault 2.0 mode, a table's Data Vault reading (hub, links, satellites; hints only); slice 8's organizations and
+sign-in in their development form: a start page to sign in (e-mail, organization, its password) or create an
+organization, each organization's link, a password asked once per organization in a session, "New organization…" in
+the organization menu, and on the People tab adding a person, changing roles, removing people and the organization's
+access (its link and password). Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md).
 
 ## Getting started
 
@@ -74,7 +78,10 @@ npm run seed                      # demo data in .data/dev-db.json
 npm run dev                       # http://localhost:3000
 ```
 
-Open http://localhost:3000 and pick a test user on the development sign-in page. The demo data mirrors the prototype,
+Open http://localhost:3000. The start page signs in with an e-mail address and the organization's password, or creates
+an organization; below it, the development list of test users signs in with one click, as before, with every
+organization of that user unlocked. **The demo organizations' password is `demo-pass`** (InfoMate and Retail Co; a
+data file from before slice 8 gets it when it is first read, with one log line). The demo data mirrors the prototype,
 including its model (concepts Customer, Sales, Product, Reference data; sources CRM, WEB, ERP) on the canvases of
 Retail Co – DWH and Sales analytics, and the prototype's five requirements (REQ-101 to REQ-105) in Retail Co – DWH.
 The demo's sources record no import (“not imported yet”). To try the import, use the test files in
@@ -87,8 +94,10 @@ of the demo's systems; see the README there): “Import sources…” at the top
 | InfoMate | Bank X – Risk DWH (archived) | Łukasz owner, Anna Nowak modeler |
 | Retail Co | Sales analytics | Marek Lis owner, Łukasz reviewer (guest) |
 
-Until the database slice (last, AD-31), data lives in a JSON file on the server and sign-in means picking a test user
-(AD-29). Both exist only in development: a production build refuses them.
+Until the database slice (last, AD-31), data lives in a JSON file on the server, and sign-in means picking a test user
+(AD-29) or an organization's shared password (D-58). All of it exists only in development: a production build refuses
+it. The session is a signed cookie; its secret is `INFOMAPPER_SESSION_SECRET` (`.env.local`, at least 32 characters) or
+else `.data/session-secret`, made on first use.
 
 ## Commands
 

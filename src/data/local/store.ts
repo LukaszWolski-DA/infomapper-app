@@ -3,6 +3,7 @@
 // plus version checks, and writes the rows and change events of one command together or not at all.
 
 import type { Write, WriteSet } from "@/domain/changes";
+import { LAST_OWNER } from "@/domain/commands/people";
 import { UNDOABLE_TABLES, type WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
@@ -278,11 +279,26 @@ async function applyToFile(file: string, writeSet: WriteSet): Promise<ApplyResul
     if (error) return { ok: false, error };
   }
   next.change_event = [...current.change_event, ...structuredClone(writeSet.events)];
+  // The last owner (slice 8): the domain counts a workspace's owners from what it read before this write, and two owners
+  // removing or demoting each other at once write different rows, which no version check sees. Counted again here,
+  // inside the serialised write.
+  const ownerless = workspaceWithoutOwner(next, writeSet.writes);
+  if (ownerless) return { ok: false, error: domainError("invalid", LAST_OWNER(ownerless)) };
   // only what this write can have broken: the touched tables and the new change events
   const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length });
   if (violation) return { ok: false, error: violationError(violation) };
   await writeDb(file, next);
   return { ok: true };
+}
+
+/** The name of a workspace this write left with members but no owner, or null. */
+function workspaceWithoutOwner(db: DevDb, writes: readonly Write[]): string | null {
+  const touched = new Set(writes.filter((w) => w.table === "workspace_member" && w.kind !== "insert").map((w) => (w.before as { workspace_id: Uuid }).workspace_id));
+  for (const workspaceId of touched) {
+    const members = db.workspace_member.filter((m) => m.workspace_id === workspaceId);
+    if (members.length > 0 && !members.some((m) => m.role === "owner")) return db.workspace.find((w) => w.id === workspaceId)?.name ?? "This workspace";
+  }
+  return null;
 }
 
 /**

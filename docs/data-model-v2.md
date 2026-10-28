@@ -17,6 +17,7 @@ from each other: every model and work table carries `workspace_id`.
 ```mermaid
 erDiagram
   ORGANIZATION ||--o{ WORKSPACE : owns
+  ORGANIZATION ||--o| ORGANIZATION_ACCESS : "signs in with"
   WORKSPACE ||--o{ CONCEPT : contains
   CONCEPT ||--o{ ENTITY : groups
   ENTITY ||--o{ ATTRIBUTE : has
@@ -44,7 +45,7 @@ Table groups (AD-10):
 
 | Group | Tables |
 | --- | --- |
-| Tenancy and access | `app_user`, `organization`, `organization_member`, `workspace`, `workspace_member`, `invitation` |
+| Tenancy and access | `app_user`, `organization`, `organization_access`, `organization_member`, `workspace`, `workspace_member`, `invitation` |
 | Model | `concept`, `entity`, `attribute`, `relationship` |
 | Sources | `source_system`, `source_table`, `source_column`, `source_relationship`, `source_relationship_column`, `source_import`, `source_change`, `classification`, `classification_link` |
 | Mappings | `mapping`, `mapping_input` |
@@ -117,8 +118,33 @@ key into the `auth` schema, so the table works with any identity provider later.
 | `id`, `version`, `created_*`, `updated_*`, `deleted_at` | | | standard (no `workspace_id`) |
 | `name` | text | no | e.g. InfoMate |
 
+### `organization_access`
+The organization's password for signing in during development (slice 8, D-58; AD-04's note): one row per organization,
+in a table of its own so the hash never travels with an organization row. Read only on the server, never sent to the
+browser. Until the database slice replaces it with real accounts (AD-04), the local data file holds it; the file's
+format 9 gave every organization without a row the development password `demo-pass` (no change events, one log line).
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| `organization_id` | uuid | no | primary key, FK `organization` |
+| `access_hash` | text | no | scrypt: parameters, salt and key in one string (`scrypt$15$8$1$<salt>$<key>`), made by the server; compared in constant time |
+| `changed_at` | timestamptz | no | |
+| `changed_by` | uuid | no | FK `app_user` |
+| `version` | integer | no | default 1 (AD-12) |
+
+Change events carry the marker `"(changed)"` or `"(unchanged)"` in place of `access_hash` in both images, never the
+value (`SECRET_COLUMNS` in `src/domain/changes.ts`).
+
 ### `organization_member`
 A person can belong to several organizations (AD-01).
+
+**Membership (slice 8, D-58).** A person *belongs* to an organization when they have a workspace in it: that is what
+signing in, the organization's link and unlocking read. `organization_member` keeps the organization role (`owner`,
+`admin`, `member`) and tells a home organization from a guest one. Adding a person to a workspace writes a `member` row
+only when they have neither a row nor a workspace in that organization (a new person, or an account from another
+organization added there for the first time); a guest of the organization (a workspace there, no row) stays a guest.
+Removing a person from their last workspace in the organization removes their `admin` or `member` row too; an
+organization's `owner` cannot be removed from their last workspace there.
 
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
@@ -146,7 +172,10 @@ One model with its people, settings and baselines (AD-01, AD-07 – AD-09).
 
 ### `workspace_member`
 Roles are per workspace (AD-05). A guest is a member whose user is not a member of the workspace's organization;
-that is derived, not stored.
+that is derived, not stored. A workspace with members keeps at least one `owner`; only an owner gives or takes the
+Owner role, and nobody changes or removes their own row (slice 8). The last owner is checked inside the write, not only
+from what the command read (two owners removing each other at once write different rows): the local adapter counts
+again in its serialised write; the database slice does it in the write's transaction.
 
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
@@ -515,6 +544,12 @@ not soft-deleted: their `delete` event has a before image and a null after image
 `object_id` names the moved thing (the canvas for `project_canvas`, the user for `workspace_member`); the images
 always contain the full row with both keys.
 
+Organization rows (slice 8) have no workspace of their own; their events go to a workspace's change group: creating an
+organization (`app_user`, `organization`, `organization_access`, `organization_member`) to its first workspace's,
+written in the same group; adding, changing or removing a person (with the `organization_member` row an addition or a
+removal writes) to that workspace's; a password change to the workspace whose People tab was used. `object_id` for
+`organization_member` is the user, for `organization_access` the organization. None of these groups is an undo step.
+
 ### `baseline`
 A frozen, named snapshot of the model part of a workspace (AD-03, AD-14).
 
@@ -535,6 +570,10 @@ The database guarantees keys, references, closed value lists and uniqueness. The
 because they are business logic or must work on any database:
 
 - Permissions per role (AD-05), archive read-only (AD-09), four-eyes approval (AD-06).
+- People and organizations (slice 8): who may add, change and remove people (owners and admins; only owners give or
+  take Owner; nobody changes their own row; the last owner, checked again inside the write); the membership rule
+  (section 3); who may change an organization's password (its owners and admins, not from an archived workspace); the
+  form checks (passwords 8 to 200 characters, names up to 200 in slice 8's forms).
 - Mapping input counts (section 6) and type checking.
 - Duplicate-name warnings for entities (B-25); concept deletion moves entities first (D-47).
 - Soft-delete cascades and the impact preview before deleting an entity (D-47); a deleted source table takes its

@@ -1,6 +1,6 @@
 # Slice 8 – Acceptance
 
-Status: **step 5 (People) done, waiting for Łukasz.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
+Status: **step 6 (closing) done; waiting for Łukasz's manual acceptance.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
 `slice-07c`). PRD: `docs/prd/slice-08-organizations.md`. The PRD stays as written; this file is its amendment.
 
 ## Answers from Łukasz (step 1) (27 October 2026)
@@ -1271,3 +1271,167 @@ status lines), one full e2e run, your manual acceptance; merge only on your comm
 1. Check 1: accept the guard's page totals as "+1 script", or try loading the dialog on demand?
 2. Decisions 1–4 above, in particular the texts in decision 1.
 3. Finding 1: keep the unreachable last-owner refusal as a safety net (my recommendation), or drop it?
+
+## Answers from Łukasz (step 5) (28 October 2026)
+
+- Step 5 is approved.
+- **Check 1:** "+1 script" accepted. The note sits next to the element guard (CLAUDE.md, the guard's command and the
+  "Measure canvas performance" paragraph), so later slices read the page total as the baseline's plus one script.
+- **Decisions 1–4** accepted. Decision 3 (the organization's link from the request's host) is fine in development; in
+  production the link must come from a configured base URL: a known limitation, and an idea for the database slice.
+- **Finding 1:** the last-owner refusal stays. It is reachable through concurrency: two owners removing or demoting
+  each other at the same moment write different rows, so the version check does not catch it. Check whether the owner
+  count is taken inside the local adapter's serialised write or before it; if before, re-check it inside, with a unit
+  test of two concurrent removals that leaves one owner; if that is not possible, say why and record a known
+  limitation.
+- **Finding 2** accepted: seed rows without change events show "someone" after their author is removed; one sentence
+  in `known-limitations.md`.
+- Then step 6, the closing: the docs (PRD section 10 as amended by all the answers), lint, typecheck, unit tests, one
+  full e2e run, the full manual checklist (S8-01 to S8-12) and the Definition of done scenario as amended, in this file.
+
+### The last owner under concurrent writes
+
+**Before the fix, the count was taken before the write.** `runCommand` reads the workspace's members
+(`removeState` and `changeRoleAction` in `src/app/_actions/people.ts`), the domain counts the owners in that read
+(`changeRole` and `checkRemove`, `src/domain/commands/people.ts`), and only then does the adapter apply the write set
+inside its per-file queue (`serialise` and `applyToFile`, `src/data/local/store.ts`). A removal and a role change write
+one `workspace_member` row each, compared with what was read (`workspace_member` has no version; the whole row is
+compared). Łukasz removing Anna and Anna removing Łukasz at the same moment touch different rows: both pass, and Retail Co
+– DWH is left without an owner. The same holds for two demotions.
+
+**Fixed inside the serialised write.** `applyToFile` now counts again, after the writes and before the file is written:
+a workspace whose `workspace_member` rows this write updated or removed must still have an owner if it has members
+(`workspaceWithoutOwner`); otherwise the whole write is refused with the domain's text, "{workspace} needs at least one
+owner." (`LAST_OWNER`, now exported from `commands/people.ts`), and nothing is written. Unit tests in
+`src/data/local/organization-store.test.ts`: two concurrent removals and two concurrent demotions, each from one state
+read by both owners before either writes, through `Promise.all` on the adapter: one write goes through, the other is
+refused, one owner stays. Without the re-check both tests fail (checked by switching it off once).
+
+**For the database slice:** the same re-check belongs in the write's transaction (the members of the workspace locked or
+read again under a serialisable transaction). A note in `docs/data-model-v2.md` and in `known-limitations.md` says so.
+
+## Manual acceptance (28 October 2026)
+
+For Łukasz. S8-13 (secrets), S8-14 (the upgrade) and S8-15 (CI and the full run) are automated; the full run is below.
+
+### The checklist (S8-01 to S8-12)
+
+Start with `npm run reset-dev-data`, then `npm run dev`, and open http://localhost:3000 (no e2e run at the same time).
+The password of InfoMate and Retail Co is `demo-pass`. Items 1–7 start signed out; items 8–12 sign in as Łukasz from the
+test users' list and open Retail Co – DWH's People tab, unless they say otherwise.
+
+1. **S8-01** Signed out, open any address: you land on the start page with "Sign in" and "Create an organization"
+   side by side and the test users' list below. Clicking Łukasz in the list signs in as before.
+2. **S8-02** Sign out. Under "Create an organization", press Continue with empty fields, then with a bad e-mail, a
+   7-character password and two different passwords: each message under its field. Fill in "Test Org", your name, a
+   new e-mail, a password twice; Continue shows the summary. Back keeps everything; Continue, Create: the workspace home
+   of "First workspace" with "Created Test Org with an empty first workspace."
+3. **S8-03** Sign out. Create an organization with `lukasz@infomate.pl`: the hint to sign in and use the
+   organization menu, and nothing is created.
+4. **S8-04** Sign out. Sign in with `nobody@example.com`: "No organization uses this e-mail address." With
+   `lukasz@infomate.pl`: InfoMate (its workspace count) and Retail Co (guest), and Test Org not among them. A wrong
+   password: "That password does not open InfoMate."; `demo-pass`: your last used InfoMate workspace.
+5. **S8-05** Signed out, open `/sign-in?org=` with Retail Co's id (from its workspace's switcher link, or
+   `01a0f9e9-2006-7178-8cdf-249f50cfcf87`): "Sign in to Retail Co" with e-mail and password together. Anna's e-mail is
+   refused like an unknown one; `m.lis@retailco.com` with `demo-pass` opens Sales analytics.
+6. **S8-06** Signed in to InfoMate with the password (step 4), open the organization menu: Retail Co has the lock
+   with "Asks for the password once". Choose it: Retail Co's form with your e-mail filled in; `demo-pass` brings you to
+   Sales analytics. Switch back and forth: no more passwords. Sign out: both ask again.
+7. **S8-07** Signed in, organization menu → "New organization…": the dialog's checks, the summary, Back, Create:
+   the new organization opens with the toast and no lock, and you are its owner (its People tab).
+8. **S8-08** "Add a person": Continue with an empty name ("Enter a name."). Name "Ola Nowa", e-mail
+   `ola@example.com`, role Reviewer, Continue: the summary; Back keeps the fields; Continue, Add: the toast and her row.
+   Again with `piotr.w@infomate.pl`: "Piotr Wiśniewski is already in Retail Co – DWH.". Make a workspace "Second" (the
+   workspace menu), and add `piotr.w@infomate.pl` there (his name and "that name stays") and `m.lis@retailco.com` (no
+   name: "they keep their own name"). Sign out; open the link of InfoMate (from the Organization access box) and sign
+   in as `ola@example.com` with `demo-pass`: only Retail Co – DWH, as Reviewer.
+9. **S8-09** Your own row shows "Owner" as text. Anna's select: Reviewer (the toast), then back to Modeler. Make her
+   Admin, sign in as Anna: your row is text, Piotr's select has no Owner.
+10. **S8-10** As Łukasz, Remove on Piotr: two lines (he leaves InfoMate too); Cancel changes nothing; Remove: the toast.
+   Remove on Anna: one line (she keeps Bank X). Add both back if you want to go on.
+11. **S8-11** The Organization access box: Copy, then paste somewhere (the link); "Link copied.". Change the password to
+   a new one (try 7 characters and two different ones first): the summary, then the toast. Signed in elsewhere (another
+   browser) you stay signed in; signing in again with `demo-pass` is refused, the new one works. Set it back to
+   `demo-pass` (or run `npm run reset-dev-data`).
+12. **S8-12** As Piotr (reviewer), Anna (modeler) and Kasia (reader): the People tab has the table and the role table
+   only. As Łukasz in Bank X (archived): the same.
+
+### The Definition of done (PRD section 5, as amended)
+
+Amended by the answers: the new workspace has an empty first project and canvas (F6, step 2's texts); an existing
+account from another organization is named by its e-mail only (F11, step 2's answer 3); and the account added from
+elsewhere is Łukasz's, so the scenario's last switch to Test Org works (in the PRD it was Anna, who would not be in
+Test Org's menu for Łukasz).
+
+1. Sign out. On the start page try to create an organization with `lukasz@infomate.pl`: the hint to sign in and use
+   the organization menu.
+2. Create "Test Org" with a new e-mail (e.g. `owner@test-org.test`) and a password: you land on its workspace "First
+   workspace" with an empty first project and canvas, and the toast. Later, in a column's panel, the 19 built-in
+   classifications.
+3. Create a project, import a source file (`src/domain/import/samples/`) and map a column.
+4. People tab: add `lukasz@infomate.pl` as Modeler (an account from elsewhere: the summary names the e-mail only, "they
+   keep their own name") and a new "Jan Test" (`jan@test-org.test`) as Reviewer. Copy the link.
+5. In a private window, open the link and sign in as `jan@test-org.test` with Test Org's password: only Test Org's
+   workspace.
+6. Back as the owner: change Jan to Reader, then Remove him and read the last-workspace sentence ("…so they leave Test
+   Org too.").
+7. Change Test Org's password; sign out; sign in with the old one (refused) and the new one (in).
+8. Sign out. Sign in as `lukasz@infomate.pl` to InfoMate with `demo-pass`. Create "Second Org" from the organization
+   menu (it opens unlocked). Switch back to InfoMate (no password), then to Test Org (the lock; its new password; then
+   its workspace).
+
+## Step 6: the closing (28 October 2026)
+
+Commit: `docs: slice 8 closing` (with the last-owner fix, which step 5's answer asked for before the closing).
+
+### What changed
+
+- **The last owner under concurrent writes** (step 5's answer, finding 1): re-checked inside the local adapter's
+  serialised write (`workspaceWithoutOwner`, `src/data/local/store.ts`; above, "The last owner under concurrent
+  writes"); two unit tests in `src/data/local/organization-store.test.ts`. `src/app/_lib/people.test.ts`'s F10 test
+  removed Sales analytics' only owner as its test data, which the re-check now refuses: it removes Anna (a modeler in
+  Retail Co – DWH, after she created a project) instead; it checks the same thing.
+- **`docs/data-model-v2.md`:** `organization_access` (columns, the hash's form, the marker, format 9) and the diagram;
+  the membership rule (D-58: "belongs" = a workspace there, when a `member` row is written or removed, the owner's last
+  workspace); the last owner on `workspace_member`, checked inside the write; where organization rows' change events go
+  (section 10); slice 8's rules in section 11.
+- **`docs/inventory-prototype-vs-app.md`:** "New organization" and the People tab's role select and Remove are done in
+  the development form; inviting by e-mail stays for the database slice; slice 8's deliberate differences.
+- **`docs/known-limitations.md`:** the last owner (fixed locally; the database slice checks it in the transaction); a new
+  section "Organizations and sign-in": development only, one shared password, an e-mail reveals its organizations, a
+  password change keeps sessions, no limit on failed sign-ins, the link from the request's host, seed rows that lose
+  their author's name.
+- **`docs/ideas.md`:** PRD section 9's ideas (licences and activation codes, groups, SSO, guests from other
+  organizations, an organization page, deleting an account, a public landing page) and a configured base URL.
+- **README:** the status (0–7c merged, slice 8 waiting), slice 8 in the list, `demo-pass`, the start page and the
+  development list, the session's secret.
+- **CLAUDE.md:** a sentence in "What this is"; "Session and unlocked organizations"; slice 8's e2e helpers; the element
+  guard's "+1 script" note (beside the guard's command and in the measuring paragraph).
+- **This file:** the answers to step 5, the full manual checklist (S8-01 to S8-12) and the Definition of done as
+  amended (above, "Manual acceptance").
+
+### The acceptance criteria
+
+| ID | Where | Result |
+| --- | --- | --- |
+| S8-01 to S8-12 | `e2e/slice-08/S8-01.spec.ts` … `S8-12.spec.ts` | pass (the full run below) |
+| S8-13 | `S8-13.spec.ts` (page data and action results); `changes.test.ts` (no hash in an image); `password.test.ts` (the hash's format with a random salt, the right and a wrong password, malformed hashes; the compare is `timingSafeEqual` in `src/data/password.ts`, which no test can time reliably); no log line carries a password or hash (`file.ts`'s upgrade line names counts only) | pass |
+| S8-14 | `organization-store.test.ts`, "the format 9 upgrade" | pass |
+| S8-15 | CI and the full run below; changed earlier tests: `S7B-12`, `S7C-02` (format 9, step 4); `people.test.ts` (above) | see below |
+
+Section 6's figures are step 3's (password 123.5 ms median, creating an organization 135.5 ms, reseed level) and the
+element guard of step 4 (viewport equal; page total +1 script, accepted).
+
+### The runs
+
+- `npm run lint` (44 s) and `npm run typecheck` (17 s) pass; `npm test`: 107 files, 1,375 tests passed (+2: the last
+  owner under concurrent writes).
+- One full e2e run (`npm run e2e`, from scratch, no dev server running; 28 October, ended 10:29): **355 passed,
+  1 skipped** (`S7C-14-commits.spec.ts`, on demand, as in slice 7c), **none failed, no flake**, in **62 min**
+  (3,723 s). Step 4's run took 90 min with 4 failures (two of them the format specs, fixed; S0-10 and S1B-12 flakes,
+  above); this run is back at slice 7c's time (61 min for 336).
+
+### Open
+
+Your manual acceptance (the checklist and the Definition of done above). Merge only on your command, then the tag
+`slice-08`.

@@ -31,7 +31,8 @@ export const ROLE_LABEL: Record<WorkspaceRole, string> = {
 export const ADDABLE_ROLES = ["admin", "modeler", "reviewer", "reader"] as const satisfies readonly WorkspaceRole[];
 export const DEFAULT_ADDED_ROLE: (typeof ADDABLE_ROLES)[number] = "modeler";
 
-const LAST_OWNER = (workspace: string) => `${workspace} needs at least one owner.`;
+/** The last owner keeps the role (item 11, 12); the local adapter checks it again inside its write (step 5's answer). */
+export const LAST_OWNER = (workspace: string) => `${workspace} needs at least one owner.`;
 export const OWN_ROLE_MESSAGE = "You cannot change your own role.";
 export const OWN_REMOVAL_MESSAGE = "You cannot remove yourself.";
 export const OWNER_ONLY_GIVE_MESSAGE = "Only an owner can make someone an owner.";

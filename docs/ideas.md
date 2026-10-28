@@ -267,3 +267,42 @@ What slice 7c leaves for the data model review (PRD 7c section 9, amended by Łu
   restored or renamed built-in keeps it. Two columns may read better.
 - **A system author for upgrades** (e.g. "InfoMapper upgrade"): the rows and change events slice 7c's upgrade wrote are
   signed by the workspace's creator (known limitation).
+
+## Licences and activation codes for creating an organization (slice 8, PRD section 9)
+
+Today anyone who reaches the start page may create an organization. A licence, or an activation code handed out with
+one, could gate that step.
+
+## Groups of people (slice 8, PRD section 9)
+
+Groups within an organization (e.g. "Finance analysts"), added to a workspace at once with one role, instead of person
+by person.
+
+## Single sign-on (slice 8, PRD section 9; AD-04)
+
+Signing in through the company's identity provider (SAML or OpenID Connect) instead of a password.
+
+## Guests from other organizations (slice 8, PRD section 9; AD-01)
+
+Slice 8 adds no new guests: an account from another organization added to a workspace becomes a member of this one too
+(F8). A guest invited across organizations, with what they may see of their home organization, needs its own decision.
+
+## An organization page (slice 8, PRD section 9; AD-09)
+
+One page per organization: rename it, delete it, list its workspaces and people, transfer a workspace to another
+organization (AD-09).
+
+## Deleting a person's account (slice 8, PRD section 9)
+
+Removing a person takes away their access but keeps the account, so their earlier work keeps their name. Deleting an
+account (with what it means for their names in history, and for personal data) is a decision of its own.
+
+## A public landing page (slice 8, PRD section 9)
+
+A page before the start page with the company's promotional material. The start page itself has none (D-58).
+
+## A configured base URL for the organization's link (slice 8, Łukasz's answer to step 5)
+
+The "Organization access" box builds the organization's link from the request's host, which is right in development
+only. With the database slice, the link (and any other absolute address the app sends, e.g. in invitation e-mails)
+comes from a configured base URL (an environment variable in `.env.example`).
