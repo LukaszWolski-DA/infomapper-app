@@ -306,3 +306,36 @@ A page before the start page with the company's promotional material. The start 
 The "Organization access" box builds the organization's link from the request's host, which is right in development
 only. With the database slice, the link (and any other absolute address the app sends, e.g. in invitation e-mails)
 comes from a configured base URL (an environment variable in `.env.example`).
+
+## Notes from slice 8's manual acceptance (Łukasz, 28 October 2026)
+
+Seven notes from building a model by hand. The first three are small; the others need a decision or a data model
+change first.
+
+### Quick
+
+- **Tab from Precision to Scale loses the focus (a bug).** In the attribute panel the type's parameter fields are keyed
+  by the attribute's version (`key={`p${v}`}`, `key={`s${v}`}`, `src/app/_panels/attribute-panel.tsx`). Tab saves
+  Precision, the version goes up, Scale is mounted anew and the focus that Tab just put there is gone; the person has to
+  click Scale again. Fix: a stable key, the field taking a new value from its props; check the other panels' fields for
+  the same pattern. A `fix:` of its own, with an e2e test (Tab, then type).
+- **Renaming a project** (and its description). The prototype edits both on the project home (`renderHome`,
+  `data-pf`); the app names a project only when it is created (`docs/inventory-prototype-vs-app.md`). The pattern is
+  `renameCanvas`: a domain command with its change event, one undo step, a field on the home.
+- **Typing the zoom** (e.g. 95 %) next to + and −. Not in the prototype, so a decision: the range (the canvas's minimum
+  and maximum), Enter applies, Esc goes back. One `setViewport`, no re-render of `ModelCanvas` (AD-24).
+
+### Later
+
+- **Thumbnails on the project home's canvas tiles.** The prototype draws them (`thumb`); the app has an empty strip
+  since slice 0 ("no thumbnails yet"). The Overview's miniature can draw them, but the home would read every canvas's
+  layout: measure the home's load first.
+- **Copying an attribute to another entity** ("copy to", picking an entity on the canvas), e.g. a primary or business
+  key that becomes a foreign key elsewhere. Decide: a plain copy, or a foreign key tied to a relationship (with the
+  self-relationship below); what happens to its classifications and mappings; whether the copy follows the original.
+- **An alias for entities and attributes**, with a switch to show the alias instead of the name on the canvas. A data
+  model change (`docs/data-model-v2.md`, the local file's next format), the cards' text fit and the element guard; decide
+  whether the import reads an alias.
+- **A relationship from an entity to itself** (parent and child). Refused today on purpose, as in the prototype
+  (`createRel`: "Pick a different entity to relate to."; `createRelationship` and its test). Allowing it changes the
+  prototype's behaviour (a decision) and needs a loop drawn in the line layer (AD-24, measured).
