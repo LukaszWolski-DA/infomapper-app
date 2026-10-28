@@ -1,6 +1,6 @@
 # Slice 8 – Acceptance
 
-Status: **step 4 (the start page and signing in) done, waiting for Łukasz.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
+Status: **step 5 (People) done, waiting for Łukasz.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
 `slice-07c`). PRD: `docs/prd/slice-08-organizations.md`. The PRD stays as written; this file is its amendment.
 
 ## Answers from Łukasz (step 1) (27 October 2026)
@@ -1094,3 +1094,180 @@ role specs) and CI.
 
 1. Decisions 2 and 4: the start page's and the list's headings, and "New organization…" at the end of the menu?
 2. The page totals one higher than the baseline outside the viewport: look into it in step 6, or accept?
+
+## Answers from Łukasz (step 4) (28 October 2026)
+
+- Step 4 is approved. Decisions 1–5 are accepted, including the headings (2: "InfoMapper" on the start page, "Sign in
+  as a test user" over the list) and "New organization…" last in the organization menu after a separator (4).
+- Before step 5, two checks: find the element behind the page totals one higher than the baseline (a closed dialog
+  mounted all the time is mounted only when open, as the app's other dialogs are; anything else is explained here and
+  left for Łukasz), and look up whether S0-10 or S1B-12 failed intermittently before slice 8 (for S0-10: could the
+  session secret file or the first compile of `/sign-in` be involved). Record the findings; change nothing unless the
+  cause is in this slice.
+
+### Check 1: the page totals one higher than the baseline
+
+**The element is a `<script>` in `<head>`, not anything drawn.** Method: a throwaway spec (not committed) opened
+"Performance test" at the 30 % view of `S3B-15-elements.spec.ts` in each side's measurement build (`slice-07c` in the
+reference worktree `../infomapper-ab-main`, as `measure:canvas` prepares it; this branch at `d2dbaba`) and listed
+every element outside the canvas's viewport by tag and test id or source.
+
+- Totals: 5,993 on `slice-07c`, 5,994 here; outside the viewport 1,485 and 1,486. (Slice 7c's own guard read 5,993
+  too, so the +1 is slice 8's.)
+- Every element of the page's body is the same on both sides, test id for test id. The only difference is in
+  `<head>`: `slice-07c` loads 6 JavaScript chunks (`<script src="/_next/static/chunks/…">`), this branch 7. The
+  stylesheet is one `<link>` on both sides.
+- The cause is how Turbopack splits the client code: the top bar now imports the "New organization…" dialog and the
+  lock icon, and the build put that code into one more chunk. The dialog itself mounts only when it is open
+  (`{creating && <NewOrganizationDialog … />}` in `top-bar.tsx`), as the app's other dialogs do; a closed menu draws
+  nothing.
+- A script element is never painted or laid out, so it costs nothing on a pan or zoom frame; the viewport counts the
+  guard compares are equal.
+
+**Left for your decision.** Options: (a) accept, and read the guard's page totals as "+1 script" from now on;
+(b) load the dialog only when it opens (`next/dynamic`), which might or might not bring the chunk count back, as the
+split is Turbopack's; I would not do it for an element nobody sees. My recommendation: (a).
+
+### Check 2: S0-10 and S1B-12
+
+**S0-10 (the restart) has failed intermittently since slice 1a**, always on its own cold dev server, never because of
+what it checks:
+
+- Slice 1a (3–4 October): timed out twice, and its server answered 404 for whole routes (Turbopack's dev cache in a
+  reused build folder; fixed then, `docs/known-limitations.md`, "end-to-end tests").
+- Slice 1b: its restarted server did not answer within 2 minutes. Slice 2a: the wait went up to 5 minutes and the canvas
+  page is warmed after the restart.
+- **Slice 2b (step runs): "timed out at its first sign-in on its own cold dev server (the workspace page took over 15 s
+  to compile)"** — the same failure as this run's.
+- Slice 2c, 4b-1, 4b-2 (run 3 each): its restarted server did not start within 300 s. Slice 4b-2 gave the restart its
+  own build folder (`a0e2b38`). Slice 7a: its first server answered 404 for the canvas page it had just created.
+
+This run's failure: `signInAs` waits 15 s for the top bar after clicking Łukasz in the list, on the test's first,
+freshly started server (port 3201), before any restart. Three runs on their own passed (87–88 s each).
+
+- **The session secret file: not involved.** `.data/session-secret` exists before S0-10 starts (the shared e2e
+  server's global setup signs in first, which writes it if missing), both of S0-10's servers run in the same folder and
+  read the same file, and the secret is cached per process (`src/data/local/session-secret.ts`). A cookie the server
+  could not verify would send the page back to `/sign-in` at once (`getSession` returns null), not wait 15 s; and the
+  failure came before the restart.
+- **The first compile: involved, and slice 8 adds to it.** On a cold server the click compiles the sign-in action,
+  then `/` (the landing, as before slice 8) and then the workspace page, which `signInAs` gives 15 s in all. Slice 8
+  made `/sign-in` larger (the two paths' client components, 288 lines) and `/` a little (the unlocked check). That is
+  the same cause as slice 2b's; slice 8 makes the cold path somewhat longer, it does not add a new failure. No change (your instruction: only if the cause is in this slice); if it comes
+  back, `signInAs` could wait for the top bar with S0-10's `COLD` timeout on that server only.
+
+**S1B-12 had never failed before** (no acceptance doc, run table or `known-limitations.md` names it; its file has no
+history of a timing fix). This run's failure: the test's 60 s ran out at the last `Ctrl+Z` (line 123), after 26 steps.
+On its own it passed three times; Playwright's totals for those runs (53.6 s, 54.6 s, 51.2 s) include the server's
+start, not only the test.
+
+**Is slice 8 slower? No.** Step 4's full run took 90.5 min for 347 tests; slice 7c's last took 61 min for 335. To
+tell the code from the laptop, the same 31 tests (`e2e/slice-01b`, `e2e/slice-04a`, JSON reporter, per-test durations)
+ran on `slice-07c` (the reference worktree) and then on this branch, in one sitting (28 October): **494 s on
+`slice-07c`, 374 s here**; S1B-12 **33 s and 21 s**; every test but one (S4A-14, 12.1 and 13.8 s) as fast or faster here.
+One round, unbalanced (the reference ran first, right after its build), so it shows no slowdown rather than a gain. The
+full run's 90 minutes, and S1B-12 reaching its 60 s in it (about three times its time here), were the laptop's state
+during that run, not this slice. No change.
+
+## Step 5: People (28 October 2026)
+
+Commit: `feat: slice 8 step 5: people`.
+
+### What changed
+
+- **The People tab** (`src/app/w/[workspaceId]/page.tsx`, controls in `_components/people.tsx`), for the workspace's
+  owners and admins, not in an archived workspace (`can(access, "people.edit")`):
+  - **"Add a person"** (item 10), a box under the table where the prototype has "Invite someone": name, e-mail and
+    role (Admin, Modeler, Reviewer, Reader; Modeler first). Continue shows the summary from the server
+    (`previewAddPersonAction`: a new account; an account linked to this organization, its name kept; an account from
+    elsewhere, named by e-mail only, F11) with Back (keeps the fields, writes nothing) and Add. Field messages under
+    their fields; "{name} is already in {workspace}." and the other refusals as toasts; the toast after Add.
+  - **The role select** per member (item 11): Owner is offered to owners only; an owner's row is text for an admin;
+    your own row is text (F12). A refusal leaves the shown role.
+  - **Remove** per member (item 12), on the rows a select is on: the confirmation's lines come from the server
+    (`previewRemovePersonAction`: "{name} loses access to {workspace}." and, for their last workspace in the
+    organization, the sentence that they leave it), Cancel or Remove; F9's refusal shows as a toast when the dialog
+    would open.
+- **"Organization access"** (item 13), a box under "Add a person" for the organization's owners and admins
+  (`organization_member.role`), not in an archived workspace (F17): the link `{host}/sign-in?org={id}` with Copy
+  ("Link copied."), and "Change the password": new password twice, Continue (the checks, through
+  `previewOrganizationPasswordAction`, new, writes nothing), the summary, Back or "Change the password", the toast. The
+  page sends the password row's version only; S8-13's check now also covers this box.
+- **F12's two texts:** `ROLE_CAN.admin` and the role table's Admin row, as approved in step 2.
+- **The archive** uses slice 0's `ARCHIVED_MESSAGE` ("This workspace is archived, so it is read-only.") for every
+  people write and the password change, as the domain already did; the page shows none of the controls there.
+- **e2e:** `changeRoleAs`, `openPeople` and `personRow` in `e2e/slice-08/helpers.ts`; specs S8-08 to S8-12.
+
+### Findings
+
+1. **The last-owner refusal cannot be reached from the app.** Nobody changes or removes their own row, and only an
+   owner changes or removes an owner (F12); so whoever changes an owner's row is another owner, who stays. "{workspace}
+   needs at least one owner." remains as the domain's safety net, covered by `people.test.ts` (role and removal) with
+   a state the app cannot produce. S8-09 and S8-10 check the rules that make it unreachable (own row as text, owners
+   as text for admins, the server's refusals) instead of the refusal itself.
+2. **A removed person's name in history needs a change event** (F10 as approved): the seed writes no change events, so
+   a seed note by Piotr would show "someone" after his removal. S8-10 lets Piotr write a note through the domain (with
+   its change event, as the server writes), and that note keeps his name. Anything written in the app has its event.
+
+### Earlier specs touched
+
+None changed. Through behaviour: S0-03 (the role texts; the admin's changed text is not among those it reads), S0-06
+(a reviewer sees no People controls), S0-07 (the archive; Bank X shows none), S6B-01 (the People tab as a history entry),
+and slice 8's S8-13 (the access box sends no hash). All pass (below).
+
+### Decisions I took (please check)
+
+1. **Button and title texts not in the PRD:** "Continue" and "Add" in "Add a person" (as "Continue" and "Create" on the
+   start page); "Remove {name}?" as the removal dialog's title with "Cancel" and "Remove"; "Change the password" as
+   the password summary's button (the PRD's own words); the box's placeholders "Name", "name@company.com" (the
+   prototype's), "New password", "New password again".
+2. **Refusals on the People tab are toasts** (as everywhere in the app, AD-23), field messages under their fields; the
+   start page keeps its refusals under the form (step 4, decision 3).
+3. **The link** is built from the request's host (`x-forwarded-proto`, else `http`), so it is the address people used
+   to reach this page.
+4. **Remove sits on the rows that have a select**: whoever may change a row's role may remove it, and no one else.
+
+### The runs
+
+A small step's runs (no full e2e run here; it comes in step 6):
+
+- S8-08 to S8-12 (9 tests), first run: 8 passed, S8-08 failed on the spec's own check (it read the workspace menu
+  item's whole text, "Retail Co – DWHReviewer✓", for the name); fixed to the name and the one item, then the file three
+  times on its own: 3 of 3 passed (48–53 s).
+- The touched specs and the slice: `e2e/slice-00` (S0-01 to S0-11), `e2e/slice-06b/S6B-01.spec.ts` and all of
+  `e2e/slice-08` (S8-01 to S8-13): **41 passed in 6.6 min**.
+- `npm run lint` (96 s) and `npm run typecheck` (29 s) pass; `npm test`: 107 files, 1,373 tests passed (unchanged:
+  the rules were tested in step 2).
+
+### Manual checklist for Łukasz (S8-08 to S8-12)
+
+Start with `npm run reset-dev-data`, then `npm run dev`; sign in as Łukasz from the test users' list; open Retail Co –
+DWH's People tab. The password of InfoMate and Retail Co is `demo-pass`.
+
+1. **S8-08** "Add a person": Continue with an empty name ("Enter a name."). Name "Ola Nowa", e-mail
+   `ola@example.com`, role Reviewer, Continue: the summary; Back keeps the fields; Continue, Add: the toast and her row.
+   Again with `piotr.w@infomate.pl`: "Piotr Wiśniewski is already in Retail Co – DWH.". Make a workspace "Second" (the
+   workspace menu), and add `piotr.w@infomate.pl` there (his name and "that name stays") and `m.lis@retailco.com` (no
+   name: "they keep their own name"). Sign out; open the link of InfoMate (from the Organization access box) and sign
+   in as `ola@example.com` with `demo-pass`: only Retail Co – DWH, as Reviewer.
+2. **S8-09** Your own row shows "Owner" as text. Anna's select: Reviewer (the toast), then back to Modeler. Make her
+   Admin, sign in as Anna: your row is text, Piotr's select has no Owner.
+3. **S8-10** As Łukasz, Remove on Piotr: two lines (he leaves InfoMate too); Cancel changes nothing; Remove: the toast.
+   Remove on Anna: one line (she keeps Bank X). Add both back if you want to go on.
+4. **S8-11** The Organization access box: Copy, then paste somewhere (the link); "Link copied.". Change the password to
+   a new one (try 7 characters and two different ones first): the summary, then the toast. Signed in elsewhere (another
+   browser) you stay signed in; signing in again with `demo-pass` is refused, the new one works. Set it back to
+   `demo-pass` (or run `npm run reset-dev-data`).
+5. **S8-12** As Piotr (reviewer), Anna (modeler) and Kasia (reader): the People tab has the table and the role table
+   only. As Łukasz in Bank X (archived): the same.
+
+### Open for step 6
+
+The docs (section 10: `docs/data-model-v2.md`, the README's `demo-pass` line, `known-limitations.md`, `ideas.md`, the
+status lines), one full e2e run, your manual acceptance; merge only on your command, tag `slice-08`.
+
+### Questions for Łukasz
+
+1. Check 1: accept the guard's page totals as "+1 script", or try loading the dialog on demand?
+2. Decisions 1–4 above, in particular the texts in decision 1.
+3. Finding 1: keep the unreachable last-owner refusal as a safety net (my recommendation), or drop it?

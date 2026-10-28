@@ -2,7 +2,7 @@
 
 // Organizations (slice 8, items 6–9, 13). The typed passwords are checked by the domain, hashed here through the
 // password adapter (F19) and never logged; the hash goes to the command and never back to the browser. The pages and
-// dialogs that call these come in steps 4 and 5.
+// dialogs that call these are the start page, "New organization…" and the People tab's "Organization access" box.
 
 import { revalidatePath } from "next/cache";
 import { scryptHasher } from "@/data/password";
@@ -99,6 +99,12 @@ export async function createOrganizationFromMenuAction(input: NewOrganizationFor
   await writeSession(session.user.id, [...session.unlocked, result.value.organizationId]);
   revalidatePath("/", "layout");
   return { ok: true, value: { href: workspaceHref(result.value.workspaceId), toast: ORGANIZATION_CREATED(input.organizationName.trim()) } };
+}
+
+/** "Change the password": the two fields' checks before the summary (item 13). Writes nothing. */
+export async function previewOrganizationPasswordAction(input: { password: string; passwordAgain: string }): Promise<ActionResult<null>> {
+  const weak = checkNewPassword(typeof input?.password === "string" ? input.password : "", typeof input?.passwordAgain === "string" ? input.passwordAgain : "");
+  return weak ? refused(weak) : { ok: true, value: null };
 }
 
 /**

@@ -2,7 +2,7 @@
 
 // People on a workspace's People tab (slice 8, items 10–12). Each runs a domain command through runCommand(), so the
 // server refuses whatever the role, the archive or the lock does not allow, whatever the page showed. None is an undo
-// step. The People tab's controls come in step 5.
+// step. The People tab's controls are in `w/[workspaceId]/_components/people.tsx`.
 
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";

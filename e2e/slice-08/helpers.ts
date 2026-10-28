@@ -1,11 +1,12 @@
 // Slice 8's helpers: signing in with a password through the start page (`signInWithPassword`), and test data written as
-// the server writes it, through the domain and the local adapter (`createOrganization`, `addPerson`).
+// the server writes it, through the domain and the local adapter (`createOrganization`, `addPerson`, `changeRoleAs`);
+// step 5's People tab (`openPeople`, `personRow`).
 import { expect, type Page } from "@playwright/test";
 import { createLocalDataStore } from "../../src/data/local/store";
 import { DEMO_PASSWORD, DEMO_PASSWORD_HASH } from "../../src/data/local/demo-password";
 import { scryptHasher } from "../../src/data/password";
 import { createOrganization as createOrganizationCommand, normalizeEmail } from "../../src/domain/commands/organization";
-import { addPerson as addPersonCommand } from "../../src/domain/commands/people";
+import { addPerson as addPersonCommand, changeRole as changeRoleCommand } from "../../src/domain/commands/people";
 import { uuidv7 } from "../../src/domain/ids";
 import type { WorkspaceRole } from "../../src/domain/types";
 import { E2E_DB } from "../config";
@@ -73,3 +74,24 @@ export async function addPerson(byUserId: string, workspaceId: string, p: { name
   if (!applied.ok) throw new Error(applied.error.message);
   return result.value.userId;
 }
+
+/** Test data: changes a person's role in a workspace as `byUserId` would (item 11). */
+export async function changeRoleAs(byUserId: string, workspaceId: string, userId: string, role: WorkspaceRole) {
+  const s = store();
+  const workspace = await s.workspaces.get(workspaceId);
+  if (!workspace) throw new Error(`no workspace ${workspaceId}`);
+  const state = { access: { workspace, member: await s.workspaces.getMember(workspaceId, byUserId) }, person: await s.users.get(userId), members: await s.workspaces.listMembers(workspaceId) };
+  const result = changeRoleCommand({ actorId: byUserId, now: new Date().toISOString(), newId: () => uuidv7() }, state, { workspaceId, userId, role });
+  if (!result.ok) throw new Error(result.error.message);
+  const applied = await s.apply(result.writeSet);
+  if (!applied.ok) throw new Error(applied.error.message);
+}
+
+/** Opens a workspace's People tab. */
+export async function openPeople(page: Page, workspaceId: string) {
+  await page.goto(`/w/${workspaceId}?tab=people`);
+  await expect(page.getByTestId("table-people")).toBeVisible();
+}
+
+/** A person's row on the People tab, by their name or e-mail. */
+export const personRow = (page: Page, who: string) => page.getByTestId("row-person").filter({ hasText: who });
