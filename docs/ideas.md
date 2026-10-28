@@ -314,11 +314,16 @@ change first.
 
 ### Quick
 
-- **Tab from Precision to Scale loses the focus (a bug).** In the attribute panel the type's parameter fields are keyed
-  by the attribute's version (`key={`p${v}`}`, `key={`s${v}`}`, `src/app/_panels/attribute-panel.tsx`). Tab saves
-  Precision, the version goes up, Scale is mounted anew and the focus that Tab just put there is gone; the person has to
-  click Scale again. Fix: a stable key, the field taking a new value from its props; check the other panels' fields for
-  the same pattern. A `fix:` of its own, with an e2e test (Tab, then type).
+- **Tab from Precision to Scale lost the focus (a bug): fixed** on `fix/panel-field-focus`. The panels' fields were
+  keyed by their object's version, so the save on leaving one field mounted the next one anew; they are now keyed by
+  their own value (`fieldKey`, `src/app/_panels/fields.tsx`) in the attribute, entity, mapping, requirement, frame,
+  note, relationship and classification panels (`e2e/fixes/panel-field-focus.spec.ts`).
+- **A second save in a panel within about a second is refused as a conflict.** Found with the fix above: after a field
+  is saved, the panel shows the new version about 0.9 s after the action's response (the e2e dev server). A field
+  left before that saves with the old version and gets "Someone changed this meanwhile. Reload to see the latest
+  version." although nobody else changed anything (typing "2" in Scale and pressing Enter right after Tab). Before the
+  fix the remount hid it by taking the focus. Options: the panel keeps the version each save returns, or the field
+  waits for the refresh before it saves.
 - **Renaming a project** (and its description). The prototype edits both on the project home (`renderHome`,
   `data-pf`); the app names a project only when it is created (`docs/inventory-prototype-vs-app.md`). The pattern is
   `renameCanvas`: a domain command with its change event, one undo step, a field on the home.

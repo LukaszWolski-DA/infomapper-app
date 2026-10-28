@@ -1,6 +1,6 @@
 # Slice 8 – Acceptance
 
-Status: **step 6 (closing) done; waiting for Łukasz's manual acceptance.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
+Status: **accepted by Łukasz on 28 October 2026; merged into `main` through PR 22 (merge commit `8652b2b`), tag `slice-08`.** Branch `slice/08-organizations`, from `main` at `bbc16c5` (tag
 `slice-07c`). PRD: `docs/prd/slice-08-organizations.md`. The PRD stays as written; this file is its amendment.
 
 ## Answers from Łukasz (step 1) (27 October 2026)
