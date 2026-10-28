@@ -15,7 +15,7 @@ import { STEREOTYPES, type Entity, type Stereotype } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
-import { Actions, buttonClass, dangerClass, Field, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextField } from "./fields";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
@@ -71,17 +71,16 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
     }
   }
 
-  const v = `${e.id}:${e.version}`;
   return (
     <div data-testid="panel-entity">
       <div className="mb-1.5 text-[11.5px] text-im-ink-3">Entity</div>
       <Field label="Name" htmlFor="f-en">
-        <TextField key={v} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-entity-name" inputRef={nameRef} />
+        <TextField key={fieldKey(e.id, "name", e.name)} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-entity-name" inputRef={nameRef} />
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Stereotype" htmlFor="f-es">
           <select
-            key={v}
+            key={fieldKey(e.id, "stereotype", e.stereotype)}
             id="f-es"
             defaultValue={e.stereotype}
             disabled={!p.editable}
@@ -98,7 +97,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         </Field>
         <Field label="Concept" htmlFor="f-ec">
           <select
-            key={v}
+            key={fieldKey(e.id, "concept", e.concept_id)}
             id="f-ec"
             defaultValue={e.concept_id}
             disabled={!p.editable}
@@ -115,7 +114,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         </Field>
       </div>
       <RichTextField
-        key={v}
+        key={fieldKey(e.id, "definition", e.definition_html)}
         label="Definition"
         html={e.definition_html}
         text={e.definition_text}

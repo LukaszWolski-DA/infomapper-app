@@ -28,7 +28,7 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, dangerClass, Field, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { RequirementsSection } from "./requirements-section";
 import { ItemLabels } from "./item-labels";
@@ -200,7 +200,6 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   const first = inputs[0] ? ix.column.get(inputs[0].source_column_id) : undefined;
   const firstTable = first ? ix.table.get(first.source_table_id)?.name : undefined;
   const fourEyesBlocks = p.fourEyes && m.status !== "approved" && p.contentAuthors[m.id] === p.userId;
-  const v = `${m.id}:${m.version}`;
 
   return (
     <div data-testid="panel-mapping">
@@ -314,7 +313,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
       </Field>
       <Field label="Transformation rule" htmlFor="f-rule">
         <textarea
-          key={v}
+          key={fieldKey(m.id, "rule", m.rule_expression)}
           ref={rule}
           id="f-rule"
           defaultValue={m.rule_expression ?? ""}
@@ -359,7 +358,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
       {fourEyesBlocks && <Note warn testId="note-four-eyes">{FOUR_EYES_MESSAGE}</Note>}
       <Field label="Note" htmlFor="f-note">
         <TextArea
-          key={v}
+          key={fieldKey(m.id, "note", m.note_text)}
           id="f-note"
           value={m.note_text ?? ""}
           readOnly={!p.editable}

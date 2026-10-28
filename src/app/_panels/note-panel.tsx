@@ -10,7 +10,7 @@ import { CanvasUiCtx } from "@/canvas/context";
 import { noteDate } from "@/canvas/note-data";
 import type { Uuid } from "@/domain/ids";
 import { NOTE_COLORS } from "@/domain/types";
-import { Actions, buttonClass, dangerClass, Field, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextArea } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextArea } from "./fields";
 import { usePanel } from "./inspector";
 
 const COLOR_LABEL = { yellow: "Yellow", blue: "Blue", green: "Green", pink: "Pink", grey: "Grey" } as const;
@@ -38,7 +38,7 @@ export function NotePanel({ noteId }: { noteId: Uuid }) {
       <Kind>Note on this canvas</Kind>
       <Field label="Text" htmlFor="f-nt">
         <TextArea
-          key={`${n.id}:${n.version}`}
+          key={fieldKey(n.id, "text", n.text)}
           id="f-nt"
           value={n.text}
           readOnly={!can}

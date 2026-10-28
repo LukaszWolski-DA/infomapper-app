@@ -13,7 +13,7 @@ import { CanvasUiCtx, type FramePatch } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { FREE_FRAME_COLORS } from "@/domain/model/frames";
 import type { FrameKind } from "@/domain/types";
-import { Actions, buttonClass, dangerClass, Field, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextField } from "./fields";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
 import { NotesHere } from "./notes-here";
@@ -92,7 +92,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       <Kind>Frame on this canvas</Kind>
       <Field label="Name" htmlFor="f-fn">
         <TextField
-          key={`${f.id}:${f.version}`}
+          key={fieldKey(f.id, "name", f.name)}
           id="f-fn"
           value={f.name}
           required
@@ -108,7 +108,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       {f.kind === "concept" && (
         <Field label="Concept" htmlFor="f-fr">
           <select
-            key={`${f.id}:${f.version}`}
+            key={fieldKey(f.id, "concept", f.conceptId)}
             id="f-fr"
             className={inputClass}
             defaultValue={f.conceptId ?? ""}
@@ -129,7 +129,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       {f.kind === "source_system" && (
         <Field label="Source system" htmlFor="f-fr">
           <select
-            key={`${f.id}:${f.version}`}
+            key={fieldKey(f.id, "system", f.sourceSystemId)}
             id="f-fr"
             className={inputClass}
             defaultValue={f.sourceSystemId ?? ""}

@@ -8,7 +8,7 @@ import { deleteRelationshipAction, swapRelationshipAction, updateRelationshipAct
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { CardinalityMax, CardinalityMin, Relationship } from "@/domain/types";
-import { Actions, buttonClass, dangerClass, Field, Kind, Seg, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Kind, Seg, TextField } from "./fields";
 import { usePanel } from "./inspector";
 
 /** The four cardinalities the prototype offers (CARDS). */
@@ -60,7 +60,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
       </div>
       <Field label="Verb phrase" htmlFor="f-rl">
         <TextField
-          key={`${r.id}:${r.version}`}
+          key={fieldKey(r.id, "label", r.label)}
           id="f-rl"
           value={r.label ?? ""}
           readOnly={!p.editable}

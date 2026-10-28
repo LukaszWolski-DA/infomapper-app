@@ -22,6 +22,7 @@ import {
   Flag,
   GroupedSelect,
   Hint,
+  fieldKey,
   inputClass,
   Kind,
   Li,
@@ -106,11 +107,10 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
     if (result.ok) ui.select(null);
   }
 
-  const v = `${a.id}:${a.version}`;
   const siblings = p.ix.attributesOf.get(a.entity_id) ?? [];
   const position = siblings.findIndex((x) => x.id === a.id) + 1;
   return (
-    <div data-testid="panel-attribute">
+    <div data-testid="panel-attribute" data-version={a.version}>
       <Kind>
         Attribute of{" "}
         <button
@@ -123,7 +123,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         </button>
       </Kind>
       <Field label="Name" htmlFor="f-an">
-        <TextField key={v} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-attribute-name" inputRef={nameRef} />
+        <TextField key={fieldKey(a.id, "name", a.name)} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-attribute-name" inputRef={nameRef} />
       </Field>
 
       <Field label="Position on the entity">
@@ -154,7 +154,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         {/* the parameters sit next to the type, and wrap under it when the panel is narrow */}
         <div className="flex flex-wrap gap-2" data-testid="field-attribute-type">
           <select
-            key={v}
+            key={fieldKey(a.id, "type", a.data_type)}
             id="f-at"
             defaultValue={a.data_type}
             disabled={!p.editable}
@@ -169,18 +169,18 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
             ))}
           </select>
           {a.data_type === "string" && (
-            <ParamField key={`l${v}`} label="Length" value={a.type_length} disabled={!p.editable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
+            <ParamField key={fieldKey(a.id, "length", a.type_length)} label="Length" value={a.type_length} disabled={!p.editable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
           )}
           {a.data_type === "decimal" && (
             <div className="flex flex-none gap-2">
-              <ParamField key={`p${v}`} label="Precision" value={a.type_precision} disabled={!p.editable} onSave={(n) => saveType({ precision: n })} testId="input-type-precision" />
-              <ParamField key={`s${v}`} label="Scale" value={a.type_scale} disabled={!p.editable} onSave={(n) => saveType({ scale: n })} testId="input-type-scale" />
+              <ParamField key={fieldKey(a.id, "precision", a.type_precision)} label="Precision" value={a.type_precision} disabled={!p.editable} onSave={(n) => saveType({ precision: n })} testId="input-type-precision" />
+              <ParamField key={fieldKey(a.id, "scale", a.type_scale)} label="Scale" value={a.type_scale} disabled={!p.editable} onSave={(n) => saveType({ scale: n })} testId="input-type-scale" />
             </div>
           )}
         </div>
         {a.data_type === "custom" && (
           <div className="mt-2">
-            <TextField key={`c${v}`} value={a.custom_type ?? ""} readOnly={!p.editable} onSave={(customType) => saveType({ customType })} testId="input-type-custom" mono />
+            <TextField key={fieldKey(a.id, "custom", a.custom_type)} value={a.custom_type ?? ""} readOnly={!p.editable} onSave={(customType) => saveType({ customType })} testId="input-type-custom" mono />
             <div className="mt-1 text-[11.5px] text-im-ink-3">The type’s name, e.g. uuid.</div>
           </div>
         )}
@@ -208,7 +208,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       )}
 
       <RichTextField
-        key={v}
+        key={fieldKey(a.id, "definition", a.definition_html)}
         label="Definition"
         html={a.definition_html}
         text={a.definition_text}

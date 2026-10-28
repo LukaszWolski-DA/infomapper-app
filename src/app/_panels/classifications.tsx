@@ -25,7 +25,7 @@ import { dataVaultReading, READING_EMPTY, READING_FOOTER, readingText, type Read
 import type { Classification, ClassificationScope, SourceTable } from "@/domain/types";
 import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
-import { buttonClass, dangerClass, Field, Fold, Hint, inputClass, LongList, Li, smallButtonClass, TextArea } from "./fields";
+import { buttonClass, dangerClass, Field, fieldKey, Fold, Hint, inputClass, LongList, Li, smallButtonClass, TextArea } from "./fields";
 import { usePanel } from "./inspector";
 
 type Target = { kind: "source_table" | "source_column"; id: Uuid };
@@ -90,7 +90,7 @@ export function SourceNote({ target, name, version, value, placeholder, hint }: 
   return (
     <Field label="Note" htmlFor={id}>
       <TextArea
-        key={`${target.id}:${version}`}
+        key={fieldKey(target.id, "note", value)}
         id={id}
         value={value ?? ""}
         readOnly={!p.editable}
@@ -343,7 +343,7 @@ function Row({ c, all, onRemove }: { c: Classification; all: readonly Classifica
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           {p.editable ? (
             <input
-              key={`${c.id}:${c.version}`}
+              key={fieldKey(c.id, "name", c.name)}
               type="text"
               defaultValue={c.name}
               aria-label="Name"
