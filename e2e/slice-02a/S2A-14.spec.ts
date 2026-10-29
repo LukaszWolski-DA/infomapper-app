@@ -50,7 +50,7 @@ test("S2A-14: on “Performance test”, dragging a group of at least 20 cards a
     await lassoView();
   }
   for (let i = 0; i < 5; i++) await page.getByTestId("button-zoom-in").click();
-  await expect(page.getByTestId("value-zoom")).toHaveText("50%");
+  await expect(page.getByTestId("value-zoom")).toHaveValue("50%"); // a field since slice 9 (D-60)
   const marks = page.getByTestId("mark-selected");
   await expect.poll(() => marks.count()).toBeGreaterThanOrEqual(20);
   const selected = await marks.count();

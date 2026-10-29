@@ -5,12 +5,12 @@
 
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";
-import { createProject } from "@/domain/commands/project";
+import { createProject, updateProject } from "@/domain/commands/project";
 import { archiveWorkspace, createWorkspace, unarchiveWorkspace, updateWorkspaceSettings } from "@/domain/commands/workspace";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { projectHref, workspaceHref } from "../_lib/paths";
-import { runCommand, type ActionResult } from "../_lib/run-command";
+import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 
@@ -86,6 +86,30 @@ export async function createProjectAction(input: { workspaceId: string; name: st
       if (!access) return NOT_FOUND;
       const result = createProject(ctx, access, input);
       return result.ok ? { ...result, value: { href: projectHref(access.workspace.id, result.value.projectId) } } : result;
+    }),
+  );
+}
+
+/** The project's name and description from its home (slice 9, D-59); the new version for the next save. */
+export async function updateProjectAction(input: {
+  workspaceId: string;
+  projectId: string;
+  expectedVersion: number;
+  name?: string;
+  description?: string | null;
+}): Promise<ActionResult<Saved<{ name: string }>>> {
+  return done(
+    await runCommand(async (ctx, store, user) => {
+      const access = await loadAccess(store, input?.workspaceId, user.id);
+      if (!access) return NOT_FOUND;
+      const project = typeof input?.projectId === "string" ? await store.projects.get(access.workspace.id, input.projectId) : null;
+      const result = updateProject(ctx, access, { project }, {
+        projectId: input?.projectId,
+        expectedVersion: input?.expectedVersion,
+        ...(input?.name !== undefined ? { name: input.name } : {}),
+        ...(input?.description !== undefined ? { description: input.description } : {}),
+      });
+      return result.ok ? { ...result, value: { name: result.value.project.name, version: result.value.project.version } } : result;
     }),
   );
 }

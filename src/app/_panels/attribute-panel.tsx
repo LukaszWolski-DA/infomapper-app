@@ -60,7 +60,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   const p = usePanel();
   const move = useMoveAttribute(p.ix, p.workspaceId);
   const ui = useContext(CanvasUiCtx);
-  const { run } = useAction();
+  const { run, saveRow } = useAction();
   const toast = useToast();
   const { nameFocus, setNameFocus } = usePanels();
   const nameRef = useRef<HTMLInputElement>(null);
@@ -77,16 +77,9 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
     setNameFocus(null);
   }, [nameFocus, a.id, setNameFocus]);
 
-  const save = (change: Change) => run(() => updateAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: a.version, ...change }));
-
-  const type: TypeInput = {
-    dataType: a.data_type,
-    customType: a.custom_type,
-    length: a.type_length,
-    precision: a.type_precision,
-    scale: a.type_scale,
-  };
-  const saveType = (patch: Partial<TypeInput>) => void save({ type: { ...type, ...patch } });
+  const save = (change: Change) => saveRow(a, (v) => updateAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: v, ...change }));
+  // only the part that changed (slice 9, F1): a queued Scale save must not send back the precision this render showed
+  const saveType = (patch: TypeInput) => void save({ type: patch });
 
   async function addColumn(columnId: string) {
     const result = await run(() => createMappingAction(p.workspaceId, { attributeId: a.id, sourceColumnId: columnId }));
@@ -99,8 +92,9 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
 
   async function remove() {
     const n = mappings.length;
-    const result = await run(
-      () => deleteAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: a.version }),
+    const result = await saveRow(
+      a,
+      (v) => deleteAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: v }),
       `Attribute deleted${n ? ` together with ${n} mapping${n > 1 ? "s" : ""}` : ""}`,
       { undoable: true },
     );

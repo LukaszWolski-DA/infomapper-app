@@ -25,7 +25,13 @@ import { lockedRefusal, organizationOfWrite } from "./unlock";
 export type ActionResult<T = undefined> =
   | { ok: true; value: T; live?: LiveOutcome }
   /** `fields`: the domain's field messages, when it gave some (slice 7a: P8's refusal says `review: "stale"`). */
-  | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected"; message: string; fields?: Record<string, string> };
+  | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected" | "cut"; message: string; fields?: Record<string, string> };
+
+/**
+ * What a panel's save returns (slice 9, F3): the row's new version, with the action's own values. The next save of the
+ * same row sends it (`src/ui/row-saves.ts`), before the fresh page shows it.
+ */
+export type Saved<T extends object = object> = T & { version: number };
 
 /**
  * Runs one write (AD-23): the signed-in user, a fresh context, the domain command, then the changes to resolve it

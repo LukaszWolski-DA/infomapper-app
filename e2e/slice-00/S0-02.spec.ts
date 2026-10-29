@@ -25,7 +25,8 @@ test("S0-02: the top bar shows organization / workspace / project, and the switc
   await expect(page).toHaveURL(new RegExp(`/w/${SEED_IDS.wsRetailDwh}$`));
   await pickFromMenu(page, "switcher-project", "Order management 2 canvases");
   await expect(page).toHaveURL(new RegExp(`/w/${SEED_IDS.wsRetailDwh}/p/${SEED_IDS.projOrderManagement}$`));
-  await expect(page.getByTestId("page-project-home")).toContainText("Order management");
+  // since slice 9 the name is a field for editors (D-59)
+  await expect(page.getByTestId("page-project-home").getByTestId("field-project-name")).toHaveValue("Order management");
 
   // the last used project is remembered per workspace
   await pickFromMenu(page, "switcher-workspace", "Workspace home");

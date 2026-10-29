@@ -31,7 +31,7 @@ const TYPE: Record<string, string> = { entity: "entity", attribute: "attribute",
 export function RequirementPanel({ requirement: r }: { requirement: Requirement }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
-  const { run } = useAction();
+  const { run, saveRow } = useAction();
   const { nameFocus, setNameFocus } = usePanels();
   /** Bumped after a refusal, so the fields show the stored values again. An empty key or name goes to the server, which
    * refuses it with “Enter a key.” / “Enter a name.” (PRD item 2, S4A-02). */
@@ -50,14 +50,14 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
   }, [nameFocus, r.id, setNameFocus]);
 
   async function save<F extends Field>(field: F, value: Value<F>): Promise<boolean> {
-    const result = await run(() => updateRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: r.version, field, value } as UpdateRequirementInput));
+    const result = await saveRow(r, (v) => updateRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: v, field, value } as UpdateRequirementInput));
     if (!result.ok) setReset((n) => n + 1);
     return result.ok;
   }
   const setStatus = (status: string) =>
-    void run(() => setRequirementStatusAction(p.workspaceId, { requirementId: r.id, expectedVersion: r.version, status }));
+    void saveRow(r, (v) => setRequirementStatusAction(p.workspaceId, { requirementId: r.id, expectedVersion: v, status }));
   async function remove() {
-    const result = await run(() => deleteRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: r.version }), (v) => v.message, { undoable: true });
+    const result = await saveRow(r, (v) => deleteRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: v }), (x) => x.message, { undoable: true });
     if (result.ok) ui.select(null);
   }
   const unlink = (k: RequirementLink) =>

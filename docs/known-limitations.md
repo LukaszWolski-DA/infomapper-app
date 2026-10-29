@@ -571,8 +571,11 @@ the demo data is replaced: steps whose change group is no longer in the change l
 ### No undo outside canvases (slice 3a, step 0)
 
 Undo and redo (the top bar's buttons, Ctrl+Z, Ctrl+Shift+Z) exist only on canvas pages (slice 1b, assumption 8).
-Changes made on the project and workspace home pages (projects, canvases) are in the undo history, but can only be
-undone from a canvas. Pinning a label to a project and unpinning it (project home, slice 3a) write a change group with
+Changes made on the project and workspace home pages are in the undo history but can only be undone from a canvas.
+That covers creating projects and canvases and, since slice 9 (D-59), a project's name and description. The history is
+one per person and workspace: the last 50 steps, kept in the server's memory and empty again after a restart until the
+database slice. So such a step is undone and redone from any canvas of the workspace, of any project, in its turn after
+the steps made later. Pinning a label to a project and unpinning it (project home, slice 3a) write a change group with
 their change events but are not undo steps at all. Deleting a label is an undo step, and its undo brings its project pins
 back with it.
 
@@ -866,3 +869,54 @@ The "Organization access" box builds the link from the host this page was asked 
 A removed person's name stays in history through their change events (F10: `workspacePeople` lists a workspace's
 members and the authors of its change events). The seed writes rows without change events, so a seed note or approval
 by someone removed later shows "someone" instead of their name; anything written in the app has its events.
+
+## Saving in panels (slice 9)
+
+### Writes started from the canvas are not on a row's save chain
+
+Since slice 9 a panel's saves of one row run one after another, each with the newest version known when it is sent
+(`rowSaves`, `src/ui/row-saves.ts`; `saveRow` in `src/app/_components/use-action.ts`). Some writes started from the canvas
+write the same rows as a panel field, but run through plain `run` with the version of the last render:
+
+| Canvas action | File, function | Row | Panel field on the same row |
+| --- | --- | --- | --- |
+| A mapping line's menu: status, split, delete | `src/app/_panels/canvas-host.tsx`, the mapping line's menu items (`setMappingStatusAction`, `splitMappingAction`), `deleteLine` (`deleteMappingAction`) | `mapping` | mapping panel: kind, rule, note, status, inputs |
+| A relationship line's menu: swap direction, delete | `canvas-host.tsx`, the relationship's menu items (`swapRelationshipAction`), `deleteLine` (`deleteRelationshipAction`) | `relationship` | relationship panel: label, cardinality, swap |
+| An entity card's attribute row menu: delete the attribute | `canvas-host.tsx`, the attribute row's menu (`deleteAttributeAction`) | `attribute` | attribute panel |
+| Moving an attribute (the row menu, Ctrl+arrows on the card; also the attribute and entity panels' move buttons) | `src/app/_panels/move-attribute.ts`, `useMoveAttribute` (`reorderAttributeAction`); the command `reorderAttribute` renumbers the entity's other attributes too | `attribute`, the moved one **and its renumbered siblings** | attribute panel (of any attribute of that entity) |
+| A column dropped on a mapping with a rule | `src/app/_panels/map-column.tsx`, the drop choice (`addMappingInputAction`) | `mapping` | mapping panel |
+| A frame panel's "move to the frame's concept" | `src/app/_panels/frame-panel.tsx`, `moveToFrameConcept` (`updateEntityAction`) | `entity` | entity panel: name, stereotype, concept, definition |
+
+Both orders can give a false "changed by someone else" refusal while the first write is on its way:
+
+- **Panel first, then the canvas.** The canvas action sends the version shown before the panel's save came back, and
+  the server refuses it.
+- **Canvas first, then the panel.** The canvas action's answer does not reach `rowSaves.answer`, so the chain sends
+  `max(last answered, shown)`, and both are older than the canvas's write until the page shows the new data.
+
+The canvas does not take the version from the answer (these actions return `Saved<T>` only where the panel's action
+does, and the canvas ignores it). It waits for the page's refresh: `revalidatePath` in the action, then the model
+through `ModelIndex`. `mergeFresh` (`src/canvas/fresh.ts`) concerns only the canvas's own rows (cards, frames,
+notes), not model rows.
+
+Nothing is overwritten: the refusal is the domain's (AD-12), and trying again after the page shows the change works.
+
+Not affected:
+
+- notes, which have one queue for the canvas and the note's panel (`useNotes`, slice 3b);
+- cards and frames, which have the canvas's own versions (`versions.current`);
+- creating entities, relationships, mappings or attributes from the canvas (new rows).
+
+Undo and Redo do wait for both kinds (`rowSaves.exclusive` and `ui.settled()`).
+
+**Fix (later):** send these writes through `saveRow` too, and feed a reorder's renumbered siblings with
+`rowSaves.answer`. The first candidate for slice 10 "Relationships", which changes the same actions in
+`canvas-host.tsx` (Łukasz, 29 October 2026; `docs/ideas.md`).
+
+### A project's description in Firefox and WebKit does not count wrapped lines (slice 9, D-59)
+
+The project home's description grows with its text through `field-sizing: content`, which only Chromium supports.
+Firefox and WebKit fall back to the field's `rows`, taken from the text's line breaks in the render and in the `input`
+event (`project-heading.tsx`), never from a measured height (PRD item 12). A long line that wraps is not counted, so
+there the field shows fewer lines than the text has and scrolls inside. Later: drop the fallback once those browsers
+support `field-sizing`, or measure in the `input` event only.

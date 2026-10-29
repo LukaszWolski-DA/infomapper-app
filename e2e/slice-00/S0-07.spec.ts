@@ -36,7 +36,8 @@ test("S0-07: in an archived workspace all writes are refused; after the owner un
   await page.getByTestId("input-new-project-tile").fill("Risk models");
   await page.getByTestId("input-new-project-tile").press("Enter");
   await expectToast(page, "Created the project Risk models.");
-  await expect(page.getByTestId("page-project-home")).toContainText("Risk models");
+  // since slice 9 the name is a field for editors (D-59)
+  await expect(page.getByTestId("page-project-home").getByTestId("field-project-name")).toHaveValue("Risk models");
 });
 
 test("S0-07: only the owner can archive; an admin sees the button disabled with a hint", async ({ browser }) => {

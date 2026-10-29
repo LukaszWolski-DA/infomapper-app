@@ -33,7 +33,7 @@ docs (some are repeated below where they explain an item).
 | Mappings | suggested mappings; re-pointing a mapping to another attribute | – |
 | Sources | only ideas: relationships between source tables on the canvas; slice 7c's ideas (see Sources) | idea |
 | Labels and notes | rich text in notes | known limitation |
-| Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer; deleting a project; editing a project's name and description on its home | baselines: decision only (AD-03, AD-14); the rest: – |
+| Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer; deleting a project | baselines: decision only (AD-03, AD-14); the rest: – |
 | Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
 
 ## Canvas
@@ -43,9 +43,11 @@ changed and retired row marks.
 
 **Present since the earlier inventory:** requirement markers, coverage colours and Focus (4b-1); requirement cards and
 trace lines (4b-2); showing, hiding and resizing the side panels (5a); the view-state bar and the narrow top bar (6a);
-a missing column's row and mapping line marks (7a).
+a missing column's row and mapping line marks (7a); a zoom typed in the top bar (9, D-60).
 
 **Deliberate differences:**
+- **Slice 9:** the zoom value between − and + is a field, where the prototype shows text (`#zoomv`): a typed zoom applies
+  on Enter or on leaving the field, clamped to 10–300 % (D-60).
 - **Slice 7a:** a missing column's row is muted by colour, not by opacity, and a line segment by its stroke opacity
   (AD-24: no opacity on repeated elements); on a combined mapping only the missing input's segment is marked (F29).
 - **Slice 6a** (view-state bar): no lens chip; no role or archived chip; chips that do not fit fold into "+{n}"; the
@@ -175,7 +177,7 @@ nothing, D-26), notes, and their chips in the view-state bar (6a).
 | Duplicate a workspace | a copy of the workspace | `data-wa="dup"` | – **(uncertain** what the copy includes) |
 | Transfer to another organization | hand the model over (Owner only) | `data-wa="transfer"` | – |
 | Delete a project | "Deleted the project {name}…" | `openProjMenu` | – **(uncertain** where the entry sits) |
-| A project's name and description on its home | editable fields | `renderHome` (`data-pf`) | – |
+| A project's name and description on its home | editable fields | `renderHome` (`data-pf`) | **done** (slice 9, D-59) |
 
 **Present:** workspaces, projects and canvases as in the earlier inventory; the empty workspace's next steps name
 importing sources (7a); "New organization…" in the organization menu (slice 8, item 9), with a password, the first

@@ -59,6 +59,33 @@ describe("updateAttribute", () => {
     expect(update({ type: { dataType: "custom", customType: "uuid" } })).toMatchObject({ ok: true, value: { attribute: { data_type: "custom", custom_type: "uuid" } } });
   });
 
+  it("takes only the type's changed parts: absent keeps the stored one, null clears it (slice 9, F1)", () => {
+    const decimal = { attribute: attribute(email, { data_type: "decimal", type_length: null, type_precision: 12, type_scale: null }) };
+    const patch = (type: object) => updateAttribute(makeCtx(), access("modeler"), decimal, { ...ref, type });
+    // a queued Scale save sends only the scale: the stored precision 12 stays
+    expect(patch({ scale: 2 })).toMatchObject({ ok: true, value: { attribute: { data_type: "decimal", type_precision: 12, type_scale: 2 } } });
+    expect(patch({ precision: 18 })).toMatchObject({ ok: true, value: { attribute: { type_precision: 18, type_scale: null } } });
+    expect(patch({ precision: null })).toMatchObject({ ok: true, value: { attribute: { type_precision: null } } });
+    expect(patch({ scale: 14 })).toMatchObject({ ok: false, error: { message: "The scale cannot be larger than the precision." } });
+    expect(patch({})).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+  });
+
+  it("changing only the data type clears the parameters the new type lacks and keeps those it has, as before slice 9", () => {
+    const stored = (over: Partial<Attribute>) => ({ attribute: attribute(email, { data_type: "string", type_length: 50, type_precision: null, type_scale: null, custom_type: null, ...over }) });
+    const to = (over: Partial<Attribute>, dataType: string) => updateAttribute(makeCtx(), access("modeler"), stored(over), { ...ref, type: { dataType } });
+    // string(50) → decimal: no length, no precision yet
+    expect(to({}, "decimal")).toMatchObject({ ok: true, value: { attribute: { data_type: "decimal", type_length: null, type_precision: null, type_scale: null } } });
+    // decimal(12,2) → string: no length, precision and scale cleared
+    expect(to({ data_type: "decimal", type_length: null, type_precision: 12, type_scale: 2 }, "string")).toMatchObject({
+      ok: true,
+      value: { attribute: { data_type: "string", type_length: null, type_precision: null, type_scale: null } },
+    });
+    // decimal(12,2) → date: every parameter cleared
+    expect(to({ data_type: "decimal", type_length: null, type_precision: 12, type_scale: 2 }, "date")).toMatchObject({ ok: true, value: { attribute: { data_type: "date", type_precision: null, type_scale: null } } });
+    // to custom without a stored name: refused, as before
+    expect(to({}, "custom")).toMatchObject({ ok: false, error: { message: "Name the custom type, e.g. uuid." } });
+  });
+
   it("refuses impossible type parameters", () => {
     expect(update({ type: { dataType: "custom" } })).toMatchObject({ ok: false, error: { message: "Name the custom type, e.g. uuid." } });
     expect(update({ type: { dataType: "decimal", scale: 2 } })).toMatchObject({ ok: false, error: { message: "A scale needs a precision." } });

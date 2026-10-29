@@ -3,6 +3,7 @@
 import { useCallback, useContext, useTransition } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import { useToast } from "@/ui/components/toast";
+import { rowSaves } from "@/ui/row-saves";
 import type { ActionResult } from "../_lib/run-command";
 
 /**
@@ -36,5 +37,19 @@ export function useAction() {
     [toast, ui],
   );
 
-  return { run, pending };
+  /**
+   * Runs a save of one row as `run` does, after that row's earlier saves and with the newest version known when it is
+   * sent (slice 9, `rowSaves`): `row` is the row as the panel shows it, `action` gets the version to send. A save that a
+   * refusal before it cut comes back as `CUT`, without a toast of its own.
+   */
+  const saveRow = useCallback(
+    <T,>(row: { id: string; version: number }, action: (expectedVersion: number) => Promise<ActionResult<T>>, success?: string | ((value: T) => string), options?: { undoable?: boolean }) =>
+      rowSaves.save(row.id, row.version, (v) => run(() => action(v), success, options)).then((r): ActionResult<T> => r ?? CUT),
+    [run],
+  );
+
+  return { run, saveRow, pending };
 }
+
+/** A save not sent: a refusal of an earlier save of the same row cut it (its toast says why). */
+export const CUT = { ok: false as const, code: "cut" as const, message: "" };

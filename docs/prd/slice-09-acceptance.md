@@ -1,0 +1,547 @@
+# Slice 9 – acceptance
+
+Status: **step 1 (critical review) done, waiting for Łukasz's answers.**
+
+- Branch `slice/09-saves-project-zoom` was made from `main` at `bcdfb7a`, the merge of PR 23 (`fix/panel-field-focus`).
+- The PRD is copied unchanged from `~/Downloads/slice-09-saves-project-zoom.md` (commit "docs: slice 9 PRD").
+- **About that file:** the one in Downloads is 25,843 bytes and dated 29 October 07:29. The step 1 prompt described 25,588 bytes from 28 October 22:33. It is the only file with that name, so I took it as the newer version. Please confirm.
+
+Step 1 checks every item, decision, assumption and criterion against the code, `docs/decisions.md`, the earlier slices' acceptance docs and `e2e/fixes/panel-field-focus.spec.ts`. It writes no application code.
+
+## Summary
+
+| # | Finding | Proposal |
+| --- | --- | --- |
+| F1 | **A queued save can undo the save before it.** An attribute's type is sent whole (data type, custom type, length, precision, scale), built from the panel's last render. Item 1 alone would send Scale with the right version but with the old precision (null), and the stored precision 12 would be lost without any message. | Build a queued save's patch when its turn comes. Either the type command keeps the parameters it is not sent (proposal a), or the queue merges the patch with the values the last answered save stored (b). Recommended: (a). |
+| F2 | **Saves already go one at a time.** Next.js dispatches server actions one at a time per client (`node_modules/next/dist/docs/01-app/02-guides/server-actions.md`, "Sequential dispatch"). The false conflict comes from the arguments: `expectedVersion: a.version` is read when the save is *started*, from the render before the first save's answer. | Item 2 is still needed, but not as a second network queue. What matters is reading the version (and the patch, F1) when the save is sent. Next.js calls its sequential dispatch "an implementation detail", so our own per-object chain stays. |
+| F3 | **The panels' update actions return no version.** `updateAttributeAction`, `updateEntityAction`, `updateMappingAction` and the others return `null` or a notice, so item 1's "the version the last answered save returned" does not exist yet. Only `updateWorkspaceSettingsAction` returns `{ version }` (`settings-form.tsx`). | Every update action a panel uses returns the row's new version (about 10 actions, a type change each). The alternative "expected + 1 after success" is not safe once a write set touches the row twice. |
+| F4 | **Undo writes a higher version** (Q2). Item 1's "the larger of" is safe. | Keep item 1 as written. |
+| F5 | **Undo does not wait for panel saves.** `UndoProvider` runs a step after `ui.settled()`, which covers only the canvas's card, frame and note queue (`ModelCanvas.tsx`, `settled`). A click on Undo while a panel save is on its way can undo the step before it. | The new panel queue joins `settled()`. S9-05 checks it. |
+| F6 | **A refused save does not put the panel field back today.** With `fieldKey` (and with the version key before it), a refusal changes no stored value, so the field keeps the refused text. Only the requirement panel resets (its `reset` counter) and the settings form reverts. Items 3 and 4 say "the field goes back" as if it already did. | Make "goes back" part of item 3 for every panel field: the queue raises the object's reset counter on a refusal, as the requirement panel does. S0-08 (settings) is unchanged. |
+| F7 | **"Nothing to change."** If a field is left twice with the same new value before the page refreshes, the second save repeats the first one. The domain refuses it as `invalid` "Nothing to change." (`shared.ts`, `nothingToChange`), shown as a refusal toast. | The queue drops a save whose patch equals what the last answered save stored. |
+| F8 | **Notes and frames already do items 1–2.** The canvas saves them through `enqueue` with `versions` (`ModelCanvas.tsx`) and `mergeFresh` (`useNotes.update`, `ui.updateFrame`). The note panel and the frame panel's name are therefore not affected. | Q1's list below. S9-04 covers them as "unchanged" cases, not new code. |
+| F9 | **Names have no length limit.** `nameSchema` (`src/domain/validation.ts`) is `trim().min(1)` with no maximum. A project name has no limit when created, and duplicate project names are allowed. | Item 10 states the real rules: no maximum, duplicates allowed. Adding a 200-character maximum would be a new rule for all names, so it waits for its own decision. |
+| F10 | **Most of item 20 already holds.** The canvas shortcuts (F, M, E, H, A, N, V, Escape, Delete), the nudge keys, Undo's Ctrl+Z/Y and history-nav's Alt+←/→ all skip an `INPUT` target (`isTyping` and `isTextField`). | An `<input>` in the zoom group needs no new key code; S9-12 only proves it. |
+| F11 | **D-59 (iii) costs almost nothing.** `project` is an undoable table (`undo.ts`, `isUndoable`), and every `runCommand` write is remembered. (iv) needs a new exception next to `project_pinned_label`. | Either works. (iii) is the default path. |
+| F12 | **No new permission is needed for the project home.** A `project.edit` (or reusing `canvas.rename`'s EDITORS set) gives the roles of item 13. The archive check is part of `checkPermission`. | A new `project.edit` permission with EDITORS and the message "edit projects". |
+
+## Q1. Where saves get their version
+
+**How the version reaches a field today.**
+- Every panel reads its object from the page's model (`Inspector` → `indexModel(model)`), with no `mergeFresh`.
+- The save closure sends `expectedVersion: <row>.version` from that render.
+- The field is keyed by its own value (`fieldKey`, since PR 23).
+- A model write calls `revalidatePath("/", "layout")` (`modelCommand`), so the action's single response carries the fresh page. The new version reaches the panel only when that page is applied: about 0.9 s on the e2e dev server, after the action resolves.
+- `data-version` is on `panel-attribute` (PR 23), `panel-requirement` (slice 4a) and the source note (slice 7c).
+
+**Every field that saves with an object's version:**
+
+| Panel or page | Fields | Action | Several columns at once? |
+| --- | --- | --- | --- |
+| Attribute (`attribute-panel.tsx`) | name, type select, length, precision, scale, custom type, five flags, definition (dialog) | `updateAttributeAction` | **yes: the type is sent whole (F1)** |
+| Entity (`entity-panel.tsx`) | name, stereotype, concept, definition (dialog) | `updateEntityAction` | no |
+| Mapping (`mapping-panel.tsx`) | kind, rule, note, status | `updateMappingAction`, `setMappingStatusAction` | kind and rule together when a rule is typed for a direct mapping (`saveRule`); `chooseKind` reads `m.rule_expression` from the render |
+| Relationship (`relationship-panel.tsx`) | label, cardinality of each end | `updateRelationshipAction` | min and max of one end (one control: safe) |
+| Requirement (`requirement-panel.tsx`) | key, kind, name, description, expression, owner, ref, parent; status | `updateRequirementAction` (one field per call), `setRequirementStatusAction` | no |
+| Source table and column note (`classifications.tsx`, `SourceNote`) | note | `setSourceNoteAction` | no |
+| Classification list (`classifications.tsx`) | rename | `renameClassificationAction` | no |
+| Concept, left panel (`left-panel.tsx`) | rename | `renameConceptAction` | no |
+| Canvas tab (`canvas-tabs.tsx`) | rename | `renameCanvasAction` | no |
+| Canvas menu (`canvas-menu.tsx`) | look (grid, layer…) | `setCanvasLookAction` | no; view state |
+| Working label (`label-panel.tsx`) | rename | `renameLabelAction` | no |
+| Workspace settings (`settings-form.tsx`) | name, description, four-eyes, Data Vault | `updateWorkspaceSettingsAction` | no; **already keeps the returned version**, but in state, so a second save before the first answer has the same race |
+| Note panel (`note-panel.tsx`) | text, status, colour | `ui.updateNote`: the canvas's queue | **already queued (F8)** |
+| Frame panel (`frame-panel.tsx`) | name, concept, system | `ui.updateFrame`: the canvas's queue | **already queued (F8)**; "move to concept" uses `updateEntityAction` per entity |
+| Project home (new, items 7–15) | name, description | new action | name and description separately |
+
+Toggles that add or remove rows (classification links, label links, requirement links) send no version of the object and are not affected.
+
+**One place.**
+- The rule can live in one hook beside `fieldKey`, for example `useRowSaves()` in `src/app/_panels/fields.tsx` or its own module.
+- Per object id, it keeps the last answered version and a promise chain. `save(id, versionNow, send)` runs `send(max(lastAnswered, versionNow()))` when its turn comes.
+- `versionNow` reads a ref set on every render, not the closure.
+- Each panel's `save` changes from `run(() => action({ …, expectedVersion: x.version }))` to `rowSave(x.id, () => x.version, (v) => action({ …, expectedVersion: v }))`. That is one line per panel plus F3's return values.
+- The settings form and the canvas tabs and menu use the same hook.
+
+## Q2. Undo, redo and versions
+
+- An undo or a redo writes a **new, higher version**. It never restores the image's version.
+- `src/domain/commands/undo.ts:269` builds the row as `{ ...structuredClone(base), version: (current.version as number) + 1, updated_at: ctx.now, updated_by: ctx.actorId }`.
+- The tests say so: `undo.test.ts`, "undoes an edit with the before-image, as a new version": Customer→Client→Customer gives version 3, and redo gives `version: 3` after `2`.
+- Versions only grow, so item 1's "the larger of" never sends a version that is too high. No other rule is needed.
+- **The catch is the order, not the number (F5).** Undo must wait for a panel save on its way, or it may undo the step before it.
+
+## Q3. A refused save in a queue
+
+- **Today**, `useAction.run` shows the domain's message as a refusal toast. The panel field keeps the refused text (F6), except in the requirement panel (`setReset`) and the settings form (`revert()`).
+- **Item 3's proposal holds, with F6:** a refusal stops the object's queue, raises its reset counter (all its fields show the stored values), and one toast shows the first refusal.
+- **A validation refusal of a different field.** Example: a too-long custom type is refused while a queued name save waits. The name save would have succeeded on its own. I propose to stop it anyway: the person sees one toast and every field back at its stored value. That is simpler to understand than a half-saved panel. The alternative, sending queued saves after a validation refusal (not after a conflict), is about 5 more lines.
+
+## Q4. The fresh page and the panels
+
+- The panels take the fresh page as it comes (the props), not through `mergeFresh`.
+- Because Next.js applies one action's response at a time (F2), a late page from the panels' own saves cannot overtake a later save's page.
+- A late page from *another* write could. The known limitation "A late fresh page could show an older state" says so ("What is left: the model's content on cards … and everything else on the page").
+- With item 1 the *version* sent never goes back (the larger of). A field could still show an older value for a moment, until the next page. That remains the limitation's case; the store revision (AD-31) is still its fix.
+- The limitation's text changes only to say that panel saves keep their version.
+
+## Q5. Projects today
+
+- **Creating:** `createProject` (`src/domain/commands/project.ts`):
+  - permission `project.create` (EDITORS: owner, admin, modeler; archived workspaces are refused by `checkPermission`);
+  - `name: nameSchema`, trimmed, at least 1 character, **no maximum** (F9);
+  - **duplicates allowed**;
+  - `description: null`;
+  - the action is `createProjectAction` (`src/app/_actions/workspace.ts:82`).
+- **The model for item 11:** `renameCanvas` (`src/domain/commands/canvas.ts:89`): `checkPermission(access, "canvas.rename")`, `parseInput`, the version, then `nextVersion(ctx, canvas, { name })`.
+- **A new `project.edit` permission** with EDITORS (F12).
+- **Where the name shows:**
+  - the project home's `<h1>` (`p/[projectId]/page.tsx:89`) and its description `<p>` (line 90);
+  - the breadcrumbs (`breadcrumbs.tsx:21`);
+  - the switcher (`top-bar.tsx:203`);
+  - the workspace home's tiles (`w/[workspaceId]/page.tsx:175`);
+  - the canvas menu's toasts and list (`canvas-menu.tsx:89, 107, 115, 168`);
+  - `project-tiles.tsx` ("Also in", "Add to {project}", its toast);
+  - the moved notice (`MovedNotice`, canvas page);
+  - the live canvas toast "Added the live canvas {name} to {project}."
+  - There is no document title (`generateMetadata` is not used) and no `GONE` entry: a project is not a history place.
+  - All are read from the page, so every one shows the new name after the save's fresh page.
+- **Escape in the panels' fields:** `TextField` and `TextArea` do nothing on Escape: no revert, no blur. So item 8's "Escape returns the field to the stored value" would be new. Proposal: the project home does as the panels do (nothing). Escape in all text fields stays an idea.
+
+## Q6. Undo on the home pages
+
+- A canvas created on a project home goes into the person's undo history as every `runCommand` write does (`remember` → `isUndoable`). It can be undone only from a canvas (known limitation "No undo outside canvases").
+- **(iii) costs:**
+  - nothing in undo (`project` is an undoable table);
+  - a label for the toast ("Undid: Renamed project …"), which `changeLabel` already writes generically from the events ("project");
+  - the known limitation's text.
+- **(iv) costs:** a new exception in `isUndoable` next to `project_pinned_label`, with its unit test.
+- Both are small. I leave the choice to you.
+
+## Q7. The zoom controls today
+
+`src/canvas/ZoomControls.tsx`:
+- It subscribes to React Flow's store for `transform[2]` (the zoom), `width` and `height`. A pan does not re-render it, because the selected zoom number does not change.
+- − and + call `zoomAround(rf.getViewport(), 1/1.2 or 1.2, { width, height })` (`geometry.ts`) and one `rf.setViewport(v)`, around the middle of the canvas's own size from the store, with no layout read.
+- The range is `MIN_ZOOM = 0.1` and `MAX_ZOOM = 3`, i.e. **10–300 %**, as the prototype. Fit goes up to `FIT_MAX_ZOOM = 1.1`.
+- The value is `<span data-testid="value-zoom" class="min-w-[44px] …">{Math.round(zoom * 100)}%</span>`.
+- A typed zoom calls `zoomAround` with `factor = typed / current`, the same path as − and +.
+- **The remembered view:** `onMoveEnd` (`ModelCanvas.tsx:420`) writes `infomapper:view:<canvas id>`. It reads `rootRef.current.getBoundingClientRect().left`, but in a React Flow event, not in a commit. Whatever fires it for − and + fires it for a typed zoom (S9-13 checks it).
+- **Keys:** see F10. An `<input>` in the top bar is covered by `isTyping` (canvas), `isTextField` (history-nav) and Undo's `isTyping`. React Flow's own `panActivationKeyCode="Space"` ignores inputs.
+
+## Q8. The element guard and the top bar
+
+- **Guard:** the zoom group is in the top bar, outside the canvas's viewport. Replacing the `<span>` with an `<input>` keeps the element count the same, so the viewport counts are unchanged and the page total is unchanged. A wrapper or a `<label>` would add one element to the page total, but not to the viewport.
+- **Width:** the field must stay the span's box (`min-w-[44px]`, with the same padding) with a fixed CSS width, e.g. `w-[44px]` and `text-center`. Then slice 6a's measurements stay as they are: the zoom group in the 1,600 px row of `slice-06a-acceptance.md`, never in "More".
+- **Commits:** typing is the input's own state in `ZoomControls`. Applying is one `setViewport`, as + is.
+
+## Q9. Earlier tests and docs
+
+**Specs that read `value-zoom`:**
+- `S1A-03` (30 %), `S2A-14` (50 %), `S4B2-11` (zoom after a pan).
+- If the test id moves to the input, they read `toHaveValue` instead of `toHaveText`.
+- Proposal: keep the id `value-zoom` on the input, so the change is `toHaveValue` in three specs, rather than item 16's new id `field-zoom`.
+
+**Specs of what step 2 touches:**
+- `e2e/fixes/panel-field-focus.spec.ts`;
+- the slice 4a specs that wait with `expectPanelVersion`;
+- `S0-08` (settings, unchanged);
+- the panel specs of slices 1a, 1b, 2b, 3a and 7c (the PR 23 set: 106 tests).
+
+**Other specs:**
+- Step 3: `S0-04`, `S0-06`, `S0-07` and `S0-11` (the project home); `S6B-*` if the home is a history place (it stays one).
+- Step 4: slice 6a's top bar specs (`S6A-10` widths) and slice 5a's zoom specs.
+
+**Known limitations:**
+- "No undo outside canvases": item 14.
+- "A late fresh page could show an older state": Q4.
+
+**Status lines:** the README ("slices 0 to 8 are merged") and `docs/inventory-prototype-vs-app.md` ("Projects and workspace").
+
+## Decisions and assumptions
+
+- **P1 (scope):** matches the ideas list, the "Quick" notes of slice 8's acceptance in `docs/ideas.md`.
+- **P2 (tests):** right. Item 1 touches every panel; one full run after step 2.
+- **P3 (a fix, not a decision):** right for the version. F6 (a refused field goes back) changes what a person sees after a refusal in most panels: today the refused text stays. I count it as part of the fix, since S0-08 already shows the rule for settings; tell me if it should be a decision.
+- **D-59 and D-60:** the options are open; costs in Q6 and below.
+  - **(v)/(vi):** both are a `blur` handler.
+  - **(vii)** reuses `clamp`. **(viii)** adds one toast text.
+  - Neither touches the guard.
+- **A1:** holds. PR 23 is merged (`bcdfb7a`), `fieldKey` is on main, and the branch starts from it.
+- **A2: holds, checked against `8f0f3e7`.**
+  - CLAUDE.md ("Łukasz's test model") now says the model "is never committed; it stays on his disk only (his decision, 28 October 2026)".
+  - It says to back up `.data/dev-db.json` before a slice that changes the local file's format, and on request.
+  - This slice changes no format, so no upgrade and no forced backup. The Definition of done asks for a backup before the manual acceptance, which CLAUDE.md allows ("on request").
+  - PRD section 9 says "never a fixture in the repository". CLAUDE.md does not use the word "fixture", but it says the same thing ("never committed"). No conflict.
+  - Optional wording for the PRD: "(CLAUDE.md: never committed, on his disk only)".
+- **A3:** holds. `project.name` and `project.description` exist (data model section 9; `Project` type; `createProject` writes `description: null`). No migration and no format change. F9 adds no rule unless you want a maximum.
+
+## Differences from the prototype that the slice touches
+
+- **Project home:**
+  - In the prototype the name and description are always fields (`.ph-name`, `.ph-desc`). In the app they are an `<h1>` and a `<p>` that appears only when there is a description. Item 7 makes them fields for editors and keeps text for the others (item 13).
+  - The prototype's description grows by reading `scrollHeight` in `renderHome` and on `input`. The app would use CSS (`field-sizing: content`, supported in Chromium; Firefox and WebKit would keep `rows` with `resize-y`) or the input event only, never a read in a render.
+- **Zoom:** the prototype's `#zoomv` is a `<span>` (`min-width: 44px`). The input is a deliberate difference (D-60).
+- **Saving:** the prototype has no versions; the app's per-object chain does not show.
+
+## New user-visible texts (proposals, for approval in steps 3 and 4)
+
+- Project home: the aria labels "Project name" and "Project description", and the placeholder "What is this project about?" (all from the prototype).
+- D-59 (ii): the toast "A project needs a name."
+- D-60 (viii): the toast "Type a zoom from 10 to 300 %."
+- The zoom field: an aria label "Zoom", and a title "Type a zoom and press Enter" (new; the prototype has none).
+- The permission message for `project.edit`: "edit projects", inside the existing refusal sentence.
+- Step 2 adds no text: the conflict and refusal toasts are the domain's.
+
+## Small things found in passing (step 2)
+
+- In `src/app/_panels/fields.tsx` the doc comment of `TextField` ("A text field that saves on Enter…") now sits above `fieldKey`, whose own comment follows it. The file's header still says the fields are "keyed by the row's version". Both get fixed in step 2, where the file changes anyway.
+
+## Łukasz's answers (29 October 2026)
+
+- **The PRD:** the file from Downloads dated 29 October (25,843 bytes) is the right version.
+- **F1:** the attribute's type command takes only the changed parameters:
+  - absent: keep the stored value;
+  - `null`: clear it;
+  - a value: set it.
+
+  Changing only the data type behaves as today (described below, with a unit test). Other panel actions that send a whole object or several fields at once follow the same rule (the list below).
+- **F2:** the version is read when the save is sent. The order of one object's saves is kept by our own chain per object, not only by Next.js's queue of actions, and a test covers it.
+- **F3:** agreed. Every save action of the panels returns the new version, in one shape.
+- **F5:** agreed. Undo and Redo wait for panel saves on their way; Ctrl+Z in a text field stays the field's own text undo. S9-05 is extended.
+- **F6:** no change in this slice: on a refusal every field behaves as today. PRD items 3–4 and S9-03 are corrected. Making the behaviour the same everywhere is in `docs/ideas.md`, next to "keep the typed value on a stale-version conflict".
+- **Q3:** a stale version, a missing permission and the archive stop the object's queued saves (one toast). A validation refusal does not stop them.
+- **F9:** no length rule. Item 10: no length rule, duplicates as when creating a project.
+- **Q8:** the test id `value-zoom` stays (assertions with `toHaveValue`).
+- **D-59:**
+  - (ii): an empty name sends the field back with the toast "A project needs a name.";
+  - (iii): renaming and the description are an undo step, as `renameCanvas`.
+- **D-60:**
+  - (v): leaving the field applies the value, as Enter does;
+  - (vii): a value out of range is cut to 10 % or 300 % and the result is shown.
+- The texts of D-59 and D-60 are quoted for approval in steps 3 and 4. They go into `docs/decisions.md` only after that.
+
+The PRD is corrected accordingly: items 2 (with 2a and 2b), 3, 4, 10 and 16, S9-03 and S9-05, and the chosen options of D-59 and D-60.
+
+## Step 2: saving in panels (items 1–6)
+
+### What changed
+
+- **The chain** is `src/ui/row-saves.ts` (`RowSaves`, one per browser tab, `rowSaves`).
+  - Per row it keeps the newest version an answer gave and a promise chain.
+  - `save(id, shown, send)` runs after the row's earlier saves and after any undo or redo on its way. It sends `max(answered, shown)`, read when the save is sent (F2).
+  - A refusal for `stale_version`, `forbidden` or `archived` cuts the saves of that row already waiting. They are not sent, and the one toast is the refusal's. `invalid` cuts nothing (Q3).
+  - `exclusive(step)` runs undo and redo after every save on its way and before saves started meanwhile. `answer(versions)` takes the versions an undo or redo wrote (F5).
+  - Unit tests: `src/ui/row-saves.test.ts`, 7 tests. One of them checks that the order comes from our chain: the second save is not sent before the first answer.
+- **`useAction().saveRow(row, (version) => action, success?, options?)`** (`src/app/_components/use-action.ts`) is `run` through the chain. A cut save comes back as `CUT` (`code: "cut"`) with no toast of its own.
+- **One shape for the answers (F3):** `Saved<T> = T & { version }` (`src/app/_lib/run-command.ts`). Returned by:
+  - `updateAttributeAction`, `updateEntityAction`, `renameConceptAction`;
+  - `updateRelationshipAction`, `swapRelationshipAction`;
+  - `updateMappingAction`, `setMappingStatusAction`, and the mapping input actions through `withNotice`: `addMappingInputAction`, `removeMappingInputAction`, `reorderMappingInputsAction`;
+  - `updateRequirementAction`, `setRequirementStatusAction`;
+  - `setSourceNoteAction` (the domain's `setSourceNote` returns `version`);
+  - `renameClassificationAction`, `renameLabelAction`;
+  - `updateWorkspaceSettingsAction` (already returned it).
+- **Undo and redo** (`undoAction`) return `versions`, the new version of every row the step wrote. `UndoProvider` runs a step inside `rowSaves.exclusive` (F5). Ctrl+Z in a text field is still the field's own (`isTyping`, unchanged).
+- **The attribute type (F1):** `updateAttribute` takes `type` as a patch (`typePatchInput`, `patchedType`):
+  - absent: keep;
+  - `null`: clear;
+  - a value: set.
+
+  The panel sends only the changed part (`saveType`). Changing only the data type behaves as before: `attributeType` keeps the parameters the new type has (string: length; decimal: precision and scale; custom: the name) and clears the others. Going from a type without a stored custom name to `custom` is refused ("Name the custom type, e.g. uuid."). Unit tests in `attribute.test.ts`.
+- **Other actions that send several fields at once (F1, checked):**
+  - The mapping panel's rule for a direct mapping sends `kind: "transform"` with the rule. Both are what the person did.
+  - A relationship end's cardinality sends min and max from one control.
+  - The attribute's flags send the value the click asked for (`!shown`).
+  - None of these sends a stored value it did not change, so the rule needs nothing more.
+- **Panels on the chain:**
+  - attribute (fields and delete);
+  - entity (fields, definition);
+  - mapping (kind, rule, note, status, inputs, split, delete);
+  - relationship (label, cardinality, swap, delete);
+  - requirement (fields, status, delete);
+  - source table and column note;
+  - classification rename;
+  - concept rename (left panel);
+  - working label rename;
+  - workspace settings.
+- **Already queued, unchanged (F8):** notes and frames, through the canvas's `enqueue`.
+- **Not on the chain:** the canvas tabs' rename and the canvas menu's look (not panels), and actions started from the canvas (the toolbox, a column dropped on a mapping), as before.
+- `fields.tsx`: the misplaced doc comment and the header ("keyed by the row's version") are fixed.
+
+### Specs
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S9-01 | `S9-01.spec.ts`: Precision 12, Tab, Scale 2, Enter at once on Order Line.unit_price; version +2, two change groups, no toast | passed; **fails on `bcdfb7a`** (the code before step 2) |
+| S9-02 | `S9-02.spec.ts`: the name three times with Enter, without waiting; the change events' after-images in order, three groups | passed; **fails on `bcdfb7a`** |
+| S9-03 | `S9-03.spec.ts`: (1) two sessions; the second's name save gets the conflict toast once, its scale save behind it is not sent, nothing is overwritten, the field keeps the typed text (F6); (2) a refused scale ("A scale needs a precision.") does not stop the name save behind it | passed |
+| S9-04 | `S9-04.spec.ts`, one case each: attribute (name, flag), entity (name, stereotype), mapping (note, status), relationship (label, cardinality), requirement (name, owner), source column (note twice), note (text, status: the canvas's queue); added after step 2 (Łukasz): workspace settings (name, client) and classification (the name twice) | passed; the two added cases **fail on `bcdfb7a`** |
+| S9-05 | `S9-05.spec.ts`: (1) save, Ctrl+Z while it is on its way, save at once: the undo takes back that save, the next one is stored, no conflict; (2) Ctrl+Z in the name field undoes the typing only | passed; (1) **fails on `bcdfb7a`** |
+
+Concept rename and label rename are on the same chain but have no case of their own in S9-04; their saves go through the same `saveRow` as the attribute's.
+
+Redo has no e2e case of its own. A new save clears the redo history, so a redo cannot overlap a panel save that matters. Redo uses the same `exclusive` path as undo, and the unit test covers it.
+
+### Checks
+
+- `npm run lint` passed (46 s), `npm run typecheck` passed (8 s), `npm test` passed: 108 files, 1,384 tests (24 s).
+- Slice 9 specs on their own: 13 passed (2.5 min).
+- Full e2e run (P2, from scratch, no dev server of mine running): **370 passed, 1 skipped, 0 failed, 3,935 s** (1 h 6 min). Slice 8's full run took 3,723 s (28 October), so today's run is +6 %; 4,336 s was the fix/panel-field-focus run. The skipped test is the one skipped on purpose since before slice 9. The run covers the earlier specs of the touched panels: slices 00 (S0-08, settings), 01a, 01b, 02b, 03a, 04a, 07c and the fixes' specs.
+- `.data/dev-db.json` was not touched. e2e uses `.data/e2e-db.json`.
+
+### Writes started from the canvas (after step 2, Łukasz's question)
+
+Some writes started from the canvas write the same rows as a panel field but are not on the save chain. They use `run` with the rendered version:
+
+- the mapping and relationship line menus (status, split, swap, delete);
+- the attribute row's delete;
+- moving an attribute, which also renumbers its siblings;
+- a column dropped on a mapping with a rule;
+- the frame panel's "move to the frame's concept".
+
+A quick panel save followed by one of these, or one of these followed by a panel save, can still be refused as a false conflict until the page refreshes. The canvas does not read `Saved<T>`. It waits for the refresh, and `mergeFresh` covers only cards, frames and notes. Not fixed (Łukasz). The table with files and functions is in `docs/known-limitations.md`, "Saving in panels (slice 9)", and there is an entry in PRD section 9.
+
+## Step 3: the project's name and description (items 7–15, D-59)
+
+### What changed
+
+- **Domain:**
+  - `updateProject` (`src/domain/commands/project.ts`) follows `renameCanvas`. It checks the new permission `project.edit` (EDITORS; the archive through `checkPermission`; the refusal text "edit projects", F12), validates with Zod, checks `version`, and writes the project row and its change event in one change group.
+  - The name is trimmed. An empty name is refused with `PROJECT_NAME_REQUIRED`, "A project needs a name." (D-59 (ii)). There is no length rule and duplicates are allowed (item 10, F9).
+  - The description is plain text, trimmed, with its lines kept; an empty one is stored as null.
+  - It takes only what is sent (name, description or both). Nothing new is "Nothing to change.".
+- **Undo (D-59 (iii)):** `project` is undoable, and every `runCommand` write is remembered, so a renaming is one undo step, undone from a canvas. The toasts read "Undone: Rename project" and "Undone: Change project" (the generic `changeLabel`).
+- **Action:** `updateProjectAction` (`src/app/_actions/workspace.ts`) returns `Saved<{ name }>` (F3). `loadProjectView` now carries the project's `version` and `canEditProject`.
+- **Home:** `ProjectHeading` (`p/[projectId]/_components/project-heading.tsx`) shows the prototype's `.ph-name` and `.ph-desc`.
+  - For editors these are fields (`field-project-name`, `field-project-description`), saved through `saveRow` and keyed by `fieldKey`. The name saves on Enter or on leaving the field; the description on leaving the field (Enter adds a line).
+  - An empty name goes back with the toast, without a call to the server. The server refuses it too, with the same text.
+  - On another refusal the fields keep the typed text, as the panels' `TextField` does (F6).
+  - Escape does nothing, as in the panels (Q5).
+  - The description grows through CSS (`field-sizing: content`), with no height read (item 12).
+  - Reviewers, readers and an archived workspace see text (`text-project-name`, `text-project-description`, lines kept).
+- **Where the name shows:** the breadcrumbs, the switcher and the workspace home's tiles read the page, so they show the new name after the save's fresh page. No history place is added (item 15).
+
+### Specs
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S9-06 | `S9-06.spec.ts`: (1) the name with spaces and Enter, stored trimmed, version +1, one change group, shown in the breadcrumbs, the switcher and the workspace home's tile, no toast; an empty name goes back with "A project needs a name." and stores nothing; (2) a 259-character name and another project's name are stored | passed |
+| S9-07 | `S9-07.spec.ts`: two lines (Enter adds a line, nothing is saved until Tab), the field grows, shown after a reload; emptied, stored as null | passed (3 of 3 after the fix below) |
+| S9-08 | `S9-08.spec.ts`: (1) a modeler sees the fields; a reviewer and a reader see text; a reviewer's direct call is refused with "As a reviewer you cannot edit projects."; (2) archived: the owner sees text, and the direct call is refused with "This workspace is archived, so it is read-only." | passed |
+| S9-09 | `S9-09.spec.ts`: the name and the description changed on the home; on a canvas, Ctrl+Z undoes the description, then the name ("Undone: Change project", "Undone: Rename project"), and the breadcrumbs show the old name | passed |
+| S9-10 | `S9-10.spec.ts`: the name, Tab, the description, Tab without waiting: both stored, version +2, two change groups, no toast | passed |
+
+- **Typing before hydration:** S9-07 failed once in three runs. `fill("")` came before hydration, the field lost its selection, and Delete removed one letter. A probe found no field being replaced after a load. The new helper `hydrated(page)` waits for Back to be enabled (it is enabled only from the client), and the specs of the project home call it after every load.
+- **Earlier specs changed:** `S0-02`, `S0-04` and `S0-07` read the project's name as the home's text (`toContainText`). For an editor the name is now a field's value, so they read `field-project-name` with `toHaveValue`; the reason is D-59. `S0-06` and `S0-11` pass unchanged. `S5A-02` only checks that the home is visible.
+
+### Checks
+
+- `npm run lint` passed (37 s), `npm run typecheck` passed (22 s), `npm test` passed: 108 files, 1,394 tests (20 s).
+- `e2e/slice-09`: 22 passed (2.9 min). Slice 0: S0-02, S0-04, S0-06, S0-07 and S0-11 passed (S0-02, S0-04 and S0-07 after the change above).
+
+### Texts for Łukasz's approval (step 3)
+
+- D-59, with the chosen options (ii) and (iii) written in.
+- The toast "A project needs a name.".
+- The permission text "edit projects", which shows inside the existing sentence "As a {role} you cannot edit projects.".
+- The aria labels "Project name" and "Project description", and the placeholder "What is this project about?". These come from the prototype.
+
+### After Łukasz's review of step 3 (29 October 2026)
+
+- **How the description grows (item 12):**
+  - Chromium uses CSS only (`field-sizing: content`).
+  - Firefox and WebKit lack it, so the field's `rows` follow the text's line count. The count is taken from the text in the render and in the `input` event.
+  - Nothing reads a height or other layout. Wrapped lines are not counted in that fallback.
+- **The scope of undo:**
+  - There is one history per person and workspace (`historyKey`, `src/domain/model/undo-history.ts`). It holds the last 50 steps in the server's memory.
+  - A project's rename or description is undone and redone from any canvas of the workspace, of any project, in its turn. S9-09 now undoes and redoes the description from Order management's canvas.
+  - D-59 says so, and the known limitation "No undo outside canvases" is updated.
+- **Toasts:** a description alone reads "Change project description" (`changeLabel`), so "Undone: …" and "Redone: …" use it. A name alone stays "Rename project", and both at once (only by a direct call) read "Change project".
+- **Docs:**
+  - AD-05 has a note on `project.edit`.
+  - CLAUDE.md lists slice 9's e2e helpers, `hydrated` among them.
+  - D-59 is in `docs/decisions.md`, accepted 29 October 2026.
+
+## Step 4: typing the zoom (items 16–22, D-60)
+
+### What changed
+
+- **The field** (`src/canvas/ZoomControls.tsx`):
+  - The `<span>` between − and + is now an `<input>`. It keeps the test id `value-zoom` (Q8), the 44 px width and its place in the zoom group, so it adds no element, no wrapper and no `<label>`.
+  - It shows the zoom as before ("100%").
+  - A click or Tab into the field selects its text. Only the click that focuses it keeps the selection; a later click places the caret.
+  - New texts: the aria label "Zoom" and the title "Type a zoom and press Enter".
+- **Typing:**
+  - The typed text is `ZoomControls`' own state from the first key on, so typing re-renders only the zoom group.
+  - Until a key is pressed the field follows every zoom. While someone types, a zoom does not overwrite the text.
+- **Applying (D-60 (v), (vii)):**
+  - Enter and leaving the field (Tab, a click elsewhere) apply the zoom.
+  - `typedZoom` (`src/canvas/geometry.ts`, unit-tested) reads a number with an optional "%" and spaces. A decimal is rounded, and a comma counts as the decimal point. A value is clamped to 10–300 % and shown.
+  - Anything else goes back without a toast.
+  - Escape goes back and leaves the field.
+  - The zoom is applied through `zoomBy(typed / current)`: the same `zoomAround` and one `setViewport` as − and +, around the middle of the canvas's size from React Flow's store. Nothing reads layout.
+- **Keys:** the canvas's shortcuts, Undo and Back already skip text fields (F10), so no key handling was added.
+- **The remembered view:** it is written by `onMoveEnd`, as for − and +.
+
+### Specs
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S9-11 | `S9-11.spec.ts`: (1) the aria label and the title; "95" and Enter gives 95 % with the canvas point at the view's centre kept (to the pixel) and the field left; "80%", " 120 % " and "66.6" (67 %); (2) Tab applies (v); "5" gives 10 % and "500" gives 300 % (vii); "abc" and Escape go back; a click outside applies; no toast; (3) the field follows +, −, a pinch (Ctrl and the wheel) and Fit; focused but not typed in yet, it follows a pinch and keeps its value selected, so the first key replaces it; while typing, a pinch does not overwrite the text; Back reopens the canvas at a typed 50 % | passed (3 of 3 after the fix below) |
+| S9-12 | `S9-12.spec.ts`: with an entity selected and a rename to undo, E, F, H, Ctrl+Z, Alt+← and Escape typed in the field change no tool, zoom, URL, selection or model; outside the field E switches the entity tool on and Escape off | passed |
+| S9-13 | `S9-13.spec.ts`: a typed 150 % is in `infomapper:view:<canvas id>`; Ctrl+Z after it undoes the rename before it and keeps 150 %; after a reload the canvas opens at 150 % | passed |
+| S9-14 | `S9-14.spec.ts` (development build, `window.__imCanvasCommits`): typing "120" adds **0** canvas commits; 100 to 120 %, typed **0** and + **0**; 45 to 38 % (across 40 %, the plain blocks), typed **1** and − **1** | passed |
+
+- **The fix found by the run:** S9-11 (3) failed once in the step's run. Fit was still animating when the field was clicked, the new zoom was written into the field, which drops the selection, and "2" was appended ("42%2"). While the field has the focus and holds no typed text, `ZoomControls` now selects its value again when the shown zoom changes (`select()` reads no layout). S9-11 now checks this case on purpose, with a pinch after the click.
+- **The element guard (S9-14, section 6):**
+  - There was no slice-08 baseline file. Slice 8 compared against slice-07b's and was equal.
+  - So `slice-08` was built in the measurement worktree (`infomapper-ab-main`, checked out at the tag and returned to `bbc16c5` after) and `S3B-15-elements.spec.ts` was run there. The result is `.data/measure/s9-14-baseline/slice-08.json` (git-ignored): viewport 4,508 / 19,305 / 1,465 / 4,907, page 5,994 / 20,791 / 2,861 / 6,303, the numbers slice 8 recorded.
+  - This branch with `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json` is **equal in all four views, page totals included**: the input replaced the span and adds no element.
+- **The top bar from 800 to 2,560 px (S6A-10)** passed in the run below. The field keeps the span's 44 px.
+
+### Earlier specs
+
+- `S1A-03` and `S2A-14` read the zoom with `toHaveValue`, and `S4B2-11` with `inputValue()` (the reason is D-60).
+- Slices 5a and 6a (top bar, zoom, widths): `e2e/slice-05a`, `e2e/slice-06a` (S6A-10 included), `S1A-03` and `e2e/slice-09`: 73 passed and 1 failed (S9-11 (3), fixed above), in 636 s. Then S9-11 ran 3 of 3 twice (before and after its new step).
+- Measuring specs whose line changed (measurement build):
+  - `S2A-14`'s group drag reads "50%" from the field. Its fps bar failed at 28.8 fps, within the known limitation (25–30 fps in the measurement build, "partly met", `docs/known-limitations.md`); not caused by the field.
+  - `S4B2-11` ran through and read `zoomAfterPan` from the field ("37%", "120%"…).
+
+### Checks
+
+- `npm run lint` passed (38 s), `npm run typecheck` passed (23 s), `npm test` passed: 108 files, 1,395 tests (22 s; `typedZoom` is new in `src/canvas/canvas.test.ts`).
+- The measurement build of this branch contains the field (checked for its title in `.next-measure`).
+
+### Texts for Łukasz's approval (step 4)
+
+- D-60, with (v) and (vii) written in.
+- The field's aria label "Zoom" and its title "Type a zoom and press Enter" (new; the prototype has none).
+- No new toast. (viii) was not chosen, so "Type a zoom from 10 to 300 %." is not used.
+
+### After Łukasz's review of step 4 (29 October 2026)
+
+- **S2A-14 A/B** (one sitting):
+  - The sides were the measurement builds (AD-31) of the `slice-08` tag (worktree `infomapper-ab-main`, checked out at the tag and returned to `bbc16c5` after) and of this branch (rebuilt after the reselect fix), run alternately: slice-08 first in each of 3 rounds, 11:19 to 11:25.
+  - All runs fail S2A-14's soft bar of 45 fps on both sides, as recorded in the known limitation ("partly met", 25–30 fps).
+
+  | Measurement | slice-08 (3 runs) | median | spread | slice 9 (3 runs) | median | spread |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Group drag, 31 cards at 50 % (avg fps) | 26.7, 23.9, 29.3 | **26.7** | 5.4 | 25.4, 29.6, 30.1 | **29.6** | 4.7 |
+  | Single-card drag (avg fps) | 20.6, 19.2, 15.5 | **19.2** | 5.1 | 19.4, 16.3, 16.0 | **16.3** | 3.4 |
+  | Lasso marks, median of 20 (ms) | 26.7, 28.5, 27.5 | **27.5** | 1.8 | 26.4, 27.2, 28.7 | **27.2** | 2.3 |
+
+  - The branch is not worse than slice-08 by more than the spread:
+    - its group drag median is higher;
+    - its single-card median is 2.9 fps lower, inside slice-08's spread of 5.1;
+    - the lasso is equal.
+  - So there are no phase traces. The field is in the top bar, outside the canvas; S9-14 has 0 commits while typing, and the element counts are equal.
+- **D-60** is in `docs/decisions.md` with Łukasz's text, accepted 29 October 2026. A decimal with a point or a comma is rounded.
+- **Known limitation:** in Firefox and WebKit a project's description does not count lines that wrap (`field-sizing: content` is Chromium only).
+
+## Step 5: the closing (29 October 2026)
+
+Commit: `docs: slice 9 closing`.
+
+### What changed
+
+- **`docs/inventory-prototype-vs-app.md`:**
+  - "A project's name and description on its home" is done (D-59) and is out of the summary's missing list.
+  - The Canvas section has a typed zoom under "present" and the field as a deliberate difference (D-60).
+- **`docs/known-limitations.md`:**
+  - "No undo outside canvases": the scope of the history (step 3).
+  - "Writes started from the canvas are not on a row's save chain": slice 10's first candidate.
+  - The description's wrapped lines in Firefox and WebKit.
+- **`docs/ideas.md`:**
+  - The three quick notes from slice 8's acceptance are marked done (steps 2, 3 and 4).
+  - The canvas actions on the save chain are slice 10's first candidate.
+  - "One behaviour for a refused save" (F6).
+- **README:** the status (slices 0 to 9, tag `slice-09` after the merge), slice 9's features, and the link to this file.
+- **CLAUDE.md:**
+  - "What this is" has a sentence for slice 9.
+  - A new paragraph "Saving in panels": `saveRow`, `rowSaves`, `Saved<T>`, what cuts a queue, undo as `exclusive`, patches of changed fields only, and the canvas writes not yet on the chain.
+  - Slice 9's e2e helpers, `hydrated` among them (step 3).
+  - The element guard's command against `slice-08` (step 4).
+
+### The acceptance criteria
+
+| ID | Where | Result |
+| --- | --- | --- |
+| S9-01 | `e2e/slice-09/S9-01.spec.ts` | pass; fails on `bcdfb7a` (before the slice) |
+| S9-02 | `S9-02.spec.ts` | pass; fails on `bcdfb7a` |
+| S9-03 | `S9-03.spec.ts` (a real conflict cuts the queue with one toast; a validation refusal does not); S0-08 unchanged | pass |
+| S9-04 | `S9-04.spec.ts`: attribute, entity, mapping, relationship, requirement, source column, note, workspace settings, classification | pass; settings and classification fail on `bcdfb7a` |
+| S9-05 | `S9-05.spec.ts` (Undo waits for a save on its way; Ctrl+Z in a field stays the field's); `src/ui/row-saves.test.ts` (order, newest version, cuts, `exclusive`, redo) | pass; (1) fails on `bcdfb7a` |
+| S9-06 | `S9-06.spec.ts` (Enter, everywhere, one change group; the empty name's toast; no length rule; a duplicate name) | pass |
+| S9-07 | `S9-07.spec.ts` (two lines, saved on leaving, after a reload; emptied, stored as null) | pass |
+| S9-08 | `S9-08.spec.ts` (reviewer and reader see text; the reviewer's direct call refused; archived: text and refused) | pass |
+| S9-09 | `S9-09.spec.ts` (undone and redone from a canvas of another project, then of its own; "Undone/Redone: Change project description", "Undone: Rename project") | pass |
+| S9-10 | `S9-10.spec.ts` (the name, then at once the description) | pass |
+| S9-11 | `S9-11.spec.ts` (95 around the centre, "%" and spaces, a decimal; Tab and a click apply (v); 5 and 500 clamped (vii); abc and Escape; it follows +, −, a pinch, Fit and Back; it keeps its selection when focused; it keeps the typed text); `typedZoom` in `src/canvas/canvas.test.ts` | pass |
+| S9-12 | `S9-12.spec.ts` (E, F, H, Ctrl+Z, Alt+←, Escape in the field) | pass |
+| S9-13 | `S9-13.spec.ts` (remembered over a reload; no undo step) | pass |
+| S9-14 | `S9-14.spec.ts` (commits: typing 0; 100 to 120 %, typed 0 and + 0; 45 to 38 %, typed 1 and − 1); the element guard against `slice-08` (equal, page totals too); S6A-10 (800 to 2,560 px); S2A-14 A/B (above) | pass |
+| S9-15 | CI and the full run below. Changed earlier tests, each with its reason: `S0-02`, `S0-04`, `S0-07` (the project's name is a field for editors, D-59); `S1A-03`, `S2A-14`, `S4B2-11` (the zoom is a field, D-60); `source.test.ts` (`setSourceNote` returns the version, F3); `permissions.test.ts` (`project.edit`) | see below |
+
+### The runs
+
+- `npm run lint` passed (76 s), `npm run typecheck` passed (15 s), `npm test` passed: 108 files, 1,395 tests (30 s).
+- Full e2e run (from scratch, no dev server of mine running, ended 12:35): **385 passed, 1 skipped, 0 failed, 4,148 s** (1 h 9 min). Slice 8's full run took 3,723 s (+11 %) and step 2's 3,935 s (+5 %); the run has 15 more tests than step 2's (slice 9's S9-06 to S9-14 and the cases added to S9-04). The skipped test is `S7C-14-commits.spec.ts` (on demand, as since slice 7c). One server log line, "The destination stream closed early", came after S9-11's third test: a response cut off by a page that navigated away; no test failed.
+
+### Manual checklist for Łukasz (on your model KB, "Kanton Basel")
+
+Before you start, back up your data file (CLAUDE.md): copy `.data/dev-db.json` to `.data/backups/dev-db-<yyyymmdd-hhmm>.json` and to `.data/backups/kb-model-latest.json`. The slice changes no file format, so no upgrade runs. Then run `npm run dev` on the branch `slice/09-saves-project-zoom`.
+
+1. **Precision and scale (S9-01).**
+   - Open an attribute with a decimal type, type a precision, press Tab, type a scale and press Enter, at your usual speed.
+   - Expected: no toast, and both values are in the panel after a reload.
+2. **Several saves in a row (S9-02, S9-04).**
+   - In an entity's panel: the name, Tab, the definition, then click elsewhere. Then a mapping's note, then its status at once.
+   - Expected: no toast, and everything is stored.
+3. **A real conflict (S9-03).**
+   - Open the same attribute in a second window, change its name there, then change it in the first window.
+   - Expected: the first window shows the toast "Someone changed this meanwhile. Reload to see the latest version." once. Nothing of the second window's change is overwritten, and after a reload you see it.
+4. **Undo right after a save (S9-05).**
+   - Change a name, press Enter, and right away press Ctrl+Z with the focus outside the field.
+   - Expected: that change is undone ("Undone: …"), and a further save goes through without a conflict.
+   - Inside a text field Ctrl+Z only undoes the typing.
+5. **The project's name (S9-06).**
+   - On a project home, click the name, type a new one and press Enter.
+   - Expected: the breadcrumbs, the project switcher and the workspace home's tile show it, with no toast.
+   - Then empty the name and leave the field. Expected: the old name comes back with the toast "A project needs a name.".
+6. **The description (S9-07).**
+   - Click the line under the name ("What is this project about?" when it is empty), write two lines (Enter adds a line) and click elsewhere.
+   - Expected: the field grows; after a reload both lines are there.
+7. **Undo of the project change (S9-09).**
+   - Open any canvas of the workspace and press Ctrl+Z.
+   - Expected: "Undone: Change project description", then on the next Ctrl+Z "Undone: Rename project" (if nothing newer of yours is in the history). Ctrl+Shift+Z redoes it.
+8. **Typing the zoom (S9-11).**
+   - On a canvas, click the zoom value between − and + (the value is selected), type 95 and press Enter.
+   - Expected: 95 %, and the middle of the view stays in place.
+   - Type 5 and press Enter: 10 %. Type 500 and press Tab: 300 %. Type abc and press Enter: it goes back without a toast. Type 150 and press Escape: it goes back.
+9. **Keys in the zoom field (S9-12).**
+   - With a card selected, click into the zoom field and press E, F, H, Ctrl+Z, Alt+← and Escape.
+   - Expected: nothing happens on the canvas (no tool, no fit, no undo, no Back); the selection and its panel stay.
+   - Outside the field, E switches the entity tool on again.
+10. **The remembered zoom (S9-13).**
+    - Type 80 and press Enter, then reload. Expected: the canvas opens at 80 %.
+    - Ctrl+Z right after a typed zoom undoes your last model change, not the zoom.
+
+## Manual acceptance (29 October 2026)
+
+Łukasz ran the checklist above on his model KB ("Kanton Basel"). Every step gave the expected result.
+
+| Step | What | Result |
+| --- | --- | --- |
+| 1 | Precision and scale (S9-01) | Pass |
+| 2 | Several saves in a row (S9-02, S9-04) | Pass |
+| 3 | A real conflict (S9-03) | Pass |
+| 4 | Undo right after a save (S9-05) | Pass |
+| 5 | The project's name (S9-06) | Pass |
+| 6 | The description (S9-07) | Pass |
+| 7 | Undo of the project change (S9-09) | Pass |
+| 8 | Typing the zoom (S9-11) | Pass |
+| 9 | Keys in the zoom field (S9-12) | Pass |
+| 10 | The remembered zoom (S9-13) | Pass |
+
+Slice 9 is accepted. It is merged into `main` with a merge commit and tagged `slice-09`.

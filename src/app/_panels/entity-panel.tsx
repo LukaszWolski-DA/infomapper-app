@@ -35,7 +35,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   /** Dragging in the attribute list: which attribute, and where it would go. */
   const [order, setOrder] = useState<{ dragging: string | null; over: { id: string; after: boolean } | null }>({ dragging: null, over: null });
   const ui = useContext(CanvasUiCtx);
-  const { run } = useAction();
+  const { run, saveRow } = useAction();
   const toast = useToast();
   const { nameFocus, setNameFocus } = usePanels();
   const nameRef = useRef<HTMLInputElement>(null);
@@ -55,12 +55,12 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   }, [nameFocus, cardId, setNameFocus]);
 
   async function save(change: Omit<UpdateEntityInput, "entityId" | "expectedVersion">) {
-    const result = await run(() => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: e.version, ...change }));
+    const result = await saveRow(e, (v) => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v, ...change }));
     if (result.ok && result.value.warning) toast(result.value.warning);
   }
 
   async function saveDefinition(html: string): Promise<boolean> {
-    return (await run(() => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: e.version, definition: html }))).ok;
+    return (await saveRow(e, (v) => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v, definition: html }))).ok;
   }
 
   async function addAttribute() {

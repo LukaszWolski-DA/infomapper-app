@@ -41,13 +41,15 @@ const fieldClass =
 
 /** `dataVaultUses`: the workspace's uses of Data Vault classifications (answer F16), for the mode-off message. */
 export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial: SettingsValues; editable: boolean; dataVaultUses?: number }) {
-  const { run } = useAction();
+  const { saveRow } = useAction();
   const [version, setVersion] = useState(initial.version);
   const saved = useRef<SettingsValues>(initial);
 
   async function save(patch: Patch, revert: () => void) {
-    const result = await run(
-      () => updateWorkspaceSettingsAction({ workspaceId: initial.workspaceId, expectedVersion: version, ...patch }),
+    // after this workspace's earlier saves, with the version the last one returned (slice 9)
+    const result = await saveRow(
+      { id: initial.workspaceId, version },
+      (v) => updateWorkspaceSettingsAction({ workspaceId: initial.workspaceId, expectedVersion: v, ...patch }),
       SAVED_MESSAGE(patch, dataVaultUses),
     );
     if (result.ok) {

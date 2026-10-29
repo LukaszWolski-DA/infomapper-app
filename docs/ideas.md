@@ -10,6 +10,31 @@ Reload to see the latest version."), the field goes back to the last value this 
 lost. Better: keep the user's typed value in the field and show the current server value next to it, so the user can
 choose which to keep (or copy parts of theirs) instead of retyping.
 
+## Panels: one behaviour for a refused save in every field (slice 9, step 1, F6)
+
+After a refused save most panel fields keep the refused text (the field is keyed by its stored value, which did not
+change); the requirement panel shows the stored values again (its reset counter) and the workspace settings go back to
+the last saved value. One behaviour for every field would be clearer: either all go back, or all keep the typed text
+with the stored value beside it (the idea above). Łukasz kept today's behaviour in slice 9 (29 October 2026).
+
+## Canvas actions on a row's save chain (slice 9, after step 2): first candidate for slice 10 "Relationships"
+
+These writes are started from the canvas and write a row a panel field also writes:
+
+- the mapping and relationship line menus and the attribute row's delete, in `src/app/_panels/canvas-host.tsx`;
+- moving an attribute (`useMoveAttribute`);
+- a column dropped on a mapping (`map-column.tsx`);
+- the frame panel's "move to the frame's concept".
+
+They send the rendered version through `run`, not through `saveRow`. A quick panel save next to one of them can still be refused as a false conflict until the page refreshes (`docs/known-limitations.md`, "Writes started from the canvas are not on a row's save chain").
+
+The fix:
+
+- send these actions through `saveRow`;
+- feed the versions of the siblings that `reorderAttribute` renumbers to `rowSaves.answer`, so a sibling's next panel save sends them.
+
+Łukasz made it the first candidate for slice 10 "Relationships", which changes the same actions in `canvas-host.tsx` (29 October 2026).
+
 ## Mapping by drag: from the attribute side too (slice 1b, step 2)
 
 The prototype also starts a mapping drag from an attribute row and drops it on a column row. The slice 1b PRD asks
@@ -323,12 +348,15 @@ change first.
   left before that saves with the old version and gets "Someone changed this meanwhile. Reload to see the latest
   version." although nobody else changed anything (typing "2" in Scale and pressing Enter right after Tab). Before the
   fix the remount hid it by taking the focus. Options: the panel keeps the version each save returns, or the field
-  waits for the refresh before it saves.
+  waits for the refresh before it saves. **Done in slice 9** (step 2): one save per object at a time, each with the
+  newest version known (`saveRow`, `src/ui/row-saves.ts`).
 - **Renaming a project** (and its description). The prototype edits both on the project home (`renderHome`,
   `data-pf`); the app names a project only when it is created (`docs/inventory-prototype-vs-app.md`). The pattern is
-  `renameCanvas`: a domain command with its change event, one undo step, a field on the home.
+  `renameCanvas`: a domain command with its change event, one undo step, a field on the home. **Done in slice 9**
+  (step 3, D-59).
 - **Typing the zoom** (e.g. 95 %) next to + and −. Not in the prototype, so a decision: the range (the canvas's minimum
-  and maximum), Enter applies, Esc goes back. One `setViewport`, no re-render of `ModelCanvas` (AD-24).
+  and maximum), Enter applies, Esc goes back. One `setViewport`, no re-render of `ModelCanvas` (AD-24). **Done in
+  slice 9** (step 4, D-60).
 
 ### Later
 

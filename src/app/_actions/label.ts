@@ -9,7 +9,7 @@ import type { DataStore } from "@/data";
 import type { CommandContext, CommandResult } from "@/domain/changes";
 import { addLabel, createLabel, deleteLabel, removeLabel, renameLabel, setLabelPinned, type AddLabelInput } from "@/domain/commands/label";
 import type { WorkspaceAccess } from "@/domain/permissions";
-import { runCommand, type ActionResult } from "../_lib/run-command";
+import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -52,12 +52,12 @@ export async function removeLabelAction(workspaceId: string, input: { labelLinkI
   );
 }
 
-export async function renameLabelAction(workspaceId: string, input: { labelId: string; expectedVersion: number; name: string }): Promise<ActionResult<{ name: string }>> {
+export async function renameLabelAction(workspaceId: string, input: { labelId: string; expectedVersion: number; name: string }): Promise<ActionResult<Saved<{ name: string }>>> {
   return labelCommand(workspaceId, async (ctx, access, store) => {
     const ws = access.workspace.id;
     const [labels, canvases] = await Promise.all([store.labels.list(ws), store.canvases.list(ws)]);
     const r = renameLabel(ctx, access, { labels, canvases }, input);
-    return r.ok ? { ...r, value: { name: r.value.label.name } } : r;
+    return r.ok ? { ...r, value: { name: r.value.label.name, version: r.value.label.version } } : r;
   });
 }
 

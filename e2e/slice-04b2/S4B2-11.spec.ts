@@ -49,7 +49,7 @@ test("S4B2-11: pan and zoom with Focus on against off, with requirement cards, 3
         const litCards = await page.evaluate(() => document.querySelector<HTMLElement>('[data-testid="layer-fade"]')?.dataset.litCards ?? null);
         const litTraces = await page.locator('[data-testid="lit-trace"]').count();
         const raf = await pan(page);
-        const zoomAfterPan = await page.getByTestId("value-zoom").textContent();
+        const zoomAfterPan = await page.getByTestId("value-zoom").inputValue(); // a field since slice 9 (D-60)
         let presented: unknown = null;
         if (TO_SCREEN) {
           await ready();

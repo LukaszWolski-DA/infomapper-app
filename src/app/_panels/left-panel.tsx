@@ -76,7 +76,7 @@ export interface LeftPanelProps {
 export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames = {}, importData }: LeftPanelProps) {
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
-  const { run } = useAction();
+  const { run, saveRow } = useAction();
   const { setNameFocus, setLastConcept, leftTab: tab, setLeftTab: setTab } = usePanels();
   const imported = useImported();
   // slice 5a (Q4): creating something whose name is typed in the details panel, and a requirement's click, open it
@@ -177,7 +177,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     setRenaming(null);
     const trimmed = name.trim();
     if (!trimmed || trimmed === c.name) return;
-    await run(() => renameConceptAction(workspaceId, { conceptId: c.id, expectedVersion: c.version, name: trimmed }));
+    await saveRow(c, (v) => renameConceptAction(workspaceId, { conceptId: c.id, expectedVersion: v, name: trimmed }));
   }
 
   async function createConcept(name: string) {

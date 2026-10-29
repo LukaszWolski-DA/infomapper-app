@@ -217,6 +217,10 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
   // A new canvas that comes with cards is a duplicated layout (slice 2a).
   if (of("canvas").some((e) => e.operation === "create") && cards.some((e) => e.operation === "create")) return "Duplicate canvas";
 
+  // A project's description from its home (slice 9, D-59); its name alone stays "Rename project".
+  const projects = of("project");
+  if (projects.length === 1 && events.length === 1 && projects[0]!.operation === "update" && only(projects[0]!, ["description"])) return "Change project description";
+
   // Attribute order (D-36): only sort orders changed.
   const attributes = of("attribute");
   if (attributes.length === events.length && attributes.every((e) => e.operation === "update" && only(e, ["sort_order"]))) return "Reorder attributes";

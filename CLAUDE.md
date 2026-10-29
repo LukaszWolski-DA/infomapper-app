@@ -13,7 +13,8 @@ fixed codes the rules read, and the workspace's own) and the modeller's notes; a
 classifications, and in Data Vault 2.0 mode a table panel shows its Data Vault reading (slice 7c, D-57). One workspace
 holds one model; projects and canvases organise the work on it. Organizations are silos: in development people sign in
 with an organization's shared password or the test users' list, create organizations, and owners and admins add,
-change and remove people (slice 8, D-58).
+change and remove people (slice 8, D-58). Panels save one object at a time, each save with the newest version known; a project's name
+and description are edited on its home, and a zoom is typed in the top bar (slice 9, D-59, D-60).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -183,6 +184,7 @@ npx tsx scripts/bench-import-plan.ts --no-coverage            # slice 7c: the pl
 ONLY_REMOVE=1 npx tsx scripts/bench-import-write.ts 20000     # slice 7c: only removing Business key from 2,000 columns (bar 1 s); without it the whole write bench
 COMMITS=1 npx playwright test e2e/slice-07c/S7C-14-commits.spec.ts   # slice 7c: canvas commits per classification toggle (on demand; 3 on slice-07b and 7c)
 MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7C-14's element guard; slice 8 too (page total +1, see below)
+MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts   # slice 9's element guard (S9-14), against slice-08's own counts
 npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06b/S6B-10.spec.ts         # slice 6b: selection places, the buttons, the background refresh, phase by phase
@@ -243,8 +245,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   (`signInWithPassword`; the demo password is `DEMO_PASSWORD`, `demo-pass`), write an organization, a person or a role
   as test data through the domain (`createOrganization`, `addPerson`, `changeRoleAs`) and open the People tab
   (`openPeople`, `personRow`); the earlier slices' helpers keep signing in through the test users' list (`signInAs`),
-  which unlocks every organization. The undo history lives in the server's memory and is empty again after each
-  reseed.
+  which unlocks every organization. Slice 9's helpers do the following:
+  - record every toast a page shows (`recordToasts`, then `toasts`);
+  - read a row's change groups (`groupsOf`);
+  - open and read the project home (`projectHome`, `loadProject`, `C360`);
+  - wait for hydration (`hydrated`), which matters because typing before it can lose a field's selection. Call it after
+    `goto` or `reload` and before typing.
+
+  The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
   with notes below 40 % zoom (a note measured while drawn plain once grew on every round), `S3B-15-idle.spec.ts` on a
@@ -378,3 +386,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   people (`workspacePeople`, F10). The last owner is checked again inside the local adapter's write.
 - Writes: a server action calls `runCommand()` (`src/app/_lib/run-command.ts`), which runs the domain command and
   applies its write set through the adapter; refusals come back with the domain's message and are shown as toasts.
+- **Saving in panels** (slice 9, P3): a field that saves an object's row calls `saveRow(row, (expectedVersion) => action(…))`
+  (`useAction`, `src/app/_components/use-action.ts`), never `run` with `row.version`. `rowSaves` (`src/ui/row-saves.ts`)
+  sends one save per object at a time, each with the newest version known when it is sent (the last answered, or the
+  shown one if newer); a stale version, a permission or the archive cuts the saves waiting behind it (one toast), an
+  invalid input does not. Every panel save action returns `Saved<T>` (`{ version, … }`); undo and redo run as
+  `rowSaves.exclusive` and feed back the versions they wrote. A command takes only the fields that changed (an
+  attribute's type: absent keeps, `null` clears). Writes started from the canvas on a panel's row are not on the chain
+  yet (`docs/known-limitations.md`, slice 10's first candidate). Fields are keyed by their stored value (`fieldKey`).

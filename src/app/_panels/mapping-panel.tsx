@@ -50,7 +50,7 @@ const iconButton = "grid size-6 flex-none place-items-center rounded text-im-ink
 export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
-  const { run } = useAction();
+  const { run, saveRow } = useAction();
   const toast = useToast();
   const ix = p.ix;
   const attribute = ix.attribute.get(m.attribute_id);
@@ -86,8 +86,9 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   }, [mergeFocus, setMergeFocus, m.id, p.editable]);
 
   async function split() {
-    await run(
-      () => splitMappingAction(p.workspaceId, ref),
+    await saveRow(
+      m,
+      (v) => splitMappingAction(p.workspaceId, ref(v)),
       (v) => v.notice ?? `Split into ${v.mappings} separate mappings.`,
     );
   }
@@ -98,7 +99,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
     const result = await run(
       () =>
         mergeMappingsAction(p.workspaceId, {
-          mappings: [ref, ...chosen.map((o) => ({ mappingId: o.id, expectedVersion: o.version }))],
+          mappings: [ref(m.version), ...chosen.map((o) => ({ mappingId: o.id, expectedVersion: o.version }))],
           ruleExpression: mergeRule.current?.value ?? "",
         }),
       `Merged ${chosen.length + 1} mappings into one transformation.`,
@@ -122,11 +123,11 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
 
   const kind: MappingKind = pending || wantsRule ? "transform" : m.kind;
   const ruleOpen = p.editable && kind === "transform";
-  const ref = { mappingId: m.id, expectedVersion: m.version };
+  const ref = (expectedVersion: number) => ({ mappingId: m.id, expectedVersion });
 
-  /** Runs a write that may carry D-51's notice. */
-  async function write(action: () => Promise<ActionResult<{ notice: string | null }>>) {
-    const result = await run(action);
+  /** Runs a write of this mapping that may carry D-51's notice, after its earlier saves (slice 9). */
+  async function write(action: (expectedVersion: number) => Promise<ActionResult<{ notice: string | null }>>) {
+    const result = await saveRow(m, action);
     if (result.ok && result.value.notice) toast(result.value.notice);
     return result.ok;
   }
@@ -135,7 +136,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
 
   function chooseKind(next: MappingKind) {
     if (next === "transform") {
-      if (m.rule_expression?.trim()) void write(() => updateMappingAction(p.workspaceId, { ...ref, kind: "transform" }));
+      if (m.rule_expression?.trim()) void write((v) => updateMappingAction(p.workspaceId, { ...ref(v), kind: "transform" }));
       else {
         setWantsRule(true);
         focusRule();
@@ -143,7 +144,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
     } else if (wantsRule || pending) {
       setWantsRule(false);
       setPending(null);
-    } else void write(() => updateMappingAction(p.workspaceId, { ...ref, kind: "direct" }));
+    } else void write((v) => updateMappingAction(p.workspaceId, { ...ref(v), kind: "direct" }));
   }
 
   function onRuleBlur(text: string) {
@@ -151,11 +152,11 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
     const value = text.trim();
     if (wantsRule) {
       setWantsRule(false);
-      if (value) void write(() => updateMappingAction(p.workspaceId, { ...ref, kind: "transform", ruleExpression: value }));
+      if (value) void write((v) => updateMappingAction(p.workspaceId, { ...ref(v), kind: "transform", ruleExpression: value }));
       return;
     }
     if (m.kind === "transform" && value !== (m.rule_expression ?? "")) {
-      void write(() => updateMappingAction(p.workspaceId, { ...ref, ruleExpression: value || null }));
+      void write((v) => updateMappingAction(p.workspaceId, { ...ref(v), ruleExpression: value || null }));
     }
   }
 
@@ -170,7 +171,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   }
 
   function addInput(columnId: Uuid) {
-    if (m.rule_expression?.trim()) void write(() => addMappingInputAction(p.workspaceId, { ...ref, sourceColumnId: columnId }));
+    if (m.rule_expression?.trim()) void write((v) => addMappingInputAction(p.workspaceId, { ...ref(v), sourceColumnId: columnId }));
     else {
       setPending(columnId);
       focusRule();
@@ -179,8 +180,8 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
 
   async function savePending() {
     if (!pending) return;
-    const ok = await write(() =>
-      addMappingInputAction(p.workspaceId, { ...ref, sourceColumnId: pending, ruleExpression: rule.current?.value ?? "" }),
+    const ok = await write((v) =>
+      addMappingInputAction(p.workspaceId, { ...ref(v), sourceColumnId: pending, ruleExpression: rule.current?.value ?? "" }),
     );
     if (ok) setPending(null);
   }
@@ -189,11 +190,11 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
     const ids = inputs.map((i) => i.id);
     const [moved] = ids.splice(index, 1);
     ids.splice(index + by, 0, moved!);
-    void write(() => reorderMappingInputsAction(p.workspaceId, { ...ref, mappingInputIds: ids }));
+    void write((v) => reorderMappingInputsAction(p.workspaceId, { ...ref(v), mappingInputIds: ids }));
   }
 
   async function remove() {
-    const result = await run(() => deleteMappingAction(p.workspaceId, ref), "Mapping deleted", { undoable: true });
+    const result = await saveRow(m, (v) => deleteMappingAction(p.workspaceId, ref(v)), "Mapping deleted", { undoable: true });
     if (result.ok) ui.select(null);
   }
 
@@ -271,7 +272,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
                       className={iconButton}
                       aria-label={`Remove ${columnLabel(ix, i.source_column_id)}`}
                       data-testid="button-remove-input"
-                      onClick={() => void write(() => removeMappingInputAction(p.workspaceId, { ...ref, mappingInputId: i.id }))}
+                      onClick={() => void write((v) => removeMappingInputAction(p.workspaceId, { ...ref(v), mappingInputId: i.id }))}
                     >
                       ×
                     </button>
@@ -346,7 +347,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
           options={STATUSES}
           disabled={!p.canSetStatus}
           testId="seg-mapping-status"
-          onChange={(status: MappingStatus) => void run(() => setMappingStatusAction(p.workspaceId, { ...ref, status }))}
+          onChange={(status: MappingStatus) => void saveRow(m, (v) => setMappingStatusAction(p.workspaceId, { ...ref(v), status }))}
         />
       </Field>
       {/* why an import or a source change sent it back to review (slice 7a, item 37; 7b, F9; D-51); cleared by any change of status or content */}
@@ -363,7 +364,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
           value={m.note_text ?? ""}
           readOnly={!p.editable}
           placeholder="Why this mapping, open questions, who decided"
-          onSave={(note) => void write(() => updateMappingAction(p.workspaceId, { ...ref, note: note.trim() ? note : null }))}
+          onSave={(note) => void write((v) => updateMappingAction(p.workspaceId, { ...ref(v), note: note.trim() ? note : null }))}
         />
       </Field>
 

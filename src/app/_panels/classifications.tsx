@@ -85,7 +85,7 @@ export function ClassificationsSection({ target }: { target: Target }) {
 /** A table's or column's note (item 15, P8): plain text, saved on blur, with its toast and Undo. */
 export function SourceNote({ target, name, version, value, placeholder, hint }: { target: Target; name: string; version: number; value: string | null; placeholder: string; hint?: string }) {
   const p = usePanel();
-  const { run } = useAction();
+  const { saveRow } = useAction();
   const id = target.kind === "source_table" ? "f-table-note" : "f-column-note";
   return (
     <Field label="Note" htmlFor={id}>
@@ -98,7 +98,7 @@ export function SourceNote({ target, name, version, value, placeholder, hint }: 
         data-testid="input-source-note"
         data-version={version}
         onSave={(note) =>
-          void run(() => setSourceNoteAction(p.workspaceId, { target, expectedVersion: version, note: note.trim() ? note : null }), (v) => (v.removed ? NOTE_REMOVED(name) : NOTE_SAVED(name)), {
+          void saveRow({ id: target.id, version }, (v) => setSourceNoteAction(p.workspaceId, { target, expectedVersion: v, note: note.trim() ? note : null }), (x) => (x.removed ? NOTE_REMOVED(name) : NOTE_SAVED(name)), {
             undoable: true,
           })
         }
@@ -322,7 +322,7 @@ function ListSection({ scope, list, all, onRemove }: { scope: ClassificationScop
 
 function Row({ c, all, onRemove }: { c: Classification; all: readonly Classification[]; onRemove: () => void }) {
   const p = usePanel();
-  const { run } = useAction();
+  const { saveRow } = useAction();
   const [error, setError] = useState<string | null>(null);
   const u = p.ix.classes.uses(c.id);
   const uses = u.tables.length + u.columns.length;
@@ -333,7 +333,7 @@ function Row({ c, all, onRemove }: { c: Classification; all: readonly Classifica
       return setError(null);
     }
     if (nameTakenBy(all, c.scope, n, c.id)) return setError(TAKEN_NAME);
-    const r = await run(() => renameClassificationAction(p.workspaceId, { classificationId: c.id, expectedVersion: c.version, name: n }));
+    const r = await saveRow(c, (v) => renameClassificationAction(p.workspaceId, { classificationId: c.id, expectedVersion: v, name: n }));
     if (r.ok) setError(null);
     else setError(r.message);
   };

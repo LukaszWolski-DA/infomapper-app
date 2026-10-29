@@ -153,7 +153,7 @@ export function setSourceNote(
   access: WorkspaceAccess,
   state: { table?: SourceTable | null; column?: SourceColumn | null },
   input: unknown,
-): CommandResult<{ name: string; removed: boolean }> {
+): CommandResult<{ name: string; removed: boolean; version: number }> {
   const parsed = begin(access, "model.edit", setSourceNoteInput, input);
   if (!parsed.ok) return fail(parsed.error);
   const { target, expectedVersion, note } = parsed.data;
@@ -163,13 +163,13 @@ export function setSourceNote(
     if (!got.ok) return fail(got.error);
     if (text === got.row.note_text) return fail(nothingToChange());
     const row = nextVersion(ctx, got.row, { note_html: html, note_text: text });
-    return done(ctx, access, { name: row.name, removed: text === null }, [{ kind: "update", table: "source_table", before: got.row, row }]);
+    return done(ctx, access, { name: row.name, removed: text === null, version: row.version }, [{ kind: "update", table: "source_table", before: got.row, row }]);
   }
   const got = current(state.column, access, target.id, expectedVersion, "source column");
   if (!got.ok) return fail(got.error);
   if (text === got.row.note_text) return fail(nothingToChange());
   const row = nextVersion(ctx, got.row, { note_html: html, note_text: text });
-  return done(ctx, access, { name: row.name, removed: text === null }, [{ kind: "update", table: "source_column", before: got.row, row }]);
+  return done(ctx, access, { name: row.name, removed: text === null, version: row.version }, [{ kind: "update", table: "source_column", before: got.row, row }]);
 }
 
 // ---- delete a table ----

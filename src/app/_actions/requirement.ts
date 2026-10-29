@@ -22,7 +22,7 @@ import {
 import type { Uuid } from "@/domain/ids";
 import { lastRequirementEditor } from "@/domain/model/requirements";
 import type { WorkspaceAccess } from "@/domain/permissions";
-import { runCommand, type ActionResult } from "../_lib/run-command";
+import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -57,10 +57,10 @@ export async function createRequirementAction(workspaceId: string, input: Create
 }
 
 /** Changes one field of a requirement. */
-export async function updateRequirementAction(workspaceId: string, input: UpdateRequirementInput): Promise<ActionResult> {
+export async function updateRequirementAction(workspaceId: string, input: UpdateRequirementInput): Promise<ActionResult<Saved>> {
   return requirementCommand(workspaceId, async (ctx, access, store) => {
     const r = updateRequirement(ctx, access, { requirements: await store.requirements.list(access.workspace.id) }, input);
-    return r.ok ? { ...r, value: undefined } : r;
+    return r.ok ? { ...r, value: { version: r.value.requirement.version } } : r;
   });
 }
 
@@ -68,13 +68,13 @@ export async function updateRequirementAction(workspaceId: string, input: Update
 export async function setRequirementStatusAction(
   workspaceId: string,
   input: { requirementId: string; expectedVersion: number; status: string },
-): Promise<ActionResult> {
+): Promise<ActionResult<Saved>> {
   return requirementCommand(workspaceId, async (ctx, access, store) => {
     const ws = access.workspace.id;
     const requirement = await store.requirements.get(ws, str(input?.requirementId));
     const contentAuthorId = requirement ? lastRequirementEditor(requirement, await store.changeEvents.listForRequirement(ws, requirement.id)) : ctx.actorId;
     const r = setRequirementStatus(ctx, access, { requirement, contentAuthorId }, input);
-    return r.ok ? { ...r, value: undefined } : r;
+    return r.ok ? { ...r, value: { version: r.value.requirement.version } } : r;
   });
 }
 

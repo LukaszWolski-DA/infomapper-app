@@ -1,8 +1,9 @@
 "use client";
 
 // Building blocks of the right panel, styled after the prototype (.fld, .seg, .flags, .note, .list, .li, .pill,
-// .actions). Text fields save when they lose the focus (prototype "change"); the panel remounts them, keyed by the
-// row's version, once the server has the new value.
+// .actions). Text fields save when they lose the focus (prototype "change"); the panel remounts a field, keyed by its
+// stored value (`fieldKey`), once the server has a new one. The panels save through `saveRow` (`useAction`, slice 9):
+// one row's saves one after the other, each with the newest version known when it is sent.
 
 import { useEffect, useState, type ReactNode, type TextareaHTMLAttributes } from "react";
 
@@ -28,7 +29,6 @@ export function Field({ label, children, htmlFor }: { label: string; children: R
 export const inputClass =
   "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 text-im-ink outline-none focus:border-im-logical disabled:opacity-50 read-only:bg-im-panel";
 
-/** A text field that saves on Enter or when it loses the focus. An empty required field goes back. */
 /**
  * The key of a panel field that shows `value` of the object `id`: the field is mounted anew, and shows the stored
  * value, only when that value changes (its own save, an undo, someone else's write). Keyed by the object's version, a
@@ -36,6 +36,7 @@ export const inputClass =
  */
 export const fieldKey = (id: string, field: string, value: string | number | null | undefined): string => `${id}:${field}:${value ?? ""}`;
 
+/** A text field that saves on Enter or when it loses the focus. An empty required field goes back. */
 export function TextField({
   id,
   value,

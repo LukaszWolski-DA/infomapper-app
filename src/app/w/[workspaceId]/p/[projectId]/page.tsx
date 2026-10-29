@@ -10,6 +10,7 @@ import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import { modelConsistency } from "@/domain/source-changes/consistency";
 import type { CanvasItem, WorkspaceModel } from "@/domain/types";
 import { ProjectConsistency } from "./_components/project-consistency";
+import { ProjectHeading } from "./_components/project-heading";
 import { ProjectLabels } from "./_components/project-labels";
 import { ProjectNotes } from "./_components/project-notes";
 import { ProjectRequirements } from "./_components/project-requirements";
@@ -30,7 +31,7 @@ function labelContext(model: WorkspaceModel, items: readonly CanvasItem[]): Proj
 
 // Project home (D-29): the project's canvases as tiles; the labels used on them and pinned to the project, and the
 // number and list of their open notes (slice 3a); the requirements whose scope touches its canvases (slice 4a); model
-// consistency (slice 7b, item 25).
+// consistency (slice 7b, item 25); its name and description, editable (slice 9, D-59).
 export default async function ProjectHomePage({ params }: PageProps<"/w/[workspaceId]/p/[projectId]">) {
   const { workspaceId, projectId } = await params;
   const shell = await loadShell({ workspaceId, projectId });
@@ -86,8 +87,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
       <div data-testid="page-project-home" className="min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-7">
         <div className="mx-auto max-w-[1180px]">
           <div className="mb-1 text-xs text-im-ink-3">Project</div>
-          <h1 className="m-0 py-0.5 text-2xl font-semibold leading-tight">{view.project.name}</h1>
-          {view.project.description && <p className="m-0 py-0.5 text-im-ink-2">{view.project.description}</p>}
+          <ProjectHeading workspaceId={ws} project={view.project} editable={view.canEditProject} />
           <div className="mb-1 mt-3.5 flex flex-wrap gap-2 [&>span]:rounded-[14px] [&>span]:bg-im-surface [&>span]:px-[11px] [&>span]:py-[3px] [&>span]:text-xs [&>span]:text-im-ink-2 [&>span]:shadow-[0_0_0_1px_var(--im-line)] [&_b]:font-semibold [&_b]:text-im-ink">
             <span>
               <b>{n}</b> canvas{n === 1 ? "" : "es"}

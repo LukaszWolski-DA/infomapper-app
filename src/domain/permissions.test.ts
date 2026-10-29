@@ -16,12 +16,12 @@ import { WORKSPACE_ROLES, type WorkspaceRole } from "./types";
 const expected: Record<WorkspaceRole, WorkspaceAction[]> = {
   owner: [...WORKSPACE_ACTIONS].filter((a) => a !== "workspace.unarchive"),
   admin: [
-    "workspace.view", "workspace.edit_settings", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects",
+    "workspace.view", "workspace.edit_settings", "project.create", "project.edit", "canvas.create", "canvas.rename", "canvas.edit_projects",
     "canvas.edit_items", "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
     "requirement.edit", "requirement.set_status", "people.edit",
   ],
   modeler: [
-    "workspace.view", "project.create", "canvas.create", "canvas.rename", "canvas.edit_projects", "canvas.edit_items",
+    "workspace.view", "project.create", "project.edit", "canvas.create", "canvas.rename", "canvas.edit_projects", "canvas.edit_items",
     "canvas.edit_look", "canvas.delete", "model.edit", "mapping.set_status", "label.edit", "note.edit",
     "requirement.edit", "requirement.set_status",
   ],
