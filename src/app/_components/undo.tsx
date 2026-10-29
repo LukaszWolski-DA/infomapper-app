@@ -4,11 +4,13 @@
 // in the top bar (prototype #tUndo, #tRedo) and the “Undo” link in toasts. Steps run one after the other, after the
 // canvas has saved what is still on its way. Whether there is something to undo comes from the server with every
 // fresh page; a card change saved without a fresh page (a move, a width) turns Undo on and Redo off right here.
+// Slice 9: a step waits for the panels' saves on their way (`rowSaves.exclusive`); Ctrl+Z in a text field is the field's own.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import { doneStepMessage } from "@/domain/model/undo-history";
 import { useToast } from "@/ui/components/toast";
+import { rowSaves } from "@/ui/row-saves";
 import { undoAction, type UndoState } from "../_actions/undo";
 
 interface UndoApi {
@@ -55,11 +57,16 @@ export function UndoProvider({
       // Nothing to undo: the keys do nothing, as in the prototype. A toast's “Undo” always asks the server.
       if (!always && !(mode === "undo" ? stateRef.current.canUndo : stateRef.current.canRedo)) return;
       queue.current = queue.current.then(async () => {
-        await ui.settled();
-        const result = await undoAction(workspaceId, mode, { projectId, canvasId }).catch(() => ({
-          ok: false as const,
-          message: "Something went wrong. Nothing was changed.",
-        }));
+        // after the panels' saves on their way, and before any started meanwhile (slice 9, F5)
+        const result = await rowSaves.exclusive(async () => {
+          await ui.settled();
+          const r = await undoAction(workspaceId, mode, { projectId, canvasId }).catch(() => ({
+            ok: false as const,
+            message: "Something went wrong. Nothing was changed.",
+          }));
+          if (r.ok) rowSaves.answer(r.value.versions);
+          return r;
+        });
         if (!result.ok) {
           toast(result.message, "refusal");
           return;

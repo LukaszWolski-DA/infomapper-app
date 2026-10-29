@@ -19,7 +19,7 @@ import { entityImpact, type EntityImpact } from "@/domain/model/impact";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { getSession } from "../_lib/session";
 import { lockedRefusal } from "../_lib/unlock";
-import { runCommand, type ActionResult } from "../_lib/run-command";
+import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -56,10 +56,10 @@ export async function createConceptAction(workspaceId: string, input: { name: st
 export async function renameConceptAction(
   workspaceId: string,
   input: { conceptId: string; expectedVersion: number; name: string },
-): Promise<ActionResult<null>> {
+): Promise<ActionResult<Saved>> {
   return modelCommand(workspaceId, (ctx, access, { concepts }) => {
     const result = renameConcept(ctx, access, { concept: byId(concepts, input?.conceptId) }, input);
-    return result.ok ? { ...result, value: null } : result;
+    return result.ok ? { ...result, value: { version: result.value.concept.version } } : result;
   });
 }
 
@@ -97,11 +97,11 @@ export async function createEntityAction(
 }
 
 /** Name, stereotype, concept, definition (right panel). A duplicate name comes back as a warning (B-25). */
-export async function updateEntityAction(workspaceId: string, input: UpdateEntityInput): Promise<ActionResult<{ warning: string | null }>> {
+export async function updateEntityAction(workspaceId: string, input: UpdateEntityInput): Promise<ActionResult<Saved<{ warning: string | null }>>> {
   return modelCommand(workspaceId, (ctx, access, { entities, concepts }) => {
     const state = { entity: byId(entities, input?.entityId), entities, concept: byId(concepts, input?.conceptId) };
     const result = updateEntity(ctx, access, state, input);
-    return result.ok ? { ...result, value: { warning: result.value.warning } } : result;
+    return result.ok ? { ...result, value: { warning: result.value.warning, version: result.value.entity.version } } : result;
   });
 }
 
@@ -176,10 +176,10 @@ export async function createAttributeFromColumnAction(
 }
 
 /** Name, type with parameters, flags and definition. */
-export async function updateAttributeAction(workspaceId: string, input: UpdateAttributeInput): Promise<ActionResult<null>> {
+export async function updateAttributeAction(workspaceId: string, input: UpdateAttributeInput): Promise<ActionResult<Saved>> {
   return modelCommand(workspaceId, (ctx, access, { attributes }) => {
     const result = updateAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId) }, input);
-    return result.ok ? { ...result, value: null } : result;
+    return result.ok ? { ...result, value: { version: result.value.attribute.version } } : result;
   });
 }
 
@@ -218,17 +218,17 @@ export async function createRelationshipAction(
 }
 
 /** Verb phrase and the cardinality at both ends. */
-export async function updateRelationshipAction(workspaceId: string, input: UpdateRelationshipInput): Promise<ActionResult<null>> {
+export async function updateRelationshipAction(workspaceId: string, input: UpdateRelationshipInput): Promise<ActionResult<Saved>> {
   return modelCommand(workspaceId, (ctx, access, { relationships }) => {
     const result = updateRelationship(ctx, access, { relationship: byId(relationships, input?.relationshipId) }, input);
-    return result.ok ? { ...result, value: null } : result;
+    return result.ok ? { ...result, value: { version: result.value.relationship.version } } : result;
   });
 }
 
-export async function swapRelationshipAction(workspaceId: string, input: { relationshipId: string; expectedVersion: number }): Promise<ActionResult<null>> {
+export async function swapRelationshipAction(workspaceId: string, input: { relationshipId: string; expectedVersion: number }): Promise<ActionResult<Saved>> {
   return modelCommand(workspaceId, (ctx, access, { relationships }) => {
     const result = swapRelationship(ctx, access, { relationship: byId(relationships, input?.relationshipId) }, input);
-    return result.ok ? { ...result, value: null } : result;
+    return result.ok ? { ...result, value: { version: result.value.relationship.version } } : result;
   });
 }
 

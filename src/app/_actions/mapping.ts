@@ -28,7 +28,7 @@ import type { Uuid } from "@/domain/ids";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { WorkspaceModel } from "@/domain/types";
-import { runCommand, type ActionResult } from "../_lib/run-command";
+import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 
@@ -53,7 +53,9 @@ const mappingState = (model: WorkspaceModel, mappingId: unknown) => ({
   inputs: model.mappingInputs.filter((i) => i.mapping_id === mappingId),
 });
 type Notice = { notice: string | null };
-const withNotice = <T extends Notice>(r: CommandResult<T>): CommandResult<Notice> => (r.ok ? { ...r, value: { notice: r.value.notice } } : r);
+/** The notice and the mapping's new version (slice 9: the panel's next save sends it). */
+const withNotice = <T extends Notice & { mapping: { version: number } }>(r: CommandResult<T>): CommandResult<Saved<Notice>> =>
+  r.ok ? { ...r, value: { notice: r.value.notice, version: r.value.mapping.version } } : r;
 
 /** “Add a source column” in the attribute panel: a direct draft mapping. */
 export async function createMappingAction(
@@ -76,12 +78,12 @@ export async function createMappingAction(
 }
 
 /** Kind, rule and note. */
-export async function updateMappingAction(workspaceId: string, input: UpdateMappingInput): Promise<ActionResult<Notice>> {
+export async function updateMappingAction(workspaceId: string, input: UpdateMappingInput): Promise<ActionResult<Saved<Notice>>> {
   return mappingCommand(workspaceId, (ctx, access, model) => withNotice(updateMapping(ctx, access, mappingState(model, input?.mappingId), input)));
 }
 
 /** A further input; a second one needs the rule in the same save (D-49). */
-export async function addMappingInputAction(workspaceId: string, input: AddMappingInputInput): Promise<ActionResult<Notice>> {
+export async function addMappingInputAction(workspaceId: string, input: AddMappingInputInput): Promise<ActionResult<Saved<Notice>>> {
   return mappingCommand(workspaceId, (ctx, access, model) =>
     withNotice(
       addMappingInput(ctx, access, { ...mappingState(model, input?.mappingId), column: byId(model.sourceColumns, input?.sourceColumnId) }, input),
@@ -89,24 +91,24 @@ export async function addMappingInputAction(workspaceId: string, input: AddMappi
   );
 }
 
-export async function removeMappingInputAction(workspaceId: string, input: RemoveMappingInputInput): Promise<ActionResult<Notice>> {
+export async function removeMappingInputAction(workspaceId: string, input: RemoveMappingInputInput): Promise<ActionResult<Saved<Notice>>> {
   return mappingCommand(workspaceId, (ctx, access, model) => withNotice(removeMappingInput(ctx, access, mappingState(model, input?.mappingId), input)));
 }
 
-export async function reorderMappingInputsAction(workspaceId: string, input: ReorderMappingInputsInput): Promise<ActionResult<Notice>> {
+export async function reorderMappingInputsAction(workspaceId: string, input: ReorderMappingInputsInput): Promise<ActionResult<Saved<Notice>>> {
   return mappingCommand(workspaceId, (ctx, access, model) =>
     withNotice(reorderMappingInputs(ctx, access, mappingState(model, input?.mappingId), input)),
   );
 }
 
 /** Draft, in review, approved; reviewers too. Four-eyes reads the mapping's change log (AD-06). */
-export async function setMappingStatusAction(workspaceId: string, input: SetMappingStatusInput): Promise<ActionResult<null>> {
+export async function setMappingStatusAction(workspaceId: string, input: SetMappingStatusInput): Promise<ActionResult<Saved>> {
   return mappingCommand(workspaceId, async (ctx, access, model, store) => {
     const mapping = byId(model.mappings, input?.mappingId);
     const events = mapping ? await store.changeEvents.listForMapping(access.workspace.id, mapping.id) : [];
     const contentAuthorId = mapping ? lastContentEditor(mapping, events) : ctx.actorId;
     const result = setMappingStatus(ctx, access, { mapping, contentAuthorId }, input);
-    return result.ok ? { ...result, value: null } : result;
+    return result.ok ? { ...result, value: { version: result.value.mapping.version } } : result;
   });
 }
 

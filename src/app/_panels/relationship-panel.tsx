@@ -31,16 +31,16 @@ const split = (v: Card): { min: CardinalityMin; max: CardinalityMax } => {
 export function RelationshipPanel({ relationship: r }: { relationship: Relationship }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
-  const { run } = useAction();
+  const { saveRow } = useAction();
   const from = p.ix.entity.get(r.from_entity_id)?.name ?? "?";
   const to = p.ix.entity.get(r.to_entity_id)?.name ?? "?";
-  const ref = { relationshipId: r.id, expectedVersion: r.version };
+  const ref = (expectedVersion: number) => ({ relationshipId: r.id, expectedVersion });
 
   const save = (change: Omit<Parameters<typeof updateRelationshipAction>[1], "relationshipId" | "expectedVersion">) =>
-    void run(() => updateRelationshipAction(p.workspaceId, { ...ref, ...change }));
+    void saveRow(r, (v) => updateRelationshipAction(p.workspaceId, { ...ref(v), ...change }));
 
   async function remove() {
-    const result = await run(() => deleteRelationshipAction(p.workspaceId, ref), "Relationship deleted", { undoable: true });
+    const result = await saveRow(r, (v) => deleteRelationshipAction(p.workspaceId, ref(v)), "Relationship deleted", { undoable: true });
     if (result.ok) ui.select(null);
   }
 
@@ -98,7 +98,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
             type="button"
             className={buttonClass}
             data-testid="button-swap-relationship"
-            onClick={() => void run(() => swapRelationshipAction(p.workspaceId, ref))}
+            onClick={() => void saveRow(r, (v) => swapRelationshipAction(p.workspaceId, ref(v)))}
           >
             Swap direction
           </button>

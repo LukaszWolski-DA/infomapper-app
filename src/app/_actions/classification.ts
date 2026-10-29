@@ -28,7 +28,7 @@ import { checkPermission, type WorkspaceAccess } from "@/domain/permissions";
 import type { Classification, WorkspaceModel } from "@/domain/types";
 import { getSession } from "../_lib/session";
 import { lockedRefusal } from "../_lib/unlock";
-import { runCommand, type ActionResult } from "../_lib/run-command";
+import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 
@@ -56,8 +56,8 @@ export async function addClassificationAction(workspaceId: string, input: AddCla
   return command(workspaceId, (ctx, access, m) => value(addClassification(ctx, access, m, input), (v) => ({ classificationId: v.classification.id, name: v.classification.name })));
 }
 
-export async function renameClassificationAction(workspaceId: string, input: RenameClassificationInput): Promise<ActionResult<{ name: string }>> {
-  return command(workspaceId, (ctx, access, m) => value(renameClassification(ctx, access, m, input), (v) => ({ name: v.classification.name })));
+export async function renameClassificationAction(workspaceId: string, input: RenameClassificationInput): Promise<ActionResult<Saved<{ name: string }>>> {
+  return command(workspaceId, (ctx, access, m) => value(renameClassification(ctx, access, m, input), (v) => ({ name: v.classification.name, version: v.classification.version })));
 }
 
 export async function removeClassificationAction(workspaceId: string, input: RemoveClassificationInput): Promise<ActionResult<{ name: string; tables: number; columns: number }>> {
@@ -74,7 +74,7 @@ export async function setClassificationAction(workspaceId: string, input: SetCla
   );
 }
 
-export async function setSourceNoteAction(workspaceId: string, input: SetSourceNoteInput): Promise<ActionResult<{ name: string; removed: boolean }>> {
+export async function setSourceNoteAction(workspaceId: string, input: SetSourceNoteInput): Promise<ActionResult<Saved<{ name: string; removed: boolean }>>> {
   return command(workspaceId, (ctx, access, m) =>
     setSourceNote(ctx, access, { table: m.sourceTables.find((t) => t.id === input?.target?.id) ?? null, column: m.sourceColumns.find((c) => c.id === input?.target?.id) ?? null }, input),
   );

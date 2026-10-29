@@ -32,7 +32,7 @@ const SENTENCE: [LabelTargetKind, string, string][] = [
 export function LabelPanel({ label }: { label: Label }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
-  const { run, pending } = useAction();
+  const { run, saveRow, pending } = useAction();
   const workingContext = useWorkingContext();
   const liveCanvas = p.liveCanvases[label.id] ?? null;
   const openLive = useOpenLiveCanvas(p.workspaceId, p.projectId);
@@ -66,7 +66,7 @@ export function LabelPanel({ label }: { label: Label }) {
   const mono = (k: LabelTargetKind) => k === "mapping" || k === "source_table" || k === "source_column";
 
   async function rename(name: string) {
-    const r = await run(() => renameLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: label.version, name }));
+    const r = await saveRow(label, (v) => renameLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: v, name }));
     if (!r.ok) setReset((n) => n + 1);
   }
 
