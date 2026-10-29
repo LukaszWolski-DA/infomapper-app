@@ -34,6 +34,25 @@ const typeInput = z
   .strict();
 
 /**
+ * A change of an attribute's type (slice 9, F1): only what changed. A part that is absent keeps the stored one, `null`
+ * clears it, a value sets it. A queued save then never sends back an older parameter it did not change.
+ */
+const typePatchInput = typeInput.extend({ dataType: z.enum(LOGICAL_TYPES).optional() });
+export type AttributeTypePatch = z.input<typeof typePatchInput>;
+
+/** The type after a patch: the stored parts, with the patch's on top (before `attributeType` clears what the type lacks). */
+export function patchedType(before: AttributeType, patch: z.output<typeof typePatchInput>): z.output<typeof typeInput> {
+  const pick = <T,>(value: T | undefined, stored: T): T => (value === undefined ? stored : value);
+  return {
+    dataType: patch.dataType ?? before.data_type,
+    customType: pick(patch.customType, before.custom_type),
+    length: pick(patch.length, before.type_length),
+    precision: pick(patch.precision, before.type_precision),
+    scale: pick(patch.scale, before.type_scale),
+  };
+}
+
+/**
  * The stored type: only the parameters the logical type has are kept (length for string, precision and scale for
  * decimal, the name for custom); the others are cleared, so switching types never leaves stale parameters.
  */
@@ -108,7 +127,7 @@ const updateAttributeInput = z
     attributeId: uuidSchema,
     expectedVersion: versionSchema,
     name: nameSchema.optional(),
-    type: typeInput.optional(),
+    type: typePatchInput.optional(),
     isPrimaryKey: z.boolean().optional(),
     isForeignKey: z.boolean().optional(),
     isBusinessKey: z.boolean().optional(),
@@ -144,7 +163,7 @@ export function updateAttribute(
   const patch: Partial<Attribute> = {};
   if (data.name !== undefined && data.name !== before.name) patch.name = data.name;
   if (data.type !== undefined) {
-    const t = attributeType(data.type);
+    const t = attributeType(patchedType(before, data.type));
     if (!t.ok) return fail(t.error);
     for (const key of ["data_type", "custom_type", "type_length", "type_precision", "type_scale"] as const) {
       if (t.type[key] !== before[key]) Object.assign(patch, { [key]: t.type[key] });
