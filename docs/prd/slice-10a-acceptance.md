@@ -450,3 +450,34 @@ Kept as well, because they are the measurements that see the loop: the branch-on
 - `npm run lint`, `npm run typecheck`: pass. `npm test`: 108 files, 1,407 tests, pass.
 - `row-saves.test.ts` three times on its own: 17 of 17 each time. One test had failed once while I was writing it: it expected two different rows' saves in a fixed order, which the chain does not promise. It now compares them as a set.
 - S9-01 to S9-05 and S0-08 (dev server, from scratch, none of mine running): **17 passed, 152 s**. The server log showed "The destination stream closed early" five times, the known line; no test failed.
+
+**Łukasz's answer to step 2a (29 October 2026): held rows.** Kept as built. A cut on a held row does not stop a several-row save; only a cut on a checked row does. The reason: a held row's version is not sent, and the server reads it as it stands, so the save cannot overwrite anyone's change. The move (or a concept's "move to") is a separate intent of the person. This rule and its reason go into CLAUDE.md's "Saving in panels" at the closing.
+
+## Step 2b: the writes on the chain (29 October 2026)
+
+**Wiring, as the F1/F2 table says.** What the canvas shows still waits for the page's refresh (item 3); only the version sent changes.
+- `saveRow`: from a mapping line's menu the status, split, swap and delete; a relationship line's delete; the canvas's attribute delete; "Add to mapping" (D-48, `map-column.tsx`); "Move to the frame's concept" (`frame-panel.tsx`); the entity's delete from the model; a source table's delete and "Mark as needed"; a working label's delete; a classification's remove and restore; archive and unarchive (`lifecycle.tsx`, the workspace's row).
+- `saveRows`: an attribute's move (`move-attribute.ts`: the moved attribute checked, its siblings held); a merge (every mapping checked); a concept's delete with "move to" (the concept checked, its entities held); the D-05 drop (`useFrames.ts`, `ModelCanvas.tsx`: the moved entities held, only with `moveToConcepts`).
+- `rowSaves.answer`: the change-to-resolve actions, through `run`, which now feeds back every answer's `versions`.
+- Canvas rename and delete stay off the chain (known-limitations.md, step 2a).
+
+**One addition to step 2a's mechanics: `deletes`.** A save queued behind a delete that succeeded was still sent and toasted "This … does not exist." (F5's gap: the cut came only on a refusal). With `{ deletes: true }` a success cuts the checked rows' saves waiting behind it, without a toast. Every delete passes it (the panels' deletes too: relationship, attribute, requirement, mapping, entity, concept, table, label, classification). A cut delete shows no Undo toast (item 5); a delete that succeeds keeps it (S1B-13). Unit tests: the `deletes` cut, and an invalid refusal that cuts nothing. `npm test`: 108 files, 1,409 tests.
+
+**Specs `e2e/slice-10a/`:** S10A-01 to S10A-06 (22 cases), named after the action. S10A-04 has one case per added write (12). Proof against step 2a's code (the wiring stashed): 16 of 22 fail. The 6 that pass there:
+- S10A-03 "Ctrl+↓, then a sibling's name": the page's refresh came before the name was typed;
+- S10A-03 "a sibling's name, then Ctrl+↑": the move does not send the siblings' versions, so it was never refused;
+- S10A-04 delete from model, delete a source table, delete a working label, archive: the steps in the browser take longer than the refresh;
+- S10A-05's two real-conflict cases, which must pass both ways.
+
+**Canvas commits (PRD section 6), a status from a mapping line's menu, `window.__imCanvasCommits`, development build:** before the wiring **4** (three runs out of three), after **4** (three out of three, and again in the full run). Equal. `S10A-commits.spec.ts` keeps the check.
+
+**Earlier specs of the actions touched** (slices 1b, 2b, 2c, 7b, 7c and 9 with the others listed in Q9, and 10a): **204 passed, 1 skipped (S7C-14-commits, on demand), 0 failed, 1,972 s.** The first try failed in the global setup's warm-up, because the unit tests and the typecheck ran at the same time; run alone, it passed.
+
+**CI:** `npm run lint` clean, `npm run typecheck` pass, `npm test` 1,409 tests pass.
+
+**Full e2e run** (from scratch, no dev server of mine running, 18:31 to 19:49): **408 passed, 1 skipped, 2 failed, 4,646 s** (1 h 17 min), against slice 9's 4,148 s (+12 %). The run has 25 more tests (slice 10a's). Both failures timed out at sign-in (`bar-top` not shown within 15 s), with no slice 10a code on the path:
+- `S7A-12`: an archived workspace offers no import;
+- `S9-09`: a renaming and a description undone from a canvas.
+Each file three times on its own: passed three times out of three (both files together: 1.1 min, 54 s, 52 s). Flakes, not bugs. The server log showed the known "The destination stream closed early".
+
+**New or changed user-visible texts:** none. One text no longer appears: "This … does not exist." after a save that waited behind a successful delete.
