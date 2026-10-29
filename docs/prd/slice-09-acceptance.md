@@ -301,3 +301,48 @@ Some writes started from the canvas write the same rows as a panel field but are
 - the frame panel's "move to the frame's concept".
 
 A quick panel save followed by one of these, or one of these followed by a panel save, can still be refused as a false conflict until the page refreshes. The canvas does not read `Saved<T>`. It waits for the refresh, and `mergeFresh` covers only cards, frames and notes. Not fixed (Łukasz). The table with files and functions is in `docs/known-limitations.md`, "Saving in panels (slice 9)", and there is an entry in PRD section 9.
+
+## Step 3: the project's name and description (items 7–15, D-59)
+
+### What changed
+
+- **Domain:**
+  - `updateProject` (`src/domain/commands/project.ts`) follows `renameCanvas`. It checks the new permission `project.edit` (EDITORS; the archive through `checkPermission`; the refusal text "edit projects", F12), validates with Zod, checks `version`, and writes the project row and its change event in one change group.
+  - The name is trimmed. An empty name is refused with `PROJECT_NAME_REQUIRED`, "A project needs a name." (D-59 (ii)). There is no length rule and duplicates are allowed (item 10, F9).
+  - The description is plain text, trimmed, with its lines kept; an empty one is stored as null.
+  - It takes only what is sent (name, description or both). Nothing new is "Nothing to change.".
+- **Undo (D-59 (iii)):** `project` is undoable, and every `runCommand` write is remembered, so a renaming is one undo step, undone from a canvas. The toasts read "Undone: Rename project" and "Undone: Change project" (the generic `changeLabel`).
+- **Action:** `updateProjectAction` (`src/app/_actions/workspace.ts`) returns `Saved<{ name }>` (F3). `loadProjectView` now carries the project's `version` and `canEditProject`.
+- **Home:** `ProjectHeading` (`p/[projectId]/_components/project-heading.tsx`) shows the prototype's `.ph-name` and `.ph-desc`.
+  - For editors these are fields (`field-project-name`, `field-project-description`), saved through `saveRow` and keyed by `fieldKey`. The name saves on Enter or on leaving the field; the description on leaving the field (Enter adds a line).
+  - An empty name goes back with the toast, without a call to the server. The server refuses it too, with the same text.
+  - On another refusal the fields keep the typed text, as the panels' `TextField` does (F6).
+  - Escape does nothing, as in the panels (Q5).
+  - The description grows through CSS (`field-sizing: content`), with no height read (item 12).
+  - Reviewers, readers and an archived workspace see text (`text-project-name`, `text-project-description`, lines kept).
+- **Where the name shows:** the breadcrumbs, the switcher and the workspace home's tiles read the page, so they show the new name after the save's fresh page. No history place is added (item 15).
+
+### Specs
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S9-06 | `S9-06.spec.ts`: (1) the name with spaces and Enter, stored trimmed, version +1, one change group, shown in the breadcrumbs, the switcher and the workspace home's tile, no toast; an empty name goes back with "A project needs a name." and stores nothing; (2) a 259-character name and another project's name are stored | passed |
+| S9-07 | `S9-07.spec.ts`: two lines (Enter adds a line, nothing is saved until Tab), the field grows, shown after a reload; emptied, stored as null | passed (3 of 3 after the fix below) |
+| S9-08 | `S9-08.spec.ts`: (1) a modeler sees the fields; a reviewer and a reader see text; a reviewer's direct call is refused with "As a reviewer you cannot edit projects."; (2) archived: the owner sees text, and the direct call is refused with "This workspace is archived, so it is read-only." | passed |
+| S9-09 | `S9-09.spec.ts`: the name and the description changed on the home; on a canvas, Ctrl+Z undoes the description, then the name ("Undone: Change project", "Undone: Rename project"), and the breadcrumbs show the old name | passed |
+| S9-10 | `S9-10.spec.ts`: the name, Tab, the description, Tab without waiting: both stored, version +2, two change groups, no toast | passed |
+
+- **Typing before hydration:** S9-07 failed once in three runs. `fill("")` came before hydration, the field lost its selection, and Delete removed one letter. A probe found no field being replaced after a load. The new helper `hydrated(page)` waits for Back to be enabled (it is enabled only from the client), and the specs of the project home call it after every load.
+- **Earlier specs changed:** `S0-02`, `S0-04` and `S0-07` read the project's name as the home's text (`toContainText`). For an editor the name is now a field's value, so they read `field-project-name` with `toHaveValue`; the reason is D-59. `S0-06` and `S0-11` pass unchanged. `S5A-02` only checks that the home is visible.
+
+### Checks
+
+- `npm run lint` passed (37 s), `npm run typecheck` passed (22 s), `npm test` passed: 108 files, 1,394 tests (20 s).
+- `e2e/slice-09`: 22 passed (2.9 min). Slice 0: S0-02, S0-04, S0-06, S0-07 and S0-11 passed (S0-02, S0-04 and S0-07 after the change above).
+
+### Texts for Łukasz's approval (step 3)
+
+- D-59, with the chosen options (ii) and (iii) written in.
+- The toast "A project needs a name.".
+- The permission text "edit projects", which shows inside the existing sentence "As a {role} you cannot edit projects.".
+- The aria labels "Project name" and "Project description", and the placeholder "What is this project about?". These come from the prototype.

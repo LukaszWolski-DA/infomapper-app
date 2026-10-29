@@ -17,6 +17,24 @@ change); the requirement panel shows the stored values again (its reset counter)
 the last saved value. One behaviour for every field would be clearer: either all go back, or all keep the typed text
 with the stored value beside it (the idea above). Łukasz kept today's behaviour in slice 9 (29 October 2026).
 
+## Canvas actions on a row's save chain (slice 9, after step 2): first candidate for slice 10 "Relationships"
+
+These writes are started from the canvas and write a row a panel field also writes:
+
+- the mapping and relationship line menus and the attribute row's delete, in `src/app/_panels/canvas-host.tsx`;
+- moving an attribute (`useMoveAttribute`);
+- a column dropped on a mapping (`map-column.tsx`);
+- the frame panel's "move to the frame's concept".
+
+They send the rendered version through `run`, not through `saveRow`. A quick panel save next to one of them can still be refused as a false conflict until the page refreshes (`docs/known-limitations.md`, "Writes started from the canvas are not on a row's save chain").
+
+The fix:
+
+- send these actions through `saveRow`;
+- feed the versions of the siblings that `reorderAttribute` renumbers to `rowSaves.answer`, so a sibling's next panel save sends them.
+
+Łukasz made it the first candidate for slice 10 "Relationships", which changes the same actions in `canvas-host.tsx` (29 October 2026).
+
 ## Mapping by drag: from the attribute side too (slice 1b, step 2)
 
 The prototype also starts a mapping drag from an attribute row and drops it on a column row. The slice 1b PRD asks
