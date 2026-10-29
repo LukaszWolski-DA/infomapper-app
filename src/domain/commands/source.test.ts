@@ -137,7 +137,7 @@ describe("the modeller's note on a table or column (slice 7c, P8, item 15, S7C-0
   it("saves a note as plain text, markup stored escaped, as a mapping's note is", () => {
     const r = setSourceNote(makeCtx(), access("modeler"), { column }, { target: { kind: "source_column", id: column.id }, expectedVersion: 1, note: "Values <b>A</b> & B\n\nsecond" });
     if (!r.ok) throw new Error(r.error.message);
-    expect(r.value).toEqual({ name: "email", removed: false });
+    expect(r.value).toEqual({ name: "email", removed: false, version: 2 });
     expect(r.writeSet.writes).toEqual([
       expect.objectContaining({ kind: "update", table: "source_column", row: expect.objectContaining({ note_text: "Values <b>A</b> & B\n\nsecond", note_html: "<p>Values &lt;b&gt;A&lt;/b&gt; &amp; B</p><p>second</p>", version: 2 }) }),
     ]);
@@ -147,7 +147,7 @@ describe("the modeller's note on a table or column (slice 7c, P8, item 15, S7C-0
   it("clears a note on a table; refuses nothing to change and a stale version", () => {
     const noted = { ...table, note_html: "<p>Owned by Finance</p>", note_text: "Owned by Finance" };
     const r = setSourceNote(makeCtx(), access("owner"), { table: noted }, { target: { kind: "source_table", id: table.id }, expectedVersion: 1, note: "  " });
-    expect(r.ok && r.value).toEqual({ name: "customer", removed: true });
+    expect(r.ok && r.value).toEqual({ name: "customer", removed: true, version: 2 });
     expect(r.ok && r.writeSet.writes[0]).toMatchObject({ row: { note_html: null, note_text: null } });
     expect(NOTE_REMOVED("customer")).toBe("Note removed from customer");
     expect(setSourceNote(makeCtx(), access("owner"), { table: noted }, { target: { kind: "source_table", id: table.id }, expectedVersion: 1, note: "Owned by Finance" })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
