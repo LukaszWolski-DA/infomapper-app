@@ -8,6 +8,7 @@ import path from "node:path";
 import { expect, test, type Page } from "./fixtures";
 import { canvasUrl, card, expectSelected, openCanvas, relationshipLine, selfRelationship, setCard, signInAs } from "./helpers";
 import { pointOnLine } from "../slice-01b/helpers";
+import { AROUND, makeFrame, namePoint } from "../slice-02c/helpers";
 
 const OUT = path.resolve("docs", "prd", "slice-10a-screens", process.env.SCREENS === "1" ? "latest" : (process.env.SCREENS ?? "latest"));
 const AT_100 = { x: -260, y: 140, zoom: 1 };
@@ -72,4 +73,32 @@ test("S10A-08 screenshots: the loop in both notations at 100 % and 30 %, collaps
   await page.getByTestId("button-focus").click();
   await expect(page.getByTestId("layer-lit-lines").locator(`[data-relationship="${rel.id}"]`)).toHaveCount(1);
   await shot("loop-focus-loop");
+});
+
+// Łukasz's step 4 answer: a loop at the top of an expanded concept frame sized by its cards, and "Fit everything" with
+// a loop on the topmost and rightmost card.
+test("S10A-08 screenshots: a labelled loop in a fitted concept frame, and Fit everything with a loop", async ({ page }) => {
+  test.setTimeout(180_000);
+  fs.mkdirSync(OUT, { recursive: true });
+  const shot = async (name: string) => {
+    await page.waitForTimeout(400);
+    await page.screenshot({ path: path.join(OUT, `${name}.png`) });
+  };
+  const rel = await selfRelationship("Customer", { label: "refers" });
+  await signInAs(page, "Łukasz");
+
+  // Fit everything without a frame: Customer is a topmost card and has the loop
+  await openCanvas(page, canvasUrl(), AT_100);
+  await page.getByTestId("button-zoom-fit").click();
+  await shot("loop-fit-view");
+
+  await makeFrame(AROUND.customer, { concept: "Customer" });
+  await openCanvas(page, canvasUrl(), AT_100);
+  // the frame sized by its cards: "Fit frame to its content"
+  const name = await namePoint(page, "Customer");
+  await page.mouse.click(name.x, name.y, { button: "right" });
+  await page.getByTestId("menu-toolbox").getByRole("menuitem", { name: /Fit frame to its content/ }).click();
+  await page.waitForTimeout(800);
+  await expect(relationshipLine(page, rel.id)).toHaveCount(1);
+  await shot("loop-in-frame");
 });

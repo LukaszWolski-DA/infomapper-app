@@ -924,6 +924,12 @@ Undo and Redo do wait for both kinds (`rowSaves.exclusive` and `ui.settled()`).
   way still sends the version it knows and can be refused as a false conflict. The reason: only the server knows which
   tables, columns and mappings an action writes, so the browser cannot hold those rows before it is sent (`saveRows`).
 
+### Three or more loops on a collapsed card (slice 10a, D-61)
+
+A loop's from end sits on the card's right edge, 16 px lower for each further loop, but never lower than 6 px above
+the card's bottom edge (`loopGeom`, `src/canvas/geometry.ts`). A collapsed card is the header only, so with three or
+more loops their from ends come closer than 16 px and their end marks can overlap. Accepted (Łukasz, step 4 answers).
+
 ### A project's description in Firefox and WebKit does not count wrapped lines (slice 9, D-59)
 
 The project home's description grows with its text through `field-sizing: content`, which only Chromium supports.

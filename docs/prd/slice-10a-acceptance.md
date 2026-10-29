@@ -580,3 +580,29 @@ The drawing matches the condition on the field names: from on the right edge, to
 "An entity can be related to itself (a parent and its children). Owners, admins and modelers create it with “Relate to itself” in the card header's menu, in a workspace that is not archived, and its panel opens; the relate button clicked on the same card asks for a different entity and names that item. A new one has the ends 0..1 (the parent) and 0..n (the children). It is drawn as a loop at its card's top right corner: from the right edge at the header's middle to the top edge near the corner, meeting both edges at right angles, with both ends in the chosen notation at every zoom and the label at the loop's outer point. Further loops on one card nest outside it, their ends 16 px further from the corner. The loop follows the card's moves, width and collapsing; the miniature leaves it out. Its panel names the ends “At the right end” and “At the top end”. Inside a collapsed frame it is a line inside one frame: not drawn and not counted in a bundle. Swap exchanges its two ends' cardinalities, and is refused with “Nothing to change.” when they are equal. Otherwise it behaves as any relationship: label and cardinality in its panel, delete with Undo, layers (hidden in Mappings), Focus, a history place, counted once in an entity's delete preview."
 
 Changed against the PRD's proposal: the loop's place and shape, the nesting, the label place and what the loop follows are written out; "refused" names its text; "layers" says Mappings hides it.
+
+## Łukasz's answers to step 4 (29 October 2026)
+
+- **D-61:** approved as quoted; written into `docs/decisions.md`, accepted on 29 October 2026 (slice 10a).
+- **Three or more loops on a collapsed card:** accepted; one entry in `docs/known-limitations.md`.
+- **The loop's drawing:** approved on condition that two more screenshots show no problem (below).
+
+### The two more screenshots
+
+Both are in `docs/prd/slice-10a-screens/step-4/` (the second test of `S10A-08-screens.spec.ts`):
+- `loop-in-frame.png`: Customer in a concept frame fitted to its cards ("Fit frame to its content"), with "refers";
+- `loop-fit-view.png`: "Fit everything on screen" on "Customer & orders", Customer a topmost card with the loop.
+
+**How far a loop reaches out of its card** (from the geometry, in canvas units): the first loop 50.6 px above the top edge and 49.6 px right of the right edge; the second 82.5 and 81.5; the third 114.3 and 113.3. Its label's pill lies inside that reach.
+
+**The frame: a problem.** A frame is its cards' box plus 40 px at the top and 32 px at the sides (`FRAME_PADDING`, `frameAround`). The loop reaches 50.6 px up and 49.6 px right, so it crosses the frame's top border by about 11 px and its right border by about 18 px. The label "refers" sits on the right border. The frame's title is not crossed: it stands at the frame's left. A second loop reaches out of the frame by about 50 px.
+
+**Fit everything: no problem in this screenshot, but one at higher zooms.** Here the fit is set by the canvas's height (46 %): the loop reaches about 23 px into the 40 px screen margin and is not cut. The fit's bounds are the cards' box (`contentBounds`), and the margin is 40 screen px (`fitViewport`). So the first loop is cut at the screen's edge when the fit zooms above 79 % (40 / 50.6), and a second loop above 48 %. A small canvas fits at up to 110 % (`FIT_MAX_ZOOM`), so a canvas with a few cards and a loop on its topmost or rightmost card shows the loop cut.
+
+**The smallest fix proposed (nothing built):** the loop's reach joins the bounds.
+- A card with self-relationships counts as its rectangle grown upwards and to the right by its outermost loop's reach (50.6 + 32 per further loop, rounded up to 8), in one function beside `loopGeom`.
+- It is used in `contentBounds` (Fit everything, Zoom to frame), and in `frameAround` where a frame is sized by its cards: "Fit frame to its content" (`useFrames.ts`, `fitFrame`), a new frame around cards and "Arrange into frames" (`src/domain/commands/frame.ts`). The domain then needs the self-relationship count per card. The model is already in those commands' state, and the canvas has it in the lines.
+- Membership does not change: it is decided by the middle of a card's header (D-05), not by the frame's size.
+- Cost: about 20 lines, unit tests beside `loop-geometry.test.ts` and `frames.test.ts`, one spec case each in S10A-08. No data change, no change events beyond the frame's size the commands already write.
+
+The other way is to accept both as known limitations.
