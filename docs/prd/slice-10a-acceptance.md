@@ -456,7 +456,7 @@ Kept as well, because they are the measurements that see the loop: the branch-on
 ## Step 2b: the writes on the chain (29 October 2026)
 
 **Wiring, as the F1/F2 table says.** What the canvas shows still waits for the page's refresh (item 3); only the version sent changes.
-- `saveRow`: from a mapping line's menu the status, split, swap and delete; a relationship line's delete; the canvas's attribute delete; "Add to mapping" (D-48, `map-column.tsx`); "Move to the frame's concept" (`frame-panel.tsx`); the entity's delete from the model; a source table's delete and "Mark as needed"; a working label's delete; a classification's remove and restore; archive and unarchive (`lifecycle.tsx`, the workspace's row).
+- `saveRow`: from a mapping line's menu the status, split and delete; from a relationship line's menu the swap and delete (item 1 b, S10A-01); the canvas's attribute delete; "Add to mapping" (D-48, `map-column.tsx`); "Move to the frame's concept" (`frame-panel.tsx`); the entity's delete from the model; a source table's delete and "Mark as needed"; a working label's delete; a classification's remove and restore; archive and unarchive (`lifecycle.tsx`, the workspace's row).
 - `saveRows`: an attribute's move (`move-attribute.ts`: the moved attribute checked, its siblings held); a merge (every mapping checked); a concept's delete with "move to" (the concept checked, its entities held); the D-05 drop (`useFrames.ts`, `ModelCanvas.tsx`: the moved entities held, only with `moveToConcepts`).
 - `rowSaves.answer`: the change-to-resolve actions, through `run`, which now feeds back every answer's `versions`.
 - Canvas rename and delete stay off the chain (known-limitations.md, step 2a).
@@ -481,3 +481,20 @@ Kept as well, because they are the measurements that see the loop: the branch-on
 Each file three times on its own: passed three times out of three (both files together: 1.1 min, 54 s, 52 s). Flakes, not bugs. The server log showed the known "The destination stream closed early".
 
 **New or changed user-visible texts:** none. One text no longer appears: "This … does not exist." after a save that waited behind a successful delete.
+
+## Łukasz's answers to step 2b (29 October 2026)
+
+1. **Swap.** The list in step 2b's record was a slip: "Swap direction" is on a relationship line's menu (a mapping line has none), and it saves through `saveRow` (`canvas-host.tsx`, the relationship line's items; S10A-01's second case). The record above is corrected.
+2. **The cases that pass without the wiring.**
+   - S10A-05's two real-conflict cases must pass either way.
+   - S10A-03 "a sibling's name, Enter, then at once Ctrl+↑ on another row" checks behaviour, not the fix: a move sends no sibling's version, so it was never refused, with or without the chain. It guards that the move and the name are both stored and the order kept.
+   - The e2e setup has no way to delay a server action's answer or the page's refresh (no `page.route` on actions, no server-side delay), and none is built in this slice. These cases pass without the wiring because the page's refresh comes first; the fix in them is guarded by `src/ui/row-saves.test.ts` only:
+
+     | Case | Unit test |
+     | --- | --- |
+     | S10A-03 "Ctrl+↓ on a row, then at once a sibling's name in its panel" | `RowSaves.saveRows` › "holds every row it lists: a one-row save started meanwhile waits for it and sends the version it returned" |
+     | S10A-04 "delete from model (card menu), after the entity's name in its panel" | `RowSaves` › "sends a row's second save after the first one's answer, with the version it returned (S9-01's case)" |
+     | S10A-04 "delete a source table (table panel), after the table's note" | the same |
+     | S10A-04 "delete a working label (label panel), after its name" | the same |
+     | S10A-04 "archive and unarchive (workspace home), after the workspace's name in the settings, then the name again" | the same (the archive answers `Saved`, its `value.version`), and `RowSaves` › "sends the version the page shows when it is newer than the last answer" for the name after it |
+3. **`deletes`: agreed on 29 October 2026.** A delete that succeeds cuts the saves of its rows waiting behind it, with no toast (they would be refused as not found). It goes into CLAUDE.md's "Saving in panels" at the closing, with the held-rows rule.
