@@ -112,9 +112,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   acceptance sessions use it. Never run `npm run reset-dev-data` on that file without a fresh backup and his OK; back it
   up on request and before a slice that changes the local file's format (`.data/backups/dev-db-<yyyymmdd-hhmm>.json`,
   the newest also `.data/backups/kb-model-latest.json`; git-ignored). It holds his real e-mail and KB's password hash,
-  so it is never committed as it is. **Planned after slice 8's merge:** KB alone as an anonymised fixture in the
-  repository (the e-mail at `example.com`, the password `demo-pass`) with a command that loads it into
-  `.data/dev-db.json`, refreshed from his file after later test sessions.
+  so it is never committed; it stays on his disk only (his decision, 28 October 2026).
 
 ## Security
 

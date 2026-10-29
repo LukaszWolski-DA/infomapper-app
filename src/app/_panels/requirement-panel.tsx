@@ -17,7 +17,7 @@ import { coverageText } from "./requirement-ui";
 import { coverageParts, ENTITY_GAP_REASON, fourEyesRequirementMessage, KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
 import { REQUIREMENT_KINDS, REQUIREMENT_PRIORITIES, REQUIREMENT_STATUSES, type Requirement, type RequirementLink } from "@/domain/types";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
-import { Actions, buttonClass, dangerClass, Field, Hint, inputClass, Kind, List, Note, Section, Seg, TextArea, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, Hint, inputClass, Kind, List, Note, Section, Seg, TextArea, TextField, fieldKey } from "./fields";
 import { usePanel } from "./inspector";
 import { attributeLabel, columnLabel, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -98,7 +98,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
     const go = { entity: p.goEntity, attribute: p.goAttribute, mapping: p.goMapping, source_table: p.goTable, source_column: p.goColumn }[t.kind];
     return { name, type: TYPE[t.kind]!, go: () => go(t.id), mono: t.kind !== "entity" && t.kind !== "attribute" };
   };
-  const v = `${r.id}:${r.version}:${reset}`;
+  const rid = `${r.id}:${reset}`; // a refused save mounts the fields anew with the stored values
   const kindName = KIND_NAMES[r.kind].toLowerCase();
 
   return (
@@ -106,10 +106,10 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       <Kind>Requirement</Kind>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="ID" htmlFor="f-rqk">
-          <TextField key={v} id="f-rqk" value={r.key} mono readOnly={!p.editable} onSave={(key) => void save("key", key)} testId="input-req-key" />
+          <TextField key={fieldKey(rid, "key", r.key)} id="f-rqk" value={r.key} mono readOnly={!p.editable} onSave={(key) => void save("key", key)} testId="input-req-key" />
         </Field>
         <Field label="Kind" htmlFor="f-rqkind">
-          <select key={v} id="f-rqkind" className={inputClass} defaultValue={r.kind} disabled={!p.editable} onChange={(e) => void save("kind", e.target.value as Requirement["kind"])} data-testid="select-req-kind">
+          <select key={fieldKey(rid, "kind", r.kind)} id="f-rqkind" className={inputClass} defaultValue={r.kind} disabled={!p.editable} onChange={(e) => void save("kind", e.target.value as Requirement["kind"])} data-testid="select-req-kind">
             {REQUIREMENT_KINDS.map((k) => (
               <option key={k} value={k}>
                 {KIND_NAMES[k]}
@@ -119,10 +119,10 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
         </Field>
       </div>
       <Field label="Name" htmlFor="f-rqn">
-        <TextField key={v} id="f-rqn" inputRef={nameRef} value={r.name} readOnly={!p.editable} onSave={(name) => void save("name", name)} testId="input-req-name" />
+        <TextField key={fieldKey(rid, "name", r.name)} id="f-rqn" inputRef={nameRef} value={r.name} readOnly={!p.editable} onSave={(name) => void save("name", name)} testId="input-req-name" />
       </Field>
       <RichTextField
-        key={`d:${v}`}
+        key={fieldKey(rid, "description", r.description_html)}
         label="Description"
         html={r.description_html}
         text={r.description_text}
@@ -137,7 +137,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       {usesExpression(r.kind) && (
         <Field label={r.kind === "dq_rule" ? "Check" : "Rule"} htmlFor="f-rqe">
           <TextArea
-            key={v}
+            key={fieldKey(rid, "expression", r.expression)}
             id="f-rqe"
             code
             value={r.expression ?? ""}
@@ -167,14 +167,14 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Owner" htmlFor="f-rqo">
-          <TextField key={v} id="f-rqo" value={r.owner_name ?? ""} readOnly={!p.editable} onSave={(owner) => void save("owner_name", owner || null)} testId="input-req-owner" />
+          <TextField key={fieldKey(rid, "owner", r.owner_name)} id="f-rqo" value={r.owner_name ?? ""} readOnly={!p.editable} onSave={(owner) => void save("owner_name", owner || null)} testId="input-req-owner" />
         </Field>
         <Field label="External reference" htmlFor="f-rqr">
-          <TextField key={v} id="f-rqr" value={r.external_ref ?? ""} readOnly={!p.editable} placeholder="e.g. JIRA-481" onSave={(ref) => void save("external_ref", ref || null)} testId="input-req-ref" />
+          <TextField key={fieldKey(rid, "ref", r.external_ref)} id="f-rqr" value={r.external_ref ?? ""} readOnly={!p.editable} placeholder="e.g. JIRA-481" onSave={(ref) => void save("external_ref", ref || null)} testId="input-req-ref" />
         </Field>
       </div>
       <Field label="Part of" htmlFor="f-rqp">
-        <select key={v} id="f-rqp" className={inputClass} defaultValue={r.parent_id ?? ""} disabled={!p.editable} onChange={(e) => void save("parent_id", e.target.value || null)} data-testid="select-req-parent">
+        <select key={fieldKey(rid, "parent", r.parent_id)} id="f-rqp" className={inputClass} defaultValue={r.parent_id ?? ""} disabled={!p.editable} onChange={(e) => void save("parent_id", e.target.value || null)} data-testid="select-req-parent">
           <option value="">None (top level)</option>
           {parents.map((x) => (
             <option key={x.id} value={x.id}>

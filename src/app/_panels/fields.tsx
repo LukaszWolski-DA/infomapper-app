@@ -29,6 +29,13 @@ export const inputClass =
   "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 text-im-ink outline-none focus:border-im-logical disabled:opacity-50 read-only:bg-im-panel";
 
 /** A text field that saves on Enter or when it loses the focus. An empty required field goes back. */
+/**
+ * The key of a panel field that shows `value` of the object `id`: the field is mounted anew, and shows the stored
+ * value, only when that value changes (its own save, an undo, someone else's write). Keyed by the object's version, a
+ * save on leaving one field mounted the next one anew and took the focus Tab had just put there.
+ */
+export const fieldKey = (id: string, field: string, value: string | number | null | undefined): string => `${id}:${field}:${value ?? ""}`;
+
 export function TextField({
   id,
   value,
