@@ -910,4 +910,13 @@ Not affected:
 Undo and Redo do wait for both kinds (`rowSaves.exclusive` and `ui.settled()`).
 
 **Fix (later):** send these writes through `saveRow` too, and feed a reorder's renumbered siblings with
-`rowSaves.answer`.
+`rowSaves.answer`. The first candidate for slice 10 "Relationships", which changes the same actions in
+`canvas-host.tsx` (Łukasz, 29 October 2026; `docs/ideas.md`).
+
+### A project's description in Firefox and WebKit does not count wrapped lines (slice 9, D-59)
+
+The project home's description grows with its text through `field-sizing: content`, which only Chromium supports.
+Firefox and WebKit fall back to the field's `rows`, taken from the text's line breaks in the render and in the `input`
+event (`project-heading.tsx`), never from a measured height (PRD item 12). A long line that wraps is not counted, so
+there the field shows fewer lines than the text has and scrolls inside. Later: drop the fallback once those browsers
+support `field-sizing`, or measure in the `input` event only.

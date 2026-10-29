@@ -92,6 +92,7 @@ Behaviour reference: `docs/prototype/infomapper-prototype-with-sources.html`. Da
   - The home pages have no Undo or Redo. Such a step is undone and redone from any canvas of the workspace, of any project, in its turn after the steps the person made later.
 
   Accepted by Łukasz, 29 October 2026.
+- **D-60** Typing the zoom (slice 9). The zoom value between − and + is a field. A number, with or without %, applies on Enter around the view's centre, as − and + do; a decimal, with a point or a comma, is rounded. Escape goes back. Leaving the field (a click elsewhere, Tab) applies it as Enter does. A value outside the range applies the nearest limit, 10 % or 300 %, and the field shows it; anything that is not a number goes back without a toast. The field follows every zoom except while someone types in it; keys typed in it do not reach the canvas. Typing the zoom is view state, outside undo (D-22). Accepted by Łukasz, 29 October 2026.
 
 
 ### Way of working

@@ -418,3 +418,23 @@ A quick panel save followed by one of these, or one of these followed by a panel
 - D-60, with (v) and (vii) written in.
 - The field's aria label "Zoom" and its title "Type a zoom and press Enter" (new; the prototype has none).
 - No new toast. (viii) was not chosen, so "Type a zoom from 10 to 300 %." is not used.
+
+### After Łukasz's review of step 4 (29 October 2026)
+
+- **S2A-14 A/B** (one sitting):
+  - The sides were the measurement builds (AD-31) of the `slice-08` tag (worktree `infomapper-ab-main`, checked out at the tag and returned to `bbc16c5` after) and of this branch (rebuilt after the reselect fix), run alternately: slice-08 first in each of 3 rounds, 11:19 to 11:25.
+  - All runs fail S2A-14's soft bar of 45 fps on both sides, as recorded in the known limitation ("partly met", 25–30 fps).
+
+  | Measurement | slice-08 (3 runs) | median | spread | slice 9 (3 runs) | median | spread |
+  | --- | --- | --- | --- | --- | --- | --- |
+  | Group drag, 31 cards at 50 % (avg fps) | 26.7, 23.9, 29.3 | **26.7** | 5.4 | 25.4, 29.6, 30.1 | **29.6** | 4.7 |
+  | Single-card drag (avg fps) | 20.6, 19.2, 15.5 | **19.2** | 5.1 | 19.4, 16.3, 16.0 | **16.3** | 3.4 |
+  | Lasso marks, median of 20 (ms) | 26.7, 28.5, 27.5 | **27.5** | 1.8 | 26.4, 27.2, 28.7 | **27.2** | 2.3 |
+
+  - The branch is not worse than slice-08 by more than the spread:
+    - its group drag median is higher;
+    - its single-card median is 2.9 fps lower, inside slice-08's spread of 5.1;
+    - the lasso is equal.
+  - So there are no phase traces. The field is in the top bar, outside the canvas; S9-14 has 0 commits while typing, and the element counts are equal.
+- **D-60** is in `docs/decisions.md` with Łukasz's text, accepted 29 October 2026. A decimal with a point or a comma is rounded.
+- **Known limitation:** in Firefox and WebKit a project's description does not count lines that wrap (`field-sizing: content` is Chromium only).
