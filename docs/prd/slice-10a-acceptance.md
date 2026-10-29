@@ -575,6 +575,8 @@ A first try scaled each further loop about the corner; its ends came only 12 px 
 
 The drawing matches the condition on the field names: from on the right edge, to on the top edge.
 
+Two more screenshots, after Łukasz's step 4 answer: `loop-in-frame.png` (a labelled loop in a concept frame fitted to its cards) and `loop-fit-view.png` (Fit everything with a loop on a topmost card). See "The two more screenshots" below.
+
 **D-61, the final text proposed for approval:**
 
 "An entity can be related to itself (a parent and its children). Owners, admins and modelers create it with “Relate to itself” in the card header's menu, in a workspace that is not archived, and its panel opens; the relate button clicked on the same card asks for a different entity and names that item. A new one has the ends 0..1 (the parent) and 0..n (the children). It is drawn as a loop at its card's top right corner: from the right edge at the header's middle to the top edge near the corner, meeting both edges at right angles, with both ends in the chosen notation at every zoom and the label at the loop's outer point. Further loops on one card nest outside it, their ends 16 px further from the corner. The loop follows the card's moves, width and collapsing; the miniature leaves it out. Its panel names the ends “At the right end” and “At the top end”. Inside a collapsed frame it is a line inside one frame: not drawn and not counted in a bundle. Swap exchanges its two ends' cardinalities, and is refused with “Nothing to change.” when they are equal. Otherwise it behaves as any relationship: label and cardinality in its panel, delete with Undo, layers (hidden in Mappings), Focus, a history place, counted once in an entity's delete preview."
@@ -606,3 +608,5 @@ Both are in `docs/prd/slice-10a-screens/step-4/` (the second test of `S10A-08-sc
 - Cost: about 20 lines, unit tests beside `loop-geometry.test.ts` and `frames.test.ts`, one spec case each in S10A-08. No data change, no change events beyond the frame's size the commands already write.
 
 The other way is to accept both as known limitations.
+
+**Łukasz's answer (29 October 2026): no fix.** A loop is a relationship line and may reach a little out of its frame; he resizes the frame himself. Fit everything cutting a loop on a small canvas at a high zoom is accepted too. Nothing is built; D-61 stays as accepted. One entry in `docs/known-limitations.md`.

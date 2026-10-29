@@ -930,6 +930,11 @@ A loop's from end sits on the card's right edge, 16 px lower for each further lo
 the card's bottom edge (`loopGeom`, `src/canvas/geometry.ts`). A collapsed card is the header only, so with three or
 more loops their from ends come closer than 16 px and their end marks can overlap. Accepted (Łukasz, step 4 answers).
 
+### Fitting the view and sizing a frame count only the cards (slice 10a, D-61)
+
+Fitting the view and sizing a frame by its cards count only the cards, so a loop may reach past a fitted frame's border
+or be cut at the screen's edge when the fit zooms above about 79 %. Accepted by Łukasz on 29 October 2026.
+
 ### A project's description in Firefox and WebKit does not count wrapped lines (slice 9, D-59)
 
 The project home's description grows with its text through `field-sizing: content`, which only Chromium supports.
