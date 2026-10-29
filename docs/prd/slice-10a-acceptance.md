@@ -533,3 +533,50 @@ Reused, not new: the relate toast, "Nothing to change." (now also from the panel
 
 - **Texts approved:** "Relate to itself"; "Pick a different entity, or use “Relate to itself” in the card's menu."; "At the right end" and "At the top end", on condition that step 4 draws the loop from the right edge (from) to the top edge (to). He confirms them finally with step 4's screenshots.
 - **A correction to step 2b's answer 2:** the unit test named for the four cases guards the chain's mechanism, not that those actions use it. The wiring of delete from model, delete a source table, delete a working label and archive is guarded by review only. Nothing is built for it.
+
+## Step 4: the loop (29 October 2026)
+
+**Geometry** (`src/canvas/geometry.ts`, `loopGeom`, a branch of `relGeom` when both ends are one card):
+- the from end leaves the right edge at the header's middle (27 px below the top), the to end comes back through the top edge 32 px left of the corner; normals (1, 0) and (0, −1), so `ieMarker` and `umlMarker` draw as on any line, at every zoom (F6);
+- one cubic Bézier, its control points 128 px straight out of each end; the label at t = 0.5, the outer point, up and to the right of the corner;
+- a further loop (`offset` 16, 32 … from `buildLines`, F11) moves both ends 16 px further from the corner, as parallel lines are spaced, and its control points 80 px further out, so its outer point lies 22 px further out on both axes: the loops nest and their labels (18 px high) do not overlap;
+- on a collapsed card the from end stays on the card (at most 6 px above its bottom edge). With three or more loops on a collapsed card the from ends can come closer than 16 px; nothing else changes.
+- Fixed in canvas units, so it zooms with the card, and it follows moves, widths and collapsing, since it reads the card's rectangle like any line.
+
+A first try scaled each further loop about the corner; its ends came only 12 px apart, so the end marks and labels overlapped. The screenshots below are of the version described above.
+
+**Drawing:** `RelPath` (`LineLayer.tsx`) passes `fromCardId === toCardId`, so the line layer, the overlay's lit lines (F7) and the hit target (`path.hit`, `pointer-events: stroke`) share the geometry. A click inside the loop's empty area selects nothing. The hover thickens it by CSS (`.lnk:hover .s`). The miniature (`Overview.tsx`) leaves self-relationships out (F12). Layers and collapsed frames need no code: `bundleLines` drops relationships in Mappings, and a line with both ends in one collapsed frame (`fa === fz`).
+
+**Unit tests** (`src/canvas/loop-geometry.test.ts`, beside `line-geometry.test.ts`, 10 tests): the ends' points and directions, the right angles, the label outside the card, the curve outside the card, nesting (ends 16 px apart, outer points 22 px, every point further from the corner), a move, a width and a collapsed card, two cards unchanged, the collapsed-frame exclusion (no loop, no bundle counts it), and the layer modes. `npm test`: 109 files, 1,422 tests.
+
+**Specs:**
+- S10A-08 (5 cases): the ends on the right and the top edge at 100 % and 30 %, the marks of both notations, the label at the outer point; the miniature's line count unchanged; a click inside selects nothing, the hover thickens it, a click selects it, the menu offers swap and delete; two loops nest with their labels apart; a move, a width change and a collapsed card.
+- S10A-09 (3 cases): Mappings hides it, Relationships and Everything show it; in a collapsed concept frame no loop and the bundle reads "1 relationship"; Focus on Customer lights it, Focus on Sales Order leaves it under the veil.
+- S10A-07, -10 and -11 now select the loop on the canvas (`clickLine`, `LOOP_VIEW`); S10A-07 also checks that the new loop is drawn. One fix while writing S10A-08: the collapsed-card case waits for the drag and the width to be stored before collapsing the card as test data.
+- All 19 cases of S10A-07 to S10A-11 pass.
+
+**Earlier specs:** S1A-06 (notation), slice 1b, slice 2c, S3B-13 (the miniature's commits), slice 4b-1 and slice 10a: **105 passed, 0 failed, 854 s.** No earlier test changed.
+
+**CI:** lint clean, typecheck pass, `npm test` 1,422 tests pass.
+
+**A4:** no self-relationship in the demo seed or "Performance test"; the specs make them through the domain.
+
+**Screenshots** (`docs/prd/slice-10a-screens/step-4/`, from `SCREENS=step-4 npx playwright test e2e/slice-10a/S10A-08-screens.spec.ts`, on "Customer & orders" with "refers" on Customer):
+
+| File | What |
+| --- | --- |
+| `loop-ie-100.png`, `loop-uml-100.png` | crow's foot and UML at 100 % |
+| `loop-ie-30.png`, `loop-uml-30.png` | the same at 30 % |
+| `loop-collapsed-card.png` | Customer collapsed |
+| `loops-nested.png` | "refers" and "replaces" nested |
+| `loop-selected-panel.png` | the loop selected, its panel with "At the right end" and "At the top end" |
+| `loop-focus-entity.png` | Focus on Customer: its loops and lines lit |
+| `loop-focus-loop.png` | Focus on the loop: the loop and Customer lit, every other line and card faded (the other loop too) |
+
+The drawing matches the condition on the field names: from on the right edge, to on the top edge.
+
+**D-61, the final text proposed for approval:**
+
+"An entity can be related to itself (a parent and its children). Owners, admins and modelers create it with “Relate to itself” in the card header's menu, in a workspace that is not archived, and its panel opens; the relate button clicked on the same card asks for a different entity and names that item. A new one has the ends 0..1 (the parent) and 0..n (the children). It is drawn as a loop at its card's top right corner: from the right edge at the header's middle to the top edge near the corner, meeting both edges at right angles, with both ends in the chosen notation at every zoom and the label at the loop's outer point. Further loops on one card nest outside it, their ends 16 px further from the corner. The loop follows the card's moves, width and collapsing; the miniature leaves it out. Its panel names the ends “At the right end” and “At the top end”. Inside a collapsed frame it is a line inside one frame: not drawn and not counted in a bundle. Swap exchanges its two ends' cardinalities, and is refused with “Nothing to change.” when they are equal. Otherwise it behaves as any relationship: label and cardinality in its panel, delete with Undo, layers (hidden in Mappings), Focus, a history place, counted once in an entity's delete preview."
+
+Changed against the PRD's proposal: the loop's place and shape, the nesting, the label place and what the loop follows are written out; "refused" names its text; "layers" says Mappings hides it.

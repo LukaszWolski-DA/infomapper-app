@@ -17,6 +17,8 @@
 // selection (the layer's `dimmed` class), never on a hover. Step 6 (item 21): under Focus a trace line with both ends lit
 // is drawn again above the veil by `LitLines`, solid (step 8: dashed, they cost about 32 ms of raster per Focus switch at
 // 30 %); the rest fade under it, dashed.
+// Slice 10a (D-61): a relationship from an entity to itself is a loop at its card's top right corner (`relGeom`'s
+// `self`), drawn by `RelPath` like any relationship line, here and in the overlay's lit lines.
 
 import { Fragment, memo, useContext, useState, type ReactNode } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi, type InternalNode } from "@xyflow/react";
@@ -91,7 +93,7 @@ const MapPath = memo(
 
 const RelPath = memo(
   function RelPath({ line, a, z, notation, className, onSelect }: LineProps & { line: RelLineData; a: Placed; z: Placed; notation: Notation }) {
-    const g = relGeom(cardRect(a), cardRect(z), line.offset);
+    const g = relGeom(cardRect(a), cardRect(z), line.offset, line.fromCardId === line.toCardId);
     let marks: React.ReactNode;
     if (notation === "ie") {
       const ma = ieMarker(g.pa, g.na, line.fromMin, line.fromMax), mb = ieMarker(g.pb, g.nb, line.toMin, line.toMax);

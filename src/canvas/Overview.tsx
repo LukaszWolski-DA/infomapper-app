@@ -211,6 +211,7 @@ const Miniature = memo(function Miniature({
         return a && z ? <line key={pair} className="mm" x1={a.x} y1={a.y} x2={z.x} y2={z.y} /> : null;
       })}
       {lines.relationships.map((r) => {
+        if (r.fromCardId === r.toCardId) return null; // a relationship from an entity to itself: no line (slice 10a, F12)
         const a = centre(r.fromCardId), z = centre(r.toCardId);
         return a && z ? <line key={r.id} className="mr" x1={a.x} y1={a.y} x2={z.x} y2={z.y} /> : null;
       })}

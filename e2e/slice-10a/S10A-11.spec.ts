@@ -1,10 +1,11 @@
 import { expect, test } from "./fixtures";
 import {
   canvasUrl,
+  clickLine,
+  LOOP_VIEW,
   card,
   clickCard,
   contextOn,
-  expectSelected,
   expectToast,
   ids,
   linkedTo,
@@ -57,10 +58,8 @@ test("S10A-11: deleting the self-relationship is immediate, with Undo in the toa
   const rel = await selfRelationship("Customer");
   const live = async () => (await loadModel()).relationships.some((r) => r.id === rel.id);
   await signInAs(page, "Łukasz");
-  await openCanvas(page, canvasUrl());
-  await clickCard(page, "Customer");
-  await page.getByTestId("panel-entity").getByText("Customer relates to Customer", { exact: true }).click();
-  await expectSelected(page, "relationship");
+  await openCanvas(page, canvasUrl(), LOOP_VIEW);
+  await clickLine(page, rel.id);
   await page.getByTestId("button-delete-relationship").click();
   await expectToast(page, "Relationship deleted");
   const toast = page.getByTestId("toast");

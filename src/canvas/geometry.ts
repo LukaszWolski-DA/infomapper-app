@@ -245,8 +245,30 @@ export function fNode(attribute: End, inputs: readonly End[]) {
 /** The rectangle of a card for relationship lines. */
 export const cardRect = (p: Placed): Rect => ({ x: p.x, y: p.y, w: cardWidth(p.card), h: cardHeight(p.card) });
 
-/** Side to side when the cards are apart horizontally, otherwise top to bottom; anchored at header height. */
-export function relGeom(A: Rect, B: Rect, off: number) {
+/**
+ * A relationship from an entity to itself (slice 10a, D-61): a loop at the card's top right corner. The from end leaves
+ * the right edge at the header's middle, the to end comes back through the top edge near the corner, both at right
+ * angles, so the end marks draw as on any line. Further loops on one card (`off`: 16, 32 …) move both ends `off` away
+ * from the corner, as parallel lines do, and bulge out further, so they nest outside the first with their labels apart
+ * (the outer point moves `1.375 × off` out along both axes); on a collapsed card the from end stays on the card.
+ */
+const LOOP_FROM = HEAD_H / 2, LOOP_TO = 32, LOOP_K = 128;
+
+function loopGeom(A: Rect, off: number) {
+  const rx = A.x + A.w;
+  const pa = { x: rx, y: A.y + Math.min(LOOP_FROM + off, A.h - 6) }, na = { x: 1, y: 0 };
+  const pb = { x: rx - Math.min(LOOP_TO + off, A.w - 24), y: A.y }, nb = { x: 0, y: -1 };
+  const k = LOOP_K + 5 * off;
+  const c1 = { x: pa.x + k, y: pa.y }, c2 = { x: pb.x, y: pb.y - k };
+  return { d: `M${pa.x},${pa.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${pb.x},${pb.y}`, mid: bez(pa, c1, c2, pb, 0.5), pa, pb, na, nb };
+}
+
+/**
+ * Side to side when the cards are apart horizontally, otherwise top to bottom; anchored at header height. `self`: both
+ * ends on one card, a loop (`loopGeom`).
+ */
+export function relGeom(A: Rect, B: Rect, off: number, self = false) {
+  if (self) return loopGeom(A, off);
   let pa: Pt, pb: Pt, na: Pt, nb: Pt;
   if (A.x + A.w + 24 < B.x || B.x + B.w + 24 < A.x) {
     const aLeft = A.x < B.x;

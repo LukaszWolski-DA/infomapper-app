@@ -6,11 +6,16 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { createRelationship, updateRelationship } from "../../src/domain/commands/relationship";
 import type { Relationship } from "../../src/domain/types";
 import { asLukasz, ids, loadModel, pointOnLine } from "../slice-01b/helpers";
+import { expectSelected } from "../slice-06b/helpers";
 
 export * from "../slice-09/helpers";
 export { canvasCommits, contextOn, linkedTo } from "../slice-03b/helpers";
 export { expectHidden, togglePanel, viewportTransform } from "../slice-05a/helpers";
 export { backButton, clickCard, expectSelected } from "../slice-06b/helpers";
+export { setCard } from "../slice-06a/helpers";
+export { dragCardBy } from "../slice-02a/helpers";
+export { collapsedFrame, makeFrame, AROUND } from "../slice-02c/helpers";
+export { pointOnLine } from "../slice-01b/helpers";
 
 /** A mapping's line on the canvas. */
 export const mappingLine = (page: Page, mappingId: string): Locator =>
@@ -67,6 +72,16 @@ export async function selfRelationship(entityName: string, ends: Partial<Pick<Re
     ...(ends.to_max !== undefined ? { toMax: ends.to_max } : {}),
   };
   return (await asLukasz((ctx, access) => updateRelationship(ctx, access, { relationship }, input))).relationship;
+}
+
+/** "Customer & orders" at 100 %, with room above Customer for its loops (step 4). */
+export const LOOP_VIEW = { x: -260, y: 140, zoom: 1 };
+
+/** Clicks a relationship's line (a loop included) at its middle; the details panel shows it. */
+export async function clickLine(page: Page, relationshipId: string): Promise<void> {
+  const at = await pointOnLine(relationshipLine(page, relationshipId), 0.5);
+  await page.mouse.click(at.x, at.y);
+  await expectSelected(page, "relationship");
 }
 
 /** The relationships of an entity in the data file, deleted ones left out. */

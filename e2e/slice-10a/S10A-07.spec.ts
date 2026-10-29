@@ -16,14 +16,14 @@ import {
   newSession,
   openCanvas,
   RETAIL,
+  relationshipLine,
   relationshipsOf,
   signInAs,
   togglePanel,
   toolboxAt,
 } from "./helpers";
 
-// "Relate to itself" in an entity card header's menu (items 8 and 9, D-61). The loop is step 4: here the new line may
-// still be drawn as the line layer draws two ends on one card today.
+// "Relate to itself" in an entity card header's menu (items 8 and 9, D-61); the new relationship is drawn as a loop.
 
 const ADDED = "Relationship added. Name it and set the cardinality on the right.";
 const SAME_CARD = "Pick a different entity, or use “Relate to itself” in the card's menu.";
@@ -46,6 +46,7 @@ test("S10A-07: Relate to itself creates one relationship with the entity at both
   await expect(page.getByTestId("button-toggle-right")).toHaveAttribute("aria-pressed", "true");
   await expectSelected(page, "relationship");
   await expect(page.getByTestId("panel-relationship").locator("h2")).toHaveText("Customer and Customer");
+  await expect(relationshipLine(page, made.id)).toHaveCount(1);
 
   // one undo step, and redo brings it back
   await expect(page.getByTestId("button-undo")).toBeEnabled();
