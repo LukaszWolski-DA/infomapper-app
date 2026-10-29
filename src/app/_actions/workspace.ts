@@ -63,7 +63,7 @@ export async function archiveWorkspaceAction(input: { workspaceId: string; expec
       const access = await loadAccess(store, input?.workspaceId, user.id);
       if (!access) return NOT_FOUND;
       const result = archiveWorkspace(ctx, access, input);
-      return result.ok ? { ...result, value: undefined } : result;
+      return result.ok ? { ...result, value: { version: result.value.workspace.version } } : result;
     }),
   );
 }
@@ -73,8 +73,9 @@ export async function unarchiveWorkspaceAction(input: { workspaceId: string; exp
     await runCommand(async (ctx, store, user) => {
       const access = await loadAccess(store, input?.workspaceId, user.id);
       if (!access) return NOT_FOUND;
+      // the settings form's next save sends this version (slice 10a, F1)
       const result = unarchiveWorkspace(ctx, access, input);
-      return result.ok ? { ...result, value: undefined } : result;
+      return result.ok ? { ...result, value: { version: result.value.workspace.version } } : result;
     }),
   );
 }

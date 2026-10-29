@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { access, archived, attribute, builtins, entity, fixtureLinks, ids, makeCtx, mapping, mappingInput, NOW, sourceColumn } from "../__fixtures__/domain";
+import { writtenVersions } from "../changes";
 import type { Attribute } from "../types";
 import { addAttribute, createAttributeFromColumn, deleteAttribute, reorderAttribute, updateAttribute } from "./attribute";
 
@@ -220,6 +221,12 @@ describe("reorderAttribute (D-36)", () => {
     for (const w of r.writeSet.writes) if (w.kind === "update" && w.table === "attribute") next.set(w.row.id, w.row.sort_order);
     return [...attributes].sort((x, y) => next.get(x.id)! - next.get(y.id)!).map((x) => x.name);
   };
+
+  it("writes new versions of the moved attribute and of every sibling it renumbers, which the answer carries (slice 10a, F3)", () => {
+    const r = move(3, 0);
+    if (!r.ok) throw new Error(r.error.message);
+    expect(writtenVersions(r.writeSet.writes)).toEqual({ [list[3]!.id]: 2, [list[0]!.id]: 2, [list[1]!.id]: 2, [list[2]!.id]: 2 });
+  });
 
   it("moves one place up or down (Ctrl ↑/↓), writing only the two rows that change, in one change group", () => {
     const up = move(2, 1);

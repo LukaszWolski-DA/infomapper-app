@@ -19,7 +19,7 @@ import { entityImpact, type EntityImpact } from "@/domain/model/impact";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { getSession } from "../_lib/session";
 import { lockedRefusal } from "../_lib/unlock";
-import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
+import { runCommand, type ActionResult, type CommandOptions, type Saved } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -35,12 +35,13 @@ async function loadAccess(store: DataStore, workspaceId: unknown, userId: Uuid):
 async function modelCommand<T>(
   workspaceId: unknown,
   build: (ctx: CommandContext, access: WorkspaceAccess, model: WorkspaceModel, store: DataStore) => Promise<CommandResult<T>> | CommandResult<T>,
+  options: CommandOptions = {},
 ): Promise<ActionResult<T>> {
   const result = await runCommand<T>(async (ctx, store, user) => {
     const access = await loadAccess(store, workspaceId, user.id);
     if (!access) return NOT_FOUND;
     return build(ctx, access, await store.model.load(access.workspace.id), store);
-  });
+  }, options);
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
@@ -71,7 +72,7 @@ export async function deleteConceptAction(
     const concept = byId(concepts, input?.conceptId);
     const frames = await store.frames.list(access.workspace.id);
     return deleteConcept(ctx, access, { concept, concepts, entities: entities.filter((e) => e.concept_id === concept?.id), frames }, input);
-  });
+  }, { versions: true }); // with "move to", the moved entities' versions (slice 10a, F1)
 }
 
 // ---- entities ----
@@ -183,13 +184,17 @@ export async function updateAttributeAction(workspaceId: string, input: UpdateAt
   });
 }
 
-/** Moves an attribute to a position among its entity's attributes (slice 1b, D-36). */
+/**
+ * Moves an attribute to a position among its entity's attributes (slice 1b, D-36). The answer carries the versions of
+ * the moved attribute and its renumbered siblings (slice 10a, F3).
+ */
 export async function reorderAttributeAction(
   workspaceId: string,
   input: { attributeId: string; expectedVersion: number; position: number },
 ): Promise<ActionResult<{ position: number }>> {
   return modelCommand(workspaceId, (ctx, access, { attributes }) =>
     reorderAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), attributes }, input),
+    { versions: true },
   );
 }
 

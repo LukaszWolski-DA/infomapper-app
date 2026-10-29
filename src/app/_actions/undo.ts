@@ -9,7 +9,7 @@
 
 import { revalidatePath } from "next/cache";
 import { getDataStore } from "@/data";
-import type { CommandContext, Write } from "@/domain/changes";
+import { writtenVersions, type CommandContext } from "@/domain/changes";
 import { revertChangeGroup } from "@/domain/commands/undo";
 import { changeCanvasId } from "@/domain/model/change-label";
 import { canvasAfterStep } from "@/domain/model/next-canvas";
@@ -42,17 +42,6 @@ export interface UndoOutcome extends UndoState {
   /** The new version of every row the step wrote (slice 9): the panels' next saves of those rows send it. */
   versions: Record<string, number>;
 }
-
-/** Rows with an id and a version (link rows have neither). */
-const versionsOf = (writes: readonly Write[]): Record<string, number> => {
-  const out: Record<string, number> = {};
-  for (const w of writes) {
-    if (!("row" in w)) continue;
-    const row = w.row as { id?: unknown; version?: unknown };
-    if (typeof row.id === "string" && typeof row.version === "number") out[row.id] = row.version;
-  }
-  return out;
-};
 
 const stateOf = (h: UndoHistory): UndoState => ({ canUndo: h.undo.length > 0, canRedo: h.redo.length > 0 });
 const NOTHING = { undo: "Nothing to undo.", redo: "Nothing to redo." } as const;
@@ -112,7 +101,7 @@ export async function undoAction(
     revalidatePath("/", "layout");
     const canvasId = changeCanvasId(step.events);
     const canvas = canvasId ? await store.canvases.get(workspace.id, canvasId) : null;
-    return { ok: true, value: { label: step.label, canvas: canvas ? { id: canvas.id, name: canvas.name } : null, versions: versionsOf(result.writeSet.writes), ...stateOf(next) } };
+    return { ok: true, value: { label: step.label, canvas: canvas ? { id: canvas.id, name: canvas.name } : null, versions: writtenVersions(result.writeSet.writes), ...stateOf(next) } };
   } catch (e) {
     console.error("Undo failed:", e instanceof Error ? `${e.name}: ${e.message}` : "unknown error");
     return { ok: false, code: "unexpected", message: "Something went wrong. Nothing was changed." };

@@ -6,7 +6,7 @@
 
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";
-import type { CommandContext, CommandResult } from "@/domain/changes";
+import { writtenVersions, type CommandContext, type CommandResult } from "@/domain/changes";
 import {
   acknowledgeChange,
   approveChangeAgain,
@@ -34,7 +34,7 @@ import { sourceDeleteCascade, sourceDeleteImpact, type SourceDeleteImpact } from
 import { getDataStore } from "@/data";
 import { getSession } from "../_lib/session";
 import { lockedRefusal } from "../_lib/unlock";
-import { runCommand, type ActionResult } from "../_lib/run-command";
+import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 
@@ -68,6 +68,10 @@ async function stateOf(store: DataStore, workspaceId: Uuid): Promise<SourceChang
   };
 }
 
+/**
+ * Runs a change's action. The answer carries the versions it wrote (slice 10a, F2): only the server knows which tables,
+ * columns and mappings an action writes, so the browser's next saves of those rows take their versions from here.
+ */
 async function changeCommand<T>(
   workspaceId: unknown,
   build: (ctx: CommandContext, access: WorkspaceAccess, state: SourceChangeState, store: DataStore) => Promise<CommandResult<T>> | CommandResult<T>,
@@ -78,7 +82,7 @@ async function changeCommand<T>(
     if (!workspace) return NOT_FOUND;
     const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
     return build(ctx, access, await stateOf(store, workspace.id), store);
-  });
+  }, { versions: true });
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
@@ -135,8 +139,15 @@ export async function approveImportAgainAction(workspaceId: string, input: Appro
   });
 }
 
-export async function markColumnNeededAction(workspaceId: string, input: MarkNeededInput): Promise<ActionResult<{ name: string }>> {
-  return changeCommand(workspaceId, (ctx, access, state) => markColumnNeeded(ctx, access, { column: state.columns.find((c) => c.id === input?.sourceColumnId) ?? null }, input));
+/** “Mark as needed”; the column's version lets its note, typed right after, through (slice 10a, F1). */
+export async function markColumnNeededAction(workspaceId: string, input: MarkNeededInput): Promise<ActionResult<Saved<{ name: string }>>> {
+  return changeCommand(workspaceId, (ctx, access, state) => {
+    const column = state.columns.find((c) => c.id === input?.sourceColumnId) ?? null;
+    const result = markColumnNeeded(ctx, access, { column }, input);
+    if (!result.ok) return result;
+    // found, or the command refused it
+    return { ...result, value: { name: result.value.name, version: writtenVersions(result.writeSet.writes)[column!.id]! } };
+  });
 }
 
 /**

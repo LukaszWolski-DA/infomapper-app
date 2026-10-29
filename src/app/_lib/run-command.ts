@@ -2,7 +2,7 @@ import "server-only";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import { getDataStore, type DataStore } from "@/data";
-import { buildWriteSet, type CommandContext, type CommandResult, type WriteSet } from "@/domain/changes";
+import { buildWriteSet, writtenVersions, type CommandContext, type CommandResult, type WriteSet } from "@/domain/changes";
 import { completeLiveWrites, touchesLiveCanvases, type LiveOutcome } from "@/domain/commands/live";
 import { CONTEXT_LABEL_GONE, contextTargets } from "@/domain/model/live";
 import { isUndoable } from "@/domain/commands/undo";
@@ -23,9 +23,21 @@ import { lockedRefusal, organizationOfWrite } from "./unlock";
 
 /** What a server action returns to the browser: the value, or the domain's message to show in a toast. */
 export type ActionResult<T = undefined> =
-  | { ok: true; value: T; live?: LiveOutcome }
+  /**
+   * `versions`: the new version of every row the write wrote, for the writes that opt in (`runCommand`'s `versions`,
+   * slice 10a, F2); the browser's next saves of those rows send them (`rowSaves`).
+   */
+  | { ok: true; value: T; live?: LiveOutcome; versions?: Record<string, number> }
   /** `fields`: the domain's field messages, when it gave some (slice 7a: P8's refusal says `review: "stale"`). */
   | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected" | "cut"; message: string; fields?: Record<string, string> };
+
+/** How `runCommand` runs a write. */
+export interface CommandOptions {
+  /** A write refused as stale is built again from fresh data once (slice 4a). */
+  freshOnStale?: boolean;
+  /** The answer carries `versions` (slice 10a, F2). */
+  versions?: boolean;
+}
 
 /**
  * What a panel's save returns (slice 9, F3): the row's new version, with the action's own values. The next save of the
@@ -40,11 +52,13 @@ export type Saved<T extends object = object> = T & { version: number };
  * `completeLiveWrites`), then the adapter applies the rows and change events together, and the change group goes into
  * the person's undo history (slice 1b). Refusals come back with the domain's message. With `freshOnStale`, a write
  * refused as stale is built again from fresh data (slice 4a: the requirement key counter, `fresh-retry.ts`). A write
- * into an organization this session has not unlocked is refused before anything is applied (slice 8, F3).
+ * into an organization this session has not unlocked is refused before anything is applied (slice 8, F3). With
+ * `versions`, the answer carries the new version of every row written, the settled changes and the live step's included
+ * (slice 10a, F2).
  */
 export async function runCommand<T>(
   build: (ctx: CommandContext, store: DataStore, user: AppUser) => Promise<CommandResult<T>>,
-  options: { freshOnStale?: boolean } = {},
+  options: CommandOptions = {},
 ): Promise<ActionResult<T>> {
   const session = await getSession();
   if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
@@ -72,7 +86,12 @@ export async function runCommand<T>(
     if (!applied.ok) return { ok: false, code: applied.error.code, message: applied.error.message };
     await remember(store, user.id, completed.writeSet);
     if (completed.value.canvases.length) recordLiveNotices(user.id, completed.value);
-    return { ok: true, value: result.value, ...(completed.value.canvases.length || completed.value.labeled ? { live: completed.value } : {}) };
+    return {
+      ok: true,
+      value: result.value,
+      ...(completed.value.canvases.length || completed.value.labeled ? { live: completed.value } : {}),
+      ...(options.versions ? { versions: writtenVersions(completed.writeSet.writes) } : {}),
+    };
   };
   try {
     return options.freshOnStale ? await retryWhenStale(once, (r) => !r.ok && r.code === "stale_version") : await once();

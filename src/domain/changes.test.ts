@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { ids, makeCtx, member, T0 } from "./__fixtures__/domain";
-import { buildWriteSet, SECRET_CHANGED, SECRET_UNCHANGED } from "./changes";
+import { buildWriteSet, SECRET_CHANGED, SECRET_UNCHANGED, writtenVersions } from "./changes";
 import type { OrganizationAccess } from "./types";
 
 const access: OrganizationAccess = { organization_id: ids.org, access_hash: "scrypt$15$8$1$a$b", changed_at: T0, changed_by: ids.actor, version: 1 };
@@ -36,5 +36,17 @@ describe("buildWriteSet: membership rows (slice 8, F4)", () => {
       { kind: "remove", table: "organization_member", before: { organization_id: ids.org, user_id: ids.someoneElse, role: "member", created_at: T0 } },
     ]);
     for (const e of removed.events) expect(e).toMatchObject({ object_id: ids.someoneElse, operation: "delete", after_image: null });
+  });
+});
+
+describe("writtenVersions (slice 9 undo; slice 10a, F2)", () => {
+  it("gives each written row's new version by id, inserts and updates alike; removed links and rows without an id are left out", () => {
+    const writes = [
+      { kind: "update", table: "entity", before: { id: "e1", version: 3 }, row: { id: "e1", version: 4 } },
+      { kind: "insert", table: "relationship", row: { id: "r1", version: 1 } },
+      { kind: "remove", table: "project_canvas", before: { project_id: "p", canvas_id: "c" } },
+      { kind: "update", table: "organization_access", before: access, row: { ...access, version: 2 } },
+    ] as unknown as Parameters<typeof writtenVersions>[0];
+    expect(writtenVersions(writes)).toEqual({ e1: 4, r1: 1 });
   });
 });

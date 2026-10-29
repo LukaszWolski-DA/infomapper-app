@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { access, archived, concept, entity, frame, ids, makeCtx, NOW } from "../__fixtures__/domain";
+import { writtenVersions } from "../changes";
 import { STALE_VERSION_MESSAGE } from "../errors";
 import { createConcept, deleteConcept, renameConcept } from "./concept";
 
@@ -75,6 +76,8 @@ describe("deleteConcept (D-47)", () => {
       { table: "concept", row: { id: conceptCustomer, deleted_at: NOW } },
     ]);
     expect(new Set(r.writeSet.events.map((e) => e.change_group_id))).toEqual(new Set([r.writeSet.changeGroupId]));
+    // the moved entities' new versions, which the answer carries (slice 10a, F1)
+    expect(writtenVersions(r.writeSet.writes)).toMatchObject({ [customer]: 2, [salesOrder]: 2 });
   });
 
   it("does not delete a concept with entities without a target", () => {
