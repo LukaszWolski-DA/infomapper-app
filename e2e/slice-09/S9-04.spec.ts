@@ -1,5 +1,5 @@
 import type { Locator, Page } from "@playwright/test";
-import { columnId } from "../slice-07c/helpers";
+import { columnId, openColumn, openList } from "../slice-07c/helpers";
 import { expect, test } from "./fixtures";
 import {
   canvasUrl,
@@ -11,6 +11,8 @@ import {
   pointOnLine,
   recordToasts,
   requirementByKey,
+  RETAIL,
+  store,
   rowNamed,
   signInAs,
   toasts,
@@ -112,4 +114,28 @@ test("S9-04: note (the canvas's own queue since slice 3b): the text, then the st
   await panel.getByTestId("seg-note-status").getByRole("button", { name: "Resolved" }).click();
   await expect.poll(async () => (await loadNotes()).find((n) => n.id === note.id)).toMatchObject({ body_text: "Ask Finance about the key", status: "resolved" });
   expect(await toasts(page)).not.toContainEqual(expect.stringContaining("Someone changed"));
+});
+
+test("S9-04: workspace settings: the name, then the client", async ({ page }) => {
+  await recordToasts(page);
+  await signInAs(page, "Łukasz");
+  await page.goto(`/w/${RETAIL}?tab=settings`);
+  const before = (await store().workspaces.get(RETAIL))!;
+  await typeAndLeave(page.getByTestId("input-workspace-name"), "Retail Co – DWH 2026");
+  await typeAndLeave(page.getByTestId("input-workspace-client"), "Retail Co AG");
+  await expect
+    .poll(async () => store().workspaces.get(RETAIL))
+    .toMatchObject({ name: "Retail Co – DWH 2026", client_name: "Retail Co AG", version: before.version + 2 });
+  expect(new Set(await toasts(page))).toEqual(new Set(["Settings saved."]));
+});
+
+test("S9-04: classification: the name twice", async ({ page }) => {
+  await recordToasts(page);
+  await openColumn(page, "customers", "cust_no");
+  await openList(page);
+  const name = page.getByTestId("dialog-classifications").locator('[data-testid="classification-row"][data-code="BK"]').getByTestId("input-classification-name");
+  await typeAndLeave(name, "Klucz biznesowy");
+  await typeAndLeave(name, "Klucz biznesowy (BK)");
+  await expect.poll(async () => (await loadModel()).classifications.find((c) => c.code === "BK")?.name).toBe("Klucz biznesowy (BK)");
+  expect(await toasts(page)).toEqual([]);
 });
