@@ -5,6 +5,7 @@
 // - A new entity from the Entity tool or the toolbox (D-46): in the concept used last, else the first one; its name is
 //   ready to type in the right panel.
 // - A relationship from one entity card to another, then its panel for the label and cardinality.
+// - Slice 10a (D-61): “Relate to itself” in an entity card header's menu; the relate button on the same card refuses.
 // - The toolbox for what was right-clicked (D-19), with the actions of the prototype that exist so far. A row's toolbox
 //   has only that row's actions; the card's are in its header's toolbox (D-52).
 // - Ctrl/Alt + arrows on a selected attribute (D-36).
@@ -150,7 +151,7 @@ export function useCanvasHost({
       const from = cardById.get(fromCardId), to = cardById.get(toCardId);
       if (from?.kind !== "ent" || to?.kind !== "ent") return;
       if (from.id === to.id) {
-        toast("Pick a different entity to relate to.");
+        toast("Pick a different entity, or use “Relate to itself” in the card's menu.");
         return;
       }
       const result = await run(
@@ -160,6 +161,24 @@ export function useCanvasHost({
       if (result.ok) ui.select({ t: "rel", id: result.value.relationshipId });
     },
     [editable, cardById, toast, run, workspaceId, ui],
+  );
+
+  /**
+   * A relationship from the card's entity to itself (slice 10a, D-61), from the card header's menu. It leads to the
+   * panel's fields, so a hidden details panel opens (D-54, F13); the relate button keeps the panel as it is.
+   */
+  const relateToItself = useCallback(
+    async (card: HostCard) => {
+      if (!editable || card.kind !== "ent") return;
+      const result = await run(
+        () => createRelationshipAction(workspaceId, { fromEntityId: card.targetId, toEntityId: card.targetId }),
+        "Relationship added. Name it and set the cardinality on the right.",
+      );
+      if (!result.ok) return;
+      ui.select({ t: "rel", id: result.value.relationshipId });
+      openDetails();
+    },
+    [editable, run, workspaceId, ui, openDetails],
   );
 
   /** Deletes a mapping or a relationship at once; the toast offers Undo (slice 1b). */
@@ -234,6 +253,7 @@ export function useCanvasHost({
           toast(RELATE_HINT);
         },
       });
+      items.push({ label: "Relate to itself", act: () => void relateToItself(card) });
     }
     if (editable) {
       items.push({

@@ -1,11 +1,16 @@
 // Slice 10a's steps: slice 9's (toasts, change groups, the panels' fields) and the line and row menus of the canvas.
+// Step 3: a relationship from an entity to itself as test data, and the earlier slices' panels, history and context.
 // Saves are started without waiting for the page: the point of step 2 is that the second write does not need to.
 
 import { expect, type Locator, type Page } from "@playwright/test";
-import { pointOnLine } from "../slice-01b/helpers";
+import { createRelationship, updateRelationship } from "../../src/domain/commands/relationship";
+import type { Relationship } from "../../src/domain/types";
+import { asLukasz, ids, loadModel, pointOnLine } from "../slice-01b/helpers";
 
 export * from "../slice-09/helpers";
-export { canvasCommits } from "../slice-03b/helpers";
+export { canvasCommits, contextOn, linkedTo } from "../slice-03b/helpers";
+export { expectHidden, togglePanel, viewportTransform } from "../slice-05a/helpers";
+export { backButton, clickCard, expectSelected } from "../slice-06b/helpers";
 
 /** A mapping's line on the canvas. */
 export const mappingLine = (page: Page, mappingId: string): Locator =>
@@ -46,5 +51,26 @@ export async function settledCommits(page: Page, read: (page: Page) => Promise<n
     await page.waitForTimeout(500);
   }
 }
+
+/** Test data: a relationship from an entity to itself (step 3), as Łukasz through the domain; its row. */
+export async function selfRelationship(entityName: string, ends: Partial<Pick<Relationship, "label" | "from_min" | "from_max" | "to_min" | "to_max">> = {}): Promise<Relationship> {
+  const e = (await ids()).entity(entityName);
+  const { relationship } = await asLukasz((ctx, access) => createRelationship(ctx, access, { from: e, to: e }, { fromEntityId: e.id, toEntityId: e.id }));
+  if (Object.keys(ends).length === 0) return relationship;
+  const input = {
+    relationshipId: relationship.id,
+    expectedVersion: relationship.version,
+    ...(ends.label !== undefined ? { label: ends.label } : {}),
+    ...(ends.from_min !== undefined ? { fromMin: ends.from_min } : {}),
+    ...(ends.from_max !== undefined ? { fromMax: ends.from_max } : {}),
+    ...(ends.to_min !== undefined ? { toMin: ends.to_min } : {}),
+    ...(ends.to_max !== undefined ? { toMax: ends.to_max } : {}),
+  };
+  return (await asLukasz((ctx, access) => updateRelationship(ctx, access, { relationship }, input))).relationship;
+}
+
+/** The relationships of an entity in the data file, deleted ones left out. */
+export const relationshipsOf = async (entityId: string): Promise<Relationship[]> =>
+  (await loadModel()).relationships.filter((r) => r.from_entity_id === entityId || r.to_entity_id === entityId);
 
 export { expect };

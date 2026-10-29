@@ -498,3 +498,33 @@ Each file three times on its own: passed three times out of three (both files to
      | S10A-04 "delete a working label (label panel), after its name" | the same |
      | S10A-04 "archive and unarchive (workspace home), after the workspace's name in the settings, then the name again" | the same (the archive answers `Saved`, its `value.version`), and `RowSaves` › "sends the version the page shows when it is newer than the last answer" for the name after it |
 3. **`deletes`: agreed on 29 October 2026.** A delete that succeeds cuts the saves of its rows waiting behind it, with no toast (they would be refused as not found). It goes into CLAUDE.md's "Saving in panels" at the closing, with the held-rows rule.
+
+## Step 3: the self-relationship in the domain and the panels (29 October 2026)
+
+**Domain** (`src/domain/commands/relationship.ts`):
+- `createRelationship` allows `from = to`. Its ends are then 0..1 → 0..n (`from_min` 0); between two entities they stay 1 → 0..n. One insert, one change event, so one undo step.
+- `swapRelationship` refuses with "Nothing to change." when the swapped row equals the old one: a self-relationship with equal cardinalities at both ends (F10). Between two entities equal cardinalities still swap.
+- No migration and no adapter change (Q4, A2).
+
+**Unit tests** (`relationship.test.ts`): the refusal test became the acceptance test (ends 0..1 → 0..n, one insert and one event, refused to a reviewer and in an archived workspace); the unknown or deleted entities keep their own test; a self-relationship's swap exchanges only the cardinalities; the empty swap is refused, and the same ends between two entities still swap. `npm test`: 108 files, 1,412 tests.
+
+**Canvas host** (`canvas-host.tsx`):
+- "Relate to itself" in an entity card header's menu, right after "Draw a relationship from here", under the same `editable` (owners, admins, modelers, not archived; live canvases too, Q7). It selects the new relationship, opens a hidden details panel (`openDetails()`, F13) and shows the relate toast.
+- The relate button on the same card: the new text (item 9).
+
+**Panel** (`relationship-panel.tsx`): the title is "{entity} and {entity}" already (F8). On a self-relationship the end fields are "At the right end" (from) and "At the top end" (to); other relationships keep "At the {entity} end".
+
+**Specs only, no code** (F14): the delete preview counts the self-relationship once; deleting the entity removes it and undo brings it back; the working context labels the entity once; history (D-38) selects it without moving the view.
+
+**Specs `e2e/slice-10a/`:** S10A-07 (3 cases), S10A-10 (5), S10A-11 (3). Until step 4 draws the loop, they select the self-relationship from the entity panel's list of relationships. New helpers: `selfRelationship` (test data through the domain), `relationshipsOf`, and re-exports of slices 3b, 5a and 6b's. One fix while writing them: Ctrl+Shift+Z does nothing until the page shows a redo, so S10A-07 waits for `button-redo` (as S1B-12 does). S10A-07 then passed three times out of three on its own.
+
+**Earlier specs:** S1A-10 (the delete preview), S1B-06, S1B-07, S1B-12, S1B-13, S1B-14 (relate, toolbox, undo, delete, reviewer), S3B-02, S3B-03 (working context), slices 6b, 9 and 10a: **85 passed, 0 failed, 675 s.** No earlier test changed.
+
+**CI:** lint clean, typecheck pass, `npm test` 1,412 tests pass.
+
+**New user-visible texts (for approval):**
+- the menu item "Relate to itself";
+- the relate button on the same card: "Pick a different entity, or use “Relate to itself” in the card's menu." (was "Pick a different entity to relate to.");
+- the end fields on a self-relationship: "At the right end", "At the top end".
+
+Reused, not new: the relate toast, "Nothing to change." (now also from the panel's swap), the panel title "{entity} and {entity}".

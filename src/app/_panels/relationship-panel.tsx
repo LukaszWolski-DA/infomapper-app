@@ -1,7 +1,8 @@
 "use client";
 
 // The relationship panel (prototype insRel): the two entities, the relationship read as sentences, the verb phrase,
-// the cardinality at both ends, swap direction, delete. Drawing relationships on the canvas is slice 1b.
+// the cardinality at both ends, swap direction, delete. Drawing relationships on the canvas is slice 1b. From an entity
+// to itself (slice 10a, D-61, F9) the two ends are named after the loop's drawing: from on the right, to on the top.
 
 import { useContext } from "react";
 import { deleteRelationshipAction, swapRelationshipAction, updateRelationshipAction } from "@/app/_actions/model";
@@ -35,6 +36,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
   const from = p.ix.entity.get(r.from_entity_id)?.name ?? "?";
   const to = p.ix.entity.get(r.to_entity_id)?.name ?? "?";
   const ref = (expectedVersion: number) => ({ relationshipId: r.id, expectedVersion });
+  const self = r.from_entity_id === r.to_entity_id;
 
   const save = (change: Omit<Parameters<typeof updateRelationshipAction>[1], "relationshipId" | "expectedVersion">) =>
     void saveRow(r, (v) => updateRelationshipAction(p.workspaceId, { ...ref(v), ...change }));
@@ -68,7 +70,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
           testId="input-relationship-label"
         />
       </Field>
-      <Field label={`At the ${from} end`}>
+      <Field label={self ? "At the right end" : `At the ${from} end`}>
         <Seg
           value={`${r.from_min},${r.from_max}` as Card}
           options={CARDS}
@@ -80,7 +82,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
           }}
         />
       </Field>
-      <Field label={`At the ${to} end`}>
+      <Field label={self ? "At the top end" : `At the ${to} end`}>
         <Seg
           value={`${r.to_min},${r.to_max}` as Card}
           options={CARDS}
