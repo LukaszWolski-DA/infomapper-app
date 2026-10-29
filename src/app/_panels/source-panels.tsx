@@ -67,7 +67,7 @@ const KIND_OF: Record<SourceTable["object_type"], (t: SourceTable) => string> = 
 export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; cardId: Uuid | null }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
-  const { run, pending } = useAction();
+  const { saveRow, pending } = useAction();
   const [deleting, setDeleting] = useState(false);
   const columns = p.ix.columnsOf.get(t.id) ?? [];
   const changes = p.changes.filter((c) => c.source_table_id === t.id && c.deleted_at === null && c.status === "open");
@@ -85,10 +85,12 @@ export function SourceTablePanel({ table: t, cardId }: { table: SourceTable; car
   const goes = (c: SourceColumn) => mappingsOfColumn(p.ix, c.id).map((m) => attributeLabel(p.ix, m.attribute_id));
 
   async function remove() {
-    const result = await run(
-      () => deleteSourceTableAction(p.workspaceId, { sourceTableId: t.id, expectedVersion: t.version }),
+    // on the table's save chain, with its note (slice 10a)
+    const result = await saveRow(
+      t,
+      (v) => deleteSourceTableAction(p.workspaceId, { sourceTableId: t.id, expectedVersion: v }),
       columns.length ? `Deleted ${t.name} with its ${columns.length} column${columns.length === 1 ? "" : "s"}.` : `Deleted ${t.name}.`,
-      { undoable: true },
+      { undoable: true, deletes: true },
     );
     if (result.ok) {
       setDeleting(false);
@@ -275,11 +277,12 @@ function RelationshipLi({ r, tableId }: { r: SourceRelationship; tableId: string
 /** A column, with or without its table's card on this canvas; the table chip goes to the table (slice 4a fallback). */
 export function SourceColumnPanel({ column: c }: { column: SourceColumn }) {
   const p = usePanel();
-  const { run } = useAction();
+  const { saveRow } = useAction();
   const table = p.ix.table.get(c.source_table_id)!;
   const mappings = mappingsOfColumn(p.ix, c.id);
-  const ref = { sourceColumnId: c.id, expectedVersion: c.version };
-  const markNeeded = () => void run(() => markColumnNeededAction(p.workspaceId, ref), ({ name }) => `Marked as needed: ${name}`, { undoable: true });
+  // on the column's save chain, with its note (slice 10a)
+  const markNeeded = () =>
+    void saveRow(c, (v) => markColumnNeededAction(p.workspaceId, { sourceColumnId: c.id, expectedVersion: v }), ({ name }) => `Marked as needed: ${name}`, { undoable: true });
   /** Where the D-48 choice opens: under the attribute picker. */
   const mapAt = useRef({ x: 0, y: 0 });
 

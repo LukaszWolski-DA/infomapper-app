@@ -186,7 +186,7 @@ function Reading({ line: l }: { line: ReadingLine }) {
 /** The workspace's classification list (items 7–12; prototype `#setDlg`). Data Vault ones always show (answer F21). */
 export function ClassificationsDialog({ onClose }: { onClose: () => void }) {
   const p = usePanel();
-  const { run, pending } = useAction();
+  const { saveRow, pending } = useAction();
   const [removing, setRemoving] = useState<Classification | null>(null);
   const all = p.ix.model.classifications;
   const live = p.ix.classes.list;
@@ -200,7 +200,8 @@ export function ClassificationsDialog({ onClose }: { onClose: () => void }) {
   );
 
   const remove = async (c: Classification) => {
-    const r = await run(() => removeClassificationAction(p.workspaceId, { classificationId: c.id, expectedVersion: c.version }), (v) => `Removed ${v.name} from the list.`, { undoable: true });
+    // on the classification's save chain, with its rename (slice 10a)
+    const r = await saveRow(c, (v) => removeClassificationAction(p.workspaceId, { classificationId: c.id, expectedVersion: v }), (v) => `Removed ${v.name} from the list.`, { undoable: true, deletes: true });
     if (r.ok) setRemoving(null);
   };
   /** The form first when it is in use or a rule reads it (Łukasz, step 4); otherwise at once, with Undo. */
@@ -210,7 +211,7 @@ export function ClassificationsDialog({ onClose }: { onClose: () => void }) {
     else setRemoving(c);
   };
   const restore = (c: Classification) =>
-    void run(() => restoreClassificationAction(p.workspaceId, { classificationId: c.id, expectedVersion: c.version }), (v) => `Restored ${v.name}.`, { undoable: true });
+    void saveRow(c, (v) => restoreClassificationAction(p.workspaceId, { classificationId: c.id, expectedVersion: v }), (v) => `Restored ${v.name}.`, { undoable: true });
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>

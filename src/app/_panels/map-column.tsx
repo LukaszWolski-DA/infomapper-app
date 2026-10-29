@@ -36,7 +36,7 @@ interface Choice {
 
 export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelIndex; workspaceId: string; editable: boolean; cardOf: (targetId: Uuid) => Uuid | null }) {
   const ui = useContext(CanvasUiCtx);
-  const { run } = useAction();
+  const { run, saveRow } = useAction();
   const toast = useToast();
   const [choice, setChoice] = useState<Choice | null>(null);
   const [pendingInput, setPendingInput] = useState<PendingInput | null>(null);
@@ -80,7 +80,8 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
       const mapping = ix.mapping.get(option.mappingId);
       if (!mapping) return;
       if (mapping.rule_expression?.trim()) {
-        void run(() => addMappingInputAction(workspaceId, { mappingId: mapping.id, expectedVersion: mapping.version, sourceColumnId: c.columnId })).then(
+        // on the mapping's save chain (slice 10a): after its panel's saves, with the newest version
+        void saveRow(mapping, (v) => addMappingInputAction(workspaceId, { mappingId: mapping.id, expectedVersion: v, sourceColumnId: c.columnId })).then(
           (r) => {
             if (!r.ok) return;
             ui.select({ t: "map", id: mapping.id });
@@ -92,7 +93,7 @@ export function useMapColumn({ ix, workspaceId, editable, cardOf }: { ix: ModelI
       setPendingInput({ mappingId: mapping.id, columnId: c.columnId });
       ui.select({ t: "map", id: mapping.id });
     },
-    [ix, createDirect, run, workspaceId, ui, toast],
+    [ix, createDirect, saveRow, workspaceId, ui, toast],
   );
 
   /**

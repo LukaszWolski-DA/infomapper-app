@@ -54,8 +54,10 @@ import type { Selection } from "./line-data";
 import type { NoteData } from "./note-data";
 import { rectBetween } from "./selection";
 import type { NoteMover } from "./useNotes";
+import { rowSaves } from "@/ui/row-saves";
 
-type WriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
+/** `versions`: the model rows a drop wrote (D-05's concept change, slice 10a), for the panels' save chains. */
+type WriteResult<T> = { ok: true; value: T; versions?: Record<string, number> } | { ok: false; code?: string; message: string };
 type Versions = { versions: Record<string, number> };
 type CardRef = { canvasItemId: Uuid; expectedVersion: number };
 type SizedRef = CardRef & { height: number };
@@ -344,9 +346,14 @@ export function useFrames(o: Options) {
       const frameIds = framesBefore.map((f) => f.id);
       enqueueGroup([...frameIds, ...touched, ...noteMoves.map((m) => m.id), ...reqMoves.map((m) => m.id)], async () => {
         const moveToConcepts = await answer;
+        // moving entities to their frames' concepts writes their rows: the write holds those rows' save chains (their
+        // panels' saves wait for it) and answers with their versions (slice 10a, D-05); their versions are not sent
+        const held = moveToConcepts ? questions.map((q) => ({ id: q.entityId })) : [];
+        const onChain = <R extends WriteResult<unknown>>(write: () => Promise<R>): Promise<R> =>
+          held.length ? rowSaves.saveRows(held, write).then((r) => r!) : write(); // held rows only: never cut
         let result: WriteResult<Versions & { movedToConcepts: number }>;
         try {
-          result = await writes.moveOnCanvas({
+          result = await onChain(() => writes.moveOnCanvas({
             frames: frameIds.map((id) => ({ frameId: id, expectedVersion: ver(id), ...(moved.has(id) ? { x: moved.get(id)!.x, y: moved.get(id)!.y } : {}) })),
             items: touched.map((id) => {
               const ref = { canvasItemId: id, expectedVersion: ver(id) };
@@ -363,7 +370,7 @@ export function useFrames(o: Options) {
             ...(moveToConcepts ? { moveToConcepts: true } : {}),
             ...(opts.ask ? { dragDrop: true } : {}),
             ...(noteMoves.length ? { notes: noteMoves.map((m) => ({ noteId: m.id, expectedVersion: ver(m.id), x: m.x, y: m.y })) } : {}),
-          });
+          }));
         } catch {
           result = FAILED;
         }

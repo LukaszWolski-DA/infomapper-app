@@ -72,8 +72,8 @@ export class RowSaves {
    * Sends a save of row `id` after its earlier saves and any undo on its way, with the newest version known then
    * (`shown`: the version the field showed). Resolves with the answer, or `null` when a refusal before it cut it.
    */
-  save<R extends SaveOutcome>(id: string, shown: number, send: (version: number) => Promise<R>): Promise<R | null> {
-    return this.saveRows([{ id, shown }], (versionOf) => send(versionOf(id)));
+  save<R extends SaveOutcome>(id: string, shown: number, send: (version: number) => Promise<R>, options: { deletes?: boolean } = {}): Promise<R | null> {
+    return this.saveRows([{ id, shown }], (versionOf) => send(versionOf(id)), options);
   }
 
   /**
@@ -81,9 +81,14 @@ export class RowSaves {
    * its way; saves of those rows started meanwhile wait for it. `send` gets the newest known version of each checked row.
    * It is not sent when a refusal before it cut one of its checked rows (a held row's version is not sent, so its cut
    * does not stop it). On success the answer's `versions` reach every row, and its `value.version` the first checked
-   * row; a cutting refusal cuts the waiting saves of every row it lists.
+   * row; a cutting refusal cuts the waiting saves of every row it lists. With `deletes` (the write deletes its checked
+   * rows), a success cuts the checked rows' saves waiting behind it too: they would be refused as not found (F5).
    */
-  saveRows<R extends SaveOutcome>(rows: readonly SaveRowsRow[], send: (versionOf: (id: string) => number) => Promise<R>): Promise<R | null> {
+  saveRows<R extends SaveOutcome>(
+    rows: readonly SaveRowsRow[],
+    send: (versionOf: (id: string) => number) => Promise<R>,
+    options: { deletes?: boolean } = {},
+  ): Promise<R | null> {
     const listed = new Map<string, SaveRowsRow>();
     for (const r of rows) if (!listed.get(r.id)?.shown) listed.set(r.id, r);
     const parts = [...listed.values()].map((r) => {
@@ -103,6 +108,7 @@ export class RowSaves {
         const v = versionOf(outcome.value);
         const first = checked[0];
         if (v !== null && first) first.row.answered = Math.max(first.row.answered, v);
+        if (options.deletes) for (const p of checked) p.row.cutThrough = p.row.started;
       } else if (outcome.code && CUTS.has(outcome.code)) for (const p of parts) p.row.cutThrough = p.row.started;
       return outcome;
     });

@@ -40,7 +40,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
     void saveRow(r, (v) => updateRelationshipAction(p.workspaceId, { ...ref(v), ...change }));
 
   async function remove() {
-    const result = await saveRow(r, (v) => deleteRelationshipAction(p.workspaceId, ref(v)), "Relationship deleted", { undoable: true });
+    const result = await saveRow(r, (v) => deleteRelationshipAction(p.workspaceId, ref(v)), "Relationship deleted", { undoable: true, deletes: true });
     if (result.ok) ui.select(null);
   }
 

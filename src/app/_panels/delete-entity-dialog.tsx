@@ -21,7 +21,7 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
-  const { run, pending } = useAction();
+  const { saveRow, pending } = useAction();
   const [impact, setImpact] = useState<EntityImpact | null>(null);
   // Read once per entity; the parent may re-render with a new onClose meanwhile.
   const refusal = useRef({ toast, onClose });
@@ -45,7 +45,8 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
   }, [p.workspaceId, e.id]);
 
   async function confirm() {
-    const result = await run(() => deleteEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: e.version }), `Deleted ${e.name} from the model.`, { undoable: true });
+    // on the entity's save chain (slice 10a): after its panel's saves, with the newest version
+    const result = await saveRow(e, (v) => deleteEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v }), `Deleted ${e.name} from the model.`, { undoable: true, deletes: true });
     if (result.ok) {
       ui.select(null);
       onClose();

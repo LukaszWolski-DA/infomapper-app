@@ -64,6 +64,31 @@ describe("RowSaves (slice 9, items 1–3)", () => {
     }
   });
 
+  it("cuts the saves waiting behind a delete once it succeeds (`deletes`, slice 10a, F5); a later save is sent", async () => {
+    const saves = new RowSaves();
+    const { calls, send } = pendingSave();
+    void saves.save("a", 1, send, { deletes: true });
+    const waiting = saves.save("a", 1, send);
+    await tick();
+    calls[0]!.answer({ ok: true, value: null });
+    expect(await waiting).toBeNull();
+    expect(calls).toHaveLength(1);
+    void saves.save("a", 3, send); // after an undo brought it back
+    await tick();
+    expect(calls.map((c) => c.version)).toEqual([1, 3]);
+  });
+
+  it("does not cut anything when a delete is refused for being invalid", async () => {
+    const saves = new RowSaves();
+    const { calls, send } = pendingSave();
+    void saves.save("a", 1, send, { deletes: true });
+    void saves.save("a", 1, send);
+    await tick();
+    calls[0]!.answer({ ok: false, code: "invalid" });
+    await tick();
+    expect(calls).toHaveLength(2);
+  });
+
   it("does not cut the saves behind a validation refusal", async () => {
     const saves = new RowSaves();
     const { calls, send } = pendingSave();

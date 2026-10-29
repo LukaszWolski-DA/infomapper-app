@@ -50,7 +50,7 @@ const iconButton = "grid size-6 flex-none place-items-center rounded text-im-ink
 export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
-  const { run, saveRow } = useAction();
+  const { saveRow, saveRows } = useAction();
   const toast = useToast();
   const ix = p.ix;
   const attribute = ix.attribute.get(m.attribute_id);
@@ -96,10 +96,12 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   async function merge() {
     if (!merging?.size) return;
     const chosen = others.filter((o) => merging.has(o.id));
-    const result = await run(
-      () =>
+    // on the save chains of every mapping it merges (slice 10a): after their saves, with their newest versions
+    const result = await saveRows(
+      [m, ...chosen].map((x) => ({ id: x.id, shown: x.version })),
+      (versionOf) =>
         mergeMappingsAction(p.workspaceId, {
-          mappings: [ref(m.version), ...chosen.map((o) => ({ mappingId: o.id, expectedVersion: o.version }))],
+          mappings: [ref(versionOf(m.id)), ...chosen.map((o) => ({ mappingId: o.id, expectedVersion: versionOf(o.id) }))],
           ruleExpression: mergeRule.current?.value ?? "",
         }),
       `Merged ${chosen.length + 1} mappings into one transformation.`,
@@ -194,7 +196,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
   }
 
   async function remove() {
-    const result = await saveRow(m, (v) => deleteMappingAction(p.workspaceId, ref(v)), "Mapping deleted", { undoable: true });
+    const result = await saveRow(m, (v) => deleteMappingAction(p.workspaceId, ref(v)), "Mapping deleted", { undoable: true, deletes: true });
     if (result.ok) ui.select(null);
   }
 

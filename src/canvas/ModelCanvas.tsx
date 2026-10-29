@@ -48,6 +48,7 @@ import "@xyflow/react/dist/style.css";
 import "./canvas.css";
 import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
+import { rowSaves } from "@/ui/row-saves";
 import { withClips, type CardData } from "./card-data";
 import CardNode, { cardNodesOf, filtersOf, type CardNodeT } from "./CardNode";
 import BlockNode, { blockNodeId, type BlockNodeT } from "./BlockNode";
@@ -139,7 +140,8 @@ export interface CardChange {
   rowFilter?: CardData["rowFilter"];
 }
 /** What a canvas write returns: the value, or the domain's message for a toast. */
-export type CanvasWriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
+/** `versions`: the model rows a write wrote (a drop's concept change, slice 10a), for the panels' save chains. */
+export type CanvasWriteResult<T> = { ok: true; value: T; versions?: Record<string, number> } | { ok: false; code?: string; message: string };
 export type SaveCardResult = CanvasWriteResult<{ version: number }>;
 
 export interface ModelCanvasProps {
@@ -922,7 +924,9 @@ export function ModelCanvas({
       }
       let result: CanvasWriteResult<{ canvasItemId: string }>;
       try {
-        result = await placeCard({ ...target, ...spot, height: h, frames: frameRefs(), ...(dropped ? { dragDrop: true } : {}), ...(moveToConcepts ? { moveToConcepts: true } : {}) });
+        const write = () => placeCard({ ...target, ...spot, height: h, frames: frameRefs(), ...(dropped ? { dragDrop: true } : {}), ...(moveToConcepts ? { moveToConcepts: true } : {}) });
+        // moving the entity to the frame's concept writes its row: on its save chain, held (slice 10a, D-05)
+        result = moveToConcepts && isEntity(target) ? (await rowSaves.saveRows([{ id: target.entityId }], write))! /* held only: never cut */ : await write();
       } catch {
         result = FAILED;
       }

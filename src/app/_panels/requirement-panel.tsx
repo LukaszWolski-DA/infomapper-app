@@ -57,7 +57,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
   const setStatus = (status: string) =>
     void saveRow(r, (v) => setRequirementStatusAction(p.workspaceId, { requirementId: r.id, expectedVersion: v, status }));
   async function remove() {
-    const result = await saveRow(r, (v) => deleteRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: v }), (x) => x.message, { undoable: true });
+    const result = await saveRow(r, (v) => deleteRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: v }), (x) => x.message, { undoable: true, deletes: true });
     if (result.ok) ui.select(null);
   }
   const unlink = (k: RequirementLink) =>
