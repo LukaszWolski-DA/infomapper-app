@@ -1,6 +1,6 @@
 # Slice 10a – Canvas actions on the save chain, a relationship from an entity to itself
 
-Status: **first draft, 29 October 2026**, not yet checked against the code. Branch `slice/10a-save-chain-self-relationship`, from `main` at tag `slice-09` (`84ff767`, assumption A1). PRD file: `docs/prd/slice-10a-save-chain-self-relationship.md`; step 1 writes `docs/prd/slice-10a-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus one full e2e run after step 2, because it changes how the canvas's actions save (P3). Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Status: **step 1 answered, 29 October 2026** (`docs/prd/slice-10a-acceptance.md`, "Łukasz's answers"; this PRD is updated where they change it). Branch `slice/10a-save-chain-self-relationship`, from `main` at tag `slice-09` (`84ff767`, assumption A1). PRD file: `docs/prd/slice-10a-save-chain-self-relationship.md`; step 1 writes `docs/prd/slice-10a-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus one full e2e run after step 2b, because it changes how the canvas's actions save (P3). Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 ## 1. Why this slice
 
@@ -24,7 +24,7 @@ The slice changes **no data model and no local data file format** (A2): `relatio
 
 **Proposed, to confirm in step 1:**
 
-- **P3. Tests.** The small-slice regime, plus one full e2e run after step 2: item 1 changes the save path of the canvas's line menus, attribute moves and drops, and many earlier specs use them (slices 1b, 2c, 7b).
+- **P3. Tests.** The small-slice regime, plus one full e2e run after step 2b: item 1 changes the save path of the canvas's line menus, attribute moves and drops, and many earlier specs use them (slices 1b, 2c, 7b).
 - **P5. Item 1 is a fix, not a decision.** It changes neither the prototype's behaviour (the prototype has no versions) nor the data model. A real conflict stays refused exactly as today (S0-08, S9-03).
 
 ## 2. Sources
@@ -67,19 +67,25 @@ Texts in quotes are proposals. Step 1 may adjust them, and the step that builds 
    - **d)** a column dropped on a mapping with a rule, the D-48 choice "Add to mapping …" (`addMappingInputAction` in `src/app/_panels/map-column.tsx`);
    - **e)** the frame panel's "move to the frame's concept", one save per entity (`moveToFrameConcept`, `updateEntityAction`, `src/app/_panels/frame-panel.tsx`);
    - **f)** moving an attribute (item 2);
-   - **g)** any write step 1 adds (Q1, P4).
+   - **g)** the writes step 1 added (F1; the rule: a write off the chain joins it when it writes a row that a field already on the chain also writes): merge (`mapping-panel.tsx`), "Delete from model…" (`delete-entity-dialog.tsx`), "Mark as needed" and deleting a source table (`source-panels.tsx`), deleting a working label (`label-panel.tsx`), removing and restoring a classification (`classifications.tsx`), deleting a concept (`delete-concept-dialog.tsx`), archiving and unarchiving the workspace (`lifecycle.tsx`).
 
-   File and function names are those of `known-limitations.md`. Step 1 confirms them.
+   Names confirmed in step 1. Renaming and deleting a canvas stay off the chain (the tab's rename is off it too), as one line in `known-limitations.md`.
+
+   **How each one saves (F2):**
+   - **one row, `saveRow`**, with the answer's `version`: a)–e), "Delete from model…", "Mark as needed", deleting a table or a label, removing or restoring a classification, archiving and unarchiving. `splitMappingAction`, `markColumnNeededAction`, `restoreClassificationAction` and `unarchiveWorkspaceAction` start returning `version`;
+   - **several rows known before it is sent, `saveRows`** (item 2), with the answer's `versions`: moving an attribute, merge, deleting a concept with "move to" (the concept checked, its entities held), D-05's drop into another concept's frame (the entities asked about, held only; called from `src/canvas`);
+   - **rows not known before, their versions to `rowSaves.answer`:** the change-to-resolve actions (`source-change.ts`), which write tables, columns and mappings the server decides on.
 2. **Moving an attribute** (`useMoveAttribute` in `src/app/_panels/move-attribute.ts`, `reorderAttributeAction`; the row menu, Ctrl/Alt+↑/↓ on the card, the attribute and entity panels' move buttons). The command `reorderAttribute` renumbers the moved attribute's siblings too.
    - **The answer:** the action returns the new version of every row it wrote (proposal: `Saved<T>` with a `versions` map, as undo returns `versions`). They are fed to `rowSaves.answer`, so a sibling's next panel save sends its new version.
-   - **The order:** a panel save of a sibling that is on its way when the move starts must not be refused. Neither may a sibling's save started while the move is on its way. Proposal: the move waits for the saves on their way of every attribute of that entity, and saves of those rows started meanwhile wait for it. That is a save over several rows on the chain. Step 1 checks whether `rowSaves` needs it (Q2).
+   - **The order:** a panel save of a sibling that is on its way when the move starts must not be refused. Neither may a sibling's save started while the move is on its way. The move waits for the saves on their way of every attribute of that entity, and saves of those rows started meanwhile wait for it (step 1, F3: feeding `answer` alone is too late, because a save reads its version when it is called).
+   - **`rowSaves.saveRows(rows, send)`** (F3) does that: it waits for every listed row's earlier saves and any undo, holds every listed row until its answer, sends the checked rows' newest versions, and feeds back every version in the answer's `versions`. `save` is its one-row case. A cutting refusal (stale version, permission, archive, not found) cuts the waiting saves of every row it lists, with one toast. `useAction` gets `saveRows` beside `saveRow`.
 3. **What the canvas shows after its own write** stays as today: it waits for the page's refresh (`revalidatePath`, then the model through `ModelIndex`). Only the version sent changes. `mergeFresh` keeps covering cards, frames and notes only.
 4. **A refused canvas write behaves as a refused panel save** (slice 9, item 3):
-   - a refusal for a stale version, a permission or the archive cuts the saves of that row waiting behind it, with one toast, the refusal's message;
+   - a refusal for a stale version, a permission, the archive or a row not found cuts the saves of that row waiting behind it, with one toast, the refusal's message ("not found" is new, for the panels too: F5);
    - a validation refusal cuts nothing;
    - a cut write shows no toast of its own.
 5. **Deletes keep their Undo link in the toast** (S1B-13). A delete that is cut shows no "Undo" toast, because nothing was deleted.
-6. **Undo and Redo wait for these writes** as they do today (`rowSaves.exclusive`, `ui.settled()`). The new path must keep that. S10A-06 proves it.
+6. **Undo and Redo wait for these writes once they are on the chain** (`rowSaves.exclusive`). Today they do not: `ui.settled()` waits for the canvas's card queue only, and only Next.js's sequential dispatch keeps these writes before an undo (step 1, F4). A unit test in `row-saves.test.ts` fails without the chain; S10A-06 is the end-to-end proof.
 7. **Creating rows from the canvas stays as it is:** new entities, relationships, mappings and attributes, and requirement or label links. They send no version of an existing row.
 
 ### A relationship from an entity to itself (D-61)
@@ -87,26 +93,29 @@ Texts in quotes are proposals. Step 1 may adjust them, and the step that builds 
 8. **Creating one.** "Relate to itself" is an item in an entity card header's menu (D-52: card actions only there).
    - **Who:** owners, admins and modelers, in a workspace that is not archived, as the relate button (S1B-14). Reviewers and readers do not see the item, and the server refuses a direct call.
    - **The new relationship:** `from_entity_id = to_entity_id`, with the ends `from_min` 0, `from_max` 1 (the parent) and `to_min` 0, `to_max` n (the children). An empty label.
-   - **Afterwards:** the new relationship is selected and its panel opens, as after a relate, with the relate toast ("Relationship added. Name it and set the cardinality on the right.").
+   - **Afterwards:** the new relationship is selected and its panel opens, a hidden details panel included (`openDetails()`, D-54: the item leads to editing a field in the panel; step 1, F13; the relate button stays as it is), with the relate toast ("Relationship added. Name it and set the cardinality on the right.").
    - **Undo:** one change group, one undo step.
    - **Live canvases:** the same rule as relating there today (Q7).
 9. **The relate button clicked on the same card** still refuses. Proposed text: "Pick a different entity, or use “Relate to itself” in the card's menu." (today "Pick a different entity to relate to.").
 10. **The domain** allows `from_entity_id = to_entity_id`, in `createRelationship` and in every other check that refuses it today (validation, the local adapter's rules, a migration's CHECK if there is one; Q4). If a CHECK exists, a new migration drops it. Applied migrations are never edited. The local file's format stays the same: no stored row changes.
 11. **The loop.** A self-relationship is drawn in the existing relationship line layer (AD-24 rule 3), as one path like any relationship line, with no new layer, element type on cards or handle (rule 2).
-    - **Shape (a proposal; step 4 shows screenshots for approval):** it leaves the card's right edge at the header's middle and comes back through the card's top edge, near the right corner. The two ends meet the card at right angles, so both notations' end marks (crow's foot, UML; D-22) draw as on any line.
-    - **Size:** fixed in canvas units, so it zooms with the card. A second or third loop on the same card nests outside the first.
+    - **Shape (a proposal; step 4 shows screenshots for approval):** it leaves the card's right edge at the header's middle (the `from` end) and comes back through the card's top edge, near the right corner (the `to` end). The two ends meet the card at right angles, so both notations' end marks (crow's foot, UML; D-22) draw as on any line. If the geometry makes another pairing of ends and edges more natural, step 4 proposes it with the screenshots (item 14's field names follow it).
+    - **Where in the code (step 1, F11):** a branch in `relGeom` (`src/canvas/geometry.ts`) when both ends are one card. `RelPath` (`LineLayer.tsx`) draws it, in the line layer and in the overlay's lit lines alike.
+    - **Size:** fixed in canvas units, so it zooms with the card. A second or third loop on the same card nests outside the first, by the parallel-relationship `offset` that `buildLines` already gives (16 px apart).
     - **The label** sits at the loop's outer point.
     - **What it follows:** card moves, width changes (D-37) and a collapsed card. The header is always there, so the loop never depends on the rows.
-    - **Below 40 %:** the loop loses its end dots as every line does (rule 1).
-12. **Selecting, hover, menu:** a click on the loop selects the relationship and opens its panel. Hovered and lit, it is drawn in the overlay as other relationship lines are, by the same geometry. Its right-click menu is the relationship line's (swap, delete), on the chain (item 1 b).
+    - **End marks:** kept at every zoom, as on every relationship line (only mapping lines lose their end dots below 40 %; step 1, F6).
+    - **The miniature** (`Overview.tsx`) leaves self-relationships out (step 1, F12).
+12. **Selecting, hover, menu:** a click on the loop selects the relationship and opens its panel. Hovered, it thickens by CSS in the line layer, as other relationship lines do; lit (Focus), it is drawn again in the overlay by the same `RelPath` (step 1, F7). Its right-click menu is the relationship line's (swap, delete), on the chain (item 1 b).
 13. **Layers, frames, Focus:**
     - **Layers:** shown in Everything and Relationships, hidden in Mappings.
     - **Collapsed concept frame:** a member's loop is a line inside one frame, so it is not drawn and not counted in a bundle, as other lines inside one frame (S2C-11).
     - **Focus:** on the entity, it lights the loop. Focus on anything that leaves the entity faded fades it.
     - **Requirement traces** do not reach relationships (D-32). Nothing changes there.
 14. **The panel and swap:**
-    - **The panel** is the relationship panel as it is, titled "{entity} – {entity}", as the prototype names a relationship. The label and both ends are edited as today, on the chain.
-    - **Swap** exchanges the two ends' cardinalities (the parent end becomes the child end), and is one undo step. Step 1 checks what `swapRelationship` writes when both ids are the same (Q6).
+    - **The panel** is the relationship panel as it is, titled "{entity} and {entity}", as the prototype's `insRel` and the app title every relationship (step 1, F8). The label and both ends are edited as today, on the chain.
+    - **The two ends' fields** are named after the loop's drawing on a self-relationship: "At the right end" (`from`) and "At the top end" (`to`), instead of "At the {entity} end" twice (step 1, F9). Other relationships keep "At the {from} end" and "At the {to} end".
+    - **Swap** exchanges the two ends' cardinalities and is one undo step. `swapRelationship` already does that on a self-relationship: it exchanges the entity ids (the same) and the cardinalities (step 1, F10). When the swapped row equals the old one (equal cardinalities at both ends), it is refused with the domain's "Nothing to change.".
 15. **Everything else as for any relationship:**
     - **Delete:** at once, with Undo in the toast (S1B-13).
     - **History:** a place of its own, selected without moving the view (D-38). Nothing new in `SelectionHistory.tsx` unless step 1 finds that `placeOf` or `GONE` treats a relationship by its two entities (Q6).
@@ -120,9 +129,11 @@ Texts in quotes are proposals. Step 1 may adjust them, and the step that builds 
 Stop after each step with a short summary of what changed and how to check it. Wait for Łukasz before the next.
 
 1. **Critical review** (section 7). Check every item, decision and criterion against the code, `docs/decisions.md` and the earlier slices' acceptance docs; answer Q1–Q9 in `docs/prd/slice-10a-acceptance.md`. No application code. Stop.
-2. **Canvas actions on the save chain** (items 1–7). The changed actions and their answers, the several-row save if Q2 needs it, its unit tests (`src/ui/row-saves.test.ts`), specs S10A-01 to S10A-06, the earlier specs of the actions touched, CI, and one full e2e run (P3). Stop.
+2. **Canvas actions on the save chain** (items 1–7), in two parts (Łukasz's answer to step 1):
+   - **2a. The chain's mechanics:** `rowSaves.saveRows` with `save` as its one-row case, the "not found" cut, `useAction`'s `saveRows`, and the actions returning `version` or `versions` (item 1's groups). Unit tests in `src/ui/row-saves.test.ts`: holding all rows, the order against a one-row save started meanwhile, the versions fed back, a cut across rows, `exclusive` (undo) waiting for it, and the test that fails without the chain (item 6); the domain's tests for what the actions return. CI. Stop.
+   - **2b. Wiring:** the actions of item 1 onto the chain, specs S10A-01 to S10A-06, the earlier specs of the actions touched, CI, and one full e2e run (P3). Stop.
 3. **The self-relationship in the domain and the panels** (items 8–10, 14, 15). The domain change and its unit tests (`relationship.test.ts`: the refusal test becomes an acceptance test), the menu item, the relate button's text, the panel, swap, the impact preview, the context. Specs S10A-07, S10A-10, S10A-11, and slice 1b's relate and delete specs. On this step the loop may still be drawn as the line layer draws it today; S10A-08 waits for step 4. Stop.
-4. **The loop** (items 11–13, 16). Its geometry in the line layer and the overlay, its unit tests (beside `line-geometry.test.ts`), specs S10A-08 and S10A-09, slice 2c's bundle specs, slice 4b-1's Focus specs. Screenshots of the loop in both notations, at 100 % and below 40 %, collapsed card, two nested loops, for Łukasz's approval of D-61's drawing. Stop.
+4. **The loop** (items 11–13, 16). Its geometry in the line layer and the overlay, its unit tests (beside `line-geometry.test.ts`), specs S10A-08 and S10A-09, slice 2c's bundle specs, slice 4b-1's Focus specs. Screenshots of the loop in both notations, at 100 % and below 40 %, collapsed card, two nested loops, for Łukasz's approval of D-61's drawing and of which end is on which edge (item 14's field names). Stop.
 5. **The measurement sitting** (section 6, S10A-12). The element guard, the LayerTree read, the A/B sitting against `slice-09`, the loop's cost on the branch. Stop.
 6. **Closing:** docs (section 10), one full e2e run, Łukasz's manual acceptance on KB after a backup. Merge only on his command; tag `slice-10a`.
 
@@ -135,15 +146,15 @@ Tests in `e2e/slice-10a/`, one file per criterion, each from a fresh seed; unit 
 | S10A-01 | **Panel first, then the canvas.** A mapping's note typed in its panel, then at once a status from the mapping line's menu: both stored, no toast, two change groups. The same for a relationship's label in its panel, then at once swap from its line's menu. |
 | S10A-02 | **The canvas first, then the panel.** A status from the mapping line's menu, then at once the mapping's note in its panel: both stored, no toast. The same for swap from the line, then at once the label in the relationship panel. |
 | S10A-03 | **Moving an attribute** (item 2). Ctrl+↓ on a card's row, then at once a sibling's name in its panel: both stored, no toast, the new order kept. Reversed (a sibling's name, Enter, then at once Ctrl+↑ on another row): both stored. The moved attribute's own panel saved right after the move: stored. |
-| S10A-04 | **The other actions** (item 1 c, d, e and every write step 1 adds, P4), one case each. An attribute's name saved in its panel, then at once deleted from its row's menu: deleted, no conflict. A mapping's rule saved, then at once a column dropped with "Add to mapping …": the input added. An entity's name saved, then at once the frame panel's "move to the frame's concept": moved. |
-| S10A-05 | **A real conflict stays refused.** Another session changes a mapping. The status set from its line's menu is refused with "Someone changed this meanwhile. Reload to see the latest version." once, and the saves of that mapping waiting behind it are not sent. A cut delete shows no Undo toast (item 5). S0-08 and S9-03 pass unchanged. |
-| S10A-06 | **Undo waits.** A status from the line's menu, then Ctrl+Z at once: that status change is undone, and the next save goes through without a conflict. The same for an attribute move (its siblings' order is restored). |
-| S10A-07 | **Creating a self-relationship.** "Relate to itself" in a card header's menu creates one relationship with the entity at both ends, ends 0..1 → 0..n, one change group, its panel open, the toast. Ctrl+Z removes it, Ctrl+Shift+Z brings it back. The relate button clicked on the same card shows item 9's toast and creates nothing. As a reviewer the item is not in the menu and a direct call is refused; in an archived workspace the write is refused. |
-| S10A-08 | **The loop.** At 100 % the loop leaves the card's right edge and returns through its top edge; both notations draw their end marks; the label sits at the outer point. Below 40 % no end dots. A click on the loop selects the relationship. Its right-click menu offers swap and delete. A second self-relationship nests outside the first. The loop follows a card move, a width change and a collapsed card. |
+| S10A-04 | **The other actions** (item 1 c, d, e and g), one case each. An attribute's name saved in its panel, then at once deleted from its row's menu: deleted, no conflict. A mapping's rule saved, then at once a column dropped with "Add to mapping …": the input added. An entity's name saved, then at once the frame panel's "move to the frame's concept": moved. And for item 1 g: a mapping's note, then merge; an entity's name, then "Delete from model…"; a column's note, then "Mark as needed", then the note again; a table's note, then its delete; a label's name, then its delete; a classification's name, then remove, and restore, then its name; a concept's name, then its delete with "move to", then a moved entity's name; the workspace's name in the settings, then archive; unarchive, then the name. Each: stored, no false conflict. A drop into another concept's frame with "Move to …", then at once the entity's name in its panel: both stored. |
+| S10A-05 | **A real conflict stays refused.** Another session changes a mapping. The status set from its line's menu is refused with "Someone changed this meanwhile. Reload to see the latest version." once, and the saves of that mapping waiting behind it are not sent. A cut delete shows no Undo toast (item 5). A save queued behind a delete of the same row is not sent and shows no toast of its own (F5). S0-08 and S9-03 pass unchanged. |
+| S10A-06 | **Undo waits.** A status from the line's menu, then Ctrl+Z at once: that status change is undone, and the next save goes through without a conflict. The same for an attribute move (its siblings' order is restored). This would pass today through Next.js's order (F4); the unit test of item 6 is the check that fails without the chain. |
+| S10A-07 | **Creating a self-relationship.** "Relate to itself" in a card header's menu creates one relationship with the entity at both ends, ends 0..1 → 0..n, one change group, its panel open (also when the details panel was hidden), the toast. Ctrl+Z removes it, Ctrl+Shift+Z brings it back. The relate button clicked on the same card shows item 9's toast and creates nothing. As a reviewer the item is not in the menu and a direct call is refused; in an archived workspace the write is refused. |
+| S10A-08 | **The loop.** At 100 % the loop leaves the card's right edge and returns through its top edge; both notations draw their end marks, at 100 % and below 40 % alike; the label sits at the outer point. The miniature draws no line for it. A click on the loop selects the relationship. Its right-click menu offers swap and delete. A second self-relationship nests outside the first. The loop follows a card move, a width change and a collapsed card. |
 | S10A-09 | **Layers, frames, Focus.** Mappings hides the loop; Relationships and Everything show it. With the entity in a collapsed concept frame there is no loop and no bundle counts it. Focus on the entity lights the loop; Focus on another entity fades it. |
-| S10A-10 | **Panel, swap, history.** The panel is titled "{entity} – {entity}". Label and both ends are saved. Swap exchanges the ends' cardinalities in one undo step. Selecting the loop, then a card, then Back selects the self-relationship again without moving the view (D-38). |
+| S10A-10 | **Panel, swap, history.** The panel is titled "{entity} and {entity}", its end fields "At the right end" and "At the top end". Label and both ends are saved. Swap exchanges the ends' cardinalities in one undo step; with equal cardinalities it is refused with "Nothing to change." and writes nothing. Selecting the loop, then a card, then Back selects the self-relationship again without moving the view (D-38). |
 | S10A-11 | **Deleting and the context.** The entity's delete preview counts the self-relationship once. Deleting the entity removes it, and undo brings it back with its loop. With a working context on, creating it labels the entity once. Deleting the self-relationship is immediate with Undo in the toast. |
-| S10A-12 | **Performance** (section 6): the element guard's viewport counts are equal against `slice-09`; the LayerTree read shows no new drawing layer with 20 loops in view; the A/B sitting is within its bars; the loop's cost on the branch is within its bar. |
+| S10A-12 | **Performance** (section 6): the element guard's viewport counts are equal against `slice-09` (baseline `slice-08.json`); the LayerTree read shows no new drawing layer with 20 loops in view; the A/B sitting is within its bars; the loop's cost on the branch is within its bar. |
 | S10A-13 | CI and the runs of the test regime (P3); changed earlier tests listed with the reason (at least `relationship.test.ts`'s refusal). |
 
 **Definition of done (scenario for the manual acceptance, on Łukasz's model KB).** Back up `.data/dev-db.json` first (CLAUDE.md).
@@ -160,16 +171,16 @@ The save chain adds nothing to the page. The loop is a new shape in the existing
 
 | What | How | Bar |
 | --- | --- | --- |
-| Viewport elements on a canvas page | `S3B-15-elements.spec.ts` with `ELEMENTS_BASELINE` from `slice-09` (seed unchanged, item 16) | viewport counts equal; a page total that differs is explained (as slice 8's +1 script) |
+| Viewport elements on a canvas page | `S3B-15-elements.spec.ts` with `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json`: slice 9's closing found its counts equal to `slice-08`'s, page totals too (seed unchanged, item 16; step 1, F17) | viewport counts equal; a page total that differs is explained (as slice 8's +1 script) |
 | Drawing layers | the LayerTree read (as `S4B2-15-layers.spec.ts`) on a copy of "Performance test" with 20 loops in view, against the same view without them | no drawing layer more |
-| Pan and zoom, first render, hover, Focus switching, without loops | `npm run measure:canvas -- --to-screen` against `slice-09`, `--only` with the line-layer figures (`pan`, `c08`, `c10`, `fading`; step 1 confirms the keys, Q8), one discarded warm-up run after the builds, then `--rounds 2` (balanced) | within the sitting's run-to-run spread (slice 4b-2: pan within 2.3 %) |
-| The loop's own cost | on the branch only, the same view of "Performance test" with 20 self-relationships against 20 ordinary relationships added on the same cards, pan and zoom as presented frames; `slice-09` cannot hold a self-relationship (it refuses it, and a row written into the file by hand would be drawn as a degenerate curve) | within 2 % of the ordinary relationships |
+| Pan and zoom and the first render, without loops | `npm run measure:canvas -- --to-screen --only pan,c08` against `slice-09` (step 1, F17: without loops in the seed the line layer draws the same elements by the same code), one discarded warm-up run after the builds, then `--rounds 2` (balanced) | within the sitting's run-to-run spread (slice 4b-2: pan within 2.3 %) |
+| The loop's own cost | on the branch only, the same view of "Performance test" with 20 self-relationships against 20 ordinary relationships added on the same cards (the measuring spec writes them into the e2e data file before the page opens, as `S4B2-15-layers.spec.ts` does; never `.data/dev-db.json`, no `seed:large` option), pan and zoom as presented frames; `slice-09` cannot hold a self-relationship (it refuses it, and a row written into the file by hand would be drawn as a degenerate curve) | within 2 % of the ordinary relationships |
 | Canvas commits | `window.__imCanvasCommits` for a status from a line's menu, before and after item 1 | equal (the chain changes the version sent, not the render) |
 
 **Nothing above the canvas reads layout during a commit** (CLAUDE.md): this slice adds no element above or beside the canvas. The menu item is in the existing card menu, and the panel is the existing relationship panel. Item 1 adds no element anywhere.
 
 **New elements on the canvas (AD-24):**
-- A loop is one path in the relationship line layer, plus the same hit target and end marks as any relationship line (step 1 states which elements a relationship line has today, Q5). So the element guard counts it as a relationship line, and the seed has none.
+- A loop is one path in the relationship line layer, plus the same hit target and end marks as any relationship line: 5–7 elements in crow's foot, 6 in UML, 3 more with a label (step 1, Q5). So the element guard counts it as a relationship line, and the seed has none.
 - Hovered and lit loops are drawn in the overlay (its own compositing layer), with no new layer.
 - If a change of a few milliseconds has to be judged, compare phase traces, not medians (slice 6a).
 
@@ -207,7 +218,9 @@ The save chain adds nothing to the page. The loop is a new shape in the existing
 - An entity can be related to itself (D-61). The prototype refuses it (`createRel`).
 - A new self-relationship has the ends 0..1 → 0..n; a relationship between two entities keeps the prototype's 1..1 → 0..N.
 - The relate button's refusal on the same card names "Relate to itself" (item 9).
-- A self-relationship is drawn as a loop; the prototype has no such shape.
+- A self-relationship is drawn as a loop; the prototype has no such shape. The miniature leaves it out.
+- A self-relationship's panel keeps the prototype's title, "{entity} and {entity}", but names its end fields after the loop: "At the right end" and "At the top end" (the prototype's "At the {entity} end" would show twice).
+- Swap on a self-relationship with equal cardinalities is refused with "Nothing to change.".
 - Canvas writes carry versions and wait for each other per row (items 1–7); the prototype has no versions.
 
 ## 9. Left for later
@@ -230,7 +243,7 @@ The save chain adds nothing to the page. The loop is a new shape in the existing
 
 ### D-61 (proposal) A relationship from an entity to itself
 
-"An entity can be related to itself (a parent and its children). Owners, admins and modelers create it with “Relate to itself” in the card header's menu, in a workspace that is not archived; the relate button clicked on the same card asks for a different entity and names that item. A new one has the ends 0..1 (the parent) and 0..n (the children). It is drawn as a loop on its card, from the right edge to the top edge, with both ends in the chosen notation; several loops on one card nest. Inside a collapsed frame it is a line inside one frame: not drawn and not counted in a bundle. Swap exchanges its two ends' cardinalities. Otherwise it behaves as any relationship: label and cardinality in its panel, delete with Undo, layers, Focus, a history place, counted once in an entity's delete preview."
+"An entity can be related to itself (a parent and its children). Owners, admins and modelers create it with “Relate to itself” in the card header's menu, in a workspace that is not archived, and its panel opens; the relate button clicked on the same card asks for a different entity and names that item. A new one has the ends 0..1 (the parent) and 0..n (the children). It is drawn as a loop on its card, from the right edge to the top edge, with both ends in the chosen notation at every zoom; several loops on one card nest; the miniature leaves it out. Its panel names the ends “At the right end” and “At the top end”. Inside a collapsed frame it is a line inside one frame: not drawn and not counted in a bundle. Swap exchanges its two ends' cardinalities, and is refused when they are equal. Otherwise it behaves as any relationship: label and cardinality in its panel, delete with Undo, layers, Focus, a history place, counted once in an entity's delete preview."
 
 - **Creating it:**
   - **(i)** the relate button clicked on the same card creates it;
@@ -262,14 +275,15 @@ One sentence under rule 3, with the sitting's figures: "A self-relationship is a
   - section 11, if a rule moves there.
 - **`supabase/migrations/`:** only if Q4 finds a CHECK (A2).
 - **`docs/inventory-prototype-vs-app.md`:** deliberate differences: the self-relationship and its loop (D-61).
-- **`docs/known-limitations.md`:** "Writes started from the canvas are not on a row's save chain" fixed (kept with its fix, or removed, as Łukasz prefers).
+- **`docs/known-limitations.md`:** "Writes started from the canvas are not on a row's save chain" fixed (kept with its fix, or removed, as Łukasz prefers); one line: renaming and deleting a canvas are not on the chain (the tab's rename, the menu's delete; the look has its own queue).
 - **`docs/ideas.md`:**
   - "Canvas actions on a row's save chain" done;
   - "A relationship from an entity to itself" done;
   - the plan of P1 (10b, 10c, 11, 12, 13) recorded;
-  - section 9's two new ideas.
+  - section 9's two new ideas;
+  - "The relate button opens the details panel" (step 1, F13: today it selects the new relationship only).
 - **README and CLAUDE.md:**
   - the slice's status;
-  - CLAUDE.md's "Saving in panels": canvas writes on the chain, and a move's versions through `rowSaves.answer` (and the several-row save, if built);
+  - CLAUDE.md's "Saving in panels": canvas writes on the chain, `saveRows` for writes over several rows, versions through `rowSaves.answer` for writes whose rows only the server knows, and "not found" as a cut;
   - the new e2e helpers;
   - the element guard's command against `slice-09`.

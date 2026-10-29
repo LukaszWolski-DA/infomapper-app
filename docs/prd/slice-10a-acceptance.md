@@ -1,6 +1,6 @@
 # Slice 10a – acceptance
 
-Status: **step 1 (critical review) done, waiting for Łukasz's answers.**
+Status: **step 1 answered (29 October 2026); step 2a next.** Łukasz's answers are at the end of this file.
 
 - `main` was at `84ff767` (tag `slice-09`), as A1 says. Branch `slice/10a-save-chain-self-relationship` was made from that tag.
 - The PRD is copied unchanged from `~/Downloads/slice-10a-save-chain-self-relationship.md` (33,348 bytes, 29 October 2026; the only file with that name). Commit "docs: slice 10a PRD".
@@ -330,3 +330,72 @@ Nothing else new: the chain's refusals reuse the domain's messages.
 7. **F13:** should "Relate to itself" open a hidden details panel? The relate button would stay as it is.
 8. **F17 / Q8:** a short A/B (`--only pan,c08`, two balanced rounds after a warm-up), and `slice-08.json` as `slice-09`'s element baseline?
 9. **F10:** refuse a swap that changes nothing?
+
+## Łukasz's answers (29 October 2026)
+
+**F1. Wider than proposed.** The rule: a write off the chain joins it when it writes a row that a field already on the chain also writes. In 10a:
+- the six from `known-limitations.md`;
+- merge, "Delete from model…", "Mark as needed", deleting a source table, deleting a working label;
+- removing and restoring a classification (its rename is on the chain), deleting a concept (its rename is on the chain), archiving and unarchiving the workspace (the settings form is on the chain).
+
+Renaming and deleting a canvas wait, because the canvas tab's rename is not on the chain either. They become one line in `known-limitations.md`.
+
+**What the added writes cost beyond wrapping them in `saveRow`** (checked before building, as asked):
+
+| Write | Row | Beyond the wrap |
+| --- | --- | --- |
+| Merge (`mapping-panel.tsx`, `merge`) | the mapping and the chosen others | several rows: `saveRows`; `mergeMappingsAction` returns `{ mappingId }` and gains the versions |
+| "Delete from model…" (`delete-entity-dialog.tsx`) | entity | nothing: the cascade deletes the other rows, and their saves are cut by "not found" (F5) |
+| "Mark as needed" (`source-panels.tsx`) | source column (the note is on that row: `SourceNote` gets `c.version`) | `markColumnNeededAction` returns `{ name }`; it gains the version, so a note typed right after is not refused |
+| Delete a source table (`source-panels.tsx`, `remove`) | source table (the table's note is on that row) | nothing |
+| Delete a working label (`label-panel.tsx`) | label | nothing |
+| Remove a classification (`classifications.tsx`) | classification | nothing |
+| Restore a classification (same) | classification | `restoreClassificationAction` returns `{ name }`; it gains the version, so a rename right after is not refused |
+| Delete a concept (`delete-concept-dialog.tsx`) | concept; **with "move to" it rewrites every entity of the concept unchecked** (`deleteConceptAction` → `{ movedEntities }`) | **the one that costs more:** `saveRows` with the concept checked and its entities held, and the entities' versions returned. The entities are known before it is sent (the concept's entities in the page's model) |
+| Archive, unarchive (`lifecycle.tsx`) | workspace; the settings form already saves it with the row id `workspaceId` | the archive box reads `version` from the page, the settings form from its own state; on the chain both send the newest. Unarchive must return its version, so the settings form's next save is not refused. After archiving, the settings saves are refused as "archived" anyway |
+
+**F2. Yes, opt-in per action.** Where an action knows its rows before it is sent, it uses `saveRows` (F3). Where it does not, it returns the versions it wrote and they go to `rowSaves.answer`.
+
+| Group | Actions |
+| --- | --- |
+| **One row, `saveRow`**, the answer's `version` | mapping status, split, add to mapping (D-48), delete mapping; swap, delete relationship; delete attribute; "move to the frame's concept"; "Delete from model…"; "Mark as needed"; delete a source table; delete a label; remove, restore a classification; archive, unarchive. Split, "Mark as needed", restore and unarchive start returning `version` (F16 and above) |
+| **Several rows known before, `saveRows`**, the answer's `versions` | moving an attribute (the moved one checked, the entity's other attributes held); merge (all chosen mappings checked); deleting a concept with "move to" (the concept checked, its entities held); D-05's drop into another concept's frame (the entities asked about, held only, since the drop sends no entity version; called from `src/canvas`) |
+| **Rows not known before, `versions` to `rowSaves.answer`** | the change-to-resolve actions (retire, move, delete, map, not needed, decide column by column, approve again, leave in review, acknowledge, approve again all): the server decides which tables, columns and mappings it writes. Their change row has no panel field, so they send its version as today |
+
+**F3. Yes**, `rowSaves.saveRows` as sketched, with `save` as its one-row case. A cutting refusal of a several-row save (stale version, permission, archive, not found) cuts the waiting saves of **every row it lists**, with one toast. This replaces the sketch's "only the checked rows". Unit tests:
+- holding all rows;
+- the order against a one-row save started meanwhile;
+- the versions fed back;
+- a cut across rows;
+- `exclusive` (undo) waiting for it.
+
+**F4.** Item 6 is corrected. A unit test is added that fails without the chain.
+
+**F5. Yes:** "not found" also cuts the saves waiting behind it, in the panels too.
+
+**F6.** Item 11 and S10A-08 are corrected: relationship lines keep their end marks at every zoom. The "below 40 %" line is dropped.
+
+**F8.** Keep "{entity} and {entity}", as the prototype. Item 14, S10A-10 and section 8 are corrected.
+
+**F9. Not "parent" and "child":** swap exchanges the ends' cardinalities, so after a swap "parent end" would show 0..n. For a self-relationship the two fields are named after the loop's drawing: **"At the right end"** (from) and **"At the top end"** (to). Step 4 checks that the loop is drawn with from on the right edge and to on the top edge (Q5's sketch does: `pa`, the from end, on the right edge; `pb`, the to end, on the top edge). If the geometry makes another pairing more natural, step 4 proposes it with the screenshots.
+
+**F10. The clarification.** `swapRelationship` exchanges both entity ids **and** the four cardinality columns (`relationship.ts`). On a self-relationship the ids are the same, so swap already exchanges only the cardinalities, as D-61 says, at no cost. "Equal ends" in F10 meant **equal cardinalities at both ends of a self-relationship**: then the swapped row equals the old one. On a relationship between two entities, equal cardinalities still change the direction, so that swap is not refused. **Answer: yes,** refuse with the domain's "Nothing to change." when the swapped row equals the old one (in practice: a self-relationship with equal cardinalities).
+
+**F12. Yes,** leave self-relationships out of the miniature.
+
+**F13. Yes,** "Relate to itself" opens a hidden details panel (D-54: a menu item that leads to editing a field in the panel). The relate button stays as it is. "Relate opens the details panel" goes to `docs/ideas.md`.
+
+**F14, F15, F16.** Accepted as written. A2 holds: no migration.
+
+**F17. Yes:**
+- the short A/B sitting (`--only pan,c08`);
+- the loops added in the measuring spec to the e2e data file only;
+- `slice-08.json` as the element baseline.
+
+Kept as well, because they are the measurements that see the loop: the branch-only loop cost (20 loops against 20 ordinary relationships on the same cards) and the LayerTree read with 20 loops in view.
+
+**F7 and F11** were not answered separately. They correct what the PRD says about the code (a hovered relationship line thickens by CSS; the loop is a branch in `relGeom`, nested by `offset`) and change no behaviour. The PRD takes them as written; say if not.
+
+**Steps.** Step 2 is split:
+- **2a:** the chain's mechanics (`saveRows`, the "not found" cut, the actions returning versions), with unit tests. Stop.
+- **2b:** wiring the actions of F1, specs S10A-01 to S10A-06, and the full e2e run. Stop.
