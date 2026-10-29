@@ -78,6 +78,17 @@ export function zoomAround(v: Viewport, factor: number, screen: { width: number;
   return { zoom, x: mx - ((mx - v.x) * zoom) / v.zoom, y: my - ((my - v.y) * zoom) / v.zoom };
 }
 
+/**
+ * A zoom typed in the top bar's field (slice 9, D-60): a number with an optional "%" and spaces, a decimal rounded,
+ * clamped to 10–300 % (D-60 (vii)); the zoom as a factor (0.95), or null for anything that is not a number.
+ */
+export function typedZoom(text: string): number | null {
+  const m = /^\s*(\d+(?:[.,]\d*)?|[.,]\d+)\s*%?\s*$/.exec(text);
+  if (!m) return null;
+  const pct = Math.round(Number(m[1]!.replace(",", ".")));
+  return clamp(pct, MIN_ZOOM * 100, MAX_ZOOM * 100) / 100;
+}
+
 // ---- placing new cards (prototype placeNear, createEntity) ----
 
 /** Space kept free around a new card. */

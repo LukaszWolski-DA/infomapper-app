@@ -18,7 +18,7 @@ import {
 } from "@/domain/__fixtures__/domain";
 import type { SourceChange, WorkspaceModel } from "@/domain/types";
 import { buildCards, visibleRows, type CardData } from "./card-data";
-import { besideAnchor, besideSpots, cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, newCardHeight, stackSpot, zoomAround } from "./geometry";
+import { besideAnchor, besideSpots, cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, newCardHeight, stackSpot, typedZoom, zoomAround } from "./geometry";
 import { splitName } from "./names";
 
 // Customer (customer_id, email) and CRM customers (cust_id, email, first_name):
@@ -178,6 +178,16 @@ describe("view", () => {
     const z = zoomAround(v, 2, { width: 1000, height: 800 });
     expect((500 - z.x) / z.zoom).toBeCloseTo(500);
     expect((400 - z.y) / z.zoom).toBeCloseTo(400);
+  });
+
+  it("reads a typed zoom: a whole number with or without %, spaces, a decimal rounded, clamped to 10–300 % (D-60)", () => {
+    for (const text of ["95", "95%", " 95 % ", "95.4", "94,5", "95 %"]) expect(typedZoom(text)).toBe(0.95);
+    expect(typedZoom("5")).toBe(0.1);
+    expect(typedZoom("0")).toBe(0.1);
+    expect(typedZoom("500")).toBe(3);
+    expect(typedZoom("300%")).toBe(3);
+    expect(typedZoom("10")).toBe(0.1);
+    for (const text of ["", " ", "abc", "-50", "9 5", "%", "95%%", "1e2", "50px"]) expect(typedZoom(text)).toBeNull();
   });
 });
 
