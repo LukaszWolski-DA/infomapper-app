@@ -362,3 +362,59 @@ A quick panel save followed by one of these, or one of these followed by a panel
   - AD-05 has a note on `project.edit`.
   - CLAUDE.md lists slice 9's e2e helpers, `hydrated` among them.
   - D-59 is in `docs/decisions.md`, accepted 29 October 2026.
+
+## Step 4: typing the zoom (items 16–22, D-60)
+
+### What changed
+
+- **The field** (`src/canvas/ZoomControls.tsx`):
+  - The `<span>` between − and + is now an `<input>`. It keeps the test id `value-zoom` (Q8), the 44 px width and its place in the zoom group, so it adds no element, no wrapper and no `<label>`.
+  - It shows the zoom as before ("100%").
+  - A click or Tab into the field selects its text. Only the click that focuses it keeps the selection; a later click places the caret.
+  - New texts: the aria label "Zoom" and the title "Type a zoom and press Enter".
+- **Typing:**
+  - The typed text is `ZoomControls`' own state from the first key on, so typing re-renders only the zoom group.
+  - Until a key is pressed the field follows every zoom. While someone types, a zoom does not overwrite the text.
+- **Applying (D-60 (v), (vii)):**
+  - Enter and leaving the field (Tab, a click elsewhere) apply the zoom.
+  - `typedZoom` (`src/canvas/geometry.ts`, unit-tested) reads a number with an optional "%" and spaces. A decimal is rounded, and a comma counts as the decimal point. A value is clamped to 10–300 % and shown.
+  - Anything else goes back without a toast.
+  - Escape goes back and leaves the field.
+  - The zoom is applied through `zoomBy(typed / current)`: the same `zoomAround` and one `setViewport` as − and +, around the middle of the canvas's size from React Flow's store. Nothing reads layout.
+- **Keys:** the canvas's shortcuts, Undo and Back already skip text fields (F10), so no key handling was added.
+- **The remembered view:** it is written by `onMoveEnd`, as for − and +.
+
+### Specs
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S9-11 | `S9-11.spec.ts`: (1) the aria label and the title; "95" and Enter gives 95 % with the canvas point at the view's centre kept (to the pixel) and the field left; "80%", " 120 % " and "66.6" (67 %); (2) Tab applies (v); "5" gives 10 % and "500" gives 300 % (vii); "abc" and Escape go back; a click outside applies; no toast; (3) the field follows +, −, a pinch (Ctrl and the wheel) and Fit; focused but not typed in yet, it follows a pinch and keeps its value selected, so the first key replaces it; while typing, a pinch does not overwrite the text; Back reopens the canvas at a typed 50 % | passed (3 of 3 after the fix below) |
+| S9-12 | `S9-12.spec.ts`: with an entity selected and a rename to undo, E, F, H, Ctrl+Z, Alt+← and Escape typed in the field change no tool, zoom, URL, selection or model; outside the field E switches the entity tool on and Escape off | passed |
+| S9-13 | `S9-13.spec.ts`: a typed 150 % is in `infomapper:view:<canvas id>`; Ctrl+Z after it undoes the rename before it and keeps 150 %; after a reload the canvas opens at 150 % | passed |
+| S9-14 | `S9-14.spec.ts` (development build, `window.__imCanvasCommits`): typing "120" adds **0** canvas commits; 100 to 120 %, typed **0** and + **0**; 45 to 38 % (across 40 %, the plain blocks), typed **1** and − **1** | passed |
+
+- **The fix found by the run:** S9-11 (3) failed once in the step's run. Fit was still animating when the field was clicked, the new zoom was written into the field, which drops the selection, and "2" was appended ("42%2"). While the field has the focus and holds no typed text, `ZoomControls` now selects its value again when the shown zoom changes (`select()` reads no layout). S9-11 now checks this case on purpose, with a pinch after the click.
+- **The element guard (S9-14, section 6):**
+  - There was no slice-08 baseline file. Slice 8 compared against slice-07b's and was equal.
+  - So `slice-08` was built in the measurement worktree (`infomapper-ab-main`, checked out at the tag and returned to `bbc16c5` after) and `S3B-15-elements.spec.ts` was run there. The result is `.data/measure/s9-14-baseline/slice-08.json` (git-ignored): viewport 4,508 / 19,305 / 1,465 / 4,907, page 5,994 / 20,791 / 2,861 / 6,303, the numbers slice 8 recorded.
+  - This branch with `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json` is **equal in all four views, page totals included**: the input replaced the span and adds no element.
+- **The top bar from 800 to 2,560 px (S6A-10)** passed in the run below. The field keeps the span's 44 px.
+
+### Earlier specs
+
+- `S1A-03` and `S2A-14` read the zoom with `toHaveValue`, and `S4B2-11` with `inputValue()` (the reason is D-60).
+- Slices 5a and 6a (top bar, zoom, widths): `e2e/slice-05a`, `e2e/slice-06a` (S6A-10 included), `S1A-03` and `e2e/slice-09`: 73 passed and 1 failed (S9-11 (3), fixed above), in 636 s. Then S9-11 ran 3 of 3 twice (before and after its new step).
+- Measuring specs whose line changed (measurement build):
+  - `S2A-14`'s group drag reads "50%" from the field. Its fps bar failed at 28.8 fps, within the known limitation (25–30 fps in the measurement build, "partly met", `docs/known-limitations.md`); not caused by the field.
+  - `S4B2-11` ran through and read `zoomAfterPan` from the field ("37%", "120%"…).
+
+### Checks
+
+- `npm run lint` passed (38 s), `npm run typecheck` passed (23 s), `npm test` passed: 108 files, 1,395 tests (22 s; `typedZoom` is new in `src/canvas/canvas.test.ts`).
+- The measurement build of this branch contains the field (checked for its title in `.next-measure`).
+
+### Texts for Łukasz's approval (step 4)
+
+- D-60, with (v) and (vii) written in.
+- The field's aria label "Zoom" and its title "Type a zoom and press Enter" (new; the prototype has none).
+- No new toast. (viii) was not chosen, so "Type a zoom from 10 to 300 %." is not used.
