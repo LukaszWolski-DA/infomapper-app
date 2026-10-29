@@ -13,7 +13,8 @@ fixed codes the rules read, and the workspace's own) and the modeller's notes; a
 classifications, and in Data Vault 2.0 mode a table panel shows its Data Vault reading (slice 7c, D-57). One workspace
 holds one model; projects and canvases organise the work on it. Organizations are silos: in development people sign in
 with an organization's shared password or the test users' list, create organizations, and owners and admins add,
-change and remove people (slice 8, D-58).
+change and remove people (slice 8, D-58). Panels save one object at a time, each save with the newest version known; a project's name
+and description are edited on its home, and a zoom is typed in the top bar (slice 9, D-59, D-60).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -385,3 +386,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   people (`workspacePeople`, F10). The last owner is checked again inside the local adapter's write.
 - Writes: a server action calls `runCommand()` (`src/app/_lib/run-command.ts`), which runs the domain command and
   applies its write set through the adapter; refusals come back with the domain's message and are shown as toasts.
+- **Saving in panels** (slice 9, P3): a field that saves an object's row calls `saveRow(row, (expectedVersion) => action(…))`
+  (`useAction`, `src/app/_components/use-action.ts`), never `run` with `row.version`. `rowSaves` (`src/ui/row-saves.ts`)
+  sends one save per object at a time, each with the newest version known when it is sent (the last answered, or the
+  shown one if newer); a stale version, a permission or the archive cuts the saves waiting behind it (one toast), an
+  invalid input does not. Every panel save action returns `Saved<T>` (`{ version, … }`); undo and redo run as
+  `rowSaves.exclusive` and feed back the versions they wrote. A command takes only the fields that changed (an
+  attribute's type: absent keeps, `null` clears). Writes started from the canvas on a panel's row are not on the chain
+  yet (`docs/known-limitations.md`, slice 10's first candidate). Fields are keyed by their stored value (`fieldKey`).

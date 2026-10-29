@@ -438,3 +438,91 @@ A quick panel save followed by one of these, or one of these followed by a panel
   - So there are no phase traces. The field is in the top bar, outside the canvas; S9-14 has 0 commits while typing, and the element counts are equal.
 - **D-60** is in `docs/decisions.md` with Łukasz's text, accepted 29 October 2026. A decimal with a point or a comma is rounded.
 - **Known limitation:** in Firefox and WebKit a project's description does not count lines that wrap (`field-sizing: content` is Chromium only).
+
+## Step 5: the closing (29 October 2026)
+
+Commit: `docs: slice 9 closing`.
+
+### What changed
+
+- **`docs/inventory-prototype-vs-app.md`:**
+  - "A project's name and description on its home" is done (D-59) and is out of the summary's missing list.
+  - The Canvas section has a typed zoom under "present" and the field as a deliberate difference (D-60).
+- **`docs/known-limitations.md`:**
+  - "No undo outside canvases": the scope of the history (step 3).
+  - "Writes started from the canvas are not on a row's save chain": slice 10's first candidate.
+  - The description's wrapped lines in Firefox and WebKit.
+- **`docs/ideas.md`:**
+  - The three quick notes from slice 8's acceptance are marked done (steps 2, 3 and 4).
+  - The canvas actions on the save chain are slice 10's first candidate.
+  - "One behaviour for a refused save" (F6).
+- **README:** the status (slices 0 to 9, tag `slice-09` after the merge), slice 9's features, and the link to this file.
+- **CLAUDE.md:**
+  - "What this is" has a sentence for slice 9.
+  - A new paragraph "Saving in panels": `saveRow`, `rowSaves`, `Saved<T>`, what cuts a queue, undo as `exclusive`, patches of changed fields only, and the canvas writes not yet on the chain.
+  - Slice 9's e2e helpers, `hydrated` among them (step 3).
+  - The element guard's command against `slice-08` (step 4).
+
+### The acceptance criteria
+
+| ID | Where | Result |
+| --- | --- | --- |
+| S9-01 | `e2e/slice-09/S9-01.spec.ts` | pass; fails on `bcdfb7a` (before the slice) |
+| S9-02 | `S9-02.spec.ts` | pass; fails on `bcdfb7a` |
+| S9-03 | `S9-03.spec.ts` (a real conflict cuts the queue with one toast; a validation refusal does not); S0-08 unchanged | pass |
+| S9-04 | `S9-04.spec.ts`: attribute, entity, mapping, relationship, requirement, source column, note, workspace settings, classification | pass; settings and classification fail on `bcdfb7a` |
+| S9-05 | `S9-05.spec.ts` (Undo waits for a save on its way; Ctrl+Z in a field stays the field's); `src/ui/row-saves.test.ts` (order, newest version, cuts, `exclusive`, redo) | pass; (1) fails on `bcdfb7a` |
+| S9-06 | `S9-06.spec.ts` (Enter, everywhere, one change group; the empty name's toast; no length rule; a duplicate name) | pass |
+| S9-07 | `S9-07.spec.ts` (two lines, saved on leaving, after a reload; emptied, stored as null) | pass |
+| S9-08 | `S9-08.spec.ts` (reviewer and reader see text; the reviewer's direct call refused; archived: text and refused) | pass |
+| S9-09 | `S9-09.spec.ts` (undone and redone from a canvas of another project, then of its own; "Undone/Redone: Change project description", "Undone: Rename project") | pass |
+| S9-10 | `S9-10.spec.ts` (the name, then at once the description) | pass |
+| S9-11 | `S9-11.spec.ts` (95 around the centre, "%" and spaces, a decimal; Tab and a click apply (v); 5 and 500 clamped (vii); abc and Escape; it follows +, −, a pinch, Fit and Back; it keeps its selection when focused; it keeps the typed text); `typedZoom` in `src/canvas/canvas.test.ts` | pass |
+| S9-12 | `S9-12.spec.ts` (E, F, H, Ctrl+Z, Alt+←, Escape in the field) | pass |
+| S9-13 | `S9-13.spec.ts` (remembered over a reload; no undo step) | pass |
+| S9-14 | `S9-14.spec.ts` (commits: typing 0; 100 to 120 %, typed 0 and + 0; 45 to 38 %, typed 1 and − 1); the element guard against `slice-08` (equal, page totals too); S6A-10 (800 to 2,560 px); S2A-14 A/B (above) | pass |
+| S9-15 | CI and the full run below. Changed earlier tests, each with its reason: `S0-02`, `S0-04`, `S0-07` (the project's name is a field for editors, D-59); `S1A-03`, `S2A-14`, `S4B2-11` (the zoom is a field, D-60); `source.test.ts` (`setSourceNote` returns the version, F3); `permissions.test.ts` (`project.edit`) | see below |
+
+### The runs
+
+- `npm run lint` passed (76 s), `npm run typecheck` passed (15 s), `npm test` passed: 108 files, 1,395 tests (30 s).
+- Full e2e run (from scratch, no dev server of mine running, ended 12:35): **385 passed, 1 skipped, 0 failed, 4,148 s** (1 h 9 min). Slice 8's full run took 3,723 s (+11 %) and step 2's 3,935 s (+5 %); the run has 15 more tests than step 2's (slice 9's S9-06 to S9-14 and the cases added to S9-04). The skipped test is `S7C-14-commits.spec.ts` (on demand, as since slice 7c). One server log line, "The destination stream closed early", came after S9-11's third test: a response cut off by a page that navigated away; no test failed.
+
+### Manual checklist for Łukasz (on your model KB, "Kanton Basel")
+
+Before you start, back up your data file (CLAUDE.md): copy `.data/dev-db.json` to `.data/backups/dev-db-<yyyymmdd-hhmm>.json` and to `.data/backups/kb-model-latest.json`. The slice changes no file format, so no upgrade runs. Then run `npm run dev` on the branch `slice/09-saves-project-zoom`.
+
+1. **Precision and scale (S9-01).**
+   - Open an attribute with a decimal type, type a precision, press Tab, type a scale and press Enter, at your usual speed.
+   - Expected: no toast, and both values are in the panel after a reload.
+2. **Several saves in a row (S9-02, S9-04).**
+   - In an entity's panel: the name, Tab, the definition, then click elsewhere. Then a mapping's note, then its status at once.
+   - Expected: no toast, and everything is stored.
+3. **A real conflict (S9-03).**
+   - Open the same attribute in a second window, change its name there, then change it in the first window.
+   - Expected: the first window shows the toast "Someone changed this meanwhile. Reload to see the latest version." once. Nothing of the second window's change is overwritten, and after a reload you see it.
+4. **Undo right after a save (S9-05).**
+   - Change a name, press Enter, and right away press Ctrl+Z with the focus outside the field.
+   - Expected: that change is undone ("Undone: …"), and a further save goes through without a conflict.
+   - Inside a text field Ctrl+Z only undoes the typing.
+5. **The project's name (S9-06).**
+   - On a project home, click the name, type a new one and press Enter.
+   - Expected: the breadcrumbs, the project switcher and the workspace home's tile show it, with no toast.
+   - Then empty the name and leave the field. Expected: the old name comes back with the toast "A project needs a name.".
+6. **The description (S9-07).**
+   - Click the line under the name ("What is this project about?" when it is empty), write two lines (Enter adds a line) and click elsewhere.
+   - Expected: the field grows; after a reload both lines are there.
+7. **Undo of the project change (S9-09).**
+   - Open any canvas of the workspace and press Ctrl+Z.
+   - Expected: "Undone: Change project description", then on the next Ctrl+Z "Undone: Rename project" (if nothing newer of yours is in the history). Ctrl+Shift+Z redoes it.
+8. **Typing the zoom (S9-11).**
+   - On a canvas, click the zoom value between − and + (the value is selected), type 95 and press Enter.
+   - Expected: 95 %, and the middle of the view stays in place.
+   - Type 5 and press Enter: 10 %. Type 500 and press Tab: 300 %. Type abc and press Enter: it goes back without a toast. Type 150 and press Escape: it goes back.
+9. **Keys in the zoom field (S9-12).**
+   - With a card selected, click into the zoom field and press E, F, H, Ctrl+Z, Alt+← and Escape.
+   - Expected: nothing happens on the canvas (no tool, no fit, no undo, no Back); the selection and its panel stay.
+   - Outside the field, E switches the entity tool on again.
+10. **The remembered zoom (S9-13).**
+    - Type 80 and press Enter, then reload. Expected: the canvas opens at 80 %.
+    - Ctrl+Z right after a typed zoom undoes your last model change, not the zoom.

@@ -348,12 +348,15 @@ change first.
   left before that saves with the old version and gets "Someone changed this meanwhile. Reload to see the latest
   version." although nobody else changed anything (typing "2" in Scale and pressing Enter right after Tab). Before the
   fix the remount hid it by taking the focus. Options: the panel keeps the version each save returns, or the field
-  waits for the refresh before it saves.
+  waits for the refresh before it saves. **Done in slice 9** (step 2): one save per object at a time, each with the
+  newest version known (`saveRow`, `src/ui/row-saves.ts`).
 - **Renaming a project** (and its description). The prototype edits both on the project home (`renderHome`,
   `data-pf`); the app names a project only when it is created (`docs/inventory-prototype-vs-app.md`). The pattern is
-  `renameCanvas`: a domain command with its change event, one undo step, a field on the home.
+  `renameCanvas`: a domain command with its change event, one undo step, a field on the home. **Done in slice 9**
+  (step 3, D-59).
 - **Typing the zoom** (e.g. 95 %) next to + and −. Not in the prototype, so a decision: the range (the canvas's minimum
-  and maximum), Enter applies, Esc goes back. One `setViewport`, no re-render of `ModelCanvas` (AD-24).
+  and maximum), Enter applies, Esc goes back. One `setViewport`, no re-render of `ModelCanvas` (AD-24). **Done in
+  slice 9** (step 4, D-60).
 
 ### Later
 
