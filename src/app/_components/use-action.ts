@@ -3,7 +3,7 @@
 import { useCallback, useContext, useTransition } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import { useToast } from "@/ui/components/toast";
-import { rowSaves } from "@/ui/row-saves";
+import { rowSaves, type SaveRowsRow } from "@/ui/row-saves";
 import type { ActionResult } from "../_lib/run-command";
 
 /**
@@ -48,7 +48,17 @@ export function useAction() {
     [run],
   );
 
-  return { run, saveRow, pending };
+  /**
+   * Runs a save that writes several rows (slice 10a, `rowSaves.saveRows`): `rows` are the rows it writes, with `shown`
+   * where it sends their version; `action` gets the version to send of each of those. Cut as `saveRow`.
+   */
+  const saveRows = useCallback(
+    <T,>(rows: readonly SaveRowsRow[], action: (versionOf: (id: string) => number) => Promise<ActionResult<T>>, success?: string | ((value: T) => string), options?: { undoable?: boolean }) =>
+      rowSaves.saveRows(rows, (versionOf) => run(() => action(versionOf), success, options)).then((r): ActionResult<T> => r ?? CUT),
+    [run],
+  );
+
+  return { run, saveRow, saveRows, pending };
 }
 
 /** A save not sent: a refusal of an earlier save of the same row cut it (its toast says why). */
