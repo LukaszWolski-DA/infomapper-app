@@ -528,3 +528,8 @@ Each file three times on its own: passed three times out of three (both files to
 - the end fields on a self-relationship: "At the right end", "At the top end".
 
 Reused, not new: the relate toast, "Nothing to change." (now also from the panel's swap), the panel title "{entity} and {entity}".
+
+## Łukasz's answers to step 3 (29 October 2026)
+
+- **Texts approved:** "Relate to itself"; "Pick a different entity, or use “Relate to itself” in the card's menu."; "At the right end" and "At the top end", on condition that step 4 draws the loop from the right edge (from) to the top edge (to). He confirms them finally with step 4's screenshots.
+- **A correction to step 2b's answer 2:** the unit test named for the four cases guards the chain's mechanism, not that those actions use it. The wiring of delete from model, delete a source table, delete a working label and archive is guarded by review only. Nothing is built for it.
