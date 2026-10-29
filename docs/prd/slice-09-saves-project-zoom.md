@@ -1,6 +1,6 @@
 # Slice 9 – Saving in panels, the project's name, typing the zoom
 
-Status: **draft for step 1**, 28 October 2026. Branch `slice/09-saves-project-zoom`, from `main` at tag `slice-08` with `fix/panel-field-focus` merged (assumption A1). PRD file: `docs/prd/slice-09-saves-project-zoom.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus one full e2e run after step 2, because it changes how every panel saves (P2). Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Status: **step 1 answered** (29 October 2026; Łukasz's answers in `docs/prd/slice-09-acceptance.md`), first draft 28 October 2026. Branch `slice/09-saves-project-zoom`, from `main` at tag `slice-08` with `fix/panel-field-focus` merged (assumption A1). PRD file: `docs/prd/slice-09-saves-project-zoom.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus one full e2e run after step 2, because it changes how every panel saves (P2). Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 ## 1. Why this slice
 
@@ -46,9 +46,11 @@ Texts in quotes are proposals; step 1 may adjust them, and the step that builds 
 ### Saving in panels (P3)
 
 1. **A save sends the newest version the page knows** of its object: the larger of the version the last answered save of that object returned and the version in the latest fresh page (versions only grow, as `mergeFresh` does for cards, frames and notes since slice 3b). Step 1 checks this against undo and redo (Q2).
-2. **Saves to one object from one page go one after another.** A save started while an earlier save of the same object is still on its way waits for that answer and then sends the version it returned. Saves to different objects do not wait for each other.
-3. **A refused save stops the queue of its object.** When a save is refused (a real conflict, a validation message, a permission), the saves of that object waiting behind it are not sent; their fields go back to the stored values and one toast shows the first refusal's message (proposal, Q3).
-4. **A real conflict stays refused** as today: another session or another browser tab that saved meanwhile makes the save fail with "Someone changed this meanwhile. Reload to see the latest version." and the field goes back (S0-08 unchanged). Keeping the typed value on a conflict is a separate idea (section 9).
+2. **Saves to one object from one page go one after another.** A save started while an earlier save of the same object is still on its way waits for that answer and then sends the version it returned. Saves to different objects do not wait for each other. The version and the patch are read when the save is sent, not when it is started; the order is kept by the app's own chain per object, not only by Next.js's queue of actions (F2). Every save action of the panels returns the row's new version in one shape, `{ version, … }` (F3).
+2a. **A save sends only what changed** (F1): the attribute's type command takes only the changed parameters (absent: keep the stored one, `null`: clear it, a value: set it); changing the data type clears the parameters the new type does not have, as today.
+2b. **Undo and Redo wait for the panels' saves on their way** (F5); Ctrl+Z in a text field stays the field's own undo.
+3. **A refused save stops the queue of its object** when it is refused for a stale version, a permission or the archive: the saves of that object waiting behind it are not sent, and one toast shows the refusal's message. A validation refusal stops nothing: the saves behind it are sent (Q3). Each field behaves on a refusal as it does today (F6: no change in this slice).
+4. **A real conflict stays refused** as today: another session or another browser tab that saved meanwhile makes the save fail with "Someone changed this meanwhile. Reload to see the latest version." and each field behaves as it does today (S0-08 unchanged; F6). Keeping the typed value on a conflict, and the same behaviour on a refusal in every field, are ideas (section 9).
 5. **Where:** every field on a page that saves with an object's version: the panels the fix named (attribute, entity, mapping, requirement, frame, note, relationship, classification), and any other found in step 1 (source system, table and column panels, the workspace settings, the project home's new fields). Step 1 lists them (Q1). Where the code allows, the rule lives in one place used by all fields, not once per panel.
 6. **Test waits stay valid:** the panels' `data-version` keeps meaning the version the panel shows. Earlier specs that wait with `expectPanelVersion` keep working; new specs check that a quick second save succeeds without waiting.
 
@@ -57,7 +59,7 @@ Texts in quotes are proposals; step 1 may adjust them, and the step that builds 
 7. **The project home** shows the project's name as an editable heading and its description as a plain-text field below it, as the prototype (aria labels "Project name" and "Project description", placeholder "What is this project about?"). Test ids `field-project-name` and `field-project-description` (proposal; named after what they edit).
 8. **Saving:** the name on Enter or on leaving the field; the description on leaving the field (Enter in the description adds a line, as the prototype's text area). Values are trimmed. Escape returns the field to the stored value and leaves it, if the panels' fields do so today (Q5); otherwise as the panels do.
 9. **An empty name** is not saved (D-59, option (i) or (ii)). An empty description is saved as empty (null).
-10. **Lengths and duplicates:** the same rules as when a project is created (step 1 states them; slice 8's forms take names up to 200 characters). Two projects may have the same name if creating allows it today (Q5).
+10. **Lengths and duplicates:** as when a project is created (`createProject`, `nameSchema`): no length rule, and two projects may have the same name (F9).
 11. **The command** follows `renameCanvas` (`docs/ideas.md`): a domain command that checks the role and the archive, validates with Zod at the boundary, checks `version`, and writes the project row and its change event in one change group (AD-12, AD-13, AD-23). The save follows items 1–3, so saving the name and at once the description is not refused.
 12. **Where the name shows:** the breadcrumbs, the project switcher, the workspace home's list of projects and any other place found in step 1 (Q5) show the new name after the save; other open pages show it on their next load. Nothing on the project home reads layout in a render or a layout effect: the description grows with its text through CSS or in its own input event (the project home has no canvas, but the rule from CLAUDE.md is kept for every bar and field the slice adds).
 13. **Roles and archive:** owners, admins and modelers edit; reviewers and readers see the name and the description as text, not as fields; an archived workspace shows them as text and the server refuses the write (proposal: the same roles as renaming a canvas, S0-06; Q5).
@@ -66,7 +68,7 @@ Texts in quotes are proposals; step 1 may adjust them, and the step that builds 
 
 ### Typing the zoom (D-60)
 
-16. **The zoom value between − and + becomes a field.** It shows the current zoom as today (e.g. "100%"), keeps the zoom group's width (128 px in slice 6a's measurements), so the top bar's breakpoints and the "More" menu do not change. Test id `field-zoom` (proposal). Every role and an archived workspace may use it (view state).
+16. **The zoom value between − and + becomes a field.** It shows the current zoom as today (e.g. "100%"), keeps the zoom group's width (128 px in slice 6a's measurements), so the top bar's breakpoints and the "More" menu do not change. Test id `value-zoom`, kept from the text it replaces (Q8; earlier specs read it with `toHaveValue`). Every role and an archived workspace may use it (view state).
 17. **Editing:** a click or Tab into the field selects its text. The field takes a whole number with an optional "%" and spaces; a decimal is rounded. Enter applies; Escape goes back to the current zoom and leaves the field; leaving the field otherwise is D-60 (vi). A value outside the range is D-60 (vii). A value that is not a number goes back to the current zoom without a toast.
 18. **Applying:** zoom around the centre of the canvas's view, as − and + do, in one `setViewport`; the canvas's size comes from React Flow's store (its own `ResizeObserver`), never from `getBoundingClientRect` or a similar read. The range is the canvas's (the prototype's 10–300 %; step 1 states the app's, Q7). Below 40 % the cards draw their plain blocks as after any zoom (AD-24 rule 1).
 19. **The field follows the zoom:** after the wheel, a pinch, − and +, Fit, opening a canvas and going Back to a place, the field shows the new zoom; while the person is typing in it, it does not overwrite their text.
@@ -92,9 +94,9 @@ Tests in `e2e/slice-09/`, one file per criterion, each from a fresh seed; unit t
 | --- | --- |
 | S9-01 | The case found in slice 8: in an attribute's panel, type Precision, Tab, type Scale, Enter at once (without waiting for the page): both values are stored, no toast, two change groups. |
 | S9-02 | Three saves to one object in a row, each before the page shows the previous one's version: all stored in order; the last typed value is the stored one; one change group each. |
-| S9-03 | A real conflict: two sessions on one attribute; the first saves; the second's save (quick or not) is refused with "Someone changed this meanwhile. Reload to see the latest version.", its field goes back, nothing is overwritten, and the saves of that object waiting behind it are not sent (item 3). S0-08 passes unchanged. |
+| S9-03 | A real conflict: two sessions on one attribute; the first saves; the second's save (quick or not) is refused with "Someone changed this meanwhile. Reload to see the latest version.", its field behaves as today (F6), nothing is overwritten, and the saves of that object waiting behind it are not sent (item 3); after a validation refusal they are sent. S0-08 passes unchanged. |
 | S9-04 | Every field listed in step 1 (Q1): a second save of the same object right after the first is stored without a toast (one spec, one case per panel or field kind). |
-| S9-05 | Save, undo, save again in one panel without waiting: the second save is stored (or the behaviour step 1 agrees in Q2). |
+| S9-05 | Save, undo, save again in one panel without waiting: the second save is stored. Undo and Redo pressed while a panel save is on its way wait for it, so they undo and redo that save (item 2b); Ctrl+Z in a text field changes only the field's text. |
 | S9-06 | The project's name: edit, Enter: the breadcrumbs, the switcher and the workspace home show the new name; one change event in one change group; the empty name per D-59; length and duplicate rules per item 10. |
 | S9-07 | The description: several lines, saved on leaving the field, shown after a reload; emptied, it is stored empty. |
 | S9-08 | Roles and archive: reviewers and readers see text, not fields; the server refuses a direct call from a reviewer; an archived workspace shows text and refuses the write. |
@@ -158,9 +160,9 @@ The slice touches the canvas only through the zoom field, which is above it. Bar
 
 - **Empty name**, choose one:
   - **(i)** the field goes back to the stored name without a toast (the prototype);
-  - **(ii)** the field goes back and a toast says "A project needs a name." (recommended: the person sees why nothing was saved).
+  - **(ii)** the field goes back and a toast says "A project needs a name." (recommended: the person sees why nothing was saved). **Chosen by Łukasz, 29 October 2026.**
 - **Undo**, choose one:
-  - **(iii)** one undo step, in the undo history like a canvas created on the home, undone from a canvas (recommended: the pattern of `renameCanvas`, `docs/ideas.md`; the known limitation "No undo outside canvases" names it);
+  - **(iii)** one undo step, in the undo history like a canvas created on the home, undone from a canvas (recommended: the pattern of `renameCanvas`, `docs/ideas.md`; the known limitation "No undo outside canvases" names it); **chosen by Łukasz, 29 October 2026**;
   - **(iv)** a change group that is not an undo step, as a pin (D-29).
 
 ### D-60 (proposal) Typing the zoom
@@ -168,10 +170,10 @@ The slice touches the canvas only through the zoom field, which is above it. Bar
 "The zoom value between − and + is a field. A whole number, with or without %, applies on Enter around the view's centre, as − and + do; Escape goes back. {Leaving the field.} {Out of range.} The field follows every zoom except while someone types in it; keys typed in it do not reach the canvas. Typing the zoom is view state, outside undo (D-22)."
 
 - **Leaving the field** (a click elsewhere, Tab), choose one:
-  - **(v)** applies, as Enter (recommended: Tab to apply is common in zoom fields);
+  - **(v)** applies, as Enter (recommended: Tab to apply is common in zoom fields); **chosen by Łukasz, 29 October 2026**;
   - **(vi)** goes back, only Enter applies.
 - **Out of range**, choose one:
-  - **(vii)** applies the nearest limit and shows it (recommended: "500" gives the maximum at once);
+  - **(vii)** applies the nearest limit and shows it (recommended: "500" gives the maximum at once); **chosen by Łukasz, 29 October 2026**;
   - **(viii)** goes back with a toast "Type a zoom from {min} to {max} %.".
 
 (S9-11's "per D-60 (vi)" and "(vii)" read as the chosen option.)

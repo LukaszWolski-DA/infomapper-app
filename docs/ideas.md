@@ -10,6 +10,13 @@ Reload to see the latest version."), the field goes back to the last value this 
 lost. Better: keep the user's typed value in the field and show the current server value next to it, so the user can
 choose which to keep (or copy parts of theirs) instead of retyping.
 
+## Panels: one behaviour for a refused save in every field (slice 9, step 1, F6)
+
+After a refused save most panel fields keep the refused text (the field is keyed by its stored value, which did not
+change); the requirement panel shows the stored values again (its reset counter) and the workspace settings go back to
+the last saved value. One behaviour for every field would be clearer: either all go back, or all keep the typed text
+with the stored value beside it (the idea above). Łukasz kept today's behaviour in slice 9 (29 October 2026).
+
 ## Mapping by drag: from the attribute side too (slice 1b, step 2)
 
 The prototype also starts a mapping drag from an attribute row and drops it on a column row. The slice 1b PRD asks

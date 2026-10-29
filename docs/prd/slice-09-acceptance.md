@@ -196,3 +196,29 @@ Toggles that add or remove rows (classification links, label links, requirement 
 ## Small things found in passing (step 2)
 
 - In `src/app/_panels/fields.tsx` the doc comment of `TextField` ("A text field that saves on Enter…") now sits above `fieldKey`, whose own comment follows it. The file's header still says the fields are "keyed by the row's version". Both get fixed in step 2, where the file changes anyway.
+
+## Łukasz's answers (29 October 2026)
+
+- **The PRD:** the file from Downloads dated 29 October (25,843 bytes) is the right version.
+- **F1:** the attribute's type command takes only the changed parameters:
+  - absent: keep the stored value;
+  - `null`: clear it;
+  - a value: set it.
+
+  Changing only the data type behaves as today (described below, with a unit test). Other panel actions that send a whole object or several fields at once follow the same rule (the list below).
+- **F2:** the version is read when the save is sent. The order of one object's saves is kept by our own chain per object, not only by Next.js's queue of actions, and a test covers it.
+- **F3:** agreed. Every save action of the panels returns the new version, in one shape.
+- **F5:** agreed. Undo and Redo wait for panel saves on their way; Ctrl+Z in a text field stays the field's own text undo. S9-05 is extended.
+- **F6:** no change in this slice: on a refusal every field behaves as today. PRD items 3–4 and S9-03 are corrected. Making the behaviour the same everywhere is in `docs/ideas.md`, next to "keep the typed value on a stale-version conflict".
+- **Q3:** a stale version, a missing permission and the archive stop the object's queued saves (one toast). A validation refusal does not stop them.
+- **F9:** no length rule. Item 10: no length rule, duplicates as when creating a project.
+- **Q8:** the test id `value-zoom` stays (assertions with `toHaveValue`).
+- **D-59:**
+  - (ii): an empty name sends the field back with the toast "A project needs a name.";
+  - (iii): renaming and the description are an undo step, as `renameCanvas`.
+- **D-60:**
+  - (v): leaving the field applies the value, as Enter does;
+  - (vii): a value out of range is cut to 10 % or 300 % and the result is shown.
+- The texts of D-59 and D-60 are quoted for approval in steps 3 and 4. They go into `docs/decisions.md` only after that.
+
+The PRD is corrected accordingly: items 2 (with 2a and 2b), 3, 4, 10 and 16, S9-03 and S9-05, and the chosen options of D-59 and D-60.
