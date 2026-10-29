@@ -6,7 +6,7 @@ test("S1A-03: below 40% zoom cards show header and a plain block, lines keep the
   const items = await loadItems();
 
   await expectLineEndsOnRows(page, 0.3); // opens the canvas at 30% after reading the rows at 100%
-  await expect(page.getByTestId("value-zoom")).toHaveText("30%");
+  await expect(page.getByTestId("value-zoom")).toHaveValue("30%"); // a field since slice 9 (D-60)
   await expect(page.getByTestId("card-name")).toHaveCount(items.length);
   // the entity and table cards (a requirement card has its plain block too since slice 4b-2)
   await expect(cardNodes(page).getByTestId("card-block")).toHaveCount(items.length);
