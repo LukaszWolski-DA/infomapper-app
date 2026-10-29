@@ -526,3 +526,22 @@ Before you start, back up your data file (CLAUDE.md): copy `.data/dev-db.json` t
 10. **The remembered zoom (S9-13).**
     - Type 80 and press Enter, then reload. Expected: the canvas opens at 80 %.
     - Ctrl+Z right after a typed zoom undoes your last model change, not the zoom.
+
+## Manual acceptance (29 October 2026)
+
+Łukasz ran the checklist above on his model KB ("Kanton Basel"). Every step gave the expected result.
+
+| Step | What | Result |
+| --- | --- | --- |
+| 1 | Precision and scale (S9-01) | Pass |
+| 2 | Several saves in a row (S9-02, S9-04) | Pass |
+| 3 | A real conflict (S9-03) | Pass |
+| 4 | Undo right after a save (S9-05) | Pass |
+| 5 | The project's name (S9-06) | Pass |
+| 6 | The description (S9-07) | Pass |
+| 7 | Undo of the project change (S9-09) | Pass |
+| 8 | Typing the zoom (S9-11) | Pass |
+| 9 | Keys in the zoom field (S9-12) | Pass |
+| 10 | The remembered zoom (S9-13) | Pass |
+
+Slice 9 is accepted. It is merged into `main` with a merge commit and tagged `slice-09`.
