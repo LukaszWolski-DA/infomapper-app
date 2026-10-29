@@ -222,3 +222,70 @@ Toggles that add or remove rows (classification links, label links, requirement 
 - The texts of D-59 and D-60 are quoted for approval in steps 3 and 4. They go into `docs/decisions.md` only after that.
 
 The PRD is corrected accordingly: items 2 (with 2a and 2b), 3, 4, 10 and 16, S9-03 and S9-05, and the chosen options of D-59 and D-60.
+
+## Step 2: saving in panels (items 1–6)
+
+### What changed
+
+- **The chain** is `src/ui/row-saves.ts` (`RowSaves`, one per browser tab, `rowSaves`).
+  - Per row it keeps the newest version an answer gave and a promise chain.
+  - `save(id, shown, send)` runs after the row's earlier saves and after any undo or redo on its way. It sends `max(answered, shown)`, read when the save is sent (F2).
+  - A refusal for `stale_version`, `forbidden` or `archived` cuts the saves of that row already waiting. They are not sent, and the one toast is the refusal's. `invalid` cuts nothing (Q3).
+  - `exclusive(step)` runs undo and redo after every save on its way and before saves started meanwhile. `answer(versions)` takes the versions an undo or redo wrote (F5).
+  - Unit tests: `src/ui/row-saves.test.ts`, 7 tests. One of them checks that the order comes from our chain: the second save is not sent before the first answer.
+- **`useAction().saveRow(row, (version) => action, success?, options?)`** (`src/app/_components/use-action.ts`) is `run` through the chain. A cut save comes back as `CUT` (`code: "cut"`) with no toast of its own.
+- **One shape for the answers (F3):** `Saved<T> = T & { version }` (`src/app/_lib/run-command.ts`). Returned by:
+  - `updateAttributeAction`, `updateEntityAction`, `renameConceptAction`;
+  - `updateRelationshipAction`, `swapRelationshipAction`;
+  - `updateMappingAction`, `setMappingStatusAction`, and the mapping input actions through `withNotice`: `addMappingInputAction`, `removeMappingInputAction`, `reorderMappingInputsAction`;
+  - `updateRequirementAction`, `setRequirementStatusAction`;
+  - `setSourceNoteAction` (the domain's `setSourceNote` returns `version`);
+  - `renameClassificationAction`, `renameLabelAction`;
+  - `updateWorkspaceSettingsAction` (already returned it).
+- **Undo and redo** (`undoAction`) return `versions`, the new version of every row the step wrote. `UndoProvider` runs a step inside `rowSaves.exclusive` (F5). Ctrl+Z in a text field is still the field's own (`isTyping`, unchanged).
+- **The attribute type (F1):** `updateAttribute` takes `type` as a patch (`typePatchInput`, `patchedType`):
+  - absent: keep;
+  - `null`: clear;
+  - a value: set.
+
+  The panel sends only the changed part (`saveType`). Changing only the data type behaves as before: `attributeType` keeps the parameters the new type has (string: length; decimal: precision and scale; custom: the name) and clears the others. Going from a type without a stored custom name to `custom` is refused ("Name the custom type, e.g. uuid."). Unit tests in `attribute.test.ts`.
+- **Other actions that send several fields at once (F1, checked):**
+  - The mapping panel's rule for a direct mapping sends `kind: "transform"` with the rule. Both are what the person did.
+  - A relationship end's cardinality sends min and max from one control.
+  - The attribute's flags send the value the click asked for (`!shown`).
+  - None of these sends a stored value it did not change, so the rule needs nothing more.
+- **Panels on the chain:**
+  - attribute (fields and delete);
+  - entity (fields, definition);
+  - mapping (kind, rule, note, status, inputs, split, delete);
+  - relationship (label, cardinality, swap, delete);
+  - requirement (fields, status, delete);
+  - source table and column note;
+  - classification rename;
+  - concept rename (left panel);
+  - working label rename;
+  - workspace settings.
+- **Already queued, unchanged (F8):** notes and frames, through the canvas's `enqueue`.
+- **Not on the chain:** the canvas tabs' rename and the canvas menu's look (not panels), and actions started from the canvas (the toolbox, a column dropped on a mapping), as before.
+- `fields.tsx`: the misplaced doc comment and the header ("keyed by the row's version") are fixed.
+
+### Specs
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S9-01 | `S9-01.spec.ts`: Precision 12, Tab, Scale 2, Enter at once on Order Line.unit_price; version +2, two change groups, no toast | passed; **fails on `bcdfb7a`** (the code before step 2) |
+| S9-02 | `S9-02.spec.ts`: the name three times with Enter, without waiting; the change events' after-images in order, three groups | passed; **fails on `bcdfb7a`** |
+| S9-03 | `S9-03.spec.ts`: (1) two sessions; the second's name save gets the conflict toast once, its scale save behind it is not sent, nothing is overwritten, the field keeps the typed text (F6); (2) a refused scale ("A scale needs a precision.") does not stop the name save behind it | passed |
+| S9-04 | `S9-04.spec.ts`, one case each: attribute (name, flag), entity (name, stereotype), mapping (note, status), relationship (label, cardinality), requirement (name, owner), source column (note twice), note (text, status: the canvas's queue) | passed |
+| S9-05 | `S9-05.spec.ts`: (1) save, Ctrl+Z while it is on its way, save at once: the undo takes back that save, the next one is stored, no conflict; (2) Ctrl+Z in the name field undoes the typing only | passed; (1) **fails on `bcdfb7a`** |
+
+Classification rename, concept rename, label rename and the settings form are on the same chain but have no case of their own in S9-04. Their saves go through the same `saveRow` as the attribute's, and S0-08 (settings) runs in the full run.
+
+Redo has no e2e case of its own. A new save clears the redo history, so a redo cannot overlap a panel save that matters. Redo uses the same `exclusive` path as undo, and the unit test covers it.
+
+### Checks
+
+- `npm run lint` passed (46 s), `npm run typecheck` passed (8 s), `npm test` passed: 108 files, 1,384 tests (24 s).
+- Slice 9 specs on their own: 13 passed (2.5 min).
+- Full e2e run (P2, from scratch, no dev server of mine running): **370 passed, 1 skipped, 0 failed, 3,935 s** (1 h 6 min). Slice 8's full run took 4,336 s. The skipped test is the one skipped on purpose since before slice 9. The run covers the earlier specs of the touched panels: slices 00 (S0-08, settings), 01a, 01b, 02b, 03a, 04a, 07c and the fixes' specs.
+- `.data/dev-db.json` was not touched. e2e uses `.data/e2e-db.json`.
