@@ -7,7 +7,8 @@ test("S0-04: Łukasz creates project Finance and canvas Invoices; Finance has Fi
   // create project "Finance" and open it
   await createFromSwitcher(page, "switcher-project", "input-new-project", "Finance");
   await expectToast(page, "Created the project Finance.");
-  await expect(page.getByTestId("page-project-home")).toContainText("Finance");
+  // since slice 9 the name is a field for editors (D-59)
+  await expect(page.getByTestId("page-project-home").getByTestId("field-project-name")).toHaveValue("Finance");
   await expect(page.getByTestId("switcher-project")).toHaveText("Finance");
   await expect(page.getByTestId("tile-canvas-name")).toHaveText(["First canvas"]);
 
