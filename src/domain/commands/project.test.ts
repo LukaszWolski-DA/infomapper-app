@@ -55,7 +55,10 @@ describe("updateProject (slice 9, D-59)", () => {
     const r = updateProject(makeCtx(), access("owner"), state, { ...ref, description: "  One line.\nAnother line.  " });
     if (!r.ok) throw new Error(r.error.message);
     expect(r.value.project).toMatchObject({ name: "Customer 360", description: "One line.\nAnother line." });
-    expect(changeLabel(r.writeSet.events)).toBe("Change project");
+    expect(changeLabel(r.writeSet.events)).toBe("Change project description");
+    const both = updateProject(makeCtx(), access("owner"), state, { ...ref, name: "P", description: "D" });
+    if (!both.ok) throw new Error(both.error.message);
+    expect(changeLabel(both.writeSet.events)).toBe("Change project");
     const emptied = updateProject(makeCtx(), access("owner"), { project: project(ids.projectA, { description: "Old" }) }, { ...ref, description: "   " });
     if (!emptied.ok) throw new Error(emptied.error.message);
     expect(emptied.value.project.description).toBeNull();
