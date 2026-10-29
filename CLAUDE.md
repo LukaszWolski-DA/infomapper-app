@@ -243,8 +243,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   (`signInWithPassword`; the demo password is `DEMO_PASSWORD`, `demo-pass`), write an organization, a person or a role
   as test data through the domain (`createOrganization`, `addPerson`, `changeRoleAs`) and open the People tab
   (`openPeople`, `personRow`); the earlier slices' helpers keep signing in through the test users' list (`signInAs`),
-  which unlocks every organization. The undo history lives in the server's memory and is empty again after each
-  reseed.
+  which unlocks every organization. Slice 9's helpers do the following:
+  - record every toast a page shows (`recordToasts`, then `toasts`);
+  - read a row's change groups (`groupsOf`);
+  - open and read the project home (`projectHome`, `loadProject`, `C360`);
+  - wait for hydration (`hydrated`), which matters because typing before it can lose a field's selection. Call it after
+    `goto` or `reload` and before typing.
+
+  The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
   with notes below 40 % zoom (a note measured while drawn plain once grew on every round), `S3B-15-idle.spec.ts` on a

@@ -571,8 +571,11 @@ the demo data is replaced: steps whose change group is no longer in the change l
 ### No undo outside canvases (slice 3a, step 0)
 
 Undo and redo (the top bar's buttons, Ctrl+Z, Ctrl+Shift+Z) exist only on canvas pages (slice 1b, assumption 8).
-Changes made on the project and workspace home pages (projects, canvases) are in the undo history, but can only be
-undone from a canvas. Pinning a label to a project and unpinning it (project home, slice 3a) write a change group with
+Changes made on the project and workspace home pages are in the undo history but can only be undone from a canvas.
+That covers creating projects and canvases and, since slice 9 (D-59), a project's name and description. The history is
+one per person and workspace: the last 50 steps, kept in the server's memory and empty again after a restart until the
+database slice. So such a step is undone and redone from any canvas of the workspace, of any project, in its turn after
+the steps made later. Pinning a label to a project and unpinning it (project home, slice 3a) write a change group with
 their change events but are not undo steps at all. Deleting a label is an undo step, and its undo brings its project pins
 back with it.
 

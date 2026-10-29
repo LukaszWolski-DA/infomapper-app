@@ -346,3 +346,19 @@ A quick panel save followed by one of these, or one of these followed by a panel
 - The toast "A project needs a name.".
 - The permission text "edit projects", which shows inside the existing sentence "As a {role} you cannot edit projects.".
 - The aria labels "Project name" and "Project description", and the placeholder "What is this project about?". These come from the prototype.
+
+### After Łukasz's review of step 3 (29 October 2026)
+
+- **How the description grows (item 12):**
+  - Chromium uses CSS only (`field-sizing: content`).
+  - Firefox and WebKit lack it, so the field's `rows` follow the text's line count. The count is taken from the text in the render and in the `input` event.
+  - Nothing reads a height or other layout. Wrapped lines are not counted in that fallback.
+- **The scope of undo:**
+  - There is one history per person and workspace (`historyKey`, `src/domain/model/undo-history.ts`). It holds the last 50 steps in the server's memory.
+  - A project's rename or description is undone and redone from any canvas of the workspace, of any project, in its turn. S9-09 now undoes and redoes the description from Order management's canvas.
+  - D-59 says so, and the known limitation "No undo outside canvases" is updated.
+- **Toasts:** a description alone reads "Change project description" (`changeLabel`), so "Undone: …" and "Redone: …" use it. A name alone stays "Rename project", and both at once (only by a direct call) read "Change project".
+- **Docs:**
+  - AD-05 has a note on `project.edit`.
+  - CLAUDE.md lists slice 9's e2e helpers, `hydrated` among them.
+  - D-59 is in `docs/decisions.md`, accepted 29 October 2026.
