@@ -276,10 +276,10 @@ The PRD is corrected accordingly: items 2 (with 2a and 2b), 3, 4, 10 and 16, S9-
 | S9-01 | `S9-01.spec.ts`: Precision 12, Tab, Scale 2, Enter at once on Order Line.unit_price; version +2, two change groups, no toast | passed; **fails on `bcdfb7a`** (the code before step 2) |
 | S9-02 | `S9-02.spec.ts`: the name three times with Enter, without waiting; the change events' after-images in order, three groups | passed; **fails on `bcdfb7a`** |
 | S9-03 | `S9-03.spec.ts`: (1) two sessions; the second's name save gets the conflict toast once, its scale save behind it is not sent, nothing is overwritten, the field keeps the typed text (F6); (2) a refused scale ("A scale needs a precision.") does not stop the name save behind it | passed |
-| S9-04 | `S9-04.spec.ts`, one case each: attribute (name, flag), entity (name, stereotype), mapping (note, status), relationship (label, cardinality), requirement (name, owner), source column (note twice), note (text, status: the canvas's queue) | passed |
+| S9-04 | `S9-04.spec.ts`, one case each: attribute (name, flag), entity (name, stereotype), mapping (note, status), relationship (label, cardinality), requirement (name, owner), source column (note twice), note (text, status: the canvas's queue); added after step 2 (Łukasz): workspace settings (name, client) and classification (the name twice) | passed; the two added cases **fail on `bcdfb7a`** |
 | S9-05 | `S9-05.spec.ts`: (1) save, Ctrl+Z while it is on its way, save at once: the undo takes back that save, the next one is stored, no conflict; (2) Ctrl+Z in the name field undoes the typing only | passed; (1) **fails on `bcdfb7a`** |
 
-Classification rename, concept rename, label rename and the settings form are on the same chain but have no case of their own in S9-04. Their saves go through the same `saveRow` as the attribute's, and S0-08 (settings) runs in the full run.
+Concept rename and label rename are on the same chain but have no case of their own in S9-04; their saves go through the same `saveRow` as the attribute's.
 
 Redo has no e2e case of its own. A new save clears the redo history, so a redo cannot overlap a panel save that matters. Redo uses the same `exclusive` path as undo, and the unit test covers it.
 
@@ -287,5 +287,17 @@ Redo has no e2e case of its own. A new save clears the redo history, so a redo c
 
 - `npm run lint` passed (46 s), `npm run typecheck` passed (8 s), `npm test` passed: 108 files, 1,384 tests (24 s).
 - Slice 9 specs on their own: 13 passed (2.5 min).
-- Full e2e run (P2, from scratch, no dev server of mine running): **370 passed, 1 skipped, 0 failed, 3,935 s** (1 h 6 min). Slice 8's full run took 4,336 s. The skipped test is the one skipped on purpose since before slice 9. The run covers the earlier specs of the touched panels: slices 00 (S0-08, settings), 01a, 01b, 02b, 03a, 04a, 07c and the fixes' specs.
+- Full e2e run (P2, from scratch, no dev server of mine running): **370 passed, 1 skipped, 0 failed, 3,935 s** (1 h 6 min). Slice 8's full run took 3,723 s (28 October), so today's run is +6 %; 4,336 s was the fix/panel-field-focus run. The skipped test is the one skipped on purpose since before slice 9. The run covers the earlier specs of the touched panels: slices 00 (S0-08, settings), 01a, 01b, 02b, 03a, 04a, 07c and the fixes' specs.
 - `.data/dev-db.json` was not touched. e2e uses `.data/e2e-db.json`.
+
+### Writes started from the canvas (after step 2, Łukasz's question)
+
+Some writes started from the canvas write the same rows as a panel field but are not on the save chain. They use `run` with the rendered version:
+
+- the mapping and relationship line menus (status, split, swap, delete);
+- the attribute row's delete;
+- moving an attribute, which also renumbers its siblings;
+- a column dropped on a mapping with a rule;
+- the frame panel's "move to the frame's concept".
+
+A quick panel save followed by one of these, or one of these followed by a panel save, can still be refused as a false conflict until the page refreshes. The canvas does not read `Saved<T>`. It waits for the refresh, and `mergeFresh` covers only cards, frames and notes. Not fixed (Łukasz). The table with files and functions is in `docs/known-limitations.md`, "Saving in panels (slice 9)", and there is an entry in PRD section 9.
