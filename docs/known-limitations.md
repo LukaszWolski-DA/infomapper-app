@@ -913,6 +913,17 @@ Undo and Redo do wait for both kinds (`rowSaves.exclusive` and `ui.settled()`).
 `rowSaves.answer`. The first candidate for slice 10 "Relationships", which changes the same actions in
 `canvas-host.tsx` (Łukasz, 29 October 2026; `docs/ideas.md`).
 
+### Writes still off the save chain (slice 10a)
+
+- **Renaming and deleting a canvas** (`canvas-tabs.tsx`, `canvas-menu.tsx`) send the canvas's version from the page.
+  The look (grid, background, layer) has its own queue with its own version (`look.tsx`), so a rename right after a
+  layer switch can be refused until the page refreshes. Left for later, as the tab's rename is not on the chain either
+  (Łukasz, step 1 answers).
+- **The change-to-resolve actions** (`source-changes.tsx`) answer with the versions of every row they wrote, and those
+  go to `rowSaves.answer`. A panel save of such a row (a table's or column's note) started while the action is on its
+  way still sends the version it knows and can be refused as a false conflict. The reason: only the server knows which
+  tables, columns and mappings an action writes, so the browser cannot hold those rows before it is sent (`saveRows`).
+
 ### A project's description in Firefox and WebKit does not count wrapped lines (slice 9, D-59)
 
 The project home's description grows with its text through `field-sizing: content`, which only Chromium supports.

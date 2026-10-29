@@ -399,3 +399,54 @@ Kept as well, because they are the measurements that see the loop: the branch-on
 **Steps.** Step 2 is split:
 - **2a:** the chain's mechanics (`saveRows`, the "not found" cut, the actions returning versions), with unit tests. Stop.
 - **2b:** wiring the actions of F1, specs S10A-01 to S10A-06, and the full e2e run. Stop.
+
+## Step 2a: the chain's mechanics (29 October 2026)
+
+**What changed:**
+- **`rowSaves.saveRows(rows, send)`** (`src/ui/row-saves.ts`):
+  - a row with `shown` is checked (its newest version is sent); a row without is held;
+  - it waits for every listed row's saves and any undo, and holds all of them until its answer;
+  - it feeds back the answer's `versions` to every row, and `value.version` to the first checked row;
+  - a cutting refusal cuts the waiting saves of every listed row;
+  - it is not sent when a refusal before it cut one of its checked rows. A held row's cut does not stop it, because its version is not sent. This was not in the sketch; tell me if you want held rows to stop it too;
+  - `save` is its one-row case.
+- **"Not found" cuts** (`CUTS`), for the panels too (F5).
+- **`useAction`** has `saveRows` beside `saveRow` (`use-action.ts`). Nothing calls it yet; that is 2b.
+- **Versions from the server:**
+  - `writtenVersions(writes)` (`src/domain/changes.ts`): undo's version map, moved into the domain and shared;
+  - `runCommand`'s option `versions` puts them on the answer (`ActionResult.versions`), the settled changes' and the live step's writes included;
+  - the wrappers `modelCommand`, `mappingCommand` and `onCanvas` (`frame.ts`) pass the option through.
+- **The actions:**
+
+  | Action | Now returns |
+  | --- | --- |
+  | `reorderAttributeAction` | `versions` (the moved attribute and its renumbered siblings) |
+  | `mergeMappingsAction` | `versions` |
+  | `deleteConceptAction` | `versions` (with "move to", the moved entities) |
+  | the change-to-resolve actions (`changeCommand`: retire, move, delete, map, not needed, decide column by column, approve again, leave in review, acknowledge, approve again all) | `versions` |
+  | `placeCardAction`, `moveOnCanvasAction` | `versions`, only with `moveToConcepts` (D-05), so an ordinary drag answers as before |
+  | `splitMappingAction` | `Saved`: the kept mapping's version |
+  | `markColumnNeededAction` | `Saved`: the column's version |
+  | `restoreClassificationAction` | `Saved`: the classification's version |
+  | `archiveWorkspaceAction`, `unarchiveWorkspaceAction` | `Saved`: the workspace's version (both, so the archive box answers as one row) |
+
+- **`docs/known-limitations.md`:** "Writes still off the save chain (slice 10a)", with the canvas's rename and delete and the change-to-resolve actions (Łukasz's answer).
+
+**Unit tests:**
+- `src/ui/row-saves.test.ts`: the "not found" cut; and for `saveRows`:
+  - it waits for a listed row's save on its way;
+  - it holds every row (a one-row save started meanwhile waits and sends the returned version);
+  - the versions fed back;
+  - a cut across rows, held ones included, other rows going on;
+  - a checked row's earlier cut stops it, a held row's does not;
+  - a validation refusal cuts nothing;
+  - an undo waits for it;
+  - a one-row `saveRows` is `save`;
+  - an unchecked row's version is refused.
+- F4's test: an undo does not wait for a write outside the chain and does wait for the same write on it. Its first half is today's canvas actions.
+- `changes.test.ts`: `writtenVersions`. `attribute.test.ts`: a move writes versions of the moved attribute and every renumbered sibling. `concept.test.ts`: deleting with "move to" writes the entities' versions.
+
+**Checks:**
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: 108 files, 1,407 tests, pass.
+- `row-saves.test.ts` three times on its own: 17 of 17 each time. One test had failed once while I was writing it: it expected two different rows' saves in a fixed order, which the chain does not promise. It now compares them as a set.
+- S9-01 to S9-05 and S0-08 (dev server, from scratch, none of mine running): **17 passed, 152 s**. The server log showed "The destination stream closed early" five times, the known line; no test failed.
