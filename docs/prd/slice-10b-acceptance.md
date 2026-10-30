@@ -1,6 +1,6 @@
 # Slice 10b – acceptance
 
-Status: **step 1 answered (Łukasz, 30 October 2026; "Łukasz's answers" below); step 2 next.**
+Status: **manual acceptance passed (Łukasz, 30 October 2026); merged as PR 26, tag `slice-10b`.** Steps 1 to 5 and Łukasz's answers to each are below.
 
 - Tag `slice-10a` and `origin/main` are at `82f8e0d`, as A1 says. The local `main` was still at `84ff767` (slice 9); it was not moved. Branch `slice/10b-source-relationship-lines` was made from the tag.
 - The PRD is copied unchanged from `~/Downloads/slice-10b-source-relationship-lines.md` (19,340 bytes, 30 October 2026; the only file with that name). Commit "docs: slice 10b PRD".

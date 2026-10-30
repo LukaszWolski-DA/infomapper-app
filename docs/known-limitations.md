@@ -726,6 +726,13 @@ the click on Łukasz the top bar did not show within 15 s. That is before any sl
 full runs logged since slice 7a's close, and the file passed 3 of 3 on its own. Recorded as a known flake (Łukasz, 26
 October 2026); if it comes back, look at the sign-in redirect's timing under a long run.
 
+### S4B2-06 flaked again after its fix (slice 10b)
+
+In slice 10b's closing full run (30 October 2026), S4B2-06 (`e2e/slice-04b2/S4B2-06.spec.ts`) failed once more under
+load. That was after `05d0a04`, slice 7b's fix for the race on REQ-101's card. It passed 3 of 3 on its own. The cause is
+unknown, because the run's error text was lost (the output was filtered, and the reruns replaced `test-results/`). In
+the next full run, keep the failing test's error output before rerunning it.
+
 ## Source import (slice 7a)
 
 ### Every write rewrites the whole local data file
