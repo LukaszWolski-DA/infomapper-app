@@ -102,3 +102,32 @@ export async function setWidth(name: string, width: number): Promise<void> {
     moveOnCanvas(ctx, access, { canvas, frames: [], items, entities: [], concepts: [] }, { canvasId: i.canvas_id, frames: [], items: [{ canvasItemId: i.id, expectedVersion: i.version, width, height: i.height }] }),
   );
 }
+
+// ---- step 3: clicks, Focus, live canvases ----
+
+export { closeToolbox, pointOnLine, toolboxAt } from "../slice-01b/helpers";
+export { backButton, clickCard, expectSelected, selected } from "../slice-06b/helpers";
+export { expectHidden, togglePanel, viewportTransform } from "../slice-05a/helpers";
+export { approvedMapping, fade, fadeTables } from "../slice-04b1/helpers";
+export { labelItem, liveUrl, openLiveFor } from "../slice-03b/helpers";
+
+/**
+ * A point of a source line on the screen where the line itself takes the click (not a card above it): the first point
+ * along its path, from `from` (0–1), whose topmost element is the line's hit target.
+ */
+export const freePointOn = (page: Page, id: string, from = 0.05): Promise<Pt> =>
+  page.evaluate(
+    ([rid, start]) => {
+      const g = document.querySelector(`[data-testid="layer-lines"] [data-source-relationship="${rid}"]`)!;
+      const path = g.querySelector("path.s") as SVGPathElement;
+      const m = path.getScreenCTM()!;
+      const len = path.getTotalLength();
+      for (let l = len * start; l < len; l += 4) {
+        const p = path.getPointAtLength(l);
+        const x = p.x * m.a + m.e, y = p.y * m.d + m.f;
+        if (document.elementFromPoint(x, y)?.closest("[data-source-relationship]") === g) return { x, y };
+      }
+      throw new Error("no free point on the line");
+    },
+    [id, from] as const,
+  );

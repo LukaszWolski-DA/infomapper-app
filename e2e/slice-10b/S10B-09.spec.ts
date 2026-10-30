@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { dragCardBy, FK_ORDER, openCanvas, setCard, setWidth, signInAs, sourceRelationshipId, sourceShape } from "./helpers";
+import { dragCardBy, FK_ORDER, item, openCanvas, setCard, setWidth, signInAs, sourceRelationshipId, sourceShape } from "./helpers";
 
 // S10B-09: the line follows its cards (item 9): order_line moved by a drag, order_header made wider, order_header
 // collapsed. Each time the ends are back on the cards' edges.
@@ -21,9 +21,14 @@ test("S10B-09: the line follows a card's move, a width change and a collapsed ca
   };
 
   const before = await onEdges();
+  const start = await item("order_line");
+  // the page settles after it is ready (cards measured, the view placed) before a drag by position
+  await page.waitForTimeout(800);
   await dragCardBy(page, "order_line", 40, 60);
+  await expect.poll(async () => (await sourceShape(page, id, "order_line", "order_header")).start.y - before.start.y).toBeGreaterThan(30);
   const moved = await onEdges();
-  expect(moved.start.y - before.start.y).toBeGreaterThan(30);
+  // the drag's save reaches the data before the next write as test data
+  await expect.poll(async () => (await item("order_line")).y).toBeGreaterThan(start.y);
 
   await setWidth("order_header", 360);
   await page.reload();
