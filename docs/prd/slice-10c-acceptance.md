@@ -561,3 +561,122 @@ No interface yet. Commands, rules, two server actions and unit tests.
 - **The commit that did not typecheck on its own** was folded into the next one (nothing was pushed). The step's
   commits are now `db80486` (the code) and `91e98d6` (the docs). Every code commit since the branch's start
   typechecks on its own (`6845e73`, `172f49b`, `33052f0`, `db80486`: 0 errors each).
+
+## Step 4: the interface (30 October 2026)
+
+**The clipboard** (`src/app/_components/attribute-clipboard.ts`):
+- A value store of the page holding `{ workspaceId, attributeId }` only (F13). It survives Next.js's client navigation
+  between canvases and is empty after a reload.
+- The canvas host empties it when its canvas is of another workspace.
+- The menus read the attribute's name from the page's model, so a rename shows, and offer it only while the attribute
+  is in that model.
+
+**The menus** (`src/app/_panels/canvas-host.tsx`):
+- **"Copy"** in an attribute row's menu, after "Map from a column…", for editors (`editable`: owners, admins and
+  modelers, not archived). Its toast is "Copied “{attribute}”. Paste it with “Paste attribute” in an entity card's menu."
+- **"Paste attribute “{attribute}”"** in an entity card header's menu, after "Relate to itself", while the clipboard
+  holds an attribute of this workspace.
+  - It follows the rules of the other editors' card actions, live canvases included (F15).
+  - On success: the toast as approved, the new row selected, the details panel opened even when hidden (D-54), the name
+    focused and selected (`setNameFocus`, as "Add attribute" does).
+  - A refusal shows the domain's message and empties the clipboard.
+- **"Delete attribute"** in the row's menu asks for a second click when the attribute has mappings or live copies. The
+  text is `armedDeleteText` with `copiesStopFollowing`.
+  - An armed menu item's text now wraps instead of being cut (`toolbox.tsx`), so the names show.
+
+**The attribute panel** (`src/app/_panels/attribute-panel.tsx`):
+- **A copy:** a note above the data type.
+  - Original live: "Copied from {entity}.{attribute}", the name a link that selects the original (`goAttribute`, a
+    history place).
+  - Original deleted: "Copied from {entity}.{attribute}, which was deleted.", from `lostOriginals` (F6).
+  - Both have the button "Stop following", for editors.
+- **The followed fields** (data type, length, precision, scale, custom name, Personal data) are disabled while the
+  attribute has a link, live original or deleted (F2). Under the data type: "Follows {entity}.{attribute}." while the
+  original is live.
+- **An original:** a section "Copies" (folding, with its count) lists its live copies as "{entity}.{attribute}", by
+  entity, then attribute; each selects that attribute.
+- **The save chain (F4):** the type's fields and Personal data save through `saveRows`, the attribute checked and every
+  copy below it held (`copiesBelow`). The other fields stay `saveRow`.
+- **The delete:** `ConfirmDelete` asks when there are mappings or copies, with `also` (mappings) and the new `then`
+  (copies). The toast is `attributeDeleted`: "Attribute deleted together with 2 mappings. 2 copies no longer follow it",
+  each part only when it applies.
+
+**D-47's dialog** (`delete-entity-dialog.tsx`) gets the row from `copiesImpactRow` after the requirements row, when there
+are copies elsewhere.
+
+**Specs** (`e2e/slice-10c/`, one file per criterion that a browser checks):
+
+| Criterion | Spec | What it checks |
+| --- | --- | --- |
+| S10C-01 | `S10C-01.spec.ts` (2 tests) | Copy and Paste in the menus, the toasts, the copy's fields, last, no mappings, requirement links or labels, the name focused and selected, undo and redo; a non-key copy is no foreign key |
+| S10C-02 | `S10C-02.spec.ts` | its own entity (the name note), two more entities, the clipboard over a canvas tab switch, gone after a reload, no item while empty |
+| S10C-03 | `S10C-03.spec.ts` | the type and the length to a copy and a copy of a copy in one change group, one undo for all, Personal data; the copy's panel read-only with "Follows Customer.customer_id.", its name and nullable its own |
+| S10C-04 | `S10C-04.spec.ts` | "Copies" and "Copied from" select each other; Back returns; a copy without a card here |
+| S10C-05 | `S10C-05.spec.ts` (2 tests) | the second click naming both copies, disarming after 4 s with nothing deleted, the delete and its toast, the lost copy's panel read-only with Stop following, Undo (the copy unwritten, version 1); a copy without mappings or copies goes at once with Undo in the toast |
+| S10C-06 | `S10C-06.spec.ts` | D-47's row "1 copy" — "loses its original: Order Line.customer_id"; a copy inside Customer counted as an attribute |
+| S10C-07 | `S10C-07.spec.ts` (2 tests) | Stop following: the link cleared, the fields enabled, the original's list empty; one undo; on a lost copy |
+| S10C-08 | `S10C-08.spec.ts` (2 tests) | a deleted original refused with the text, the clipboard emptied; a reviewer without Copy or Paste, a direct call refused; archived: refused |
+| S10C-09 | `S10C-09.spec.ts` | the length saved, its answer held back 2 s by the test, and the copy deleted from its row meanwhile: both stored, no false conflict |
+| S10C-10 | unit: `upgrade-10.test.ts`, `undo.test.ts` (F10) | step 2 |
+| S10C-11 | the element guard | the closing (step 5) |
+| S10C-12 | CI and the runs below | |
+| S10C-13 | `S10C-13.spec.ts`, and `undo.test.ts` for the other cases | undo of a type change made before a paste brings the copy back |
+| S10C-14 | unit: `attribute.test.ts` ("labels the original…") | step 3 |
+
+**S10C-09 proves F4.** Without the held rows, the copy's delete is sent before the length's answer arrives, so the
+right-click alone was slower than the save. The spec now holds the answer back 2 s with `page.route`; the server has
+already written it.
+- With the copies not held (`saveRows` with the attribute only, a temporary edit): it failed, with the copy not deleted
+  (refused as stale).
+- With them held: 3 of 3 passed.
+
+**Earlier specs that one change touched:** S1B-07 lists the row's menu exactly; it now expects "Copy" after "Map from a
+column…" (a comment says why).
+
+**Runs:**
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm test`: 112 files, 1,469 tests, passed.
+- **The slice's specs:** 14 tests in `e2e/slice-10c/`, passed (2.2 min). Again after the last change to the delete
+  button, with S1B-07 and S1B-13: 16 passed (2 min 42 s).
+- **The earlier specs of what the step touched**, run from 17:09 to 17:26, 110 tests:
+  - all of slice 1b (attribute rows and menus, deletes, a reviewer);
+  - all of slice 3b (the working context and live canvases);
+  - all of slice 9 (saves in panels);
+  - all of slice 10a (the save chain, menus, deletes);
+  - S1A-10, S1A-11, S3A-12, S4A-10.
+
+  109 passed and one failed: S1B-07, for the "Copy" item above. After its update S1B-07 passed.
+- KB's file was not touched (the same size and time as after its upgrade, 16:16:51).
+
+**The screenshots** (`docs/prd/slice-10c-screens/step-4/`, made by `SCREENS=step-4 npx playwright test
+e2e/slice-10c/S10C-screens.spec.ts`; Customer.customer_id pasted into Order Line and Product):
+1. `1-original-with-copies.png`: the original's panel, "Copies" with its two copies.
+2. `2-copy-linked.png`: a copy's panel, "Copied from Customer.customer_id" with Stop following, the type read-only with
+   "Follows Customer.customer_id.".
+3. `3-copy-original-deleted.png`: the same copy after the original's delete, "Copied from Customer.customer_id, which
+   was deleted.".
+4. `4-delete-second-click.png`: the original's delete armed: "Click again to delete, with 1 mapping; these copies stop
+   following it: Order Line.customer_id, Product.customer_id".
+5. `5-entity-preview-copies-row.png`: D-47's dialog for Customer with "2 copies" — "lose their original: Order
+   Line.customer_id, Product.customer_id".
+6. `6-paste-item-in-card-menu.png`: Sales Order's header menu with "Paste attribute “customer_id”" after "Relate to
+   itself". The copy toast still shows at the bottom.
+
+The first screenshots showed the armed button's text running out of the button. `ConfirmDelete` now lets an armed
+button grow to hold its text (`min-h-8`, `fields.tsx`); unarmed it is as before.
+
+### D-63 (final text proposed for approval)
+
+"**D-63** Copying an attribute (slice 10c). An attribute can be copied to any entity, its own included: “Copy” in its
+row's menu, then “Paste attribute “{attribute}”” in an entity card header's menu, one attribute at a time, by owners,
+admins and modelers in a workspace that is not archived. The clipboard is the page's: it stays while switching canvases
+and is empty after a reload or in another workspace. The copy is a full attribute of its entity, last in its order, and
+its panel opens with the name selected. It starts with the original's name, definition and nullable, which are then its
+own, and gets no mappings, requirement links or labels. A copy of a primary key is flagged as a foreign key; nothing
+ties a copy to a relationship (a validator's work, later). The copy follows its original's data type with its
+parameters and Personal data: they are read-only in its panel while it is a copy, also when its original is deleted, and
+a change of them on the original, or an undo or redo, reaches every copy and their copies in the same step. An
+original's panel lists its copies and a copy's panel names its original, each selecting the other. Deleting an original
+that has copies asks for a second click that names them; the copies stay, and each copy's panel says its original was
+deleted until Undo brings it back. “Stop following” detaches a copy, whether its original is live or deleted."
