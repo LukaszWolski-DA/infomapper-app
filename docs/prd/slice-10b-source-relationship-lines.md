@@ -1,6 +1,6 @@
 # Slice 10b – Relationships between source tables as lines on the canvas
 
-Status: **first draft, 30 October 2026**, not yet checked against the code. Branch `slice/10b-source-relationship-lines`, from `main` at tag `slice-10a` (`82f8e0d`, assumption A1). PRD file: `docs/prd/slice-10b-source-relationship-lines.md`; step 1 writes `docs/prd/slice-10b-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), with one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Status: **step 1 answered, 30 October 2026** (`docs/prd/slice-10b-acceptance.md`, "Łukasz's answers"; this PRD is updated where they change it). Branch `slice/10b-source-relationship-lines`, from `main` at tag `slice-10a` (`82f8e0d`, assumption A1). PRD file: `docs/prd/slice-10b-source-relationship-lines.md`; step 1 writes `docs/prd/slice-10b-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), with one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 ## 1. Why this slice
 
@@ -52,32 +52,33 @@ The prototype draws no source relationship: every part of the drawing is D-62.
 The slice adds no new user-facing text, as far as this draft knows. Step 1 lists any it finds needed.
 
 1. **The canvas gets the source relationships** of the tables whose cards it shows: each relationship's from table, to table and `missing_since`. Its column pairs are not needed for drawing.
-   - Step 1 says how the model reaches the canvas today (`ModelIndex`) and what loading them costs (Q1).
+   - The canvas page already loads them with the model; `buildLines` (on the server) returns them as a list of their own, `sources`, beside `mappings` and `relationships` (step 1, F1, F2).
 2. **A line per source relationship** whose two table cards are both on the canvas as cards.
-   - It is drawn in the existing line layer (AD-24 rule 3), with no new layer.
+   - It is drawn in the existing line layer (AD-24 rule 3), with no new layer, by `SourcePath` (step 1, F2).
    - It is anchored like a relationship between entity cards (`relGeom`). It is not anchored on column rows.
    - **Its look:**
      - grey, thinner than a relationship between entities;
      - no cardinality marks in either notation;
+     - the grey is `--im-ink-3`, 1.2 px wide (step 1, answer 8);
      - a small arrow at the referenced table's end;
      - no label.
-   - **The arrow:** proposal, one shared SVG marker definition (`marker-end`) rather than an element per line (Q2).
+   - **The arrow:** one arrow path per line, like a relationship's end marks: it fades with its line and is drawn again above the Focus veil (step 1, answer 1).
    - **Several relationships between the same two tables** are spaced as parallel relationships are (`buildLines`'s offsets).
 3. **A table's key to itself** is drawn as slice 10a's loop: from the right edge (the table with the key) to the top edge (the referenced table, with the arrow). Several keys to itself on one table nest as loops do.
 4. **A missing relationship** (`missing_since` set) is drawn dashed.
 5. **Layers:** shown in Everything and Relationships, hidden in Mappings (D-22's layer mode, no new switch).
-6. **Collapsed frames:** no line when either card is a member of a collapsed frame. A source relationship never joins a bundle and never changes a bundle's count.
+6. **Collapsed frames:** no line when either card is a member of a collapsed frame. A source relationship never joins a bundle and never changes a bundle's count. `bundleLines` keeps the list and leaves out those lines (step 1, F3).
 7. **Interaction:**
    - **Hover** thickens the line by CSS, as other lines.
-   - **A click on the stroke** selects the table with the key, as a click on its card does (its panel, its history place, D-38). It does not move the view.
+   - **A click on the stroke** selects the table with the key, as a click on its card does (its history place, D-38). Its panel shows where the details panel is shown; a hidden details panel stays hidden (D-54). It does not move the view.
    - **A click inside a loop's empty area** selects nothing.
-   - **No line menu**, no drag, and Delete does nothing on it.
+   - **No line menu:** a right-click opens the empty canvas's toolbox (step 1, F8). No drag. Delete with the line hovered does nothing; after a click, Delete is the selected card's own Delete (on a live canvas, D-11's question).
    - Every role sees the same lines.
-8. **Focus:** a line is lit when both of its tables are lit, and fades otherwise, as other lines between cards. The Changes view gets nothing new: its lines fade with their cards (Q6).
+8. **Focus and the Changes view:** a line is lit when both of its cards are lit, and fades otherwise. `FadeLayer` gives these lines to `LitLines`; no domain change (step 1, F6, answer 2). Focus on one table lights no other table, so it fades that table's source lines.
 9. **The line follows** card moves, width changes and collapsed cards, as any line does.
 10. **Live canvases:** a line is drawn between two table cards that are both on the canvas, by the same rule (Q5).
 11. **The miniature** leaves source relationships out.
-12. **The seed is not changed.** It already has two declared relationships (slice 7a). Wherever both of their tables have cards on a demo canvas, the lines appear there, and the element guard's counts change by exactly those lines (section 6, Q3).
+12. **The seed is not changed.** It already has two declared relationships (slice 7a). `FK_order_line_order_header` appears on "Customer & orders" and Sales' "First canvas"; the other on no canvas. The element guard counts "Performance test", which has none: its counts do not change (step 1, F5).
 
 ## 4. Steps
 
@@ -95,14 +96,14 @@ Tests in `e2e/slice-10b/`, one file per criterion, each from a fresh seed; unit 
 
 | ID | Criterion |
 | --- | --- |
-| S10B-01 | **A line between two tables.** With the cards of `order_line` and `order_header` on a canvas, `FK_order_line_order_header` is drawn as a grey line between them, with the arrow at `order_header`. It has no cardinality marks in crow's foot or UML, and no label. With one of the two cards removed from the canvas, there is no line. |
+| S10B-01 | **A line between two tables.** With the cards of `order_line` and `order_header` on a canvas, `FK_order_line_order_header` is drawn as a grey line between them (`--im-ink-3`, 1.2 px), with the arrow at `order_header`. It has no cardinality marks in crow's foot or UML, and no label. With one of the two cards removed from the canvas, there is no line. |
 | S10B-02 | **A key to itself.** After an import with a key from `employees.manager_id` to `employees`, the table's card shows a loop from its right edge to its top edge, with the arrow at the top end. A second key to itself nests outside it. |
 | S10B-03 | **A missing relationship.** After a re-import without the key, the line is dashed. The table panel still says "· missing". |
 | S10B-04 | **Layers.** Everything and Relationships show the line; Mappings hides it. |
-| S10B-05 | **Collapsed frames.** With either table's card in a collapsed frame there is no line, and no bundle's count changes. |
-| S10B-06 | **Clicks and hover.** A click on the line selects `order_line` and opens its panel without moving the view; Back returns to what was selected before. A click inside a loop's empty area selects nothing. Hover thickens the line. A right-click offers no line menu, and Delete with the line hovered or clicked removes nothing. A reviewer sees the same lines. |
-| S10B-07 | **Focus.** Focus on `order_line` lights the line when `order_header` is lit as well, and fades it otherwise, as other lines between cards (Q6). |
-| S10B-08 | **Live canvases and the miniature.** On a live canvas with both table cards, the line is drawn. The miniature's line count is the same with and without source relationships. |
+| S10B-05 | **Collapsed frames.** With either table's card in a collapsed frame there is no line, and no bundle's count changes. With an unrelated frame collapsed, the line is still drawn. |
+| S10B-06 | **Clicks and hover.** A click on the line selects `order_line` without moving the view; its panel shows in the details panel, and a hidden details panel stays hidden. Back returns to what was selected before. A click inside a loop's empty area selects nothing. Hover thickens the line. A right-click opens the empty canvas's toolbox, not a line menu. Delete with the line hovered removes nothing; after a click, Delete is the card's own (nothing on an ordinary canvas). A reviewer sees the same lines. |
+| S10B-07 | **Focus.** Focus on an entity whose mappings read both `order_line` and `order_header` lights the line. Focus on `order_line` alone lights only that table and fades the line. |
+| S10B-08 | **Live canvases and the miniature.** On a live canvas with both table cards, the line is drawn, context cards included, and never faded. The miniature draws its relationship lines as before and none for a source relationship. |
 | S10B-09 | **Following the card.** The line follows a card move, a width change and a collapsed card. |
 | S10B-10 | **Performance** (section 6): the element guard's changes are exactly the seeded lines; no new drawing layer; the A/B sitting within its bars; the lines' own cost within its bar. |
 | S10B-11 | CI and the runs of the test regime; changed earlier tests listed with the reason. |
@@ -120,18 +121,18 @@ The lines are a new kind in the existing SVG line layer. Bars are proposals to c
 
 | What | How | Bar |
 | --- | --- | --- |
-| Viewport elements on a canvas page | `S3B-15-elements.spec.ts` with `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json` (slice 9 and 10a matched it) | equal where no seeded source relationship is drawn; where one is, the difference is exactly its lines' elements, explained per view (Q3) |
+| Viewport elements on a canvas page | `S3B-15-elements.spec.ts` with `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json` (slice 9 and 10a matched it) | equal in all four views: "Performance test" has no source relationship (step 1, F5) |
 | Drawing layers | the LayerTree read (as `S10A-12-loops.spec.ts`) on a copy of "Performance test" with 20 source relationships in view, against none | no drawing layer more |
-| Pan and zoom, first render | `npm run measure:canvas -- --to-screen --only pan,c08 --no-build --against slice-10a`, one discarded warm-up run, then `--rounds 2`, balanced | within the sitting's run-to-run spread |
-| The lines' own cost | on the branch only, the same view of a copy of "Performance test", pan and zoom as presented frames: 20 source relationships against 20 ordinary relationships on cards in the same view, written into the e2e data file in the measuring spec only | within 2 % |
+| Pan and zoom, first render | `npm run measure:canvas -- --to-screen --only pan,c08 --no-build --against slice-10a`, one discarded warm-up run, then `--rounds 2`, balanced (a short sitting, as slice 10a's: it measures only the empty path) | within the sitting's run-to-run spread |
+| The lines' own cost | on the branch only, the same view of a copy of "Performance test", pan and zoom as presented frames: 20 source relationships against 20 ordinary relationships on cards in the same view, written through the local adapter into the e2e data file in the measuring spec only (step 1, answer 6) | within 2 % |
 
 **Nothing above the canvas reads layout during a commit** (CLAUDE.md): this slice adds no element above or beside the canvas.
 
 **New elements on the canvas (AD-24):**
-- One visible path and one hit target per line, like a relationship line, with no marks of its own.
-- The arrow is a shared marker definition (Q2): one element per canvas, not per line.
+- Four elements per line: its group, one hit target, one visible path and one arrow path; no cardinality marks.
+- The arrow is one path per line, like a relationship's end marks (step 1, answer 1).
 - A dashed line is a CSS class, not an element.
-- Lit lines in Focus are drawn in the overlay with the same geometry (`RelPath`).
+- Lit lines in Focus are drawn in the overlay with the same geometry (`SourcePath`, `relGeom`).
 
 **If a difference of a few milliseconds has to be judged,** compare phase traces, not medians (slice 6a).
 
@@ -176,11 +177,11 @@ The lines are a new kind in the existing SVG line layer. Bars are proposals to c
 
 ### D-62 (proposal) Relationships between source tables on the canvas
 
-"A foreign key between source tables (from an import) is drawn on a canvas when the cards of both tables are on it: a grey line between the cards, thinner than a relationship between entities, with an arrow at the referenced table and no cardinality marks or label. A key from a table to itself is drawn as the loop of D-61. A relationship the source no longer declares is dashed. Source relationships are read-only: the line has no menu, and a click on it selects the table with the key. They show in the layers Everything and Relationships, are left out when either card is in a collapsed frame (never in a bundle), and the miniature leaves them out."
+"A foreign key between source tables (from an import) is drawn on a canvas when the cards of both tables are on it: a grey line between the cards, lighter and thinner than a relationship between entities, with a small arrow at the referenced table (its own path, so it fades with the line) and no cardinality marks or label. A key from a table to itself is drawn as the loop of D-61. A relationship the source no longer declares is dashed. Source relationships are read-only: the line has no menu (a right-click opens the canvas's toolbox), and a click on it selects the table with the key, as a click on its card does. They show in the layers Everything and Relationships, are left out when either card is in a collapsed frame (never in a bundle), are lit under Focus and in the Changes view when both cards are lit, and the miniature leaves them out."
 
 **Options chosen by Łukasz on 30 October 2026:**
 - **A. Where it ends:** between the table cards, not on column rows.
-- **B. End marks:** an arrow at the referenced table, no cardinality.
+- **B. End marks:** an arrow at the referenced table (one path per line), no cardinality.
 - **C. Layers:** Everything and Relationships, no new switch.
 - **D. A click:** selects the table with the key; no new history place.
 - **E. Label:** none.

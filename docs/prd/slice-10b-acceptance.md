@@ -1,6 +1,6 @@
 # Slice 10b – acceptance
 
-Status: **step 1 (critical review) done, 30 October 2026; waiting for Łukasz's answers before step 2.**
+Status: **step 1 answered (Łukasz, 30 October 2026; "Łukasz's answers" below); step 2 next.**
 
 - Tag `slice-10a` and `origin/main` are at `82f8e0d`, as A1 says. The local `main` was still at `84ff767` (slice 9); it was not moved. Branch `slice/10b-source-relationship-lines` was made from the tag.
 - The PRD is copied unchanged from `~/Downloads/slice-10b-source-relationship-lines.md` (19,340 bytes, 30 October 2026; the only file with that name). Commit "docs: slice 10b PRD".
@@ -166,3 +166,17 @@ None needed. One optional text (question 7): in the import review, a new relatio
 6. **The measurement (F16):** 20 source relationships written through the local adapter in the spec only, and a short A/B sitting (`pan,c08`)?
 7. **The review's text:** leave it empty for a new relationship, or "Drawn as a grey line between the table cards on a canvas"?
 8. **Look (F9, F10):** `--im-ink-3`, 1.2 px wide (relationships 1.6)?
+
+## Łukasz's answers (30 October 2026)
+
+1. **The arrow (F4):** one arrow path per line, not a shared marker. It matches how relationships draw their own end marks, fades with its line and works above the Focus veil with no special cases. The cost of one element per line is accepted. Item 2, section 6 and D-62's text are corrected.
+2. **Focus and the Changes view (F6):** a line is lit only when both of its cards are lit, in both. No domain change. S10B-07 has a case where both tables are lit (Focus on an entity whose mappings read both) and a case where only one is.
+3. **Click and Delete (F7):** accepted. A click selects the table with the key; its panel shows only where the details panel is shown (D-54). Delete after the click is the card's own Delete (D-11 on a live canvas). S10B-06 is reworded.
+4. **Right-click (F8):** the empty canvas's toolbox, no code.
+5. **The seed (F13):** kept as it is (A4). The manual acceptance on KB shows the lines better.
+6. **The measurement (F16):** 20 relationships written through the local adapter into the e2e data file, in the measuring spec only; the short A/B sitting (`pan`, `c08`), as in slice 10a. The lines' own cost is kept against 20 ordinary relationships.
+7. **The import review:** no new text.
+8. **The look (F9, F10):** `--im-ink-3`, 1.2 px. Łukasz confirms it with step 3's screenshots, in both notations and in dark mode (the app has one: `globals.css`, `prefers-color-scheme: dark`).
+9. **F2, F3, F19:** accepted. F3 gets a unit test and a case in S10B-05 with an unrelated frame collapsed.
+
+With one arrow path per line, a source line has four elements (the group, the hit path, the path, the arrow). The element guard's expected difference from `slice-08.json` stays zero in all four views (F5): "Performance test" has no source relationship.
