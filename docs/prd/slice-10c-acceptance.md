@@ -426,3 +426,122 @@ step and `readDb`'s write-back. Nothing edited the file by hand.
 
 **F20, the size growth:** 32 bytes per attribute, 4.9 % of the attributes' stored data on "Performance test" (above);
 on KB 3,777 bytes, 0.26 % of the file. No measurement is planned.
+
+## Step 3: the domain (30 October 2026)
+
+No interface yet. Commands, rules, two server actions and unit tests.
+
+**The rule in one place: `src/domain/model/copies.ts`.**
+- `FOLLOWED_COLUMNS`: `data_type`, `custom_type`, `type_length`, `type_precision`, `type_scale`, `is_pii`.
+- `followOriginals(ctx, current attributes, writes)`:
+  - It brings in step every live attribute that the writes write, and every live copy below them.
+  - Each takes its own original's followed fields when that original is live after the writes. An original is settled
+    before its copies, so a value reaches copies of copies through the chain.
+  - A copy whose original is deleted keeps its values.
+  - A copy the writes already write gets the fields in that write; it is never written twice. Any other copy gets an
+    update of its own, with its version + 1.
+  - It returns the writes and `followers`: the copies only following wrote.
+  - A visited set and an "in progress" set end any loop (F17); a unit test makes a loop by hand.
+  - It also brings a **written copy** in step with its live original. That covers the redo of a paste and the undo of
+    "Stop following" after the original changed (F1 (c), (d)).
+- `liveCopiesOf` (direct copies: what a delete asks about) and `copiesBelow` (every copy below: the rows a save holds in
+  the browser's chain, F4).
+- Names: `attributePath` (live, or deleted from `lostOriginals`), `pathsOf` (by entity, then attribute), `namedList`
+  (five, then "and n more"), `copiesStopFollowing` (F7's part of the second click).
+
+**Commands** (`src/domain/commands/attribute.ts`):
+- **`pasteAttribute`** (input `{ entityId, attributeId }`; state `{ entity, original, attributes }`):
+  - permission `model.edit`, so role and archive are checked;
+  - one insert, last on the entity, with the fields of item 5;
+  - `is_foreign_key` is the original's `is_primary_key`; the link points to the attribute copied, a copy or not;
+  - the same entity is allowed;
+  - it answers `{ attributeId, nameTaken }` (F12: a live attribute of that name in the entity, case ignored);
+  - a deleted original is refused as `not_found` with "The copied attribute no longer exists.".
+- **`updateAttribute`:**
+  - **Following:** a change of a followed field calls `followOriginals`, so the copies are written in the same change
+    group. The write set's `followers` lists them.
+  - **The refusal (F5):** a patch that would change a followed field is refused while the attribute has a link, whether
+    its original is live or deleted. A type patch that changes nothing is "Nothing to change.", not a refusal.
+  - **`stopFollowing: true`:** clears the link, live original or deleted, in one change group. With no link it is
+    "Nothing to change.".
+  - **The state:** gains `attributes`, `entities` and `lostOriginals`, all optional, so existing callers keep working.
+- **Undo and redo** (`revertChangeGroup`) call `followOriginals` on the workspace's attributes, deleted ones included,
+  after the consistency checks. Undo of an original's delete writes no copy, because the copies kept its values (F2).
+
+**The working context (F3):**
+- `WriteSet.followers` (`src/domain/changes.ts`) lists the copies only following wrote.
+- `contextTargets` (`src/domain/model/live.ts`) leaves them out. Its two callers pass the list:
+  `completeLiveWrites` (`src/domain/commands/live.ts`) and `withLiveCanvases` (`src/app/_lib/run-command.ts`).
+- Undo and redo never label (`revert`), as before.
+
+**Impacts and names:**
+- `attributeCopiesImpact(attributes, entities, id)` (`impact.ts`) lists an attribute's live copies, as
+  "{entity}.{attribute}", for F7's second click. Step 4 reads it from the page's model; no server read is needed.
+- `EntityImpact.copies` (F8) lists the live copies in other entities of the entity's attributes; copies in the entity
+  itself go with it. `entityImpactAction` already passes the entities.
+- `copiesImpactRow` words D-47's row; with no copies there is no row.
+- `WorkspaceModel.lostOriginals` and the `LostOriginal` type (`src/domain/types.ts`) give `{ id, name, entityName }` for
+  each deleted original a live copy points to. The local adapter's `model.load` builds the list in one pass over the
+  workspace's attributes (`lostOriginals` in `src/data/local/store.ts`).
+
+**Server actions** (`src/app/_actions/model.ts`):
+- `pasteAttributeAction(workspaceId, { entityId, attributeId })`.
+- `updateAttributeAction` passes the attributes, entities and lost originals, and answers with `{ versions: true }`, so
+  every written version reaches `rowSaves.answer` (F4). The browser side of F4 (`saveRows` with `copiesBelow` held) is
+  step 4.
+
+**Tests:**
+- `src/domain/model/copies.test.ts` (new, 8 tests):
+  - copies of copies, a deleted copy not written, Personal data;
+  - a copy already in the writes, a written copy pulled in step, a deleted original followed by nothing;
+  - the loop guard, the lists and the texts.
+- `attribute.test.ts` (+11):
+  - paste: a primary key into another entity, a non-key, the same entity with `nameTaken` (case ignored), a copy of a
+    copy;
+  - paste's refusals: a deleted original, an unknown entity, a reviewer, an archived workspace;
+  - following with one change group and every version;
+  - Personal data;
+  - the context labels the original only (F3);
+  - the refusals on a copy and a copy of a copy, its own fields free, a lost copy's refusal;
+  - Stop following: live and lost, then its own copy follows it; nothing to stop; a reviewer refused.
+- `undo.test.ts` (+6, F1, S10C-13):
+  - undo and redo of a type change made before a paste;
+  - undo of a type change after a second paste;
+  - redo of a paste after a type change;
+  - undo of Stop following after a type change;
+  - undo of an original's delete with no write on the copy;
+  - undo of Stop following on a lost copy.
+- `impact.test.ts` (+3): the attribute's copies, the entity's copies elsewhere, D-47's row with five named.
+- `model-store.test.ts` (+2):
+  - `lostOriginals`: one deleted original named; a deleted original whose copy is deleted too is not; none elsewhere;
+  - a paste, a followed type change and its undo through the local adapter.
+- `entity.test.ts`: the expected impact gains `copies: []` (an object compared whole).
+- The test models (9 files) gain `lostOriginals: []`.
+
+**Runs:**
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm test`: 112 files, 1,469 tests, passed.
+- **The earlier specs:** S1B-08, S1B-13, D-47's preview (S1A-10, S10A-11), S3A-12 (deleting an entity) and S10A-04
+  (deletes on the save chain): 19 tests, all passed, in 6 min 24 s.
+- KB's file was not touched: the same size and time as after its upgrade (16:16:51).
+
+### New user-visible texts (for approval)
+
+| Where | Text |
+| --- | --- |
+| Paste refused, the original gone | "The copied attribute no longer exists." |
+| A followed field on a copy | "This attribute follows {entity}.{attribute}. Use “Stop following” to change it." |
+| The same, original deleted | "This attribute was copied from {entity}.{attribute}, which was deleted. Use “Stop following” to change it." |
+| Either, if the original's names are unknown | "{entity}.{attribute}" becomes "its original" |
+| Stop following on an attribute that is no copy | "Nothing to change." (existing text) |
+| The paste's name note (from `nameTaken`, for step 4's toast) | "Pasted “{attribute}” into {entity}, which has another attribute of that name. Type its name now." (without a clash: "Pasted “{attribute}” into {entity}. Type its name now.") |
+| F7's second click, its copies' part | "this copy stops following it: Order.customer_id" / "these copies stop following it: Order.customer_id, Invoice.customer_id", five named, then "and n more" |
+| D-47's row | "1 copy" — "loses its original: …"; "n copies" — "lose their original: …"; five named, then "and n more" |
+| The undo history | unchanged words: a paste is "Create attribute", Stop following and a followed change "Change attribute" (F22) |
+
+**Assumptions:**
+- `updateAttributeAction` answers with versions on every save, not only on followed fields. It costs one small map per
+  answer, and the browser needs no second kind of save.
+- A refusal of a followed field has the code `invalid`. It does not cut the saves waiting behind it (`CUTS`), as a
+  validation refusal never does.
