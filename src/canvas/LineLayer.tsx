@@ -468,7 +468,8 @@ function LineLayer({
   return (
     <EdgeLabelRenderer>
       <svg className={`line-layer${related ? " dimmed" : ""}`} width={1} height={1} data-testid="layer-lines">
-        <g>{sources}</g>
+        {/* only with a source line: an empty group would be one more element in every canvas's viewport (S10B-10) */}
+        {sources.length > 0 && <g>{sources}</g>}
         <g>{rels}</g>
         <g>{maps}</g>
         <g>{bundled}</g>
