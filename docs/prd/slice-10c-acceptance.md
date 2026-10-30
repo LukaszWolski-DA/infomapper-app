@@ -328,7 +328,7 @@ The armed button (panel) and the armed menu item (row's menu) read the same:
 - Read from the backup, not from KB's file: format 9, 118 attributes (117 live), 771 change events.
 - Both backups are local only (`.data/` is git-ignored).
 
-**KB is not upgraded.** `.data/dev-db.json` has the same SHA-256 after every run of this step. It waits for Łukasz's go.
+**KB is not upgraded** by the build and the runs: `.data/dev-db.json` kept the same SHA-256 through all of them. It was upgraded afterwards, on Łukasz's go (below).
 
 **Built:**
 - **The migration** `supabase/migrations/20261030160000_attribute_copied_from.sql`:
@@ -392,3 +392,37 @@ changes only its format assertion (above).
 - KB's upgrade.
 - `docs/data-model-v2.md` (closing docs, PRD section 10).
 - The commands: paste, following, Stop following (step 3).
+
+### KB's upgrade (Łukasz's go, 30 October 2026)
+
+**How:** through the app's own path. A one-off `tsx` call of `readDb(devDbPath())` (not committed) ran the format 10
+step and `readDb`'s write-back. Nothing edited the file by hand.
+
+| | Before | After |
+| --- | --- | --- |
+| Format | 9 | 10 |
+| Attributes | 118 (117 live) | 118 (117 live) |
+| Change events | 771 | 771 |
+| File size | 1,429,705 bytes | 1,433,482 bytes (+3,777) |
+| Attributes with `copied_from_attribute_id` | 0 | 118, every one null |
+
+- **The checks:**
+  - Every table's row count is the same.
+  - The file equals the backup in every byte of content apart from the format and the new key on each attribute
+    (compared as JSON).
+  - The 3,777 bytes are 118 × 32 bytes for `"copied_from_attribute_id":null,` and one for the format "9" → "10".
+- **No log line**, as expected. Nothing differed from the expectation, so the backup was not restored. It is unchanged
+  (SHA-256 `a81d91a0…`).
+- **The app on KB:**
+  - `npm run dev` on `.data/dev-db.json` (launch configuration `infomapper-dev`).
+  - Signed in through the test users' list as Lukasz_KB.
+  - Opened Kanton Basel's home, "First project" and its canvas LDM.
+  - The canvas showed its 8 cards in the Building frame with their lines, at its remembered view (19 %). The status bar
+    read 49 attributes on the canvas.
+  - The browser console had no errors. The server's log had only `200` answers, no error or warning, and no upgrade
+    line (the file was at format 10 already).
+  - The server was stopped afterwards. KB's file was the same after the session (size and counts; nothing writes on
+    sign-in or reading).
+
+**F20, the size growth:** 32 bytes per attribute, 4.9 % of the attributes' stored data on "Performance test" (above);
+on KB 3,777 bytes, 0.26 % of the file. No measurement is planned.
