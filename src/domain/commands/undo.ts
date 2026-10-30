@@ -71,6 +71,7 @@ type AnyRow = RowImage;
 const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, UndoableTable])[]>> = {
   project_canvas: [["project_id", "project"], ["canvas_id", "canvas"]],
   entity: [["concept_id", "concept"]],
+  // not `copied_from_attribute_id` (slice 10c, F9): a copy keeps a deleted original as its lost reference
   attribute: [["entity_id", "entity"]],
   relationship: [["from_entity_id", "entity"], ["to_entity_id", "entity"]],
   source_table: [["source_system_id", "source_system"]],
@@ -266,7 +267,10 @@ export function revertChangeGroup(
 
     if (!current || !e.after_image || !unchangedSince(table, current, e.after_image)) return fail(refused());
     const base = e.before_image ?? { ...current, deleted_at: ctx.now };
-    const row: AnyRow = { ...structuredClone(base), version: (current.version as number) + 1, updated_at: ctx.now, updated_by: ctx.actorId };
+    // a column added to the table after the step was recorded is absent from the image: written as null, never left out
+    // of the row (slice 10c, F10)
+    const added = Object.fromEntries(Object.keys(current).filter((k) => !(k in base)).map((k) => [k, null]));
+    const row: AnyRow = { ...added, ...structuredClone(base), version: (current.version as number) + 1, updated_at: ctx.now, updated_by: ctx.actorId };
     if (table === "canvas") row.look = structuredClone(current.look);
     writes.push({ kind: "update", table, before: current, row } as unknown as Write);
     rows.set(key, row);

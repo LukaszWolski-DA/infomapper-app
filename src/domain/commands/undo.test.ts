@@ -31,7 +31,7 @@ import {
 import { buildWriteSet, type CommandResult, type WriteSet } from "../changes";
 import type { WorkspaceAccess } from "../permissions";
 import type { Canvas, CanvasItem, ChangeEvent, WorkspaceRole } from "../types";
-import { createAttributeFromColumn, deleteAttribute, reorderAttribute } from "./attribute";
+import { addAttribute, createAttributeFromColumn, deleteAttribute, reorderAttribute, updateAttribute } from "./attribute";
 import { deleteCanvas, duplicateCanvas, renameCanvas, setCanvasLook } from "./canvas";
 import { removeFromCanvas } from "./canvas-item";
 import { moveOnCanvas } from "./frame";
@@ -713,5 +713,65 @@ describe("classifications (slice 7c): each change is one undo step", () => {
       ok: false,
       error: { code: "conflict", message: CLASSIFICATION_NAME_CLASH("Hash candidate") },
     });
+  });
+});
+
+describe("copies of attributes (slice 10c)", () => {
+  /** The images as a change event recorded before format 10 holds them: without `copied_from_attribute_id`. */
+  const beforeFormat10 = (events: readonly ChangeEvent[]): ChangeEvent[] =>
+    events.map((e) => {
+      const strip = (image: ChangeEvent["before_image"]) => image && Object.fromEntries(Object.entries(image).filter(([k]) => k !== "copied_from_attribute_id"));
+      return { ...e, before_image: strip(e.before_image), after_image: strip(e.after_image) } as ChangeEvent;
+    });
+
+  it("writes a column an older event's image lacks as null, on an undone edit and on a restored delete (F10)", () => {
+    const rows = seed();
+    const renamed = ok(updateAttribute(ctx, modeler, { attribute: find(rows, "attribute", ids.email) as never }, { attributeId: ids.email, expectedVersion: 1, name: "e_mail" }));
+    const afterRename = apply(rows, renamed);
+    const undone = revertChangeGroup(makeCtx(), modeler, { events: beforeFormat10(renamed.events), rows: afterRename }, "undo");
+    if (!undone.ok) throw new Error(undone.error.message);
+    const row = find(apply(afterRename, undone.writeSet), "attribute", ids.email);
+    expect(row).toMatchObject({ name: "email", copied_from_attribute_id: null });
+    expect("copied_from_attribute_id" in row).toBe(true);
+
+    const deleted = ok(deleteAttribute(ctx, modeler, { attribute: find(rows, "attribute", ids.email) as never, mappings: [], mappingInputs: [] }, { attributeId: ids.email, expectedVersion: 1 }));
+    const afterDelete = apply(rows, deleted);
+    const restored = revertChangeGroup(makeCtx(), modeler, { events: beforeFormat10(deleted.events), rows: afterDelete }, "undo");
+    if (!restored.ok) throw new Error(restored.error.message);
+    const back = find(apply(afterDelete, restored.writeSet), "attribute", ids.email);
+    expect(back).toMatchObject({ deleted_at: null, copied_from_attribute_id: null });
+    expect("copied_from_attribute_id" in back).toBe(true);
+  });
+
+  it("keeps a recorded link: an undone edit of a copy writes its link back", () => {
+    const rows = seed();
+    rows.attribute = rows.attribute.map((a) => (a.id === ids.email ? { ...a, copied_from_attribute_id: ids.customerId } : a));
+    const { afterUndo, undone } = doAndUndo(rows, (r) => ok(updateAttribute(ctx, modeler, { attribute: find(r, "attribute", ids.email) as never }, { attributeId: ids.email, expectedVersion: 1, name: "e_mail" })));
+    expect(undone.ok).toBe(true);
+    expect(find(afterUndo, "attribute", ids.email)).toMatchObject({ name: "email", copied_from_attribute_id: ids.customerId });
+  });
+
+  it("is no parent link (F9): a copy comes back while its original is deleted, and an original goes while copies point to it", () => {
+    // Customer.email is a copy of Customer.customer_id; the original is deleted, then the copy
+    const rows = seed();
+    rows.attribute = rows.attribute.map((a) => (a.id === ids.email ? { ...a, copied_from_attribute_id: ids.customerId } : a));
+    const original = ok(deleteAttribute(ctx, modeler, { attribute: find(rows, "attribute", ids.customerId) as never, mappings: [], mappingInputs: [] }, { attributeId: ids.customerId, expectedVersion: 1 }));
+    const afterOriginal = apply(rows, original);
+    const copy = ok(deleteAttribute(ctx, modeler, { attribute: find(afterOriginal, "attribute", ids.email) as never, mappings: rows.mapping, mappingInputs: rows.mapping_input }, { attributeId: ids.email, expectedVersion: 1 }));
+    const afterCopy = apply(afterOriginal, copy);
+    const back = revertChangeGroup(makeCtx(), modeler, { events: copy.events, rows: afterCopy }, "undo");
+    if (!back.ok) throw new Error(back.error.message);
+    expect(find(apply(afterCopy, back.writeSet), "attribute", ids.email)).toMatchObject({ deleted_at: null, copied_from_attribute_id: ids.customerId });
+
+    // a new attribute that a copy points to: undoing its creation deletes it, and the copy keeps its lost reference
+    const added = ok(addAttribute(ctx, modeler, { entity: find(rows, "entity", ids.salesOrder) as never, attributes: rows.attribute }, { entityId: ids.salesOrder }));
+    const addedId = insertedId(added);
+    const afterAdd = apply(rows, added);
+    afterAdd.attribute = afterAdd.attribute.map((a) => (a.id === ids.orderId ? { ...a, copied_from_attribute_id: addedId } : a));
+    const undone = revertChangeGroup(makeCtx(), modeler, { events: added.events, rows: afterAdd }, "undo");
+    if (!undone.ok) throw new Error(undone.error.message);
+    const after = apply(afterAdd, undone.writeSet);
+    expect(find(after, "attribute", addedId).deleted_at).toBe(NOW);
+    expect(find(after, "attribute", ids.orderId)).toMatchObject({ deleted_at: null, copied_from_attribute_id: addedId });
   });
 });
