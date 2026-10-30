@@ -1,6 +1,6 @@
 # Slice 10a – acceptance
 
-Status: **step 1 answered (29 October 2026); step 2a next.** Łukasz's answers are at the end of this file.
+Status: **manual acceptance passed (Łukasz, 30 October 2026); merged as PR 25, tag `slice-10a`.** Steps 1 to 6 and Łukasz's answers to each are below.
 
 - `main` was at `84ff767` (tag `slice-09`), as A1 says. Branch `slice/10a-save-chain-self-relationship` was made from that tag.
 - The PRD is copied unchanged from `~/Downloads/slice-10a-save-chain-self-relationship.md` (33,348 bytes, 29 October 2026; the only file with that name). Commit "docs: slice 10a PRD".
@@ -711,3 +711,7 @@ It goes into `docs/decisions.md` once approved.
   appear; the server's log shows "The destination stream closed early."). Run three times on its own, it passed each time
   (48.0, 38.1, 39.5 s): a flake, not a bug, in a slice 9 spec that this slice does not touch.
 - **CI:** `npm run lint` clean, `npm run typecheck` clean, `npm test` 109 files, 1,422 tests passed.
+
+## Manual acceptance (30 October 2026)
+
+Łukasz ran the manual acceptance scenario (PRD section 5, updated for the decisions since step 1) on his KB model, after the backup `.data/backups/dev-db-20261030-0823.json`. **It passed.**
