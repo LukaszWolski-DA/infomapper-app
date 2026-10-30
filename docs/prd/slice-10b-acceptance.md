@@ -204,3 +204,45 @@ Items 1–6, 9, 11 and 12, as the answers set them.
 - The arrow's size (7 × 7 px) is mine; step 3's screenshots show it.
 
 **How to check:** run `npx playwright test e2e/slice-10b`. In the app, open "Customer & orders": a grey line runs from order_line's left edge to order_header's right edge, with the arrow at order_header (mostly behind the Order and Line cards, F13). Switch to Maps to hide it, and collapse the frame around the tables to remove it.
+
+## Łukasz's answers to step 2 (30 October 2026)
+
+Accepted, with the assumptions: the small ERP import file with `FK_employees_manager` and `FK_employees_mentor`, source lines painting below the other lines, and a missing key dashed with a solid arrow. Łukasz judges the arrow's size on step 3's screenshots.
+
+## Step 3: interaction and screenshots (30 October 2026)
+
+Items 7, 8 and 10.
+
+- **Click (F7):** `SourcePath`'s group calls `select({ t: "card", id: fromCardId })`, as a click on the card does. The selection is a card's: its D-38 place, the view does not move, and its panel shows only where the details panel is shown (D-54). After the click, Delete is the card's own (nothing on an ordinary canvas; D-11's question on a live one). A click inside a loop's empty area goes to the pane and selects nothing, because the hit path takes the stroke only.
+- **Hover:** the existing `.lnk:hover .s` (1.2 → 2.6 px). **Right-click (F8):** the empty canvas's toolbox; no code.
+- **Focus and the Changes view (F6):** `litSources` (`fade-canvas.tsx`) returns the source lines whose two cards are lit (`isLitCard`). `FadeLayer` passes them to `LitLines`, which draws them again above the veil with `SourcePath` (test id `lit-source`), arrow included. No domain change. The Changes view uses the same path, so its lit set of tables lights a line with both tables and fades it with one.
+- **Live canvases (F11):** no code. `buildLines` gets every card of a live canvas, context cards included, and never fades a source line.
+
+**Tests:**
+- Unit: `fade-canvas.test.ts` + 1 (`litSources`: both cards lit, one, a key to itself, none). `npm test`: 110 files, 1,432 tests.
+- e2e: S10B-06 (3 tests: click, view, Back, hover, Delete hovered and after the click, right-click, the hidden details panel; inside a loop; a reviewer), S10B-07 (2: Focus on Order Line, whose mappings read both tables as test data, then on order_line alone; the Changes view's lit set with both and with one), S10B-08 (2: a live canvas with a labeled table and a context card; the miniature). All pass.
+- Earlier specs (slices 2c, 4b-1, 10a, all of 10b, S7A-10, S7B-14, S7B-15): 105 passed and 1 failed in 12.0 min. The failure was S10B-09, which passed three times on its own: a race in the spec, not the app. It wrote the card width as test data while the page's save of the drag before it was still on its way, so the page's save won. The spec now waits until the drag's save is in the data and the page has settled before the drag. It then passed 4 times out of 4.
+- Slice 7a has no spec on the table panel's relationship list; S7A-10 is the one that opens table panels. S7B-16-changes is a measuring spec, outside the normal run.
+- CI: lint and typecheck pass.
+
+**Screenshots** (`docs/prd/slice-10b-screens/step-3/`, `SCREENS=step-3 npx playwright test e2e/slice-10b/S10B-screens.spec.ts`; "Order lines & products", with order_header placed left of order_line, and an HR import below):
+
+| File | What |
+| --- | --- |
+| `line-100-ie.png`, `line-100-uml.png` | the seeded key at 100 %: the line to order_header's right edge, its arrow there; the same in both notations |
+| `line-30-ie.png`, `line-30-uml.png` | the same at 30 % (the HR keys at the bottom) |
+| `keys-missing-loops.png` | employees: two keys to itself (nested loops, arrows on the top edge); two keys to departments, the second missing (dashed, solid arrow); one back from departments |
+| `hover.png` | the line hovered (2.6 px) |
+| `focus-both-lit.png` | Focus on Order Line: both tables lit, the line drawn above the veil |
+| `focus-one-lit.png` | Focus on order_line: order_header faded, the line under the veil |
+| `mapping-selected.png` | a mapping selected: the other lines fade, the source line's arrow with it |
+| `*-dark.png` | dark mode (`prefers-color-scheme`): `line-100-*`, `line-30-*`, `keys-missing-loops` |
+
+**What the screenshots show:**
+- The arrow is 7 px long and 7 px wide. At 30 % it is still readable as an arrow.
+- The prototype draws nothing to compare against (section 8).
+- In `keys-missing-loops.png` the import marked `emp_id` and `dept_id` as Business keys (slice 7c's suggestion from the primary key). That is not this slice.
+
+### D-62 (final text, for Łukasz's approval)
+
+"**D-62** Relationships between source tables on the canvas (slice 10b). A foreign key between source tables, from an import, is drawn on a canvas when the cards of both tables are on it. It is a grey line between the cards, lighter and thinner than a relationship between entities, anchored as relationships are. It has a small arrow at the referenced table, as its own path so it fades with its line, and no cardinality marks or label. Source lines paint below the other lines. Several keys between the same two tables are drawn 16 px apart. A key from a table to itself is drawn as the loop of D-61, its arrow on the top edge. A relationship the source no longer declares is dashed, and its arrow stays solid. Source relationships are read-only: the line has no menu (a right-click opens the canvas's toolbox), and a click on it selects the table with the key, as a click on its card does. They show in the layers Everything and Relationships. They are left out when either card is in a collapsed frame: never in a bundle, never counted. Under Focus and in the Changes view a line is lit when both of its cards are lit, and fades otherwise. On a live canvas a line is drawn between any two of its table cards, context cards included. The miniature leaves them out. Accepted by Łukasz, {date}."
