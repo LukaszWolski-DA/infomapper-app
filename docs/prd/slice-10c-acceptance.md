@@ -318,3 +318,77 @@ The armed button (panel) and the armed menu item (row's menu) read the same:
   (`IMPACT_KEYS_SHOWN`, `requirementsImpactRow`). Example: "…: A.x, B.x, C.x, D.x, E.x and 3 more".
 - **The toast after the delete** counts only: "Attribute deleted together with 2 mappings. 2 copies no longer follow
   it." (one: "1 copy no longer follows it").
+
+## Step 2: data (30 October 2026)
+
+**The backup, before anything opened the local file:**
+- `.data/backups/dev-db-20261030-1554-before-format-10.json`, 1,429,705 bytes, byte-identical to `.data/dev-db.json`
+  (`cmp`; SHA-256 `a81d91a0…`).
+- `.data/backups/kb-model-latest.json` was updated to the same copy.
+- Read from the backup, not from KB's file: format 9, 118 attributes (117 live), 771 change events.
+- Both backups are local only (`.data/` is git-ignored).
+
+**KB is not upgraded.** `.data/dev-db.json` has the same SHA-256 after every run of this step. It waits for Łukasz's go.
+
+**Built:**
+- **The migration** `supabase/migrations/20261030160000_attribute_copied_from.sql`:
+  - `copied_from_attribute_id uuid references attribute (id)`, nullable, with no `on delete` clause (Q5);
+  - an index `attribute_copied_from_ix`, as every other foreign key of `attribute` has one.
+- **The domain type:** `Attribute.copied_from_attribute_id: Uuid | null` (`src/domain/types.ts`).
+  - Every place that builds an attribute row sets it to null: `addAttribute`, `createAttributeFromColumn`, both seeds,
+    `requirement-index-synthetic.ts`, the two fixtures and `import.test.ts`.
+- **The local adapter's rule:** `copied_from_attribute_id: "attribute"` in `RULES.attribute.foreignKeys`
+  (`src/data/local/schema.ts`). It accepts a deleted original and refuses an unknown id (F9).
+- **Format 10** (`DEV_DB_FORMAT = 10`):
+  - an inline step in `upgradeDb` (`src/data/local/file.ts`): `copied_from_attribute_id ??= null` on every attribute;
+  - no change events and no log line;
+  - format 9's step now ends at 9 and the new step at `DEV_DB_FORMAT`;
+  - `readDb`'s write-back condition is `was < DEV_DB_FORMAT` (F11).
+- **Undo** (`revertChangeGroup`, `src/domain/commands/undo.ts`):
+  - a column of the current row that the image lacks is written as null (F10);
+  - `PARENTS` is unchanged, with a comment saying why the link is not in it (F9).
+
+**Tests:**
+- `src/data/local/upgrade-10.test.ts` (new, 4 tests):
+  - a format-9 file gets the column as null on every attribute;
+  - nothing else changes, every table's count is kept, and there is no change event and no log line;
+  - the file is written back at once;
+  - a format-10 file with a link is read as it is and not written again;
+  - the adapter's FK accepts a deleted original and refuses an unknown id.
+- `undo.test.ts` (3 new tests):
+  - F10 on an undone edit and on a restored delete, with the images an event recorded before format 10 holds. The test
+    fails without the fix (checked).
+  - A copy's recorded link comes back on undo.
+  - F9: a copy comes back while its original is deleted, and undoing an original's creation is allowed while a copy
+    points to it.
+- The current format in the earlier tests' assertions moves from 9 to 10, as slice 8 moved it from 8 to 9:
+  - `organization-store.test.ts`, `requirement-store.test.ts`, `upgrade-8.test.ts`, `working-layer-store.test.ts`;
+  - `e2e/slice-07b/S7B-12.spec.ts` and `e2e/slice-07c/S7C-02.spec.ts`, which read the e2e file's format after an
+    upgrade.
+
+**A correction to F18:** `S7C-02.spec.ts` builds source column rows, not attribute rows, so it needs no new field. It
+changes only its format assertion (above).
+
+**Runs:**
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm test`: 111 files, 1,439 tests, passed.
+- **The AD-31 schema check** passed on a local Postgres 18.3 in the scratchpad, made with
+  `initdb -E UTF8 --locale=C` and deleted afterwards. CI uses 17.
+  - Result: "The schema matches the domain: 33 tables, 440 columns". The new column is `uuid`, nullable, with
+    `FOREIGN KEY (copied_from_attribute_id) REFERENCES attribute(id)`.
+  - A cluster in the Windows default encoding (WIN1252) cannot apply the earlier migrations (they contain "Ł"), hence
+    `-E UTF8`.
+- **e2e, what the step touched:** `S7B-12` and `S7C-02`, the specs that upgrade an older e2e file. Both passed, 57 s.
+
+**F20's size, measured on a scratch file:** `npm run seed` and `npm run seed:large` into a scratch file, with
+`INFOMAPPER_DEV_DB` set; it was deleted afterwards.
+- The file is created at format 10.
+- "Performance test" has 779 live attributes. Their JSON grows by 24,928 bytes, 32 bytes per attribute: 4.9 % of the
+  attributes' JSON, uncompressed.
+- This is the data, not the page's payload; step 4 can read the page itself if Łukasz wants.
+
+**Not done in this step, as the brief says:**
+- KB's upgrade.
+- `docs/data-model-v2.md` (closing docs, PRD section 10).
+- The commands: paste, following, Stop following (step 3).
