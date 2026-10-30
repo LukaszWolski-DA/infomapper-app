@@ -19,18 +19,21 @@
 // 30 %); the rest fade under it, dashed.
 // Slice 10a (D-61): a relationship from an entity to itself is a loop at its card's top right corner (`relGeom`'s
 // `self`), drawn by `RelPath` like any relationship line, here and in the overlay's lit lines.
+// Slice 10b (D-62): relationships between source tables, `SourcePath`: the same geometry (`relGeom`, the loop for a key
+// to itself), grey and thinner, no cardinality and no label, an arrow path at the referenced table; dashed when the
+// source no longer declares it. Four elements per line; their own group, first, so they paint below the other lines.
 
 import { Fragment, memo, useContext, useState, type ReactNode } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi, type InternalNode } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type Notation } from "./context";
 import { blockNodeId, type BlockNodeT } from "./BlockNode";
-import { cardRect, ieMarker, LOD_ZOOM, multText, relGeom, umlMarker, type Placed, type Pt, type Rect } from "./geometry";
+import { arrowHead, cardRect, ieMarker, LOD_ZOOM, multText, relGeom, umlMarker, type Placed, type Pt, type Rect } from "./geometry";
 import { bundleGeom, mapGeom, placedOf, traceGeom, type Bundle, type BundleEnd, type BundleGeom, type MapGeom, type TraceCardPlace } from "./line-geometry";
 import { REQ_CARD, requirementCardHeight } from "./requirement-card-data";
 import type { ReqNodeT } from "./RequirementCardNode";
 import type { TraceData } from "./trace-data";
-import { relatedLines, type CanvasLines, type MapLineData, type RelLineData, type Related, type Selection } from "./line-data";
+import { relatedLines, type CanvasLines, type MapLineData, type RelLineData, type Related, type Selection, type SourceLineData } from "./line-data";
 import { useValue, type ValueStore } from "./value-store";
 
 interface LineProps {
@@ -137,6 +140,24 @@ const RelPath = memo(
   (a, b) => a.sig === b.sig,
 );
 
+/**
+ * A relationship between source tables (slice 10b, D-62): a group, its hit target, its path and its arrow. Read-only: a
+ * click selects the table with the key, as a click on its card does; it has no menu.
+ */
+const SourcePath = memo(
+  function SourcePath({ line, a, z, className, onSelect, testId = "line-source" }: LineProps & { line: SourceLineData; a: Placed; z: Placed; testId?: string }) {
+    const g = relGeom(cardRect(a), cardRect(z), line.offset, line.fromCardId === line.toCardId);
+    return (
+      <g className={className} data-testid={testId} data-source-relationship={line.id} onClick={onSelect}>
+        <path className="hit" d={g.d} />
+        <path className="s" d={g.d} />
+        <path className="ar" d={arrowHead(g.pb, g.nb)} />
+      </g>
+    );
+  },
+  (a, b) => a.sig === b.sig,
+);
+
 /** A bundle of two or more mappings, or of relationships (slice 2c, prototype .lnk.bundle). */
 const BundlePath = memo(
   function BundlePath({ bundleKey, geom, className, onSelect }: LineProps & { bundleKey: string; geom: Exclude<BundleGeom, { kind: "single" }> }) {
@@ -184,6 +205,8 @@ const NO_BLOCKS = new Map<string, Rect>();
 const NO_MAPS = new Map<string, MapLineData>();
 const NO_TETHERS: readonly { id: string; x1: number; y1: number; x2: number; y2: number }[] = [];
 const NO_TRACES: readonly TraceData[] = [];
+const NO_SOURCES: readonly SourceLineData[] = [];
+const NO_SOURCE_IDS: ReadonlySet<string> = new Set();
 
 /** A trace line (slice 4b-2): a dashed path and, at 40 % and above, its end dot; two elements, no group (S3A-14). */
 const TracePath = memo(
@@ -340,6 +363,27 @@ function LineLayer({
     });
     if (el) rels.push(el);
   }
+  const sources: ReactNode[] = [];
+  for (const l of lines.sources ?? NO_SOURCES) {
+    const key = `${cardKey(l.fromCardId)}|${cardKey(l.toCardId)}|${objectId(l)}`;
+    const el = reuse(`src:${l.id}`, key, () => {
+      const a = placedOf(lookup.get(l.fromCardId)), z = placedOf(lookup.get(l.toCardId));
+      if (!a || !z) return null;
+      const className = `lnk srel${l.missing ? " missing" : ""}`;
+      return (
+        <SourcePath
+          key={l.id}
+          sig={`${placedSig(a)}|${placedSig(z)}|${className}|${l.offset}`}
+          line={l}
+          a={a}
+          z={z}
+          className={className}
+          onSelect={() => onSelect({ t: "card", id: l.fromCardId })}
+        />
+      );
+    });
+    if (el) sources.push(el);
+  }
   const maps: ReactNode[] = [];
   for (const l of lines.mappings) {
     const key = `${cardKey(l.cardId)}|${l.inputs.map((i) => cardKey(i.cardId)).join(",")}|${dots}|${state("map", l.id)}|${objectId(l)}`;
@@ -424,6 +468,8 @@ function LineLayer({
   return (
     <EdgeLabelRenderer>
       <svg className={`line-layer${related ? " dimmed" : ""}`} width={1} height={1} data-testid="layer-lines">
+        {/* only with a source line: an empty group would be one more element in every canvas's viewport (S10B-10) */}
+        {sources.length > 0 && <g>{sources}</g>}
         <g>{rels}</g>
         <g>{maps}</g>
         <g>{bundled}</g>
@@ -514,6 +560,7 @@ export const HoverLines = memo(function HoverLines({
 export const LitLines = memo(function LitLines({
   maps,
   rels,
+  sources = NO_SOURCE_IDS,
   lines,
   bundles = NO_BUNDLES,
   blocks = NO_BLOCKS,
@@ -523,6 +570,8 @@ export const LitLines = memo(function LitLines({
 }: {
   maps: ReadonlySet<string>;
   rels: ReadonlySet<string>;
+  /** Relationships between source tables with both cards lit (slice 10b, D-62). */
+  sources?: ReadonlySet<string>;
   /** Focus's lit trace lines (slice 4b-2, PRD item 21: both ends lit). */
   traces?: readonly TraceData[];
   /** Focus's lit lines, or a selected requirement's (slice 4b-1, coverage colours). */
@@ -541,6 +590,14 @@ export const LitLines = memo(function LitLines({
   const placed = (cardId: string) => placedOf(lookup.get(cardId));
   return (
     <svg className="line-layer lit-lines" width={1} height={1} data-testid={testId}>
+      {(lines.sources ?? NO_SOURCES)
+        .filter((l) => sources.has(l.id))
+        .map((l) => {
+          const a = placed(l.fromCardId), z = placed(l.toCardId);
+          if (!a || !z) return null;
+          const className = `lnk srel${l.missing ? " missing" : ""}`;
+          return <SourcePath key={l.id} sig={`${placedSig(a)}|${placedSig(z)}|${className}|${l.offset}`} line={l} a={a} z={z} className={className} onSelect={NOOP} testId="lit-source" />;
+        })}
       {lines.relationships
         .filter((l) => rels.has(l.id))
         .map((l) => {

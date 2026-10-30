@@ -333,7 +333,10 @@ export function ModelCanvas({
         ? { mappings: [], relationships: [] }
         : layer === "all"
         ? allLines
-        : { mappings: layer === "relationships" ? [] : allLines.mappings, relationships: layer === "mappings" ? [] : allLines.relationships },
+        : layer === "relationships"
+        ? { ...allLines, mappings: [] }
+        : // Mappings also hides the relationships between source tables (slice 10b, D-62)
+          { mappings: allLines.mappings, relationships: [] },
     [allLines, layer, diagnosis.noLines],
   );
   const { selection, select, registerCanvas } = ui;

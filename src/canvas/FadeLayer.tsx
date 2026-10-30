@@ -19,7 +19,7 @@ import { useEffect } from "react";
 import { useStore } from "@xyflow/react";
 import type { CardNodeT } from "./CardNode";
 import { LitLines } from "./LineLayer";
-import { LitRows, litNodeIds, litTraces, nodeRect, useLit, type FadeData, type FadeNote } from "./fade-canvas";
+import { LitRows, litNodeIds, litSources, litTraces, nodeRect, useLit, type FadeData, type FadeNote } from "./fade-canvas";
 import type { CanvasLines, MapLineData } from "./line-data";
 import type { Bundle } from "./line-geometry";
 import type { TraceData } from "./trace-data";
@@ -103,7 +103,7 @@ export default function FadeLayer({ data, notes, lines, bundles, blocks, mapsByI
       <svg className="fade-veil" width={1} height={1} data-testid="layer-fade" data-fade={key} data-lit-cards={ids.size} data-lit-notes={litNotes}>
         <path d={outer + holes.join("")} fillRule="evenodd" />
       </svg>
-      <LitLines maps={lit.mappings} rels={lit.relationships} lines={lines} bundles={bundles} blocks={blocks} mapsById={mapsById} traces={litTraces(traces, lookup, lit)} />
+      <LitLines maps={lit.mappings} rels={lit.relationships} sources={litSources(lines, lookup, lit)} lines={lines} bundles={bundles} blocks={blocks} mapsById={mapsById} traces={litTraces(traces, lookup, lit)} />
       <LitRows rows={lit.rows} />
     </>
   );

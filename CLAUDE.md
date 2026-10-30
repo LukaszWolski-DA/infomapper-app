@@ -184,8 +184,10 @@ npx tsx scripts/bench-import-plan.ts --no-coverage            # slice 7c: the pl
 ONLY_REMOVE=1 npx tsx scripts/bench-import-write.ts 20000     # slice 7c: only removing Business key from 2,000 columns (bar 1 s); without it the whole write bench
 COMMITS=1 npx playwright test e2e/slice-07c/S7C-14-commits.spec.ts   # slice 7c: canvas commits per classification toggle (on demand; 3 on slice-07b and 7c)
 MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7C-14's element guard; slice 8 too (page total +1, see below)
-MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts   # the element guard (S9-14, S10A-12), against slice-08's own counts (slice 9 and 10a matched them)
+MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts   # the element guard (S9-14, S10A-12, S10B-10), against slice-08's own counts (slices 9, 10a and 10b matched them)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-10a/S10A-12-loops.spec.ts   # slice 10a: 20 loops against 20 relationships, layers and pans (branch only)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-10b/S10B-10-lines.spec.ts   # slice 10b: 20 source lines against 20 relationships, layers and pans (branch only)
+SCREENS=<folder> npx playwright test e2e/slice-10b/S10B-screens.spec.ts                   # slice 10b: D-62's drawing, light and dark
 npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06b/S6B-10.spec.ts         # slice 6b: selection places, the buttons, the background refresh, phase by phase
@@ -258,6 +260,13 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - read the canvas commits once they settle (`settledCommits`);
   - make a self-relationship as test data (`selfRelationship`) and read an entity's relationships (`relationshipsOf`);
   - click a line or a loop at its middle (`clickLine`) in the view with room for Customer's loops (`LOOP_VIEW`).
+
+  Slice 10b's helpers do the following:
+  - find source lines on the page (`sourceLines`, `sourceLine`, `sourceRelationshipId`; `FK_ORDER` is the seeded key on
+    "Customer & orders") and read a line's ends, arrow and cards on the screen (`sourceShape`);
+  - find a point of a source line that is not under a card, to hover or click it (`freePointOn`);
+  - import keys into ERP as test data (`keysFile` with named keys, `employeesFile` for keys to itself, `importKeys`) and
+    set a card's width (`setWidth`).
 
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
@@ -364,6 +373,15 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   files in `src/domain/import/samples/` are read only by tests (an ESLint rule; P10: no samples in the app). Missing
   marks on the canvas are classes on existing elements (`row.gone`, `path.s.gone`; AD-24); a source system is a
   selection `{ t: "element", kind: "source_system" }` and a history place (`GONE.source_system`).
+- **Line kinds in the line layer** (slice 10b, D-62): `buildLines` (`line-data.ts`) returns mappings, relationships and,
+  as a list of their own, `sources` (relationships between source tables with both table cards on the canvas; absent
+  without one). Code that does not know `sources` leaves them out (the miniature, bundles, the line menu, Delete).
+  `bundleLines` keeps the list and drops a line with a card in a collapsed frame; Mappings hides it. `SourcePath`
+  (`LineLayer.tsx`) draws one with `relGeom` (the loop for a key to itself): 4 elements (group, hit target, path, the
+  arrow from `arrowHead`), class `lnk srel` (`src` is the source card's), painted first. Their shared `<g>` is drawn
+  only when the canvas has a source line: an empty group was one element more in every canvas's viewport (S10B-10). A
+  click selects the table with the key (`{ t: "card" }`). Under Focus and in the Changes view `litSources`
+  (`fade-canvas.tsx`) lights a line whose two cards are lit, drawn again in `LitLines`; no domain change.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a

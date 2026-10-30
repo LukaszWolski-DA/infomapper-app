@@ -323,7 +323,7 @@ One classification on one source table or column (AD-15), as `label_link` is for
 | `source_table_id`, `source_column_id` | uuid | yes | exactly one set, of the classification's scope (checked by the domain); one live link per classification and object |
 
 ### `source_relationship`
-A foreign key between two source tables, from an import (slice 7a). Shown in the table panels; not drawn on canvases.
+A foreign key between two source tables, from an import (slice 7a). Shown in the table panels and drawn on canvases between the table cards (slice 10b, D-62).
 
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |

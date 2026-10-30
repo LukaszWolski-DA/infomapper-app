@@ -26,7 +26,8 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 ## The plan after slice 10a (Łukasz, 30 October 2026)
 
 - **10b: relationships between source tables as lines on the canvas**, reusing the loop for a table that refers to
-  itself (see "Relationships between source tables as lines on the canvas" below).
+  itself. **Done in slice 10b** (D-62).
+- **Next: 10c.**
 - **10c: an attribute copied to another entity as a foreign key tied to a relationship.** A data model and local file
   format change, with a backup of Łukasz's KB model as a step of its own (see "Copying an attribute to another entity").
 - **11: an alias for entities and attributes** (see the entry below).
@@ -223,11 +224,41 @@ The wizard shows "dbt project" ("catalog.json, later"), "Snowflake (later)" and 
 prototype does. Each needs its catalog query or its file read into the standard, with the type names of that database
 in D-01's table and their fractional seconds (as SQL Server's and PostgreSQL's queries got in slice 7a, step 5).
 
-## Relationships between source tables as lines on the canvas (slice 7a, step 5)
+## Relationships between source tables as lines on the canvas (slice 7a, step 5): done in slice 10b
+
+**Done in slice 10b** (D-62): grey lines with an arrow at the referenced table, the loop for a key to itself, dashed
+when missing, in Everything and Relationships (no layer switch of its own; see the next entry).
 
 The prototype's review promised "Shown later as a grey line between the table cards on a canvas" for a new
 relationship; slice 7a left the sentence out. Lines between table cards for declared relationships, in the line layer
 (AD-24 rule 3), with their own layer switch, would show the source's structure next to the mappings.
+
+## Source relationships: a layer switch of their own (slice 10b, PRD section 9)
+
+Source relationship lines show in Everything and Relationships (D-62). A switch of their own would show them in the
+Mappings layer while mapping: a key in `canvas.look` and a control above the canvas (which must not read layout during
+a commit, CLAUDE.md).
+
+## Source relationships: the key's name and its columns (slice 10b, PRD section 9)
+
+- **The key's name on hover**, as a tooltip: an element per line (the element guard).
+- **A click scrolling the table's panel** to "Relationships between source tables".
+- **Lines anchored on the key's column rows** rather than on the cards.
+
+## Source relationships: cardinality from the key (slice 10b, PRD section 9)
+
+Many at the table with the key, one or optional by the columns' nullability. Not drawn now: the source says nothing
+about uniqueness beyond the primary key.
+
+## Source relationships at collapsed frames (slice 10b, PRD section 9)
+
+A source line with a card in a collapsed frame is left out (D-62). A bundle of its own, with its count, would show that
+the frame's tables join others.
+
+## The Changes view lighting a missing source relationship (slice 10b, PRD section 9)
+
+A missing relationship is not a change to resolve (`SOURCE_CHANGE_KINDS`), so the Changes view lights it only when both
+of its tables are touched. Lighting it as a change of its own would need a kind or a rule in `touched.ts`.
 
 ## A change to resolve as its own history place (slice 7b, PRD section 9)
 

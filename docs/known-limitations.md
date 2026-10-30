@@ -726,6 +726,13 @@ the click on Łukasz the top bar did not show within 15 s. That is before any sl
 full runs logged since slice 7a's close, and the file passed 3 of 3 on its own. Recorded as a known flake (Łukasz, 26
 October 2026); if it comes back, look at the sign-in redirect's timing under a long run.
 
+### S4B2-06 flaked again after its fix (slice 10b)
+
+In slice 10b's closing full run (30 October 2026), S4B2-06 (`e2e/slice-04b2/S4B2-06.spec.ts`) failed once more under
+load. That was after `05d0a04`, slice 7b's fix for the race on REQ-101's card. It passed 3 of 3 on its own. The cause is
+unknown, because the run's error text was lost (the output was filtered, and the reruns replaced `test-results/`). In
+the next full run, keep the failing test's error output before rerunning it.
+
 ## Source import (slice 7a)
 
 ### Every write rewrites the whole local data file
@@ -882,6 +889,20 @@ by someone removed later shows "someone" instead of their name; anything written
   go to `rowSaves.answer`. A panel save of such a row (a table's or column's note) started while the action is on its
   way still sends the version it knows and can be refused as a false conflict. The reason: only the server knows which
   tables, columns and mappings an action writes, so the browser cannot hold those rows before it is sent (`saveRows`).
+
+### Relationships between source tables on the demo canvas (slice 10b, D-62)
+
+On the seed's "Customer & orders" (and Sales' "First canvas", the same layout), the line of
+`FK_order_line_order_header` runs from order_line on the right to order_header on the left at header height, mostly
+behind the Order and Line entity cards; it shows only in the gaps between them. The seed is not changed (A4, Łukasz,
+step 1 answers); a canvas where the two cards face each other shows it whole (step 3's screenshots).
+
+### Test coverage around source relationships (slice 10b, step 3)
+
+- Slice 7a has no end-to-end spec for the table panel's list of relationships between source tables
+  (`list-table-relationships`). Noted, nothing built (Łukasz, step 3 answers).
+- S7B-16 (the Changes view and Focus to the screen) is a measuring spec, outside the normal e2e run (measurement build
+  only); the normal run checks the Changes view through S7B-14 and S7B-15, and slice 10b's lit lines through S10B-07.
 
 ### Three or more loops on a collapsed card (slice 10a, D-61)
 

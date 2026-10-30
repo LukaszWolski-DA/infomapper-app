@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 10a's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 10b's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -31,7 +31,7 @@ docs (some are repeated below where they explain an item).
 | Panels and navigation | "Show its requirements (n)" in the row and card menus; editing a requirement's description from its card | idea |
 | Model | Data Vault 2.0 hints in the entity panel | idea (P12 of slice 7c; AD-08) |
 | Mappings | suggested mappings; re-pointing a mapping to another attribute | – |
-| Sources | only ideas: relationships between source tables on the canvas; slice 7c's ideas (see Sources) | idea |
+| Sources | only ideas: slice 7c's ideas (see Sources) | idea |
 | Labels and notes | rich text in notes | known limitation |
 | Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer; deleting a project | baselines: decision only (AD-03, AD-14); the rest: – |
 | Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
@@ -46,6 +46,11 @@ trace lines (4b-2); showing, hiding and resizing the side panels (5a); the view-
 a missing column's row and mapping line marks (7a); a zoom typed in the top bar (9, D-60).
 
 **Deliberate differences:**
+- **Slice 10b (D-62):** relationships between source tables are drawn on canvases, where the prototype only promised
+  it ("Shown later as a grey line…"): a grey line between the table cards, lighter and thinner than a relationship
+  between entities, with an arrow at the referenced table and no cardinality marks or label, painted below the other
+  lines. A key from a table to itself is slice 10a's loop. A relationship the source no longer declares is dashed (its
+  arrow solid); the prototype marks it only in the panel. A click selects the table with the key; no line menu.
 - **Slice 10a:** a relationship from an entity to itself is drawn as a loop at its card's top right corner, from the
   right edge to the top edge; the prototype has no such shape. The miniature leaves it out (D-61).
 - **Slice 10a:** canvas writes on a model row (a line's status, split, swap and delete, an attribute's move and delete,
@@ -114,7 +119,6 @@ reading every classification and suggesting some, and the Data Vault reading of 
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Relationships between source tables on the canvas | grey lines between table cards ("shown later" in the prototype) | the review's text only | idea |
 | Readings that use Link candidate and Satellite source | the prototype lists both table classifications; its reading reads neither | `DEFAULT_CLASSES` | idea |
 
 Beyond the prototype, slice 7c's other ideas are in `docs/ideas.md`: a panel-only write that does not redraw the canvas,

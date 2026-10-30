@@ -28,6 +28,7 @@ import {
   type Requirement,
   type RequirementLink,
   type SourceColumn,
+  type SourceRelationship,
   type SourceSystem,
   type SourceTable,
   type Workspace,
@@ -282,6 +283,18 @@ export const sourceColumn = (id: string = ids.colEmail, over: Partial<SourceColu
   default_value: null,
   comment: null,
   missing_since: null, retired_since: null, not_needed: false, note_html: null, note_text: null,
+  ...over,
+});
+
+/** A foreign key between two source tables (slice 7a), from `from` (the table with the key) to `to`. */
+export const sourceRelationship = (id: string, from: string, to: string, over: Partial<SourceRelationship> = {}): SourceRelationship => ({
+  id,
+  ...ws,
+  source_table_id: from,
+  to_source_table_id: to,
+  name: `FK_${id.slice(-4)}`,
+  kind: "declared",
+  missing_since: null,
   ...over,
 });
 
