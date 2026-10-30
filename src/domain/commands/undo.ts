@@ -19,10 +19,11 @@
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
+import { followOriginals } from "../model/copies";
 import { keyTakenMessage, requirementKey, restoreKeyTakenMessage } from "../model/requirements";
 import type { Uuid } from "../ids";
 import { checkPermission, type WorkspaceAccess, type WorkspaceAction } from "../permissions";
-import { LINK_TABLES, type ChangeEvent, type LinkTable, type RowImage, type WritableRows } from "../types";
+import { LINK_TABLES, type Attribute, type ChangeEvent, type LinkTable, type RowImage, type WritableRows } from "../types";
 
 export const UNDO_REFUSED_MESSAGE = "This can't be undone because it was changed afterwards.";
 export const REDO_REFUSED_MESSAGE = "This can't be redone because it was changed afterwards.";
@@ -279,7 +280,11 @@ export function revertChangeGroup(
   if (!consistent(after, touched)) return fail(refused());
   const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched);
   if (keyClash) return fail(keyClash);
-  const writeSet = buildWriteSet(ctx, workspaceId, writes);
+  // copies stay in step with their originals (slice 10c, F1): an undo or redo of a followed field, a paste or a
+  // “Stop following” writes the copies that differ, in the same group; an original brought back writes none, as its
+  // copies kept its values
+  const followed = followOriginals(ctx, (state.rows.attribute as readonly Attribute[]).filter((a) => a.workspace_id === workspaceId), writes);
+  const writeSet = buildWriteSet(ctx, workspaceId, followed.writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
 }
 

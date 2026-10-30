@@ -30,8 +30,8 @@ import {
 } from "../__fixtures__/domain";
 import { buildWriteSet, type CommandResult, type WriteSet } from "../changes";
 import type { WorkspaceAccess } from "../permissions";
-import type { Canvas, CanvasItem, ChangeEvent, WorkspaceRole } from "../types";
-import { addAttribute, createAttributeFromColumn, deleteAttribute, reorderAttribute, updateAttribute } from "./attribute";
+import type { Attribute, Canvas, CanvasItem, ChangeEvent, WorkspaceRole } from "../types";
+import { addAttribute, createAttributeFromColumn, deleteAttribute, pasteAttribute, reorderAttribute, updateAttribute } from "./attribute";
 import { deleteCanvas, duplicateCanvas, renameCanvas, setCanvasLook } from "./canvas";
 import { removeFromCanvas } from "./canvas-item";
 import { moveOnCanvas } from "./frame";
@@ -773,5 +773,105 @@ describe("copies of attributes (slice 10c)", () => {
     const after = apply(afterAdd, undone.writeSet);
     expect(find(after, "attribute", addedId).deleted_at).toBe(NOW);
     expect(find(after, "attribute", ids.orderId)).toMatchObject({ deleted_at: null, copied_from_attribute_id: addedId });
+  });
+});
+
+describe("undo and redo keep copies in step (slice 10c, F1, S10C-13)", () => {
+  const C1 = "01900000-0000-7000-8000-0000000c0001";
+  const attr = (rows: Rows, id: string) => find(rows, "attribute", id) as unknown as Attribute;
+  const typeOf = (rows: Rows, id: string) => {
+    const a = attr(rows, id);
+    return [a.data_type, a.type_length];
+  };
+  const step = (rows: Rows, events: readonly ChangeEvent[], mode: "undo" | "redo") => {
+    const r = revertChangeGroup(makeCtx(), modeler, { events, rows }, mode);
+    if (!r.ok) throw new Error(r.error.message);
+    return { writeSet: r.writeSet, rows: apply(rows, r.writeSet) };
+  };
+  const setType = (rows: Rows, id: string, length: number) =>
+    ok(updateAttribute(ctx, modeler, { attribute: attr(rows, id), attributes: rows.attribute as Attribute[] }, { attributeId: id, expectedVersion: attr(rows, id).version, type: { dataType: "string", length } }));
+  /** Customer.customer_id pasted into Sales Order. */
+  const paste = (rows: Rows) =>
+    ok(pasteAttribute(makeCtx(), modeler, { entity: find(rows, "entity", ids.salesOrder) as never, original: attr(rows, ids.customerId), attributes: rows.attribute as Attribute[] }, { entityId: ids.salesOrder, attributeId: ids.customerId }));
+  /** The seed with Sales Order.customer_id, a live copy of Customer.customer_id. */
+  const withCopy = (): Rows => {
+    const rows = seed();
+    rows.attribute.push(attribute(C1, { entity_id: ids.salesOrder, name: "customer_id", is_primary_key: false, is_foreign_key: true, copied_from_attribute_id: ids.customerId }));
+    return rows;
+  };
+
+  it("undo of a type change made before the paste brings the copy back too; redo takes both forward", () => {
+    const rows = seed();
+    const change = setType(rows, ids.customerId, 20);
+    const afterChange = apply(rows, change);
+    const pasted = paste(afterChange);
+    const copyId = insertedId(pasted);
+    const afterPaste = apply(afterChange, pasted);
+    expect(typeOf(afterPaste, copyId)).toEqual(["string", 20]);
+
+    const undone = step(afterPaste, change.events, "undo");
+    expect(typeOf(undone.rows, ids.customerId)).toEqual(["integer", null]);
+    expect(typeOf(undone.rows, copyId)).toEqual(["integer", null]);
+    expect(new Set(undone.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+    const redone = step(undone.rows, undone.writeSet.events, "redo");
+    expect(typeOf(redone.rows, ids.customerId)).toEqual(["string", 20]);
+    expect(typeOf(redone.rows, copyId)).toEqual(["string", 20]);
+  });
+
+  it("undo of a type change that already wrote a copy brings back a copy pasted since as well", () => {
+    const rows = withCopy();
+    const change = setType(rows, ids.customerId, 20);
+    const afterChange = apply(rows, change);
+    const pasted = paste(afterChange);
+    const second = insertedId(pasted);
+    const afterPaste = apply(afterChange, pasted);
+    const undone = step(afterPaste, change.events, "undo");
+    expect([typeOf(undone.rows, ids.customerId), typeOf(undone.rows, C1), typeOf(undone.rows, second)]).toEqual([
+      ["integer", null],
+      ["integer", null],
+      ["integer", null],
+    ]);
+  });
+
+  it("redo of a paste after the original's type changed brings the copy back with the original's type", () => {
+    const rows = seed();
+    const pasted = paste(rows);
+    const copyId = insertedId(pasted);
+    const undone = step(apply(rows, pasted), pasted.events, "undo");
+    expect(attr(undone.rows, copyId).deleted_at).toBe(NOW);
+    const changed = apply(undone.rows, setType(undone.rows, ids.customerId, 12));
+    const redone = step(changed, undone.writeSet.events, "redo");
+    expect(attr(redone.rows, copyId)).toMatchObject({ deleted_at: null, data_type: "string", type_length: 12, copied_from_attribute_id: ids.customerId });
+  });
+
+  it("undo of “Stop following” after the original's type changed links the copy again with the original's type", () => {
+    const rows = withCopy();
+    const stop = ok(updateAttribute(ctx, modeler, { attribute: attr(rows, C1), attributes: rows.attribute as Attribute[] }, { attributeId: C1, expectedVersion: 1, stopFollowing: true }));
+    const afterStop = apply(rows, stop);
+    const changed = setType(afterStop, ids.customerId, 8);
+    expect(changed.writes).toHaveLength(1); // the detached copy does not follow
+    const afterChange = apply(afterStop, changed);
+    const undone = step(afterChange, stop.events, "undo");
+    expect(attr(undone.rows, C1)).toMatchObject({ copied_from_attribute_id: ids.customerId, data_type: "string", type_length: 8 });
+  });
+
+  it("undo of an original's delete brings it back, and its copies follow again with no write of their own", () => {
+    const rows = withCopy();
+    const deleted = ok(deleteAttribute(ctx, modeler, { attribute: attr(rows, ids.customerId), mappings: rows.mapping, mappingInputs: rows.mapping_input }, { attributeId: ids.customerId, expectedVersion: 1 }));
+    const afterDelete = apply(rows, deleted);
+    expect(attr(afterDelete, C1)).toMatchObject({ deleted_at: null, copied_from_attribute_id: ids.customerId });
+    const undone = step(afterDelete, deleted.events, "undo");
+    expect(attr(undone.rows, ids.customerId).deleted_at).toBeNull();
+    expect(undone.writeSet.writes.some((w) => w.table === "attribute" && w.row.id === C1)).toBe(false);
+    expect(attr(undone.rows, C1)).toMatchObject({ copied_from_attribute_id: ids.customerId, version: 1 });
+  });
+
+  it("undo of “Stop following” on a copy whose original is deleted links it again, writing nothing more", () => {
+    const rows = withCopy();
+    const afterDelete = apply(rows, ok(deleteAttribute(ctx, modeler, { attribute: attr(rows, ids.customerId), mappings: rows.mapping, mappingInputs: rows.mapping_input }, { attributeId: ids.customerId, expectedVersion: 1 })));
+    const stop = ok(updateAttribute(ctx, modeler, { attribute: attr(afterDelete, C1), attributes: afterDelete.attribute as Attribute[] }, { attributeId: C1, expectedVersion: 1, stopFollowing: true }));
+    const undone = step(apply(afterDelete, stop), stop.events, "undo");
+    expect(undone.writeSet.writes).toHaveLength(1);
+    expect(attr(undone.rows, C1).copied_from_attribute_id).toBe(ids.customerId);
   });
 });

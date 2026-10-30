@@ -2,6 +2,7 @@
 
 import type { Uuid } from "../ids";
 import type { Attribute, Canvas, CanvasItem, Entity, Mapping, MappingInput, Project, ProjectCanvas, Relationship } from "../types";
+import { liveCopiesOf, namedList, pathsOf } from "./copies";
 import type { RequirementIndex } from "./requirement-index";
 
 /** The live rows around one entity, as loaded by the caller. Rows that do not belong to the entity are ignored. */
@@ -12,6 +13,8 @@ export interface EntityRows {
   mappingInputs: readonly MappingInput[];
   relationships: readonly Relationship[];
   canvasItems: readonly CanvasItem[];
+  /** The workspace's live entities: the copies' names (slice 10c, F8). */
+  entities?: readonly Entity[];
 }
 
 export interface EntityCascade {
@@ -51,6 +54,11 @@ export interface EntityImpact {
   projects: { id: Uuid; name: string }[];
   /** Requirements whose scope contains the entity, by key (slice 4a: they lose it from their scope). */
   requirements: { id: Uuid; key: string }[];
+  /**
+   * Live copies in other entities of the entity's attributes, as "{entity}.{attribute}" (slice 10c, F8): they lose
+   * their original. Copies in the entity itself go with it and count as attributes.
+   */
+  copies: { id: Uuid; label: string }[];
 }
 
 /**
@@ -78,7 +86,26 @@ export function entityImpact(
       .filter((r) => context.requirements!.scope(r.id).entities.has(rows.entity.id))
       .map(({ id, key }) => ({ id, key }))
       .sort((a, b) => a.key.localeCompare(b.key, "en", { numeric: true })),
+    copies: pathsOf(
+      cascade.attributes.flatMap((a) => liveCopiesOf(rows.attributes, a.id)).filter((c) => c.entity_id !== rows.entity.id),
+      rows.entities ?? [],
+    ),
   };
+}
+
+/** What deleting an attribute asks about (slice 10c, F7): its live copies, as "{entity}.{attribute}". */
+export function attributeCopiesImpact(attributes: readonly Attribute[], entities: readonly Entity[], attributeId: Uuid): { id: Uuid; label: string }[] {
+  return pathsOf(liveCopiesOf(attributes, attributeId), entities);
+}
+
+/**
+ * D-47's dialog row for copies (slice 10c, F8): "2 copies" — "lose their original: Order.customer_id, …"; one: "1 copy"
+ * — "loses its original: …"; more than five: the first five, then "and n more"; none: no row.
+ */
+export function copiesImpactRow(labels: readonly string[]): [what: string, happens: string] | null {
+  const n = labels.length;
+  if (!n) return null;
+  return [`${n} cop${n === 1 ? "y" : "ies"}`, `${n === 1 ? "loses its" : "lose their"} original: ${namedList(labels)}`];
 }
 
 /** At most this many keys are named in the delete dialog's requirements row; the rest are counted. */

@@ -151,7 +151,7 @@ export async function withLiveCanvases(
   const workspace = await store.workspaces.get(workspaceId);
   if (!workspace) return none;
   const access = { workspace, member: await store.workspaces.getMember(workspaceId, user.id) };
-  const full = touches || contextTargets(writeSet.writes, writeSet.mainTargets).length > 0;
+  const full = touches || contextTargets(writeSet.writes, writeSet.mainTargets, writeSet.followers).length > 0;
   const state = full ? await loadLiveState(store, workspaceId) : { ...EMPTY_LIVE_STATE, labels: await store.labels.list(workspaceId) };
   return completeLiveWrites(ctx, access, state, writeSet, { revert: options.revert, contextLabelId });
 }

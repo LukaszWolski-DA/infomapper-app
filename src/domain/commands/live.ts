@@ -231,7 +231,7 @@ export function completeLiveWrites(
 
   // 1. the active working context
   let labeled = 0;
-  const targets = contextLabelId && !writeSet.labelNothing ? contextTargets(writeSet.writes, writeSet.mainTargets) : [];
+  const targets = contextLabelId && !writeSet.labelNothing ? contextTargets(writeSet.writes, writeSet.mainTargets, writeSet.followers) : [];
   if (contextLabelId) {
     const denied = checkPermission(access, "label.edit");
     // the label must exist when the action starts (deleting the context's own label is an action like any other)

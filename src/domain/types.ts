@@ -373,6 +373,15 @@ export interface WorkspaceModel {
   classifications: Classification[];
   /** Live links only. */
   classificationLinks: ClassificationLink[];
+  /** The deleted originals that live copies point to, by name (slice 10c, F6). */
+  lostOriginals: LostOriginal[];
+}
+
+/** A deleted attribute that a live copy points to: what its panel names (slice 10c, F6). */
+export interface LostOriginal {
+  id: Uuid;
+  name: string;
+  entityName: string;
 }
 
 // ---- Requirements (data model section 7, slice 4a) ----

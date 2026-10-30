@@ -22,6 +22,7 @@ function model(mappings: Mapping[] = [mapping()], inputs: MappingInput[] = [mapp
     sourceRelationshipColumns: [],
     classifications: [],
     classificationLinks: [],
+    lostOriginals: [],
     mappingInputs: inputs,
   };
 }

@@ -33,6 +33,11 @@ export interface WriteSet {
    */
   mainTargets?: { kind: "entity" | "attribute" | "mapping"; id: Uuid }[];
   /**
+   * Copies of attributes that only following wrote (slice 10c, F3): the working context leaves them out, as it leaves
+   * out an attribute only renumbered.
+   */
+  followers?: Uuid[];
+  /**
    * The working context labels nothing in this group (slice 7a, P9: an import, including the mappings it sends back to
    * review); its change events still record the context, as a layout change's do (D-26).
    */

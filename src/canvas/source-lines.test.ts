@@ -45,6 +45,7 @@ const model: WorkspaceModel = {
   sourceRelationshipColumns: [],
   classifications: [],
   classificationLinks: [],
+  lostOriginals: [],
 };
 const items = [
   canvasItem(ids.itemCustomer, { x: 400, y: 0 }),

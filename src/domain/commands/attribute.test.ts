@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { access, archived, attribute, builtins, entity, fixtureLinks, ids, makeCtx, mapping, mappingInput, NOW, sourceColumn } from "../__fixtures__/domain";
 import { writtenVersions } from "../changes";
 import type { Attribute } from "../types";
-import { addAttribute, createAttributeFromColumn, deleteAttribute, reorderAttribute, updateAttribute } from "./attribute";
+import { COPIED_GONE, FOLLOWS_LOST_REFUSAL, FOLLOWS_REFUSAL } from "../model/copies";
+import { contextTargets } from "../model/live";
+import { addAttribute, createAttributeFromColumn, deleteAttribute, pasteAttribute, reorderAttribute, updateAttribute } from "./attribute";
 
 const { customer, customerId, email, mapEmail, inEmail } = ids;
 const ref = { attributeId: email, expectedVersion: 1 };
@@ -256,5 +258,158 @@ describe("reorderAttribute (D-36)", () => {
     expect(reorderAttribute(makeCtx(), access("owner"), at1, { attributeId: list[1]!.id, expectedVersion: 4, position: 0 })).toMatchObject({ ok: false, error: { code: "stale_version" } });
     expect(reorderAttribute(makeCtx(), access("reviewer"), at1, { attributeId: list[1]!.id, expectedVersion: 1, position: 0 })).toMatchObject({ ok: false, error: { code: "forbidden" } });
     expect(reorderAttribute(makeCtx(), access("owner", archived), at1, { attributeId: list[1]!.id, expectedVersion: 1, position: 0 })).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
+
+// ---- slice 10c: copies (D-63) ----
+
+describe("pasteAttribute (slice 10c, items 4, 5)", () => {
+  const { salesOrder, orderId } = ids;
+  const attributes = [attribute(customerId, { definition_html: "<p>The customer.</p>", definition_text: "The customer." }), attribute(email), attribute(orderId)];
+  const paste = (entityId: string, attributeId: string, over: { role?: Parameters<typeof access>[0]; ws?: object; rows?: Attribute[] } = {}) => {
+    const rows = over.rows ?? attributes;
+    return pasteAttribute(makeCtx(), access(over.role ?? "modeler", over.ws ?? {}), { entity: entity(entityId), original: rows.find((a) => a.id === attributeId) ?? null, attributes: rows }, { entityId, attributeId });
+  };
+  const inserted = (r: ReturnType<typeof paste>): Attribute => {
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes).toHaveLength(1);
+    const w = r.writeSet.writes[0]!;
+    if (w.kind !== "insert" || w.table !== "attribute") throw new Error("not an attribute insert");
+    return w.row;
+  };
+
+  it("copies a primary key into another entity, last, as a foreign key with the original's type, definition and nullable", () => {
+    const r = paste(salesOrder, customerId);
+    const row = inserted(r);
+    expect(row).toMatchObject({
+      entity_id: salesOrder,
+      name: "customer_id",
+      sort_order: 1,
+      data_type: "integer",
+      type_length: null,
+      is_primary_key: false,
+      is_foreign_key: true,
+      is_business_key: false,
+      is_pii: false,
+      is_nullable: false,
+      definition_html: "<p>The customer.</p>",
+      definition_text: "The customer.",
+      copied_from_attribute_id: customerId,
+    });
+    expect(r).toMatchObject({ ok: true, value: { attributeId: row.id, nameTaken: false } });
+  });
+
+  it("copies an attribute that is not a primary key with no foreign key, and its Personal data and length", () => {
+    expect(inserted(paste(salesOrder, email))).toMatchObject({ name: "email", is_foreign_key: false, is_pii: true, data_type: "string", type_length: 100, is_nullable: true });
+  });
+
+  it("pastes into the same entity and says the name is taken (F12)", () => {
+    const r = paste(customer, customerId);
+    expect(inserted(r)).toMatchObject({ entity_id: customer, name: "customer_id", sort_order: 2 });
+    expect(r).toMatchObject({ value: { nameTaken: true } });
+    // the name is compared ignoring case
+    const upper = [...attributes, attribute("01900000-0000-7000-8000-0000000c0009", { entity_id: salesOrder, name: "CUSTOMER_ID" })];
+    expect(paste(salesOrder, customerId, { rows: upper })).toMatchObject({ value: { nameTaken: true } });
+  });
+
+  it("links a copy of a copy to the copy that was copied", () => {
+    const copy = attribute("01900000-0000-7000-8000-0000000c0001", { entity_id: salesOrder, is_primary_key: false, is_foreign_key: true, copied_from_attribute_id: customerId });
+    expect(inserted(paste(customer, copy.id, { rows: [...attributes, copy] }))).toMatchObject({ copied_from_attribute_id: copy.id, is_foreign_key: false });
+  });
+
+  it("refuses a deleted original, an unknown entity, a reviewer and an archived workspace", () => {
+    expect(paste(salesOrder, customerId, { rows: [attribute(customerId, { deleted_at: NOW })] })).toMatchObject({ ok: false, error: { code: "not_found", message: COPIED_GONE } });
+    expect(
+      pasteAttribute(makeCtx(), access("modeler"), { entity: entity(salesOrder, { deleted_at: NOW }), original: attributes[0]!, attributes }, { entityId: salesOrder, attributeId: customerId }),
+    ).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(paste(salesOrder, customerId, { role: "reviewer" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(paste(salesOrder, customerId, { role: "owner", ws: archived })).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
+
+describe("following and Stop following (slice 10c, items 6, 9, 10; F1 to F5)", () => {
+  const { salesOrder } = ids;
+  const C1 = "01900000-0000-7000-8000-0000000c0001";
+  const C2 = "01900000-0000-7000-8000-0000000c0002";
+  const entities = [entity(customer), entity(salesOrder)];
+  const family = () => [
+    attribute(customerId),
+    attribute(email),
+    attribute(C1, { entity_id: salesOrder, name: "customer_id", is_primary_key: false, is_foreign_key: true, copied_from_attribute_id: customerId }),
+    attribute(C2, { entity_id: salesOrder, name: "parent_id", is_primary_key: false, copied_from_attribute_id: C1 }),
+  ];
+  const update = (rows: Attribute[], id: string, input: object, extra: object = {}) =>
+    updateAttribute(makeCtx(), access("modeler"), { attribute: rows.find((a) => a.id === id) ?? null, attributes: rows, entities, ...extra }, { attributeId: id, expectedVersion: 1, ...input });
+  const rowsOf = (r: ReturnType<typeof update>) => (r.ok ? r.writeSet.writes.map((w) => (w as { row: Attribute }).row) : []);
+
+  it("writes a type change to every copy and a copy of a copy, in one change group, and answers with every version", () => {
+    const r = update(family(), customerId, { type: { dataType: "string", length: 36 } });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(rowsOf(r).map((row) => [row.id, row.data_type, row.type_length])).toEqual([
+      [customerId, "string", 36],
+      [C1, "string", 36],
+      [C2, "string", 36],
+    ]);
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+    expect(writtenVersions(r.writeSet.writes)).toEqual({ [customerId]: 2, [C1]: 2, [C2]: 2 });
+    expect(r.writeSet.followers).toEqual([C1, C2]);
+  });
+
+  it("writes Personal data to the copies too, and a name only to the original", () => {
+    expect(rowsOf(update(family(), customerId, { isPii: true })).map((row) => row.is_pii)).toEqual([true, true, true]);
+    const name = update(family(), customerId, { name: "cust_id" });
+    expect(rowsOf(name)).toHaveLength(1);
+    expect(name.ok && name.writeSet.followers).toBeUndefined();
+  });
+
+  it("labels the original in the working context, not the copies that follow it (F3)", () => {
+    const r = update(family(), customerId, { type: { dataType: "date" } });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(contextTargets(r.writeSet.writes, r.writeSet.mainTargets, r.writeSet.followers)).toEqual([{ kind: "attribute", id: customerId }]);
+    // without the list every written copy would be labeled
+    expect(contextTargets(r.writeSet.writes, r.writeSet.mainTargets)).toHaveLength(3);
+  });
+
+  it("refuses a followed field on a copy, naming its original, and lets its own fields change alone (F5)", () => {
+    const refusal = { ok: false, error: { code: "invalid", message: FOLLOWS_REFUSAL("Customer.customer_id") } };
+    expect(update(family(), C1, { type: { length: 10, dataType: "string" } })).toMatchObject(refusal);
+    expect(update(family(), C1, { type: { dataType: "date" } })).toMatchObject(refusal);
+    expect(update(family(), C1, { isPii: true })).toMatchObject(refusal);
+    expect(update(family(), C2, { isPii: true })).toMatchObject({ error: { message: FOLLOWS_REFUSAL("Sales Order.customer_id") } });
+    const own = update(family(), C1, { name: "client_id", isNullable: true, isForeignKey: false, isPrimaryKey: true, definition: "<p>Its own.</p>" });
+    if (!own.ok) throw new Error(own.error.message);
+    expect(rowsOf(own).map((row) => row.id)).toEqual([C1]);
+    // a type patch that changes nothing is no change of a followed field
+    expect(update(family(), C1, { type: { dataType: "integer" } })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+  });
+
+  it("keeps a copy of a deleted original read-only, naming the deleted original (F2, F6)", () => {
+    const rows = family().filter((a) => a.id !== customerId);
+    const lostOriginals = [{ id: customerId, name: "customer_id", entityName: "Customer" }];
+    expect(update(rows, C1, { type: { dataType: "date" } }, { lostOriginals })).toMatchObject({
+      ok: false,
+      error: { code: "invalid", message: FOLLOWS_LOST_REFUSAL("Customer.customer_id") },
+    });
+  });
+
+  it("“Stop following” clears the link, live original or deleted, in one change group; the copy's copies keep following it", () => {
+    const stop = update(family(), C1, { stopFollowing: true });
+    if (!stop.ok) throw new Error(stop.error.message);
+    expect(stop.writeSet.writes).toMatchObject([{ row: { id: C1, copied_from_attribute_id: null, data_type: "integer" } }]);
+    // then its fields are its own: a type change reaches its own copy, not the original
+    const detached = family().map((a) => (a.id === C1 ? stop.value.attribute : a));
+    const own = updateAttribute(makeCtx(), access("modeler"), { attribute: stop.value.attribute, attributes: detached, entities }, { attributeId: C1, expectedVersion: 2, type: { dataType: "date" } });
+    expect(rowsOf(own).map((row) => [row.id, row.data_type])).toEqual([
+      [C1, "date"],
+      [C2, "date"],
+    ]);
+    // a lost copy stops following too
+    expect(update(family().filter((a) => a.id !== customerId), C1, { stopFollowing: true })).toMatchObject({ ok: true, value: { attribute: { copied_from_attribute_id: null } } });
+    // an attribute that is no copy has nothing to stop; a reviewer may not
+    expect(update(family(), customerId, { stopFollowing: true })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(updateAttribute(makeCtx(), access("reviewer"), { attribute: family()[2]!, attributes: family() }, { attributeId: C1, expectedVersion: 1, stopFollowing: true })).toMatchObject({
+      ok: false,
+      error: { code: "forbidden" },
+    });
   });
 });
