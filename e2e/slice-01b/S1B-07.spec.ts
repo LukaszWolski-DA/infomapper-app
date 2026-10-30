@@ -57,7 +57,8 @@ test("S1B-07: the Entity tool and “New entity here” create an entity at the 
   // an attribute row: only the row's actions, no card actions (D-52)
   const email = (await rowNamed(page, "Customer", "email").boundingBox())!;
   const onRow = await toolboxAt(page, { x: email.x + 30, y: email.y + email.height / 2 });
-  expect(onRow).toEqual(["Move up", "Move down", "Move to the top", "Move to the bottom", "Map from a column…", "Delete attribute"]);
+  // slice 10c: "Copy" (D-63)
+  expect(onRow).toEqual(["Move up", "Move down", "Move to the top", "Move to the bottom", "Map from a column…", "Copy", "Delete attribute"]);
   await expect(page.getByTestId("menu-toolbox").getByText("Rows", { exact: true })).toHaveCount(0);
   await closeToolbox(page);
 

@@ -1,14 +1,14 @@
 "use client";
 
 // “Delete from model…” (D-47, prototype askDeleteEntity): the impact first (with the requirements that lose it from their
-// scope, slice 4a), then the entity goes with its attributes, mappings, relationships, cards and requirement links, in
-// one change group.
+// scope, slice 4a; and the copies in other entities that lose their original, slice 10c, F8), then the entity goes with
+// its attributes, mappings, relationships, cards and requirement links, in one change group.
 
 import { useContext, useEffect, useRef, useState } from "react";
 import { deleteEntityAction, entityImpactAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
-import { requirementsImpactRow, type EntityImpact } from "@/domain/model/impact";
+import { copiesImpactRow, requirementsImpactRow, type EntityImpact } from "@/domain/model/impact";
 import type { Entity } from "@/domain/types";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
 import { useToast } from "@/ui/components/toast";
@@ -53,6 +53,7 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
     }
   }
 
+  const copiesRow = impact ? copiesImpactRow(impact.copies.map((c) => c.label)) : null;
   const rows: [string, string][] = impact
     ? [
         [count(impact.attributes, "attribute"), "deleted"],
@@ -61,6 +62,8 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
         [count(impact.canvases.length, "canvas", "canvases"), impact.canvases.length ? `removed from ${impact.canvases.map((c) => c.name).join(", ")}` : "–"],
         // slice 4a (prototype entityImpact): requirements whose scope contains the entity
         requirementsImpactRow(impact.requirements.map((r) => r.key)),
+        // slice 10c (F8): no row without copies
+        ...(copiesRow ? [copiesRow] : []),
         [count(impact.projects.length, "project"), impact.projects.length ? impact.projects.map((x) => x.name).join(", ") : "–"],
       ]
     : [];
