@@ -15,6 +15,7 @@ import type { Requirement, RequirementLink, SourceChange, WorkspaceModel } from 
 import type { BlockNodeT } from "./BlockNode";
 import type { CardNodeT } from "./CardNode";
 import type { ReqNodeT } from "./RequirementCardNode";
+import type { CanvasLines } from "./line-data";
 import type { TraceData } from "./trace-data";
 import { fadeKey, focusTarget, useFadeRequest } from "./fade";
 import { cardWidth, LOD_ZOOM, ROW_H, rowEnd, type Rect } from "./geometry";
@@ -119,6 +120,19 @@ export function litTraces(traces: readonly TraceData[], lookup: Map<string, AnyN
     const card = lookup.get(t.target.cardId);
     return !!card && isLitCard(card, lit);
   });
+}
+
+/**
+ * The relationships between source tables that stay lit (slice 10b, D-62): both cards lit, under Focus and in the
+ * Changes view alike; the domain's lit set is not changed. The rest fade with the veil.
+ */
+export function litSources(lines: Pick<CanvasLines, "sources">, lookup: Map<string, AnyNode>, lit: Lit): Set<string> {
+  const out = new Set<string>();
+  for (const l of lines.sources ?? []) {
+    const a = lookup.get(l.fromCardId), z = lookup.get(l.toCardId);
+    if (a && z && isLitCard(a, lit) && isLitCard(z, lit)) out.add(l.id);
+  }
+  return out;
 }
 
 /** A node's rectangle as React Flow measured it. */

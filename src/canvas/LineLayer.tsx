@@ -140,12 +140,15 @@ const RelPath = memo(
   (a, b) => a.sig === b.sig,
 );
 
-/** A relationship between source tables (slice 10b, D-62): a group, its hit target, its path and its arrow. */
+/**
+ * A relationship between source tables (slice 10b, D-62): a group, its hit target, its path and its arrow. Read-only: a
+ * click selects the table with the key, as a click on its card does; it has no menu.
+ */
 const SourcePath = memo(
-  function SourcePath({ line, a, z, className }: { sig: string; line: SourceLineData; a: Placed; z: Placed; className: string }) {
+  function SourcePath({ line, a, z, className, onSelect, testId = "line-source" }: LineProps & { line: SourceLineData; a: Placed; z: Placed; testId?: string }) {
     const g = relGeom(cardRect(a), cardRect(z), line.offset, line.fromCardId === line.toCardId);
     return (
-      <g className={className} data-testid="line-source" data-source-relationship={line.id}>
+      <g className={className} data-testid={testId} data-source-relationship={line.id} onClick={onSelect}>
         <path className="hit" d={g.d} />
         <path className="s" d={g.d} />
         <path className="ar" d={arrowHead(g.pb, g.nb)} />
@@ -203,6 +206,7 @@ const NO_MAPS = new Map<string, MapLineData>();
 const NO_TETHERS: readonly { id: string; x1: number; y1: number; x2: number; y2: number }[] = [];
 const NO_TRACES: readonly TraceData[] = [];
 const NO_SOURCES: readonly SourceLineData[] = [];
+const NO_SOURCE_IDS: ReadonlySet<string> = new Set();
 
 /** A trace line (slice 4b-2): a dashed path and, at 40 % and above, its end dot; two elements, no group (S3A-14). */
 const TracePath = memo(
@@ -366,7 +370,17 @@ function LineLayer({
       const a = placedOf(lookup.get(l.fromCardId)), z = placedOf(lookup.get(l.toCardId));
       if (!a || !z) return null;
       const className = `lnk srel${l.missing ? " missing" : ""}`;
-      return <SourcePath key={l.id} sig={`${placedSig(a)}|${placedSig(z)}|${className}|${l.offset}`} line={l} a={a} z={z} className={className} />;
+      return (
+        <SourcePath
+          key={l.id}
+          sig={`${placedSig(a)}|${placedSig(z)}|${className}|${l.offset}`}
+          line={l}
+          a={a}
+          z={z}
+          className={className}
+          onSelect={() => onSelect({ t: "card", id: l.fromCardId })}
+        />
+      );
     });
     if (el) sources.push(el);
   }
@@ -545,6 +559,7 @@ export const HoverLines = memo(function HoverLines({
 export const LitLines = memo(function LitLines({
   maps,
   rels,
+  sources = NO_SOURCE_IDS,
   lines,
   bundles = NO_BUNDLES,
   blocks = NO_BLOCKS,
@@ -554,6 +569,8 @@ export const LitLines = memo(function LitLines({
 }: {
   maps: ReadonlySet<string>;
   rels: ReadonlySet<string>;
+  /** Relationships between source tables with both cards lit (slice 10b, D-62). */
+  sources?: ReadonlySet<string>;
   /** Focus's lit trace lines (slice 4b-2, PRD item 21: both ends lit). */
   traces?: readonly TraceData[];
   /** Focus's lit lines, or a selected requirement's (slice 4b-1, coverage colours). */
@@ -572,6 +589,14 @@ export const LitLines = memo(function LitLines({
   const placed = (cardId: string) => placedOf(lookup.get(cardId));
   return (
     <svg className="line-layer lit-lines" width={1} height={1} data-testid={testId}>
+      {(lines.sources ?? NO_SOURCES)
+        .filter((l) => sources.has(l.id))
+        .map((l) => {
+          const a = placed(l.fromCardId), z = placed(l.toCardId);
+          if (!a || !z) return null;
+          const className = `lnk srel${l.missing ? " missing" : ""}`;
+          return <SourcePath key={l.id} sig={`${placedSig(a)}|${placedSig(z)}|${className}|${l.offset}`} line={l} a={a} z={z} className={className} onSelect={NOOP} testId="lit-source" />;
+        })}
       {lines.relationships
         .filter((l) => rels.has(l.id))
         .map((l) => {

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { InternalNode } from "@xyflow/react";
 import type { Lit } from "@/domain/model/lit";
 import { fadeKey, focusTarget } from "./fade";
-import { isLitCard, isLitReqCard, litNodeIds, litTraces } from "./fade-canvas";
+import { isLitCard, isLitReqCard, litNodeIds, litSources, litTraces } from "./fade-canvas";
 import type { TraceData } from "./trace-data";
 import { roundRect } from "./FadeLayer";
 
@@ -53,6 +53,18 @@ describe("requirement cards under Focus (slice 4b-2, PRD items 20–21)", () => 
     ];
     expect(litTraces(traces, lookup, l).map((x) => x.id)).toEqual(["a", "c", "d"]);
     expect(litTraces(traces, lookup, lit({ entities: new Set(["E1"]) }))).toEqual([]);
+  });
+});
+
+describe("relationships between source tables under Focus and in the Changes view (slice 10b, D-62)", () => {
+  const lookup = new Map([card("t1", "src", "T1"), card("t2", "src", "T2"), card("t3", "src", "T3")]);
+  const src = (id: string, fromCardId: string, toCardId: string) => ({ id, fromCardId, toCardId, offset: 0 });
+  const lines = { sources: [src("s12", "t1", "t2"), src("s13", "t1", "t3"), src("s11", "t1", "t1"), src("sx", "t1", "gone")] };
+
+  it("a line is lit only with both cards lit; a key to itself with its card", () => {
+    expect(litSources(lines, lookup, lit({ tables: new Set(["T1", "T2"]) }))).toEqual(new Set(["s12", "s11"]));
+    expect(litSources(lines, lookup, lit({ tables: new Set(["T2"]) }))).toEqual(new Set());
+    expect(litSources({}, lookup, lit({ tables: new Set(["T1"]) }))).toEqual(new Set());
   });
 });
 
