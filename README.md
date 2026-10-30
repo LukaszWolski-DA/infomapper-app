@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 9 are merged (slice 9, saving in panels, a project's name and description and typing the zoom: tag `slice-09`). On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 9 are merged (slice 9, saving in panels, a project's name and description and typing the zoom: tag `slice-09`); slice 10a (canvas writes on a row's save chain, a relationship from an entity to itself) is in review. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -62,12 +62,14 @@ sign-in in their development form: a start page to sign in (e-mail, organization
 organization, each organization's link, a password asked once per organization in a session, "New organization…" in
 the organization menu, and on the People tab adding a person, changing roles, removing people and the organization's
 access (its link and password); slice 9's saves in panels without false conflicts (one save per object at a time, each
-with the newest version known), a project's name and description edited on its home, and a zoom typed in the top bar.
+with the newest version known), a project's name and description edited on its home, and a zoom typed in the top bar;
+slice 10a's canvas writes on the same save chain as the panels, and a relationship from an entity to itself ("Relate to
+itself" in the card's menu), drawn as a loop.
 Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
 [slice 2p](docs/prd/slice-02p-acceptance.md), [slice 2b](docs/prd/slice-02b-acceptance.md),
-[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md).
+[slice 2c](docs/prd/slice-02c-acceptance.md), [slice 3a](docs/prd/slice-03a-acceptance.md), [slice 3b](docs/prd/slice-03b-acceptance.md), [slice 4a](docs/prd/slice-04a-acceptance.md), [slice 4p](docs/prd/slice-04p-acceptance.md), [slice 4b-1](docs/prd/slice-04b1-acceptance.md), [slice 4b-2](docs/prd/slice-04b2-acceptance.md), [slice 5a](docs/prd/slice-05a-acceptance.md), [slice 6a](docs/prd/slice-06a-acceptance.md), [slice 6b](docs/prd/slice-06b-acceptance.md), [slice 7a](docs/prd/slice-07a-acceptance.md), [slice 7b](docs/prd/slice-07b-acceptance.md), [slice 7c](docs/prd/slice-07c-acceptance.md), [slice 8](docs/prd/slice-08-acceptance.md), [slice 9](docs/prd/slice-09-acceptance.md), [slice 10a](docs/prd/slice-10a-acceptance.md).
 
 ## Getting started
 

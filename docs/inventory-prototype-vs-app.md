@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 8's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 10a's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -46,6 +46,12 @@ trace lines (4b-2); showing, hiding and resizing the side panels (5a); the view-
 a missing column's row and mapping line marks (7a); a zoom typed in the top bar (9, D-60).
 
 **Deliberate differences:**
+- **Slice 10a:** a relationship from an entity to itself is drawn as a loop at its card's top right corner, from the
+  right edge to the top edge; the prototype has no such shape. The miniature leaves it out (D-61).
+- **Slice 10a:** canvas writes on a model row (a line's status, split, swap and delete, an attribute's move and delete,
+  a column dropped on a mapping, the frame panel's "move to the frame's concept", and the panels' other writes on rows
+  their fields save) carry the newest version known and wait for each other per row (`saveRow`, `saveRows`); the
+  prototype has no versions.
 - **Slice 9:** the zoom value between − and + is a field, where the prototype shows text (`#zoomv`): a typed zoom applies
   on Enter or on leaving the field, clamped to 10–300 % (D-60).
 - **Slice 7a:** a missing column's row is muted by colour, not by opacity, and a line segment by its stroke opacity
@@ -69,6 +75,15 @@ source system's panel as a selection and a history place (7a).
 | --- | --- | --- | --- |
 | Data Vault 2.0 hints | the entity panel's hub or link name, business key, satellites by source system, unmapped attributes | `dvSection` (`settings.dv2`) | idea ("Data Vault hints in the entity panel"; not part of 7c, P12) |
 | Mixed-systems hint for combined mappings | a combined mapping across source systems suggests a business rule in a later layer (D-50) | **(uncertain)**: no function of its own found | decision only |
+
+**Deliberate differences (slice 10a, D-61):**
+- An entity can be related to itself; the prototype refuses it (`createRel`). "Relate to itself" in the card header's
+  menu creates one with the ends 0..1 → 0..n; a relationship between two entities keeps the prototype's 1..1 → 0..N.
+- The relate button clicked on the same card still refuses, and its text names that item: "Pick a different entity, or
+  use “Relate to itself” in the card's menu." (the prototype: "Pick a different entity to relate to.").
+- A self-relationship's panel keeps the prototype's title, "{entity} and {entity}", but names its end fields after the
+  loop: "At the right end" and "At the top end" (the prototype's "At the {entity} end" would show twice).
+- Swap on a self-relationship with equal cardinalities is refused with "Nothing to change.".
 
 **Not a gap:** the new prototype's attribute panel has a "Length" field for String attributes; the app has type
 parameters (AD-27).

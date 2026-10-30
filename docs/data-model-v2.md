@@ -240,7 +240,7 @@ again in its serialised write; the database slice does it in the write's transac
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
 | standard columns | | | |
-| `from_entity_id`, `to_entity_id` | uuid | no | FK `entity` |
+| `from_entity_id`, `to_entity_id` | uuid | no | FK `entity`; may be the same entity, a relationship from an entity to itself (D-61, slice 10a; no constraint either way, no migration) |
 | `label` | text | yes | e.g. “places” |
 | `from_min`, `to_min` | smallint | no | 0 or 1 |
 | `from_max`, `to_max` | text | no | `1` or `n` |

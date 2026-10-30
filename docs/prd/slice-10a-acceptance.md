@@ -673,3 +673,29 @@ With round 1 included the dense figure read −8.8 % presented (`summary.md` bef
 **AD-24's addition, proposed for approval** (one sentence under rule 3):
 
 "A self-relationship is a loop in the same SVG layer (slice 10a): one path with its hit target and end marks, 7 elements in crow's foot, no new layer (55 drawing layers with 20 loops in view, as without them); pan and zoom with 20 loops within 0.9 % of 20 ordinary relationships on the same cards (58.2 against 57.7 presented fps, faster)."
+
+## Łukasz's answers to step 5 (30 October 2026)
+
+- **The measurements are accepted**, including replacing round 1 of the A/B sitting. The reason stays as recorded above: round 1's branch side ran slow in both views, the overview included, while Windows Search finished indexing (the quiet check before that round waited 164 s, peak 23 % CPU). A drawing difference does not slow the overview, and rounds 2 and 3 were level.
+
+### Why a loop is 7 viewport elements and an ordinary relationship 6
+
+One relationship line in crow's foot (`RelPath`, `src/canvas/LineLayer.tsx`) is:
+1. `g` (the line's group, `data-testid="line-relationship"`);
+2. `path.hit` (the transparent hit target);
+3. `path.s` (the stroke);
+4. `g` (`data-testid="ends-ie"`, the end marks);
+5. `path.mk` (both ends' bars and feet, one path);
+6. a `circle.mk` for each **optional** end (`min = 0`): `ieMarker` returns a circle only then, and `RelPath` draws `{ma.circle && <circle …>}` and `{mb.circle && <circle …>}`.
+
+So the count is 5 plus one per optional end. The measuring spec's ordinary relationships have the default ends of a new relationship between two entities, **1 → 0..n**: one optional end, 6 elements. The loops have the default ends of a self-relationship (D-61), **0..1 → 0..n**: two optional ends, 7 elements. The extra element is the circle that marks the parent end as optional ("zero or one").
+
+**It is needed:** it is the notation's "zero" mark, drawn on every relationship whose end is optional. An ordinary relationship with 0..1 → 0..n is 7 elements too, and a loop set to 1 → 0..n is 6. The loop itself adds no element over an ordinary line: same group, hit target, stroke, marks group and path. Not a mistake; nothing to fix. (In UML both are 6: two `text` labels, no circles.)
+
+### AD-24's addition, the final text proposed for approval
+
+Łukasz's text, with the element count added after the explanation above:
+
+"A self-relationship is a loop in the same SVG layer (slice 10a): one path with its hit target and end marks, no new layer; in crow's foot it has the elements of any relationship line with the same ends (7 with its default 0..1 → 0..n, one circle per optional end). Measured with 20 loops in view: the same drawing layers, and pan and zoom within 1 % of 20 ordinary relationships on the same cards."
+
+It goes into `docs/decisions.md` once approved.

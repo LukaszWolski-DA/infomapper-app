@@ -870,48 +870,7 @@ A removed person's name stays in history through their change events (F10: `work
 members and the authors of its change events). The seed writes rows without change events, so a seed note or approval
 by someone removed later shows "someone" instead of their name; anything written in the app has its events.
 
-## Saving in panels (slice 9)
-
-### Writes started from the canvas are not on a row's save chain
-
-Since slice 9 a panel's saves of one row run one after another, each with the newest version known when it is sent
-(`rowSaves`, `src/ui/row-saves.ts`; `saveRow` in `src/app/_components/use-action.ts`). Some writes started from the canvas
-write the same rows as a panel field, but run through plain `run` with the version of the last render:
-
-| Canvas action | File, function | Row | Panel field on the same row |
-| --- | --- | --- | --- |
-| A mapping line's menu: status, split, delete | `src/app/_panels/canvas-host.tsx`, the mapping line's menu items (`setMappingStatusAction`, `splitMappingAction`), `deleteLine` (`deleteMappingAction`) | `mapping` | mapping panel: kind, rule, note, status, inputs |
-| A relationship line's menu: swap direction, delete | `canvas-host.tsx`, the relationship's menu items (`swapRelationshipAction`), `deleteLine` (`deleteRelationshipAction`) | `relationship` | relationship panel: label, cardinality, swap |
-| An entity card's attribute row menu: delete the attribute | `canvas-host.tsx`, the attribute row's menu (`deleteAttributeAction`) | `attribute` | attribute panel |
-| Moving an attribute (the row menu, Ctrl+arrows on the card; also the attribute and entity panels' move buttons) | `src/app/_panels/move-attribute.ts`, `useMoveAttribute` (`reorderAttributeAction`); the command `reorderAttribute` renumbers the entity's other attributes too | `attribute`, the moved one **and its renumbered siblings** | attribute panel (of any attribute of that entity) |
-| A column dropped on a mapping with a rule | `src/app/_panels/map-column.tsx`, the drop choice (`addMappingInputAction`) | `mapping` | mapping panel |
-| A frame panel's "move to the frame's concept" | `src/app/_panels/frame-panel.tsx`, `moveToFrameConcept` (`updateEntityAction`) | `entity` | entity panel: name, stereotype, concept, definition |
-
-Both orders can give a false "changed by someone else" refusal while the first write is on its way:
-
-- **Panel first, then the canvas.** The canvas action sends the version shown before the panel's save came back, and
-  the server refuses it.
-- **Canvas first, then the panel.** The canvas action's answer does not reach `rowSaves.answer`, so the chain sends
-  `max(last answered, shown)`, and both are older than the canvas's write until the page shows the new data.
-
-The canvas does not take the version from the answer (these actions return `Saved<T>` only where the panel's action
-does, and the canvas ignores it). It waits for the page's refresh: `revalidatePath` in the action, then the model
-through `ModelIndex`. `mergeFresh` (`src/canvas/fresh.ts`) concerns only the canvas's own rows (cards, frames,
-notes), not model rows.
-
-Nothing is overwritten: the refusal is the domain's (AD-12), and trying again after the page shows the change works.
-
-Not affected:
-
-- notes, which have one queue for the canvas and the note's panel (`useNotes`, slice 3b);
-- cards and frames, which have the canvas's own versions (`versions.current`);
-- creating entities, relationships, mappings or attributes from the canvas (new rows).
-
-Undo and Redo do wait for both kinds (`rowSaves.exclusive` and `ui.settled()`).
-
-**Fix (later):** send these writes through `saveRow` too, and feed a reorder's renumbered siblings with
-`rowSaves.answer`. The first candidate for slice 10 "Relationships", which changes the same actions in
-`canvas-host.tsx` (Łukasz, 29 October 2026; `docs/ideas.md`).
+## Saving in panels (slice 9; the canvas's writes joined the chain in slice 10a)
 
 ### Writes still off the save chain (slice 10a)
 

@@ -184,7 +184,8 @@ npx tsx scripts/bench-import-plan.ts --no-coverage            # slice 7c: the pl
 ONLY_REMOVE=1 npx tsx scripts/bench-import-write.ts 20000     # slice 7c: only removing Business key from 2,000 columns (bar 1 s); without it the whole write bench
 COMMITS=1 npx playwright test e2e/slice-07c/S7C-14-commits.spec.ts   # slice 7c: canvas commits per classification toggle (on demand; 3 on slice-07b and 7c)
 MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7C-14's element guard; slice 8 too (page total +1, see below)
-MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts   # slice 9's element guard (S9-14), against slice-08's own counts
+MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts   # the element guard (S9-14, S10A-12), against slice-08's own counts (slice 9 and 10a matched them)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-10a/S10A-12-loops.spec.ts   # slice 10a: 20 loops against 20 relationships, layers and pans (branch only)
 npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06b/S6B-10.spec.ts         # slice 6b: selection places, the buttons, the background refresh, phase by phase
@@ -251,6 +252,12 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - open and read the project home (`projectHome`, `loadProject`, `C360`);
   - wait for hydration (`hydrated`), which matters because typing before it can lose a field's selection. Call it after
     `goto` or `reload` and before typing.
+
+  Slice 10a's helpers do the following:
+  - open a line's menu and pick an item (`mappingLine`, `relationshipLine`, `lineMenu`, `toolboxItem`, `menuOn`);
+  - read the canvas commits once they settle (`settledCommits`);
+  - make a self-relationship as test data (`selfRelationship`) and read an entity's relationships (`relationshipsOf`);
+  - click a line or a loop at its middle (`clickLine`) in the view with room for Customer's loops (`LOOP_VIEW`).
 
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
@@ -392,5 +399,20 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   shown one if newer); a stale version, a permission or the archive cuts the saves waiting behind it (one toast), an
   invalid input does not. Every panel save action returns `Saved<T>` (`{ version, … }`); undo and redo run as
   `rowSaves.exclusive` and feed back the versions they wrote. A command takes only the fields that changed (an
-  attribute's type: absent keeps, `null` clears). Writes started from the canvas on a panel's row are not on the chain
-  yet (`docs/known-limitations.md`, slice 10's first candidate). Fields are keyed by their stored value (`fieldKey`).
+  attribute's type: absent keeps, `null` clears). Fields are keyed by their stored value (`fieldKey`).
+  **Slice 10a:**
+  - **Canvas writes are on the chain:** a line's status, split, swap and delete, an attribute's delete, a column dropped
+    on a mapping, "move to the frame's concept", and the panels' writes on rows their fields save (deletes, "Mark as
+    needed", a classification's remove and restore, archive and unarchive) go through `saveRow`.
+  - **`saveRows(rows, send)`** is for a write over several rows known before it is sent: an attribute's move (its
+    siblings are renumbered), a merge, a concept deleted with "move to", the D-05 drop. A row with `shown` is checked:
+    `send` gets its newest version. A row without it is held: its version is not sent. All listed rows wait for the
+    write, and the answer's `versions` (`runCommand`'s option `{ versions: true }`, `writtenVersions`) reach every row.
+  - **Held rows:** a cut on a held row does not stop a several-row save; only a cut on a checked row does. A held row's
+    version is not sent and the server reads it as it stands, so the save cannot overwrite anyone's change; the move
+    (or a concept's "move to") is a separate intent of the person (Łukasz, slice 10a).
+  - **Cuts:** "not found" cuts like a stale version, and a write with `{ deletes: true }` that succeeds cuts the saves
+    of its rows waiting behind it, with no toast (they would be refused as not found). A cut delete shows no Undo toast.
+  - **Rows only the server knows:** the change-to-resolve actions return `versions`, and `run` feeds them to
+    `rowSaves.answer`. Still off the chain: a canvas's rename and delete, and that action's own window
+    (`docs/known-limitations.md`).
