@@ -328,3 +328,8 @@ Items 7, 8 and 10.
 **AD-24's addition, proposed for approval** (one sentence under rule 3, in the shape of slice 10a's):
 
 "Source relationships are a line kind in the same SVG layer (slice 10b): 4 elements per line (its group, hit target, path and arrow path, no end marks or label), one shared group drawn only when the canvas has one, no new layer. Measured with 20 source lines in view: the same drawing layers (55), and pan and zoom within 0.2 % of 20 ordinary relationships on cards in the same view (58.5 against 58.4 presented fps)."
+
+## Łukasz's answers to step 4 (30 October 2026)
+
+- **The measurements are accepted**, including the fix of the empty group (`a5a6fae`).
+- **AD-24's addition**, in Łukasz's words, is in `docs/decisions.md` after the slice 10a sentence: "Source relationships are a line kind in the same SVG layer (slice 10b): 4 elements per line (group, hit target, path, arrow), one shared group drawn only when the canvas has a source line, no new layer. Measured with 20 source lines in view: the same drawing layers, and pan and zoom within 1 % of 20 ordinary relationships on cards in the same view."

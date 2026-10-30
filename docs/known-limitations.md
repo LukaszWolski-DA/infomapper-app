@@ -883,6 +883,20 @@ by someone removed later shows "someone" instead of their name; anything written
   way still sends the version it knows and can be refused as a false conflict. The reason: only the server knows which
   tables, columns and mappings an action writes, so the browser cannot hold those rows before it is sent (`saveRows`).
 
+### Relationships between source tables on the demo canvas (slice 10b, D-62)
+
+On the seed's "Customer & orders" (and Sales' "First canvas", the same layout), the line of
+`FK_order_line_order_header` runs from order_line on the right to order_header on the left at header height, mostly
+behind the Order and Line entity cards; it shows only in the gaps between them. The seed is not changed (A4, Łukasz,
+step 1 answers); a canvas where the two cards face each other shows it whole (step 3's screenshots).
+
+### Test coverage around source relationships (slice 10b, step 3)
+
+- Slice 7a has no end-to-end spec for the table panel's list of relationships between source tables
+  (`list-table-relationships`). Noted, nothing built (Łukasz, step 3 answers).
+- S7B-16 (the Changes view and Focus to the screen) is a measuring spec, outside the normal e2e run (measurement build
+  only); the normal run checks the Changes view through S7B-14 and S7B-15, and slice 10b's lit lines through S10B-07.
+
 ### Three or more loops on a collapsed card (slice 10a, D-61)
 
 A loop's from end sits on the card's right edge, 16 px lower for each further loop, but never lower than 6 px above
