@@ -94,3 +94,22 @@ export const attributeShown = (page: Page): Promise<string> =>
 
 /** Waits until the attribute panel shows "{entity}.{attribute}". */
 export const expectAttributeShown = (page: Page, expected: string) => expect.poll(() => attributeShown(page)).toBe(expected);
+
+/**
+ * Holds back the answer of the next server action whose request body contains `bodyHas` (slice 10c, S10C-09): the
+ * request reaches the server at once and is written there; the browser gets the answer `ms` later. A Playwright route
+ * on this page only, so the app has no switch for it in any build. Returns whether it has held one.
+ */
+export async function holdAnswer(page: Page, bodyHas: string, ms = 2000): Promise<() => boolean> {
+  let held = false;
+  await page.route("**/*", async (route) => {
+    const r = route.request();
+    if (!held && r.method() === "POST" && r.headers()["next-action"] && (r.postData() ?? "").includes(bodyHas)) {
+      held = true;
+      const response = await route.fetch();
+      await new Promise((done) => setTimeout(done, ms));
+      await route.fulfill({ response });
+    } else await route.continue();
+  });
+  return () => held;
+}
