@@ -180,3 +180,27 @@ None needed. One optional text (question 7): in the import review, a new relatio
 9. **F2, F3, F19:** accepted. F3 gets a unit test and a case in S10B-05 with an unrelated frame collapsed.
 
 With one arrow path per line, a source line has four elements (the group, the hit path, the path, the arrow). The element guard's expected difference from `slice-08.json` stays zero in all four views (F5): "Performance test" has no source relationship.
+
+## Step 2: the lines (30 October 2026)
+
+Items 1–6, 9, 11 and 12, as the answers set them.
+
+- **Data:** `buildLines` (`line-data.ts`) returns `sources?: SourceLineData[]`: `{ id, fromCardId, toCardId, offset, missing? }` for every source relationship with both table cards on the canvas. Keys between the same two cards are 16 px apart in either direction, as relationships are; a key to itself has one card at both ends. The field is left out when no line is drawn.
+- **Bundling (F3):** `bundleLines` (`line-geometry.ts`) keeps `sources` and leaves out a line with either card in a collapsed frame. Source lines never enter a bundle or its count. In the Mappings layer the list is empty.
+- **Layers:** the `lines` memo in `ModelCanvas.tsx` keeps `sources` in Relationships and drops it in Mappings, with the relationships.
+- **Drawing:** `SourcePath` (`LineLayer.tsx`), in its own group first in the layer, so it paints below the other lines. It has four elements: the group, the hit path, the path, and the arrow from `arrowHead` (`geometry.ts`; 7 px long, 7 px wide, its tip at the referenced card's edge). The geometry is `relGeom`, the loop included. The cache key and signature follow the relationship line's, so drags, widths, collapsed cards and row filters redraw it.
+- **Look (`canvas.css`):** the class is `lnk srel` (`src` is taken by source cards). The line is `--im-ink-3`, 1.2 px; the arrow is filled in the same colour. Missing: `stroke-dasharray: 5 4` on the path only, so the arrow stays whole. On a selected mapping or relationship the arrow fades with the other lines (`.dimmed .lnk:not(.hl) .ar`). Hover is the existing `.lnk:hover .s`.
+- **Miniature (item 11):** `Overview.tsx` reads `relationships` only, so there is no change.
+- **Not yet (step 3):** the click (the line has no `onClick` yet; its hit path shows the pointer), Focus's lit copy, live canvases. Until then a click on the line does nothing.
+
+**Tests:**
+- Unit: `src/canvas/source-lines.test.ts` (9 tests: `buildLines`, bundling with an unrelated and a related frame collapsed, layer mode, the arrow on a line and on a loop). The fixture `sourceRelationship` is in `src/domain/__fixtures__/domain.ts`.
+- e2e, `e2e/slice-10b/`: S10B-01 (look, ends, arrow, both notations, no line without order_header), S10B-02 (the loop and a nested second key, imported into ERP as test data), S10B-03 (dashed after a re-import without the key; the panel's "· missing"), S10B-04 (layers), S10B-05 (an unrelated frame collapsed; order_header in a collapsed frame: no line, no relationship bundle, no bundle at order_line), S10B-09 (drag, width, collapsed card). All 6 pass.
+- The earlier specs of what the step touches: slices 1a, 1b, 2a, 2c and 10a, `S3B-13`, `S4B2-07`: 122 passed in 18.1 min, none changed.
+- CI: `npm run lint`, `npm run typecheck`, `npm test` (110 files, 1,431 tests) pass.
+
+**Assumed:**
+- S10B-02 and S10B-03 import a small file in the standard (`employeesFile`, `e2e/slice-10b/helpers.ts`) with `FK_employees_manager` as the HR sample has it, plus `FK_employees_mentor` for the second key, rather than the whole HR sample. That way they can name both keys.
+- The arrow's size (7 × 7 px) is mine; step 3's screenshots show it.
+
+**How to check:** run `npx playwright test e2e/slice-10b`. In the app, open "Customer & orders": a grey line runs from order_line's left edge to order_header's right edge, with the arrow at order_header (mostly behind the Order and Line cards, F13). Switch to Maps to hide it, and collapse the frame around the tables to remove it.
