@@ -246,3 +246,11 @@ Items 7, 8 and 10.
 ### D-62 (final text, for Łukasz's approval)
 
 "**D-62** Relationships between source tables on the canvas (slice 10b). A foreign key between source tables, from an import, is drawn on a canvas when the cards of both tables are on it. It is a grey line between the cards, lighter and thinner than a relationship between entities, anchored as relationships are. It has a small arrow at the referenced table, as its own path so it fades with its line, and no cardinality marks or label. Source lines paint below the other lines. Several keys between the same two tables are drawn 16 px apart. A key from a table to itself is drawn as the loop of D-61, its arrow on the top edge. A relationship the source no longer declares is dashed, and its arrow stays solid. Source relationships are read-only: the line has no menu (a right-click opens the canvas's toolbox), and a click on it selects the table with the key, as a click on its card does. They show in the layers Everything and Relationships. They are left out when either card is in a collapsed frame: never in a bundle, never counted. Under Focus and in the Changes view a line is lit when both of its cards are lit, and fades otherwise. On a live canvas a line is drawn between any two of its table cards, context cards included. The miniature leaves them out. Accepted by Łukasz, {date}."
+
+## Łukasz's answers to step 3 (30 October 2026)
+
+- **The arrow's size** (7 × 7 px): accepted.
+- **D-62:** accepted with two cuts, which were implementation details, not decisions: "anchored as relationships are" and "as its own path so it fades with its line". It is in `docs/decisions.md`, accepted on 30 October 2026.
+- **Coverage gaps, noted; nothing to build in this slice:**
+  - slice 7a has no spec for the table panel's relationship list;
+  - S7B-16 (the Changes view to the screen) is a measuring spec, outside the normal run.
