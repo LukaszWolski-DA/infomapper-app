@@ -7,7 +7,7 @@ import type { CardNodeT } from "./CardNode";
 import type { CanvasLayer } from "@/domain/types";
 import { BLOCK } from "@/domain/model/frames";
 import { cardRect, cardWidth, clamp, curve, fNode, HEAD_H, relGeom, rowEnd, type End, type Placed, type Pt, type Rect } from "./geometry";
-import type { CanvasLines, MapLineData, RelLineData } from "./line-data";
+import type { CanvasLines, MapLineData, RelLineData, SourceLineData } from "./line-data";
 
 export const placedOf = (n: InternalNode | undefined): Placed | null =>
   n && !n.hidden ? { x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, card: (n as unknown as CardNodeT).data.card } : null;
@@ -105,6 +105,8 @@ export interface BundledLines {
   /** Lines that touch no collapsed frame, drawn as before. */
   mappings: MapLineData[];
   relationships: RelLineData[];
+  /** Relationships between source tables with both cards drawn (slice 10b): never bundled, never counted (D-62). */
+  sources?: SourceLineData[];
   bundles: Bundle[];
 }
 
@@ -154,7 +156,9 @@ export function bundleLines(lines: CanvasLines, collapsedFrameOf: (cardId: strin
       add("rel", `r|${ends[0]!.key}|${ends[1]!.key}`, ends[0]!, ends[1]!, r.id);
     }
   }
-  return { mappings, relationships, bundles: [...bundles.values()] };
+  // relationships between source tables (slice 10b, D-62): left out when either card is in a collapsed frame
+  const sources = layer === "mappings" ? [] : (lines.sources ?? []).filter((r) => !collapsedFrameOf(r.fromCardId) && !collapsedFrameOf(r.toCardId));
+  return { mappings, relationships, ...(sources.length ? { sources } : {}), bundles: [...bundles.values()] };
 }
 
 /** A bundle's stroke grows with its count (prototype: 1.6 + 1.3 · log2 n, at most 4 more). */

@@ -288,6 +288,16 @@ export function relGeom(A: Rect, B: Rect, off: number, self = false) {
   return { d: `M${pa.x},${pa.y} C${c1.x},${c1.y} ${c2.x},${c2.y} ${pb.x},${pb.y}`, mid: bez(pa, c1, c2, pb, 0.5), pa, pb, na, nb };
 }
 
+/** The arrow's size in canvas pixels: from its tip to its base, and half its base. */
+export const ARROW = { length: 7, half: 3.5 } as const;
+
+/** The arrow of a relationship between source tables (slice 10b, D-62): its tip at the card edge `p`, pointing into the card (`n`: the edge's outward normal). */
+export function arrowHead(p: Pt, n: Pt): string {
+  const t = { x: -n.y, y: n.x }, b = { x: p.x + n.x * ARROW.length, y: p.y + n.y * ARROW.length };
+  const r = (v: number) => +v.toFixed(2);
+  return `M${r(p.x)},${r(p.y)}L${r(b.x + t.x * ARROW.half)},${r(b.y + t.y * ARROW.half)}L${r(b.x - t.x * ARROW.half)},${r(b.y - t.y * ARROW.half)}Z`;
+}
+
 /** Crow's foot end: many = foot, one = bar; optional = circle, mandatory = a second bar. */
 export function ieMarker(p: Pt, n: Pt, min: 0 | 1, max: "1" | "n") {
   const t = { x: -n.y, y: n.x };

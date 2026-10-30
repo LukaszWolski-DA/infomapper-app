@@ -1,5 +1,6 @@
 // The lines of one canvas, as plain data: mappings (with all their inputs, D-49) and relationships between the cards
-// on it, built on the server next to the cards. Which lines a selection emphasises is decided here too.
+// on it, built on the server next to the cards. Which lines a selection emphasises is decided here too. Slice 10b
+// (D-62): relationships between source tables, a list of their own (`sources`).
 
 import type { Uuid } from "@/domain/ids";
 import { checkMappingTypes } from "@/domain/model/type-check";
@@ -45,9 +46,25 @@ export interface RelLineData {
   offset: number;
 }
 
+/** A foreign key between two source tables (slice 10b, D-62): read-only, from an import; drawn between the table cards. */
+export interface SourceLineData {
+  /** The source relationship id. */
+  id: Uuid;
+  /** The card of the table with the key; the arrow is at the other end. */
+  fromCardId: Uuid;
+  /** The card of the referenced table (the same card for a key to itself: a loop, D-61). */
+  toCardId: Uuid;
+  /** Several keys between the same two tables are drawn 16 px apart, as parallel relationships are. */
+  offset: number;
+  /** The source no longer declares it (`missing_since`): drawn dashed. */
+  missing?: true;
+}
+
 export interface CanvasLines {
   mappings: MapLineData[];
   relationships: RelLineData[];
+  /** Relationships between source tables (slice 10b); absent: none. Code that does not know them leaves them out. */
+  sources?: SourceLineData[];
 }
 
 /** Mapping lines need the attribute's card and at least one input card; relationships need both entity cards. */
@@ -113,7 +130,19 @@ export function buildLines(
       offset: (n - 1) * 16,
     });
   }
-  return { mappings, relationships };
+
+  // relationships between source tables (slice 10b): both table cards on the canvas; the column pairs are not read
+  const sourcePairs = new Map<string, number>();
+  const sources: SourceLineData[] = [];
+  for (const r of model.sourceRelationships) {
+    const from = tableCard.get(r.source_table_id), to = tableCard.get(r.to_source_table_id);
+    if (!from || !to) continue;
+    const key = [from, to].sort().join("|");
+    const n = (sourcePairs.get(key) ?? 0) + 1;
+    sourcePairs.set(key, n);
+    sources.push({ id: r.id, fromCardId: from, toCardId: to, offset: (n - 1) * 16, ...(r.missing_since ? { missing: true as const } : {}) });
+  }
+  return { mappings, relationships, ...(sources.length ? { sources } : {}) };
 }
 
 /** What is selected on the canvas; a hovered row or line uses the same shape (slice 1b, C-10). */

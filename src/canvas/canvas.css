@@ -193,6 +193,11 @@
 .im-canvas .rel .mk { fill: none; stroke: var(--im-rel); stroke-width: 1.6; pointer-events: none }
 .im-canvas .rel circle.mk { fill: var(--im-canvas) }
 .im-canvas .rel.sel .mk { stroke-width: 2.4 }
+/* relationships between source tables (slice 10b, D-62): lighter and thinner than relationships, an arrow at the
+   referenced table, dashed when the source no longer declares it; faded with the other lines by stroke and fill opacity */
+.im-canvas .srel .s { stroke: var(--im-ink-3); stroke-width: 1.2 }
+.im-canvas .srel.missing .s { stroke-dasharray: 5 4 }
+.im-canvas .srel .ar { fill: var(--im-ink-3); stroke: none; pointer-events: none }
 /* bundled lines at a collapsed frame (slice 2c, prototype .lnk.bundle): the width grows with the count (inline) */
 .im-canvas .lnk.bundle .s { stroke-linecap: round }
 .im-canvas .lnk.bundle .chip circle { stroke-width: 1.6 }
@@ -213,6 +218,7 @@
 /* a selection: its lines stay, the others fade (prototype .dimmed .lnk:not(.hl)) */
 .im-canvas .dimmed .lnk:not(.hl) .s,
 .im-canvas .dimmed .lnk:not(.hl) .mk { stroke-opacity: .12 }
+.im-canvas .dimmed .lnk:not(.hl) .ar,
 .im-canvas .dimmed .lnk:not(.hl) .end,
 .im-canvas .dimmed .lnk:not(.hl) .mult,
 .im-canvas .dimmed .lnk:not(.hl) .rlab text { fill-opacity: .12 }
