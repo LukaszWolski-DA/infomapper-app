@@ -333,3 +333,14 @@ Items 7, 8 and 10.
 
 - **The measurements are accepted**, including the fix of the empty group (`a5a6fae`).
 - **AD-24's addition**, in Łukasz's words, is in `docs/decisions.md` after the slice 10a sentence: "Source relationships are a line kind in the same SVG layer (slice 10b): 4 elements per line (group, hit target, path, arrow), one shared group drawn only when the canvas has a source line, no new layer. Measured with 20 source lines in view: the same drawing layers, and pan and zoom within 1 % of 20 ordinary relationships on cards in the same view."
+
+## Step 5: the closing (30 October 2026)
+
+- **Docs:** AD-24's addition in `docs/decisions.md`; `data-model-v2.md`, `inventory-prototype-vs-app.md`, `ideas.md`,
+  `known-limitations.md`, CLAUDE.md and the README (slice 10b in review).
+- **Full e2e run** (from scratch, no dev server running): 441 passed, 1 failed, 1 skipped, **3,977 s** (slice 10a:
+  4,053 s). The failure was S4B2-06, a known flake under the full run (slice 7b's step 6 follow-up). On its own it passed
+  3 of 3 (46.6 s, 46.3 s, 46.4 s). The run's error text was not kept.
+- **CI:** `npm run lint`, `npm run typecheck` and `npm test` (110 files, 1,432 tests) pass.
+- **Backup of the KB model:** `.data/backups/dev-db-20261030-1314.json` and `.data/backups/kb-model-latest.json` (local
+  only, git-ignored).
