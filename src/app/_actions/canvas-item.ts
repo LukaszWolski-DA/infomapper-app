@@ -77,7 +77,8 @@ export async function placeCardAction(
       frames,
     };
     return placeOnCanvas(ctx, access, state, { ...input, canvasId });
-  });
+    // a drop that moves its entity to the frame's concept answers with the entity's version (slice 10a, D-05)
+  }, { versions: !!input?.moveToConcepts });
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }

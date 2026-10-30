@@ -27,15 +27,18 @@ export function DeleteConceptDialog({
   frames?: number;
   onClose: () => void;
 }) {
-  const { run, pending } = useAction();
+  const { saveRows, pending } = useAction();
   const [moveTo, setMoveTo] = useState(others[0]?.id ?? "");
   const n = c.entities.length;
   const blocked = n > 0 && others.length === 0;
 
   async function confirm() {
     const target = others.find((o) => o.id === moveTo);
-    const result = await run(
-      () => deleteConceptAction(workspaceId, { conceptId: c.id, expectedVersion: c.version, moveToConceptId: n ? moveTo : null }),
+    // on the save chains of the concept and of the entities it moves (slice 10a): the concept's version is sent, the
+    // entities are held, and their versions come back
+    const result = await saveRows(
+      [{ id: c.id, shown: c.version }, ...(n ? c.entities.map((e) => ({ id: e.id })) : [])],
+      (versionOf) => deleteConceptAction(workspaceId, { conceptId: c.id, expectedVersion: versionOf(c.id), moveToConceptId: n ? moveTo : null }),
       n ? `Moved the entities to ${target?.name ?? ""} and deleted ${c.name}.` : `Deleted the concept ${c.name}.`,
       { undoable: true },
     );

@@ -16,10 +16,12 @@ export const btnClass =
   "inline-flex h-[26px] items-center rounded-md border border-im-line bg-im-surface px-[9px] text-xs text-im-ink hover:bg-im-hover disabled:cursor-default disabled:opacity-50 disabled:hover:bg-im-surface";
 
 function useArchive({ workspaceId, workspaceName, version, archived }: Props) {
-  const { run, pending } = useAction();
+  const { saveRow, pending } = useAction();
+  // on the workspace's save chain, with the settings form (slice 10a)
   const toggle = () =>
-    run(
-      () => (archived ? unarchiveWorkspaceAction : archiveWorkspaceAction)({ workspaceId, expectedVersion: version }),
+    saveRow(
+      { id: workspaceId, version },
+      (v) => (archived ? unarchiveWorkspaceAction : archiveWorkspaceAction)({ workspaceId, expectedVersion: v }),
       archived ? `${workspaceName} is editable again.` : `Archived ${workspaceName}. It is read-only now.`,
     );
   return { toggle, pending };

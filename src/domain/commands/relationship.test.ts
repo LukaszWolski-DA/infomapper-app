@@ -16,10 +16,20 @@ describe("createRelationship (relate button on an entity card, slice 1b)", () =>
     expect(r.writeSet.events).toMatchObject([{ operation: "create", object_type: "relationship" }]);
   });
 
-  it("refuses relating an entity to itself, and unknown or deleted entities", () => {
-    expect(createRelationship(makeCtx(), access("owner"), ends, { fromEntityId: ids.customer, toEntityId: ids.customer })).toMatchObject({
-      ok: false, error: { code: "invalid", message: "Pick a different entity to relate to." },
+  it("relates an entity to itself with the ends 0..1 to 0..n (slice 10a, D-61): one insert, one change event", () => {
+    const self = { from: entity(ids.customer), to: entity(ids.customer) };
+    const r = createRelationship(makeCtx(), access("modeler"), self, { fromEntityId: ids.customer, toEntityId: ids.customer });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value.relationship).toMatchObject({
+      from_entity_id: ids.customer, to_entity_id: ids.customer, label: null, from_min: 0, from_max: "1", to_min: 0, to_max: "n", version: 1,
     });
+    expect(r.writeSet.writes).toMatchObject([{ kind: "insert", table: "relationship" }]);
+    expect(r.writeSet.events).toMatchObject([{ operation: "create", object_type: "relationship" }]);
+    expect(createRelationship(makeCtx(), access("reviewer"), self, { fromEntityId: ids.customer, toEntityId: ids.customer })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(createRelationship(makeCtx(), access("owner", archived), self, { fromEntityId: ids.customer, toEntityId: ids.customer })).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+
+  it("refuses unknown or deleted entities", () => {
     expect(createRelationship(makeCtx(), access("owner"), { ...ends, to: null }, input)).toMatchObject({ ok: false, error: { code: "not_found" } });
     expect(createRelationship(makeCtx(), access("owner"), { ...ends, from: entity(ids.customer, { deleted_at: NOW }) }, input)).toMatchObject({ ok: false, error: { code: "not_found" } });
   });
@@ -53,6 +63,21 @@ describe("relationships in the right panel", () => {
       ok: true,
       value: { relationship: { from_entity_id: ids.salesOrder, to_entity_id: ids.customer, from_min: 0, from_max: "n", to_min: 1, to_max: "1", label: "places" } },
     });
+  });
+
+  it("swaps a relationship from an entity to itself: only the cardinalities change places (slice 10a, F10)", () => {
+    const self = { relationship: relationship({ from_entity_id: ids.customer, to_entity_id: ids.customer, from_min: 0, from_max: "1", to_min: 0, to_max: "n" }) };
+    expect(swapRelationship(makeCtx(), access("modeler"), self, ref)).toMatchObject({
+      ok: true,
+      value: { relationship: { from_entity_id: ids.customer, to_entity_id: ids.customer, from_min: 0, from_max: "n", to_min: 0, to_max: "1", version: 2 } },
+    });
+  });
+
+  it("refuses a swap that changes nothing: a relationship from an entity to itself with equal ends (slice 10a, F10)", () => {
+    const self = { relationship: relationship({ from_entity_id: ids.customer, to_entity_id: ids.customer, from_min: 0, from_max: "n", to_min: 0, to_max: "n" }) };
+    expect(swapRelationship(makeCtx(), access("modeler"), self, ref)).toMatchObject({ ok: false, error: { code: "invalid", message: "Nothing to change." } });
+    const between = { relationship: relationship({ from_min: 0, from_max: "n", to_min: 0, to_max: "n" }) };
+    expect(swapRelationship(makeCtx(), access("modeler"), between, ref)).toMatchObject({ ok: true, value: { relationship: { from_entity_id: ids.salesOrder, to_entity_id: ids.customer } } });
   });
 
   it("deletes softly", () => {

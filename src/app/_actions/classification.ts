@@ -64,8 +64,11 @@ export async function removeClassificationAction(workspaceId: string, input: Rem
   return command(workspaceId, (ctx, access, m) => removeClassification(ctx, access, { classifications: m.classifications, links: m.classificationLinks }, input));
 }
 
-export async function restoreClassificationAction(workspaceId: string, input: RestoreClassificationInput): Promise<ActionResult<{ name: string }>> {
-  return command(workspaceId, (ctx, access, m) => value(restoreClassification(ctx, access, m, input), (v: { classification: Classification }) => ({ name: v.classification.name })));
+/** Restores a removed classification; its version lets a rename right after it through (slice 10a, F1). */
+export async function restoreClassificationAction(workspaceId: string, input: RestoreClassificationInput): Promise<ActionResult<Saved<{ name: string }>>> {
+  return command(workspaceId, (ctx, access, m) =>
+    value(restoreClassification(ctx, access, m, input), (v: { classification: Classification }) => ({ name: v.classification.name, version: v.classification.version })),
+  );
 }
 
 export async function setClassificationAction(workspaceId: string, input: SetClassificationInput): Promise<ActionResult<{ name: string; objectName: string; on: boolean }>> {

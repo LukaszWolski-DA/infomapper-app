@@ -35,7 +35,7 @@ const plural = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? o
 export function FramePanel({ frameId }: { frameId: Uuid }) {
   const ui = useContext(CanvasUiCtx);
   const p = usePanel();
-  const { run } = useAction();
+  const { saveRow } = useAction();
   const { nameFocus, setNameFocus } = usePanels();
   const nameRef = useRef<HTMLInputElement>(null);
   const view = ui.frameView(frameId);
@@ -74,7 +74,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
   const moveToFrameConcept = (entityId: Uuid) => {
     const e = ix.entity.get(entityId);
     if (!e || !frameConcept) return;
-    void run(() => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: e.version, conceptId: frameConcept.id }), `${e.name} now belongs to ${frameConcept.name}.`, {
+    void saveRow(e, (v) => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v, conceptId: frameConcept.id }), `${e.name} now belongs to ${frameConcept.name}.`, {
       undoable: true,
     });
   };

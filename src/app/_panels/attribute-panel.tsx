@@ -96,7 +96,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       a,
       (v) => deleteAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: v }),
       `Attribute deleted${n ? ` together with ${n} mapping${n > 1 ? "s" : ""}` : ""}`,
-      { undoable: true },
+      { undoable: true, deletes: true },
     );
     if (result.ok) ui.select(null);
   }

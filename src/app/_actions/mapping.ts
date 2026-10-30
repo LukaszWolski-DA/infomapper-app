@@ -28,13 +28,14 @@ import type { Uuid } from "@/domain/ids";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { WorkspaceModel } from "@/domain/types";
-import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
+import { runCommand, type ActionResult, type CommandOptions, type Saved } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 
 async function mappingCommand<T>(
   workspaceId: unknown,
   build: (ctx: CommandContext, access: WorkspaceAccess, model: WorkspaceModel, store: DataStore) => Promise<CommandResult<T>> | CommandResult<T>,
+  options: CommandOptions = {},
 ): Promise<ActionResult<T>> {
   const result = await runCommand<T>(async (ctx, store, user) => {
     if (typeof workspaceId !== "string") return NOT_FOUND;
@@ -42,7 +43,7 @@ async function mappingCommand<T>(
     if (!workspace) return NOT_FOUND;
     const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
     return build(ctx, access, await store.model.load(workspace.id), store);
-  });
+  }, options);
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
@@ -124,14 +125,18 @@ export async function deleteMappingAction(workspaceId: string, input: { mappingI
 export async function splitMappingAction(
   workspaceId: string,
   input: { mappingId: string; expectedVersion: number },
-): Promise<ActionResult<{ mappings: number; notice: string | null }>> {
+): Promise<ActionResult<Saved<{ mappings: number; notice: string | null }>>> {
   return mappingCommand(workspaceId, (ctx, access, model) => {
     const result = splitMapping(ctx, access, mappingState(model, input?.mappingId), input);
-    return result.ok ? { ...result, value: { mappings: result.value.newMappingIds.length + 1, notice: result.value.notice } } : result;
+    // the kept mapping's version: its next save sends it (slice 10a, F16)
+    return result.ok ? { ...result, value: { mappings: result.value.newMappingIds.length + 1, notice: result.value.notice, version: result.value.mapping.version } } : result;
   });
 }
 
-/** “Merge mappings” (D-49): mappings of one attribute become one transformation with the given rule. */
+/**
+ * “Merge mappings” (D-49): mappings of one attribute become one transformation with the given rule. The answer carries
+ * the versions it wrote (slice 10a: a save over several rows).
+ */
 export async function mergeMappingsAction(workspaceId: string, input: MergeMappingsInput): Promise<ActionResult<{ mappingId: Uuid }>> {
   return mappingCommand(workspaceId, async (ctx, access, model, store) => {
     const ids = new Set(Array.isArray(input?.mappings) ? input.mappings.map((m) => m?.mappingId) : []);
@@ -143,5 +148,5 @@ export async function mergeMappingsAction(workspaceId: string, input: MergeMappi
       input,
     );
     return result.ok ? { ...result, value: { mappingId: result.value.mapping.id } } : result;
-  });
+  }, { versions: true });
 }

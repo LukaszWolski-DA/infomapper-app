@@ -32,7 +32,7 @@ const SENTENCE: [LabelTargetKind, string, string][] = [
 export function LabelPanel({ label }: { label: Label }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
-  const { run, saveRow, pending } = useAction();
+  const { saveRow, pending } = useAction();
   const workingContext = useWorkingContext();
   const liveCanvas = p.liveCanvases[label.id] ?? null;
   const openLive = useOpenLiveCanvas(p.workspaceId, p.projectId);
@@ -75,11 +75,13 @@ export function LabelPanel({ label }: { label: Label }) {
     // after step 2); the undo brings the label back, not the context
     const wasContext = workingContext?.active?.id === label.id;
     if (wasContext) workingContext!.set(null, { silent: true });
-    const r = await run(
-      () => deleteLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: label.version }),
+    // on the label's save chain, with its name (slice 10a)
+    const r = await saveRow(
+      label,
+      (v) => deleteLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: v }),
       // a live canvas became a normal canvas in the same step (slice 3b, PRD item 13)
       (v) => `${wasContext ? `Deleted the label ${v.name}; the working context is off.` : `Deleted the label ${v.name}.`}${v.hadLiveCanvas ? " Its live canvas became a normal canvas." : ""}`,
-      { undoable: true },
+      { undoable: true, deletes: true },
     );
     if (r.ok) ui.select(null);
     else if (wasContext) workingContext!.set(label.id, { silent: true });

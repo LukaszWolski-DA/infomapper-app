@@ -17,23 +17,39 @@ change); the requirement panel shows the stored values again (its reset counter)
 the last saved value. One behaviour for every field would be clearer: either all go back, or all keep the typed text
 with the stored value beside it (the idea above). Łukasz kept today's behaviour in slice 9 (29 October 2026).
 
-## Canvas actions on a row's save chain (slice 9, after step 2): first candidate for slice 10 "Relationships"
+## Canvas actions on a row's save chain (slice 9, after step 2): done in slice 10a
 
-These writes are started from the canvas and write a row a panel field also writes:
+The canvas's writes on a model row, and the panels' other writes on rows their fields save, run through `saveRow` or
+`saveRows`, and actions whose rows only the server knows feed `rowSaves.answer` (`docs/prd/slice-10a-acceptance.md`).
+What is still off the chain is in `docs/known-limitations.md` ("Writes still off the save chain (slice 10a)").
 
-- the mapping and relationship line menus and the attribute row's delete, in `src/app/_panels/canvas-host.tsx`;
-- moving an attribute (`useMoveAttribute`);
-- a column dropped on a mapping (`map-column.tsx`);
-- the frame panel's "move to the frame's concept".
+## The plan after slice 10a (Łukasz, 30 October 2026)
 
-They send the rendered version through `run`, not through `saveRow`. A quick panel save next to one of them can still be refused as a false conflict until the page refreshes (`docs/known-limitations.md`, "Writes started from the canvas are not on a row's save chain").
+- **10b: relationships between source tables as lines on the canvas**, reusing the loop for a table that refers to
+  itself (see "Relationships between source tables as lines on the canvas" below).
+- **10c: an attribute copied to another entity as a foreign key tied to a relationship.** A data model and local file
+  format change, with a backup of Łukasz's KB model as a step of its own (see "Copying an attribute to another entity").
+- **11: an alias for entities and attributes** (see the entry below).
+- **12: the home pages:** undo and redo there, deleting a project, and the canvas tiles' thumbnails after measuring the
+  home's load.
+- **13: one behaviour for a refused save in every field** (F6, above), with the typed value kept on a conflict (the
+  first entry).
 
-The fix:
+## Role names per relationship end (slice 10a, PRD section 9)
 
-- send these actions through `saveRow`;
-- feed the versions of the siblings that `reorderAttribute` renumbers to `rowSaves.answer`, so a sibling's next panel save sends them.
+A name for each end of a relationship ("parent", "child"; "manager", "report"), shown in the panel's sentences and,
+perhaps, beside the end marks. Most useful on a self-relationship, whose two ends name the same entity. A data model
+change (two columns on `relationship`).
 
-Łukasz made it the first candidate for slice 10 "Relationships", which changes the same actions in `canvas-host.tsx` (29 October 2026).
+## A mark for self-relationships on a collapsed frame's block (slice 10a, PRD section 9)
+
+A member's loop is a line inside one frame, so a collapsed frame shows nothing of it (D-61). A small mark on the
+block's row of that entity, or a count, would tell that the entity relates to itself.
+
+## The relate button opens the details panel (slice 10a, F13)
+
+"Relate to itself" opens a hidden details panel, as it leads to the panel's fields (D-54). The relate button keeps the
+panel as it is; doing the same there would make the two consistent.
 
 ## Mapping by drag: from the attribute side too (slice 1b, step 2)
 
@@ -369,6 +385,5 @@ change first.
 - **An alias for entities and attributes**, with a switch to show the alias instead of the name on the canvas. A data
   model change (`docs/data-model-v2.md`, the local file's next format), the cards' text fit and the element guard; decide
   whether the import reads an alias.
-- **A relationship from an entity to itself** (parent and child). Refused today on purpose, as in the prototype
-  (`createRel`: "Pick a different entity to relate to."; `createRelationship` and its test). Allowing it changes the
-  prototype's behaviour (a decision) and needs a loop drawn in the line layer (AD-24, measured).
+- **A relationship from an entity to itself** (parent and child). **Done in slice 10a** (D-61): "Relate to itself" in
+  the card header's menu, drawn as a loop.

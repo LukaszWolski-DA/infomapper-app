@@ -5,10 +5,13 @@
 // - A new entity from the Entity tool or the toolbox (D-46): in the concept used last, else the first one; its name is
 //   ready to type in the right panel.
 // - A relationship from one entity card to another, then its panel for the label and cardinality.
+// - Slice 10a (D-61): “Relate to itself” in an entity card header's menu; the relate button on the same card refuses.
 // - The toolbox for what was right-clicked (D-19), with the actions of the prototype that exist so far. A row's toolbox
 //   has only that row's actions; the card's are in its header's toolbox (D-52).
 // - Ctrl/Alt + arrows on a selected attribute (D-36).
 // - Delete on a selected mapping or relationship line: deleted at once, with Undo in the toast (slice 1b).
+// - Slice 10a: the writes on a model row (a line's status, split, swap, delete; an attribute's delete) save through the
+//   row's save chain (`saveRow`), as the panel's fields do, so the two never refuse each other as a conflict.
 // - “Show its sources” and “Show the entities it feeds” place them beside the card (B-08).
 // - Frames (slice 2b): “New frame here” on the empty canvas; a frame's toolbox (Rename…, Fit frame to its content,
 //   Select its cards, Zoom to frame, Delete frame); a new frame's name is ready to type in the panel. Slice 2c:
@@ -94,7 +97,7 @@ export function useCanvasHost({
     openDetails();
     focusField(id);
   };
-  const { run } = useAction();
+  const { run, saveRow } = useAction();
   const toast = useToast();
   const [toolbox, setToolbox] = useState<ToolboxRequest | null>(null);
   const [deleting, setDeleting] = useState<Uuid | null>(null);
@@ -148,7 +151,7 @@ export function useCanvasHost({
       const from = cardById.get(fromCardId), to = cardById.get(toCardId);
       if (from?.kind !== "ent" || to?.kind !== "ent") return;
       if (from.id === to.id) {
-        toast("Pick a different entity to relate to.");
+        toast("Pick a different entity, or use “Relate to itself” in the card's menu.");
         return;
       }
       const result = await run(
@@ -160,6 +163,24 @@ export function useCanvasHost({
     [editable, cardById, toast, run, workspaceId, ui],
   );
 
+  /**
+   * A relationship from the card's entity to itself (slice 10a, D-61), from the card header's menu. It leads to the
+   * panel's fields, so a hidden details panel opens (D-54, F13); the relate button keeps the panel as it is.
+   */
+  const relateToItself = useCallback(
+    async (card: HostCard) => {
+      if (!editable || card.kind !== "ent") return;
+      const result = await run(
+        () => createRelationshipAction(workspaceId, { fromEntityId: card.targetId, toEntityId: card.targetId }),
+        "Relationship added. Name it and set the cardinality on the right.",
+      );
+      if (!result.ok) return;
+      ui.select({ t: "rel", id: result.value.relationshipId });
+      openDetails();
+    },
+    [editable, run, workspaceId, ui, openDetails],
+  );
+
   /** Deletes a mapping or a relationship at once; the toast offers Undo (slice 1b). */
   const deleteLine = useCallback(
     async (line: { t: "map" | "rel"; id: Uuid }) => {
@@ -167,18 +188,19 @@ export function useCanvasHost({
       if (line.t === "map") {
         const m = ix.mapping.get(line.id);
         if (!m) return;
-        const r = await run(() => deleteMappingAction(workspaceId, { mappingId: m.id, expectedVersion: m.version }), "Mapping deleted", { undoable: true });
+        const r = await saveRow(m, (v) => deleteMappingAction(workspaceId, { mappingId: m.id, expectedVersion: v }), "Mapping deleted", { undoable: true, deletes: true });
         if (r.ok) ui.select(null);
       } else {
         const rel = ix.model.relationships.find((x) => x.id === line.id);
         if (!rel) return;
-        const r = await run(() => deleteRelationshipAction(workspaceId, { relationshipId: rel.id, expectedVersion: rel.version }), "Relationship deleted", {
+        const r = await saveRow(rel, (v) => deleteRelationshipAction(workspaceId, { relationshipId: rel.id, expectedVersion: v }), "Relationship deleted", {
           undoable: true,
+          deletes: true,
         });
         if (r.ok) ui.select(null);
       }
     },
-    [editable, ix, run, workspaceId, ui],
+    [editable, ix, saveRow, workspaceId, ui],
   );
 
   useEffect(() => {
@@ -231,6 +253,7 @@ export function useCanvasHost({
           toast(RELATE_HINT);
         },
       });
+      items.push({ label: "Relate to itself", act: () => void relateToItself(card) });
     }
     if (editable) {
       items.push({
@@ -335,7 +358,7 @@ export function useCanvasHost({
           items.push({
             label: STATUS_LABEL[status],
             checked: m.status === status,
-            act: () => void run(() => setMappingStatusAction(workspaceId, { mappingId: m.id, expectedVersion: m.version, status })),
+            act: () => void saveRow(m, (v) => setMappingStatusAction(workspaceId, { mappingId: m.id, expectedVersion: v, status })),
           });
         }
       }
@@ -349,8 +372,9 @@ export function useCanvasHost({
           items.push({
             label: "Split into separate mappings",
             act: () =>
-              void run(
-                () => splitMappingAction(workspaceId, { mappingId: m.id, expectedVersion: m.version }),
+              void saveRow(
+                m,
+                (v) => splitMappingAction(workspaceId, { mappingId: m.id, expectedVersion: v }),
                 (v) => v.notice ?? `Split into ${v.mappings} separate mappings.`,
               ),
           });
@@ -375,9 +399,8 @@ export function useCanvasHost({
       if (!r) return items;
       items.push({ head: `${ix.entity.get(r.from_entity_id)?.name ?? "?"} – ${ix.entity.get(r.to_entity_id)?.name ?? "?"}` });
       if (editable) {
-        const ref = { relationshipId: r.id, expectedVersion: r.version };
         items.push({ label: "Edit name and cardinality…", act: () => focusDetails("f-rl") });
-        items.push({ label: "Swap direction", act: () => void run(() => swapRelationshipAction(workspaceId, ref)) });
+        items.push({ label: "Swap direction", act: () => void saveRow(r, (v) => swapRelationshipAction(workspaceId, { relationshipId: r.id, expectedVersion: v })) });
         items.push({
           label: "Delete relationship",
           danger: true,
@@ -517,10 +540,11 @@ export function useCanvasHost({
             danger: true,
             ...(n ? { confirm: `Click again to delete, with ${n} mapping${n > 1 ? "s" : ""}` } : {}),
             act: () =>
-              void run(
-                () => deleteAttributeAction(workspaceId, { attributeId: a.id, expectedVersion: a.version }),
+              void saveRow(
+                a,
+                (v) => deleteAttributeAction(workspaceId, { attributeId: a.id, expectedVersion: v }),
                 `Attribute deleted${n ? ` together with ${n} mapping${n > 1 ? "s" : ""}` : ""}`,
-                { undoable: true },
+                { undoable: true, deletes: true },
               ).then((r) => {
                 if (r.ok) ui.select(null);
               }),

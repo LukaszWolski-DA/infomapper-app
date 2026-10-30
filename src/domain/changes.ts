@@ -149,3 +149,17 @@ export function nextVersion<R extends { version: number; updated_at: Timestamp; 
 ): R {
   return { ...row, ...patch, version: row.version + 1, updated_at: ctx.now, updated_by: ctx.actorId };
 }
+
+/**
+ * The new version of every row a write set wrote, by id (link rows without an id or a version are left out). Undo
+ * returns it (slice 9), and so do the writes that opt in (slice 10a, F2): the browser's next saves of those rows send it.
+ */
+export function writtenVersions(writes: readonly Write[]): Record<Uuid, number> {
+  const out: Record<Uuid, number> = {};
+  for (const w of writes) {
+    if (!("row" in w)) continue;
+    const row = w.row as { id?: unknown; version?: unknown };
+    if (typeof row.id === "string" && typeof row.version === "number") out[row.id] = row.version;
+  }
+  return out;
+}

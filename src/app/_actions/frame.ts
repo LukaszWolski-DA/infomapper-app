@@ -24,7 +24,7 @@ import {
 import { resetCanvasView } from "@/domain/commands/canvas";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { DataStore } from "@/data";
-import { runCommand, type ActionResult } from "../_lib/run-command";
+import { runCommand, type ActionResult, type CommandOptions } from "../_lib/run-command";
 
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
@@ -49,6 +49,7 @@ function onCanvas<T>(
   workspaceId: string,
   canvasId: string | ((store: DataStore, workspaceId: string) => Promise<string>),
   command: (ctx: CommandContext, access: WorkspaceAccess, state: FrameCanvasState, store: DataStore) => Promise<CommandResult<T>> | CommandResult<T>,
+  options: CommandOptions = {},
 ): Promise<ActionResult<T>> {
   return runCommand(async (ctx, store, user) => {
     const access = await accessOf(store, workspaceId, user.id);
@@ -56,7 +57,7 @@ function onCanvas<T>(
     const ws = access.workspace.id;
     const cid = typeof canvasId === "function" ? await canvasId(store, ws) : str(canvasId);
     return command(ctx, access, await canvasState(store, ws, cid), store);
-  });
+  }, options);
 }
 
 /** The canvas of the frame an input names (a frame of another canvas is “not found” by the command). */
@@ -110,7 +111,8 @@ export async function moveOnCanvasAction(workspaceId: string, canvasId: string, 
     const model = await store.model.load(access.workspace.id);
     const full: MoveState = { ...state, entities: model.entities, concepts: model.concepts };
     return moveOnCanvas(ctx, access, full, { ...input, canvasId });
-  });
+    // a drop that moves entities to their frames' concepts answers with their versions (slice 10a, D-05)
+  }, { versions: !!input?.moveToConcepts });
   // a concept change is a change of the model: the panels show it
   return result.ok && result.value.movedToConcepts ? refreshed(result) : result;
 }
