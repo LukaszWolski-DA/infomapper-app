@@ -1,6 +1,6 @@
 # Slice 10c – acceptance
 
-Status: **step 1 answered (Łukasz, 30 October 2026); step 2 (data) in progress.** The PRD is updated to the answers.
+Status: **steps 1 to 4 accepted (Łukasz, 30 October 2026); step 5, the closing, in review.** The PRD is updated to the answers of step 1.
 
 - Tag `slice-10b` is at `6d1a251`, as A1 says. Branch `slice/10c-copy-attribute` was made from that tag.
 - The PRD is copied unchanged from `~/Downloads/slice-10c-copy-attribute.md` (23,900 bytes, 30 October 2026; the only
@@ -680,3 +680,71 @@ a change of them on the original, or an undo or redo, reaches every copy and the
 original's panel lists its copies and a copy's panel names its original, each selecting the other. Deleting an original
 that has copies asks for a second click that names them; the copies stay, and each copy's panel says its original was
 deleted until Undo brings it back. “Stop following” detaches a copy, whether its original is live or deleted."
+
+## Łukasz's answers to step 4 (30 October 2026)
+
+- **Step 4 is accepted,** including the two layout fixes of the armed delete and S1B-07's menu list.
+- **D-63 is approved** as quoted. It is in `docs/decisions.md`, accepted on 30 October 2026.
+- **The answer delay of S10C-09:** report how it is done, confirm that it works only under e2e, describe it in
+  CLAUDE.md, and add an idea for slice 10a's four cases guarded by review only.
+
+### How S10C-09 holds an answer back
+
+- **The mechanism.** It is a Playwright route on the test's own page (`page.route`), now the helper `holdAnswer` in
+  `e2e/slice-10c/helpers.ts`.
+  - The route sees the browser's request for the server action whose body has a given text (`"length":20`).
+  - It passes the request to the dev server at once (`route.fetch()`), so the server writes it as usual.
+  - It gives the browser the answer only after 2 s (`route.fulfill`).
+  - Every other request goes on unchanged (`route.continue()`).
+- **Why slice 10a found no way:** it looked for a delay on the server, which would need a switch in the app. This one
+  delays only what the browser receives. That is enough for the save chain, which orders saves by their answers.
+- **Only under e2e.** The route exists only inside a Playwright test, on the page that test opened. No application file
+  reads it, and there is no environment variable, test hook or cookie for it. A normal dev server, a production build
+  and the measurement build have nothing to switch on.
+- **CLAUDE.md** describes it with slice 10c's helpers.
+- **`docs/ideas.md`** has the entry "The e2e answer delay for slice 10a's cases" with the requested text.
+
+## Step 5: the closing (30 October 2026)
+
+**The element guard (S10C-11):**
+- The command: `npm run measure:build`, then `MEASURE=1 MEASURE_BUILD=production
+  ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test
+  e2e/slice-03b/S3B-15-elements.spec.ts`.
+- The result is **equal** in all four views, page totals included:
+
+| View | Page (slice-08 / 10c) | Viewport (slice-08 / 10c) |
+| --- | --- | --- |
+| 30 %, expanded | 5,994 / 5,994 | 4,508 / 4,508 |
+| 100 %, expanded | 20,791 / 20,791 | 19,305 / 19,305 |
+| 30 %, collapsed | 2,861 / 2,861 | 1,465 / 1,465 |
+| 100 %, collapsed | 6,303 / 6,303 | 4,907 / 4,907 |
+
+**Docs in this pull request:**
+- `docs/decisions.md`: D-63.
+- `docs/data-model-v2.md`:
+  - section 4, `attribute.copied_from_attribute_id` and a paragraph on copies: the followed columns, no loops, the
+    migration, format 10 and its upgrade, and undo's null for an absent column;
+  - section 2, deleting keeps the link;
+  - section 11, the rules on following and on attribute names.
+- `docs/inventory-prototype-vs-app.md`: section 8's two differences, with the header and the history line.
+- `docs/ideas.md`:
+  - "Copying an attribute to another entity" done;
+  - "A model validator", PRD section 9 word for word;
+  - "Copies of attributes: what comes later": the row mark, several attributes and Ctrl+C / Ctrl+V, another workspace,
+    copying with mappings;
+  - the answer delay for slice 10a;
+  - the plan: 10c done as copy and paste, not tied to a relationship; next 11.
+- `docs/known-limitations.md`: "Copies of attributes (slice 10c, D-63)", with these entries:
+  - copies made elsewhere since the page loaded are not held;
+  - a pasted attribute on a live canvas's context card;
+  - the page's clipboard;
+  - the lost reference in the panel only;
+  - the undo history's general names.
+- `CLAUDE.md`:
+  - the opening paragraph;
+  - a section "Copies of attributes": the link, format 10, `followOriginals` and `followers`, the refusal and
+    `stopFollowing`, `lostOriginals`, the clipboard, the held copies, the delete's question and D-47's row, and what a
+    later command must do;
+  - slice 10c's e2e helpers, `holdAnswer` included;
+  - the element guard's line and the screenshots command.
+- `README.md`: slice 10c in review, its line in the status, and the link to this file.

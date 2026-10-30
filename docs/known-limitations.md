@@ -890,6 +890,21 @@ by someone removed later shows "someone" instead of their name; anything written
   way still sends the version it knows and can be refused as a false conflict. The reason: only the server knows which
   tables, columns and mappings an action writes, so the browser cannot hold those rows before it is sent (`saveRows`).
 
+### Copies of attributes (slice 10c, D-63)
+
+- **Copies made elsewhere since the page loaded are not held.** A save of an original's type or Personal data holds its
+  copies in the save chain as the page knows them (`copiesBelow`, F4). A copy pasted in another session since the page
+  loaded is written by the server all the same, but a save of that copy started at the same moment can be refused as a
+  conflict until the page refreshes.
+- **On a live canvas a pasted attribute may not show on a context card**, which shows only its relevant rows, unless the
+  active working context labels it; “Add attribute” behaves the same (F15).
+- **The clipboard is the page's**, one per browser tab, not the system's: it does not reach another tab and is empty
+  after a reload (F13).
+- **A lost reference shows in the copy's panel only** (P7); a mark on the card row waits for the model validator
+  (`docs/ideas.md`).
+- **The undo history names a paste “Create attribute”** and a followed change or “Stop following” “Change attribute”
+  (F22).
+
 ### Relationships between source tables on the demo canvas (slice 10b, D-62)
 
 On the seed's "Customer & orders" (and Sales' "First canvas", the same layout), the line of
