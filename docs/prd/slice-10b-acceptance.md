@@ -254,3 +254,77 @@ Items 7, 8 and 10.
 - **Coverage gaps, noted; nothing to build in this slice:**
   - slice 7a has no spec for the table panel's relationship list;
   - S7B-16 (the Changes view to the screen) is a measuring spec, outside the normal run.
+
+## Step 4: the measurement sitting (S10B-10; 30 October 2026)
+
+**Builds and machine:**
+- This branch at `a5a6fae`: the step 3 code, plus the fix below and the measuring spec (`9e50b7b`). `slice-10a` at `82f8e0d`. Both sides ran in the production measurement build (`--prepare-only`).
+- Lenovo 20L7005FUS, Intel Core i7-8550U (8 threads), 8 GB, Intel UHD Graphics 620, on mains. Chrome 156.0.8078.79 throughout.
+- The machine was quiet before the sitting: CPU 2–8 %, mostly the Claude app itself; nothing on ports 3000, 3200 or 3300. Nothing was stopped. The sitting's own quiet check ran before each side.
+
+**A fix the element guard found.** The first guard run was **+1 in every view**, page and viewport alike. The cause was `LineLayer.tsx`: it always drew the source lines' `<g>`, even with no source line on the canvas, so every canvas had one element more. That broke step 1's F4 (a) condition, and the same applies to a group as to a marker. The group is now drawn only when the canvas has a source line (commit `a5a6fae`, "fix: no empty source line group in the line layer"). After the fix, the measurement build was rebuilt and the guard ran again, with the result below. All 13 slice 10b specs pass after the fix.
+
+**Element guard** (`S3B-15-elements.spec.ts`, `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json`): **equal** in every view, page totals included.
+
+| View | Page | Viewport | `slice-08.json` |
+| --- | --- | --- | --- |
+| 30 %, expanded | 5,994 | 4,508 | 5,994 / 4,508 |
+| 100 %, expanded | 20,791 | 19,305 | 20,791 / 19,305 |
+| 30 %, collapsed | 2,861 | 1,465 | 2,861 / 1,465 |
+| 100 %, collapsed | 6,303 | 4,907 | 6,303 / 4,907 |
+
+"Performance test" has no source relationship (F5), so there is nothing to explain.
+
+**The lines' reads** (`e2e/slice-10b/S10B-10-lines.spec.ts`, new; measurement build only, in `playwright.config.ts`'s ignore list otherwise). On a copy of "Performance test" in the e2e data file, three variants:
+- none;
+- 20 ordinary relationships (each of 20 entity cards to the next, through the domain);
+- 20 source relationships (each of 20 table cards to the next). Their rows (`source_relationship` and its column pair, with their change events) are one write set applied through the local adapter (`store().apply`), on a fresh file per variant (A4, answer 6).
+
+**The view:** around ent:23, as in S10A-12. The spec zooms out in 5 % steps until 20 entity cards and 20 table cards have their header in view. That is **10 %** (the pane is 932 × 718 with the panels open): the whole canvas, as in slice 10a.
+
+**LayerTree read:**
+
+| Variant | Drawing layers | Drawing megapixels | Viewport elements | Line layer elements | Relationship lines | Source lines |
+| --- | --- | --- | --- | --- | --- | --- |
+| none | 55 | 69 | 4,508 | 1,976 | 40 | 0 |
+| 20 ordinary | 55 | 69 | 4,628 (+120) | 2,096 | 60 | 0 |
+| 20 source | 55 | 69 | 4,589 (+81) | 2,057 | 40 | 20 |
+
+**No drawing layer more.** The elements are as expected:
+- a source line is 4 elements (its group, the hit path, the path, the arrow), so 20 lines are 80;
+- their shared group, drawn only with a source line, adds 1, so 81 in all;
+- an ordinary relationship of the demo ends (1 → 0..n) is 6 elements, as in slice 10a.
+
+**The lines' own cost** (branch only; pan and zoom for 10 s as presented frames, traced; 3 balanced rounds, the order alternating):
+
+| Variant | Presented fps per round | Median | p95 interval (ms) | Gaps over 50 ms |
+| --- | --- | --- | --- | --- |
+| none | 58.5, 58.8, 57.2 | 58.5 | 20.4, 20.4, 21.7 | 1, 1, 2 |
+| 20 ordinary | 58.1, 58.4, 59.0 | 58.4 | 20.9, 20.8, 20.4 | 2, 2, 1 |
+| 20 source | 58.0, 58.5, 58.8 | 58.5 | 20.8, 20.4, 20.7 | 2, 1, 1 |
+
+**20 source lines against 20 ordinary relationships: +0.2 % presented fps on the median, −0.1 % on the mean (bar: within 2 %): met.** Raw results are in `.data/measure/s10b10-lines.json`.
+
+**A/B sitting against `slice-10a`** (`npm run measure:canvas -- --to-screen --only pan,c08 --no-build --against slice-10a`):
+- **Warm-up:** sitting `2026-10-30-11-45`, one round, discarded.
+- **The counted sitting:** `2026-10-30-11-53`, `--rounds 2`, balanced. Every round is kept in `.data/measure/2026-10-30-11-53/`.
+
+| Figure | `slice-10a` median (min–max) | This branch | Change | Bar (within the sitting's spread) |
+| --- | --- | --- | --- | --- |
+| Pan and zoom, overview, presented fps | 57.0 (56.8–57.2) | 58.3 (57.8–58.8) | +2.3 % | met |
+| Pan and zoom, overview, rAF fps | 59.0 (59.0–59.1) | 59.3 (59.3–59.4) | +0.5 % | met |
+| Pan and zoom, 100 % dense, presented fps | 45.7 (45.2–46.1) | 44.9 (43.6–46.1) | −1.8 % | met (the ranges overlap) |
+| Pan and zoom, 100 % dense, rAF fps | 47.3 (46.8–47.9) | 48.8 (48.4–49.3) | +3.2 % | met |
+| – gaps between presents over 50 ms (dense) | 11 | 12 | – | – |
+| C-08, untraced, median of 5 | 1,715 ms (1,713–1,717) | 1,591 (1,581–1,601) | −7.2 % | met |
+| C-08 to its last present (traced) | 1,796 ms (1,771–1,821) | 1,736 (1,734–1,737) | −3.4 % | met |
+
+**Reading the sitting:**
+- "Performance test" draws no source line, so this sitting measures only the empty path (step 1, F16).
+- The dense view's −1.8 % lies within the spread: the branch's best round equals the reference's best (46.1).
+- No difference of a few milliseconds needed phase traces.
+- The tool's absolute bars (50 fps at 100 % dense, C-08 ≤ 1,500 ms) are missed by both sides alike. They stay with S1A-14's entry (partly met, the database slice), as since slice 4b-2.
+
+**AD-24's addition, proposed for approval** (one sentence under rule 3, in the shape of slice 10a's):
+
+"Source relationships are a line kind in the same SVG layer (slice 10b): 4 elements per line (its group, hit target, path and arrow path, no end marks or label), one shared group drawn only when the canvas has one, no new layer. Measured with 20 source lines in view: the same drawing layers (55), and pan and zoom within 0.2 % of 20 ordinary relationships on cards in the same view (58.5 against 58.4 presented fps)."
