@@ -42,7 +42,7 @@ async function workspaceNamed(name: string) {
 describe("organization access (slice 8, F5, F7)", () => {
   it("the seed gives every organization the precomputed demo-pass hash, with no change events", async () => {
     const db = await readDb(file);
-    expect(db.format).toBe(9);
+    expect(db.format).toBe(10);
     expect(db.organization_access.map((a) => [a.organization_id, a.access_hash])).toEqual(
       db.organization.map((o) => [o.id, DEMO_PASSWORD_HASH]),
     );
@@ -86,7 +86,7 @@ describe("the format 9 upgrade (slice 8, item 18, S8-14)", () => {
     log.mockClear();
     await readDb(file);
     expect(log).not.toHaveBeenCalled();
-    expect(JSON.parse(await readFile(file, "utf8")).format).toBe(9);
+    expect(JSON.parse(await readFile(file, "utf8")).format).toBe(10);
   });
 
   it("keeps an organization's existing password", async () => {

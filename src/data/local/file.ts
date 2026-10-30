@@ -55,7 +55,7 @@ export async function readDb(file: string): Promise<DevDb> {
   }
   // the derived changes and the classifications get their ids once (slices 7b, 7c): written back at once, so every
   // later read sees the same rows
-  if (was >= 2 && was < 9) await writeDb(file, db);
+  if (was >= 2 && was < DEV_DB_FORMAT) await writeDb(file, db);
   if (report) {
     // slice 7c (Q4): the moved comments' columns in a file beside the data, one line in the server's log
     const out = path.join(path.dirname(file), `upgrade-8-${path.basename(file, ".json")}.txt`);
@@ -74,7 +74,8 @@ export async function readDb(file: string): Promise<DevDb> {
  * change group per workspace, each event signed by the person who ran the import; no undo step. From 7, the
  * classifications and notes (slice 7c, `upgrade-8.ts`); its report comes back for the caller to write. From 8, every
  * organization without a password gets the development password `demo-pass` (slice 8, F7: the seed's precomputed hash;
- * F18: no change events); the count comes back for the caller's log line.
+ * F18: no change events); the count comes back for the caller's log line. From 9, every attribute gets
+ * `copied_from_attribute_id` null (slice 10c, F11: no change events, no log line).
  */
 export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number } {
   let report: Upgrade8Report | null = null;
@@ -135,7 +136,11 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
       access.push({ organization_id: o.id, access_hash: DEMO_PASSWORD_HASH, changed_at: now, changed_by: o.created_by, version: 1 });
       passwordsGiven++;
     }
-    Object.assign(db, { format: DEV_DB_FORMAT, organization_access: access });
+    Object.assign(db, { format: 9, organization_access: access });
+  }
+  if ((db.format as number) === 9) {
+    for (const a of db.attribute) a.copied_from_attribute_id ??= null;
+    Object.assign(db, { format: DEV_DB_FORMAT });
   }
   return { report, passwordsGiven };
 }
