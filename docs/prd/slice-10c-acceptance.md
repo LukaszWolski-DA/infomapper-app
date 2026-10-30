@@ -545,3 +545,19 @@ No interface yet. Commands, rules, two server actions and unit tests.
   answer, and the browser needs no second kind of save.
 - A refusal of a followed field has the code `invalid`. It does not cut the saves waiting behind it (`CUTS`), as a
   validation refusal never does.
+
+## Łukasz's answers to step 3 (30 October 2026)
+
+- **The texts are approved**, except the paste toast:
+  - "The copied attribute no longer exists.";
+  - "This attribute follows {entity}.{attribute}. Use “Stop following” to change it.";
+  - "This attribute was copied from {entity}.{attribute}, which was deleted. Use “Stop following” to change it.";
+  - "its original" when the names are unknown;
+  - the second click's copies part, five named, then "and n more";
+  - D-47's row.
+- **The paste toast is changed** to "Pasted “{attribute}” into {entity}.", and with a clash to "Pasted “{attribute}” into
+  {entity}, which already has an attribute of that name." The name selected in the panel is invitation enough.
+- **The undo history** keeps "Create attribute" and "Change attribute".
+- **The commit that did not typecheck on its own** was folded into the next one (nothing was pushed). The step's
+  commits are now `db80486` (the code) and `91e98d6` (the docs). Every code commit since the branch's start
+  typechecks on its own (`6845e73`, `172f49b`, `33052f0`, `db80486`: 0 errors each).
