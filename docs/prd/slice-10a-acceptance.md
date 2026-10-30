@@ -699,3 +699,15 @@ So the count is 5 plus one per optional end. The measuring spec's ordinary relat
 "A self-relationship is a loop in the same SVG layer (slice 10a): one path with its hit target and end marks, no new layer; in crow's foot it has the elements of any relationship line with the same ends (7 with its default 0..1 → 0..n, one circle per optional end). Measured with 20 loops in view: the same drawing layers, and pan and zoom within 1 % of 20 ordinary relationships on the same cards."
 
 It goes into `docs/decisions.md` once approved.
+
+## Step 6: the closing (30 October 2026)
+
+- **Docs:** `docs/data-model-v2.md` (both ends may be the same entity, D-61; no migration), `docs/inventory-prototype-vs-app.md`
+  (section 8's deliberate differences), `docs/known-limitations.md` (the canvas line removed; this slice's four kept),
+  `docs/ideas.md` (two entries done, the plan 10b–13, three new ideas), `CLAUDE.md` ("Saving in panels", the helpers, the
+  element guard's command with `slice-08.json`), `README.md` (status).
+- **Full e2e run** from scratch, no dev server running: 428 passed, 1 skipped, 1 failed, in **4,053 s** (1 h 7 min; step
+  2b: 4,646 s, so 593 s faster). The failure was `e2e/slice-09/S9-09.spec.ts`, at sign-in (`signInAs`: the top bar did not
+  appear; the server's log shows "The destination stream closed early."). Run three times on its own, it passed each time
+  (48.0, 38.1, 39.5 s): a flake, not a bug, in a slice 9 spec that this slice does not touch.
+- **CI:** `npm run lint` clean, `npm run typecheck` clean, `npm test` 109 files, 1,422 tests passed.
