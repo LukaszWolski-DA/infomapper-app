@@ -748,3 +748,20 @@ deleted until Undo brings it back. “Stop following” detaches a copy, whether
   - slice 10c's e2e helpers, `holdAnswer` included;
   - the element guard's line and the screenshots command.
 - `README.md`: slice 10c in review, its line in the status, and the link to this file.
+
+**Full e2e run** (from scratch, no dev server running, 17:50 to 19:13): 452 passed, 4 failed, 1 skipped,
+**4,975 s** (slice 10b: 3,977 s for 443 tests; this run has 13 more and ran slower throughout, S0-10 alone 5.6 min). The
+four failures, with their errors kept before the reruns:
+- `S0-10`: "Server did not start within 300 s" (the restarted dev server).
+- `S8-12`: `bar-top` not visible within 15 s after picking a test user.
+- `S9-11`: the zoom field still "41%" 15 s after Escape.
+- `S10C-13`: Undo stayed disabled after the page's refresh (the type change stored, the copy pasted by test data).
+
+Each file on its own, three times, from 19:15: **all passed 3 of 3** (S10C-13 39 to 56 s, S9-11 49 s to 1.4 min, S8-12 47
+to 54 s, S0-10 1.4 min each). The first three are timeouts of a loaded machine. S10C-13 is this slice's spec and failed
+once in the full run only; its trace was lost to the reruns, so its cause is not known.
+
+**CI:** `npm run lint` passed, `npm run typecheck` passed, `npm test` 112 files, 1,469 tests, passed.
+
+**KB's backup:** `.data/backups/dev-db-20261030-1914.json` and `.data/backups/kb-model-latest.json` (1,433,482 bytes,
+the same as `.data/dev-db.json`; local only, git-ignored).
