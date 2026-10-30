@@ -141,6 +141,11 @@ export interface Attribute extends StandardColumns, AttributeType {
   is_nullable: boolean;
   definition_html: string | null;
   definition_text: string | null;
+  /**
+   * The attribute this one was copied from (slice 10c): null when not made by paste or after "Stop following". It may
+   * point to a deleted attribute (a lost reference).
+   */
+  copied_from_attribute_id: Uuid | null;
 }
 
 export interface Relationship extends StandardColumns {

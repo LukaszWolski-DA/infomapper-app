@@ -116,6 +116,7 @@ export function addAttribute(
     is_nullable: true,
     definition_html: null,
     definition_text: null,
+    copied_from_attribute_id: null,
   };
   return done(ctx, access, { attributeId: attribute.id }, [{ kind: "insert", table: "attribute", row: attribute }]);
 }
@@ -295,6 +296,7 @@ export function createAttributeFromColumn(
     is_nullable: column.row.is_nullable,
     definition_html: html,
     definition_text: text,
+    copied_from_attribute_id: null,
   };
   const r = createMapping(ctx, access, { attribute, column: column.row, mappings: [], mappingInputs: [] }, { attributeId: attribute.id, sourceColumnId });
   if (!r.ok) return r;

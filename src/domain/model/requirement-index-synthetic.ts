@@ -30,6 +30,7 @@ export function syntheticIndexInput() {
     is_nullable: true,
     definition_html: null,
     definition_text: null,
+    copied_from_attribute_id: null,
   }));
   const sourceTables: SourceTable[] = Array.from({ length: TABLES }, (_, i) => ({ ...std(id("t", i)), source_system_id: "s", database_name: "db", schema_name: "dbo", name: `t${i}`, object_type: "table", file_format: null, row_count: null, comment: null, missing_since: null, retired_since: null, note_html: null, note_text: null }));
   const sourceColumns: SourceColumn[] = Array.from({ length: COLUMNS }, (_, i) => ({

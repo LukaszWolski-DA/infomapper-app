@@ -89,6 +89,7 @@ export function withEntity(model: ImportModel, name: string, attributes: (Partia
     is_nullable: true,
     definition_html: null,
     definition_text: null,
+    copied_from_attribute_id: null,
     ...a,
   }));
   return { ...model, entities: [...model.entities, entity], attributes: [...model.attributes, ...rows] };
