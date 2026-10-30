@@ -610,3 +610,66 @@ Both are in `docs/prd/slice-10a-screens/step-4/` (the second test of `S10A-08-sc
 The other way is to accept both as known limitations.
 
 **Łukasz's answer (29 October 2026): no fix.** A loop is a relationship line and may reach a little out of its frame; he resizes the frame himself. Fit everything cutting a loop on a small canvas at a high zoom is accepted too. Nothing is built; D-61 stays as accepted. One entry in `docs/known-limitations.md`.
+
+## Step 5: the measurement sitting (S10A-12; 29–30 October 2026)
+
+**Builds and machine.** This branch at `af42076` (the step 4 code; `af42076` only adds the measuring spec), `slice-09` at `84ff767`, both in the production measurement build (`--prepare-only`). Lenovo 20L7005FUS, Intel Core i7-8550U (8 threads), 8 GB, Intel UHD Graphics 620 (ANGLE, Direct3D 11), on mains, "Best performance". Chrome 156.0.8078.48 for the element guard and the LayerTree read; Chrome updated itself overnight, and the A/B sitting and the loop cost ran on 156.0.8078.79 (both sides alike).
+
+**Element guard** (`S3B-15-elements.spec.ts`, `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json`): **equal** in every view, page totals included.
+
+| View | Page | Viewport | `slice-08.json` |
+| --- | --- | --- | --- |
+| 30 %, expanded | 5,994 | 4,508 | 5,994 / 4,508 |
+| 100 %, expanded | 20,791 | 19,305 | 20,791 / 19,305 |
+| 30 %, collapsed | 2,861 | 1,465 | 2,861 / 1,465 |
+| 100 %, collapsed | 6,303 | 4,907 | 6,303 / 4,907 |
+
+No page total differs, so there is nothing to explain.
+
+**The loop reads** (`e2e/slice-10a/S10A-12-loops.spec.ts`, new, measurement build only, in `playwright.config.ts`'s ignore list otherwise). On a copy of "Performance test" ("100 cards") in the e2e data file, three variants: none; 20 ordinary relationships (each of 20 entity cards to the next); 20 self-relationships on the same 20 cards. The rows are written through the domain into the e2e file before the page opens, on a fresh file per variant (A4).
+- **The view:** around ent:23, as S4B2-15. At 30 % only 7 entity cards have their header and the loop's room in view (the panels are open: the pane is 932 × 718), and fewer than 20 at 15 %. So the spec zooms out in 5 % steps until 20 fit, which is **10 %**: the whole canvas, every card in view.
+- **A first run was void:** `seedLargeData` keeps an existing "Performance test", so each variant kept the previous one's rows (40, 60, 80 relationship lines). The spec now resets the file before each variant and checks the counts (none + 20 = loops = ordinary).
+
+**LayerTree read** (as `S4B2-15-layers.spec.ts`):
+
+| Variant | Drawing layers | Drawing megapixels | Viewport elements | Line layer elements | Relationship lines |
+| --- | --- | --- | --- | --- | --- |
+| none | 55 | 69 | 4,508 | 1,976 | 40 |
+| 20 ordinary | 55 | 69 | 4,628 (+120) | 2,096 | 60 |
+| 20 loops | 55 | 69 | 4,648 (+140) | 2,116 | 60 |
+
+**No drawing layer more.** An ordinary relationship of the demo ends (1 → 0..n) is 6 elements, a loop (0..1 → 0..n, two circles) 7, as Q5 counted.
+
+**The loop's own cost** (branch only; pan and zoom 10 s as presented frames, traced, 3 balanced rounds; the order alternates):
+
+| Variant | Presented fps per round | Median | p95 interval (ms) | Gaps over 50 ms |
+| --- | --- | --- | --- | --- |
+| none | 58.8, 58.7, 55.6 | 58.7 | 19.9, 20.7, 24.8 | 1, 1, 2 |
+| 20 ordinary | 58.0, 57.7, 57.2 | 57.7 | 21.2, 21.2, 21.6 | 1, 2, 2 |
+| 20 loops | 58.9, 58.2, 58.2 | 58.2 | 20.3, 21.1, 21.0 | 1, 1, 1 |
+
+**20 loops against 20 ordinary relationships: +0.9 % presented fps (bar: within 2 %): met.** Raw results in `.data/measure/s10a12-loops.json`. An earlier run on the busy machine (before Łukasz prepared it) gave −1.2 % on the median and +0.5 % on the mean; it is not counted.
+
+**A/B sitting against `slice-09`** (`npm run measure:canvas -- --to-screen --only pan,c08`, sitting `2026-10-30-05-39`).
+- **Warm-up:** the first warm-up (29 October) measured nothing: the machine never got quiet (Windows Search indexing, Spotify, a dev server on port 3000). Łukasz prepared the laptop; the second warm-up measured one round and was discarded.
+- **The counted sitting:** `--rounds 2` (round 1 reference first, round 2 branch first). Round 1's branch side ran slow in both views, the overview included (dense 100 % presented 38.7 fps against the reference's 46.3; overview 55.2 against 58.7). Before that round's reference side the quiet check waited 164 s, with a peak of 23 % CPU, as Windows Search finished. A drawing difference does not slow the overview, and round 2 was level (44.4 against 44.8). So round 1 counts as disturbed: a replacement round 3 in round 1's order (`--add-round`), and the summary leaves round 1 out (`--resummarize --drop 1`).
+
+| Figure | `slice-09` median (min–max) | This branch | Change | Bar (within the sitting's spread) |
+| --- | --- | --- | --- | --- |
+| Pan and zoom, overview, presented fps | 56.3 (55.2–57.3) | 58.5 (58.5–58.6) | +4.1 % | met |
+| Pan and zoom, overview, rAF fps | 59.1 (59.0–59.3) | 59.3 (59.3–59.4) | +0.3 % | met |
+| Pan and zoom, 100 % dense, presented fps | 45.1 (44.8–45.4) | 45.0 (44.4–45.5) | −0.3 % | met |
+| Pan and zoom, 100 % dense, rAF fps | 47.4 (46.5–48.2) | 48.3 (48.3–48.3) | +2.0 % | met |
+| – gaps between presents over 50 ms (dense) | 14 | 10 | – | – |
+| C-08, untraced, median of 5 | 1,695 ms (1,689–1,700) | 1,659 (1,647–1,671) | −2.1 % | met |
+| C-08 to its last present (traced) | 1,802 ms (1,760–1,844) | 1,705 (1,692–1,717) | −5.4 % | met |
+
+The ranges overlap in every figure, and no change is beyond the reference's own spread on the slower side. No difference of a few milliseconds needed phase traces. The tool's absolute bars (50 fps at 100 % dense, C-08 ≤ 1,500 ms) are missed by both sides alike; they stay with S1A-14's entry (partly met, the database slice), as since slice 4b-2.
+
+With round 1 included the dense figure read −8.8 % presented (`summary.md` before `--drop`); every round is kept in `.data/measure/2026-10-30-05-39/`.
+
+**Canvas commits** (from step 2b): 4 before and 4 after the wiring.
+
+**AD-24's addition, proposed for approval** (one sentence under rule 3):
+
+"A self-relationship is a loop in the same SVG layer (slice 10a): one path with its hit target and end marks, 7 elements in crow's foot, no new layer (55 drawing layers with 20 loops in view, as without them); pan and zoom with 20 loops within 0.9 % of 20 ordinary relationships on the same cards (58.2 against 57.7 presented fps, faster)."
