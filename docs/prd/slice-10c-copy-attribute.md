@@ -1,6 +1,6 @@
 # Slice 10c – Copying an attribute to another entity
 
-Status: **first draft, 30 October 2026**, not yet checked against the code. Branch `slice/10c-copy-attribute`, from `main` at tag `slice-10b` (`6d1a251`, assumption A1). PRD file: `docs/prd/slice-10c-copy-attribute.md`; step 1 writes `docs/prd/slice-10c-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus the local data file's upgrade tests, and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Status: **step 1 answered, 30 October 2026** (Łukasz's answers in `docs/prd/slice-10c-acceptance.md`; the items, criteria and D-63 below are updated to them). Branch `slice/10c-copy-attribute`, from `main` at tag `slice-10b` (`6d1a251`, assumption A1). PRD file: `docs/prd/slice-10c-copy-attribute.md`; step 1 writes `docs/prd/slice-10c-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus the local data file's upgrade tests, and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 This PRD was written from the docs at slice 10a's state and from what slice 10b changed as Łukasz described it. Step 1 checks every reference against the docs in the repository, which are at slice 10b's state.
 
@@ -29,7 +29,7 @@ That is impact analysis at the attribute level.
   Any attribute can be copied, not only a key. Composite keys are built by copying their attributes one by one: that is modelling and validating work.
 - **P5. A copy is not tied to a relationship.** The sides of a relationship are not checked when copying. Whether keys and relationships fit together is a model validator's work (section 9; `docs/ideas.md`).
 - **P6. Losing the original leaves a lasting trace, not only a toast.**
-  - Deleting an original with copies first shows the consequences.
+  - Deleting an original with copies first asks for a second click that names the copies (F7).
   - The copy's panel keeps showing that its original was deleted.
   - Undo brings the link back.
 - **P7. A copy's lost reference shows in its panel only,** with no mark on the canvas. A mark on the card rows is left to the validator.
@@ -84,8 +84,11 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
    - Null for every attribute today and for any attribute not made by paste.
    - It may point to a soft-deleted attribute: that is the lost reference (item 9). No other column records it.
    - A new migration adds it. Applied migrations are never edited, and the AD-31 schema check passes.
-2. **The local data file's next format** (Q7) adds the column as null to every attribute, with an upgrade test.
-   - The upgrade writes no change events, as format 9's did.
+   - The local adapter checks it as a foreign key that may point to a deleted row. Undo's parent check (`PARENTS`) leaves it out (F9).
+   - Undo writes a column that an older change event's image lacks as null (F10).
+2. **The local data file's format 10** (Q7, F11) adds the column as null to every attribute, as an inline step in `upgradeDb`, with an upgrade test.
+   - The upgrade writes no change events, as format 9's did, and no log line.
+   - `readDb` writes an upgraded file back at once (the check moves to `was < DEV_DB_FORMAT`).
    - Step 2 backs up `.data/dev-db.json` before the first run that upgrades it (section 4).
 
 ### Copy and paste (P4)
@@ -115,21 +118,25 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
    - **In a copy's panel,** the followed fields are read-only, with "Follows {entity}.{attribute}." beside them.
    - **Other fields** stay the copy's own: name, definition, nullable, keys, mappings.
    - **Mappings:** a type change that now mismatches a copy's mapping is shown by D-01's type check as for any attribute.
-   - **The save chain:** the action returns the versions it wrote for the copies to `rowSaves.answer` (slice 10a), so a copy's next save is not refused (Q4).
+   - **The save chain:** a followed-field save on an original goes through `saveRows`, the original checked and its copies held; the action returns the versions it wrote (`{ versions: true }`), so a copy's save is never refused as a false conflict (F4).
+   - **One rule in one place:** `followOriginals` (`src/domain/model/copies.ts`), called by `updateAttribute` and by undo and redo (`revertChangeGroup`), writes the copies in the same change group; a visited set guards the walk (F1, F17).
+   - **The domain refuses** a followed field on a copy with a link, whatever calls it (F5).
+   - **The working context** labels the original only; copies written by following are left out (F3).
 7. **The panels show the link:**
    - **An original:** "Copies" lists every live copy as "{entity}.{attribute}", each selecting that attribute (a history place, D-38).
    - **A copy:** "Copied from {entity}.{attribute}", selecting the original.
 
 ### Losing the original (P6, P7)
 
-8. **Deleting an attribute that has live copies** first shows its consequences. Proposed text: "{n} copies stop following it and stay as ordinary attributes: {entity}.{attribute}, …", with "Delete" and "Cancel".
-   - **Without copies** the delete stays immediate, with Undo in the toast (S1B-13).
+8. **Deleting an attribute that has live copies** asks for a second click, the existing pattern of an attribute with mappings (`ConfirmDelete` in the panel, `confirm` in the row's menu; F7). The second click's text names the copies (texts in the acceptance doc, F7).
+   - **Without mappings and copies** the delete stays immediate, with Undo in the toast (S1B-13); with mappings only it asks as today.
    - **Deleting an entity:** D-47's preview gains a line for copies in other entities whose originals go with it.
    - **Deleting a copy** is an ordinary delete.
 9. **A copy whose original is deleted** keeps its link.
    - **Its panel says** "Copied from {entity}.{attribute}, which was deleted."
-   - **Its followed fields** become editable, since nothing is followed.
-   - **Undo** of the delete restores the original, and the copy follows again with no further write.
+   - **Its followed fields** stay read-only; only "Stop following" makes them editable (F2).
+   - **Its panel names the deleted original** from a small list the page loads (`lostOriginals` in `model.load`, F6).
+   - **Undo** of the delete restores the original, and the copy follows again; it writes the copy only if the two differ (F1).
    - **The original's later changes** reach nothing while it is deleted.
 10. **"Stop following"** in a copy's panel, live original or deleted, clears `copied_from_attribute_id`. One change group, one undo step. The fields stay as they are and become editable.
 
@@ -169,14 +176,16 @@ Tests in `e2e/slice-10c/`, one file per criterion, each from a fresh seed; unit 
 | S10C-02 | **The same entity and again.** Pasting `employee_id` into Employee creates a second attribute there (Q1's naming). The same clipboard pastes into two more entities. The clipboard survives switching canvases and is empty after a reload. The paste item is absent while the clipboard is empty. |
 | S10C-03 | **Following.** Changing the original's type or length, and then Personal data, changes every copy and a copy of a copy, in one change group. One undo restores all. In a copy's panel the type fields and Personal data are read-only with "Follows Customer.customer_id."; its name, definition, nullable and keys are editable and do not change the original. |
 | S10C-04 | **The panels.** The original's panel lists "Copies" with each copy; a click selects it, and Back returns. The copy's panel shows "Copied from Customer.customer_id"; a click selects the original. |
-| S10C-05 | **Deleting the original.** With two copies, deleting `Customer.customer_id` first shows the consequences listing both. Cancel deletes nothing. Delete removes it, and each copy's panel says its original was deleted, with editable type fields. Undo restores the original, and the copies follow again. An attribute without copies is still deleted at once, with Undo in the toast (S1B-13). |
+| S10C-05 | **Deleting the original.** With two copies, deleting `Customer.customer_id` asks for a second click whose text names both copies; the button disarms after 4 s or on leaving it, and nothing is deleted. The second click removes it, and each copy's panel says its original was deleted, with its followed fields still read-only and "Stop following". Undo restores the original, and the copies follow again. An attribute without copies is still deleted at once, with Undo in the toast (S1B-13). |
 | S10C-06 | **Deleting an entity.** Deleting Customer shows D-47's preview with the copies in other entities that lose their original. |
 | S10C-07 | **Stop following.** On a copy, "Stop following" clears the link: its fields become editable, and the original's panel no longer lists it. One undo restores the link. The same works on a copy whose original is deleted. |
 | S10C-08 | **Refusals and rights.** Pasting after the original was deleted (in another session) is refused with item 4's text, and the clipboard empties. As a reviewer there is no "Copy" and no paste item, and a direct call is refused. In an archived workspace paste is refused. |
 | S10C-09 | **The save chain.** The original's length changed in its panel, then at once a copy deleted from its row's menu: both stored, no false conflict (the copies' versions reach `rowSaves.answer`). |
-| S10C-10 | **Data.** The migration and the schema check pass. The local file's upgrade sets the new column to null on every attribute, keeps every count, and writes no change event (unit test). A file already at the new format is not upgraded again. |
+| S10C-10 | **Data.** The migration and the schema check pass. The local file's upgrade sets the new column to null on every attribute, keeps every count, and writes no change event (unit test). A file already at the new format is not upgraded again. An undo of a change recorded before format 10 writes the column as null (F10). |
 | S10C-11 | **The canvas is unchanged:** the element guard is equal to `slice-08.json` in all four views. |
-| S10C-12 | CI and the runs of the test regime; changed earlier tests listed with the reason (at least S1B-13's delete and D-47's preview specs). |
+| S10C-12 | CI and the runs of the test regime. Earlier specs pass unchanged in behaviour; code that builds attribute rows gains the column (F18). |
+| S10C-13 | **Undo keeps copies in step.** Undo of a type change made before a paste, redo of a paste after a type change, and undo of Stop following after a type change: every copy shows its original's type (unit tests; one e2e for the first case). |
+| S10C-14 | **The working context.** With a context on, a followed change labels the original only (unit). |
 
 **Definition of done (scenario for the manual acceptance, on Łukasz's model KB, after the backup and the upgrade).**
 
@@ -281,8 +290,8 @@ The attribute row grows by one column. Step 1 says whether the page's data grows
 - "Copy" in its row's menu, then "Paste attribute" in an entity card header's menu, one attribute at a time, by owners, admins and modelers in a workspace that is not archived.
 - The copy is a full attribute of its entity. It starts with the original's name, definition and nullable, which are then its own. It gets no mappings, requirement links or labels.
 - A copy of a primary key is flagged as a foreign key; nothing ties a copy to a relationship (a validator's work, later).
-- The copy follows its original's data type with its parameters and Personal data, which are read-only in its panel. A change of them on the original reaches every copy in the same step.
-- Deleting an original that has copies first lists them. The copies stay, and each copy's panel keeps saying its original was deleted until Undo brings it back.
+- The copy follows its original's data type with its parameters and Personal data, which are read-only in its panel while it is a copy, also when its original is deleted. A change of them on the original, or an undo or redo, reaches every copy and their copies in the same step.
+- Deleting an original that has copies asks for a second click that names them. The copies stay, and each copy's panel keeps saying its original was deleted until Undo brings it back.
 - "Stop following" detaches a copy."
 
 **Choices by Łukasz, 30 October 2026:**

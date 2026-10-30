@@ -1,7 +1,6 @@
 # Slice 10c – acceptance
 
-Status: **step 1 (critical review), 30 October 2026. Waiting for Łukasz's answers before step 2.** No application code,
-tests or migrations.
+Status: **step 1 answered (Łukasz, 30 October 2026); step 2 (data) in progress.** The PRD is updated to the answers.
 
 - Tag `slice-10b` is at `6d1a251`, as A1 says. Branch `slice/10c-copy-attribute` was made from that tag.
 - The PRD is copied unchanged from `~/Downloads/slice-10c-copy-attribute.md` (23,900 bytes, 30 October 2026; the only
@@ -283,3 +282,39 @@ where the app and the prototype already differ or will differ:
 7. **F10:** may `revertChangeGroup` write a column that an old image lacks as null? This is a small change in undo that
    all of KB's history needs.
 8. Do you approve the new criteria S10C-13 and S10C-14, the changed S10C-05 and S10C-12, and the texts above?
+
+## Łukasz's answers (30 October 2026)
+
+- **F1: yes.** Undo and redo write the copies too, through `followOriginals` in `src/domain/model/copies.ts`, called by
+  `updateAttribute` and `revertChangeGroup`, in the same change group. The visited set stays.
+- **F2: yes.** A copy with a link keeps its followed fields read-only, whether its original is live or deleted. Only
+  "Stop following" makes them editable. Item 9 and D-63 are corrected (PRD).
+- **F3: yes.** Copies written by following are left out of the working context; only the original is labeled.
+- **F4: accepted.** A followed-field save on an original goes through `saveRows`, with its copies as held rows.
+- **F5, F8, F9, F11, F18: accepted.**
+- **F6:** the panel names the deleted original ("Copied from {entity}.{attribute}, which was deleted."), from the small
+  `lostOriginals` list in `model.load`.
+- **F7:** two clicks, the existing pattern, armed also by copies. The second click's text names the copies, not only
+  their count. The exact text and its rule for many copies are below.
+- **F12:** the paste keeps the name. When the target entity already has an attribute with that name, the toast says so.
+  The panel opens with the name selected.
+- **F10: yes.** Undo writes a missing column as null.
+- **S10C-13, S10C-14, the changed S10C-05 and S10C-12:** accepted as proposals (PRD updated).
+- **The new texts:** accepted as proposals. Łukasz approves them finally in step 4, built.
+
+### F7's text (proposal)
+
+The armed button (panel) and the armed menu item (row's menu) read the same:
+
+| Case | Text |
+| --- | --- |
+| Copies only, one | "Click again to delete; this copy stops following it: Order.customer_id" |
+| Copies only, several | "Click again to delete; these copies stop following it: Order.customer_id, Invoice.customer_id" |
+| Mappings and copies | "Click again to delete, with 2 mappings; these copies stop following it: Order.customer_id, Invoice.customer_id" |
+| Mappings only | as today: "Click again to delete, with 2 mappings" |
+
+- **Order:** by entity name, then attribute name, as "{entity}.{attribute}".
+- **Many copies:** the first five are named, then "and {n} more" (n ≥ 1), the rule of D-47's requirements row
+  (`IMPACT_KEYS_SHOWN`, `requirementsImpactRow`). Example: "…: A.x, B.x, C.x, D.x, E.x and 3 more".
+- **The toast after the delete** counts only: "Attribute deleted together with 2 mappings. 2 copies no longer follow
+  it." (one: "1 copy no longer follows it").
