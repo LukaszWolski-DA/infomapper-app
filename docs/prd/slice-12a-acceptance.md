@@ -1,6 +1,6 @@
 # Slice 12a – acceptance
 
-Status: **step 1 (critical review) done; waiting for Łukasz's answers before step 2.**
+Status: **step 1 answered (Łukasz, 31 October 2026); step 2 (the domain) in progress.**
 
 - Branch `slice/12a-home-undo-project-delete`, made on 31 October 2026 from `main` at `de2af7f` (the start commit). Tag
   `slice-11` is at `6c231c6`; `main` is one docs-only merge past it (PR 29, the InfoCube idea in `docs/ideas.md`), so
@@ -123,6 +123,28 @@ mostly in undo: the step's name, the last project under undo, and who may undo a
 - **Q-E (F7, F8, F11).** Agree to the three undo additions: "a workspace keeps a project" in `consistent`, the same count inside the local adapter's write, and `canvas.live_label_id` in `PARENTS`?
 - **Q-F (F4).** Agree to explicit undo names, which also renames the existing "Create canvas" of a new project to "Create project"?
 - **Q-G (manual acceptance, A3).** Scenario point 4 creates and deletes a test project in KB. Its soft-deleted rows and change events stay in your file afterwards. Is that fine, after the backup?
+
+## Łukasz's answers to step 1 (31 October 2026)
+
+- **Q-A:** only "Undone: Create project", as on canvases.
+- **Q-B:** a sentence in the known limitation "'At least one canvas' can race"; the database slice fixes both. No check
+  in the local adapter.
+- **Q-C:** "Click again to delete the project", as in the prototype.
+- **Q-D:** owners, admins and modelers (`project.delete` with the editors). D-65 gets a sentence that only the person
+  who deleted a project can undo it (the undo history is personal).
+- **Q-E:** yes to F7, F8 and F11.
+- **Q-F:** yes to explicit step names, "Create project" instead of today's "Create canvas" included. The tests that
+  change are listed with their reason.
+- **Q-G:** yes, after the KB backup.
+- **F1:** item 16 exists; it stays as a regression test (S12A-12) with "That project no longer exists.".
+- **F2:** the short-lived cookie is agreed; the redirect stays in `loadShell` only.
+- **F6:** agreed; the wider refusals go into the known limitations and a sentence into D-65.
+- **F10:** the shared soft-delete part of a canvas is agreed; `deleteCanvas` behaves as before.
+- **F13:** Undo in the toast on the home pages is in the slice (item 14).
+- **Texts:** the table above is accepted, with the changes these answers bring (S12A-01's "… on {canvas}", S12A-05's
+  single toast).
+
+The PRD is updated to these answers (status "step 1 answered").
 
 ## Assumptions
 
