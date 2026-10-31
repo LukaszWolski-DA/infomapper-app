@@ -1,6 +1,6 @@
 # Slice 10c – acceptance
 
-Status: **steps 1 to 4 accepted (Łukasz, 30 October 2026); step 5, the closing, in review.** The PRD is updated to the answers of step 1.
+Status: **manual acceptance passed (Łukasz, 30 October 2026); merged as PR 27, tag `slice-10c`.** Steps 1 to 5 and Łukasz's answers to each are below; the PRD is updated to the answers of step 1.
 
 - Tag `slice-10b` is at `6d1a251`, as A1 says. Branch `slice/10c-copy-attribute` was made from that tag.
 - The PRD is copied unchanged from `~/Downloads/slice-10c-copy-attribute.md` (23,900 bytes, 30 October 2026; the only
