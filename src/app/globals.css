@@ -34,6 +34,8 @@
   --im-req: #534ab7;
   --im-req-soft: #eeedfe;
   --im-req-ink: #3c3489;
+  /* a card's exception to its canvas's names or aliases (slice 11, D-64): its header or its rows tinted */
+  --im-alias-soft: #fbe7f1;
   /* a requirement card's filled header (D-41, prototype --req-head, --req-on; slice 4b-2) */
   --im-req-head: #534ab7;
   --im-req-on: #ffffff;
@@ -52,6 +54,7 @@
     --im-line: #2f3944;
     --im-logical: #8f9cff;
     --im-logical-soft: #262d55;
+    --im-alias-soft: #3d2433;
     --im-physical: #e2a74b;
     --im-physical-soft: #3a2f1c;
     --im-map: #3ecfae;

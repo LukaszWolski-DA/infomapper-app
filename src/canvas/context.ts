@@ -2,6 +2,8 @@
 
 import { createContext, type PointerEvent as ReactPointerEvent } from "react";
 import type { Uuid } from "@/domain/ids";
+import type { NameDimension } from "@/domain/model/aliases";
+import type { NameMode } from "@/domain/types";
 import type { TraceTarget } from "@/domain/model/requirements";
 import type { ArrangeMode } from "./arrange";
 import type { FrameData, FrameStats } from "./frame-data";
@@ -97,8 +99,11 @@ export interface CanvasHandle {
   placeAt: (target: CardTarget, rows: number, at: { x: number; y: number }) => void;
   /** “Fit width to names” (D-37): the narrowest width at which every name of the card fits. */
   fitWidth: (cardId: Uuid) => void;
-  /** Collapses or expands a card, or sets its row filter (toolbox); saved like the card's own buttons. */
-  setCardView: (cardId: Uuid, view: { collapsed?: boolean; rowFilter?: RowFilter }) => void;
+  /**
+   * Collapses or expands a card, or sets its row filter (toolbox); saved like the card's own buttons. Slice 11: an entity
+   * card's names or aliases; a choice equal to the canvas's mode follows the canvas again.
+   */
+  setCardView: (cardId: Uuid, view: { collapsed?: boolean; rowFilter?: RowFilter; entityNames?: NameMode; attributeNames?: NameMode }) => void;
   /**
    * Places elements beside a card in one change (B-08): feeding sources on the left, fed entities on the right, each
    * in a free spot. Elements already here are skipped.
@@ -106,8 +111,11 @@ export interface CanvasHandle {
   placeBeside: (cards: readonly { target: CardTarget; rows: number }[], anchorCardId: Uuid, side: "left" | "right") => void;
   /** Resolves once every card change still on its way has been saved (before an undo). */
   settled: () => Promise<void>;
-  /** A card's collapse state and row filter as the canvas shows them now (changed without a fresh page). */
-  cardView: (cardId: Uuid) => { collapsed: boolean; rowFilter: RowFilter } | null;
+  /**
+   * A card's collapse state and row filter as the canvas shows them now (changed without a fresh page); slice 11: what
+   * its header and rows show, name or alias.
+   */
+  cardView: (cardId: Uuid) => { collapsed: boolean; rowFilter: RowFilter; entityNames: NameMode; attributeNames: NameMode } | null;
   /** Selects every card on the canvas (Ctrl+A, toolbox “Select all”; slice 2a). */
   selectAll: () => void;
   /** The selected cards aligned, stacked or lined up, in one change (slice 2a). */
@@ -160,6 +168,11 @@ export interface CanvasHandle {
    * undo step); reviewers and readers expand frames in this tab only. Resolves whether a step was saved.
    */
   resetView: (parts: ViewReset) => Promise<boolean>;
+  /**
+   * The top bar's “Entity aliases” and “Attribute aliases” (slice 11): the canvas's mode in one dimension, every card's
+   * exception there cleared, in one change (one undo step). Resolves whether it was saved.
+   */
+  setNames: (dimension: NameDimension, mode: NameMode) => Promise<boolean>;
   /** A bundle of lines at a collapsed frame as the canvas draws it now (slice 2c, the bundle panel). */
   bundleView: (key: string) => Bundle | null;
   /** A note as the canvas has it now (slice 3a, the note panel), or null. */
@@ -404,6 +417,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   setFrameCollapsed: noop,
   setAllFramesCollapsed: noop,
   resetView: () => Promise.resolve(false),
+  setNames: () => Promise.resolve(false),
   bundleView: () => null,
   noteView: () => null,
   newNote: noop,

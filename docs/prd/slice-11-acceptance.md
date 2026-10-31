@@ -435,3 +435,110 @@ soon as the tree carries aliases; step 4 checks it on the page.
   - switching a canvas to names stores null;
   - the check box also clears a card exception that equals the new mode;
   - both of a card's dimensions in one call is named "Change card".
+
+## Step 4: the interface (31 October 2026)
+
+Branch `slice/11-aliases`, after `e5c681d`. `.data/dev-db.json` (KB) was not opened: the browser checks ran on a fresh
+scratch file, `.data/verify-db.json` (launch configuration `infomapper-verify`), and the specs on the e2e file.
+
+**Built:**
+- **Alias fields** (item 6): "Alias" under the name in the entity panel (`input-entity-alias`) and the attribute panel
+  (`input-attribute-alias`), placeholder "Another name, e.g. in Polish", on `saveRow` as every field; read-only where
+  the name is (`p.editable`: role and archive).
+- **The check boxes** (item 8): `src/canvas/NamesSwitch.tsx` in the top bar after the layer switch
+  (`check-entity-aliases`, `check-attribute-aliases`, group `switch-names`).
+  - Their state is `namesState` (`src/canvas/names-state.ts`), a value store `ModelCanvas` publishes from an effect
+    with `namesControl` over its cards' exceptions, as `viewCounts`. `indeterminate` is set in an effect; nothing reads
+    layout.
+  - Disabled for reviewers and readers, with the tooltip "Only editors change what this canvas shows".
+  - A click calls `ui.setNames` → `ModelCanvas.setNames`: the new mode and the cleared exceptions are shown at once (one
+    `setState` for the modes and one for the nodes, one commit), then `setCanvasNamesAction` (new, `frame.ts`, as
+    `resetCanvasViewAction`) runs on the canvas's queue (`enqueueGroup` over every card) with the cards' versions. Its
+    answer gives the cards their versions and the canvas's new version to the look provider (`noteVersion`, new in
+    `look.tsx`). A refusal puts the mode and the exceptions back with the domain's message.
+  - In "More" (`more-entity-aliases`, `more-attribute-aliases`) with Focus; an indeterminate item shows a dash
+    (`dropdown-menu.tsx`'s indicator: `MinusIcon` for `indeterminate`).
+- **The card menu** (item 9): two segments after "Rows" on entity cards for editors, "Entity name" and "Attribute
+  names" with "Name" and "Alias" (`seg-entity-name`, `seg-attribute-names`; `ToolboxItem`'s segment gained an optional
+  `testId`). They show `cardMode`; a click goes through `ui.setCardView` → `change(...)`, shown as an exception unless
+  it equals the canvas's mode, and sent as the choice (the server decides the same).
+- **What cards show** (items 10, 12, 13; F8 as changed by Q-B):
+  - `CardData` and `CardRow` carry `alias` and, only when it differs from the name, `shown`; a card carries its
+    exceptions `entityNames`/`attributeNames` only when set. A model without aliases sends the same card data.
+  - `applyNames(card, canvasNames)` (`card-data.ts`) sets the shown texts with `cardShownNames` and works the clips out
+    again (`withClips` reads `shownText`); the same card comes back when nothing it shows changes. The server applies
+    it in `buildCards` (first paint); `ModelCanvas` applies it when it builds nodes, in `patchCard`, on fresh pages and
+    on a switch.
+  - `shownText` is read by the header, the rows (`splitName`), the low-zoom block and their `title`s (`CardNode`), a
+    collapsed frame's block list, "Fit width to names" and the requirement drop hint. Toasts, questions and pin names
+    keep `name`.
+  - A fresh page brings the canvas's names keyed on the canvas row's version too (`names.version`): the switch's own
+    page can be replaced by a later one, so the names alone may not change from one page to the next (found by S11-02
+    and S11-05; an older page is ignored).
+- **The tint** (item 11): the class `alt` on `.c-head` (entity exception) and on `.c-body`/`.c-lod` (attribute
+  exception); token `--im-alias-soft` (`#fbe7f1` light, `#3d2433` dark; a pink no other mark uses). No new element.
+- **Search** (item 14): the left panel's hint line draws step 3's hints as it is.
+
+**A change to F7, for approval:** S6A-10 showed that the check boxes (225 px) do not fit in the bar from 1,201 to
+1,300 px (working context on, both panels shown). So:
+- the check boxes go into "More" **up to 1,300 px** (`MORE_NAMES`), and "More" shows from there; Focus, Changes and
+  the notation stay in the bar down to 1,201 px as before (`MORE_FOCUS`, 1,200 px, unchanged);
+- "More" beside Focus and the notation was 7 px too wide at 1,201 px, so the working context's label is truncated at
+  90 px instead of 100 px from 1,201 to 1,300 px (`working-context.tsx`; the full name stays its tooltip as before);
+- the check boxes' labels were tightened (gap and padding 4 px), which made 1,536 px fit.
+
+I first tried moving Focus and the notation to 1,300 px with the check boxes: it fits, but Playwright's 1,280 px
+window would then put Focus into "More" for about 25 earlier specs, and it changes slice 6a's step; so I kept F7's
+1,200 px for them. S6A-10 checks the new step (the check boxes in "More" at 1,300 px, Focus not; both at 1,200 px).
+Slice 11's specs run in a 1,536 × 864 window (`fixtures.ts`), so the check boxes are in the bar.
+
+**Measured in the dev build (not step 5's sitting):** one switch is 1 synchronous canvas commit and 4 in all after the
+server's fresh page, the same as a layer switch on the same canvas (4).
+
+**Specs** (`e2e/slice-11/`, helpers in `helpers.ts`): S11-01 to S11-11, 16 tests, plus `S11-screens.spec.ts` (only with
+`SCREENS=<folder>`).
+- S11-06's context card: a live canvas for a label on one attribute of Order Line (CR-99, test data).
+- S11-10's second test also checks that a layer change right after two quick clicks is not refused (the look
+  provider's version).
+
+**Earlier specs changed:** `S6A-10` (the check boxes' 1,300 px step above). No other earlier spec changed: `S1B-07` does not list the
+segments' texts (it reads items by test id), so it passed unchanged.
+
+**Unit tests:** `src/canvas/card-names.test.ts` (new, 5): no extra data without aliases; aliases on the first paint;
+exceptions and the same card back; clips again for the shown text; table cards alone.
+
+**Screenshots** (`docs/prd/slice-11-screens/step-4/`): 1 names, 2 aliases, 3 both check boxes indeterminate, 4 an
+entity exception light and dark, 5 an attribute exception light and dark, 6 the card menu's segments, 7 a long alias
+truncated, 8 a search by alias, 9 the alias field, 10 "More" at 1,150 px (the check boxes, the attribute one
+indeterminate, with Focus and the notation).
+
+**New user-visible texts (for approval):**
+- Check boxes: **"Entity aliases"**, **"Attribute aliases"**; tooltips **"Show entity aliases on this canvas"**,
+  **"Show attribute aliases on this canvas"**; disabled: **"Only editors change what this canvas shows"**. The same in
+  "More".
+- Card menu segments: **"Entity name"** and **"Attribute names"**, each **"Name"** / **"Alias"**.
+- Panel field: **"Alias"**, placeholder **"Another name, e.g. in Polish"** (entity and attribute panels).
+- Search hints (step 3): "alias {alias}", "attribute {name} · {alias}".
+- Approved in step 3: the refusal and the undo history's names.
+
+**Runs (small slice):**
+- `npm run lint`, `npm run typecheck`: passed. `npm test`: 116 files, 1,508 tests, passed.
+- **The final run on the final code:** 53 passed, 8.3 min:
+  - slice 11: S11-01 to S11-11 (16 tests) and the screenshots;
+  - the cards and rows: S1A-02, S1A-03, S1A-04, S1A-06;
+  - the panels: S1A-07, S1A-11, S1B-12;
+  - the card menu: S1B-07;
+  - row filters and "Show all" (`resetCanvasView`): S6A-01 to S6A-08;
+  - the top bar: S6B-02, S6B-09; the search: S2A-02, S4A-01;
+  - live canvases: S3B-06 to S3B-09;
+  - the paste: S10C-01, S10C-02;
+  - canvas commits with fading and collapsed frames: S2C-12, S4P-12, S4B1-06.
+- S6A-10 on the final code: passed (37.7 s), by itself.
+- **Failures on the way, all fixed before the final run:**
+  - S11-01: the field cleared before the panel showed the stored row (the test now waits for `data-version`).
+  - S11-02, S11-05: undo of a switch was stored but not drawn (the names' version key above).
+  - S11-02: test data put a label on Customer that the seed already had.
+  - S6A-10: the top bar (the F7 change above).
+  - Ten slice 11 tests while "More" was at 1,300 px for Focus too (the 1,280 px window).
+- Before the final run, one earlier-spec run was discarded: the code changed while it ran.
+- The dev server's font loader failed once at start (Google Fonts, as in step 2); the rerun passed.

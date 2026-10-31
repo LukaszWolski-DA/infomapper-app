@@ -40,7 +40,8 @@ import {
   type FrameBox,
 } from "@/domain/model/frames";
 import { noteFrameAt } from "@/domain/model/notes";
-import type { Frame } from "@/domain/types";
+import type { NameDimension } from "@/domain/model/aliases";
+import type { Frame, NameMode } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import type { CardData } from "./card-data";
 import { cardNodesOf, type CardNodeT } from "./CardNode";
@@ -78,6 +79,8 @@ export interface FrameWrites {
   setFrameCollapsed: (input: { frameId: Uuid; expectedVersion: number; collapsed: boolean }) => Promise<WriteResult<{ frame: Frame }>>;
   /** The view-state bar (slice 6a): row filters to All, cards and frames expanded, the parts asked for, one change. */
   resetCanvasView: (input: ViewReset & { cards: CardRef[]; frames: { frameId: Uuid; expectedVersion: number }[] }) => Promise<WriteResult<Versions & { cards: number; frames: number }>>;
+  /** The top bar's names or aliases (slice 11): the canvas's mode in one dimension, the cards' exceptions cleared, one change. */
+  setCanvasNames: (input: { dimension: NameDimension; mode: NameMode; cards: CardRef[] }) => Promise<WriteResult<Versions & { cards: number }>>;
   /** “Collapse all” / “Expand all” (slice 2c, item 8): every frame of the canvas, one change. */
   setAllFramesCollapsed: (input: { frames: { frameId: Uuid; expectedVersion: number }[]; collapsed: boolean }) => Promise<WriteResult<Versions & { frames: number }>>;
   createFrame: (input: { x: number; y: number; width: number; height: number; cards: SizedRef[] }) => Promise<WriteResult<Versions & { frameId: Uuid; claimed: number }>>;
@@ -99,7 +102,7 @@ export interface ViewReset {
   expandFrames?: boolean;
 }
 
-export type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width" | "frameId">>;
+export type CardPatch = Partial<Pick<CardData, "collapsed" | "rowFilter" | "x" | "y" | "width" | "frameId" | "entityNames" | "attributeNames">>;
 
 /**
  * The canvas's requirement cards as a layout save sees them (slice 4b-2): they move with a selection in the same change

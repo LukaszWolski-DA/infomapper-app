@@ -19,6 +19,8 @@ export interface CanvasLookApi {
   editable: boolean;
   /** Editors: shown at once and saved. Others: only the layer mode, in this browser. */
   setLook: (patch: LookPatch) => void;
+  /** A newer version of the canvas row written by another command (slice 11's names), for the next look change. */
+  noteVersion: (version: number) => void;
 }
 
 export const CanvasLookCtx = createContext<CanvasLookApi | null>(null);
@@ -94,7 +96,12 @@ export function CanvasLookProvider({
     [editable, look, save, canvasId, toast],
   );
 
-  const api = useMemo(() => ({ canvasId, look, editable, setLook }), [canvasId, look, editable, setLook]);
+  // another write of the canvas row (the names' modes, slice 11) hands its new version over, so the next look change
+  // is not refused as stale
+  const noteVersion = useCallback((v: number) => {
+    versionRef.current = Math.max(versionRef.current, v);
+  }, []);
+  const api = useMemo(() => ({ canvasId, look, editable, setLook, noteVersion }), [canvasId, look, editable, setLook, noteVersion]);
   return <CanvasLookCtx.Provider value={api}>{children}</CanvasLookCtx.Provider>;
 }
 

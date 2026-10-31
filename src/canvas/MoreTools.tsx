@@ -1,7 +1,7 @@
 "use client";
 
 // “More” (⋯) at the right end of the canvas tools (slice 6a, item 9; Łukasz's step 1 answer 7): on a narrow window the
-// tools that do not fit leave the bar and are here instead. Up to 1,200 px Focus, the Changes view (slice 7b) and the notation switch (the prototype
+// tools that do not fit leave the bar and are here instead. Up to 1,300 px the names' check boxes (slice 11); up to 1,200 px Focus, the Changes view (slice 7b) and the notation switch (the prototype
 // hides them at 1,000 px, but the app has no other place for the notation and only card menus for Focus); up to 1,100 px
 // also the Entity, Frame, Note and Hand tools (they keep their keys and the toolbox). Widths measured in step 4. Each
 // tool's own element carries its breakpoint (`more-breakpoints.ts`), and so does each menu item; nothing is set on
@@ -24,7 +24,10 @@ import { ENTITY_TOOL_HINT, FRAME_TOOL_HINT, HAND_TOOL_HINT, NOTE_TOOL_HINT } fro
 import { CanvasUiCtx, type Notation } from "./context";
 import { CHANGES_TITLE, changesOn, toggleChanges } from "./changes-view";
 import { focusOn } from "./fade";
-import { MORE_FOCUS, MORE_TOOLS } from "./more-breakpoints";
+import { useCanvasLook } from "./look";
+import { namesState, nextMode } from "./names-state";
+import { NAMES_READ_ONLY, NAMES_SWITCHES } from "./NamesSwitch";
+import { MORE_FOCUS, MORE_NAMES, MORE_TOOLS } from "./more-breakpoints";
 import { toggleFocus } from "./Focus";
 import { useValue } from "./value-store";
 
@@ -48,6 +51,9 @@ export function MoreTools({ editable, canNote }: { editable: boolean; canNote: b
   const toast = useToast();
   const focus = useValue(focusOn);
   const changes = !!useValue(changesOn);
+  // the names' check boxes come here with Focus (slice 11, F7)
+  const names = useValue(namesState);
+  const lookEditable = !!useCanvasLook()?.editable;
   const tools = TOOLS.filter((t) => t.who === "all" || (t.who === "edit" ? editable : canNote));
   return (
     <DropdownMenu>
@@ -55,7 +61,7 @@ export function MoreTools({ editable, canNote }: { editable: boolean; canNote: b
         data-testid="button-more-tools"
         title="More tools"
         aria-label="More tools"
-        className={`inline-flex h-[30px] flex-none items-center rounded-md px-1.5 text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover ${MORE_FOCUS.inMenu}`}
+        className={`inline-flex h-[30px] flex-none items-center rounded-md px-1.5 text-im-ink-2 outline-none hover:bg-im-hover hover:text-im-ink focus-visible:ring-2 focus-visible:ring-im-logical data-[state=open]:bg-im-hover ${MORE_NAMES.inMenu}`}
       >
         <svg viewBox="0 0 16 16" className="size-4 fill-current" aria-hidden>
           <circle cx="3.5" cy="8" r="1.3" />
@@ -68,23 +74,41 @@ export function MoreTools({ editable, canNote }: { editable: boolean; canNote: b
         data-testid="menu-more-tools"
         className="min-w-[220px] rounded-lg border-0 bg-im-surface p-1 text-[13px] text-im-ink shadow-[0_0_0_1px_var(--im-line),0_12px_28px_-10px_var(--im-shadow)]"
       >
+        {NAMES_SWITCHES.map((n) => {
+          const state = names?.[n.dimension] ?? "name";
+          return (
+            <DropdownMenuCheckboxItem
+              key={n.dimension}
+              data-testid={`more-${n.testId.replace("check-", "")}`}
+              data-state-names={state}
+              checked={state === "mixed" ? "indeterminate" : state === "alias"}
+              disabled={!lookEditable}
+              onCheckedChange={() => void ui.setNames(n.dimension, nextMode(state))}
+              title={lookEditable ? n.title : NAMES_READ_ONLY}
+              className={`${itemClass} data-[disabled]:opacity-60 ${MORE_NAMES.inMenu}`}
+            >
+              {n.label}
+            </DropdownMenuCheckboxItem>
+          );
+        })}
+        <DropdownMenuSeparator className={`mx-0.5 my-1 bg-im-line ${MORE_FOCUS.inMenu}`} />
         <DropdownMenuCheckboxItem
           data-testid="more-focus"
           checked={focus}
           onCheckedChange={() => toggleFocus(ui.selection, toast)}
           title="Fade everything not connected to the selection"
-          className={itemClass}
+          className={`${itemClass} ${MORE_FOCUS.inMenu}`}
         >
           Focus
         </DropdownMenuCheckboxItem>
-        <DropdownMenuCheckboxItem data-testid="more-changes" checked={changes} onCheckedChange={toggleChanges} title={CHANGES_TITLE} className={itemClass}>
+        <DropdownMenuCheckboxItem data-testid="more-changes" checked={changes} onCheckedChange={toggleChanges} title={CHANGES_TITLE} className={`${itemClass} ${MORE_FOCUS.inMenu}`}>
           Changes
         </DropdownMenuCheckboxItem>
-        <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
-        <DropdownMenuLabel className="px-2.5 pb-1 pt-1.5 text-[11px] font-semibold text-im-ink-2">Relationship notation</DropdownMenuLabel>
+        <DropdownMenuSeparator className={`mx-0.5 my-1 bg-im-line ${MORE_FOCUS.inMenu}`} />
+        <DropdownMenuLabel className={`px-2.5 pb-1 pt-1.5 text-[11px] font-semibold text-im-ink-2 ${MORE_FOCUS.inMenu}`}>Relationship notation</DropdownMenuLabel>
         <DropdownMenuRadioGroup value={ui.notation} onValueChange={(v) => ui.setNotation(v as Notation)}>
           {NOTATIONS.map((n) => (
-            <DropdownMenuRadioItem key={n.value} value={n.value} data-testid="more-notation" data-notation={n.value} className={itemClass}>
+            <DropdownMenuRadioItem key={n.value} value={n.value} data-testid="more-notation" data-notation={n.value} className={`${itemClass} ${MORE_FOCUS.inMenu}`}>
               {n.label}
             </DropdownMenuRadioItem>
           ))}

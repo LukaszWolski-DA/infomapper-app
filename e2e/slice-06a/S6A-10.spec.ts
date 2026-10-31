@@ -2,8 +2,8 @@
 // the working context on (its widest state), both panels shown, at 2,560, 2,100, 1,880, 1,600, 1,536, 1,300,
 // 1,201, 1,200, 1,101, 1,100, 1,000 and 800 px: no control reaches past the bar or under another, nothing scrolls; the layer switch,
 // the working context, undo, zoom, both panel buttons and the user indicator are always there; the prototype's steps
-// (short labels up to 2,100, icon-only tools up to 1,880, no brand up to 1,300); Focus and the notation in “More” up to
-// 1,200 px, the Entity, Frame, Note and Hand tools too up to 1,100 px, each reachable there. The measured widths are
+// (short labels up to 2,100, icon-only tools up to 1,880, no brand up to 1,300); the names' check boxes in “More” up to
+// 1,300 px (slice 11); Focus and the notation in “More” up to 1,200 px, the Entity, Frame, Note and Hand tools too up to 1,100 px, each reachable there. The measured widths are
 // printed (the step's table).
 
 import { expect, test, type Page } from "./fixtures";
@@ -54,9 +54,11 @@ test("S6A-10: nothing in the top bar is cut off from 2,560 to 800 px; what does 
     // the prototype's steps
     expect(await page.locator('[data-testid="switch-layer"] [data-layer="all"]').innerText(), `${width}: layer label`).toBe(width > 2100 ? "Everything" : "All");
     expect(s.brand, `${width}: brand`).toBe(width > 1300);
+    // the names' check boxes (slice 11): in the bar above 1,300 px, in “More” up to it, and “More” with them
+    (width > 1300 ? expect(s.ids, `${width}: names`) : expect(s.ids, `${width}: names in More`).not).toContain("switch-names");
     if (width > 1200) {
       for (const id of [...FOCUS_AND_NOTATION, ...TOOLS]) expect(s.ids, `${width}: ${id}`).toContain(id);
-      expect(s.ids, `${width}: no More`).not.toContain("button-more-tools");
+      (width > 1300 ? expect(s.ids, `${width}: no More`).not : expect(s.ids, `${width}: More`)).toContain("button-more-tools");
       expect((await page.getByTestId("button-tool-hand").innerText()).trim(), `${width}: Hand's label`).toBe(width > 1880 ? "Hand" : "");
     } else {
       for (const id of FOCUS_AND_NOTATION) expect(s.ids, `${width}: ${id} in More`).not.toContain(id);
@@ -66,10 +68,22 @@ test("S6A-10: nothing in the top bar is cut off from 2,560 to 800 px; what does 
   }
   console.log(`S6A-10 widths: ${JSON.stringify(table)}`);
 
-  // “More” at 1,200 px: Focus and the notation, no tools; at 800 px the tools too, and each works from there
-  await page.setViewportSize({ width: 1200, height: 900 });
+  // “More” at 1,300 px: only the names' check boxes (slice 11)
+  await page.setViewportSize({ width: 1300, height: 900 });
   await page.getByTestId("button-more-tools").click();
   const menu = page.getByTestId("menu-more-tools");
+  await expect(menu.getByTestId("more-entity-aliases")).toBeVisible();
+  await expect(menu.getByTestId("more-attribute-aliases")).toBeVisible();
+  await expect(menu.getByTestId("more-focus")).toBeHidden();
+  await expect(menu.getByTestId("more-notation").first()).toBeHidden();
+  await page.keyboard.press("Escape");
+  await expect(menu).toBeHidden();
+
+  // “More” at 1,200 px: the check boxes, Focus and the notation, no tools; at 800 px the tools too, and each works from
+  // there
+  await page.setViewportSize({ width: 1200, height: 900 });
+  await page.getByTestId("button-more-tools").click();
+  await expect(menu.getByTestId("more-entity-aliases")).toBeVisible();
   await expect(menu.getByTestId("more-focus")).toBeVisible();
   await expect(menu.getByTestId("more-notation")).toHaveCount(2);
   await expect(menu.getByTestId("more-tool-hand")).toBeHidden();

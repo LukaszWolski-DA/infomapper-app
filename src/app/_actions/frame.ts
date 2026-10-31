@@ -21,7 +21,7 @@ import {
   type FrameCanvasState,
   type MoveState,
 } from "@/domain/commands/frame";
-import { resetCanvasView } from "@/domain/commands/canvas";
+import { resetCanvasView, setCanvasNames } from "@/domain/commands/canvas";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { DataStore } from "@/data";
 import { runCommand, type ActionResult, type CommandOptions } from "../_lib/run-command";
@@ -150,6 +150,18 @@ export async function resetCanvasViewAction(
   },
 ) {
   return refreshed(await onCanvas(workspaceId, canvasId, async (ctx, access, state) => resetCanvasView(ctx, access, state, { ...input, canvasId })));
+}
+
+/**
+ * The top bar's “Entity aliases” and “Attribute aliases” (slice 11, item 8): the canvas's mode in one dimension, every
+ * card's exception there cleared, in one change; all or nothing on the cards' versions, the canvas row read as it stands.
+ */
+export async function setCanvasNamesAction(
+  workspaceId: string,
+  canvasId: string,
+  input: { dimension: string; mode: string; cards: { canvasItemId: string; expectedVersion: number }[] },
+) {
+  return refreshed(await onCanvas(workspaceId, canvasId, async (ctx, access, state) => setCanvasNames(ctx, access, state, { ...input, canvasId })));
 }
 
 /** The resize handle at a frame's bottom-right corner. */
