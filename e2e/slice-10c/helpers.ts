@@ -108,7 +108,8 @@ export async function holdAnswer(page: Page, bodyHas: string, ms = 2000): Promis
       held = true;
       const response = await route.fetch();
       await new Promise((done) => setTimeout(done, ms));
-      await route.fulfill({ response });
+      // a test that failed or timed out meanwhile has closed the page: nothing is left to answer
+      await route.fulfill({ response }).catch(() => {});
     } else await route.continue();
   });
   return () => held;
