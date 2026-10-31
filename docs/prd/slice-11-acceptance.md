@@ -1,6 +1,6 @@
 # Slice 11 – acceptance
 
-Status: **steps 1–4 done and answered, step 5 (the measurement sitting) done (31 October 2026); the closing next, after Łukasz's answers to step 5.**
+Status: **accepted: manual acceptance passed on 31 October 2026 (Łukasz); merged through PR 28 and tagged `slice-11`.** The tint's colour stays as built.
 
 - Tag `slice-10c` is at `72ef24b`, as A1 says. Branch `slice/11-aliases` was made from that tag.
 - The PRD is copied unchanged from `~/Downloads/slice-11-aliases.md` (24,332 bytes; the only file with that name; its

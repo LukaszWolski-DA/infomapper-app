@@ -742,6 +742,18 @@ worker, traces on, about 15 minutes). The cause is unknown; the first run's trac
 repeats' traces are in `.data/s10c13-repro/` and `.data/s10c13-repro2/`. In the next full runs, keep its trace and error
 output if it fails (copy `test-results/` and the log before any rerun).
 
+### S11-10 and S7C-02 failed once in slice 11's closing run
+
+In slice 11's closing full run (31 October 2026), two specs failed once before their own steps ran, and each passed 3
+of 3 on its own:
+- **S11-10** (`e2e/slice-11/S11-10.spec.ts`, two quick clicks on a check box): the canvas never became ready in
+  `openCanvas` (`data-ready` stayed empty for 15 s).
+- **S7C-02** (`e2e/slice-07c/S7C-02.spec.ts`, which starts its own server on a format-7 file): the page drew nothing,
+  and the top bar never showed.
+
+The cause is unknown. Both error texts and traces are in `.data/e2e-11-close/` (git-ignored). From now on, keep a
+failing run's trace and error output before any rerun (copy `test-results/` and the log).
+
 ## Source import (slice 7a)
 
 ### Every write rewrites the whole local data file

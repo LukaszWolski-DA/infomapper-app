@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 10c are merged (slice 10c, copying an attribute to another entity: tag `slice-10c`); slice 11, aliases of entities and attributes, is in review. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 11 are merged (slice 11, aliases of entities and attributes: tag `slice-11`). On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -64,7 +64,7 @@ the organization menu, and on the People tab adding a person, changing roles, re
 access (its link and password); slice 9's saves in panels without false conflicts (one save per object at a time, each
 with the newest version known), a project's name and description edited on its home, and a zoom typed in the top bar;
 slice 10a's canvas writes on the same save chain as the panels, and a relationship from an entity to itself ("Relate to
-itself" in the card's menu), drawn as a loop; slice 10b's relationships between source tables drawn as grey lines between the table cards (D-62); slice 10c's copy and paste of an attribute into any entity, the copy following its original's type and Personal data (D-63); in review, slice 11's aliases of entities and attributes, shown on each canvas by its two check boxes with exceptions per card, and found by the search (D-64).
+itself" in the card's menu), drawn as a loop; slice 10b's relationships between source tables drawn as grey lines between the table cards (D-62); slice 10c's copy and paste of an attribute into any entity, the copy following its original's type and Personal data (D-63); slice 11's aliases of entities and attributes, shown on each canvas by its two check boxes with exceptions per card, and found by the search (D-64).
 Acceptance:
 [slice 0](docs/prd/slice-00-acceptance.md), [slice 1a](docs/prd/slice-01a-acceptance.md),
 [slice 1b](docs/prd/slice-01b-acceptance.md), [slice 2a](docs/prd/slice-02a-acceptance.md),
