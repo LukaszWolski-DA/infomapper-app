@@ -14,7 +14,7 @@ test("S11-01: Customer's and customer_id's aliases are saved in their panels, on
   await hydrated(page);
   await openEntityFromTree(page, "Customer");
   const entityField = page.getByTestId("panel-entity").getByTestId("input-entity-alias");
-  await expect(entityField).toHaveAttribute("placeholder", "Another name, e.g. in Polish");
+  await expect(entityField).toHaveAttribute("placeholder", "Another name, e.g. a translation");
   await entityField.fill("  Klient ");
   await entityField.press("Enter");
   await expect.poll(() => aliasOf("Customer")).toBe("Klient");

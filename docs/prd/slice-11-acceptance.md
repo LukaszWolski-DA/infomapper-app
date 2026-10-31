@@ -443,7 +443,7 @@ scratch file, `.data/verify-db.json` (launch configuration `infomapper-verify`),
 
 **Built:**
 - **Alias fields** (item 6): "Alias" under the name in the entity panel (`input-entity-alias`) and the attribute panel
-  (`input-attribute-alias`), placeholder "Another name, e.g. in Polish", on `saveRow` as every field; read-only where
+  (`input-attribute-alias`), placeholder "Another name, e.g. a translation", on `saveRow` as every field; read-only where
   the name is (`p.editable`: role and archive).
 - **The check boxes** (item 8): `src/canvas/NamesSwitch.tsx` in the top bar after the layer switch
   (`check-entity-aliases`, `check-attribute-aliases`, group `switch-names`).
@@ -517,7 +517,7 @@ indeterminate, with Focus and the notation).
   **"Show attribute aliases on this canvas"**; disabled: **"Only editors change what this canvas shows"**. The same in
   "More".
 - Card menu segments: **"Entity name"** and **"Attribute names"**, each **"Name"** / **"Alias"**.
-- Panel field: **"Alias"**, placeholder **"Another name, e.g. in Polish"** (entity and attribute panels).
+- Panel field: **"Alias"**, placeholder **"Another name, e.g. a translation"** (entity and attribute panels).
 - Search hints (step 3): "alias {alias}", "attribute {name} · {alias}".
 - Approved in step 3: the refusal and the undo history's names.
 
@@ -542,3 +542,14 @@ indeterminate, with Focus and the notation).
   - Ten slice 11 tests while "More" was at 1,300 px for Focus too (the 1,280 px window).
 - Before the final run, one earlier-spec run was discarded: the code changed while it ran.
 - The dev server's font loader failed once at start (Google Fonts, as in step 2); the rerun passed.
+
+### Łukasz's answers to step 4 (31 October 2026)
+
+- **The 1,300 px step is approved:** the check boxes in "More" up to 1,300 px; Focus, Changes and the notation
+  unchanged; the working context's label cut at 90 px from 1,201 to 1,300 px. It goes into CLAUDE.md at the closing.
+- **The texts are approved,** with one change: the alias field's placeholder is "Another name, e.g. a translation"
+  (built: both panels and S11-01; the texts above are updated).
+- **The tint's colour:** Łukasz judges it on the screenshots and says before the closing if he wants another.
+- **D-64 is approved** with one change: "each set by a check box in the top bar after the layer switch (in “More” on
+  narrow screens)". Written into `docs/decisions.md`, accepted on 31 October 2026, with D-63's addition "A copy also
+  gets its original's alias once (slice 11)."

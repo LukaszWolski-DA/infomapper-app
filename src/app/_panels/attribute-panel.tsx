@@ -146,7 +146,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         <TextField key={fieldKey(a.id, "name", a.name)} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-attribute-name" inputRef={nameRef} />
       </Field>
       <Field label="Alias" htmlFor="f-aalias">
-        <TextField key={fieldKey(a.id, "alias", a.alias)} id="f-aalias" value={a.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. in Polish" onSave={(alias) => void save({ alias })} testId="input-attribute-alias" />
+        <TextField key={fieldKey(a.id, "alias", a.alias)} id="f-aalias" value={a.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => void save({ alias })} testId="input-attribute-alias" />
       </Field>
 
       <Field label="Position on the entity">
