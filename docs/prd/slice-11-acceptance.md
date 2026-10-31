@@ -190,9 +190,31 @@ names are (D-37). Table and requirement cards are unchanged."
 
 ## Handover for the next session
 
-- **Branch** `slice/11-aliases`, from tag `slice-10c` (`72ef24b`); the last commit is "docs: slice 11 step 1 answers".
-  Not pushed yet.
-- **Step 2 starts with KB's backup,** before anything opens `.data/dev-db.json`:
+- **State after step 2 (31 October 2026):** branch `slice/11-aliases`, from tag `slice-10c` (`72ef24b`). The last
+  commit is "docs: slice 11 step 2, KB upgraded to format 11". Not pushed.
+  - Step 2 is done and KB is at format 11.
+  - The newest KB backup is `.data/backups/dev-db-20261031-1008-before-format-11.json`, also saved as
+    `kb-model-latest.json`; it is the format-10 file.
+- **What step 3 (the domain) must know:**
+  - **The columns exist and are null everywhere.** `pasteAttribute` still writes `alias: null`; step 3 sets
+    `alias: original.alias` (P10, D-63's addition). `alias` is not a followed column (`FOLLOWED_COLUMNS` stays).
+  - **`duplicateCanvas` already copies the canvas's two modes**, and the cards' exceptions come with `...i`.
+  - **Commands to build:**
+    - `alias` in `updateEntity` and `updateAttribute`: trimmed, an empty alias stored as null, no uniqueness, the
+      name's rights, refused when archived;
+    - `setCanvasNames(canvasId, dimension, mode, cards[])`, shaped like `resetCanvasView`: it checks only the cards'
+      versions, and the canvas row is read as it stands (F2, last write wins);
+    - `entityNames` and `attributeNames` in `updateCanvasItem`: entity cards only, null when equal to the canvas's
+      mode, `state.canvas` already passed;
+    - the search's matching with the hint texts (F13) in `tree-data.ts` `show` (step 4 draws it; the matching is
+      domain-side pure code in `src/app/_panels/tree-data.ts`, unit-tested there).
+  - **Undo needs no new code:** canvas and `canvas_item` are undoable tables, and the modes are not in the look.
+  - **Rights:** the control and the card exceptions are for editors (`canvas.edit_items`, as `resetCanvasView` and
+    `updateCanvasItem`); the alias edits need `model.edit`.
+  - **Step 3's earlier specs and the undo history's names:** list the names for approval (`changeLabel` or a write
+    set's `label`).
+- **History, done:** step 2 started with KB's backup, before anything opened `.data/dev-db.json`, as below.
+- **(Done) Step 2 started with KB's backup,** before anything opened `.data/dev-db.json`:
   `.data/backups/dev-db-<yyyymmdd-hhmm>-before-format-11.json`, byte-identical (`cmp`), path and size reported. The
   newest backup also goes to `.data/backups/kb-model-latest.json`. No `seed`, `reset-dev-data`, dev server or e2e run
   before it (the e2e runs use `.data/e2e-db.json`, but run none before the backup anyway).
@@ -291,3 +313,24 @@ names are (D-37). Table and requirement cards are unchanged."
   - Google Fonts answered normally a minute later, and the retry passed. No test ran in the failed attempt; the cause
     was outside the app.
 - KB was not upgraded.
+
+**KB's upgrade (Łukasz's go, 31 October 2026):**
+- **How:** through the app's own path. A one-off `tsx` file, not committed, called `readDb(devDbPath())` with no
+  `INFOMAPPER_DEV_DB` set; the upgrade wrote the file back. The file was not edited by hand.
+- **Before:** format 10, 1,437,183 bytes; 20 entities, 119 attributes, 6 canvases, 33 canvas items, 773 change events.
+  None of the six new columns was in the file.
+- **After:** format 11, 1,440,667 bytes (+3,484); 20 entities, 119 attributes, 6 canvases, 33 canvas items, 773
+  change events. The new columns are present and null on every row:
+  - `alias` on 20 of 20 entities and 119 of 119 attributes;
+  - both modes on 6 of 6 canvases and 33 of 33 canvas items.
+- **Compared with the backup as JSON**, table by table and row by row, without the format and the new columns:
+  0 differences. Every table's count is the same, and no change event was added.
+- **The app opens KB:**
+  - the dev server (`npm run dev`, port 3000, on `.data/dev-db.json`) started;
+  - signed in through the test users' list as Lukasz_KB, which leads to "Kanton Basel";
+  - the canvas LDM of "First project" opened with its 8 entity cards and 2 source tables (Building, Floor, Room,
+    Parcel, Place, RoomType, Flooring, Blind) and its panels;
+  - no browser console message, and no error in the server log (every request 200 or 307);
+  - the server was stopped, and the file is unchanged by the visit (SHA-256 `59a5a756…f08b6db8`, 10:22).
+- The backup stays as it is: `.data/backups/dev-db-20261031-1008-before-format-11.json` (format 10, SHA-256
+  `9074b153…cb6ab1`).
