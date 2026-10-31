@@ -1,0 +1,168 @@
+# Slice 11 – acceptance
+
+Status: **step 1, the review, waiting for Łukasz's answers (31 October 2026).** No application code yet.
+
+- Tag `slice-10c` is at `72ef24b`, as A1 says. Branch `slice/11-aliases` was made from that tag.
+- The PRD is copied unchanged from `~/Downloads/slice-11-aliases.md` (24,332 bytes; the only file with that name; its
+  file time is 31 October 2026, 09:46). Commit "docs: slice 11 PRD".
+- `.data/dev-db.json` (KB) was not touched. Nothing that opens the local file was run.
+
+Step 1 checks items 1–15, P1–P14, D-64, D-63's addition, A1–A4 and S11-01 to S11-14 against the code, `docs/decisions.md`
+and the earlier acceptance docs. The agreed points stand. F1 shows that one of them, undo for the canvas's control,
+cannot be built on `canvas.look`, and proposes where the modes live instead.
+
+## Step 1: findings
+
+| # | Finding | Code behind it | Proposal |
+| --- | --- | --- | --- |
+| F1 | **The modes cannot live in `canvas.look` (P13, item 2) and be undoable (P8).** D-12 puts the look outside undo. `isUndoable` refuses any change group in which a canvas's look changed. `revertChangeGroup` writes a canvas row back with its *current* look. A control that writes the look and clears card exceptions in one group would not be an undo step at all. | `undo.ts`: `isUndoable` (look compared), the write-back (`row.look = current.look`), `matches` (look ignored); `setCanvasLook` (`canvas.ts`), "not an undo step (D-12)"; `run-command.ts` `remember` | Two **columns on `canvas`**: `entity_names` and `attribute_names`, text, null, CHECK `in ('name','alias')`, **null reads as `name`**. They are ordinary canvas columns, so undo restores them with the cleared exceptions in one step. The look, D-12 and the layer mode stay as they are. Null instead of a default keeps slice 10c's rule (F10: undo writes a column missing from an old image as null) valid for canvas rows too. |
+| F2 | **The canvas's control and the save chain.** Writes to the canvas row are off the chain today. The look has its own queue and version (`look.tsx`); rename and delete send the page's version (known limitation, slice 10a). A control that sends the canvas's version would race with a look change: a false conflict. | `CanvasLookProvider` (`versionRef`, own `queue`); `known-limitations.md`, "Writes still off the save chain" | **The control's command does not check the canvas row's version.** The row is read as it stands, like a held row in `saveRows` (slice 10a), because the mode is a separate intent. It checks every card version it clears, all or nothing, as `resetCanvasView` does (slice 6a). The browser sends it through the canvas's own queue (`enqueueGroup` in `useFrames.ts`, as `resetView`), with the cards' versions as shown. Its answer gives the canvas's new version to the look provider, so a look change right after it is not refused. |
+| F3 | **The pattern exists: `resetCanvasView`** (slice 6a). It writes several cards in one change group, checks each card's version and is one undo step. The control is the same shape plus the canvas row. | `canvas.ts` `resetCanvasView`; `useFrames.ts` `resetView` (optimistic `patchCard`, `enqueueGroup`) | A new command `setCanvasNames(canvasId, dimension, mode, cards[])` modelled on it; `nothingToChange` when the mode is already set and no card has an exception. |
+| F4 | **A card's exceptions fit `canvas_item`** and its command. `updateCanvasItem` already saves `collapsed` and `row_filter`, and `setCardView` (`ModelCanvas.tsx`) is the card's optimistic path with its undo patch. | `canvas-item.ts` `updateCanvasItem`; `ModelCanvas.tsx` `setCardView`; `canvas-host.tsx` header menu | Two optional inputs, `entityNames` and `attributeNames` (`"name"`, `"alias"` or `null` to follow). The command stores null when the value equals the canvas's mode (`state.canvas`, already passed for the Labeled filter). Refused on table and requirement cards. |
+| F5 | **The card menu has a segment pattern.** "Rows" is a segmented item (`seg`, `options` with `on`). Two segments, **"Entity name: Name / Alias"** and **"Attribute names: Name / Alias"**, show the card's effective mode, and a click on the canvas's mode clears the exception. That is simpler than toggling item texts (item 9) and matches the card menu. Like "Rows", it is for editors only (`if (editable)`), on live canvases too. | `canvas-host.tsx` lines 297–304 (`seg: "Rows"`, `filtersOf`, `FILTER_LABEL`) | Use segments, placed after "Rows". If Łukasz prefers item 9's toggling texts, they go in the same place. |
+| F6 | **Reviewers and the layer mode.** Item 8 and S11-10 say "rights as for the layer mode", but S11-10 also says reviewers are not offered the controls. The layer mode *is* offered to reviewers and readers: they switch it in their browser only, unsaved (`look.tsx`). | `CanvasLookProvider.setLook` (`!editable` branch); `LayerSwitch.tsx` | Question Q-A. Proposal: **editors only** (owners, admins, modelers; not archived), as card views are. Reviewers and readers see the check boxes **disabled**, showing the saved state. Local switching would be a second, unsaved path for little gain. |
+| F7 | **Where the check boxes go (Q1).** The layer switch is the first tool in the top bar (`CanvasTools`, canvas page). Background and grid are in the canvas tab's menu and in the Overview panel's "Canvas look" fold (editors). The top bar's narrow steps (`more-breakpoints.ts`, widths measured in slice 6a) assume today's tools. | `page.tsx` `CanvasTools`; `canvas-menu.tsx`; `overview-panel.tsx`; `MoreTools.tsx`, `MORE_FOCUS` | **In the top bar, right after the layer switch**, with short labels. Up to 1,200 px they move into "More" with Focus (`MORE_FOCUS`, CSS classes on their own element, no layout read). The narrow steps are checked again with step 4's screenshots. Their indeterminate state is the `indeterminate` DOM property, set in an effect from data, not from layout. |
+| F8 | **What a card shows is decided in the browser, at node build.** Cards are built on the server (`buildCards`, canvas `page.tsx`), with clip flags (`withClips`) for the name's width. A switch must show at once, and the clip flags and "Fit width to names" must follow the shown text. | `card-data.ts` `buildCards`, `withClips`; `text-fit.ts` `rowNeedsClip`, `titleNeedsClip`; `CardNode.tsx` | `buildCards` adds `alias` to an entity card and to a row only when set (no bytes otherwise), plus the card's two exceptions. `ModelCanvas` sets `name` to the shown text when it builds nodes, and runs `withClips` again for entity cards on a switch. Header, rows, the low-zoom block, a collapsed frame's block list, text fit, "Fit width to names" and the drop hint then follow with no change of their own. **One `ModelCanvas` commit per switch, as the layer switch has one** (`layer` is read in `ModelCanvas`). |
+| F9 | **More canvas places show names than item 13 expects** (Q3). A collapsed frame's block lists its cards by name (`BlockNode`, members from `c.name`). Tooltips (`title`) on rows, the header and the low-zoom block show the name. Mapping tooltips on rows ("from T.c", "to E.a") are built from the model. Toasts and questions on the canvas use `card.name` (a live canvas's unlabel question, drops into collapsed frames, a note's pin name). | `BlockNode.tsx`; `ModelCanvas.tsx` 1304 (members), 974 (live question), 947 (toast), 1788 (pin name); `card-data.ts` 164 (mapping lines) | With F8, everything that reads the card's `name` follows the card: block members, the row, header and block tooltips, toasts and questions about a card. Mapping tooltips keep the model's names; they describe the model, not the card. Question Q-B for the toasts. |
+| F10 | **Performance bar (S11-13) is unrealistic.** Switching the layer mode re-renders the line layer only. Switching attribute names re-renders every entity card's rows, which is far more work in the dense view. "Layer mode + 20 %" would very likely fail on correct code. `measure:canvas` has no figure for the layer switch. | `ModelCanvas.tsx` 327–340 (`layer` filters the lines); `measure-canvas.ts` `CRITERIA` (pan, c10, lasso, fading, c08, colours, c09, drags) | A new branch-only measuring spec `S11-13.spec.ts`, to the screen as `S6A-09` does: click to the first presented frame, at 100 % and 30 % on "Performance test" with aliases written into the e2e data file. It reports the layer switch on the same view beside it. **Bars:** a canvas commit count of 1 and 0 miniature commits for a switch; the drawing layers unchanged; the time reported against the layer switch and against "Show all" with row filters (also every card), with no fixed bar until the first figures (question Q-C). |
+| F11 | **Undo and a later mode change.** With the modes on the canvas row, a mode change is a canvas change like a rename. An older undo step on the same canvas row (a rename) is then "changed afterwards" and refused, as with any row. Today a look change does not block it. | `undo.ts` `matches` | Accept: it is the general undo rule. A note in `known-limitations.md` if Łukasz agrees. |
+| F12 | **Code that builds these rows** gains the columns (as F18 in slice 10c): `newCanvasItem` (`canvas-item.ts`); `duplicateCanvas` (copies the modes and the cards' exceptions, as it copies row filters); `createCanvas`; the live sync's inserts (`live.ts`); `addAttribute`, `createAttributeFromColumn`, `createEntity`; the seeds (`seed-model.ts`, `seed-large.ts`); the fixtures (`__fixtures__/domain.ts`, `import.ts`); `requirement-index-synthetic.ts`; the local schema's checks (`schema.ts`). `applyLookToAllCanvases` stays look-only. | as listed | Step 2 adds the columns everywhere a row is built. A new canvas starts with null (names). |
+| F13 | **The search (Q8)** runs in the browser (`tree-data.ts` `show`). The rows are entities and tables only. A match on a field (an attribute's name) shows the entity with a muted second line, the hint ("attribute customer_id"). | `tree-data.ts` `buildTree` (`fieldsOf`), `show`, `filterConcepts`; `left-panel.tsx` `TreeItem` (`hint`) | The smallest change uses the hint. An entity found by its alias gets the hint **"alias Klient"**. An entity found by an attribute's alias gets **"attribute customer_id · Numer klienta"**. A match by name is unchanged. No new row type and no inline "name · alias" (item 14's example), because the hint line exists already. |
+| F14 | **Rows have one or two name spans.** `splitName` gives a long name a second span (`b`) for its tail. A long alias in place of a short name adds that span. The element guard runs on the seed without aliases (A4), so it stays equal. | `names.ts` `splitName`; `CardNode.tsx` `Row` | Nothing to build. The PRD's "the same element" is true per row up to that span; noted for S11-13. |
+| F15 | **The page's data (Q4).** The panels get the full model (`model.entities`, `model.attributes`), so `"alias":null` adds about 13 bytes per entity and attribute. The cards add an alias only when it is set. | canvas `page.tsx`; `card-data.ts` | Accept. KB's 118 attributes add about 1.6 kB. |
+| F16 | **D-12 and D-22 stay true** with F1. D-64's text should say that the names' modes, unlike the look, are undo steps. | `decisions.md` D-12, D-22 | D-64's text below is adjusted. |
+| F17 | **The PRD's references are right except:** item 2 and P13 (`canvas.look`, see F1); S11-10 (reviewers, F6); S11-13 (bar, F10); item 9 (segments, F5); item 14 (hint, F13). D-35, D-37, D-38, D-52, D-63, AD-24 and AD-31 are as quoted. The local file is at format 10 (`DEV_DB_FORMAT`). `pasteAttribute` builds the copy's fields in `attribute.ts` (`name`, `definition_*`, `is_nullable`, `copied_from_attribute_id`). | `schema.ts`; `attribute.ts` `pasteAttribute` | Update the PRD to the answers after step 1, as in slice 10c. |
+
+## Answers to Q1–Q11
+
+**Q1. The canvas's look today.**
+- **Where:** the layer mode is the top bar's first tool (`LayerSwitch`, always in the bar). Background and grid are in the
+  canvas tab's menu (`canvas-menu.tsx`) and in the Overview panel's fold "Canvas look" (`overview-panel.tsx`, editors).
+- **Rights:** `canvas.edit_look`, editors (owners, admins, modelers), not archived. Reviewers and readers switch the
+  layer mode in their browser only, not saved (`look.tsx`). Live canvases have the same rules.
+- **Undo:** each change writes the canvas row with a new version and a change event. It is not an undo step (D-12), and
+  undo leaves the look alone.
+- **Save chain:** no. The look provider has its own queue and version.
+- **Proposal:** the two check boxes in the top bar after the layer switch, moving into "More" up to 1,200 px with Focus
+  (F7). Their state comes from data: the canvas's mode and whether any card has an exception, published to the top bar
+  through a store, as `viewCounts` is (`view-counts.ts`), so `ModelCanvas` is not re-rendered and nothing reads layout.
+  They are undoable (F1) and written through the canvas's queue (F2).
+
+**Q2. The data's shape.**
+- The look is `{ background, grid, layer }`, validated by Zod enums in `setCanvasLook`. The modes do not go there (F1).
+- A card's exceptions fit `canvas_item` beside `row_filter` (F4).
+- A change group holds the canvas row and many `canvas_item` rows as `resetCanvasView` holds frames and cards (F3).
+- `saveRows` is not needed: the canvas's own queue covers the cards, and the canvas row is not version-checked (F2).
+
+**Q3. Every place on the canvas that shows an entity's or an attribute's name.**
+
+| Place | Follows the card | Where |
+| --- | --- | --- |
+| Card header | yes | `CardNode.tsx` `.c-name` |
+| Attribute rows | yes | `CardNode.tsx` `Row` (`splitName`) |
+| Low-zoom block (title) | yes | `CardNode.tsx` `.c-lod` |
+| Collapsed card | header only | `CardNode.tsx` |
+| Live context cards | yes | `buildCards` (`live`) |
+| A collapsed frame's block list | yes (not in the PRD) | `BlockNode.tsx`; `ModelCanvas.tsx` members |
+| Tooltips of header, rows, block | yes | `title` attributes |
+| Mapping tooltips on rows ("from …", "to …") | no, the model's names | `card-data.ts` `note` |
+| Toasts and questions about a card | yes with F8 (Q-B) | `ModelCanvas.tsx` |
+| Overlay (hover, lit rows, selection) | no names drawn | `OverlayLayer`, `HoverOverlay` |
+| Requirement cards | requirement names only | `RequirementCardNode.tsx` |
+| Frames | frame names only | `FrameLayer` |
+| The miniature | no names | `Overview.tsx` |
+| Zoom-to-fit labels | do not exist | – |
+
+The truncation is `splitName` (`src/canvas/names.ts`) for rows and the CSS clip (`clip`, from `text-fit.ts`) for the
+header (D-37).
+
+**Q4. The page's data.** Server-built cards (`buildCards`) and the full model for the panels. See F15.
+
+**Q5. The card header's menu.** `canvas-host.tsx`, the `card` branch. Rows, Collapse and "Fit width to names" are
+offered under `editable` (role and archive from the page), on live canvases too. The two segments go after "Rows"
+(F5).
+
+**Q6. Undo and change events.**
+- **Alias:** a new optional field `alias` in `updateEntity` and `updateAttribute` (trimmed, empty stored as null, no
+  uniqueness). A change of the alias alone does not run `followOriginals` (it is not a followed column).
+- **The canvas's control:** `setCanvasNames` (F3). One change group with the canvas row and every card it clears.
+- **A card's exception:** `updateCanvasItem` (F4).
+- **Names in the undo history:** from `changeLabel(events)` unless a write set sets `label`. Step 3 lists them for
+  approval.
+- **Restoring cleared exceptions:** `revertChangeGroup` writes back every row of the group to its before-image: the
+  canvas row's modes (ordinary columns, F1) and each card's exceptions. No new undo code.
+- **Older events:** slice 10c's rule writes a missing column as null. Null means "name" on a canvas and "follow the
+  canvas" on a card, so older events undo correctly.
+
+**Q7. The local data file.** The current format is 10 (`DEV_DB_FORMAT`, `src/data/local/schema.ts`). Format 10's step
+is inline in `upgradeDb` (`file.ts`). `readDb` writes the file back when `was >= 2 && was < DEV_DB_FORMAT`. Format 11:
+`if (format === 10)`, then `alias ??= null` on every entity and attribute, the two columns `??= null` on every canvas
+and every canvas item, and `format = DEV_DB_FORMAT`. No change events, no log line. The look is untouched. Tests as
+`upgrade-10.test.ts`.
+
+**Q8. The search.** In the browser, names of entities and tables, plus a hint for a field match (F13).
+
+**Q9. Copies.** `pasteAttribute` (`attribute.ts`) builds the copy from the original's fields; `alias: original.alias`
+is one more line. It is not a followed column (`FOLLOWED_COLUMNS` stays as is). D-63's addition stands.
+
+**Q10. The measurement.** No layer-switch figure exists. See F10: a branch-only spec `S11-13.spec.ts`, to the screen,
+with the layer switch measured beside it. The `--only` keys are pan, c10, lasso, fading, c08, colours, c09 and drags;
+the PRD's `--only pan,c08` against `slice-10c` is right for pan and the first render. Aliases are written into the
+e2e data file's "Performance test" rows by the spec before the page opens (as slice 7b's specs write test data).
+
+**Q11. Earlier tests and docs.**
+- `S1B-07` lists the card header's menu exactly: it gains the two segments.
+- `S6A-10` checks that nothing in the top bar is cut off from 2,560 to 800 px and what "More" holds: it gains the
+  check boxes, and it is the test that tells whether they fit beside today's tools.
+- Panel field lists: no spec lists them exactly (checked for `panel-entity` and `panel-attribute`); the specs use test
+  ids.
+- Search: no spec reads the hint's text for an alias; nothing changes.
+- The element guard's page totals grow by the check boxes' elements (explained per element in step 5).
+- Docs: as PRD section 10, with F1's columns instead of the look's keys.
+
+## Differences from the prototype that the slice touches
+
+- The prototype has no aliases. The top bar gains two check boxes after the layer switch (and in "More" on narrow
+  windows).
+- The card header's menu gains two segments after "Rows".
+- The entity and attribute panels gain the field "Alias" under the name.
+- The object browser's hint line shows an alias match.
+
+## New user-visible texts (proposals)
+
+- Check boxes: **"Entity aliases"**, **"Attribute aliases"**. Their tooltips: "Show entity aliases on this canvas" and
+  "Show attribute aliases on this canvas". Disabled for reviewers: "Only editors change what this canvas shows".
+- Card menu segments: **"Entity name"**: "Name", "Alias"; **"Attribute names"**: "Name", "Alias".
+- Panel field: **"Alias"**, placeholder "Another name, e.g. in Polish".
+- Search hints: **"alias {alias}"**; **"attribute {name} · {alias}"**.
+- Undo history names: step 3 lists them.
+
+## D-64 (proposal, adjusted to F1, F5, F6, F13)
+
+"An entity and an attribute may have an alias: free text, an extra name with no fixed meaning (a translation, a
+technical or a workshop name), edited in its panel. The name stays primary: everything outside the canvas shows the
+name, and the object browser's search also finds aliases, naming the alias in the found row's hint. Imports carry no
+alias, and sources have none. A copied attribute gets its original's alias once.
+
+A canvas shows names or aliases in two independent dimensions, entity names and attribute names, each set by a check box
+beside the layer switch: checked for aliases, unchecked for names, and indeterminate when a card has an exception. A
+card may make an exception in either dimension from its header's menu; its header is tinted for an entity exception,
+its attribute rows for an attribute exception. Clicking a check box sets the canvas's mode and clears the cards'
+exceptions in that dimension; unlike the canvas's look (D-12), this is one undo step, and undo restores them. Editors
+set them; reviewers and readers see the canvas as saved. With no alias the name is shown. Long aliases are truncated as
+names are (D-37). Table and requirement cards are unchanged."
+
+## Questions for Łukasz
+
+1. **F1:** the modes as two nullable columns on `canvas` (null = name), not in `canvas.look`?
+2. **F2:** the control's command does not check the canvas row's version, only the cards' versions?
+3. **Q-A (F6):** editors only, with disabled check boxes for reviewers and readers? Or local switching as the layer
+   mode has?
+4. **F5:** segments in the card menu ("Entity name: Name / Alias") instead of item 9's toggling texts?
+5. **F7:** the check boxes in the top bar after the layer switch, into "More" up to 1,200 px?
+6. **Q-B (F9):** toasts and questions about a card name what the card shows (the simplest)? Or always the name?
+7. **F13:** the search's hint line instead of an inline "name · alias"?
+8. **Q-C (F10):** S11-13 with a commit count of 1, no miniature commit, the same layers, and the switch's time reported
+   against the layer switch and "Show all", with the bar set after the first figures?
+9. **F11:** accept that a later mode change blocks undo of an older rename of the same canvas?
+10. The texts above.
