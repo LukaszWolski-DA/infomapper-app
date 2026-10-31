@@ -1,8 +1,9 @@
 // The local data file's upgrade from format 9 to 10 (slice 10c, item 2, F11; S10C-10): every attribute gets
 // `copied_from_attribute_id` null, nothing else changes, no change event and no log line; the file is written back at
-// once, and a file at format 10 is read as it is. The adapter's foreign key accepts a deleted original (F9).
+// once. The adapter's foreign key accepts a deleted original (F9). Since slice 11 the file goes on to format 11
+// (`upgrade-11.test.ts`).
 
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -46,7 +47,6 @@ describe("the upgrade to format 10 (slice 10c, S10C-10)", () => {
 
     const upgraded = await readDb(file);
     expect(upgraded.format).toBe(DEV_DB_FORMAT);
-    expect(DEV_DB_FORMAT).toBe(10);
     expect(upgraded.attribute.every((a) => "copied_from_attribute_id" in a && a.copied_from_attribute_id === null)).toBe(true);
     expect(counts(upgraded)).toEqual(counts(db));
     expect(upgraded.change_event).toEqual(db.change_event);
@@ -60,21 +60,22 @@ describe("the upgrade to format 10 (slice 10c, S10C-10)", () => {
     await asFormat9();
     await readDb(file);
     const onDisk = JSON.parse(await readFile(file, "utf8")) as DevDb;
-    expect(onDisk.format).toBe(10);
+    expect(onDisk.format).toBe(DEV_DB_FORMAT);
     expect(onDisk.attribute.every((a) => a.copied_from_attribute_id === null)).toBe(true);
   });
 
-  it("reads a file at format 10 as it is: a link kept, the file not written again", async () => {
+  it("keeps a format-10 file's links on its way to the current format", async () => {
     const db = await readDb(file);
     const [original, copy] = db.attribute;
     const linked = { ...db, attribute: db.attribute.map((a) => (a.id === copy!.id ? { ...a, copied_from_attribute_id: original!.id } : a)) };
-    await writeFile(file, JSON.stringify(linked), "utf8");
-    const before = await stat(file);
+    // as slice 10c wrote it: format 10, without slice 11's columns
+    const strip = (row: object) => Object.fromEntries(Object.entries(row).filter(([k]) => !["alias", "entity_names", "attribute_names"].includes(k)));
+    const format10 = { ...linked, format: 10, entity: linked.entity.map(strip), attribute: linked.attribute.map(strip), canvas: linked.canvas.map(strip), canvas_item: linked.canvas_item.map(strip) };
+    await writeFile(file, JSON.stringify(format10), "utf8");
 
     const read = await readDb(file);
     expect(read.attribute.find((a) => a.id === copy!.id)!.copied_from_attribute_id).toBe(original!.id);
     expect(read).toEqual(linked);
-    expect((await stat(file)).mtimeMs).toBe(before.mtimeMs);
   });
 });
 

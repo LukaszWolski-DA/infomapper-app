@@ -15,7 +15,9 @@ holds one model; projects and canvases organise the work on it. Organizations ar
 with an organization's shared password or the test users' list, create organizations, and owners and admins add,
 change and remove people (slice 8, D-58). Panels save one object at a time, each save with the newest version known; a project's name
 and description are edited on its home, and a zoom is typed in the top bar (slice 9, D-59, D-60). An attribute can be
-copied and pasted into any entity; the copy follows its original's type and Personal data (slice 10c, D-63).
+copied and pasted into any entity; the copy follows its original's type and Personal data (slice 10c, D-63). Entities
+and attributes have an alias; each canvas shows names or aliases in two dimensions, with exceptions per card (slice 11,
+D-64).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -185,10 +187,13 @@ npx tsx scripts/bench-import-plan.ts --no-coverage            # slice 7c: the pl
 ONLY_REMOVE=1 npx tsx scripts/bench-import-write.ts 20000     # slice 7c: only removing Business key from 2,000 columns (bar 1 s); without it the whole write bench
 COMMITS=1 npx playwright test e2e/slice-07c/S7C-14-commits.spec.ts   # slice 7c: canvas commits per classification toggle (on demand; 3 on slice-07b and 7c)
 MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7C-14's element guard; slice 8 too (page total +1, see below)
-MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts   # the element guard (S9-14, S10A-12, S10B-10, S10C-11), against slice-08's own counts (slices 9 to 10c matched them)
+MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts   # the element guard (S9-14, S10A-12, S10B-10, S10C-11), against slice-08's own counts (slices 9 to 10c matched them; slice 11's page total is +6, the names' check boxes, S11-13)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-10a/S10A-12-loops.spec.ts   # slice 10a: 20 loops against 20 relationships, layers and pans (branch only)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-10b/S10B-10-lines.spec.ts   # slice 10b: 20 source lines against 20 relationships, layers and pans (branch only)
 SCREENS=<folder> npx playwright test e2e/slice-10b/S10B-screens.spec.ts                   # slice 10b: D-62's drawing, light and dark
+COMMITS=1 npx playwright test e2e/slice-11/S11-13-commits.spec.ts                         # slice 11: commits of a names switch against the layer switch (dev server, on demand)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-11/S11-13.spec.ts         # slice 11: a names switch to the screen, the layer switch beside it, the LayerTree read
+SCREENS=<folder> npx playwright test e2e/slice-11/S11-screens.spec.ts                     # slice 11: names and aliases, mixed, exceptions, More, the panel field
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
 npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
@@ -281,13 +286,29 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     server at once and gives the browser its answer later, so a second save starts before the first one's answer
     arrives (S10C-09). It lives in the test only: the app has no switch for it in any build.
 
+  Slice 11's helpers do the following:
+  - write aliases and names as test data through the domain: an entity's or an attribute's alias (`setEntityAlias`,
+    `setAttributeAlias`), a canvas's mode (`setNamesAs`) and a card's exception (`setException`); read them back
+    (`canvasRow`, `exceptionsOf`);
+  - find a card by its canvas item, since its header may show an alias (`cardOf`, `headerOf`, `rowTextOf`, `idsOf`);
+  - read the check boxes (`entityBox`, `attributeBox`, `expectBox` with the DOM's `checked` and `indeterminate`), pick a
+    card menu's segment (`pickSegment`) and read the tints (`tintOf`);
+  - views: `HALF` (50 %, every card's rows drawn) and `FULL` (100 %).
+
+  Slice 11's specs run in a 1,536 × 864 window (`e2e/slice-11/fixtures.ts`): up to 1,300 px the check boxes are in
+  “More”. Its measuring steps (`e2e/slice-11/measure.ts`) alias every entity and attribute of “Performance test” in the
+  e2e data file (`aliasEverything`, prefix `PL `).
+
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
   with notes below 40 % zoom (a note measured while drawn plain once grew on every round), `S3B-15-idle.spec.ts` on a
   live canvas. Keep it when changing `ModelCanvas.tsx`; a render loop once cost a collapsed canvas a third of its frames.
   The Overview's miniature counts its commits in `window.__imMiniatureCommits` (slice 3b): `S3B-13.spec.ts` checks that
-  panning and zooming do not redraw it and a note's drag redraws it once, on the drop.
+  panning and zooming do not redraw it and a note's drag redraws it once, on the drop. Since slice 11 the Overview keys
+  its lists on a string of what it draws (each node's rectangle and fill, `drawnKey`), not on React Flow's nodes array:
+  a card change that moves or recolours nothing (a names switch) does not redraw it (S11-13: one canvas commit, no
+  miniature commit).
 - **Test hooks** (slice 4p): the canvas page installs them only where `areTestHooksOn()` (the e2e dev server, which sets
   `INFOMAPPER_TEST_HOOKS=1`, and the measurement build): `window.__imFade({ focus } | { lit, key } | null)` switches
   fading (`focus`: an entity id, or a `FocusTarget` such as `{ t: "requirement", id }`; slice 4b-1 removed `{ lens }`), `window.__imCanvasThrow()` throws inside the canvas's error boundary, `window.__imIndexTiming("page" |
@@ -327,7 +348,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   `ResizeObserver` (`src/ui/fit-chips.ts`, 16 px hysteresis). The breadcrumbs row is `contain: strict` (static). The
   filter and collapsed-card chips and the layout part of “Show all” are one undo step each through `resetCanvasView`
   (`src/domain/commands/canvas.ts`). The top bar's narrow steps are classes on the tools' own elements; “More”
-  (`src/canvas/MoreTools.tsx`) takes Focus and the notation up to 1,200 px and the four tools up to 1,100 px
+  (`src/canvas/MoreTools.tsx`) takes the names' check boxes up to 1,300 px (`MORE_NAMES`, slice 11; “More” shows from
+  there, and the working context's label is cut at 90 px from 1,201 to 1,300 px), Focus and the notation up to
+  1,200 px and the four tools up to 1,100 px
   (`src/canvas/more-breakpoints.ts`, a plain module the server page and the client menu share). Tailwind's `min-[N]` and
   `max-[N]` meet at N: the app writes the prototype's “up to N px” as `max-[N+1px]`.
 - **Nothing above the canvas reads layout during a commit** (slice 6a, S6A-09-hand): no `offsetWidth`,
@@ -409,6 +432,26 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   written. An attribute's delete asks a second click when it has mappings or copies (`ConfirmDelete`'s `then`,
   `armedDeleteText`, `copiesStopFollowing`); D-47's dialog has the row `copiesImpactRow`. **A later command that writes
   an attribute's type or Personal data:** pass its write set through `followOriginals`.
+- **Names and aliases** (slice 11, D-64): `entity.alias` and `attribute.alias` (format 11 added them and the four mode
+  columns as null; a paste copies the alias once, it is not followed). A canvas's modes are `canvas.entity_names` and
+  `attribute_names` (null = name; names stored as null), a card's exceptions `canvas_item.entity_names` and
+  `attribute_names` (null = follow; a choice equal to the mode is stored as null; entity cards only). **The rules in one
+  place:** `src/domain/model/aliases.ts` (`canvasMode`, `cardMode`, `exceptionFor`, `namesControl`, `cardShownNames`).
+  The commands: the alias in `updateEntity`/`updateAttribute`; `setCanvasNames` (`canvas.ts`, shaped like
+  `resetCanvasView`: clears every exception in that dimension, checks the cards' versions, not the canvas row's); the
+  exceptions in `updateCanvasItem`. Undo names come from the write set's `label`. **What a card shows:** cards keep
+  `name` for toasts and questions; `CardData`/`CardRow` carry `alias` and, only when it differs, `shown`, and a card its
+  exceptions only when set; `applyNames(card, canvasNames)` (`card-data.ts`) sets the shown texts and the clips again
+  (`withClips` reads `shownText`), returning the same card when nothing changes. `buildCards` applies it for the first
+  paint, `ModelCanvas` on node builds, `patchCard`, fresh pages and a switch. **Read `shownText`, never `name`, for
+  anything drawn on a card** (header, rows, low-zoom block, a collapsed frame's list, their titles, fit width, the drop
+  hint). **The switch:** `ui.setNames` → `ModelCanvas.setNames` shows the modes and the cleared exceptions in one
+  commit, then `setCanvasNamesAction` on the canvas's queue (`enqueueGroup`); its answer's canvas version goes to the
+  look provider (`noteVersion`, `look.tsx`). A fresh page brings the names keyed on the canvas row's version too
+  (`names.version`): the switch's own page may be replaced by a later one. The check boxes (`NamesSwitch.tsx`, “More”)
+  read `namesState` (`names-state.ts`), which `ModelCanvas` publishes from an effect with `namesControl`, as
+  `viewCounts`. The tint is the class `alt` on `.c-head` and on `.c-body`/`.c-lod` (`--im-alias-soft`). The search
+  matches aliases in `tree-data.ts` (`show`; the hint “alias {alias}” or “attribute {name} · {alias}”).
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a

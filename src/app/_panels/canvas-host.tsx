@@ -50,6 +50,12 @@ import { useSidePanels } from "../_components/side-panels";
 import { Toolbox, type SearchResult, type ToolboxItem } from "./toolbox";
 
 /** A card of this canvas as the host needs it. */
+/** A card's names or aliases in its header's menu (slice 11, F5). */
+const NAME_CHOICES = [
+  { value: "name", label: "Name" },
+  { value: "alias", label: "Alias" },
+] as const;
+
 export interface HostCard {
   id: Uuid;
   kind: "ent" | "src";
@@ -300,6 +306,14 @@ export function useCanvasHost({
         seg: "Rows",
         options: filtersOf(card).map((f) => ({ label: FILTER_LABEL[f], on: view.rowFilter === f, act: () => ui.setCardView(card.id, { rowFilter: f }) })),
       });
+      // what an entity card shows, name or alias, against its canvas (slice 11, F5): the choice equal to the canvas's
+      // mode follows the canvas again
+      const names = isEnt ? ui.cardView(card.id) : null;
+      if (names) {
+        for (const [seg, key, testId] of [["Entity name", "entityNames", "seg-entity-name"], ["Attribute names", "attributeNames", "seg-attribute-names"]] as const) {
+          items.push({ seg, testId, options: NAME_CHOICES.map((c) => ({ label: c.label, on: names[key] === c.value, act: () => ui.setCardView(card.id, { [key]: c.value }) })) });
+        }
+      }
       items.push({ label: view.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !view.collapsed }) });
       items.push({ label: "Fit width to names", act: () => ui.fitWidth(card.id) });
       if (canNote) items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });

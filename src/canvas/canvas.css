@@ -117,6 +117,10 @@
 
 /* below 40 % zoom: one plain block of the same height as the rows it replaces (AD-24 rule 1) */
 .im-canvas .c-lod { padding: 6px 10px }
+/* a card's exception to the canvas's names or aliases (slice 11, D-64): a class on the header or the rows' area, no element */
+.im-canvas .c-head.alt { background-color: var(--im-alias-soft); border-radius: 10px 10px 0 0 }
+.im-canvas .card.collapsed .c-head.alt { border-radius: 10px }
+.im-canvas .c-body.alt, .im-canvas .c-lod.alt { background-color: var(--im-alias-soft); border-radius: 0 0 10px 10px }
 .im-canvas .c-block { height: 100%; border-radius: 4px; background: var(--im-hover) }
 
 /* ---------- requirement cards (slice 4b-2, D-41; prototype .rq-card) ----------

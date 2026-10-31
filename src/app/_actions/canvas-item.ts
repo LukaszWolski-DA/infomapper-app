@@ -25,9 +25,12 @@ export interface CardChangeInput {
   expectedVersion: number;
   collapsed?: boolean;
   rowFilter?: string;
+  /** The card's own names or aliases (slice 11): `name`, `alias`, or null to follow the canvas. */
+  entityNames?: string | null;
+  attributeNames?: string | null;
 }
 
-/** Saves a card's collapse state or row filter. Returns the card's new version for the next change. */
+/** Saves a card's collapse state, row filter or names (slice 11). Returns the card's new version for the next change. */
 export async function updateCardAction(workspaceId: string, change: CardChangeInput): Promise<ActionResult<{ version: number }>> {
   return runCommand(async (ctx, store, user) => {
     const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
@@ -35,8 +38,9 @@ export async function updateCardAction(workspaceId: string, change: CardChangeIn
     const access = { workspace, member: await store.workspaces.getMember(workspace.id, user.id) };
     const id = typeof change?.canvasItemId === "string" ? change.canvasItemId : "";
     const item = await store.canvasItems.get(workspace.id, id);
-    // the labeled filter only on live canvases (slice 3b)
-    const canvas = item && change?.rowFilter === "labeled" ? await store.canvases.get(workspace.id, item.canvas_id) : null;
+    // the labeled filter only on live canvases (slice 3b); a card's names against its canvas's (slice 11)
+    const needsCanvas = change?.rowFilter === "labeled" || change?.entityNames !== undefined || change?.attributeNames !== undefined;
+    const canvas = item && needsCanvas ? await store.canvases.get(workspace.id, item.canvas_id) : null;
     const result = updateCanvasItem(ctx, access, { item, canvas }, change);
     return result.ok ? { ...result, value: { version: result.value.item.version } } : result;
   });

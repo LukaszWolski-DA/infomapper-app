@@ -13,7 +13,8 @@ import { cardWidthOf, dropCards } from "../model/frames";
 import { LIVE_ONE_AT_A_TIME, LIVE_REMOVE_UNLABELS } from "../model/live";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
 import { isElementCard, isRequirementCard } from "../model/card-kinds";
-import type { Canvas, CanvasItem, Entity, Frame, Note, Requirement, SourceTable } from "../types";
+import { cardMode, exceptionFor, type NameDimension } from "../model/aliases";
+import { NAME_MODES, type Canvas, type CanvasItem, type Entity, type Frame, type Note, type Requirement, type SourceTable } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
 import { releaseNotes } from "./note";
 import { begin, current, done, isLive, nothingToChange, softDelete } from "./shared";
@@ -61,6 +62,8 @@ export function newCanvasItem(
     row_filter: "all",
     frame_id: null,
     live_level: null,
+    entity_names: null,
+    attribute_names: null,
   };
 }
 
@@ -258,7 +261,7 @@ export function placeManyOnCanvas(
   );
 }
 
-// ---- collapse, row filter ----
+// ---- collapse, row filter, names or aliases (slice 11) ----
 
 const updateItemInput = z
   .object({
@@ -266,13 +269,18 @@ const updateItemInput = z
     expectedVersion: versionSchema,
     collapsed: z.boolean().optional(),
     rowFilter: z.enum(SAVED_ROW_FILTERS).optional(),
+    /** The card's own choice of entity name or alias (slice 11, item 9); null follows the canvas. */
+    entityNames: z.enum(NAME_MODES).nullable().optional(),
+    /** The same for its attribute names. */
+    attributeNames: z.enum(NAME_MODES).nullable().optional(),
   })
   .strict();
 export type UpdateCanvasItemInput = z.input<typeof updateItemInput>;
 
 /**
  * Saves whether a card is collapsed and its row filter (per canvas). Position and width: `moveOnCanvas`. The `labeled`
- * filter (the rows that carry the label) exists only on live canvases (`canvas`: the card's canvas; slice 3b).
+ * filter (the rows that carry the label) exists only on live canvases (`canvas`: the card's canvas; slice 3b). Slice 11:
+ * an entity card's exceptions to the canvas's names or aliases; a choice equal to the canvas's mode is stored as none.
  */
 export function updateCanvasItem(
   ctx: CommandContext,
@@ -282,7 +290,7 @@ export function updateCanvasItem(
 ): CommandResult<{ item: CanvasItem }> {
   const parsed = begin(access, "canvas.edit_items", updateItemInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { canvasItemId, expectedVersion, collapsed, rowFilter } = parsed.data;
+  const { canvasItemId, expectedVersion, collapsed, rowFilter, entityNames, attributeNames } = parsed.data;
   const got = current(state.item, access, canvasItemId, expectedVersion, "card");
   if (!got.ok) return fail(got.error);
   const before = got.row;
@@ -293,11 +301,34 @@ export function updateCanvasItem(
   if (patch.row_filter === "labeled" && !(state.canvas?.id === before.canvas_id && state.canvas.live_label_id)) {
     return fail(domainError("invalid", "The Labeled filter is only on live canvases."));
   }
+  if (entityNames !== undefined || attributeNames !== undefined) {
+    if (!before.entity_id) return fail(domainError("invalid", ALIASES_ON_ENTITY_CARDS));
+    const canvas = state.canvas;
+    if (!isLive(canvas, access.workspace.id) || canvas.id !== before.canvas_id) return fail(notFound("canvas"));
+    const entity = entityNames === undefined ? undefined : exceptionFor(entityNames, canvas, "entity");
+    const attribute = attributeNames === undefined ? undefined : exceptionFor(attributeNames, canvas, "attribute");
+    if (entity !== undefined && entity !== before.entity_names) patch.entity_names = entity;
+    if (attribute !== undefined && attribute !== before.attribute_names) patch.attribute_names = attribute;
+  }
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
 
   const row = nextVersion(ctx, before, patch);
-  return done(ctx, access, { item: row }, [{ kind: "update", table: "canvas_item", before, row }]);
+  const result = done(ctx, access, { item: row }, [{ kind: "update", table: "canvas_item", before, row }]);
+  // the undo history names what the card shows now, which the change event alone cannot tell (null: as the canvas)
+  const keys = Object.keys(patch);
+  const names: NameDimension | null = keys.length !== 1 ? null : keys[0] === "entity_names" ? "entity" : keys[0] === "attribute_names" ? "attribute" : null;
+  if (result.ok && names && state.canvas) result.writeSet.label = CARD_NAMES_LABEL[names][cardMode(row, state.canvas, names)];
+  return result;
 }
+
+/** The undo history's names of a card's choice (slice 11). */
+export const CARD_NAMES_LABEL = {
+  entity: { name: "Show entity name on card", alias: "Show entity alias on card" },
+  attribute: { name: "Show attribute names on card", alias: "Show attribute aliases on card" },
+} as const;
+
+/** The refusal of a name or alias choice on a table or requirement card (slice 11, item 3). */
+export const ALIASES_ON_ENTITY_CARDS = "Only entity cards show aliases.";
 
 // ---- remove from this canvas ----
 

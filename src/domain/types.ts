@@ -116,6 +116,8 @@ export interface Concept extends StandardColumns {
 export interface Entity extends StandardColumns {
   concept_id: Uuid;
   name: string;
+  /** Another name (slice 11, D-64): free text, trimmed, null when empty. A canvas may show it instead of the name. */
+  alias: string | null;
   stereotype: Stereotype;
   definition_html: string | null;
   definition_text: string | null;
@@ -133,6 +135,8 @@ export interface AttributeType {
 export interface Attribute extends StandardColumns, AttributeType {
   entity_id: Uuid;
   name: string;
+  /** Another name (slice 11, D-64), as an entity's. */
+  alias: string | null;
   sort_order: number;
   is_primary_key: boolean;
   is_foreign_key: boolean;
@@ -457,6 +461,12 @@ export interface Canvas extends StandardColumns {
   name: string;
   live_label_id: Uuid | null;
   look: CanvasLook;
+  /**
+   * Names or aliases on this canvas's entity cards, headers and attribute rows apart (slice 11, D-64); null = names.
+   * Ordinary columns, unlike the look: a change is an undo step.
+   */
+  entity_names: NameMode | null;
+  attribute_names: NameMode | null;
 }
 
 export interface ProjectCanvas {
@@ -467,6 +477,10 @@ export interface ProjectCanvas {
   added_at: Timestamp;
   added_by: Uuid;
 }
+
+/** What a canvas shows for entity or attribute names (slice 11, D-64): the name, or the alias where there is one. */
+export const NAME_MODES = ["name", "alias"] as const;
+export type NameMode = (typeof NAME_MODES)[number];
 
 export const ROW_FILTERS = ["all", "mapped", "unmapped", "keys", "labeled"] as const;
 export type RowFilter = (typeof ROW_FILTERS)[number];
@@ -488,6 +502,9 @@ export interface CanvasItem extends StandardColumns {
   row_filter: RowFilter;
   frame_id: Uuid | null;
   live_level: LiveLevel | null;
+  /** An entity card's exception to its canvas's names (slice 11, D-64); null = as the canvas. Always null on other cards. */
+  entity_names: NameMode | null;
+  attribute_names: NameMode | null;
 }
 
 /** What a frame stands for (D-04, D-05): a concept, a source system, or only an area of this canvas. */

@@ -77,6 +77,9 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
       <Field label="Name" htmlFor="f-en">
         <TextField key={fieldKey(e.id, "name", e.name)} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-entity-name" inputRef={nameRef} />
       </Field>
+      <Field label="Alias" htmlFor="f-ealias">
+        <TextField key={fieldKey(e.id, "alias", e.alias)} id="f-ealias" value={e.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => void save({ alias })} testId="input-entity-alias" />
+      </Field>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Stereotype" htmlFor="f-es">
           <select

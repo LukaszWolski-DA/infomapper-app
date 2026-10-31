@@ -14,7 +14,7 @@ import { attributeNamedAfter } from "../model/mapping-choice";
 import { logicalTypeOf } from "../model/type-check";
 import type { WorkspaceAccess } from "../permissions";
 import { LOGICAL_TYPES, type Attribute, type AttributeType, type Classification, type ClassificationLink, type Entity, type LabelLink, type LostOriginal, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
-import { nameSchema, uuidSchema, versionSchema } from "../validation";
+import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
 import { linksOnItems, softDeleteLinks } from "./label";
 import { softDeleteRequirementLinks } from "./requirement";
 import { createMapping } from "./mapping";
@@ -105,6 +105,7 @@ export function addAttribute(
     workspace_id: workspaceId,
     entity_id: entityId,
     name: name ?? DEFAULT_ATTRIBUTE_NAME,
+    alias: null,
     sort_order: nextSortOrder(state.attributes.filter((a) => isLive(a, workspaceId) && a.entity_id === entityId)),
     data_type: "string",
     custom_type: null,
@@ -130,6 +131,8 @@ const updateAttributeInput = z
     attributeId: uuidSchema,
     expectedVersion: versionSchema,
     name: nameSchema.optional(),
+    /** Another name, shown on canvases that ask for it (slice 11, D-64): trimmed, empty clears it; not followed by copies. */
+    alias: optionalTextSchema.optional(),
     type: typePatchInput.optional(),
     isPrimaryKey: z.boolean().optional(),
     isForeignKey: z.boolean().optional(),
@@ -161,10 +164,10 @@ export interface UpdateAttributeState {
 }
 
 /**
- * Name, type with parameters, flags (PK, FK, BK, PII, nullable) and definition. Slice 10c: a change of a followed field
- * (type, parameters, Personal data) reaches every live copy below the attribute in the same change group
- * (`followOriginals`); a copy's own followed fields are refused while it has a link, live original or deleted (F2, F5);
- * `stopFollowing` clears the link.
+ * Name, alias (slice 11), type with parameters, flags (PK, FK, BK, PII, nullable) and definition. Slice 10c: a change of
+ * a followed field (type, parameters, Personal data) reaches every live copy below the attribute in the same change
+ * group (`followOriginals`); a copy's own followed fields are refused while it has a link, live original or deleted (F2,
+ * F5); `stopFollowing` clears the link. An alias is a copy's own (P10).
  */
 export function updateAttribute(
   ctx: CommandContext,
@@ -181,6 +184,7 @@ export function updateAttribute(
 
   const patch: Partial<Attribute> = {};
   if (data.name !== undefined && data.name !== before.name) patch.name = data.name;
+  if (data.alias !== undefined && data.alias !== before.alias) patch.alias = data.alias;
   if (data.type !== undefined) {
     const t = attributeType(patchedType(before, data.type));
     if (!t.ok) return fail(t.error);
@@ -232,10 +236,10 @@ export interface PasteAttributeState {
 
 /**
  * “Paste attribute” (items 4, 5): a new attribute last on the entity, its own entity included, with the original's
- * name, definition and nullable (then its own), its type, parameters and Personal data (followed), no keys but a foreign
- * key when the original is a primary key (P8), and a link to the attribute that was copied, a copy itself or not. No
- * mappings, requirement links or labels (P3). `nameTaken`: the entity already has an attribute of that name, case
- * ignored (F12), for the toast.
+ * name, alias (slice 11, P10), definition and nullable (then its own), its type, parameters and Personal data
+ * (followed), no keys but a foreign key when the original is a primary key (P8), and a link to the attribute that was
+ * copied, a copy itself or not. No mappings, requirement links or labels (P3). `nameTaken`: the entity already has an
+ * attribute of that name, case ignored (F12), for the toast.
  */
 export function pasteAttribute(
   ctx: CommandContext,
@@ -258,6 +262,7 @@ export function pasteAttribute(
     workspace_id: workspaceId,
     entity_id: entityId,
     name: original.name,
+    alias: original.alias,
     sort_order: nextSortOrder(siblings),
     data_type: original.data_type,
     custom_type: original.custom_type,
@@ -380,6 +385,7 @@ export function createAttributeFromColumn(
     workspace_id: workspaceId,
     entity_id: entityId,
     name: column.row.name,
+    alias: null,
     sort_order: nextSortOrder(siblings),
     ...logicalTypeOf(column.row),
     is_primary_key: false,

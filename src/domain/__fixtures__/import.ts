@@ -72,7 +72,7 @@ export const columnNamed = (model: ImportModel, table: string, name: string) => 
 
 /** An entity with attributes, added to the model. */
 export function withEntity(model: ImportModel, name: string, attributes: (Partial<Attribute> & { name: string })[]): ImportModel {
-  const entity: Entity = { ...standard(importId()), concept_id: ids.conceptCustomer, name, stereotype: "object", definition_html: null, definition_text: null };
+  const entity: Entity = { ...standard(importId()), concept_id: ids.conceptCustomer, name, alias: null, stereotype: "object", definition_html: null, definition_text: null };
   const rows: Attribute[] = attributes.map((a, i) => ({
     ...standard(importId()),
     entity_id: entity.id,
@@ -89,6 +89,7 @@ export function withEntity(model: ImportModel, name: string, attributes: (Partia
     is_nullable: true,
     definition_html: null,
     definition_text: null,
+    alias: null,
     copied_from_attribute_id: null,
     ...a,
   }));

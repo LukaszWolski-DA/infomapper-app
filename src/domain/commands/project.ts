@@ -38,6 +38,8 @@ export function createProject(
     name: FIRST_CANVAS_NAME,
     live_label_id: null,
     look: { ...DEFAULT_CANVAS_LOOK },
+    entity_names: null,
+    attribute_names: null,
   };
   const link: ProjectCanvas = {
     project_id: project.id,

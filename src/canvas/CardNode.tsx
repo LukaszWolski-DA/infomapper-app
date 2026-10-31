@@ -6,7 +6,7 @@
 
 import { memo, useContext } from "react";
 import { useStore, type Node, type NodeProps } from "@xyflow/react";
-import { visibleRows, type CardData, type CardRow } from "./card-data";
+import { shownText, visibleRows, type CardData, type CardRow } from "./card-data";
 import { CanvasCardsCtx, DiagnosisCtx } from "./context";
 import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
 import { splitName } from "./names";
@@ -86,7 +86,9 @@ function keyTitle(r: CardRow) {
 const CHANGED_TITLE = "Changed in the source: see the table's changes to resolve";
 
 function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; selected: boolean }) {
-  const { head, tail } = splitName(row.name);
+  // the alias in alias mode, otherwise the name (slice 11, F8)
+  const text = shownText(row);
+  const { head, tail } = splitName(text);
   const status = row.mappings === 0 ? "" : row.warn ? " warn" : " ok";
   return (
     <div
@@ -100,7 +102,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
         {row.pk && <b className="pk">PK</b>}
         {row.fk && <b>FK</b>}
       </span>
-      <span className={`nm${row.clip ? " clip" : ""}`} title={row.name}>
+      <span className={`nm${row.clip ? " clip" : ""}`} title={text}>
         <span className="a">{head}</span>
         {tail && <span className="b">{tail}</span>}
       </span>
@@ -169,7 +171,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
       data-filter={card.rowFilter}
       aria-selected={cardSelected || undefined}
     >
-      <div className="c-head">
+      <div className={card.entityNames ? "c-head alt" : "c-head"}>
         <div className="c-l1">
           {isEnt ? (
             <>
@@ -224,8 +226,8 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
           )}
         </div>
         <div className="c-l2">
-          <span className="c-name" data-testid="card-name" title={card.name}>
-            {card.name}
+          <span className="c-name" data-testid="card-name" title={shownText(card)}>
+            {shownText(card)}
           </span>
           <span className="cov" title={`${card.mapped} of ${total} ${isEnt ? "attributes mapped" : "columns used"}`}>
             <i style={{ width: `${total ? (card.mapped / total) * 100 : 0}%` }} />
@@ -249,12 +251,12 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
         />
       )}
       {!card.collapsed && lod && (
-        <div className="c-lod" data-testid="card-block" title={card.name} style={{ height: BODY_PAD * 2 + Math.max(1, rows.length) * ROW_H }}>
+        <div className={card.attributeNames ? "c-lod alt" : "c-lod"} data-testid="card-block" title={shownText(card)} style={{ height: BODY_PAD * 2 + Math.max(1, rows.length) * ROW_H }}>
           <div className="c-block" />
         </div>
       )}
       {!card.collapsed && !lod && (
-        <div className="c-body">
+        <div className={card.attributeNames ? "c-body alt" : "c-body"}>
           {rows.map((r) => (
             <Row key={r.id} row={r} kind={card.kind} selected={r.id === selectedRow} />
           ))}

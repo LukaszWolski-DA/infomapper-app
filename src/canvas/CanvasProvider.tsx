@@ -124,6 +124,7 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       setFrameCollapsed: (frameId, collapsed) => handle.current?.setFrameCollapsed(frameId, collapsed),
       setAllFramesCollapsed: (collapsed) => handle.current?.setAllFramesCollapsed(collapsed),
       resetView: (parts) => handle.current?.resetView(parts) ?? Promise.resolve(false),
+      setNames: (dimension, mode) => handle.current?.setNames(dimension, mode) ?? Promise.resolve(false),
       bundleView: (key) => handle.current?.bundleView(key) ?? null,
       noteView: (noteId) => handle.current?.noteView(noteId) ?? null,
       newNote: (where) => handle.current?.newNote(where),

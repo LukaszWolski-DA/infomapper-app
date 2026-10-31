@@ -86,7 +86,7 @@ function firstImport() {
 
 /** Customer.email string(120) with an approved direct mapping from customers.email_addr, approved by someone else. */
 function withEmailMapping(db: Db) {
-  const entity: Entity = { id: ids.customer, workspace_id: ids.ws, version: 1, created_at: T1, created_by: ids.someoneElse, updated_at: T1, updated_by: ids.someoneElse, deleted_at: null, concept_id: ids.conceptCustomer, name: "Customer", stereotype: "object", definition_html: null, definition_text: null };
+  const entity: Entity = { id: ids.customer, workspace_id: ids.ws, version: 1, created_at: T1, created_by: ids.someoneElse, updated_at: T1, updated_by: ids.someoneElse, deleted_at: null, concept_id: ids.conceptCustomer, name: "Customer", alias: null, stereotype: "object", definition_html: null, definition_text: null };
   const attr: Attribute = {
     ...entity,
     id: ids.email,

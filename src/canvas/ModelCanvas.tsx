@@ -49,7 +49,10 @@ import "./canvas.css";
 import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
 import { rowSaves } from "@/ui/row-saves";
-import { withClips, type CardData } from "./card-data";
+import { applyNames, shownText, withClips, type CanvasNames, type CardData } from "./card-data";
+import { canvasMode, cardMode, NAMES_COLUMN, namesControl, type NameDimension } from "@/domain/model/aliases";
+import type { NameMode } from "@/domain/types";
+import { namesState } from "./names-state";
 import CardNode, { cardNodesOf, filtersOf, type CardNodeT } from "./CardNode";
 import BlockNode, { blockNodeId, type BlockNodeT } from "./BlockNode";
 import RequirementCardNode, { reqNodesOf, type ReqNodeT } from "./RequirementCardNode";
@@ -138,7 +141,11 @@ export interface CardChange {
   expectedVersion: number;
   collapsed?: boolean;
   rowFilter?: CardData["rowFilter"];
+  /** A card's names or aliases (slice 11): the choice; the server stores none when it equals the canvas's mode. */
+  entityNames?: NameMode;
+  attributeNames?: NameMode;
 }
+type CardChangeFields = Omit<CardChange, "canvasItemId" | "expectedVersion">;
 /** What a canvas write returns: the value, or the domain's message for a toast. */
 /** `versions`: the model rows a write wrote (a drop's concept change, slice 10a), for the panels' save chains. */
 export type CanvasWriteResult<T> = { ok: true; value: T; versions?: Record<string, number> } | { ok: false; code?: string; message: string };
@@ -147,6 +154,8 @@ export type SaveCardResult = CanvasWriteResult<{ version: number }>;
 export interface ModelCanvasProps {
   canvasId: string;
   cards: CardData[];
+  /** The canvas's names or aliases (slice 11, D-64): what its entity cards show, fresh with every page. */
+  names?: CanvasNames & { version: number };
   lines: CanvasLines;
   editable: boolean;
   /** Saves a card's collapse state or row filter (a server action). */
@@ -288,11 +297,20 @@ const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
 
 const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
+const NO_NAMES: CanvasNames & { version: number } = { entity_names: null, attribute_names: null, version: 0 };
+const CARD_KEY = { entity: "entityNames", attribute: "attributeNames" } as const satisfies Record<NameDimension, keyof CardData>;
+/** A card without its exception in one dimension. */
+const withoutException = (card: CardData, dimension: NameDimension): CardData => {
+  const { [CARD_KEY[dimension]]: _gone, ...rest } = card;
+  void _gone;
+  return rest;
+};
 const isEntity = (t: CardTarget): t is { entityId: string } => "entityId" in t;
 
 export function ModelCanvas({
   canvasId,
   cards: initialCards,
+  names: pageNames = NO_NAMES,
   lines: allLines,
   editable,
   saveCard,
@@ -345,7 +363,12 @@ export function ModelCanvas({
   // Whether the pane has a size yet; the size itself is read from the store where needed, so a resize of the pane
   // (a side panel shown, hidden or resized, slice 5a) never re-renders the canvas.
   const sized = useStore((s) => s.width > 0 && s.height > 0);
-  const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(c, editable)));
+  // the canvas's names or aliases (slice 11): state, so a switch redraws the cards in one commit with the new texts
+  const [names, setNamesState] = useState<CanvasNames>(() => ({ entity_names: pageNames.entity_names, attribute_names: pageNames.attribute_names }));
+  const namesRef = useRef(names);
+  /** Writes of the canvas's names still on their way: a fresh page keeps the names shown until they are saved. */
+  const namesPending = useRef(0);
+  const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(applyNames(c, pageNames), editable)));
   // Development only (slice 2c, S2C-12): every commit of the canvas is counted, so a spec can check that nothing
   // re-renders the canvas while nobody touches it (a render loop once cost a collapsed canvas a third of its frames).
   useEffect(() => {
@@ -622,16 +645,27 @@ export function ModelCanvas({
           deletedHere: removedHere.current,
           versionOf: (c) => Math.max(c.version, versions.current.get(c.id) ?? 0),
           // the model's content from the page, the layout as the canvas has it
-          keep: (here, page) => ({ ...page, x: here.x, y: here.y, collapsed: here.collapsed, rowFilter: here.rowFilter, width: here.width, frameId: here.frameId }),
+          keep: (here, page) => ({
+            ...page,
+            x: here.x,
+            y: here.y,
+            collapsed: here.collapsed,
+            rowFilter: here.rowFilter,
+            width: here.width,
+            frameId: here.frameId,
+            entityNames: here.entityNames,
+            attributeNames: here.attributeNames,
+          }),
         },
       );
       const page = new Set(initialCards);
       return merged.map((c) => {
         const mine = local.get(c.id);
-        // the number of notes and the requirement marker stay as they were last given (slices 3a, 4b-1)
-        if (!mine || page.has(c)) return toNode(c, editable, mine?.data);
+        // the number of notes and the requirement marker stay as they were last given (slices 3a, 4b-1); the texts
+        // follow the names the canvas shows now (slice 11)
+        if (!mine || page.has(c)) return toNode(applyNames(c, namesRef.current), editable, mine?.data);
         if (c === mine.data.card) return mine;
-        return { ...toNode(c, editable, mine.data), position: mine.position, dragging: mine.dragging };
+        return { ...toNode(applyNames(c, namesRef.current), editable, mine.data), position: mine.position, dragging: mine.dragging };
       });
     });
     for (const [id, v] of grownVersions(initialCards, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
@@ -700,19 +734,20 @@ export function ModelCanvas({
       ns.map((n) => {
         if (n.id !== id) return n;
         const merged = { ...n.data.card, ...patch };
-        const card = patch.width !== undefined ? withClips(merged) : merged;
+        const card = applyNames(patch.width !== undefined ? withClips(merged) : merged, namesRef.current);
         return { ...n, position: { x: card.x, y: card.y }, width: cardWidth(card), height: cardHeight(card), data: { ...n.data, card } };
       }),
     );
   }, []);
 
   const change = useCallback(
-    (id: string, patch: CardPatch, undo: CardPatch) => {
+    /** `send`: what the server is asked for when it is not the patch shown (a card's names, slice 11). */
+    (id: string, patch: CardPatch, undo: CardPatch, send: CardChangeFields = patch as CardChangeFields) => {
       patchCard(id, patch);
       enqueue(id, async () => {
         let result: SaveCardResult;
         try {
-          result = await saveCard({ canvasItemId: id, expectedVersion: versions.current.get(id) ?? 1, ...patch });
+          result = await saveCard({ canvasItemId: id, expectedVersion: versions.current.get(id) ?? 1, ...send });
         } catch {
           result = FAILED;
         }
@@ -728,6 +763,82 @@ export function ModelCanvas({
     [patchCard, saveCard, toast, enqueue, ui],
   );
 
+  // ---- names or aliases (slice 11, D-64): the canvas's two modes, applied to every entity card in one commit ----
+  /** Shows the canvas's names as given; `card` changes each card first (its exceptions cleared or put back). */
+  const showNames = useCallback((next: CanvasNames, card: (c: CardData) => CardData = (c) => c) => {
+    namesRef.current = next;
+    setNamesState(next);
+    setNodes((ns) =>
+      ns.map((n) => {
+        const c = applyNames(card(n.data.card), next);
+        return c === n.data.card ? n : { ...n, data: { ...n.data, card: c } };
+      }),
+    );
+  }, []);
+  // a fresh page brings the saved names (an undo or another editor's change); a switch still on its way keeps its own.
+  // Keyed on the canvas row's version too: the page of the switch itself may never arrive (a later page replaces it),
+  // so the names a page brings may equal the last page's while the canvas shows others; an older page is ignored
+  const namesVersion = useRef(pageNames.version);
+  useEffect(() => {
+    if (namesPending.current || pageNames.version < namesVersion.current) return;
+    namesVersion.current = pageNames.version;
+    const now = namesRef.current;
+    if (now.entity_names === pageNames.entity_names && now.attribute_names === pageNames.attribute_names) return;
+    showNames({ entity_names: pageNames.entity_names, attribute_names: pageNames.attribute_names });
+  }, [pageNames.entity_names, pageNames.attribute_names, pageNames.version, showNames]);
+
+  const noteCanvasVersion = useCanvasLook()?.noteVersion;
+  /**
+   * “Entity aliases” or “Attribute aliases” clicked (item 8): the canvas's mode at once and every card's exception in
+   * that dimension cleared, saved as one change after every card write on its way (F2); a refusal puts both back.
+   */
+  const setNames = useCallback(
+    (dimension: NameDimension, mode: NameMode): Promise<boolean> =>
+      new Promise((resolve) => {
+        if (!editable) {
+          resolve(false);
+          return;
+        }
+        const before = namesRef.current;
+        const key = CARD_KEY[dimension];
+        const cards = cardsNow();
+        const exceptions = new Map(cards.filter((c) => c[key]).map((c) => [c.id, c[key]!]));
+        const next: CanvasNames = { ...before, [NAMES_COLUMN[dimension]]: mode === "name" ? null : mode };
+        if (canvasMode(before, dimension) === mode && !exceptions.size) {
+          resolve(false);
+          return;
+        }
+        namesPending.current += 1;
+        showNames(next, (c) => (exceptions.has(c.id) ? withoutException(c, dimension) : c));
+        const ids = cards.map((c) => c.id);
+        enqueueGroup(ids, async () => {
+          let result: Awaited<ReturnType<FrameWrites["setCanvasNames"]>>;
+          try {
+            result = await frameWrites.setCanvasNames({ dimension, mode, cards: ids.map((id) => ({ canvasItemId: id, expectedVersion: versions.current.get(id) ?? 1 })) });
+          } catch {
+            result = FAILED;
+          }
+          namesPending.current -= 1;
+          if (!result.ok) {
+            showNames(before, (c) => (exceptions.has(c.id) ? { ...c, [key]: exceptions.get(c.id) } : c));
+            toast(result.message, "refusal");
+            resolve(false);
+            return;
+          }
+          for (const [id, v] of Object.entries(result.value.versions)) {
+            if (id !== canvasId) versions.current.set(id, v);
+            else {
+              noteCanvasVersion?.(v);
+              namesVersion.current = Math.max(namesVersion.current, v);
+            }
+          }
+          ui.undo()?.noteSaved();
+          resolve(true);
+        });
+      }),
+    [editable, cardsNow, showNames, enqueueGroup, frameWrites, toast, canvasId, noteCanvasVersion, ui],
+  );
+
   // ---- card width (D-37, C-09): saved like every change of positions and widths, frames decided again ----
   const saveLayoutRef = useRef<ReturnType<typeof useFrames>["saveLayout"]>(() => {});
   const setWidth = useCallback((id: string, patch: { width: number | null }) => saveLayoutRef.current({ cards: [{ id, width: patch.width }] }), []);
@@ -736,7 +847,8 @@ export function ModelCanvas({
     (id: string) => {
       const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
       if (!card) return;
-      const width = fitWidthOf({ kind: card.kind, name: card.name, coverage: `${card.mapped}/${card.rows.length}`, rows: card.rows });
+      // the names as the card shows them (slice 11, F8)
+      const width = fitWidthOf({ kind: card.kind, name: shownText(card), coverage: `${card.mapped}/${card.rows.length}`, rows: card.rows.map((r) => ({ ...r, name: shownText(r) })) });
       if (width !== card.width) setWidth(id, { width });
       toast("Fitted the card to its names.");
     },
@@ -1273,6 +1385,16 @@ export function ModelCanvas({
     viewCounts.set({ filtered: filteredCards, collapsedCards, collapsedFrames: collapsedIds.size, resolvedNotes, openNotes });
   }, [filteredCards, collapsedCards, collapsedIds.size, resolvedNotes, openNotes]);
   useEffect(() => () => viewCounts.set(null), []);
+  // the top bar's names check boxes (slice 11): the canvas's modes, or mixed while a card has an exception (from data)
+  const namesItems = useMemo(
+    () => cardData.map((c) => ({ canvas_id: canvasId, deleted_at: null, entity_names: c.entityNames ?? null, attribute_names: c.attributeNames ?? null })),
+    [cardData, canvasId],
+  );
+  useEffect(() => {
+    const canvas = { id: canvasId, ...names };
+    namesState.set({ entity: namesControl(canvas, namesItems, "entity"), attribute: namesControl(canvas, namesItems, "attribute") });
+  }, [names, namesItems, canvasId]);
+  useEffect(() => () => namesState.set(null), []);
   // ready for a place to be selected (slice 6b, `SelectionHistory`)
   useEffect(() => {
     canvasReady.set(ready);
@@ -1301,7 +1423,7 @@ export function ModelCanvas({
           data: {
             frame: f,
             color: frameColor(f, (id) => conceptColors[id]),
-            members: members.map((c) => ({ id: c.id, kind: c.kind, name: c.name, mapped: c.mapped, total: c.rows.length })),
+            members: members.map((c) => ({ id: c.id, kind: c.kind, name: shownText(c), mapped: c.mapped, total: c.rows.length })),
             // the block's footer: mapped, used, type and drafts; not “misplaced”; its notes (prototype blockCard)
             chips: [
               ...frameChips(frameStats(f, members), f.kind).filter((c) => c.tone !== "misplaced"),
@@ -1750,7 +1872,9 @@ export function ModelCanvas({
       settled,
       cardView: (id) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
-        return card ? { collapsed: card.collapsed, rowFilter: card.rowFilter } : null;
+        if (!card) return null;
+        const item = { entity_names: card.entityNames ?? null, attribute_names: card.attributeNames ?? null };
+        return { collapsed: card.collapsed, rowFilter: card.rowFilter, entityNames: cardMode(item, namesRef.current, "entity"), attributeNames: cardMode(item, namesRef.current, "attribute") };
       },
       selectAll,
       arrangeSelection: group.arrangeSelection,
@@ -1768,6 +1892,7 @@ export function ModelCanvas({
       setFrameCollapsed: frameState.setCollapsed,
       setAllFramesCollapsed: frameState.setAllCollapsed,
       resetView: frameState.resetView,
+      setNames,
       bundleView: (key) => bundlesRef.current.find((b) => b.key === key) ?? null,
       noteView: noteState.noteView,
       newNote: noteState.newNote,
@@ -1814,11 +1939,21 @@ export function ModelCanvas({
         const undo: CardPatch = {};
         if (view.collapsed !== undefined) undo.collapsed = card.collapsed;
         if (view.rowFilter !== undefined) undo.rowFilter = card.rowFilter;
-        change(id, view, undo);
+        // a card's names (slice 11): shown as an exception unless the choice equals the canvas's mode; the server is
+        // sent the choice and decides the same
+        const { entityNames, attributeNames, ...rest } = view;
+        const patch: CardPatch = { ...rest };
+        for (const [dimension, choice] of [["entity", entityNames], ["attribute", attributeNames]] as const) {
+          if (choice === undefined) continue;
+          const key = CARD_KEY[dimension];
+          patch[key] = choice === canvasMode(namesRef.current, dimension) ? undefined : choice;
+          undo[key] = card[key];
+        }
+        change(id, patch, undo, view);
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store
@@ -1831,7 +1966,17 @@ export function ModelCanvas({
       dropTargetAt(document.elementFromPoint(e.clientX, e.clientY), {
         card: (cardId) => {
           const c = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
-          return c ? { kind: c.kind, targetId: c.targetId, name: c.name, rowName: (rowId) => c.rows.find((r) => r.id === rowId)?.name } : null;
+          // the hint names what the card shows (slice 11, F8)
+          if (!c) return null;
+          return {
+            kind: c.kind,
+            targetId: c.targetId,
+            name: shownText(c),
+            rowName: (rowId) => {
+              const r = c.rows.find((x) => x.id === rowId);
+              return r && shownText(r);
+            },
+          };
         },
         mappingName: (mappingId) => {
           const l = allMappings.find((m) => m.id === mappingId);

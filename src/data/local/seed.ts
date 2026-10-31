@@ -115,7 +115,7 @@ export function buildSeed(now: Date = new Date()): DevDb {
   };
 
   const canvas = (id: Uuid, workspaceId: Uuid, by: SeedUser, name: string, projects: Project[]): Canvas => {
-    const c = { id, workspace_id: workspaceId, name, live_label_id: null, look: { ...DEFAULT_CANVAS_LOOK }, ...audit(by) };
+    const c = { id, workspace_id: workspaceId, name, live_label_id: null, look: { ...DEFAULT_CANVAS_LOOK }, entity_names: null, attribute_names: null, ...audit(by) };
     db.canvas.push(c);
     for (const p of projects) {
       const sort_order = db.project_canvas.filter((l) => l.project_id === p.id).length;

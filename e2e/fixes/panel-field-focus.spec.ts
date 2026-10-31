@@ -34,7 +34,8 @@ test("Tab from Precision to Scale: the focus stays in Scale after Precision is s
   await expect(precision).toHaveValue("12");
 });
 
-test("Tab from an entity's name to its stereotype: the focus stays on the stereotype after the name is saved", async ({ page }) => {
+// since slice 11 the entity's Alias field follows its name
+test("Tab from an entity's name to its alias: the focus stays on the alias after the name is saved", async ({ page }) => {
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl());
   await card(page, "Customer").getByTestId("card-name").click();
@@ -44,5 +45,5 @@ test("Tab from an entity's name to its stereotype: the focus stays on the stereo
   await tabAndSave(page);
   await expect(card(page, "Client")).toBeVisible();
   await expect(name).toHaveValue("Client");
-  await expect(page.getByTestId("select-entity-stereotype")).toBeFocused();
+  await expect(page.getByTestId("input-entity-alias")).toBeFocused();
 });

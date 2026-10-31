@@ -6,7 +6,8 @@ import { rowShown } from "@/domain/model/card-size";
 import { indexOf } from "@/domain/model/classifications";
 import type { CardSubject } from "@/domain/model/frames";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
-import type { CanvasItem, LiveLevel, RowFilter, SourceChange, WorkspaceModel } from "@/domain/types";
+import { cardShownNames } from "@/domain/model/aliases";
+import type { Canvas, CanvasItem, LiveLevel, NameMode, RowFilter, SourceChange, WorkspaceModel } from "@/domain/types";
 import { lineNeedsClip, rowNeedsClip, titleNeedsClip } from "./text-fit";
 
 export type CardKind = "ent" | "src";
@@ -14,7 +15,12 @@ export type CardKind = "ent" | "src";
 export interface CardRow {
   /** Attribute or source column id. */
   id: Uuid;
+  /** The model's name: toasts and questions name the row by it (slice 11, P3). */
   name: string;
+  /** The attribute's alias, only when it has one (slice 11). */
+  alias?: string;
+  /** What the row shows when it is not the name: the alias in alias mode (`applyNames`; slice 11, F8). */
+  shown?: string;
   /** Shown type: `Integer`, `String(100)` for attributes; `varchar(20)` for columns. */
   type: string;
   pk: boolean;
@@ -53,7 +59,15 @@ export interface CardData {
   kind: CardKind;
   /** The entity or source table. */
   targetId: Uuid;
+  /** The model's name: toasts and questions name the card by it (slice 11, P3). */
   name: string;
+  /** The entity's alias, only when it has one (slice 11). */
+  alias?: string;
+  /** What the header shows when it is not the name: the alias in alias mode (`applyNames`; slice 11, F8). */
+  shown?: string;
+  /** The entity card's exceptions to the canvas's names or aliases, only when set (slice 11, D-64). */
+  entityNames?: NameMode;
+  attributeNames?: NameMode;
   /** Entity: stereotype (`Object`); source: path (`CRM / crmprod.dbo`). */
   line1: string;
   /** Entity: `in Customer`; source: empty. */
@@ -122,6 +136,8 @@ export function buildCards(
   live: LiveCards | null = null,
   /** The workspace's changes to resolve (slice 7b): the open ones mark their columns. */
   changes: readonly SourceChange[] = [],
+  /** The canvas's names or aliases (slice 11): what the cards show on the first paint. */
+  canvas?: CanvasNames,
 ): CardData[] {
   const labelsOf = (key: string) => labelNames.get(key)?.join(", ") || null;
   const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
@@ -185,6 +201,8 @@ export function buildCards(
       liveTitle: null,
       frameId: item.frame_id,
       createdAt: item.created_at,
+      ...(item.entity_names ? { entityNames: item.entity_names } : {}),
+      ...(item.attribute_names ? { attributeNames: item.attribute_names } : {}),
     } as const;
     /** The distinct mappings of the given rows. */
     const links = (rows: readonly CardRow[]) => [...new Map(rows.flatMap((r) => linksOf.get(r.id) ?? []).map((l) => [l.id, l])).values()];
@@ -197,6 +215,7 @@ export function buildCards(
         .map((a) => ({
           id: a.id,
           name: a.name,
+          ...(a.alias ? { alias: a.alias } : {}),
           type: cap(formatAttributeType(a)),
           pk: a.is_primary_key,
           fk: a.is_foreign_key,
@@ -212,6 +231,7 @@ export function buildCards(
         kind: "ent",
         targetId: entity.id,
         name: entity.name,
+        ...(entity.alias ? { alias: entity.alias } : {}),
         line1: cap(entity.stereotype),
         // a context card says why it is here (prototype entCard, slice 3b)
         line1b: live && item.live_level === "context" ? "context only" : `in ${concept?.name ?? "–"}`,
@@ -261,7 +281,7 @@ export function buildCards(
       });
     }
   }
-  return cards.map(withClips).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "src" ? -1 : 1));
+  return cards.map((c) => (canvas ? applyNames(withClips(c), canvas) : withClips(c))).sort((a, b) => (a.kind === b.kind ? 0 : a.kind === "src" ? -1 : 1));
 }
 
 /** Marks the names that may not fit, so only they are clipped (S1A-14); again whenever the width changes. */
@@ -270,10 +290,34 @@ export function withClips(card: Omit<CardData, "clipName" | "clipLine1">): CardD
   const dual = card.rows.some((r) => r.pk && r.fk);
   return {
     ...card,
-    rows: card.rows.map((r) => ({ ...r, clip: rowNeedsClip(r, card.kind, dual, width) })),
-    clipName: titleNeedsClip(card.name, card.kind, `${card.mapped}/${card.rows.length}`, width),
+    rows: card.rows.map((r) => ({ ...r, clip: rowNeedsClip({ ...r, name: shownText(r) }, card.kind, dual, width) })),
+    clipName: titleNeedsClip(shownText(card), card.kind, `${card.mapped}/${card.rows.length}`, width),
     clipLine1: lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, width, !!card.labels),
   };
+}
+
+/** The canvas's names or aliases (slice 11): the two columns of its row. */
+export type CanvasNames = Pick<Canvas, "entity_names" | "attribute_names">;
+
+/** What a header or a row shows: its shown text, or its name (slice 11, F8). */
+export const shownText = (named: { name: string; shown?: string }): string => named.shown ?? named.name;
+
+/**
+ * An entity card with the texts it shows under the canvas's names or aliases and its own exceptions (`cardShownNames`),
+ * its clips worked out again for them; the same card when nothing it shows changes. Table cards are unchanged.
+ */
+export function applyNames(card: CardData, canvas: CanvasNames): CardData {
+  if (card.kind !== "ent") return card;
+  const item = { entity_names: card.entityNames ?? null, attribute_names: card.attributeNames ?? null };
+  const { header, rows } = cardShownNames(item, canvas, { name: card.name, alias: card.alias ?? null }, card.rows.map((r) => ({ name: r.name, alias: r.alias ?? null })));
+  const differs = (named: { name: string; shown?: string }, text: string) => shownText(named) !== text;
+  if (!differs(card, header) && !card.rows.some((r, i) => differs(r, rows[i]!))) return card;
+  const shown = <T extends { name: string; shown?: string }>(named: T, text: string): T => {
+    const { shown: _old, ...rest } = named;
+    void _old;
+    return (text === named.name ? rest : { ...rest, shown: text }) as T;
+  };
+  return withClips({ ...shown(card, header), rows: card.rows.map((r, i) => shown(r, rows[i]!)) });
 }
 
 /** The rows a card shows under its filter (prototype rowsOf); a collapsed card shows none. */

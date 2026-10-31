@@ -162,3 +162,33 @@ describe("buildTree: source changes (slice 7b, item 22)", () => {
     expect(tree.systems[0]!.openChanges).toBe(0);
   });
 });
+
+describe("the search finds aliases (slice 11, item 14, F13)", () => {
+  const aliased: WorkspaceModel = {
+    ...model,
+    entities: [entity(ids.customer, { alias: "Klient" }), model.entities[1]!],
+    attributes: [attribute(ids.customerId, { alias: "Numer klienta" }), attribute(ids.email)],
+  };
+  const t = buildTree(aliased, items, ids.canvas1, [ids.canvas1]);
+  const found = (q: string) => filterConcepts(t.concepts, { q, canvasOnly: false }).flatMap((g) => g.items.map((s) => [s.item.name, s.hint]));
+
+  it("carries an alias only where one is set", () => {
+    expect(t.concepts[0]!.entities[0]).toMatchObject({ alias: "Klient", aliases: [{ name: "customer_id", alias: "Numer klienta" }] });
+    expect(t.concepts[1]!.entities[0]).not.toHaveProperty("alias");
+    expect(t.concepts[1]!.entities[0]).not.toHaveProperty("aliases");
+    expect(tree.concepts[0]!.entities[0]).not.toHaveProperty("alias");
+  });
+
+  it("finds an entity by its alias, and by an attribute's alias, naming the alias in the hint", () => {
+    expect(found("klient")).toEqual([["Customer", "alias Klient"]]);
+    expect(found("Numer")).toEqual([["Customer", "attribute customer_id · Numer klienta"]]);
+  });
+
+  it("a match by name is unchanged, and a name or an attribute's name comes before an alias", () => {
+    expect(found("Customer")).toEqual([["Customer", null]]);
+    expect(found("email")).toEqual([["Customer", "attribute email"]]);
+    // "customer_id" is an attribute's name: its hint names the attribute, not the alias
+    expect(found("customer_")).toEqual([["Customer", "attribute customer_id"]]);
+    expect(found("Kopia")).toEqual([]);
+  });
+});

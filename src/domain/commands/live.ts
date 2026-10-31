@@ -381,7 +381,7 @@ export function openLiveCanvas(
 
   const denied = checkPermission(access, "canvas.create");
   if (denied) return fail(denied);
-  const canvas: Canvas = { ...newRowColumns(ctx), workspace_id: ws, name: label.name, live_label_id: labelId, look: { ...DEFAULT_CANVAS_LOOK } };
+  const canvas: Canvas = { ...newRowColumns(ctx), workspace_id: ws, name: label.name, live_label_id: labelId, look: { ...DEFAULT_CANVAS_LOOK }, entity_names: null, attribute_names: null };
   const membership = liveMembership(labelId, liveModelOf(state, ws));
   const items: CanvasItem[] = [
     ...[...membership.tables].map(([id, level]) => ({ ...newCanvasItem(ctx, ws, canvas.id, { source_table_id: id }, { x: 0, y: 0 }), live_level: level, row_filter: liveRowFilter(level) })),

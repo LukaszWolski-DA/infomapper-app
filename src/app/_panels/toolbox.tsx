@@ -23,7 +23,7 @@ export type ToolboxItem =
       /** Asks for a second click first, with this text (as the panels' delete buttons do). */
       confirm?: string;
     }
-  | { seg: string; options: { label: string; on: boolean; act: () => void }[] }
+  | { seg: string; testId?: string; options: { label: string; on: boolean; act: () => void }[] }
   | { search: (query: string) => SearchResult[] };
 
 export interface SearchResult {
@@ -176,7 +176,7 @@ export function Toolbox({ items, at, onClose }: { items: ToolboxItem[]; at: { x:
         }
         if ("seg" in item) {
           return (
-            <div key={i} className="px-2 py-1">
+            <div key={i} className="px-2 py-1" data-testid={item.testId}>
               <div className="mb-1 text-[11px] text-im-ink-3">{item.seg}</div>
               <div className="flex rounded-[7px] bg-im-hover p-0.5">
                 {item.options.map((o) => (

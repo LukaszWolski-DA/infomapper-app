@@ -74,19 +74,29 @@ export function Overview({ lines, notes = NO_NOTES, notesDragging = false }: { l
   const [frozen, setFrozen] = useState<Rect | null>(null);
 
   const view: Rect = { x: -tx / zoom, y: -ty / zoom, w: width / zoom, h: height / zoom };
-  /** The cards drawn and the blocks (slice 2c); a hidden card's lines go to its block. */
-  const shown = useMemo(() => nodes.filter((n) => !n.hidden) as (CardNodeT | BlockNodeT)[], [nodes]);
-  const rects = useMemo(
+  /**
+   * What the miniature draws of the nodes, as one string: the lists below are made again only when it changes. A change
+   * of a card's data that moves or recolours nothing (slice 11: names or aliases switched) leaves the miniature alone.
+   */
+  const drawnKey = useMemo(
     () =>
-      new Map(
-        shown.map((n) => [
-          n.id,
-          isCardNode(n) ? { x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) } : { x: n.position.x, y: n.position.y, w: n.width ?? 0, h: n.height ?? 0 },
-        ]),
-      ),
-    [shown],
+      nodes
+        .map((n) => {
+          if (n.hidden) return isCardNode(n) ? `${n.id}>${n.data.card.frameId ?? ""}` : "";
+          const r = rectOf(n);
+          const fill = isCardNode(n) ? `${n.data.card.kind}${n.data.card.color}` : isReqNode(n) ? "q" : (n as BlockNodeT).data.color;
+          return `${n.id}|${r.x}|${r.y}|${r.w}|${r.h}|${fill}`;
+        })
+        .join(";"),
+    [nodes],
   );
-  const blockOf = useMemo(() => new Map(nodes.filter((n) => n.hidden && isCardNode(n)).map((n) => [n.id, blockNodeId((n as CardNodeT).data.card.frameId ?? "")])), [nodes]);
+  // keyed on what is drawn, not on the nodes array, which every card change replaces
+  /* eslint-disable react-hooks/exhaustive-deps */
+  /** The cards drawn and the blocks (slice 2c); a hidden card's lines go to its block. */
+  const shown = useMemo(() => nodes.filter((n) => !n.hidden) as (CardNodeT | BlockNodeT)[], [drawnKey]);
+  const blockOf = useMemo(() => new Map(nodes.filter((n) => n.hidden && isCardNode(n)).map((n) => [n.id, blockNodeId((n as CardNodeT).data.card.frameId ?? "")])), [drawnKey]);
+  /* eslint-enable react-hooks/exhaustive-deps */
+  const rects = useMemo(() => new Map(shown.map((n) => [n.id, rectOf(n)])), [shown]);
   const content = useMemo(() => {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const r of [...rects.values(), ...miniNotes]) {
@@ -177,6 +187,10 @@ export function Overview({ lines, notes = NO_NOTES, notesDragging = false }: { l
 }
 
 /** The cards and lines in miniature: lines between card centres, entities in their concept colour. */
+/** A node's rectangle in the miniature: a card's size from its data, a block's or a requirement card's from the node. */
+const rectOf = (n: Node): Rect =>
+  isCardNode(n) ? { x: n.position.x, y: n.position.y, w: cardWidth(n.data.card), h: cardHeight(n.data.card) } : { x: n.position.x, y: n.position.y, w: n.width ?? 0, h: n.height ?? 0 };
+
 const Miniature = memo(function Miniature({
   nodes,
   rects,

@@ -7,6 +7,7 @@ import {
   moveOnCanvasAction,
   putInNewFrameAction,
   resetCanvasViewAction,
+  setCanvasNamesAction,
   resizeFrameAction,
   setAllFramesCollapsedAction,
   setFrameCollapsedAction,
@@ -39,7 +40,7 @@ import { buildLines, type Selection } from "@/canvas/line-data";
 import { buildNotes } from "@/canvas/note-data";
 import { NoteToolButton } from "@/canvas/NoteToolButton";
 import { MoreTools } from "@/canvas/MoreTools";
-import { MORE_FOCUS, MORE_TOOLS } from "@/canvas/more-breakpoints";
+import { MORE_FOCUS, MORE_NAMES, MORE_TOOLS } from "@/canvas/more-breakpoints";
 import { CanvasProvider } from "@/canvas/CanvasProvider";
 import { EntityToolButton } from "@/canvas/EntityToolButton";
 import { HandToolButton } from "@/canvas/HandToolButton";
@@ -47,6 +48,7 @@ import { FocusButton } from "@/canvas/Focus";
 import { ChangesButton } from "@/canvas/Changes";
 import { changesImport } from "@/canvas/changes-import";
 import { LayerSwitch } from "@/canvas/LayerSwitch";
+import { NamesSwitch } from "@/canvas/NamesSwitch";
 import { CanvasLookProvider } from "@/canvas/look";
 import { ModelCanvas } from "@/canvas/ModelCanvas";
 import { SelectionHistory } from "@/canvas/SelectionHistory";
@@ -137,6 +139,7 @@ export default async function CanvasPage({
         }
       : null,
     sourceChanges,
+    canvas,
   );
   // requirements (slice 4a): the index is built once per page here for the left panel; the panels build theirs once
   // per data version in the browser
@@ -280,6 +283,7 @@ export default async function CanvasPage({
               key={canvasId}
               canvasId={canvasId}
               cards={cards}
+              names={{ entity_names: canvas.entity_names, attribute_names: canvas.attribute_names, version: canvas.version }}
               lines={buildLines(model, cards, labelNames, liveMappings)}
               editable={editable}
               saveCard={updateCardAction.bind(null, ws)}
@@ -304,6 +308,7 @@ export default async function CanvasPage({
                 setFrameCollapsed: setFrameCollapsedAction.bind(null, ws),
                 setAllFramesCollapsed: setAllFramesCollapsedAction.bind(null, ws, canvasId),
                 resetCanvasView: resetCanvasViewAction.bind(null, ws, canvasId),
+                setCanvasNames: setCanvasNamesAction.bind(null, ws, canvasId),
               }}
               entityConcepts={Object.fromEntries(model.entities.map((e) => [e.id, e.concept_id]))}
               focusCardId={focusCardId}
@@ -365,11 +370,14 @@ function arrivalSelection(query: Record<string, string | string[] | undefined>, 
   return card ? { t: "row", cardId: card.id, id: row } : { t: "element", kind: attribute ? "attribute" : "source_column", id: row };
 }
 
-// On a narrow window Focus and the notation, then the four tools, leave the bar for “More” (slice 6a): each wrapper is
+// On a narrow window the names' check boxes (slice 11), then Focus and the notation, then the four tools, leave the bar for “More” (slice 6a): each wrapper is
 // the tool's own element in the bar (`display: contents` until its breakpoint).
 const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolean }) => (
   <>
     <LayerSwitch />
+    <span className={`contents ${MORE_NAMES.inBar}`}>
+      <NamesSwitch />
+    </span>
     <span className={`contents ${MORE_FOCUS.inBar}`}>
       <FocusButton />
       <ChangesButton />
