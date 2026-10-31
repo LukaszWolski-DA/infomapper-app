@@ -25,7 +25,7 @@ import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { WorkingContextButton, WorkingContextProvider } from "@/app/_components/working-context";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { canvasHref } from "@/app/_lib/paths";
-import { loadShell } from "@/app/_lib/shell";
+import { leaveMissingCanvas, loadShell } from "@/app/_lib/shell";
 import { Inspector } from "@/app/_panels/inspector";
 import { LeftPanel } from "@/app/_panels/left-panel";
 import { PanelsProvider } from "@/app/_panels/panels-context";
@@ -114,7 +114,8 @@ export default async function CanvasPage({
   const frames = buildFrames(frameRows.filter((f) => f.canvas_id === canvasId));
   const conceptFrames: Record<string, number> = {};
   for (const f of frameRows) if (f.concept_id && canvases.some((c) => c.id === f.canvas_id)) conceptFrames[f.concept_id] = (conceptFrames[f.concept_id] ?? 0) + 1;
-  const canvas = canvases.find((c) => c.id === canvasId)!;
+  // a delete that landed after `loadShell` read the canvas (slice 12a): the same way as arriving at a deleted canvas (D-38)
+  const canvas = canvases.find((c) => c.id === canvasId) ?? (await leaveMissingCanvas(ws, projectId, canvasId));
   const undoState = { canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 };
   // Four-eyes (AD-06): the panel says beforehand who may not approve; the server checks again.
   const fourEyes = !!workspace?.four_eyes;

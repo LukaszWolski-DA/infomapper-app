@@ -1,6 +1,6 @@
 # Slice 12a – acceptance
 
-Status: **step 3 (undo on the home pages) done; waiting for Łukasz before step 4.**
+Status: **step 4 (deleting a project) done; waiting for Łukasz before step 5 (closing).**
 
 - Branch `slice/12a-home-undo-project-delete`, made on 31 October 2026 from `main` at `de2af7f` (the start commit). Tag
   `slice-11` is at `6c231c6`; `main` is one docs-only merge past it (PR 29, the InfoCube idea in `docs/ideas.md`), so
@@ -247,6 +247,10 @@ the project home is now an undo step, undone from a canvas ("Undone: Pin label �
    as it is. Changing it, so that a group which labels nothing records no context, would change D-26 and every
    delete, not only the project's. **Question to Łukasz (Q-H):** keep D-26 as it is (my proposal), or change it in a
    later slice?
+
+   **Łukasz's answer to Q-H (31 October 2026):** D-26 stays as it is. His remark was wrong: D-26 forbids labeling
+   deleted elements (no `label_link`), while recording `context_label_id` on every change event of the group is
+   required, deletions included. The test in `live.test.ts` checks the right behaviour.
 3. **D-58:** "like a pin (D-29) they are not undo steps" becomes "they are not undo steps". It goes into
    `docs/decisions.md` in this PR's closing, together with D-29, D-59, D-65, D-28's addition and AD-05's note (PRD
    section 10, as updated after step 1).
@@ -315,6 +319,93 @@ the project home is now an undo step, undone from a canvas ("Undone: Pin label �
 **How to check:** `npx playwright test e2e/slice-12a`. By hand: move a card on a canvas, open the project home or the
 workspace home, and press Undo, Redo or Ctrl+Z there. Or create a project and press Undo on its home: you land on the
 workspace home with "Undone: Create project".
+
+## Step 4: deleting a project (31 October 2026)
+
+**What changed**
+
+- **The section** (`project-delete.tsx`, items 8–10): at the end of the project home, after "Open notes", for people
+  with `project.delete` in a workspace that is not archived (`ProjectView.canDeleteProject`).
+  - The button is `ConfirmDelete`, with one new optional prop for the armed text, "Click again to delete the project".
+    It disarms after 4 s or on blur.
+  - For the only project it is a disabled button, and the text reads "This is the only project.".
+  - Otherwise the text is the prototype's sentence, then "Deleted with it: …" and "Staying in other projects: …". The
+    page computes them from the projects each canvas is in (P4), with no extra read.
+- **`deleteProjectAction`** (`_actions/workspace.ts`) reads what `deleteProject` needs, runs it through `runCommand`,
+  and remembers the project (`rememberGoneProject`, F2).
+  - The browser sends it on the project row's save chain (`saveRow`, `deletes: true`, F23).
+  - The page, drawn again, goes to the workspace home without "That project no longer exists."
+  - The toast "Deleted the project {project} and {n} canvas(es) that only it used. The model is untouched." offers
+    Undo (item 14), from the page's undo (step 3). The count comes from the server's answer.
+- **The toast after undoing a delete** said "Undone: Delete project Order management on Order lines & products",
+  because the group's cards are all on one canvas (`changeCanvasId`). A group that writes a project is no longer "on"
+  a canvas (`change-label.ts`, with a unit test). The toast now reads "Undone: Delete project Order management".
+- **The race from step 2** (`page.tsx:127`, fixed as Łukasz asked):
+  - one rule, `missingCanvasWay` (`src/app/_lib/missing-canvas.ts`, pure), decides where a canvas page whose canvas
+    is not there goes, by D-38;
+  - `leaveMissingCanvas` (`shell.ts`) reads the project and its links as they are now and redirects by it;
+  - `loadShell` uses it for a gone project and for a canvas no longer in its project (its own earlier branches, now
+    in one place);
+  - the canvas page uses it when its own `canvases.list` no longer has the canvas that `loadShell` saw, instead of
+    `find(…)!`.
+
+  So a delete landing between the two reads takes the same way as an arrival at a deleted canvas: the project's first
+  other canvas with "This canvas is no longer in …", or the workspace home with "That project no longer exists.". The
+  race cannot be driven from an e2e test without a switch in the app: both reads happen inside one server request,
+  and a Playwright route only holds the browser's traffic. So it has a unit test of the branch,
+  `missing-canvas.test.ts` (4 cases), as Łukasz allowed.
+
+**Specs**
+
+| ID | What it does |
+| --- | --- |
+| S12A-07 | Order management's preview names "Order lines & products" (deleted with it) and "Customer & orders" (staying); the section is the page's last; the first click arms ("Click again to delete the project"), and the arm goes after 4 s and on a click elsewhere |
+| S12A-08 | With a frame, a note, a requirement card on its own canvas and CR-23 pinned: the second click deletes. The workspace home shows the toast, without "That project no longer exists."; the project and its own canvas with every card, frame and note are deleted; the shared canvas and its rows are exactly as before; the links and the pin are gone; the model's tables are unchanged; all in one change group |
+| S12A-09 | Undo in the toast brings back the project, its canvas with the same live rows, its links and its pin, and its tile; Redo deletes it again; Ctrl+Z on the workspace home brings it back. Deleted again, then CR-23 deleted: Undo is refused with "Couldn't undo “Delete project Order management” …", and the projects, canvases, links and pins are unchanged |
+| S12A-10 | Customer 360 deleted through the domain: Order management's button is disabled with "This is the only project."; a direct call of the action is refused with "A workspace needs at least one project." |
+| S12A-11 | Anna (modeler) sees the section and deletes a spare project; Piotr (reviewer) and Kasia (reader) see no section and a direct call is refused ("As a reviewer / reader you cannot delete projects."); archived: no section, and the call is refused with the archive's message |
+| S12A-12 | Anna has Order management's home and its own canvas open. After Łukasz's delete her card move is refused (a refusal toast, nothing written); reloading each of her pages, and opening the shared canvas under the deleted project's address, leads to the workspace home with "That project no longer exists."; Back in Łukasz's tab to the deleted project's canvas does the same |
+
+`S12A-screens.spec.ts` (`SCREENS=step-4`): `docs/prd/slice-12a-screens/step-4/`. It has the section, armed, and the
+only project, each light and dark, and the workspace home's top bar with Undo and Redo.
+
+**What the runs found (and are not bugs of the app)**
+
+- **F28 was wrong about Back.** The redirect of the delete's own page **replaces** the deleted home's history entry; it
+  does not push one (checked: the tab's entries before and after the delete). So after your own delete, Back from the
+  workspace home goes to the page before the project home, not to the deleted home. This suits D-38 better: no dead
+  entry to step through. S12A-12 checks Back to the deleted project's **canvas**, which stays in the history: it leads
+  to the workspace home with the toast.
+- **A page restored from Chrome's back-forward cache is not checked (an old gap in D-38).** If the earlier page was
+  opened by a full page load (a typed address, `page.goto` in a test), Back restores that whole document from Chrome's
+  back-forward cache. No server request is made, and no code of the page runs (`history-nav.tsx`'s refresh listens to
+  traversals inside one document). So Back shows the deleted project's canvas as it was. It goes away on the next
+  click or reload, and any write is refused as not found. Through the app's own links (tabs, breadcrumbs, tiles) the
+  pages are one document, and Back goes through `loadShell`, as S12A-12 shows. The same holds for a canvas deleted
+  since slice 6b. **Proposal:** a known limitation in the closing, and an idea for later (`pageshow` with `persisted`
+  → refresh). Not built: not in this PRD.
+- S12A-09 compared the restored canvas links in file order; they come back complete in another order, so the test
+  compares them sorted. S12A-12 reads Anna's toasts from a record of every toast (`recordToasts`), because her tabs
+  may be in the background.
+
+**Runs**
+
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: 117 files, 1,530 tests pass.
+- S12A-12 three times on its own after its last change: pass.
+- e2e, with no dev server of mine running: 92 tests pass in 16.1 min. The set: all of slice 0 (homes, switcher), all
+  of slice 2a (a canvas's delete and removal, the "moved" notice), all of slice 6b (Back and Forward, gone places), all
+  of slice 9 (the project home), S3A-05, S1B-13 (Undo toasts) and all of slice 12a (the screenshot spec skips itself
+  without `SCREENS`). The `live_label_id` error did not appear.
+- No earlier test changed in step 4.
+
+**New texts on screen (as accepted after step 1):** "Delete this project", "Click again to delete the project", "This is
+the only project.", the preview's sentence with "Deleted with it: …" and "Staying in other projects: …", and the
+toast "Deleted the project {project} and {n} canvas(es) that only it used. The model is untouched." (or "Deleted the
+project {project}. The model is untouched."). The server's "A workspace needs at least one project." and "As a
+{role} you cannot delete projects." are step 2's.
+
+**How to check:** `npx playwright test e2e/slice-12a`. By hand on the demo data: open Order management's home, read
+the section at its end, click twice, press Undo in the toast; then open the project's old address from the history.
 
 ## Assumptions
 

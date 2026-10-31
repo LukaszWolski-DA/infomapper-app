@@ -12,6 +12,8 @@ export interface ProjectView {
   project: { id: Uuid; name: string; description: string | null; version: number };
   /** May edit the project's name and description (slice 9, D-59). The server checks again. */
   canEditProject: boolean;
+  /** May delete the project from its home (slice 12a, D-65): `project.delete`, not archived. The server checks again. */
+  canDeleteProject: boolean;
   /** May create, rename and move canvases between projects. The server checks again. */
   canEdit: boolean;
   /** The project's canvases in tab order, with the projects each one is in, their number of cards and their look. */
@@ -51,6 +53,7 @@ export async function loadProjectView(shell: ShellData): Promise<ProjectView> {
     project: { id: project!.id, name: project!.name, description: project!.description, version: project!.version },
     canEdit: can({ workspace: workspace!, member }, "canvas.create"),
     canEditProject: can({ workspace: workspace!, member }, "project.edit"),
+    canDeleteProject: can({ workspace: workspace!, member }, "project.delete"),
     canvases: links.map((l) => {
       const c = canvases.find((x) => x.id === l.canvas_id)!;
       return { id: c.id, name: c.name, version: c.version, projectIds: linksByCanvas.get(c.id) ?? [], cards: cards.get(c.id) ?? 0, look: c.look, liveLabel: liveLabelOf(c.live_label_id) };

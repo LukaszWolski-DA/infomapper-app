@@ -5,10 +5,11 @@
 
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";
-import { createProject, updateProject } from "@/domain/commands/project";
+import { createProject, deleteProject, updateProject } from "@/domain/commands/project";
 import { archiveWorkspace, createWorkspace, unarchiveWorkspace, updateWorkspaceSettings } from "@/domain/commands/workspace";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
+import { rememberGoneProject } from "../_lib/gone-project";
 import { projectHref, workspaceHref } from "../_lib/paths";
 import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
 
@@ -113,4 +114,31 @@ export async function updateProjectAction(input: {
       return result.ok ? { ...result, value: { name: result.value.project.name, version: result.value.project.version } } : result;
     }),
   );
+}
+
+/**
+ * "Delete this project" on its home (slice 12a, D-65): the project, its links and pins, and the canvases only it uses.
+ * The page, drawn again, finds its project gone and goes to the workspace home without "That project no longer
+ * exists." (`rememberGoneProject`, F2); the browser shows the delete's own toast, with Undo.
+ */
+export async function deleteProjectAction(input: { workspaceId: string; projectId: string; expectedVersion: number }): Promise<ActionResult<{ name: string; deletedCanvases: number }>> {
+  const result = await runCommand(async (ctx, store, user) => {
+    const access = await loadAccess(store, input?.workspaceId, user.id);
+    if (!access) return NOT_FOUND;
+    const ws = access.workspace.id;
+    const [project, projects, canvases, items, frames, notes, pins] = await Promise.all([
+      typeof input?.projectId === "string" ? store.projects.get(ws, input.projectId) : null,
+      store.projects.list(ws),
+      store.canvases.list(ws),
+      store.canvasItems.list(ws),
+      store.frames.list(ws),
+      store.notes.list(ws),
+      store.labels.listPins(ws),
+    ]);
+    const links = (await Promise.all(canvases.map((c) => store.canvases.listLinksOfCanvas(ws, c.id)))).flat();
+    const r = deleteProject(ctx, access, { project, projects, links, canvases, items, frames, notes, pins }, { projectId: input?.projectId, expectedVersion: input?.expectedVersion });
+    return r.ok ? { ...r, value: { name: r.value.name, deletedCanvases: r.value.deletedCanvasIds.length } } : r;
+  });
+  if (result.ok) await rememberGoneProject(input.projectId);
+  return done(result);
 }
