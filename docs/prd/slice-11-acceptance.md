@@ -328,8 +328,8 @@ names are (D-37). Table and requirement cards are unchanged."
 - **The app opens KB:**
   - the dev server (`npm run dev`, port 3000, on `.data/dev-db.json`) started;
   - signed in through the test users' list as Lukasz_KB, which leads to "Kanton Basel";
-  - the canvas LDM of "First project" opened with its 8 entity cards and 2 source tables (Building, Floor, Room,
-    Parcel, Place, RoomType, Flooring, Blind) and its panels;
+  - the canvas LDM of "First project" opened with its 8 entity cards (Building, Floor, Room, Parcel, Place,
+    RoomType, Flooring, Blind), its 2 source tables and its panels;
   - no browser console message, and no error in the server log (every request 200 or 307);
   - the server was stopped, and the file is unchanged by the visit (SHA-256 `59a5a756…f08b6db8`, 10:22).
 - The backup stays as it is: `.data/backups/dev-db-20261031-1008-before-format-11.json` (format 10, SHA-256
