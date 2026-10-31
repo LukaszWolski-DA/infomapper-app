@@ -147,6 +147,7 @@ describe("deleting an entity (D-47)", () => {
         { id: ids.projectB, name: "Order management" },
       ],
       requirements: [],
+      copies: [],
     });
   });
 

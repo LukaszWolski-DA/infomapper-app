@@ -6,7 +6,9 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildWriteSet, type CommandContext, type Write } from "@/domain/changes";
+import { pasteAttribute, updateAttribute } from "@/domain/commands/attribute";
 import { createConcept } from "@/domain/commands/concept";
+import { revertChangeGroup } from "@/domain/commands/undo";
 import { createEntity, deleteEntity } from "@/domain/commands/entity";
 import { createFrame } from "@/domain/commands/frame";
 import { addMappingInput, setMappingStatus } from "@/domain/commands/mapping";
@@ -621,5 +623,57 @@ describe("seed:large (S1A-14)", () => {
     const db = await readDb(other);
     expect(db.workspace.map((w) => w.name)).toContain("Retail Co – DWH");
     expect(db.workspace.map((w) => w.name)).toContain("Performance test");
+  });
+});
+
+describe("the deleted originals of live copies (slice 10c, F6)", () => {
+  it("names each deleted original a live copy points to, with its entity's name, and nothing else", async () => {
+    const db = await readDb(file);
+    const ws = db.attribute[0]!.workspace_id;
+    const [original, copy, liveOriginal, liveCopy, gone, goneCopy] = db.attribute.filter((a) => a.workspace_id === ws && a.deleted_at === null);
+    const at = "2026-10-30T12:00:00.000Z";
+    const link = (id: string, to: string) => {
+      db.attribute.find((a) => a.id === id)!.copied_from_attribute_id = to;
+    };
+    link(copy!.id, original!.id);
+    link(liveCopy!.id, liveOriginal!.id);
+    link(goneCopy!.id, gone!.id);
+    // the original deleted; another deleted original whose copy is deleted too names nothing
+    db.attribute.find((a) => a.id === original!.id)!.deleted_at = at;
+    db.attribute.find((a) => a.id === gone!.id)!.deleted_at = at;
+    db.attribute.find((a) => a.id === goneCopy!.id)!.deleted_at = at;
+    await writeFile(file, JSON.stringify(db), "utf8");
+
+    const entityName = db.entity.find((e) => e.id === original!.entity_id)!.name;
+    expect((await store.model.load(ws)).lostOriginals).toEqual([{ id: original!.id, name: original!.name, entityName }]);
+    // a workspace without copies has none
+    const other = db.workspace.find((w) => w.id !== ws)!.id;
+    expect((await store.model.load(other)).lostOriginals).toEqual([]);
+  });
+});
+
+describe("copies through the adapter (slice 10c)", () => {
+  it("a paste, a followed type change and its undo apply, the copy in step at each point", async () => {
+    const anna = SEED_IDS.userAnna;
+    const access = await accessAs(anna);
+    let m = await store.model.load(RETAIL);
+    const original = m.attributes.find((a) => a.is_primary_key)!;
+    const target = m.entities.find((e) => e.id !== original.entity_id)!;
+    const pasted = pasteAttribute(ctxFor(anna), access, { entity: target, original, attributes: m.attributes }, { entityId: target.id, attributeId: original.id });
+    if (!pasted.ok) throw new Error(pasted.error.message);
+    expect(await store.apply(pasted.writeSet)).toEqual({ ok: true });
+
+    m = await store.model.load(RETAIL);
+    const before = m.attributes.find((a) => a.id === original.id)!;
+    const changed = updateAttribute(ctxFor(anna), access, { attribute: before, attributes: m.attributes, entities: m.entities }, { attributeId: before.id, expectedVersion: before.version, type: { dataType: "string", length: 77 } });
+    if (!changed.ok) throw new Error(changed.error.message);
+    expect(await store.apply(changed.writeSet)).toEqual({ ok: true });
+    const copyNow = () => store.model.load(RETAIL).then((x) => x.attributes.find((a) => a.id === pasted.value.attributeId)!);
+    expect(await copyNow()).toMatchObject({ data_type: "string", type_length: 77, copied_from_attribute_id: original.id });
+
+    const undone = revertChangeGroup(ctxFor(anna), access, { events: changed.writeSet.events, rows: await store.model.loadForUndo(RETAIL) }, "undo");
+    if (!undone.ok) throw new Error(undone.error.message);
+    expect(await store.apply(undone.writeSet)).toEqual({ ok: true });
+    expect(await copyNow()).toMatchObject({ data_type: before.data_type, type_length: before.type_length });
   });
 });

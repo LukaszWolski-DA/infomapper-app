@@ -14,7 +14,8 @@ classifications, and in Data Vault 2.0 mode a table panel shows its Data Vault r
 holds one model; projects and canvases organise the work on it. Organizations are silos: in development people sign in
 with an organization's shared password or the test users' list, create organizations, and owners and admins add,
 change and remove people (slice 8, D-58). Panels save one object at a time, each save with the newest version known; a project's name
-and description are edited on its home, and a zoom is typed in the top bar (slice 9, D-59, D-60).
+and description are edited on its home, and a zoom is typed in the top bar (slice 9, D-59, D-60). An attribute can be
+copied and pasted into any entity; the copy follows its original's type and Personal data (slice 10c, D-63).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -184,10 +185,11 @@ npx tsx scripts/bench-import-plan.ts --no-coverage            # slice 7c: the pl
 ONLY_REMOVE=1 npx tsx scripts/bench-import-write.ts 20000     # slice 7c: only removing Business key from 2,000 columns (bar 1 s); without it the whole write bench
 COMMITS=1 npx playwright test e2e/slice-07c/S7C-14-commits.spec.ts   # slice 7c: canvas commits per classification toggle (on demand; 3 on slice-07b and 7c)
 MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s7c14-baseline/slice-07b.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts  # S7C-14's element guard; slice 8 too (page total +1, see below)
-MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts   # the element guard (S9-14, S10A-12, S10B-10), against slice-08's own counts (slices 9, 10a and 10b matched them)
+MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts   # the element guard (S9-14, S10A-12, S10B-10, S10C-11), against slice-08's own counts (slices 9 to 10c matched them)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-10a/S10A-12-loops.spec.ts   # slice 10a: 20 loops against 20 relationships, layers and pans (branch only)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-10b/S10B-10-lines.spec.ts   # slice 10b: 20 source lines against 20 relationships, layers and pans (branch only)
 SCREENS=<folder> npx playwright test e2e/slice-10b/S10B-screens.spec.ts                   # slice 10b: D-62's drawing, light and dark
+SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
 npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06b/S6B-10.spec.ts         # slice 6b: selection places, the buttons, the background refresh, phase by phase
@@ -267,6 +269,17 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - find a point of a source line that is not under a card, to hover or click it (`freePointOn`);
   - import keys into ERP as test data (`keysFile` with named keys, `employeesFile` for keys to itself, `importKeys`) and
     set a card's width (`setWidth`).
+
+  Slice 10c's helpers do the following:
+  - read an attribute by its entity and name (`attributeOf`), an entity's attributes in order (`attributesOf`) and a
+    stored row, deleted or not (`rawAttribute`);
+  - write copies as test data through the domain: a paste (`pasteAs`), a length the copies follow (`setLengthAs`) and a
+    delete (`deleteAs`);
+  - press “Copy” on a row (`copyRow`, its toast `COPY_TOAST`) and “Paste attribute” on a card's header (`pasteOn`,
+    `headOf`), and read what the attribute panel shows (`attributeShown`, `expectAttributeShown`);
+  - hold back a server action's answer (`holdAnswer`): a Playwright route on the test's page passes the request to the
+    server at once and gives the browser its answer later, so a second save starts before the first one's answer
+    arrives (S10C-09). It lives in the test only: the app has no switch for it in any build.
 
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
@@ -382,6 +395,20 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   only when the canvas has a source line: an empty group was one element more in every canvas's viewport (S10B-10). A
   click selects the table with the key (`{ t: "card" }`). Under Focus and in the Changes view `litSources`
   (`fade-canvas.tsx`) lights a line whose two cards are lit, drawn again in `LitLines`; no domain change.
+- **Copies of attributes** (slice 10c, D-63): `attribute.copied_from_attribute_id` links a copy to the attribute it was
+  pasted from (a copy itself or not); the local data file's format 10 added it as null. **One rule in one place:**
+  `followOriginals` (`src/domain/model/copies.ts`) brings every live copy below the written attributes in step with its
+  own original (type, parameters, Personal data: `FOLLOWED_COLUMNS`), in the same change group; `updateAttribute` and
+  `revertChangeGroup` (undo and redo) call it, so an undo never leaves a copy out of step. The copies only following
+  wrote are the write set's `followers`, which the working context leaves out (`contextTargets`). `updateAttribute`
+  refuses a followed field on a copy with a link (its original live or deleted) and clears the link on `stopFollowing`.
+  The link is not in undo's `PARENTS`. `model.load` returns `lostOriginals` (a deleted original's name and its entity's)
+  for the copy's panel. In the browser: the clipboard is a value store of the page (`src/app/_components/
+  attribute-clipboard.ts`: workspace and attribute id only); the panel saves a followed field through `saveRows` with the
+  attribute checked and every copy below it held (`copiesBelow`), and `updateAttributeAction` answers with every version
+  written. An attribute's delete asks a second click when it has mappings or copies (`ConfirmDelete`'s `then`,
+  `armedDeleteText`, `copiesStopFollowing`); D-47's dialog has the row `copiesImpactRow`. **A later command that writes
+  an attribute's type or Personal data:** pass its write set through `followOriginals`.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a

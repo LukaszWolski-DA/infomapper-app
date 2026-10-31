@@ -45,6 +45,9 @@ test("S9-06: no length rule, and another project's name is fine", async ({ page 
   await name.fill(long);
   await name.press("Enter");
   await expect.poll(async () => (await loadProject()).name).toBe(long);
+  // the save's refresh replaces the field (keyed by its stored value): the breadcrumbs show the long name in the same
+  // render, so the second name is typed into the new field, not into the one the refresh removes
+  await expect(page.getByTestId("nav-breadcrumbs")).toContainText(long);
   await expect(name).toHaveValue(long);
   await name.fill("Order management");
   await name.press("Enter");

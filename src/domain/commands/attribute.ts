@@ -1,17 +1,19 @@
 // Attribute commands: “Add attribute” in the entity panel, edit in the attribute panel, delete with its mappings;
-// slice 1b: a new attribute from a column dropped on an entity's header, and the attribute order (D-36).
+// slice 1b: a new attribute from a column dropped on an entity's header, and the attribute order (D-36); slice 10c
+// (D-63): paste a copy of an attribute, its followed fields read-only while it is a copy, and “Stop following”.
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { indexOf } from "../model/classifications";
+import { attributePath, changesFollowed, COPIED_GONE, followOriginals, FOLLOWS_LOST_REFUSAL, FOLLOWS_REFUSAL } from "../model/copies";
 import { plainTextPair } from "../model/plain-text";
 import { sanitizeRich } from "../model/rich-text";
 import { attributeNamedAfter } from "../model/mapping-choice";
 import { logicalTypeOf } from "../model/type-check";
 import type { WorkspaceAccess } from "../permissions";
-import { LOGICAL_TYPES, type Attribute, type AttributeType, type Classification, type ClassificationLink, type Entity, type LabelLink, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
+import { LOGICAL_TYPES, type Attribute, type AttributeType, type Classification, type ClassificationLink, type Entity, type LabelLink, type LostOriginal, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
 import { linksOnItems, softDeleteLinks } from "./label";
 import { softDeleteRequirementLinks } from "./requirement";
@@ -116,6 +118,7 @@ export function addAttribute(
     is_nullable: true,
     definition_html: null,
     definition_text: null,
+    copied_from_attribute_id: null,
   };
   return done(ctx, access, { attributeId: attribute.id }, [{ kind: "insert", table: "attribute", row: attribute }]);
 }
@@ -134,6 +137,8 @@ const updateAttributeInput = z
     isPii: z.boolean().optional(),
     isNullable: z.boolean().optional(),
     definition: richTextSchema.optional(),
+    /** Detaches a copy from its original, live or deleted (slice 10c, item 10). */
+    stopFollowing: z.literal(true).optional(),
   })
   .strict();
 export type UpdateAttributeInput = z.input<typeof updateAttributeInput>;
@@ -146,11 +151,25 @@ const FLAGS = [
   ["isNullable", "is_nullable"],
 ] as const;
 
-/** Name, type with parameters, flags (PK, FK, BK, PII, nullable) and definition. */
+export interface UpdateAttributeState {
+  attribute: Attribute | null;
+  /** The workspace's live attributes: the copies a change of a followed field reaches (slice 10c). */
+  attributes?: readonly Attribute[];
+  /** The workspace's live entities and the deleted originals of live copies: the names in a refusal (F5). */
+  entities?: readonly Entity[];
+  lostOriginals?: readonly LostOriginal[];
+}
+
+/**
+ * Name, type with parameters, flags (PK, FK, BK, PII, nullable) and definition. Slice 10c: a change of a followed field
+ * (type, parameters, Personal data) reaches every live copy below the attribute in the same change group
+ * (`followOriginals`); a copy's own followed fields are refused while it has a link, live original or deleted (F2, F5);
+ * `stopFollowing` clears the link.
+ */
 export function updateAttribute(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: { attribute: Attribute | null },
+  state: UpdateAttributeState,
   input: unknown,
 ): CommandResult<{ attribute: Attribute }> {
   const parsed = begin(access, "model.edit", updateAttributeInput, input);
@@ -177,10 +196,85 @@ export function updateAttribute(
     const { html, text } = sanitizeRich(data.definition);
     if (html !== before.definition_html) Object.assign(patch, { definition_html: html, definition_text: text });
   }
+  if (data.stopFollowing && before.copied_from_attribute_id !== null) patch.copied_from_attribute_id = null;
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
+  const link = patch.copied_from_attribute_id === undefined ? before.copied_from_attribute_id : null;
+  if (link !== null && changesFollowed(patch)) return fail(followsRefusal(state, link));
 
   const row = nextVersion(ctx, before, patch);
-  return done(ctx, access, { attribute: row }, [{ kind: "update", table: "attribute", before, row }]);
+  const followed = followOriginals(ctx, state.attributes ?? [before], [{ kind: "update", table: "attribute", before, row }]);
+  const result = done(ctx, access, { attribute: row }, followed.writes);
+  // the working context labels the attribute changed, not the copies that follow it (F3)
+  if (result.ok && followed.followers.length) result.writeSet.followers = followed.followers;
+  return result;
+}
+
+/** The refusal of a followed field on a copy: its original named, live or deleted (F5). */
+function followsRefusal(state: UpdateAttributeState, originalId: Uuid): DomainError {
+  const live = state.attributes?.some((a) => a.id === originalId && a.deleted_at === null);
+  const path = attributePath(originalId, state.attributes ?? [], state.entities ?? [], state.lostOriginals) ?? "its original";
+  return domainError("invalid", live ? FOLLOWS_REFUSAL(path) : FOLLOWS_LOST_REFUSAL(path));
+}
+
+// ---- paste a copy (slice 10c, D-63) ----
+
+const pasteInput = z.object({ entityId: uuidSchema, attributeId: uuidSchema }).strict();
+export type PasteAttributeInput = z.input<typeof pasteInput>;
+
+export interface PasteAttributeState {
+  /** The entity it goes into. */
+  entity: Entity | null;
+  /** The attribute that was copied; null or deleted when it is gone. */
+  original: Attribute | null;
+  /** The workspace's live attributes. */
+  attributes: readonly Attribute[];
+}
+
+/**
+ * “Paste attribute” (items 4, 5): a new attribute last on the entity, its own entity included, with the original's
+ * name, definition and nullable (then its own), its type, parameters and Personal data (followed), no keys but a foreign
+ * key when the original is a primary key (P8), and a link to the attribute that was copied, a copy itself or not. No
+ * mappings, requirement links or labels (P3). `nameTaken`: the entity already has an attribute of that name, case
+ * ignored (F12), for the toast.
+ */
+export function pasteAttribute(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: PasteAttributeState,
+  input: unknown,
+): CommandResult<{ attributeId: Uuid; nameTaken: boolean }> {
+  const parsed = begin(access, "model.edit", pasteInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { entityId, attributeId } = parsed.data;
+  const workspaceId = access.workspace.id;
+  const entity = found(state.entity, access, entityId, "entity");
+  if (!entity.ok) return fail(entity.error);
+  const original = state.original;
+  if (!isLive(original, workspaceId) || original.id !== attributeId) return fail(domainError("not_found", COPIED_GONE));
+
+  const siblings = state.attributes.filter((a) => isLive(a, workspaceId) && a.entity_id === entityId);
+  const attribute: Attribute = {
+    ...newRowColumns(ctx),
+    workspace_id: workspaceId,
+    entity_id: entityId,
+    name: original.name,
+    sort_order: nextSortOrder(siblings),
+    data_type: original.data_type,
+    custom_type: original.custom_type,
+    type_length: original.type_length,
+    type_precision: original.type_precision,
+    type_scale: original.type_scale,
+    is_primary_key: false,
+    is_foreign_key: original.is_primary_key,
+    is_business_key: false,
+    is_pii: original.is_pii,
+    is_nullable: original.is_nullable,
+    definition_html: original.definition_html,
+    definition_text: original.definition_text,
+    copied_from_attribute_id: original.id,
+  };
+  const nameTaken = siblings.some((a) => a.name.toLowerCase() === original.name.toLowerCase());
+  return done(ctx, access, { attributeId: attribute.id, nameTaken }, [{ kind: "insert", table: "attribute", row: attribute }]);
 }
 
 // ---- delete ----
@@ -295,6 +389,7 @@ export function createAttributeFromColumn(
     is_nullable: column.row.is_nullable,
     definition_html: html,
     definition_text: text,
+    copied_from_attribute_id: null,
   };
   const r = createMapping(ctx, access, { attribute, column: column.row, mappings: [], mappingInputs: [] }, { attributeId: attribute.id, sourceColumnId });
   if (!r.ok) return r;

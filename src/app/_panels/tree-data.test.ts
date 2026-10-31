@@ -32,6 +32,7 @@ const model: WorkspaceModel = {
   sourceRelationshipColumns: [],
   classifications: [],
   classificationLinks: [],
+  lostOriginals: [],
   mappingInputs: [],
 };
 const items = [

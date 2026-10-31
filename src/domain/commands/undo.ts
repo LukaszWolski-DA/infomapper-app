@@ -19,10 +19,11 @@
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
+import { followOriginals } from "../model/copies";
 import { keyTakenMessage, requirementKey, restoreKeyTakenMessage } from "../model/requirements";
 import type { Uuid } from "../ids";
 import { checkPermission, type WorkspaceAccess, type WorkspaceAction } from "../permissions";
-import { LINK_TABLES, type ChangeEvent, type LinkTable, type RowImage, type WritableRows } from "../types";
+import { LINK_TABLES, type Attribute, type ChangeEvent, type LinkTable, type RowImage, type WritableRows } from "../types";
 
 export const UNDO_REFUSED_MESSAGE = "This can't be undone because it was changed afterwards.";
 export const REDO_REFUSED_MESSAGE = "This can't be redone because it was changed afterwards.";
@@ -71,6 +72,7 @@ type AnyRow = RowImage;
 const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, UndoableTable])[]>> = {
   project_canvas: [["project_id", "project"], ["canvas_id", "canvas"]],
   entity: [["concept_id", "concept"]],
+  // not `copied_from_attribute_id` (slice 10c, F9): a copy keeps a deleted original as its lost reference
   attribute: [["entity_id", "entity"]],
   relationship: [["from_entity_id", "entity"], ["to_entity_id", "entity"]],
   source_table: [["source_system_id", "source_system"]],
@@ -266,7 +268,10 @@ export function revertChangeGroup(
 
     if (!current || !e.after_image || !unchangedSince(table, current, e.after_image)) return fail(refused());
     const base = e.before_image ?? { ...current, deleted_at: ctx.now };
-    const row: AnyRow = { ...structuredClone(base), version: (current.version as number) + 1, updated_at: ctx.now, updated_by: ctx.actorId };
+    // a column added to the table after the step was recorded is absent from the image: written as null, never left out
+    // of the row (slice 10c, F10)
+    const added = Object.fromEntries(Object.keys(current).filter((k) => !(k in base)).map((k) => [k, null]));
+    const row: AnyRow = { ...added, ...structuredClone(base), version: (current.version as number) + 1, updated_at: ctx.now, updated_by: ctx.actorId };
     if (table === "canvas") row.look = structuredClone(current.look);
     writes.push({ kind: "update", table, before: current, row } as unknown as Write);
     rows.set(key, row);
@@ -275,7 +280,11 @@ export function revertChangeGroup(
   if (!consistent(after, touched)) return fail(refused());
   const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched);
   if (keyClash) return fail(keyClash);
-  const writeSet = buildWriteSet(ctx, workspaceId, writes);
+  // copies stay in step with their originals (slice 10c, F1): an undo or redo of a followed field, a paste or a
+  // “Stop following” writes the copies that differ, in the same group; an original brought back writes none, as its
+  // copies kept its values
+  const followed = followOriginals(ctx, (state.rows.attribute as readonly Attribute[]).filter((a) => a.workspace_id === workspaceId), writes);
+  const writeSet = buildWriteSet(ctx, workspaceId, followed.writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
 }
 

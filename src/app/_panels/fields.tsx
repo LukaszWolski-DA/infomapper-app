@@ -237,7 +237,13 @@ export function GroupedSelect({
  * columns; other deletes go at once with Undo in the toast): the first click turns it into
  * “Click again to delete”, with what goes along; it turns back after a few seconds or when the focus leaves.
  */
-export function ConfirmDelete({ label, also, onConfirm, testId }: { label: string; also?: string; onConfirm: () => void; testId?: string }) {
+/**
+ * The second click's text of a delete (slice 1b; slice 10c, F7): "Click again to delete", ", with {also}" for what goes
+ * with it, "; {then}" for what it changes elsewhere (an attribute's copies).
+ */
+export const armedDeleteText = (also?: string, then?: string): string => `Click again to delete${also ? `, with ${also}` : ""}${then ? `; ${then}` : ""}`;
+
+export function ConfirmDelete({ label, also, then, onConfirm, testId }: { label: string; also?: string; then?: string; onConfirm: () => void; testId?: string }) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
@@ -247,7 +253,8 @@ export function ConfirmDelete({ label, also, onConfirm, testId }: { label: strin
   return (
     <button
       type="button"
-      className={`${dangerClass} ${armed ? "border-im-warn bg-im-warn-soft" : ""}`}
+      // armed, the text may name an attribute's copies (slice 10c, F7): the button grows to hold it
+      className={armed ? `${dangerClass.replace("h-8", "min-h-8 py-1.5 text-left")} border-im-warn bg-im-warn-soft` : dangerClass}
       data-testid={testId}
       data-armed={armed || undefined}
       onBlur={() => setArmed(false)}
@@ -259,7 +266,7 @@ export function ConfirmDelete({ label, also, onConfirm, testId }: { label: strin
         }
       }}
     >
-      {armed ? `Click again to delete${also ? `, with ${also}` : ""}` : label}
+      {armed ? armedDeleteText(also, then) : label}
     </button>
   );
 }

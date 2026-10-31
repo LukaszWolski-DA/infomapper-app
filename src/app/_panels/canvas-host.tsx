@@ -18,10 +18,14 @@
 //   “Collapse into one block” or “Expand”; a collapsed frame offers no fit and “Select its cards” is disabled.
 // - Notes (slice 3a): “Add a note here”, “Add a note to this”, “Add a note to this frame”, and a note's own toolbox
 //   (Edit text, Mark as resolved / Reopen, Colour, Unpin, Delete note), for editors and reviewers (`canNote`).
+// - Slice 10c (D-63): “Copy” in an attribute row's menu puts it in the page's clipboard (`attribute-clipboard.ts`);
+//   “Paste attribute “…”” in an entity card header's menu pastes a copy and opens its panel with the name selected. An
+//   attribute's delete asks for a second click when it has mappings or copies, naming the copies.
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
-import { createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, swapRelationshipAction } from "@/app/_actions/model";
+import { createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, pasteAttributeAction, swapRelationshipAction } from "@/app/_actions/model";
+import { attributeClipboard, useClippedAttribute } from "@/app/_components/attribute-clipboard";
 import { useAction } from "@/app/_components/use-action";
 import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
 import { newCardHeight } from "@/canvas/geometry";
@@ -31,11 +35,14 @@ import { isCardKey, isReqKey } from "@/canvas/selection";
 import { focusOn } from "@/canvas/fade";
 import { toggleFocus } from "@/canvas/Focus";
 import type { Uuid } from "@/domain/ids";
+import { copiesStopFollowing } from "@/domain/model/copies";
+import { attributeCopiesImpact } from "@/domain/model/impact";
 import { NOTE_COLORS, type MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
-import { STATUS_LABEL } from "./attribute-panel";
+import { attributeDeleted, STATUS_LABEL } from "./attribute-panel";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
 import { useMapColumn } from "./map-column";
+import { armedDeleteText } from "./fields";
 import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, columnLabel, fedEntities, feedingSourceCards, feedingSources, inputsLabel, type ModelIndex } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -106,6 +113,13 @@ export function useCanvasHost({
   const cardOf = useCallback((targetId: Uuid) => cards.find((c) => c.targetId === targetId)?.id ?? null, [cards]);
   const columns = useMapColumn({ ix, workspaceId, editable, cardOf });
   const moveAttribute = useMoveAttribute(ix, workspaceId);
+  // the copied attribute (slice 10c): only one of this workspace and still in its model is offered for pasting
+  const clippedId = useClippedAttribute(workspaceId);
+  const clipped = clippedId ? ix.attribute.get(clippedId) : undefined;
+  useEffect(() => {
+    const held = attributeClipboard.get();
+    if (held && held.workspaceId !== workspaceId) attributeClipboard.set(null);
+  }, [workspaceId]);
 
   const createEntityAt = useCallback(
     async (at: { x: number; y: number }, name?: string) => {
@@ -181,6 +195,31 @@ export function useCanvasHost({
     [editable, run, workspaceId, ui, openDetails],
   );
 
+  /**
+   * “Paste attribute” (slice 10c, item 4): a copy of the clipboard's attribute, last on the card's entity. It leads to the
+   * new attribute's name, so a hidden details panel opens (D-54), as for “Relate to itself”. A refusal empties the
+   * clipboard: the attribute is gone, or the paste cannot be made here.
+   */
+  const pasteInto = useCallback(
+    async (card: HostCard, attributeId: Uuid) => {
+      if (!editable || card.kind !== "ent") return;
+      const name = ix.attribute.get(attributeId)?.name ?? "";
+      const entity = ix.entity.get(card.targetId)?.name ?? "";
+      const result = await run(
+        () => pasteAttributeAction(workspaceId, { entityId: card.targetId, attributeId }),
+        (v) => (v.nameTaken ? `Pasted “${name}” into ${entity}, which already has an attribute of that name.` : `Pasted “${name}” into ${entity}.`),
+      );
+      if (!result.ok) {
+        attributeClipboard.set(null);
+        return;
+      }
+      ui.select({ t: "row", cardId: card.id, id: result.value.attributeId });
+      openDetails();
+      panels.setNameFocus(result.value.attributeId);
+    },
+    [editable, ix, run, workspaceId, ui, openDetails, panels],
+  );
+
   /** Deletes a mapping or a relationship at once; the toast offers Undo (slice 1b). */
   const deleteLine = useCallback(
     async (line: { t: "map" | "rel"; id: Uuid }) => {
@@ -254,6 +293,7 @@ export function useCanvasHost({
         },
       });
       items.push({ label: "Relate to itself", act: () => void relateToItself(card) });
+      if (clipped) items.push({ label: `Paste attribute “${clipped.name}”`, act: () => void pasteInto(card, clipped.id) });
     }
     if (editable) {
       items.push({
@@ -532,18 +572,26 @@ export function useCanvasHost({
           items.push({ label: "Move to the bottom", kbd: "Ctrl Shift ↓", disabled: pos >= last, act: move("bottom") });
           items.push({ sep: true });
           items.push({ label: "Map from a column…", act: () => focusDetails("f-addc") });
+          items.push({
+            label: "Copy",
+            act: () => {
+              attributeClipboard.set({ workspaceId, attributeId: a.id });
+              toast(`Copied “${a.name}”. Paste it with “Paste attribute” in an entity card's menu.`);
+            },
+          });
           items.push({ sep: true });
-          // the same confirmation as in the attribute panel: with mappings it asks for a second click
+          // the same confirmation as in the attribute panel: with mappings or copies it asks for a second click (F7)
           const n = (ix.mappingsOf.get(a.id) ?? []).length;
+          const copies = attributeCopiesImpact(ix.model.attributes, ix.model.entities, a.id).map((c) => c.label);
           items.push({
             label: "Delete attribute",
             danger: true,
-            ...(n ? { confirm: `Click again to delete, with ${n} mapping${n > 1 ? "s" : ""}` } : {}),
+            ...(n || copies.length ? { confirm: armedDeleteText(n ? `${n} mapping${n > 1 ? "s" : ""}` : undefined, copies.length ? copiesStopFollowing(copies) : undefined) } : {}),
             act: () =>
               void saveRow(
                 a,
                 (v) => deleteAttributeAction(workspaceId, { attributeId: a.id, expectedVersion: v }),
-                `Attribute deleted${n ? ` together with ${n} mapping${n > 1 ? "s" : ""}` : ""}`,
+                attributeDeleted(n, copies.length),
                 { undoable: true, deletes: true },
               ).then((r) => {
                 if (r.ok) ui.select(null);

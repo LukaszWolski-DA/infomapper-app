@@ -8,7 +8,7 @@ import { UNDOABLE_TABLES, type WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
 import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-history";
-import type { ProjectCanvas } from "@/domain/types";
+import type { LostOriginal, ProjectCanvas } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
 import { assertNotProduction, readDbCached, writeDb } from "./file";
 import { findViolation, keyOf, rowsOf, type AnyRow, type DevDb, type DevTable, type IntegrityViolation } from "./schema";
@@ -42,6 +42,26 @@ export function createLocalDataStore(file: string): DataStore {
     return db.project_canvas.filter(
       (l) => l.workspace_id === workspaceId && projects.has(l.project_id) && canvases.has(l.canvas_id),
     );
+  };
+
+  /**
+   * The deleted originals that live copies point to, with their entity's name, deleted too or not (slice 10c, F6):
+   * what a copy's panel names. One pass over the workspace's attributes.
+   */
+  const lostOriginals = (db: Readonly<DevDb>, workspaceId: Uuid): LostOriginal[] => {
+    const attributes = db.attribute.filter((a) => a.workspace_id === workspaceId);
+    const byId = new Map(attributes.map((a) => [a.id, a]));
+    const wanted = new Set<Uuid>();
+    for (const a of attributes) {
+      if (a.deleted_at !== null || a.copied_from_attribute_id === null) continue;
+      if (byId.get(a.copied_from_attribute_id)?.deleted_at !== null) wanted.add(a.copied_from_attribute_id);
+    }
+    if (!wanted.size) return [];
+    const entityName = new Map(db.entity.filter((e) => e.workspace_id === workspaceId).map((e) => [e.id, e.name]));
+    return [...wanted].flatMap((id) => {
+      const a = byId.get(id);
+      return a ? [{ id, name: a.name, entityName: entityName.get(a.entity_id) ?? "?" }] : [];
+    });
   };
 
   /** Live label links whose label and item are live too (the domain deletes links with their items; this is a guard). */
@@ -165,6 +185,7 @@ export function createLocalDataStore(file: string): DataStore {
           // slice 7c: the list with its removed rows (a removed built-in one can be restored), live links only
           classifications: db.classification.filter((c) => c.workspace_id === workspaceId),
           classificationLinks: of(db.classification_link),
+          lostOriginals: lostOriginals(db, workspaceId),
         };
       },
       listImports: async (workspaceId, sourceSystemId) =>

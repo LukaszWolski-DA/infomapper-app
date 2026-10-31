@@ -94,7 +94,9 @@ only line of defence (AD-23).
 
 **Deleting.** All deletes are soft. When the domain deletes an entity it also soft-deletes its attributes, its
 mappings, their inputs, its relationships and its links, in one change group (D-47). Hard deletes happen only when a
-workspace is deleted after export (AD-09).
+workspace is deleted after export (AD-09). A copy of an attribute keeps its link to a deleted original (slice 10c): the
+link is not a parent in undo's checks, so a copy comes back while its original is deleted and an original goes while
+copies point to it.
 
 ---
 
@@ -235,6 +237,14 @@ again in its serialised write; the database slice does it in the write's transac
 | `is_pii` | boolean | no | personal data |
 | `is_nullable` | boolean | no | |
 | `definition_html`, `definition_text` | text | yes | rich text (D-42) |
+| `copied_from_attribute_id` | uuid | yes | FK `attribute`: the attribute this one was pasted from (slice 10c, D-63); null when not made by paste and after “Stop following”; may point to a soft-deleted attribute (the copy's lost reference) |
+
+**Copies (slice 10c, D-63).** A copy follows its original's `data_type`, `custom_type`, `type_length`,
+`type_precision`, `type_scale` and `is_pii`; everything else is its own from the paste on. The link is set only on a new
+row, to an attribute that exists already, so links never form a loop. Migration
+`20261030160000_attribute_copied_from.sql` adds the column and an index on it. The local data file's format 10 gave
+every attribute the column as null (no change events, no log line); undo writes a column that an older change event's
+image lacks as null.
 
 ### `relationship`
 | Column | Type | Null | Notes |
@@ -575,7 +585,12 @@ because they are business logic or must work on any database:
   (section 3); who may change an organization's password (its owners and admins, not from an archived workspace); the
   form checks (passwords 8 to 200 characters, names up to 200 in slice 8's forms).
 - Mapping input counts (section 6) and type checking.
-- Duplicate-name warnings for entities (B-25); concept deletion moves entities first (D-47).
+- Duplicate-name warnings for entities (B-25); concept deletion moves entities first (D-47). Attribute names need not
+  be unique in an entity and are not warned about (slice 10c, F12).
+- Copies of attributes (slice 10c, D-63): a change of a followed field reaches every live copy below the attribute, copies
+  of copies included, in the same change group, and so does an undo or redo (`followOriginals`); a copy's followed fields
+  are refused while it has a link, its original live or deleted; the walk keeps a visited set although the links cannot
+  loop.
 - Soft-delete cascades and the impact preview before deleting an entity (D-47); a deleted source table takes its
   relationships in both directions with it (slice 7a).
 - Source import (slice 7a): matching, statuses, rename choices, the scope of missing (P4), and when a mapping goes back

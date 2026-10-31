@@ -233,9 +233,10 @@ const changedColumns = (before: object, after: object): string[] =>
  * changed, both entities of a relationship created or changed, the mapping whose inputs changed. Not deletions, not
  * layout, labels, concepts, source tables or columns. An attribute whose only change is its place in the order
  * (`sort_order`, renumbered when another attribute moves) is not labeled unless the action names it as its main
- * target (the attribute moved: Łukasz's answer to Q2). Items deleted by the same action are left out.
+ * target (the attribute moved: Łukasz's answer to Q2). Items deleted by the same action are left out, and so are the
+ * copies that only following wrote (`followers`, slice 10c, F3).
  */
-export function contextTargets(writes: readonly Write[], mainTargets: readonly LabelTarget[] = []): LabelTarget[] {
+export function contextTargets(writes: readonly Write[], mainTargets: readonly LabelTarget[] = [], followers: readonly Uuid[] = []): LabelTarget[] {
   const out = new Map<string, LabelTarget>();
   const add = (kind: LabelTarget["kind"], id: Uuid) => out.set(`${kind}:${id}`, { kind, id });
   const deleted = new Set<string>();
@@ -265,5 +266,6 @@ export function contextTargets(writes: readonly Write[], mainTargets: readonly L
     }
   }
   for (const t of mainTargets) add(t.kind, t.id);
+  for (const id of followers) deleted.add(`attribute:${id}`);
   return [...out.values()].filter((t) => !deleted.has(`${t.kind}:${t.id}`));
 }

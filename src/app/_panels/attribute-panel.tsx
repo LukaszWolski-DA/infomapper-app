@@ -2,7 +2,10 @@
 
 // The attribute panel (prototype insAttr): name, data type with its parameters (AD-27), flags with the business-key
 // suggestion (AD-28), definition (rich text in the editor dialog, slice 4a), where it comes from (one row per mapping, D-49),
-// “Add a source column” to create a mapping, and delete; slice 1b: its position on the entity (D-36).
+// “Add a source column” to create a mapping, and delete; slice 1b: its position on the entity (D-36). Slice 10c (D-63):
+// a copy names its original (“Copied from”, or that it was deleted) with “Stop following”, its type and Personal data
+// read-only; an original lists its copies, saves its type and Personal data with its copies held in the save chain
+// (F4), and asks before a delete that leaves copies without it (F7).
 
 import { useContext, useEffect, useRef } from "react";
 import { createMappingAction } from "@/app/_actions/mapping";
@@ -10,6 +13,8 @@ import { deleteAttributeAction, updateAttributeAction } from "@/app/_actions/mod
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { UpdateAttributeInput } from "@/domain/commands/attribute";
+import { copiesBelow, copiesStopFollowing } from "@/domain/model/copies";
+import { attributeCopiesImpact } from "@/domain/model/impact";
 import { checkMappingTypes } from "@/domain/model/type-check";
 import { LOGICAL_TYPES, type Attribute, type LogicalType } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
@@ -53,6 +58,15 @@ const FLAGS = [
 type Change = Omit<UpdateAttributeInput, "attributeId" | "expectedVersion">;
 type TypeInput = NonNullable<Change["type"]>;
 
+/**
+ * The toast after an attribute's delete: “Attribute deleted”, “… together with 2 mappings”, then “. 2 copies no longer
+ * follow it” (slice 10c, F7).
+ */
+export const attributeDeleted = (mappings: number, copies: number): string =>
+  `Attribute deleted${mappings ? ` together with ${mappings} mapping${mappings > 1 ? "s" : ""}` : ""}${
+    copies ? `. ${copies} ${copies === 1 ? "copy no longer follows" : "copies no longer follow"} it` : ""
+  }`;
+
 /** A number field for a type parameter: empty means none. */
 const toNumber = (v: string): number | null => (v.trim() === "" ? null : Number(v));
 
@@ -60,7 +74,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   const p = usePanel();
   const move = useMoveAttribute(p.ix, p.workspaceId);
   const ui = useContext(CanvasUiCtx);
-  const { run, saveRow } = useAction();
+  const { run, saveRow, saveRows } = useAction();
   const toast = useToast();
   const { nameFocus, setNameFocus } = usePanels();
   const nameRef = useRef<HTMLInputElement>(null);
@@ -69,6 +83,14 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   const mappings = ix.mappingsOf.get(a.id) ?? [];
   const bkColumns = businessKeyHint(ix, a);
   const mappedColumns = new Set(mappings.flatMap((m) => inputColumns(ix, m.id).map((c) => c.id)));
+  // slice 10c: the original it was copied from, live or deleted (F6), and its own copies
+  const originalId = a.copied_from_attribute_id;
+  const original = originalId ? ix.attribute.get(originalId) : undefined;
+  const lost = originalId && !original ? ix.model.lostOriginals.find((o) => o.id === originalId) : undefined;
+  const copies = attributeCopiesImpact(ix.model.attributes, ix.model.entities, a.id);
+  // a copy's type and Personal data follow its original while it has a link, live or deleted (F2)
+  const followEditable = p.editable && !originalId;
+  const follows = original ? attributeLabel(ix, original.id) : null;
 
   useEffect(() => {
     if (nameFocus !== a.id) return;
@@ -78,8 +100,13 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   }, [nameFocus, a.id, setNameFocus]);
 
   const save = (change: Change) => saveRow(a, (v) => updateAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: v, ...change }));
+  // a followed field writes the copies below it too (slice 10c, F4): they are held in the save chain until it answers
+  const saveFollowed = (change: Change) =>
+    saveRows([{ id: a.id, shown: a.version }, ...copiesBelow(ix.model.attributes, a.id).map((c) => ({ id: c.id }))], (versionOf) =>
+      updateAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: versionOf(a.id), ...change }),
+    );
   // only the part that changed (slice 9, F1): a queued Scale save must not send back the precision this render showed
-  const saveType = (patch: TypeInput) => void save({ type: patch });
+  const saveType = (patch: TypeInput) => void saveFollowed({ type: patch });
 
   async function addColumn(columnId: string) {
     const result = await run(() => createMappingAction(p.workspaceId, { attributeId: a.id, sourceColumnId: columnId }));
@@ -91,11 +118,10 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   }
 
   async function remove() {
-    const n = mappings.length;
     const result = await saveRow(
       a,
       (v) => deleteAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: v }),
-      `Attribute deleted${n ? ` together with ${n} mapping${n > 1 ? "s" : ""}` : ""}`,
+      attributeDeleted(mappings.length, copies.length),
       { undoable: true, deletes: true },
     );
     if (result.ok) ui.select(null);
@@ -144,6 +170,28 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         </div>
       </Field>
 
+      {originalId && (
+        <Note testId="note-copied-from">
+          {original ? (
+            <>
+              Copied from{" "}
+              <button type="button" className="font-mono text-xs text-im-logical underline-offset-2 hover:underline" onClick={() => p.goAttribute(original.id)} data-testid="link-copied-from">
+                {attributeLabel(ix, original.id)}
+              </button>
+            </>
+          ) : (
+            <>Copied from {lost ? `${lost.entityName}.${lost.name}` : "an attribute"}, which was deleted.</>
+          )}
+          {p.editable && (
+            <div className="mt-2">
+              <button type="button" className={smallButtonClass} onClick={() => void save({ stopFollowing: true })} data-testid="button-stop-following">
+                Stop following
+              </button>
+            </div>
+          )}
+        </Note>
+      )}
+
       <Field label="Data type" htmlFor="f-at">
         {/* the parameters sit next to the type, and wrap under it when the panel is narrow */}
         <div className="flex flex-wrap gap-2" data-testid="field-attribute-type">
@@ -151,7 +199,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
             key={fieldKey(a.id, "type", a.data_type)}
             id="f-at"
             defaultValue={a.data_type}
-            disabled={!p.editable}
+            disabled={!followEditable}
             className={`${inputClass} min-w-[120px] flex-1 basis-[120px]`}
             data-testid="select-attribute-type"
             onChange={(e) => saveType({ dataType: e.target.value as LogicalType })}
@@ -163,28 +211,38 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
             ))}
           </select>
           {a.data_type === "string" && (
-            <ParamField key={fieldKey(a.id, "length", a.type_length)} label="Length" value={a.type_length} disabled={!p.editable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
+            <ParamField key={fieldKey(a.id, "length", a.type_length)} label="Length" value={a.type_length} disabled={!followEditable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
           )}
           {a.data_type === "decimal" && (
             <div className="flex flex-none gap-2">
-              <ParamField key={fieldKey(a.id, "precision", a.type_precision)} label="Precision" value={a.type_precision} disabled={!p.editable} onSave={(n) => saveType({ precision: n })} testId="input-type-precision" />
-              <ParamField key={fieldKey(a.id, "scale", a.type_scale)} label="Scale" value={a.type_scale} disabled={!p.editable} onSave={(n) => saveType({ scale: n })} testId="input-type-scale" />
+              <ParamField key={fieldKey(a.id, "precision", a.type_precision)} label="Precision" value={a.type_precision} disabled={!followEditable} onSave={(n) => saveType({ precision: n })} testId="input-type-precision" />
+              <ParamField key={fieldKey(a.id, "scale", a.type_scale)} label="Scale" value={a.type_scale} disabled={!followEditable} onSave={(n) => saveType({ scale: n })} testId="input-type-scale" />
             </div>
           )}
         </div>
         {a.data_type === "custom" && (
           <div className="mt-2">
-            <TextField key={fieldKey(a.id, "custom", a.custom_type)} value={a.custom_type ?? ""} readOnly={!p.editable} onSave={(customType) => saveType({ customType })} testId="input-type-custom" mono />
+            <TextField key={fieldKey(a.id, "custom", a.custom_type)} value={a.custom_type ?? ""} readOnly={!followEditable} onSave={(customType) => saveType({ customType })} testId="input-type-custom" mono />
             <div className="mt-1 text-[11.5px] text-im-ink-3">The type’s name, e.g. uuid.</div>
+          </div>
+        )}
+        {/* the type and Personal data are the original's while it is a copy (slice 10c, item 6) */}
+        {follows && (
+          <div className="mt-1.5 text-[11.5px] text-im-ink-3" data-testid="hint-follows">
+            Follows {follows}.
           </div>
         )}
       </Field>
 
       <Field label="Flags">
         <div className="flex flex-wrap gap-1.5" data-testid="flags-attribute">
-          {FLAGS.map(([key, column, label]) => (
-            <Flag key={key} on={a[column]} label={label} disabled={!p.editable} onToggle={() => void save({ [key]: !a[column] })} />
-          ))}
+          {FLAGS.map(([key, column, label]) =>
+            key === "isPii" ? (
+              <Flag key={key} on={a[column]} label={label} disabled={!followEditable} onToggle={() => void saveFollowed({ isPii: !a[column] })} />
+            ) : (
+              <Flag key={key} on={a[column]} label={label} disabled={!p.editable} onToggle={() => void save({ [key]: !a[column] })} />
+            ),
+          )}
         </div>
       </Field>
       {bkColumns.length > 0 && (
@@ -247,13 +305,30 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         )}
       </Fold>
 
+      {copies.length > 0 && (
+        <Fold title="Copies" count={copies.length} testId="fold-attribute-copies">
+          <LongList
+            items={copies}
+            testId="list-attribute-copies"
+            text={(c) => c.label}
+            render={(c) => (
+              <Li key={c.id} onClick={() => p.goAttribute(c.id)} testId="item-attribute-copy">
+                <span className="truncate font-mono text-xs">{c.label}</span>
+              </Li>
+            )}
+          />
+        </Fold>
+      )}
+
       {p.editable && (
         <Actions>
-          {mappings.length ? (
-            // With mappings it still asks (slice 1b, item 13); without, it goes at once with Undo in the toast.
+          {mappings.length || copies.length ? (
+            // With mappings or copies it still asks (slice 1b, item 13; slice 10c, F7); without, it goes at once with Undo
+            // in the toast.
             <ConfirmDelete
               label="Delete attribute"
-              also={`${mappings.length} mapping${mappings.length > 1 ? "s" : ""}`}
+              also={mappings.length ? `${mappings.length} mapping${mappings.length > 1 ? "s" : ""}` : undefined}
+              then={copies.length ? copiesStopFollowing(copies.map((c) => c.label)) : undefined}
               onConfirm={() => void remove()}
               testId="button-delete-attribute"
             />

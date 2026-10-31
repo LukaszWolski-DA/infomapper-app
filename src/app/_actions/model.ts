@@ -2,12 +2,13 @@
 
 // Model writes from the panels (slice 1a): concepts (D-46, D-47), entities with their impact before deleting,
 // attributes, relationships, and source tables and columns; from the canvas (slice 1b): a new attribute from a
-// dropped column, attribute order, a new relationship. Mappings are in mapping.ts.
+// dropped column, attribute order, a new relationship. Mappings are in mapping.ts. Slice 10c: paste a copy of an
+// attribute; a change of a followed field writes the copies too and answers with every version written.
 
 import { revalidatePath } from "next/cache";
 import { getDataStore, type DataStore } from "@/data";
 import type { CommandContext, CommandResult } from "@/domain/changes";
-import { addAttribute, createAttributeFromColumn, deleteAttribute, reorderAttribute, updateAttribute, type UpdateAttributeInput } from "@/domain/commands/attribute";
+import { addAttribute, createAttributeFromColumn, deleteAttribute, pasteAttribute, reorderAttribute, updateAttribute, type PasteAttributeInput, type UpdateAttributeInput } from "@/domain/commands/attribute";
 import { createConcept, deleteConcept, renameConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity, type UpdateEntityInput } from "@/domain/commands/entity";
 import { createRelationship, deleteRelationship, swapRelationship, updateRelationship, type UpdateRelationshipInput } from "@/domain/commands/relationship";
@@ -177,11 +178,29 @@ export async function createAttributeFromColumnAction(
 }
 
 /** Name, type with parameters, flags and definition. */
+/**
+ * Name, type, flags, definition, or “Stop following” (slice 10c). A change of a followed field writes the attribute's
+ * copies too: the answer carries every version written (F4), for the copies held in the browser's save chain.
+ */
 export async function updateAttributeAction(workspaceId: string, input: UpdateAttributeInput): Promise<ActionResult<Saved>> {
-  return modelCommand(workspaceId, (ctx, access, { attributes }) => {
-    const result = updateAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId) }, input);
-    return result.ok ? { ...result, value: { version: result.value.attribute.version } } : result;
-  });
+  return modelCommand(
+    workspaceId,
+    (ctx, access, { attributes, entities, lostOriginals }) => {
+      const result = updateAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), attributes, entities, lostOriginals }, input);
+      return result.ok ? { ...result, value: { version: result.value.attribute.version } } : result;
+    },
+    { versions: true },
+  );
+}
+
+/**
+ * “Paste attribute” (slice 10c, items 4, 5): a copy of the attribute, from its id, last on the entity. `nameTaken`: the
+ * entity has another attribute of that name (F12).
+ */
+export async function pasteAttributeAction(workspaceId: string, input: PasteAttributeInput): Promise<ActionResult<{ attributeId: string; nameTaken: boolean }>> {
+  return modelCommand(workspaceId, (ctx, access, { entities, attributes }) =>
+    pasteAttribute(ctx, access, { entity: byId(entities, input?.entityId), original: byId(attributes, input?.attributeId), attributes }, input),
+  );
 }
 
 /**

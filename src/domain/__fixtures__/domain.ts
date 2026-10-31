@@ -227,6 +227,7 @@ export const attribute = (id: string = ids.email, over: Partial<Attribute> = {})
   is_nullable: id === ids.email,
   definition_html: null,
   definition_text: null,
+  copied_from_attribute_id: null,
   ...over,
 });
 

@@ -75,7 +75,7 @@ describe("the upgrade to format 8 (slice 7c)", () => {
     await writeFile(file, JSON.stringify(format7()), "utf8");
     vi.spyOn(console, "log").mockImplementation(() => {});
     const db = await readDb(file);
-    expect(db.format).toBe(9);
+    expect(db.format).toBe(10);
     for (const ws of db.workspace) {
       const list = db.classification.filter((c) => c.workspace_id === ws.id);
       expect(list.map((c) => [c.code, c.name, c.scope, c.origin])).toEqual(BUILTIN_CLASSIFICATIONS.map((b) => [b.code, b.name, b.scope, b.origin]));

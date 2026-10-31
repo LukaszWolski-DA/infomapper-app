@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 10b's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 10c's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -46,6 +46,11 @@ trace lines (4b-2); showing, hiding and resizing the side panels (5a); the view-
 a missing column's row and mapping line marks (7a); a zoom typed in the top bar (9, D-60).
 
 **Deliberate differences:**
+- **Slice 10c (D-63):** an attribute can be copied and pasted into any entity, its own included (“Copy” in its row's
+  menu, “Paste attribute “…”” in a card header's menu); the copy follows its original's data type and Personal data,
+  read-only in its panel, which names its original and lists an original's copies. The prototype has neither.
+- **Slice 10c:** deleting an attribute that has copies asks for a second click naming them, as one with mappings does
+  since slice 1b; the prototype deletes an attribute at once.
 - **Slice 10b (D-62):** relationships between source tables are drawn on canvases, where the prototype only promised
   it ("Shown later as a grey line…"): a grey line between the table cards, lighter and thinner than a relationship
   between entities, with an arrow at the referenced table and no cardinality marks or label, painted below the other

@@ -1,0 +1,850 @@
+# Slice 10c – acceptance
+
+Status: **manual acceptance passed (Łukasz, 30 October 2026); merged as PR 27, tag `slice-10c`.** Steps 1 to 5 and Łukasz's answers to each are below; the PRD is updated to the answers of step 1.
+
+- Tag `slice-10b` is at `6d1a251`, as A1 says. Branch `slice/10c-copy-attribute` was made from that tag.
+- The PRD is copied unchanged from `~/Downloads/slice-10c-copy-attribute.md` (23,900 bytes, 30 October 2026; the only
+  file with that name). Commit "docs: slice 10c PRD".
+- `.data/dev-db.json` (KB) was not touched. No seed, reset or anything that opens the local file was run.
+
+Step 1 checks every item, P1–P12, D-63, A1–A4 and every criterion against the code, `docs/decisions.md` and the earlier
+slices' acceptance docs. The agreed points (P1–P5, P7, P9, P10) stand; F1–F4 say what they cost in the code.
+
+## Summary
+
+| # | Finding | Proposal |
+| --- | --- | --- |
+| F1 | **Undo and redo can leave a copy out of step** (Q4). `revertChangeGroup` (`src/domain/commands/undo.ts`) writes back only the rows its change group recorded. Five ways it breaks P2: (a) undo of a type change on the original made *before* the copy was pasted; (b) undo of a type change after a new copy was pasted since; (c) redo of a paste after the original's type changed; (d) undo of "Stop following" after the original's type changed; (e) undo of an original's delete after the copy's followed fields were edited (item 9). The PRD assumes that following happens only in `updateAttribute`. | **One rule in one place:** `followOriginals(attributes after the writes, written ids)` in a new `src/domain/model/copies.ts`. After the writes, every live copy below a written attribute gets its original's followed fields, in the same change group. A copy that is already in the write set has that write changed; it is not written twice. `updateAttribute` and `revertChangeGroup` both call it. The copies it adds are rewritten rows, as a renumbered sibling is (no version from the browser). The undo action already returns every written version (`src/app/_actions/undo.ts`, `writtenVersions`). Question 1. |
+| F2 | **Item 9 contradicts itself.** Item 9 makes a copy's followed fields editable while its original is deleted, and then says Undo of the delete makes the copy "follow again with no further write". If the copy was edited meanwhile, the two now differ, and F1 would overwrite the modeller's edit on Undo. | **A copy with a link never edits its followed fields**, whether the original is live or deleted. To edit them, the modeller uses "Stop following". Undo of a delete then writes nothing in the usual case, and nothing is overwritten. Item 9's "become editable" and S10C-05's "with editable type fields" change. Question 2. |
+| F3 | **The working context would label every copy** (D-26). `contextTargets` (`src/domain/model/live.ts`) labels every attribute an action changes, except a change of `sort_order` only. The copies that following writes would be labeled too, and a label brings cards onto live canvases (D-10, D-11). | The copies written by following are left out of `contextTargets`. A list on the write set does this, next to `mainTargets` (`src/domain/changes.ts`), e.g. `followers`. The original is labeled as today. The new attribute of a paste is labeled in an active context, as "Add attribute" is. That is D-26, not copying labels (P3). Question 3. |
+| F4 | **Returned versions alone do not stop a false conflict** (S10C-09, Q4). `rowSaves.answer` (`src/ui/row-saves.ts`) helps only the saves sent *after* the answer. A copy's delete sent while the original's save is still on its way reads the copy's old version and is refused as stale. Slice 10a's `saveRows` solves exactly this with held rows. | A save of a followed field on an original goes through `saveRows`: the original checked, and every live copy below it held (the page knows them from `copied_from_attribute_id`). `updateAttributeAction` (`src/app/_actions/model.ts`) answers with `{ versions: true }`. Saves of other fields (name, definition, keys) stay `saveRow`. |
+| F5 | **The domain must refuse a followed field on a copy, not only the panel.** `updateAttribute` (`src/domain/commands/attribute.ts`) takes `type` and `isPii` from any caller. | `updateAttribute` refuses `type` and `isPii` on an attribute with `copied_from_attribute_id` set (F2: original live or deleted). Text in "New texts". A unit test and S10C-08's direct call. |
+| F6 | **The page cannot name a deleted original.** `store.model.load` sends live rows only (`src/data/ports.ts`: "Every live model row"; `src/data/local/store.ts`). Item 9's "Copied from {entity}.{attribute}, which was deleted." needs the deleted attribute's name and its entity's name, and the entity may be deleted too (D-47). | `model.load` adds a small list `lostOriginals`: `{ id, name, entityName }` for each deleted original that a live copy points to. One pass over attributes and entities, in the local adapter; nothing in the domain. The alternative is a text without names, "Its original was deleted.". Question 4. |
+| F7 | **The app already asks before an attribute delete, with two clicks, not a dialog** (item 8, Q6). In the panel, `ConfirmDelete` (`src/app/_panels/fields.tsx`) shows "Click again to delete, with {also}". In the row's menu, the toolbox item's `confirm` (`src/app/_panels/canvas-host.tsx`) does the same. Both ask when the attribute has mappings (S1B-13). So "without copies the delete stays immediate" is true only without mappings too, and there is no "Delete" and "Cancel" pair anywhere for attributes. | Reuse the two clicks. Ask when the attribute has mappings **or** live copies, and add the copies to the `also` text. The panel's new "Copies" section (item 7) already names them above the button. No new dialog, and nothing changes for an attribute with neither. Question 5. |
+| F8 | **D-47's preview gets one row** (Q6). `entityImpact` (`src/domain/model/impact.ts`) builds the numbers; `DeleteEntityDialog` (`src/app/_panels/delete-entity-dialog.tsx`) draws the rows. `entityImpactAction` loads the live model, which is enough. | `EntityImpact.copies`: the live copies in *other* entities whose originals are among the entity's attributes, by "{entity}.{attribute}". Copies in the same entity go with it and are counted as attributes. The row is shaped like `requirementsImpactRow`: at most five names, then "and n more". |
+| F9 | **The link must not be a parent in undo** (Q5). `PARENTS` (`undo.ts`) makes `consistent()` refuse a live row whose parent is deleted, and a deletion whose row still has live children. With `copied_from_attribute_id` among them, Undo could not bring back a copy whose original is deleted, nor delete an original that has copies. | Leave it out of `PARENTS`. The local adapter's rule is `copied_from_attribute_id: "attribute"` in `RULES.attribute.foreignKeys` (`src/data/local/schema.ts`). `findViolation` checks against every row, deleted ones included, so a lost reference passes, as it does in Postgres. |
+| F10 | **Undoing a change recorded before the new column drops the column from the row.** `revertChangeGroup` writes `e.before_image` as the new row; `applyWrite` (`store.ts`) stores it as it is. KB's whole history predates format 10, so after such an undo an attribute would have no `copied_from_attribute_id` key at all (undefined, not null). `unchangedSince` already reads an absent column as null, but only when comparing. | In `revertChangeGroup`, a column of the current row that the image lacks is written as null. One line and a unit test. It also covers slice 7a's and 7b's added columns, which have the same gap today. |
+| F11 | **Format 10 needs no module of its own** (Q7). The current format is 9 (`DEV_DB_FORMAT`, `schema.ts`). Format 9's step is inline in `upgradeDb` (`src/data/local/file.ts`); `upgrade-8.ts` is the only upgrade module. `readDb` writes the file back only when `was < 9`. | An inline step, like 5 → 6: `for (const a of db.attribute) a.copied_from_attribute_id ??= null`, then format 10. The write-back condition becomes `was < DEV_DB_FORMAT`. No change events, and no log line, since there is nothing to report. The tests go in a new `src/data/local/upgrade-10.test.ts`. Reading an absent field as null instead would put `?? null` into every reader, so the upgrade is simpler. |
+| F12 | **Attribute names need not be unique, and nothing warns** (Q1). The data model sets no rule, the local adapter has no unique index on attribute names, and `duplicateNameWarning` (B-25) is for entities only (`src/domain/commands/entity.ts`). There is one catch: `createAttributeFromColumn` maps a dropped column to an existing attribute with the column's name (`attributeNamedAfter`, case ignored). With two attributes of the same name it picks the first. | The paste keeps the name in every case, with no suffix. The panel opens with the name selected, so the modeller types `manager_id` at once. When the entity already has an attribute of that name (case ignored), the paste's toast says so. No new domain rule. Question 6. |
+| F13 | **The clipboard is a value store in the page** (Q3). A module-level store survives Next.js's client navigation (canvas tabs, the homes) and is empty after a reload, as `rowSaves` is. | `src/app/_components/attribute-clipboard.ts`, a `createValueStore` (`src/canvas/value-store.ts`; `app` → `canvas` is allowed) holding `{ workspaceId, attributeId }` only. Menus read the name and entity from the page's index (`ModelIndex`), so a rename shows. "Paste" shows only in the same workspace and only while the original is in the page's model, so switching workspaces needs no clearing. The paste sends `{ entityId, attributeId }`; the server reads the rest. |
+| F14 | **The paste is a new command.** Nothing today creates an attribute from another attribute. | `pasteAttribute` in `attribute.ts`, with state `{ entity, original, attributes }` and permission `model.edit` (role and archive through `begin`). It refuses an original that is not live in this workspace, and the browser then empties the clipboard. The copy goes last (`nextSortOrder`) with item 5's fields, in one change group. The host selects the new row, opens the details panel (D-54: a menu action that leads to a name to type) and focuses the name with `setNameFocus`, as the entity panel's "Add attribute" does (`entity-panel.tsx`). |
+| F15 | **There is no attribute rule for live canvases** (Q2). D-11 is about adding and removing *cards*, and attributes are added in the entity panel only. On a live canvas, cards and their header menus are editable for editors (`canvas-host.tsx`, `cardItems`). | No special rule: the paste works on a live canvas as "Add attribute" does. On a context card, which shows only relevant rows (`live.relevantRows`, `card-data.ts`), the new row may not show unless the active context labels it. That is today's behaviour for "Add attribute". |
+| F16 | **Stop following fits `updateAttribute`.** | `updateAttribute` gains `stopFollowing: true`, which clears `copied_from_attribute_id`. It needs no new action, and it saves through `saveRow` on the copy. `stopFollowing` with no link is "Nothing to change.". |
+| F17 | **Following cannot loop, and it is linear** (Q4). `copied_from_attribute_id` is set only on insert, pointing to a row that exists already (so it is older). "Stop following" only clears it, and Undo writes back earlier values, so the links form a forest by construction. | `followOriginals` builds a `childrenOf` map once from the attributes `modelCommand` already loads, walks depth-first, and keeps a visited set as a guard anyway. O(attributes) per save; no measurement. |
+| F18 | **The earlier specs do not change** (S10C-12, Q10). The seed gets no copies (A4), so S1B-13 and D-47's specs (`S1A-10`, `S1A-11`, `S1B-07`, `S3A-12`, `S10A-04`, `S10A-11`) see the same pages. Only code that builds `Attribute` rows by hand gets the new field, which typecheck enforces: the seeds (`seed-model.ts`, `seed-large.ts`), `requirement-index-synthetic.ts`, the fixtures (`src/domain/__fixtures__/domain.ts`, `import.ts`), six unit test files and one spec that builds a row (`e2e/slice-07c/S7C-02.spec.ts`, the field only). | S10C-12 reads: "earlier specs pass unchanged in behaviour; code that builds attribute rows gains the column". They run in step 4 as the PRD lists, and none is expected to change. |
+| F19 | **The canvas: as the PRD assumes** (Q8, P12). The row's FK badge exists (`card-data.ts` `fk: a.is_foreign_key`, `CardNode.tsx` `<b>FK</b>`). The key column widens only for a row that is both PK and FK (`dual`), and a copy has PK false. The guard's baseline `.data/measure/s9-14-baseline/slice-08.json` is on disk. | No change. S10C-11 is as written. |
+| F20 | **The page's data grows by one field per attribute** (Q9). The whole `WorkspaceModel` reaches the page. `"copied_from_attribute_id":null` is 31 bytes of JSON per attribute: about 25 KB uncompressed on "Performance test" (about 800 attributes), against rows of about 400 bytes. | No gate. Step 2 reports the canvas page's payload before and after on "Performance test". |
+| F21 | **The plan in `docs/ideas.md` still says "tied to a relationship".** "The plan after slice 10a" describes 10c as "a foreign key tied to a relationship". The entry "Copying an attribute to another entity" asks "copy to" by picking an entity. | Both are updated in the closing (PRD section 10), as P4 and P5 agreed. No conflict with the code. |
+| F22 | **The undo toasts name the change in general words.** `changeLabel` (`src/domain/model/change-label.ts`) gives "Create attribute" for a paste and "Change attribute" for following and for Stop following. | Keep them; no new texts. |
+
+## Q1. Names
+
+- Attribute names are **not unique** in an entity. The data model (`docs/data-model-v2.md`, section 4) and the migration
+  have no rule, the local adapter's `RULES.attribute` has no `unique`, and `addAttribute` gives every new attribute the
+  name `new_attribute`.
+- **No warning.** B-25's `duplicateNameWarning` is for entities only (`createEntity`, `updateEntity`).
+- **Proposal (F12):** the paste keeps the name. A clash (case ignored) adds one clause to the toast, and the panel opens
+  with the name selected. Same entity: "employee_id" becomes a second "employee_id", which the modeller renames to
+  "manager_id" straight away. A "_copy" suffix would be a rename the modeller has to undo in the foreign key case,
+  which is the common one.
+
+## Q2. Menus and rights
+
+- **Both menus are built in `useCanvasHost`** (`src/app/_panels/canvas-host.tsx`): the row's menu in `items()` at
+  `t.kind === "row" && card.kind === "ent"`, and the card header's in `cardItems()`. The menu is drawn by `Toolbox`
+  (`toolbox.tsx`).
+- **Rights:** `editable` comes from the page (owners, admins and modelers, workspace not archived). Today the row's menu
+  offers editors the moves, "Map from a column…" and "Delete attribute", and everyone Focus. Readers and reviewers get
+  only Focus and the headings.
+- **Where the items go:**
+  - "Copy" goes after "Map from a column…", behind `editable`.
+  - "Paste attribute “{attribute}”" goes in `cardItems` for an entity card, behind `editable`, after "Relate to itself".
+  - The server checks again (`begin(access, "model.edit")`: role and archive).
+- **Live canvases:** no attribute rule (F15).
+- **"Copy" in the attribute's panel:** not proposed, as the PRD says. A panel button "Copy" next to "Delete attribute"
+  would be one line if Łukasz wants it later.
+
+## Q3. The clipboard
+
+- **Where it lives:** a value store in the page (F13). There is no "UI store" across pages today; `rowSaves` and
+  `focusOn` are the same kind of module-level state.
+- **Switching workspaces:** nothing to clear. The store holds the workspace id, and the paste item shows only there.
+- **What a paste sends:** `{ entityId, attributeId }`. The server reads the original and its entity.
+- **A deleted original:** the paste item shows only while the original is in the page's model. A delete in another
+  session is refused by the server with item 4's text, and the browser then empties the store.
+
+## Q4. Following
+
+**Every path that can change a followed field** (`data_type`, `custom_type`, `type_length`, `type_precision`,
+`type_scale`, `is_pii`):
+
+| Path | Writes followed fields? | In slice 10c |
+| --- | --- | --- |
+| `updateAttribute` (the panel's type select, Length, Precision, Scale, custom name, the Personal data flag) | yes | on an original: follows (F1); on a copy: refused (F5) |
+| `revertChangeGroup` (undo and redo) | yes, from images | follows (F1) |
+| `pasteAttribute` (new) | on its own new row | copies them once |
+| `addAttribute`, `createAttributeFromColumn` | on new rows only; a name clash maps to the existing attribute without writing it | none |
+| `reorderAttribute` | `sort_order` only | none |
+| `deleteAttribute`, `deleteEntity` | `deleted_at` only | none (the copies keep their link) |
+| Imports, source-change actions (`mapToAttribute` and the others), classifications | never write attributes | none |
+
+- **Where it belongs:** in the domain, as one function (`followOriginals`, F1), called by the two commands that can
+  change a followed field. The action layer stays as it is (AD-23).
+- **Copies of copies:** the walk goes depth-first from each written attribute through `childrenOf` and sets every
+  descendant to its *own* original's values. The written attribute's values therefore reach the grandchildren through
+  the child. The links form a forest (F17); a visited set guards anyway.
+- **The change group and undo:** one group. Undo of it reverts the original and every copy, because they are all in its
+  events. A copy changed in between makes the undo refused ("changed afterwards"), as for any row.
+- **The versions:** `updateAttributeAction` with `{ versions: true }`, and `saveRows` with the copies held (F4). Undo and
+  redo already answer with every written version.
+- **Any other path to a copy's followed field:** none in the code except `updateAttribute`, which refuses it (F5).
+
+## Q5. Deleting
+
+- **Deletes are soft everywhere.**
+  - A `remove` write is typed for link tables only (`RemoveOf<LinkTable>` in `src/domain/changes.ts`).
+  - `applyWrite` (`store.ts`) splices a row only for `remove`.
+  - No purge exists, and AD-09's workspace delete is not built.
+  - `reset-dev-data` and the e2e reseed replace the whole file.
+
+  No path hard-deletes an attribute that a copy points to.
+- **Undo restores an original** from its delete event's before-image (`deleted_at` null). F9 keeps it free of the
+  parent check; F1 brings copies back in step if they differ.
+- **The self FK:**
+  - The migration's column is `copied_from_attribute_id uuid references attribute (id)`, nullable, with no
+    `on delete` clause. Postgres checks a `NO ACTION` FK at the end of the statement, so the later workspace delete can
+    remove all of a workspace's attributes in one statement.
+  - No RLS line, since this is not a new table.
+  - The local adapter gets the rule of F9, and the seed gets nothing.
+
+## Q6. The previews
+
+- **How an attribute is deleted today:** in the panel and in the row's menu, at once with Undo in the toast, or after a
+  second click when it has mappings (S1B-13; F7). Both go through `saveRow` with `deletes: true`.
+- **Item 8:**
+  - The same two clicks, armed also by live copies; the `also` text names the count (F7).
+  - Without mappings and copies, nothing changes.
+  - The success toast adds the copies.
+  - The server needs no change: `deleteAttribute` leaves the copies as they are.
+- **D-47:** `entityImpact` and one row in `DeleteEntityDialog` (F8).
+
+## Q7. The local data file
+
+- **The current format is 9** (`DEV_DB_FORMAT = 9`, `src/data/local/schema.ts`), from slice 8. There is no later one.
+- **The pattern:**
+  - Formats 3 to 7 and 9 are inline steps in `upgradeDb` (`src/data/local/file.ts`); only format 8 has a module
+    (`upgrade-8.ts`), because it writes rows and a report.
+  - Format 9's step is tested in `organization-store.test.ts`.
+- **Upgrade, or read absent as null:** an upgrade (F11). Reading an absent field would put `?? null` into every reader
+  and into the undo images (F10). The format number moves to 10 either way. `readDb`'s write-back condition moves with
+  it, so the upgraded file is written at once, as before.
+- **The backup:** step 2 copies `.data/dev-db.json` to `.data/backups/dev-db-<yyyymmdd-hhmm>.json` and
+  `kb-model-latest.json` before anything opens it (CLAUDE.md, "Łukasz's test model").
+
+## Q8. The canvas
+
+Yes: an attribute row shows an FK badge from `is_foreign_key` (F19). A pasted copy of a primary key shows it, as any row
+with the flag does: one `<b>` inside the row's existing key span, no new element type. The seed has no copies, so the
+guard is expected equal to `slice-08.json`.
+
+## Q9. Other readers of attributes
+
+| Reader | Must know the column? |
+| --- | --- |
+| The attribute panel (`attribute-panel.tsx`) | yes: "Follows…", "Copied from…", "Copies", Stop following, read-only fields |
+| `ModelIndex` (`model-index.ts`) | yes: `copiesOf` (built once per load), for the panel, the menus and F4's held rows |
+| The canvas host's menus (`canvas-host.tsx`) | yes: Copy, Paste, the delete confirmation |
+| `entityImpact` and its dialog | yes (F8) |
+| `revertChangeGroup` | yes (F1, F10); not in `PARENTS` (F9) |
+| `contextTargets` (`live.ts`) | yes (F3) |
+| The local adapter (`schema.ts` RULES, `upgradeDb`, `model.load` for F6) | yes |
+| The schema check (`tests/schema/domain-tables.ts`) | reads the type itself; nothing to add |
+| Seeds, fixtures, `requirement-index-synthetic.ts` | the field only (F18) |
+| The cards (`card-data.ts`), the tree, search (entities and tables only), change labels | no |
+| Imports (`src/domain/import/`), model consistency, the changes to resolve | no: they read attributes for mappings only and never write them |
+| The Data Vault reading (`data-vault-reading.ts`) | no: it reads source tables |
+| Business key suggestions (AD-28, `businessKeyHint`) | no: they read the attribute's mapped columns; a copy has none |
+| Requirement index and coverage | no |
+| Exports, baselines | none exist (inventory: baselines decision only, workspace export not built) |
+
+**The page's data:** one null per attribute (F20).
+
+## Q10. Earlier tests and docs
+
+- **Specs:** none change (F18). Step 4 runs the earlier specs of attribute rows, the attribute and entity panels and the
+  deletes, as the PRD lists: S1B-07, S1B-08, S1B-13, S1B-14, S1A-10, S1A-11, S3A-12, S4A-10, S10A-04, S10A-11.
+- **Unit tests that grow:**
+  - `attribute.test.ts`: paste, following, the refusals, Stop following;
+  - `undo.test.ts`: F1, F9, F10;
+  - `live.test.ts`: F3;
+  - `impact.test.ts`: F8;
+  - `row-saves.test.ts`: F4's held copies, if the helper changes;
+  - the upgrade test.
+- **Docs**, as PRD section 10, plus:
+  - `docs/data-model-v2.md`: section 2's deleting paragraph (the link survives a soft delete) and section 11's rule list;
+  - CLAUDE.md: the clipboard store, `followOriginals`, the held copies and format 10.
+
+## Items, decisions and criteria checked
+
+| Item | Result |
+| --- | --- |
+| 1 Column | Correct. The PRD's FK and nullability are right; F9 and F11 add the adapter's rule and the upgrade. |
+| 2 Format | Format 10 (F11). "No change events, as format 9's" is right. "One log line" was slice 8's; here there is none. |
+| 3 Copy | Correct. The row's menu is in `canvas-host.tsx` (Q2). The clipboard holds ids only (F13); the name comes from the page. |
+| 4 Paste | Correct, with F14 and F15. "When it shows" adds: while the original is in the page's model. |
+| 5 What is copied | Correct. The definition is copied as stored (sanitized already, AD-17). |
+| 6 Following | Needs F1 (undo), F3 (labels), F4 (saveRows), F5 (refusal). "Other fields stay the copy's own" is right. |
+| 7 Panels | Correct; `goAttribute` (`inspector.tsx`) already selects a row or an element, both history places (D-38). The "Copied from" of a deleted original is plain text, as it has no place. |
+| 8 Delete | Two clicks, not Delete and Cancel (F7); D-47's row (F8). |
+| 9 Lost original | Needs F6 (names) and F2 (read-only). |
+| 10 Stop following | `updateAttribute` (F16). "Become editable" holds. |
+| 11 Canvas | Correct (F19). |
+| 12 Unchanged | Correct for relationships, mappings, requirements, imports and Data Vault; the working context changes (F3). |
+| P1–P5, P7, P9, P10 | Agreed; nothing in the code prevents them. P2 costs F1–F5. |
+| P6 | Holds with F6 and F7: the trace is in the panel; the consequences are the two clicks. |
+| P8 | Correct: `is_foreign_key` = the original's `is_primary_key`. |
+| P11 | One column, format 10. Confirmed (A2). |
+| P12 | Confirmed: the guard only. |
+| D-63 | Its "first lists them" becomes the two clicks with the count; "read-only" also while the original is deleted (F2). Text proposed below. |
+| D-01, D-11, D-36, D-38, D-47, D-52, D-54, D-61, D-62 | D-01: a copy's mappings are type-checked after a followed change with no new code. D-11: F15. D-36: last. D-38: Q2 and item 7. D-47: F8. D-52: "Copy" is a row action and "Paste" a card action, as D-52 asks. D-54: F14. D-61: the same-entity paste needs nothing from it. D-62: untouched. |
+| AD-05, AD-09, AD-12, AD-13, AD-23 | `begin(access, "model.edit")`; versions through the chain (F4); one change group per action; the domain writes. |
+| AD-27, AD-28 | All five type parts follow; BK is false on a copy, and with no mappings no BK suggestion shows. |
+| AD-31 | `npm run schema:check` compares column types and nullability only, not FKs (`tests/schema/compare-schema.ts`). The FK is the migration's and the adapter's. |
+| A1 | Confirmed (`6d1a251`). |
+| A2 | Confirmed, with F6's read (no data change). |
+| A3 | Confirmed; step 2 and the closing. |
+| A4 | Confirmed; F18. |
+| S10C-01 | Correct. |
+| S10C-02 | Correct; "(Q1's naming)": the same name, and the toast's clash clause (F12). |
+| S10C-03 | Correct; add "the copy's followed fields cannot be saved by a direct call" (F5). |
+| S10C-04 | Correct. |
+| S10C-05 | Change: "first shows its consequences" → "asks for a second click naming 2 copies; the button disarms after 4 s or on leaving it (no Cancel)"; "with editable type fields" → "its followed fields read-only with Stop following" (F2). |
+| S10C-06 | Correct (F8). |
+| S10C-07 | Correct. |
+| S10C-08 | Correct; add the direct call of F5. |
+| S10C-09 | Correct as a test; it needs F4, not only `answer`. |
+| S10C-10 | Correct; add "an undo of a change recorded before format 10 writes the column as null" (F10). |
+| S10C-11 | Correct. |
+| S10C-12 | "Changed earlier tests: at least S1B-13's…" → none expected (F18). |
+| New (proposed) | S10C-13 **Undo keeps copies in step**: undo of a type change made before a paste, redo of a paste after a type change, undo of Stop following after a type change: every copy shows its original's type (unit tests; one e2e for the first case). S10C-14 **The working context**: with a context on, a followed change labels the original only (unit). |
+
+## Differences between the prototype and the app that the slice touches
+
+The prototype has no copy and paste of attributes, so everything here is new (D-63). The slice touches these places,
+where the app and the prototype already differ or will differ:
+
+- **The row's menu** (prototype `ctxFor`, attribute row) gains "Copy". The app's row menu already differs: Focus, and
+  the moves with their shortcuts.
+- **The card header's menu** gains "Paste attribute “{attribute}”", next to slice 10a's "Relate to itself".
+- **The attribute panel** (prototype `insAttr`) gains "Copied from" or "Copies", read-only followed fields with
+  "Follows {entity}.{attribute}.", and "Stop following".
+- **Deleting an attribute.** The prototype deletes at once. The app has asked since slice 1b when there are mappings,
+  and now also when there are copies.
+- **D-47's dialog** gains a row for copies elsewhere.
+
+## New user-visible texts (proposals)
+
+| Where | Text |
+| --- | --- |
+| Row menu | "Copy" |
+| Toast after Copy | "Copied “{attribute}”. Paste it with “Paste attribute” in an entity card's menu." |
+| Card header menu | "Paste attribute “{attribute}”" |
+| Toast after a paste | "Pasted “{attribute}” into {entity}. Type its name now." With a clash (F12): "Pasted “{attribute}” into {entity}, which has another attribute of that name. Type its name now." |
+| Paste refused | "The copied attribute no longer exists." |
+| Followed field refused (F5) | "This follows {entity}.{attribute}. Change it there, or stop following first." |
+| Panel, beside the type and Personal data | "Follows {entity}.{attribute}." |
+| Panel, a copy | "Copied from {entity}.{attribute}" (a link) |
+| Panel, a lost original | "Copied from {entity}.{attribute}, which was deleted." (F6; without names: "Its original was deleted.") |
+| Panel, an original | section "Copies" with "{entity}.{attribute}" rows |
+| Panel button | "Stop following" |
+| Toast after Stop following | none (a field save) |
+| Delete, armed (panel) | "Click again to delete, with 2 mappings; 2 copies stop following it" (the "with…" part only when there are mappings; one copy: "1 copy stops following it") |
+| Delete, armed (row menu) | the same text in the item's `confirm` |
+| Toast after the delete | "Attribute deleted together with 2 mappings. 2 copies no longer follow it." (each part only when it applies) |
+| D-47 dialog row | "2 copies" — "lose their original: Order.customer_id, Invoice.customer_id" (one: "1 copy" — "loses its original: …"; more than five: "and n more"; none: no row) |
+| D-63 | "An attribute can be copied to any entity, its own included: “Copy” in its row's menu, then “Paste attribute” in an entity card header's menu, one attribute at a time, by owners, admins and modelers in a workspace that is not archived. The copy is a full attribute of its entity. It starts with the original's name, definition and nullable, which are then its own, and gets no mappings, requirement links or labels. A copy of a primary key is flagged as a foreign key; nothing ties a copy to a relationship. The copy follows its original's data type with its parameters and Personal data, which are read-only in its panel while it is a copy; a change of them on the original, or an undo or redo, reaches every copy and their copies in the same step. Deleting an original that has copies asks for a second click naming how many copies stop following it; the copies stay, and each copy's panel says its original was deleted until Undo brings it back. “Stop following” detaches a copy." |
+
+## Questions for Łukasz
+
+1. **F1:** may undo and redo write the copies too, so that a copy always shows its original's type? This is
+   recommended. The alternative is to refuse such an undo, which would refuse many ordinary undos.
+2. **F2:** should a copy's followed fields stay read-only while its original is deleted, with "Stop following" to edit
+   them? This is recommended. The alternative is the PRD's "become editable", where Undo of the delete then overwrites
+   the edit.
+3. **F3:** should copies written by following be left unlabeled by the working context, so that only the original is
+   labeled? This is recommended.
+4. **F6:** should the copy's panel name a deleted original, through a small list the page loads? This is recommended.
+   The alternative is "Its original was deleted." without names.
+5. **F7:** should an attribute delete ask with the existing two clicks (count of copies in the text) instead of a Delete
+   and Cancel pair? This is recommended.
+6. **F12:** should a paste keep the name, adding a clause to the toast when it clashes? This is recommended. The
+   alternative is a "_copy" suffix.
+7. **F10:** may `revertChangeGroup` write a column that an old image lacks as null? This is a small change in undo that
+   all of KB's history needs.
+8. Do you approve the new criteria S10C-13 and S10C-14, the changed S10C-05 and S10C-12, and the texts above?
+
+## Łukasz's answers (30 October 2026)
+
+- **F1: yes.** Undo and redo write the copies too, through `followOriginals` in `src/domain/model/copies.ts`, called by
+  `updateAttribute` and `revertChangeGroup`, in the same change group. The visited set stays.
+- **F2: yes.** A copy with a link keeps its followed fields read-only, whether its original is live or deleted. Only
+  "Stop following" makes them editable. Item 9 and D-63 are corrected (PRD).
+- **F3: yes.** Copies written by following are left out of the working context; only the original is labeled.
+- **F4: accepted.** A followed-field save on an original goes through `saveRows`, with its copies as held rows.
+- **F5, F8, F9, F11, F18: accepted.**
+- **F6:** the panel names the deleted original ("Copied from {entity}.{attribute}, which was deleted."), from the small
+  `lostOriginals` list in `model.load`.
+- **F7:** two clicks, the existing pattern, armed also by copies. The second click's text names the copies, not only
+  their count. The exact text and its rule for many copies are below.
+- **F12:** the paste keeps the name. When the target entity already has an attribute with that name, the toast says so.
+  The panel opens with the name selected.
+- **F10: yes.** Undo writes a missing column as null.
+- **S10C-13, S10C-14, the changed S10C-05 and S10C-12:** accepted as proposals (PRD updated).
+- **The new texts:** accepted as proposals. Łukasz approves them finally in step 4, built.
+
+### F7's text (proposal)
+
+The armed button (panel) and the armed menu item (row's menu) read the same:
+
+| Case | Text |
+| --- | --- |
+| Copies only, one | "Click again to delete; this copy stops following it: Order.customer_id" |
+| Copies only, several | "Click again to delete; these copies stop following it: Order.customer_id, Invoice.customer_id" |
+| Mappings and copies | "Click again to delete, with 2 mappings; these copies stop following it: Order.customer_id, Invoice.customer_id" |
+| Mappings only | as today: "Click again to delete, with 2 mappings" |
+
+- **Order:** by entity name, then attribute name, as "{entity}.{attribute}".
+- **Many copies:** the first five are named, then "and {n} more" (n ≥ 1), the rule of D-47's requirements row
+  (`IMPACT_KEYS_SHOWN`, `requirementsImpactRow`). Example: "…: A.x, B.x, C.x, D.x, E.x and 3 more".
+- **The toast after the delete** counts only: "Attribute deleted together with 2 mappings. 2 copies no longer follow
+  it." (one: "1 copy no longer follows it").
+
+## Step 2: data (30 October 2026)
+
+**The backup, before anything opened the local file:**
+- `.data/backups/dev-db-20261030-1554-before-format-10.json`, 1,429,705 bytes, byte-identical to `.data/dev-db.json`
+  (`cmp`; SHA-256 `a81d91a0…`).
+- `.data/backups/kb-model-latest.json` was updated to the same copy.
+- Read from the backup, not from KB's file: format 9, 118 attributes (117 live), 771 change events.
+- Both backups are local only (`.data/` is git-ignored).
+
+**KB is not upgraded** by the build and the runs: `.data/dev-db.json` kept the same SHA-256 through all of them. It was upgraded afterwards, on Łukasz's go (below).
+
+**Built:**
+- **The migration** `supabase/migrations/20261030160000_attribute_copied_from.sql`:
+  - `copied_from_attribute_id uuid references attribute (id)`, nullable, with no `on delete` clause (Q5);
+  - an index `attribute_copied_from_ix`, as every other foreign key of `attribute` has one.
+- **The domain type:** `Attribute.copied_from_attribute_id: Uuid | null` (`src/domain/types.ts`).
+  - Every place that builds an attribute row sets it to null: `addAttribute`, `createAttributeFromColumn`, both seeds,
+    `requirement-index-synthetic.ts`, the two fixtures and `import.test.ts`.
+- **The local adapter's rule:** `copied_from_attribute_id: "attribute"` in `RULES.attribute.foreignKeys`
+  (`src/data/local/schema.ts`). It accepts a deleted original and refuses an unknown id (F9).
+- **Format 10** (`DEV_DB_FORMAT = 10`):
+  - an inline step in `upgradeDb` (`src/data/local/file.ts`): `copied_from_attribute_id ??= null` on every attribute;
+  - no change events and no log line;
+  - format 9's step now ends at 9 and the new step at `DEV_DB_FORMAT`;
+  - `readDb`'s write-back condition is `was < DEV_DB_FORMAT` (F11).
+- **Undo** (`revertChangeGroup`, `src/domain/commands/undo.ts`):
+  - a column of the current row that the image lacks is written as null (F10);
+  - `PARENTS` is unchanged, with a comment saying why the link is not in it (F9).
+
+**Tests:**
+- `src/data/local/upgrade-10.test.ts` (new, 4 tests):
+  - a format-9 file gets the column as null on every attribute;
+  - nothing else changes, every table's count is kept, and there is no change event and no log line;
+  - the file is written back at once;
+  - a format-10 file with a link is read as it is and not written again;
+  - the adapter's FK accepts a deleted original and refuses an unknown id.
+- `undo.test.ts` (3 new tests):
+  - F10 on an undone edit and on a restored delete, with the images an event recorded before format 10 holds. The test
+    fails without the fix (checked).
+  - A copy's recorded link comes back on undo.
+  - F9: a copy comes back while its original is deleted, and undoing an original's creation is allowed while a copy
+    points to it.
+- The current format in the earlier tests' assertions moves from 9 to 10, as slice 8 moved it from 8 to 9:
+  - `organization-store.test.ts`, `requirement-store.test.ts`, `upgrade-8.test.ts`, `working-layer-store.test.ts`;
+  - `e2e/slice-07b/S7B-12.spec.ts` and `e2e/slice-07c/S7C-02.spec.ts`, which read the e2e file's format after an
+    upgrade.
+
+**A correction to F18:** `S7C-02.spec.ts` builds source column rows, not attribute rows, so it needs no new field. It
+changes only its format assertion (above).
+
+**Runs:**
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm test`: 111 files, 1,439 tests, passed.
+- **The AD-31 schema check** passed on a local Postgres 18.3 in the scratchpad, made with
+  `initdb -E UTF8 --locale=C` and deleted afterwards. CI uses 17.
+  - Result: "The schema matches the domain: 33 tables, 440 columns". The new column is `uuid`, nullable, with
+    `FOREIGN KEY (copied_from_attribute_id) REFERENCES attribute(id)`.
+  - A cluster in the Windows default encoding (WIN1252) cannot apply the earlier migrations (they contain "Ł"), hence
+    `-E UTF8`.
+- **e2e, what the step touched:** `S7B-12` and `S7C-02`, the specs that upgrade an older e2e file. Both passed, 57 s.
+
+**F20's size, measured on a scratch file:** `npm run seed` and `npm run seed:large` into a scratch file, with
+`INFOMAPPER_DEV_DB` set; it was deleted afterwards.
+- The file is created at format 10.
+- "Performance test" has 779 live attributes. Their JSON grows by 24,928 bytes, 32 bytes per attribute: 4.9 % of the
+  attributes' JSON, uncompressed.
+- This is the data, not the page's payload; step 4 can read the page itself if Łukasz wants.
+
+**Not done in this step, as the brief says:**
+- KB's upgrade.
+- `docs/data-model-v2.md` (closing docs, PRD section 10).
+- The commands: paste, following, Stop following (step 3).
+
+### KB's upgrade (Łukasz's go, 30 October 2026)
+
+**How:** through the app's own path. A one-off `tsx` call of `readDb(devDbPath())` (not committed) ran the format 10
+step and `readDb`'s write-back. Nothing edited the file by hand.
+
+| | Before | After |
+| --- | --- | --- |
+| Format | 9 | 10 |
+| Attributes | 118 (117 live) | 118 (117 live) |
+| Change events | 771 | 771 |
+| File size | 1,429,705 bytes | 1,433,482 bytes (+3,777) |
+| Attributes with `copied_from_attribute_id` | 0 | 118, every one null |
+
+- **The checks:**
+  - Every table's row count is the same.
+  - The file equals the backup in every byte of content apart from the format and the new key on each attribute
+    (compared as JSON).
+  - The 3,777 bytes are 118 × 32 bytes for `"copied_from_attribute_id":null,` and one for the format "9" → "10".
+- **No log line**, as expected. Nothing differed from the expectation, so the backup was not restored. It is unchanged
+  (SHA-256 `a81d91a0…`).
+- **The app on KB:**
+  - `npm run dev` on `.data/dev-db.json` (launch configuration `infomapper-dev`).
+  - Signed in through the test users' list as Lukasz_KB.
+  - Opened Kanton Basel's home, "First project" and its canvas LDM.
+  - The canvas showed its 8 cards in the Building frame with their lines, at its remembered view (19 %). The status bar
+    read 49 attributes on the canvas.
+  - The browser console had no errors. The server's log had only `200` answers, no error or warning, and no upgrade
+    line (the file was at format 10 already).
+  - The server was stopped afterwards. KB's file was the same after the session (size and counts; nothing writes on
+    sign-in or reading).
+
+**F20, the size growth:** 32 bytes per attribute, 4.9 % of the attributes' stored data on "Performance test" (above);
+on KB 3,777 bytes, 0.26 % of the file. No measurement is planned.
+
+## Step 3: the domain (30 October 2026)
+
+No interface yet. Commands, rules, two server actions and unit tests.
+
+**The rule in one place: `src/domain/model/copies.ts`.**
+- `FOLLOWED_COLUMNS`: `data_type`, `custom_type`, `type_length`, `type_precision`, `type_scale`, `is_pii`.
+- `followOriginals(ctx, current attributes, writes)`:
+  - It brings in step every live attribute that the writes write, and every live copy below them.
+  - Each takes its own original's followed fields when that original is live after the writes. An original is settled
+    before its copies, so a value reaches copies of copies through the chain.
+  - A copy whose original is deleted keeps its values.
+  - A copy the writes already write gets the fields in that write; it is never written twice. Any other copy gets an
+    update of its own, with its version + 1.
+  - It returns the writes and `followers`: the copies only following wrote.
+  - A visited set and an "in progress" set end any loop (F17); a unit test makes a loop by hand.
+  - It also brings a **written copy** in step with its live original. That covers the redo of a paste and the undo of
+    "Stop following" after the original changed (F1 (c), (d)).
+- `liveCopiesOf` (direct copies: what a delete asks about) and `copiesBelow` (every copy below: the rows a save holds in
+  the browser's chain, F4).
+- Names: `attributePath` (live, or deleted from `lostOriginals`), `pathsOf` (by entity, then attribute), `namedList`
+  (five, then "and n more"), `copiesStopFollowing` (F7's part of the second click).
+
+**Commands** (`src/domain/commands/attribute.ts`):
+- **`pasteAttribute`** (input `{ entityId, attributeId }`; state `{ entity, original, attributes }`):
+  - permission `model.edit`, so role and archive are checked;
+  - one insert, last on the entity, with the fields of item 5;
+  - `is_foreign_key` is the original's `is_primary_key`; the link points to the attribute copied, a copy or not;
+  - the same entity is allowed;
+  - it answers `{ attributeId, nameTaken }` (F12: a live attribute of that name in the entity, case ignored);
+  - a deleted original is refused as `not_found` with "The copied attribute no longer exists.".
+- **`updateAttribute`:**
+  - **Following:** a change of a followed field calls `followOriginals`, so the copies are written in the same change
+    group. The write set's `followers` lists them.
+  - **The refusal (F5):** a patch that would change a followed field is refused while the attribute has a link, whether
+    its original is live or deleted. A type patch that changes nothing is "Nothing to change.", not a refusal.
+  - **`stopFollowing: true`:** clears the link, live original or deleted, in one change group. With no link it is
+    "Nothing to change.".
+  - **The state:** gains `attributes`, `entities` and `lostOriginals`, all optional, so existing callers keep working.
+- **Undo and redo** (`revertChangeGroup`) call `followOriginals` on the workspace's attributes, deleted ones included,
+  after the consistency checks. Undo of an original's delete writes no copy, because the copies kept its values (F2).
+
+**The working context (F3):**
+- `WriteSet.followers` (`src/domain/changes.ts`) lists the copies only following wrote.
+- `contextTargets` (`src/domain/model/live.ts`) leaves them out. Its two callers pass the list:
+  `completeLiveWrites` (`src/domain/commands/live.ts`) and `withLiveCanvases` (`src/app/_lib/run-command.ts`).
+- Undo and redo never label (`revert`), as before.
+
+**Impacts and names:**
+- `attributeCopiesImpact(attributes, entities, id)` (`impact.ts`) lists an attribute's live copies, as
+  "{entity}.{attribute}", for F7's second click. Step 4 reads it from the page's model; no server read is needed.
+- `EntityImpact.copies` (F8) lists the live copies in other entities of the entity's attributes; copies in the entity
+  itself go with it. `entityImpactAction` already passes the entities.
+- `copiesImpactRow` words D-47's row; with no copies there is no row.
+- `WorkspaceModel.lostOriginals` and the `LostOriginal` type (`src/domain/types.ts`) give `{ id, name, entityName }` for
+  each deleted original a live copy points to. The local adapter's `model.load` builds the list in one pass over the
+  workspace's attributes (`lostOriginals` in `src/data/local/store.ts`).
+
+**Server actions** (`src/app/_actions/model.ts`):
+- `pasteAttributeAction(workspaceId, { entityId, attributeId })`.
+- `updateAttributeAction` passes the attributes, entities and lost originals, and answers with `{ versions: true }`, so
+  every written version reaches `rowSaves.answer` (F4). The browser side of F4 (`saveRows` with `copiesBelow` held) is
+  step 4.
+
+**Tests:**
+- `src/domain/model/copies.test.ts` (new, 8 tests):
+  - copies of copies, a deleted copy not written, Personal data;
+  - a copy already in the writes, a written copy pulled in step, a deleted original followed by nothing;
+  - the loop guard, the lists and the texts.
+- `attribute.test.ts` (+11):
+  - paste: a primary key into another entity, a non-key, the same entity with `nameTaken` (case ignored), a copy of a
+    copy;
+  - paste's refusals: a deleted original, an unknown entity, a reviewer, an archived workspace;
+  - following with one change group and every version;
+  - Personal data;
+  - the context labels the original only (F3);
+  - the refusals on a copy and a copy of a copy, its own fields free, a lost copy's refusal;
+  - Stop following: live and lost, then its own copy follows it; nothing to stop; a reviewer refused.
+- `undo.test.ts` (+6, F1, S10C-13):
+  - undo and redo of a type change made before a paste;
+  - undo of a type change after a second paste;
+  - redo of a paste after a type change;
+  - undo of Stop following after a type change;
+  - undo of an original's delete with no write on the copy;
+  - undo of Stop following on a lost copy.
+- `impact.test.ts` (+3): the attribute's copies, the entity's copies elsewhere, D-47's row with five named.
+- `model-store.test.ts` (+2):
+  - `lostOriginals`: one deleted original named; a deleted original whose copy is deleted too is not; none elsewhere;
+  - a paste, a followed type change and its undo through the local adapter.
+- `entity.test.ts`: the expected impact gains `copies: []` (an object compared whole).
+- The test models (9 files) gain `lostOriginals: []`.
+
+**Runs:**
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm test`: 112 files, 1,469 tests, passed.
+- **The earlier specs:** S1B-08, S1B-13, D-47's preview (S1A-10, S10A-11), S3A-12 (deleting an entity) and S10A-04
+  (deletes on the save chain): 19 tests, all passed, in 6 min 24 s.
+- KB's file was not touched: the same size and time as after its upgrade (16:16:51).
+
+### New user-visible texts (for approval)
+
+| Where | Text |
+| --- | --- |
+| Paste refused, the original gone | "The copied attribute no longer exists." |
+| A followed field on a copy | "This attribute follows {entity}.{attribute}. Use “Stop following” to change it." |
+| The same, original deleted | "This attribute was copied from {entity}.{attribute}, which was deleted. Use “Stop following” to change it." |
+| Either, if the original's names are unknown | "{entity}.{attribute}" becomes "its original" |
+| Stop following on an attribute that is no copy | "Nothing to change." (existing text) |
+| The paste's name note (from `nameTaken`, for step 4's toast) | "Pasted “{attribute}” into {entity}, which has another attribute of that name. Type its name now." (without a clash: "Pasted “{attribute}” into {entity}. Type its name now.") |
+| F7's second click, its copies' part | "this copy stops following it: Order.customer_id" / "these copies stop following it: Order.customer_id, Invoice.customer_id", five named, then "and n more" |
+| D-47's row | "1 copy" — "loses its original: …"; "n copies" — "lose their original: …"; five named, then "and n more" |
+| The undo history | unchanged words: a paste is "Create attribute", Stop following and a followed change "Change attribute" (F22) |
+
+**Assumptions:**
+- `updateAttributeAction` answers with versions on every save, not only on followed fields. It costs one small map per
+  answer, and the browser needs no second kind of save.
+- A refusal of a followed field has the code `invalid`. It does not cut the saves waiting behind it (`CUTS`), as a
+  validation refusal never does.
+
+## Łukasz's answers to step 3 (30 October 2026)
+
+- **The texts are approved**, except the paste toast:
+  - "The copied attribute no longer exists.";
+  - "This attribute follows {entity}.{attribute}. Use “Stop following” to change it.";
+  - "This attribute was copied from {entity}.{attribute}, which was deleted. Use “Stop following” to change it.";
+  - "its original" when the names are unknown;
+  - the second click's copies part, five named, then "and n more";
+  - D-47's row.
+- **The paste toast is changed** to "Pasted “{attribute}” into {entity}.", and with a clash to "Pasted “{attribute}” into
+  {entity}, which already has an attribute of that name." The name selected in the panel is invitation enough.
+- **The undo history** keeps "Create attribute" and "Change attribute".
+- **The commit that did not typecheck on its own** was folded into the next one (nothing was pushed). The step's
+  commits are now `db80486` (the code) and `91e98d6` (the docs). Every code commit since the branch's start
+  typechecks on its own (`6845e73`, `172f49b`, `33052f0`, `db80486`: 0 errors each).
+
+## Step 4: the interface (30 October 2026)
+
+**The clipboard** (`src/app/_components/attribute-clipboard.ts`):
+- A value store of the page holding `{ workspaceId, attributeId }` only (F13). It survives Next.js's client navigation
+  between canvases and is empty after a reload.
+- The canvas host empties it when its canvas is of another workspace.
+- The menus read the attribute's name from the page's model, so a rename shows, and offer it only while the attribute
+  is in that model.
+
+**The menus** (`src/app/_panels/canvas-host.tsx`):
+- **"Copy"** in an attribute row's menu, after "Map from a column…", for editors (`editable`: owners, admins and
+  modelers, not archived). Its toast is "Copied “{attribute}”. Paste it with “Paste attribute” in an entity card's menu."
+- **"Paste attribute “{attribute}”"** in an entity card header's menu, after "Relate to itself", while the clipboard
+  holds an attribute of this workspace.
+  - It follows the rules of the other editors' card actions, live canvases included (F15).
+  - On success: the toast as approved, the new row selected, the details panel opened even when hidden (D-54), the name
+    focused and selected (`setNameFocus`, as "Add attribute" does).
+  - A refusal shows the domain's message and empties the clipboard.
+- **"Delete attribute"** in the row's menu asks for a second click when the attribute has mappings or live copies. The
+  text is `armedDeleteText` with `copiesStopFollowing`.
+  - An armed menu item's text now wraps instead of being cut (`toolbox.tsx`), so the names show.
+
+**The attribute panel** (`src/app/_panels/attribute-panel.tsx`):
+- **A copy:** a note above the data type.
+  - Original live: "Copied from {entity}.{attribute}", the name a link that selects the original (`goAttribute`, a
+    history place).
+  - Original deleted: "Copied from {entity}.{attribute}, which was deleted.", from `lostOriginals` (F6).
+  - Both have the button "Stop following", for editors.
+- **The followed fields** (data type, length, precision, scale, custom name, Personal data) are disabled while the
+  attribute has a link, live original or deleted (F2). Under the data type: "Follows {entity}.{attribute}." while the
+  original is live.
+- **An original:** a section "Copies" (folding, with its count) lists its live copies as "{entity}.{attribute}", by
+  entity, then attribute; each selects that attribute.
+- **The save chain (F4):** the type's fields and Personal data save through `saveRows`, the attribute checked and every
+  copy below it held (`copiesBelow`). The other fields stay `saveRow`.
+- **The delete:** `ConfirmDelete` asks when there are mappings or copies, with `also` (mappings) and the new `then`
+  (copies). The toast is `attributeDeleted`: "Attribute deleted together with 2 mappings. 2 copies no longer follow it",
+  each part only when it applies.
+
+**D-47's dialog** (`delete-entity-dialog.tsx`) gets the row from `copiesImpactRow` after the requirements row, when there
+are copies elsewhere.
+
+**Specs** (`e2e/slice-10c/`, one file per criterion that a browser checks):
+
+| Criterion | Spec | What it checks |
+| --- | --- | --- |
+| S10C-01 | `S10C-01.spec.ts` (2 tests) | Copy and Paste in the menus, the toasts, the copy's fields, last, no mappings, requirement links or labels, the name focused and selected, undo and redo; a non-key copy is no foreign key |
+| S10C-02 | `S10C-02.spec.ts` | its own entity (the name note), two more entities, the clipboard over a canvas tab switch, gone after a reload, no item while empty |
+| S10C-03 | `S10C-03.spec.ts` | the type and the length to a copy and a copy of a copy in one change group, one undo for all, Personal data; the copy's panel read-only with "Follows Customer.customer_id.", its name and nullable its own |
+| S10C-04 | `S10C-04.spec.ts` | "Copies" and "Copied from" select each other; Back returns; a copy without a card here |
+| S10C-05 | `S10C-05.spec.ts` (2 tests) | the second click naming both copies, disarming after 4 s with nothing deleted, the delete and its toast, the lost copy's panel read-only with Stop following, Undo (the copy unwritten, version 1); a copy without mappings or copies goes at once with Undo in the toast |
+| S10C-06 | `S10C-06.spec.ts` | D-47's row "1 copy" — "loses its original: Order Line.customer_id"; a copy inside Customer counted as an attribute |
+| S10C-07 | `S10C-07.spec.ts` (2 tests) | Stop following: the link cleared, the fields enabled, the original's list empty; one undo; on a lost copy |
+| S10C-08 | `S10C-08.spec.ts` (2 tests) | a deleted original refused with the text, the clipboard emptied; a reviewer without Copy or Paste, a direct call refused; archived: refused |
+| S10C-09 | `S10C-09.spec.ts` | the length saved, its answer held back 2 s by the test, and the copy deleted from its row meanwhile: both stored, no false conflict |
+| S10C-10 | unit: `upgrade-10.test.ts`, `undo.test.ts` (F10) | step 2 |
+| S10C-11 | the element guard | the closing (step 5) |
+| S10C-12 | CI and the runs below | |
+| S10C-13 | `S10C-13.spec.ts`, and `undo.test.ts` for the other cases | undo of a type change made before a paste brings the copy back |
+| S10C-14 | unit: `attribute.test.ts` ("labels the original…") | step 3 |
+
+**S10C-09 proves F4.** Without the held rows, the copy's delete is sent before the length's answer arrives, so the
+right-click alone was slower than the save. The spec now holds the answer back 2 s with `page.route`; the server has
+already written it.
+- With the copies not held (`saveRows` with the attribute only, a temporary edit): it failed, with the copy not deleted
+  (refused as stale).
+- With them held: 3 of 3 passed.
+
+**Earlier specs that one change touched:** S1B-07 lists the row's menu exactly; it now expects "Copy" after "Map from a
+column…" (a comment says why).
+
+**Runs:**
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm test`: 112 files, 1,469 tests, passed.
+- **The slice's specs:** 14 tests in `e2e/slice-10c/`, passed (2.2 min). Again after the last change to the delete
+  button, with S1B-07 and S1B-13: 16 passed (2 min 42 s).
+- **The earlier specs of what the step touched**, run from 17:09 to 17:26, 110 tests:
+  - all of slice 1b (attribute rows and menus, deletes, a reviewer);
+  - all of slice 3b (the working context and live canvases);
+  - all of slice 9 (saves in panels);
+  - all of slice 10a (the save chain, menus, deletes);
+  - S1A-10, S1A-11, S3A-12, S4A-10.
+
+  109 passed and one failed: S1B-07, for the "Copy" item above. After its update S1B-07 passed.
+- KB's file was not touched (the same size and time as after its upgrade, 16:16:51).
+
+**The screenshots** (`docs/prd/slice-10c-screens/step-4/`, made by `SCREENS=step-4 npx playwright test
+e2e/slice-10c/S10C-screens.spec.ts`; Customer.customer_id pasted into Order Line and Product):
+1. `1-original-with-copies.png`: the original's panel, "Copies" with its two copies.
+2. `2-copy-linked.png`: a copy's panel, "Copied from Customer.customer_id" with Stop following, the type read-only with
+   "Follows Customer.customer_id.".
+3. `3-copy-original-deleted.png`: the same copy after the original's delete, "Copied from Customer.customer_id, which
+   was deleted.".
+4. `4-delete-second-click.png`: the original's delete armed: "Click again to delete, with 1 mapping; these copies stop
+   following it: Order Line.customer_id, Product.customer_id".
+5. `5-entity-preview-copies-row.png`: D-47's dialog for Customer with "2 copies" — "lose their original: Order
+   Line.customer_id, Product.customer_id".
+6. `6-paste-item-in-card-menu.png`: Sales Order's header menu with "Paste attribute “customer_id”" after "Relate to
+   itself". The copy toast still shows at the bottom.
+
+The first screenshots showed the armed button's text running out of the button. `ConfirmDelete` now lets an armed
+button grow to hold its text (`min-h-8`, `fields.tsx`); unarmed it is as before.
+
+### D-63 (final text proposed for approval)
+
+"**D-63** Copying an attribute (slice 10c). An attribute can be copied to any entity, its own included: “Copy” in its
+row's menu, then “Paste attribute “{attribute}”” in an entity card header's menu, one attribute at a time, by owners,
+admins and modelers in a workspace that is not archived. The clipboard is the page's: it stays while switching canvases
+and is empty after a reload or in another workspace. The copy is a full attribute of its entity, last in its order, and
+its panel opens with the name selected. It starts with the original's name, definition and nullable, which are then its
+own, and gets no mappings, requirement links or labels. A copy of a primary key is flagged as a foreign key; nothing
+ties a copy to a relationship (a validator's work, later). The copy follows its original's data type with its
+parameters and Personal data: they are read-only in its panel while it is a copy, also when its original is deleted, and
+a change of them on the original, or an undo or redo, reaches every copy and their copies in the same step. An
+original's panel lists its copies and a copy's panel names its original, each selecting the other. Deleting an original
+that has copies asks for a second click that names them; the copies stay, and each copy's panel says its original was
+deleted until Undo brings it back. “Stop following” detaches a copy, whether its original is live or deleted."
+
+## Łukasz's answers to step 4 (30 October 2026)
+
+- **Step 4 is accepted,** including the two layout fixes of the armed delete and S1B-07's menu list.
+- **D-63 is approved** as quoted. It is in `docs/decisions.md`, accepted on 30 October 2026.
+- **The answer delay of S10C-09:** report how it is done, confirm that it works only under e2e, describe it in
+  CLAUDE.md, and add an idea for slice 10a's four cases guarded by review only.
+
+### How S10C-09 holds an answer back
+
+- **The mechanism.** It is a Playwright route on the test's own page (`page.route`), now the helper `holdAnswer` in
+  `e2e/slice-10c/helpers.ts`.
+  - The route sees the browser's request for the server action whose body has a given text (`"length":20`).
+  - It passes the request to the dev server at once (`route.fetch()`), so the server writes it as usual.
+  - It gives the browser the answer only after 2 s (`route.fulfill`).
+  - Every other request goes on unchanged (`route.continue()`).
+- **Why slice 10a found no way:** it looked for a delay on the server, which would need a switch in the app. This one
+  delays only what the browser receives. That is enough for the save chain, which orders saves by their answers.
+- **Only under e2e.** The route exists only inside a Playwright test, on the page that test opened. No application file
+  reads it, and there is no environment variable, test hook or cookie for it. A normal dev server, a production build
+  and the measurement build have nothing to switch on.
+- **CLAUDE.md** describes it with slice 10c's helpers.
+- **`docs/ideas.md`** has the entry "The e2e answer delay for slice 10a's cases" with the requested text.
+
+## Step 5: the closing (30 October 2026)
+
+**The element guard (S10C-11):**
+- The command: `npm run measure:build`, then `MEASURE=1 MEASURE_BUILD=production
+  ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test
+  e2e/slice-03b/S3B-15-elements.spec.ts`.
+- The result is **equal** in all four views, page totals included:
+
+| View | Page (slice-08 / 10c) | Viewport (slice-08 / 10c) |
+| --- | --- | --- |
+| 30 %, expanded | 5,994 / 5,994 | 4,508 / 4,508 |
+| 100 %, expanded | 20,791 / 20,791 | 19,305 / 19,305 |
+| 30 %, collapsed | 2,861 / 2,861 | 1,465 / 1,465 |
+| 100 %, collapsed | 6,303 / 6,303 | 4,907 / 4,907 |
+
+**Docs in this pull request:**
+- `docs/decisions.md`: D-63.
+- `docs/data-model-v2.md`:
+  - section 4, `attribute.copied_from_attribute_id` and a paragraph on copies: the followed columns, no loops, the
+    migration, format 10 and its upgrade, and undo's null for an absent column;
+  - section 2, deleting keeps the link;
+  - section 11, the rules on following and on attribute names.
+- `docs/inventory-prototype-vs-app.md`: section 8's two differences, with the header and the history line.
+- `docs/ideas.md`:
+  - "Copying an attribute to another entity" done;
+  - "A model validator", PRD section 9 word for word;
+  - "Copies of attributes: what comes later": the row mark, several attributes and Ctrl+C / Ctrl+V, another workspace,
+    copying with mappings;
+  - the answer delay for slice 10a;
+  - the plan: 10c done as copy and paste, not tied to a relationship; next 11.
+- `docs/known-limitations.md`: "Copies of attributes (slice 10c, D-63)", with these entries:
+  - copies made elsewhere since the page loaded are not held;
+  - a pasted attribute on a live canvas's context card;
+  - the page's clipboard;
+  - the lost reference in the panel only;
+  - the undo history's general names.
+- `CLAUDE.md`:
+  - the opening paragraph;
+  - a section "Copies of attributes": the link, format 10, `followOriginals` and `followers`, the refusal and
+    `stopFollowing`, `lostOriginals`, the clipboard, the held copies, the delete's question and D-47's row, and what a
+    later command must do;
+  - slice 10c's e2e helpers, `holdAnswer` included;
+  - the element guard's line and the screenshots command.
+- `README.md`: slice 10c in review, its line in the status, and the link to this file.
+
+**Full e2e run** (from scratch, no dev server running, 17:50 to 19:13): 452 passed, 4 failed, 1 skipped,
+**4,975 s** (slice 10b: 3,977 s for 443 tests; this run has 13 more and ran slower throughout, S0-10 alone 5.6 min). The
+four failures, with their errors kept before the reruns:
+- `S0-10`: "Server did not start within 300 s" (the restarted dev server).
+- `S8-12`: `bar-top` not visible within 15 s after picking a test user.
+- `S9-11`: the zoom field still "41%" 15 s after Escape.
+- `S10C-13`: Undo stayed disabled after the page's refresh (the type change stored, the copy pasted by test data).
+
+Each file on its own, three times, from 19:15: **all passed 3 of 3** (S10C-13 39 to 56 s, S9-11 49 s to 1.4 min, S8-12 47
+to 54 s, S0-10 1.4 min each). The first three are timeouts of a loaded machine. S10C-13 is this slice's spec and failed
+once in the full run only; its trace was lost to the reruns, so its cause is not known.
+
+**CI:** `npm run lint` passed, `npm run typecheck` passed, `npm test` 112 files, 1,469 tests, passed.
+
+**KB's backup:** `.data/backups/dev-db-20261030-1914.json` and `.data/backups/kb-model-latest.json` (1,433,482 bytes,
+the same as `.data/dev-db.json`; local only, git-ignored).
+
+### Before the merge (Łukasz, 30 October 2026)
+
+**GitHub checks on PR 27:** "check" passed (1 min 25 s). "migrations" passed (44 s): Postgres 17.11 applied
+`20261030160000_attribute_copied_from.sql`, and the schema check read "The schema matches the domain: 33 tables, 440
+columns".
+
+**`holdAnswer` (S10C-09):**
+- **Scope.** The route lives on the test's page (its own browser context) and only for S10C-09. It holds one answer at
+  most (`held`), and it sends the request to the server at once (`route.fetch()`), so nothing waits on the server.
+  Every other request goes through with `route.continue()`. Playwright runs one worker, in file order.
+- **Not a cause.** S0-10, S8-12, S9-06 and S9-11 run before S10C-09. S10C-09 passes only after the held answer has been
+  given, because the copy's delete waits for it, so S10C-13 starts after the release.
+- **Finding.** If S10C-09 failed or timed out within the 2 s hold, the page would close, and `route.fulfill` would throw
+  "Target page, context or browser has been closed" inside the handler. Proposed fix: catch it in the helper, or call
+  `page.unrouteAll({ behavior: "ignoreErrors" })` at the test's end. Not built; waiting for Łukasz.
+
+**S10C-13 under load:** run with `--repeat-each`, one worker, traces on.
+- With S10C-09 and S9-11 (10 rounds, 6.2 min): 50 passed.
+- With S0-10 and S10C-09 (8 rounds, 8.8 min): 24 passed.
+
+That is 18 runs of S10C-13 and no failure. The first full run's failure is not reproduced, and its cause is not known.
+The traces are in `.data/s10c13-repro/` and `.data/s10c13-repro2/`.
+
+**Second full e2e run** (from scratch, no dev server running, 00:07 to 01:22): 453 passed, 3 failed, 1 skipped, **4,492 s**
+(first run 4,975 s; slice 10b 3,977 s for 443 tests). Before the start the machine was nearly idle:
+- CPU load 5 to 13 % (one 40 % reading); the only processes using CPU were Claude, dwm, iCloud, WMI and PSExpress;
+- Windows Search running;
+- 2.9 GB of 8 GB RAM free on an i7-8550U;
+- no node process.
+
+Its results are kept in `.data/e2e-10c-close-run2/`.
+- **S8-12** failed at its first sign-in. The trace shows the workspace page answered in **10.9 s**, against about 0.4 s
+  in the same file's earlier sign-ins. The 15 s wait ran out about 1 s before the page could be drawn. The server was
+  slow; the test is not wrong. Alone: 3 of 3 passed.
+- **S9-11** failed at line 91 with "41%", exactly as in the first run. Alone: 3 of 3 passed. The check compares the
+  field after Escape with `fitted`. Two pinches of +200 and −200 can bring the zoom back to `fitted`, which is correct
+  behaviour, so the check is weak.
+- **S9-06** ("no length rule…") failed, and alone it **failed 2 of 3**. The trace shows one POST only (the long name);
+  "Order management" was never sent.
+  - The field is keyed by its stored value (`fieldKey`, `project-heading.tsx`), so it is replaced when the save's
+    refresh arrives.
+  - The test waits for the file (`loadProject`) and then for the old field's typed value. It types the second name
+    into the field that the refresh then replaces, so the Enter saves nothing.
+  - Slice 10c did not change `project-heading.tsx`, `fieldKey`, `use-action.ts` or `row-saves.ts`: a race in slice 9's
+    test.
+  - Proposed fix: wait for the refresh before the second name, for example for the breadcrumbs to show the long name.
+    Not built.
+
+### Łukasz's answers to the second run (30 October 2026), and the fixes
+
+- **`holdAnswer`:** `route.fulfill` is caught. If the test has failed or timed out and its page is closed, nothing is
+  left to answer.
+- **S9-11:** after Escape, the field must show the view's zoom (`viewZoom`, the transform's scale rounded as the field
+  rounds it). It must also differ from the zoom before the pinch made while typing (`pinched`). It is no longer compared
+  with `fitted`, because −200 and +200 can return to it exactly.
+- **S9-06 at tag slice-10b** (the `infomapper-ab-main` worktree, the same Next.js 16.3.8, Playwright 1.63.0 and lock file):
+  - 3 of 3 passed, then 4 of 5 passed in turns with this branch. Round 4 stopped before any test ran: no test result,
+    no error context.
+  - In the same turns this branch passed 5 of 5.
+  - Over all runs: slice-10b had no test failure in 7 runs; this branch failed 3 times in 11 (2 in 3, 1 in 3, 0 in 5).
+  - Slice 10c did not change the field's code (`project-heading.tsx`, `fieldKey`, `use-action.ts`, `row-saves.ts`).
+    The test's race depends on when the save's answer arrives.
+- **A user can hit it.** This is from the code; it was not checked by hand, because the dev server's file is KB.
+  - The name field is keyed by its stored value. Its save's answer (`revalidatePath`, in the same response) replaces
+    the field.
+  - Text typed after clicking back into the field during the round trip is lost with the old field, and so is the
+    focus. The Enter after that saves nothing.
+  - An Enter pressed before the answer arrives saves the second name after the first.
+  - The panels' fields behave the same way (28 fields with `fieldKey`).
+  - Recorded in `docs/known-limitations.md` ("Typing into a field while its save is on its way") and under slice 13 in
+    `docs/ideas.md`.
+- **S9-06 fixed:** before the second name it waits for the breadcrumbs to show the long name, which happens in the same
+  render that replaces the field.
+- **S10C-13:** a line in `docs/known-limitations.md` ("S10C-13 failed once in slice 10c's first closing run").
+- **S8-12:** accepted as a slow server; nothing changed.
+
+**Runs after the fixes**, each file three times on its own:
+- S9-06: 3 of 3 passed.
+- S9-11: 3 of 3 passed.
+- S10C-09: 3 of 3 passed.
+
+CI: lint passed, typecheck passed, `npm test` 112 files, 1,469 tests, passed. No third full run, as only tests changed.

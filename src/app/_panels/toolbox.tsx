@@ -208,7 +208,8 @@ export function Toolbox({ items, at, onClose }: { items: ToolboxItem[]; at: { x:
             onClick={() => (item.confirm && armed !== i ? setArmed(i) : run(item.act))}
           >
             <span className="w-3 flex-none text-im-logical">{item.checked ? "✓" : ""}</span>
-            <span className="min-w-0 flex-1 truncate">{armed === i ? item.confirm : item.label}</span>
+            {/* an armed item's text wraps: it may name what the delete changes (slice 10c, F7) */}
+            <span className={`min-w-0 flex-1 ${armed === i ? "whitespace-normal" : "truncate"}`}>{armed === i ? item.confirm : item.label}</span>
             {item.kbd && <kbd className="flex-none font-sans text-[11px] text-im-ink-3">{item.kbd}</kbd>}
           </button>
         );

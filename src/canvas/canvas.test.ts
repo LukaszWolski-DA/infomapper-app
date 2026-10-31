@@ -38,6 +38,7 @@ const model: WorkspaceModel = {
   // cust_id is a business key, email and first_name personal data (slice 7c: links)
   classifications: builtins(),
   classificationLinks: fixtureLinks(),
+  lostOriginals: [],
   mappingInputs: [mappingInput(), mappingInput("01900000-0000-7000-8000-00000000b002", { mapping_id: firstNameMap.id, source_column_id: ids.colFirstName })],
 };
 const items = [

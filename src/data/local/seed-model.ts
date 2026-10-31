@@ -265,6 +265,7 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
         is_nullable: !has(flags, "PK"),
         definition_html: null,
         definition_text: null,
+        copied_from_attribute_id: null,
       });
     });
   }

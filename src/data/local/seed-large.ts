@@ -191,6 +191,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
           is_nullable: !row.pk,
           definition_html: null,
           definition_text: null,
+          copied_from_attribute_id: null,
         });
       });
     }

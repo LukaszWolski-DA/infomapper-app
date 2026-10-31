@@ -27,14 +27,43 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 
 - **10b: relationships between source tables as lines on the canvas**, reusing the loop for a table that refers to
   itself. **Done in slice 10b** (D-62).
-- **Next: 10c.**
-- **10c: an attribute copied to another entity as a foreign key tied to a relationship.** A data model and local file
-  format change, with a backup of Łukasz's KB model as a step of its own (see "Copying an attribute to another entity").
+- **10c: copying an attribute to another entity.** **Done in slice 10c** (D-63), as copy and paste of one attribute at
+  a time, not tied to a relationship; the copy follows its original's type and Personal data. A data model and local
+  file format change (format 10), with backups of Łukasz's KB model.
+- **Next: 11.**
 - **11: an alias for entities and attributes** (see the entry below).
 - **12: the home pages:** undo and redo there, deleting a project, and the canvas tiles' thumbnails after measuring the
   home's load.
 - **13: one behaviour for a refused save in every field** (F6, above), with the typed value kept on a conflict (the
-  first entry).
+  first entry). Also keep text typed into a field while its save is on its way: the save's answer replaces the field
+  (keyed by its stored value) and the typed text and focus are lost (`docs/known-limitations.md`, slice 10c).
+
+## A model validator (slice 10c, PRD section 9)
+
+**A model validator (slice 10c, PRD section 9).** Copies of attributes are not tied to relationships (slice 10c), so a
+check across the model would report what does not fit:
+- a copy of a primary key in an entity with no relationship to the original's entity;
+- a relationship with no copied key on its "many" side;
+- a copy whose original is deleted ("reference lost");
+- a foreign key flag without a copy;
+- keys copied in the wrong direction (from the "many" side to the "one" side).
+
+The results as a list in a panel, each linking to the place; later a mark on the card rows (an element guard and a
+measurement). The validator reads only; it changes nothing.
+
+## Copies of attributes: what comes later (slice 10c, PRD section 9)
+
+- **A mark on the card row** of a copy whose original was deleted, with the validator (above).
+- **Copying several attributes at once** (a whole composite key), and Ctrl+C / Ctrl+V on a selected attribute row.
+- **Pasting into another workspace.**
+- **Copying with mappings,** as an option.
+
+## The e2e answer delay for slice 10a's cases (slice 10c, step 4)
+
+Use the e2e answer delay (slice 10c) to make the four slice 10a cases guarded by review only (delete from model, delete
+a source table, delete a working label, archive) fail without the save chain. `holdAnswer` (`e2e/slice-10c/helpers.ts`)
+holds a server action's answer back in the browser while the server has written it, so a second save is started before
+the first one's answer arrives.
 
 ## Role names per relationship end (slice 10a, PRD section 9)
 
@@ -410,9 +439,9 @@ change first.
 - **Thumbnails on the project home's canvas tiles.** The prototype draws them (`thumb`); the app has an empty strip
   since slice 0 ("no thumbnails yet"). The Overview's miniature can draw them, but the home would read every canvas's
   layout: measure the home's load first.
-- **Copying an attribute to another entity** ("copy to", picking an entity on the canvas), e.g. a primary or business
-  key that becomes a foreign key elsewhere. Decide: a plain copy, or a foreign key tied to a relationship (with the
-  self-relationship below); what happens to its classifications and mappings; whether the copy follows the original.
+- **Copying an attribute to another entity.** **Done in slice 10c** (D-63): “Copy” and “Paste attribute”, one
+  attribute at a time, not tied to a relationship; the copy follows its original's type and Personal data; mappings,
+  requirement links and labels are not copied. Later steps are in the entries of slice 10c below.
 - **An alias for entities and attributes**, with a switch to show the alias instead of the name on the canvas. A data
   model change (`docs/data-model-v2.md`, the local file's next format), the cards' text fit and the element guard; decide
   whether the import reads an alias.
