@@ -1,4 +1,5 @@
 import { AppShell } from "@/app/_components/app-shell";
+import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { loadProjectView } from "@/app/_lib/project-view";
 import { loadShell } from "@/app/_lib/shell";
 import { projectOpenNotes, projectRequirements, projectStats } from "@/app/_panels/stats";
@@ -31,7 +32,8 @@ function labelContext(model: WorkspaceModel, items: readonly CanvasItem[]): Proj
 
 // Project home (D-29): the project's canvases as tiles; the labels used on them and pinned to the project, and the
 // number and list of their open notes (slice 3a); the requirements whose scope touches its canvases (slice 4a); model
-// consistency (slice 7b, item 25); its name and description, editable (slice 9, D-59).
+// consistency (slice 7b, item 25); its name and description, editable (slice 9, D-59); Undo and Redo, buttons and keys,
+// on the person's history of the workspace (slice 12a, D-65).
 export default async function ProjectHomePage({ params }: PageProps<"/w/[workspaceId]/p/[projectId]">) {
   const { workspaceId, projectId } = await params;
   const shell = await loadShell({ workspaceId, projectId });
@@ -39,7 +41,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   const n = view.canvases.length;
   const store = getDataStore();
   const ws = shell.workspace.id;
-  const [model, items, labels, links, pins, notes, frames, allCanvases, requirements, requirementLinks, sourceChanges] = await Promise.all([
+  const [model, items, labels, links, pins, notes, frames, allCanvases, requirements, requirementLinks, sourceChanges, history] = await Promise.all([
     store.model.load(ws),
     store.canvasItems.list(ws),
     store.labels.list(ws),
@@ -51,6 +53,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
     store.requirements.list(ws),
     store.requirements.listLinks(ws),
     store.model.listChanges(ws),
+    store.undoHistory.get(ws, shell.user.id),
   ]);
   // labels with a live canvas (slice 3b): “Open live canvas” instead of “Open as live canvas”
   const withLive = new Set(allCanvases.filter((c) => c.deleted_at === null && c.live_label_id).map((c) => c.live_label_id!));
@@ -83,7 +86,8 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   }));
 
   return (
-    <AppShell shell={shell} project={{ view, currentCanvasId: null }}>
+    <UndoProvider workspaceId={ws} state={{ canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 }}>
+    <AppShell shell={shell} project={{ view, currentCanvasId: null, tools: <UndoButtons /> }}>
       <div data-testid="page-project-home" className="min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-7">
         <div className="mx-auto max-w-[1180px]">
           <div className="mb-1 text-xs text-im-ink-3">Project</div>
@@ -124,5 +128,6 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
         </div>
       </div>
     </AppShell>
+    </UndoProvider>
   );
 }

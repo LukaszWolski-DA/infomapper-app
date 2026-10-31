@@ -1,6 +1,6 @@
 # Slice 12a – acceptance
 
-Status: **step 2 accepted (Łukasz, 31 October 2026); step 3 (undo on the home pages) in progress.**
+Status: **step 3 (undo on the home pages) done; waiting for Łukasz before step 4.**
 
 - Branch `slice/12a-home-undo-project-delete`, made on 31 October 2026 from `main` at `de2af7f` (the start commit). Tag
   `slice-11` is at `6c231c6`; `main` is one docs-only merge past it (PR 29, the InfoCube idea in `docs/ideas.md`), so
@@ -250,6 +250,71 @@ the project home is now an undo step, undone from a canvas ("Undone: Pin label �
 3. **D-58:** "like a pin (D-29) they are not undo steps" becomes "they are not undo steps". It goes into
    `docs/decisions.md` in this PR's closing, together with D-29, D-59, D-65, D-28's addition and AD-05's note (PRD
    section 10, as updated after step 1).
+
+## Step 3: undo on the home pages (31 October 2026)
+
+**What changed**
+
+- **Both homes** wrap their page in `UndoProvider` and show `UndoButtons` as the top bar's only tool (item 1). The
+  project home passes them in its frame's `tools`; `AppShell` got a `tools` slot for workspace pages (the workspace
+  home). Both loaders read the person's history for `canUndo` and `canRedo` (F15). The buttons' enabled state comes
+  from that data, never from a measured size.
+- **`UndoProvider`** (`src/app/_components/undo.tsx`) works without a canvas: `projectId` and `canvasId` are optional,
+  and `undoAction` gets no `open` canvas on a home. The keys are the canvas pages' (Ctrl+Z, Ctrl+Shift+Z, Ctrl+Y, also
+  with ⌘), outside text fields (item 2). A step made on a canvas reads "Undone: {step} on {canvas}" (F16). The undo
+  queue is now one for the tab, shared by every provider and every toast's "Undo" (F21).
+- **Toasts with "Undo" on the home pages** (F13, item 14): `useAction` takes Undo from the canvas as before, else from
+  the page's provider through a separate context, `useUndoNow`. That context holds only a stable function, so
+  components that use `useAction` on canvas pages do not re-render when the undo state changes. Step 4's delete toast
+  uses this.
+- **An undo or redo that removes the page's project** (item 5, Q-A, F2): `undoAction` remembers every project its
+  revert deleted (`rememberGoneProject`, `src/app/_lib/gone-project.ts`, a one-minute cookie, the twin of
+  `next-canvas.ts`). `loadShell`, the one place that sends a missing project's pages to the workspace home, does so
+  without `?gone=project` when the page is drawn again as that action's result. So the workspace home shows only
+  "Undone: Create project". Every other arrival keeps "That project no longer exists." (F1, S6B-06).
+- After an undo or redo the home is drawn again by `undoAction`'s `revalidatePath`. Its versions reach `rowSaves`, as
+  on canvases (item 4).
+
+**Specs (`e2e/slice-12a/`, new helpers in `helpers.ts`: `undoButton`, `redoButton`, `key`, `moveCardUp`, `yOf`,
+`OM_HOME`)**
+
+| ID | What it does |
+| --- | --- |
+| S12A-01 | Both buttons disabled on both homes with nothing to undo, and the bar has only them. A card moved on "Customer & orders" is undone and redone from the project home ("Undone: Move card on Customer & orders"), undone again from the workspace home; the canvas shows the card back in place |
+| S12A-02 | A rename undone on the home: the field, the breadcrumbs and the switcher show "Customer 360"; the next rename is stored, no conflict toast |
+| S12A-03 | In the description, Ctrl+Z undoes the typing and the rename stays undoable; outside a field Ctrl+Z, Ctrl+Shift+Z and Ctrl+Y undo and redo the rename |
+| S12A-04 | Anna renames the project after Łukasz: his undo on the home is refused with "Couldn't undo “Rename project” because it was changed afterwards. …", nothing written; in an archived workspace Undo and Redo answer "This workspace is archived, so it is read-only." |
+| S12A-05 | "Create project" undone on the new project's home: the workspace home with only "Undone: Create project" (the recorded toasts have no "That project no longer exists."), the project gone; Redo brings it and its tile back |
+| S12A-06 | Pin and unpin of CR-23 on the home are undone and redone ("Undone: Pin label CR-23", "Undone: Unpin label CR-23"); Piotr (reviewer) sees the plain ★ with no control; CR-23's delete from its label panel, undone from the home, brings the pin back |
+
+**Notes from the runs**
+
+- S12A-03 failed twice while I wrote it; both were the test, not the app:
+  - Chrome undoes typing in the description one letter at a time. The test now presses Ctrl+Z in the field until the
+    text is back, and checks that the field still has the focus and the history is untouched.
+  - A Ctrl+Y pressed before the previous undo's answer was back does nothing, because the page does not know yet that
+    there is something to redo. This is the same on canvases, where S1B-12 waits for the toast; the test now waits too.
+
+  Afterwards it passed three runs in a row.
+
+**Runs**
+
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: 116 files, 1,526 tests pass.
+- e2e, with no dev server of mine running: 75 tests pass in 12.4 min. The set:
+  - slice 12a's six specs;
+  - all of slice 0 (the homes, the switcher, creating projects);
+  - S1B-12 to S1B-14 (undo and redo, the Undo toasts);
+  - S3A-05 and S3A-13 (pins, roles on the project home);
+  - all of slice 6b (Back and Forward, gone places);
+  - all of slice 9 (the project home's fields, S9-09's undo from a canvas);
+  - S11-05 and S11-11 (undo of the names).
+
+  The `live_label_id` error from "Before step 3" did not appear in this run.
+- No earlier test changed in step 3.
+
+**How to check:** `npx playwright test e2e/slice-12a`. By hand: move a card on a canvas, open the project home or the
+workspace home, and press Undo, Redo or Ctrl+Z there. Or create a project and press Undo on its home: you land on the
+workspace home with "Undone: Create project".
 
 ## Assumptions
 

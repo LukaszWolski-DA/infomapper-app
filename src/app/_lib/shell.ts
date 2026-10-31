@@ -5,6 +5,7 @@ import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { can, checkCreateWorkspace, isArchived, isGuest } from "@/domain/permissions";
 import type { AppUser, WorkspaceRole } from "@/domain/types";
+import { goneByMe } from "./gone-project";
 import { nextCanvasFor } from "./next-canvas";
 import { workspaceHref } from "./paths";
 import { LAST_PROJECTS_COOKIE, parseLastProjects } from "./preferences";
@@ -83,8 +84,13 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
   if (where.projectId) {
     project = projectRows.find((p) => p.id === where.projectId) ?? null;
     // a project that no longer exists (deleted, or never in this workspace) opens the workspace home with a toast, for
-    // every arrival: a typed address, a link, Back or Forward (slice 6b, step 1 answer 5)
-    if (!project) redirect(`${workspaceHref(workspace.id)}?gone=project`);
+    // every arrival: a typed address, a link, Back or Forward (slice 6b, step 1 answer 5); drawn again as the result of
+    // your own action that removed it (its delete, an undo or a redo), without that toast: the action has its own
+    // (slice 12a, F2)
+    if (!project) {
+      const mine = (await headers()).has("next-action") && (await goneByMe(where.projectId));
+      redirect(mine ? workspaceHref(workspace.id) : `${workspaceHref(workspace.id)}?gone=project`);
+    }
   } else {
     const remembered = parseLastProjects((await cookies()).get(LAST_PROJECTS_COOKIE)?.value)[workspace.id];
     project = projectRows.find((p) => p.id === remembered) ?? projectRows[0] ?? null;
