@@ -1,10 +1,12 @@
 // Canvas commands: create, rename, and which projects a canvas belongs to (D-28); duplicate its layout, delete it,
-// and its look and layer mode (slice 2a, D-12, D-22); what hides things on it, removed (slice 6a, D-39).
+// and its look and layer mode (slice 2a, D-12, D-22); what hides things on it, removed (slice 6a, D-39); names or aliases
+// (slice 11, D-64).
 
 import { z } from "zod";
 import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound, staleVersion } from "../errors";
 import type { Uuid } from "../ids";
+import { canvasMode, NAME_DIMENSIONS, NAMES_COLUMN, type NameDimension } from "../model/aliases";
 import { isElementCard } from "../model/card-kinds";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
 import {
@@ -12,6 +14,7 @@ import {
   CANVAS_GRIDS,
   CANVAS_LAYERS,
   DEFAULT_CANVAS_LOOK,
+  NAME_MODES,
   type Canvas,
   type CanvasItem,
   type CanvasLook,
@@ -487,4 +490,65 @@ export function resetCanvasView(
   }
   if (!writes.length) return fail(nothingToChange());
   return done(ctx, access, { versions, cards: writes.length - frameCount, frames: frameCount }, writes);
+}
+
+// ---- names or aliases (slice 11, D-64) ----
+
+const namesInput = z
+  .object({
+    canvasId: uuidSchema,
+    dimension: z.enum(NAME_DIMENSIONS),
+    mode: z.enum(NAME_MODES),
+    /** The canvas's cards at the versions the user read: every card whose exception it clears must be among them. */
+    cards: z.array(z.object({ canvasItemId: uuidSchema, expectedVersion: versionSchema }).strict()).max(MAX_VIEW_ROWS),
+  })
+  .strict();
+export type SetCanvasNamesInput = z.input<typeof namesInput>;
+
+/** The undo history's names of the canvas's control (slice 11). */
+export const CANVAS_NAMES_LABEL = {
+  entity: { name: "Show entity names", alias: "Show entity aliases" },
+  attribute: { name: "Show attribute names", alias: "Show attribute aliases" },
+} as const satisfies Record<NameDimension, Record<(typeof NAME_MODES)[number], string>>;
+
+/**
+ * The canvas's check box for entity names or attribute names (item 8): sets the canvas's mode in that dimension and
+ * clears every card's exception there, in one change group (one undo step, which restores them; P8). Shaped like
+ * `resetCanvasView`: all or nothing on the cards it clears, each read at its version. The canvas row is read as it
+ * stands, not version-checked: two editors setting the mode at once, the last write wins (F2). Names are stored as
+ * null, the canvas's default. Nothing to change writes nothing.
+ */
+export function setCanvasNames(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: { canvas: Canvas | null; items: readonly CanvasItem[] },
+  input: unknown,
+): CommandResult<{ canvas: Canvas; versions: Record<Uuid, number>; cards: number }> {
+  const parsed = begin(access, "canvas.edit_items", namesInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { canvasId, dimension, mode } = parsed.data;
+  const ws = access.workspace.id;
+  const { canvas } = state;
+  if (!isLive(canvas, ws) || canvas.id !== canvasId) return fail(notFound("canvas"));
+  const column = NAMES_COLUMN[dimension];
+  const saw = new Map(parsed.data.cards.map((c) => [c.canvasItemId, c.expectedVersion]));
+  const writes: Write[] = [];
+  const versions: Record<Uuid, number> = {};
+  let next = canvas;
+  if (canvasMode(canvas, dimension) !== mode) {
+    next = nextVersion(ctx, canvas, { [column]: mode === "name" ? null : mode });
+    writes.push({ kind: "update", table: "canvas", before: canvas, row: next });
+    versions[next.id] = next.version;
+  }
+  for (const before of state.items) {
+    if (!isLive(before, ws) || before.canvas_id !== canvasId || before[column] === null) continue;
+    if (saw.get(before.id) !== before.version) return fail(staleVersion());
+    const row = nextVersion(ctx, before, { [column]: null });
+    writes.push({ kind: "update", table: "canvas_item", before, row });
+    versions[row.id] = row.version;
+  }
+  if (!writes.length) return fail(nothingToChange());
+  const result = done(ctx, access, { canvas: next, versions, cards: writes.length - (next === canvas ? 0 : 1) }, writes);
+  if (result.ok) result.writeSet.label = CANVAS_NAMES_LABEL[dimension][mode];
+  return result;
 }

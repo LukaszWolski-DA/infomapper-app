@@ -245,7 +245,8 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
     case "restore":
       return `Restore ${noun}`;
     default:
-      return only(main, ["name"]) ? `Rename ${noun}` : cap(`change ${noun}`);
+      // an entity's or an attribute's alias alone (slice 11)
+      return only(main, ["name"]) ? `Rename ${noun}` : only(main, ["alias"]) ? cap(`change ${noun} alias`) : cap(`change ${noun}`);
   }
 }
 

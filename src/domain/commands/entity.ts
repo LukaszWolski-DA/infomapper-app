@@ -8,7 +8,7 @@ import { entityCascade, type EntityRows } from "../model/impact";
 import { sanitizeRich } from "../model/rich-text";
 import type { WorkspaceAccess } from "../permissions";
 import { STEREOTYPES, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type LabelLink, type Note, type RequirementLink } from "../types";
-import { nameSchema, uuidSchema, versionSchema } from "../validation";
+import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, isLive, nothingToChange, richTextSchema, softDelete } from "./shared";
 import { cardHeightSchema, frameRefsSchema, joinFrames, newCanvasItem, positionSchema } from "./canvas-item";
 import { linksOnItems, softDeleteLinks } from "./label";
@@ -106,6 +106,8 @@ const updateEntityInput = z
     entityId: uuidSchema,
     expectedVersion: versionSchema,
     name: nameSchema.optional(),
+    /** Another name, shown on canvases that ask for it (slice 11, D-64): trimmed, empty clears it. */
+    alias: optionalTextSchema.optional(),
     stereotype: z.enum(STEREOTYPES).optional(),
     conceptId: uuidSchema.optional(),
     definition: richTextSchema.optional(),
@@ -121,7 +123,10 @@ export interface UpdateEntityState {
   concept: Concept | null;
 }
 
-/** Name, stereotype, concept and definition (rich text, sanitized on the server; slice 4a). A duplicate name gives a warning. */
+/**
+ * Name, alias (slice 11), stereotype, concept and definition (rich text, sanitized on the server; slice 4a). A duplicate
+ * name gives a warning; an alias may repeat.
+ */
 export function updateEntity(
   ctx: CommandContext,
   access: WorkspaceAccess,
@@ -130,13 +135,14 @@ export function updateEntity(
 ): CommandResult<{ entity: Entity; warning: string | null }> {
   const parsed = begin(access, "model.edit", updateEntityInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { entityId, expectedVersion, name, stereotype, conceptId, definition } = parsed.data;
+  const { entityId, expectedVersion, name, alias, stereotype, conceptId, definition } = parsed.data;
   const got = current(state.entity, access, entityId, expectedVersion, "entity");
   if (!got.ok) return fail(got.error);
   const before = got.row;
 
   const patch: Partial<Entity> = {};
   if (name !== undefined && name !== before.name) patch.name = name;
+  if (alias !== undefined && alias !== before.alias) patch.alias = alias;
   if (stereotype !== undefined && stereotype !== before.stereotype) patch.stereotype = stereotype;
   if (conceptId !== undefined && conceptId !== before.concept_id) {
     if (!isLive(state.concept, access.workspace.id) || state.concept.id !== conceptId) return fail(notFound("concept"));

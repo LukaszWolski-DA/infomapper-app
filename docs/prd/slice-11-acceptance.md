@@ -334,3 +334,88 @@ names are (D-37). Table and requirement cards are unchanged."
   - the server was stopped, and the file is unchanged by the visit (SHA-256 `59a5a756…f08b6db8`, 10:22).
 - The backup stays as it is: `.data/backups/dev-db-20261031-1008-before-format-11.json` (format 10, SHA-256
   `9074b153…cb6ab1`).
+
+## Step 3: the domain (31 October 2026)
+
+Branch `slice/11-aliases`, from `b22727b` (the handover commit). `.data/dev-db.json` was not opened. No interface yet.
+
+**The shown text and the modes: `src/domain/model/aliases.ts`** (pure, no React):
+- `NAME_DIMENSIONS` (`entity`, `attribute`) and `NAMES_COLUMN` (the same column on `canvas` and `canvas_item`).
+- `canvasMode` (null reads as name), `cardMode` (the card's exception, or its canvas's mode), `exceptionFor` (a
+  choice equal to the canvas's mode is none).
+- `namesControl(canvas, items, dimension)`: `name`, `alias` or `mixed` (a live card of the canvas has an exception),
+  from the data only, for step 4's check boxes.
+- `shownName(named, mode)` and `cardShownNames(item, canvas, entity, attributes)`: the header and the rows, row by row,
+  the alias in alias mode when there is one, otherwise the name (F8 as changed by Q-B). Cards keep `name` for toasts
+  and questions; step 4 feeds this text to what the card draws.
+
+**Commands:**
+- **`updateEntity`, `updateAttribute`:** an optional `alias` (`optionalTextSchema`: trimmed, empty or blank stored as
+  null; no uniqueness, no warning). Rights as for the name (`model.edit`, so archived is refused). One change group. An
+  attribute's alias is not a followed column: it is allowed on a copy with a link and reaches no copy.
+- **`pasteAttribute`:** `alias: original.alias`, once (P10).
+- **`updateCanvasItem`:** optional `entityNames` and `attributeNames` (`name`, `alias`, or null to follow). Stored
+  through `exceptionFor`, so a choice equal to the canvas's mode is null. Entity cards only; it needs the card's canvas
+  (`state.canvas`), so `updateCardAction` now loads it for these two fields too (a two-line change at the server
+  boundary). `canvas.edit_items`: editors, not archived.
+- **`setCanvasNames(canvasId, dimension, mode, cards[])`** (`canvas.ts`), shaped like `resetCanvasView`:
+  - it sets the canvas's column (names stored as null, the default; the row is written only when the mode changes)
+    and clears every live card's exception in that dimension, the other dimension untouched;
+  - all or nothing on the cards it clears, each at the version the user read; the canvas row carries no version in the
+    input and is read as it stands (F2, last write wins);
+  - nothing to change: "Nothing to change." (the existing text);
+  - it answers `{ canvas, versions, cards }`; `versions` holds the canvas's new version, for the look provider (step 4).
+- **No server action for `setCanvasNames` yet:** step 4 adds it with the canvas's queue (F2), as `resetCanvasViewAction`.
+
+**Undo and redo:** no new undo code (F1). The control's group holds the canvas row (look unchanged, so `isUndoable`
+accepts it) and the cards; `revertChangeGroup` writes their before-images back. The test undoes three cleared
+exceptions and redoes them.
+
+**Search** (`src/app/_panels/tree-data.ts`): a tree entity carries `alias` and `aliases` (its attributes' names and
+aliases) only when set, so a model without aliases sends the same data. `show` matches, in this order: the name (no
+hint); the entity's alias ("alias Klient"); an attribute's name ("attribute email"); an attribute's alias ("attribute
+customer_id · Numer klienta"). The left panel already draws the hint line, so a search by alias works in the browser as
+soon as the tree carries aliases; step 4 checks it on the page.
+
+**Tests:**
+- `src/domain/commands/aliases.test.ts` (new, 21 tests): the aliases (trim, clear, repeat, rights, archive, stale; a
+  copy's own alias); the paste; a card's exception (stored, equal to the mode stored as null, cleared, refused on table
+  and requirement cards and without its canvas, rights, archive, stale; a row filter's undo name unchanged); the
+  canvas's command (one group, the dimension alone, the mixed case, names as null, nothing to change, the cards'
+  versions all or nothing and no canvas version, rights, archive, a deleted canvas); undo and redo with three cleared
+  exceptions; undo of a card's exception.
+- `src/domain/model/aliases.test.ts` (new, 5 tests): the modes, `exceptionFor`, `namesControl` (deleted cards and other
+  canvases do not count), the shown text with and without an alias, both dimensions independent.
+- `tree-data.test.ts` (+3): aliases carried only when set; found by the entity's alias and by an attribute's alias with
+  their hints; a match by name unchanged, and a name before an alias.
+
+**New user-visible texts (for approval):**
+- Refusal on a table or requirement card: **"Only entity cards show aliases."** (only a direct call can reach it; the
+  menu offers the segments on entity cards only).
+- Undo history names:
+  - the canvas's control: **"Show entity aliases"**, **"Show entity names"**, **"Show attribute aliases"**, **"Show
+    attribute names"**;
+  - a card's exception, by what the card shows afterwards: **"Show entity alias on card"**, **"Show entity name on
+    card"**, **"Show attribute aliases on card"**, **"Show attribute names on card"**;
+  - an alias alone: **"Change entity alias"**, **"Change attribute alias"** (`changeLabel`; with other fields in the same
+    save it stays "Change entity" or "Change attribute").
+- Search hints, as approved in step 1: "alias {alias}", "attribute {name} · {alias}".
+- Every other refusal is an existing text ("Nothing to change.", the role and archive refusals, the stale version).
+
+**Assumptions:**
+- Names are stored as null on the canvas, never as `name` (both read the same; one value keeps a fresh canvas and a
+  switched-back one alike).
+- A card exception equal to the new mode is cleared by the canvas's control too (it would follow the canvas anyway),
+  so after a click no card in that dimension has an exception and the control is not mixed.
+- A card's exception with both fields in one call is allowed and named "Change card" (the menu sends one at a time).
+
+**Runs:**
+- `npm run lint`: passed. `npm run typecheck`: passed.
+- `npm test`: 115 files, 1,503 tests, passed (step 2: 113 files, 1,474).
+- **Earlier e2e specs of what the step touched** (one run, 15 tests in 11 files, all passed, 2.7 min):
+  - card rows and the row filter: `S1A-02`, `S1A-03`, `S1A-04`;
+  - the card header's menu: `S1B-07`;
+  - the chips and "Show all" (`resetCanvasView`): `S6A-01` to `S6A-05`;
+  - the paste: `S10C-01`, `S10C-02`.
+  - The dev server logged one "The destination stream closed early" during `S6A-03`'s live-canvas test, which passed
+    (a page left while its response streamed; not an app error).
