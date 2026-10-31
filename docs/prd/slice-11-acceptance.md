@@ -1,6 +1,6 @@
 # Slice 11 – acceptance
 
-Status: **step 1, the review, waiting for Łukasz's answers (31 October 2026).** No application code yet.
+Status: **step 1 answered by Łukasz (31 October 2026); step 2 next, in a new session.** No application code yet.
 
 - Tag `slice-10c` is at `72ef24b`, as A1 says. Branch `slice/11-aliases` was made from that tag.
 - The PRD is copied unchanged from `~/Downloads/slice-11-aliases.md` (24,332 bytes; the only file with that name; its
@@ -166,3 +166,56 @@ names are (D-37). Table and requirement cards are unchanged."
    against the layer switch and "Show all", with the bar set after the first figures?
 9. **F11:** accept that a later mode change blocks undo of an older rename of the same canvas?
 10. The texts above.
+
+## Łukasz's answers to step 1 (31 October 2026)
+
+- **F1: yes.** The modes are two nullable columns on `canvas`, `entity_names` and `attribute_names` (null = name). The
+  PRD is updated: P13, items 2–5, D-64, section 10's data model docs, S11-12.
+- **F2: yes.** The control's command checks the versions of the cards it clears, not the canvas row's. Two editors
+  changing the same canvas's mode at once: the last write wins, as it is a display setting. The cards' versions are
+  still checked, so a card exception set meanwhile refuses the control's write.
+- **F6: editors only.** The check boxes are disabled for reviewers and readers. "Left for later" gains a reviewer's own
+  local choice of names or aliases, as the layer mode works for them today.
+- **F5: yes.** Two segments after "Rows" in the card header's menu.
+- **F7: yes.** In the top bar after the layer switch; into "More" below 1,200 px.
+- **Q-B: toasts and questions about a card keep the name**, not the alias (P3: everything outside the canvas shows the
+  name). So F8 changes: the card keeps `name` (the model's), and a separate shown text drives what the card draws (see
+  the handover).
+- **F13: yes,** the existing hint line.
+- **F10: yes.** The bars: one canvas commit, no miniature commit, the same drawing layers. The time bar is proposed
+  after the first figures, for Łukasz's approval. The short A/B sitting (pan, c08) against `slice-10c` stays.
+- **F11: accepted.** A later mode change on a canvas blocks undo of an older rename of it; recorded in
+  `docs/known-limitations.md` at the closing.
+- **The texts:** accepted as proposals; approved finally in step 4, built.
+
+## Handover for the next session
+
+- **Branch** `slice/11-aliases`, from tag `slice-10c` (`72ef24b`); the last commit is "docs: slice 11 step 1 answers".
+  Not pushed yet.
+- **Step 2 starts with KB's backup,** before anything opens `.data/dev-db.json`:
+  `.data/backups/dev-db-<yyyymmdd-hhmm>-before-format-11.json`, byte-identical (`cmp`), path and size reported. The
+  newest backup also goes to `.data/backups/kb-model-latest.json`. No `seed`, `reset-dev-data`, dev server or e2e run
+  before it (the e2e runs use `.data/e2e-db.json`, but run none before the backup anyway).
+- **Step 2's shape** (as format 10 in slice 10c):
+  - a migration `supabase/migrations/<time>_aliases.sql` with `entity.alias`, `attribute.alias`,
+    `canvas.entity_names`, `canvas.attribute_names`, `canvas_item.entity_names`, `canvas_item.attribute_names`, each
+    text null; CHECK `in ('name','alias')` on the four mode columns;
+  - the types (`src/domain/types.ts`), the local schema's checks (`src/data/local/schema.ts`), `DEV_DB_FORMAT = 11`;
+  - format 11 inline in `upgradeDb` (`src/data/local/file.ts`): `??= null` on the six columns, no change events;
+  - every place that builds these rows (F12);
+  - tests as `upgrade-10.test.ts`; the AD-31 schema check on a local Postgres in the scratchpad, made with
+    `initdb -E UTF8 --locale=C` (a WIN1252 cluster fails on "Ł");
+  - KB's upgrade only after Łukasz's go, through `readDb`, with counts before and after.
+- **Not yet in the PRD, known from step 1:**
+  - **Shown text:** because toasts keep the name (Q-B), cards keep `name`. `ModelCanvas` adds a shown text per entity
+    card and row when it builds nodes (`alias` when the effective mode is alias and the alias is set). `CardNode`
+    (header, rows, low-zoom block and their `title`s), `BlockNode`'s member list, `text-fit.ts` (`withClips`), "Fit
+    width to names" and the requirement drop hint read the shown text; toasts, questions and pin names read `name`.
+  - **Exceptions on the card's data:** `buildCards` passes the item's two exceptions and the alias only when set.
+  - **The check boxes' state** comes through a store published by `ModelCanvas` from an effect, as `viewCounts`
+    (`src/canvas/view-counts.ts`); the indeterminate state is the DOM property set in an effect.
+  - **The canvas's new version** from the control's answer goes to the look provider (`look.tsx`, `versionRef`), so a
+    look change right after it is not refused.
+  - **`duplicateCanvas`** copies the modes and the exceptions; `applyLookToAllCanvases` does not.
+  - **S6A-10** decides whether the check boxes fit the top bar; `S1B-07` lists the card header's menu.
+  - Slice 9's S9-06 and S9-11 test fixes and slice 10c's `holdAnswer` guard are on `main` (merged with slice 10c).

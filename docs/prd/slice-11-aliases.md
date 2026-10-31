@@ -1,6 +1,6 @@
 # Slice 11 – Aliases of entities and attributes, shown by the canvas
 
-Status: **first draft, 30 October 2026**, not yet checked against the code. Branch `slice/11-aliases`, from `main` at tag `slice-10c` (`72ef24b`, assumption A1). PRD file: `docs/prd/slice-11-aliases.md`; step 1 writes `docs/prd/slice-11-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus the local data file's upgrade tests, a measurement sitting, and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Status: **step 1 answered (Łukasz, 31 October 2026)**; the PRD is updated to the answers (`slice-11-acceptance.md`, F1–F17). Branch `slice/11-aliases`, from `main` at tag `slice-10c` (`72ef24b`, assumption A1). PRD file: `docs/prd/slice-11-aliases.md`; step 1 writes `docs/prd/slice-11-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus the local data file's upgrade tests, a measurement sitting, and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 This PRD was written from the docs at slice 10a's state and from what slices 10b and 10c changed, as recorded in the conversation with Łukasz. Step 1 checks every reference against the docs in the repository, which are at slice 10c's state.
 
@@ -47,7 +47,8 @@ A modeller often needs a second name for an entity or an attribute: the Polish n
 
 - **P13. The data.**
   - `entity.alias` and `attribute.alias` (text, null).
-  - Two keys in `canvas.look` for the canvas's modes.
+  - Two nullable columns on `canvas` for the canvas's modes, `entity_names` and `attribute_names` (null = name). Not
+    in `canvas.look`: the look is outside undo (D-12), and the modes are undo steps (P8; step 1, F1).
   - Two columns on `canvas_item` for a card's exceptions, as `row_filter` is a card's own display setting.
   - The local data file's next format (assumed format 11; Q7), with a step that backs up Łukasz's KB model first.
 - **P14. Measured.** Switching a mode changes the text on every card at once. A measurement sitting checks its cost and that nothing else got slower (section 6).
@@ -86,14 +87,14 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
 ### Data
 
 1. **`entity.alias` and `attribute.alias`:** text, null, no uniqueness, trimmed. An empty alias is stored as null.
-2. **The canvas's modes:** two keys in `canvas.look`, proposed `entity_names` and `attribute_names` (step 1 checks the existing keys' style), each `name` or `alias`. A key that is absent reads as `name`.
+2. **The canvas's modes:** two columns on `canvas`, `entity_names` and `attribute_names`, text, null, `name` or `alias`. Null reads as `name`. They are ordinary canvas columns, so undo restores them (F1); `canvas.look` and D-12 are unchanged.
 3. **A card's exceptions:** `canvas_item.entity_names` and `canvas_item.attribute_names`, text, null, `name` or `alias`. Null means the card follows the canvas.
    - Only entity cards use them; table and requirement cards keep them null.
    - A stored exception always differs from the canvas's mode. Setting a card to the canvas's mode clears it.
-4. **A new migration** adds the columns, with CHECK constraints on the two card columns. Applied migrations are never edited. The AD-31 schema check passes. The domain validates `canvas.look`'s new keys.
+4. **A new migration** adds the six columns, with CHECK constraints `in ('name','alias')` on the four mode columns (canvas and card). Applied migrations are never edited. The AD-31 schema check passes.
 5. **The local data file's next format** (Q7):
-   - The upgrade sets the new columns to null.
-   - It leaves `canvas.look` as it is: absent keys read as `name`.
+   - The upgrade sets the six new columns to null (entities, attributes, canvases, canvas items).
+   - It leaves `canvas.look` as it is.
    - It writes no change events.
    - Step 2 backs up `.data/dev-db.json` before the first run that upgrades it.
 
@@ -107,7 +108,7 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
 
 ### Showing aliases on the canvas
 
-8. **Two controls for the canvas,** where its layer mode is set (D-22; Q1). Proposed:
+8. **Two controls for the canvas,** in the top bar right after the layer switch; below 1,200 px they move into "More" with Focus (F7). Proposed:
    - **Two check boxes,** "Entity aliases" and "Attribute aliases";
    - **States:** checked = alias, unchecked = name, indeterminate = mixed (some card has an exception in that dimension).
    - **A click:**
@@ -115,13 +116,13 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
      - checked → unchecked;
      - indeterminate → checked (aliases everywhere).
 
-     In each case it clears every card's exception in that dimension, in one change group and one undo step.
-   - **Rights:** as for the layer mode (Q1).
-9. **A card header's menu** (D-52) gets two items for an entity card. Each names what a click would show:
-   - "Show entity alias" or "Show entity name";
-   - "Show attribute aliases" or "Show attribute names".
+     In each case it clears every card's exception in that dimension, in one change group and one undo step. The command checks the versions of the cards it clears, not the canvas row's: two editors changing the same canvas's mode at once means the last write wins (F2).
+   - **Rights:** editors (owners, admins, modelers), not archived. For reviewers and readers the check boxes are disabled and show the saved state (F6).
+9. **A card header's menu** (D-52) gets two segments for an entity card, after "Rows", for editors (F5):
+   - "Entity name": "Name", "Alias";
+   - "Attribute names": "Name", "Alias".
 
-   A click stores the card's exception, or clears it when the result equals the canvas's mode. One change group, one undo step.
+   The segment shows the card's effective mode. A click stores the card's exception, or clears it when the choice equals the canvas's mode. One change group, one undo step.
 10. **What a card shows:**
     - **The header:** the entity's alias when the card's effective entity mode is `alias` and the alias is not empty; otherwise the name.
     - **The attribute rows:** the same rule with the attribute mode, row by row.
@@ -134,12 +135,12 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
 
     Both are CSS classes on existing elements, with a colour token for light and dark mode. The colour is chosen with step 4's screenshots.
 12. **Truncation:** an alias is truncated by the same function and rule as a name (D-37).
-13. **Other names on the canvas:** every other text on the canvas that shows an entity's or an attribute's name follows the card it belongs to. Step 1 lists them (Q3); the PRD expects only the card's header and rows.
+13. **Other names on the canvas** (step 1, Q3): the header, the rows, the low-zoom block, a collapsed frame's block list and their tooltips follow the card. Mapping tooltips on rows keep the model's names. Toasts and questions about a card keep the name (P3).
 
 ### Search
 
 14. **The object browser's search** (D-35) also matches an entity's or an attribute's alias.
-    - A row found by its alias shows the name, then the alias in a muted style, e.g. "Customer · Klient".
+    - A row found by an alias names it in the existing hint line (F13): "alias Klient" for the entity's own alias, "attribute customer_id · Numer klienta" for an attribute's.
     - A row found by its name is unchanged.
 
 ### Unchanged
@@ -199,15 +200,15 @@ Tests in `e2e/slice-11/`, one file per criterion, each from a fresh seed; unit t
 | S11-01 | **Alias fields.** Customer's alias "Klient" and `customer_id`'s alias "Numer klienta" are saved in their panels; each is one undo step. Clearing the field stores no alias. Breadcrumbs, panel titles and the object browser's lists still show the names. A reviewer cannot edit the field, and a direct call is refused; in an archived workspace the write is refused. |
 | S11-02 | **Entity aliases on a canvas.** Checking "Entity aliases" shows "Klient" in Customer's header. Entities without an alias show their names. One undo step. The mode stays after a reload. Another canvas with Customer still shows "Customer". |
 | S11-03 | **Attribute aliases on a canvas.** Checking "Attribute aliases" shows "Numer klienta" on `customer_id`'s row and names on rows without an alias. The two check boxes are independent. |
-| S11-04 | **A card's exceptions.** "Show entity alias" on Customer's card shows "Klient" while the canvas shows names, and tints Customer's header. "Show attribute aliases" tints its attribute rows. Choosing the item that equals the canvas's mode clears the exception and its tint. Each is one undo step. |
+| S11-04 | **A card's exceptions.** "Entity name: Alias" in Customer's card menu shows "Klient" while the canvas shows names, and tints Customer's header. "Attribute names: Alias" tints its attribute rows. Choosing the segment that equals the canvas's mode clears the exception and its tint. Each is one undo step. |
 | S11-05 | **Mixed.** With one card's entity exception, "Entity aliases" is indeterminate. Clicking it shows aliases on every card and clears the exception (no tint). One undo restores the canvas's previous mode and the card's exception with its tint. The attribute dimension is untouched. |
 | S11-06 | **Other cards.** A collapsed card shows the entity alias by the entity mode. A live canvas's context card follows the same rules. Table and requirement cards are unchanged under both modes. |
 | S11-07 | **Truncation.** A long alias in a 200 px card is truncated by D-37's rule, like a name of the same length. |
-| S11-08 | **Search.** Typing "Klient" in the object browser's search finds Customer, shown as "Customer · Klient". Typing "Customer" shows "Customer" unchanged. |
+| S11-08 | **Search.** Typing "Klient" in the object browser's search finds Customer with the hint "alias Klient"; typing "Numer" finds it with "attribute customer_id · Numer klienta". Typing "Customer" shows "Customer" unchanged. |
 | S11-09 | **Copies.** Pasting a copy of `customer_id` gives it "Numer klienta". A later change of the original's alias does not reach the copy. |
-| S11-10 | **Rights and the save chain.** The check boxes and card items follow the layer mode's rights (Q1); as a reviewer they are not offered and a direct call is refused. Two quick clicks on a check box store both changes with no false conflict. |
+| S11-10 | **Rights and the save chain.** The check boxes and the card segments are for editors; as a reviewer the check boxes are disabled, the segments are not offered, and a direct call is refused. Two quick clicks on a check box store both changes with no false conflict. |
 | S11-11 | **Undo of the canvas's control after card exceptions:** three cards with attribute exceptions; checking "Attribute aliases" clears all three; one undo restores all three and their tints; redo clears them again. |
-| S11-12 | **Data.** The migration and the schema check pass. The local file's upgrade sets the new columns to null, keeps every count, writes no change event, and is not repeated on a file at the new format (unit test). An old change event without the new columns is undone with them as null (slice 10c's rule). |
+| S11-12 | **Data.** The migration and the schema check pass. The local file's upgrade sets the six new columns to null (entities, attributes, canvases, canvas items), keeps every count, writes no change event, and is not repeated on a file at the new format (unit test). An old change event without the new columns is undone with them as null (slice 10c's rule): a canvas then shows names, a card follows its canvas. |
 | S11-13 | **Performance** (section 6). |
 | S11-14 | CI and the runs of the test regime; changed earlier tests listed with the reason. |
 
@@ -226,7 +227,7 @@ The only new elements are the two check boxes beside the canvas, outside the can
 | What | How | Bar |
 | --- | --- | --- |
 | Viewport elements on a canvas page | `S3B-15-elements.spec.ts` with `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json` | viewport counts equal; the page totals differ only by the two check boxes' elements, explained per element |
-| Switching a mode | on a copy of "Performance test" with an alias on every entity and attribute, written into the e2e data file in the measuring spec only: from the click on "Attribute aliases" to the presented frame, 3 balanced rounds, against switching the layer mode in the same sitting (Q10) | within the layer mode's switch time + 20 %; the canvas's commit count equal to the layer mode's |
+| Switching a mode | a branch-only spec `S11-13.spec.ts`, to the screen as `S6A-09`: on "Performance test" with an alias on every entity and attribute, written into the e2e data file by the spec only, from the click on "Attribute aliases" to the first presented frame, at 100 % and 30 %, with the layer switch and "Show all" measured beside it (F10) | one canvas commit, no miniature commit; the time bar proposed after the first figures, for Łukasz's approval |
 | Drawing layers | the LayerTree read on the same view with aliases shown and with names shown | the same drawing layers |
 | Pan and zoom, first render | `npm run measure:canvas -- --to-screen --only pan,c08 --no-build --against slice-10c`, one discarded warm-up run, then `--rounds 2`, balanced | within the sitting's run-to-run spread |
 
@@ -299,6 +300,7 @@ The only new elements are the two check boxes beside the canvas, outside the can
 
 - **Aliases for concepts,** frames, source tables or columns. Not wanted for sources (P9).
 - **Several aliases per object** (by language or audience), with a choice of which to show.
+- **A reviewer's own local choice** of names or aliases, as the layer mode works for reviewers and readers today.
 - **Showing an alias outside the canvas** (breadcrumbs, panel titles), as a user setting.
 - **Marking a shown name** that stands in for a missing alias.
 - **Exceptions per attribute row** rather than per card.
@@ -309,9 +311,9 @@ The only new elements are the two check boxes beside the canvas, outside the can
 
 ### D-64 (proposal) Aliases of entities and attributes
 
-"An entity and an attribute may have an alias: free text, an extra name with no fixed meaning (a translation, a technical or a workshop name), edited in its panel. The name stays primary: everything outside the canvas shows the name, and the object browser's search also finds aliases, showing “name · alias” for a match by alias. Imports carry no alias, and sources have none. A copied attribute gets its original's alias once.
+"An entity and an attribute may have an alias: free text, an extra name with no fixed meaning (a translation, a technical or a workshop name), edited in its panel. The name stays primary: everything outside the canvas shows the name, and the object browser's search also finds aliases, naming the alias in the found row's hint. Imports carry no alias, and sources have none. A copied attribute gets its original's alias once.
 
-A canvas shows names or aliases in two independent dimensions, entity names and attribute names, each set by a check box beside the canvas: checked for aliases, unchecked for names, and indeterminate when a card has an exception. A card may make an exception in either dimension from its header's menu: its header is tinted for an entity exception, its attribute rows for an attribute exception. Clicking a check box sets the canvas's mode and clears the cards' exceptions in that dimension; one undo restores them. With no alias the name is shown. Long aliases are truncated as names are (D-37). Table and requirement cards are unchanged."
+A canvas shows names or aliases in two independent dimensions, entity names and attribute names, each set by a check box beside the layer switch: checked for aliases, unchecked for names, and indeterminate when a card has an exception. A card may make an exception in either dimension from its header's menu: its header is tinted for an entity exception, its attribute rows for an attribute exception. Clicking a check box sets the canvas's mode and clears the cards' exceptions in that dimension; unlike the canvas's look (D-12), this is one undo step, and undo restores them. Editors set them; reviewers and readers see the canvas as saved. With no alias the name is shown. Long aliases are truncated as names are (D-37). Table and requirement cards are unchanged."
 
 **Choices by Łukasz, 30 October 2026:**
 - **The name is primary;** the alias is an extra field of the object.
@@ -345,7 +347,7 @@ One sentence with the sitting's figures: the names' modes switch text and classe
 - **`docs/decisions.md`** (only with Łukasz's approval): D-64; D-63's addition; AD-24's addition.
 - **`docs/data-model-v2.md`:**
   - `entity.alias`, `attribute.alias`;
-  - `canvas.look`'s new keys;
+  - `canvas.entity_names` and `canvas.attribute_names`;
   - `canvas_item.entity_names` and `attribute_names`;
   - the new format and its upgrade;
   - section 11's rules (a stored exception differs from the canvas's mode).
