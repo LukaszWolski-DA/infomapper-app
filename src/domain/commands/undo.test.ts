@@ -875,3 +875,36 @@ describe("undo and redo keep copies in step (slice 10c, F1, S10C-13)", () => {
     expect(attr(undone.rows, C1).copied_from_attribute_id).toBe(ids.customerId);
   });
 });
+
+describe("aliases and the canvases' names (slice 11)", () => {
+  /** The images as a change event recorded before format 11 holds them: without the slice's columns. */
+  const NEW = ["alias", "entity_names", "attribute_names"];
+  const beforeFormat11 = (events: readonly ChangeEvent[]): ChangeEvent[] =>
+    events.map((e) => {
+      const strip = (image: ChangeEvent["before_image"]) => image && Object.fromEntries(Object.entries(image).filter(([k]) => !NEW.includes(k)));
+      return { ...e, before_image: strip(e.before_image), after_image: strip(e.after_image) } as ChangeEvent;
+    });
+  const undoOld = (rows: Rows, events: readonly ChangeEvent[]) => {
+    const undone = revertChangeGroup(makeCtx(), modeler, { events: beforeFormat11(events), rows }, "undo");
+    if (!undone.ok) throw new Error(undone.error.message);
+    return apply(rows, undone.writeSet);
+  };
+
+  it("writes the columns an older event's images lack as null: an entity, a canvas and a card (slice 10c's rule, S11-12)", () => {
+    const rows = seed();
+    const renamed = rename(rows, "Client", 1);
+    const entity = find(undoOld(apply(rows, renamed), renamed.events), "entity", ids.customer);
+    expect(entity).toMatchObject({ name: "Customer", alias: null });
+    expect("alias" in entity).toBe(true);
+
+    const canvasRenamed = ok(renameCanvas(ctx, modeler, { canvas: find(rows, "canvas", ids.canvas1) as never }, { canvasId: ids.canvas1, expectedVersion: find(rows, "canvas", ids.canvas1).version, name: "Customers" }));
+    const canvas = find(undoOld(apply(rows, canvasRenamed), canvasRenamed.events), "canvas", ids.canvas1);
+    expect(canvas).toMatchObject({ entity_names: null, attribute_names: null });
+    expect("entity_names" in canvas && "attribute_names" in canvas).toBe(true);
+
+    const removed = ok(removeFromCanvas(ctx, modeler, { item: find(rows, "canvas_item", ids.itemCustomer) as never } as never, { canvasItemId: ids.itemCustomer, expectedVersion: find(rows, "canvas_item", ids.itemCustomer).version }));
+    const item = find(undoOld(apply(rows, removed), removed.events), "canvas_item", ids.itemCustomer);
+    expect(item).toMatchObject({ deleted_at: null, entity_names: null, attribute_names: null });
+    expect("entity_names" in item && "attribute_names" in item).toBe(true);
+  });
+});
