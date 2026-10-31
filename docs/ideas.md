@@ -33,9 +33,11 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 - **11: an alias for entities and attributes.** **Done in slice 11** (D-64): an alias field in the entity and
   attribute panels; each canvas shows names or aliases in two dimensions, with exceptions per card; the search finds
   aliases. A data model and local file format change (format 11), with a backup of Łukasz's KB model.
-- **Next: 12.**
-- **12: the home pages:** undo and redo there, deleting a project, and the canvas tiles' thumbnails after measuring the
-  home's load.
+- **12: the home pages,** split in two (slice 12a's PRD):
+  - **12a: undo and redo on the home pages, and deleting a project.** **Done in slice 12a** (D-65): the canvas pages'
+    Undo and Redo on both home pages, on the same history; pins are undo steps; "Delete this project" at the end of a
+    project's home, with a preview of the canvases it takes, one undo step. No data model change.
+  - **Next: 12b: the canvas tiles' thumbnails,** after measuring the home's load.
 - **13: one behaviour for a refused save in every field** (F6, above), with the typed value kept on a conflict (the
   first entry). Also keep text typed into a field while its save is on its way: the save's answer replaces the field
   (keyed by its stored value) and the typed text and focus are lost (`docs/known-limitations.md`, slice 10c).
@@ -117,7 +119,9 @@ The prototype offers “Undo” in almost every toast after a change (a new mapp
 a card). The slice 1b PRD asks for it on destructive actions only (deletes, remove from canvas), so that is what is
 built; Ctrl+Z and the top bar's Undo work for every change.
 
-## Undo and redo on the project and workspace home pages (slice 1b, acceptance)
+## Undo and redo on the project and workspace home pages (slice 1b, acceptance): done in slice 12a
+
+**Done in slice 12a** (D-65): both home pages have the canvas pages' buttons and keys, on the same history.
 
 Undo and redo (the top bar's buttons and Ctrl+Z, Ctrl+Shift+Z) are only on canvas pages (assumption 8 in the slice 1b
 acceptance). Changes made on the project and workspace home pages (projects, canvases) are in the undo history too,
@@ -506,3 +510,21 @@ end (role-playing dimensions).
 
 **Until then.** No InfoMapper decision should close this path. When generalising changes to resolve or building the
 validator, design them for reuse by modules.
+
+## Deleting a project: what comes later (slice 12a, PRD section 9)
+
+- **From the workspace home:** a menu on a project's tile with "Delete project" (considered for slice 12a, not built: a
+  project is deleted from its own home, as in the prototype).
+- **A list of deleted projects to restore,** for when the undo history is gone (a restart, more than 50 steps later);
+  the rows stay soft-deleted (`docs/known-limitations.md`, "A project's delete: its undo is all or nothing").
+- **Moving a project's own canvases to another project** before deleting it, instead of deleting them with it.
+- **A live notice** to people who have a deleted project open; today they learn of it on their next load or write.
+- **The workspace's lifecycle** from the prototype: duplicate, transfer, export and delete (AD-09).
+
+## Refresh a page restored from the back-forward cache (slice 12a, step 4)
+
+Back onto a page opened by a full page load restores that whole document from the browser's back-forward cache, so a
+page of a project or a canvas deleted since shows it as it was until the next action or reload
+(`docs/known-limitations.md`, "Back onto a page restored from the browser's back-forward cache"). A `pageshow` listener
+that sees `event.persisted` could call `router.refresh()` (or reload), so the page goes through `loadShell` as every
+other arrival does (D-38). Measure first that it costs nothing on an ordinary Back within one document.

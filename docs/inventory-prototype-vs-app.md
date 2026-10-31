@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 10c's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 12a's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -33,7 +33,7 @@ docs (some are repeated below where they explain an item).
 | Mappings | suggested mappings; re-pointing a mapping to another attribute | – |
 | Sources | only ideas: slice 7c's ideas (see Sources) | idea |
 | Labels and notes | rich text in notes | known limitation |
-| Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer; deleting a project | baselines: decision only (AD-03, AD-14); the rest: – |
+| Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer | baselines: decision only (AD-03, AD-14); the rest: – |
 | Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
 
 ## Canvas
@@ -205,13 +205,22 @@ nothing, D-26), notes, and their chips in the view-state bar (6a).
 | Export and delete a workspace | delete after showing the full export (Owner only) | `data-wa="delete"` | – |
 | Duplicate a workspace | a copy of the workspace | `data-wa="dup"` | – **(uncertain** what the copy includes) |
 | Transfer to another organization | hand the model over (Owner only) | `data-wa="transfer"` | – |
-| Delete a project | "Deleted the project {name}…" | `openProjMenu` | – **(uncertain** where the entry sits) |
+| Delete a project | "Delete this project" at the end of the project home, two clicks; "Deleted the project {name}…" | `renderHome` (`data-hdel`) | **done** (slice 12a, D-65) |
+| Undo and Redo on the home pages | the top bar's `#tUndo`, `#tRedo` on both home pages | `mutate`, `doUndo`, `doRedo` | **done** (slice 12a, D-65) |
 | A project's name and description on its home | editable fields | `renderHome` (`data-pf`) | **done** (slice 9, D-59) |
 
 **Present:** workspaces, projects and canvases as in the earlier inventory; the empty workspace's next steps name
 importing sources (7a); "New organization…" in the organization menu (slice 8, item 9), with a password, the first
 workspace's name and a summary; the new workspace keeps "First project" and "First canvas" (F6) and has no concept
 "General".
+
+**Slice 12a, deliberate differences from the prototype (PRD section 8):** after a project's delete the app shows the
+workspace home (D-38), the prototype another project's home; the app's preview names the canvases deleted and staying,
+the prototype's text is general; the undo toast names the step ("Undone: Delete project …"), the prototype says
+"Undone"; a page of a deleted project leads to the workspace home with a toast; the server refuses the last project,
+also under concurrent writes and undo. The home pages show only Undo and Redo of the canvas's top bar; the prototype
+keeps the whole bar. The delete section is left out for reviewers, readers and an archived workspace; the prototype
+draws it for everyone and refuses the change. The armed button disarms after 4 s or on blur (`ConfirmDelete`).
 
 ## Settings and roles
 
