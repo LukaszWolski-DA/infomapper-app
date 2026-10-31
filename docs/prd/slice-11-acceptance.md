@@ -219,3 +219,75 @@ names are (D-37). Table and requirement cards are unchanged."
   - **`duplicateCanvas`** copies the modes and the exceptions; `applyLookToAllCanvases` does not.
   - **S6A-10** decides whether the check boxes fit the top bar; `S1B-07` lists the card header's menu.
   - Slice 9's S9-06 and S9-11 test fixes and slice 10c's `holdAnswer` guard are on `main` (merged with slice 10c).
+
+## Step 2: data (31 October 2026)
+
+**KB's backup, before anything opened the file:**
+- Made before any build or run: `.data/backups/dev-db-20261031-1008-before-format-11.json` and
+  `.data/backups/kb-model-latest.json`, 1,437,183 bytes each, local only (git-ignored).
+- Both are byte-identical to `.data/dev-db.json` (`cmp`; SHA-256 `9074b153…cb6ab1` for all three).
+- The file holds format 10 with:
+  - 20 entities;
+  - 119 attributes (117 live);
+  - 6 canvases;
+  - 33 canvas items (32 live);
+  - 773 change events.
+
+  The counts were read from the backup copy.
+- `.data/dev-db.json` was not opened afterwards: same SHA-256 and time (09:14) at the end of the step.
+
+**Built:**
+- **Migration** `supabase/migrations/20261031100000_aliases.sql`:
+  - `entity.alias` and `attribute.alias`;
+  - `canvas.entity_names`, `canvas.attribute_names`, `canvas_item.entity_names` and `canvas_item.attribute_names`;
+  - all text and null, with CHECKs `x is null or x in ('name', 'alias')` on the four mode columns
+    (`canvas_entity_names_ck`, `canvas_attribute_names_ck`, `canvas_item_entity_names_ck`,
+    `canvas_item_attribute_names_ck`). No index.
+- **Types** (`src/domain/types.ts`): `NAME_MODES` and `NameMode`, `Entity.alias`, `Attribute.alias`,
+  `Canvas.entity_names` and `attribute_names`, `CanvasItem.entity_names` and `attribute_names`.
+- **The local adapter** (`src/data/local/schema.ts`): the same four checks (`noneOrOneOf`); `DEV_DB_FORMAT = 11`; the
+  format's doc comment.
+- **Format 11** inline in `upgradeDb` (`file.ts`):
+  - format 9's step now ends at format 10;
+  - `if (format === 10)` sets the six columns `?? null` on every entity, attribute, canvas and canvas item;
+  - no change events, no log line, the look untouched.
+
+  `readDb`'s write-back check (`was >= 2 && was < DEV_DB_FORMAT`) already covers format 10, so it needed no change.
+- **Every place that builds these rows**, with null:
+  - commands: `createEntity`, `addAttribute`, `pasteAttribute` (step 3 copies the original's alias, P10),
+    `createAttributeFromColumn`, `newCanvasItem`, `createCanvas`, the first canvases of a project and of a workspace
+    (`project.ts`, `workspace.ts`), a live canvas (`live.ts`);
+  - the seeds (`seed.ts`, `seed-model.ts`, `seed-large.ts`, `seed-large-requirement-cards.ts`, `seed-requirements.ts`);
+  - `requirement-index-synthetic.ts` and the test fixtures (`__fixtures__/domain.ts`, `import.ts`,
+    `import.test.ts`, `model-store.test.ts`).
+- **One exception to "null":** `duplicateCanvas` copies the canvas's two modes. The copied cards keep their exceptions
+  (the items are copied with `...i`), so the copy keeps the names they are exceptions to (handover).
+
+**Tests:**
+- `src/data/local/upgrade-11.test.ts` (new, 4 tests):
+  - a format-10 file gets every new column as null, keeps every row and count, writes no change event or log line,
+    and is otherwise equal;
+  - it is written back at once;
+  - a file at format 11 is read as it is, with an alias and both modes kept, and is not written again;
+  - the adapter refuses a mode other than name or alias, on a canvas and on a card.
+- `undo.test.ts`, "aliases and the canvases' names (slice 11)": change events whose images lack the new columns are
+  undone with them as null, for an entity's rename, a canvas's rename and a card's removal (slice 10c's rule, S11-12).
+- `upgrade-10.test.ts`: its format is history now. A format-10 file goes on to format 11 and keeps its links; the test
+  that read a format-10 file "as it is" now starts from a real format-10 file.
+- The format's number, 10 → 11, in the store tests (`organization-store`, `requirement-store`, `upgrade-8`,
+  `working-layer-store`) and in `S7B-12` and `S7C-02`.
+
+**Runs:**
+- `npm run lint`: passed.
+- `npm run typecheck`: passed.
+- `npm test`: 113 files, 1,474 tests, passed.
+- **The AD-31 schema check** on a throwaway Postgres 18.3 cluster in the scratchpad (`initdb -E UTF8 --locale=C`):
+  every migration applied, "The schema matches the domain: 33 tables, 446 columns" (slice 10c: 440). `pg_constraint`
+  shows the four CHECKs; `information_schema` shows the six columns as text, nullable. The cluster was stopped
+  afterwards.
+- **The two specs whose format check changed** (`S7B-12`, `S7C-02`, on the e2e data file): 2 passed (52.7 s).
+  - The first attempt never started its dev server. Next.js's font loader for `IBM_Plex_Sans` (`src/app/layout.tsx`)
+    failed with "next/font/google queries have exactly one entry".
+  - Google Fonts answered normally a minute later, and the retry passed. No test ran in the failed attempt; the cause
+    was outside the app.
+- KB was not upgraded.
