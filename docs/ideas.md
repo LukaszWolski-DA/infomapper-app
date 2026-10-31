@@ -465,3 +465,44 @@ change first.
   below.
 - **A relationship from an entity to itself** (parent and child). **Done in slice 10a** (D-61): "Relate to itself" in
   the card header's menu, drawn as a loop.
+
+## InfoCube: a dimensional modelling module (concept, 31 October 2026)
+
+A colleague asked whether InfoMapper can model facts and dimensions. Agreed with Łukasz: not inside InfoMapper's LDM,
+but as a separate module, InfoCube, built later, after the planned slices.
+
+**What it is.** A module for facts and dimensions, built mostly on LDM entities and attributes, sometimes directly on
+source columns. It holds its own mappings (LDM attribute → dimensional attribute, sometimes source column →
+dimensional attribute) and its own description (grain, measures and their additivity, SCD types, role-playing
+dimensions, perhaps bridge and junk dimensions).
+
+**Principles.**
+1. **One database, one repository.** InfoCube is an extension of InfoMapper's database and domain with its own tables,
+   not a new database or repository. It shares the standard columns, soft deletes, versions (AD-12), change events and
+   undo (AD-13), the save chain, the migrations and the local data file's format.
+2. **One-way dependency.** InfoCube's tables point to InfoMapper's (entity, attribute, concept, requirement), never the
+   other way. InfoMapper works without InfoCube.
+3. **Impact analysis crosses the modules through one extension point.** When InfoMapper deletes or changes an object
+   that InfoCube uses, its impact preview (D-47, slice 10c's second click) shows InfoCube's dependencies. Modules report
+   their dependencies on an object; InfoMapper shows them without knowing their details.
+4. **LDM is InfoCube's upstream.** Changes to LDM entities and attributes reach InfoCube as changes to resolve, as source
+   imports reach mappings today (D-56). That mechanism should be generalised rather than copied.
+5. **Requirements and concepts are shared**, so requirement coverage and "everything about a concept" span both layers:
+   source → LDM → dimensional → requirement.
+
+**Open question for the module's design.** Are facts and dimensions InfoCube's own tables, or InfoMapper entities with a
+layer, plus InfoCube's tables for their dimensional description? Own tables give a clean module boundary; entities with a
+layer reuse panels, relationships, copied attributes (D-63), aliases (D-64) and the canvas.
+
+**Other open points.** Reading LDM from other workspaces (an organisation-level repository) is a new concept with rights
+to design; start within one workspace. Two feeds of one dimensional attribute (from LDM and from a source) are allowed,
+and the model validator reports them. Stay at the logical level: technical SCD columns are a dimension's property, not
+attributes, unless asked otherwise.
+
+**What already fits.** Concepts as the link across layers; relationships (a fact → dimension relationship is many to
+one); copied attributes for dimension keys in a fact (D-63); aliases as business names (D-64); requirements; the model
+validator (a fact without a grain, a fact without dimension keys, a non-numeric measure); role names per relationship
+end (role-playing dimensions).
+
+**Until then.** No InfoMapper decision should close this path. When generalising changes to resolve or building the
+validator, design them for reuse by modules.
