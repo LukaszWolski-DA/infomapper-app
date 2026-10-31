@@ -789,7 +789,7 @@ columns".
 That is 18 runs of S10C-13 and no failure. The first full run's failure is not reproduced, and its cause is not known.
 The traces are in `.data/s10c13-repro/` and `.data/s10c13-repro2/`.
 
-**Second full e2e run** (from scratch, no dev server running, 01:07 to 02:22): 453 passed, 3 failed, 1 skipped, **4,492 s**
+**Second full e2e run** (from scratch, no dev server running, 00:07 to 01:22): 453 passed, 3 failed, 1 skipped, **4,492 s**
 (first run 4,975 s; slice 10b 3,977 s for 443 tests). Before the start the machine was nearly idle:
 - CPU load 5 to 13 % (one 40 % reading); the only processes using CPU were Claude, dwm, iCloud, WMI and PSExpress;
 - Windows Search running;
