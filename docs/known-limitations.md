@@ -733,6 +733,15 @@ load. That was after `05d0a04`, slice 7b's fix for the race on REQ-101's card. I
 unknown, because the run's error text was lost (the output was filtered, and the reruns replaced `test-results/`). In
 the next full run, keep the failing test's error output before rerunning it.
 
+### S10C-13 failed once in slice 10c's first closing run
+
+In the first closing full run of slice 10c (30 October 2026), S10C-13 (`e2e/slice-10c/S10C-13.spec.ts`) failed once:
+after the page's refresh, Undo stayed disabled, though the type change was stored and the copy pasted as test data. On
+its own it passed 3 of 3. Under load, with S10C-09 and S9-11 or with S0-10, it passed 18 repeats (`--repeat-each`, one
+worker, traces on, about 15 minutes). The cause is unknown; the first run's trace was lost to the reruns, and the
+repeats' traces are in `.data/s10c13-repro/` and `.data/s10c13-repro2/`. In the next full runs, keep its trace and error
+output if it fails (copy `test-results/` and the log before any rerun).
+
 ## Source import (slice 7a)
 
 ### Every write rewrites the whole local data file
@@ -889,6 +898,16 @@ by someone removed later shows "someone" instead of their name; anything written
   go to `rowSaves.answer`. A panel save of such a row (a table's or column's note) started while the action is on its
   way still sends the version it knows and can be refused as a false conflict. The reason: only the server knows which
   tables, columns and mappings an action writes, so the browser cannot hold those rows before it is sent (`saveRows`).
+
+### Typing into a field while its save is on its way (slice 9; found in slice 10c)
+
+A field that saves an object's row is keyed by its stored value (`fieldKey`, `src/app/_panels/fields.tsx`; the
+project's name on its home, `project-heading.tsx`, and the panels' fields). The save's answer brings the fresh page with
+the new value, so React replaces the field with a new one. Text typed into the field after the save was sent and before
+its answer arrives is lost with the old field, and so is the focus: an Enter pressed after that goes nowhere, and
+nothing is saved. It happens when someone clicks back into the field and types within the save's round trip (about
+0.2 s on an idle laptop, seconds on a slow server). An Enter or a click elsewhere pressed before the answer arrives saves
+the second text as usual, after the first (`rowSaves`). Planned with slice 13 ("keep the typed value").
 
 ### Copies of attributes (slice 10c, D-63)
 

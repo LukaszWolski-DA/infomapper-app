@@ -813,3 +813,38 @@ Its results are kept in `.data/e2e-10c-close-run2/`.
     test.
   - Proposed fix: wait for the refresh before the second name, for example for the breadcrumbs to show the long name.
     Not built.
+
+### Łukasz's answers to the second run (30 October 2026), and the fixes
+
+- **`holdAnswer`:** `route.fulfill` is caught. If the test has failed or timed out and its page is closed, nothing is
+  left to answer.
+- **S9-11:** after Escape, the field must show the view's zoom (`viewZoom`, the transform's scale rounded as the field
+  rounds it). It must also differ from the zoom before the pinch made while typing (`pinched`). It is no longer compared
+  with `fitted`, because −200 and +200 can return to it exactly.
+- **S9-06 at tag slice-10b** (the `infomapper-ab-main` worktree, the same Next.js 16.3.8, Playwright 1.63.0 and lock file):
+  - 3 of 3 passed, then 4 of 5 passed in turns with this branch. Round 4 stopped before any test ran: no test result,
+    no error context.
+  - In the same turns this branch passed 5 of 5.
+  - Over all runs: slice-10b had no test failure in 7 runs; this branch failed 3 times in 11 (2 in 3, 1 in 3, 0 in 5).
+  - Slice 10c did not change the field's code (`project-heading.tsx`, `fieldKey`, `use-action.ts`, `row-saves.ts`).
+    The test's race depends on when the save's answer arrives.
+- **A user can hit it.** This is from the code; it was not checked by hand, because the dev server's file is KB.
+  - The name field is keyed by its stored value. Its save's answer (`revalidatePath`, in the same response) replaces
+    the field.
+  - Text typed after clicking back into the field during the round trip is lost with the old field, and so is the
+    focus. The Enter after that saves nothing.
+  - An Enter pressed before the answer arrives saves the second name after the first.
+  - The panels' fields behave the same way (28 fields with `fieldKey`).
+  - Recorded in `docs/known-limitations.md` ("Typing into a field while its save is on its way") and under slice 13 in
+    `docs/ideas.md`.
+- **S9-06 fixed:** before the second name it waits for the breadcrumbs to show the long name, which happens in the same
+  render that replaces the field.
+- **S10C-13:** a line in `docs/known-limitations.md` ("S10C-13 failed once in slice 10c's first closing run").
+- **S8-12:** accepted as a slow server; nothing changed.
+
+**Runs after the fixes**, each file three times on its own:
+- S9-06: 3 of 3 passed.
+- S9-11: 3 of 3 passed.
+- S10C-09: 3 of 3 passed.
+
+CI: lint passed, typecheck passed, `npm test` 112 files, 1,469 tests, passed. No third full run, as only tests changed.

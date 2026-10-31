@@ -35,7 +35,8 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 - **12: the home pages:** undo and redo there, deleting a project, and the canvas tiles' thumbnails after measuring the
   home's load.
 - **13: one behaviour for a refused save in every field** (F6, above), with the typed value kept on a conflict (the
-  first entry).
+  first entry). Also keep text typed into a field while its save is on its way: the save's answer replaces the field
+  (keyed by its stored value) and the typed text and focus are lost (`docs/known-limitations.md`, slice 10c).
 
 ## A model validator (slice 10c, PRD section 9)
 
