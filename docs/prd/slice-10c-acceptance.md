@@ -765,3 +765,51 @@ once in the full run only; its trace was lost to the reruns, so its cause is not
 
 **KB's backup:** `.data/backups/dev-db-20261030-1914.json` and `.data/backups/kb-model-latest.json` (1,433,482 bytes,
 the same as `.data/dev-db.json`; local only, git-ignored).
+
+### Before the merge (Łukasz, 30 October 2026)
+
+**GitHub checks on PR 27:** "check" passed (1 min 25 s). "migrations" passed (44 s): Postgres 17.11 applied
+`20261030160000_attribute_copied_from.sql`, and the schema check read "The schema matches the domain: 33 tables, 440
+columns".
+
+**`holdAnswer` (S10C-09):**
+- **Scope.** The route lives on the test's page (its own browser context) and only for S10C-09. It holds one answer at
+  most (`held`), and it sends the request to the server at once (`route.fetch()`), so nothing waits on the server.
+  Every other request goes through with `route.continue()`. Playwright runs one worker, in file order.
+- **Not a cause.** S0-10, S8-12, S9-06 and S9-11 run before S10C-09. S10C-09 passes only after the held answer has been
+  given, because the copy's delete waits for it, so S10C-13 starts after the release.
+- **Finding.** If S10C-09 failed or timed out within the 2 s hold, the page would close, and `route.fulfill` would throw
+  "Target page, context or browser has been closed" inside the handler. Proposed fix: catch it in the helper, or call
+  `page.unrouteAll({ behavior: "ignoreErrors" })` at the test's end. Not built; waiting for Łukasz.
+
+**S10C-13 under load:** run with `--repeat-each`, one worker, traces on.
+- With S10C-09 and S9-11 (10 rounds, 6.2 min): 50 passed.
+- With S0-10 and S10C-09 (8 rounds, 8.8 min): 24 passed.
+
+That is 18 runs of S10C-13 and no failure. The first full run's failure is not reproduced, and its cause is not known.
+The traces are in `.data/s10c13-repro/` and `.data/s10c13-repro2/`.
+
+**Second full e2e run** (from scratch, no dev server running, 01:07 to 02:22): 453 passed, 3 failed, 1 skipped, **4,492 s**
+(first run 4,975 s; slice 10b 3,977 s for 443 tests). Before the start the machine was nearly idle:
+- CPU load 5 to 13 % (one 40 % reading); the only processes using CPU were Claude, dwm, iCloud, WMI and PSExpress;
+- Windows Search running;
+- 2.9 GB of 8 GB RAM free on an i7-8550U;
+- no node process.
+
+Its results are kept in `.data/e2e-10c-close-run2/`.
+- **S8-12** failed at its first sign-in. The trace shows the workspace page answered in **10.9 s**, against about 0.4 s
+  in the same file's earlier sign-ins. The 15 s wait ran out about 1 s before the page could be drawn. The server was
+  slow; the test is not wrong. Alone: 3 of 3 passed.
+- **S9-11** failed at line 91 with "41%", exactly as in the first run. Alone: 3 of 3 passed. The check compares the
+  field after Escape with `fitted`. Two pinches of +200 and −200 can bring the zoom back to `fitted`, which is correct
+  behaviour, so the check is weak.
+- **S9-06** ("no length rule…") failed, and alone it **failed 2 of 3**. The trace shows one POST only (the long name);
+  "Order management" was never sent.
+  - The field is keyed by its stored value (`fieldKey`, `project-heading.tsx`), so it is replaced when the save's
+    refresh arrives.
+  - The test waits for the file (`loadProject`) and then for the old field's typed value. It types the second name
+    into the field that the refresh then replaces, so the Enter saves nothing.
+  - Slice 10c did not change `project-heading.tsx`, `fieldKey`, `use-action.ts` or `row-saves.ts`: a race in slice 9's
+    test.
+  - Proposed fix: wait for the refresh before the second name, for example for the breadcrumbs to show the long name.
+    Not built.
