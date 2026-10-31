@@ -1,6 +1,6 @@
 # Slice 11 – acceptance
 
-Status: **step 1 answered by Łukasz (31 October 2026); step 2 next, in a new session.** No application code yet.
+Status: **steps 1–3 done and answered by Łukasz (31 October 2026); step 4 (the interface) next, in a new session.**
 
 - Tag `slice-10c` is at `72ef24b`, as A1 says. Branch `slice/11-aliases` was made from that tag.
 - The PRD is copied unchanged from `~/Downloads/slice-11-aliases.md` (24,332 bytes; the only file with that name; its
@@ -190,57 +190,62 @@ names are (D-37). Table and requirement cards are unchanged."
 
 ## Handover for the next session
 
-- **State after step 2 (31 October 2026):** branch `slice/11-aliases`, from tag `slice-10c` (`72ef24b`). The last
-  commits are step 2's docs ("docs: slice 11 step 2, …"; `git log --oneline -8` shows the slice). Not pushed.
-  - Step 2 is done and KB is at format 11.
+- **State after step 3 (31 October 2026):** branch `slice/11-aliases`, from tag `slice-10c` (`72ef24b`). Not pushed.
+  - The last commit is "docs: slice 11 step 3 answered, handover for step 4" (`git log --oneline -10` shows the slice);
+    step 3's code is the commit before it, `6fe7a7f` ("feat: slice 11 step 3, …").
+  - Steps 1–3 are done and answered. KB is at format 11; step 3 did not open `.data/dev-db.json`.
   - The newest KB backup is `.data/backups/dev-db-20261031-1008-before-format-11.json`, also saved as
-    `kb-model-latest.json`; it is the format-10 file.
-- **What step 3 (the domain) must know:**
-  - **The columns exist and are null everywhere.** `pasteAttribute` still writes `alias: null`; step 3 sets
-    `alias: original.alias` (P10, D-63's addition). `alias` is not a followed column (`FOLLOWED_COLUMNS` stays).
-  - **`duplicateCanvas` already copies the canvas's two modes**, and the cards' exceptions come with `...i`.
-  - **Commands to build:**
-    - `alias` in `updateEntity` and `updateAttribute`: trimmed, an empty alias stored as null, no uniqueness, the
-      name's rights, refused when archived;
-    - `setCanvasNames(canvasId, dimension, mode, cards[])`, shaped like `resetCanvasView`: it checks only the cards'
-      versions, and the canvas row is read as it stands (F2, last write wins);
-    - `entityNames` and `attributeNames` in `updateCanvasItem`: entity cards only, null when equal to the canvas's
-      mode, `state.canvas` already passed;
-    - the search's matching with the hint texts (F13) in `tree-data.ts` `show` (step 4 draws it; the matching is
-      domain-side pure code in `src/app/_panels/tree-data.ts`, unit-tested there).
-  - **Undo needs no new code:** canvas and `canvas_item` are undoable tables, and the modes are not in the look.
-  - **Rights:** the control and the card exceptions are for editors (`canvas.edit_items`, as `resetCanvasView` and
-    `updateCanvasItem`); the alias edits need `model.edit`.
-  - **Step 3's earlier specs and the undo history's names:** list the names for approval (`changeLabel` or a write
-    set's `label`).
-- **History, done:** step 2 started with KB's backup, before anything opened `.data/dev-db.json`, as below.
-- **(Done) Step 2 started with KB's backup,** before anything opened `.data/dev-db.json`:
-  `.data/backups/dev-db-<yyyymmdd-hhmm>-before-format-11.json`, byte-identical (`cmp`), path and size reported. The
-  newest backup also goes to `.data/backups/kb-model-latest.json`. No `seed`, `reset-dev-data`, dev server or e2e run
-  before it (the e2e runs use `.data/e2e-db.json`, but run none before the backup anyway).
-- **Step 2's shape** (as format 10 in slice 10c):
-  - a migration `supabase/migrations/<time>_aliases.sql` with `entity.alias`, `attribute.alias`,
-    `canvas.entity_names`, `canvas.attribute_names`, `canvas_item.entity_names`, `canvas_item.attribute_names`, each
-    text null; CHECK `in ('name','alias')` on the four mode columns;
-  - the types (`src/domain/types.ts`), the local schema's checks (`src/data/local/schema.ts`), `DEV_DB_FORMAT = 11`;
-  - format 11 inline in `upgradeDb` (`src/data/local/file.ts`): `??= null` on the six columns, no change events;
-  - every place that builds these rows (F12);
-  - tests as `upgrade-10.test.ts`; the AD-31 schema check on a local Postgres in the scratchpad, made with
-    `initdb -E UTF8 --locale=C` (a WIN1252 cluster fails on "Ł");
-  - KB's upgrade only after Łukasz's go, through `readDb`, with counts before and after.
-- **Not yet in the PRD, known from step 1:**
-  - **Shown text:** because toasts keep the name (Q-B), cards keep `name`. `ModelCanvas` adds a shown text per entity
-    card and row when it builds nodes (`alias` when the effective mode is alias and the alias is set). `CardNode`
-    (header, rows, low-zoom block and their `title`s), `BlockNode`'s member list, `text-fit.ts` (`withClips`), "Fit
-    width to names" and the requirement drop hint read the shown text; toasts, questions and pin names read `name`.
-  - **Exceptions on the card's data:** `buildCards` passes the item's two exceptions and the alias only when set.
-  - **The check boxes' state** comes through a store published by `ModelCanvas` from an effect, as `viewCounts`
-    (`src/canvas/view-counts.ts`); the indeterminate state is the DOM property set in an effect.
-  - **The canvas's new version** from the control's answer goes to the look provider (`look.tsx`, `versionRef`), so a
-    look change right after it is not refused.
-  - **`duplicateCanvas`** copies the modes and the exceptions; `applyLookToAllCanvases` does not.
-  - **S6A-10** decides whether the check boxes fit the top bar; `S1B-07` lists the card header's menu.
-  - Slice 9's S9-06 and S9-11 test fixes and slice 10c's `holdAnswer` guard are on `main` (merged with slice 10c).
+    `kb-model-latest.json` (the format-10 file).
+- **What step 4 (the interface) must know, beyond the PRD:**
+  - **The domain is ready** (step 3 below): the alias in `updateEntity`/`updateAttribute`, `pasteAttribute`'s alias,
+    `entityNames`/`attributeNames` in `updateCanvasItem`, `setCanvasNames` (`canvas.ts`), and in
+    `src/domain/model/aliases.ts` `canvasMode`, `cardMode`, `exceptionFor`, `namesControl`, `shownName`,
+    `cardShownNames`.
+  - **Server actions:**
+    - `updateEntityAction` and `updateAttributeAction` pass the input through, so `alias` already works through them;
+      the panels' field goes through `saveRow` as any field (slice 9).
+    - `updateCardAction` (`src/app/_actions/canvas-item.ts`) already takes `entityNames`/`attributeNames` and loads the
+      card's canvas for them (the command refuses without it). That file has CRLF line ends in the working copy; edit it
+      with the Edit tool, not a script that rewrites line ends.
+    - **`setCanvasNames` has no action yet:** add it beside `resetCanvasViewAction` (`src/app/_actions/frame.ts`, the
+      `onCanvas` helper) and pass it to the canvas page's `writes` as `resetCanvasView` is
+      (`c/[canvasId]/page.tsx`). Send it through the canvas's queue (`enqueueGroup`, `useFrames.ts`, as `resetView`),
+      with the cards' versions as shown. Its answer's `versions` holds the canvas's new version: give it to the look
+      provider (`src/canvas/look.tsx`, `versionRef`) so a look change right after it is not refused (F2); the cards'
+      versions go back as `resetView`'s do.
+  - **Undo names come from the commands** (write set `label`), approved: the canvas's control "Show entity aliases",
+    "Show entity names", "Show attribute aliases", "Show attribute names"; a card's choice "Show entity alias on
+    card", "Show entity name on card", "Show attribute aliases on card", "Show attribute names on card"; an alias alone
+    "Change entity alias", "Change attribute alias" (`changeLabel`). The card's label needs `state.canvas`, which the
+    action passes.
+  - **The search already works once the tree carries aliases:** `buildTree` adds `alias`/`aliases` only when set and
+    `show` gives the hints; the left panel's `TreeItem` draws `hint` as it is. Step 4 only checks it on the page
+    (S11-08) and takes the screenshot.
+  - **The shown text (F8 as changed by Q-B):** cards keep `name` (toasts, questions, pin names). `buildCards`
+    (`card-data.ts`) must pass the entity's and each row's `alias` only when set, and the card's two exceptions;
+    `ModelCanvas` computes the shown text when it builds nodes (`cardShownNames` with the canvas's modes) and feeds it
+    to `CardNode` (header, rows, low-zoom block and their `title`s), `BlockNode`'s member list, `withClips`
+    (`text-fit.ts`), "Fit width to names" and the requirement drop hint. Mapping tooltips keep the model's names.
+    One `ModelCanvas` commit per switch (S11-13 checks it in step 5).
+  - **The check boxes' state:** `namesControl(canvas, items, dimension)` gives `name`, `alias` or `mixed`; publish it
+    from `ModelCanvas` in an effect through a store, as `viewCounts` (`src/canvas/view-counts.ts`), and set the
+    `indeterminate` DOM property in an effect. A click: `mixed` or `name` → `alias`, `alias` → `name`. Disabled for
+    reviewers and readers (F6). Nothing above the canvas reads layout during a commit (CLAUDE.md).
+  - **Accepted behaviour (Łukasz, step 3):** switching to names stores null; the control also clears an exception
+    equal to the new mode, so after a click nothing is mixed; both of a card's dimensions in one call is "Change
+    card" (the menu sends one at a time).
+  - **The card menu:** two segments after "Rows" in `canvas-host.tsx` (`seg`, `options`, `on`), under `editable`, on
+    entity cards only; the segment shows `cardMode`, a click sends the choice (the command stores null when it equals
+    the canvas's mode). `S1B-07` lists the menu exactly and gains them.
+  - **Top bar:** the check boxes after the layer switch, into "More" up to 1,200 px with Focus (`MORE_FOCUS`,
+    `more-breakpoints.ts`); `S6A-10` decides whether they fit.
+  - **Texts approved in step 1, built in step 4 and listed again for final approval:** the check boxes, their
+    tooltips and the disabled tooltip, the card segments, the panel field "Alias" and its placeholder, D-64's text.
+  - **Tests:** specs S11-01 to S11-11 in `e2e/slice-11/` with their own `fixtures.ts`/`helpers.ts`; aliases written
+    as test data through the domain or into the e2e file only (A4: the seed gets none). Earlier specs to run: the cards,
+    panels, look controls and search, plus `S1B-07` and `S6A-10`. Stop the preview server before any Playwright run.
+- **History, done:** step 2 started with KB's backup before anything opened `.data/dev-db.json`; its shape and runs are
+  under "Step 2: data". Step 3's are under "Step 3: the domain".
 
 ## Step 2: data (31 October 2026)
 
@@ -419,3 +424,14 @@ soon as the tree carries aliases; step 4 checks it on the page.
   - the paste: `S10C-01`, `S10C-02`.
   - The dev server logged one "The destination stream closed early" during `S6A-03`'s live-canvas test, which passed
     (a page left while its response streamed; not an app error).
+
+### Łukasz's answers to step 3 (31 October 2026)
+
+- **The new texts are approved:** the refusal "Only entity cards show aliases."; the eight undo history names of the
+  check boxes ("Show entity aliases", "Show entity names", "Show attribute aliases", "Show attribute names") and of a
+  card's choice ("Show entity alias on card", "Show entity name on card", "Show attribute aliases on card", "Show
+  attribute names on card"); "Change entity alias" and "Change attribute alias".
+- **The three assumptions are accepted:**
+  - switching a canvas to names stores null;
+  - the check box also clears a card exception that equals the new mode;
+  - both of a card's dimensions in one call is named "Change card".
