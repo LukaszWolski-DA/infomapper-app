@@ -1,6 +1,6 @@
 # Slice 11 – acceptance
 
-Status: **steps 1–3 done and answered by Łukasz (31 October 2026); step 4 (the interface) next, in a new session.**
+Status: **steps 1–4 done and answered, step 5 (the measurement sitting) done (31 October 2026); the closing next, after Łukasz's answers to step 5.**
 
 - Tag `slice-10c` is at `72ef24b`, as A1 says. Branch `slice/11-aliases` was made from that tag.
 - The PRD is copied unchanged from `~/Downloads/slice-11-aliases.md` (24,332 bytes; the only file with that name; its
@@ -190,61 +190,34 @@ names are (D-37). Table and requirement cards are unchanged."
 
 ## Handover for the next session
 
-- **State after step 3 (31 October 2026):** branch `slice/11-aliases`, from tag `slice-10c` (`72ef24b`). Not pushed.
-  - The last commit is "docs: slice 11 step 3 answered, handover for step 4" (`git log --oneline -10` shows the slice);
-    step 3's code is the commit before it, `6fe7a7f` ("feat: slice 11 step 3, …").
-  - Steps 1–3 are done and answered. KB is at format 11; step 3 did not open `.data/dev-db.json`.
-  - The newest KB backup is `.data/backups/dev-db-20261031-1008-before-format-11.json`, also saved as
-    `kb-model-latest.json` (the format-10 file).
-- **What step 4 (the interface) must know, beyond the PRD:**
-  - **The domain is ready** (step 3 below): the alias in `updateEntity`/`updateAttribute`, `pasteAttribute`'s alias,
-    `entityNames`/`attributeNames` in `updateCanvasItem`, `setCanvasNames` (`canvas.ts`), and in
-    `src/domain/model/aliases.ts` `canvasMode`, `cardMode`, `exceptionFor`, `namesControl`, `shownName`,
-    `cardShownNames`.
-  - **Server actions:**
-    - `updateEntityAction` and `updateAttributeAction` pass the input through, so `alias` already works through them;
-      the panels' field goes through `saveRow` as any field (slice 9).
-    - `updateCardAction` (`src/app/_actions/canvas-item.ts`) already takes `entityNames`/`attributeNames` and loads the
-      card's canvas for them (the command refuses without it). That file has CRLF line ends in the working copy; edit it
-      with the Edit tool, not a script that rewrites line ends.
-    - **`setCanvasNames` has no action yet:** add it beside `resetCanvasViewAction` (`src/app/_actions/frame.ts`, the
-      `onCanvas` helper) and pass it to the canvas page's `writes` as `resetCanvasView` is
-      (`c/[canvasId]/page.tsx`). Send it through the canvas's queue (`enqueueGroup`, `useFrames.ts`, as `resetView`),
-      with the cards' versions as shown. Its answer's `versions` holds the canvas's new version: give it to the look
-      provider (`src/canvas/look.tsx`, `versionRef`) so a look change right after it is not refused (F2); the cards'
-      versions go back as `resetView`'s do.
-  - **Undo names come from the commands** (write set `label`), approved: the canvas's control "Show entity aliases",
-    "Show entity names", "Show attribute aliases", "Show attribute names"; a card's choice "Show entity alias on
-    card", "Show entity name on card", "Show attribute aliases on card", "Show attribute names on card"; an alias alone
-    "Change entity alias", "Change attribute alias" (`changeLabel`). The card's label needs `state.canvas`, which the
-    action passes.
-  - **The search already works once the tree carries aliases:** `buildTree` adds `alias`/`aliases` only when set and
-    `show` gives the hints; the left panel's `TreeItem` draws `hint` as it is. Step 4 only checks it on the page
-    (S11-08) and takes the screenshot.
-  - **The shown text (F8 as changed by Q-B):** cards keep `name` (toasts, questions, pin names). `buildCards`
-    (`card-data.ts`) must pass the entity's and each row's `alias` only when set, and the card's two exceptions;
-    `ModelCanvas` computes the shown text when it builds nodes (`cardShownNames` with the canvas's modes) and feeds it
-    to `CardNode` (header, rows, low-zoom block and their `title`s), `BlockNode`'s member list, `withClips`
-    (`text-fit.ts`), "Fit width to names" and the requirement drop hint. Mapping tooltips keep the model's names.
-    One `ModelCanvas` commit per switch (S11-13 checks it in step 5).
-  - **The check boxes' state:** `namesControl(canvas, items, dimension)` gives `name`, `alias` or `mixed`; publish it
-    from `ModelCanvas` in an effect through a store, as `viewCounts` (`src/canvas/view-counts.ts`), and set the
-    `indeterminate` DOM property in an effect. A click: `mixed` or `name` → `alias`, `alias` → `name`. Disabled for
-    reviewers and readers (F6). Nothing above the canvas reads layout during a commit (CLAUDE.md).
-  - **Accepted behaviour (Łukasz, step 3):** switching to names stores null; the control also clears an exception
-    equal to the new mode, so after a click nothing is mixed; both of a card's dimensions in one call is "Change
-    card" (the menu sends one at a time).
-  - **The card menu:** two segments after "Rows" in `canvas-host.tsx` (`seg`, `options`, `on`), under `editable`, on
-    entity cards only; the segment shows `cardMode`, a click sends the choice (the command stores null when it equals
-    the canvas's mode). `S1B-07` lists the menu exactly and gains them.
-  - **Top bar:** the check boxes after the layer switch, into "More" up to 1,200 px with Focus (`MORE_FOCUS`,
-    `more-breakpoints.ts`); `S6A-10` decides whether they fit.
-  - **Texts approved in step 1, built in step 4 and listed again for final approval:** the check boxes, their
-    tooltips and the disabled tooltip, the card segments, the panel field "Alias" and its placeholder, D-64's text.
-  - **Tests:** specs S11-01 to S11-11 in `e2e/slice-11/` with their own `fixtures.ts`/`helpers.ts`; aliases written
-    as test data through the domain or into the e2e file only (A4: the seed gets none). Earlier specs to run: the cards,
-    panels, look controls and search, plus `S1B-07` and `S6A-10`. Stop the preview server before any Playwright run.
-- **History, done:** step 2 started with KB's backup before anything opened `.data/dev-db.json`; its shape and runs are
+- **State after step 5 (31 October 2026):** branch `slice/11-aliases`, from tag `slice-10c` (`72ef24b`). Not pushed.
+  - The last commit is "docs: slice 11 step 5, the measurement sitting" (`4f5d337`). Steps 1–4 are done and answered;
+    step 5's figures wait for Łukasz's answers (the time bar, AD-24's addition) before the closing.
+  - KB is at format 11 and was not opened after step 2. The newest KB backup is
+    `.data/backups/dev-db-20261031-1008-before-format-11.json` (also `kb-model-latest.json`, the format-10 file).
+- **What the closing (step 6) must know, beyond the PRD:**
+  - **Answers still open from step 5:** the proposed time bar (60 ms at 30 %, 300 ms dense, p95 350 ms) and AD-24's
+    addition. Łukasz may also ask for another tint colour (`--im-alias-soft`, `globals.css`) after the screenshots.
+  - **Accepted already:** D-64 and D-63's addition are in `docs/decisions.md`; the 1,300 px step for the check boxes
+    goes into CLAUDE.md (the "View-state bar" paragraph says "More" takes Focus and the notation up to 1,200 px and the
+    four tools up to 1,100 px: add the check boxes up to 1,300 px, `MORE_NAMES`, and the working context's label at
+    90 px from 1,201 to 1,300 px).
+  - **Docs to write** (PRD section 10): `data-model-v2.md` (the six columns, format 11, a stored exception differs from
+    the canvas's mode, names stored as null); `inventory-prototype-vs-app.md`; `ideas.md` (alias done, section 9's
+    entries, the plan: 11 done, next 12); `known-limitations.md` (F11: a later mode change blocks undo of an older rename
+    of the same canvas); README and CLAUDE.md (slice status; aliases and the shown text: `applyNames`, `shownText`,
+    `namesState`, `setNames`, the names' version key on fresh pages; the miniature keyed on what it draws; the slice 11
+    helpers and `measure.ts`; the commands `COMMITS=1 npx playwright test e2e/slice-11/S11-13-commits.spec.ts`,
+    `MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-11/S11-13.spec.ts`,
+    `SCREENS=<folder> npx playwright test e2e/slice-11/S11-screens.spec.ts`; the element guard's page total is +6 over
+    `slice-08.json`, explained per element in step 5).
+  - **Tests to know:** slice 11's specs run in a 1,536 × 864 window (`e2e/slice-11/fixtures.ts`), because up to
+    1,300 px the check boxes are in "More". `S6A-10` was changed for the step.
+  - **Then:** one full e2e run (keep a failing test's error text and trace before rerunning), CI and the pull request
+    with both GitHub checks, a KB backup, the manual acceptance scenario on KB. Merge and tag only on Łukasz's command.
+  - **Scratch files:** `.data/verify-db.json` and `.data/preview-db.json` hold demo data and "Performance test"
+    (git-ignored; overwriting them is fine, KB is `.data/dev-db.json`).
+- **History, done:** step 4's handover notes are under "Step 4" (what was built); step 2 started with KB's backup before anything opened `.data/dev-db.json`; its shape and runs are
   under "Step 2: data". Step 3's are under "Step 3: the domain".
 
 ## Step 2: data (31 October 2026)
