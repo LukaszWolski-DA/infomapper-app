@@ -1,6 +1,6 @@
 # Slice 12a – acceptance
 
-Status: **step 4 (deleting a project) done; waiting for Łukasz before step 5 (closing).**
+Status: **step 5 (closing) done; waiting for Łukasz's manual acceptance, then his command to merge and tag `slice-12a`.**
 
 - Branch `slice/12a-home-undo-project-delete`, made on 31 October 2026 from `main` at `de2af7f` (the start commit). Tag
   `slice-11` is at `6c231c6`; `main` is one docs-only merge past it (PR 29, the InfoCube idea in `docs/ideas.md`), so
@@ -406,6 +406,87 @@ project {project}. The model is untouched."). The server's "A workspace needs at
 
 **How to check:** `npx playwright test e2e/slice-12a`. By hand on the demo data: open Order management's home, read
 the section at its end, click twice, press Undo in the toast; then open the project's old address from the history.
+
+## Step 5: closing (31 October 2026)
+
+Łukasz accepted step 4 with two additions: D-65 gets a sentence on the history after one's own delete (F28), and the
+back-forward cache becomes a known limitation and an idea, not built in 12a.
+
+**Docs (PRD section 10, and the answers since)**
+
+- `docs/decisions.md`:
+  - **D-65**, new, with step 1's two sentences (only the person who deleted it undoes it; the undo refused as a whole)
+    and the history sentence;
+  - the changes of D-29 (pins are undo steps), D-58 ("they are not undo steps"), D-59 (undone from any page of the
+    workspace);
+  - D-28's addition (a project is deleted from its home; the last one cannot be);
+  - AD-05's note (`project.delete`).
+- `docs/known-limitations.md`:
+  - **removed:** "No undo outside canvases". What stays true moved: the history per person and workspace is in "The
+    undo history lives in server memory", with the delete lost after a restart (F27); a label's delete bringing its
+    pins back is in D-29 and the tests;
+  - **new:** "A project's delete: its undo is all or nothing" (F6); "The last project under concurrent writes" (F8,
+    fixed in the local adapter, a note for the database slice); "Back onto a page restored from the browser's
+    back-forward cache" (step 4);
+  - **added to:** "'At least one canvas' can race", with the shared canvas left in no project (Q-B).
+- `docs/ideas.md`:
+  - the plan: 12a done, next 12b;
+  - "Undo and redo on the project and workspace home pages" done;
+  - "Deleting a project: what comes later" (PRD section 9);
+  - "Refresh a page restored from the back-forward cache".
+- `docs/inventory-prototype-vs-app.md`: "Delete a project" done, its source corrected to `renderHome` (`data-hdel`);
+  "Undo and Redo on the home pages" done; the slice's deliberate differences (PRD section 8, plus the top bar, the
+  section's visibility and the arm's timeout).
+- `docs/data-model-v2.md` section 11: the projects' rules (the last project, what a delete takes, the live label);
+  no table changes (A2).
+- `README.md` (status, the slice's features, the acceptance link) and `CLAUDE.md` (what this is, the screenshot
+  command, slice 12a's e2e helpers and the back-forward cache note for tests, the architecture note "Undo on the home
+  pages and a project's delete").
+
+**S12A-13 (the element guard):** `npm run measure:build`, then `MEASURE=1 MEASURE_BUILD=production
+ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts`
+passes (65 s with the build).
+
+| View | Viewport (slice 8 → 12a) | Page total (slice 8 → 12a) |
+| --- | --- | --- |
+| 30 %, expanded | 4,508 → 4,508 | 5,994 → 6,000 |
+| 100 %, expanded | 19,305 → 19,305 | 20,791 → 20,797 |
+| 30 %, collapsed | 1,465 → 1,465 | 2,861 → 2,867 |
+| 100 %, collapsed | 4,907 → 4,907 | 6,303 → 6,309 |
+
+The viewport counts are equal. The page totals are +6, the same as slice 11's (the names' check boxes, S11-13), so
+slice 12a adds nothing to the canvas page.
+
+**Full e2e run** (from scratch, no dev server running): **481 passed, 2 skipped, 3 failed, 4,901 s** (1 h 22 min),
+against slice 10a's 4,646 s with 78 fewer tests. The failures:
+
+- `S9-08` and `S10C-02`: timed out at sign-in (`bar-top` not shown within 15 s), as slice 10a's two flakes did; nothing
+  of slice 12a on that path.
+- `S12A-02`: the dev server restarted during the test ("Server is approaching the used memory threshold,
+  restarting..."), and the page after the undo was the error page; the undo itself had been stored and its toast shown.
+
+Output and traces are kept in `.data/e2e-failures/12a-close-1/` (git-ignored). Each file three times on its own: all
+passed, 3 of 3 (S9-08 75 s, 59 s, 52 s; S10C-02 41 s, 43 s, 40 s; S12A-02 34 s, 36 s, 35 s). Flakes, not bugs.
+
+**CI:** lint and typecheck pass; `npm test`: 117 files, 1,530 tests pass.
+
+**Backup of KB:** `.data/backups/dev-db-20261031-2038.json` and `.data/backups/kb-model-latest.json`, both identical to
+`.data/dev-db.json` (SHA-256 `f530d1aa…`), git-ignored. No format change in this slice (P12), so nothing upgrades the
+file.
+
+**Manual acceptance (on KB, after the backup):**
+
+1. In "Kanton Basel", move a card on a canvas, open the project home and press Undo there ("Undone: Move card on
+   {canvas}"), then Redo.
+2. Rename the project on its home, click outside the field, press Ctrl+Z ("Undone: Rename project").
+3. Pin a label on the project home and press Undo ("Undone: Pin label {label}").
+4. Create a test project from the switcher, add one of the existing canvases to it ("Add a canvas from another
+   project"), and read the section at the end of its home: "Deleted with it: First canvas." and "Staying in other
+   projects: {canvas}.". Click "Delete this project" twice: the workspace home with "Deleted the project … and 1 canvas
+   that only it used. The model is untouched."; press Undo in the toast (the tile is back); delete it again. The test
+   project stays soft-deleted in KB (Q-G).
+5. Open the deleted project's address from the browser's history (or Back to one of its pages, reached through the
+   app's links): the workspace home with "That project no longer exists.".
 
 ## Assumptions
 
