@@ -658,3 +658,22 @@ the sitting's spread of slice-10c."
   and 300 ms in the 100 % dense view, p95 at most 350 ms." The exact figures stay here.
 - **`docs/ideas.md`** gains the layer switch at 30 % to measure on slice-10c and earlier.
 - **The overwritten `.data/preview-db.json`:** noted, nothing to do.
+
+## The closing (31 October 2026)
+
+**Full e2e run from scratch** (no dev server running, `npm run e2e`): 474 tests, **469 passed, 3 failed, 2 skipped,
+4,927 s** (slice 10c's runs: 4,975 s and 4,492 s). Each failure's error text and trace were copied to
+`.data/e2e-11-close/` before the reruns (git-ignored):
+- `e2e/fixes/panel-field-focus.spec.ts`, "Tab from an entity's name to its stereotype": **failed 3 of 3 on its own, a
+  real failure of this slice.** The entity panel's Alias field now follows the name, so Tab lands there. The spec now
+  expects the focus on the alias (its point, the focus kept in the next field after the save, is unchanged); 3 of 3
+  passed after it.
+- `e2e/slice-07c/S7C-02.spec.ts` (its own server on a format-7 file; the page never drew the top bar) and
+  `e2e/slice-11/S11-10.spec.ts` (the canvas never became ready in `openCanvas`, before the test did anything): **3 of 3
+  passed each on their own**, flakes.
+- The miniature's specs (`S3B-13.spec.ts`, both tests) passed in the full run.
+
+**CI:** lint, typecheck and unit tests (116 files, 1,508 tests) pass.
+
+**KB backup:** `.data/backups/dev-db-20261031-1534.json`, also `.data/backups/kb-model-latest.json` (format 11,
+byte-identical to `.data/dev-db.json`). KB was not reset or seeded.
