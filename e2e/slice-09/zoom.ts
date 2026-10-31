@@ -25,10 +25,12 @@ export async function centrePoint(page: Page): Promise<{ x: number; y: number }>
   });
 }
 
+/** The view's zoom in whole percent, as the field rounds it. */
+export const viewZoom = async (page: Page) =>
+  Math.round(100 * (await page.locator(".react-flow__viewport").evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).a)));
+
 /** Waits until the field shows `pct` and the view's zoom rounds to `pct` % (− from 45 % gives 37.5 %, shown as 38 %). */
 export async function expectZoom(page: Page, pct: number) {
   await expect(zoomField(page)).toHaveValue(`${pct}%`);
-  await expect
-    .poll(async () => Math.round(100 * (await page.locator(".react-flow__viewport").evaluate((el) => new DOMMatrixReadOnly(getComputedStyle(el).transform).a))))
-    .toBe(pct);
+  await expect.poll(async () => viewZoom(page)).toBe(pct);
 }

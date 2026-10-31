@@ -1,6 +1,6 @@
 import { expect, test } from "./fixtures";
 import { canvasUrl, openCanvas, projectHome, recordToasts, signInAs, toasts } from "./helpers";
-import { centrePoint, expectZoom, typeZoom, zoomField } from "./zoom";
+import { centrePoint, expectZoom, typeZoom, viewZoom, zoomField } from "./zoom";
 
 // The zoom field (items 16–19, D-60): a whole number with or without "%" and spaces applies on Enter around the view's
 // centre; leaving the field applies it too (v); out of range is clamped and shown (vii); "abc" goes back without a
@@ -80,6 +80,7 @@ test("S9-11: the field follows a pinch, − and +, Fit and Back, but not while s
   await page.keyboard.up("Control");
   await expect(zoomField(page)).not.toHaveValue(fitted);
   await expect(zoomField(page)).toBeFocused();
+  const pinched = await zoomField(page).inputValue();
   await page.keyboard.type("2");
   // while typing, a zoom does not overwrite the text
   await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2);
@@ -88,7 +89,10 @@ test("S9-11: the field follows a pinch, − and +, Fit and Back, but not while s
   await page.keyboard.up("Control");
   await expect(zoomField(page)).toHaveValue("2");
   await page.keyboard.press("Escape");
-  await expect(zoomField(page)).not.toHaveValue(fitted);
+  // Escape shows the view's zoom again, the one the pinch while typing made; that pinch may bring it back to `fitted`
+  // exactly, so the field is compared with the view, and with the zoom before that pinch
+  await expect.poll(async () => (await zoomField(page).inputValue()) === `${await viewZoom(page)}%`).toBe(true);
+  await expect(zoomField(page)).not.toHaveValue(pinched);
 
   // Back: the canvas opens again at its remembered view
   await typeZoom(page, "50");
