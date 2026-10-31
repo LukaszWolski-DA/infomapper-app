@@ -646,3 +646,15 @@ long name does. The miniature keys its lists on what it draws, so a switch is on
 commit. Measured on "Performance test" with every entity and attribute aliased: to the screen 37 / 32 ms at 30 % and
 242 / 218 ms in the 100 % dense view (the layer switch there: 188 / 199 ms); pan and zoom and the first render within
 the sitting's spread of slice-10c."
+
+### Łukasz's answers to step 5 (31 October 2026)
+
+- **The time bar is approved:** a names switch to the screen, medians at most 60 ms at 30 % and at most 300 ms in the
+  100 % dense view, p95 at most 350 ms.
+- **AD-24's addition** in Łukasz's words, written into `docs/decisions.md` after the slice 10b sentence: "The names'
+  modes (slice 11) switch text and classes only: no new element on the canvas and the same drawing layers with names and
+  with aliases; a long alias may add a name's tail span as a long name does. The miniature keys its lists on what it
+  draws, so a switch is one canvas commit and no miniature commit. Bars: to the screen, medians at most 60 ms at 30 %
+  and 300 ms in the 100 % dense view, p95 at most 350 ms." The exact figures stay here.
+- **`docs/ideas.md`** gains the layer switch at 30 % to measure on slice-10c and earlier.
+- **The overwritten `.data/preview-db.json`:** noted, nothing to do.

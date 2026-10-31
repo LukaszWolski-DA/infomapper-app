@@ -46,6 +46,11 @@ trace lines (4b-2); showing, hiding and resizing the side panels (5a); the view-
 a missing column's row and mapping line marks (7a); a zoom typed in the top bar (9, D-60).
 
 **Deliberate differences:**
+- **Slice 11 (D-64):** entities and attributes have an alias, edited in their panels; the prototype has none. A canvas
+  shows names or aliases in two dimensions, set by "Entity aliases" and "Attribute aliases" in the top bar after the
+  layer switch (in "More" up to 1,300 px), with exceptions per card from its header's menu ("Entity name" and "Attribute
+  names" segments after "Rows") and a tint on cards with an exception. The object browser's search also finds aliases,
+  naming the alias in the row's hint.
 - **Slice 10c (D-63):** an attribute can be copied and pasted into any entity, its own included (“Copy” in its row's
   menu, “Paste attribute “…”” in a card header's menu); the copy follows its original's data type and Personal data,
   read-only in its panel, which names its original and lists an original's copies. The prototype has neither.

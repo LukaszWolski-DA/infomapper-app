@@ -30,13 +30,31 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 - **10c: copying an attribute to another entity.** **Done in slice 10c** (D-63), as copy and paste of one attribute at
   a time, not tied to a relationship; the copy follows its original's type and Personal data. A data model and local
   file format change (format 10), with backups of Łukasz's KB model.
-- **Next: 11.**
-- **11: an alias for entities and attributes** (see the entry below).
+- **11: an alias for entities and attributes.** **Done in slice 11** (D-64): an alias field in the entity and
+  attribute panels; each canvas shows names or aliases in two dimensions, with exceptions per card; the search finds
+  aliases. A data model and local file format change (format 11), with a backup of Łukasz's KB model.
+- **Next: 12.**
 - **12: the home pages:** undo and redo there, deleting a project, and the canvas tiles' thumbnails after measuring the
   home's load.
 - **13: one behaviour for a refused save in every field** (F6, above), with the typed value kept on a conflict (the
   first entry). Also keep text typed into a field while its save is on its way: the save's answer replaces the field
   (keyed by its stored value) and the typed text and focus are lost (`docs/known-limitations.md`, slice 10c).
+
+## Aliases: what comes later (slice 11, PRD section 9)
+
+- **Aliases for concepts, frames,** source tables or columns. Not wanted for sources (P9: a source is what it is).
+- **Several aliases per object** (by language or audience), with a choice of which to show.
+- **A reviewer's own local choice** of names or aliases, as the layer mode works for reviewers and readers today (they
+  switch it in their browser only); in slice 11 they see the canvas as saved (F6).
+- **Showing an alias outside the canvas** (breadcrumbs, panel titles), as a user setting.
+- **Marking a shown name** that stands in for a missing alias.
+- **Exceptions per attribute row** rather than per card.
+- **Advanced search and grouping** belong to a later, separate tool, outside InfoMapper's scope for now.
+
+## The layer switch at 30 % (slice 11, step 5)
+
+Measure the layer switch at 30 % on slice-10c and earlier: slice 11's sitting found about 650 ms to the screen (240 ms
+on the main thread), not touched by slice 11.
 
 ## A model validator (slice 10c, PRD section 9)
 
@@ -442,8 +460,8 @@ change first.
 - **Copying an attribute to another entity.** **Done in slice 10c** (D-63): “Copy” and “Paste attribute”, one
   attribute at a time, not tied to a relationship; the copy follows its original's type and Personal data; mappings,
   requirement links and labels are not copied. Later steps are in the entries of slice 10c below.
-- **An alias for entities and attributes**, with a switch to show the alias instead of the name on the canvas. A data
-  model change (`docs/data-model-v2.md`, the local file's next format), the cards' text fit and the element guard; decide
-  whether the import reads an alias.
+- **An alias for entities and attributes.** **Done in slice 11** (D-64): the alias in the panels, the canvas's two
+  check boxes with exceptions per card, the search; imports carry no alias. Later steps are in the entries of slice 11
+  below.
 - **A relationship from an entity to itself** (parent and child). **Done in slice 10a** (D-61): "Relate to itself" in
   the card header's menu, drawn as a loop.

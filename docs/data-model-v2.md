@@ -217,6 +217,7 @@ again in its serialised write; the database slice does it in the write's transac
 | standard columns | | | |
 | `concept_id` | uuid | no | FK `concept` |
 | `name` | text | no | not unique; the domain warns on duplicates (B-25) |
+| `alias` | text | yes | another name, free text (slice 11, D-64); trimmed, an empty alias is null; not unique, no warning |
 | `stereotype` | text | no | `object`, `link`, `dictionary`, `context`, `informative` |
 | `definition_html`, `definition_text` | text | yes | rich text (D-42) |
 
@@ -226,6 +227,7 @@ again in its serialised write; the database slice does it in the write's transac
 | standard columns | | | |
 | `entity_id` | uuid | no | FK `entity` |
 | `name` | text | no | |
+| `alias` | text | yes | another name, free text (slice 11, D-64); trimmed, an empty alias is null; a copy gets its original's once and does not follow it |
 | `sort_order` | integer | no | position on the entity; belongs to the model (D-36) |
 | `data_type` | text | no | `string`, `integer`, `decimal`, `boolean`, `date`, `datetime`, `json`, `custom` |
 | `custom_type` | text | yes | when `data_type = 'custom'`, e.g. `uuid`, `geography` |
@@ -245,6 +247,12 @@ row, to an attribute that exists already, so links never form a loop. Migration
 `20261030160000_attribute_copied_from.sql` adds the column and an index on it. The local data file's format 10 gave
 every attribute the column as null (no change events, no log line); undo writes a column that an older change event's
 image lacks as null.
+
+**Aliases (slice 11, D-64).** Migration `20261031100000_aliases.sql` adds `entity.alias`, `attribute.alias`,
+`canvas.entity_names`, `canvas.attribute_names`, `canvas_item.entity_names` and `canvas_item.attribute_names` (all text,
+null; the four mode columns with CHECKs `x is null or x in ('name', 'alias')`). The local data file's format 11 gave every
+entity, attribute, canvas and canvas item the new columns as null (no change events, no log line). Imports write no
+alias, and source tables and columns have none.
 
 ### `relationship`
 | Column | Type | Null | Notes |
@@ -496,6 +504,7 @@ A canvas can belong to several projects (D-28).
 | `name` | text | no | |
 | `live_label_id` | uuid | yes | set = live label canvas (D-10, D-25) |
 | `look` | jsonb | no | `{ "background": "grey", "grid": "dots", "layer": "all" }` (D-12, D-22) |
+| `entity_names`, `attribute_names` | text | yes | `name` or `alias`: what the canvas's entity cards show in each dimension (slice 11, D-64); null = name, and names are stored as null; ordinary columns, so undo restores them (unlike `look`) |
 
 ### `canvas_item`
 One card on one canvas (AD-16). Layout belongs to the canvas, not the model (D-04, D-37).
@@ -511,9 +520,11 @@ One card on one canvas (AD-16). Layout belongs to the canvas, not the model (D-0
 | `row_filter` | text | no | `all`, `mapped`, `unmapped`, `keys`, `labeled` |
 | `frame_id` | uuid | yes | frame membership |
 | `live_level` | text | yes | `full`, `context`; only on live canvases |
+| `entity_names`, `attribute_names` | text | yes | `name` or `alias`: an entity card's exception to its canvas's mode (slice 11, D-64); null = the card follows the canvas |
 
 A requirement card (`requirement_id` set) stores `width` null (drawn 230 px), `collapsed` false, `row_filter` `all`,
-and `frame_id` and `live_level` null: it is layout only (slice 4b-2).
+and `frame_id` and `live_level` null: it is layout only (slice 4b-2). Only entity cards have `entity_names` or
+`attribute_names`; table and requirement cards keep them null (slice 11).
 
 ### `frame`
 | Column | Type | Null | Notes |
@@ -591,6 +602,10 @@ because they are business logic or must work on any database:
   of copies included, in the same change group, and so does an undo or redo (`followOriginals`); a copy's followed fields
   are refused while it has a link, its original live or deleted; the walk keeps a visited set although the links cannot
   loop.
+- Names and aliases on canvases (slice 11, D-64): a card's stored exception always differs from its canvas's mode (a
+  choice equal to the mode is stored as null), and only entity cards have one; setting a canvas's mode clears every
+  card's exception in that dimension in the same change group, checking the cards' versions but not the canvas row's
+  (the last write wins on the mode).
 - Soft-delete cascades and the impact preview before deleting an entity (D-47); a deleted source table takes its
   relationships in both directions with it (slice 7a).
 - Source import (slice 7a): matching, statuses, rename choices, the scope of missing (P4), and when a mapping goes back

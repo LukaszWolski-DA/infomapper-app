@@ -924,6 +924,18 @@ the second text as usual, after the first (`rowSaves`). Planned with slice 13 ("
 - **The undo history names a paste “Create attribute”** and a followed change or “Stop following” “Change attribute”
   (F22).
 
+### Names and aliases on canvases (slice 11, D-64)
+
+- **The last write wins on a canvas's mode.** Setting "Entity aliases" or "Attribute aliases" checks the versions of the
+  cards whose exceptions it clears, but not the canvas row's (F2): two editors switching the same canvas at once keep
+  the later choice, without a conflict.
+- **A later mode change blocks undo of an older rename of the same canvas** (F11): the modes are ordinary canvas
+  columns, so the rename's row has changed afterwards, as with any row.
+- **Reviewers and readers see a canvas's names as saved** (F6); unlike the layer mode they cannot switch them in their
+  own browser (`docs/ideas.md`).
+- **Up to 1,300 px wide the check boxes are in "More"** (step 4, S6A-10): with the working context on and both panels
+  shown they do not fit the top bar there.
+
 ### Relationships between source tables on the demo canvas (slice 10b, D-62)
 
 On the seed's "Customer & orders" (and Sales' "First canvas", the same layout), the line of
