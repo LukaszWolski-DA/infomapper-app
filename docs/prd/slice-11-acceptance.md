@@ -553,3 +553,123 @@ indeterminate, with Focus and the notation).
 - **D-64 is approved** with one change: "each set by a check box in the top bar after the layer switch (in “More” on
   narrow screens)". Written into `docs/decisions.md`, accepted on 31 October 2026, with D-63's addition "A copy also
   gets its original's alias once (slice 11)."
+
+## Step 5: the measurement sitting (S11-13; 31 October 2026)
+
+**Builds and machine:**
+- This branch at `11c60ee`: step 4's code, the placeholder (`795f4ba`), the miniature fix below and the measuring specs.
+  `slice-10c` at `72ef24b` (worktree `../infomapper-ab-main`). Both in the production measurement build, made with
+  `--prepare-only` before the sitting.
+- Lenovo 20L7005FUS, Intel Core i7-8550U (4 cores, 8 threads), 8 GB, Intel UHD Graphics 620, on mains, power plan
+  "Balanced". Chrome 156.0.8078.79 (Playwright's `chrome` channel, headed), Playwright 1.63.0, Node 22.20.0.
+- **Quiet:** before the sitting the CPU was at 5 %; the busiest processes over 5 s were the Claude app (under 0.5 s of
+  CPU), iCloud and WhatsApp in the background. Again 10 % before S11-13, with nothing on ports 3000, 3200 or 3300.
+  Nothing was stopped.
+
+**A fix the commit bar needed** (commit `11c60ee`, "perf: … the miniature keyed on what it draws"): the miniature (a
+`memo` on React Flow's nodes array) redrew on every switch of names, because every entity card's data changes. The
+Overview now keys its lists on a string of what it draws (each node's rectangle and fill); a change that moves or
+recolours nothing leaves the miniature alone. Slice 11's 16 specs passed after it.
+
+**Element guard** (`S3B-15-elements.spec.ts`, `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json`):
+
+| View | Page | Viewport | `slice-08.json` |
+| --- | --- | --- | --- |
+| 30 %, expanded | 6,000 (+6) | 4,508 | 5,994 / 4,508 |
+| 100 %, expanded | 20,797 (+6) | 19,305 | 20,791 / 19,305 |
+| 30 %, collapsed | 2,867 (+6) | 1,465 | 2,861 / 1,465 |
+| 100 %, collapsed | 6,309 (+6) | 4,907 | 6,303 / 4,907 |
+
+**The viewport counts are equal.** The 6 page elements are all in the top bar, read on the measurement build:
+- `<span class="contents max-[1301px]:hidden">`: the check boxes' wrapper, which carries their step into "More";
+- `<div data-testid="switch-names">`: their group;
+- 2 × `<label>` and 2 × `<input type="checkbox">`.
+
+No new `<script>`: the canvas page has the same 5 entry chunks in both builds (the check boxes' code is in an existing
+chunk). The "More" items are not in the page until the menu opens.
+
+**Commits** (`e2e/slice-11/S11-13-commits.spec.ts`, new, on demand with `COMMITS=1`; the counters exist only in
+development, so on the e2e dev server). "Performance test" with an alias on all 41 entities and 779 attributes (e2e
+data file only). Each switch's server answer was held for 2 s, so the switch's own commits (read after 1 s) are told
+apart from those of the fresh page after its answer. 3 balanced rounds, both views:
+
+| Switch | Its own commits: canvas / miniature | After the server's answer: canvas / miniature |
+| --- | --- | --- |
+| "Attribute aliases" on, off (30 % and 100 % dense) | **1 / 0** in all 12 | 3 / 1 in all 12 |
+| Layer mode on, off (30 % and 100 % dense) | 1 / 1 in all 12 | 3 / 1 in all 12 |
+
+**Bars met:** one canvas commit and no miniature commit per switch. The layer switch redraws the miniature by design
+(its lines change). The fresh page's commits are the same for both, as for any saved canvas write.
+
+**To the screen** (`e2e/slice-11/S11-13.spec.ts`, new; measurement build only, ignored otherwise in
+`playwright.config.ts`). Same data, S6A-09's two views (pane 932 × 718), 10 settled pairs per run, each switch from its
+click to the first GPU present after its commit. 3 balanced rounds, the order alternating. Medians to the screen per
+round, in ms:
+
+| View | Switch | On | Off | p95 (highest round, on / off) | Main thread (median of rounds, on / off) |
+| --- | --- | --- | --- | --- | --- |
+| 30 % around ent:23 | "Attribute aliases" | 36.4 / 37.0 / 38.1 | 33.3 / 29.9 / 31.7 | 48.2 / 46.6 | 33.3 / 27.5 |
+| 30 % around ent:23 | layer mode | 650.6 / 653.5 / 663.7 | 688.3 / 691.5 / 679.3 | 723.5 / 765.0 | 244.4 / 241.9 |
+| 100 % dense | "Attribute aliases" | 230.6 / 242.5 / 242.2 | 226.8 / 218.2 / 215.8 | 280.0 / 261.4 | 153.0 / 134.1 |
+| 100 % dense | layer mode | 189.7 / 187.5 / 185.7 | 195.8 / 198.5 / 201.2 | 211.8 / 227.2 | 91.9 / 91.8 |
+
+- No switch went unsettled or without a present.
+- At 30 % the rows are not drawn (below 40 %), so a switch of attribute names changes little on the page: 37 / 32 ms.
+- In the dense view every entity card's rows get new texts: 242 / 218 ms, which is 29 % / 10 % above the layer switch
+  in the same view.
+- **The layer switch at 30 % takes about 650 ms to the screen** (240 ms main thread; 34 ms in the page). Slice 11 does
+  not touch it: the line layer and the look are unchanged. It was not measured on `slice-10c`, so whether it was the
+  same there is not known.
+- **Proposed time bar** (for Łukasz's approval): a switch of names or aliases, medians to the screen, **at most 60 ms
+  at 30 %** and **at most 300 ms in the 100 % dense view**, p95 at most 350 ms. This sitting: 38 and 242 ms at most;
+  p95 280 ms.
+
+**LayerTree read** (the same spec, each view with names and with aliases, entity and attribute names both):
+
+| View | Drawing layers | Drawing megapixels | Viewport elements | Headers / rows showing aliases |
+| --- | --- | --- | --- | --- |
+| 30 %, names | 47 | 69.2 | 4,508 | 0 / 0 |
+| 30 %, aliases | 47 | 69.2 | 4,508 | 41 / 0 (rows not drawn below 40 %) |
+| 100 % dense, names | 47 | 68.4 | 19,305 | 0 / 0 |
+| 100 % dense, aliases | 47 | 68.4 | 19,632 (+327) | 41 / 779 |
+
+**Bar met: the same drawing layers.** The 327 elements are F14's second name span. An alias "PL {name}" is 3
+characters longer than its name, so more rows pass `splitName`'s length and get a tail span (`.b`). A long name does
+the same: no new kind of element, and the guard (on names) is equal.
+
+**A/B sitting against `slice-10c`** (`npm run measure:canvas -- --to-screen --only pan,c08 --no-build --against
+slice-10c`):
+- one discarded warm-up run after the builds (sitting `2026-10-31-13-31`, `--rounds 1`);
+- then sitting `2026-10-31-13-42`, `--rounds 2`, balanced.
+
+| Figure | slice-10c: median (min–max) | This branch | Change |
+| --- | --- | --- | --- |
+| Pan and zoom at the overview (rAF fps) | 57.6 (56.2–59.0) | 59.0 (58.8–59.2) | +2.4 % |
+| – frames over 50 ms | 1 (0–1) | 0 (0–0) | – |
+| Pan and zoom at 100 % dense (rAF fps) | 47.2 (46.2–48.1) | 48.0 (47.6–48.3) | +1.7 % |
+| – frames over 50 ms | 5 (3–7) | 9 (6–12) | – |
+| Initial render C-08, median of 5 (ms) | 1737 (1714–1760) | 1634 (1590–1677) | −6.0 % |
+| Pan and zoom at the overview, presented fps | 57.5 (56.6–58.4) | 58.5 (58.5–58.5) | +1.7 % |
+| – gaps over 50 ms | 2 (1–3) | 1 (1–1) | – |
+| Pan and zoom at 100 % dense, presented fps | 44.4 (44.0–44.7) | 45.1 (44.9–45.4) | +1.8 % |
+| – gaps over 50 ms | 13 (10–15) | 15 (14–15) | – |
+| Initial render to its last present (ms, diagnosis) | 1814 (1776–1851) | 1739 (1729–1748) | −4.1 % |
+
+**Bar met: within the sitting's run-to-run spread, or better.** Two figures need a word:
+- The dense view's frames over 50 ms are 9 against 5, but the ranges meet (6–12 against 3–7). The presented fps there
+  is +1.8 % and its gaps are 15 against 13, with ranges that also meet. So it is within the spread.
+- The tool's absolute bars (50 fps dense, 1,500 ms C-08) are "not met" on both sides, as in every sitting since they
+  were set. They are not this slice's.
+
+No difference of a few milliseconds needed judging, so no phase traces were compared.
+
+**A scratch file overwritten:** to read the page's elements on the measurement server, I replaced
+`.data/preview-db.json` (the preview configurations' scratch file, git-ignored, dated 30 October) with the demo data
+and "Performance test", without looking at it first. KB (`.data/dev-db.json`) was not touched.
+
+**AD-24's addition (proposal):** "The names' modes (slice 11) switch text and classes only: no new element on the
+canvas, the same drawing layers with names and with aliases (47), and a longer alias may add a name's tail span as a
+long name does. The miniature keys its lists on what it draws, so a switch is one canvas commit and no miniature
+commit. Measured on "Performance test" with every entity and attribute aliased: to the screen 37 / 32 ms at 30 % and
+242 / 218 ms in the 100 % dense view (the layer switch there: 188 / 199 ms); pan and zoom and the first render within
+the sitting's spread of slice-10c."
