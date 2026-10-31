@@ -75,7 +75,9 @@ export async function readDb(file: string): Promise<DevDb> {
  * classifications and notes (slice 7c, `upgrade-8.ts`); its report comes back for the caller to write. From 8, every
  * organization without a password gets the development password `demo-pass` (slice 8, F7: the seed's precomputed hash;
  * F18: no change events); the count comes back for the caller's log line. From 9, every attribute gets
- * `copied_from_attribute_id` null (slice 10c, F11: no change events, no log line).
+ * `copied_from_attribute_id` null (slice 10c, F11: no change events, no log line). From 10, entities and attributes
+ * get `alias` null and canvases and canvas items `entity_names` and `attribute_names` null (slice 11; no change
+ * events, no log line).
  */
 export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number } {
   let report: Upgrade8Report | null = null;
@@ -140,6 +142,14 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
   }
   if ((db.format as number) === 9) {
     for (const a of db.attribute) a.copied_from_attribute_id ??= null;
+    Object.assign(db, { format: 10 });
+  }
+  // slice 11: aliases and the canvases' names, all null (a canvas shows names, a card follows its canvas)
+  if ((db.format as number) === 10) {
+    for (const e of db.entity) e.alias ??= null;
+    for (const a of db.attribute) a.alias ??= null;
+    for (const c of db.canvas) Object.assign(c, { entity_names: c.entity_names ?? null, attribute_names: c.attribute_names ?? null });
+    for (const i of db.canvas_item) Object.assign(i, { entity_names: i.entity_names ?? null, attribute_names: i.attribute_names ?? null });
     Object.assign(db, { format: DEV_DB_FORMAT });
   }
   return { report, passwordsGiven };

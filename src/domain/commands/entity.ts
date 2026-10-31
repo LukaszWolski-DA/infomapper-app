@@ -82,6 +82,7 @@ export function createEntity(
     workspace_id: workspaceId,
     concept_id: conceptId,
     name: name ?? freeDefaultName(state.entities),
+    alias: null,
     stereotype: "object",
     definition_html: null,
     definition_text: null,

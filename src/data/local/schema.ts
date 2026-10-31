@@ -57,6 +57,7 @@ import {
   REQUIREMENT_PRIORITIES,
   REQUIREMENT_SEVERITIES,
   REQUIREMENT_STATUSES,
+  NAME_MODES,
   ROW_FILTERS,
   SOURCE_CHANGE_KINDS,
   SOURCE_CHANGE_SEVERITIES,
@@ -73,14 +74,15 @@ import {
  * on sources, `review_reason` on mappings), 7 = slice 7b (changes to resolve; `retired_since` on sources, `not_needed`
  * on columns, two counts on imports), 8 = slice 7c (classifications and their links, notes on tables and columns; the
  * columns' business key and personal data flags dropped), 9 = slice 8 (organization access: every organization's
- * development password), 10 = slice 10c (`copied_from_attribute_id` on attributes, null). A format-2 to 9 file is read
- * as format 10 with the missing tables empty and the new columns null (false, 0); a format-6 file also gets the open
+ * development password), 10 = slice 10c (`copied_from_attribute_id` on attributes, null), 11 = slice 11 (`alias` on
+ * entities and attributes, `entity_names` and `attribute_names` on canvases and canvas items, all null). A format-2 to 10
+ * file is read as format 11 with the missing tables empty and the new columns null (false, 0); a format-6 file also gets the open
  * changes its imports leave (`deriveSourceChanges`, F1), a format-7 file the classifications its flags said and its
  * hand-typed comments as notes (`upgrade-8.ts`), a format-8 file the password `demo-pass` for every organization (F7,
  * F18: no change events, one log line), a format-9 file the null link on every attribute (slice 10c, F11: no change
- * events, no log line). It is written back at once; an older file is refused with a hint to run "npm run reset-dev-data".
+ * events, no log line), a format-10 file the null aliases and names (slice 11: no change events, no log line). It is written back at once; an older file is refused with a hint to run "npm run reset-dev-data".
  */
-export const DEV_DB_FORMAT = 10;
+export const DEV_DB_FORMAT = 11;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -175,6 +177,8 @@ interface TableRules {
 const audit = { created_by: "app_user", updated_by: "app_user" } as const;
 const oneOf = (values: readonly string[], column: string) => (row: AnyRow) => values.includes(row[column] as string);
 const isSet = (v: unknown) => v !== null && v !== undefined;
+/** A nullable closed value (`x is null or x in (...)`). */
+const noneOrOneOf = (values: readonly string[], column: string) => (row: AnyRow) => row[column] === null || values.includes(row[column] as string);
 /** Standard model columns: the workspace and the audit users. */
 const model = { workspace_id: "workspace", ...audit } as const;
 
@@ -222,6 +226,10 @@ export const RULES: Record<DevTable, TableRules> = {
     foreignKeys: { workspace_id: "workspace", live_label_id: "label", ...audit },
     // at most one live canvas per label (canvas_live_label_uq, slice 3b)
     unique: [{ columns: ["live_label_id"], live: true, where: (r) => isSet(r.live_label_id) }],
+    checks: [
+      { name: "canvas_entity_names_ck", test: noneOrOneOf(NAME_MODES, "entity_names") },
+      { name: "canvas_attribute_names_ck", test: noneOrOneOf(NAME_MODES, "attribute_names") },
+    ],
   },
   project_canvas: {
     key: ["project_id", "canvas_id"],
@@ -421,6 +429,8 @@ export const RULES: Record<DevTable, TableRules> = {
       { name: "canvas_item_width_ck", test: (r) => r.width === null || ((r.width as number) >= 200 && (r.width as number) <= 600) },
       { name: "canvas_item_row_filter_ck", test: oneOf(ROW_FILTERS, "row_filter") },
       { name: "canvas_item_live_level_ck", test: (r) => r.live_level === null || oneOf(LIVE_LEVELS, "live_level")(r) },
+      { name: "canvas_item_entity_names_ck", test: noneOrOneOf(NAME_MODES, "entity_names") },
+      { name: "canvas_item_attribute_names_ck", test: noneOrOneOf(NAME_MODES, "attribute_names") },
     ],
   },
   frame: {

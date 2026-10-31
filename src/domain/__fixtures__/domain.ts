@@ -167,6 +167,8 @@ export const canvas = (id: string = ids.canvas1, over: Partial<Canvas> = {}): Ca
   id,
   workspace_id: ids.ws,
   name: id === ids.canvas1 ? "Customer & orders" : "Order lines & products",
+  entity_names: null,
+  attribute_names: null,
   live_label_id: null,
   look: { ...DEFAULT_CANVAS_LOOK },
   ...standard,
@@ -203,6 +205,7 @@ export const entity = (id: string = ids.customer, over: Partial<Entity> = {}): E
   ...ws,
   concept_id: id === ids.customer ? ids.conceptCustomer : ids.conceptSales,
   name: id === ids.customer ? "Customer" : "Sales Order",
+  alias: null,
   stereotype: "object",
   definition_html: null,
   definition_text: null,
@@ -214,6 +217,7 @@ export const attribute = (id: string = ids.email, over: Partial<Attribute> = {})
   ...ws,
   entity_id: id === ids.orderId ? ids.salesOrder : ids.customer,
   name: id === ids.customerId ? "customer_id" : id === ids.orderId ? "order_id" : "email",
+  alias: null,
   sort_order: id === ids.email ? 1 : 0,
   data_type: id === ids.email ? "string" : "integer",
   custom_type: null,
@@ -337,6 +341,8 @@ export const canvasItem = (id: string = ids.itemCustomer, over: Partial<CanvasIt
   row_filter: "all",
   frame_id: null,
   live_level: null,
+  entity_names: null,
+  attribute_names: null,
   ...over,
 });
 

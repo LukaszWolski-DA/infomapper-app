@@ -33,6 +33,6 @@ test("S7B-12: a format-6 file gets the open changes its imports left, marked as 
   await expect(card(page, "business_key_changed", "dbo.customers.cust_no")).toBeVisible();
 
   // written back at once, now as format 10 (slice 10c)
-  expect((JSON.parse(fs.readFileSync(E2E_DB, "utf8")) as { format: number }).format).toBe(10);
+  expect((JSON.parse(fs.readFileSync(E2E_DB, "utf8")) as { format: number }).format).toBe(11);
   expect((await loadChanges()).every((c) => c.source_import_id !== null)).toBe(true);
 });

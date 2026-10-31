@@ -61,6 +61,8 @@ export function createCanvas(
     name: parsed.data.name,
     live_label_id: null,
     look: { ...DEFAULT_CANVAS_LOOK },
+    entity_names: null,
+    attribute_names: null,
   };
   const link: ProjectCanvas = {
     project_id: project.id,
@@ -241,6 +243,9 @@ export function duplicateCanvas(
     name: `${canvas.name} (copy)`,
     live_label_id: null,
     look: { ...canvas.look },
+    // the cards keep their exceptions (`...i` below), so the copy keeps the names they are exceptions to (slice 11)
+    entity_names: canvas.entity_names,
+    attribute_names: canvas.attribute_names,
   };
   const link: ProjectCanvas = {
     project_id: project.id,

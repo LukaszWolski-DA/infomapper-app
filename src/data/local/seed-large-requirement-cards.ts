@@ -156,6 +156,8 @@ export function addLargeRequirementCards(o: { db: DevDb; data: GenDataSet; works
       row_filter: "all",
       frame_id: null,
       live_level: null,
+      entity_names: null,
+      attribute_names: null,
     };
     db.canvas_item.push(item);
   };

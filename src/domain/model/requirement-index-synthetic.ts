@@ -12,11 +12,12 @@ export function syntheticIndexInput() {
 
   const ENTITIES = 500, ATTRIBUTES = 5000, TABLES = 300, COLUMNS = 3000, MAPPINGS = 2000, REQUIREMENTS = 500, LINKS = 3000;
 
-  const entities: Entity[] = Array.from({ length: ENTITIES }, (_, i) => ({ ...std(id("e", i)), concept_id: "c", name: `E${i}`, stereotype: "object", definition_html: null, definition_text: null }));
+  const entities: Entity[] = Array.from({ length: ENTITIES }, (_, i) => ({ ...std(id("e", i)), concept_id: "c", name: `E${i}`, alias: null, stereotype: "object", definition_html: null, definition_text: null }));
   const attributes: Attribute[] = Array.from({ length: ATTRIBUTES }, (_, i) => ({
     ...std(id("a", i)),
     entity_id: id("e", i % ENTITIES),
     name: `a${i}`,
+    alias: null,
     sort_order: Math.floor(i / ENTITIES),
     data_type: i % 3 === 0 ? "integer" : "string",
     custom_type: null,

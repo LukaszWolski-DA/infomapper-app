@@ -85,7 +85,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
   addBuiltinClassifications(db, ws, by, at);
   let columnsSeen = 0, tablesSeen = 0;
   db.project.push({ id: LARGE_IDS.project, workspace_id: ws, name: "Performance", description: null, ...audit });
-  db.canvas.push({ id: LARGE_IDS.canvas, workspace_id: ws, name: "100 cards", live_label_id: null, look: { ...DEFAULT_CANVAS_LOOK }, ...audit });
+  db.canvas.push({ id: LARGE_IDS.canvas, workspace_id: ws, name: "100 cards", live_label_id: null, look: { ...DEFAULT_CANVAS_LOOK }, entity_names: null, attribute_names: null, ...audit });
   db.project_canvas.push({ project_id: LARGE_IDS.project, canvas_id: LARGE_IDS.canvas, workspace_id: ws, sort_order: 0, added_at: at, added_by: by });
 
   const data = generate();
@@ -168,6 +168,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
         ...std(`entity:${card.id}`),
         concept_id: id(`concept:${colour}`),
         name: card.name,
+        alias: null,
         stereotype: STEREOTYPE[card.sub as (typeof STEREOS)[number]] ?? "object",
         definition_html: null,
         definition_text: null,
@@ -178,6 +179,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
           ...std(`attribute:${row.id}`),
           entity_id: entityId,
           name: row.name,
+          alias: null,
           sort_order: i,
           data_type: LOGICAL[row.dataType as (typeof ATTR_TYPES)[number]] ?? "string",
           custom_type: null,
@@ -208,6 +210,8 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
       row_filter: "all",
       frame_id: card.frameId ? id(`frame:${card.frameId}`) : null,
       live_level: null,
+      entity_names: null,
+      attribute_names: null,
     });
   }
 

@@ -181,5 +181,7 @@ export function addDemoRequirementCard(db: DevDb, o: { workspaceId: Uuid; canvas
     row_filter: "all",
     frame_id: null,
     live_level: null,
+    entity_names: null,
+    attribute_names: null,
   });
 }

@@ -245,13 +245,14 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
 
   for (const [key, concept, name, stereotype, definition] of ENTITIES) {
     const text = plainTextPair(definition);
-    const row: Entity = { ...std(`entity:${key}`), concept_id: id(`concept:${concept}`), name, stereotype, definition_html: text.html, definition_text: text.text };
+    const row: Entity = { ...std(`entity:${key}`), concept_id: id(`concept:${concept}`), name, alias: null, stereotype, definition_html: text.html, definition_text: text.text };
     db.entity.push(row);
     ATTRIBUTES[key]!.forEach(([attr, type, flags], i) => {
       db.attribute.push({
         ...std(`attribute:${key}.${attr}`),
         entity_id: row.id,
         name: attr,
+        alias: null,
         sort_order: i,
         data_type: type,
         custom_type: null,
@@ -371,6 +372,8 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
       row_filter: "all",
       frame_id: null,
       live_level: null,
+      entity_names: null,
+      attribute_names: null,
     });
     for (const [key, xy] of Object.entries(layout.entities)) db.canvas_item.push(card(`entity:${key}`, { entity_id: id(`entity:${key}`), source_table_id: null }, xy));
     for (const [key, xy] of Object.entries(layout.tables)) db.canvas_item.push(card(`table:${key}`, { entity_id: null, source_table_id: id(`table:${key}`) }, xy));
