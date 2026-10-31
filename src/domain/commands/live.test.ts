@@ -27,6 +27,7 @@ import { reorderAttribute } from "./attribute";
 import { removeCanvasItems, removeFromCanvas, placeManyOnCanvas, updateCanvasItem } from "./canvas-item";
 import { duplicateCanvas } from "./canvas";
 import { deleteLabel, renameLabel } from "./label";
+import { deleteProject } from "./project";
 import { afterWrites, completeLiveWrites, openLiveCanvas, removeFromLiveCanvas, touchesLiveCanvases, type LiveWriteState } from "./live";
 
 const CR = ids.labelCr23;
@@ -98,6 +99,37 @@ describe("completeLiveWrites: the active working context (D-26)", () => {
     if (!del.ok) return;
     const r = completeLiveWrites(makeCtx(), owner, state(), del.writeSet, { contextLabelId: ids.labelJira });
     expect(r.ok && r.writeSet.writes.filter((w) => w.kind === "insert" && w.table === "label_link")).toEqual([]);
+  });
+
+  it("labels nothing when a project is deleted, and records the context on the group's events as for any write (slice 12a, D-26)", () => {
+    const s = state();
+    const del = deleteProject(
+      makeCtx(),
+      owner,
+      {
+        project: project(ids.projectA),
+        projects: [project(ids.projectA), project(ids.projectB)],
+        links: [link(ids.projectA, ids.canvas1), link(ids.projectA, LIVE), link(ids.projectB, ids.canvas1)],
+        canvases: s.canvases,
+        items: s.canvasItems,
+        frames: [],
+        notes: [],
+        pins: [],
+      },
+      { projectId: ids.projectA, expectedVersion: 1 },
+    );
+    if (!del.ok) throw new Error(del.error.message);
+    const r = completeLiveWrites(makeCtx(), owner, s, del.writeSet, { contextLabelId: ids.labelJira });
+    if (!r.ok) throw new Error(r.error.message);
+    // deletions are not labeled: no label link, and nothing of the model or the labels written
+    expect(r.value.labeled).toBe(0);
+    expect(r.writeSet.writes.some((w) => w.table === "label_link" || w.table === "label")).toBe(false);
+    expect(new Set(r.writeSet.writes.map((w) => w.table))).toEqual(new Set(["canvas_item", "canvas", "project_canvas", "project"]));
+    // the active context is recorded on every event of the group (D-26, AD-13), as for a canvas's delete
+    expect(r.writeSet.events.every((e) => e.context_label_id === ids.labelJira)).toBe(true);
+    // and the group stays the command's, with its name
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id))).toEqual(new Set([del.writeSet.changeGroupId]));
+    expect(r.writeSet.label).toBe("Delete project Customer 360");
   });
 
   it("labels only the moved attribute when attributes are renumbered (Q2)", () => {

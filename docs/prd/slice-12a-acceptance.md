@@ -1,6 +1,6 @@
 # Slice 12a – acceptance
 
-Status: **step 2 (the domain) done; waiting for Łukasz before step 3.**
+Status: **step 2 accepted (Łukasz, 31 October 2026); step 3 (undo on the home pages) in progress.**
 
 - Branch `slice/12a-home-undo-project-delete`, made on 31 October 2026 from `main` at `de2af7f` (the start commit). Tag
   `slice-11` is at `6c231c6`; `main` is one docs-only merge past it (PR 29, the InfoCube idea in `docs/ideas.md`), so
@@ -218,6 +218,38 @@ The PRD is updated to these answers (status "step 1 answered").
 **How to check:** `npx vitest run src/domain/commands/project.test.ts src/domain/commands/undo.test.ts
 src/domain/commands/label.test.ts src/data/local/store.test.ts`. Nothing changes on screen yet, except that a pin on
 the project home is now an undo step, undone from a canvas ("Undone: Pin label …").
+
+## Before step 3 (Łukasz's three points, 31 October 2026)
+
+1. **The canvas page's `live_label_id` on undefined (`page.tsx:127`) is an old race, found in this slice: fixed in
+   step 4.**
+   - **Where I ran it:** `main` at `de2af7f`, in a separate worktree (`../infomapper-check-main`, `npm ci`, no code
+     changed), and this branch.
+   - **On `main`:** S6B-06 alone twice (`--repeat-each=2`) and the same seven-spec set as step 2's run once; the error
+     did not appear.
+   - **On this branch:** S6B-06 alone twice, and the seven-spec set twice more; the error did not appear. So it
+     appeared once in 3 runs of the set on the branch, and never in the 3 runs on `main`.
+   - **Why it is old:** the branch changes nothing on that path. `loadShell`, the canvas page and the local adapter's
+     reads are as on `main`, and `deleteCanvas` writes the same rows in the same order. `loadShell` reads the canvas
+     and its link from one state of the file. The page then reads `store.canvases.list` again and takes
+     `canvases.find(…)!`. When a canvas's delete lands between the two reads (here: S6B-06 deletes "Order lines &
+     products" while that tab's page may be prefetched or drawn again), the second read has no such canvas, and the
+     render throws. It is a timing race that one run in a few hits, on either branch.
+   - **Fix in step 4** (it touches the pages of deleted projects anyway): the page takes the canvas from the same read
+     as `loadShell`, or treats a canvas missing from its own read as gone (the `?moved=1` path), and never uses `!` on
+     it. With a unit or e2e test that deletes the canvas between the two reads.
+2. **The working context and a project's delete.** A new test, `live.test.ts` "labels nothing when a project is
+   deleted…", confirms D-26's rule that deletions are not labeled: with the context on, the delete writes no label
+   link and nothing of the model or the labels (`labeled` 0). **But `context_label_id` is not empty on the group's
+   events:** the context is recorded on **every** change event of an editor's group, deletions included. D-26 asks for
+   that ("records it on every change event of the group"), and so does AD-13. A canvas's delete has done the same
+   since slice 3b (the existing test "links the label … with the label on every event"). The new test asserts this
+   as it is. Changing it, so that a group which labels nothing records no context, would change D-26 and every
+   delete, not only the project's. **Question to Łukasz (Q-H):** keep D-26 as it is (my proposal), or change it in a
+   later slice?
+3. **D-58:** "like a pin (D-29) they are not undo steps" becomes "they are not undo steps". It goes into
+   `docs/decisions.md` in this PR's closing, together with D-29, D-59, D-65, D-28's addition and AD-05's note (PRD
+   section 10, as updated after step 1).
 
 ## Assumptions
 
