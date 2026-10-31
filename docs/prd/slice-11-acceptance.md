@@ -191,7 +191,7 @@ names are (D-37). Table and requirement cards are unchanged."
 ## Handover for the next session
 
 - **State after step 2 (31 October 2026):** branch `slice/11-aliases`, from tag `slice-10c` (`72ef24b`). The last
-  commit is "docs: slice 11 step 2, KB upgraded to format 11". Not pushed.
+  commits are step 2's docs ("docs: slice 11 step 2, …"; `git log --oneline -8` shows the slice). Not pushed.
   - Step 2 is done and KB is at format 11.
   - The newest KB backup is `.data/backups/dev-db-20261031-1008-before-format-11.json`, also saved as
     `kb-model-latest.json`; it is the format-10 file.
