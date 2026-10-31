@@ -1,8 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { access, archived, ids, makeCtx, NOW, project } from "../__fixtures__/domain";
+import { access, archived, canvas, canvasItem, frame, ids, link, makeCtx, note, NOW, pin, project } from "../__fixtures__/domain";
+import type { Write } from "../changes";
 import { STALE_VERSION_MESSAGE } from "../errors";
 import { changeLabel } from "../model/change-label";
-import { createProject, PROJECT_NAME_REQUIRED, updateProject } from "./project";
+import type { WorkspaceRole } from "../types";
+import { createProject, deleteProject, LAST_PROJECT_MESSAGE, PROJECT_NAME_REQUIRED, updateProject, type DeleteProjectState } from "./project";
+import { isUndoable } from "./undo";
 import { FIRST_CANVAS_NAME } from "./workspace";
 
 describe("createProject", () => {
@@ -16,6 +19,9 @@ describe("createProject", () => {
     expect(writes[2]).toMatchObject({ row: { project_id: r.value.projectId, canvas_id: r.value.canvasId, sort_order: 0, added_by: ids.actor } });
     expect(events.map((e) => e.operation)).toEqual(["create", "create", "create"]);
     expect(new Set(events.map((e) => e.change_group_id))).toEqual(new Set([changeGroupId]));
+    // named by the command (slice 12a, F4): by its events the group read "Create canvas"
+    expect(r.writeSet.label).toBe("Create project");
+    expect(changeLabel(events)).toBe("Create canvas");
   });
 
   it("is allowed to owner, admin and modeler only", () => {
@@ -87,5 +93,93 @@ describe("updateProject (slice 9, D-59)", () => {
       expect(updateProject(makeCtx(), access(role), state, { ...ref, name: "X" })).toMatchObject({ ok: false, error: { code: "forbidden", message: expect.stringContaining("edit projects") } });
     }
     expect(updateProject(makeCtx(), access("owner", archived), state, { ...ref, name: "X" })).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
+
+describe("deleteProject (slice 12a, D-65)", () => {
+  const canvas3 = "01900000-0000-7000-8000-000000002003";
+  const reqCard = "01900000-0000-7000-8000-00000000c003";
+  const sharedCard = "01900000-0000-7000-8000-00000000c004";
+  /**
+   * Project A has canvas 1 (only A: a card, a requirement card, a frame, a note), canvas 2 (shared with B, a card) and
+   * canvas 3 (only A, CR-23's live canvas). A pins CR-23, B pins JIRA-481.
+   */
+  const world = (over: Partial<DeleteProjectState> = {}): DeleteProjectState => ({
+    project: project(ids.projectA),
+    projects: [project(ids.projectA), project(ids.projectB)],
+    links: [link(ids.projectA, ids.canvas1, 0), link(ids.projectA, ids.canvas2, 1), link(ids.projectA, canvas3, 2), link(ids.projectB, ids.canvas2)],
+    canvases: [canvas(ids.canvas1), canvas(ids.canvas2), canvas(canvas3, { name: "CR-23", live_label_id: ids.labelCr23 })],
+    items: [
+      canvasItem(ids.itemCustomer),
+      canvasItem(reqCard, { entity_id: null, requirement_id: ids.req101 }),
+      canvasItem(sharedCard, { canvas_id: ids.canvas2, entity_id: ids.salesOrder }),
+    ],
+    frames: [frame(ids.frameA)],
+    notes: [note(ids.noteFree)],
+    pins: [pin(ids.projectA, ids.labelCr23), pin(ids.projectB, ids.labelJira)],
+    ...over,
+  });
+  const ref = { projectId: ids.projectA, expectedVersion: 1 };
+  const run = (state = world(), role: WorkspaceRole = "modeler", ws = {}) => deleteProject(makeCtx(), access(role, ws), state, ref);
+  /** A write as "kind table key": the id, or the link's pair. */
+  const keyOf = (w: Write): string => {
+    if (w.kind === "insert") return `insert ${w.table}`;
+    const b = w.before as unknown as Record<string, string>;
+    return `${w.kind} ${w.table} ${b.id ?? `${b.project_id}|${b.canvas_id ?? b.label_id}`}`;
+  };
+
+  it("deletes the project, its own canvases with their content, its links and pins; a shared canvas stays; one change group", () => {
+    const r = run();
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toEqual({ name: "Customer 360", deletedCanvasIds: [ids.canvas1, canvas3], keptCanvasIds: [ids.canvas2] });
+    const { writes, events, changeGroupId } = r.writeSet;
+    expect(writes.map(keyOf)).toEqual([
+      `update note ${ids.noteFree}`,
+      `update canvas_item ${ids.itemCustomer}`,
+      `update canvas_item ${reqCard}`,
+      `update frame ${ids.frameA}`,
+      `update canvas ${ids.canvas1}`,
+      `update canvas ${canvas3}`,
+      `remove project_canvas ${ids.projectA}|${ids.canvas1}`,
+      `remove project_canvas ${ids.projectA}|${ids.canvas2}`,
+      `remove project_canvas ${ids.projectA}|${canvas3}`,
+      `remove project_pinned_label ${ids.projectA}|${ids.labelCr23}`,
+      `update project ${ids.projectA}`,
+    ]);
+    for (const w of writes) if (w.kind === "update") expect(w.row).toMatchObject({ deleted_at: NOW, version: (w.before as { version: number }).version + 1 });
+    // a deleted live canvas keeps its label: the label's next "Open live" makes a new one (D-10)
+    expect(writes.find((w) => w.kind === "update" && w.table === "canvas" && w.row.id === canvas3)).toMatchObject({ row: { live_label_id: ids.labelCr23 } });
+    // the requirement itself, the model and the other project's pin are untouched (D-28)
+    expect(new Set(writes.map((w) => w.table))).toEqual(new Set(["note", "canvas_item", "frame", "canvas", "project_canvas", "project_pinned_label", "project"]));
+    expect(new Set(events.map((e) => e.change_group_id))).toEqual(new Set([changeGroupId]));
+    expect(events.at(-1)).toMatchObject({ object_type: "project", operation: "delete", object_id: ids.projectA });
+    expect(r.writeSet.label).toBe("Delete project Customer 360");
+    expect(isUndoable(events)).toBe(true);
+  });
+
+  it("deletes no canvas when all are shared, and skips deleted rows", () => {
+    const r = run(world({ links: [link(ids.projectA, ids.canvas2), link(ids.projectB, ids.canvas2)], notes: [note(ids.noteFree, { deleted_at: NOW })] }));
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value).toMatchObject({ deletedCanvasIds: [], keptCanvasIds: [ids.canvas2] });
+    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["project_canvas", "project_pinned_label", "project"]);
+  });
+
+  it("refuses the workspace's last live project", () => {
+    expect(run(world({ projects: [project(ids.projectA), project(ids.projectB, { deleted_at: NOW })] }))).toEqual({ ok: false, error: { code: "invalid", message: LAST_PROJECT_MESSAGE } });
+    expect(LAST_PROJECT_MESSAGE).toBe("A workspace needs at least one project.");
+  });
+
+  it("is for owners, admins and modelers, not in an archived workspace", () => {
+    for (const role of ["owner", "admin", "modeler"] as const) expect(run(world(), role).ok).toBe(true);
+    expect(run(world(), "reviewer")).toEqual({ ok: false, error: { code: "forbidden", message: "As a reviewer you cannot delete projects." } });
+    expect(run(world(), "reader")).toEqual({ ok: false, error: { code: "forbidden", message: "As a reader you cannot delete projects." } });
+    expect(run(world(), "owner", archived)).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+
+  it("refuses a stale version, a deleted or unknown project and bad input", () => {
+    expect(deleteProject(makeCtx(), access("owner"), world(), { ...ref, expectedVersion: 2 })).toEqual({ ok: false, error: { code: "stale_version", message: STALE_VERSION_MESSAGE } });
+    expect(run(world({ project: project(ids.projectA, { deleted_at: NOW }) }))).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(run(world({ project: null }))).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(deleteProject(makeCtx(), access("owner"), world(), { projectId: "x" })).toMatchObject({ ok: false, error: { code: "invalid" } });
   });
 });

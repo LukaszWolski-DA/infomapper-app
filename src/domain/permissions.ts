@@ -12,6 +12,7 @@ export const WORKSPACE_ACTIONS = [
   "workspace.unarchive",
   "project.create",
   "project.edit",
+  "project.delete",
   "canvas.create",
   "canvas.rename",
   "canvas.edit_projects",
@@ -44,6 +45,8 @@ export const ROLE_PERMISSIONS: Record<WorkspaceAction, readonly WorkspaceRole[]>
   "project.create": EDITORS,
   // a project's name and description on its home (slice 9, D-59)
   "project.edit": EDITORS,
+  // deleting a project from its home, with the canvases only it uses (slice 12a, D-65)
+  "project.delete": EDITORS,
   "canvas.create": EDITORS,
   "canvas.rename": EDITORS,
   "canvas.edit_projects": EDITORS,
@@ -70,6 +73,7 @@ const ACTION_TEXT: Record<WorkspaceAction, string> = {
   "workspace.unarchive": "unarchive this workspace",
   "project.create": "create projects",
   "project.edit": "edit projects",
+  "project.delete": "delete projects",
   "canvas.create": "create canvases",
   "canvas.rename": "rename canvases",
   "canvas.edit_projects": "change which projects a canvas belongs to",

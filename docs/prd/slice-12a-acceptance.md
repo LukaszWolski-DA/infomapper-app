@@ -1,6 +1,6 @@
 # Slice 12a – acceptance
 
-Status: **step 1 answered (Łukasz, 31 October 2026); step 2 (the domain) in progress.**
+Status: **step 2 (the domain) done; waiting for Łukasz before step 3.**
 
 - Branch `slice/12a-home-undo-project-delete`, made on 31 October 2026 from `main` at `de2af7f` (the start commit). Tag
   `slice-11` is at `6c231c6`; `main` is one docs-only merge past it (PR 29, the InfoCube idea in `docs/ideas.md`), so
@@ -145,6 +145,79 @@ mostly in undo: the step's name, the last project under undo, and who may undo a
   single toast).
 
 The PRD is updated to these answers (status "step 1 answered").
+
+## Step 2: the domain (31 October 2026)
+
+**What changed**
+
+- **`project.delete`** (`permissions.ts`): owners, admins and modelers; refusal "As a {role} you cannot delete
+  projects.".
+- **`deleteProject`** (`src/domain/commands/project.ts`), item 11:
+  - one change group named "Delete project {project}" (`deleteProjectLabel`);
+  - checks `project.delete`, the archive and the project's version;
+  - refuses the last live project with `LAST_PROJECT_MESSAGE` ("A workspace needs at least one project.");
+  - soft-deletes every canvas only this project links, through `canvasDeletionWrites`;
+  - removes the project's canvas links and pins, then soft-deletes the project;
+  - returns `deletedCanvasIds` and `keptCanvasIds` for item 14's toast.
+- **`canvasDeletionWrites`** (`canvas.ts`, F10) is the soft-delete part of `deleteCanvas`: notes, cards, frames, the
+  canvas. `deleteCanvas` uses it and writes what it wrote before, in the same order (its tests are unchanged and pass).
+- **Step names** (F4): `createProject` names its group "Create project" (`CREATE_PROJECT_LABEL`), and `setLabelPinned`
+  names its groups "Pin label {label}" / "Unpin label {label}" (`pinLabelLabel`). `changeLabel` is unchanged.
+- **Undo** (`undo.ts`):
+  - pins are undo steps: the `project_pinned_label` exception in `isUndoable` is gone (item 7);
+  - `PARENTS` has `canvas.live_label_id` → `label` (F11);
+  - `actionFor("project")`: create → `project.create`, delete and restore → `project.delete`, other updates →
+    `project.edit` (F12);
+  - `consistent` refuses a revert that leaves the workspace without a live project (F7).
+- **Local adapter** (`store.ts`, F8): `workspaceWithoutProject` counts the live projects again inside the serialised
+  write, only for workspaces whose projects the write deletes, and refuses with `LAST_PROJECT_MESSAGE`.
+- Comments updated in `label.ts`, `undo.ts` and `_actions/label.ts`. No server action, page or text on screen yet:
+  the delete's action, the section and the home pages' undo come in steps 3 and 4.
+
+**Unit tests (new)**
+
+- `project.test.ts`, "deleteProject (slice 12a, D-65)":
+  - the change group with shared and unshared canvases, a card, a requirement card, a frame, a note, a live canvas
+    (keeps its `live_label_id`) and pins of two projects, in order and in one group;
+  - only shared canvases;
+  - the last project;
+  - the roles (owner, admin and modeler may; reviewer and reader refused with their text) and the archive;
+  - a stale version, a deleted or unknown project and bad input.
+  - `createProject` is named "Create project", while `changeLabel` alone would still say "Create canvas".
+- `undo.test.ts`, "a project's delete (slice 12a, D-65)":
+  - undo brings back exactly the state before, and redo the state after;
+  - the undo is refused as a whole after a pinned label, the shared canvas or an entity on its canvas was deleted;
+  - no canvas comes back for a deleted live label;
+  - a reviewer, an archived workspace and another person are refused;
+  - no revert leaves the workspace without a project: neither an undo of "Create project" nor a redo of a delete.
+  - Pins: pin and unpin are undone and redone with their names, and an unpin is not undone once its label is
+    deleted. The existing test that a label's delete brings its pins back on undo still passes.
+- `store.test.ts`, "the last project under concurrent writes": two deletes of Retail Co – DWH's two projects from
+  the same read, one refused with `LAST_PROJECT_MESSAGE`, one project left.
+
+**Earlier tests changed, with the reason**
+
+| Test | Change | Why |
+| --- | --- | --- |
+| `undo.test.ts` "does not undo pinning a label to a project" | Replaced by "undoes and redoes pinning and unpinning a label…" | P2, item 7: pins are undo steps now (D-29 changes) |
+| `label.test.ts` "pins a label … but not an undo step" | `isUndoable` expects `true`; the step names are checked | Same |
+| `permissions.test.ts`, the roles' matrix | `project.delete` added for admins and modelers (owners get every action) | P11, Q-D |
+
+**Runs**
+
+- `npm run lint` and `npm run typecheck`: pass.
+- `npm test`: 116 files, 1,525 tests pass (20 s).
+- e2e of what step 2 touched: S3A-05 (pins), S9-09 (undo of the project's name from a canvas), S6B-06 (a gone
+  project and canvas), S1B-12 to S1B-14 (undo), S2A-09 (a canvas's delete). 9 tests pass, 2.4 min, no dev server of
+  mine running.
+- **Seen in that run's server log:** during S6B-06's "Back onto a deleted canvas", the canvas page logged
+  `TypeError: Cannot read properties of undefined (reading 'live_label_id')` (`page.tsx:127`). The test passes, and
+  step 2 changes neither that page nor what a canvas's delete writes. I have not checked whether `main` logs it too;
+  step 4 touches the pages of deleted projects and will look at it.
+
+**How to check:** `npx vitest run src/domain/commands/project.test.ts src/domain/commands/undo.test.ts
+src/domain/commands/label.test.ts src/data/local/store.test.ts`. Nothing changes on screen yet, except that a pin on
+the project home is now an undo step, undone from a canvas ("Undone: Pin label …").
 
 ## Assumptions
 

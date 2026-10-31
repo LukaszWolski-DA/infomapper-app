@@ -4,7 +4,7 @@ import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { buildWriteSet, type CommandContext, type WriteSet } from "@/domain/changes";
 import { renameCanvas } from "@/domain/commands/canvas";
-import { createProject } from "@/domain/commands/project";
+import { createProject, deleteProject, LAST_PROJECT_MESSAGE } from "@/domain/commands/project";
 import { updateWorkspaceSettings } from "@/domain/commands/workspace";
 import { STALE_VERSION_MESSAGE } from "@/domain/errors";
 import { isUuid, uuidv7 } from "@/domain/ids";
@@ -327,6 +327,36 @@ describe("undo (slice 1b)", () => {
 
     await resetDevData(file);
     expect((await store.undoHistory.get(ws, actor.id)).undo).toEqual([]);
+  });
+});
+
+describe("the last project under concurrent writes (slice 12a, F8)", () => {
+  /** What `deleteProject` reads for one of Retail Co – DWH's two projects, as of now. */
+  async function deleteOf(projectId: string) {
+    const { actor, access } = await accessOf("lukasz", "Retail Co – DWH");
+    const ws = access.workspace.id;
+    const [project, projects, canvases, items, frames, notes, pins] = await Promise.all([
+      store.projects.get(ws, projectId),
+      store.projects.list(ws),
+      store.canvases.list(ws),
+      store.canvasItems.list(ws),
+      store.frames.list(ws),
+      store.notes.list(ws),
+      store.labels.listPins(ws),
+    ]);
+    const links = (await Promise.all(canvases.map((c) => store.canvases.listLinksOfCanvas(ws, c.id)))).flat();
+    const r = deleteProject(ctxFor(actor.id), access, { project, projects, links, canvases, items, frames, notes, pins }, { projectId, expectedVersion: project!.version });
+    if (!r.ok) throw new Error(r.error.message);
+    return r.writeSet;
+  }
+
+  it("two deletes of the last two projects at once: one goes through, the other is refused, one project stays", async () => {
+    // both read before either writes: each sees two projects
+    const [a, b] = [await deleteOf(SEED_IDS.projCustomer360), await deleteOf(SEED_IDS.projOrderManagement)];
+    const results = await Promise.all([store.apply(a), store.apply(b)]);
+    expect(results).toEqual([{ ok: true }, { ok: false, error: expect.objectContaining({ code: "invalid", message: LAST_PROJECT_MESSAGE }) }]);
+    const ws = (await workspaceNamed("Retail Co – DWH")).id;
+    expect((await store.projects.list(ws)).map((p) => p.id)).toEqual([SEED_IDS.projOrderManagement]);
   });
 });
 
