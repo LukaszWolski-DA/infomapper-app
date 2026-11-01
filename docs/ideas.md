@@ -578,3 +578,13 @@ its memory threshold" and "The e2e server's start may miss its 120 s"). A small 
 
 Measure a full run's time and failures before and after.
 
+
+## Why the e2e dev server's heap grows about 6 MB per test (chore e2e reliability, step 2)
+
+In one full run on `main`'s code (1 November 2026) the server child's heap grew steadily, about 33 MB a minute or 6 MB
+a test, from 224 MB to the restart threshold (3,255 MB) at test 465 of 497, in every folder
+(`docs/prd/chore-e2e-reliability-acceptance.md`, step 2). The chore splits the run in three parts and does not look
+into it. To check: whether the application's own structures grow (the undo history in the server's memory, the local
+adapter's caches) or Turbopack's and Next.js's (the module graph, compiled pages, request caches). The next step is a
+heap snapshot of the child before the threshold (for example `--heapsnapshot-near-heap-limit` or the inspector on a run
+of a few folders), read by retainers.

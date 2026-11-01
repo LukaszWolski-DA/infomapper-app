@@ -1,6 +1,6 @@
 # Chore – Reliable full e2e runs (memory, fonts, sign-in)
 
-Status: **step 1 answered (1 November 2026); step 2 done; waiting for the decision on P2 and P4.** Branch `chore/e2e-reliability`, from `main` at tag `slice-12b` (assumption A1). PRD file: `docs/prd/chore-e2e-reliability.md`; step 1 writes `docs/prd/chore-e2e-reliability-acceptance.md`. A chore: no change to the application's behaviour, the data model or the local data file. Step 1 checks this PRD against the code and the e2e setup (CLAUDE.md, "How we work").
+Status: **step 1 answered (1 November 2026); step 2 answered (1 November 2026); step 3 in progress.** Branch `chore/e2e-reliability`, from `main` at tag `slice-12b` (assumption A1). PRD file: `docs/prd/chore-e2e-reliability.md`; step 1 writes `docs/prd/chore-e2e-reliability-acceptance.md`. A chore: no change to the application's behaviour, the data model or the local data file. Step 1 checks this PRD against the code and the e2e setup (CLAUDE.md, "How we work").
 
 This PRD was written from `docs/known-limitations.md` and `docs/ideas.md` at slice 12b's state, without reading the code or the e2e configuration.
 

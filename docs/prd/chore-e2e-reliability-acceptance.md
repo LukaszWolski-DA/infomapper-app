@@ -1,6 +1,6 @@
 # Chore e2e reliability – acceptance
 
-Status: **step 1 answered by Łukasz (1 November 2026); step 2 done, waiting for the decision on P2 and P4.**
+Status: **step 1 answered by Łukasz (1 November 2026); step 2 answered by Łukasz (1 November 2026); step 3 (the remedies) in progress.**
 
 - Branch `chore/e2e-reliability`, made on 1 November 2026 from `main` at the tag `slice-12b` (annotated tag object
   `71ecd5383bcb1a26b7dc2c9dd01287ca3b325031`), whose commit is the merge of pull request 31,
@@ -443,3 +443,17 @@ Node processes, 2,332 of them in the run, summed while alive at once. `next dev`
 - **Not proposed in this chore:** why the heap grows 6 MB per test (a heap snapshot of the child before the threshold
   would tell: Turbopack's module graph, the server's undo history, or the dev server's caches). Noted in `docs/ideas.md`
   only if Łukasz wants it.
+
+### Łukasz's answers to step 2 (1 November 2026)
+
+- **P4: A.** No test sign-in.
+- **P2: B, in three parts at once, not two:** with two parts each would end at about 2 GB of heap, and #244 failed at
+  2.0 GB. The parts are cut by folder so that each ends at a similar heap (from step 2's log), with an estimate of the
+  heap at each part's end. `npm run e2e` runs all three, each with its own server, and gives one result; each part can
+  also be run on its own.
+- **P3:** the dependency on `next/font/google` is shown (the section above): **B**, IBM Plex through `next/font/local`
+  with the OFL 1.1 licence. No retry of the server's start is needed.
+- **`E2E_MEMORY_LOG=1`** stays on in both closing runs (step 4).
+- **`docs/ideas.md`:** an entry on the e2e server's heap growing about 6 MB per test, with the hypothesis to check (the
+  application's structures, such as the undo history in the server's memory and the local adapter's caches, or
+  Turbopack's and Next.js's) and the next step, a heap snapshot before the threshold. Not looked into in this chore.
