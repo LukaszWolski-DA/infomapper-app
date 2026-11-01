@@ -1,7 +1,19 @@
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_BASE, E2E_DB, E2E_PORT, E2E_PRODUCTION } from "./e2e/config";
 
 const baseURL = E2E_BASE;
+
+// E2E_MEMORY_LOG=1 (chore e2e reliability, P1): the dev server's memory every 5 s, the machine's, and each test's start
+// and end, into `.data/e2e-memory-<time>.*.jsonl`. The name is fixed once here; the workers inherit it.
+const MEMORY_LOG = !!process.env.E2E_MEMORY_LOG && !E2E_PRODUCTION;
+if (MEMORY_LOG && !process.env.E2E_MEMORY_FILE) {
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
+  process.env.E2E_MEMORY_FILE = path.resolve(".data", `e2e-memory-${stamp}`);
+}
+const memoryEnv: Record<string, string> = MEMORY_LOG
+  ? { NODE_OPTIONS: `--require=${path.resolve("scripts", "e2e-memory-probe.cjs").replace(/\\/g, "/")}`, E2E_MEMORY_FILE: process.env.E2E_MEMORY_FILE! }
+  : {};
 
 export default defineConfig({
   testDir: "e2e",
@@ -25,7 +37,7 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: [["list"], ["html", { open: "never" }]],
+  reporter: [["list"], ["html", { open: "never" }], ...(MEMORY_LOG ? [["./e2e/memory-reporter.ts"] as ["./e2e/memory-reporter.ts"]] : [])],
   use: {
     baseURL,
     trace: "retain-on-failure",
@@ -56,7 +68,7 @@ export default defineConfig({
         command: `npx tsx scripts/clean-e2e-build.ts .next-e2e && npm run reset-dev-data && npm run dev -- --port ${E2E_PORT}`,
         url: `${baseURL}/sign-in`,
         // the test hooks (slice 4p) are on in the e2e dev server only
-        env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e", INFOMAPPER_TEST_HOOKS: "1" },
+        env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e", INFOMAPPER_TEST_HOOKS: "1", ...memoryEnv },
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
       },
