@@ -1,6 +1,6 @@
 # Slice 12b – Thumbnails on the canvas tiles
 
-Status: **proposal for step 1.** Branch `slice/12b-canvas-thumbnails`, from `main` at tag `slice-12a` (`98e107a`, assumption A1). PRD file: `docs/prd/slice-12b-canvas-thumbnails.md`; step 1 writes `docs/prd/slice-12b-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus two measurement steps (the home's load before and after) and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Status: **step 1 answered** (Łukasz, 1 November 2026; `slice-12b-acceptance.md`, "Łukasz's answers to step 1"). Branch `slice/12b-canvas-thumbnails`, from `main` at tag `slice-12a` (`98e107a`, assumption A1). PRD file: `docs/prd/slice-12b-canvas-thumbnails.md`; step 1 writes `docs/prd/slice-12b-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus two measurement steps (the home's load before and after) and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 This PRD was written from the docs at slice 12a's state (`CLAUDE.md`, `docs/decisions.md`, `docs/data-model-v2.md`, `docs/known-limitations.md`, `docs/ideas.md`, `docs/inventory-prototype-vs-app.md`, `slice-12a-acceptance.md`) and from the prototype's `thumb`, `renderHome` and `renderWsHome`, without reading the code.
 
@@ -16,19 +16,19 @@ The idea has waited for one reason (`docs/ideas.md`, "Thumbnails on the project 
 - **P2. A thumbnail is a sketch of the canvas's layout, as in the prototype (`thumb`):**
   - frames as tinted rectangles in their colour; a collapsed frame as its block, with its cards not drawn;
   - entity cards as rounded rectangles in their concept's colour; table cards in the physical colour; a collapsed card as its header;
-  - one straight line per source table and entity pair on the canvas joined by at least one mapping, in the mapping colour, from centre to centre;
-  - free notes in their paper colour (pinned notes are not drawn);
+  - one straight line per source table and entity pair on the canvas joined by at least one mapping, in the mapping colour, from centre to centre; no line to a card in a collapsed frame, and the canvas's layer mode is ignored, as in the prototype (step 1, answer 4);
+  - free notes in their paper colour as the canvas shows them: not while their frame is collapsed (`noteVisible`); resolved notes are drawn, as hiding them is a preference in the browser (D-21) (step 1, answer 5); pinned notes are not drawn;
   - requirement cards in the reserved violet;
   - no text, no relationship lines, no source relationship lines, no marks;
   - fitted into the tile's strip with a 6 % margin, keeping the proportions;
   - an empty canvas says "Empty canvas".
-- **P3. Nothing on the canvas changes.** The thumbnail is drawn on the home pages only. AD-24 does not apply; S12B-11 checks the canvas page is unchanged.
+- **P3. Nothing on the canvas changes.** The thumbnail is drawn on the home pages only. AD-24 does not apply; S12B-11 checks the canvas page is unchanged. **A rule of the slice (step 1, F3):** nothing of the thumbnails or the frame count goes into `loadProjectView` or the canvas page; the home page computes them from what it already reads and passes them to the tiles. The one change in the canvas layer is moving the constant `NOTE_MINI` to `src/ui/` (answer 6), with no change to what the Overview draws; the step that does it runs S3B-13.
 - **P4. No data model change and no new format of the local data file.** A thumbnail is computed from rows that exist (`canvas_item`, `frame`, `note`, the cards' entities and tables, their attribute and column counts, mappings, concept colours). No KB backup step before the closing's usual backup.
 
 **Proposed, to confirm in step 1 and after step 2:**
 
-- **P5. Computed when the page loads, on the server, as static SVG in the page's HTML.** No script, no layout read, no React Flow on the home. It is fresh on every load, so a change on a canvas or an undo on the home (D-65) shows on the next draw of the home. **Fallback if step 2's figures miss the bars:** a stored thumbnail per canvas, written with the canvas's layout changes. That is a data model change and a new decision; it is not built in this slice without Łukasz's approval.
-- **P6. Card heights follow the prototype's rule,** a sketch, not the canvas's exact drawing: a header plus padding plus one row per attribute or column (at least one), whatever the card's row filter; a collapsed card is its header. Widths are the card's stored width (default 256). A requirement card is 230 × 94, a free note its width × 80, a collapsed frame's block 280 × 160. If the canvas already computes card heights from data in a pure function, step 1 says whether using it costs less than copying the rule (Q3).
+- **P5. Computed when the page loads, on the server, as static SVG in the page's HTML.** No script, no layout read, no React Flow on the home. The SVG is rendered by a server component and handed to the (client) tile as a slot (step 1, F4); its form (React nodes or one string, rounded coordinates) is chosen from step 2's byte figures (answer 3). It is fresh on every load, so a change on a canvas or an undo on the home (D-65) shows on the next draw of the home. **Fallback if step 2's figures miss the bars:** a stored thumbnail per canvas, written with the canvas's layout changes. That is a data model change and a new decision; it is not built in this slice without Łukasz's approval.
+- **P6. Card heights follow the canvas's rules** (step 1, F5 and answer 1): `cardHeightOf` with the card's row filter (`src/domain/model/card-size.ts`), a live canvas's context cards through `liveMembership` (`labeled`), a collapsed card as its header; a collapsed frame's block is `blockHeight(members)` (280 wide). Widths are the card's stored width (default 256). A requirement card is always 230 × 94 (answer 2), a free note its width × 80 (its height is not stored). A unit test compares the heights with the canvas's `cardHeight(buildCards(…))` on the seed and on "Performance test".
 - **P7. The frame count on a tile** ("{n} cards, {m} frames. Also in …", prototype), closing the known limitation "Canvas tiles have no frame count". The data is read for the thumbnail anyway.
 - **P8. The workspace home's project tiles** show the thumbnail of the project's first canvas, as the prototype does (`renderWsHome`, `thumb(cs[0])`). It reads one canvas per project. **Alternative:** leave the workspace home without thumbnails (section 9). Step 2 measures both homes; Łukasz decides with the figures.
 
@@ -71,7 +71,7 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
 2. **On three data sets:**
    - the seed's project with "Customer & orders";
    - "Performance test" (`npm run seed:large`: 100 cards, labels and notes; a second canvas with 12 requirement cards);
-   - a project with many canvases: the measuring spec copies "Performance test"'s canvas layout into **20 canvases** of one project in the e2e data file, through the data file only (not the seed). Step 1 proposes the count if 20 does not fit how the local adapter behaves.
+   - a project with many canvases: the measuring spec copies "Performance test"'s canvas layout into **20 canvases** of a separate project, "Performance test – 20 canvases", in the "Performance test" workspace, in the e2e data file only (not the seed, never `.data/dev-db.json`; answer 8).
 3. **The thumbnail's cost before building it:** a bench script (as `scripts/bench-*.ts`) that reads what P2 needs for every canvas of a project through the same repository calls the page would use and computes the shapes, on the three data sets; time and the SVG's size per canvas and per page.
 4. **The proposal for Łukasz:** the figures, the bars for step 5 (proposal: the project home's server time and LCP at most +20 % and at most +50 ms on "Performance test", the 20-canvas project's at most +100 ms, the page's HTML growth stated in bytes), and P5 or its fallback.
 
@@ -81,7 +81,7 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
 6. **The project home's tiles** draw it as SVG in the existing strip (`project-tiles.tsx`), server-rendered, with `preserveAspectRatio="xMidYMid meet"` and a viewBox from the bounds plus 6 %. Colours come from the palette's tokens (`--im-…`), so light and dark mode both work; concept colours are the stored `#RRGGBB`. The SVG is decorative (`aria-hidden`); the tile's name stays its accessible name.
 7. **"Empty canvas"** in the strip when the canvas has nothing P2 draws.
 8. **The tile's text:** "{n} cards, {m} frames. Also in …" with singular and plural as the prototype (P7); without frames as today.
-9. **The workspace home's project tiles** (only if P8 is accepted after step 2): the strip shows the project's first canvas's thumbnail by the same function, in tab order; a project's tile without a canvas cannot happen (D-65, the last canvas rule).
+9. **The workspace home's project tiles** (only if P8 is accepted after step 2): the strip shows the project's first canvas's thumbnail by the same function, in tab order; a project's tile without a canvas cannot happen (`removeCanvasFromProject`: "This project would have no canvas left."; step 1, F8).
 10. **What is read.** The home reads what the thumbnails need in the same requests as today's page data, once per page load, never per tile in the browser. Deleted rows are never drawn: a card whose entity, table or requirement is deleted, a deleted frame or note. Live canvases (D-10) are drawn as any canvas, context cards included.
 11. **Freshness.** The thumbnail is as fresh as the page: every load, and every redraw after a write or an undo on the home (D-65). Nothing is cached between loads.
 
@@ -117,11 +117,11 @@ Tests in `e2e/slice-12b/`, one file per criterion, each from a fresh seed; unit 
 | S12B-02 | **Collapsed.** A collapsed frame is drawn as its block and its cards are not drawn; a collapsed card is drawn as its header's height. |
 | S12B-03 | **Empty.** A new canvas's tile says "Empty canvas". After a card is placed on it and the home is loaded again, it shows the card. |
 | S12B-04 | **Fresh after an undo.** Move a card on a canvas, open the project home, press Undo there: the thumbnail shows the card at its old place (D-65). |
-| S12B-05 | **Deleted things.** A card of a deleted entity, a deleted frame, a deleted note and a deleted requirement's card are not drawn; a pinned note is not drawn. |
+| S12B-05 | **Deleted things.** A card of a deleted entity, a deleted frame, a deleted note and a deleted requirement's card are not drawn; a pinned note is not drawn; a note that was pinned to the deleted entity's card is drawn as a free note at its place (D-20; step 1, F16). |
 | S12B-06 | **Live canvas.** A label's live canvas has a thumbnail with its full and context cards. |
 | S12B-07 | **The frame count.** A tile reads "{n} cards, {m} frames. Also in …" with singular and plural, and "{n} cards" without frames. |
-| S12B-08 | **The workspace home** (if P8 is accepted): each project tile shows its first canvas's thumbnail; a project whose first canvas changes order shows the new first one. |
-| S12B-09 | **No layout read and no script.** The thumbnails are in the server's HTML (present with JavaScript off in the test's page), and the home's code contains no layout read for them. Readers and reviewers see the same thumbnails. |
+| S12B-08 | **The workspace home** (if P8 is accepted): each project tile shows its first canvas's thumbnail; after the first canvas is removed from the project, the tile shows the next one's (the app has no reordering of canvases; step 1, F8). |
+| S12B-09 | **In the server's HTML.** The thumbnails are in the server's HTML response (present in a page with JavaScript off); a reader and a reviewer get the same SVG as an owner. That the thumbnail has no layout read and no client code is checked in step 4's review (a grep, listed in the acceptance; step 1, F17). |
 | S12B-10 | **The home's load** (section 6), against the bars approved after step 2. |
 | S12B-11 | **Nothing on the canvas changes.** `S3B-15-elements.spec.ts` against `.data/measure/s9-14-baseline/slice-08.json`: the viewport counts equal; the page totals as slice 12a's (+6), or each difference explained. |
 | S12B-12 | CI and the runs of the test regime; changed earlier tests listed with the reason. |
@@ -165,7 +165,9 @@ The slice adds nothing to the canvas. It adds a read and static SVG to the home 
 
 ## 8. Differences from the prototype (deliberate)
 
-- **Card heights** follow the prototype's rule unless step 1 finds the canvas's own function cheaper (P6, Q3).
+- **Card heights follow the canvas, not the prototype's `thumb`** (P6; step 1, answer 1): the row filter counts (the prototype draws every row), a live canvas's context cards show their relevant rows, and a collapsed frame's block is as high as on the canvas (`blockHeight(members)`, the prototype 160). A requirement card stays 230 × 94 as in the prototype (the canvas grows it by its name's lines).
+- **Notes in a collapsed frame are not drawn** (the prototype draws them), and a note is 80 high in the bounds too (the prototype fits 90); step 1, F14.
+- **"Empty canvas"** is HTML text of a fixed size in the strip, not SVG text scaled with the tile (step 1, F9).
 - **Colours come from the app's tokens,** so dark mode works; the prototype's variables are the same in spirit.
 - **Thumbnails are server-rendered** static SVG; the prototype draws them in the browser on every render.
 

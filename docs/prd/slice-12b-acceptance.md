@@ -1,6 +1,6 @@
 # Slice 12b – acceptance
 
-Status: **step 1 (review of the PRD against the code); waiting for Łukasz's answers before step 2.**
+Status: **step 1 answered (1 November 2026); step 2 (the measurement of today's load).**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -87,6 +87,34 @@ There is no other text: the SVG has no text and no title.
    two canvases, so its figures stay comparable with slice 7b's.
 9. **S12B-05, S12B-08 and S12B-09 (F16, F8, F17):** accept them as reworded above?
 10. **P8:** decided after step 2, as the PRD says; the figures will cover both homes.
+
+## Łukasz's answers to step 1 (1 November 2026)
+
+1. Card heights by the canvas's rules (`cardHeightOf` with the filter, context cards through `liveMembership`,
+   `blockHeight` for a collapsed frame), with a test comparing them with `buildCards`. Written into the PRD's section 8
+   as a deliberate difference from the prototype.
+2. A requirement card is always 94 px high: yes.
+3. The SVG's form after step 2's byte figures: yes; F4 (the SVG rendered on the server as the tile's slot) is the
+   proposal to compare.
+4. No line into a collapsed frame and no layer mode, as in the prototype: yes.
+5. Notes in a collapsed frame hidden; resolved ones drawn (hiding them is a preference in the browser, D-21): yes.
+6. `NOTE_MINI` into `src/ui/`: yes, as a move of the constant only, with no change to the Overview's behaviour; the step
+   that does it runs S3B-13.
+7. The strip's background is the page's canvas colour: yes.
+8. "Performance test – 20 canvases" as a separate project, in the e2e data file only: yes.
+9. S12B-08 as proposed: yes. S12B-05 and S12B-09: accepted as long as each criterion's aim is unchanged; written into
+   the PRD, full text shown in step 2's summary.
+10. P8 is decided after step 2.
+
+Also:
+- **F3 is a rule of the slice:** nothing of the thumbnails or the frame count goes into `loadProjectView` or the canvas
+  page.
+- **F2:** measured only in step 2 (the labels' cost and `listLinksOfCanvas` per canvas apart, where possible). A fix
+  joins 12b only on Łukasz's decision, if the page misses the bars.
+- **The new texts** ("Empty canvas", "{n} card(s), {m} frame(s). Also in …") are accepted.
+
+The PRD is updated to these answers (status "step 1 answered"; P2, P3, P5, P6, item 2, item 9, S12B-05, S12B-08,
+S12B-09, section 8).
 
 ## Assumptions
 
