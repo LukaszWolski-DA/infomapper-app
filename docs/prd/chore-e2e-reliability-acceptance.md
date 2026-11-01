@@ -1,6 +1,6 @@
 # Chore e2e reliability – acceptance
 
-Status: **step 1 answered by Łukasz (1 November 2026); step 2 (the memory log and one measured full run) in progress.**
+Status: **step 1 answered by Łukasz (1 November 2026); step 2 done, waiting for the decision on P2 and P4.**
 
 - Branch `chore/e2e-reliability`, made on 1 November 2026 from `main` at the tag `slice-12b` (annotated tag object
   `71ecd5383bcb1a26b7dc2c9dd01287ca3b325031`), whose commit is the merge of pull request 31,
@@ -358,3 +358,88 @@ installed package holds only the compiled native module, whose strings match).
 
 **Conclusion for P3:** the error is tied to `next/font/google` (its Turbopack replacer, fed by Google's answer).
 By Łukasz's answer this means **B**: IBM Plex through `next/font/local` with the OFL 1.1 text, in step 3.
+
+### The measured full run (1 November 2026, `main`'s code at `slice-12b`)
+
+`E2E_MEMORY_LOG=1 npm run e2e`, no dev server running, laptop on mains, power mode "Best performance". Log
+`.data/e2e-runs/chore-step2-full.log`; memory `.data/e2e-memory-20261101-1401.{server,system,tests}.jsonl` and the
+per-minute table `.minutes.csv` (`npx tsx scripts/e2e-memory-report.ts .data/e2e-memory-20261101-1401`). The failures'
+traces and the log were copied to `.data/e2e-failures/chore-step2-1/` before anything else ran; nothing was rerun.
+
+- **Time:** 5,588 s (1 h 33 min) from the command to its end; Playwright reports 1.5 h. Slice 12b's closing: 1 h 30 min.
+- **Result:** 492 passed, 3 failed, 2 skipped (497).
+- **Other programs:** windows open were Chrome (Łukasz's), Claude and Settings; the busiest processes at the start and
+  the end were Claude (1.1 to 1.5 % CPU) and the sampler's PowerShell (0.8 %). Among the six largest by memory at any
+  minute: Memory Compression (up to 3,368 MB), the server's node (2,577 MB), Claude (554 MB), the test's
+  chrome-headless-shell (453 MB), Chrome (297 MB), Defender (200 MB). Nothing heavy besides the run.
+
+#### The memory curve
+
+| Minute | Test | Child heap (MB) | Child RSS (MB) | Workers' RSS (MB) | Available (MB) | Page file (MB) | Commit (MB) | Pages in/s (peak) |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 3 | 310 | 1,111 | 934 | 609 | 547 | 14,867 | 5,203 |
+| 10 | 52 | 821 | 823 | 718 | 250 | 545 | 18,206 | 11,394 |
+| 20 | 93 | 1,188 | 1,095 | 1,045 | 38 | 538 | 18,585 | 8,182 |
+| 30 | 139 | 1,555 | 457 | 1,097 | 169 | 581 | 19,467 | 3,120 |
+| 40 | 180 | 1,701 | 658 | 1,018 | 795 | 1,421 | 19,793 | 9,291 |
+| 50 | 236 | 1,982 | 511 | 1,179 | 143 | 1,117 | 20,331 | 11,585 |
+| 60 | 297 | 2,256 | 2,148 | 1,299 | 4 | 997 | 17,804 | 1,007 |
+| 70 | 361 | 2,644 | 2,561 | 920 | 35 | 958 | 18,293 | 12,697 |
+| 80 | 421 | 3,049 | 2,330 | 1,004 | 168 | 1,914 | 20,382 | 12,876 |
+| 88 | 465 | **3,241 → restart** | | | | | | |
+| 90 | 483 | 480 | 1,348 | 1,984 | 1,285 | 1,029 | 15,146 | 119 |
+
+(Heap and RSS are the minute's peaks, available memory its lowest. "Workers" are the server child's own short-lived
+Node processes, 2,332 of them in the run, summed while alive at once. `next dev`'s main process stayed under 62 MB.)
+
+- **The heap grows steadily, about 33 MB a minute (about 6 MB a test),** from 224 MB to 3,241 MB, with no plateau. It
+  is not a few heavy specs: every folder adds to it.
+- **The threshold:** heap limit 4,069 MB (50 % of 8,042 MB RAM, F1), threshold 3,255 MB. The child restarted at
+  **88.0 min, during test 465 (S11-05)**: exit code 77, and `.next-e2e/dev/trace` holds
+  `server-restart-close-to-memory-threshold` with `memory.heapUsed` 3,414,015,816 B (3,256 MiB) of
+  `memory.heapSizeLimit` 4,266,655,744 B. The fourth occurrence: slice 11 at 472/474, 12a at 476/486, 12b at
+  467/497, now 465/497.
+- **The machine pages from the start.** Available memory is under 1 GB from the first minute and under 200 MB in 85 of
+  1,030 samples (all four quarters of the run), down to 2 MB; the commit charge is 15 to 21 GB of 23.4 GB; Memory
+  Compression holds up to 3.4 GB; the page file grows from 547 MB to 2,206 MB; pages in reach 50,729/s, over 10,000/s
+  in 80 samples. From minute 30 the child's RSS is often well **below** its heap (457 MB resident at a 1,555 MB heap):
+  Windows has trimmed or compressed most of the server's heap, and a garbage collection that walks it has to read it
+  back. Turbopack's native memory comes on top (the child's RSS exceeds its heap at the start: 1,111 MB at 310 MB).
+- After the restart the heap starts again at about 400 MB, available memory comes back to 1.3 to 1.6 GB and paging
+  nearly stops (119 pages/s): the restart is the only thing that frees memory during a run (F2).
+
+#### The failures against memory
+
+| # | Test | Minute | What failed | Heap | Child RSS | Available | Pages in/s |
+| ---: | --- | ---: | --- | ---: | ---: | ---: | ---: |
+| 244 | S6B-08-edit | 52.6 | sign-in: `bar-top` not visible within 15 s after picking the user | ≤ 1,999 MB | ≤ 1,154 MB | ≥ 74 MB | ≤ 15,375 |
+| 439 | S10B-06 "a reviewer sees the same line" | 83.6 | the same, the second person's sign-in (`signInAs` in a new context) | ≤ 3,054 MB | ≤ 2,136 MB | ≥ 151 MB | ≤ 22,106 |
+| 466 | S11-06 | 88.0 | `page.goto("/sign-in")` timed out at 60 s | ≤ 3,241 MB | ≤ 708 MB | ≥ 1,599 MB | ≤ 10,436 |
+
+- **466 is the restart:** it began while the child exited at the threshold and the new child compiled again from cold.
+- **244 and 439 are sign-in timeouts during heavy paging, with a large heap:** both at the sign-in's last step, the
+  same form as the 9 flakes of the last three closings (F3); both with available memory under 160 MB and over 15,000
+  pages in a second; both with the heap at 2 GB and more, in the run's second half.
+- **Paging alone is not enough:** tests with even more paging passed (S4B2-09 and S4P-05 at 50,729/s, heap about
+  1.8 GB; S6A-04 at 3 MB available). Both sign-in failures came with a heap of 2 GB or more and none below it; the
+  likely mechanism is a full collection of a large heap that is mostly paged out, which stalls the whole server for
+  seconds. The log has no GC events, so this is the likely reading, not a proven one.
+- **P4:** the sign-in failures line up with high memory: by Łukasz's answer this is **A**, no test sign-in.
+- The log's 90 "The destination stream closed early" lines are from the server answering a page the browser had
+  already left; the earlier closings' logs have 13 to 28 each. Not a failure; not followed further.
+
+#### Recommendations
+
+- **P2: B, the split in two by folder,** with the cut before `slice-06a` (49 % / 51 % of the time, F7). In this run
+  part 1 (`fixes` to `slice-05a`) ended at a heap of about 1.95 GB (60 % of the threshold) and part 2 grew about
+  1.3 GB from `slice-06a`'s start to the end, so each part peaks near 2 GB: about 40 % below the threshold
+  (CE-01's 20 % margin) and no restart. Both sign-in failures would have come at a heap of about 0.3 GB and 1.4 GB.
+  A (a larger heap) is ruled out by the curve: the machine already pages at a 2 GB heap. C (both) is not needed.
+- **What B does not fix:** the laptop pages at any heap size (available memory is low from the first minute). A sign-in
+  that times out in a split run would show it; the two closing runs keep `E2E_MEMORY_LOG=1` so CE-03 can be read
+  against memory. If a part's heap still reaches about 2 GB with failures, three parts are the next step (about 1.5 min
+  per part more).
+- **P3: B,** IBM Plex through `next/font/local` with the OFL 1.1 text (the source above).
+- **Not proposed in this chore:** why the heap grows 6 MB per test (a heap snapshot of the child before the threshold
+  would tell: Turbopack's module graph, the server's undo history, or the dev server's caches). Noted in `docs/ideas.md`
+  only if Łukasz wants it.
