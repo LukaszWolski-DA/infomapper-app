@@ -1,6 +1,7 @@
 # Slice 12b – acceptance
 
-Status: **step 1 answered (1 November 2026); step 2 (the measurement of today's load).**
+Status: **step 2 done (1 November 2026): today's load measured; waiting for Łukasz's decision on P5, P8, the SVG's
+form and the bars before step 3.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -121,3 +122,144 @@ S12B-09, section 8).
 - **A1** holds: `main` is the tag `slice-12a` (`98e107a`), and `origin/main` is the same commit.
 - **A2** holds (F20).
 - **A3, A4:** the seed does not change, and only the measuring spec writes the 20 canvases, into `E2E_DB`.
+
+## Step 2: today's load and what the thumbnails would cost
+
+No change to the application. What step 2 adds:
+- `e2e/slice-12b/S12B-10.spec.ts`, the measuring spec (measurement build only; added to `testIgnore`), with its
+  `fixtures.ts`;
+- `scripts/lib/many-canvases.ts`, "Performance test – 20 canvases" (`addManyCanvases`), used by the spec and the bench;
+- `scripts/bench-thumbnails.ts`, the bench;
+- `scripts/lib/thumbnail-draft.ts`, a draft of the thumbnail for the bench only. Step 3 writes the real function in
+  `src/domain/model/thumbnail.ts`, and the draft then goes.
+
+How it was run: the development laptop, Chrome 156, headed (`MEASURE=1`), the measurement build (`npm run
+measure:build`), nothing else running. Two full runs of S12B-10 (15 loads per page after 2 discarded; raw figures in
+`.data/measure/s12b10-step2/`), then the bench (9 rounds after a warm-up; `.data/bench-thumbnails-step2.log`). The
+data sets:
+- **seed:** Order management's home (2 canvases) and Retail Co – DWH's workspace home.
+- **large:** "Performance test" has 3 canvases: "100 cards" (101 cards, 8 frames, 24 notes), the live canvas PERF-2 (22
+  cards, 20 of them context cards with the `labeled` filter) and "Performance test – requirements" (113 cards with 12
+  requirement cards). Its workspace home has 1 project.
+- **many:** "Performance test – 20 canvases", 20 copies of "100 cards". Its workspace home now has 2 projects.
+
+### The pages today (S12B-10, median / p95 in ms; HTML in bytes)
+
+| Page | Run | TTFB | responseEnd | DOMContentLoaded | FCP = LCP | HTML |
+| --- | --- | --- | --- | --- | --- | --- |
+| seed, project home | 1 / 2 | 18 / 37, 20 / 30 | 22 / 41, 25 / 34 | 54 / 69, 54 / 69 | 92 / 140, 92 / 112 | 62,171 |
+| seed, workspace home | 1 / 2 | 14 / 19, 17 / 34 | 17 / 25, 19 / 37 | 44 / 49, 50 / 85 | 72 / 88, 84 / 112 | 33,148 |
+| large, project home | 1 / 2 | 53 / 67, 60 / 70 | 60 / 77, 68 / 79 | 122 / 146, 118 / 138 | 208 / 232, 212 / 232 | 449,864 |
+| large, workspace home | 1 / 2 | 20 / 29, 25 / 36 | 23 / 32, 27 / 38 | 49 / 65, 51 / 77 | 76 / 92, 80 / 116 | 31,500 |
+| many, project home (20 canvases) | 1 / 2 | 111 / 131, 117 / 150 | 124 / 143, 128 / 162 | 227 / 373, 221 / 385 | 324 / 384, 332 / 404 | 1,095,097 |
+| many, workspace home (2 projects) | 1 / 2 | 22 / 29, 22 / 31 | 25 / 33, 24 / 34 | 53 / 65, 55 / 66 | 88 / 112, 80 / 164 | 33,186 |
+
+- **LCP is FCP on every page:** the largest paint is a block of text in the first frame. As step 1 expected (F11), the
+  thumbnails can reach LCP only through the document's size.
+- **The two runs agree within about 8 ms in the medians.** The p95 spreads more, up to 50 ms on the workspace home's
+  FCP.
+- **What makes today's documents large** (one document of each kind kept with `SAVE_HTML`, the markup outside
+  `<script>`; the RSC payload in the scripts carries about as much again):
+
+  | Part of the markup | large, project home | many, project home |
+  | --- | --- | --- |
+  | the shell (top bar, tabs) | 16 KB | 34 KB |
+  | model consistency (232 lines) | 134 KB | 134 KB |
+  | the canvas tiles | 6 KB | 30 KB |
+  | requirements | 14 KB | 14 KB |
+  | labels | 6 KB | 6 KB |
+  | open notes | 28 KB (42 notes) | 275 KB (360 notes) |
+  | whole document (markup + scripts) | 450 KB | 1,095 KB |
+
+  The project home's size today comes from model consistency (a known limitation: "Model consistency lists every line")
+  and from the list of open notes, which grows with every canvas. Neither is this slice's subject (question 4 below).
+
+### The server's work today, split (bench, median in ms)
+
+| Part | seed | large | many |
+| --- | --- | --- | --- |
+| the shell's reads | 0.7–1.0 | 1.2 | 1.2 |
+| the project view's reads | 0.3 | 0.4 | 0.7 |
+| **`listLinksOfCanvas` per canvas (F2)** | 0.2 | 0.35 | **3.3** |
+| the page's reads | 0.5 | 2.4 | 2.9 |
+| stats | 0.1 | 0.9 | 1.3 |
+| labels of the project | 0.04 | 0.4 | 0.8 |
+| **labels per canvas, `usedOn` (F2)** | 0.06 | 1.0 | **8.7** |
+| requirement index | 0.1 | 1.2 | 1.6 |
+| model consistency | 0.1 | 1.6–2.4 | 2.6–3.5 |
+| open notes | 0.02 | 0.1 | 0.6 |
+| **total of the page's own code** | **2.6** | **10.8** | **26.1** |
+
+The workspace home: 1.4 ms (seed), 5.7 ms (large), 8.3 ms (many).
+
+- **The page's own code is a small part of TTFB.** On "many" it is 26 of 111–117 ms; the rest is React rendering and
+  serializing the document. That rest grows with the document: 450 KB took 53–60 ms and 1,095 KB took 111–117 ms,
+  about 0.09 ms per KB.
+- **F2:** on the 20-canvas project, the labels per canvas (8.7 ms) and `listLinksOfCanvas` (3.3 ms) are 12 ms of
+  TTFB's 111–117. Not worth a fix in this slice (Łukasz's rule: only if the page misses the bars).
+
+### What the thumbnails would add
+
+**Server time** (draft, the canvas's height rule): the index once per page, 0.1 ms (seed), 1.0–2.2 ms (large) and
+1.3 ms (many); the shapes 0.07 ms (2 canvases), 5–6 ms (3 canvases) and 26 ms (20 canvases), about 1.3 ms per "100
+cards" canvas. The draft filters every item of the workspace once per canvas; step 3 groups them by canvas once, which
+should bring the 20 canvases well under 26 ms. **The prototype's height rule is no faster**: 24 ms on 20 canvases, 2.6
+ms on 3. On "large" it differs in height for **20 of 224 cards**, exactly PERF-2's context cards; on the copies of
+"100 cards", none (no row filters there).
+
+**Shapes per thumbnail:** "100 cards" has 400: 8 frames, 60 tables, 41 entities, 12 notes and **279 lines** (70 %). On
+the 20-canvas project that is 8,000 shapes per page.
+
+**Bytes** (HTML markup + the RSC payload's estimate, for the whole page):
+
+| Form | seed, project (2) | large, project (3) | many, project (20) | large, workspace (P8, 1) | many, workspace (P8, 2) |
+| --- | --- | --- | --- | --- | --- |
+| an element per shape (`<rect>`, `<line>`) | 3.4 KB | 126 KB | 1,161 KB | 58 KB | 116 KB |
+| the same as one string | 3.3 KB | 123 KB | 1,130 KB | 57 KB | 113 KB |
+| an element per shape, whole numbers in 400 units | 3.1 KB | 119 KB | 1,091 KB | 55 KB | 109 KB |
+| the same as one string | 3.0 KB | 116 KB | 1,061 KB | 53 KB | 106 KB |
+| **one `<path>` per class and colour, whole numbers in 400 units** | **1.9 KB** | **34 KB** | **298 KB** | **15 KB** | **30 KB** |
+
+- **A string (`dangerouslySetInnerHTML`) saves only 3 % over React elements, and whole numbers about 6 %.** Most of
+  the bytes are one element per shape.
+- **One `<path>` per class and colour is about 3.9 times smaller.** A rectangle is written `M x y h w v h h -w z` and a
+  line `M x y L x y`, in a 400-unit space (sub-pixel in a 140 px strip). The corners are not rounded (under a pixel at
+  this size), and each thumbnail has a handful of elements, so React elements and a string cost the same. Tests read
+  the shapes from the paths' subpaths (one `M` per shape; class and fill tell the kind and colour).
+- **What it means for the page:** with paths, "many" grows from 1,095 KB to about 1,393 KB (+27 %), "large" from 450 KB
+  to about 484 KB (+7 %). At about 0.09 ms per KB, plus the shapes, that is about **+35 to +55 ms TTFB on "many"** and
+  about **+5 to +10 ms on "large"**. With an element per shape, "many" would double (+1.1 MB, about +100 ms TTFB before
+  parsing), and that would miss the bars.
+
+### Proposed bars for step 5
+
+S12B-10 against `slice-12a` in one sitting, each side run twice in turns (A B A B), medians of 15 loads; p95 reported,
+not a gate (its spread is too wide for one).
+
+| Page | TTFB | FCP (= LCP) | HTML |
+| --- | --- | --- | --- |
+| seed, project home | ≤ +20 % or ≤ +10 ms, whichever is larger | the same | ≤ +5 KB |
+| large, project home | ≤ +20 % and ≤ +50 ms (the PRD's) | ≤ +20 % and ≤ +50 ms | ≤ +50 KB |
+| many, project home (20 canvases) | ≤ +100 ms (the PRD's) | ≤ +100 ms | ≤ +350 KB |
+| workspace homes (if P8) | ≤ +20 ms | ≤ +20 ms | ≤ +20 KB per project shown |
+
+### Recommendation
+
+- **P5: build it as proposed: computed on the server on each load, static SVG.** The fallback (a stored thumbnail, a
+  data model change) is not needed: the computation is about 1 ms per canvas, and the cost lies in the bytes, which the
+  form solves.
+- **The SVG's form: one `<path>` per class and colour, whole numbers in a 400-unit space, as React elements** (no
+  `dangerouslySetInnerHTML`; React escapes the attributes), rendered by a server component and passed to the tile as a
+  slot (F4).
+- **P8: accept it.** The workspace home today is 31–33 KB and 20–25 ms TTFB. With paths it adds about 15 KB and 2–4 ms
+  per project shown.
+- **F2: no fix in this slice** (12 ms of 111–117 on the 20-canvas home).
+
+### Questions for Łukasz after step 2
+
+1. P5 as recommended (no stored thumbnail)?
+2. The SVG's form: paths per class and colour, in 400 units, as React elements?
+3. P8: accept?
+4. The bars as proposed? Should the large parts of today's home (model consistency's 134 KB, the open notes' 275 KB on
+   20 canvases) go into `docs/ideas.md` (folding or a limit, as the consistency limitation suggests), with no work in
+   12b?
