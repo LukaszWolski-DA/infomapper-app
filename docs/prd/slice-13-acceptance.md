@@ -473,3 +473,14 @@ Both are in `docs/ideas.md` since the answers: "by {person}" from the field's ow
 - "Enter a name." now also shows in the browser when an empty settings or requirement name goes back (the server's text
   before).
 - No other text yet: the line, "Not saved" and the rest are steps 3 and 4.
+
+## For the closing (Łukasz's request, 1 November 2026)
+
+At the closing, after slice 13 is closed, add to `docs/ideas.md` a new section "The plan after slice 13 (Łukasz,
+<the closing's date>)":
+- **14a:** saving notes and frames by slice 13's rule (the canvas's queue, AD-24, measurements);
+- **14b:** the writes off the save chain (the canvas's name in its tab, the change-to-resolve actions; the canvas's look
+  as slice 14a's step 1 decides) and a warning when leaving a page with an unsaved draft;
+- **then InfoCube** (a concept document first);
+- **then the model validator;**
+- **the database slice last** (AD-31).
