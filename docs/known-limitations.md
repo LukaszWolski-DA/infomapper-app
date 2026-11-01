@@ -12,8 +12,12 @@ re-checks versions, keys and references inside its serialised write, but not thi
 moment can therefore both pass the check and leave a canvas or project without its last link.
 
 - **Accepted** in the local adapter: it is development only and has one user at a time in practice.
+- **Slice 12a (Q-B):** deleting a project is one more way in. Say a canvas is in projects A and B: one person deletes A
+  (the canvas stays in B) while another takes the canvas out of B (allowed, as it is still in A). The canvas ends in no
+  project and is not deleted. Accepted the same way; no check in the local adapter (Łukasz, step 1).
 - **The database slice (last, AD-31):** check this rule in the same transaction as the write (e.g. lock the project's and the canvas's
-  `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed.
+  `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed. The same for a project's
+  delete and its shared canvases.
 
 ### The last owner under concurrent writes (slice 8; fixed in the local adapter)
 
@@ -25,6 +29,17 @@ concurrent demotions).
 
 - **The database slice (last, AD-31):** the same check in the write's transaction (lock or read again the workspace's
   members under a serialisable transaction), as for "at least one canvas" above.
+
+### The last project under concurrent writes (slice 12a; fixed in the local adapter)
+
+A workspace keeps at least one project (D-65). The domain counts the live projects from what the command read, and an
+undo refuses a revert that would leave none; but two people deleting the last two projects at the same moment, or a
+delete and an undo of "Create project", each count before the other writes. The local adapter counts the live projects
+again inside its serialised write, for the workspaces whose projects a write deletes, and refuses with "A workspace
+needs at least one project." (`workspaceWithoutProject` in `src/data/local/store.ts`, tested with two concurrent
+deletes).
+
+- **The database slice (last, AD-31):** the same check in the write's transaction, as for the last owner.
 
 ### A late fresh page could show an older state (slice 3a step 5; fixed for notes, frames and cards in slice 3b)
 
@@ -446,6 +461,20 @@ panels exist only on canvas pages.
 
 ## Back and forward (slice 6b)
 
+### Back onto a page restored from the browser's back-forward cache (slice 12a)
+
+When the earlier page was opened by a full page load (a typed address, a bookmark, a reload), Back restores that whole
+document from the browser's back-forward cache (Chrome's bfcache): no request reaches the server and no code of the page
+runs (`history-nav.tsx`'s refresh hears traversals inside one document only). So Back onto a page of a project or a
+canvas deleted since shows it as it was: the canvas page of a deleted project (slice 12a) or a deleted canvas (since
+slice 6b). Any write there is refused as not found, and the view goes on the next action or reload, which goes through
+`loadShell` (the workspace home with "That project no longer exists.", or the project's first canvas with "This canvas
+is no longer in …"). Through the app's own links (tabs, breadcrumbs, tiles) the pages are one document and Back is
+checked as D-38 says (S12A-12, S6B-06).
+
+- **Accepted** by Łukasz in slice 12a, step 4. **Later:** `docs/ideas.md`, "Refresh a page restored from the back-forward
+  cache".
+
 ### Browsers without the Navigation API
 
 Back and Forward, Alt+←/→ and the selection places rest on the Navigation API (Baseline since January 2026: Chrome and
@@ -548,6 +577,9 @@ memory of the server process, as the PRD asks for now. It is lost when the serve
 the demo data is replaced: steps whose change group is no longer in the change log are left out).
 
 - **Accepted** for the local adapter: one development server, one user at a time in practice.
+- **Slice 12a:** the history is one per person and workspace, used from every page since slice 12a (the canvases and
+  both home pages, D-65). The largest step it can lose is a project's delete: after a restart a deleted project cannot
+  be brought back from the app; its rows stay soft-deleted in the data file.
 - **The database slice (last, AD-31):** decide whether the history must survive a restart (and several server instances). If it must,
   keep it in the database next to `change_event`.
 - **Slice 7c (F6):** a step recorded before the local data file's upgrade to format 8 that touched a source column
@@ -568,19 +600,18 @@ the demo data is replaced: steps whose change group is no longer in the change l
 - **Slice 7c (live columns only):** the upgrade moved hand-typed comments into notes on live columns only. A deleted
   column brought back by undo keeps a hand-typed comment, shown as "From the source:".
 
-### No undo outside canvases (slice 3a, step 0)
+### A project's delete: its undo is all or nothing (slice 12a)
 
-Undo and redo (the top bar's buttons, Ctrl+Z, Ctrl+Shift+Z) exist only on canvas pages (slice 1b, assumption 8).
-Changes made on the project and workspace home pages are in the undo history but can only be undone from a canvas.
-That covers creating projects and canvases and, since slice 9 (D-59), a project's name and description. The history is
-one per person and workspace: the last 50 steps, kept in the server's memory and empty again after a restart until the
-database slice. So such a step is undone and redone from any canvas of the workspace, of any project, in its turn after
-the steps made later. Pinning a label to a project and unpinning it (project home, slice 3a) write a change group with
-their change events but are not undo steps at all. Deleting a label is an undo step, and its undo brings its project pins
-back with it.
+Deleting a project is one undo step (D-65). Its undo brings back the project, its links, its pins and its own
+canvases with their cards, frames and notes, or nothing: it is refused as a whole, with "This can't be undone because it
+was changed afterwards.", when anything it would bring back depends on something deleted since. That is not only a
+pinned label or a shared canvas deleted afterwards: deleting **any element shown on one of its own canvases** (an
+entity, a source table, a requirement, a concept or a source system of a frame) makes the undo refuse, because the
+deleted canvases' cards still point at it (a delete takes live cards only). A canvas's delete has worked so since slice
+2a. As every refused step, the step leaves the history, and the next Ctrl+Z goes further back. The rows stay
+soft-deleted in the data; there is no list of deleted projects to restore yet (`docs/ideas.md`).
 
-- **Accepted** by Łukasz in slice 3a, step 0.
-- **Later:** undo on the home pages (`docs/ideas.md`, “Undo and redo on the project and workspace home pages”).
+- **Accepted** by Łukasz in slice 12a, step 1 (F6).
 
 ## Dependencies (slice 2a, step 0)
 
@@ -725,6 +756,20 @@ nothing and says so” (`e2e/slice-07a/S7A-04-route.spec.ts`) failed at its firs
 the click on Łukasz the top bar did not show within 15 s. That is before any slice code runs. It happened in 1 of 9
 full runs logged since slice 7a's close, and the file passed 3 of 3 on its own. Recorded as a known flake (Łukasz, 26
 October 2026); if it comes back, look at the sign-in redirect's timing under a long run.
+
+### The e2e dev server restarts itself at its memory threshold (slice 12a)
+
+In slice 12a's closing full run (31 October 2026, 4,901 s), the e2e dev server printed "⚠ Server is approaching the
+used memory threshold, restarting..." once, near the end of the run, while S12A-02 (`e2e/slice-12a/S12A-02.spec.ts`)
+was running. The undo was stored and its toast shown, but the page after it was the app's error page ("Something went
+wrong."), so the test failed. On its own it passed 3 of 3. Next.js's dev server restarts itself when its memory grows
+past a threshold over a long run (Turbopack's compiled pages and caches); the test that runs at that moment fails, and
+any test may be that one. The run's output and trace are in `.data/e2e-failures/12a-close-1/`.
+
+- **Accepted:** a dev-server restart, not the app; the test passes on its own.
+- **Later:** if it comes back, raise the dev server's memory for the e2e run (Node's `--max-old-space-size` in the e2e
+  web server's command) or split the full run in two; the database slice's production-build e2e runs (AD-31) would
+  end it.
 
 ### S4B2-06 flaked again after its fix (slice 10b)
 

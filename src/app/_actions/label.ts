@@ -77,7 +77,7 @@ export async function deleteLabelAction(workspaceId: string, input: { labelId: s
   });
 }
 
-/** Pins a label to a project's home or unpins it (not an undo step). */
+/** Pins a label to a project's home or unpins it (one undo step each, slice 12a). */
 export async function setLabelPinnedAction(workspaceId: string, input: { projectId: string; labelId: string; pinned: boolean }): Promise<ActionResult> {
   return labelCommand(workspaceId, async (ctx, access, store) => {
     const ws = access.workspace.id;

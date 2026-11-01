@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { attribute, builtin, canvasItem, classificationLink, entity, frame, ids, makeCtx, mapping, mappingInput, ownClassification, requirement, requirementLink, sourceColumn, workspace } from "../__fixtures__/domain";
+import { attribute, builtin, canvasItem, classificationLink, entity, frame, ids, makeCtx, mapping, mappingInput, ownClassification, project, requirement, requirementLink, sourceColumn, workspace } from "../__fixtures__/domain";
 import { buildWriteSet, nextVersion, type Write } from "../changes";
 import { changeCanvasId, changeLabel } from "./change-label";
 
@@ -51,6 +51,8 @@ describe("the canvas of a change (slice 1b)", () => {
     expect(changeCanvasId(events([update("canvas_item", canvasItem(), { x: 400, y: 80 })]))).toBe(ids.canvas1);
     expect(changeCanvasId(events([{ kind: "insert", table: "entity", row: entity() }, { kind: "insert", table: "canvas_item", row: canvasItem() }]))).toBe(ids.canvas1);
     expect(changeCanvasId(events([update("entity", entity(), { name: "Client" })]))).toBeNull();
+    // a project's delete takes its canvas's cards, but is not a change "on" that canvas (slice 12a)
+    expect(changeCanvasId(events([deleted("canvas_item", canvasItem()), deleted("project", project(ids.projectA))]))).toBeNull();
     expect(
       changeCanvasId(events([deleted("canvas_item", canvasItem()), deleted("canvas_item", canvasItem(ids.itemCrmCustomer, { canvas_id: ids.canvas2 }))])),
     ).toBeNull();

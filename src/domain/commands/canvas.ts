@@ -1,6 +1,6 @@
 // Canvas commands: create, rename, and which projects a canvas belongs to (D-28); duplicate its layout, delete it,
 // and its look and layer mode (slice 2a, D-12, D-22); what hides things on it, removed (slice 6a, D-39); names or aliases
-// (slice 11, D-64).
+// (slice 11, D-64). A canvas's soft-delete is shared with a project's delete (slice 12a, `canvasDeletionWrites`).
 
 import { z } from "zod";
 import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
@@ -338,20 +338,33 @@ export function deleteCanvas(
   if (otherProjectIds.length) {
     return { ok: true, value: { deleted: false, otherProjectIds }, writeSet: buildWriteSet(ctx, workspaceId, [unlink]) };
   }
-  const items = state.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvas.id);
-  const frames = state.frames.filter((f) => isLive(f, workspaceId) && f.canvas_id === canvas.id);
-  const notes = (state.notes ?? []).filter((n) => isLive(n, workspaceId) && n.canvas_id === canvas.id);
   return {
     ok: true,
     value: { deleted: true, otherProjectIds: [] },
-    writeSet: buildWriteSet(ctx, workspaceId, [
-      ...notes.map((n): Write => ({ kind: "update", table: "note", before: n, row: nextVersion(ctx, n, { deleted_at: ctx.now }) })),
-      ...items.map((i): Write => ({ kind: "update", table: "canvas_item", before: i, row: nextVersion(ctx, i, { deleted_at: ctx.now }) })),
-      ...frames.map((f): Write => ({ kind: "update", table: "frame", before: f, row: nextVersion(ctx, f, { deleted_at: ctx.now }) })),
-      { kind: "update", table: "canvas", before: canvas, row: nextVersion(ctx, canvas, { deleted_at: ctx.now }) },
-      unlink,
-    ]),
+    writeSet: buildWriteSet(ctx, workspaceId, [...canvasDeletionWrites(ctx, workspaceId, canvas, state), unlink]),
   };
+}
+
+/**
+ * What deleting a canvas soft-deletes (D-28): its notes, its cards (requirement cards included), its frames and the
+ * canvas itself; its project links are the caller's. A live canvas keeps its `live_label_id` while deleted: the label's
+ * next "Open live" makes a new one (D-10). Shared by `deleteCanvas` and `deleteProject` (slice 12a, F10).
+ */
+export function canvasDeletionWrites(
+  ctx: CommandContext,
+  workspaceId: Uuid,
+  canvas: Canvas,
+  rows: { items: readonly CanvasItem[]; frames: readonly Frame[]; notes?: readonly Note[] },
+): Write[] {
+  const items = rows.items.filter((i) => isLive(i, workspaceId) && i.canvas_id === canvas.id);
+  const frames = rows.frames.filter((f) => isLive(f, workspaceId) && f.canvas_id === canvas.id);
+  const notes = (rows.notes ?? []).filter((n) => isLive(n, workspaceId) && n.canvas_id === canvas.id);
+  return [
+    ...notes.map((n): Write => ({ kind: "update", table: "note", before: n, row: nextVersion(ctx, n, { deleted_at: ctx.now }) })),
+    ...items.map((i): Write => ({ kind: "update", table: "canvas_item", before: i, row: nextVersion(ctx, i, { deleted_at: ctx.now }) })),
+    ...frames.map((f): Write => ({ kind: "update", table: "frame", before: f, row: nextVersion(ctx, f, { deleted_at: ctx.now }) })),
+    { kind: "update", table: "canvas", before: canvas, row: nextVersion(ctx, canvas, { deleted_at: ctx.now }) },
+  ];
 }
 
 // ---- look and layer mode (D-12, D-22) ----

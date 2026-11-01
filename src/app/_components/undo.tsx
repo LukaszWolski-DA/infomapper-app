@@ -5,6 +5,9 @@
 // canvas has saved what is still on its way. Whether there is something to undo comes from the server with every
 // fresh page; a card change saved without a fresh page (a move, a width) turns Undo on and Redo off right here.
 // Slice 9: a step waits for the panels' saves on their way (`rowSaves.exclusive`); Ctrl+Z in a text field is the field's own.
+// Slice 12a (D-65): the workspace home and the project home have the same buttons and keys, on the same history; they
+// have no open canvas, so a canvas step's toast names its canvas. Every provider and every toast's “Undo” share one queue
+// (F21): a toast shown by the page before it shows the next one still undoes in turn.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
@@ -17,9 +20,16 @@ interface UndoApi {
   state: UndoState;
   undo: () => void;
   redo: () => void;
+  /** Undoes the newest step even when this page thinks there is none: a toast's “Undo” always asks the server. */
+  undoNow: () => void;
 }
 
 const UndoCtx = createContext<UndoApi | null>(null);
+/** Only `undoNow`, which does not change with the state: a toast's “Undo” reads it without re-rendering on every step. */
+const UndoNowCtx = createContext<(() => void) | null>(null);
+
+/** One queue for the tab: steps run one after the other, whichever page or toast asked. */
+let queue: Promise<void> = Promise.resolve();
 
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName));
@@ -32,10 +42,10 @@ export function UndoProvider({
   children,
 }: {
   workspaceId: string;
-  /** The open project: a step that takes the open canvas out of it opens another canvas (slice 2a). */
-  projectId: string;
-  /** The open canvas: a step on another canvas says which one in its toast. */
-  canvasId: string;
+  /** The open project, on canvas pages: a step that takes the open canvas out of it opens another canvas (slice 2a). */
+  projectId?: string;
+  /** The open canvas: a step on another canvas says which one in its toast. None on the home pages (slice 12a). */
+  canvasId?: string;
   state: UndoState;
   children: ReactNode;
 }) {
@@ -50,17 +60,15 @@ export function UndoProvider({
     serverRef.current = server;
     stateRef.current = state;
   }, [server, state]);
-  const queue = useRef<Promise<void>>(Promise.resolve());
-
   const run = useCallback(
     (mode: "undo" | "redo", always = false) => {
       // Nothing to undo: the keys do nothing, as in the prototype. A toast's “Undo” always asks the server.
       if (!always && !(mode === "undo" ? stateRef.current.canUndo : stateRef.current.canRedo)) return;
-      queue.current = queue.current.then(async () => {
+      queue = queue.then(async () => {
         // after the panels' saves on their way, and before any started meanwhile (slice 9, F5)
         const result = await rowSaves.exclusive(async () => {
           await ui.settled();
-          const r = await undoAction(workspaceId, mode, { projectId, canvasId }).catch(() => ({
+          const r = await undoAction(workspaceId, mode, projectId && canvasId ? { projectId, canvasId } : undefined).catch(() => ({
             ok: false as const,
             message: "Something went wrong. Nothing was changed.",
           }));
@@ -80,6 +88,7 @@ export function UndoProvider({
   );
   const undo = useCallback(() => run("undo"), [run]);
   const redo = useCallback(() => run("redo"), [run]);
+  const undoNow = useCallback(() => run("undo", true), [run]);
 
   useEffect(() => {
     ui.registerUndo({ undo: () => run("undo", true), noteSaved: () => setLocal({ from: serverRef.current, state: { canUndo: true, canRedo: false } }) });
@@ -103,12 +112,19 @@ export function UndoProvider({
     return () => window.removeEventListener("keydown", onKey);
   }, [undo, redo]);
 
-  const api = useMemo(() => ({ state, undo, redo }), [state, undo, redo]);
-  return <UndoCtx.Provider value={api}>{children}</UndoCtx.Provider>;
+  const api = useMemo(() => ({ state, undo, redo, undoNow }), [state, undo, redo, undoNow]);
+  return (
+    <UndoNowCtx.Provider value={undoNow}>
+      <UndoCtx.Provider value={api}>{children}</UndoCtx.Provider>
+    </UndoNowCtx.Provider>
+  );
 }
 
-/** The page's undo, where there is one (canvas pages). */
+/** The page's undo, where there is one (canvas pages; the home pages since slice 12a). */
 export const useUndo = () => useContext(UndoCtx);
+
+/** The page's “undo the newest step”, for toasts (slice 12a); stable while the undo state changes. */
+export const useUndoNow = () => useContext(UndoNowCtx);
 
 const btn =
   "inline-flex h-[30px] items-center rounded-md px-1.5 text-im-ink-2 hover:bg-im-hover hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical disabled:pointer-events-none disabled:opacity-40";

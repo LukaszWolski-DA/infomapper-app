@@ -250,8 +250,12 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
   }
 }
 
-/** The canvas a change group's cards, frames and notes are on, when they are all on one; null for a change of the model only. */
+/**
+ * The canvas a change group's cards, frames and notes are on, when they are all on one; null for a change of the model
+ * only, and for a change of a project (slice 12a: a project's delete takes its canvases' cards, but is not "on" a canvas).
+ */
 export function changeCanvasId(events: readonly ChangeEvent[]): string | null {
+  if (events.some((e) => e.object_type === "project")) return null;
   const ids = new Set(
     events
       .filter((e) => e.object_type === "canvas_item" || e.object_type === "frame" || e.object_type === "note")

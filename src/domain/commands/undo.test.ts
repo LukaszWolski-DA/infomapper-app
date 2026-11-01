@@ -30,7 +30,7 @@ import {
 } from "../__fixtures__/domain";
 import { buildWriteSet, type CommandResult, type WriteSet } from "../changes";
 import type { WorkspaceAccess } from "../permissions";
-import type { Attribute, Canvas, CanvasItem, ChangeEvent, WorkspaceRole } from "../types";
+import type { Attribute, Canvas, CanvasItem, ChangeEvent, Label, WorkspaceRole } from "../types";
 import { addAttribute, createAttributeFromColumn, deleteAttribute, pasteAttribute, reorderAttribute, updateAttribute } from "./attribute";
 import { deleteCanvas, duplicateCanvas, renameCanvas, setCanvasLook } from "./canvas";
 import { removeFromCanvas } from "./canvas-item";
@@ -40,6 +40,7 @@ import { addLabel, deleteLabel, removeLabel, setLabelPinned } from "./label";
 import { createNote, updateNote } from "./note";
 import { changeLabel } from "../model/change-label";
 import { deleteMapping, mergeMappings, setMappingStatus } from "./mapping";
+import { createProject, deleteProject } from "./project";
 import { createRelationship, deleteRelationship } from "./relationship";
 import { addClassification, removeClassification, setClassification } from "./classification";
 import {
@@ -647,20 +648,46 @@ describe("the working layer (slice 3a)", () => {
     expect(revertChangeGroup(makeCtx(), as("reader"), { events: created.events, rows: apply(rows, created) }, "undo")).toMatchObject({ ok: false, error: { code: "forbidden" } });
   });
 
-  it("does not undo pinning a label to a project", () => {
+  it("undoes and redoes pinning and unpinning a label, each one step with its name (slice 12a, D-29)", () => {
     const rows = withWorkingLayer();
-    const pinned = ok(
+    const setPin = (r: Rows, pinned: boolean) =>
+      ok(
+        setLabelPinned(
+          ctx,
+          modeler,
+          { project: find(r, "project", ids.projectB) as never, label: find(r, "label", ids.labelCr23) as never, pins: r.project_pinned_label },
+          { projectId: ids.projectB, labelId: ids.labelCr23, pinned },
+        ),
+      );
+    const pinned = doAndUndo(rows, (r) => setPin(r, true));
+    expect(pinned.done.label).toBe("Pin label CR-23");
+    expect(isUndoable(pinned.done.events)).toBe(true);
+    expect(pinned.afterDo.project_pinned_label).toContainEqual(pin(ids.projectB, ids.labelCr23));
+    if (!pinned.undone.ok) throw new Error(pinned.undone.error.message);
+    expect(content(pinned.afterUndo)).toEqual(content(rows));
+    const redone = revertChangeGroup(makeCtx(), modeler, { events: pinned.undone.writeSet.events, rows: pinned.afterUndo }, "redo");
+    if (!redone.ok) throw new Error(redone.error.message);
+    expect(content(apply(pinned.afterUndo, redone.writeSet))).toEqual(content(pinned.afterDo));
+
+    const unpinned = doAndUndo(pinned.afterDo, (r) => setPin(r, false));
+    expect(unpinned.done.label).toBe("Unpin label CR-23");
+    if (!unpinned.undone.ok) throw new Error(unpinned.undone.error.message);
+    expect(content(unpinned.afterUndo)).toEqual(content(pinned.afterDo));
+  });
+
+  it("refuses to undo a pin once its label is deleted", () => {
+    const rows = withWorkingLayer();
+    const unpinned = ok(
       setLabelPinned(
         ctx,
         modeler,
-        { project: find(rows, "project", ids.projectB) as never, label: find(rows, "label", ids.labelCr23) as never, pins: rows.project_pinned_label },
-        { projectId: ids.projectB, labelId: ids.labelCr23, pinned: true },
+        { project: find(rows, "project", ids.projectA) as never, label: find(rows, "label", ids.labelCr23) as never, pins: rows.project_pinned_label },
+        { projectId: ids.projectA, labelId: ids.labelCr23, pinned: false },
       ),
     );
-    expect(revertChangeGroup(makeCtx(), modeler, { events: pinned.events, rows: apply(rows, pinned) }, "undo")).toMatchObject({
-      ok: false,
-      error: { code: "invalid", message: NOT_UNDOABLE_MESSAGE },
-    });
+    const afterUnpin = apply(rows, unpinned);
+    const gone = apply(afterUnpin, buildWriteSet(ctx, ids.ws, [{ kind: "update", table: "label", before: find(afterUnpin, "label", ids.labelCr23) as never, row: { ...(find(afterUnpin, "label", ids.labelCr23) as never as Label), deleted_at: NOW, version: 2 } }]));
+    expect(revertChangeGroup(makeCtx(), modeler, { events: unpinned.events, rows: gone }, "undo")).toMatchObject({ ok: false, error: { code: "conflict", message: UNDO_REFUSED_MESSAGE } });
   });
 
   it("refuses to undo putting a card on a canvas once a note is pinned to it, and to bring back a link whose label was deleted", () => {
@@ -906,5 +933,102 @@ describe("aliases and the canvases' names (slice 11)", () => {
     const item = find(undoOld(apply(rows, removed), removed.events), "canvas_item", ids.itemCustomer);
     expect(item).toMatchObject({ deleted_at: null, entity_names: null, attribute_names: null });
     expect("entity_names" in item && "attribute_names" in item).toBe(true);
+  });
+});
+
+describe("a project's delete (slice 12a, D-65)", () => {
+  /** The seed with canvas 2 shared by A and B, CR-23 pinned to A, a frame and a note on canvas 1. */
+  const world = (): Rows => {
+    const rows = seed();
+    return {
+      ...rows,
+      project_canvas: [...rows.project_canvas, link(ids.projectA, ids.canvas2, 1)],
+      label: [label(ids.labelCr23)],
+      project_pinned_label: [pin(ids.projectA, ids.labelCr23)],
+      frame: [frame(ids.frameA)],
+      note: [note(ids.noteFree)],
+    };
+  };
+  const del = (r: Rows, who: WorkspaceAccess = modeler) =>
+    ok(
+      deleteProject(
+        ctx,
+        who,
+        {
+          project: find(r, "project", ids.projectA) as never,
+          projects: r.project.filter((p) => p.deleted_at === null),
+          links: r.project_canvas,
+          canvases: r.canvas,
+          items: r.canvas_item,
+          frames: r.frame,
+          notes: r.note,
+          pins: r.project_pinned_label,
+        },
+        { projectId: ids.projectA, expectedVersion: 1 },
+      ),
+    );
+  /** Soft-deletes one row as some other write did. */
+  const softDeleteRow = (r: Rows, table: UndoableTable, id: string) => {
+    const before = find(r, table, id);
+    return apply(r, buildWriteSet(ctx, ids.ws, [{ kind: "update", table, before, row: { ...before, deleted_at: NOW, version: Number(before.version) + 1 } } as never]));
+  };
+  const undo = (events: readonly ChangeEvent[], rows: Rows, who: WorkspaceAccess = modeler) => revertChangeGroup(makeCtx(), who, { events, rows }, "undo");
+
+  it("is undone in one step, bringing back everything, and redone", () => {
+    const rows = world();
+    const { done, afterDo, undone, afterUndo } = doAndUndo(rows, (r) => del(r));
+    expect(find(afterDo, "project", ids.projectA)).toMatchObject({ deleted_at: NOW });
+    expect(find(afterDo, "canvas", ids.canvas1)).toMatchObject({ deleted_at: NOW });
+    expect(find(afterDo, "canvas", ids.canvas2)).toMatchObject({ deleted_at: null });
+    expect(afterDo.project_canvas).toEqual([link(ids.projectB, ids.canvas2)]);
+    expect(afterDo.project_pinned_label).toEqual([]);
+    if (!undone.ok) throw new Error(undone.error.message);
+    expect(content(afterUndo)).toEqual(content(rows));
+    const redone = revertChangeGroup(makeCtx(), modeler, { events: undone.writeSet.events, rows: afterUndo }, "redo");
+    if (!redone.ok) throw new Error(redone.error.message);
+    expect(content(apply(afterUndo, redone.writeSet))).toEqual(content(afterDo));
+    expect(done.label).toBe("Delete project Customer 360");
+  });
+
+  it("refuses the undo as a whole once a pinned label, a shared canvas or an element on its canvas is deleted (F5, F6)", () => {
+    const rows = world();
+    const done = del(rows);
+    const afterDo = apply(rows, done);
+    const refused = { ok: false, error: { code: "conflict", message: UNDO_REFUSED_MESSAGE } };
+    expect(undo(done.events, softDeleteRow(afterDo, "label", ids.labelCr23))).toEqual(refused);
+    const sharedGone = apply(softDeleteRow(afterDo, "canvas", ids.canvas2), buildWriteSet(ctx, ids.ws, [{ kind: "remove", table: "project_canvas", before: link(ids.projectB, ids.canvas2) }]));
+    expect(undo(done.events, sharedGone)).toEqual(refused);
+    expect(undo(done.events, softDeleteRow(afterDo, "entity", ids.customer))).toEqual(refused);
+  });
+
+  it("does not bring back a canvas as the live canvas of a label deleted since (F11)", () => {
+    const rows = { ...world(), project_pinned_label: [], canvas: [canvas(ids.canvas1, { live_label_id: ids.labelCr23 }), canvas(ids.canvas2)] };
+    const done = del(rows);
+    const afterDo = apply(rows, done);
+    expect(undo(done.events, afterDo).ok).toBe(true);
+    expect(undo(done.events, softDeleteRow(afterDo, "label", ids.labelCr23))).toMatchObject({ ok: false, error: { code: "conflict" } });
+  });
+
+  it("needs the right to delete a project to undo or redo it (F12)", () => {
+    const rows = world();
+    const done = del(rows);
+    expect(undo(done.events, apply(rows, done), as("reviewer"))).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(undo(done.events, apply(rows, done), as("owner", archived))).toMatchObject({ ok: false, error: { code: "archived" } });
+    // only the person who deleted it
+    expect(revertChangeGroup(makeCtx(ids.someoneElse), modeler, { events: done.events, rows: apply(rows, done) }, "undo")).toMatchObject({ ok: false, error: { code: "forbidden" } });
+  });
+
+  it("never leaves the workspace without a live project: an undo of “Create project”, or a redo of a delete (F7)", () => {
+    const rows = world();
+    const created = ok(createProject(ctx, modeler, { workspaceId: ids.ws, name: "Finance" }));
+    const withC = apply(rows, created);
+    expect(undo(created.events, withC).ok).toBe(true);
+    const onlyC = softDeleteRow(softDeleteRow(withC, "project", ids.projectA), "project", ids.projectB);
+    expect(undo(created.events, onlyC)).toMatchObject({ ok: false, error: { code: "conflict", message: UNDO_REFUSED_MESSAGE } });
+
+    const { undone, afterUndo } = doAndUndo(rows, (r) => del(r));
+    if (!undone.ok) throw new Error(undone.error.message);
+    const withoutB = apply(softDeleteRow(afterUndo, "project", ids.projectB), buildWriteSet(ctx, ids.ws, [{ kind: "remove", table: "project_canvas", before: link(ids.projectB, ids.canvas2) }]));
+    expect(revertChangeGroup(makeCtx(), modeler, { events: undone.writeSet.events, rows: withoutB }, "redo")).toMatchObject({ ok: false, error: { code: "conflict", message: REDO_REFUSED_MESSAGE } });
   });
 });

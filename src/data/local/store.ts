@@ -4,6 +4,7 @@
 
 import type { Write, WriteSet } from "@/domain/changes";
 import { LAST_OWNER } from "@/domain/commands/people";
+import { LAST_PROJECT_MESSAGE } from "@/domain/commands/project";
 import { UNDOABLE_TABLES, type WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
@@ -305,6 +306,9 @@ async function applyToFile(file: string, writeSet: WriteSet): Promise<ApplyResul
   // inside the serialised write.
   const ownerless = workspaceWithoutOwner(next, writeSet.writes);
   if (ownerless) return { ok: false, error: domainError("invalid", LAST_OWNER(ownerless)) };
+  // The last project (slice 12a, F8): two deletes at once, or a delete and an undo of "Create project", each counted the
+  // projects from what it read. Counted again here, for the workspaces whose projects this write deletes.
+  if (workspaceWithoutProject(next, writeSet.writes)) return { ok: false, error: domainError("invalid", LAST_PROJECT_MESSAGE) };
   // only what this write can have broken: the touched tables and the new change events
   const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length });
   if (violation) return { ok: false, error: violationError(violation) };
@@ -320,6 +324,14 @@ function workspaceWithoutOwner(db: DevDb, writes: readonly Write[]): string | nu
     if (members.length > 0 && !members.some((m) => m.role === "owner")) return db.workspace.find((w) => w.id === workspaceId)?.name ?? "This workspace";
   }
   return null;
+}
+
+/** Whether this write deleted the last live project of a workspace. */
+function workspaceWithoutProject(db: DevDb, writes: readonly Write[]): boolean {
+  const touched = new Set<Uuid>();
+  for (const w of writes) if (w.table === "project" && w.kind === "update" && w.before.deleted_at === null && w.row.deleted_at !== null) touched.add(w.before.workspace_id);
+  for (const workspaceId of touched) if (!db.project.some((p) => p.workspace_id === workspaceId && p.deleted_at === null)) return true;
+  return false;
 }
 
 /**

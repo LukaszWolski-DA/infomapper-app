@@ -243,7 +243,22 @@ export function GroupedSelect({
  */
 export const armedDeleteText = (also?: string, then?: string): string => `Click again to delete${also ? `, with ${also}` : ""}${then ? `; ${then}` : ""}`;
 
-export function ConfirmDelete({ label, also, then, onConfirm, testId }: { label: string; also?: string; then?: string; onConfirm: () => void; testId?: string }) {
+/** A delete that asks for a second click; `armedText` replaces the armed default (slice 12a: "Click again to delete the project"). */
+export function ConfirmDelete({
+  label,
+  also,
+  then,
+  armedText,
+  onConfirm,
+  testId,
+}: {
+  label: string;
+  also?: string;
+  then?: string;
+  armedText?: string;
+  onConfirm: () => void;
+  testId?: string;
+}) {
   const [armed, setArmed] = useState(false);
   useEffect(() => {
     if (!armed) return;
@@ -266,7 +281,7 @@ export function ConfirmDelete({ label, also, then, onConfirm, testId }: { label:
         }
       }}
     >
-      {armed ? armedDeleteText(also, then) : label}
+      {armed ? (armedText ?? armedDeleteText(also, then)) : label}
     </button>
   );
 }

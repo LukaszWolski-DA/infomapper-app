@@ -608,6 +608,12 @@ because they are business logic or must work on any database:
   (the last write wins on the mode).
 - Soft-delete cascades and the impact preview before deleting an entity (D-47); a deleted source table takes its
   relationships in both directions with it (slice 7a).
+- Projects (slice 12a, D-65): a workspace keeps at least one live project, checked by the delete, by undo and redo, and
+  again inside the write; deleting a project soft-deletes it, removes its `project_canvas` and `project_pinned_label`
+  rows, and soft-deletes each of its canvases that no other project links, with their `canvas_item`, `frame` and
+  `note` rows, in one change group; shared canvases stay in their other projects; the model is untouched. A deleted
+  canvas keeps its `live_label_id`, and undo does not bring a canvas back as the live canvas of a deleted label. No
+  table changes.
 - Source import (slice 7a): matching, statuses, rename choices, the scope of missing (P4), and when a mapping goes back
   to review (P6); the plan is rebuilt on the server and must do what the review showed (P8).
 - Classifications (slice 7c): a link fits its classification's scope; names unique against names and codes per scope;

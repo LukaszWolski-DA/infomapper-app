@@ -170,16 +170,18 @@ describe("setLabelPinned (S3A-05)", () => {
   const set = (pinned: boolean, s: object = {}, role: WorkspaceRole = "modeler") =>
     setLabelPinned(makeCtx(), access(role), { ...state, ...s }, { projectId: projectA, labelId: labelJira, pinned });
 
-  it("pins a label to a project and unpins it; written with a change event, but not an undo step", () => {
+  it("pins a label to a project and unpins it; one undo step each, named by the command (slice 12a, D-29)", () => {
     const r = set(true);
     if (!r.ok) throw new Error(r.error.message);
     expect(r.writeSet.writes).toEqual([{ kind: "insert", table: "project_pinned_label", row: pin(projectA, labelJira) }]);
     expect(r.writeSet.events).toMatchObject([{ object_type: "project_pinned_label", object_id: labelJira, operation: "create" }]);
-    expect(isUndoable(r.writeSet.events)).toBe(false);
+    expect(isUndoable(r.writeSet.events)).toBe(true);
+    expect(r.writeSet.label).toBe("Pin label JIRA-481");
     const u = set(false, { pins: [pin(projectA, labelJira)] });
     if (!u.ok) throw new Error(u.error.message);
     expect(u.writeSet.writes).toEqual([{ kind: "remove", table: "project_pinned_label", before: pin(projectA, labelJira) }]);
-    expect(isUndoable(u.writeSet.events)).toBe(false);
+    expect(isUndoable(u.writeSet.events)).toBe(true);
+    expect(u.writeSet.label).toBe("Unpin label JIRA-481");
   });
 
   it("refuses pinning twice, unpinning what is not pinned, deleted labels and projects, and reviewers", () => {

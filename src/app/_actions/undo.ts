@@ -6,6 +6,8 @@
 // Slice 2a: when the step takes the open canvas out of its project (undoing its duplicate, redoing its deletion), the
 // canvas to open instead is remembered: the original of an undone duplicate, as in the prototype, else the project's
 // first canvas.
+// Slice 12a: when the step removes a project (undoing "Create project", redoing a project's delete), that project is
+// remembered, so that its page, drawn again, goes to the workspace home with only this step's toast (F2, Q-A).
 
 import { revalidatePath } from "next/cache";
 import { getDataStore } from "@/data";
@@ -24,6 +26,7 @@ import {
   refusedStepMessage,
   type UndoHistory,
 } from "@/domain/model/undo-history";
+import { rememberGoneProject } from "../_lib/gone-project";
 import { rememberNextCanvas } from "../_lib/next-canvas";
 import { withLiveCanvases, type ActionResult } from "../_lib/run-command";
 import { getSession } from "../_lib/session";
@@ -97,6 +100,9 @@ export async function undoAction(
       const links = await store.canvases.listLinksOfProject(workspace.id, open.projectId);
       const next = canvasAfterStep(open, links, step.events);
       if (next) await rememberNextCanvas(open.canvasId, next);
+    }
+    for (const w of result.writeSet.writes) {
+      if (w.table === "project" && w.kind === "update" && w.before.deleted_at === null && w.row.deleted_at !== null) await rememberGoneProject(w.row.id);
     }
     revalidatePath("/", "layout");
     const canvasId = changeCanvasId(step.events);

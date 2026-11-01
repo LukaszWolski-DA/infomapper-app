@@ -1,7 +1,7 @@
 // Working labels (D-08, D-09, D-24, slice 3a): assigned by hand to entities, attributes, mappings, source tables and
 // columns; renamed, deleted (with their links and project pins, one change group) and pinned to a project's home
 // (D-29). Labels are kept apart from the model: deleting one leaves the model untouched. Modelers, admins and owners
-// change labels (Łukasz, step 0 answer 2). Pinning is written with its change events but is not an undo step.
+// change labels (Łukasz, step 0 answer 2). Pinning and unpinning are one undo step each (slice 12a, D-29).
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
@@ -229,7 +229,10 @@ export interface PinLabelState {
   pins: readonly ProjectPinnedLabel[];
 }
 
-/** Pins a label to a project's home or unpins it (written with its change event, not an undo step). */
+/** The undo history's names of a pin (slice 12a, F4): its change events hold only ids, so the command names it. */
+export const pinLabelLabel = (name: string, pinned: boolean): string => `${pinned ? "Pin" : "Unpin"} label ${name}`;
+
+/** Pins a label to a project's home or unpins it: one undo step each (slice 12a, D-29). */
 export function setLabelPinned(ctx: CommandContext, access: WorkspaceAccess, state: PinLabelState, input: unknown): CommandResult {
   const parsed = begin(access, "label.edit", pinInput, input);
   if (!parsed.ok) return fail(parsed.error);
@@ -242,11 +245,16 @@ export function setLabelPinned(ctx: CommandContext, access: WorkspaceAccess, sta
   if (pinned) {
     if (pin) return fail(domainError("conflict", `${label.row.name} is already pinned to ${project.row.name}.`));
     const row: ProjectPinnedLabel = { project_id: projectId, label_id: labelId, workspace_id: access.workspace.id };
-    return done(ctx, access, undefined, [{ kind: "insert", table: "project_pinned_label", row }]);
+    return named(done(ctx, access, undefined, [{ kind: "insert", table: "project_pinned_label", row }]), pinLabelLabel(label.row.name, true));
   }
   if (!pin) return fail(domainError("not_found", `${label.row.name} is not pinned to ${project.row.name}.`));
-  return done(ctx, access, undefined, [{ kind: "remove", table: "project_pinned_label", before: pin }]);
+  return named(done(ctx, access, undefined, [{ kind: "remove", table: "project_pinned_label", before: pin }]), pinLabelLabel(label.row.name, false));
 }
+
+const named = <T>(result: CommandResult<T>, label: string): CommandResult<T> => {
+  if (result.ok) result.writeSet.label = label;
+  return result;
+};
 
 // ---- links of deleted items (D-47 cascade) ----
 

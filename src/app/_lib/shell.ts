@@ -5,8 +5,9 @@ import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { can, checkCreateWorkspace, isArchived, isGuest } from "@/domain/permissions";
 import type { AppUser, WorkspaceRole } from "@/domain/types";
+import { goneByMe } from "./gone-project";
+import { missingCanvasWay } from "./missing-canvas";
 import { nextCanvasFor } from "./next-canvas";
-import { workspaceHref } from "./paths";
 import { LAST_PROJECTS_COOKIE, parseLastProjects } from "./preferences";
 import { standingOf, type Standing } from "./roles";
 import { getSession } from "./session";
@@ -83,8 +84,10 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
   if (where.projectId) {
     project = projectRows.find((p) => p.id === where.projectId) ?? null;
     // a project that no longer exists (deleted, or never in this workspace) opens the workspace home with a toast, for
-    // every arrival: a typed address, a link, Back or Forward (slice 6b, step 1 answer 5)
-    if (!project) redirect(`${workspaceHref(workspace.id)}?gone=project`);
+    // every arrival: a typed address, a link, Back or Forward (slice 6b, step 1 answer 5); drawn again as the result of
+    // your own action that removed it (its delete, an undo or a redo), without that toast: the action has its own
+    // (slice 12a, F2)
+    if (!project) await leaveMissingCanvas(workspace.id, where.projectId, where.canvasId ?? "");
   } else {
     const remembered = parseLastProjects((await cookies()).get(LAST_PROJECTS_COOKIE)?.value)[workspace.id];
     project = projectRows.find((p) => p.id === remembered) ?? projectRows[0] ?? null;
@@ -94,18 +97,8 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
     const row = links.some((l) => l.canvas_id === where.canvasId)
       ? await store.canvases.get(workspace.id, where.canvasId)
       : null;
-    // A canvas no longer in this project (slice 2a). While the page is drawn again after your own delete, removal or
-    // undo (a server action), the canvas that action chose opens (`next-canvas.ts`), else the first one, without more
-    // ado; any other visit opens the project's first canvas with a toast (`?moved=1`).
-    if (!row && project && links.length) {
-      const base = `/w/${workspace.id}/p/${project.id}/c/`;
-      if ((await headers()).has("next-action")) {
-        const next = await nextCanvasFor(where.canvasId);
-        redirect(base + (next && links.some((l) => l.canvas_id === next) ? next : links[0]!.canvas_id));
-      }
-      redirect(`${base}${links[0]!.canvas_id}?moved=1`);
-    }
-    if (!row) notFound();
+    // A canvas no longer in this project (slice 2a): `leaveMissingCanvas`
+    if (!row) return leaveMissingCanvas(workspace.id, where.projectId!, where.canvasId);
     canvas = { id: row.id, name: row.name };
   }
 
@@ -143,4 +136,30 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
       checkCreateWorkspace(organization.id, myOrgMemberships.find((m) => m.organization_id === organization.id) ?? null) === null,
     canCreateProject: can({ workspace, member }, "project.create"),
   };
+}
+
+/**
+ * Leaves a canvas page whose canvas is not there, by `missingCanvasWay` (D-38): `loadShell` when the canvas or its
+ * project is gone, and the canvas page when its own read no longer has the canvas that `loadShell` saw, because a delete
+ * landed in between (slice 12a, the race of step 2's run). A project that no longer exists leads to the workspace home
+ * (`?gone=project`, or silently after your own action that removed it, `gone-project.ts`); a canvas no longer in its
+ * project opens the project's first other canvas (`?moved=1`, or after your own action the one it chose,
+ * `next-canvas.ts`). Never returns.
+ */
+export async function leaveMissingCanvas(workspaceId: string, projectId: string, canvasId: string): Promise<never> {
+  const store = getDataStore();
+  const projectLive = !!(await store.projects.get(workspaceId, projectId));
+  const ownAction = (await headers()).has("next-action");
+  const way = missingCanvasWay({
+    workspaceId,
+    projectId,
+    canvasId,
+    projectLive,
+    links: projectLive ? await store.canvases.listLinksOfProject(workspaceId, projectId) : [],
+    ownAction,
+    next: ownAction && canvasId ? await nextCanvasFor(canvasId) : null,
+    projectGoneByMe: ownAction && !projectLive && (await goneByMe(projectId)),
+  });
+  if ("to" in way) redirect(way.to);
+  notFound();
 }

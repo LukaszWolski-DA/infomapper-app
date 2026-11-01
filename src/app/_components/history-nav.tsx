@@ -30,7 +30,9 @@ function subscribe(onChange: () => void): () => void {
     } catch {
       // blocked storage: nothing to prune
     }
-    onChange();
+    // Next.js pushes and replaces its entries inside a `useInsertionEffect`, and the Navigation API reports them at once:
+    // React refuses an update scheduled there, so the buttons hear of the change once that commit is done.
+    queueMicrotask(onChange);
   };
   nav.addEventListener("currententrychange", changed);
   return () => nav.removeEventListener("currententrychange", changed);

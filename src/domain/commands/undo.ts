@@ -8,14 +8,15 @@
 // steps themselves come from the person's own history (`model/undo-history.ts`).
 // A canvas's look and layer mode are outside undo (D-12, slice 2a): a later change of only `canvas.look` does not
 // count as “changed afterwards”, and a canvas row that is written back keeps its current look.
-// Slice 3a: labels, label links and notes are undo steps (Łukasz's step 0 answer 3); pinning a label to a project is
-// written with its change events but is not an undo step (step 0 answer 3), while the pins that go with a deleted label
-// come back when its deletion is undone.
+// Slice 3a: labels, label links and notes are undo steps (Łukasz's step 0 answer 3); the pins that go with a deleted
+// label come back when its deletion is undone. Slice 12a: pinning and unpinning a label are undo steps too (D-29).
 // Slice 4a: requirements and requirement links are undo steps. Creating a requirement also raises the workspace's key
 // counter; that write is never reverted (a key is not given out twice), and alone it is not an undo step. A step that
 // would bring back a requirement whose key another live requirement uses by then is refused (Łukasz, step 0).
 // Slice 7c: classifications and their links are undo steps; a link whose classification, table or column is deleted
 // cannot come back alone (`PARENTS`).
+// Slice 12a (D-65): a project's delete is one step; a revert never leaves the workspace without a live project, and a
+// canvas does not come back as the live canvas of a deleted label.
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
@@ -70,6 +71,8 @@ type AnyRow = RowImage;
 
 /** Columns that point to a parent row whose deletion the domain cascades (data model, section 11). */
 const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, UndoableTable])[]>> = {
+  // slice 12a (F11): a label's delete turns only its live canvas into a normal one; a deleted one keeps the link
+  canvas: [["live_label_id", "label"]],
   project_canvas: [["project_id", "project"], ["canvas_id", "canvas"]],
   entity: [["concept_id", "concept"]],
   // not `copied_from_attribute_id` (slice 10c, F9): a copy keeps a deleted original as its lost reference
@@ -134,13 +137,12 @@ function isKeyCounter(e: ChangeEvent): boolean {
 
 /**
  * A change group can be undone when every row it wrote is in the undo history's tables and no canvas look changed.
- * Pinning or unpinning a label on a project alone is not an undo step (slice 3a), nor is the requirement key counter.
+ * The requirement key counter alone is not an undo step.
  */
 export function isUndoable(events: readonly ChangeEvent[]): boolean {
   const rows = events.filter((e) => !isKeyCounter(e));
   return (
     rows.length > 0 &&
-    !rows.every((e) => e.object_type === "project_pinned_label") &&
     rows.every(
       (e) =>
         isUndoableTable(e.object_type) &&
@@ -183,7 +185,8 @@ function actionFor(e: ChangeEvent): WorkspaceAction {
     case "project_canvas":
       return "canvas.edit_projects";
     case "project":
-      return "project.create";
+      // slice 12a (F12): a delete and its restore need the right to delete a project
+      return e.operation === "create" ? "project.create" : e.operation === "delete" || e.operation === "restore" ? "project.delete" : "project.edit";
     case "label":
     case "label_link":
     case "project_pinned_label":
@@ -301,7 +304,7 @@ function unchangedSince(table: UndoableTable, current: AnyRow, image: AnyRow): b
 /**
  * After the revert: every touched live row has live parents; every touched row that stopped being live has no live
  * children; a card that comes back is not on its canvas twice; a canvas keeps at least one project and a project at
- * least one canvas (D-28).
+ * least one canvas (D-28); the workspace keeps at least one live project (slice 12a, F7).
  */
 function consistent(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: readonly { table: UndoableTable; key: string; wasLive: boolean }[]): boolean {
   const live = (table: UndoableTable, id: unknown) => typeof id === "string" && isLiveRow(table, rows.get(table)!.get(id));
@@ -341,6 +344,7 @@ function consistent(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: read
       // a card that comes back must not be on its canvas twice (itself counted once)
       if (table === "canvas_item" && !wasLive && (row!.entity_id !== null || row!.source_table_id !== null) && cardsAt(row!) > 1) return false;
     } else if (wasLive) {
+      if (table === "project" && ![...rows.get("project")!.values()].some((p) => p.deleted_at === null)) return false;
       if (table === "project_canvas") {
         const [projectId, canvasId] = key.split("|");
         const links = [...rows.get("project_canvas")!.values()];

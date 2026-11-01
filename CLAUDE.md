@@ -17,7 +17,8 @@ change and remove people (slice 8, D-58). Panels save one object at a time, each
 and description are edited on its home, and a zoom is typed in the top bar (slice 9, D-59, D-60). An attribute can be
 copied and pasted into any entity; the copy follows its original's type and Personal data (slice 10c, D-63). Entities
 and attributes have an alias; each canvas shows names or aliases in two dimensions, with exceptions per card (slice 11,
-D-64).
+D-64). Both home pages have the canvas pages' Undo and Redo on the same history, and a project is deleted from its home
+with the canvases only it uses, one undo step (slice 12a, D-65).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -194,6 +195,7 @@ SCREENS=<folder> npx playwright test e2e/slice-10b/S10B-screens.spec.ts         
 COMMITS=1 npx playwright test e2e/slice-11/S11-13-commits.spec.ts                         # slice 11: commits of a names switch against the layer switch (dev server, on demand)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-11/S11-13.spec.ts         # slice 11: a names switch to the screen, the layer switch beside it, the LayerTree read
 SCREENS=<folder> npx playwright test e2e/slice-11/S11-screens.spec.ts                     # slice 11: names and aliases, mixed, exceptions, More, the panel field
+SCREENS=<folder> npx playwright test e2e/slice-12a/S12A-screens.spec.ts                   # slice 12a: the delete section (shared and own canvases, armed, the only project), the homes' Undo, light and dark
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
 npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
@@ -298,6 +300,18 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   Slice 11's specs run in a 1,536 × 864 window (`e2e/slice-11/fixtures.ts`): up to 1,300 px the check boxes are in
   “More”. Its measuring steps (`e2e/slice-11/measure.ts`) alias every entity and attribute of “Performance test” in the
   e2e data file (`aliasEverything`, prefix `PL `).
+
+  Slice 12a's helpers do the following:
+  - press the top bar's Undo and Redo (`undoButton`, `redoButton`) and the keys outside a field (`key`);
+  - move a card up by its header and read its stored y (`moveCardUp`, `yOf`);
+  - name Order management's home and canvases (`OM_HOME`, `OM`, `OWN` only its own, `SHARED` with Customer 360) and
+    give its own canvas a frame, a note, a requirement card and CR-23's pin as test data (`furnishOrderManagement`);
+  - read every row on a canvas, deleted or not (`rowsOn`), and the delete section (`deleteSection`, `deleteButton`,
+    `deleteText`).
+
+  Go between a project's pages by the app's links (`tab-home`, tiles) when a test then uses Back: after a typed address
+  Back restores a whole earlier document from the browser's back-forward cache, which no page code sees
+  (`docs/known-limitations.md`). Toasts of a tab in the background are read with `recordToasts`.
 
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
@@ -452,6 +466,18 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   read `namesState` (`names-state.ts`), which `ModelCanvas` publishes from an effect with `namesControl`, as
   `viewCounts`. The tint is the class `alt` on `.c-head` and on `.c-body`/`.c-lod` (`--im-alias-soft`). The search
   matches aliases in `tree-data.ts` (`show`; the hint “alias {alias}” or “attribute {name} · {alias}”).
+- **Undo on the home pages and a project's delete** (slice 12a, D-65): both homes wrap their page in `UndoProvider`
+  (no canvas) and show `UndoButtons` as the top bar's only tool (`AppShell`'s `tools`); the loaders read the history.
+  One undo queue serves the tab; toasts take "Undo" from the canvas, else from `useUndoNow` (a stable context, so
+  nothing re-renders when the undo state changes). `deleteProject` (`project.ts`) shares a canvas's soft-delete with
+  `deleteCanvas` (`canvasDeletionWrites`); steps are named by their commands (`writeSet.label`: "Create project",
+  "Delete project {name}", "Pin label {label}"). Undo refuses a revert that leaves no live project, and the local
+  adapter counts again (`workspaceWithoutProject`). **One place for a missing project or canvas:** `missingCanvasWay`
+  (`src/app/_lib/missing-canvas.ts`) through `leaveMissingCanvas` (`shell.ts`), used by `loadShell` and by the canvas
+  page when its own read misses the canvas; your own action that removed the project (the delete, an undo or a redo)
+  remembers it for a minute (`gone-project.ts`, like `next-canvas.ts`), so its page goes to the workspace home without
+  "That project no longer exists.". A step that writes a project is not "on" a canvas in the undo toast
+  (`changeCanvasId`).
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a

@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import type { ReactNode } from "react";
 import { AppShell } from "@/app/_components/app-shell";
 import { GoneNotice } from "@/app/_components/gone-notice";
+import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { projectHref, workspaceHref } from "@/app/_lib/paths";
 import { ROLE_LABEL } from "@/app/_lib/roles";
 import { loadShell } from "@/app/_lib/shell";
@@ -29,13 +30,14 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const shell = await loadShell({ workspaceId });
   const store = getDataStore();
   const workspace = (await store.workspaces.get(workspaceId))!;
-  const [members, users, projects, model, requirements, requirementLinks] = await Promise.all([
+  const [members, users, projects, model, requirements, requirementLinks, history] = await Promise.all([
     store.workspaces.listMembers(workspaceId),
     workspacePeople(store, workspaceId),
     store.projects.list(workspaceId),
     store.model.load(workspaceId),
     store.requirements.list(workspaceId),
     store.requirements.listLinks(workspaceId),
+    store.undoHistory.get(workspaceId, shell.user.id),
   ]);
   const orgMemberships = await store.organizations.listMembershipsOfUsers(members.map((m) => m.user_id));
   const organizations = await Promise.all(
@@ -70,8 +72,10 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
   const counts = new Map(shell.projects.map((p) => [p.id, p.canvasCount]));
 
+  // Undo and Redo, buttons and keys, on the person's history of the workspace (slice 12a, D-65)
   return (
-    <AppShell shell={shell}>
+    <UndoProvider workspaceId={workspaceId} state={{ canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 }}>
+    <AppShell shell={shell} tools={<UndoButtons />}>
       {query.gone === "project" && <GoneNotice message="That project no longer exists." />}
       <div data-testid="page-workspace-home" className="min-h-full bg-im-canvas px-[clamp(16px,4vw,48px)] pb-12 pt-6">
         <div className="mx-auto max-w-[1180px]">
@@ -295,6 +299,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
         </div>
       </div>
     </AppShell>
+    </UndoProvider>
   );
 }
 

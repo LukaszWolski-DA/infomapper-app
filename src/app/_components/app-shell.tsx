@@ -13,7 +13,7 @@ interface ProjectFrame {
   view: ProjectView;
   currentCanvasId: string | null;
   renameOnOpen?: boolean;
-  /** Canvas tools for the top bar (zoom, fit), on canvas pages. */
+  /** Tools for the top bar: the canvas's on canvas pages, Undo and Redo on the project home (slice 12a). */
   tools?: ReactNode;
   /** Panel contents on canvas pages; project pages show placeholders. */
   left?: ReactNode;
@@ -31,11 +31,22 @@ interface ProjectFrame {
  * left panel | canvas tabs, breadcrumbs and content | right panel. Canvas pages fill the panels. The panels show, hide
  * and slide over the canvas on narrow screens as `SidePanelsProvider` (around the page) says (slice 5a).
  */
-export async function AppShell({ shell, project, children }: { shell: ShellData; project?: ProjectFrame; children: ReactNode }) {
+export async function AppShell({
+  shell,
+  project,
+  tools,
+  children,
+}: {
+  shell: ShellData;
+  project?: ProjectFrame;
+  /** The top bar's tools on workspace pages: Undo and Redo on the workspace home (slice 12a). */
+  tools?: ReactNode;
+  children: ReactNode;
+}) {
   if (!project) {
     return (
       <div className="flex h-dvh min-h-0 flex-col bg-im-panel text-im-ink">
-        <TopBar shell={shell} />
+        <TopBar shell={shell} tools={tools} />
         <Breadcrumbs shell={shell} />
         <main className="min-h-0 flex-1 overflow-auto">{children}</main>
       </div>
