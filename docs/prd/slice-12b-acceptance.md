@@ -1,7 +1,6 @@
 # Slice 12b – acceptance
 
-Status: **step 2 done (1 November 2026): today's load measured; waiting for Łukasz's decision on P5, P8, the SVG's
-form and the bars before step 3.**
+Status: **step 3 in progress (1 November 2026): step 2 answered; the thumbnail function and its unit tests.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -263,3 +262,20 @@ not a gate (its spread is too wide for one).
 4. The bars as proposed? Should the large parts of today's home (model consistency's 134 KB, the open notes' 275 KB on
    20 canvases) go into `docs/ideas.md` (folding or a limit, as the consistency limitation suggests), with no work in
    12b?
+
+## Łukasz's answers to step 2 (1 November 2026)
+
+1. **P5:** yes. Computed on the server on every load; no stored thumbnail.
+2. **The SVG's form:** one `<path>` per class and colour, whole numbers in a 400-unit space, as React elements (no
+   `dangerouslySetInnerHTML`), in a server component passed to the tile as a slot.
+3. **P8:** accepted.
+4. **The bars for step 5:** as proposed (PRD section 6), on medians; p95 only reported. If a bar is missed, stop and
+   describe it; the bars do not change after the measurement.
+5. **Model consistency (134 KB) and the open notes (275 KB with 360 notes):** only an entry in `docs/ideas.md` with
+   these figures, no work in 12b.
+6. **F2:** no fix. The figures stay here: on the 20-canvas project the labels per canvas (`usedOn`) take 8.7 ms and
+   `listLinksOfCanvas` per canvas 3.3 ms, 12 ms of TTFB's 111–117 ms; on "Performance test" 1.0 and 0.35 ms.
+7. **To check in step 4, right after the tiles are built:** whether the thumbnails' bytes are in the document once or a
+   second time in the embedded RSC payload, and what they add to a write's answer on the project home (a pin, a
+   rename, Undo), with figures for "Performance test" and the 20-canvas project. If there are two copies, propose how
+   to avoid them before step 5.

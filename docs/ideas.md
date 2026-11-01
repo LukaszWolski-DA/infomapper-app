@@ -539,3 +539,16 @@ late in a long run (the traces in `.data/e2e-failures/12a-close-1/` show the sig
 page requested), whether a longer wait in `signInAs` only or a sign-in that sets the session cookie directly (as the
 domain helpers write test data) would end it, and whether it goes with the dev server's memory growth
 (`docs/known-limitations.md`, "The e2e dev server restarts itself at its memory threshold").
+
+## The project home's own large parts (slice 12b, step 2)
+
+Slice 12b's step 2 measured today's project home (`docs/prd/slice-12b-acceptance.md`, "Step 2"). Two parts of it
+outweigh everything else in the document:
+- **Model consistency:** 134 KB of markup for 232 lines on "Performance test" (its project home is 450 KB in all).
+- **The open notes:** 275 KB with 360 notes on the 20-canvas project "Performance test – 20 canvases" (its home is
+  1,095 KB).
+
+The embedded RSC payload roughly doubles what client components receive, and TTFB grows by about 0.09 ms per KB. To
+look at: folding the consistency lines by kind with a count (as its known limitation suggests), and a limit on the open
+notes shown with "Show all". Measure with S12B-10 before and after.
+

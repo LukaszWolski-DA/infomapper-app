@@ -1,6 +1,6 @@
 # Slice 12b – Thumbnails on the canvas tiles
 
-Status: **step 1 answered** (Łukasz, 1 November 2026; `slice-12b-acceptance.md`, "Łukasz's answers to step 1"). Branch `slice/12b-canvas-thumbnails`, from `main` at tag `slice-12a` (`98e107a`, assumption A1). PRD file: `docs/prd/slice-12b-canvas-thumbnails.md`; step 1 writes `docs/prd/slice-12b-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus two measurement steps (the home's load before and after) and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Status: **step 2 answered** (Łukasz, 1 November 2026; `slice-12b-acceptance.md`, "Łukasz's answers to step 1" and "Łukasz's answers to step 2"). Branch `slice/12b-canvas-thumbnails`, from `main` at tag `slice-12a` (`98e107a`, assumption A1). PRD file: `docs/prd/slice-12b-canvas-thumbnails.md`; step 1 writes `docs/prd/slice-12b-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus two measurement steps (the home's load before and after) and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 This PRD was written from the docs at slice 12a's state (`CLAUDE.md`, `docs/decisions.md`, `docs/data-model-v2.md`, `docs/known-limitations.md`, `docs/ideas.md`, `docs/inventory-prototype-vs-app.md`, `slice-12a-acceptance.md`) and from the prototype's `thumb`, `renderHome` and `renderWsHome`, without reading the code.
 
@@ -27,10 +27,10 @@ The idea has waited for one reason (`docs/ideas.md`, "Thumbnails on the project 
 
 **Proposed, to confirm in step 1 and after step 2:**
 
-- **P5. Computed when the page loads, on the server, as static SVG in the page's HTML.** No script, no layout read, no React Flow on the home. The SVG is rendered by a server component and handed to the (client) tile as a slot (step 1, F4); its form (React nodes or one string, rounded coordinates) is chosen from step 2's byte figures (answer 3). It is fresh on every load, so a change on a canvas or an undo on the home (D-65) shows on the next draw of the home. **Fallback if step 2's figures miss the bars:** a stored thumbnail per canvas, written with the canvas's layout changes. That is a data model change and a new decision; it is not built in this slice without Łukasz's approval.
+- **P5. Computed when the page loads, on the server, as static SVG in the page's HTML.** No script, no layout read, no React Flow on the home. The SVG is rendered by a server component and handed to the (client) tile as a slot (step 1, F4); **Its form (step 2, answered):** one `<path>` per class and colour, whole numbers in a 400-unit space, as React elements (no `dangerouslySetInnerHTML`), rendered by a server component passed to the tile as a slot. It is fresh on every load, so a change on a canvas or an undo on the home (D-65) shows on the next draw of the home. **Fallback if step 2's figures miss the bars:** a stored thumbnail per canvas, written with the canvas's layout changes. That is a data model change and a new decision; it is not built in this slice without Łukasz's approval.
 - **P6. Card heights follow the canvas's rules** (step 1, F5 and answer 1): `cardHeightOf` with the card's row filter (`src/domain/model/card-size.ts`), a live canvas's context cards through `liveMembership` (`labeled`), a collapsed card as its header; a collapsed frame's block is `blockHeight(members)` (280 wide). Widths are the card's stored width (default 256). A requirement card is always 230 × 94 (answer 2), a free note its width × 80 (its height is not stored). A unit test compares the heights with the canvas's `cardHeight(buildCards(…))` on the seed and on "Performance test".
 - **P7. The frame count on a tile** ("{n} cards, {m} frames. Also in …", prototype), closing the known limitation "Canvas tiles have no frame count". The data is read for the thumbnail anyway.
-- **P8. The workspace home's project tiles** show the thumbnail of the project's first canvas, as the prototype does (`renderWsHome`, `thumb(cs[0])`). It reads one canvas per project. **Alternative:** leave the workspace home without thumbnails (section 9). Step 2 measures both homes; Łukasz decides with the figures.
+- **P8. The workspace home's project tiles** show the thumbnail of the project's first canvas, as the prototype does (`renderWsHome`, `thumb(cs[0])`). It reads one canvas per project. **Alternative:** leave the workspace home without thumbnails (section 9). Step 2 measures both homes; Łukasz decides with the figures. **Accepted** (step 2).
 
 ## 2. Sources
 
@@ -95,8 +95,8 @@ Stop after each step with a short summary of what changed and how to check it. W
 
 1. **Critical review** (section 7). Check every item, decision and criterion against the code, `docs/decisions.md` and the earlier slices' acceptance docs. Answer Q1–Q9 in `docs/prd/slice-12b-acceptance.md`, with the differences from the prototype the slice touches and every new text proposed. No application code. Stop.
 2. **The measurement of today's load** (items 1–4): the measuring spec and the bench script, both outside the normal e2e run; the figures; the proposed bars and approach. No change to the application. Stop for Łukasz's decision on P5, P8 and the bars.
-3. **The thumbnail function** (item 5) with its unit tests. CI. Stop.
-4. **The tiles** (items 6–11): the project home, the frame count, the workspace home if P8 is accepted. Specs S12B-01 to S12B-09, the earlier specs of both home pages (slice 0, 2a, 9, 12a) and CI. Screenshots beside the prototype's tiles: the seed, "Performance test", an empty canvas, a collapsed frame, a live canvas, light and dark. Every new text listed. Stop.
+3. **The thumbnail function** (item 5) with its unit tests (including the heights against `buildCards`), the move of `NOTE_MINI` to `src/ui/` with S3B-13; the bench's draft replaced by the real function. CI. Stop.
+4. **The tiles** (items 6–11): the project home, the frame count, the workspace home if P8 is accepted. Specs S12B-01 to S12B-09, the earlier specs of both home pages (slice 0, 2a, 9, 12a) and CI. Screenshots beside the prototype's tiles: the seed, "Performance test", an empty canvas, a collapsed frame, a live canvas, light and dark. Every new text listed. Right after the tiles: the thumbnails' bytes in the document and in the embedded RSC payload, and in a write's answer (a pin, a rename, Undo) on "Performance test" and the 20-canvas project; if they are there twice, a proposal before step 5. Stop.
 5. **The measurement after** (S12B-10): the same spec and data sets as step 2, A/B against `slice-12a` in one balanced sitting (`--rounds 2`, a discarded warm-up), against the bars Łukasz approved. S12B-11's element check. Stop.
 6. **Closing:**
    - the docs (section 10);
@@ -140,10 +140,21 @@ The slice adds nothing to the canvas. It adds a read and static SVG to the home 
 
 | What | How | Bar |
 | --- | --- | --- |
-| The project home's load | a measuring spec (`e2e/slice-12b/S12B-10.spec.ts`, measurement build only, as S7B-16 measures the home's load), on the seed, "Performance test" and the 20-canvas project: server time, HTML size, FCP, LCP; median and p95 | proposed after step 2 (item 4), approved by Łukasz |
+| The project home's load | a measuring spec (`e2e/slice-12b/S12B-10.spec.ts`, measurement build only, as S7B-16 measures the home's load), on the seed, "Performance test" and the 20-canvas project: server time, HTML size, FCP, LCP; median and p95 | step 2's bars, approved (below) |
 | The workspace home's load | the same spec, if P8 is accepted | the same |
 | The thumbnail's data and shapes | a bench script (`scripts/bench-thumbnails.ts`), the three data sets | reported, not a gate |
 | The canvas page | S12B-11's element check | unchanged |
+
+**The bars (approved after step 2):** S12B-10 against `slice-12a` in one sitting, each side twice in turns (A B A B), medians of 15 loads; p95 reported, not a gate. If a bar is missed, stop and describe it; the bars do not change after the measurement.
+
+| Page | TTFB | FCP (= LCP) | HTML |
+| --- | --- | --- | --- |
+| seed, project home | ≤ +20 % or ≤ +10 ms, whichever is larger | the same | ≤ +5 KB |
+| "Performance test", project home | ≤ +20 % and ≤ +50 ms | ≤ +20 % and ≤ +50 ms | ≤ +50 KB |
+| "Performance test – 20 canvases", project home | ≤ +100 ms | ≤ +100 ms | ≤ +350 KB |
+| workspace homes | ≤ +20 ms | ≤ +20 ms | ≤ +20 KB per project shown |
+
+**Step 4 checks the bytes right after the tiles are built** (step 2's answer): whether the thumbnails are in the document once or a second time in the embedded RSC payload, and what they add to a write's answer on the project home (a pin, a rename, Undo), on "Performance test" and the 20-canvas project. If there are two copies, step 4 proposes how to avoid them before step 5.
 
 **Nothing reads layout.** The SVG's viewBox comes from the data's bounds; no size is measured in the browser. The tile's strip keeps its fixed height (prototype: 140 px), so the SVG does not change the page's layout when it arrives.
 
