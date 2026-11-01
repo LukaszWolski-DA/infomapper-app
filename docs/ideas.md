@@ -542,6 +542,19 @@ page requested), whether a longer wait in `signInAs` only or a sign-in that sets
 domain helpers write test data) would end it, and whether it goes with the dev server's memory growth
 (`docs/known-limitations.md`, "The e2e dev server restarts itself at its memory threshold").
 
+**Result** (the e2e reliability chore, 1 November 2026): the cause is the dev server's memory, not the sign-in. In one
+measured single run both sign-in failures came with the server's heap at 2 GB and more while the laptop paged hard; in
+the run split in three parts (each heap under 1.6 GB) two full runs had none. No test sign-in was added (Łukasz, P4 A).
+The chore's acceptance (`docs/prd/chore-e2e-reliability-acceptance.md`, steps 2 and 4) has the figures.
+
+## A fourth part for the full e2e run, if the sign-in times out again
+
+The full e2e run is three parts (`e2e/parts.ts`), each ending at a heap of 1.4 to 1.6 GB (the e2e reliability chore,
+step 4). If a sign-in times out again in a full run, read the memory log (`E2E_MEMORY_LOG=1`) at that test: with the
+heap well above 1.5 GB, move the cuts to four parts (one more entry in `PART_STARTS`, each part about 20 minutes, a
+server start of about 50 s more); at a low heap, the cause is elsewhere and more parts would not help. New slices fall
+into part 3, so it grows first: watch its end heap at each closing.
+
 ## The project home's own large parts (slice 12b, step 2)
 
 Slice 12b's step 2 measured today's project home (`docs/prd/slice-12b-acceptance.md`, "Step 2"). Two parts of it
@@ -577,6 +590,9 @@ its memory threshold" and "The e2e server's start may miss its 120 s"). A small 
   least, a longer `webServer` start timeout for the e2e run.
 
 Measure a full run's time and failures before and after.
+
+**Done** in the e2e reliability chore (1 November 2026): the full run in three parts, each with its own server, and
+IBM Plex hosted with the app (`docs/prd/chore-e2e-reliability-acceptance.md`).
 
 
 ## Why the e2e dev server's heap grows about 6 MB per test (chore e2e reliability, step 2)

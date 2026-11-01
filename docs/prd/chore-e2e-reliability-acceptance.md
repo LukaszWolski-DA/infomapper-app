@@ -1,6 +1,6 @@
 # Chore e2e reliability – acceptance
 
-Status: **step 1 answered by Łukasz (1 November 2026); step 2 answered by Łukasz (1 November 2026); step 3 (the remedies) done, waiting for Łukasz before step 4.**
+Status: **step 1 answered by Łukasz (1 November 2026); step 2 answered by Łukasz (1 November 2026); step 3 (the remedies) done; step 4 (two closing runs, the fonts' A/B, the docs) done, waiting for Łukasz before the merge.**
 
 - Branch `chore/e2e-reliability`, made on 1 November 2026 from `main` at the tag `slice-12b` (annotated tag object
   `71ecd5383bcb1a26b7dc2c9dd01287ca3b325031`), whose commit is the merge of pull request 31,
@@ -561,3 +561,96 @@ Less paging with a smaller heap may make the tests faster; step 4 measures it.
 - `src/app/fonts/ibm-plex/`: the five font files, `LICENSE.txt` (OFL 1.1), `README.md`.
 - `.gitattributes`: `*.woff2 binary`.
 - `package.json`: `"e2e": "tsx scripts/e2e.ts"`.
+
+## Step 4 – two closing runs, the fonts' measurement, the docs
+
+### The two full runs (1 November 2026)
+
+`E2E_MEMORY_LOG=1 npm run e2e` twice in a row, no dev server running, nothing else heavy on the laptop. Logs
+`.data/e2e-runs/chore-close-{1,2}.log`; memory `.data/e2e-memory-20261101-1619-part<n>.*` (run 1) and
+`.data/e2e-memory-20261101-1739-part<n>.*` (run 2), read with `scripts/e2e-memory-report.ts`; each run's
+`test-results/`, `playwright-report/` and log copied to `.data/e2e-failures/chore-close-{1,2}/` right after it.
+
+**Both runs: 495 passed, 2 skipped (the two on-demand specs), no failure.** Nothing to rerun.
+
+| Run | Part | Folders | Time | Heap peak (of 3,255 MB) | Lowest available | Page file peak | Pages in/s peak | Restarts |
+| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 1 | `fixes` to `slice-03a` | 25 min 59 s | 1,361 MB (42 %) | 207 MB | 2,643 MB | 24,744 | 0 |
+| 1 | 2 | `slice-03b` to `slice-07b` | 28 min 20 s | 1,540 MB (47 %) | 255 MB | 1,200 MB | 35,173 | 0 |
+| 1 | 3 | `slice-07c` to `slice-12b` | 25 min 3 s | 1,577 MB (48 %) | 204 MB | 946 MB | 25,849 | 0 |
+| 1 | | **total** | **79 min 22 s** (command 4,767 s) | | | | | |
+| 2 | 1 | `fixes` to `slice-03a` | 25 min 21 s | 1,410 MB (43 %) | 189 MB | 1,431 MB | 17,040 | 0 |
+| 2 | 2 | `slice-03b` to `slice-07b` | 27 min 3 s | 1,576 MB (48 %) | 366 MB | 1,078 MB | 136,387 | 0 |
+| 2 | 3 | `slice-07c` to `slice-12b` | 25 min 3 s | 1,542 MB (47 %) | 184 MB | 1,470 MB | 19,079 | 0 |
+| 2 | | **total** | **77 min 27 s** (command 4,652 s) | | | | | |
+
+- **Each part's server** started once and never exited (one child per part, no exit code 77, no "approaching the used
+  memory threshold" line in either log). The child's RSS peaked at 1,398 to 1,846 MB, the main process at 65 MB.
+- **The heap against step 3's estimate:** part 1 about 1.4 GB (measured 1.36 and 1.41), part 2 about 1.3 GB (1.54 and
+  1.58), part 3 about 1.5 GB (1.58 and 1.54). Part 2 grows a little more than its folders did in the single run; the
+  three stay within 0.2 GB of each other, so the cuts stand.
+- **Paging stayed:** available memory fell to about 200 MB in every part and the page file was used throughout (Memory
+  Compression up to 2.4 GB), as in step 2. The heaviest paging (run 2, S7B-06, 136,387 pages in per second at a heap of
+  1.47 GB) failed nothing. That matches step 2's reading: the sign-in timeouts need a large heap (2 GB and more) on top
+  of the paging.
+- **The time:** 77 and 79 minutes, against step 3's estimate of 1 h 32 min, step 2's single run (1 h 33 min) and slice
+  12b's closing (1 h 30 min): 12 to 14 minutes faster. A smaller heap means shorter collections and less of the server
+  paged out; each part's start and warm-up (about 50 s) costs less than that.
+
+### Against the criteria
+
+- **CE-01 (no restart):** met. No restart in either run; the highest peak, 1,577 MB, is 52 % below the threshold
+  (the bar: 20 %).
+- **CE-02 (start-up):** met. Six server starts within the limit; with P3 B no build fetches fonts (step 3's offline
+  build), and no start depends on Google Fonts.
+- **CE-03 (sign-in):** met. No test failed at the sign-in in either run; P4 B is not needed.
+- **CE-04 (nothing else changed):** met. The differences outside `e2e/`, `playwright.config.ts`, `scripts/` and the
+  docs are step 3's list (the fonts, `.gitattributes`, `package.json`'s `e2e` script); no test's assertions changed; CI
+  passes (below).
+- **CE-05 (the runs' cost):** met. Each run's time and its parts' times are in the table; both runs are faster than
+  slice 12b's closing (1 h 30 min), not slower.
+
+### The fonts: an A/B against `main` in the measurement build
+
+A temporary spec after S12B-10's method (never committed): the seed's project home (Order management) and workspace
+home (Retail DWH), 10 first visits each in a new context with an empty cache, then 2 discarded and 10 warm loads; TTFB,
+FCP, LCP, the document's bytes, all bytes transferred and the fonts' bytes and requests, and the font preload links.
+`npm run measure:build` on this branch and on `main` (`b49ede2`, tag `slice-12b`, in a worktree with its own
+`npm ci`: Turbopack refuses a `node_modules` junction that points outside the project). One discarded warm-up on the
+branch, then main, branch, branch, main. Results in `.data/measure/fonts-ab/`.
+
+| Page, visit | Side | TTFB (ms) | FCP = LCP (ms), median [range] | Bytes transferred | Font bytes (files) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Project home, first | main | 53 / 51 | 328 [272–460] / 356 [284–580] | 541 KB | 106 KB (6) |
+| | branch | 55 / 50 | 348 [316–504] / 368 [304–460] | 732 KB | 298 KB (5) |
+| Project home, warm | main | 27 / 28 | 124 / 136 | 48 KB | 0 |
+| | branch | 24 / 21 | 104 / 104 | 48 KB | 0 |
+| Workspace home, first | main | 38 / 39 | 276 [228–324] / 272 [208–368] | 471 KB | 106 KB (6) |
+| | branch | 44 / 42 | 240 [208–348] / 232 [172–304] | 662 KB | 298 KB (5) |
+| Workspace home, warm | main | 20 / 25 | 108 / 104 | 41 KB | 0 |
+| | branch | 19 / 18 | 92 / 92 | 41 KB | 0 |
+
+(Two values: round 1 / round 2. Bytes are the medians of the first visits; LCP equals FCP on every load.)
+
+- **Preloads:** every font file is preloaded on both sides: the branch's 5 (`IBMPlexSans_{Regular,Medium,SemiBold}`,
+  `IBMPlexMono_{Regular,Medium}`, `…-s.p.….woff2`), `main`'s 6 (Google's subsets, which `next/font/google` downloads
+  at build time and serves from `_next/static/media` as well, so neither side fetches fonts from Google in the browser).
+- **FCP and LCP:** no change beyond the spread. The project home's first visit is 12 to 20 ms slower in the medians,
+  the workspace home's 36 to 40 ms faster, the warm loads 12 to 32 ms faster; every difference lies inside both sides'
+  ranges. With `display: swap` nothing waits for the fonts.
+- **Bytes:** a first visit transfers about 192 KB more (298 KB of fonts instead of 106 KB): IBM's complete files carry
+  every script the fonts cover, Google's subsets only Latin. On localhost this costs nothing measurable; on a slow
+  network the fonts arrive later after the first paint (swap), not the page. Subsetting is not allowed under the
+  Reserved Font Name (step 3). Warm loads transfer the same.
+- **Comparability:** timings measured before and after this chore compare as before; a first visit's total bytes are
+  about 192 KB higher from this chore on (recorded in `docs/known-limitations.md`).
+
+### The docs and CI of step 4
+
+- `docs/known-limitations.md`: the font start and the memory restart marked resolved (step 2's and step 4's figures);
+  "Sign-in timeouts under memory pressure"; the fonts' 192 KB; the S7C-02 correction (only S0-10 starts a server of its
+  own).
+- `docs/ideas.md`: "Sign-in timeouts in full e2e runs" with its result; "A fourth part for the full e2e run, if the
+  sign-in times out again"; the chore before slice 13 marked done.
+- `CLAUDE.md` and `README.md`: `npm run e2e` in three parts, `--part`, `E2E_MEMORY_LOG`, the local fonts.
+- CI: `npm run lint`, `npm run typecheck`, `npm test` (119 files, 1,555 tests): pass.
