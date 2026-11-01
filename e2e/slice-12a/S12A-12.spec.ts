@@ -2,8 +2,8 @@ import { expect, test } from "./fixtures";
 import { backButton, box, canvasUrl, deleteButton, expectAt, expectToast, loadItems, newSession, OM, OM_HOME, OWN, recordToasts, RETAIL, SHARED, signInAs, toasts, WS_HOME } from "./helpers";
 
 // S12A-12 (items 16, 17; a regression test of D-38's redirect, F1): a second person has the project's home and its own
-// canvas open; after the delete, a write on that canvas is refused as not found, a reload of each page shows the
-// workspace home with "That project no longer exists.", and so does Back to a page of the deleted project in the first
+// canvas open; after the delete, a write on that canvas is refused as not found and its fresh page (slice 13, F3), like
+// a reload of the home, shows the workspace home with "That project no longer exists.", and so does Back to a page of the deleted project in the first
 // person's tab. A shared canvas opened under the deleted project's address does the same.
 // The delete's own redirect replaces the deleted home's history entry (step 4: Next.js replaces the entry when the
 // action's page redirects), so Back from the workspace home goes to the page before it: here the project's canvas.
@@ -40,17 +40,16 @@ test("S12A-12: pages of a deleted project: someone else's write refused, reloads
   await canvas.mouse.down();
   for (let i = 1; i <= 6; i++) await canvas.mouse.move(head.x + head.width / 3 + i * 10, head.y + head.height / 2);
   await canvas.mouse.up();
-  await expect(canvas.getByTestId("toast")).toHaveAttribute("data-kind", "refusal");
-  await expect(canvas.getByTestId("toast")).toHaveAttribute("data-visible", "true");
+  // the refusal brings the fresh page (slice 13, F3): the canvas tab leads to the workspace home with the toast at once
+  await expectAt(canvas, WS_HOME);
+  await expect.poll(() => toasts(canvas)).toContain(GONE);
   expect((await loadItems(RETAIL, OWN)).length).toBe(0);
 
-  // reloads of both of Anna's pages
-  for (const p of [home, canvas]) {
-    await p.bringToFront();
-    await p.reload();
-    await expectAt(p, WS_HOME);
-    await expect.poll(() => toasts(p)).toContain(GONE);
-  }
+  // a reload of Anna's project home
+  await home.bringToFront();
+  await home.reload();
+  await expectAt(home, WS_HOME);
+  await expect.poll(() => toasts(home)).toContain(GONE);
   // Back in Łukasz's tab: the deleted project's canvas, which leads to the workspace home with the toast
   await page.bringToFront();
   await backButton(page).click();

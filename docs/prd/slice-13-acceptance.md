@@ -1,6 +1,6 @@
 # Slice 13 – acceptance
 
-Status: **step 1 answered (1 November 2026); step 2 (the shared mechanism) in progress.**
+Status: **step 2 (the shared mechanism) done, 1 November 2026; waiting for Łukasz before step 3.**
 
 - Branch `slice/13-field-saves`, made on 1 November 2026 from `main` at `e66cc42` (the start commit,
   `e66cc42c4c1fefd9514f3c9a09cc67c7051136d3`), the merge of PR 32 (chore e2e reliability, merged 1 November 2026,
@@ -466,6 +466,24 @@ Both are in `docs/ideas.md` since the answers: "by {person}" from the field's ow
 - S13-01's note case first failed on its toast check alone. The recorder counts a repeated text once
   (`recordToasts`), so the two identical "Note saved on customers" toasts read as one; the check now expects one.
 - CI: `npm run lint` clean, `npm run typecheck` pass, `npm test` 120 files, 1,564 tests, pass.
+
+**Full e2e run** (three parts, from scratch, no dev server of mine running, 22:09 to 23:29): **499 passed, 1 failed, 2
+skipped, 1 h 20 min**. The parts:
+- part 1 (fixes to slice 3a): 127 passed, 27 min 30 s;
+- part 2 (slice 3b to 7b): 183 passed, 26 min 57 s;
+- part 3 (slice 7c to 13): 189 passed, 1 failed, 2 skipped, 25 min 12 s.
+
+The two skipped tests are the ones skipped on purpose (on demand). The log and the failure's trace are kept in
+`.data/e2e-s13-step2-fail/`.
+
+- **S12A-12 failed, a change of behaviour, not a flake.** Anna's refused move on the deleted project's canvas is a
+  `not_found` refusal. Since F3 it brings the fresh page, so her canvas tab goes to the workspace home with "That project
+  no longer exists." at once; the trace shows the `?gone=project` request. The spec then reloaded that tab and expected
+  the toast again on a page that had already left. This is D-38's way, reached earlier (answer 1).
+- The spec now expects the canvas tab at the workspace home with the toast after the refusal, and reloads only the
+  project home. Run alone after the change: **3 of 3 passed** (51 s, 53 s, 56 s).
+- No other spec failed, so the earlier panel specs pass with the stable keys: slices 1a, 1b, 2b, 3a, 4a, 7c, 9, 10a,
+  10c, 11 and 12a, and `panel-field-focus`.
 
 ### New or changed user-visible texts
 
