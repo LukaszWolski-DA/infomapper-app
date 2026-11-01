@@ -25,18 +25,24 @@ const LABEL = process.env.LABEL ?? "branch";
 const PAYLOAD = /<script>self\.__next_f\.push\([\s\S]*?\)<\/script>/g;
 const THUMB = /<svg[^>]*data-testid="tile-thumbnail"[\s\S]*?<\/svg>/g;
 const D = / d="([^"]+)"/g;
+const HREF = /\/w\/[\w-]+\/thumbnail\/[\w-]+\?v=[\w-]+/g;
 
 const bytes = (s: string) => Buffer.byteLength(s, "utf8");
 const all = (s: string, re: RegExp) => [...s.matchAll(re)].map((m) => m[0]);
 const occurrences = (hay: string, needle: string) => hay.split(needle).length - 1;
 
-/** The document's parts, and how many copies of the thumbnails' paths it holds. */
+/**
+ * The document's parts, and how many copies of each thumbnail it holds: of its paths' data when the SVG is inline
+ * (step 4's first form), else of its address (PRD P5's form); `marker` is the first of them, looked for in the writes.
+ */
 function documentParts(html: string) {
   const payload = all(html, PAYLOAD).reduce((n, s) => n + bytes(s), 0);
   const thumbs = all(html, THUMB);
   const ds = thumbs.flatMap((t) => [...t.matchAll(D)].map((m) => m[1]!));
-  const copies = ds.length ? Math.min(...ds.map((d) => occurrences(html, d))) : 0;
-  return { html: bytes(html), payload, rest: bytes(html) - payload, thumbnails: thumbs.length, thumbnailMarkup: thumbs.reduce((n, s) => n + bytes(s), 0), pathData: ds.reduce((n, d) => n + bytes(d), 0), copiesOfEachPath: copies, firstD: ds[0] ?? null };
+  const hrefs = thumbs.flatMap((t) => all(t, HREF));
+  const markers = ds.length ? ds : hrefs;
+  const copies = markers.length ? Math.min(...markers.map((d) => occurrences(html, d))) : 0;
+  return { html: bytes(html), payload, rest: bytes(html) - payload, thumbnails: thumbs.length, thumbnailMarkup: thumbs.reduce((n, s) => n + bytes(s), 0), pathData: ds.reduce((n, d) => n + bytes(d), 0), copiesOfEach: copies, hrefs, firstD: markers[0] ?? null };
 }
 
 /** Runs `act` and returns the body of the server action it sends (read on its way through a route, then passed on). */
@@ -71,7 +77,14 @@ async function measure(page: Page, url: string) {
   }, doc.firstD);
   await expect(page.getByTestId("text-project-name").or(name)).toBeVisible();
   const undo = await answerOf(page, () => page.getByTestId("button-undo").click(), doc.firstD);
-  return { url, document: doc, writes: { pin, rename, undo } };
+  // the drawings' files themselves (PRD P5's form): their sizes and cache headers
+  const files = await Promise.all(doc.hrefs.map(async (h) => {
+    const r = await page.request.get(h);
+    return { status: r.status(), bytes: (await r.body()).length, cache: r.headers()["cache-control"] };
+  }));
+  const { hrefs, ...document } = doc;
+  void hrefs;
+  return { url, document, writes: { pin, rename, undo }, files: { count: files.length, bytes: files.reduce((n, f) => n + f.bytes, 0), statuses: [...new Set(files.map((f) => f.status))], cache: [...new Set(files.map((f) => f.cache))] } };
 }
 
 test("S12B-bytes: the project home's document and write answers on “Performance test” and its 20-canvas project", async ({ page, browser }) => {

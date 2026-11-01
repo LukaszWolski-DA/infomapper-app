@@ -2,7 +2,7 @@
 
 // Canvas tiles on the project home: open, ⋯ menu (Rename, In projects), "New canvas" and
 // "Add a canvas from another project". Each tile's strip shows its canvas's thumbnail, rendered on the server and
-// handed in as a slot (slice 12b).
+// handed in as a slot, and its text the frame count (slice 12b, prototype `renderHome`).
 
 import Link from "next/link";
 import type { ReactNode } from "react";
@@ -24,7 +24,15 @@ import { CanvasMenu, DotsIcon, itemClass, menuClass, useNewCanvas } from "./canv
 const addTileClass =
   "grid min-h-[200px] place-items-center rounded-[10px] bg-transparent font-medium text-im-ink-2 shadow-[inset_0_0_0_1.5px_var(--im-line)] hover:text-im-logical hover:shadow-[inset_0_0_0_1.5px_var(--im-logical)] data-[state=open]:text-im-logical";
 
-export function CanvasTiles({ view, thumbnails }: { view: ProjectView; thumbnails: Readonly<Record<string, ReactNode>> }) {
+export function CanvasTiles({
+  view,
+  thumbnails,
+  frames,
+}: {
+  view: ProjectView;
+  thumbnails: Readonly<Record<string, ReactNode>>;
+  frames: Readonly<Record<string, number>>;
+}) {
   const router = useRouter();
   const { create, pending } = useNewCanvas(view);
   const { run } = useAction();
@@ -34,6 +42,7 @@ export function CanvasTiles({ view, thumbnails }: { view: ProjectView; thumbnail
       {view.canvases.map((canvas) => {
         const href = canvasHref(view.workspaceId, view.project.id, canvas.id);
         const also = view.projects.filter((p) => p.id !== view.project.id && canvas.projectIds.includes(p.id));
+        const m = frames[canvas.id] ?? 0;
         return (
           <div
             key={canvas.id}
@@ -52,8 +61,9 @@ export function CanvasTiles({ view, thumbnails }: { view: ProjectView; thumbnail
                   {canvas.name}
                 </span>
               </span>
-              <span className="block px-3 pb-3 text-[11.5px] text-im-ink-3">
+              <span className="block px-3 pb-3 text-[11.5px] text-im-ink-3" data-testid="tile-canvas-meta">
                 {canvas.cards} card{canvas.cards === 1 ? "" : "s"}
+                {m ? `, ${m} frame${m === 1 ? "" : "s"}` : ""}
                 {also.length ? `. Also in ${also.map((p) => p.name).join(", ")}` : ""}
               </span>
             </Link>

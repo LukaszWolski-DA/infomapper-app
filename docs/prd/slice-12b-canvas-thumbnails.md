@@ -1,6 +1,6 @@
 # Slice 12b – Thumbnails on the canvas tiles
 
-Status: **step 2 answered** (Łukasz, 1 November 2026; `slice-12b-acceptance.md`, "Łukasz's answers to step 1" and "Łukasz's answers to step 2"). Branch `slice/12b-canvas-thumbnails`, from `main` at tag `slice-12a` (`98e107a`, assumption A1). PRD file: `docs/prd/slice-12b-canvas-thumbnails.md`; step 1 writes `docs/prd/slice-12b-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus two measurement steps (the home's load before and after) and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Status: **step 2 answered; step 4's form decided** (Łukasz, 1 November 2026; `slice-12b-acceptance.md`, "Łukasz's answers to step 1", "Łukasz's answers to step 2" and "Before building A: the answers"). Branch `slice/12b-canvas-thumbnails`, from `main` at tag `slice-12a` (`98e107a`, assumption A1). PRD file: `docs/prd/slice-12b-canvas-thumbnails.md`; step 1 writes `docs/prd/slice-12b-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing"), plus two measurement steps (the home's load before and after) and one full e2e run at the closing. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 This PRD was written from the docs at slice 12a's state (`CLAUDE.md`, `docs/decisions.md`, `docs/data-model-v2.md`, `docs/known-limitations.md`, `docs/ideas.md`, `docs/inventory-prototype-vs-app.md`, `slice-12a-acceptance.md`) and from the prototype's `thumb`, `renderHome` and `renderWsHome`, without reading the code.
 
@@ -27,7 +27,22 @@ The idea has waited for one reason (`docs/ideas.md`, "Thumbnails on the project 
 
 **Proposed, to confirm in step 1 and after step 2:**
 
-- **P5. Computed when the page loads, on the server, as static SVG in the page's HTML.** No script, no layout read, no React Flow on the home. The SVG is rendered by a server component and handed to the (client) tile as a slot (step 1, F4); **Its form (step 2, answered):** one `<path>` per class and colour, whole numbers in a 400-unit space, as React elements (no `dangerouslySetInnerHTML`), rendered by a server component passed to the tile as a slot. It is fresh on every load, so a change on a canvas or an undo on the home (D-65) shows on the next draw of the home. **Fallback if step 2's figures miss the bars:** a stored thumbnail per canvas, written with the canvas's layout changes. That is a data model change and a new decision; it is not built in this slice without Łukasz's approval.
+- **P5. Computed on the server on every load; drawn from a route the tile refers to** (step 4: the inline SVG was in the document twice and added 384 KB to the 20-canvas home, over its bar; Łukasz chose this form, acceptance "Before building A: the answers"). No script, no layout read, no React Flow on the home.
+  - **The page** computes each canvas's drawing (`src/domain/model/thumbnail.ts`) from the rows it reads anyway and a key from it: SHA-256 of the drawing's size and its paths' kinds, colours and data, base64url, 16 characters. The tile's strip holds `<svg><use href="/w/{workspaceId}/thumbnail/{canvasId}?v={key}#t"/></svg>`; an empty canvas has no address and shows "Empty canvas" as text.
+  - **The route** `GET /w/{workspaceId}/thumbnail/{canvasId}?v={key}` computes the same drawing and answers an SVG file with one `<symbol id="t">`: one `<path>` per kind and colour, whole numbers in a 400-unit space, painted with the page's tokens (`fill: var(--im-physical)` and so on), stored concept colours as `#RRGGBB` (only in that shape), note colours from `NOTE_MINI`. The shapes an external `<use>` draws inherit the page's custom properties, so light and dark mode (and any later switch) come from the same tokens, with no copy of their values; the address carries no theme.
+  - **Its answers:**
+
+    | Case | Answer |
+    | --- | --- |
+    | no session | 401 |
+    | not a member of the workspace, or no such workspace | 404 |
+    | the workspace's organization not unlocked in this session | 403 |
+    | the canvas deleted, or not in this workspace | 404 |
+    | the key matches the drawing | 200, `image/svg+xml`, `X-Content-Type-Options: nosniff`, `Cache-Control: private, max-age=31536000, immutable` |
+    | the key does not match (an older address, or a change since the page) | 200, the current drawing, `Cache-Control: private, no-store` |
+
+  - It is fresh on every load: a change on a canvas or an undo on the home (D-65) changes the drawing, its key and its address.
+  - **Fallback, described only, not built:** one file of symbols per page (`#c-{canvasId}`) under one key, one request with the index built once, at the cost of fetching every thumbnail again after any one changes; only if step 5 shows the per-canvas requests delaying what is measured. A stored thumbnail per canvas (a data model change) stays out of this slice.
 - **P6. Card heights follow the canvas's rules** (step 1, F5 and answer 1): `cardHeightOf` with the card's row filter (`src/domain/model/card-size.ts`), a live canvas's context cards through `liveMembership` (`labeled`), a collapsed card as its header; a collapsed frame's block is `blockHeight(members)` (280 wide). Widths are the card's stored width (default 256). A requirement card is always 230 × 94 (answer 2), a free note its width × 80 (its height is not stored). A unit test compares the heights with the canvas's `cardHeight(buildCards(…))` on the seed and on "Performance test".
 - **P7. The frame count on a tile** ("{n} cards, {m} frames. Also in …", prototype), closing the known limitation "Canvas tiles have no frame count". The data is read for the thumbnail anyway.
 - **P8. The workspace home's project tiles** show the thumbnail of the project's first canvas, as the prototype does (`renderWsHome`, `thumb(cs[0])`). It reads one canvas per project. **Alternative:** leave the workspace home without thumbnails (section 9). Step 2 measures both homes; Łukasz decides with the figures. **Accepted** (step 2).
@@ -121,7 +136,7 @@ Tests in `e2e/slice-12b/`, one file per criterion, each from a fresh seed; unit 
 | S12B-06 | **Live canvas.** A label's live canvas has a thumbnail with its full and context cards. |
 | S12B-07 | **The frame count.** A tile reads "{n} cards, {m} frames. Also in …" with singular and plural, and "{n} cards" without frames. |
 | S12B-08 | **The workspace home** (if P8 is accepted): each project tile shows its first canvas's thumbnail; after the first canvas is removed from the project, the tile shows the next one's (the app has no reordering of canvases; step 1, F8). |
-| S12B-09 | **In the server's HTML.** The thumbnails are in the server's HTML response (present in a page with JavaScript off); a reader and a reviewer get the same SVG as an owner. That the thumbnail has no layout read and no client code is checked in step 4's review (a grep, listed in the acceptance; step 1, F17). |
+| S12B-09 | **In the server's HTML.** Each tile's thumbnail is in the server's HTML response as an `<svg>` that refers to its canvas's drawing at an address carrying the drawing's key (`/w/{workspace}/thumbnail/{canvas}?v={key}`), and it is drawn with JavaScript off. That address answers only a person who may open the workspace, 404 for a canvas deleted or outside the workspace, with `Cache-Control: private, max-age=31536000, immutable`; a reader and a reviewer get the same drawing as an owner. That the thumbnail has no layout read and no client code is checked in step 4's review (a grep, listed in the acceptance; step 1, F17). |
 | S12B-10 | **The home's load** (section 6), against the bars approved after step 2. |
 | S12B-11 | **Nothing on the canvas changes.** `S3B-15-elements.spec.ts` against `.data/measure/s9-14-baseline/slice-08.json`: the viewport counts equal; the page totals as slice 12a's (+6), or each difference explained. |
 | S12B-12 | CI and the runs of the test regime; changed earlier tests listed with the reason. |
