@@ -107,7 +107,8 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   the criterion id. They run against a seeded local database, never against production.
 - **Full e2e runs** (Łukasz, slice 4b-2): after each step one full run (`npm run e2e`, from scratch, no dev server
   running); if a test fails, run that file three times on its own to tell a flake from a bug. Before a merge: two full
-  runs in a row. Report each run's time.
+  runs in a row. Report each run's time and its parts' times. Keep a failing run's traces (`test-results/part-<n>/`) and
+  log before any rerun.
 - **Small slices** (Łukasz, slice 5a): after each step the slice's specs and the earlier specs of what the step
   touched, plus CI (lint, typecheck, unit tests); a failing test run three times on its own; one full e2e run before
   the merge. The PRD says which kind a slice is.
@@ -148,6 +149,8 @@ npm run lint             # ESLint, including the layer rules (eslint-plugin-boun
 npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
+npm run e2e -- --part 2   # one of the full run's three parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
+E2E_MEMORY_LOG=1 npm run e2e   # with the e2e server's and the machine's memory every 5 s (.data/e2e-memory-<time>-part<n>.*; scripts/e2e-memory-report.ts)
 MEASURE=1 npx playwright test e2e/slice-01a/S1A-14.spec.ts   # canvas performance in headed Chrome (S1A-14)
 MEASURE=1 npx playwright test e2e/slice-01b/S1B-09.spec.ts   # card resize (C-09), same way
 MEASURE=1 npx playwright test e2e/slice-01b/S1B-10.spec.ts   # hover delay (C-10), pan and zoom against slice 1a's median
@@ -409,6 +412,15 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   and total objects, paint, layerize; as `S6A-09-hand.spec.ts` does) rather than unprepared medians to the screen, whose
   run-to-run spread (up to 12 ms in slice 6a) is larger than what is measured.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
+- **The full run in three parts** (chore e2e reliability, P2 B): `npm run e2e` (`scripts/e2e.ts`) runs the folders in
+  three parts (`e2e/parts.ts`, `PART_STARTS`), each with its own fresh dev server, and merges their blob reports into
+  one result (`playwright-report/`); failure traces are in `test-results/part-<n>/`. A server's heap grows about 6 MB a
+  test, and on 8 GB RAM a heap of 2 GB or more under paging timed out sign-ins; Next.js restarts the server at 80 % of
+  its heap limit (3,255 MB here). Each part ends at about 1.3 to 1.5 GB. When a part's heap (`E2E_MEMORY_LOG=1`) comes
+  near 2 GB, move the cuts or add a part. The full run refuses to start while port 3200 is in use.
+- **Fonts** (P3 B): IBM Plex is hosted in `src/app/fonts/ibm-plex/` (IBM's unmodified WOFF2 files, OFL 1.1, `README.md`
+  with their checksums) and loaded through `next/font/local`; no build or start fetches fonts. "Plex" is a Reserved Font
+  Name: never subset or change the files; replace them only with other unmodified files from IBM.
 - Measure canvas performance only with `MEASURE=1` (headed Chrome, visible window), on the dev server or, with
   `MEASURE_BUILD=production` after `npm run measure:build`, on the measurement-only production build (AD-31: starts only
   with `INFOMAPPER_MEASURE=1`, on 127.0.0.1; a normal production build still refuses the local adapter). Keep the AD-24

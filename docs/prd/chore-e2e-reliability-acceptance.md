@@ -1,0 +1,656 @@
+# Chore e2e reliability – acceptance
+
+Status: **step 1 answered by Łukasz (1 November 2026); step 2 answered by Łukasz (1 November 2026); step 3 (the remedies) done; step 4 (two closing runs, the fonts' A/B, the docs) done, waiting for Łukasz before the merge.**
+
+- Branch `chore/e2e-reliability`, made on 1 November 2026 from `main` at the tag `slice-12b` (annotated tag object
+  `71ecd5383bcb1a26b7dc2c9dd01287ca3b325031`), whose commit is the merge of pull request 31,
+  `b49ede24f6f9575ce330a291ac5381932d5be472` (the start commit); `origin/main` is at the same commit.
+- The PRD is copied unchanged from `~/Downloads/chore-e2e-reliability.md` (9,464 bytes, identical byte for byte: `cmp`
+  and SHA-256 `b39189b5b98889df67cd7f2775dafaf0dfe2923c8f025717e36c149765af3288`).
+- Step 1 changed no code, configuration or script, ran no e2e test and did not touch `.data/dev-db.json`. The kept
+  traces were unpacked into a scratch folder outside the repository and read there.
+
+## Step 1 – critical review
+
+Sources read: the PRD; `docs/known-limitations.md`, "End-to-end tests"; `docs/ideas.md`, "Sign-in timeouts in full e2e
+runs" and "A chore before slice 13"; `playwright.config.ts`, `e2e/config.ts`, `e2e/global-setup.ts`,
+`scripts/clean-e2e-build.ts`, `e2e/slice-00/helpers.ts`, `S0-10.spec.ts`, `S7C-02.spec.ts`; the sign-in's code
+(`src/app/sign-in/page.tsx`, `src/app/_actions/session.ts`, `src/app/_lib/session.ts`, `dev-session.ts`,
+`src/data/local/session-secret.ts`, `src/proxy.ts`, `src/app/page.tsx`); `src/app/layout.tsx`; Next.js 16.3.8's own
+source in `node_modules/next/dist` and its bundled docs (`node_modules/next/dist/docs`); the kept logs and traces in
+`.data/e2e-failures/12a-close-1/`, `.data/e2e-failures/12b-close-1/`, `.data/e2e-11-close/` and
+`.data/s12b-close-e2e-start-failed.log`.
+
+### Summary
+
+1. **The restart's threshold is 80 % of the dev server's V8 heap limit, and that limit is already half the laptop's
+   memory** (Q1). The laptop has 8 GB (8,042 MB); `next dev` gives its server process `--max-old-space-size=4021`
+   (a heap limit of 4,069 MB), so the restart comes at about 3,255 MB of used JavaScript heap. P2 A ("a larger heap")
+   would let one process on an 8 GB machine use more than 4 GB of heap, besides Turbopack's native memory, Chromium
+   and the rest. It moves the restart, but it may well make the machine page (F2).
+2. **Every flake of the last three closings came late in the run** (F3): 9 failures in three closings, all after 60 %
+   of the run's time, none in the first 60 %. The sign-in timeouts are not slow sign-ins: in every kept trace the
+   *whole server* answered slowly for a while (simple GETs of 4 to 17 s that normally take 0.1 to 0.2 s), and the
+   sign-in's 15 s wait is simply the longest chain of requests under one `expect`. A test sign-in (P4 B) would move
+   the wait, not remove the cause.
+3. **The memory restart happened in slice 11's closing too** (F4): S11-10's failure, filed as "cause unknown", came
+   right after the restart line. The restart is the third in three closings and comes earlier as the suite grows
+   (at 99.6 %, 98 % and 94 % of the tests).
+4. **The font failure in slice 12b's closing was not a network timeout in the log** (F6): the log has no download error
+   at all; it repeats one Turbopack error ("next/font/google queries have exactly one entry") 6,840 times for 120 s.
+   A longer start limit (P3 A) would probably only have waited longer.
+5. **The PRD's Q2 names S7C-02 as a spec with its own server; it has none** (F8): only S0-10 starts its own dev
+   server. The known limitation that says so is wrong too.
+
+### F1. Q1 – how Next.js decides to restart (Next.js 16.3.8)
+
+Next.js version: `16.3.8` (`node_modules/next/package.json`; `@next/swc-win32-x64-msvc` 16.3.8). Node `v22.20.0`. The
+bundled docs (`node_modules/next/dist/docs`) do not describe the restart; everything below is from the source.
+
+- **What starts what.** `next dev` (`next/dist/cli/next-dev.js`, `startServer`) forks a child process,
+  `next/dist/server/lib/start-server.js`, with `__NEXT_DEV_SERVER=1`. The child serves the requests and holds
+  Turbopack (a native module in the same process). The parent only restarts the child.
+- **The heap limit.** In the parent (`next-dev.js`, around line 275): if `NODE_OPTIONS` has no `--max-old-space-size`
+  and `NEXT_DISABLE_MEM_OVERRIDE` is not set, it sets `max-old-space-size` to **50 % of the machine's total memory**
+  (`os.totalmem()`), and passes `NODE_OPTIONS` to the child. A `--max-old-space-size` in `NODE_OPTIONS` is kept as
+  given (`getMaxOldSpaceSize`, `server/lib/utils.js` line 283).
+- **The check.** After **every request** (`start-server.js`, `requestListener`'s `finally`, line 232),
+  `getMemoryRestartStats` (`utils.js` line 265) reads `v8.getHeapStatistics()` and restarts when
+  `used_heap_size > 0.8 × heap_size_limit`: it prints the warning, writes a trace event
+  `server-restart-close-to-memory-threshold` (with `memory.heapSizeLimit` and `memory.heapUsed`, into the build
+  folder's `trace` file) and exits with code 77; the parent starts a new child on the same port.
+- **What it measures.** Only the V8 heap of the server process (JavaScript objects: compiled server modules, React's
+  rendering, caches). Turbopack's own memory is native and is not counted, though it is in the same process's
+  resident memory.
+- **What moves it.** `--max-old-space-size` in `NODE_OPTIONS` (the threshold stays 80 % of the resulting limit);
+  `NEXT_DISABLE_MEM_OVERRIDE=1` (then Node's own default limit applies); `experimental.devMemoryThresholdRestart: false`
+  in `next.config` (`server/lib/router-server.js` line 192; no restart at all: the process would then run into the heap
+  limit and crash, which is worse, and it is an app configuration change).
+- **This laptop.** Total memory 8,042 MB → `max-old-space-size=4021` → heap limit 4,069 MB → threshold about
+  **3,255 MB** of used heap (checked with `node --max-old-space-size=4021`). Free physical memory while nothing of
+  the app ran: about 1.3 to 1.6 GB; Windows' "Memory Compression" held 1 GB.
+
+### F2. P2 A costs more than the PRD assumes
+
+The default heap limit is already half the RAM. Raising it (say to 6 GB) on an 8 GB laptop lets the server's heap grow
+past what the machine can hold in memory together with Turbopack's native memory, Chromium, Playwright, Defender and the
+desktop. The likely result is paging, and paging is what the slow episodes in the traces look like (F3). The restart
+is, in effect, the only thing that frees the server's memory during a run. Raising the limit is safe only if P1 shows
+the heap's real peak far below what the machine can hold; on this laptop that is unlikely.
+
+### F3. The sign-in timeouts are whole-server slow episodes, late in the run
+
+Positions of the failures (`ok`/`x` lines of the kept logs; time = sum of test durations up to the failure):
+
+| Closing | Test | Where | Kind |
+| --- | --- | --- | --- |
+| 11 (474 tests, 1.4 h) | S7C-02 | test 312 (66 %) | sign-in (in `openColumn`) |
+| 11 | S11-10 | test 472 (99.6 %) | the memory restart (F4) |
+| 12a (486 tests, 4,680 s) | S9-08 | test 377, 3,814 s (81 %) | sign-in (`newSession`) |
+| 12a | S10C-02 | test 446, 4,365 s (93 %) | sign-in |
+| 12a | S12A-02 | test 476, 4,585 s (98 %) | the memory restart |
+| 12b (497 tests, 5,182 s) | S7C-02 | test 313, 3,585 s (69 %) | sign-in (in `openColumn`) |
+| 12b | S10A-08 | test 415, 4,526 s (87 %) | sign-in |
+| 12b | S11-06 | test 467, 4,950 s (96 %) | the memory restart (`ERR_CONNECTION_REFUSED`) |
+| 12b | S12A-04 | test 479, 5,045 s (97 %) | after the restart (compiling again) |
+
+(Slice 11's first failure, `panel-field-focus`, was a real bug fixed in that slice and is left out.)
+
+**What the traces show** (the network of each failing test, read from `trace.zip`):
+
+- **S9-08 (12a):** the second session's `GET /sign-in` took 4,482 ms, the sign-in's `POST` 5,864 ms, the two `GET
+  /w/…?_rsc=` 6,256 and 4,025 ms; the 15 s ran out before the workspace page was drawn. Just before, in the same test,
+  a project home took 1,434 ms and a server action 8,117 ms. In the earlier tests of the same trace the same requests
+  took 130 to 513 ms.
+- **S10C-02 (12a):** `GET /sign-in` 4,478 ms, `POST` 5,092 ms, one `_rsc` request 9,677 ms and the other never answered.
+- **S10A-08 (12b):** `GET /sign-in` 4,612 ms, `POST` 3,360 ms, `_rsc` 3,751 and 4,639 ms.
+- **S7C-02 (12b):** a canvas page 8,268 ms, then `GET /sign-in` 16,780 ms, `POST` 3,390 ms. The same requests a few
+  seconds earlier in the same test: 310, 515, 596 ms.
+
+So the sign-in's code is not slow; the server is slow at those moments, for every kind of request. `signInAs`'s
+`expect(bar-top)` covers the most requests under one 15 s wait (the `POST`, the redirect, two `_rsc` fetches and the
+workspace page's render), which is why it is where such an episode most often ends a test. The episodes come late, as
+the heap grows towards the threshold; that points to garbage collection near the heap limit or to paging, or both. It
+is not proven: the logs have no memory figures. P1 is what can tell.
+
+**S7C-02 failed at the sign-in in two of the three closings**, at the same place (its fourth sign-in, in `openColumn`,
+right after the server upgraded a format-7 file). The upgrade reads, rewrites and freezes the whole data file; under a
+large heap that allocation is a likely trigger of a long collection. P1's log should show whether its sign-in lines up
+with a memory peak.
+
+### F4. Q6 – the restart's third occurrence, and causes the PRD does not name
+
+- **Slice 11's S11-10** (`.data/e2e-11-close/full-run.txt`, line 1400): "⚠ Server is approaching the used memory
+  threshold, restarting..." comes right after test 472's start, followed by a `ChunkLoadError` of Turbopack's HMR
+  client; the canvas never became ready. `docs/known-limitations.md` files it as "cause unknown"; it is the restart.
+- **The restart comes earlier as the suite grows:** test 472 of 474, 476 of 486, 467 of 497.
+- **About 80 to 100 "The destination stream closed early" errors per full run** (92 in 12a, 82 in 12b, 98 in 11).
+  Each is logged with a stack, and `next dev` turns on `--enable-source-maps` for the child (`next-dev.js`), so each
+  stack is mapped through source maps. Whether that adds to the heap is not known; P1's per-spec log can show whether
+  the heap jumps on the specs that print it. The known limitation from slice 3a still stands.
+- **Every test reseeds the data file**, so the server reads and parses the 232 KB e2e file again on the test's first
+  request (`src/data/local/file.ts`, the stamp cache keeps one copy per file). That is steady, not growing; it is not
+  a suspect, only a cost per test.
+
+### F5. Q2 – the e2e web server today, and where a memory log and a heap setting go
+
+- **`playwright.config.ts`, `webServer` (dev):** command `npx tsx scripts/clean-e2e-build.ts .next-e2e && npm run
+  reset-dev-data && npm run dev -- --port 3200`; env `INFOMAPPER_DEV_DB=.data/e2e-db.json`, `NEXT_DIST_DIR=.next-e2e`,
+  `INFOMAPPER_TEST_HOOKS=1`; url `http://localhost:3200/sign-in`; `timeout: 120_000`; `reuseExistingServer:
+  !process.env.CI`, so **locally an already running server on port 3200 is reused**, and then no setting of this
+  config reaches it. The measurement build has its own `webServer` (`MEASURE_BUILD=production`, also 120 s); it is a
+  production server without the restart, and this chore leaves it alone.
+- Test timeout 60 s, `expect` 15 s, one worker, `retries` 0 locally (1 on CI, where e2e does not run: CI is lint,
+  typecheck and unit tests only, `.github/workflows/ci.yml`).
+- **`e2e/global-setup.ts`:** reseeds, signs in through the page once, opens the workspace, its settings, Customer 360's
+  home and "Customer & orders", reseeds again. It runs after the server answered.
+- **`scripts/clean-e2e-build.ts`:** deletes `.next-e2e` (only folders named `.next-e2e*`).
+- **Specs with their own server:** only **S0-10** (`e2e/slice-00/S0-10.spec.ts`): `npx next dev --port 3201` with
+  `{ ...process.env, INFOMAPPER_DEV_DB, NEXT_DIST_DIR: .next-e2e-restart[-2] }`, a 300 s start limit, run twice and
+  stopped with `taskkill /T /F`. It runs early (test 21, about 1 min), so for that minute two dev servers (each with
+  its own 4 GB heap limit) run side by side. S2C-11 spawns Vitest, not a server. **S7C-02 starts no server** (F8).
+- **Where the memory log goes (P1):** the heap can only be read inside the server process. Proposal: a small probe
+  (`scripts/e2e-memory-probe.cjs`) loaded with `NODE_OPTIONS=--require …` in the `webServer` env when
+  `E2E_MEMORY_LOG=1`. `next dev` passes `NODE_OPTIONS` to the child; the probe acts only where `__NEXT_DEV_SERVER=1`
+  (the child), so `npx`, `npm`, `tsx` and the parent stay quiet. Every 5 s, with an unref'd timer, it appends one line:
+  time, `heapUsed`, `heap_size_limit`, `rss`, `external`, and the machine's free memory (`os.freemem()`). The spec
+  running at the time comes from a small Playwright reporter (`e2e/memory-reporter.ts`, `onTestBegin`/`onTestEnd`)
+  appending to the same log, also only with `E2E_MEMORY_LOG=1`. A restarted child starts the probe again, so the log
+  shows the restart too, and Next's own `trace` event gives the heap at that moment. Cost: one `appendFileSync` every
+  5 s; not measurable against 1.5 h. The memory log needs `reuseExistingServer` not to reuse a server (it does not
+  when nothing listens on 3200, which is the rule anyway).
+- **Where a heap setting goes:** `NODE_OPTIONS=--max-old-space-size=<MB>` in the same `webServer` env (it applies to
+  the parent and the child; the parent keeps it as given). S0-10's own servers inherit the test worker's environment,
+  not the `webServer`'s, so they keep the default unless S0-10 passes it too.
+
+### F6. Q4 – the fonts, and what the slice 12b start failure really was
+
+- **Fonts:** `src/app/layout.tsx` loads **IBM Plex Sans** (400, 500, 600; subsets latin and latin-ext) and **IBM Plex
+  Mono** (400, 500; latin and latin-ext) through `next/font/google`, as CSS variables `--font-plex-sans` and
+  `--font-plex-mono` (`globals.css` maps them to `--font-sans` and `--font-mono`). **License:** SIL Open Font License
+  1.1 (IBM Plex is published under OFL 1.1, which allows bundling and redistributing the files with the software if the
+  license text goes with them).
+- **What the failed start's log shows** (`.data/s12b-close-e2e-start-failed.log`, 59,762 lines, 123 s): the
+  Google CSS **was** fetched (the error quotes the `@font-face` blocks with their `fonts.gstatic.com` addresses and
+  unicode ranges); what failed is Turbopack resolving the font *files* inside that CSS:
+  "Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'" / "next/font/google queries have
+  exactly one entry", for the 18 `@font-face` blocks of IBM Plex Sans, 95 times each (6,840 errors; every request the
+  readiness check made recompiled into the same error). There is **no** download error, retry or timeout line. So the
+  known limitation's "Google Fonts did not answer" is an inference the log does not show; what is certain is that the
+  server stayed broken for the whole 120 s.
+- **How a slow or absent font host is handled:** in the webpack path (`next/dist/compiled/@next/font/dist/google`):
+  3 s timeout per request in dev (`fetch-resource.js`), retries (`retry.js`), and in dev a fallback font with an error
+  log ("Failed to download … Using fallback font instead", `loader.js` line 151). Turbopack (which the app uses) has
+  its own implementation in the native module; its binary contains the same "Failed to download … from Google" text
+  and "next/font/google queries have exactly one entry", but its retries and fallback **cannot be read from the
+  source in `node_modules`** (it is compiled Rust). Not established: why the font-file replacer failed that once.
+- **Consequence for P3 A:** a longer start limit helps only if the error clears by itself within the longer limit. In
+  the kept log it did not clear in 120 s, and the same server process kept failing; a fresh run a minute later started.
+  So P3 A is unlikely to help; at best it turns a failed start into a slow one.
+- **What P3 B (`next/font/local`) costs:**
+  - Files: 5 weights × the 2 subsets, as `woff2` (around 10 files, roughly 200 to 300 KB in all), plus `OFL.txt`, for
+    example in `src/app/fonts/`. Source: the IBM Plex release or Google Fonts' download; to be chosen in step 3.
+  - `layout.tsx` changes from `IBM_Plex_Sans(...)` to `localFont({ src: [...], variable: "--font-plex-sans" })`: an app
+    file, which CE-04 allows when explained. The CSS variables stay, so nothing else changes.
+  - Google's CSS splits each weight by `unicode-range` (latin, latin-ext). Local files either keep two files per
+    weight with `unicode-range` declared (`next/font/local` takes `declarations`), or one file per weight with both
+    subsets. Either way, the glyphs drawn are the same files' glyphs.
+  - The fallback font's metrics (`adjustFontFallback`) are computed from the local file instead of Google's table; the
+    moment before the font loads may differ by a pixel. Screenshot specs (`*-screens.spec.ts`, on demand) may show it.
+  - **Builds:** `npm run dev`, every e2e run, S0-10's two servers, `npm run build` and `npm run measure:build` stop
+    fetching from Google (today each cold compile fetches). CI does not build, so nothing changes there. The
+    measurement build's figures do not depend on where the font comes from, but a figure measured before and after is
+    not comparable by one font load; the next measuring slice should note it.
+- **A cheap check for CE-02:** the native module contains `NEXT_FONT_GOOGLE_MOCKED_RESPONSES`, the variable the
+  webpack path uses to read Google's CSS from a file instead of the network. Whether Turbopack honours it for the CSS
+  and the font files is not verified. With P3 B, CE-02 is checked by blocking `fonts.googleapis.com` and
+  `fonts.gstatic.com` (for example in the hosts file, by Łukasz) for one start; no code is needed.
+
+### F7. Q3 – splitting the run
+
+- Playwright **1.63.0**. One `playwright test` starts one `webServer`; it cannot restart it between files. A split
+  needs a wrapper script (for example `scripts/e2e.ts`, behind `npm run e2e`) that runs `playwright test` twice, each
+  with its own fresh server, each writing a `blob` report, and then `npx playwright merge-reports` into the list and HTML
+  reports. `npm run e2e -- <files>` (a single file or folder) must stay one part, unchanged.
+- **Choosing the parts:** by folder, balanced by time. From slice 12b's closing (sum of test durations 5,182 s;
+  1.5 h with start and warm-up): `fixes` to `slice-05a` take 2,525 s (49 %), `slice-06a` to `slice-12b` 2,657 s
+  (51 %). Playwright's `--shard=1/2` balances by number of tests, not time; folders are clearer and stable. The split
+  point moves as slices are added; the wrapper can take it from a list in one place.
+- **Cost per run:** a second start (delete `.next-e2e`, reseed, start, about 10 to 20 s) and a second warm-up and cold
+  compile of every page the second part uses (the known limitation says about a minute for all pages). Estimate
+  1.5 to 2 min per run, about 2 %, inside CE-05's 10 %.
+- **What it gains:** each part's server starts with an empty heap. If the heap grows per test, as the restart's
+  position suggests (about 3.2 GB after about 470 tests), each part peaks around half of that, about 45 to 50 % of the
+  threshold's heap, which is inside CE-01's 20 % margin. This is the assumption P1 checks.
+
+### F8. Q5 – the sign-in, and what a test sign-in would need
+
+- **The path:** `signInAs` (`e2e/slice-00/helpers.ts`) opens `/sign-in`, clicks the user's button (a form with the
+  server action `signInAsDevUser`, `src/app/_actions/session.ts`), which checks the user, lists their organizations,
+  writes the signed cookie `infomapper_dev_session` (`writeSession`, `src/app/_lib/session.ts`) and redirects to `/`;
+  `/` (`src/app/page.tsx`) redirects to the last or first workspace; the test waits for `bar-top` (15 s).
+- **Usage:** 408 calls of `signInAs` in `e2e/` (285 of the 348 spec files call it); S7C-02's `openColumn` signs in each time (four times
+  in the one test).
+- **A test sign-in that sets the cookie** (P4 B) would need: `encodeSession` (`src/app/_lib/dev-session.ts`), the
+  secret (`sessionSecret()`, `src/data/local/session-secret.ts`: `INFOMAPPER_SESSION_SECRET` or `.data/session-secret`,
+  which the e2e server reads too), the user's organizations (`organizations.listForUser` through the local store, as
+  the helpers already write test data), `context.addCookies` with the cookie's options (`httpOnly`, `sameSite: lax`,
+  `path: /`), then `goto("/")` and the same `bar-top` wait. The proxy (`src/proxy.ts`) only checks that the cookie is
+  present; the pages check its signature. No app change is needed.
+- **What it saves:** the `GET /sign-in` and the `POST`, two of the four or five requests (about 0.3 to 0.5 s per
+  sign-in on a quiet server, a few minutes per run). **What it does not:** the slow episodes (F3) slow every request; the
+  test would then time out on `goto("/")` or its first own step instead. It is a speed gain, not a fix of the flake.
+- **Specs that must keep the real sign-in:** S0-01 (sign-in, landing, the cookie checks), slice 8's sign-in and
+  organization specs (`signInWithPassword`, used by S8-06, S8-11, S8-13 and S12B-09; S8-01 clicks `button-dev-user`), the global setup (it warms up
+  `/sign-in` and the action).
+- **The PRD's Q2 mentions "S7C-02 and others" as starting their own servers:** wrong. S7C-02 rewrites the e2e data file
+  to format 7 and lets the one e2e server upgrade it. The known limitation "S11-10 and S7C-02 failed once in slice 11's
+  closing run" says the same and needs correcting.
+
+### F9. Q6 – the docs to update (in step 4)
+
+- `docs/known-limitations.md`, "End-to-end tests":
+  - "The e2e dev server restarts itself at its memory threshold": the threshold as found (F1), slice 11's occurrence
+    (F4), the remedy chosen.
+  - "The e2e server's start may miss its 120 s": what the log shows (F6), the remedy chosen.
+  - "S7A-04-route's development sign-in timed out once" and "S11-10 and S7C-02 failed once": the cause as P1 shows it;
+    S11-10 was the restart; S7C-02 has no own server.
+  - "e2e dev servers run without Turbopack's file-system cache": unchanged unless the split changes the warm-up.
+- `docs/ideas.md`: close or shorten "Sign-in timeouts in full e2e runs" and "A chore before slice 13".
+- `CLAUDE.md`, "Testing" and "Commands": `E2E_MEMORY_LOG=1`, the split (if chosen) and how to run one part.
+- `.env.example`: only if a new variable is read by the app (none is planned; `E2E_MEMORY_LOG` is read by the test
+  setup only, but listing it there costs nothing; Łukasz decides).
+- The full-run rule in CLAUDE.md ("a failing test run three times on its own") stays.
+
+### Proposals
+
+- **P1 – as the PRD says,** with the probe inside the server process (F5), the reporter for the spec names, and the
+  machine's free memory in the same line. Step 2 runs one full run with it on `main`'s code.
+- **P2 – B (split in two by folder) first, not A.** Reasons: the heap limit is already half the RAM on this laptop (F1,
+  F2); every failure came in the run's last 40 % (F3); a split costs about 2 % of a run (F7) and needs no app change.
+  A is reconsidered only if P1 shows the heap's peak small and the machine with memory to spare. C (both) only if B
+  fails CE-01.
+- **P3 – B (`next/font/local`),** with the OFL text. The kept log does not show a slow download but a server that
+  stayed broken (F6), so a longer limit (A) would likely not have saved that run. B removes Google Fonts from every
+  start, including S0-10's two and the measurement build's. It touches `layout.tsx` and adds font files; CE-04 allows
+  it when explained. If Łukasz prefers no app change, A with 300 s is harmless but should not be counted as a fix.
+- **P4 – A,** decided after step 2's log: if the sign-in failures line up with high memory or low free memory, the
+  split is the remedy. B (a cookie sign-in) is worth it only as a speed gain, not as a fix (F8); not proposed for this
+  chore.
+
+### Differences from the PRD
+
+| PRD | Finding |
+| --- | --- |
+| P2 A "proposed": a larger heap | Already 50 % of RAM by default; raising it on 8 GB risks paging (F1, F2). Propose B. |
+| P3 A "proposed": a longer start limit | The failed start was a repeated Turbopack error, not a slow answer (F6). Propose B. |
+| §1: the server did not start "because `next/font/google` did not answer" | The log shows no download error (F6). |
+| Q2: S0-10, **S7C-02** and others start their own servers | Only S0-10 does (F5, F8). |
+| §1 lists two restart occurrences (12a, 12b) | Three: slice 11's S11-10 was one too (F4). |
+| P1: "resident and heap, if available" | The heap is available only from inside the child; proposed probe (F5). |
+| §3.1: "a part of the global setup" for the log | The global setup runs in Playwright's process, not the server's; it cannot read the heap (F5). |
+| Unchanged: "the tests' assertions" | Holds for every proposal; P3 B changes `layout.tsx`. |
+
+The PRD does not touch the reference prototype; there are no prototype differences for this chore.
+
+### Questions for Łukasz
+
+1. **P2:** B (split in two by folder, a wrapper behind `npm run e2e`) instead of A? Or decide only after step 2's log,
+   as the PRD's step order says (my recommendation: decide after step 2, with B as the expected answer)?
+2. **P3:** B (IBM Plex hosted in the repository, `next/font/local`, OFL text beside it; one app file changes), or A
+   (300 s, no app change, probably no fix)?
+3. **P4:** agree that the cookie sign-in is not built in this chore, unless step 2 shows sign-in failures without high
+   memory?
+4. **The memory log's form:** a probe loaded with `NODE_OPTIONS=--require` into the dev server's child process, plus a
+   Playwright reporter for the spec names, both only with `E2E_MEMORY_LOG=1`. Agreed? (Both live in `scripts/` and
+   `e2e/`, no app code.)
+5. **Step 2's measured run** takes about 1.5 h on this laptop and must run with no other dev server. Run it in the
+   working tree here (nothing else running), as in the closings?
+
+### Łukasz's answers to step 1 (1 November 2026)
+
+1. **P2:** decided after step 2's log; B (the split by folder, as proposed) is expected.
+2. **P3:** before choosing, establish whether Turbopack's "next/font/google queries have exactly one entry" is tied to
+   `next/font/google` (the stack, the module that raises it; whether it also comes on a start without a connection to
+   `fonts.googleapis.com`, if that is cheap to check). If it is: B (IBM Plex hosted through `next/font/local`, with the
+   OFL 1.1 text). If not: no app change; one automatic retry of the e2e server's start in the launching script, and a
+   known limitation about the Turbopack error.
+3. **P4:** A; no cookie sign-in in this chore.
+4. **The memory log:** the form is accepted. Every 5 s it also records the system's free memory, the swap (page file),
+   and the resident memory (RSS) of both `next dev`'s main process and its child, not only the JavaScript heap: on
+   8 GB the 4 to 17 s stalls may be swapping.
+5. **Step 2's run** runs here, with no dev server running; the results note any other heavy processes during the run.
+
+Also: the mistake about S7C-02 (it starts no server of its own; only S0-10 does) is corrected here (F5, F8) and goes
+into `docs/known-limitations.md` at the closing.
+
+## Step 2 – the memory log and one measured full run
+
+### P3: where "next/font/google queries have exactly one entry" comes from
+
+Read from Next.js's source at the tag `v16.3.8` (`crates/next-core/src/next_font/google/mod.rs`, fetched from GitHub; the
+installed package holds only the compiled native module, whose strings match).
+
+- **The module that raises it** is `next/font/google`'s Turbopack implementation: `NextFontGoogleFontFileReplacer`
+  (`mod.rs` line 349), the import-map replacement for `@vercel/turbopack-next/internal/font/google/font` (line 79).
+  Its `result` (line 379) calls `font_file_options_from_query_map` (line 638), which bails with exactly this message
+  when the request's query does not parse into one entry (line 642). The failed log's "Debug info" names the same
+  chain (`<NextFontGoogleFontFileReplacer as ImportMappingReplacement>::result failed`) and its import trace ends in
+  `src/app/layout.tsx`'s IBM Plex Sans.
+- **How the query is made:** `update_google_stylesheet` (around line 455) takes Google's CSS, finds every font file's
+  `url(...)` (`find_font_files_in_css`) and replaces it with `@vercel/turbopack-next/internal/font/google/font?{json}`,
+  where the JSON holds the font file's URL; the JSON goes through `qstring::QString::from(...)`, which reads `&` and
+  `=` as separators. A font URL of the usual form (`https://fonts.gstatic.com/s/ibmplexsans/v23/….woff2`, as Google
+  serves it today: 18 `@font-face` blocks for the three weights, the same 18 that failed) makes one entry. A URL with
+  `&` or `=` in it makes several, and the replacer fails on every one of them. So the error follows from **what
+  Google's stylesheet contained at that moment**; the log cuts the URLs off ("https://fonts.gs…"), so which URLs they
+  were cannot be read back. Google serves `fonts.gstatic.com/l/font?kit=…&skey=…&v=…` URLs in some answers; that is a
+  likely candidate, not a proven one.
+- **The answer is cached per server process:** Turbopack keeps the failed result as the task's result, so each of the
+  95 requests in 120 s returned the same error; a fresh server a minute later fetched a normal stylesheet.
+- **Without the network** (checked, 1 November 2026: `next dev` on port 3210 with an empty build folder
+  `.next-e2e-fontcheck`, a copy of the e2e data file, and `HTTPS_PROXY`/`HTTP_PROXY` pointing to a closed port):
+  Turbopack warned "Error while requesting resource … fonts.googleapis.com" and "Failed to download IBM Plex Mono /
+  IBM Plex Sans from Google Fonts. Using a fallback font instead.", and `/sign-in` answered 200. A start without
+  Google Fonts does **not** fail; the failure needs Google to answer with a stylesheet the replacer cannot read. The
+  server was stopped, its build folder and the data copy deleted, and `tsconfig.json`'s automatic `include` edit for
+  that folder reverted. Its log is kept in `.data/fontcheck-no-google-start.log`.
+
+**Conclusion for P3:** the error is tied to `next/font/google` (its Turbopack replacer, fed by Google's answer).
+By Łukasz's answer this means **B**: IBM Plex through `next/font/local` with the OFL 1.1 text, in step 3.
+
+### The measured full run (1 November 2026, `main`'s code at `slice-12b`)
+
+`E2E_MEMORY_LOG=1 npm run e2e`, no dev server running, laptop on mains, power mode "Best performance". Log
+`.data/e2e-runs/chore-step2-full.log`; memory `.data/e2e-memory-20261101-1401.{server,system,tests}.jsonl` and the
+per-minute table `.minutes.csv` (`npx tsx scripts/e2e-memory-report.ts .data/e2e-memory-20261101-1401`). The failures'
+traces and the log were copied to `.data/e2e-failures/chore-step2-1/` before anything else ran; nothing was rerun.
+
+- **Time:** 5,588 s (1 h 33 min) from the command to its end; Playwright reports 1.5 h. Slice 12b's closing: 1 h 30 min.
+- **Result:** 492 passed, 3 failed, 2 skipped (497).
+- **Other programs:** windows open were Chrome (Łukasz's), Claude and Settings; the busiest processes at the start and
+  the end were Claude (1.1 to 1.5 % CPU) and the sampler's PowerShell (0.8 %). Among the six largest by memory at any
+  minute: Memory Compression (up to 3,368 MB), the server's node (2,577 MB), Claude (554 MB), the test's
+  chrome-headless-shell (453 MB), Chrome (297 MB), Defender (200 MB). Nothing heavy besides the run.
+
+#### The memory curve
+
+| Minute | Test | Child heap (MB) | Child RSS (MB) | Workers' RSS (MB) | Available (MB) | Page file (MB) | Commit (MB) | Pages in/s (peak) |
+| ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| 0 | 3 | 310 | 1,111 | 934 | 609 | 547 | 14,867 | 5,203 |
+| 10 | 52 | 821 | 823 | 718 | 250 | 545 | 18,206 | 11,394 |
+| 20 | 93 | 1,188 | 1,095 | 1,045 | 38 | 538 | 18,585 | 8,182 |
+| 30 | 139 | 1,555 | 457 | 1,097 | 169 | 581 | 19,467 | 3,120 |
+| 40 | 180 | 1,701 | 658 | 1,018 | 795 | 1,421 | 19,793 | 9,291 |
+| 50 | 236 | 1,982 | 511 | 1,179 | 143 | 1,117 | 20,331 | 11,585 |
+| 60 | 297 | 2,256 | 2,148 | 1,299 | 4 | 997 | 17,804 | 1,007 |
+| 70 | 361 | 2,644 | 2,561 | 920 | 35 | 958 | 18,293 | 12,697 |
+| 80 | 421 | 3,049 | 2,330 | 1,004 | 168 | 1,914 | 20,382 | 12,876 |
+| 88 | 465 | **3,241 → restart** | | | | | | |
+| 90 | 483 | 480 | 1,348 | 1,984 | 1,285 | 1,029 | 15,146 | 119 |
+
+(Heap and RSS are the minute's peaks, available memory its lowest. "Workers" are the server child's own short-lived
+Node processes, 2,332 of them in the run, summed while alive at once. `next dev`'s main process stayed under 62 MB.)
+
+- **The heap grows steadily, about 33 MB a minute (about 6 MB a test),** from 224 MB to 3,241 MB, with no plateau. It
+  is not a few heavy specs: every folder adds to it.
+- **The threshold:** heap limit 4,069 MB (50 % of 8,042 MB RAM, F1), threshold 3,255 MB. The child restarted at
+  **88.0 min, during test 465 (S11-05)**: exit code 77, and `.next-e2e/dev/trace` holds
+  `server-restart-close-to-memory-threshold` with `memory.heapUsed` 3,414,015,816 B (3,256 MiB) of
+  `memory.heapSizeLimit` 4,266,655,744 B. The fourth occurrence: slice 11 at 472/474, 12a at 476/486, 12b at
+  467/497, now 465/497.
+- **The machine pages from the start.** Available memory is under 1 GB from the first minute and under 200 MB in 85 of
+  1,030 samples (all four quarters of the run), down to 2 MB; the commit charge is 15 to 21 GB of 23.4 GB; Memory
+  Compression holds up to 3.4 GB; the page file grows from 547 MB to 2,206 MB; pages in reach 50,729/s, over 10,000/s
+  in 80 samples. From minute 30 the child's RSS is often well **below** its heap (457 MB resident at a 1,555 MB heap):
+  Windows has trimmed or compressed most of the server's heap, and a garbage collection that walks it has to read it
+  back. Turbopack's native memory comes on top (the child's RSS exceeds its heap at the start: 1,111 MB at 310 MB).
+- After the restart the heap starts again at about 400 MB, available memory comes back to 1.3 to 1.6 GB and paging
+  nearly stops (119 pages/s): the restart is the only thing that frees memory during a run (F2).
+
+#### The failures against memory
+
+| # | Test | Minute | What failed | Heap | Child RSS | Available | Pages in/s |
+| ---: | --- | ---: | --- | ---: | ---: | ---: | ---: |
+| 244 | S6B-08-edit | 52.6 | sign-in: `bar-top` not visible within 15 s after picking the user | ≤ 1,999 MB | ≤ 1,154 MB | ≥ 74 MB | ≤ 15,375 |
+| 439 | S10B-06 "a reviewer sees the same line" | 83.6 | the same, the second person's sign-in (`signInAs` in a new context) | ≤ 3,054 MB | ≤ 2,136 MB | ≥ 151 MB | ≤ 22,106 |
+| 466 | S11-06 | 88.0 | `page.goto("/sign-in")` timed out at 60 s | ≤ 3,241 MB | ≤ 708 MB | ≥ 1,599 MB | ≤ 10,436 |
+
+- **466 is the restart:** it began while the child exited at the threshold and the new child compiled again from cold.
+- **244 and 439 are sign-in timeouts during heavy paging, with a large heap:** both at the sign-in's last step, the
+  same form as the 9 flakes of the last three closings (F3); both with available memory under 160 MB and over 15,000
+  pages in a second; both with the heap at 2 GB and more, in the run's second half.
+- **Paging alone is not enough:** tests with even more paging passed (S4B2-09 and S4P-05 at 50,729/s, heap about
+  1.8 GB; S6A-04 at 3 MB available). Both sign-in failures came with a heap of 2 GB or more and none below it; the
+  likely mechanism is a full collection of a large heap that is mostly paged out, which stalls the whole server for
+  seconds. The log has no GC events, so this is the likely reading, not a proven one.
+- **P4:** the sign-in failures line up with high memory: by Łukasz's answer this is **A**, no test sign-in.
+- The log's 90 "The destination stream closed early" lines are from the server answering a page the browser had
+  already left; the earlier closings' logs have 13 to 28 each. Not a failure; not followed further.
+
+#### Recommendations
+
+- **P2: B, the split in two by folder,** with the cut before `slice-06a` (49 % / 51 % of the time, F7). In this run
+  part 1 (`fixes` to `slice-05a`) ended at a heap of about 1.95 GB (60 % of the threshold) and part 2 grew about
+  1.3 GB from `slice-06a`'s start to the end, so each part peaks near 2 GB: about 40 % below the threshold
+  (CE-01's 20 % margin) and no restart. Both sign-in failures would have come at a heap of about 0.3 GB and 1.4 GB.
+  A (a larger heap) is ruled out by the curve: the machine already pages at a 2 GB heap. C (both) is not needed.
+- **What B does not fix:** the laptop pages at any heap size (available memory is low from the first minute). A sign-in
+  that times out in a split run would show it; the two closing runs keep `E2E_MEMORY_LOG=1` so CE-03 can be read
+  against memory. If a part's heap still reaches about 2 GB with failures, three parts are the next step (about 1.5 min
+  per part more).
+- **P3: B,** IBM Plex through `next/font/local` with the OFL 1.1 text (the source above).
+- **Not proposed in this chore:** why the heap grows 6 MB per test (a heap snapshot of the child before the threshold
+  would tell: Turbopack's module graph, the server's undo history, or the dev server's caches). Noted in `docs/ideas.md`
+  only if Łukasz wants it.
+
+### Łukasz's answers to step 2 (1 November 2026)
+
+- **P4: A.** No test sign-in.
+- **P2: B, in three parts at once, not two:** with two parts each would end at about 2 GB of heap, and #244 failed at
+  2.0 GB. The parts are cut by folder so that each ends at a similar heap (from step 2's log), with an estimate of the
+  heap at each part's end. `npm run e2e` runs all three, each with its own server, and gives one result; each part can
+  also be run on its own.
+- **P3:** the dependency on `next/font/google` is shown (the section above): **B**, IBM Plex through `next/font/local`
+  with the OFL 1.1 licence. No retry of the server's start is needed.
+- **`E2E_MEMORY_LOG=1`** stays on in both closing runs (step 4).
+- **`docs/ideas.md`:** an entry on the e2e server's heap growing about 6 MB per test, with the hypothesis to check (the
+  application's structures, such as the undo history in the server's memory and the local adapter's caches, or
+  Turbopack's and Next.js's) and the next step, a heap snapshot before the threshold. Not looked into in this chore.
+
+## Step 3 – the remedies
+
+### P2 B: the full run in three parts
+
+**The parts** (`e2e/parts.ts`, `PART_STARTS`): a part is a run of folders in Playwright's order, from its first folder up
+to the next part's first. A folder added later falls into the part before it; a new slice's folder into part 3.
+
+| Part | Folders | Tests | Test time in step 2 | Heap at the part's end (estimate) |
+| ---: | --- | ---: | ---: | ---: |
+| 1 | `fixes` to `slice-03a` | 127 | 1,594 s | about 1.4 GB |
+| 2 | `slice-03b` to `slice-07b` | 183 | 2,037 s | about 1.3 GB |
+| 3 | `slice-07c` to `slice-12b` | 187 | 1,738 s | about 1.5 GB |
+
+- **How the heap was estimated** (step 2's log, `.data/e2e-memory-20261101-1401`): each folder's peak heap, as a
+  running maximum (single samples swing by a few hundred MB with the collections). A fresh server's heap after the
+  global setup's warm-up was 294 MB at the first folder; a part ends at about 0.3 GB plus what its folders added in step
+  2. Part 1 is step 2's own curve up to `slice-03a` (1,401 MB). Part 2: 0.3 GB + (2,422 − 1,401) MB. Part 3: 0.3 GB +
+  0.82 GB (from 2,422 MB to the restart in S11-05) + about 0.07 (the rest of `slice-11`, about 6 MB a test) + about 0.3
+  (`slice-12a` and `slice-12b`, from the second child's curve, without its cold start). Uncertainty about ±0.2 GB.
+- **Against the threshold** (3,255 MB): 40 to 46 %; CE-01's bar (at least 20 % below) is 2,604 MB. #244 failed at
+  2.0 GB in step 2; the highest part ends about 0.5 GB below that.
+- **Other cuts looked at,** the same way: `slice-04a`/`slice-07c` gives 1.6, 1.2 and 1.5 GB, `slice-04a`/`slice-08`
+  1.6, 1.5 and 1.1 GB, `slice-03b`/`slice-08` 1.4, 1.7 and 1.1 GB. The chosen cut (1.4, 1.3, 1.5) has the lowest
+  highest part.
+
+**The commands** (`scripts/e2e.ts`, `npm run e2e`; `playwright.config.ts` reads `E2E_PART` and `E2E_BLOB`):
+
+- `npm run e2e`: the three parts one after another, each with its own fresh server (the `webServer` of
+  `playwright.config.ts`, unchanged: `.next-e2e` emptied, the data reseeded), then one result. It refuses to start if
+  something listens on port 3200 (every part would reuse that server), and before parts 2 and 3 waits until the last
+  part's server has left the port (up to 60 s). Every part runs even if one fails; the exit code is 1 if any part or the
+  merge failed.
+- The result: each part writes a blob report (`blob-report/part-<n>.zip`); `playwright merge-reports
+  --reporter=dot,html` prints one summary of all tests (the failures with their errors, the counts) and writes one HTML
+  report (`playwright-report/`); the wrapper adds each part's time and the total. Each part's console shows the list
+  reporter as before.
+- Failure traces: `test-results/part-<n>/` (each Playwright run empties only its own output folder, so part 2 does not
+  clear part 1's traces).
+- `npm run e2e -- --part <n>` runs one part on its own (list and HTML reporters, as a normal run); other arguments are
+  passed on (`--part 3 --grep "S11-"`).
+- `npm run e2e -- <files, folders, options>` is one run as before, with every folder it names.
+- With `E2E_MEMORY_LOG=1` each part's server writes its own memory log (`.data/e2e-memory-<time>-part<n>.*`), read with
+  `scripts/e2e-memory-report.ts` per part.
+- Playwright is called through Node (`node_modules/@playwright/test/cli.js`), not `npx`: on Windows a shell would read
+  the `|` of a `--grep` as a pipe (found in the first smoke run).
+
+**Checked:** `E2E_PART=1`, `2`, `3` list 127, 183 and 187 tests (497 together, the full run's number). A smoke run of the
+full mode with one test per part (`--grep "S0-02|S3B-02:|S12B-02:"` in a temporary copy of the wrapper, deleted
+afterwards): three servers, 3 passed, one merged summary, the three memory logs; part times 61, 72 and 50 s for tests
+of 10, 25 and 4 s, so a part's start and warm-up cost about 50 s.
+
+### P3 B: IBM Plex hosted with the app
+
+**What was established** (the section "P3: where … comes from" in step 2): the error "next/font/google queries have
+exactly one entry" is raised by `next/font/google`'s Turbopack implementation (`NextFontGoogleFontFileReplacer`) when
+Google's stylesheet holds a font URL it cannot read; a start without the network does not fail (it falls back). The
+dependency is shown, so by Łukasz's answer: B, and no retry of the server's start.
+
+- `src/app/layout.tsx` loads IBM Plex Sans 400, 500, 600 and IBM Plex Mono 400, 500 through `next/font/local`, with the
+  same CSS variables (`--font-plex-sans`, `--font-plex-mono`), so `globals.css` and every component are unchanged.
+- **The files** (`src/app/fonts/ibm-plex/`, with `README.md` and `LICENSE.txt`, the OFL 1.1): IBM's own "complete"
+  WOFF2 fonts from `@ibm/plex-sans` 1.1.0 and `@ibm/plex-mono` 2.5.0 (npm), **unmodified**. "Plex" is a Reserved Font
+  Name in the OFL: a subset is a modified version and may not be called Plex, so the files are not subset. The
+  README lists each file's package and SHA-256. `.gitattributes` marks `*.woff2` as binary.
+- **Against what Google served** (compared with fontTools: Google's `IBMPlexSans[wdth,wght].ttf` 3.201 at 400, 500
+  and 600, and `IBMPlexMono-*.ttf` 2.3, from `github.com/google/fonts`): the same units per em and line metrics (ascent
+  1,025, descent 275 in both; Google's files read them from the typographic values, IBM's from `hhea` and the Windows
+  values, so a line is 1.3 em in both); the same advance widths for Sans Regular and both Monos on a test text with
+  Polish and German letters, and 0.05 % wider for Sans Medium and SemiBold (24 and 3 thousandths of an em on 90
+  characters). The glyph count is 1,019 against 1,025 (Sans) and 1,207 against 1,033 (Mono): the complete files also
+  carry Cyrillic, Greek and IBM's own symbols.
+- **Size:** 296 KB for the five files (Sans 63 to 67 KB, Mono 49 to 50 KB), all five preloaded as the Google fonts were;
+  Google's latin and latin-ext subsets were smaller. Served from the app's own `_next/static/media/`, cached as
+  immutable.
+- **CE-02:** `npm run build` with `HTTPS_PROXY` and `HTTP_PROXY` pointing to a closed port (the way the step 2 check
+  cut Turbopack off from Google Fonts) built in 41 s with no font warning; the built CSS has the five `@font-face` rules
+  on `_next/static/media/IBMPlex*.woff2` and the fallback faces (`local(Arial)`, metrics adjusted), and no Google URL.
+  No code in `src/`, `e2e/`, `scripts/` or `tests/` names the font families.
+- **In the browser** (the preview dev server on `.data/preview-db.json`): the workspace home's body is `plexSans`, the
+  three Sans faces load, and the page's font requests are the five `_next/static/media/IBMPlex*.woff2`, none to Google.
+
+### CI and the e2e checks of step 3
+
+- `npm run lint`, `npm run typecheck`, `npm test` (119 files, 1,555 tests): pass.
+- `npm run e2e -- --part 1 --grep "S0-02|S0-01"`: 5 passed (one part on its own, a `|` in the grep).
+- `npm run e2e -- --part 3 --grep "S11-|S12B-"` (names, aliases and thumbnails on the local fonts): 26 passed, 1
+  skipped (the on-demand spec skipped in every full run).
+- `npm run e2e -- e2e/slice-02c e2e/slice-03a` (folders, as before): 43 passed.
+- The full three-part run comes in step 4 (two runs with `E2E_MEMORY_LOG=1`).
+
+### The time of a full run (estimate)
+
+Step 2's tests took 5,369 s in the three parts' folders (1,594 + 2,037 + 1,738). Each part adds a start and the warm-up,
+about 50 s (the smoke run), and the merge a few seconds: about 5,520 s, **about 1 h 32 min**, against step 2's 5,588 s
+(1 h 33 min, which included one restart's cold start) and slice 12b's closing (1 h 30 min); CE-05's bar is 1 h 39 min.
+Less paging with a smaller heap may make the tests faster; step 4 measures it.
+
+### What changed outside `e2e/`, `scripts/`, `playwright.config.ts` and the docs (CE-04)
+
+- `src/app/layout.tsx`: `next/font/local` instead of `next/font/google` (P3 B), same CSS variables.
+- `src/app/fonts/ibm-plex/`: the five font files, `LICENSE.txt` (OFL 1.1), `README.md`.
+- `.gitattributes`: `*.woff2 binary`.
+- `package.json`: `"e2e": "tsx scripts/e2e.ts"`.
+
+## Step 4 – two closing runs, the fonts' measurement, the docs
+
+### The two full runs (1 November 2026)
+
+`E2E_MEMORY_LOG=1 npm run e2e` twice in a row, no dev server running, nothing else heavy on the laptop. Logs
+`.data/e2e-runs/chore-close-{1,2}.log`; memory `.data/e2e-memory-20261101-1619-part<n>.*` (run 1) and
+`.data/e2e-memory-20261101-1739-part<n>.*` (run 2), read with `scripts/e2e-memory-report.ts`; each run's
+`test-results/`, `playwright-report/` and log copied to `.data/e2e-failures/chore-close-{1,2}/` right after it.
+
+**Both runs: 495 passed, 2 skipped (the two on-demand specs), no failure.** Nothing to rerun.
+
+| Run | Part | Folders | Time | Heap peak (of 3,255 MB) | Lowest available | Page file peak | Pages in/s peak | Restarts |
+| ---: | ---: | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| 1 | 1 | `fixes` to `slice-03a` | 25 min 59 s | 1,361 MB (42 %) | 207 MB | 2,643 MB | 24,744 | 0 |
+| 1 | 2 | `slice-03b` to `slice-07b` | 28 min 20 s | 1,540 MB (47 %) | 255 MB | 1,200 MB | 35,173 | 0 |
+| 1 | 3 | `slice-07c` to `slice-12b` | 25 min 3 s | 1,577 MB (48 %) | 204 MB | 946 MB | 25,849 | 0 |
+| 1 | | **total** | **79 min 22 s** (command 4,767 s) | | | | | |
+| 2 | 1 | `fixes` to `slice-03a` | 25 min 21 s | 1,410 MB (43 %) | 189 MB | 1,431 MB | 17,040 | 0 |
+| 2 | 2 | `slice-03b` to `slice-07b` | 27 min 3 s | 1,576 MB (48 %) | 366 MB | 1,078 MB | 136,387 | 0 |
+| 2 | 3 | `slice-07c` to `slice-12b` | 25 min 3 s | 1,542 MB (47 %) | 184 MB | 1,470 MB | 19,079 | 0 |
+| 2 | | **total** | **77 min 27 s** (command 4,652 s) | | | | | |
+
+- **Each part's server** started once and never exited (one child per part, no exit code 77, no "approaching the used
+  memory threshold" line in either log). The child's RSS peaked at 1,398 to 1,846 MB, the main process at 65 MB.
+- **The heap against step 3's estimate:** part 1 about 1.4 GB (measured 1.36 and 1.41), part 2 about 1.3 GB (1.54 and
+  1.58), part 3 about 1.5 GB (1.58 and 1.54). Part 2 grows a little more than its folders did in the single run; the
+  three stay within 0.2 GB of each other, so the cuts stand.
+- **Paging stayed:** available memory fell to about 200 MB in every part and the page file was used throughout (Memory
+  Compression up to 2.4 GB), as in step 2. The heaviest paging (run 2, S7B-06, 136,387 pages in per second at a heap of
+  1.47 GB) failed nothing. That matches step 2's reading: the sign-in timeouts need a large heap (2 GB and more) on top
+  of the paging.
+- **The time:** 77 and 79 minutes, against step 3's estimate of 1 h 32 min, step 2's single run (1 h 33 min) and slice
+  12b's closing (1 h 30 min): 12 to 14 minutes faster. A smaller heap means shorter collections and less of the server
+  paged out; each part's start and warm-up (about 50 s) costs less than that.
+
+### Against the criteria
+
+- **CE-01 (no restart):** met. No restart in either run; the highest peak, 1,577 MB, is 52 % below the threshold
+  (the bar: 20 %).
+- **CE-02 (start-up):** met. Six server starts within the limit; with P3 B no build fetches fonts (step 3's offline
+  build), and no start depends on Google Fonts.
+- **CE-03 (sign-in):** met. No test failed at the sign-in in either run; P4 B is not needed.
+- **CE-04 (nothing else changed):** met. The differences outside `e2e/`, `playwright.config.ts`, `scripts/` and the
+  docs are step 3's list (the fonts, `.gitattributes`, `package.json`'s `e2e` script); no test's assertions changed; CI
+  passes (below).
+- **CE-05 (the runs' cost):** met. Each run's time and its parts' times are in the table; both runs are faster than
+  slice 12b's closing (1 h 30 min), not slower.
+
+### The fonts: an A/B against `main` in the measurement build
+
+A temporary spec after S12B-10's method (never committed): the seed's project home (Order management) and workspace
+home (Retail DWH), 10 first visits each in a new context with an empty cache, then 2 discarded and 10 warm loads; TTFB,
+FCP, LCP, the document's bytes, all bytes transferred and the fonts' bytes and requests, and the font preload links.
+`npm run measure:build` on this branch and on `main` (`b49ede2`, tag `slice-12b`, in a worktree with its own
+`npm ci`: Turbopack refuses a `node_modules` junction that points outside the project). One discarded warm-up on the
+branch, then main, branch, branch, main. Results in `.data/measure/fonts-ab/`.
+
+| Page, visit | Side | TTFB (ms) | FCP = LCP (ms), median [range] | Bytes transferred | Font bytes (files) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Project home, first | main | 53 / 51 | 328 [272–460] / 356 [284–580] | 541 KB | 106 KB (6) |
+| | branch | 55 / 50 | 348 [316–504] / 368 [304–460] | 732 KB | 298 KB (5) |
+| Project home, warm | main | 27 / 28 | 124 / 136 | 48 KB | 0 |
+| | branch | 24 / 21 | 104 / 104 | 48 KB | 0 |
+| Workspace home, first | main | 38 / 39 | 276 [228–324] / 272 [208–368] | 471 KB | 106 KB (6) |
+| | branch | 44 / 42 | 240 [208–348] / 232 [172–304] | 662 KB | 298 KB (5) |
+| Workspace home, warm | main | 20 / 25 | 108 / 104 | 41 KB | 0 |
+| | branch | 19 / 18 | 92 / 92 | 41 KB | 0 |
+
+(Two values: round 1 / round 2. Bytes are the medians of the first visits; LCP equals FCP on every load.)
+
+- **Preloads:** every font file is preloaded on both sides: the branch's 5 (`IBMPlexSans_{Regular,Medium,SemiBold}`,
+  `IBMPlexMono_{Regular,Medium}`, `…-s.p.….woff2`), `main`'s 6 (Google's subsets, which `next/font/google` downloads
+  at build time and serves from `_next/static/media` as well, so neither side fetches fonts from Google in the browser).
+- **FCP and LCP:** no change beyond the spread. The project home's first visit is 12 to 20 ms slower in the medians,
+  the workspace home's 36 to 40 ms faster, the warm loads 12 to 32 ms faster; every difference lies inside both sides'
+  ranges. With `display: swap` nothing waits for the fonts.
+- **Bytes:** a first visit transfers about 192 KB more (298 KB of fonts instead of 106 KB): IBM's complete files carry
+  every script the fonts cover, Google's subsets only Latin. On localhost this costs nothing measurable; on a slow
+  network the fonts arrive later after the first paint (swap), not the page. Subsetting is not allowed under the
+  Reserved Font Name (step 3). Warm loads transfer the same.
+- **Comparability:** timings measured before and after this chore compare as before; a first visit's total bytes are
+  about 192 KB higher from this chore on (recorded in `docs/known-limitations.md`).
+
+### The docs and CI of step 4
+
+- `docs/known-limitations.md`: the font start and the memory restart marked resolved (step 2's and step 4's figures);
+  "Sign-in timeouts under memory pressure"; the fonts' 192 KB; the S7C-02 correction (only S0-10 starts a server of its
+  own).
+- `docs/ideas.md`: "Sign-in timeouts in full e2e runs" with its result; "A fourth part for the full e2e run, if the
+  sign-in times out again"; the chore before slice 13 marked done.
+- `CLAUDE.md` and `README.md`: `npm run e2e` in three parts, `--part`, `E2E_MEMORY_LOG`, the local fonts.
+- CI: `npm run lint`, `npm run typecheck`, `npm test` (119 files, 1,555 tests): pass.

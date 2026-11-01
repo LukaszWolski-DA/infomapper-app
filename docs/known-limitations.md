@@ -198,7 +198,8 @@ C-08 is met untraced (1,432 ms). The traced diagnosis (five loads, `scripts/c08-
   - the 250 ms durations belong to the Fit button, the go-to links and a frame's fit, all user actions;
   - the other timers (the moved row's 700 ms flash, toasts, the delete confirmation, the right-drag's click swallow, the
     local adapter's write retry) are not on the load path;
-  - the fonts come from `next/font/google` with its default `display: swap`, and nothing waits for them;
+  - the fonts come from `next/font/google` with its default `display: swap`, and nothing waits for them (since the e2e
+    reliability chore from `next/font/local`, with the same default);
   - the canvas is `visibility: hidden` only until React Flow's observer reports the pane's size.
 
   So the wait is most likely outside our code: how React hydrates the streamed page (the 246 KiB document carries the
@@ -752,8 +753,20 @@ afterwards, and the run started again from scratch passed its start. The log is 
 `.data/s12b-close-e2e-start-failed.log`.
 
 - **Accepted:** a moment without the font's download, not the app; a new run from scratch starts.
-- **Later:** host the font locally (`next/font/local`) or give the e2e server a longer start (`docs/ideas.md`, the
-  chore before slice 13).
+- **Resolved** (the e2e reliability chore, 1 November 2026): the error came from `next/font/google`'s Turbopack replacer
+  reading a Google stylesheet whose font URLs it could not parse, and Turbopack kept the failed answer for the server's
+  life (`docs/prd/chore-e2e-reliability-acceptance.md`, step 2). IBM Plex Sans and Mono are now IBM's own WOFF2 files in
+  `src/app/fonts/ibm-plex/` through `next/font/local` (OFL 1.1, not subset); no build, start or e2e run fetches fonts.
+  The six server starts of step 4's two full runs were all within the limit.
+
+### A first visit carries about 192 KB more fonts since the e2e reliability chore
+
+IBM's unmodified WOFF2 files cover every script the fonts have, so a first visit downloads 298 KB of fonts (5 files,
+all preloaded) instead of the 106 KB of Google's Latin subsets (6 files) before. In the measurement build on the seed
+(chore step 4) FCP and LCP did not change beyond the spread, warm loads transfer the same, and with `display: swap`
+nothing waits for the fonts. A first visit's total bytes measured after the chore are about 192 KB higher than
+earlier figures (S12B-10's first visits); timings compare as before. Subsetting would need another name for the font
+(OFL Reserved Font Name "Plex"), so it is not done.
 
 ### S7A-04-route's development sign-in timed out once (a known flake)
 
@@ -761,7 +774,23 @@ In slice 7b's closing (run 5 of 26 October 2026), “P8 (route): a review that n
 nothing and says so” (`e2e/slice-07a/S7A-04-route.spec.ts`) failed at its first line, the development sign-in: after
 the click on Łukasz the top bar did not show within 15 s. That is before any slice code runs. It happened in 1 of 9
 full runs logged since slice 7a's close, and the file passed 3 of 3 on its own. Recorded as a known flake (Łukasz, 26
-October 2026); if it comes back, look at the sign-in redirect's timing under a long run.
+October 2026); if it comes back, look at the sign-in redirect's timing under a long run. The cause is now known to be
+memory, not the sign-in: see "Sign-in timeouts under memory pressure" below.
+
+### Sign-in timeouts under memory pressure (the e2e reliability chore)
+
+The development sign-in's occasional timeouts in full runs (S7A-04-route in slice 7b, two tests in slice 10a, S9-08 and
+S10C-02 in slice 12a) go with the dev server's memory on this 8 GB laptop. In the chore's measured single run (step 2,
+1 November 2026) both sign-in failures came at the sign-in's last step with the server's heap at 2.0 and 3.1 GB, while
+Windows paged hard (15,000 to 22,000 pages read in per second, 74 to 151 MB available): a full collection of a large
+heap that is mostly paged out stalls the whole server for seconds. Paging alone does not do it: tests with more paging
+and a heap under 2 GB passed.
+
+- **Since the chore:** the full run is three parts, each with its own server (`e2e/parts.ts`), and each part's heap
+  peaked at 1.36 to 1.58 GB (42 to 48 % of the 3,255 MB threshold) in step 4's two runs. Neither run had a sign-in
+  failure, though the laptop still paged (available memory down to 184 MB, up to 136,000 pages in per second).
+- **If it comes back:** keep the trace and the memory log (`E2E_MEMORY_LOG=1`) and read the heap at that moment; if the
+  heap was well over 1.5 GB, a fourth part is the next step (`docs/ideas.md`).
 
 ### The e2e dev server restarts itself at its memory threshold (slice 12a)
 
@@ -779,9 +808,13 @@ any test may be that one. The run's output and trace are in `.data/e2e-failures/
   - S12A-04 (`e2e/slice-12a/S12A-04.spec.ts`) failed 12 tests later, on the server compiling again: a project's
     rename was not stored within 15 s;
   - both passed 3 of 3 on their own. Output and traces are in `.data/e2e-failures/12b-close-1/`.
-- **Later:** if it comes back, raise the dev server's memory for the e2e run (Node's `--max-old-space-size` in the e2e
-  web server's command) or split the full run in two; the database slice's production-build e2e runs (AD-31) would
-  end it.
+- **Third occurrence** (the e2e reliability chore's measured run, step 2, 1 November 2026): at test 465 of 497, with
+  the heap at 3,241 MB; the heap grows about 6 MB per test, steadily, and Next.js restarts its child at 80 % of a heap
+  limit that is half the RAM (3,255 MB of 4,069 MB here). S11-06 failed on the restart.
+- **Resolved** by the chore: `npm run e2e` runs in three parts (`e2e/parts.ts`), each with its own fresh server. In step
+  4's two full runs (77 and 79 minutes, all passed) no part's server restarted, and the parts' heaps peaked at 1,361 to
+  1,577 MB, at least 52 % below the threshold. A larger heap was ruled out: the laptop already pages at a 2 GB heap.
+  Why the heap grows is not looked into (`docs/ideas.md`).
 
 ### S4B2-06 flaked again after its fix (slice 10b)
 
@@ -805,8 +838,8 @@ In slice 11's closing full run (31 October 2026), two specs failed once before t
 of 3 on its own:
 - **S11-10** (`e2e/slice-11/S11-10.spec.ts`, two quick clicks on a check box): the canvas never became ready in
   `openCanvas` (`data-ready` stayed empty for 15 s).
-- **S7C-02** (`e2e/slice-07c/S7C-02.spec.ts`, which starts its own server on a format-7 file): the page drew nothing,
-  and the top bar never showed.
+- **S7C-02** (`e2e/slice-07c/S7C-02.spec.ts`; it starts no server of its own, only S0-10 does, corrected in the e2e
+  reliability chore): the page drew nothing, and the top bar never showed.
 
 The cause is unknown. Both error texts and traces are in `.data/e2e-11-close/` (git-ignored). From now on, keep a
 failing run's trace and error output before any rerun (copy `test-results/` and the log).

@@ -1,10 +1,31 @@
+import path from "node:path";
 import { defineConfig, devices } from "@playwright/test";
 import { E2E_BASE, E2E_DB, E2E_PORT, E2E_PRODUCTION } from "./e2e/config";
+import { partFolders } from "./e2e/parts";
 
 const baseURL = E2E_BASE;
 
+// E2E_MEMORY_LOG=1 (chore e2e reliability, P1): the dev server's memory every 5 s, the machine's, and each test's start
+// and end, into `.data/e2e-memory-<time>.*.jsonl`. The name is fixed once here; the workers inherit it.
+const MEMORY_LOG = !!process.env.E2E_MEMORY_LOG && !E2E_PRODUCTION;
+if (MEMORY_LOG && !process.env.E2E_MEMORY_FILE) {
+  const stamp = new Date().toISOString().slice(0, 16).replace(/[-:]/g, "").replace("T", "-");
+  process.env.E2E_MEMORY_FILE = path.resolve(".data", `e2e-memory-${stamp}`);
+}
+// E2E_PART=<n> (chore e2e reliability, P2 B; set by scripts/e2e.ts, `npm run e2e -- --part <n>`): only that part's
+// folders (e2e/parts.ts), its traces in their own folder so the next part does not clear them; E2E_BLOB=1 (the full
+// run) writes a blob report that scripts/e2e.ts merges with the other parts'.
+const PART = process.env.E2E_PART ? Number(process.env.E2E_PART) : undefined;
+const partMatch = PART === undefined ? {} : { testMatch: partFolders(PART).map((f) => `${f}/**/*.spec.ts`), outputDir: `test-results/part-${PART}` };
+const blob: ["blob", { outputFile: string }][] = PART !== undefined && process.env.E2E_BLOB ? [["blob", { outputFile: `blob-report/part-${PART}.zip` }]] : [];
+
+const memoryEnv: Record<string, string> = MEMORY_LOG
+  ? { NODE_OPTIONS: `--require=${path.resolve("scripts", "e2e-memory-probe.cjs").replace(/\\/g, "/")}`, E2E_MEMORY_FILE: process.env.E2E_MEMORY_FILE! }
+  : {};
+
 export default defineConfig({
   testDir: "e2e",
+  ...partMatch,
   // element counts, the live canvas's pan and zoom (S3B-15 a, c), the fading scenarios (slice 4p), slice 4b-1's
   // measurements to the screen (S4B1-09), slice 4b-2's measuring specs (S4B2-10 to S4B2-13, S4B2-15's layers) and slice
   // 5a's diagnosis (S5A-08) and slice 6a's (S6A-09) only
@@ -25,7 +46,7 @@ export default defineConfig({
   workers: 1,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
-  reporter: [["list"], ["html", { open: "never" }]],
+  reporter: [["list"], ...(blob.length > 0 ? blob : [["html", { open: "never" }] as ["html", { open: string }]]), ...(MEMORY_LOG ? [["./e2e/memory-reporter.ts"] as ["./e2e/memory-reporter.ts"]] : [])],
   use: {
     baseURL,
     trace: "retain-on-failure",
@@ -56,7 +77,7 @@ export default defineConfig({
         command: `npx tsx scripts/clean-e2e-build.ts .next-e2e && npm run reset-dev-data && npm run dev -- --port ${E2E_PORT}`,
         url: `${baseURL}/sign-in`,
         // the test hooks (slice 4p) are on in the e2e dev server only
-        env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e", INFOMAPPER_TEST_HOOKS: "1" },
+        env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e", INFOMAPPER_TEST_HOOKS: "1", ...memoryEnv },
         reuseExistingServer: !process.env.CI,
         timeout: 120_000,
       },

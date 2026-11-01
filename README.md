@@ -112,7 +112,9 @@ else `.data/session-secret`, made on first use.
 | `npm run lint` | ESLint, including the layer rules (AD-19) |
 | `npm run typecheck` | Route types, then TypeScript (strict) |
 | `npm test` | Vitest unit tests (`src/**/*.test.ts`, `tests/`) |
-| `npm run e2e` | Playwright end-to-end tests (`e2e/`). Starts its own dev server on port 3200 with `.data/e2e-db.json`, freshly seeded before every test, so it runs next to `npm run dev` |
+| `npm run e2e` | Playwright end-to-end tests (`e2e/`) in three parts by folder (`e2e/parts.ts`), each with its own fresh dev server on port 3200 and `.data/e2e-db.json`, freshly seeded before every test; one merged result (`playwright-report/`), failure traces in `test-results/part-<n>/`. It refuses to start while something listens on port 3200 |
+| `npm run e2e -- --part <n>` | One part on its own; `npm run e2e -- <files or folders>` is one run as before |
+| `E2E_MEMORY_LOG=1 npm run e2e` | The same with a memory log: the e2e server's heap and resident memory and the machine's available memory, page file and paging every 5 s, per part in `.data/e2e-memory-<time>-part<n>.*`; read it with `npx tsx scripts/e2e-memory-report.ts .data/e2e-memory-<time>-part<n>` |
 | `npm run seed` | Creates the demo data in `.data/dev-db.json` if it does not exist yet |
 | `npm run reset-dev-data` | Replaces `.data/dev-db.json` with fresh demo data |
 | `npm run seed:large` | Adds the workspace “Performance test” for Łukasz (the canvas spike's 100-card data set, with 8 frames since slice 2b, and labels and 24 notes since slice 3a, and PERF-2's live canvas since slice 3b, and since slice 4b-2 the canvas “Performance test – requirements”: the same layout with 12 requirement cards and 126 trace lines; since slice 7c classifications without a canvas mark on one column in ten and one table in five) to `.data/dev-db.json`; a file that has it already is left alone (`npm run reset-dev-data` first) |
@@ -157,6 +159,13 @@ else `.data/session-secret`, made on first use.
 5a) runs the tests of what the step touched plus CI after each step and one full run before the merge (CLAUDE.md).
 
 Optional variables are listed in `.env.example`.
+
+## Fonts
+
+IBM Plex Sans and IBM Plex Mono are hosted with the app (`src/app/fonts/ibm-plex/`, loaded through `next/font/local`
+in `src/app/layout.tsx`): no build or start fetches fonts from the network. The files are IBM's own WOFF2 fonts,
+unmodified, under the SIL Open Font License 1.1 (`LICENSE.txt` beside them). "Plex" is a Reserved Font Name, so the
+files are never subset or otherwise changed; the folder's `README.md` lists their packages and checksums.
 
 ## Repository layout
 
