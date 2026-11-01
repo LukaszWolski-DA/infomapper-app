@@ -9,6 +9,7 @@
 // One warm-up, then ROUNDS; median, fastest, slowest. Reported, not a gate.
 // Run: npx tsx scripts/bench-thumbnails.ts
 
+import { createHash } from "node:crypto";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { projectOpenNotes, projectRequirements, projectStats, workspaceStats } from "../src/app/_panels/stats";
@@ -22,7 +23,7 @@ import type { Uuid } from "../src/domain/ids";
 import { projectLabels, type ProjectLabelContext } from "../src/domain/model/labels";
 import { buildRequirementIndex } from "../src/domain/model/requirement-index";
 import { modelConsistency } from "../src/domain/source-changes/consistency";
-import { canvasThumbnails, thumbnailDrawing, thumbnailIndex, type Thumbnail, type ThumbnailDrawing } from "../src/domain/model/thumbnail";
+import { canvasThumbnail, canvasThumbnails, thumbnailDrawing, thumbnailIndex, type Thumbnail, type ThumbnailDrawing } from "../src/domain/model/thumbnail";
 import type { CanvasItem, WorkspaceModel } from "../src/domain/types";
 import { addManyCanvases, MANY_PROJECT_ID } from "./lib/many-canvases";
 
@@ -115,6 +116,25 @@ async function workspaceHome(store: DataStore, ws: Uuid, p8: boolean, t: Timings
   return timed(t, "P8: thumbnails: paths", () => first.map((c) => ({ thumbnail: made.get(c.id)!, drawing: thumbnailDrawing(made.get(c.id)!) })));
 }
 
+/**
+ * What a thumbnail route would do for one request (step 4, proposal A): the access reads, one canvas's rows, the
+ * page's reads the index needs, the index, the drawing and its SVG text. Requests run one after another here, as a
+ * Node server runs their JavaScript on one thread.
+ */
+async function routeOnce(store: DataStore, ws: Uuid, canvasId: Uuid, t: Timings) {
+  await timed(t, "route: access reads", () => Promise.all([store.workspaces.get(ws), store.workspaces.getMember(ws, USER)]));
+  const [model, canvases, items, frames, notes, labels, labelLinks, requirements] = await timed(t, "route: reads", () =>
+    Promise.all([store.model.load(ws), store.canvases.list(ws), store.canvasItems.listOfCanvas(ws, canvasId), store.frames.listOfCanvas(ws, canvasId), store.notes.listOfCanvas(ws, canvasId), store.labels.list(ws), store.labels.listLinks(ws), store.requirements.list(ws)]),
+  );
+  const ix = await timed(t, "route: index", () => thumbnailIndex(model, { requirements, labels, labelLinks }));
+  const drawing = await timed(t, "route: drawing", () => thumbnailDrawing(canvasThumbnail(canvases.find((c) => c.id === canvasId)!, { items, frames, notes }, ix)));
+  return timed(t, "route: SVG text", () => markupOf(drawing).length);
+}
+
+/** The key of a drawing's address: a hash of what it draws (its size, and each path's kind, colour and data). */
+const drawingKey = (d: ThumbnailDrawing | null) =>
+  d ? createHash("sha256").update(`${d.width} ${d.height}`).update(d.paths.map((p) => `${p.kind}|${p.color ?? ""}|${p.d}`).join("\n")).digest("base64url").slice(0, 16) : "empty";
+
 async function bench(label: string, run: (t: Timings) => Promise<unknown>) {
   await run({});
   const rounds: Timings[] = [];
@@ -166,7 +186,13 @@ async function main() {
   const runSet = async (s: { name: string; ws: Uuid; project: Uuid }) => {
     await bench(`${s.name}: project home today`, (t) => projectHome(store, s.ws, s.project, false, t));
     await bench(`${s.name}: project home + thumbnails`, (t) => projectHome(store, s.ws, s.project, true, t));
-    bytesReport(`${s.name}: project home`, (await projectHome(store, s.ws, s.project, true, {}))!);
+    const made = (await projectHome(store, s.ws, s.project, true, {}))!;
+    bytesReport(`${s.name}: project home`, made);
+    await bench(`${s.name}: the drawings' keys (sha256)`, async (t) => timed(t, "keys", () => made.map((m) => drawingKey(m.drawing))));
+    const canvasIds = (await store.canvases.listLinksOfProject(s.ws, s.project)).map((l) => l.canvas_id);
+    await bench(`${s.name}: ${canvasIds.length} thumbnail requests, one after another`, async (t) => {
+      for (const id of canvasIds) await routeOnce(store, s.ws, id, t);
+    });
   };
   const runWs = async (name: string, ws: Uuid) => {
     await bench(`${name}: workspace home today`, (t) => workspaceHome(store, ws, false, t));

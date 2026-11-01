@@ -1,7 +1,7 @@
 # Slice 12b – acceptance
 
-Status: **step 4 stopped after its byte check (1 November 2026): the thumbnails are in the document twice, and the
-20-canvas project's HTML grows by 384 KB (bar: 350 KB); waiting for Łukasz's decision before the rest of step 4.**
+Status: **step 4 stopped (1 November 2026): Łukasz chose A on conditions; the answers to his six questions are
+below ("Before building A"); waiting for his decision before A is built.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -412,4 +412,116 @@ Notes on the figures:
   the thumbnail shows (P2), so it is a product decision.
 
 Recommendation: A, with B's class paint in the SVG file itself.
+
+### Łukasz's answer to the byte check (1 November 2026)
+
+Direction A (the thumbnail from a route handler), on conditions. C is rejected: it changes what a thumbnail shows.
+Before A is built, answer six questions here, without application code. If question 1 cannot be solved without a
+second copy of the colour values, switch to B and measure its bytes again.
+
+### Before building A: the answers
+
+**1. The theme, and colours from the same source as the `--im-…` tokens.**
+- **How the app picks its theme:** only through `prefers-color-scheme`. `globals.css` defines the tokens in `:root`
+  and again in `@media (prefers-color-scheme: dark)`; the `dark` variant is that media query, and `canvas.css` follows
+  it too. There is no manual switch: nothing sets a class, a `data-theme` or `color-scheme`. So no theme has to go
+  into the image's address.
+- **An `<img>` would need a second copy.** An SVG shown through `<img>` is a separate document: the page's CSS
+  variables do not reach it. It could carry its own `@media (prefers-color-scheme: dark)`, but only with the token
+  values copied into the route.
+- **Proposal: A with `<use>` instead of `<img>`.** The tile's strip holds
+  `<svg><use href="/w/{workspace}/thumbnail/{canvas}?v={key}#t"/></svg>`. The route answers an SVG file with one
+  `<symbol id="t" viewBox="…">` whose paths are painted `style="fill: var(--im-physical)"` (and so on), stored concept
+  colours as `#RRGGBB`, and note colours from `NOTE_MINI`.
+  - The elements an external `<use>` draws are a shadow tree of the page's `<use>`, so they inherit the page's custom
+    properties: the same tokens, in both modes, with no copy.
+  - If a manual switch comes later, the tokens it sets are inherited the same way, so the address still does not need
+    the theme.
+  - **Checked in Chrome** (a static page from a local server, scratch only): the shape is painted with the page's
+    `--im-physical` (`#a0660f` light, `#e2a74b` with dark emulation), and with an overriding value under a class (a
+    stand-in for a manual switch).
+  - Firefox and Safari support external `<use>` on the same origin. A smoke test in the three browsers can go into
+    step 4's specs or the on-demand `BROWSERS=1` run (slice 6b's way).
+  - The address is same-origin, which external `<use>` requires.
+  - Everything else stays as A: one request per canvas, cached by its key, and in the document only the address.
+  - Estimated bytes: about 190 B of markup and about 230 B of RSC payload per tile, so about 8 KB in the 20-canvas
+    document and about 5 KB in each write's answer (today's figures +384 KB and +193 KB).
+
+**2. The server's cost of 20 requests** (bench, `scripts/bench-thumbnails.ts`, `.data/bench-thumbnails-step4.log`, 9
+rounds, median). A request is the access reads, one canvas's rows plus what the index reads, the index, the drawing
+and its SVG text. The figures are the JavaScript work only: Next's own work per request (routing, the session cookie's
+HMAC, the response) comes on top, about 1–2 ms each in a production build (estimate).
+
+| | per request | all of the project's canvases, one after another |
+| --- | --- | --- |
+| seed (2) | 0.7 ms | 1.4 ms |
+| "Performance test" (3) | 3.2 ms | 9.6 ms |
+| "Performance test – 20 canvases" (20) | 3.4 ms | 67.6 ms (reads 42.6, index 13.5, drawings 4.7, access 5.9, SVG text 0.5) |
+
+- The requests start only once the browser has parsed the tiles, after the document's first bytes. They do not add
+  to TTFB or FCP; they compete with the page's JavaScript chunks for the same Node thread.
+- Against the page: the 20-canvas home's TTFB is 111–117 ms. The 20 requests' JavaScript, about 70 ms plus Next's
+  20–40 ms (estimate), is of the same order, but spread after the document.
+- The page itself computes the drawings anyway for their keys (about 10 ms on the 20-canvas home, step 3) and saves
+  about 380 KB of document (about 35 ms of TTFB at about 0.09 ms per KB, step 2).
+- **On a second load nothing is fetched while no canvas changed:** the addresses are the same and the answers are
+  `immutable`. One changed canvas is one request. The project home, other project homes and the workspace home use the
+  same address for the same canvas, so they share the cache.
+- If step 5 shows the 20 requests delaying anything measured, the fallback is one file of symbols per page (`#c-{id}`)
+  under one key: one request with the index built once (about 13 ms), at the cost of fetching every thumbnail again
+  after any one changes. I propose not building it unless step 5 needs it.
+
+**3. The key in the address.**
+- **What it is computed from:** a hash of the drawing the page computes anyway: its size and each path's kind, colour
+  and data, so exactly what is drawn. SHA-256 (`node:crypto`), base64url, the first 16 characters (96 bits).
+- **What it costs:** 0.01 ms on the seed, 0.05 ms on "Performance test", 0.38 ms for 20 drawings.
+- The route computes the same drawing and its key. If the address's `v` matches, it answers with the immutable cache
+  header; if not (an older address, or a change since the page was drawn), it answers the current drawing with
+  `no-store`, so a wrong drawing is never cached under a key.
+- An empty canvas has no address: the tile shows "Empty canvas" as text, with no request.
+
+**4. The route.** `GET /w/{workspaceId}/thumbnail/{canvasId}?v={key}` (`src/app/w/[workspaceId]/thumbnail/[canvasId]/
+route.ts`, next to the import's upload route).
+- **Access as the pages:** the signed session (`getSession`); the person a member of the workspace; its organization
+  unlocked in this session (slice 8). The route needs one shared check with `loadShellFor`'s first lines, without
+  the shell's other reads.
+- **Answers:**
+  - no session: 401;
+  - not a member, or the workspace does not exist: 404, as `loadShellFor`'s `notFound()`;
+  - organization locked: 403, without a redirect (an image cannot follow the unlock form; the page around it
+    already asks for it);
+  - a canvas deleted, or not in this workspace: 404;
+  - otherwise 200, `Content-Type: image/svg+xml`, `X-Content-Type-Options: nosniff`, and `Cache-Control: private,
+    max-age=31536000, immutable` when `v` matches (`private, no-store` when not).
+- **What it draws:** the same function as the page (`canvasThumbnail`, `thumbnailDrawing`). The SVG text holds
+  numbers and colours only, no names. Colours are written only when they have the shape `#RRGGBB` (the database checks
+  only `#______`, AD-18), else the neutral colour. Writes and rights are not involved: reading a canvas is allowed to
+  every member, guests included, as on the home.
+- The development and measurement builds only, like everything on the local adapter (AD-29, AD-31).
+
+**5. LCP.**
+- Vector shapes drawn through `<use>` are not an LCP candidate: LCP counts text, `<img>`, `<image>` inside an SVG,
+  video posters and background images.
+- In the Chrome check, a page with nothing but two such thumbnails reported no LCP entry at all.
+- With an `<img>`, the 250 × 140 px image could have become the largest paint, after its own request. That is one more
+  reason for `<use>`.
+- **How step 5 checks it:**
+  - S12B-10 records the LCP element (its tag and test id) next to its time on both sides; the bar stays as approved
+    (FCP = LCP).
+  - If the LCP element changes, step 5 reports it.
+  - S12B-10 also reports, not as a gate, when the last thumbnail request ends (resource timing).
+
+**6. S12B-09, new wording (proposal):**
+
+> **In the server's HTML.** Each tile's thumbnail is in the server's HTML response as an `<svg>` that refers to its
+> canvas's drawing at an address carrying the drawing's key (`/w/{workspace}/thumbnail/{canvas}?v={key}`), and it is
+> drawn with JavaScript off. That address answers only a person who may open the workspace, 404 for a canvas deleted
+> or outside the workspace, with `Cache-Control: private, max-age=31536000, immutable`; a reader and a reviewer get
+> the same drawing as an owner. That the thumbnail has no layout read and no client code is checked in step 4's review
+> (a grep, listed in the acceptance; step 1, F17).
+
+S12B-04 and S12B-05 stay as they are: after a change or an undo the key, and so the address, changes.
+
+**Recommendation:** A with `<use>` (question 1). B is not needed, since question 1 is solved without copying the colour
+values. B's class paint is not needed either: in the route's file the bytes no longer weigh on the page.
 
