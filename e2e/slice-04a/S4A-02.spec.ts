@@ -1,7 +1,7 @@
 import { expect, test } from "./fixtures";
 import { expectToast, loadRequirements, openCanvas, openRequirementsTab, requirementByKey, signInAs, store, RETAIL } from "./helpers";
 
-test("S4A-02: “New requirement” makes REQ-106 (Data requirement, Draft, Should, name selected), then REQ-107; one undo removes it; a typed REQ-108 makes the next REQ-109; a duplicate key and an empty name are refused and the fields go back", async ({ page }) => {
+test("S4A-02: “New requirement” makes REQ-106 (Data requirement, Draft, Should, name selected), then REQ-107; one undo removes it; a typed REQ-108 makes the next REQ-109; a duplicate key is refused and kept in its field, an empty name goes back", async ({ page }) => {
   await signInAs(page, "Łukasz");
   await openCanvas(page);
   await openRequirementsTab(page);
@@ -33,11 +33,11 @@ test("S4A-02: “New requirement” makes REQ-106 (Data requirement, Draft, Shou
   await expect(page.getByTestId("input-req-key")).toHaveValue("REQ-109");
   expect((await store().workspaces.get(RETAIL))!.requirement_key_next).toBe(110);
 
-  // a duplicate key (in any case) and an empty name: refused with their messages, the fields show the stored values
+  // a duplicate key (in any case): refused, the field keeps it (slice 13); an empty name goes back with the message (D-59)
   await page.getByTestId("input-req-key").fill("req-101");
   await page.getByTestId("input-req-key").press("Enter");
   await expectToast(page, "req-101 is already used by another requirement.");
-  await expect(page.getByTestId("input-req-key")).toHaveValue("REQ-109");
+  await expect(page.getByTestId("input-req-key")).toHaveValue("req-101");
   await page.getByTestId("input-req-name").fill("   ");
   await page.getByTestId("input-req-name").press("Enter");
   await expectToast(page, "Enter a name.");
