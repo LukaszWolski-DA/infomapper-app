@@ -20,11 +20,11 @@ import {
 } from "../__fixtures__/domain";
 import type { CanvasItem, Frame, LabelLink, Note, WorkspaceModel } from "../types";
 import { cardHeightFor } from "./card-size";
+import { NO_CONCEPT_COLOR } from "./concept-colors";
 import { BLOCK, blockHeight, CARD_HEADER_HEIGHT, FREE_FRAME_COLORS } from "./frames";
 import {
   canvasThumbnail,
   canvasThumbnails,
-  NO_CONCEPT_COLOR,
   thumbnailDrawing,
   thumbnailIndex,
   THUMBNAIL_NOTE_HEIGHT,

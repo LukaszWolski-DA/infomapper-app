@@ -13,6 +13,7 @@ import type { Canvas, CanvasItem, Frame, LabelLink, Note, NoteColor, WorkspaceMo
 import { cardHeightOf, type FilterableRow } from "./card-size";
 import { REQUIREMENT_CARD_WIDTH } from "./card-kinds";
 import { indexOf } from "./classifications";
+import { NO_CONCEPT_COLOR } from "./concept-colors";
 import { blockHeight, BLOCK, cardWidthOf, FREE_FRAME_COLORS, type Rect } from "./frames";
 import { liveMembership } from "./live";
 import { isPinned, notePlaces, noteVisible } from "./notes";
@@ -25,8 +26,6 @@ export const THUMBNAIL_MARGIN = 0.06;
 export const THUMBNAIL_REQUIREMENT_HEIGHT = 94;
 /** A note's height is not stored; it is drawn 80 high (prototype `thumb`; step 1, F14). */
 export const THUMBNAIL_NOTE_HEIGHT = 80;
-/** An entity whose concept is not in the model, as the canvas draws it (`CardNode`, the Overview). */
-export const NO_CONCEPT_COLOR = "#888899";
 
 /**
  * A colour role: a stored `#RRGGBB` (a concept's, a free frame's), `physical` (tables and source frames), `req`

@@ -3,6 +3,12 @@
 
 export const CONCEPT_PALETTE = ["#2F7DD1", "#0F8B8D", "#C0437A", "#5F8A2E", "#B7791F", "#D85A30", "#5F6B7A", "#1D9E75"] as const;
 
+/**
+ * An entity whose concept is not in the model (the canvas's card, the Overview, a thumbnail; slice 12b). Like the
+ * concept colours it is one stored colour for light and dark mode.
+ */
+export const NO_CONCEPT_COLOR = "#888899";
+
 export const isConceptColor = (color: string): boolean => (CONCEPT_PALETTE as readonly string[]).includes(color.toUpperCase());
 
 /** The first palette colour no concept uses yet; when all are used, the palette repeats. */

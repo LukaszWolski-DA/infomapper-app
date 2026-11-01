@@ -1,7 +1,7 @@
 # Slice 12b – acceptance
 
-Status: **step 3 done (1 November 2026): the thumbnail function, its unit tests and the move of `NOTE_MINI`; waiting
-for Łukasz before step 4.**
+Status: **step 4 stopped after its byte check (1 November 2026): the thumbnails are in the document twice, and the
+20-canvas project's HTML grows by 384 KB (bar: 350 KB); waiting for Łukasz's decision before the rest of step 4.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -330,4 +330,86 @@ What step 3 adds and changes:
   are step 2's paths figures.
 - **CI:** `npm run lint`, `npm run typecheck` and `npm test` (119 files, 1,555 tests) pass.
 - No application page changes yet: the tiles are step 4. `.data/dev-db.json` is not touched.
+
+## Step 4: the tiles (stopped after the byte check)
+
+Łukasz's order for step 4: (1) the colour of an entity without a concept from the canvas's own source, (2) the
+thumbnails on the project home and their bytes at once, stopping if they are there twice or come near the 350 KB bar,
+(3) the rest.
+
+### 1. An entity without a concept
+
+The canvas has no token and no dark variant for it: `#888899` was written twice as a literal (`CardNode.tsx`, `--cc`;
+`Overview.tsx`), like the concept colours, which are stored colours for both modes. Step 4 makes it one constant,
+`NO_CONCEPT_COLOR` in `src/domain/model/concept-colors.ts`, which the card, the Overview and the thumbnail import. The
+canvas draws exactly what it drew. In practice the case does not happen: `entity.concept_id` is required, and a
+concept is deleted only with its entities moved or deleted (D-47).
+
+### 2. The thumbnails on the project home
+
+- `src/ui/canvas-thumbnail.tsx`: a server component with no hooks. It renders `thumbnailDrawing` as an `<svg>` (one
+  `<path>` per kind and colour, `data-kind`, `data-color`, paint as inline style: tokens `--im-physical`, `--im-map`,
+  `--im-req`, stored concept colours, `NOTE_MINI`; the prototype's opacities), or "Empty canvas" (`aria-hidden`).
+- `page.tsx` computes the thumbnails from the rows it already reads (one index, `canvasThumbnails`) and hands each tile
+  its `<CanvasThumbnail>` as a slot (`CanvasTiles`'s `thumbnails`). `loadProjectView` and the canvas page are
+  unchanged (F3).
+
+### The bytes, against `slice-12a`
+
+How: `e2e/slice-12b/S12B-bytes.spec.ts`, which runs only in the measurement build and is left out of the normal run.
+The same file ran on `slice-12a` in `../infomapper-ab-main`. Results are in `.data/measure/s12b-bytes/` (branch) and
+in the worktree's `.data/measure/s12b-bytes/` (`slice-12a`). The spec does two things:
+- It reads the project home's document as the server sends it, splits off the embedded RSC payload (the
+  `self.__next_f.push` scripts), measures the thumbnails' `<svg>` markup, and counts how often each path's `d` occurs.
+- It records the answers to three writes on the home: a label's pin, the project's name, Undo.
+
+| | "Performance test" (3 canvases) | "Performance test – 20 canvases" |
+| --- | --- | --- |
+| document, `slice-12a` | 449,864 B | 1,095,071 B |
+| document, branch | 496,611 B | 1,487,913 B |
+| **document, growth** | **+46,747 B (+45.7 KB; bar 50 KB)** | **+392,842 B (+383.6 KB; bar 350 KB)** |
+| of it, the SVG markup | 21,295 B | 180,760 B |
+| of it, the RSC payload | +25,452 B | +212,082 B |
+| copies of each path in the document | 2 (markup + payload) | 2 per thumbnail |
+| a write's answer, `slice-12a` (pin / name / Undo) | 222,793 / 222,885 / 222,904 B | 545,407 / 545,520 / 545,518 B |
+| **a write's answer, growth** | **+23,479 B each (+22.9 KB)** | **+197,463 B each (+192.8 KB)** |
+| copies of each path in a write's answer | 1 per thumbnail | 1 per thumbnail |
+
+Notes on the figures:
+- "Performance test"'s first path occurs twice in each write's answer because two of its canvases ("100 cards" and the
+  requirements canvas) have the same layout.
+- **The thumbnails are in the document twice.** This holds for any server-rendered content in the App Router: the
+  HTML has the markup, and the embedded RSC payload has the same tree again, as JSON inside a JavaScript string
+  (escaped, so a little larger). Where the SVG sits does not change it: a server component inside or outside the
+  client tile, and a string through `dangerouslySetInnerHTML`, are each still in both copies.
+- Every write on the home re-renders the page (`revalidatePath`), so every answer carries the thumbnails once again.
+- **More than step 2's estimate** (298 KB for the 20-canvas project): the paint as inline style on each path, the
+  `data-kind`/`data-color` attributes and the payload's escaping. The path data alone is 127 KB of the 384 KB.
+
+### Proposals (before the rest of step 4)
+
+- **A. The thumbnails out of the document: an `<img>` per tile from a route handler** (recommended).
+  - The route: `GET /w/{workspace}/thumbnail/{canvas}.svg?v={hash}`. It checks the session and the workspace as
+    pages do, computes the same drawing and answers SVG with long caching.
+  - The page computes the drawings anyway and puts a short hash of each into the URL, so a change or an undo gives a
+    new address (S12B-04).
+  - Estimated cost: in the document and in each write's answer, about 150 B per tile in each copy (about 6 KB for 20
+    tiles). Each SVG is about 6–9 KB, fetched in parallel after the document, and cached while the canvas does not
+    change.
+  - Costs:
+    - S12B-09 would read "the tiles' `<img>` are in the server's HTML, and their SVG comes from the server" instead of
+      "the SVG is in the HTML". The images still show with JavaScript off.
+    - One route handler more.
+    - LCP must be checked again, since an image in the strip may become the largest paint. If it does, step 5 reads it
+      against the bars.
+- **B. Keep the SVG inline, but compacter.**
+  - Paint by class (`class="e"` and so on; the opacities in `globals.css`), with `fill` only for a stored colour.
+  - No `data-` attributes: specs read the class.
+  - Relative path commands.
+  - Estimate: about +270 KB in the 20-canvas document, still two copies, and about +135 KB on every write's answer. It
+    passes the bar, but with less room, and it keeps the cost on every write.
+- **C. Fewer shapes:** for example no lines below a size, or one line per pair only up to a limit. This changes what
+  the thumbnail shows (P2), so it is a product decision.
+
+Recommendation: A, with B's class paint in the SVG file itself.
 

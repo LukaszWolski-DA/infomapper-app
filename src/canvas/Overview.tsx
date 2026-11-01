@@ -24,6 +24,7 @@ import { CanvasUiCtx } from "./context";
 import { cardHeight, cardWidth, type Rect } from "./geometry";
 import type { CanvasLines } from "./line-data";
 import type { NoteColor } from "@/domain/types";
+import { NO_CONCEPT_COLOR } from "@/domain/model/concept-colors";
 import { NOTE_MINI } from "@/ui/note-colors";
 
 const NO_NOTES: readonly MiniNote[] = [];
@@ -237,7 +238,7 @@ const Miniature = memo(function Miniature({
         if (!isCardNode(n)) return <rect key={n.id} className="mb" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: n.data.color }} />;
         const card = n.data.card;
         return card.kind === "ent" ? (
-          <rect key={n.id} className="me" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: card.color ?? "#888899" }} />
+          <rect key={n.id} className="me" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: card.color ?? NO_CONCEPT_COLOR }} />
         ) : (
           <rect key={n.id} className="ms" x={r.x} y={r.y} width={r.w} height={r.h} />
         );

@@ -6,6 +6,7 @@
 
 import { memo, useContext } from "react";
 import { useStore, type Node, type NodeProps } from "@xyflow/react";
+import { NO_CONCEPT_COLOR } from "@/domain/model/concept-colors";
 import { shownText, visibleRows, type CardData, type CardRow } from "./card-data";
 import { CanvasCardsCtx, DiagnosisCtx } from "./context";
 import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
@@ -163,7 +164,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
       onClick={onClick}
       className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${card.clipName ? " clip-name" : ""}${clipLine1 ? " clip-l1" : ""}${card.liveLevel === "context" ? " ctx" : ""}`}
       title={card.liveTitle ?? undefined}
-      style={isEnt ? ({ "--cc": card.color ?? "#888899" } as React.CSSProperties) : undefined}
+      style={isEnt ? ({ "--cc": card.color ?? NO_CONCEPT_COLOR } as React.CSSProperties) : undefined}
       data-testid={isEnt ? "card-entity" : "card-source"}
       data-card={card.id}
       data-collapsed={card.collapsed || undefined}
