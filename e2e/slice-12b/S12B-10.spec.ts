@@ -7,6 +7,10 @@
 // load), FCP, LCP (a buffered observer) and the document's size (decoded, as transferred); median and p95. Results in
 // test-results/S12B-10.json (or S12B-10-<LABEL>.json, LABEL=...) and a copy in .data/measure/s12b10/, to run the same spec
 // on another branch for the A/B (step 5). LOADS=<n> changes the number of loads; SAVE_HTML=<folder> keeps each document.
+// Step 5 adds, reported only: the LCP element (its tag and test id) and the thumbnails' requests (how many, when the
+// last one ended, how many came from the cache), on the repeated loads (a warm cache) and on COLD=<n> first visits,
+// each in a new browser context with the session's cookies and an empty cache (default 5). Each load waits for the
+// network to go quiet before it reads, so the last thumbnail is in.
 
 import fs from "node:fs";
 import path from "node:path";
@@ -17,11 +21,13 @@ import { addManyCanvases, MANY_PROJECT_ID } from "../../scripts/lib/many-canvase
 import { E2E_DB, E2E_PRODUCTION } from "../config";
 import { MEASURE, MEASURE_USE, saveResults } from "../slice-01b/measure";
 import { signInAs } from "../slice-00/helpers";
+import type { Browser, BrowserContext } from "@playwright/test";
 import { expect, test, type Page } from "./fixtures";
 
 test.use(MEASURE_USE);
 
 const LOADS = Number(process.env.LOADS ?? 15);
+const COLD = Number(process.env.COLD ?? 5);
 const WARM_UP = 2;
 const LABEL = process.env.LABEL ? `-${process.env.LABEL}` : "";
 
@@ -34,6 +40,12 @@ interface Load {
   lcp: number;
   decoded: number;
   transferred: number;
+  /** The thumbnails' requests: how many, when the last one ended (ms from the navigation's start), how many from the cache. */
+  thumbnails: number;
+  thumbnailsEnd: number;
+  thumbnailsCached: number;
+  /** The LCP element: its tag and the nearest test id. */
+  lcpElement: string;
 }
 
 const median = (xs: readonly number[]) => [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)]!;
@@ -42,21 +54,29 @@ const p95 = (xs: readonly number[]) => [...xs].sort((a, b) => a - b)[Math.min(xs
 async function loadOnce(page: Page, url: string, ready: string): Promise<Load> {
   await page.goto(url, { waitUntil: "load" });
   await expect(page.getByTestId(ready)).toBeVisible();
-  // LCP is final once the page has painted and nothing larger comes; a short pause, then read the buffered entries
-  await page.waitForTimeout(400);
+  // LCP is final once the page has painted and nothing larger comes; the network quiet (the thumbnails in), then read
+  await page.waitForLoadState("networkidle");
+  await page.waitForTimeout(200);
   return page.evaluate(
     () =>
       new Promise<Load>((resolve) => {
         const nav = performance.getEntriesByType("navigation")[0] as PerformanceNavigationTiming;
         const fcp = performance.getEntriesByName("first-contentful-paint")[0]?.startTime ?? NaN;
         let lcp = NaN;
+        let lcpElement = "none";
         const obs = new PerformanceObserver((list) => {
-          for (const e of list.getEntries()) lcp = e.startTime;
+          for (const e of list.getEntries()) {
+            lcp = e.startTime;
+            const el = (e as PerformanceEntry & { element?: Element | null }).element ?? null;
+            const id = el?.closest("[data-testid]")?.getAttribute("data-testid");
+            lcpElement = el ? `${el.tagName.toLowerCase()}${id ? ` in ${id}` : ""}` : "(removed)";
+          }
         });
         obs.observe({ type: "largest-contentful-paint", buffered: true });
         setTimeout(() => {
           obs.disconnect();
           const r = (v: number) => +v.toFixed(1);
+          const thumbs = (performance.getEntriesByType("resource") as PerformanceResourceTiming[]).filter((x) => x.name.includes("/thumbnail/"));
           resolve({
             ttfb: r(nav.responseStart - nav.requestStart),
             responseEnd: r(nav.responseEnd),
@@ -66,24 +86,51 @@ async function loadOnce(page: Page, url: string, ready: string): Promise<Load> {
             lcp: r(lcp),
             decoded: nav.decodedBodySize,
             transferred: nav.transferSize,
+            thumbnails: thumbs.length,
+            thumbnailsEnd: thumbs.length ? r(Math.max(...thumbs.map((x) => x.responseEnd))) : NaN,
+            thumbnailsCached: thumbs.filter((x) => x.transferSize === 0).length,
+            lcpElement,
           });
         }, 50);
       }),
   );
 }
 
+/** Median and p95 of the numbers; how often each LCP element was the LCP. */
+function summarize(loads: readonly Load[]) {
+  const keys = (Object.keys(loads[0]!) as (keyof Load)[]).filter((k) => k !== "lcpElement");
+  const nums = (k: keyof Load) => loads.map((l) => l[k] as number).filter((v) => !Number.isNaN(v));
+  const summary: Record<string, unknown> = Object.fromEntries(keys.map((k) => [k, nums(k).length ? { median: median(nums(k)), p95: p95(nums(k)) } : null]));
+  const elements: Record<string, number> = {};
+  for (const l of loads) elements[l.lcpElement] = (elements[l.lcpElement] ?? 0) + 1;
+  summary.lcpElement = elements;
+  return summary;
+}
+
+/** First visits: each in a new context with the session's cookies and an empty cache. */
+async function coldLoads(browser: Browser, state: Awaited<ReturnType<BrowserContext["storageState"]>>, url: string, ready: string) {
+  const loads: Load[] = [];
+  for (let i = 0; i < COLD; i++) {
+    const context = await browser.newContext({ storageState: state, viewport: MEASURE_USE.viewport, baseURL: test.info().project.use.baseURL });
+    const page = await context.newPage();
+    loads.push(await loadOnce(page, url, ready));
+    await context.close();
+  }
+  return loads;
+}
+
 async function measurePage(page: Page, url: string, ready: string) {
   for (let i = 0; i < WARM_UP; i++) await loadOnce(page, url, ready);
   const loads: Load[] = [];
   for (let i = 0; i < LOADS; i++) loads.push(await loadOnce(page, url, ready));
-  const keys = Object.keys(loads[0]!) as (keyof Load)[];
-  const summary = Object.fromEntries(keys.map((k) => [k, { median: median(loads.map((l) => l[k])), p95: p95(loads.map((l) => l[k])) }]));
+  const summary = summarize(loads);
+  const cold = COLD ? await coldLoads(page.context().browser()!, await page.context().storageState(), url, ready) : [];
   // SAVE_HTML=<folder>: the document as the server sent it, to see what its bytes are (diagnosis only)
   if (process.env.SAVE_HTML) {
     fs.mkdirSync(process.env.SAVE_HTML, { recursive: true });
     fs.writeFileSync(path.join(process.env.SAVE_HTML, `${url.replace(/[^a-z0-9]+/gi, "_")}.html`), await (await page.request.get(url)).text());
   }
-  return { url, loads: loads.length, summary, raw: loads };
+  return { url, loads: loads.length, summary, cold: cold.length ? summarize(cold) : null, raw: loads, coldRaw: cold };
 }
 
 test("S12B-10: the home pages' load on the seed, “Performance test” and its 20-canvas project", async ({ page, browser }) => {

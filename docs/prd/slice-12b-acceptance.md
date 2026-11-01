@@ -1,7 +1,7 @@
 # Slice 12b – acceptance
 
-Status: **step 5 in progress (1 November 2026): step 4 accepted with the proxy's fix; the measurement against
-`slice-12a`.**
+Status: **step 5 done (1 November 2026): every bar passes against `slice-12a`; the canvas's element counts are
+slice 12a's; waiting for Łukasz before step 6.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -696,4 +696,91 @@ the specs that cover it (or adding one).
     visiting Order management's home, whose tiles now fetch their thumbnails.
   - Both passed in step 4's run (87 of 87), and both run again in step 6's full run.
   - No new spec is needed: a canvas page takes the same branch of the proxy as the project home.
+
+## Step 5: the measurement against `slice-12a`
+
+Łukasz's instructions:
+- S12B-10 in one sitting, A B A B after a warm-up, on the seed, "Performance test" and the 20-canvas project, for the
+  project home and the workspace home: TTFB, FCP, LCP and the HTML's size, medians against the bars approved after step
+  2, p95 only reported;
+- the LCP element on both sides, and when the last thumbnail request ends, on a first visit (empty cache) and a second
+  (with the cache), reported only;
+- S12B-11.
+
+If a bar is missed: stop and describe it; the bars do not change.
+
+**How it ran:**
+- The development laptop, Chrome 156, headed (`MEASURE=1`), the measurement build on each side:
+  - A is `slice-12a` (`98e107a`) in `../infomapper-ab-main`, with this branch's `S12B-10.spec.ts`, its `fixtures.ts`
+    and `scripts/lib/many-canvases.ts` copied in;
+  - B is this branch.
+- One discarded warm-up run per side (2 loads, 1 cold visit), then A1 B1 A2 B2.
+- Each run: per page 2 discarded loads, 15 counted loads (the same tab: from the second visit on, the cache holds the
+  drawings) and 5 first visits (a new browser context with the session's cookies each, so an empty cache).
+- Each load waits for the network to go quiet before it reads, so the last thumbnail is in. Each run took 3.6–3.7 min.
+- Medians are over both runs of a side (30 loads); the per-run medians and p95 are in
+  `.data/s12b-step5-analysis.txt`.
+- Raw results: `.data/measure/s12b10/S12B-10-b{1,2}-branch-*.json` and, in the worktree,
+  `.data/measure/s12b10/S12B-10-a{1,2}-12a-*.json`.
+- `S12B-10.spec.ts` now also records the LCP element, the thumbnails' resource timing and the cold visits (`COLD`,
+  default 5).
+
+### Against the bars (medians, ms; HTML in bytes)
+
+| Page | TTFB 12a → branch | FCP = LCP 12a → branch | HTML growth | Bar | |
+| --- | --- | --- | --- | --- | --- |
+| seed, project home | 20.5 → 23.4 (+2.9) | 96 → 96 (0) | +1,461 B | ≤ +20 % or ≤ +10 ms; ≤ +5 KB | passes |
+| seed, workspace home (2 projects) | 15.4 → 16.8 (+1.4) | 80 → 88 (+8) | +1,155 B | ≤ +20 ms; ≤ +40 KB | passes |
+| "Performance test", project home | 46.8 → 48.0 (+1.2) | 216 → 216 (0) | +2,174 B | ≤ +20 % and ≤ +50 ms; ≤ +50 KB | passes |
+| "Performance test", workspace home (1 project) | 21.1 → 23.6 (+2.5) | 88 → 92 (+4) | +558 B | ≤ +20 ms; ≤ +20 KB | passes |
+| 20 canvases, project home | 115.4 → 110.9 (−4.5) | 356 → 372 (+16) | +14,445 B | ≤ +100 ms; ≤ +350 KB | passes |
+| 20 canvases' workspace home (2 projects) | 19.9 → 24.0 (+4.1) | 92 → 92 (0) | +1,142 B | ≤ +20 ms; ≤ +40 KB | passes |
+| "Performance test" again, after the 20 canvases (reported only) | 53.9 → 48.8 | 220 → 216 | +2,174 B | | |
+
+- **No bar is missed.**
+- The largest time differences, the 20 canvases' FCP (+16 ms) and the seed's workspace home FCP (+8 ms), are within
+  the per-run spread: 12a's two runs of the 20-canvas home differ by 48 ms (368 / 320). FCP is counted in 4 ms steps.
+- p95 (reported only), 12a → branch:
+  - seed project home: FCP 136 → 136;
+  - 20 canvases: TTFB 171.7 → 178.3, FCP 452 → 436;
+  - "Performance test": TTFB 60.9 → 67.0, FCP 248 → 252.
+
+### The LCP element and the thumbnails' last request (reported only)
+
+| Page | LCP element (both sides, every load) | Last thumbnail ended, warm (from the cache) | Last thumbnail ended, cold (fetched) | FCP, cold, 12a → branch |
+| --- | --- | --- | --- | --- |
+| seed, project home | "(removed)" | 46 ms (2 of 2 cached) | 144 ms | 280 → 288 |
+| seed, workspace home | `div` in `page-workspace-home` | 40 ms (1 of 1) | 133 ms | 228 → 260 |
+| "Performance test", project home | `span` in `consistency-line` | 91 ms (3 of 3) | 207 ms | 392 → 376 |
+| "Performance test", workspace home | `p` in `box-archive` | 45 ms (1 of 1) | 153 ms | 244 → 248 |
+| 20 canvases, project home | "(removed)" | 186 ms (20 of 20) | 515 ms | 668 → 656 |
+| 20 canvases' workspace home | `p` in `box-archive` | 45 ms (2 of 2) | 149 ms | 284 → 280 |
+
+- **The LCP element is the same on both sides, on every warm and cold load:** never a thumbnail, as step 4 expected.
+  "(removed)" means the element that was the largest paint is no longer in the document when the entry is read (the
+  same on `slice-12a`, so it comes from the page as it was, not from this slice).
+- **With the cache** (a second visit), every drawing comes from the browser's cache (transfer size 0). The last one is
+  in before FCP on every page, 186 ms against FCP 372 ms on the 20-canvas home.
+- **On a first visit** the drawings are fetched after the document and come in before FCP on every page (515 ms
+  against 656 ms on the 20-canvas home). They do not hold FCP back: the cold FCP medians differ by −16 to +32 ms
+  either way, within the spread of 5 cold visits.
+- The tile's strip has a fixed height, so a drawing arriving moves nothing.
+- The fallback (one file of symbols per page) is not needed.
+
+### S12B-11: nothing on the canvas changes
+
+`MEASURE=1 MEASURE_BUILD=production ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test
+e2e/slice-03b/S3B-15-elements.spec.ts` (this branch's measurement build): passed.
+
+| View | Viewport, slice 8 → branch | Page total, slice 8 → branch |
+| --- | --- | --- |
+| 30 %, expanded | 4,508 → 4,508 | 5,994 → 6,000 |
+| 100 %, expanded | 19,305 → 19,305 | 20,791 → 20,797 |
+| 30 %, collapsed | 1,465 → 1,465 | 2,861 → 2,867 |
+| 100 %, collapsed | 4,907 → 4,907 | 6,303 → 6,309 |
+
+The viewport counts are equal, and the page totals are +6, the same as slice 11's and slice 12a's (the names' check
+boxes, S11-13). The canvas page draws exactly what it drew.
+
+The worktree `../infomapper-ab-main` stays at `slice-12a` with the copied files until the closing, which removes it.
 
