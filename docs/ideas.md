@@ -3,14 +3,14 @@
 Ideas that came up while building a slice and are not part of its PRD (AD-25). Each one needs a decision before it
 is built.
 
-## Settings: keep the typed value on a stale-version conflict (slice 0, step 5b)
+## Settings: keep the typed value on a stale-version conflict (slice 0, step 5b): planned in slice 13
 
 Today, when a save is refused because someone else changed the record meanwhile ("Someone changed this meanwhile.
 Reload to see the latest version."), the field goes back to the last value this page saved, and the typed value is
 lost. Better: keep the user's typed value in the field and show the current server value next to it, so the user can
 choose which to keep (or copy parts of theirs) instead of retyping.
 
-## Panels: one behaviour for a refused save in every field (slice 9, step 1, F6)
+## Panels: one behaviour for a refused save in every field (slice 9, step 1, F6): planned in slice 13
 
 After a refused save most panel fields keep the refused text (the field is keyed by its stored value, which did not
 change); the requirement panel shows the stored values again (its reset counter) and the workspace settings go back to
@@ -40,7 +40,8 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   - **12b: the canvas tiles' thumbnails.** **Done in slice 12b** (D-29, AD-32): a sketch of each canvas's layout on
     its tile, drawn from a route through an external `<use>` with the page's colours; the frame count; each project's
     first canvas on the workspace home. No data model change.
-- **Next: 13.**
+- **Next: 13** (in progress; D-66 proposed). Candidate for the scope after 13: notes and frames on slice 13's rule
+  (below).
 - **13: one behaviour for a refused save in every field** (F6, above), with the typed value kept on a conflict (the
   first entry). Also keep text typed into a field while its save is on its way: the save's answer replaces the field
   (keyed by its stored value) and the typed text and focus are lost (`docs/known-limitations.md`, slice 10c).
@@ -614,3 +615,26 @@ for names like Łukasz's) and serve them under another family name, as OFL 1.1 r
 font with a Reserved Font Name ("Plex"): rename the font's internal family names, keep `LICENSE.txt` with the files and
 note the change in `src/app/fonts/ibm-plex/README.md`. Measure the first visit before and after (as the chore's A/B
 did). No work now (Łukasz, 1 November 2026).
+
+## Notes and frames on slice 13's rule (slice 13, step 1 answers, F12)
+
+Slice 13 leaves notes and frames on the canvas's queue (`useNotes`, `useFrames`): a note's text, edited in its panel or
+on the canvas, rolls back after a refused save (`useNotes.save`, `back`), and the frame panel's fields only got the
+stable key (`docs/known-limitations.md`, "A note's text rolls back after a refused save"). Bring them to D-66: a note's
+text keeps its draft with the conflict line, the frame's name too. It changes canvas code (`useNotes`, `NoteLayer`), so
+it needs canvas commit counts like S13-12's. A candidate for the next scope after slice 13 (Łukasz, 1 November 2026).
+
+## "by {person}" on a conflict line (slice 13, step 1, F20)
+
+Slice 13's conflict line says "Changed meanwhile to: {value}" without who changed it. A row's `updated_by` names its last
+writer, which may have changed another field, or be an undo, a copy following its original, an import or a change to
+resolve. The field's own author is in the change events: the newest event of that row whose after-image changed that
+column. Reading it needs the change events on the page (today only with four-eyes, `lastContentEditor`) or a read in the
+refusal's answer, and the project home needs the workspace's people (`workspacePeople`).
+
+## The rich-text field's "Show more" without a layout read (slice 13, step 1, F25)
+
+`RichTextField` (`src/ui/rich-text/rich-text-field.tsx`) measures its preview in a layout effect (`scrollHeight` against
+`clientHeight`) to decide whether "Show more" shows. It sits beside the canvas, which CLAUDE.md's rule "nothing above the
+canvas reads layout during a commit" covers. Decide from the text (lines and characters, as slice 13's conflict line
+does) or with a `ResizeObserver`, and check with a phase trace that a panel switch costs less.

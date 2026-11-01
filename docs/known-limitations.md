@@ -1011,6 +1011,14 @@ nothing is saved. It happens when someone clicks back into the field and types w
 0.2 s on an idle laptop, seconds on a slow server). An Enter or a click elsewhere pressed before the answer arrives saves
 the second text as usual, after the first (`rowSaves`). Planned with slice 13 ("keep the typed value").
 
+### A note's text rolls back after a refused save (slice 13, step 1 answers)
+
+Notes save through the canvas's own queue (`useNotes.save`), optimistically: a refused change of a note's text, status
+or colour, made in its panel or on the canvas, puts the note's earlier values back (`back`), and the typed text is lost.
+Frames save through the same queue (`useFrames.updateFrame`); their panel's fields keep a refused value, as other panel
+fields did before slice 13, but without its conflict line. Slice 13 (D-66) leaves both out (Łukasz, 1 November 2026);
+they are a candidate for the next scope (`docs/ideas.md`, "Notes and frames on slice 13's rule").
+
 ### Copies of attributes (slice 10c, D-63)
 
 - **Copies made elsewhere since the page loaded are not held.** A save of an original's type or Personal data holds its

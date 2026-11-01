@@ -1,6 +1,6 @@
 # Slice 13 – acceptance
 
-Status: **step 1 (the PRD checked against the code) done; waiting for Łukasz's answers before step 2.**
+Status: **step 1 answered (1 November 2026); step 2 (the shared mechanism) in progress.**
 
 - Branch `slice/13-field-saves`, made on 1 November 2026 from `main` at `e66cc42` (the start commit,
   `e66cc42c4c1fefd9514f3c9a09cc67c7051136d3`), the merge of PR 32 (chore e2e reliability, merged 1 November 2026,
@@ -363,7 +363,33 @@ pass; the wait is no longer needed and stays.
 12. **Steps:** with these answers step 2 is the hook, the stable keys, F3, F8, F24, and the settings form and requirement
     panel without their resets. Step 3 is the line, "Keep mine", F5, F6 and F4. Step 4 is F17, F16 and F15. Agreed?
 
+## Łukasz's answers to step 1 (1 November 2026)
+
+1. **Yes:** the fresh page after every refusal that cuts (`runCommand`), and the toast "Someone changed this meanwhile.".
+2. **Yes:** the conflict line inside the rich-text dialog.
+3. **"Not saved"**, saved again by the person; no automatic retry.
+4. **Choice fields:** after a refusal the newest stored value, with the toast (R4 changed in the PRD).
+5. **Notes and frames are out of slice 13;** frames get only the stable key. A known limitation (a note's text rolls
+   back after a refusal) and an entry in `docs/ideas.md` as a candidate for the next scope after 13.
+6. **Yes:** an empty required name goes back to the stored name everywhere (D-59).
+7. **Yes:** a draft of a closed panel's field stays in the page's memory (no `localStorage`), comes back when a panel of
+   that object opens again, and is gone when the page is left. If that is more than a small change, stop and describe
+   the cost; then a toast is enough.
+8. **Yes:** the draft goes with a deleted object.
+9. **Yes:** no "by {person}"; the idea with the field's last change event goes to `docs/ideas.md`.
+10. **Yes:** Escape puts the stored value back; while a line shows it is "Use this".
+11. **The texts** in the table are accepted, "Cleared meanwhile." and "Not saved. You can still copy it." included.
+12. **Steps 2–4 as proposed;** a full e2e run (three parts) after the shared mechanism's step and at the closing.
+
+**F1:** S13-01, S13-03 and S13-05 use fields that exist (proposed in the PRD). **F10:** the settings are not undo steps;
+"Keep mine" there is an ordinary save without an undo step.
+
+**Done with the answers:** the PRD is updated (status "step 1 answered", R1–R8, items 1, 5, 5a, 7–13, steps, S13-01 to
+S13-14, section 9, D-66). `docs/ideas.md` has the three entries (notes and frames, "by {person}", F25's layout read) and
+the plan's line; `docs/known-limitations.md` has "A note's text rolls back after a refused save". Item 5a is built in
+step 4, which stops there if it is more than a small change.
+
 ## Ideas (not built)
 
-- "by {person}" from the field's own last change event (F20).
-- `RichTextField`'s "Show more" without a layout read (F25).
+Both are in `docs/ideas.md` since the answers: "by {person}" from the field's own last change event (F20), and
+`RichTextField`'s "Show more" without a layout read (F25).

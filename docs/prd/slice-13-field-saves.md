@@ -1,6 +1,6 @@
 # Slice 13 – One behaviour for a field's save: nothing typed is lost
 
-Status: **proposal for step 1.** Branch `slice/13-field-saves`, from `main` after the e2e reliability chore's merge (assumption A1). PRD file: `docs/prd/slice-13-field-saves.md`; step 1 writes `docs/prd/slice-13-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing") with one full e2e run after the shared mechanism (step 2) and one at the closing (R7). Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Status: **step 1 answered** (Łukasz, 1 November 2026; `docs/prd/slice-13-acceptance.md`, "Łukasz's answers to step 1"). This PRD is updated to the answers; the copy from `~/Downloads` is commit `a1829dc`. Branch `slice/13-field-saves`, from `main` after the e2e reliability chore's merge (assumption A1). PRD file: `docs/prd/slice-13-field-saves.md`; step 1 writes `docs/prd/slice-13-acceptance.md`. Test regime: a small slice (CLAUDE.md, "Testing") with one full e2e run after the shared mechanism (step 2) and one at the closing (R7). Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 This PRD was written from the docs at the state after the e2e reliability chore (`CLAUDE.md`, `docs/decisions.md`, `docs/known-limitations.md`, `docs/ideas.md`, the acceptance docs of slices 9, 10a and 12a), without reading the code. The prototype has no save conflicts (it is a one-person app), so everything this slice shows on a conflict is new behaviour for Łukasz's approval.
 
@@ -16,16 +16,17 @@ Slice 13 gives every field that saves a row one behaviour: **what a person typed
 
 **Agreed (the plan after slice 10a; 1 November 2026):** the three points above are slice 13's scope, after the e2e reliability chore.
 
-**Proposed, to confirm in step 1 (R1–R8 of the scope review):**
+**Agreed in step 1 (R1–R8, as answered by Łukasz on 1 November 2026):**
 
-- **R1. Every field keeps the typed value after any refusal.** No field goes back on its own.
+- **R1. Every text field keeps the typed value after any refusal.** No field goes back on its own, with one exception: an empty required name goes back to the stored name everywhere, as D-59 says for a project's name (answer 6).
 - **R2. One rule per kind of refusal** (item 9's table).
-- **R3. A conflict shows the other value under the field,** with "Use this" and "Keep mine". "Keep mine" saves the typed value on the current version: a deliberate overwrite and an ordinary undo step.
-- **R4. Choice fields** (selects, toggles, check boxes) follow the same rule as text fields.
-- **R5. Writes still off the save chain stay as they are:** a canvas's rename and delete in its tab, the canvas's look, the change-to-resolve actions (`docs/known-limitations.md`, "Writes still off the save chain"). Section 9.
-- **R6. The workspace settings form and the requirement panel join the common rule:** no `revert()`, no `reset` counter.
-- **R7. A small slice,** with a full e2e run after step 2 (the shared mechanism, which every panel uses) and at the closing.
-- **R8. New texts** as listed in item 12, for approval.
+- **R3. A conflict shows the other value under the field,** with "Use this" and "Keep mine", only when that field's own stored value changed meanwhile; a stale refusal of a field nobody else changed shows "Not saved" and is saved again by the person (answer 3). "Keep mine" saves the typed value on the current version: a deliberate overwrite and an ordinary undo step, except in the workspace settings, which are not undo steps (F10).
+- **R4. Choice fields** (selects, segmented buttons, flags, check boxes) show the newest stored value after a refusal, with the toast; they keep no draft (answer 4).
+- **R5. Writes still off the save chain stay as they are:** a canvas's rename and delete in its tab, the canvas's look, the names check boxes, the change-to-resolve actions (`docs/known-limitations.md`, "Writes still off the save chain"), the role select. **Notes and frames** keep their canvas queue; the frame panel's fields only get the stable key (answer 5). Section 9.
+- **R6. The workspace settings form, the requirement panel and the working label's panel join the common rule:** no `revert()`, no `reset` counter, no form keyed by the workspace's version.
+- **R7. A small slice,** with a full e2e run (three parts) after step 2 (the shared mechanism, which every panel uses) and at the closing.
+- **R8. New texts** as listed in item 12, approved (answer 11).
+- **After every refusal that cuts** (a stale version, a permission, the archive, not found) the server sends the fresh page in the same answer, for every write; the conflict toast becomes "Someone changed this meanwhile." (answer 1).
 
 ## 2. Sources
 
@@ -55,56 +56,58 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
 
 ### Which fields
 
-1. **Every field that saves an object's row,** on any page:
-   - the canvas's panels: entity, attribute, mapping, relationship, requirement, frame, note, classification, table, column and concept, and any other panel step 1 finds; aliases are included;
+1. **Every text field that saves an object's row,** on any page (the inventory: `slice-13-acceptance.md`, Q1):
+   - the canvas's panels: entity, attribute (with the custom type and the type's parameters), mapping (rule, note), relationship, requirement (with its rule or check), working label, classification list, table and column notes, and the concept's rename in the tree; aliases are included;
+   - the rich-text fields (definitions, a requirement's description), whose draft is in their editor dialog;
    - the project's name and description on its home;
-   - the workspace settings form;
-   - any other field step 1's inventory finds (Q1).
+   - the workspace settings form.
 
-   Out of scope (R5): a canvas's rename in its tab, the canvas's look, the change-to-resolve actions, the typed zoom (it saves no row), sign-in and password fields.
+   Out of scope (R5): notes (their text keeps rolling back after a refusal, `docs/known-limitations.md`) and frames (only the stable key), a canvas's rename in its tab, the canvas's look, the names check boxes, the change-to-resolve actions, the role select, the typed zoom (it saves no row), sign-in and password fields.
 
 ### The field's value
 
 2. **A field has a draft.** From the first key (or the first choice) until its value is saved, the field holds what the person entered, apart from the stored value the page shows.
 3. **The page's fresh values never replace a draft.** A field with a draft, or with the focus, is not mounted anew and does not take a stored value that arrives from a save's answer, an undo, a redo or another write. A field with neither takes the newest stored value, as today. (This replaces keying the field by its stored value, `fieldKey`; step 1 proposes how, Q2.)
 4. **Typing while a save is on its way.** Text typed after a save was sent and before its answer arrives stays in the field with the focus and the caret. When the answer arrives, the field's draft is what was typed. If the draft differs from what was saved, it is saved next on Enter or on leaving the field, as today's chain does (`rowSaves`). If it equals the saved value, the draft ends.
-5. **A draft ends** when its value is saved, when the person chooses "Use this" (item 7), or when they press Escape in a text field (back to the stored value, as Escape does today where it exists; Q3).
+5. **A draft ends** when its value is saved, when the person chooses "Use this" (item 7), or when they press Escape in a text field: Escape puts the stored value back, keeps the focus and saves nothing; while a conflict line shows it is "Use this" (answer 10). A field compares what it saves with the value it last sent while that save is on its way, so a repeated Enter is not refused as "Nothing to change." (F8).
+5a. **A draft whose field is gone.** A draft refused after its panel closed (another selection, the panel hidden) stays in the page's memory, never in the browser's storage, and comes back with its state when a panel of that object opens again; it is gone when the page is left or reloaded (answer 7). If this is more than a small change, step 4 stops and describes the cost; then a toast is enough.
 
 ### A refused save
 
 6. **The field keeps the draft after any refusal (R1).** Nothing goes back on its own; the toasts stay one per cut, as today.
-7. **A conflict (R3).** When a save is refused because the row changed meanwhile (a stale version), the field keeps the draft and shows under it:
-   - "Changed meanwhile to: {value}" (the newest stored value; a long text folded to its first lines with "Show all", Q4), and "by {person}" if the page knows who (Q5);
+7. **A conflict (R3).** When a save is refused because the row changed meanwhile (a stale version), the refusal's answer brings the fresh page. If the field's own stored value differs from the value its draft started from, the field keeps the draft and shows under it:
+   - "Changed meanwhile to: {value}" ("Cleared meanwhile." when it is empty), the newest stored value from the fresh page; a long text folded to three lines by CSS with "Show more" / "Show less" (no "by {person}", answer 9);
    - **"Use this":** the field takes the newest stored value; the draft ends;
-   - **"Keep mine":** the draft is saved on the newest version, as a deliberate overwrite; it is an ordinary save (change event, undo step, the working context's label as D-26 says).
+   - **"Keep mine":** the draft is saved on the newest version, as a deliberate overwrite; it is an ordinary save (change event, undo step, the working context's label as D-26 says), and in the workspace settings an ordinary save without an undo step.
 
-   The line goes when the draft ends or the stored value comes to equal the draft.
+   While the line shows, Enter and leaving the field save nothing. The line goes when the draft ends or the stored value comes to equal the draft. If the field's own stored value did not change (another field of the row did), it shows "Not saved" as in item 8. In a rich-text field the line is inside the editor dialog; "Use this" puts the stored text into the editor, which stays open (answer 2).
 8. **Saves cut behind a conflict.** Today a stale refusal cuts the saves of the same object waiting behind it, with one toast. Each cut field keeps its draft:
    - if its own stored value changed meanwhile, it shows item 7's line;
-   - if not, it shows "Not saved", and its draft is saved on Enter or on leaving the field again.
+   - if not, it shows "Not saved", and its draft is saved by the person on Enter or on leaving the field again (no automatic retry, answer 3).
 9. **The other kinds of refusal (R2):**
 
 | Refusal | The field | The page |
 | --- | --- | --- |
 | Validation (an invalid input) | keeps the draft, the focus stays, nothing is cut (as today) | the domain's message as a toast |
-| Stale version (a conflict) | item 7 | one toast: "Someone changed this meanwhile." (proposal: without "Reload to see the latest version", which no longer applies) |
-| Permission, archive, locked organization | keeps the draft as read-only text the person can select and copy, marked "Not saved" | the domain's message; when the page's fresh state makes the field read-only, the draft stays readable until the person leaves the panel or the page |
-| Not found (the object was deleted) | proposal: the draft is lost with the object, and the panel behaves as today for a deleted selection (D-38) | the domain's message, or the toast D-38 shows |
+| Stale version (a conflict) | item 7 | one toast: "Someone changed this meanwhile." (for every write; the fresh page comes with the refusal) |
+| Permission, archive | keeps the draft as read-only text the person can select and copy, marked "Not saved. You can still copy it." | the domain's message; the fresh page makes the field read-only, and the draft stays readable until the person leaves the panel or the page |
+| Locked organization | keeps the draft, still editable; no fresh page (it would lead to the password form) | "Unlock {organization} first: …" as today |
+| Not found (the object was deleted) | the draft is lost with the object (answer 8); the fresh page shows what still exists | the domain's message |
 
-   The last row is the one exception to "nothing typed is lost": the object is gone, and there is nowhere to save. Step 1 says what keeping it would cost (Q6). If Łukasz wants it kept, it shows as read-only text like the permission row.
-10. **Choice fields (R4)** follow items 2–9: a chosen value is the draft; on a conflict the line shows the other choice, with "Use this" and "Keep mine".
-11. **The workspace settings form and the requirement panel (R6)** follow items 2–9. The settings form's `revert()` and the requirement panel's `reset` counter go. S0-08 and the requirement panel's specs change (Q9).
+   The last row is the one exception to "nothing typed is lost": the object is gone, and there is nowhere to save.
+10. **Choice fields (R4)** keep no draft: after a refusal they show the newest stored value from the fresh page, with the toast (answer 4).
+11. **The workspace settings form, the requirement panel and the working label's panel (R6)** follow items 2–9. The settings form's `revert()` and its key on the workspace's version, the requirement panel's `reset` counter and the label panel's version key go. S0-08, S3A-04 and S4A-02 change.
 
 ### Texts and what does not change
 
-12. **New texts (R8):** "Changed meanwhile to: {value}", "by {person}", "Show all", "Use this", "Keep mine", "Not saved", and the conflict toast's new wording. Step 1 lists every text the slice adds or changes, in a table.
+12. **New texts (R8, approved):** "Changed meanwhile to: {value}", "Cleared meanwhile.", "Use this", "Keep mine", "Show more" / "Show less", "Not saved", "Not saved. You can still copy it.", "Not saved: {field} of {object}. Open it again to see your text." (item 5a, if built), and the conflict toast "Someone changed this meanwhile.". The table: `slice-13-acceptance.md`.
 13. **Unchanged:**
-    - the domain, its refusals and messages (apart from the conflict toast's wording);
+    - the domain, its refusals and messages (apart from the conflict message's wording);
     - the save chain's rules (one save per object at a time, the newest known version, the cuts, held rows);
     - undo and redo;
     - the data model and the local data file's format;
     - the writes listed in R5;
-    - the canvas.
+    - the canvas's code (it gets a fresh page after its own cutting refusals, which it already merges).
 
 ## 4. Steps
 
@@ -118,13 +121,13 @@ Stop after each step with a short summary of what changed and how to check it. W
    - the earlier specs that change.
 
    No application code. Stop.
-2. **The shared mechanism** (items 2–6): the draft, fresh values that never replace a draft, typing while a save is on its way, a refusal that keeps the draft, in the shared field component(s) and `rowSaves`, with unit tests.
+2. **The shared mechanism** (items 2–6, 10, 11): the draft (a stable key per object and field, the stored value taken only without a draft or focus), typing while a save is on its way, the comparison with the value last sent, every field's save returning its answer, a refusal that keeps the draft, the fresh page after a cutting refusal and the new conflict toast, empty required names going back, choice fields showing the newest stored value; the settings form, the requirement panel and the label panel without their resets; the concept's rename open until its answer. Unit tests.
 
-   Every field from item 1 that uses the shared components gets it. Specs S13-01, S13-02 and S13-09, plus the earlier specs of every panel and of the project's name. **One full e2e run** (three parts) and CI. Stop.
-3. **Conflicts** (items 7, 8, 10, 11): the line under the field, "Use this", "Keep mine", "Not saved" for cut saves, choice fields, the settings form and the requirement panel.
+   Specs S13-01, S13-02 and S13-09, plus the earlier specs of every panel and of the project's name. **One full e2e run** (three parts) and CI. Stop.
+3. **Conflicts** (items 5, 7, 8): the line under the field and in the rich-text dialog, "Use this", "Keep mine", "Not saved" for cut saves and for a stale refusal of an unchanged field, Escape.
 
-   Specs S13-03 to S13-08, the earlier specs of the settings form and the requirement panel (S0-08 and others, Q9), and CI. S13-12's commit count. Screenshots: a conflict on a short field, on a long text, on a choice field, a "Not saved" field; light and dark. Stop.
-4. **The other refusals** (item 9): permission, archive, locked organization, not found. Specs S13-10 and S13-11 and CI. Stop.
+   Specs S13-03 to S13-08 and CI. S13-12's commit count. Screenshots: a conflict on a short field, on a long text, in the rich-text dialog, a "Not saved" field; light and dark. Stop.
+4. **The other refusals** (items 5a, 9): permission, archive, locked organization, not found, a draft whose field is gone. Specs S13-10, S13-11 and S13-14 and CI. Stop.
 5. **Closing:**
    - the docs (section 10);
    - one full e2e run (three parts, `E2E_MEMORY_LOG=1`), keeping a failing test's traces before rerunning it;
@@ -140,19 +143,20 @@ Tests in `e2e/slice-13/`, one file per criterion, each from a fresh seed; unit t
 
 | ID | Criterion |
 | --- | --- |
-| S13-01 | **Typing while a save is on its way, in a panel.** In an entity's description: type, press Enter, click back and type more while the answer is held; release it: the field shows all the text, keeps the focus and the caret; Enter saves the rest after the first save; both are stored, in order, as two undo steps. |
-| S13-02 | **The same on the project's home** for the project's description (D-59). |
-| S13-03 | **A conflict in a panel.** Two sessions on one entity; the second's description save is refused: the field keeps the typed text and shows "Changed meanwhile to: {the first's text}". "Keep mine" stores the second's text (one change event, an undo step); in a repeat, "Use this" shows the first's text and stores nothing. |
-| S13-04 | **A long text.** A conflict on a requirement's text of several paragraphs shows the other value folded, with "Show all". |
-| S13-05 | **Saves cut behind a conflict.** The second session changes the name and the description; the name's save is refused: the description's cut save keeps its text marked "Not saved", or with the conflict line if the first session changed it too; leaving it again saves it. |
-| S13-06 | **The workspace settings form.** A conflict on the workspace's description keeps the typed text with the conflict line (S0-08 changed). |
-| S13-07 | **The requirement panel.** A conflict keeps the typed text in every field; nothing goes back on its own. |
-| S13-08 | **A choice field.** A conflict on a mapping's kind (or an attribute's type) shows the other choice, with "Use this" and "Keep mine". |
-| S13-09 | **A fresh value without a draft.** An undo on the project home, and another session's save, show the new stored value in a field that has neither a draft nor the focus; a field with a draft keeps it. |
-| S13-10 | **Permission and archive.** A save refused because the workspace was archived meanwhile, or the person's role became reviewer: the typed text stays readable and selectable, marked "Not saved", and nothing is written. |
-| S13-11 | **A deleted object.** A save on an entity deleted meanwhile in another session behaves as Łukasz decides after Q6. |
-| S13-12 | **Nothing on the canvas changes.** Typing 20 characters in an attribute's panel field, a conflict line shown and "Use this" pressed add **0** canvas commits (`window.__imCanvasCommits`, as S9-14). `S3B-15-elements.spec.ts` against `.data/measure/s9-14-baseline/slice-08.json`: the viewport counts equal; the page totals as slice 12b's, or each difference explained. |
+| S13-01 | **Typing while a save is on its way, in a panel.** (a) In an entity's name: type, press Enter, click back and type more while the answer is held; release it: the field shows all the text, keeps the focus and the caret; Enter saves the rest after the first save; both are stored, in order, as two undo steps. (b) The same in a source table's note (a long text, left with Tab). |
+| S13-02 | **The same on the project's home** for the project's description, left by a click elsewhere (Enter adds a line, D-59). |
+| S13-03 | **A conflict in a panel.** Two sessions on one entity; the first changes its name, the second's name save is refused: the field keeps the typed text and shows "Changed meanwhile to: {the first's name}". "Keep mine" stores the second's text (one change event, an undo step); in a repeat, "Use this" shows the first's text and stores nothing. The same on a source table's note. |
+| S13-04 | **A long text in the rich-text dialog.** A conflict on a requirement's description of several paragraphs shows the line inside the dialog, the other value folded with "Show more"; "Use this" puts it into the editor. |
+| S13-05 | **Saves cut behind a conflict.** The first session changes the entity's stereotype; the second changes the name and at once the alias; the name's save is refused and shows "Not saved" (its own value did not change), the alias's cut save "Not saved"; with the first session's alias changed too, the alias shows the conflict line; leaving a "Not saved" field again saves it. |
+| S13-06 | **The workspace settings form.** A conflict on the workspace's description keeps the typed text with the conflict line; "Keep mine" saves without an undo step (S0-08 changed). |
+| S13-07 | **The requirement panel.** A refusal keeps the typed text in every text field; nothing goes back on its own. |
+| S13-08 | **A choice field.** A save of an entity's stereotype refused as stale shows the newest stored stereotype, with the toast; nothing is overwritten. |
+| S13-09 | **A fresh value without a draft.** An undo on the project home, and another session's save followed by a fresh page of this one (an own save of another field), show the new stored value in a field that has neither a draft nor the focus; a field with a draft keeps it. |
+| S13-10 | **Permission and archive.** A save refused because the workspace was archived meanwhile, or the person's role became reviewer: the typed text stays readable and selectable, marked "Not saved. You can still copy it.", and nothing is written. A locked organization keeps the draft editable. |
+| S13-11 | **A deleted object.** A save on an entity deleted meanwhile in another session: the domain's toast, the panel goes, the draft with it. |
+| S13-12 | **Nothing on the canvas changes.** Typing 20 characters in an attribute's panel field and pressing "Use this" add **0** canvas commits (`window.__imCanvasCommits`, as S9-14); a conflict's fresh page adds as many as an own save's fresh page of the same field. `S3B-15-elements.spec.ts` against `.data/measure/s9-14-baseline/slice-08.json`: the viewport counts equal; the page totals as slice 12b's, or each difference explained. |
 | S13-13 | CI and the runs of the test regime; changed earlier tests listed with the reason. |
+| S13-14 | **A draft whose field is gone** (item 5a): a refused save after the panel closed comes back with its state when the object's panel opens again, and is gone after a reload. |
 
 **Definition of done (scenario for the manual acceptance, on Łukasz's model KB, after the backup).**
 
@@ -199,25 +203,26 @@ The slice adds state to fields and a line under a field on a conflict.
 
 ## 9. Left for later
 
-- **The writes still off the save chain (R5):** a canvas's rename in its tab, the canvas's look, the change-to-resolve actions.
+- **The writes still off the save chain (R5):** a canvas's rename in its tab, the canvas's look, the names check boxes, the change-to-resolve actions.
+- **Notes and frames on the common rule** (a note's text keeps its draft after a refusal): a candidate for the next scope after slice 13 (`docs/ideas.md`).
+- **"by {person}"** from the field's own last change event (`docs/ideas.md`).
 - **A warning when leaving a page with a draft** not saved (`beforeunload`).
 - **A field-level merge** of two texts (showing the differences), beyond "Use this" and "Keep mine".
 - **Drafts kept across a reload** (in the browser's storage).
 
 ## 10. Decisions to accept, and docs in this PR
 
-### D-66 (proposal) A field's draft and a refused save
+### D-66 (proposal, updated to the step 1 answers) A field's draft and a refused save
 
-"Every field that saves an object's row keeps what the person entered (its draft) until it is saved or they drop it. A save's answer, an undo or another person's write never replaces a draft or a focused field. Text typed while a save is on its way stays and is saved next. After a refused save the field keeps its draft:
-- on a conflict it shows the other value under the field, with 'Use this' (take it) and 'Keep mine' (save the draft on the newest version, an ordinary undo step);
-- a save cut behind a conflict keeps its draft as 'Not saved';
-- after a permission, archive or locked-organization refusal the draft stays readable;
+"Every text field that saves an object's row keeps what the person typed (its draft) until it is saved or they drop it. A save's answer, an undo or another person's write never replaces a draft or a focused field. Text typed while a save is on its way stays and is saved next. A refusal that cuts (a stale version, a permission, the archive, an object not found) brings the fresh page with it. After a refused save the field keeps its draft:
+- on a conflict over the field's own value it shows the other value under the field (in a rich-text field, inside its editor), with 'Use this' (take it) and 'Keep mine' (save the draft on the newest version, an ordinary undo step; in the workspace settings an ordinary save, as settings are not undo steps); while the line shows, leaving the field saves nothing;
+- a save cut behind a conflict, or refused as stale while its own value did not change, keeps its draft as 'Not saved', saved again by the person;
+- after a permission or archive refusal the draft stays readable and can be copied; after a locked organization's refusal it stays editable;
 - an invalid input keeps the draft for correcting;
-- a deleted object takes its draft with it.
+- a deleted object takes its draft with it;
+- a draft refused after its panel closed comes back when a panel of that object opens again on the same page, and is gone when the page is left.
 
-Choice fields follow the same rule. The workspace settings and the requirement panel no longer go back on a refusal. (Slice 13.)"
-
-The last bullet changes if Łukasz decides otherwise after Q6.
+Escape in a text field puts the stored value back (while a conflict line shows, it is 'Use this'). An empty required name goes back to the stored name (D-59). Choice fields (selects, segmented buttons, flags, check boxes) keep no draft: after a refusal they show the newest stored value, with the toast. Notes and frames keep their canvas queue: a note's text still rolls back after a refusal. The workspace settings, the requirement panel and the working label's panel no longer go back on a refusal. (Slice 13.)"
 
 ### Assumptions to confirm
 
