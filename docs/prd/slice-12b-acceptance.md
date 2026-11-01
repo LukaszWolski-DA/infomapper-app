@@ -1,6 +1,7 @@
 # Slice 12b – acceptance
 
-Status: **step 6, the closing (1 November 2026): step 5 accepted; docs, the full run, CI and the pull request.**
+Status: **closed (1 November 2026): docs, the full run, CI and the pull request; waiting for Łukasz's manual
+acceptance and his command to merge and tag `slice-12b`.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -357,7 +358,7 @@ concept is deleted only with its entities moved or deleted (D-47).
 
 How: `e2e/slice-12b/S12B-bytes.spec.ts`, which runs only in the measurement build and is left out of the normal run.
 The same file ran on `slice-12a` in `../infomapper-ab-main`. Results are in `.data/measure/s12b-bytes/` (branch) and
-in the worktree's `.data/measure/s12b-bytes/` (`slice-12a`). The spec does two things:
+`.data/measure/s12b-bytes-slice-12a/` (`slice-12a`, copied out of the worktree before the closing removed it). The spec does two things:
 - It reads the project home's document as the server sends it, splits off the embedded RSC payload (the
   `self.__next_f.push` scripts), measures the thumbnails' `<svg>` markup, and counts how often each path's `d` occurs.
 - It records the answers to three writes on the home: a label's pin, the project's name, Undo.
@@ -719,8 +720,8 @@ If a bar is missed: stop and describe it; the bars do not change.
 - Each load waits for the network to go quiet before it reads, so the last thumbnail is in. Each run took 3.6–3.7 min.
 - Medians are over both runs of a side (30 loads); the per-run medians and p95 are in
   `.data/s12b-step5-analysis.txt`.
-- Raw results: `.data/measure/s12b10/S12B-10-b{1,2}-branch-*.json` and, in the worktree,
-  `.data/measure/s12b10/S12B-10-a{1,2}-12a-*.json`.
+- Raw results: `.data/measure/s12b10/S12B-10-b{1,2}-branch-*.json` and `.data/measure/s12b10-slice-12a/S12B-10-a{1,2}-12a-*.json`
+  (copied out of the worktree before the closing removed it).
 - `S12B-10.spec.ts` now also records the LCP element, the thumbnails' resource timing and the cold visits (`COLD`,
   default 5).
 
@@ -783,4 +784,80 @@ The viewport counts are equal, and the page totals are +6, the same as slice 11'
 boxes, S11-13). The canvas page draws exactly what it drew.
 
 The worktree `../infomapper-ab-main` stays at `slice-12a` with the copied files until the closing, which removes it.
+
+## Step 6: the closing
+
+Łukasz's instructions (step 5 accepted):
+- in this file, a note that LCP "(removed)" on the project homes happens on `slice-12a` too (added to step 5);
+- the docs of PRD section 10;
+- one full e2e run from scratch, with S0-01 and S0-02 passing;
+- CI, the branch pushed and the pull request with both GitHub checks;
+- KB's backup;
+- the worktree removed;
+- the manual acceptance scenario.
+
+Merge and tag only on his command.
+
+### Docs
+
+- **`docs/decisions.md`:**
+  - D-29's addition: the thumbnail as a sketch of the layout, "Empty canvas", the frame count, P8, and the form, a
+    drawing from a route through an external `<use>` in the page's tokens;
+  - **AD-32**, new: resources the browser fetches on its own for a page.
+  - Both texts are in the closing message for Łukasz's acceptance.
+- **`docs/known-limitations.md`:** "Canvas tiles have no frame count" removed. Step 6 found nothing new: the four
+  failures below are the known sign-in timeouts and the dev server's restart at its memory threshold.
+- **`docs/ideas.md`:**
+  - the thumbnails done;
+  - the plan: 12b done, next 13;
+  - section 9's entries under "Canvas thumbnails: what comes later": the Overview on the shared function, a
+    thumbnail as a link to a place on the canvas, one file of symbols per page as the described fallback, and a
+    stored thumbnail per canvas.
+- **`docs/inventory-prototype-vs-app.md`:** three rows marked done (the thumbnails, the frame count, the workspace
+  home's project tiles) and section 8's deliberate differences.
+- **`docs/data-model-v2.md`:** unchanged (no data model change, P4).
+- **README:**
+  - the status: slices 0 to 12a merged, 12b on its branch;
+  - the slice in the feature list and the acceptance links;
+  - the bench and the three on-demand specs in the commands table.
+- **CLAUDE.md:**
+  - the slice in "What this is";
+  - the commands (S12B-10, S12B-bytes, S12B-browsers with `BROWSERS=1`, S12B-screens, `bench-thumbnails`);
+  - slice 12b's e2e helpers;
+  - a "Canvas thumbnails" note: the rules in one place, the route and the tile, `workspaceAccess`, the proxy's
+    exception (AD-32), F3, and the shared constants.
+
+### The full e2e run
+
+`npm run e2e` from scratch, no dev server running.
+- **The first start failed before any test** (123 s): the e2e dev server's cold compile could not resolve
+  `next/font/google`'s IBM Plex Sans ("Module not found: Can't resolve '@vercel/turbopack-next/internal/font/google/font'"),
+  so the server did not answer within the 120 s `webServer` timeout.
+  - Google Fonts answered at once afterwards (200 in 0.23 s): a moment without the font's download.
+  - The log is kept: `.data/s12b-close-e2e-start-failed.log`.
+- **The run itself:** **491 passed, 4 failed, 2 skipped, 1 h 30 min (5,392 s).**
+  - **S0-01 (4 tests) and S0-02 passed:** pages without a session redirect to `/sign-in`, the last workspace opens
+    after sign-in, and the last project is remembered (step 6's check of the proxy's fix).
+  - The failures' error output and traces are kept in `.data/e2e-failures/12b-close-1/`, with the run's log.
+
+| Failure | What it said | Why | Three runs on its own |
+| --- | --- | --- | --- |
+| S7C-02 (format-7 file) | the top bar not visible after the sign-in, 15 s | the known sign-in timeout of long runs (`docs/ideas.md`, "Sign-in timeouts in full e2e runs") | 3 of 3 passed (48–56 s) |
+| S10A-08 (the loop at 100 % and 30 %) | the same | the same | 3 of 3 passed (5 of 5 tests each) |
+| S11-06 (table and requirement cards) | `net::ERR_CONNECTION_REFUSED` | the dev server restarted at its memory threshold at that moment (the log's "Server is approaching the used memory threshold, restarting...", the line before the failure; `docs/known-limitations.md`) | 3 of 3 passed |
+| S12A-04 (a step changed by someone else) | the project's rename not stored within 15 s | 12 tests after the restart, on a server compiling again | 3 of 3 passed |
+
+None of the four touches the home page's tiles, the thumbnail route or the proxy's thumbnail branch, and all four
+passed this slice's earlier runs (step 4: 87 of 87 for the homes).
+
+### KB's backup and the worktree
+
+- **KB:** `.data/backups/dev-db-20261101-1218.json` and `.data/backups/kb-model-latest.json`, both identical to
+  `.data/dev-db.json` (`cmp`) and git-ignored.
+  - `.data/dev-db.json` was never written in this slice: its time is 07:56 on 1 November, before step 2.
+  - The measurements wrote only the e2e data file and the bench's own copy.
+- **The worktree** `../infomapper-ab-main` is removed (`git worktree remove --force`; it held only the copied specs
+  and its builds).
+  - Its results were copied first, to `.data/measure/s12b10-slice-12a/` and `.data/measure/s12b-bytes-slice-12a/`.
+  - The other worktrees (`infomapper-side-perf-4p-trial-*`) belong to slice 4p and are untouched.
 
