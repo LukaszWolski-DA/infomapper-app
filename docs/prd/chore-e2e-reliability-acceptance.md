@@ -1,6 +1,6 @@
 # Chore e2e reliability – acceptance
 
-Status: **step 1 answered by Łukasz (1 November 2026); step 2 answered by Łukasz (1 November 2026); step 3 (the remedies) in progress.**
+Status: **step 1 answered by Łukasz (1 November 2026); step 2 answered by Łukasz (1 November 2026); step 3 (the remedies) done, waiting for Łukasz before step 4.**
 
 - Branch `chore/e2e-reliability`, made on 1 November 2026 from `main` at the tag `slice-12b` (annotated tag object
   `71ecd5383bcb1a26b7dc2c9dd01287ca3b325031`), whose commit is the merge of pull request 31,
@@ -457,3 +457,107 @@ Node processes, 2,332 of them in the run, summed while alive at once. `next dev`
 - **`docs/ideas.md`:** an entry on the e2e server's heap growing about 6 MB per test, with the hypothesis to check (the
   application's structures, such as the undo history in the server's memory and the local adapter's caches, or
   Turbopack's and Next.js's) and the next step, a heap snapshot before the threshold. Not looked into in this chore.
+
+## Step 3 – the remedies
+
+### P2 B: the full run in three parts
+
+**The parts** (`e2e/parts.ts`, `PART_STARTS`): a part is a run of folders in Playwright's order, from its first folder up
+to the next part's first. A folder added later falls into the part before it; a new slice's folder into part 3.
+
+| Part | Folders | Tests | Test time in step 2 | Heap at the part's end (estimate) |
+| ---: | --- | ---: | ---: | ---: |
+| 1 | `fixes` to `slice-03a` | 127 | 1,594 s | about 1.4 GB |
+| 2 | `slice-03b` to `slice-07b` | 183 | 2,037 s | about 1.3 GB |
+| 3 | `slice-07c` to `slice-12b` | 187 | 1,738 s | about 1.5 GB |
+
+- **How the heap was estimated** (step 2's log, `.data/e2e-memory-20261101-1401`): each folder's peak heap, as a
+  running maximum (single samples swing by a few hundred MB with the collections). A fresh server's heap after the
+  global setup's warm-up was 294 MB at the first folder; a part ends at about 0.3 GB plus what its folders added in step
+  2. Part 1 is step 2's own curve up to `slice-03a` (1,401 MB). Part 2: 0.3 GB + (2,422 − 1,401) MB. Part 3: 0.3 GB +
+  0.82 GB (from 2,422 MB to the restart in S11-05) + about 0.07 (the rest of `slice-11`, about 6 MB a test) + about 0.3
+  (`slice-12a` and `slice-12b`, from the second child's curve, without its cold start). Uncertainty about ±0.2 GB.
+- **Against the threshold** (3,255 MB): 40 to 46 %; CE-01's bar (at least 20 % below) is 2,604 MB. #244 failed at
+  2.0 GB in step 2; the highest part ends about 0.5 GB below that.
+- **Other cuts looked at,** the same way: `slice-04a`/`slice-07c` gives 1.6, 1.2 and 1.5 GB, `slice-04a`/`slice-08`
+  1.6, 1.5 and 1.1 GB, `slice-03b`/`slice-08` 1.4, 1.7 and 1.1 GB. The chosen cut (1.4, 1.3, 1.5) has the lowest
+  highest part.
+
+**The commands** (`scripts/e2e.ts`, `npm run e2e`; `playwright.config.ts` reads `E2E_PART` and `E2E_BLOB`):
+
+- `npm run e2e`: the three parts one after another, each with its own fresh server (the `webServer` of
+  `playwright.config.ts`, unchanged: `.next-e2e` emptied, the data reseeded), then one result. It refuses to start if
+  something listens on port 3200 (every part would reuse that server), and before parts 2 and 3 waits until the last
+  part's server has left the port (up to 60 s). Every part runs even if one fails; the exit code is 1 if any part or the
+  merge failed.
+- The result: each part writes a blob report (`blob-report/part-<n>.zip`); `playwright merge-reports
+  --reporter=dot,html` prints one summary of all tests (the failures with their errors, the counts) and writes one HTML
+  report (`playwright-report/`); the wrapper adds each part's time and the total. Each part's console shows the list
+  reporter as before.
+- Failure traces: `test-results/part-<n>/` (each Playwright run empties only its own output folder, so part 2 does not
+  clear part 1's traces).
+- `npm run e2e -- --part <n>` runs one part on its own (list and HTML reporters, as a normal run); other arguments are
+  passed on (`--part 3 --grep "S11-"`).
+- `npm run e2e -- <files, folders, options>` is one run as before, with every folder it names.
+- With `E2E_MEMORY_LOG=1` each part's server writes its own memory log (`.data/e2e-memory-<time>-part<n>.*`), read with
+  `scripts/e2e-memory-report.ts` per part.
+- Playwright is called through Node (`node_modules/@playwright/test/cli.js`), not `npx`: on Windows a shell would read
+  the `|` of a `--grep` as a pipe (found in the first smoke run).
+
+**Checked:** `E2E_PART=1`, `2`, `3` list 127, 183 and 187 tests (497 together, the full run's number). A smoke run of the
+full mode with one test per part (`--grep "S0-02|S3B-02:|S12B-02:"` in a temporary copy of the wrapper, deleted
+afterwards): three servers, 3 passed, one merged summary, the three memory logs; part times 61, 72 and 50 s for tests
+of 10, 25 and 4 s, so a part's start and warm-up cost about 50 s.
+
+### P3 B: IBM Plex hosted with the app
+
+**What was established** (the section "P3: where … comes from" in step 2): the error "next/font/google queries have
+exactly one entry" is raised by `next/font/google`'s Turbopack implementation (`NextFontGoogleFontFileReplacer`) when
+Google's stylesheet holds a font URL it cannot read; a start without the network does not fail (it falls back). The
+dependency is shown, so by Łukasz's answer: B, and no retry of the server's start.
+
+- `src/app/layout.tsx` loads IBM Plex Sans 400, 500, 600 and IBM Plex Mono 400, 500 through `next/font/local`, with the
+  same CSS variables (`--font-plex-sans`, `--font-plex-mono`), so `globals.css` and every component are unchanged.
+- **The files** (`src/app/fonts/ibm-plex/`, with `README.md` and `LICENSE.txt`, the OFL 1.1): IBM's own "complete"
+  WOFF2 fonts from `@ibm/plex-sans` 1.1.0 and `@ibm/plex-mono` 2.5.0 (npm), **unmodified**. "Plex" is a Reserved Font
+  Name in the OFL: a subset is a modified version and may not be called Plex, so the files are not subset. The
+  README lists each file's package and SHA-256. `.gitattributes` marks `*.woff2` as binary.
+- **Against what Google served** (compared with fontTools: Google's `IBMPlexSans[wdth,wght].ttf` 3.201 at 400, 500
+  and 600, and `IBMPlexMono-*.ttf` 2.3, from `github.com/google/fonts`): the same units per em and line metrics (ascent
+  1,025, descent 275 in both; Google's files read them from the typographic values, IBM's from `hhea` and the Windows
+  values, so a line is 1.3 em in both); the same advance widths for Sans Regular and both Monos on a test text with
+  Polish and German letters, and 0.05 % wider for Sans Medium and SemiBold (24 and 3 thousandths of an em on 90
+  characters). The glyph count is 1,019 against 1,025 (Sans) and 1,207 against 1,033 (Mono): the complete files also
+  carry Cyrillic, Greek and IBM's own symbols.
+- **Size:** 296 KB for the five files (Sans 63 to 67 KB, Mono 49 to 50 KB), all five preloaded as the Google fonts were;
+  Google's latin and latin-ext subsets were smaller. Served from the app's own `_next/static/media/`, cached as
+  immutable.
+- **CE-02:** `npm run build` with `HTTPS_PROXY` and `HTTP_PROXY` pointing to a closed port (the way the step 2 check
+  cut Turbopack off from Google Fonts) built in 41 s with no font warning; the built CSS has the five `@font-face` rules
+  on `_next/static/media/IBMPlex*.woff2` and the fallback faces (`local(Arial)`, metrics adjusted), and no Google URL.
+  No code in `src/`, `e2e/`, `scripts/` or `tests/` names the font families.
+- **In the browser** (the preview dev server on `.data/preview-db.json`): the workspace home's body is `plexSans`, the
+  three Sans faces load, and the page's font requests are the five `_next/static/media/IBMPlex*.woff2`, none to Google.
+
+### CI and the e2e checks of step 3
+
+- `npm run lint`, `npm run typecheck`, `npm test` (119 files, 1,555 tests): pass.
+- `npm run e2e -- --part 1 --grep "S0-02|S0-01"`: 5 passed (one part on its own, a `|` in the grep).
+- `npm run e2e -- --part 3 --grep "S11-|S12B-"` (names, aliases and thumbnails on the local fonts): 26 passed, 1
+  skipped (the on-demand spec skipped in every full run).
+- `npm run e2e -- e2e/slice-02c e2e/slice-03a` (folders, as before): 43 passed.
+- The full three-part run comes in step 4 (two runs with `E2E_MEMORY_LOG=1`).
+
+### The time of a full run (estimate)
+
+Step 2's tests took 5,369 s in the three parts' folders (1,594 + 2,037 + 1,738). Each part adds a start and the warm-up,
+about 50 s (the smoke run), and the merge a few seconds: about 5,520 s, **about 1 h 32 min**, against step 2's 5,588 s
+(1 h 33 min, which included one restart's cold start) and slice 12b's closing (1 h 30 min); CE-05's bar is 1 h 39 min.
+Less paging with a smaller heap may make the tests faster; step 4 measures it.
+
+### What changed outside `e2e/`, `scripts/`, `playwright.config.ts` and the docs (CE-04)
+
+- `src/app/layout.tsx`: `next/font/local` instead of `next/font/google` (P3 B), same CSS variables.
+- `src/app/fonts/ibm-plex/`: the five font files, `LICENSE.txt` (OFL 1.1), `README.md`.
+- `.gitattributes`: `*.woff2 binary`.
+- `package.json`: `"e2e": "tsx scripts/e2e.ts"`.
