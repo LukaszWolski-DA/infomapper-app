@@ -323,3 +323,38 @@ The PRD does not touch the reference prototype; there are no prototype differenc
 
 Also: the mistake about S7C-02 (it starts no server of its own; only S0-10 does) is corrected here (F5, F8) and goes
 into `docs/known-limitations.md` at the closing.
+
+## Step 2 – the memory log and one measured full run
+
+### P3: where "next/font/google queries have exactly one entry" comes from
+
+Read from Next.js's source at the tag `v16.3.8` (`crates/next-core/src/next_font/google/mod.rs`, fetched from GitHub; the
+installed package holds only the compiled native module, whose strings match).
+
+- **The module that raises it** is `next/font/google`'s Turbopack implementation: `NextFontGoogleFontFileReplacer`
+  (`mod.rs` line 349), the import-map replacement for `@vercel/turbopack-next/internal/font/google/font` (line 79).
+  Its `result` (line 379) calls `font_file_options_from_query_map` (line 638), which bails with exactly this message
+  when the request's query does not parse into one entry (line 642). The failed log's "Debug info" names the same
+  chain (`<NextFontGoogleFontFileReplacer as ImportMappingReplacement>::result failed`) and its import trace ends in
+  `src/app/layout.tsx`'s IBM Plex Sans.
+- **How the query is made:** `update_google_stylesheet` (around line 455) takes Google's CSS, finds every font file's
+  `url(...)` (`find_font_files_in_css`) and replaces it with `@vercel/turbopack-next/internal/font/google/font?{json}`,
+  where the JSON holds the font file's URL; the JSON goes through `qstring::QString::from(...)`, which reads `&` and
+  `=` as separators. A font URL of the usual form (`https://fonts.gstatic.com/s/ibmplexsans/v23/….woff2`, as Google
+  serves it today: 18 `@font-face` blocks for the three weights, the same 18 that failed) makes one entry. A URL with
+  `&` or `=` in it makes several, and the replacer fails on every one of them. So the error follows from **what
+  Google's stylesheet contained at that moment**; the log cuts the URLs off ("https://fonts.gs…"), so which URLs they
+  were cannot be read back. Google serves `fonts.gstatic.com/l/font?kit=…&skey=…&v=…` URLs in some answers; that is a
+  likely candidate, not a proven one.
+- **The answer is cached per server process:** Turbopack keeps the failed result as the task's result, so each of the
+  95 requests in 120 s returned the same error; a fresh server a minute later fetched a normal stylesheet.
+- **Without the network** (checked, 1 November 2026: `next dev` on port 3210 with an empty build folder
+  `.next-e2e-fontcheck`, a copy of the e2e data file, and `HTTPS_PROXY`/`HTTP_PROXY` pointing to a closed port):
+  Turbopack warned "Error while requesting resource … fonts.googleapis.com" and "Failed to download IBM Plex Mono /
+  IBM Plex Sans from Google Fonts. Using a fallback font instead.", and `/sign-in` answered 200. A start without
+  Google Fonts does **not** fail; the failure needs Google to answer with a stylesheet the replacer cannot read. The
+  server was stopped, its build folder and the data copy deleted, and `tsconfig.json`'s automatic `include` edit for
+  that folder reverted. Its log is kept in `.data/fontcheck-no-google-start.log`.
+
+**Conclusion for P3:** the error is tied to `next/font/google` (its Turbopack replacer, fed by Google's answer).
+By Łukasz's answer this means **B**: IBM Plex through `next/font/local` with the OFL 1.1 text, in step 3.
