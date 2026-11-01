@@ -1,19 +1,25 @@
 import type { Metadata } from "next";
-import { IBM_Plex_Mono, IBM_Plex_Sans } from "next/font/google";
+import localFont from "next/font/local";
 import { ToastProvider } from "@/ui/components/toast";
 import "./globals.css";
 
-// The prototype uses IBM Plex Sans and IBM Plex Mono.
-const plexSans = IBM_Plex_Sans({
+// The prototype uses IBM Plex Sans and IBM Plex Mono. IBM's own files, hosted with the app (chore e2e reliability, P3 B:
+// no build or start fetches fonts from the network); their source and licence are in fonts/ibm-plex/README.md.
+const plexSans = localFont({
   variable: "--font-plex-sans",
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500", "600"],
+  src: [
+    { path: "./fonts/ibm-plex/IBMPlexSans-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/ibm-plex/IBMPlexSans-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./fonts/ibm-plex/IBMPlexSans-SemiBold.woff2", weight: "600", style: "normal" },
+  ],
 });
 
-const plexMono = IBM_Plex_Mono({
+const plexMono = localFont({
   variable: "--font-plex-mono",
-  subsets: ["latin", "latin-ext"],
-  weight: ["400", "500"],
+  src: [
+    { path: "./fonts/ibm-plex/IBMPlexMono-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./fonts/ibm-plex/IBMPlexMono-Medium.woff2", weight: "500", style: "normal" },
+  ],
 });
 
 export const metadata: Metadata = {
