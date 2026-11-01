@@ -1,6 +1,6 @@
 # Chore e2e reliability – acceptance
 
-Status: **step 1 (critical review) done; waiting for Łukasz's answers before step 2.**
+Status: **step 1 answered by Łukasz (1 November 2026); step 2 (the memory log and one measured full run) in progress.**
 
 - Branch `chore/e2e-reliability`, made on 1 November 2026 from `main` at the tag `slice-12b` (annotated tag object
   `71ecd5383bcb1a26b7dc2c9dd01287ca3b325031`), whose commit is the merge of pull request 31,
@@ -306,3 +306,20 @@ The PRD does not touch the reference prototype; there are no prototype differenc
    `e2e/`, no app code.)
 5. **Step 2's measured run** takes about 1.5 h on this laptop and must run with no other dev server. Run it in the
    working tree here (nothing else running), as in the closings?
+
+### Łukasz's answers to step 1 (1 November 2026)
+
+1. **P2:** decided after step 2's log; B (the split by folder, as proposed) is expected.
+2. **P3:** before choosing, establish whether Turbopack's "next/font/google queries have exactly one entry" is tied to
+   `next/font/google` (the stack, the module that raises it; whether it also comes on a start without a connection to
+   `fonts.googleapis.com`, if that is cheap to check). If it is: B (IBM Plex hosted through `next/font/local`, with the
+   OFL 1.1 text). If not: no app change; one automatic retry of the e2e server's start in the launching script, and a
+   known limitation about the Turbopack error.
+3. **P4:** A; no cookie sign-in in this chore.
+4. **The memory log:** the form is accepted. Every 5 s it also records the system's free memory, the swap (page file),
+   and the resident memory (RSS) of both `next dev`'s main process and its child, not only the JavaScript heap: on
+   8 GB the 4 to 17 s stalls may be swapping.
+5. **Step 2's run** runs here, with no dev server running; the results note any other heavy processes during the run.
+
+Also: the mistake about S7C-02 (it starts no server of its own; only S0-10 does) is corrected here (F5, F8) and goes
+into `docs/known-limitations.md` at the closing.
