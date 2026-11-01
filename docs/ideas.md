@@ -528,3 +528,14 @@ page of a project or a canvas deleted since shows it as it was until the next ac
 (`docs/known-limitations.md`, "Back onto a page restored from the browser's back-forward cache"). A `pageshow` listener
 that sees `event.persisted` could call `router.refresh()` (or reload), so the page goes through `loadShell` as every
 other arrival does (D-38). Measure first that it costs nothing on an ordinary Back within one document.
+
+## Sign-in timeouts in full e2e runs (slice 12a's closing)
+
+The development sign-in times out now and then in full e2e runs: after the click on a test user the top bar does not
+show within 15 s (`signInAs`, `e2e/slice-00/helpers.ts`). Seen in slice 7b (S7A-04-route), slice 10a (two tests) and
+slice 12a's closing (S9-08, S10C-02, 31 October 2026); each file passed 3 of 3 on its own, and the sign-in runs before
+any slice's code. It costs a rerun of the failing files after most full runs. To look at: the sign-in redirect's timing
+late in a long run (the traces in `.data/e2e-failures/12a-close-1/` show the sign-in's POST answered and the workspace
+page requested), whether a longer wait in `signInAs` only or a sign-in that sets the session cookie directly (as the
+domain helpers write test data) would end it, and whether it goes with the dev server's memory growth
+(`docs/known-limitations.md`, "The e2e dev server restarts itself at its memory threshold").

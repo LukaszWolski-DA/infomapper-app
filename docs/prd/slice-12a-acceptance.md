@@ -1,6 +1,6 @@
 # Slice 12a – acceptance
 
-Status: **step 5 (closing) done; waiting for Łukasz's manual acceptance, then his command to merge and tag `slice-12a`.**
+Status: **closed; merged and tagged `slice-12a` on Łukasz's command (1 November 2026), before his manual acceptance, which follows on `main` (fixes, if any, on a `fix/…` branch).**
 
 - Branch `slice/12a-home-undo-project-delete`, made on 31 October 2026 from `main` at `de2af7f` (the start commit). Tag
   `slice-11` is at `6c231c6`; `main` is one docs-only merge past it (PR 29, the InfoCube idea in `docs/ideas.md`), so

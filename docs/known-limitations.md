@@ -757,6 +757,20 @@ the click on Łukasz the top bar did not show within 15 s. That is before any sl
 full runs logged since slice 7a's close, and the file passed 3 of 3 on its own. Recorded as a known flake (Łukasz, 26
 October 2026); if it comes back, look at the sign-in redirect's timing under a long run.
 
+### The e2e dev server restarts itself at its memory threshold (slice 12a)
+
+In slice 12a's closing full run (31 October 2026, 4,901 s), the e2e dev server printed "⚠ Server is approaching the
+used memory threshold, restarting..." once, near the end of the run, while S12A-02 (`e2e/slice-12a/S12A-02.spec.ts`)
+was running. The undo was stored and its toast shown, but the page after it was the app's error page ("Something went
+wrong."), so the test failed. On its own it passed 3 of 3. Next.js's dev server restarts itself when its memory grows
+past a threshold over a long run (Turbopack's compiled pages and caches); the test that runs at that moment fails, and
+any test may be that one. The run's output and trace are in `.data/e2e-failures/12a-close-1/`.
+
+- **Accepted:** a dev-server restart, not the app; the test passes on its own.
+- **Later:** if it comes back, raise the dev server's memory for the e2e run (Node's `--max-old-space-size` in the e2e
+  web server's command) or split the full run in two; the database slice's production-build e2e runs (AD-31) would
+  end it.
+
 ### S4B2-06 flaked again after its fix (slice 10b)
 
 In slice 10b's closing full run (30 October 2026), S4B2-06 (`e2e/slice-04b2/S4B2-06.spec.ts`) failed once more under
