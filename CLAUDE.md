@@ -18,7 +18,8 @@ and description are edited on its home, and a zoom is typed in the top bar (slic
 copied and pasted into any entity; the copy follows its original's type and Personal data (slice 10c, D-63). Entities
 and attributes have an alias; each canvas shows names or aliases in two dimensions, with exceptions per card (slice 11,
 D-64). Both home pages have the canvas pages' Undo and Redo on the same history, and a project is deleted from its home
-with the canvases only it uses, one undo step (slice 12a, D-65).
+with the canvases only it uses, one undo step (slice 12a, D-65). Canvas tiles show a thumbnail of the canvas's layout and
+count its frames, and the workspace home's project tiles show their first canvas's (slice 12b, D-29, AD-32).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -196,6 +197,11 @@ COMMITS=1 npx playwright test e2e/slice-11/S11-13-commits.spec.ts               
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-11/S11-13.spec.ts         # slice 11: a names switch to the screen, the layer switch beside it, the LayerTree read
 SCREENS=<folder> npx playwright test e2e/slice-11/S11-screens.spec.ts                     # slice 11: names and aliases, mixed, exceptions, More, the panel field
 SCREENS=<folder> npx playwright test e2e/slice-12a/S12A-screens.spec.ts                   # slice 12a: the delete section (shared and own canvases, armed, the only project), the homes' Undo, light and dark
+SCREENS=<folder> npx playwright test e2e/slice-12b/S12B-screens.spec.ts                   # slice 12b: the tiles (seed, empty canvas, collapsed frame, live canvas, workspace home, Performance test) beside the prototype's, light and dark
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spec.ts      # slice 12b: both homes' load, three data sets; LABEL=<name> for an A/B run, LOADS=<n>, COLD=<n> first visits
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
+BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
+npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the homes' server work and the thumbnails' cost (index, shapes, paths, bytes, 20 requests, keys; not a gate)
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
 npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
@@ -312,6 +318,18 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   Go between a project's pages by the app's links (`tab-home`, tiles) when a test then uses Back: after a typed address
   Back restores a whole earlier document from the browser's back-forward cache, which no page code sees
   (`docs/known-limitations.md`). Toasts of a tab in the background are read with `recordToasts`.
+
+  Slice 12b's helpers do the following:
+  - read a tile's thumbnail from the file its `<use>` refers to (`tileOf`, `thumbnailHref`, `thumbnailOf`,
+    `parseThumbnail`: kinds, colours, rectangles, lines, the cache header);
+  - compare it with the data without the domain's rules: the scale and offset from the outer edges, every expected
+    shape at its place and width (`expectDrawn`, `expectedOf`, `canvasData`, `mappedPairs`, `conceptColorOf`; `CO`,
+    `OL`);
+  - write test data through the domain: deletes (`deleteEntityAs`, `deleteRequirementAs`, `deleteFrameAs`,
+    `deleteNoteAs`) and a free or pinned note (`addNote`).
+
+  "Performance test – 20 canvases" (`scripts/lib/many-canvases.ts`, `addManyCanvases`) is written only into the e2e
+  data file or the bench's copy, never into the seed or `.data/dev-db.json`.
 
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
@@ -478,6 +496,22 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   remembers it for a minute (`gone-project.ts`, like `next-canvas.ts`), so its page goes to the workspace home without
   "That project no longer exists.". A step that writes a project is not "on" a canvas in the undo toast
   (`changeCanvasId`).
+- **Canvas thumbnails** (slice 12b, D-29, AD-32):
+  - **The rules in one place:** `src/domain/model/thumbnail.ts` (`thumbnailIndex` once per page, `canvasThumbnail`,
+    `canvasThumbnails`, `thumbnailDrawing`: one path per kind and colour in 400 units). Card heights are the canvas's
+    (`cardHeightOf`, `liveMembership`, `blockHeight`); `tests/thumbnail-heights.test.ts` compares them with
+    `cardHeight(buildCards(…))`.
+  - **Drawn from a route:** a home computes the drawings and their keys (`src/app/_lib/thumbnails.ts`) and the tile
+    draws `<svg><use href="/w/{ws}/thumbnail/{canvas}?v={key}#t"/></svg>` (`src/ui/canvas-thumbnail.tsx`). The route
+    (`src/app/w/[workspaceId]/thumbnail/[canvasId]/route.ts`) answers `thumbnailSymbolFile` (`src/ui/thumbnail-svg.ts`),
+    painted with the page's tokens, which the `<use>` inherits; never copy token values into it.
+  - **Access** is `workspaceAccess` (`shell.ts`), shared with `loadShellFor`.
+  - **The proxy's exception:** without a session a thumbnail's path answers 401 instead of the redirect, and the proxy
+    writes no preference cookie on it (`THUMBNAIL_PATH` in `src/proxy.ts`). A later resource the browser fetches for a
+    page follows AD-32 and needs the same exception.
+  - **F3:** nothing of the thumbnails goes into `loadProjectView` or the canvas page.
+  - `NOTE_MINI` is in `src/ui/note-colors.ts` and `NO_CONCEPT_COLOR` in `src/domain/model/concept-colors.ts`, shared
+    with the canvas.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a

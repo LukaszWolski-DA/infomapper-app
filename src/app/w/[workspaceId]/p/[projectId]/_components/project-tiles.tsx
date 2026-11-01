@@ -1,9 +1,11 @@
 "use client";
 
 // Canvas tiles on the project home: open, ⋯ menu (Rename, In projects), "New canvas" and
-// "Add a canvas from another project".
+// "Add a canvas from another project". Each tile's strip shows its canvas's thumbnail, rendered on the server and
+// handed in as a slot, and its text the frame count (slice 12b, prototype `renderHome`).
 
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { addCanvasToProjectAction } from "@/app/_actions/canvas";
 import { useAction } from "@/app/_components/use-action";
@@ -22,7 +24,15 @@ import { CanvasMenu, DotsIcon, itemClass, menuClass, useNewCanvas } from "./canv
 const addTileClass =
   "grid min-h-[200px] place-items-center rounded-[10px] bg-transparent font-medium text-im-ink-2 shadow-[inset_0_0_0_1.5px_var(--im-line)] hover:text-im-logical hover:shadow-[inset_0_0_0_1.5px_var(--im-logical)] data-[state=open]:text-im-logical";
 
-export function CanvasTiles({ view }: { view: ProjectView }) {
+export function CanvasTiles({
+  view,
+  thumbnails,
+  frames,
+}: {
+  view: ProjectView;
+  thumbnails: Readonly<Record<string, ReactNode>>;
+  frames: Readonly<Record<string, number>>;
+}) {
   const router = useRouter();
   const { create, pending } = useNewCanvas(view);
   const { run } = useAction();
@@ -32,6 +42,7 @@ export function CanvasTiles({ view }: { view: ProjectView }) {
       {view.canvases.map((canvas) => {
         const href = canvasHref(view.workspaceId, view.project.id, canvas.id);
         const also = view.projects.filter((p) => p.id !== view.project.id && canvas.projectIds.includes(p.id));
+        const m = frames[canvas.id] ?? 0;
         return (
           <div
             key={canvas.id}
@@ -39,7 +50,7 @@ export function CanvasTiles({ view }: { view: ProjectView }) {
             className="group relative overflow-hidden rounded-[10px] bg-im-surface shadow-[0_0_0_1px_var(--im-line),0_6px_16px_-12px_var(--im-shadow)] hover:shadow-[0_0_0_2px_var(--im-logical),0_10px_24px_-14px_var(--im-shadow)]"
           >
             <Link href={href} className="block text-left">
-              <span className="block h-[140px] border-b border-im-line bg-im-canvas" />
+              <span className="block h-[140px] border-b border-im-line bg-im-canvas">{thumbnails[canvas.id]}</span>
               <span className="flex items-center gap-1.5 px-3 pb-0.5 pt-2.5 text-[13.5px] font-semibold">
                 {canvas.liveLabel && (
                   <span className="inline-flex flex-none text-im-ink-3" title={`Live canvas: shows everything labeled ${canvas.liveLabel}`} data-testid="tile-canvas-live">
@@ -50,8 +61,9 @@ export function CanvasTiles({ view }: { view: ProjectView }) {
                   {canvas.name}
                 </span>
               </span>
-              <span className="block px-3 pb-3 text-[11.5px] text-im-ink-3">
+              <span className="block px-3 pb-3 text-[11.5px] text-im-ink-3" data-testid="tile-canvas-meta">
                 {canvas.cards} card{canvas.cards === 1 ? "" : "s"}
+                {m ? `, ${m} frame${m === 1 ? "" : "s"}` : ""}
                 {also.length ? `. Also in ${also.map((p) => p.name).join(", ")}` : ""}
               </span>
             </Link>

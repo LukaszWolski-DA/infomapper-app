@@ -24,6 +24,8 @@ import { CanvasUiCtx } from "./context";
 import { cardHeight, cardWidth, type Rect } from "./geometry";
 import type { CanvasLines } from "./line-data";
 import type { NoteColor } from "@/domain/types";
+import { NO_CONCEPT_COLOR } from "@/domain/model/concept-colors";
+import { NOTE_MINI } from "@/ui/note-colors";
 
 const NO_NOTES: readonly MiniNote[] = [];
 
@@ -38,9 +40,6 @@ export interface MiniNote {
   h: number;
   color: NoteColor;
 }
-
-/** The notes' paper colours in the miniature (prototype NOTE_MINI). */
-const NOTE_MINI: Record<NoteColor, string> = { yellow: "#E9C94F", blue: "#7FA9E0", green: "#7CC197", pink: "#E59BB6", grey: "#A9B0BA" };
 
 const sameNotes = (a: readonly MiniNote[], b: readonly MiniNote[]) =>
   a.length === b.length && a.every((n, i) => n.id === b[i]!.id && n.x === b[i]!.x && n.y === b[i]!.y && n.w === b[i]!.w && n.h === b[i]!.h && n.color === b[i]!.color);
@@ -239,7 +238,7 @@ const Miniature = memo(function Miniature({
         if (!isCardNode(n)) return <rect key={n.id} className="mb" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: n.data.color }} />;
         const card = n.data.card;
         return card.kind === "ent" ? (
-          <rect key={n.id} className="me" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: card.color ?? "#888899" }} />
+          <rect key={n.id} className="me" x={r.x} y={r.y} width={r.w} height={r.h} rx={12} style={{ fill: card.color ?? NO_CONCEPT_COLOR }} />
         ) : (
           <rect key={n.id} className="ms" x={r.x} y={r.y} width={r.w} height={r.h} />
         );

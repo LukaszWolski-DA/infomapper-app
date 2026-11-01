@@ -4,12 +4,14 @@ import { loadProjectView } from "@/app/_lib/project-view";
 import { loadShell } from "@/app/_lib/shell";
 import { projectOpenNotes, projectRequirements, projectStats } from "@/app/_panels/stats";
 import { canvasHref } from "@/app/_lib/paths";
+import { thumbnailHrefs } from "@/app/_lib/thumbnails";
 import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { projectLabels, type ProjectLabelContext } from "@/domain/model/labels";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import { modelConsistency } from "@/domain/source-changes/consistency";
 import type { CanvasItem, WorkspaceModel } from "@/domain/types";
+import { CanvasThumbnail } from "@/ui/canvas-thumbnail";
 import { ProjectConsistency } from "./_components/project-consistency";
 import { ProjectDelete } from "./_components/project-delete";
 import { ProjectHeading } from "./_components/project-heading";
@@ -34,7 +36,10 @@ function labelContext(model: WorkspaceModel, items: readonly CanvasItem[]): Proj
 // Project home (D-29): the project's canvases as tiles; the labels used on them and pinned to the project, and the
 // number and list of their open notes (slice 3a); the requirements whose scope touches its canvases (slice 4a); model
 // consistency (slice 7b, item 25); its name and description, editable (slice 9, D-59); Undo and Redo, buttons and keys,
-// on the person's history of the workspace, and "Delete this project" at its end (slice 12a, D-65).
+// on the person's history of the workspace, and "Delete this project" at its end (slice 12a, D-65). Each tile shows its
+// canvas's thumbnail and frame count (slice 12b), computed here from the rows the page reads anyway: the thumbnail is
+// a server-rendered slot referring to the drawing's address (PRD P5); nothing of it goes into `loadProjectView`, which
+// the canvas page shares (step 1, F3).
 export default async function ProjectHomePage({ params }: PageProps<"/w/[workspaceId]/p/[projectId]">) {
   const { workspaceId, projectId } = await params;
   const shell = await loadShell({ workspaceId, projectId });
@@ -86,6 +91,12 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
     href: `${canvasHref(ws, view.project.id, n.canvasId)}?note=${n.id}`,
   }));
 
+  // Thumbnails and frame counts (slice 12b): one index for the page, the canvases' rows grouped once
+  const tabCanvases = view.canvases.flatMap((c) => allCanvases.filter((x) => x.id === c.id));
+  const hrefs = thumbnailHrefs(ws, tabCanvases, { items, frames, notes }, { model, requirements, labels, labelLinks: links });
+  const thumbnails = Object.fromEntries(view.canvases.map((c) => [c.id, <CanvasThumbnail key={c.id} href={hrefs.get(c.id) ?? null} />]));
+  const frameCounts = Object.fromEntries(view.canvases.map((c) => [c.id, frames.filter((f) => f.canvas_id === c.id).length]));
+
   return (
     <UndoProvider workspaceId={ws} state={{ canUndo: history.undo.length > 0, canRedo: history.redo.length > 0 }}>
     <AppShell shell={shell} project={{ view, currentCanvasId: null, tools: <UndoButtons /> }}>
@@ -115,7 +126,7 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
           </div>
           <ProjectConsistency consistency={consistency} href={consistencyHref} />
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Canvases</h3>
-          <CanvasTiles view={view} />
+          <CanvasTiles view={view} thumbnails={thumbnails} frames={frameCounts} />
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Requirements</h3>
           <ProjectRequirements
             projectId={view.project.id}

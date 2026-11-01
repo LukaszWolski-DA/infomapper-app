@@ -8,10 +8,12 @@ import { UndoButtons, UndoProvider } from "@/app/_components/undo";
 import { projectHref, workspaceHref } from "@/app/_lib/paths";
 import { ROLE_LABEL } from "@/app/_lib/roles";
 import { loadShell } from "@/app/_lib/shell";
+import { thumbnailHrefs } from "@/app/_lib/thumbnails";
 import { workspaceStats } from "@/app/_panels/stats";
 import { getDataStore } from "@/data";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import { can } from "@/domain/permissions";
+import { CanvasThumbnail } from "@/ui/canvas-thumbnail";
 import { ArchiveBox, UnarchiveButton } from "./_components/lifecycle";
 import { NewProjectTile } from "./_components/new-project-tile";
 import { AddPersonBox, OrganizationAccessBox, RemovePersonButton, RoleSelect } from "./_components/people";
@@ -71,6 +73,25 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
   // the whole workspace's requirements and how many are covered, as the canvas status bar (slice 4a)
   const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
   const counts = new Map(shell.projects.map((p) => [p.id, p.canvasCount]));
+
+  // Each project tile shows its first canvas's thumbnail, in tab order (slice 12b, P8; prototype renderWsHome): the
+  // first canvases' rows only, one index for the page; on the Overview tab only
+  const firstCanvas = new Map<string, string>();
+  let thumbnails = new Map<string, string | null>();
+  if (tab === "overview") {
+    const [links, canvases, items, frames, notes, labels, labelLinks] = await Promise.all([
+      Promise.all(projects.map(async (p) => [p.id, (await store.canvases.listLinksOfProject(workspaceId, p.id))[0]?.canvas_id] as const)),
+      store.canvases.list(workspaceId),
+      store.canvasItems.list(workspaceId),
+      store.frames.list(workspaceId),
+      store.notes.list(workspaceId),
+      store.labels.list(workspaceId),
+      store.labels.listLinks(workspaceId),
+    ]);
+    for (const [projectId, canvasId] of links) if (canvasId) firstCanvas.set(projectId, canvasId);
+    const shown = canvases.filter((c) => [...firstCanvas.values()].includes(c.id));
+    thumbnails = thumbnailHrefs(workspaceId, shown, { items, frames, notes }, { model, requirements, labels, labelLinks });
+  }
 
   // Undo and Redo, buttons and keys, on the person's history of the workspace (slice 12a, D-65)
   return (
@@ -175,7 +196,9 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                       data-testid="tile-project"
                       className="overflow-hidden rounded-[10px] bg-im-surface text-left shadow-[0_0_0_1px_var(--im-line),0_6px_16px_-12px_var(--im-shadow)] hover:shadow-[0_0_0_2px_var(--im-logical),0_10px_24px_-14px_var(--im-shadow)]"
                     >
-                      <span className="block h-[140px] border-b border-im-line bg-im-canvas" />
+                      <span className="block h-[140px] border-b border-im-line bg-im-canvas">
+                        {firstCanvas.has(p.id) && <CanvasThumbnail href={thumbnails.get(firstCanvas.get(p.id)!) ?? null} />}
+                      </span>
                       <span className="block truncate px-3 pb-0.5 pt-2.5 text-[13.5px] font-semibold">{p.name}</span>
                       <span className="block px-3 pb-3 text-[11.5px] text-im-ink-3">
                         {n} canvas{n === 1 ? "" : "es"}

@@ -4,7 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { getDataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import { can, checkCreateWorkspace, isArchived, isGuest } from "@/domain/permissions";
-import type { AppUser, WorkspaceRole } from "@/domain/types";
+import type { AppUser, Workspace, WorkspaceMember, WorkspaceRole } from "@/domain/types";
 import { goneByMe } from "./gone-project";
 import { missingCanvasWay } from "./missing-canvas";
 import { nextCanvasFor } from "./next-canvas";
@@ -50,15 +50,34 @@ export async function loadShell(where: Where): Promise<ShellData> {
   return loadShellFor(session.user, where, session.unlocked);
 }
 
+/**
+ * Whether this person may open the workspace now: "missing" when it does not exist or they are not a member, "locked"
+ * when its organization is not unlocked in this session (slice 8). Pages (`loadShellFor`) and the thumbnail route
+ * (slice 12b) answer from the same check.
+ */
+export async function workspaceAccess(
+  user: AppUser,
+  workspaceId: string,
+  unlocked: ReadonlySet<Uuid>,
+): Promise<"missing" | { locked: Workspace } | { workspace: Workspace; member: WorkspaceMember }> {
+  const store = getDataStore();
+  const workspace = await store.workspaces.get(workspaceId);
+  const member = workspace ? await store.workspaces.getMember(workspace.id, user.id) : null;
+  if (!workspace || !member) return "missing";
+  if (!unlocked.has(workspace.organization_id)) return { locked: workspace };
+  return { workspace, member };
+}
+
 export async function loadShellFor(user: AppUser, where: Where, unlocked: ReadonlySet<Uuid>): Promise<ShellData> {
   const store = getDataStore();
-  const workspace = await store.workspaces.get(where.workspaceId);
-  const member = workspace && (await store.workspaces.getMember(workspace.id, user.id));
-  if (!workspace || !member) notFound();
-  if (!unlocked.has(workspace.organization_id)) {
+  const access = await workspaceAccess(user, where.workspaceId, unlocked);
+  if (access === "missing") notFound();
+  if ("locked" in access) {
+    const workspace = access.locked;
     const path = `/w/${workspace.id}${where.projectId ? `/p/${where.projectId}` : ""}${where.canvasId ? `/c/${where.canvasId}` : ""}`;
     redirect(`/sign-in?org=${workspace.organization_id}&next=${encodeURIComponent(path)}`);
   }
+  const { workspace, member } = access;
 
   const [organizations, myWorkspaces, myOrgMemberships, projects] = await Promise.all([
     store.organizations.listForUser(user.id),
