@@ -488,6 +488,15 @@ file.
 5. Open the deleted project's address from the browser's history (or Back to one of its pages, reached through the
    app's links): the workspace home with "That project no longer exists.".
 
+## During the manual acceptance (1 November 2026)
+
+- **"useInsertionEffect must not schedule updates."** (Łukasz, in the dev console, `history-nav.tsx:33`). Not slice 12a's:
+  the file was unchanged since slice 6b. A link clicked after Back drops the forward entries inside Next.js's own push
+  (a `useInsertionEffect`); the Navigation API reports it at once, and the Back and Forward buttons' store scheduled
+  its update there. Fix: the store hears of the change in a microtask, after that commit. Regression check
+  `e2e/slice-06b/S6B-01-console.spec.ts` (fails without the fix). Slice 6b's specs, S12A-05 and S12A-12: 16 passed
+  (2.6 min); lint, typecheck and 1,530 unit tests pass.
+
 ## Assumptions
 
 - A1: the slice starts from `main` at `de2af7f`: slice 11's code plus one docs commit.
