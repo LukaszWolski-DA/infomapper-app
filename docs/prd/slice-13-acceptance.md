@@ -393,3 +393,83 @@ step 4, which stops there if it is more than a small change.
 
 Both are in `docs/ideas.md` since the answers: "by {person}" from the field's own last change event (F20), and
 `RichTextField`'s "Show more" without a layout read (F25).
+
+## Step 2: the shared mechanism (1 November 2026)
+
+### What changed
+
+- **The draft's rules** are `src/ui/field-draft.ts` (`FieldDraft`, `choiceShown`, `storedBy`), pure and unit-tested
+  (`field-draft.test.ts`, 9 tests):
+  - a stored value is taken only without the focus and without a draft;
+  - a text equal to the stored value ends the draft;
+  - leaving the field compares with the value on its way, else with the stored one (F8);
+  - any refusal, a cut included, keeps the text and lets leaving the field save it again.
+- **`useDraft`** (`src/app/_panels/fields.tsx`):
+  - the element stays uncontrolled with its mount value as `defaultValue`, so typing renders nothing;
+  - an effect writes a fresh stored value into the element when `FieldDraft.receive` says so: a DOM write, never a
+    layout read;
+  - `commit` on leaving the field trims or parses (`prepare`) and saves;
+  - an empty `required` field goes back, with `onEmpty` (F14, D-59);
+  - it returns `{ bind, defaultValue, commit }`. A returned `ref` made React Compiler's `react-hooks/refs` rule flag
+    every use, so call sites destructure it.
+- **`useChoice`** (R4, answer 4): a select or check box shows its choice from the click until the stored value changes;
+  after a refusal it shows the stored value from the fresh page. It needs no effect, since the choice remembers the
+  stored value it was made on.
+- **`fieldKey(id, field)`**: stable keys everywhere, the third argument (the stored value) is gone.
+  - Every text field's `onSave` returns its save's answer (F24): entity, attribute, mapping, relationship, requirement,
+    source note, classification name, label name, project heading, settings.
+  - `TextField`, `TextArea` and `ParamField` use `useDraft`. So do the bespoke fields: the mapping's rule, the
+    classification list's name, the project's name and description, the settings' name, client and description.
+  - `useChoice` serves the entity's stereotype and concept, the attribute's type, the requirement's kind and parent, the
+    frame's concept and system, and the settings' language and two check boxes.
+- **The fresh page after a cutting refusal** (F3, answer 1):
+  - `runCommand` revalidates after `stale_version`, `forbidden`, `archived` and `not_found`, except a locked
+    organization's refusal;
+  - `STALE_VERSION_MESSAGE` is "Someone changed this meanwhile." (F23).
+- **The resets go** (R6):
+  - the requirement panel's `reset` counter: an empty name goes back with "Enter a name.";
+  - the label panel's `id:version:reset` key;
+  - the settings form's key on the workspace's version, its `version` state, `saved` ref and `revert`: the version
+    comes from the page and `rowSaves`, and an empty name goes back with "Enter a name.".
+- **The concept's rename in the tree** (F13) stays open until its answer; a refused name stays in the field to try again
+  or cancel with Escape (`NameInput`'s `onDone` returns whether it was stored).
+- **Smaller changes:**
+  - `NAME_REQUIRED` ("Enter a name.") is exported from `src/domain/validation.ts`, with the same text as before;
+  - the project description has `data-version`, so tests can wait for a save's fresh page.
+- **Not changed:**
+  - `rowSaves` (Q8);
+  - notes (their text still rolls back, R5);
+  - `Seg` and `Flag` (controlled already, so they show the stored value after a refusal, as R4 wants);
+  - the rich-text fields beyond their stable key: their dialog keeps the draft, and a refusal no longer closes the
+    requirement's.
+
+### Specs
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S13-01 | `S13-01.spec.ts`: (a) the entity's name, Enter, typed on while the answer is held (`holdUntil`), released: all the text, the focus and the caret at the end; Enter saves the rest; two change groups in order; one undo takes back the second; (b) a source table's note, left with Tab, typed on, released: the same, two versions | passed; **both cases fail on the code before step 2** (`git stash` of `src`) |
+| S13-02 | `S13-02.spec.ts`: the project's description, left, typed on (a new line) while held, released: all the text, focus, caret; leaving saves the rest | passed; fails before step 2 (the code before has no `data-version` on the description, so the first check fails there) |
+| S13-09 | `S13-09.spec.ts`: (1) an undo on the project home shows the stored name, and the description stays as stored; (2) Anna renames the project as another session; this page's description save is refused (the new toast), and its fresh page shows Anna's name in the name field (no draft, no focus) while the description keeps the draft; leaving it again stores it | passed |
+
+**Earlier specs changed** (Q9):
+- `S0-08`: the refused name is kept, and the switcher shows the stored name from the refusal's fresh page; the toast is
+  the new text. The empty name still goes back, now in the browser with "Enter a name.".
+- `S0-09` and `slice-09/helpers.ts` (`STALE`): the new toast text.
+- `S3A-04`: a refused label name is kept.
+- `S4A-02`: a refused requirement key is kept; the empty name goes back with "Enter a name.". The spec's title is
+  adjusted.
+
+**Runs:**
+- Slice 13 with the changed specs and `panel-field-focus.spec.ts` (dev server, from scratch, none of mine running):
+  13 passed, 1 failed, 2.6 min. The failure was S4A-02: my edit had changed the wrong `REQ-109` line. Fixed, and the
+  file passed 3 of 3 alone (39 s, 39 s, 45 s).
+- S13-01's note case first failed on its toast check alone. The recorder counts a repeated text once
+  (`recordToasts`), so the two identical "Note saved on customers" toasts read as one; the check now expects one.
+- CI: `npm run lint` clean, `npm run typecheck` pass, `npm test` 120 files, 1,564 tests, pass.
+
+### New or changed user-visible texts
+
+- The conflict toast is "Someone changed this meanwhile." (approved, answer 1).
+- "Enter a name." now also shows in the browser when an empty settings or requirement name goes back (the server's text
+  before).
+- No other text yet: the line, "Not saved" and the rest are steps 3 and 4.
