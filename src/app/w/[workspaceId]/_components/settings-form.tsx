@@ -1,15 +1,20 @@
 "use client";
 
 // Workspace settings as in the prototype: each field saves when it changes (no Save button).
-// Every save sends the version this page read; a stale version is refused with the domain's message (AD-12).
+// Every save goes through the workspace's save chain (slice 9) with the newest version known; a stale version is refused
+// with the domain's message (AD-12), and the refusal brings the fresh page. Slice 13 (D-66): a text field keeps its
+// draft across fresh pages and after a refusal (an empty name goes back with "Enter a name.", D-59); the language and
+// the two modes show the newest stored value after a refusal. Settings are not undo steps.
 // Slice 7c (item 17, answers F16, F17): the methodology text names the source table panels; switching Data Vault 2.0
 // mode off says how many uses of Data Vault classifications stay stored.
 
-import { useRef, useState } from "react";
 import { DATA_VAULT_MODE_TEXT, dataVaultOffMessage } from "@/domain/model/classifications";
 import type { DocLanguage } from "@/domain/types";
 import { updateWorkspaceSettingsAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
+import { useChoice, useDraft } from "@/app/_panels/fields";
+import { NAME_REQUIRED } from "@/domain/validation";
+import { useToast } from "@/ui/components/toast";
 
 export interface SettingsValues {
   workspaceId: string;
@@ -42,24 +47,22 @@ const fieldClass =
 /** `dataVaultUses`: the workspace's uses of Data Vault classifications (answer F16), for the mode-off message. */
 export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial: SettingsValues; editable: boolean; dataVaultUses?: number }) {
   const { saveRow } = useAction();
-  const [version, setVersion] = useState(initial.version);
-  const saved = useRef<SettingsValues>(initial);
+  const toast = useToast();
 
-  async function save(patch: Patch, revert: () => void) {
-    // after this workspace's earlier saves, with the version the last one returned (slice 9)
-    const result = await saveRow(
-      { id: initial.workspaceId, version },
+  // after this workspace's earlier saves, with the newest version known (slice 9): the page's or the last answer's
+  const save = (patch: Patch) =>
+    saveRow(
+      { id: initial.workspaceId, version: initial.version },
       (v) => updateWorkspaceSettingsAction({ workspaceId: initial.workspaceId, expectedVersion: v, ...patch }),
       SAVED_MESSAGE(patch, dataVaultUses),
     );
-    if (result.ok) {
-      setVersion(result.value.version);
-      saved.current = { ...saved.current, ...patch, version: result.value.version };
-    } else {
-      // Nothing was saved: show the last saved value again (the toast says why).
-      revert();
-    }
-  }
+  const trim = { prepare: (t: string) => t.trim() };
+  const { bind: nameBind, defaultValue: nameInitial, commit: nameCommit } = useDraft<HTMLInputElement>(initial.name, (v) => save({ name: v }), { ...trim, required: true, onEmpty: () => toast(NAME_REQUIRED, "refusal") });
+  const { bind: clientBind, defaultValue: clientInitial, commit: clientCommit } = useDraft<HTMLInputElement>(initial.clientName, (v) => save({ clientName: v }), trim);
+  const { bind: descriptionBind, defaultValue: descriptionInitial, commit: descriptionCommit } = useDraft<HTMLTextAreaElement>(initial.description, (v) => save({ description: v }), trim);
+  const language = useChoice(initial.docLanguage, (docLanguage) => save({ docLanguage }));
+  const dv2 = useChoice(initial.dv2Mode, (dv2Mode) => save({ dv2Mode }));
+  const fourEyes = useChoice(initial.fourEyes, (on) => save({ fourEyes: on }));
 
   const dis = !editable;
   return (
@@ -69,61 +72,46 @@ export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial
         <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">Shown on the workspace and in generated documents.</p>
         <Field label="Name">
           <input
+            ref={nameBind}
             type="text"
             data-testid="input-workspace-name"
             className={fieldClass}
-            defaultValue={initial.name}
+            defaultValue={nameInitial}
             disabled={dis}
-            onBlur={(e) => {
-              const el = e.currentTarget;
-              const v = el.value.trim();
-              if (v === saved.current.name) return;
-              void save({ name: v }, () => (el.value = saved.current.name));
-            }}
+            onBlur={nameCommit}
             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           />
         </Field>
         <Field label="Client">
           <input
+            ref={clientBind}
             type="text"
             data-testid="input-workspace-client"
             className={fieldClass}
-            defaultValue={initial.clientName}
+            defaultValue={clientInitial}
             disabled={dis}
-            onBlur={(e) => {
-              const el = e.currentTarget;
-              const v = el.value.trim();
-              if (v === saved.current.clientName) return;
-              void save({ clientName: v }, () => (el.value = saved.current.clientName));
-            }}
+            onBlur={clientCommit}
             onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
           />
         </Field>
         <Field label="Description">
           <textarea
+            ref={descriptionBind}
             rows={3}
             data-testid="input-workspace-description"
             className={fieldClass + " min-h-[60px] resize-y"}
-            defaultValue={initial.description}
+            defaultValue={descriptionInitial}
             disabled={dis}
-            onBlur={(e) => {
-              const el = e.currentTarget;
-              const v = el.value.trim();
-              if (v === saved.current.description) return;
-              void save({ description: v }, () => (el.value = saved.current.description));
-            }}
+            onBlur={descriptionCommit}
           />
         </Field>
         <Field label="Documentation language">
           <select
             data-testid="select-workspace-language"
             className={fieldClass}
-            defaultValue={initial.docLanguage}
+            value={language.value}
             disabled={dis}
-            onChange={(e) => {
-              const el = e.currentTarget;
-              void save({ docLanguage: el.value as DocLanguage }, () => (el.value = saved.current.docLanguage));
-            }}
+            onChange={(e) => language.choose(e.currentTarget.value as DocLanguage)}
           >
             {LANGUAGES.map(([value, label]) => (
               <option key={value} value={value}>
@@ -140,17 +128,7 @@ export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial
           {DATA_VAULT_MODE_TEXT}
         </p>
         <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            data-testid="checkbox-dv2"
-            defaultChecked={initial.dv2Mode}
-            disabled={dis}
-            onChange={(e) => {
-              const el = e.currentTarget;
-              void save({ dv2Mode: el.checked }, () => (el.checked = saved.current.dv2Mode));
-            }}
-          />{" "}
-          Data Vault 2.0 mode
+          <input type="checkbox" data-testid="checkbox-dv2" checked={dv2.value} disabled={dis} onChange={(e) => dv2.choose(e.currentTarget.checked)} /> Data Vault 2.0 mode
         </label>
         <h4 className="m-0 mb-1 mt-4 text-[13.5px] font-semibold">Process</h4>
         <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">
@@ -158,16 +136,7 @@ export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial
           either way (AD-06).
         </p>
         <label className="flex items-center gap-2">
-          <input
-            type="checkbox"
-            data-testid="checkbox-four-eyes"
-            defaultChecked={initial.fourEyes}
-            disabled={dis}
-            onChange={(e) => {
-              const el = e.currentTarget;
-              void save({ fourEyes: el.checked }, () => (el.checked = saved.current.fourEyes));
-            }}
-          />{" "}
+          <input type="checkbox" data-testid="checkbox-four-eyes" checked={fourEyes.value} disabled={dis} onChange={(e) => fourEyes.choose(e.currentTarget.checked)} />{" "}
           Four-eyes approval
         </label>
       </div>

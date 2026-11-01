@@ -9,7 +9,7 @@
 
 import { updateProjectAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
-import { fieldKey } from "@/app/_panels/fields";
+import { fieldKey, useDraft } from "@/app/_panels/fields";
 import { PROJECT_NAME_REQUIRED } from "@/domain/commands/project";
 import { useToast } from "@/ui/components/toast";
 
@@ -27,9 +27,6 @@ export function ProjectHeading({
   project: { id: string; name: string; description: string | null; version: number };
   editable: boolean;
 }) {
-  const { saveRow } = useAction();
-  const toast = useToast();
-
   if (!editable) {
     return (
       <>
@@ -45,46 +42,52 @@ export function ProjectHeading({
     );
   }
 
+  return <EditableHeading workspaceId={workspaceId} project={project} />;
+}
+
+/** The fields (slice 13, D-66): each keeps its draft across the page's fresh values and after a refusal. */
+function EditableHeading({ workspaceId, project }: { workspaceId: string; project: { id: string; name: string; description: string | null; version: number } }) {
+  const { saveRow } = useAction();
+  const toast = useToast();
   const save = (patch: { name?: string; description?: string }) =>
     saveRow(project, (v) => updateProjectAction({ workspaceId, projectId: project.id, expectedVersion: v, ...patch }));
+  const { bind: nameBind, defaultValue: nameInitial, commit: nameCommit } = useDraft<HTMLInputElement>(project.name, (v) => save({ name: v }), {
+    prepare: (t) => t.trim(),
+    required: true,
+    onEmpty: () => toast(PROJECT_NAME_REQUIRED, "refusal"),
+  });
+  // trimmed as the server stores it; the lines inside stay
+  const { bind: descriptionBind, defaultValue: descriptionInitial, commit: descriptionCommit } = useDraft<HTMLTextAreaElement>(project.description ?? "", (v) => save({ description: v }), { prepare: (t) => t.trim() });
 
   return (
     <>
       <h1 className="m-0">
         <input
-          key={fieldKey(project.id, "name", project.name)}
+          key={fieldKey(project.id, "name")}
+          ref={nameBind}
           type="text"
-          defaultValue={project.name}
+          defaultValue={nameInitial}
           aria-label="Project name"
           autoComplete="off"
           data-testid="field-project-name"
           className={`${fieldClass} text-2xl font-semibold leading-tight text-im-ink`}
           onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          onBlur={(e) => {
-            const el = e.currentTarget;
-            const v = el.value.trim();
-            if (!v) {
-              el.value = project.name;
-              toast(PROJECT_NAME_REQUIRED, "refusal");
-              return;
-            }
-            if (v !== project.name) void save({ name: v });
-          }}
+          onBlur={nameCommit}
         />
       </h1>
       <textarea
-        key={fieldKey(project.id, "description", project.description)}
+        key={fieldKey(project.id, "description")}
+        ref={descriptionBind}
         rows={lines(project.description ?? "")}
-        defaultValue={project.description ?? ""}
+        defaultValue={descriptionInitial}
         placeholder="What is this project about?"
         aria-label="Project description"
         data-testid="field-project-description"
+        // the stored version the page shows: tests wait for a save's fresh page with it (slice 13)
+        data-version={project.version}
         className={`${fieldClass} min-h-6 resize-none text-im-ink-2 [field-sizing:content]`}
         onInput={(e) => (e.currentTarget.rows = lines(e.currentTarget.value))}
-        onBlur={(e) => {
-          const v = e.currentTarget.value;
-          if (v.trim() !== (project.description ?? "")) void save({ description: v });
-        }}
+        onBlur={descriptionCommit}
       />
     </>
   );

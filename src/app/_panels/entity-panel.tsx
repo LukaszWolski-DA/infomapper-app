@@ -15,7 +15,7 @@ import { STEREOTYPES, type Entity, type Stereotype } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, Hint, inputClass, Li, LongList, smallButtonClass, TextField, useChoice } from "./fields";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
 import { OnCanvases } from "./on-canvases";
@@ -57,7 +57,11 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   async function save(change: Omit<UpdateEntityInput, "entityId" | "expectedVersion">) {
     const result = await saveRow(e, (v) => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v, ...change }));
     if (result.ok && result.value.warning) toast(result.value.warning);
+    return result;
   }
+  // choice fields show the newest stored value after a refusal (slice 13, R4)
+  const stereotype = useChoice(e.stereotype, (s) => save({ stereotype: s }));
+  const concept = useChoice(e.concept_id, (c) => save({ conceptId: c }));
 
   async function saveDefinition(html: string): Promise<boolean> {
     return (await saveRow(e, (v) => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v, definition: html }))).ok;
@@ -75,21 +79,21 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
     <div data-testid="panel-entity">
       <div className="mb-1.5 text-[11.5px] text-im-ink-3">Entity</div>
       <Field label="Name" htmlFor="f-en">
-        <TextField key={fieldKey(e.id, "name", e.name)} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-entity-name" inputRef={nameRef} />
+        <TextField key={fieldKey(e.id, "name")} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-entity-name" inputRef={nameRef} />
       </Field>
       <Field label="Alias" htmlFor="f-ealias">
-        <TextField key={fieldKey(e.id, "alias", e.alias)} id="f-ealias" value={e.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => void save({ alias })} testId="input-entity-alias" />
+        <TextField key={fieldKey(e.id, "alias")} id="f-ealias" value={e.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => save({ alias })} testId="input-entity-alias" />
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Stereotype" htmlFor="f-es">
           <select
-            key={fieldKey(e.id, "stereotype", e.stereotype)}
+            key={fieldKey(e.id, "stereotype")}
             id="f-es"
-            defaultValue={e.stereotype}
+            value={stereotype.value}
             disabled={!p.editable}
             className={inputClass}
             data-testid="select-entity-stereotype"
-            onChange={(x) => void save({ stereotype: x.target.value as Stereotype })}
+            onChange={(x) => stereotype.choose(x.target.value as Stereotype)}
           >
             {STEREOTYPES.map((s) => (
               <option key={s} value={s}>
@@ -100,13 +104,13 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         </Field>
         <Field label="Concept" htmlFor="f-ec">
           <select
-            key={fieldKey(e.id, "concept", e.concept_id)}
+            key={fieldKey(e.id, "concept")}
             id="f-ec"
-            defaultValue={e.concept_id}
+            value={concept.value}
             disabled={!p.editable}
             className={inputClass}
             data-testid="select-entity-concept"
-            onChange={(x) => void save({ conceptId: x.target.value })}
+            onChange={(x) => concept.choose(x.target.value)}
           >
             {ix.model.concepts.map((c) => (
               <option key={c.id} value={c.id}>
@@ -117,7 +121,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         </Field>
       </div>
       <RichTextField
-        key={fieldKey(e.id, "definition", e.definition_html)}
+        key={fieldKey(e.id, "definition")}
         label="Definition"
         html={e.definition_html}
         text={e.definition_text}

@@ -304,7 +304,6 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
 
           {tab === "settings" && (
             <SettingsForm
-              key={workspace.version}
               editable={can(access, "workspace.edit_settings")}
               dataVaultUses={dataVaultUses(indexOf(model))}
               initial={{

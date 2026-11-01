@@ -39,7 +39,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
   const self = r.from_entity_id === r.to_entity_id;
 
   const save = (change: Omit<Parameters<typeof updateRelationshipAction>[1], "relationshipId" | "expectedVersion">) =>
-    void saveRow(r, (v) => updateRelationshipAction(p.workspaceId, { ...ref(v), ...change }));
+    saveRow(r, (v) => updateRelationshipAction(p.workspaceId, { ...ref(v), ...change }));
 
   async function remove() {
     const result = await saveRow(r, (v) => deleteRelationshipAction(p.workspaceId, ref(v)), "Relationship deleted", { undoable: true, deletes: true });
@@ -62,7 +62,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
       </div>
       <Field label="Verb phrase" htmlFor="f-rl">
         <TextField
-          key={fieldKey(r.id, "label", r.label)}
+          key={fieldKey(r.id, "label")}
           id="f-rl"
           value={r.label ?? ""}
           readOnly={!p.editable}

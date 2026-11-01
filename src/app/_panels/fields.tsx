@@ -1,11 +1,14 @@
 "use client";
 
 // Building blocks of the right panel, styled after the prototype (.fld, .seg, .flags, .note, .list, .li, .pill,
-// .actions). Text fields save when they lose the focus (prototype "change"); the panel remounts a field, keyed by its
-// stored value (`fieldKey`), once the server has a new one. The panels save through `saveRow` (`useAction`, slice 9):
-// one row's saves one after the other, each with the newest version known when it is sent.
+// .actions). Text fields save when they lose the focus (prototype "change"). The panels save through `saveRow`
+// (`useAction`, slice 9): one row's saves one after the other, each with the newest version known when it is sent.
+// Slice 13 (D-66): a text field keeps what the person typed (its draft, `useDraft`) across the page's fresh values and
+// after a refusal; a choice field shows the newest stored value after a refusal (`useChoice`). Fields are keyed by their
+// object and field (`fieldKey`), never by their stored value.
 
-import { useEffect, useState, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
+import { choiceShown, FieldDraft, storedBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
 
 export const Kind = ({ children }: { children: ReactNode }) => <div className="mb-1.5 text-[11.5px] text-im-ink-3">{children}</div>;
 
@@ -30,19 +33,91 @@ export const inputClass =
   "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 text-im-ink outline-none focus:border-im-logical disabled:opacity-50 read-only:bg-im-panel";
 
 /**
- * The key of a panel field that shows `value` of the object `id`: the field is mounted anew, and shows the stored
- * value, only when that value changes (its own save, an undo, someone else's write). Keyed by the object's version, a
- * save on leaving one field mounted the next one anew and took the focus Tab had just put there.
+ * The key of a panel field that shows the field `field` of the object `id`: stable while the object lives, so a save's
+ * answer, an undo or another person's write never mounts it anew (slice 13; keyed by the stored value, text typed
+ * during a save's round trip was lost with the field, and keyed by the object's version, a save on leaving one field
+ * mounted the next one anew and took the focus Tab had just put there).
  */
-export const fieldKey = (id: string, field: string, value: string | number | null | undefined): string => `${id}:${field}:${value ?? ""}`;
+export const fieldKey = (id: string, field: string): string => `${id}:${field}`;
 
-/** A text field that saves on Enter or when it loses the focus. An empty required field goes back. */
+/** What a field's save gives back: the action's answer (`ok`, `code`), so the field knows whether it was stored. */
+export type FieldSave<V> = (value: V) => SaveAnswer | Promise<SaveAnswer>;
+
+/**
+ * A text field's draft (slice 13, D-66; the rules in `src/ui/field-draft.ts`): the element is uncontrolled, so typing
+ * renders nothing. A stored value reaches it in an effect, written into the element only while it has neither the
+ * focus nor a draft. `commit` (on leaving the field) saves the text when it differs from the value on its way or the
+ * stored one; `prepare` trims or parses it (null: nothing to save); an empty `required` field goes back to the stored
+ * value (D-59), with `onEmpty` (a toast) where one is wanted.
+ */
+export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
+  stored: string,
+  save: FieldSave<string> | undefined,
+  o: { prepare?: (text: string) => string | null; required?: boolean; onEmpty?: () => void; readOnly?: boolean; elementRef?: Ref<E> } = {},
+) {
+  const element = useRef<E | null>(null);
+  const [draft] = useState(() => new FieldDraft(stored));
+  const [initial] = useState(stored);
+  useEffect(() => {
+    const el = element.current;
+    // a DOM write after the commit, never a layout read (CLAUDE.md, slice 6a)
+    if (el && draft.receive(stored, el.value, document.activeElement === el) === "take") el.value = stored;
+  }, [stored, draft]);
+  const { elementRef } = o;
+  /** The element's ref callback. */
+  const bind = (el: E | null) => {
+    element.current = el;
+    if (typeof elementRef === "function") elementRef(el);
+    else if (elementRef) (elementRef as { current: E | null }).current = el;
+  };
+  const commit = () => {
+    const el = element.current;
+    if (!el || o.readOnly || !save) return;
+    const raw = el.value;
+    const value = o.prepare ? o.prepare(raw) : raw;
+    if (value === null) return;
+    if (o.required && !value) {
+      el.value = stored;
+      draft.reset(stored);
+      o.onEmpty?.();
+      return;
+    }
+    if (value !== raw) el.value = value;
+    if (!draft.shouldSave(value, stored)) return;
+    const n = draft.send(value);
+    Promise.resolve(save(value)).then(
+      (answer) => draft.answered(n, storedBy(answer)),
+      () => draft.answered(n, false),
+    );
+  };
+  return { bind, defaultValue: initial, commit };
+}
+
+/**
+ * A choice field (a select, a check box; slice 13, R4): the choice shows from the click until the stored value changes;
+ * after a refusal the field shows the stored value, which the refusal's fresh page brings.
+ */
+export function useChoice<T>(stored: T, save: FieldSave<T>) {
+  const [chosen, setChosen] = useState<Chosen<T> | null>(null);
+  const value = choiceShown(chosen, stored);
+  const choose = (next: T) => {
+    if (Object.is(next, value)) return;
+    const mine = { value: next, on: stored };
+    setChosen(mine);
+    const back = () => setChosen((c) => (c === mine ? null : c));
+    Promise.resolve(save(next)).then((answer) => storedBy(answer) !== true && back(), back);
+  };
+  return { value, choose };
+}
+
+/** A text field that saves on Enter or when it loses the focus. An empty required field goes back (D-59). */
 export function TextField({
   id,
   value,
   onSave,
   readOnly,
   required,
+  onEmpty,
   testId,
   inputRef,
   mono,
@@ -50,19 +125,22 @@ export function TextField({
 }: {
   id?: string;
   value: string;
-  onSave: (value: string) => void;
+  onSave: FieldSave<string>;
   readOnly?: boolean;
   required?: boolean;
+  /** An empty required field went back (a toast, where the server would have refused it: slice 13, F14). */
+  onEmpty?: () => void;
   testId?: string;
-  inputRef?: React.Ref<HTMLInputElement>;
+  inputRef?: Ref<HTMLInputElement>;
   mono?: boolean;
   placeholder?: string;
 }) {
+  const { bind: bind, defaultValue: initial, commit: commit } = useDraft<HTMLInputElement>(value, onSave, { prepare: (t) => t.trim(), required, onEmpty, readOnly, elementRef: inputRef });
   return (
     <input
       id={id}
-      ref={inputRef}
-      defaultValue={value}
+      ref={bind}
+      defaultValue={initial}
       readOnly={readOnly}
       placeholder={placeholder}
       data-testid={testId}
@@ -71,15 +149,7 @@ export function TextField({
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
       }}
-      onBlur={(e) => {
-        if (readOnly) return;
-        const v = e.currentTarget.value.trim();
-        if (required && !v) {
-          e.currentTarget.value = value;
-          return;
-        }
-        if (v !== value) onSave(v);
-      }}
+      onBlur={commit}
     />
   );
 }
@@ -90,15 +160,17 @@ export function TextArea({
   onSave,
   code,
   ...rest
-}: { value: string; onSave: (value: string) => void; code?: boolean } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
+}: { value: string; onSave: FieldSave<string>; code?: boolean } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
+  const { bind: bind, defaultValue: initial, commit: commit } = useDraft<HTMLTextAreaElement>(value, onSave, { readOnly: !!rest.readOnly || !!rest.disabled });
   return (
     <textarea
       {...rest}
-      defaultValue={value}
+      ref={bind}
+      defaultValue={initial}
       className={`${inputClass} min-h-[60px] resize-y ${code ? "font-mono text-xs" : ""}`}
       onBlur={(e) => {
         rest.onBlur?.(e);
-        if (!rest.readOnly && !rest.disabled && e.currentTarget.value !== value) onSave(e.currentTarget.value);
+        commit();
       }}
     />
   );

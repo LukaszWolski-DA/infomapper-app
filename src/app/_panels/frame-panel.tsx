@@ -13,7 +13,7 @@ import { CanvasUiCtx, type FramePatch } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { FREE_FRAME_COLORS } from "@/domain/model/frames";
 import type { FrameKind } from "@/domain/types";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextField } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextField, useChoice } from "./fields";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
 import { NotesHere } from "./notes-here";
@@ -47,10 +47,14 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
     setNameFocus(null);
   }, [nameFocus, frameId, setNameFocus]);
 
+  // frames keep the canvas's queue (slice 13, R5): stable keys only, and a choice shows the stored value after a refusal
+  const concept = useChoice(view?.frame.conceptId ?? "", (conceptId) => ui.updateFrame(frameId, { conceptId }));
+  const system = useChoice(view?.frame.sourceSystemId ?? "", (sourceSystemId) => ui.updateFrame(frameId, { sourceSystemId }));
+
   if (!view) return null;
   const { frame: f, members, stats } = view;
   const ix = p.ix;
-  const update = (patch: FramePatch) => void ui.updateFrame(f.id, patch);
+  const update = (patch: FramePatch) => ui.updateFrame(f.id, patch);
 
   /** What the frame stands for when switched to a kind: from its cards first, as in the prototype. */
   const switchTo = (kind: FrameKind) => {
@@ -92,7 +96,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       <Kind>Frame on this canvas</Kind>
       <Field label="Name" htmlFor="f-fn">
         <TextField
-          key={fieldKey(f.id, "name", f.name)}
+          key={fieldKey(f.id, "name")}
           id="f-fn"
           value={f.name}
           required
@@ -108,13 +112,13 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       {f.kind === "concept" && (
         <Field label="Concept" htmlFor="f-fr">
           <select
-            key={fieldKey(f.id, "concept", f.conceptId)}
+            key={fieldKey(f.id, "concept")}
             id="f-fr"
             className={inputClass}
-            defaultValue={f.conceptId ?? ""}
+            value={concept.value}
             disabled={!p.editable}
             data-testid="select-frame-concept"
-            onChange={(e) => update({ conceptId: e.target.value })}
+            onChange={(e) => concept.choose(e.target.value)}
           >
             {[...ix.model.concepts]
               .sort((a, b) => a.sort_order - b.sort_order)
@@ -129,13 +133,13 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
       {f.kind === "source_system" && (
         <Field label="Source system" htmlFor="f-fr">
           <select
-            key={fieldKey(f.id, "system", f.sourceSystemId)}
+            key={fieldKey(f.id, "system")}
             id="f-fr"
             className={inputClass}
-            defaultValue={f.sourceSystemId ?? ""}
+            value={system.value}
             disabled={!p.editable}
             data-testid="select-frame-system"
-            onChange={(e) => update({ sourceSystemId: e.target.value })}
+            onChange={(e) => system.choose(e.target.value)}
           >
             {ix.model.sourceSystems.map((s) => (
               <option key={s.id} value={s.id}>

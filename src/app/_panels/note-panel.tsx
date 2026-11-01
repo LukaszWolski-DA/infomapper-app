@@ -38,7 +38,7 @@ export function NotePanel({ noteId }: { noteId: Uuid }) {
       <Kind>Note on this canvas</Kind>
       <Field label="Text" htmlFor="f-nt">
         <TextArea
-          key={fieldKey(n.id, "text", n.text)}
+          key={fieldKey(n.id, "text")}
           id="f-nt"
           value={n.text}
           readOnly={!can}
