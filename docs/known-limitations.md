@@ -742,6 +742,19 @@ pages), so the first tests do not wait for compiles.
   with a fresh build folder. The same fix applies.
 - **Later:** if the e2e runs move to a production build once the local adapter is gone (the database slice, last, AD-31), this goes away.
 
+### The e2e server's start may miss its 120 s when `next/font/google` does not answer (slice 12b)
+
+In slice 12b's closing (1 November 2026), the first `npm run e2e` stopped after 123 s without running a test. The e2e
+dev server's cold compile could not resolve the root layout's IBM Plex Sans from `next/font/google` ("Module not found:
+Can't resolve '@vercel/turbopack-next/internal/font/google/font'", thousands of lines). The server did not answer
+within the `webServer` timeout ("Timed out waiting 120000ms from config.webServer"). Google Fonts answered at once
+afterwards, and the run started again from scratch passed its start. The log is in
+`.data/s12b-close-e2e-start-failed.log`.
+
+- **Accepted:** a moment without the font's download, not the app; a new run from scratch starts.
+- **Later:** host the font locally (`next/font/local`) or give the e2e server a longer start (`docs/ideas.md`, the
+  chore before slice 13).
+
 ### S7A-04-route's development sign-in timed out once (a known flake)
 
 In slice 7b's closing (run 5 of 26 October 2026), “P8 (route): a review that no longer matches the system writes
@@ -760,6 +773,12 @@ past a threshold over a long run (Turbopack's compiled pages and caches); the te
 any test may be that one. The run's output and trace are in `.data/e2e-failures/12a-close-1/`.
 
 - **Accepted:** a dev-server restart, not the app; the test passes on its own.
+- **Second occurrence** (slice 12b's closing, 1 November 2026, 5,392 s):
+  - the restart line came right before S11-06's "table and requirement cards" (`e2e/slice-11/S11-06.spec.ts`), which
+    failed with `net::ERR_CONNECTION_REFUSED`;
+  - S12A-04 (`e2e/slice-12a/S12A-04.spec.ts`) failed 12 tests later, on the server compiling again: a project's
+    rename was not stored within 15 s;
+  - both passed 3 of 3 on their own. Output and traces are in `.data/e2e-failures/12b-close-1/`.
 - **Later:** if it comes back, raise the dev server's memory for the e2e run (Node's `--max-old-space-size` in the e2e
   web server's command) or split the full run in two; the database slice's production-build e2e runs (AD-31) would
   end it.

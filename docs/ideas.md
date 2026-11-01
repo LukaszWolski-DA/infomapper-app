@@ -566,3 +566,15 @@ notes shown with "Show all". Measure with S12B-10 before and after.
   drawing came in before FCP, cold and warm).
 - **A stored thumbnail per canvas**, if a real workspace grows past step 5's bars (a data model change).
 
+## A chore before slice 13: steadier full e2e runs (slice 12b's closing)
+
+Slice 12b's closing lost a full run's start to `next/font/google`, and two tests to the dev server's restart at its
+memory threshold, the second time after slice 12a (`docs/known-limitations.md`, "The e2e dev server restarts itself at
+its memory threshold" and "The e2e server's start may miss its 120 s"). A small chore, before slice 13:
+- **Memory:** more for the e2e dev server (Node's `--max-old-space-size` in the e2e `webServer` command), or the full
+  run split in two (each half with its own server).
+- **The font:** IBM Plex Sans hosted in the repository (`next/font/local`), so no run depends on Google Fonts; or, at
+  least, a longer `webServer` start timeout for the e2e run.
+
+Measure a full run's time and failures before and after.
+
