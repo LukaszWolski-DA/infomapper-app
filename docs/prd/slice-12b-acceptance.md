@@ -861,3 +861,9 @@ passed this slice's earlier runs (step 4: 87 of 87 for the homes).
   - Its results were copied first, to `.data/measure/s12b10-slice-12a/` and `.data/measure/s12b-bytes-slice-12a/`.
   - The other worktrees (`infomapper-side-perf-4p-trial-*`) belong to slice 4p and are untouched.
 
+
+### CI and the pull request
+
+- Locally: `npm run lint`, `npm run typecheck` and `npm test` (119 files, 1,555 tests) pass.
+- The branch is pushed and the pull request is open: https://github.com/LukaszWolski-DA/infomapper-app/pull/31. GitHub runs its two checks (`check`, `migrations`) on it; they were pending when the closing message was written.
+- Merge and tag `slice-12b` only on Łukasz's command, after his manual acceptance (PRD section 5, "Definition of done", on KB after the backup above).
