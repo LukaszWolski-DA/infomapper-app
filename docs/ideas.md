@@ -604,3 +604,13 @@ into it. To check: whether the application's own structures grow (the undo histo
 adapter's caches) or Turbopack's and Next.js's (the module graph, compiled pages, request caches). The next step is a
 heap snapshot of the child before the threshold (for example `--heapsnapshot-near-heap-limit` or the inspector on a run
 of a few folders), read by retainers.
+
+## A Latin subset of IBM Plex under another family name (chore e2e reliability, step 4)
+
+Since the chore the app hosts IBM's complete WOFF2 files, so a first visit downloads 298 KB of fonts instead of the
+106 KB of Google's Latin subsets before (`docs/known-limitations.md`, "A first visit carries about 192 KB more fonts").
+If that starts to matter (a slow network, a first-visit budget), subset the five files to Latin (and Latin Extended,
+for names like Łukasz's) and serve them under another family name, as OFL 1.1 requires for a modified version of a
+font with a Reserved Font Name ("Plex"): rename the font's internal family names, keep `LICENSE.txt` with the files and
+note the change in `src/app/fonts/ibm-plex/README.md`. Measure the first visit before and after (as the chore's A/B
+did). No work now (Łukasz, 1 November 2026).
