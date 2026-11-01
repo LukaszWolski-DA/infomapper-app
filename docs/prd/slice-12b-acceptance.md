@@ -1,7 +1,8 @@
 # Slice 12b – acceptance
 
-Status: **step 4 stopped (1 November 2026): Łukasz chose A on conditions; the answers to his six questions are
-below ("Before building A"); waiting for his decision before A is built.**
+Status: **step 4 done (1 November 2026): the thumbnails are drawn from a route through an external `<use>`; the
+tiles, the frame count and the workspace home's thumbnails are built, with their specs and screenshots; waiting for
+Łukasz before step 5.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -524,4 +525,144 @@ S12B-04 and S12B-05 stay as they are: after a change or an undo the key, and so 
 
 **Recommendation:** A with `<use>` (question 1). B is not needed, since question 1 is solved without copying the colour
 values. B's class paint is not needed either: in the route's file the bytes no longer weigh on the page.
+
+### Łukasz's decision (1 November 2026)
+
+Build A with an external `<use>` (not `<img>`), as the answers above describe. The new wording of S12B-09 is accepted
+and written into the PRD, and P5 describes the form: the route, the symbol painted with the page's tokens, the table
+of answers and `no-store` under a wrong key. The fallback (one file of symbols per page) is described only. Then the
+rest of step 4: the bytes against `slice-12a` next to the estimate, a check in Firefox and WebKit, the rest of the
+tiles and specs, and the screenshots.
+
+### Step 4 as built
+
+- **The route** `src/app/w/[workspaceId]/thumbnail/[canvasId]/route.ts`:
+  - It checks access with `workspaceAccess` (`src/app/_lib/shell.ts`), the first lines of `loadShellFor` moved into
+    one function that the pages and the route share.
+  - It reads one canvas's rows and what the index needs, and answers `thumbnailSymbolFile`
+    (`src/ui/thumbnail-svg.ts`): one `<symbol id="t">`, one `<path>` per kind and colour, painted with the tokens
+    (`var(--im-physical)`, `var(--im-map)`, `var(--im-req)`), stored colours only in the shape `#RRGGBB`, and
+    `NOTE_MINI`. Each path carries `data-kind` and `data-color` for the specs.
+  - Its answers are as in P5's table.
+- **The proxy** (`src/proxy.ts`):
+  - For a thumbnail's address without a session cookie it answers 401 instead of the redirect to `/sign-in`, which
+    an image cannot follow and which Playwright followed to a 200.
+  - It remembers no preference there, so the cached answer carries no `Set-Cookie`. Without this, the proxy set the
+    "last workspace" cookie on GET requests, the thumbnail's included.
+- **The key and the address:** `src/app/_lib/thumbnails.ts` (`thumbnailKey`, `thumbnailHrefs`).
+- **The tile:** `src/ui/canvas-thumbnail.tsx` renders `<svg data-testid="tile-thumbnail"><use href="…?v={key}#t"
+  width="100%" height="100%"/></svg>`, or "Empty canvas" (`aria-hidden`, no request).
+- **The project home** passes each tile its thumbnail as a slot and the frame count: "{n} card(s), {m} frame(s). Also
+  in …" (`tile-canvas-meta`), from the frames it already reads.
+- **The workspace home** (P8): each project tile shows its first canvas's thumbnail, in tab order. It reads the rows on
+  the Overview tab only, and the same canvas has the same address on every home.
+- F3 holds: `loadProjectView` and the canvas page are unchanged (below).
+
+### The bytes, against `slice-12a` (S12B-bytes, measurement build)
+
+| | "Performance test" | "Performance test – 20 canvases" | estimate |
+| --- | --- | --- | --- |
+| document, `slice-12a` | 449,864 B | 1,095,071 B | |
+| document, branch | 452,038 B | 1,109,516 B | |
+| **document, growth** | **+2,174 B (+2.1 KB)** | **+14,445 B (+14.1 KB)** | about 8 KB (20 canvases) |
+| of it, the tiles' `<svg>` markup | 708 B | 4,720 B | |
+| copies of each address in the document | 2 (markup + RSC payload) | 2 | |
+| a write's answer, growth (pin / name / Undo) | +1,200 B each | +7,954 B each (+7.8 KB) | about 5 KB |
+| the drawings' files (fetched after the document, cached) | 3 files, 20,809 B | 20 files, 177,220 B | 6–9 KB each |
+
+- The drawings' files answer 200 with `private, max-age=31536000, immutable`.
+- The document and the write answers grow a little more than estimated: the RSC payload also carries the slot
+  elements' props (`className`, `data-testid`, the `<use>`'s size), the two maps keyed by canvas id (thumbnails and
+  frame counts) and the frame counts' text.
+- The bars (step 5) are 50 KB and 350 KB: the growth is 4 % of them.
+
+### Firefox and WebKit (`e2e/slice-12b/S12B-browsers.spec.ts`, on demand: `BROWSERS=1`)
+
+- **What the test checks:** whether the shapes an external `<use>` draws take the page's tokens. Their styles are in
+  the `<use>`'s shadow tree, which no script can read, so it reads pixels:
+  - it takes the strip's screenshot and draws it into a canvas;
+  - it counts the pixels in the blend of the page's own `--im-physical` at 55 % over `--im-canvas`, read in each
+    mode.
+- **What the counts say:**
+  - The table cards' insides are about 2,200 pixels in Chromium and Firefox, and about 9,600 in WebKit at 2×.
+  - The antialiased edges of any shape hold about 100 pixels near any blend, and the other mode's value gives 0, so
+    the bar is 1,000.
+  - A deliberate mistake (the blend at 30 %) fails the test.
+- **Chromium, Firefox and WebKit, light and dark: 6 of 6 passed.**
+- In Firefox and WebKit the dev server logs a hydration warning about `caret-color: transparent` on the project name's
+  field. Playwright's screenshot adds that style to hide the caret; it is not the app's code.
+
+### Specs (`e2e/slice-12b/`)
+
+The specs fetch each thumbnail's file as the browser does and parse its paths. They compare the shapes with the data
+without the domain's rules: the drawing is the canvas scaled and moved, so the scale and the offset come from the
+outer edges, and every expected shape must be there, of its kind and colour, at its place and width (`expectDrawn`,
+`expectedOf`). Heights are left to the unit tests, except a collapsed card's (S12B-02).
+
+| ID | What it does |
+| --- | --- |
+| S12B-01 | Order management's two tiles against their canvases: kinds, colours, places, widths; one line per mapped pair; Customer & orders' free note (its two pinned ones not drawn) and REQ-104. |
+| S12B-02 | A frame collapsed over two cards of Order lines & products: one block, the two cards and their lines gone; collapsed Product is its 54 px header. |
+| S12B-03 | "New canvas": "Empty canvas", `aria-hidden`, no address; after a card is placed, one entity. |
+| S12B-04 | A card moved on the canvas changes the address; Undo on the project home brings back the old address and the same shapes. |
+| S12B-05 | A note pinned to Customer and the seed's pinned notes not drawn; after deleting a frame, the blue note, REQ-104 and Customer: no frame, no requirement card, two entities, and only the freed note (no longer pinned, to the right of where Customer was). |
+| S12B-06 | CR-23's live canvas in Customer 360: full and context cards, all drawn. |
+| S12B-07 | "7 cards. Also in Customer 360" (Customer & orders, no frames; REQ-104's card is not counted, as before), "4 cards", "4 cards, 1 frame", "4 cards, 2 frames". |
+| S12B-08 | The workspace home: both projects show Customer & orders under the same address; after it leaves Order management, Order lines & products. |
+| S12B-09 | The server's HTML holds two `<svg>` with `<use href="/w/…/thumbnail/…?v={16 characters}#t">`. With JavaScript off the drawing is fetched (`image/svg+xml`). The address answers: `immutable` and `nosniff`; another key gives the same drawing with `no-store`; a reader (Kasia) and a reviewer (Piotr) get the owner's drawing; 404 for a canvas of Bank X and for an unknown id; 404 for Piotr in Bank X; 403 for Łukasz signed in to InfoMate only, asking for Sales analytics (Retail Co); 401 without a session (no redirect); no `Set-Cookie`; 404 once Order lines & products is deleted. |
+
+**The runs:**
+- **First run of `e2e/slice-12b`:** 8 of 10 passed.
+  - S12B-07 expected "8 cards"; the tile says 7, because REQ-104's card is not counted (as before this slice). The
+    expectation was corrected.
+  - S12B-09 found the proxy's redirect for a thumbnail without a session (200 after it). The proxy was fixed.
+  - After that, S12B-07 and both S12B-09 tests: 3 of 3 passed.
+- **This slice's specs and the earlier specs of both home pages** (`e2e/slice-00`, `slice-02a`, `slice-09`,
+  `slice-12a`, `slice-12b`; dev server, from scratch): **87 passed, 15.2 min**, none failed or flaky.
+- **S12B-browsers** (`BROWSERS=1`): 6 of 6 (Chromium, Firefox, WebKit; light and dark).
+- **CI:** `npm run lint`, `npm run typecheck` and `npm test` (119 files, 1,555 tests) pass.
+
+
+### S12B-09's review: no layout read and no client code
+
+The grep over the thumbnail's five files (`src/ui/canvas-thumbnail.tsx`, `src/ui/thumbnail-svg.ts`,
+`src/app/_lib/thumbnails.ts`, `src/domain/model/thumbnail.ts`, the route):
+
+```
+grep -nE '"use client"|useEffect|useLayoutEffect|useState|useRef|getBoundingClientRect|offsetWidth|offsetHeight|clientWidth|ResizeObserver|getComputedStyle|window\.|document\.' …
+```
+
+No match (exit 1). **F3:** `git diff slice-12a -- src/app/_lib/project-view.ts "src/app/w/[workspaceId]/p/[projectId]/c"`
+is empty. The canvas layer changed only in two imports of `NO_CONCEPT_COLOR` (`CardNode.tsx`, `Overview.tsx`) and
+`NOTE_MINI` (step 3); S12B-11's element check is step 5.
+
+### New user-facing texts
+
+- "Empty canvas", in a tile's strip when the canvas has nothing to draw (accepted in step 1).
+- ", {m} frame" / ", {m} frames" in a canvas tile's text, between "{n} card(s)" and ". Also in …" (accepted in step
+  1; the prototype's wording).
+
+Nothing else: the route answers have no body.
+
+### Screenshots (`e2e/slice-12b/S12B-screens.spec.ts`, `docs/prd/slice-12b-screens/step-4/`)
+
+Each in light and dark (`-light.png`, `-dark.png`), the tiles' grid only, 1,536 × 864 window:
+
+| File | What it shows |
+| --- | --- |
+| `seed-order-management` | Order management: Customer & orders and Order lines & products |
+| `empty-canvas-and-collapsed-frame` | the same home with "Untitled canvas 3" ("Empty canvas") and a frame collapsed over Order lines & products' top row ("4 cards, 1 frame") |
+| `live-canvas` | Customer 360 with CR-23's live canvas |
+| `workspace-home` | Retail Co – DWH's project tiles (P8) |
+| `performance-test` | "100 cards", PERF-2 and "Performance test – requirements" ("101 cards, 8 frames"; the tall bar at the right of "100 cards" is "Wide Customer Profile", the data set's entity with many attributes) |
+| `prototype-project-home` | the prototype's project home (its own demo: "7 cards, 5 frames") |
+| `prototype-workspace-home` | the prototype's workspace home |
+
+**Differences from the prototype's tiles that the screenshots show:**
+- The app draws no rounded corners: under a pixel at this size.
+- Card heights follow the canvas's rules (PRD section 8), so tall cards are tall.
+- The prototype's demo has frames on Customer & orders, and the seed has none.
+- A collapsed frame's block is the frame's colour at 40 %, as in the prototype.
+- In dark mode the stored concept colours stay as they are, as on the canvas, while tables, lines and requirement
+  cards take the dark tokens.
 

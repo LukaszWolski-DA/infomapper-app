@@ -7,6 +7,8 @@
 //   and only when the value changes. A cookie written during a server action makes Next.js refresh the page
 //   (x-action-revalidated), so writing them on every request refreshed every page after every action, even a
 //   refused one (this made S0-08 flaky).
+// - a canvas thumbnail's drawing (slice 12b, PRD P5) is not a page: without a session cookie it answers 401 instead of
+//   the redirect (an image cannot follow it), and it remembers nothing, so its cached answer carries no cookie.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { DEV_SESSION_COOKIE } from "@/app/_lib/dev-session";
@@ -19,14 +21,18 @@ import {
   rememberProject,
 } from "@/app/_lib/preferences";
 
+/** A thumbnail's drawing (`/w/{workspaceId}/thumbnail/{canvasId}`). */
+const THUMBNAIL_PATH = /^\/w\/[^/]+\/thumbnail\/[^/]+$/;
+
 export function proxy(request: NextRequest) {
   if (isMeasurementBuild() && !isLocalHost(request.headers.get("host"))) return new NextResponse("Not found", { status: 404 });
   const { pathname } = request.nextUrl;
   if (pathname === "/sign-in") return NextResponse.next();
-  if (!request.cookies.has(DEV_SESSION_COOKIE)) return NextResponse.redirect(new URL("/sign-in", request.url));
+  const thumbnail = THUMBNAIL_PATH.test(pathname);
+  if (!request.cookies.has(DEV_SESSION_COOKIE)) return thumbnail ? new NextResponse(null, { status: 401 }) : NextResponse.redirect(new URL("/sign-in", request.url));
 
   const response = NextResponse.next();
-  if (request.method !== "GET" || request.headers.has("next-action")) return response;
+  if (thumbnail || request.method !== "GET" || request.headers.has("next-action")) return response;
   const { workspaceId, projectId } = idsFromPath(pathname);
   if (workspaceId && request.cookies.get(LAST_WORKSPACE_COOKIE)?.value !== workspaceId) {
     response.cookies.set(LAST_WORKSPACE_COOKIE, workspaceId, preferenceCookieOptions);
