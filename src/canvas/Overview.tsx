@@ -24,6 +24,7 @@ import { CanvasUiCtx } from "./context";
 import { cardHeight, cardWidth, type Rect } from "./geometry";
 import type { CanvasLines } from "./line-data";
 import type { NoteColor } from "@/domain/types";
+import { NOTE_MINI } from "@/ui/note-colors";
 
 const NO_NOTES: readonly MiniNote[] = [];
 
@@ -38,9 +39,6 @@ export interface MiniNote {
   h: number;
   color: NoteColor;
 }
-
-/** The notes' paper colours in the miniature (prototype NOTE_MINI). */
-const NOTE_MINI: Record<NoteColor, string> = { yellow: "#E9C94F", blue: "#7FA9E0", green: "#7CC197", pink: "#E59BB6", grey: "#A9B0BA" };
 
 const sameNotes = (a: readonly MiniNote[], b: readonly MiniNote[]) =>
   a.length === b.length && a.every((n, i) => n.id === b[i]!.id && n.x === b[i]!.x && n.y === b[i]!.y && n.w === b[i]!.w && n.h === b[i]!.h && n.color === b[i]!.color);

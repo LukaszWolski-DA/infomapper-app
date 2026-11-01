@@ -1,6 +1,7 @@
 # Slice 12b – acceptance
 
-Status: **step 3 in progress (1 November 2026): step 2 answered; the thumbnail function and its unit tests.**
+Status: **step 3 done (1 November 2026): the thumbnail function, its unit tests and the move of `NOTE_MINI`; waiting
+for Łukasz before step 4.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -129,8 +130,8 @@ No change to the application. What step 2 adds:
   `fixtures.ts`;
 - `scripts/lib/many-canvases.ts`, "Performance test – 20 canvases" (`addManyCanvases`), used by the spec and the bench;
 - `scripts/bench-thumbnails.ts`, the bench;
-- `scripts/lib/thumbnail-draft.ts`, a draft of the thumbnail for the bench only. Step 3 writes the real function in
-  `src/domain/model/thumbnail.ts`, and the draft then goes.
+- `scripts/lib/thumbnail-draft.ts`, a draft of the thumbnail for the bench only. Step 3 wrote the real function in
+  `src/domain/model/thumbnail.ts` and removed the draft.
 
 How it was run: the development laptop, Chrome 156, headed (`MEASURE=1`), the measurement build (`npm run
 measure:build`), nothing else running. Two full runs of S12B-10 (15 loads per page after 2 discarded; raw figures in
@@ -279,3 +280,54 @@ not a gate (its spread is too wide for one).
    second time in the embedded RSC payload, and what they add to a write's answer on the project home (a pin, a
    rename, Undo), with figures for "Performance test" and the 20-canvas project. If there are two copies, propose how
    to avoid them before step 5.
+
+## Step 3: the thumbnail function
+
+What step 3 adds and changes:
+- **`src/domain/model/thumbnail.ts`** (pure, no React):
+  - `thumbnailIndex(model, { requirements, labels, labelLinks })`: what a page builds once (rows per card with their
+    mapping counts as `buildCards` counts them, colour roles, the table and entity pairs joined by a mapping);
+  - `canvasThumbnail(canvas, { items, frames, notes }, index)`: the shapes in drawing order (frames, the larger first;
+    lines; tables; entities; notes; requirement cards) and their bounds, null for "Empty canvas";
+  - `canvasThumbnails(canvases, rows, index)`: the same for several canvases, grouping the workspace's rows by canvas
+    once;
+  - `thumbnailDrawing(thumbnail)`: one path per kind and colour, whole numbers, the longer side 400 units with the 6 %
+    margin (step 2's answer).
+
+  Colours are roles: a stored `#RRGGBB`, `physical`, `req`, a note colour or null (lines). Step 4's
+  `src/ui/canvas-thumbnail.tsx` maps them to tokens.
+- **The rules, as answered:**
+  - card heights by `cardHeightOf` with the row filter; a stored `labeled` filter shows as `all` outside a live
+    canvas, and a live canvas is live only while its label exists, as on the canvas page;
+  - a collapsed card is its header; a collapsed frame is its block, `blockHeight` of its element cards whose entity or
+    table is live (`memberCounts` of the built cards), with its cards, their lines and its free notes left out;
+  - a requirement card is 230 × 94 while its requirement is live;
+  - free notes are drawn by `noteVisible` with resolved ones shown, at their width and 80 high; pinned notes are not
+    drawn;
+  - an entity whose concept is not in the model is `#888899`, as on the canvas.
+- **Unit tests:**
+  - `src/domain/model/thumbnail.test.ts`: 24 tests, one or more per rule of P2 and P6, and the paths;
+  - `tests/thumbnail-heights.test.ts`: every entity and table card the thumbnail draws on every canvas of the seed and
+    of "Performance test" has the canvas's rectangle (`cardWidth`, `cardHeight(buildCards(…))`, built as the canvas
+    page builds it, PERF-2 live), and each collapsed frame's block has the canvas's `frameShape`. The test collapses two
+    of "100 cards"'s frames in its own data file, since the seed has none. It lives in `tests/` because `domain` cannot
+    import the canvas. A check that it can fail: with the prototype's rule (every row) it fails on PERF-2
+    (`256×690` against `256×92`).
+- **`NOTE_MINI`** moved from `src/canvas/Overview.tsx` to `src/ui/note-colors.ts` (answer 6), with the same values;
+  the Overview imports it. **S3B-13: 2 of 2 passed** (45.5 s).
+- **The bench** (`scripts/bench-thumbnails.ts`) uses the real function; the draft is removed. Its output is in
+  `.data/bench-thumbnails-step3.log` (5 rounds). Median server time of the thumbnails:
+
+  | Data set | index | shapes | paths | bytes (HTML + RSC estimate) |
+  | --- | --- | --- | --- | --- |
+  | seed, project home (2 canvases) | 0.08 ms | 0.06 ms | 0.04 ms | 2.0 KB |
+  | large, project home (3) | 1.5 ms | 1.3 ms | 0.4 ms | 34.6 KB |
+  | many, project home (20) | 1.5 ms | 4.6 ms | 3.6 ms | 304.8 KB |
+  | many, workspace home (P8, 2 projects) | 1.4 ms | 0.4 ms | 0.2 ms | 30.5 KB |
+
+  The shapes on 20 canvases take 4.6 ms against the draft's 26 ms, because the rows are grouped by canvas once. The
+  shapes per "100 cards" canvas are the draft's (8 frames, 279 lines, 60 tables, 41 entities, 12 notes), and the bytes
+  are step 2's paths figures.
+- **CI:** `npm run lint`, `npm run typecheck` and `npm test` (119 files, 1,555 tests) pass.
+- No application page changes yet: the tiles are step 4. `.data/dev-db.json` is not touched.
+

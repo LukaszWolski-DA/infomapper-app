@@ -2,9 +2,10 @@
 // the project home and the workspace home do on the server today, split, and what the thumbnails would add, on three
 // data sets: the seed (Order management), "Performance test" and "Performance test – 20 canvases". The page's reads go
 // through the same store calls as the pages (`page.tsx`, `loadProjectView`, `loadShellFor`, copied here, since
-// `server-only` modules cannot be imported outside Next.js); the thumbnails are `scripts/lib/thumbnail-draft.ts` with
-// both height rules, and their bytes in the HTML and the RSC payload for four ways of writing them. The data file is
-// its own (`.data/bench-thumbnails.json`, made from the seed each run), never `.data/dev-db.json`.
+// `server-only` modules cannot be imported outside Next.js). The thumbnails are `src/domain/model/thumbnail.ts` (step 3;
+// step 2 timed a draft of it with both height rules and four ways of writing the SVG, `slice-12b-acceptance.md`), and
+// their bytes as paths (step 2's answer) in the HTML and an estimate of the RSC payload. The data file is its own
+// (`.data/bench-thumbnails.json`, made from the seed each run), never `.data/dev-db.json`.
 // One warm-up, then ROUNDS; median, fastest, slowest. Reported, not a gate.
 // Run: npx tsx scripts/bench-thumbnails.ts
 
@@ -21,9 +22,9 @@ import type { Uuid } from "../src/domain/ids";
 import { projectLabels, type ProjectLabelContext } from "../src/domain/model/labels";
 import { buildRequirementIndex } from "../src/domain/model/requirement-index";
 import { modelConsistency } from "../src/domain/source-changes/consistency";
+import { canvasThumbnails, thumbnailDrawing, thumbnailIndex, type Thumbnail, type ThumbnailDrawing } from "../src/domain/model/thumbnail";
 import type { CanvasItem, WorkspaceModel } from "../src/domain/types";
 import { addManyCanvases, MANY_PROJECT_ID } from "./lib/many-canvases";
-import { bytesOf, kindsOf, thumbIndex, thumbnail, type HeightRule } from "./lib/thumbnail-draft";
 
 const ROUNDS = Number(process.env.ROUNDS ?? 9);
 const FILE = path.resolve(".data", "bench-thumbnails.json");
@@ -60,8 +61,8 @@ async function shellReads(store: DataStore, ws: Uuid) {
   return Promise.all(projects.map(async (p) => ({ id: p.id, links: await store.canvases.listLinksOfProject(ws, p.id) })));
 }
 
-/** The project home's server work, split; with the thumbnails of every canvas when `rule` is given. */
-async function projectHome(store: DataStore, ws: Uuid, projectId: Uuid, rule: HeightRule | null, t: Timings) {
+/** The project home's server work, split; with the thumbnails of every canvas when `thumbs` is set. */
+async function projectHome(store: DataStore, ws: Uuid, projectId: Uuid, thumbs: boolean, t: Timings) {
   await timed(t, "shell reads", () => shellReads(store, ws));
   // loadProjectView
   const [, , , , canvases, links, items0, labels0] = await timed(t, "project view reads", () =>
@@ -85,12 +86,12 @@ async function projectHome(store: DataStore, ws: Uuid, projectId: Uuid, rule: He
   const reqs = await timed(t, "project requirements", () => projectRequirements(index, items, canvasIds));
   await timed(t, "model consistency", () => modelConsistency(model, items, canvasIds, index, reqs, sourceChanges));
   await timed(t, "open notes", () => projectOpenNotes(notes, canvases.filter((c) => canvasIds.includes(c.id)), items, frames, model));
-  if (!rule) return null;
-  // the thumbnails: one index per page, then one thumbnail per canvas
-  const ix = await timed(t, `thumbnails: index (${rule})`, () => thumbIndex(model, requirements.map((r) => r.id), labelLinks));
-  return timed(t, `thumbnails: shapes (${rule})`, () =>
-    canvasIds.map((id) => thumbnail(canvases.find((c) => c.id === id)!, items.filter((i) => i.canvas_id === id), frames.filter((f) => f.canvas_id === id), notes.filter((n) => n.canvas_id === id), ix, rule)),
-  );
+  if (!thumbs) return null;
+  // the thumbnails: one index per page, then one thumbnail per canvas, then their paths
+  const ix = await timed(t, "thumbnails: index", () => thumbnailIndex(model, { requirements, labels, labelLinks }));
+  const shown = canvasIds.map((id) => canvases.find((c) => c.id === id)!);
+  const made = await timed(t, "thumbnails: shapes", () => canvasThumbnails(shown, { items, frames, notes }, ix));
+  return timed(t, "thumbnails: paths", () => canvasIds.map((id) => ({ thumbnail: made.get(id)!, drawing: thumbnailDrawing(made.get(id)!) })));
 }
 
 /** The workspace home's server work today, and what P8 adds (each project's first canvas). */
@@ -105,14 +106,13 @@ async function workspaceHome(store: DataStore, ws: Uuid, p8: boolean, t: Timings
     buildRequirementIndex(requirements, requirementLinks, model);
   });
   if (!p8) return null;
-  const [items, frames, notes, canvases, labelLinks] = await timed(t, "P8: canvas reads", () => Promise.all([store.canvasItems.list(ws), store.frames.list(ws), store.notes.list(ws), store.canvases.list(ws), store.labels.listLinks(ws)]));
-  const ix = await timed(t, "P8: thumbnails: index", () => thumbIndex(model, requirements.map((r) => r.id), labelLinks));
-  return timed(t, "P8: thumbnails: shapes", () =>
-    shell.flatMap((p) => {
-      const id = p.links[0]?.canvas_id;
-      return id ? [thumbnail(canvases.find((c) => c.id === id)!, items.filter((i) => i.canvas_id === id), frames.filter((f) => f.canvas_id === id), notes.filter((n) => n.canvas_id === id), ix, "canvas")] : [];
-    }),
+  const [items, frames, notes, canvases, labels, labelLinks] = await timed(t, "P8: canvas reads", () =>
+    Promise.all([store.canvasItems.list(ws), store.frames.list(ws), store.notes.list(ws), store.canvases.list(ws), store.labels.list(ws), store.labels.listLinks(ws)]),
   );
+  const ix = await timed(t, "P8: thumbnails: index", () => thumbnailIndex(model, { requirements, labels, labelLinks }));
+  const first = shell.flatMap((p) => (p.links[0] ? [canvases.find((c) => c.id === p.links[0]!.canvas_id)!] : []));
+  const made = await timed(t, "P8: thumbnails: shapes", () => canvasThumbnails(first, { items, frames, notes }, ix));
+  return timed(t, "P8: thumbnails: paths", () => first.map((c) => ({ thumbnail: made.get(c.id)!, drawing: thumbnailDrawing(made.get(c.id)!) })));
 }
 
 async function bench(label: string, run: (t: Timings) => Promise<unknown>) {
@@ -133,17 +133,28 @@ async function bench(label: string, run: (t: Timings) => Promise<unknown>) {
   console.table(rows);
 }
 
-function bytesReport(label: string, thumbs: ReturnType<typeof thumbnail>[]) {
-  const per = thumbs.map(bytesOf);
-  const sum = (pick: (b: ReturnType<typeof bytesOf>) => number) => per.reduce((s, b) => s + pick(b), 0);
-  const shapes = thumbs.reduce((s, t) => s + t.shapes.length, 0);
-  console.log(`\n${label}: ${thumbs.length} thumbnail(s), ${shapes} shapes ${JSON.stringify(kindsOf(thumbs))}; bytes per page (HTML + RSC payload estimate)`);
-  console.table(
-    (["elements", "string", "elementsRounded", "stringRounded", "paths"] as const).map((w) => {
-      const html = sum((b) => b[w].html), payload = sum((b) => b[w].payload);
-      return { way: w, html, payload, total: html + payload, perThumbnail: Math.round((html + payload) / Math.max(1, thumbs.length)) };
-    }),
-  );
+/** The SVG's markup as a server component would write it (an estimate until step 4's component exists). */
+function markupOf(d: ThumbnailDrawing | null): string {
+  if (!d) return "";
+  const paths = d.paths.map((p) => `<path class="${p.kind}"${p.color?.startsWith("#") ? ` fill="${p.color}"` : ""} d="${p.d}"></path>`).join("");
+  return `<svg viewBox="0 0 ${d.width} ${d.height}" preserveAspectRatio="xMidYMid meet" aria-hidden="true">${paths}</svg>`;
+}
+
+/** React's flight format writes an element as ["$", type, key, props]: the RSC payload's estimate. */
+function payloadOf(d: ThumbnailDrawing | null): number {
+  if (!d) return 0;
+  const paths = d.paths.map((p) => ["$", "path", null, { className: p.kind, ...(p.color?.startsWith("#") ? { fill: p.color } : {}), d: p.d }]);
+  return JSON.stringify(["$", "svg", null, { viewBox: `0 0 ${d.width} ${d.height}`, preserveAspectRatio: "xMidYMid meet", "aria-hidden": true, children: paths }]).length;
+}
+
+function bytesReport(label: string, thumbs: { thumbnail: Thumbnail; drawing: ThumbnailDrawing | null }[]) {
+  const kinds: Record<string, number> = {};
+  for (const { thumbnail } of thumbs) for (const s of thumbnail.shapes) kinds[s.kind] = (kinds[s.kind] ?? 0) + 1;
+  const html = thumbs.reduce((s, t) => s + markupOf(t.drawing).length, 0);
+  const payload = thumbs.reduce((s, t) => s + payloadOf(t.drawing), 0);
+  const paths = thumbs.reduce((s, t) => s + (t.drawing?.paths.length ?? 0), 0);
+  console.log(`\n${label}: ${thumbs.length} thumbnail(s), ${paths} paths, shapes ${JSON.stringify(kinds)}`);
+  console.table([{ html, payload, total: html + payload, perThumbnail: Math.round((html + payload) / Math.max(1, thumbs.length)) }]);
 }
 
 async function main() {
@@ -153,17 +164,9 @@ async function main() {
   const sets: { name: string; ws: Uuid; project: Uuid }[] = [{ name: "seed: Order management", ws: SEED_IDS.wsRetailDwh, project: SEED_IDS.projOrderManagement }];
 
   const runSet = async (s: { name: string; ws: Uuid; project: Uuid }) => {
-    await bench(`${s.name}: project home today`, (t) => projectHome(store, s.ws, s.project, null, t));
-    await bench(`${s.name}: project home + thumbnails (canvas rule)`, (t) => projectHome(store, s.ws, s.project, "canvas", t));
-    await bench(`${s.name}: project home + thumbnails (prototype rule)`, (t) => projectHome(store, s.ws, s.project, "prototype", t));
-    bytesReport(`${s.name}: project home`, (await projectHome(store, s.ws, s.project, "canvas", {}))!);
-    // the canvas rule against the prototype's: how many cards differ in height
-    const a = (await projectHome(store, s.ws, s.project, "canvas", {}))!, b = (await projectHome(store, s.ws, s.project, "prototype", {}))!;
-    let differ = 0, cards = 0;
-    a.forEach((t, i) => t.shapes.forEach((sh, k) => {
-      if (sh.k === "entity" || sh.k === "table") { cards++; if (sh.h !== (b[i]!.shapes[k] as typeof sh).h) differ++; }
-    }));
-    console.log(`${s.name}: ${differ} of ${cards} cards differ in height between the canvas rule and the prototype's`);
+    await bench(`${s.name}: project home today`, (t) => projectHome(store, s.ws, s.project, false, t));
+    await bench(`${s.name}: project home + thumbnails`, (t) => projectHome(store, s.ws, s.project, true, t));
+    bytesReport(`${s.name}: project home`, (await projectHome(store, s.ws, s.project, true, {}))!);
   };
   const runWs = async (name: string, ws: Uuid) => {
     await bench(`${name}: workspace home today`, (t) => workspaceHome(store, ws, false, t));
