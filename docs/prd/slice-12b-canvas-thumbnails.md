@@ -116,6 +116,7 @@ Stop after each step with a short summary of what changed and how to check it. W
 6. **Closing:**
    - the docs (section 10);
    - one full e2e run, keeping a failing test's error output and trace before rerunning it;
+   - the proxy's fix (step 4, acceptance "A bug found: the proxy and the thumbnail's address"): pages without a session still redirect to `/sign-in` and the last workspace and project cookies are still set on pages (`e2e/slice-00/S0-01.spec.ts`, `S0-02.spec.ts`; both in the full run);
    - CI and the pull request with both GitHub checks;
    - a backup of KB (`.data/backups/dev-db-<yyyymmdd-hhmm>.json` and `kb-model-latest.json`);
    - the manual acceptance scenario.

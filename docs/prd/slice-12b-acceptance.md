@@ -1,8 +1,7 @@
 # Slice 12b – acceptance
 
-Status: **step 4 done (1 November 2026): the thumbnails are drawn from a route through an external `<use>`; the
-tiles, the frame count and the workspace home's thumbnails are built, with their specs and screenshots; waiting for
-Łukasz before step 5.**
+Status: **step 5 in progress (1 November 2026): step 4 accepted with the proxy's fix; the measurement against
+`slice-12a`.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -665,4 +664,36 @@ Each in light and dark (`-light.png`, `-dark.png`), the tiles' grid only, 1,536 
 - A collapsed frame's block is the frame's colour at 40 %, as in the prototype.
 - In dark mode the stored concept colours stay as they are, as on the canvas, while tables, lines and requirement
   cards take the dark tokens.
+
+### Łukasz's answer to step 4 (1 November 2026)
+
+Step 4 is accepted, with the fix in `src/proxy.ts`. Describe it here as a bug found. Add to step 6 a check that pages
+without a session still redirect to `/sign-in` and that the last workspace's cookie is set on pages as before, naming
+the specs that cover it (or adding one).
+
+### A bug found: the proxy and the thumbnail's address
+
+- **What happened:**
+  - `src/proxy.ts` runs before every request except static files. Without a session cookie it redirects every path
+    but `/sign-in` there (307), and the thumbnail's address `/w/{workspace}/thumbnail/{canvas}` was no exception.
+  - So the route's own 401 never ran. A client that follows redirects (Playwright's request, a browser fetching the
+    `<use>`) got the sign-in page's HTML with 200, and the tile's `<use>` was handed an HTML document.
+  - On a signed-in GET, the proxy also writes the "last workspace" cookie when its value changes (AD-07). It did so
+    for the thumbnail's address too, so an answer meant to be cached for good (`immutable`) could carry a
+    `Set-Cookie`.
+- **Why:** the proxy is written for pages (its comment says so). The thumbnail route is the first GET route handler
+  under `/w/` that is not a page; the import's upload route is a POST and is not affected.
+- **How it was found:** S12B-09 asked for 401 without a session and got 200 after the redirect.
+- **What changed:**
+  - A path matching `^/w/[^/]+/thumbnail/[^/]+$` (`THUMBNAIL_PATH`) answers 401 without a session cookie instead of
+    the redirect, and remembers no preference.
+  - Every other path is handled exactly as before.
+  - S12B-09 checks the 401 without following redirects, and that a signed-in answer has no `Set-Cookie`.
+- **What still covers the pages** (step 6's check, PRD section 4):
+  - `e2e/slice-00/S0-01.spec.ts`: without a session `/`, a workspace home and a project home redirect to `/sign-in`;
+    after sign-in the last used workspace opens, which is the cookie the proxy writes.
+  - `e2e/slice-00/S0-02.spec.ts`: the last used project is remembered per workspace (the second cookie), after
+    visiting Order management's home, whose tiles now fetch their thumbnails.
+  - Both passed in step 4's run (87 of 87), and both run again in step 6's full run.
+  - No new spec is needed: a canvas page takes the same branch of the proxy as the project home.
 
