@@ -1,7 +1,6 @@
 # Slice 12b – acceptance
 
-Status: **step 5 done (1 November 2026): every bar passes against `slice-12a`; the canvas's element counts are
-slice 12a's; waiting for Łukasz before step 6.**
+Status: **step 6, the closing (1 November 2026): step 5 accepted; docs, the full run, CI and the pull request.**
 
 - Branch `slice/12b-canvas-thumbnails`, made on 1 November 2026 from `main` at `98e107a` (the start commit), which is
   the tag `slice-12a` itself; `origin/main` is at the same commit, so there is no difference to check.
@@ -757,8 +756,9 @@ If a bar is missed: stop and describe it; the bars do not change.
 | 20 canvases' workspace home | `p` in `box-archive` | 45 ms (2 of 2) | 149 ms | 284 → 280 |
 
 - **The LCP element is the same on both sides, on every warm and cold load:** never a thumbnail, as step 4 expected.
-  "(removed)" means the element that was the largest paint is no longer in the document when the entry is read (the
-  same on `slice-12a`, so it comes from the page as it was, not from this slice).
+  "(removed)" means the element that was the largest paint is no longer in the document when the entry is read.
+  **A trait of the measurement, not of this slice** (Łukasz, step 5's acceptance): it happens on `slice-12a`'s project
+  homes too, on every load, warm and cold, and the LCP time is still recorded (it equals FCP on every page).
 - **With the cache** (a second visit), every drawing comes from the browser's cache (transfer size 0). The last one is
   in before FCP on every page, 186 ms against FCP 372 ms on the 20-canvas home.
 - **On a first visit** the drawings are fetched after the document and come in before FCP on every page (515 ms

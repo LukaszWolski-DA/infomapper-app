@@ -543,13 +543,6 @@ stops at Requirements and the working context (`src/app/_panels/status-bar.tsx`)
 
 - **Accepted** by Łukasz in slice 4a, step 5. **Later:** slice 6, with the view-state bar (D-39).
 
-### Canvas tiles have no frame count
-
-The prototype's canvas tile on the project home says “{n} cards, {m} frames. Also in …”; the application's says
-“{n} cards. Also in …” (`src/app/w/[workspaceId]/p/[projectId]/_components/project-tiles.tsx`).
-
-- **Accepted** by Łukasz in slice 4a, step 5. **Later:** not planned yet.
-
 ## Text contrast (slice 4b-1, step 6)
 
 ### Grey text and two tags are below WCAG AA on a plain card

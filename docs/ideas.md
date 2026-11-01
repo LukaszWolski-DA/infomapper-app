@@ -37,7 +37,10 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   - **12a: undo and redo on the home pages, and deleting a project.** **Done in slice 12a** (D-65): the canvas pages'
     Undo and Redo on both home pages, on the same history; pins are undo steps; "Delete this project" at the end of a
     project's home, with a preview of the canvases it takes, one undo step. No data model change.
-  - **Next: 12b: the canvas tiles' thumbnails,** after measuring the home's load.
+  - **12b: the canvas tiles' thumbnails.** **Done in slice 12b** (D-29, AD-32): a sketch of each canvas's layout on
+    its tile, drawn from a route through an external `<use>` with the page's colours; the frame count; each project's
+    first canvas on the workspace home. No data model change.
+- **Next: 13.**
 - **13: one behaviour for a refused save in every field** (F6, above), with the typed value kept on a conflict (the
   first entry). Also keep text typed into a field while its save is on its way: the save's answer replaces the field
   (keyed by its stored value) and the typed text and focus are lost (`docs/known-limitations.md`, slice 10c).
@@ -458,9 +461,8 @@ change first.
 
 ### Later
 
-- **Thumbnails on the project home's canvas tiles.** The prototype draws them (`thumb`); the app has an empty strip
-  since slice 0 ("no thumbnails yet"). The Overview's miniature can draw them, but the home would read every canvas's
-  layout: measure the home's load first.
+- **Thumbnails on the project home's canvas tiles.** **Done in slice 12b** (D-29, AD-32), after measuring the home's
+  load: the home already read every row a thumbnail needs. Later steps are in the entries of slice 12b below.
 - **Copying an attribute to another entity.** **Done in slice 10c** (D-63): “Copy” and “Paste attribute”, one
   attribute at a time, not tied to a relationship; the copy follows its original's type and Personal data; mappings,
   requirement links and labels are not copied. Later steps are in the entries of slice 10c below.
@@ -551,4 +553,16 @@ outweigh everything else in the document:
 The embedded RSC payload roughly doubles what client components receive, and TTFB grows by about 0.09 ms per KB. To
 look at: folding the consistency lines by kind with a count (as its known limitation suggests), and a limit on the open
 notes shown with "Show all". Measure with S12B-10 before and after.
+
+## Canvas thumbnails: what comes later (slice 12b, PRD section 9)
+
+- **The Overview's miniature on the shared function** (`src/domain/model/thumbnail.ts`): the Overview draws from React
+  Flow's nodes, which move live during a drag (`drawnKey`), so it needs the shapes from those positions, not from the
+  stored rows; and it draws lines into a collapsed frame's block, which the thumbnail leaves out.
+- **A thumbnail as a link to a place on the canvas:** clicking a frame or a card in the strip opens the canvas there.
+- **One file of symbols per page** (PRD P5's fallback, described only): one request with the index built once, under
+  one key for all of a page's drawings, at the cost of fetching every thumbnail again after any one changes. Only if a
+  real workspace's home shows the per-canvas requests delaying something measured (step 5: on 20 canvases the last
+  drawing came in before FCP, cold and warm).
+- **A stored thumbnail per canvas**, if a real workspace grows past step 5's bars (a data model change).
 

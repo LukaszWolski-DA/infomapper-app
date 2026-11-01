@@ -5,7 +5,7 @@ Written at slice 7a's close. It compares the reference prototype `docs/prototype
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -208,6 +208,9 @@ nothing, D-26), notes, and their chips in the view-state bar (6a).
 | Delete a project | "Delete this project" at the end of the project home, two clicks; "Deleted the project {name}…" | `renderHome` (`data-hdel`) | **done** (slice 12a, D-65) |
 | Undo and Redo on the home pages | the top bar's `#tUndo`, `#tRedo` on both home pages | `mutate`, `doUndo`, `doRedo` | **done** (slice 12a, D-65) |
 | A project's name and description on its home | editable fields | `renderHome` (`data-pf`) | **done** (slice 9, D-59) |
+| Thumbnails on the canvas tiles | a sketch of each canvas's layout in its tile's strip; "Empty canvas" | `thumb`, `renderHome` | **done** (slice 12b, D-29, AD-32) |
+| A canvas tile's frame count | "{n} cards, {m} frames. Also in …" | `renderHome` | **done** (slice 12b, D-29) |
+| A project tile's thumbnail on the workspace home | the project's first canvas | `renderWsHome` (`thumb(cs[0])`) | **done** (slice 12b, P8) |
 
 **Present:** workspaces, projects and canvases as in the earlier inventory; the empty workspace's next steps name
 importing sources (7a); "New organization…" in the organization menu (slice 8, item 9), with a password, the first
@@ -221,6 +224,16 @@ the prototype's text is general; the undo toast names the step ("Undone: Delete 
 also under concurrent writes and undo. The home pages show only Undo and Redo of the canvas's top bar; the prototype
 keeps the whole bar. The delete section is left out for reviewers, readers and an archived workspace; the prototype
 draws it for everyone and refuses the change. The armed button disarms after 4 s or on blur (`ConfirmDelete`).
+
+**Slice 12b, deliberate differences from the prototype (PRD section 8):**
+- **Card heights:** a thumbnail's cards take the heights the canvas gives them: the row filter, a live canvas's
+  context cards with their relevant rows, a collapsed frame's block. The prototype counts every row.
+- **Notes:** a free note in a collapsed frame is not drawn, as on the canvas, and notes are drawn 80 high (the
+  prototype fits its bounds to 90).
+- **"Empty canvas"** is HTML text in the strip, not SVG text.
+- **Corners:** none are rounded; at this size they would be under a pixel.
+- **How it is drawn:** from its own address through an external `<use>`, so it follows dark mode through the page's
+  tokens (AD-32).
 
 ## Settings and roles
 
