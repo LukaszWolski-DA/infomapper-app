@@ -1,6 +1,6 @@
 # Slice 13 – acceptance
 
-Status: **step 5 (the closing) in progress, 2 November 2026.**
+Status: **step 5 (the closing) done, 3 November 2026; waiting for Łukasz's acceptance, the merge and the tag.**
 
 - Branch `slice/13-field-saves`, made on 1 November 2026 from `main` at `e66cc42` (the start commit,
   `e66cc42c4c1fefd9514f3c9a09cc67c7051136d3`), the merge of PR 32 (chore e2e reliability, merged 1 November 2026,
@@ -747,6 +747,109 @@ Unchanged and shown in step 4's cases: "Unlock {organization} first: open it and
     form and would lose the draft. A field must also tell it from a permission refusal, which makes it read-only.
   - **Scope:** the refusal is the app layer's (slice 8, F3), not the domain's, and its message is unchanged. The domain's
     codes and messages are untouched.
+
+## Step 5: the closing (2 November 2026)
+
+### What changed
+
+- **`docs/decisions.md`: D-66** (proposed for acceptance), with:
+  - the step 1 answers and what steps 2–4 built: choice fields, notes and frames out of scope, the settings without an
+    undo step, Escape, the closed panel's draft in the page's memory, read-only drafts to copy after a permission or
+    the archive, an editable draft after a locked organization's refusal, a deleted object taking its drafts;
+  - the sentence that a refusal that cuts the queue brings the fresh page, and that the page of a deleted project or
+    object leads where D-38 says (step 2 answers).
+- **`docs/known-limitations.md`:**
+  - "Typing into a field while its save is on its way" is removed;
+  - "Saving in panels" names D-66;
+  - "Writes still off the save chain" adds the names check boxes and the role select;
+  - "A note's text rolls back after a refused save; a frame's fields have no line (to slice 14a)";
+  - new: "A field's draft: what slice 13 does not cover".
+- **`docs/ideas.md`:**
+  - the two entries ("Settings: keep the typed value…", "Panels: one behaviour…") are marked done in slice 13;
+  - the plan after 10a: 13 done;
+  - new: "The plan after slice 13 (Łukasz, 1 November 2026)": 14a notes and frames by slice 13's rule; 14b the writes
+    off the chain and the leaving-page warning; then InfoCube, starting with a concept document; then the model
+    validator; the database slice last (AD-31);
+  - new: "A field's draft: what comes later" (PRD section 9);
+  - added in step 1: notes and frames, "by {person}", and `RichTextField`'s layout read.
+- **`docs/inventory-prototype-vs-app.md`:** slice 13's deliberate differences (PRD section 8).
+- **README:** the status line (0 to 12b merged, and the chore; 13 on its branch), slice 13 in the list and the links,
+  and the two new commands.
+- **CLAUDE.md:**
+  - "What this is" gets slice 13;
+  - "Saving in panels": the stable key, and a new "Slice 13 (D-66)" part (the draft, the fresh page after a cutting
+    refusal, `locked`, the mark, a closed panel's draft);
+  - slice 13's e2e helpers and the two commands.
+- **KB's backup:** `.data/backups/dev-db-20261102-2229.json` and `.data/backups/kb-model-latest.json`, both identical to
+  `.data/dev-db.json` (`cmp`; 1,560,468 bytes), git-ignored. KB was not read or changed otherwise in the slice.
+
+### Manual acceptance (on your model KB, "Kanton Basel", after the backup)
+
+F1: the entity has no description; its long text is the definition, a rich-text dialog. The scenario uses the fields
+that exist.
+
+1. **Two windows.** Open the same canvas of "Kanton Basel" in two browser windows: a normal one and a private one, or
+   another browser, so that there are two sessions. In both, open the same entity's panel.
+2. **A conflict on a short field.**
+   - In window 1 rename the entity and press Enter.
+   - In window 2 type a different name and press Enter. Expect the toast "Someone changed this meanwhile.", and under
+     the field "Changed meanwhile to: {window 1's name}" with "Use this" and "Keep mine"; your text stays in the
+     field.
+   - Click into the field and leave it: nothing is saved.
+   - Press **Keep mine**: your name is stored. Undo (Ctrl+Z outside the field, or the top bar's Undo) brings back
+     window 1's name.
+3. **Use this.** Repeat step 2 with another name and press **Use this**: the field shows window 1's name and nothing is
+   stored. Once more with Escape in the field instead: the same.
+4. **"Not saved".**
+   - In window 1 change the entity's stereotype.
+   - In window 2 change the name, press Tab, and type an alias at once. Both show "Not saved", with one toast.
+   - Click into each and leave it: each is saved.
+5. **A long text in the dialog.**
+   - In window 1 edit the entity's definition (or a requirement's description) and save.
+   - In window 2 open the same definition, type, and press Save. Expect the line inside the dialog with window 1's text
+     folded to three lines; "Show more" opens it; Save is off.
+   - Press "Use this": window 1's text is in the editor, and the dialog stays open.
+6. **Typing while a save is on its way.** In a table's note, type a long text, press Tab, click back at once and keep
+   typing: nothing is lost, and leaving the field saves the rest.
+7. **The workspace settings.** In both windows open the workspace's Settings and change the description, window 1
+   first. Window 2 keeps its text with the line. "Keep mine" saves it; Undo stays off (settings are not undo steps).
+8. **A closed panel's draft.**
+   - In window 1 change the entity's stereotype.
+   - In window 2 type an alias and click another entity in the tree. Expect the toast "Not saved: Alias of {entity}.
+     Open it again to see your text."
+   - Open the entity again: the alias is there with "Not saved". After a reload it is gone.
+9. Optional: **archive.** With a workspace of your own that you may archive, type in a field in window 2 and archive
+   it in window 1 meanwhile. Window 2's field becomes read-only, its text selectable, with "Not saved. You can still
+   copy it.". Unarchive it afterwards.
+
+### The full end-to-end run (2 November 2026, 22:29 to 23:53)
+
+`E2E_MEMORY_LOG=1 npm run e2e`, from scratch, no dev server running; on the code of `9165bd3`.
+
+| Part | Folders | Time | Child heap peak (80 % threshold 3,255 MB) | Child RSS peak |
+| --- | --- | --- | --- | --- |
+| 1 | fixes to slice-03a | 27 min 43 s | 1,374 MB (42 %) | 1,373 MB |
+| 2 | slice-03b to slice-07b | 28 min 7 s | 1,528 MB (47 %) | 1,586 MB |
+| 3 | slice-07c to slice-13 | 28 min 21 s | 1,659 MB (51 %) | 1,687 MB |
+| | **total** | **84 min 11 s** | | |
+
+**514 passed, 2 skipped, 1 failed.** No server restarted (one child per part). Part 3's heap is the highest so far,
+1,659 MB, below the 2 GB at which the cuts move.
+
+**The failure: S10C-08** ("pasting after the original was deleted elsewhere is refused and empties the clipboard"): the
+card's menu still offered "Paste attribute" after the refusal's toast.
+- Traces and the log were kept before any rerun: `.data/e2e-s13-close-fail/` (`part-3/…/trace.zip`, `error-context.md`,
+  the log).
+- Alone, 3 times: **failed 3 of 3**, a bug, not a flake.
+- **The cause is slice 13's (step 2):** `useAction.run` answered every refusal that brings the fresh page (here
+  `not_found`) only once that page had committed (`afterPage`, for S13-05's race). The paste's `run` therefore learned
+  of its refusal late and emptied the clipboard after the toast; the menu opened in between still read it.
+- **The fix** (`2ccf5aa`): the wait applies only to a row's save (`saveRow`, `saveRows`), which is what the fields use;
+  a plain `run` answers at once, as before slice 13. CLAUDE.md says so.
+- **After the fix:** S10C-08 alone 3 of 3 passed; `e2e/slice-13` and `e2e/slice-10c` together 34 passed; lint clean,
+  typecheck passes, 1,567 unit tests pass.
+- The full run was not repeated after the fix (84 min); the fix only takes the wait away from actions that are not a
+  row's save.
 
 ## For the closing (Łukasz's request, 1 November 2026): done at the closing
 

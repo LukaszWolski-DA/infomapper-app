@@ -598,8 +598,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     field that saves a row uses `TextField`, `TextArea` or `useDraft` and returns the save.** Choice fields use
     `useChoice`: no draft, the newest stored value after a refusal.
   - **A refusal that cuts brings the fresh page:** `runCommand` revalidates after `stale_version`, `forbidden`,
-    `archived` and `not_found`, and `useAction.run` answers such a refusal only once the transition that applies its
-    page has committed (`afterPage`), so the field sees the newest value and version. A locked organization's refusal
+    `archived` and `not_found`, and `useAction`'s `saveRow` and `saveRows` answer such a refusal only once the transition
+    that applies its page has committed (`afterPage`), so the field sees the newest value and version; a plain `run`
+    answers at once (a paste's refusal empties the clipboard with its toast, S10C-08). A locked organization's refusal
     has its own code `locked` (`lockedRefusal`): it cuts, but brings no fresh page (the password form).
   - **The mark** (`DraftLine`): after a stale or cut refusal, the conflict line ("Changed meanwhile to: …", "Use this",
     "Keep mine") when the field's stored value differs from its draft's base, else "Not saved"; while the line shows,
