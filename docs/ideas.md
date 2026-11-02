@@ -3,14 +3,14 @@
 Ideas that came up while building a slice and are not part of its PRD (AD-25). Each one needs a decision before it
 is built.
 
-## Settings: keep the typed value on a stale-version conflict (slice 0, step 5b): planned in slice 13
+## Settings: keep the typed value on a stale-version conflict (slice 0, step 5b): done in slice 13
 
 Today, when a save is refused because someone else changed the record meanwhile ("Someone changed this meanwhile.
 Reload to see the latest version."), the field goes back to the last value this page saved, and the typed value is
 lost. Better: keep the user's typed value in the field and show the current server value next to it, so the user can
 choose which to keep (or copy parts of theirs) instead of retyping.
 
-## Panels: one behaviour for a refused save in every field (slice 9, step 1, F6): planned in slice 13
+## Panels: one behaviour for a refused save in every field (slice 9, step 1, F6): done in slice 13
 
 After a refused save most panel fields keep the refused text (the field is keyed by its stored value, which did not
 change); the requirement panel shows the stored values again (its reset counter) and the workspace settings go back to
@@ -40,11 +40,31 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   - **12b: the canvas tiles' thumbnails.** **Done in slice 12b** (D-29, AD-32): a sketch of each canvas's layout on
     its tile, drawn from a route through an external `<use>` with the page's colours; the frame count; each project's
     first canvas on the workspace home. No data model change.
-- **Next: 13** (in progress; D-66 proposed). Candidate for the scope after 13: notes and frames on slice 13's rule
-  (below).
+- **13: done in slice 13** (D-66): a field keeps its draft across fresh pages and after any refusal, with the conflict
+  line ("Use this", "Keep mine"), "Not saved", Escape, a closed panel's draft for the page, read-only drafts after a
+  permission or the archive; choice fields show the newest stored value. No data model change. The plan after it is
+  below ("The plan after slice 13").
 - **13: one behaviour for a refused save in every field** (F6, above), with the typed value kept on a conflict (the
   first entry). Also keep text typed into a field while its save is on its way: the save's answer replaces the field
   (keyed by its stored value) and the typed text and focus are lost (`docs/known-limitations.md`, slice 10c).
+
+## The plan after slice 13 (Łukasz, 1 November 2026)
+
+- **14a: saving notes and frames by slice 13's rule** (D-66): their canvas queue (`useNotes`, `useFrames`, the note on
+  the canvas in `NoteLayer`) keeps a refused draft with the conflict line instead of rolling it back; AD-24's rules for
+  the canvas, with canvas commit counts and measurements (below, "Notes and frames on slice 13's rule").
+- **14b: the writes off the save chain and leaving a page with a draft:** a canvas's name in its tab, the change-to-
+  resolve actions, and the canvas's look as slice 14a's step 1 decides (`docs/known-limitations.md`, "Writes still off
+  the save chain"); a warning when leaving a page with a draft not saved (`beforeunload`).
+- **Then InfoCube,** starting with a concept document.
+- **Then the model validator** (below, "A model validator").
+- **The database slice last** (AD-31).
+
+## A field's draft: what comes later (slice 13, PRD section 9)
+
+- **A warning when leaving a page with a draft not saved** (`beforeunload`): in 14b's plan.
+- **A field-level merge** of two texts, showing the differences, beyond "Use this" and "Keep mine".
+- **Drafts kept across a reload,** in the browser's storage (slice 13 keeps them in the page's memory only, answer 7).
 
 ## Aliases: what comes later (slice 11, PRD section 9)
 

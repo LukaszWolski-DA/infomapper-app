@@ -1,6 +1,6 @@
 # Slice 13 – acceptance
 
-Status: **step 4 (the other refusals) done, 2 November 2026; waiting for Łukasz before step 5 (the closing).**
+Status: **step 5 (the closing) in progress, 2 November 2026.**
 
 - Branch `slice/13-field-saves`, made on 1 November 2026 from `main` at `e66cc42` (the start commit,
   `e66cc42c4c1fefd9514f3c9a09cc67c7051136d3`), the merge of PR 32 (chore e2e reliability, merged 1 November 2026,
@@ -736,7 +736,19 @@ failed, 25 min.**
 Unchanged and shown in step 4's cases: "Unlock {organization} first: open it and enter its password." and the domain's
 "This {object} does not exist."
 
-## For the closing (Łukasz's request, 1 November 2026)
+## Łukasz's answers to step 4 (2 November 2026)
+
+- **Step 4 is accepted.**
+- **The refusal code `locked` is a deliberate departure from PRD item 13** ("the domain, its refusals and messages"
+  unchanged).
+  - **What changed:** `lockedRefusal` (`src/app/_lib/unlock.ts`) answers with the code `locked` instead of
+    `forbidden`; `ActionResult` and `rowSaves`' `CUTS` know it.
+  - **Why:** a locked organization's refusal must not bring the fresh page, which would be the organization's password
+    form and would lose the draft. A field must also tell it from a permission refusal, which makes it read-only.
+  - **Scope:** the refusal is the app layer's (slice 8, F3), not the domain's, and its message is unchanged. The domain's
+    codes and messages are untouched.
+
+## For the closing (Łukasz's request, 1 November 2026): done at the closing
 
 At the closing, after slice 13 is closed, add to `docs/ideas.md` a new section "The plan after slice 13 (Łukasz,
 <the closing's date>)":

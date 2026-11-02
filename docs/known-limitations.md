@@ -988,10 +988,12 @@ A removed person's name stays in history through their change events (F10: `work
 members and the authors of its change events). The seed writes rows without change events, so a seed note or approval
 by someone removed later shows "someone" instead of their name; anything written in the app has its events.
 
-## Saving in panels (slice 9; the canvas's writes joined the chain in slice 10a)
+## Saving in panels (slice 9; the canvas's writes joined the chain in slice 10a; a field's draft in slice 13, D-66)
 
 ### Writes still off the save chain (slice 10a)
 
+- **The names check boxes** (slice 11, `NamesSwitch.tsx`) write through the canvas's queue, and the role select
+  (`people.tsx`) sends no version (last write wins, D-58): neither keeps a draft (slice 13, R5).
 - **Renaming and deleting a canvas** (`canvas-tabs.tsx`, `canvas-menu.tsx`) send the canvas's version from the page.
   The look (grid, background, layer) has its own queue with its own version (`look.tsx`), so a rename right after a
   layer switch can be refused until the page refreshes. Left for later, as the tab's rename is not on the chain either
@@ -1001,23 +1003,32 @@ by someone removed later shows "someone" instead of their name; anything written
   way still sends the version it knows and can be refused as a false conflict. The reason: only the server knows which
   tables, columns and mappings an action writes, so the browser cannot hold those rows before it is sent (`saveRows`).
 
-### Typing into a field while its save is on its way (slice 9; found in slice 10c)
-
-A field that saves an object's row is keyed by its stored value (`fieldKey`, `src/app/_panels/fields.tsx`; the
-project's name on its home, `project-heading.tsx`, and the panels' fields). The save's answer brings the fresh page with
-the new value, so React replaces the field with a new one. Text typed into the field after the save was sent and before
-its answer arrives is lost with the old field, and so is the focus: an Enter pressed after that goes nowhere, and
-nothing is saved. It happens when someone clicks back into the field and types within the save's round trip (about
-0.2 s on an idle laptop, seconds on a slow server). An Enter or a click elsewhere pressed before the answer arrives saves
-the second text as usual, after the first (`rowSaves`). Planned with slice 13 ("keep the typed value").
-
-### A note's text rolls back after a refused save (slice 13, step 1 answers)
+### A note's text rolls back after a refused save; a frame's fields have no line (slice 13; to slice 14a)
 
 Notes save through the canvas's own queue (`useNotes.save`), optimistically: a refused change of a note's text, status
 or colour, made in its panel or on the canvas, puts the note's earlier values back (`back`), and the typed text is lost.
-Frames save through the same queue (`useFrames.updateFrame`); their panel's fields keep a refused value, as other panel
-fields did before slice 13, but without its conflict line. Slice 13 (D-66) leaves both out (Łukasz, 1 November 2026);
-they are a candidate for the next scope (`docs/ideas.md`, "Notes and frames on slice 13's rule").
+Frames save through the same queue (`useFrames.updateFrame`): their panel's name keeps a refused value (the stable key
+and the draft of slice 13), but it shows no conflict line or "Not saved", as that queue answers only "stored or not"
+and no refusal's code. Slice 13 (D-66) leaves both out (Łukasz, 1 November 2026); they are slice 14a's scope
+(`docs/ideas.md`, "The plan after slice 13").
+
+### A field's draft: what slice 13 does not cover (D-66)
+
+- **A draft is kept for a closed panel only in the panels' text fields with `keep`:** names, aliases, the requirement's
+  ID, name, owner and rule, a relationship's label, a mapping's note, table and column notes, a working label's name.
+  Not in a type's parameters, a custom type or a mapping's rule; not on the project home or in the settings, whose
+  drafts end with the page anyway.
+- **A read-only draft** (a permission or the archive) is not kept once its panel closes: it is for copying while it is
+  shown.
+- **Selecting another item while a save is on its way waits for the save's answer:** the selection's transition goes
+  with the save's (React's transitions). The panel then switches in the same commit as the refusal, and the draft's toast
+  comes from the field's unmount (step 3).
+- **A deleted object's drafts** are not kept again until a field of that object mounts again (an undo brought it back;
+  `field-drafts.ts`, `markGone`).
+- **The conflict line does not say who changed the value** (no "by {person}", F20; `docs/ideas.md`).
+- **The page has no polling:** another person's change shows in a field without a draft with this page's next fresh
+  page (an own write, a refusal, a navigation), as before slice 13.
+- **Leaving the page with a draft not saved gives no warning** (`beforeunload`; `docs/ideas.md`).
 
 ### Copies of attributes (slice 10c, D-63)
 
