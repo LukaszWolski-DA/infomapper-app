@@ -1,6 +1,6 @@
 # Slice 13 – acceptance
 
-Status: **step 3 (conflicts) done, 2 November 2026; waiting for Łukasz before step 4.**
+Status: **step 4 (the other refusals) done, 2 November 2026; waiting for Łukasz before step 5 (the closing).**
 
 - Branch `slice/13-field-saves`, made on 1 November 2026 from `main` at `e66cc42` (the start commit,
   `e66cc42c4c1fefd9514f3c9a09cc67c7051136d3`), the merge of PR 32 (chore e2e reliability, merged 1 November 2026,
@@ -625,6 +625,116 @@ The dialog's fold is a height of 4.5 lines. Its paragraphs have margins, so the 
 | A draft refused as its panel closes | "Not saved: {field} of {object}. Open it again to see your text." (e.g. "Not saved: Alias of Customer. …") | 3 |
 
 Still to come in step 4: "Not saved. You can still copy it." (permission and archive).
+
+## Łukasz's answers to step 3 (2 November 2026)
+
+- **Step 3 is accepted.** The toast of a closed panel's draft stays as built: it shows when a refused draft leaves its
+  panel.
+- **S0-10 is a flake.** It restarts its own dev server, and its sign-in after the restart took too long; alone it
+  passed 3 of 3 (step 3's record, `.data/e2e-s13-step3-fail2/`).
+- **Step 4** covers:
+  - permission, archive, a locked organization and a deleted object, with "Not saved. You can still copy it.";
+  - S13-10 and S13-11, and CI;
+  - the dialog's fold ending on its third line, with no layout read, and new screenshots;
+  - the page totals one lower than slice 12b's, explained from the two builds' `<head>`.
+
+## Step 4: the other refusals (2 November 2026)
+
+### What changed
+
+- **A refusal's kind** (`useDraft`, `refusalOf`):
+  - a stale version or a cut: the line or "Not saved" (step 3);
+  - `forbidden` or `archived`: **read-only** ("Not saved. You can still copy it.");
+  - `locked`: "Not saved", still editable;
+  - `not_found`: **gone**.
+
+  While a read-only mark shows, leaving the field and Escape do nothing. The draft stays until the field unmounts and
+  is not kept for the page.
+- **Permission and archive** (item 9, F17): the refusal's fresh page makes the panels' fields read-only (`readOnly`).
+  With the stable key the element keeps the draft, selectable.
+  - **The project home** keeps its fields once the page could edit and no longer can: they stay read-only inputs while
+    the saves on their way settle (`rowSaves.settled`). They become text again without a refused draft, and stay inputs
+    with one until the page is left. A page that never could edit shows text, as D-59 says.
+  - **The settings** use `readOnly` instead of `disabled` for a field with a read-only draft, as a disabled field's text
+    cannot be selected.
+- **A locked organization** (F17): `lockedRefusal` answers with its own code `locked` (app level; the domain
+  unchanged), which cuts the row's waiting saves (`CUTS`) and brings no fresh page. The field keeps the draft, editable,
+  with "Not saved"; the toast is "Unlock {organization} first: …" as before. `unlock.test.ts` expects the new code.
+- **A deleted object** (answer 8): a `not_found` refusal marks the object gone in `field-drafts.ts` (`markGone`), which
+  drops its kept drafts and keeps none again. A save cut behind it says nothing more. A field of it that mounts again
+  (an undo brought it back) forgets that (`unmarkGone`). The panel goes with the refusal's fresh page. Unit test:
+  `field-drafts.test.ts`, 3 tests.
+- **The dialog's fold** (Łukasz, step 3 answers): the other text in the rich-text dialog is folded by CSS `line-clamp-3`
+  with its paragraphs' margins off (`[&_*]:my-0`), so it ends on the third line with an ellipsis, as under a field. No
+  layout read.
+
+### Specs
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S13-10 | (a) archived meanwhile: the entity's name stays, read-only, enabled, its whole text selectable, "Not saved. You can still copy it.", nothing written; (b) Anna's role becomes reviewer meanwhile: the same for the alias; (c) archived meanwhile on the project home: the description stays in a read-only field with the mark; (d) a locked organization: Anna works in Retail Co too and signs in there with its password in another tab, leaving InfoMate locked; her alias save is refused with "Unlock InfoMate first: …", and the field stays editable with "Not saved" | passed |
+| S13-11 | Customer deleted meanwhile: the toast "This entity does not exist.", the panel goes, no other toast, nothing written | passed |
+
+**Earlier specs of the project heading:** S9-06, S9-07, S9-08 (reviewers and an archived workspace see text), S13-02
+and S13-09. Run together with S13-10 and S13-11: 12 passed.
+
+### Screenshots
+
+`docs/prd/slice-13-screens/step-4/conflict-long-dialog-light.png` and `-dark.png`: the dialog's other text folded to
+three lines, ending on the third with an ellipsis.
+
+### The page totals one lower than slice 12b's (step 3's element guard)
+
+Compared from the two measurement builds:
+- slice 12b: a worktree at the tag `slice-12b`, its own `npm ci`, since Turbopack refuses a junction to `node_modules`;
+- this branch.
+
+The same view (Performance test, 30 %, frames expanded) was read with the new
+`e2e/slice-13/S13-head-elements.spec.ts`. It writes `<head>`'s children and the counts; the files are
+`.data/measure/s13-head-12b.json` and `s13-head-branch.json`.
+
+| | slice 12b | branch |
+| --- | --- | --- |
+| page | 6,000 | 5,999 |
+| `<head>` | 28 | 27 |
+| `<body>` | 5,969 | 5,969 |
+| viewport | 4,508 | 4,508 |
+
+**The whole difference is in `<head>`'s font preloads: 6 before, 5 now.**
+- Slice 12b loaded IBM Plex through `next/font/google`, which preloads six subset files.
+- Since the e2e reliability chore (P3 B, `6934cdd`, merged before this branch) the app hosts IBM's five files: Sans
+  Regular, Medium and SemiBold; Mono Regular and Medium. It preloads those five.
+- Everything else in `<head>` has the same elements; the stylesheet and four script chunks differ only in their file
+  names.
+- `<body>` is equal. **Slice 13 adds or removes nothing.**
+- Later page totals read against 6,000 / 20,797 / 2,867 / 6,309 are therefore one lower from the chore on.
+
+**The guard on this branch's final build** (step 4's code, rebuilt; `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json`):
+passed, with the same counts as step 3's. The viewport is equal to slice 8's in all four views, and the page totals
+are 5,999 / 20,796 / 2,866 / 6,308. The slice 12b worktree was removed after the reading.
+
+**CI:** `npm run lint` clean, `npm run typecheck` pass, `npm test` 121 files, 1,567 tests, pass.
+
+**Earlier specs again** (dev server, from scratch, none of mine running): slices 0, 4a, **8** (the locked
+organization's code), 9, 10a, the fixes, S3A-04, S10C-09, S11-01, S12A-02, S12A-12 and slice 13. **154 passed, 0
+failed, 25 min.**
+
+### New and changed user-visible texts (the whole slice)
+
+| Where | Text | Step |
+| --- | --- | --- |
+| The conflict toast (every write) | "Someone changed this meanwhile." (was "… Reload to see the latest version.") | 2 |
+| An empty settings or requirement name going back | "Enter a name." (now also from the browser) | 2 |
+| Under a field, in the rich-text dialog | "Changed meanwhile to:" and the value | 3 |
+| Under a field, in the dialog | "Cleared meanwhile." | 3 |
+| The line's buttons | "Use this", "Keep mine" | 3 |
+| A long other value | "Show more", "Show less" | 3 |
+| Under a field (a cut or unchanged field, a locked organization), in the dialog | "Not saved" | 3, 4 |
+| A draft refused as its panel closes | "Not saved: {field} of {object}. Open it again to see your text." | 3 |
+| Under a read-only field (a permission, the archive) | "Not saved. You can still copy it." | 4 |
+
+Unchanged and shown in step 4's cases: "Unlock {organization} first: open it and enter its password." and the domain's
+"This {object} does not exist."
 
 ## For the closing (Łukasz's request, 1 November 2026)
 
