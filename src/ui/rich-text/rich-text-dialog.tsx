@@ -7,7 +7,7 @@
 // changes before a second Esc discards them.
 
 import { Dialog as DialogPrimitive } from "radix-ui";
-import { lazy, Suspense, useRef } from "react";
+import { lazy, Suspense, useRef, type ReactNode, type RefObject } from "react";
 import type { RichTextEditorHandle } from "./rich-text-editor";
 
 const RichTextEditor = lazy(() => import("./rich-text-editor"));
@@ -22,10 +22,15 @@ export interface RichTextDialogProps {
   /** Saves the HTML; `changed` is false when nothing was edited (the caller then only closes). */
   onSave: (html: string, changed: boolean) => void;
   onClose: () => void;
+  /** Shown above the editor's footer: a refused save's line (slice 13). */
+  notice?: ReactNode;
+  /** The editor's handle, for the caller (a conflict's "Use this" and "Keep mine"). */
+  editorRef?: RefObject<RichTextEditorHandle | null>;
 }
 
-export function RichTextDialog({ open, subtitle, title, html, template = null, saving = false, onSave, onClose }: RichTextDialogProps) {
-  const editor = useRef<RichTextEditorHandle>(null);
+export function RichTextDialog({ open, subtitle, title, html, template = null, saving = false, onSave, onClose, notice, editorRef }: RichTextDialogProps) {
+  const own = useRef<RichTextEditorHandle>(null);
+  const editor = editorRef ?? own;
   return (
     <DialogPrimitive.Root open={open} onOpenChange={(o) => !o && editor.current?.escape()}>
       <DialogPrimitive.Portal>
@@ -74,7 +79,7 @@ export function RichTextDialog({ open, subtitle, title, html, template = null, s
             </button>
           </div>
           <Suspense fallback={<div className="min-h-[300px] px-4 py-4 text-im-ink-3">Loading the editor…</div>}>
-            <RichTextEditor handle={editor} html={html} template={template} saving={saving} onSave={onSave} onDiscard={onClose} />
+            <RichTextEditor handle={editor} html={html} template={template} saving={saving} onSave={onSave} onDiscard={onClose} notice={notice} />
           </Suspense>
         </DialogPrimitive.Content>
       </DialogPrimitive.Portal>

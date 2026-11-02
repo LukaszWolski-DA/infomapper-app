@@ -39,6 +39,7 @@ import {
   TypeDot,
   useChoice,
   useDraft,
+  DraftLine,
   type FieldSave,
 } from "./fields";
 import { usePanel } from "./inspector";
@@ -148,10 +149,10 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         </button>
       </Kind>
       <Field label="Name" htmlFor="f-an">
-        <TextField key={fieldKey(a.id, "name")} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-attribute-name" inputRef={nameRef} />
+        <TextField key={fieldKey(a.id, "name")} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-attribute-name" inputRef={nameRef} keep={{ key: fieldKey(a.id, "name"), field: "Name", object: a.name }} />
       </Field>
       <Field label="Alias" htmlFor="f-aalias">
-        <TextField key={fieldKey(a.id, "alias")} id="f-aalias" value={a.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => save({ alias })} testId="input-attribute-alias" />
+        <TextField key={fieldKey(a.id, "alias")} id="f-aalias" value={a.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => save({ alias })} testId="input-attribute-alias" keep={{ key: fieldKey(a.id, "alias"), field: "Alias", object: a.name }} />
       </Field>
 
       <Field label="Position on the entity">
@@ -276,7 +277,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         editable={p.editable}
         subtitle="Attribute definition"
         title={attributeLabel(ix, a.id)}
-        onSave={async (html) => (await save({ definition: html })).ok}
+        onSave={(html) => save({ definition: html })}
         testId="field-attribute-definition"
       />
       <ItemLabels target={{ kind: "attribute", id: a.id }} />
@@ -365,7 +366,7 @@ function ParamField({
   testId: string;
 }) {
   // the text is the draft (slice 13); only a whole number or nothing is saved
-  const { bind: bind, defaultValue: initial, commit: commit } = useDraft<HTMLInputElement>(value === null ? "" : String(value), (t) => onSave(t === "" ? null : Number(t)), {
+  const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(value === null ? "" : String(value), (t) => onSave(t === "" ? null : Number(t)), {
     readOnly: disabled,
     prepare: (t) => {
       const n = toNumber(t);
@@ -373,6 +374,7 @@ function ParamField({
     },
   });
   return (
+    <>
     <input
       ref={bind}
       type="number"
@@ -387,9 +389,16 @@ function ParamField({
       className={`${inputClass.replace("w-full", "w-[84px]")} flex-none`}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
+        keyDown(e);
       }}
       onBlur={commit}
     />
+    {mark && (
+      <div className="basis-full">
+        <DraftLine mark={mark} onUse={takeStored} onKeep={keepMine} />
+      </div>
+    )}
+    </>
   );
 }
 

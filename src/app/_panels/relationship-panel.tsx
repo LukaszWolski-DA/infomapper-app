@@ -67,6 +67,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
           value={r.label ?? ""}
           readOnly={!p.editable}
           onSave={(label) => save({ label: label || null })}
+          keep={{ key: fieldKey(r.id, "label"), field: "Label", object: `${from} – ${to}` }}
           testId="input-relationship-label"
         />
       </Field>

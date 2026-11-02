@@ -9,7 +9,7 @@
 
 import { updateProjectAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
-import { fieldKey, useDraft } from "@/app/_panels/fields";
+import { DraftLine, fieldKey, useDraft } from "@/app/_panels/fields";
 import { PROJECT_NAME_REQUIRED } from "@/domain/commands/project";
 import { useToast } from "@/ui/components/toast";
 
@@ -51,13 +51,13 @@ function EditableHeading({ workspaceId, project }: { workspaceId: string; projec
   const toast = useToast();
   const save = (patch: { name?: string; description?: string }) =>
     saveRow(project, (v) => updateProjectAction({ workspaceId, projectId: project.id, expectedVersion: v, ...patch }));
-  const { bind: nameBind, defaultValue: nameInitial, commit: nameCommit } = useDraft<HTMLInputElement>(project.name, (v) => save({ name: v }), {
+  const { bind: nameBind, defaultValue: nameInitial, commit: nameCommit, keyDown: nameKeyDown, mark: nameMark, takeStored: nameTake, keepMine: nameKeep } = useDraft<HTMLInputElement>(project.name, (v) => save({ name: v }), {
     prepare: (t) => t.trim(),
     required: true,
     onEmpty: () => toast(PROJECT_NAME_REQUIRED, "refusal"),
   });
   // trimmed as the server stores it; the lines inside stay
-  const { bind: descriptionBind, defaultValue: descriptionInitial, commit: descriptionCommit } = useDraft<HTMLTextAreaElement>(project.description ?? "", (v) => save({ description: v }), { prepare: (t) => t.trim() });
+  const { bind: descriptionBind, defaultValue: descriptionInitial, commit: descriptionCommit, keyDown: descriptionKeyDown, mark: descriptionMark, takeStored: descriptionTake, keepMine: descriptionKeep } = useDraft<HTMLTextAreaElement>(project.description ?? "", (v) => save({ description: v }), { prepare: (t) => t.trim() });
 
   return (
     <>
@@ -71,10 +71,14 @@ function EditableHeading({ workspaceId, project }: { workspaceId: string; projec
           autoComplete="off"
           data-testid="field-project-name"
           className={`${fieldClass} text-2xl font-semibold leading-tight text-im-ink`}
-          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            nameKeyDown(e);
+          }}
           onBlur={nameCommit}
         />
       </h1>
+      <DraftLine mark={nameMark} onUse={nameTake} onKeep={nameKeep} />
       <textarea
         key={fieldKey(project.id, "description")}
         ref={descriptionBind}
@@ -88,7 +92,9 @@ function EditableHeading({ workspaceId, project }: { workspaceId: string; projec
         className={`${fieldClass} min-h-6 resize-none text-im-ink-2 [field-sizing:content]`}
         onInput={(e) => (e.currentTarget.rows = lines(e.currentTarget.value))}
         onBlur={descriptionCommit}
+        onKeyDown={descriptionKeyDown}
       />
+      <DraftLine mark={descriptionMark} onUse={descriptionTake} onKeep={descriptionKeep} />
     </>
   );
 }

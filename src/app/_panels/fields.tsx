@@ -7,8 +7,10 @@
 // after a refusal; a choice field shows the newest stored value after a refusal (`useChoice`). Fields are keyed by their
 // object and field (`fieldKey`), never by their stored value.
 
-import { useEffect, useRef, useState, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
+import { useToast } from "@/ui/components/toast";
 import { choiceShown, FieldDraft, storedBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
+import { dropDraft, keepDraft, takeDraft, updateDraft } from "@/ui/field-drafts";
 
 export const Kind = ({ children }: { children: ReactNode }) => <div className="mb-1.5 text-[11.5px] text-im-ink-3">{children}</div>;
 
@@ -43,54 +45,224 @@ export const fieldKey = (id: string, field: string): string => `${id}:${field}`;
 /** What a field's save gives back: the action's answer (`ok`, `code`), so the field knows whether it was stored. */
 export type FieldSave<V> = (value: V) => SaveAnswer | Promise<SaveAnswer>;
 
+/** Where a field keeps its draft when its panel closes (slice 13, item 5a): its key, and its name for the toast. */
+export interface DraftKeep {
+  key: string;
+  field: string;
+  object: string;
+}
+
+/** What a field shows under it after a refusal (slice 13, items 7–8): the other value, or "Not saved". */
+export type DraftMark = { kind: "conflict"; other: string } | { kind: "notSaved" } | null;
+
+/** Refusals after which the field shows its mark: a stale version, and a save cut behind one. */
+const MARKED = new Set(["stale_version", "cut"]);
+
+const codeOf = (answer: SaveAnswer): string => (answer && typeof answer === "object" ? (answer.code ?? "") : "");
+
+/** Points an object ref at the element (a field's `inputRef`). */
+function setRef<E>(ref: { current: E | null } | object, el: E | null): void {
+  (ref as { current: E | null }).current = el;
+}
+
+/** The toast of a draft refused after its panel closed (slice 13, item 5a). */
+export const notSavedAway = (field: string, object: string): string => `Not saved: ${field} of ${object}. Open it again to see your text.`;
+
 /**
  * A text field's draft (slice 13, D-66; the rules in `src/ui/field-draft.ts`): the element is uncontrolled, so typing
  * renders nothing. A stored value reaches it in an effect, written into the element only while it has neither the
  * focus nor a draft. `commit` (on leaving the field) saves the text when it differs from the value on its way or the
  * stored one; `prepare` trims or parses it (null: nothing to save); an empty `required` field goes back to the stored
  * value (D-59), with `onEmpty` (a toast) where one is wanted.
+ *
+ * After a stale refusal, or a save cut behind one, the refusal's fresh page decides the mark (F5): the field's stored
+ * value differs from the one its draft started from (a conflict: the other value, "Use this", "Keep mine"; leaving the
+ * field saves nothing, F6), or it does not ("Not saved": leaving the field saves it again). Escape puts the stored value
+ * back (while a conflict shows, it is "Use this"). With `keep`, a draft whose field unmounts stays for the page
+ * (`src/ui/field-drafts.ts`) and comes back when the field mounts again.
  */
 export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
   stored: string,
   save: FieldSave<string> | undefined,
-  o: { prepare?: (text: string) => string | null; required?: boolean; onEmpty?: () => void; readOnly?: boolean; elementRef?: Ref<E> } = {},
+  o: { prepare?: (text: string) => string | null; required?: boolean; onEmpty?: () => void; readOnly?: boolean; elementRef?: Ref<E>; keep?: DraftKeep } = {},
 ) {
+  const toast = useToast();
   const element = useRef<E | null>(null);
   const [draft] = useState(() => new FieldDraft(stored));
   const [initial] = useState(stored);
+  /** The refusal the mark comes from: the stored value the refused draft started from. */
+  const [refusal, setRefusal] = useState<{ base: string } | null>(null);
+  // mirrors for what runs after the field unmounted (a late answer, the cleanup)
+  const refusalNow = useRef<{ base: string } | null>(null);
+  const mounted = useRef(true);
+  const lastText = useRef<string | null>(null);
+  const keepNow = useRef<DraftKeep | undefined>(undefined);
+  const toastNow = useRef(toast);
+  const refuse = (r: { base: string } | null) => {
+    refusalNow.current = r;
+    setRefusal(r);
+  };
+
+  useEffect(() => {
+    keepNow.current = o.keep;
+    toastNow.current = toast;
+  });
   useEffect(() => {
     const el = element.current;
     // a DOM write after the commit, never a layout read (CLAUDE.md, slice 6a)
-    if (el && draft.receive(stored, el.value, document.activeElement === el) === "take") el.value = stored;
+    const take = el ? draft.receive(stored, el.value, document.activeElement === el) : "keep";
+    if (el && take === "take") el.value = stored;
+    if (take === "end" && refusalNow.current) {
+      refusalNow.current = null;
+      // the stored value came to equal the draft: its mark goes
+      setRefusal(null);
+    }
   }, [stored, draft]);
+  const keepKey = o.keep?.key;
+  useEffect(() => {
+    mounted.current = true;
+    const back = keepKey ? takeDraft(keepKey) : null;
+    const el = element.current;
+    if (back && el) {
+      el.value = back.text;
+      draft.reset(back.base);
+      refusalNow.current = back.refused ? { base: back.base } : null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- a draft kept while the panel was closed (item 5a)
+      if (back.refused) setRefusal({ base: back.base });
+    }
+    return () => {
+      mounted.current = false;
+      const text = lastText.current;
+      const keep = keepNow.current;
+      if (!keepKey || text === null || !draft.hasDraft(text)) return;
+      const refused = !!refusalNow.current;
+      keepDraft(keepKey, { text, base: refusalNow.current?.base ?? draft.taken, refused });
+      // a refused draft whose panel closes (the refusal may land in the same commit as the new selection: a pending
+      // save's transition holds the selection's): the toast says where it is
+      if (refused && keep) toastNow.current(notSavedAway(keep.field, keep.object), "refusal");
+    };
+  }, [keepKey, draft]);
+
   const { elementRef } = o;
-  /** The element's ref callback. */
+  /** The element's ref callback; the text it had when it was last detached is what an unmount keeps. */
   const bind = (el: E | null) => {
+    if (!el && element.current) lastText.current = element.current.value;
     element.current = el;
     if (typeof elementRef === "function") elementRef(el);
-    else if (elementRef) (elementRef as { current: E | null }).current = el;
+    else if (elementRef) setRef(elementRef, el);
   };
+
+  const mark: DraftMark = refusal ? (stored !== refusal.base ? { kind: "conflict", other: stored } : { kind: "notSaved" }) : null;
+
+  const send = (value: string) => {
+    const n = draft.send(value);
+    const answered = (answer: SaveAnswer) => {
+      const ok = storedBy(answer);
+      draft.answered(n, ok);
+      const keep = keepNow.current;
+      if (!mounted.current) {
+        // the field's panel closed meanwhile: the kept draft is stored, or refused (item 5a)
+        if (keep && ok === true) dropDraft(keep.key);
+        else if (keep && ok === false && updateDraft(keep.key, { refused: MARKED.has(codeOf(answer)) })) {
+          toastNow.current(notSavedAway(keep.field, keep.object), "refusal");
+        }
+        return;
+      }
+      if (ok === false && MARKED.has(codeOf(answer))) refuse({ base: draft.taken });
+    };
+    Promise.resolve(save!(value)).then(answered, () => answered(false));
+  };
+
   const commit = () => {
     const el = element.current;
     if (!el || o.readOnly || !save) return;
+    // a conflict is settled by "Use this" or "Keep mine", never by leaving the field (F6)
+    if (mark?.kind === "conflict") return;
     const raw = el.value;
     const value = o.prepare ? o.prepare(raw) : raw;
     if (value === null) return;
     if (o.required && !value) {
       el.value = stored;
       draft.reset(stored);
+      refuse(null);
       o.onEmpty?.();
       return;
     }
     if (value !== raw) el.value = value;
     if (!draft.shouldSave(value, stored)) return;
-    const n = draft.send(value);
-    Promise.resolve(save(value)).then(
-      (answer) => draft.answered(n, storedBy(answer)),
-      () => draft.answered(n, false),
-    );
+    send(value);
   };
-  return { bind, defaultValue: initial, commit };
+
+  /** "Use this": the field takes the newest stored value; the draft ends. */
+  const takeStored = () => {
+    const el = element.current;
+    if (el) el.value = stored;
+    draft.reset(stored);
+    refuse(null);
+    if (keepKey) dropDraft(keepKey);
+  };
+  /** "Keep mine": the draft is saved on the newest version, a deliberate overwrite. */
+  const keepMine = () => {
+    const el = element.current;
+    if (!el || !save) return;
+    draft.reset(stored);
+    refuse(null);
+    const value = o.prepare ? o.prepare(el.value) : el.value;
+    if (value !== null && value !== stored) send(value);
+  };
+  /** Escape puts the stored value back; while a conflict shows, it is "Use this". */
+  const keyDown = (e: KeyboardEvent<E>) => {
+    if (e.key !== "Escape" || o.readOnly) return;
+    if (mark?.kind === "conflict" || e.currentTarget.value !== stored) takeStored();
+  };
+  return { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine };
+}
+
+/** The other value's fold: more than three lines or about 240 characters, counted from the text (no layout read). */
+const isLong = (text: string): boolean => text.split("\n").length > 3 || text.length > 240;
+
+/**
+ * The mark under a field after a refusal (slice 13, items 7–8): "Changed meanwhile to: {value}" (or "Cleared
+ * meanwhile.") with "Use this" and "Keep mine", or "Not saved". A long value is folded to three lines by CSS, with "Show
+ * more" / "Show less".
+ */
+export function DraftLine({ mark, onUse, onKeep, mono }: { mark: DraftMark; onUse: () => void; onKeep: () => void; mono?: boolean }) {
+  const [more, setMore] = useState(false);
+  if (!mark) return null;
+  if (mark.kind === "notSaved")
+    return (
+      <div className="mt-1 text-xs font-medium text-im-warn" data-testid="draft-not-saved">
+        Not saved
+      </div>
+    );
+  const long = isLong(mark.other);
+  return (
+    <div className="mt-1 rounded-md bg-im-warn-soft px-2.5 py-2 text-xs text-im-ink" data-testid="draft-conflict" role="status">
+      {mark.other ? (
+        <>
+          <div>Changed meanwhile to:</div>
+          <div className={`mt-0.5 whitespace-pre-line break-words ${mono ? "font-mono" : ""} ${long && !more ? "line-clamp-3" : ""}`} data-testid="draft-other">
+            {mark.other}
+          </div>
+        </>
+      ) : (
+        <div data-testid="draft-other">Cleared meanwhile.</div>
+      )}
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        <button type="button" className={smallButtonClass} onClick={onUse} data-testid="button-use-this">
+          Use this
+        </button>
+        <button type="button" className={smallButtonClass} onClick={onKeep} data-testid="button-keep-mine">
+          Keep mine
+        </button>
+        {long && (
+          <button type="button" className={smallButtonClass} onClick={() => setMore((m) => !m)} data-testid="button-draft-more">
+            {more ? "Show less" : "Show more"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
 }
 
 /**
@@ -122,6 +294,7 @@ export function TextField({
   inputRef,
   mono,
   placeholder,
+  keep,
 }: {
   id?: string;
   value: string;
@@ -134,23 +307,36 @@ export function TextField({
   inputRef?: Ref<HTMLInputElement>;
   mono?: boolean;
   placeholder?: string;
+  /** Keep the draft when the panel closes (slice 13, item 5a). */
+  keep?: DraftKeep;
 }) {
-  const { bind: bind, defaultValue: initial, commit: commit } = useDraft<HTMLInputElement>(value, onSave, { prepare: (t) => t.trim(), required, onEmpty, readOnly, elementRef: inputRef });
+  const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(value, onSave, {
+    prepare: (t) => t.trim(),
+    required,
+    onEmpty,
+    readOnly,
+    elementRef: inputRef,
+    keep,
+  });
   return (
-    <input
-      id={id}
-      ref={bind}
-      defaultValue={initial}
-      readOnly={readOnly}
-      placeholder={placeholder}
-      data-testid={testId}
-      autoComplete="off"
-      className={`${inputClass} ${mono ? "font-mono text-xs" : ""}`}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      }}
-      onBlur={commit}
-    />
+    <>
+      <input
+        id={id}
+        ref={bind}
+        defaultValue={initial}
+        readOnly={readOnly}
+        placeholder={placeholder}
+        data-testid={testId}
+        autoComplete="off"
+        className={`${inputClass} ${mono ? "font-mono text-xs" : ""}`}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          keyDown(e);
+        }}
+        onBlur={commit}
+      />
+      <DraftLine mark={mark} onUse={takeStored} onKeep={keepMine} mono={mono} />
+    </>
   );
 }
 
@@ -160,19 +346,30 @@ export function TextArea({
   onSave,
   code,
   ...rest
-}: { value: string; onSave: FieldSave<string>; code?: boolean } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
-  const { bind: bind, defaultValue: initial, commit: commit } = useDraft<HTMLTextAreaElement>(value, onSave, { readOnly: !!rest.readOnly || !!rest.disabled });
+}: { value: string; onSave: FieldSave<string>; code?: boolean; keep?: DraftKeep } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
+  const { keep, ...props } = rest;
+  const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLTextAreaElement>(value, onSave, {
+    readOnly: !!props.readOnly || !!props.disabled,
+    keep,
+  });
   return (
-    <textarea
-      {...rest}
-      ref={bind}
-      defaultValue={initial}
-      className={`${inputClass} min-h-[60px] resize-y ${code ? "font-mono text-xs" : ""}`}
-      onBlur={(e) => {
-        rest.onBlur?.(e);
-        commit();
-      }}
-    />
+    <>
+      <textarea
+        {...props}
+        ref={bind}
+        defaultValue={initial}
+        className={`${inputClass} min-h-[60px] resize-y ${code ? "font-mono text-xs" : ""}`}
+        onKeyDown={(e) => {
+          props.onKeyDown?.(e);
+          keyDown(e);
+        }}
+        onBlur={(e) => {
+          props.onBlur?.(e);
+          commit();
+        }}
+      />
+      <DraftLine mark={mark} onUse={takeStored} onKeep={keepMine} mono={code} />
+    </>
   );
 }
 

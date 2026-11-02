@@ -63,9 +63,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   const stereotype = useChoice(e.stereotype, (s) => save({ stereotype: s }));
   const concept = useChoice(e.concept_id, (c) => save({ conceptId: c }));
 
-  async function saveDefinition(html: string): Promise<boolean> {
-    return (await saveRow(e, (v) => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v, definition: html }))).ok;
-  }
+  const saveDefinition = (html: string) => saveRow(e, (v) => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v, definition: html }));
 
   async function addAttribute() {
     const result = await run(() => addAttributeAction(p.workspaceId, { entityId: e.id }));
@@ -79,10 +77,10 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
     <div data-testid="panel-entity">
       <div className="mb-1.5 text-[11.5px] text-im-ink-3">Entity</div>
       <Field label="Name" htmlFor="f-en">
-        <TextField key={fieldKey(e.id, "name")} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-entity-name" inputRef={nameRef} />
+        <TextField key={fieldKey(e.id, "name")} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-entity-name" inputRef={nameRef} keep={{ key: fieldKey(e.id, "name"), field: "Name", object: e.name }} />
       </Field>
       <Field label="Alias" htmlFor="f-ealias">
-        <TextField key={fieldKey(e.id, "alias")} id="f-ealias" value={e.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => save({ alias })} testId="input-entity-alias" />
+        <TextField key={fieldKey(e.id, "alias")} id="f-ealias" value={e.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => save({ alias })} testId="input-entity-alias" keep={{ key: fieldKey(e.id, "alias"), field: "Alias", object: e.name }} />
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Stereotype" htmlFor="f-es">

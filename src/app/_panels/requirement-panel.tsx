@@ -49,10 +49,9 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
     setNameFocus(null);
   }, [nameFocus, r.id, setNameFocus]);
 
-  async function save<F extends Field>(field: F, value: Value<F>): Promise<boolean> {
-    const result = await saveRow(r, (v) => updateRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: v, field, value } as UpdateRequirementInput));
-    return result.ok;
-  }
+  /** Saves one field; the answer tells the field whether it was stored, and why not (slice 13). */
+  const save = <F extends Field>(field: F, value: Value<F>) =>
+    saveRow(r, (v) => updateRequirementAction(p.workspaceId, { requirementId: r.id, expectedVersion: v, field, value } as UpdateRequirementInput));
   // a refused text field keeps its draft, a choice shows the newest stored value (slice 13, D-66); an empty name goes
   // back with the server's message (D-59, F14), an empty key goes to the server, which refuses it ("Enter a key.")
   const kind = useChoice(r.kind, (k) => save("kind", k));
@@ -109,7 +108,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       <Kind>Requirement</Kind>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="ID" htmlFor="f-rqk">
-          <TextField key={fieldKey(rid, "key")} id="f-rqk" value={r.key} mono readOnly={!p.editable} onSave={(key) => save("key", key)} testId="input-req-key" />
+          <TextField key={fieldKey(rid, "key")} id="f-rqk" value={r.key} mono readOnly={!p.editable} onSave={(key) => save("key", key)} testId="input-req-key" keep={{ key: fieldKey(rid, "key"), field: "ID", object: r.key }} />
         </Field>
         <Field label="Kind" htmlFor="f-rqkind">
           <select key={fieldKey(rid, "kind")} id="f-rqkind" className={inputClass} value={kind.value} disabled={!p.editable} onChange={(e) => kind.choose(e.target.value as Requirement["kind"])} data-testid="select-req-kind">
@@ -122,7 +121,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
         </Field>
       </div>
       <Field label="Name" htmlFor="f-rqn">
-        <TextField key={fieldKey(rid, "name")} id="f-rqn" inputRef={nameRef} value={r.name} readOnly={!p.editable} onSave={(name) => save("name", name)} required onEmpty={() => toast(NAME_REQUIRED, "refusal")} testId="input-req-name" />
+        <TextField key={fieldKey(rid, "name")} id="f-rqn" inputRef={nameRef} value={r.name} readOnly={!p.editable} onSave={(name) => save("name", name)} required onEmpty={() => toast(NAME_REQUIRED, "refusal")} testId="input-req-name" keep={{ key: fieldKey(rid, "name"), field: "Name", object: r.key }} />
       </Field>
       <RichTextField
         key={fieldKey(rid, "description")}
@@ -147,6 +146,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
             readOnly={!p.editable}
             placeholder="An expression or plain words"
             onSave={(text) => save("expression", text)}
+            keep={{ key: fieldKey(rid, "expression"), field: r.kind === "dq_rule" ? "Check" : "Rule", object: r.key }}
             data-testid="input-req-expression"
           />
         </Field>
@@ -170,7 +170,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
         <Field label="Owner" htmlFor="f-rqo">
-          <TextField key={fieldKey(rid, "owner")} id="f-rqo" value={r.owner_name ?? ""} readOnly={!p.editable} onSave={(owner) => save("owner_name", owner || null)} testId="input-req-owner" />
+          <TextField key={fieldKey(rid, "owner")} id="f-rqo" value={r.owner_name ?? ""} readOnly={!p.editable} onSave={(owner) => save("owner_name", owner || null)} testId="input-req-owner" keep={{ key: fieldKey(rid, "owner"), field: "Owner", object: r.key }} />
         </Field>
         <Field label="External reference" htmlFor="f-rqr">
           <TextField key={fieldKey(rid, "ref")} id="f-rqr" value={r.external_ref ?? ""} readOnly={!p.editable} placeholder="e.g. JIRA-481" onSave={(ref) => save("external_ref", ref || null)} testId="input-req-ref" />

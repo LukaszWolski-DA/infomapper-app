@@ -28,7 +28,7 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot, useDraft } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot, useDraft, DraftLine } from "./fields";
 import { usePanel } from "./inspector";
 import { RequirementsSection } from "./requirements-section";
 import { ItemLabels } from "./item-labels";
@@ -163,7 +163,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
     return null;
   }
   // the rule's draft (slice 13): kept across fresh pages and after a refusal
-  const { bind: ruleBind, defaultValue: ruleInitial, commit: ruleCommit } = useDraft<HTMLTextAreaElement>(m.rule_expression ?? "", onRuleBlur, { elementRef: rule, readOnly: !p.editable });
+  const { bind: ruleBind, defaultValue: ruleInitial, commit: ruleCommit, keyDown: ruleKeyDown, mark: ruleMark, takeStored: ruleTake, keepMine: ruleKeep } = useDraft<HTMLTextAreaElement>(m.rule_expression ?? "", onRuleBlur, { elementRef: rule, readOnly: !p.editable });
 
   /** A click on an input puts its column name into the rule, at the cursor (D-49). */
   function insert(columnId: Uuid) {
@@ -333,7 +333,9 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
             if (wantsRule && !pending && !e.currentTarget.value.trim()) setWantsRule(false);
             ruleCommit();
           }}
+          onKeyDown={ruleKeyDown}
         />
+        <DraftLine mark={ruleMark} onUse={ruleTake} onKeep={ruleKeep} mono />
       </Field>
       {pending && (
         <Note warn testId="note-rule-needed">
@@ -374,6 +376,7 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
           readOnly={!p.editable}
           placeholder="Why this mapping, open questions, who decided"
           onSave={(note) => write((v) => updateMappingAction(p.workspaceId, { ...ref(v), note: note.trim() ? note : null }))}
+          keep={{ key: fieldKey(m.id, "note"), field: "Note", object: `the mapping to ${attribute?.name ?? "?"}` }}
         />
       </Field>
 

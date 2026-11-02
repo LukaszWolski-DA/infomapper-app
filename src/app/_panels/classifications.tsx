@@ -25,7 +25,7 @@ import { dataVaultReading, READING_EMPTY, READING_FOOTER, readingText, type Read
 import type { Classification, ClassificationScope, SourceTable } from "@/domain/types";
 import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
-import { buttonClass, dangerClass, Field, fieldKey, Fold, Hint, inputClass, LongList, Li, smallButtonClass, TextArea, useDraft } from "./fields";
+import { buttonClass, dangerClass, Field, fieldKey, Fold, Hint, inputClass, LongList, Li, smallButtonClass, TextArea, useDraft, DraftLine } from "./fields";
 import { usePanel } from "./inspector";
 
 type Target = { kind: "source_table" | "source_column"; id: Uuid };
@@ -96,6 +96,7 @@ export function SourceNote({ target, name, version, value, placeholder, hint }: 
         readOnly={!p.editable}
         placeholder={placeholder}
         data-testid="input-source-note"
+        keep={{ key: fieldKey(target.id, "note"), field: "Note", object: name }}
         data-version={version}
         onSave={(note) =>
           saveRow({ id: target.id, version }, (v) => setSourceNoteAction(p.workspaceId, { target, expectedVersion: v, note: note.trim() ? note : null }), (x) => (x.removed ? NOTE_REMOVED(name) : NOTE_SAVED(name)), {
@@ -337,7 +338,7 @@ function Row({ c, all, onRemove }: { c: Classification; all: readonly Classifica
     setError(r.ok || r.code === "cut" ? null : r.message);
     return r;
   };
-  const { bind: nameBind, defaultValue: nameInitial, commit: nameCommit } = useDraft<HTMLInputElement>(c.name, rename, { prepare: (t) => t.trim(), required: true, onEmpty: () => setError(null) });
+  const { bind: nameBind, defaultValue: nameInitial, commit: nameCommit, keyDown: nameKeyDown, mark: nameMark, takeStored: nameTake, keepMine: nameKeep } = useDraft<HTMLInputElement>(c.name, rename, { prepare: (t) => t.trim(), required: true, onEmpty: () => setError(null) });
   return (
     <li className="py-1.5" data-testid="classification-row" data-code={c.code ?? ""}>
       <div className="flex items-center gap-2">
@@ -351,7 +352,10 @@ function Row({ c, all, onRemove }: { c: Classification; all: readonly Classifica
               aria-label="Name"
               aria-invalid={!!error}
               onBlur={nameCommit}
-              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                nameKeyDown(e);
+              }}
               className={`${inputClass} h-7`}
               data-testid="input-classification-name"
             />
@@ -379,6 +383,7 @@ function Row({ c, all, onRemove }: { c: Classification; all: readonly Classifica
           {error}
         </p>
       )}
+      <DraftLine mark={nameMark} onUse={nameTake} onKeep={nameKeep} />
     </li>
   );
 }
