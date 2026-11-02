@@ -19,9 +19,10 @@ export function useAction() {
   const undoNow = useUndoNow();
   const [pending, startTransition] = useTransition();
   /**
-   * Refusals that bring the fresh page (slice 13, F3), answered only once the transition that applies it has
-   * committed: a field then reads the newest stored value and version, and a save sent right after it is not refused
-   * again with the old version. Flushed when the transition ends, when the component unmounts, and after 3 s at most.
+   * Refusals of a row's save that bring the fresh page (slice 13, F3), answered only once the transition that applies
+   * it has committed: a field then reads the newest stored value and version, and a save sent right after it is not
+   * refused again with the old version. Flushed when the transition ends, when the component unmounts, and after 3 s at
+   * most. Any other action's refusal is answered at once (a paste empties the clipboard with its toast).
    */
   const afterPage = useRef<(() => void)[]>([]);
   const flush = () => {
@@ -35,7 +36,7 @@ export function useAction() {
   useEffect(() => flush, []);
 
   const run = useCallback(
-    <T,>(action: () => Promise<ActionResult<T>>, success?: string | ((value: T) => string), options?: { undoable?: boolean }) =>
+    <T,>(action: () => Promise<ActionResult<T>>, success?: string | ((value: T) => string), options?: RunOptions) =>
       new Promise<ActionResult<T>>((resolve) => {
         startTransition(async () => {
           let result: ActionResult<T>;
@@ -51,7 +52,7 @@ export function useAction() {
             const undo = options?.undoable ? (ui.undo()?.undo ?? undoNow ?? undefined) : undefined;
             toast(typeof success === "function" ? success(result.value) : success, "info", undo ? { label: "Undo", run: undo } : undefined);
           }
-          if (!result.ok && REFRESHING.has(result.code)) {
+          if (!result.ok && options?.afterPage && REFRESHING.has(result.code)) {
             let done = false;
             const answer = () => {
               if (!done) resolve(result);
@@ -73,7 +74,7 @@ export function useAction() {
    */
   const saveRow = useCallback(
     <T,>(row: { id: string; version: number }, action: (expectedVersion: number) => Promise<ActionResult<T>>, success?: string | ((value: T) => string), options?: SaveOptions) =>
-      rowSaves.save(row.id, row.version, (v) => run(() => action(v), success, options), { deletes: options?.deletes }).then((r): ActionResult<T> => r ?? CUT),
+      rowSaves.save(row.id, row.version, (v) => run(() => action(v), success, { ...options, afterPage: true }), { deletes: options?.deletes }).then((r): ActionResult<T> => r ?? CUT),
     [run],
   );
 
@@ -83,7 +84,7 @@ export function useAction() {
    */
   const saveRows = useCallback(
     <T,>(rows: readonly SaveRowsRow[], action: (versionOf: (id: string) => number) => Promise<ActionResult<T>>, success?: string | ((value: T) => string), options?: SaveOptions) =>
-      rowSaves.saveRows(rows, (versionOf) => run(() => action(versionOf), success, options), { deletes: options?.deletes }).then((r): ActionResult<T> => r ?? CUT),
+      rowSaves.saveRows(rows, (versionOf) => run(() => action(versionOf), success, { ...options, afterPage: true }), { deletes: options?.deletes }).then((r): ActionResult<T> => r ?? CUT),
     [run],
   );
 
@@ -92,6 +93,9 @@ export function useAction() {
 
 /** A save's options: “Undo” in its toast (`undoable`), and whether it deletes its row (`deletes`, slice 10a). */
 type SaveOptions = { undoable?: boolean; deletes?: boolean };
+
+/** `run`'s options: “Undo” in its toast, and whether a refusal waits for the fresh page (a row's save, slice 13). */
+type RunOptions = { undoable?: boolean; afterPage?: boolean };
 
 /** The refusals whose answer brings the fresh page (`runCommand`, slice 13, F3). */
 const REFRESHING = new Set<string>(["stale_version", "forbidden", "archived", "not_found"]);
