@@ -1,6 +1,6 @@
 # Slice 13 – acceptance
 
-Status: **step 2 (the shared mechanism) done, 1 November 2026; waiting for Łukasz before step 3.**
+Status: **step 3 (conflicts) done, 2 November 2026; waiting for Łukasz before step 4.**
 
 - Branch `slice/13-field-saves`, made on 1 November 2026 from `main` at `e66cc42` (the start commit,
   `e66cc42c4c1fefd9514f3c9a09cc67c7051136d3`), the merge of PR 32 (chore e2e reliability, merged 1 November 2026,
@@ -491,6 +491,140 @@ The two skipped tests are the ones skipped on purpose (on demand). The log and t
 - "Enter a name." now also shows in the browser when an empty settings or requirement name goes back (the server's text
   before).
 - No other text yet: the line, "Not saved" and the rest are steps 3 and 4.
+
+## Łukasz's answers to step 2 (2 November 2026)
+
+- **Step 2 is accepted.**
+- **S12A-12 is a deliberate change of slice 12a's behaviour** (slice 12a's PRD, item 17). A `not_found` refusal on a
+  deleted project's page now leads at once to the workspace home with "That project no longer exists.", because F3
+  brings the fresh page with the refusal. Slice 12a's documents stay unchanged.
+- **At the closing,** D-66 gets the sentence: a refusal that cuts the queue brings the fresh page, and the page of a
+  deleted project or object leads where D-38 says.
+- **Step 3** builds the conflict line, the closed panel's draft (answer 7), S13-03 to S13-08 and S13-12, and the
+  screenshots.
+
+## Step 3: conflicts (2 November 2026)
+
+### What changed
+
+- **`useDraft` gives a field its mark** after a stale refusal or a save cut behind one (`MARKED`). The mark is derived
+  in the render from the stored value the refused draft started from (its base) and the stored value now (F5):
+  - they differ: the conflict line "Changed meanwhile to: {value}", or "Cleared meanwhile." when the stored value is
+    empty;
+  - they are equal: "Not saved", and leaving the field saves it again (answer 3).
+
+  While the line shows, Enter and leaving the field save nothing (F6). The mark goes when the stored value comes to
+  equal the text. Validation, permission and not-found refusals give no mark (permission and archive are step 4).
+- **The line** is `DraftLine` (`fields.tsx`): the other value, folded to three lines by CSS (`line-clamp-3`) with "Show
+  more" / "Show less" when it has more than three lines or 240 characters, counted from the text; then "Use this" and
+  "Keep mine".
+  - "Use this" puts the stored value into the element and ends the draft.
+  - "Keep mine" takes the stored value as the new base and sends the draft through the save chain, which sends the
+    newest version (the refusal's fresh page). It is an ordinary save: one change group and one undo step, and in the
+    settings a save without an undo step.
+- **Escape** in a text field puts the stored value back; while the line shows it is "Use this" (answer 10).
+- **Where the line shows:** `TextField`, `TextArea` and `ParamField` show it themselves. So do the bespoke fields: the
+  mapping's rule, the classification list's name, the project's name and description, and the settings' name, client
+  and description.
+- **Rich-text fields** (F4, answer 2): the line is inside the editor dialog, above its footer (`RichConflict` in
+  `rich-text-field.tsx`; the editor's `notice`). The other text is formatted, its fold counted from the plain text.
+  - "Use this" puts the stored text into the editor (the editor handle's new `replace`), and the dialog stays open.
+  - "Keep mine" saves the editor's text.
+  - Save is off (shown disabled) while the line shows.
+  - A stale refusal of a text nobody else changed shows "Not saved" in the dialog; Save works again.
+  - `onSave` now returns the save's answer. The requirement panel's `save` returns the action's result, no longer a
+    boolean, and so do the entity's and attribute's definitions.
+- **A draft whose field is gone** (item 5a, answer 7) is `src/ui/field-drafts.ts`, a map in the page's memory keyed by
+  `fieldKey`, holding the page's path (unit tests: `field-drafts.test.ts`).
+  - A field with `keep` that unmounts with a draft leaves it there. A field that mounts again takes it back, with its
+    mark. A draft typed on another page, or before a reload, is gone.
+  - The toast "Not saved: {field} of {object}. Open it again to see your text." shows when a refused draft leaves its
+    panel, or when the refusal arrives after the panel closed.
+  - **A finding:** selecting another item while a save is on its way waits for the save's answer, as the selection's
+    transition goes with the save's. So the refusal usually lands in the same commit as the new selection, and the
+    toast comes from the field's unmount.
+  - `keep` is on the panels' text fields: entity name and alias; attribute name and alias; requirement ID, name, owner
+    and rule; the relationship's label; the mapping's note; table and column notes; the working label's name.
+  - Not on: the type's parameters, the custom type and the mapping's rule, whose drafts are short-lived. Not on the
+    project home and the settings either: leaving those pages drops the draft anyway.
+- **A refusal reaches the field after its fresh page** (`useAction.run`). A refusal that brings the fresh page is
+  answered once the transition that applies it has committed: flushed when `useTransition`'s pending ends, on unmount,
+  or after 3 s.
+  - The touched-specs run found the gap: S13-05 failed once. The trace shows the name's second save sent about 0.8 s
+    after the first refusal, with the old version, and refused again. "Not saved" had shown before the fresh page
+    arrived.
+  - After the change, S13-05 passed 10 of 10 (`--repeat-each 5`, 2 cases).
+- **Choice fields** stay as step 2 built them (answer 4): no line; after a refusal they show the newest stored value.
+
+### Specs
+
+| ID | Spec | Result |
+| --- | --- | --- |
+| S13-03 | (a) Anna renames Customer; this page's name save is refused: the line with "Client", the field keeps "Kunde"; Enter again saves nothing; "Keep mine" stores "Kunde" as one change group, and undo takes it back. A repeat: "Use this" shows Anna's name and stores nothing. (b) A table's note: the line; Escape is "Use this" | passed |
+| S13-04 | REQ-103's description (four paragraphs from Anna): the line inside the dialog, "Show more" / "Show less", Save off; "Use this" puts Anna's text into the editor, which stays open; an edit of it is stored | passed |
+| S13-05 | (a) Anna changes the stereotype; the name, then at once the alias: both "Not saved", one toast; leaving each saves it; (b) Anna changes the alias too: the alias's line, the name's "Not saved" | passed; (a) 10 of 10 after the fix above |
+| S13-06 | The settings' description: the line; "Keep mine" stores it, and Undo stays off (no undo step); a description cleared meanwhile reads "Cleared meanwhile." | passed |
+| S13-07 | REQ-103: Anna changes the owner; the name and at once the owner: the name "Not saved", the owner's line with Anna's; a duplicate key is kept in its field | passed |
+| S13-08 | Anna changes Customer's stereotype; this page's choice is refused: the select shows Anna's, the toast, no line, nothing overwritten | passed |
+| S13-12 | Canvas commits (development): typing 20 characters **0**; an own save of the name **3**; the conflict's fresh page with its line **3**; "Use this" **0** | passed |
+| S13-14 | The alias's save held while Product is selected; released: the toast; Customer's panel again shows the draft with "Not saved"; after a reload it is gone | passed |
+
+**S13-12's 3 commits** are the fresh page's: both it and an own save rename the card's row. The line adds none.
+
+**The element guard** (`npm run measure:build`, then `MEASURE=1 MEASURE_BUILD=production
+ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json npx playwright test e2e/slice-03b/S3B-15-elements.spec.ts`):
+passed.
+
+| View | Viewport, slice 8 → branch | Page total, slice 12b → branch |
+| --- | --- | --- |
+| 30 %, expanded | 4,508 → 4,508 | 6,000 → 5,999 |
+| 100 %, expanded | 19,305 → 19,305 | 20,797 → 20,796 |
+| 30 %, collapsed | 1,465 → 1,465 | 2,867 → 2,866 |
+| 100 %, collapsed | 4,907 → 4,907 | 6,309 → 6,308 |
+
+The viewport counts are equal. The page totals are one lower than slice 12b's in every view, outside the viewport and
+nothing drawn on the canvas. Most likely `<head>` has one JavaScript chunk fewer (the bundle's split changed with the
+panels' code), as slice 8's +1 was one chunk more. Not checked against a slice 12b build in this step.
+
+**Earlier specs run:** slices 0, 4a, 9, 10a, the fixes, S3A-04, S11-01, S12A-02, S12A-12 and slice 13. **128 passed, 1
+failed** (S13-05, the gap above; its log and trace are in `.data/e2e-s13-step3-fail/`), 19 min. No earlier spec failed,
+so the settings' (S0-08, S0-09, S9-04) and the requirement panel's (slice 4a) pass unchanged in step 3.
+
+**The same set again after the fix,** with S10C-09: **129 passed, 1 failed, 25 min.**
+- The failure is S0-10 (restarting the dev server). Its sign-in after the restart did not show the top bar within
+  15 s, the known sign-in timeout (`docs/known-limitations.md`, "Sign-in timeouts under memory pressure"). No slice 13
+  code is on that path.
+- Alone it passed **3 of 3** (1.5, 1.4 and 1.4 min): a flake. The log and the trace are in
+  `.data/e2e-s13-step3-fail2/`.
+
+**CI:** `npm run lint` clean, `npm run typecheck` pass, `npm test` 121 files, 1,566 tests, pass.
+
+### Screenshots
+
+`docs/prd/slice-13-screens/step-3/` (`SCREENS=step-3 npx playwright test e2e/slice-13/S13-screens.spec.ts`), light and
+dark:
+- `conflict-short-*`: the entity's name;
+- `conflict-long-dialog-*`: REQ-103's description in the dialog, folded;
+- `not-saved-*`: the name and the alias;
+- `cleared-*`: the alias.
+
+The dialog's fold is a height of 4.5 lines. Its paragraphs have margins, so the third line can show cut at the bottom;
+"Show more" opens it.
+
+### New and changed user-visible texts (all of the slice so far)
+
+| Where | Text | Step |
+| --- | --- | --- |
+| The conflict toast (every write) | "Someone changed this meanwhile." (was "… Reload to see the latest version.") | 2 |
+| An empty settings or requirement name going back | "Enter a name." (now also from the browser) | 2 |
+| Under a field, in the dialog | "Changed meanwhile to:" and the value | 3 |
+| Under a field, in the dialog | "Cleared meanwhile." | 3 |
+| The line's buttons | "Use this", "Keep mine" | 3 |
+| A long other value | "Show more", "Show less" | 3 |
+| Under a field, in the dialog | "Not saved" | 3 |
+| A draft refused as its panel closes | "Not saved: {field} of {object}. Open it again to see your text." (e.g. "Not saved: Alias of Customer. …") | 3 |
+
+Still to come in step 4: "Not saved. You can still copy it." (permission and archive).
 
 ## For the closing (Łukasz's request, 1 November 2026)
 
