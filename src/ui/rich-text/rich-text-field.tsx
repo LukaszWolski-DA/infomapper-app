@@ -148,7 +148,8 @@ const isLong = (text: string): boolean => text.split("\n").length > 3 || text.le
 
 /**
  * A conflict's line inside the editor dialog (slice 13, F4): "Changed meanwhile to:" with the newest stored text,
- * formatted and folded by CSS, or "Cleared meanwhile."; "Use this" and "Keep mine".
+ * formatted and folded to three lines by CSS (`line-clamp`), as under a field, or "Cleared meanwhile."; "Use this" and
+ * "Keep mine".
  */
 function RichConflict({ html, text, onUse, onKeep }: { html: string | null; text: string; onUse: () => void; onKeep: () => void }) {
   const [more, setMore] = useState(false);
@@ -160,7 +161,8 @@ function RichConflict({ html, text, onUse, onKeep }: { html: string | null; text
         <>
           <div>Changed meanwhile to:</div>
           <div
-            className={`rich mt-0.5 ${long && !more ? "max-h-[4.5em] overflow-hidden" : "max-h-[30vh] overflow-auto"}`}
+            // folded: three lines by CSS, the paragraphs' margins off so the clamp ends on the third line (no layout read)
+            className={`rich mt-0.5 ${long && !more ? "line-clamp-3 [&_*]:my-0" : "max-h-[30vh] overflow-auto"}`}
             data-testid="draft-other"
             // sanitized by the server when stored (AD-17)
             dangerouslySetInnerHTML={{ __html: html }}

@@ -5,15 +5,18 @@ import type { Uuid } from "@/domain/ids";
 /** A write or read in an organization this session has not unlocked with its password (slice 8, P4, F3). */
 export const lockedMessage = (organization: string) => `Unlock ${organization} first: open it and enter its password.`;
 
-/** The refusal when the organization is locked in this session, else null. */
+/**
+ * The refusal when the organization is locked in this session, else null. Its own code (slice 13, F17): it brings no
+ * fresh page, which would be the password form, so a field keeps its draft editable.
+ */
 export async function lockedRefusal(
   store: DataStore,
   unlocked: ReadonlySet<Uuid>,
   organizationId: Uuid,
-): Promise<{ ok: false; code: "forbidden"; message: string } | null> {
+): Promise<{ ok: false; code: "locked"; message: string } | null> {
   if (unlocked.has(organizationId)) return null;
   const organization = await store.organizations.get(organizationId);
-  return { ok: false, code: "forbidden", message: lockedMessage(organization?.name ?? "this organization") };
+  return { ok: false, code: "locked", message: lockedMessage(organization?.name ?? "this organization") };
 }
 
 /**

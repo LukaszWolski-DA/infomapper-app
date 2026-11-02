@@ -35,6 +35,25 @@ export function takeDraft(key: string): KeptDraft | null {
   return { text: k.text, base: k.base, refused: k.refused };
 }
 
+/** Objects deleted while their drafts were on their way (a `not_found` refusal): none of their drafts is kept. */
+const gone = new Set<string>();
+const objectOf = (key: string): string => key.split(":")[0] ?? key;
+
+/** The object of field `key` was deleted: its kept drafts go, and none is kept again (slice 13, answer 8). */
+export function markGone(key: string): void {
+  const object = objectOf(key);
+  gone.add(object);
+  for (const k of [...kept.keys()]) if (objectOf(k) === object) kept.delete(k);
+}
+
+/** Whether the object of field `key` was deleted (`markGone`). */
+export const isGone = (key: string): boolean => gone.has(objectOf(key));
+
+/** A field of the object mounts again (an undo brought it back): its drafts are kept again. */
+export function unmarkGone(key: string): void {
+  gone.delete(objectOf(key));
+}
+
 /** Drops the kept draft of field `key` (its save was stored). */
 export function dropDraft(key: string): void {
   kept.delete(key);

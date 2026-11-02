@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { dropDraft, keepDraft, takeDraft, updateDraft } from "./field-drafts";
+import { dropDraft, isGone, keepDraft, markGone, takeDraft, unmarkGone, updateDraft } from "./field-drafts";
 
 const at = (pathname: string) => vi.stubGlobal("window", { location: { pathname } });
 
@@ -24,5 +24,19 @@ describe("field drafts of closed panels (slice 13, item 5a)", () => {
     dropDraft("e1:alias");
     expect(takeDraft("e1:alias")).toBeNull();
     expect(updateDraft("e1:alias", { refused: true })).toBe(false);
+  });
+
+  it("drops every draft of a deleted object, until a field of it mounts again", () => {
+    at("/w/1/p/2/c/3");
+    keepDraft("e2:name", { text: "Kunde", base: "Customer", refused: false });
+    keepDraft("e2:alias", { text: "Klient", base: "", refused: false });
+    keepDraft("e3:name", { text: "Order", base: "Sales Order", refused: false });
+    markGone("e2:alias");
+    expect(isGone("e2:name")).toBe(true);
+    expect(takeDraft("e2:name")).toBeNull();
+    expect(takeDraft("e2:alias")).toBeNull();
+    expect(takeDraft("e3:name")).not.toBeNull();
+    unmarkGone("e2:name");
+    expect(isGone("e2:alias")).toBe(false);
   });
 });

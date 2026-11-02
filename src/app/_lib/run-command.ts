@@ -29,9 +29,12 @@ export type ActionResult<T = undefined> =
    */
   | { ok: true; value: T; live?: LiveOutcome; versions?: Record<string, number> }
   /** `fields`: the domain's field messages, when it gave some (slice 7a: P8's refusal says `review: "stale"`). */
-  | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected" | "cut"; message: string; fields?: Record<string, string> };
+  | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected" | "cut" | "locked"; message: string; fields?: Record<string, string> };
 
-/** The refusals after which the row's waiting saves are cut (`src/ui/row-saves.ts`); each brings the fresh page. */
+/**
+ * The refusals after which the row's waiting saves are cut (`src/ui/row-saves.ts`); each brings the fresh page. A
+ * locked organization's (`locked`) cuts them too, but brings none: its page would be the password form.
+ */
 const REFRESHING_REFUSALS = new Set<string>(["stale_version", "forbidden", "archived", "not_found"]);
 
 /** How `runCommand` runs a write. */
@@ -69,19 +72,14 @@ export async function runCommand<T>(
   if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
   const { user } = session;
   const store = getDataStore();
-  /** A write into an organization this session has not unlocked: its fresh page would be the password form. */
-  let locked = false;
   const once = async (): Promise<ActionResult<T>> => {
     const ctx: CommandContext = { actorId: user.id, now: new Date().toISOString(), newId: () => uuidv7() };
     const result = await build(ctx, store, user);
     if (!result.ok) return { ok: false, code: result.error.code, message: result.error.message, ...(result.error.fields ? { fields: result.error.fields } : {}) };
     const organizationId = await organizationOfWrite(store, result.writeSet);
     if (organizationId && organizationId !== "new") {
-      const refusal = await lockedRefusal(store, session.unlocked, organizationId);
-      if (refusal) {
-        locked = true;
-        return refusal;
-      }
+      const locked = await lockedRefusal(store, session.unlocked, organizationId);
+      if (locked) return locked;
     }
     const workspaceId = result.writeSet.events[0]?.workspace_id;
     const contextLabelId = workspaceId ? parseContextCookie((await cookies()).get(contextCookieName(user.id, workspaceId))?.value)?.labelId : null;
@@ -107,7 +105,7 @@ export async function runCommand<T>(
     const result = options.freshOnStale ? await retryWhenStale(once, (r) => !r.ok && r.code === "stale_version") : await once();
     // a refusal that cuts the row's waiting saves brings the fresh page in the same answer (slice 13, F3): the newest
     // stored values and versions, and what the person may still do
-    if (!result.ok && REFRESHING_REFUSALS.has(result.code) && !locked) revalidatePath("/", "layout");
+    if (!result.ok && REFRESHING_REFUSALS.has(result.code)) revalidatePath("/", "layout");
     return result;
   } catch (e) {
     // No row content in the log (personal data, rich text): only what kind of error it was.

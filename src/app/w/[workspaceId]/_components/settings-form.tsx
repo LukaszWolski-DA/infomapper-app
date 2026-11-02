@@ -4,7 +4,8 @@
 // Every save goes through the workspace's save chain (slice 9) with the newest version known; a stale version is refused
 // with the domain's message (AD-12), and the refusal brings the fresh page. Slice 13 (D-66): a text field keeps its
 // draft across fresh pages and after a refusal (an empty name goes back with "Enter a name.", D-59); the language and
-// the two modes show the newest stored value after a refusal. Settings are not undo steps.
+// the two modes show the newest stored value after a refusal. Settings are not undo steps. A draft refused for a
+// permission or the archive stays readable: its field is read-only instead of disabled, so its text can be copied.
 // Slice 7c (item 17, answers F16, F17): the methodology text names the source table panels; switching Data Vault 2.0
 // mode off says how many uses of Data Vault classifications stay stored.
 
@@ -77,7 +78,8 @@ export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial
             data-testid="input-workspace-name"
             className={fieldClass}
             defaultValue={nameInitial}
-            disabled={dis}
+            disabled={dis && nameMark?.kind !== "copy"}
+            readOnly={dis}
             onBlur={nameCommit}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
@@ -93,7 +95,8 @@ export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial
             data-testid="input-workspace-client"
             className={fieldClass}
             defaultValue={clientInitial}
-            disabled={dis}
+            disabled={dis && clientMark?.kind !== "copy"}
+            readOnly={dis}
             onBlur={clientCommit}
             onKeyDown={(e) => {
               if (e.key === "Enter") e.currentTarget.blur();
@@ -109,7 +112,8 @@ export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial
             data-testid="input-workspace-description"
             className={fieldClass + " min-h-[60px] resize-y"}
             defaultValue={descriptionInitial}
-            disabled={dis}
+            disabled={dis && descriptionMark?.kind !== "copy"}
+            readOnly={dis}
             onBlur={descriptionCommit}
             onKeyDown={descriptionKeyDown}
           />

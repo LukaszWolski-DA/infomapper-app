@@ -24,8 +24,11 @@ export interface SaveOutcome {
   versions?: Readonly<Record<string, number>>;
 }
 
-/** Refusals after which the saves waiting behind cannot succeed either (a row not found stays so: slice 10a, F5). */
-const CUTS = new Set(["stale_version", "forbidden", "archived", "not_found"]);
+/**
+ * Refusals after which the saves waiting behind cannot succeed either (a row not found stays so: slice 10a, F5; a
+ * locked organization, slice 13).
+ */
+const CUTS = new Set(["stale_version", "forbidden", "archived", "not_found", "locked"]);
 
 /**
  * A row a several-row save writes: with `shown` (the version the page shows) when its version is sent and checked,
