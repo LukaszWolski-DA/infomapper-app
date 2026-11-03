@@ -581,3 +581,71 @@ against 9)."
 
 - `S14A-13-layers.spec.ts` is ignored outside the measurement build (`playwright.config.ts`, as S11-13).
 - Results: `test-results/S14A-13-commits-<side>.json`, `test-results/S14A-13-layers.json` (git-ignored).
+
+## Łukasz's answers to step 4 (3 November 2026)
+
+- **Step 4 accepted,** with the AD-24 sentence (accepted on the day of the merge).
+- **Step 5** as the PRD says: the docs, one full e2e run, CI, the branch pushed with a pull request, KB's backup, the
+  manual acceptance scenario. Merge and the tag `slice-14a` only on Łukasz's command.
+
+## Step 5: the closing (3 November 2026)
+
+### Docs
+
+- **`docs/decisions.md`:** D-66's sentence on notes and frames replaced (the text below); "Changed in slice 14a (notes
+  and frames); accepted by Łukasz on the day of slice 14a's merge." added to its acceptance; AD-24's sentence on a
+  refused note's mark after slice 11's.
+- **`docs/known-limitations.md`:** "A note's text rolls back after a refused save; a frame's fields have no line"
+  removed; "A new note's text, and a note that is not drawn" stays (step 1 answers 7 and 9); the list of fields that
+  keep a closed panel's draft names a frame's name and the canvas's notes.
+- **`docs/ideas.md`:** "Notes and frames on slice 13's rule" done; the plan's 14a done, next 14b.
+- **`docs/inventory-prototype-vs-app.md`:** slice 14a's deliberate differences (the mark, the lists, a frame's line; the
+  prototype's second press to edit a note).
+- **README:** the status, the slice's line, the acceptance link, the three new commands.
+- **CLAUDE.md:** the slice in the opening paragraph; "Saving in panels" with slice 14a (the canvas's queue with refusal
+  codes, `save-cuts.ts`, `note-drafts.ts`, the mark, `useDraft`'s `outside`, `NoteRow`); slice 14a's e2e helpers and
+  how 20 refusals and a LayerTree read are made; the three commands.
+
+**D-66's changed part (for your acceptance):**
+
+> Notes and frames follow the same rule through the canvas's queue (slice 14a): a note's text keeps its draft, one per
+> note for the page, in its panel and on the canvas; on the canvas a note with a refused draft shows a "Not saved" mark
+> in its header, which selects the note and opens its panel with the conflict line; the panels' lists of notes (the
+> canvas's overview, a card's or frame's "Notes", the selection's list) show the draft too, with "Not saved" after a
+> refusal; a frame's name has the conflict line in its panel and keeps its draft when the panel closes; a note's status
+> and colour and a frame's kind, concept and system show the newest stored value after a refusal; a refusal that cuts
+> cuts the note's or the frame's own saves waiting behind it (one toast), while the canvas's other writes (layout, the
+> names switch, removes) keep their behaviour. A note never saved loses its text when its creation is refused.
+
+### Backup of KB
+
+`.data/backups/dev-db-20261103-1200.json` and `.data/backups/kb-model-latest.json`, both byte for byte equal to
+`.data/dev-db.json` ("Kanton Basel" in it); git-ignored, never committed. Nothing was reset or seeded over it (A3).
+
+### Manual acceptance (on your model KB, "Kanton Basel", after the backup)
+
+Start `npm run dev` (no e2e run at the same time) and sign in. Use a canvas of "Kanton Basel" with a free note, a note
+pinned to a card and a frame (add them first if the canvas has none). Two windows on the same canvas: the second
+window's page does not know what the first one saves until it saves something itself.
+
+1. **A conflict on the canvas.** In window A change a note's text (double-click it, type, Ctrl+Enter). In window B
+   double-click the same note, type other text, Ctrl+Enter: the toast "Someone changed this meanwhile.", your text
+   stays on the note, and "Not saved" shows in its header.
+2. **The lists.** In window B press Escape (nothing selected): "Notes on this canvas" in the right panel lists the note
+   by your text with "Not saved". For the pinned note, select its card: the card's "Notes" shows the same.
+3. **The mark.** Click "Not saved" on the note: the note is selected, its panel shows your text and "Changed meanwhile
+   to: …" with A's text. Press "Keep mine": stored, the mark and the line go. Press Undo (Ctrl+Z): A's text is back.
+4. **In the panel, Use this.** Repeat step 1's change in A; in B type into the note panel's text and leave it (Tab):
+   the line shows; press "Use this": A's text, nothing stored. Repeat once more and press Escape in the field: the same.
+5. **Escape on the canvas.** Make another conflict on the canvas (step 1), then double-click the note in B and press
+   Escape: A's text shows, the mark goes.
+6. **Typing while a save is on its way.** Type a long text into a note, Ctrl+Enter, double-click it again at once and
+   go on typing: nothing is lost; Ctrl+Enter saves the rest.
+7. **A frame's name.** Rename a frame in A (its panel); in B type another name in its panel and press Enter: the line
+   with A's name. Press Escape outside the field to close the panel: the toast "Not saved: Name of {frame}. …"; select
+   the frame again: your name with its line.
+8. **Choices.** Change a note's colour in A, then another colour in B: B shows A's colour, with the toast. The same for
+   a frame's "Stands for".
+9. **Optional, read-only:** archive the workspace in A (the workspace home), then write in a note in B: the toast, the
+   mark stays, the note no longer opens its editor; the mark opens the panel with "Not saved. You can still copy it.".
+   Unarchive afterwards.
