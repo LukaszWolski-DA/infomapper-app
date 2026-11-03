@@ -491,9 +491,8 @@ navigation discards a save whose answer has not arrived, but Back in the window 
   longer leads back to the project home.
 - **Found** in slice 14b (`S6B-06`, step 3; checked for links and Back, Łukasz's question after step 3). `S6B-06` waits
   for the delete's own page before Back. **No fix in this slice.**
-- **For later PRDs:** the app itself never navigates (`router.push`, `router.replace`) after a save's answer: by then
-  the person may have clicked a link, and the address still shows the old page until the link's page arrives, so no
-  check of `window.location` can tell. Slice 14b found this with `?rename=1` (now dropped before the save is sent).
+- **Not the same as S0-06's regression in slice 14b**, which was the app's own navigation after an answer; the rule
+  that came of it is in CLAUDE.md ("Saving in panels", slice 14b: the app never navigates after a save's answer).
 
 ### Browsers without the Navigation API
 
@@ -1009,18 +1008,41 @@ by someone removed later shows "someone" instead of their name; anything written
 
 ## Saving in panels (slice 9; the canvas's writes joined the chain in slice 10a; a field's draft in slice 13, D-66)
 
-### Writes still off the save chain (slice 10a)
+### Writes still off the save chain (slice 10a; reduced in slice 14b)
 
-- **The names check boxes** (slice 11, `NamesSwitch.tsx`) write through the canvas's queue, and the role select
-  (`people.tsx`) sends no version (last write wins, D-58): neither keeps a draft (slice 13, R5).
-- **Renaming and deleting a canvas** (`canvas-tabs.tsx`, `canvas-menu.tsx`) send the canvas's version from the page.
-  The look (grid, background, layer) has its own queue with its own version (`look.tsx`), so a rename right after a
-  layer switch can be refused until the page refreshes. Left for later, as the tab's rename is not on the chain either
-  (Łukasz, step 1 answers).
-- **The change-to-resolve actions** (`source-changes.tsx`) answer with the versions of every row they wrote, and those
-  go to `rowSaves.answer`. A panel save of such a row (a table's or column's note) started while the action is on its
-  way still sends the version it knows and can be refused as a false conflict. The reason: only the server knows which
-  tables, columns and mappings an action writes, so the browser cannot hold those rows before it is sent (`saveRows`).
+- **The role select** (`people.tsx`) sends no version (last write wins, D-58) and keeps no draft (slice 13, R5).
+- Since slice 14b the canvas's own row is on the chain (its look, "Use this look on all canvases", the names switch,
+  which holds the row, the rename and the delete; a label's rename and delete answer with the live canvas's versions),
+  and so are the change-to-resolve actions (below).
+
+### The change-to-resolve actions hold their change's tables, not the whole source (slice 14b, answer 3)
+
+While an action is on its way, the panel saves it holds are those of the change's table (for a move, the target
+column's table too), all their columns, the mappings that read those columns with all their inputs, and the change's
+mapping (`src/domain/source-changes/held.ts`). Holding the whole source was measured over the bar of 20 ms per action on
+20,000 columns (28 to 30 ms for the first action on a page; `scripts/bench-source-hold.ts`), so the agreed fallback
+holds the narrow set (0.4 ms). Only the server knows exactly which rows an action writes: a save of a row of the same
+source outside that set, started while the action is on its way, can still be refused as a false conflict until the
+page refreshes. **S14B-08 checks the hold in the browser, but not that another source's save is left free:** Next.js
+sends a page's server actions one at a time, so while an answer is held no other action leaves at all; that part is
+covered by `held.test.ts`.
+
+### A refusal cuts only the rows whose version it sent (slice 10a's held rows; changed in slice 14b, answer 2)
+
+A write over several rows (an attribute's move, a merge, a concept deleted with "move to", the D-05 drop, the
+change-to-resolve actions) holds rows whose version it does not send. Until slice 14a a refusal of such a write also cut
+the held rows' saves waiting behind it, which came back as cut ("Not saved") though nobody had changed those rows. Since
+slice 14b they are sent after the refusal with the newest version known, and stored, or refused on their own if their
+row did change. Example: the attribute "Email" moved up in Customer while a save of "Phone"'s definition waits behind
+the move; the move is refused as stale; "Phone"'s save is sent and stored.
+
+### Navigation inside the app gives no warning (slice 14b, O6)
+
+The browser's warning before a page is left (`src/ui/leave-guard.ts`) comes only with a full navigation: a reload, a
+closed tab, a typed address or another site. A link, the breadcrumbs, the project switcher, Back and Forward between the
+app's pages stay in one document and fire no `beforeunload`, so a draft goes with its page without a question, as D-66
+says (and without the "Not saved: … Open it again" toast, as the draft is gone). The browser shows its own fixed text;
+the app adds none.
 
 ### A new note's text, and a note that is not drawn (slice 14a, step 1 answers 7 and 9; D-66)
 
@@ -1047,7 +1069,8 @@ by someone removed later shows "someone" instead of their name; anything written
 - **The conflict line does not say who changed the value** (no "by {person}", F20; `docs/ideas.md`).
 - **The page has no polling:** another person's change shows in a field without a draft with this page's next fresh
   page (an own write, a refusal, a navigation), as before slice 13.
-- **Leaving the page with a draft not saved gives no warning** (`beforeunload`; `docs/ideas.md`).
+- **Leaving the page with a draft not saved** warns since slice 14b on a reload, a closed tab or another site, not on
+  navigation inside the app (above).
 
 ### Copies of attributes (slice 10c, D-63)
 

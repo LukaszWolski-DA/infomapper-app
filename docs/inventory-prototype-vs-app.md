@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 14a's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 14b's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -96,6 +96,13 @@ rule. A note's text keeps its draft on the canvas and in its panel; a note with 
 button in its header, which opens its panel with the conflict line, and the panels' lists of notes show the draft with
 "Not saved"; a frame's name has the line in its panel. The prototype has none of these. Also different: the prototype
 starts editing a note on a second press of a selected note (`secondPress`); the app on a double-click (`docs/ideas.md`).
+
+**Slice 14b, deliberate differences from the prototype (PRD section 8, D-66):** the prototype has no save conflicts and
+no warning on leaving. A refused rename of a canvas keeps the typed name in its tab's field with slice 13's line in a
+compact form inside the tab, on one row after the field ("Changed meanwhile to: …", "Use this", "Keep mine"), or "Not
+saved"; an empty canvas name goes back with "Enter a name." (the prototype keeps the old name silently). A page with
+unsaved text asks the browser to warn before it is reloaded or closed, with the browser's own text; navigation inside
+the app gives no warning.
 
 ## Model
 

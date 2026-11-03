@@ -55,16 +55,27 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   saving notes and frames by slice 13's rule: their canvas queue (`useNotes`, `useFrames`, the note on
   the canvas in `NoteLayer`) keeps a refused draft with the conflict line instead of rolling it back; AD-24's rules for
   the canvas, with canvas commit counts and measurements (below, "Notes and frames on slice 13's rule").
-- **14b: the writes off the save chain and leaving a page with a draft:** a canvas's name in its tab, the change-to-
-  resolve actions, and the canvas's look as slice 14a's step 1 decides (`docs/known-limitations.md`, "Writes still off
-  the save chain"); a warning when leaving a page with a draft not saved (`beforeunload`).
-- **Then InfoCube,** starting with a concept document.
+- **14b: done in slice 14b** (D-66): the canvas's row on one chain (look, look on all canvases, names switch, rename,
+  delete, the live canvas's writes), the rename's line inside the tab, the change-to-resolve actions holding their
+  change's tables, the browser's warning before a page with unsaved text is left; no data model change. The plan was:
+  a canvas's name in its tab, the change-to-resolve actions, and the canvas's look (`docs/known-limitations.md`,
+  "Writes still off the save chain"); a warning when leaving a page with a draft not saved (`beforeunload`).
+- **Next: InfoCube,** starting with a concept document.
 - **Then the model validator** (below, "A model validator").
 - **The database slice last** (AD-31).
 
 ## A field's draft: what comes later (slice 13, PRD section 9)
 
-- **A warning when leaving a page with a draft not saved** (`beforeunload`): in 14b's plan.
+- **A warning when leaving a page with a draft not saved** (`beforeunload`): done in slice 14b for a reload, a closed
+  tab and another site.
+- **A warning on navigation inside the app** (slice 14b, O6's alternative): a link, the breadcrumbs, the project
+  switcher, Back and Forward with a draft on the page ask first, with the app's own dialog (Next.js has no hook for
+  it; the links and the history watcher would ask `leave-guard.ts`'s `asksToStay`). Not built: the browser's own
+  warning only (O6).
+- **Back right after a save keeps Forward** (slice 14b, `docs/known-limitations.md`): Back in the 50 to 150 ms after a
+  save's answer reaches the page, before its page commits, loses the entry Forward led to. A fix would hold Back (the
+  breadcrumbs row's button and Alt+←) until the router's pending action has committed, or report it to Next.js; the
+  browser's own Back button cannot be held.
 - **A field-level merge** of two texts, showing the differences, beyond "Use this" and "Keep mine".
 - **Drafts kept across a reload,** in the browser's storage (slice 13 keeps them in the page's memory only, answer 7).
 - **The import wizard's progress across a reload** (slice 14b, step 1 answer 5): a reload or a closed tab in the middle
