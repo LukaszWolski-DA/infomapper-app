@@ -5,3 +5,235 @@
 - Date: 3 November 2026
 - PRD: `docs/prd/slice-14a-notes-frames-saves.md`, copied unchanged from Łukasz's Downloads (`cmp` identical; SHA-256
   `e26ff10184009899a8651d82843c2ac26e2134d47db8920aa976b576fd158944` for both)
+
+## Step 1: the PRD checked against the code (3 November 2026)
+
+Read: the PRD; `docs/decisions.md` (D-03, D-04, D-07, D-20, D-21, D-38, D-66, AD-12, AD-13, AD-24); CLAUDE.md ("Saving in
+panels", the canvas's queue); `docs/known-limitations.md` ("A note's text rolls back…", "A field's draft: what slice 13
+does not cover", "Writes still off the save chain"); `docs/ideas.md` ("The plan after slice 13", "Notes and frames on
+slice 13's rule"); `slice-13-acceptance.md` (F2, F3, F9, F12, the inventory, S13-12, the answers to step 1). Code:
+`src/canvas/ModelCanvas.tsx` (`enqueue`, `enqueueGroup`, `change`, `setNames`, the card removes, `NoteLayer`'s props),
+`useNotes.ts`, `useFrames.ts`, `GroupActions.ts`, `NoteLayer.tsx`, `FrameLayer.tsx`, `fresh.ts`, `value-store.ts`,
+`canvas.css` (`.nt`); `src/app/_actions/note.ts`, `frame.ts`; `src/app/_lib/run-command.ts`;
+`src/app/_components/use-action.ts`; `src/app/_panels/fields.tsx` (`useDraft`, `DraftLine`, `useChoice`, `TextField`,
+`TextArea`), `note-panel.tsx`, `frame-panel.tsx`, `canvas-host.tsx`; `src/ui/field-draft.ts`, `field-drafts.ts`;
+`src/domain/commands/note.ts` (`updateNote`), `frame.ts` (`updateFrame`); the e2e specs that touch notes and frames;
+the prototype (`startEditNote`, the frame panel).
+
+**In short.** Items 1 and 2 already exist since slice 13: every note and frame write goes through `runCommand`, which
+answers the refusal's code and brings the fresh page (F1). What is missing is smaller and elsewhere: the canvas's code
+throws the code away, its queue never cuts (F2), its refusals arrive before their fresh page (F3), and a note's text has
+two editors that share one optimistic value (F4). The proposal keeps every other write on the queue exactly as it is.
+A2 holds: no data model change, no new local file format (Q9).
+
+### Findings
+
+| # | Finding | Files and functions | Proposal |
+| --- | --- | --- | --- |
+| F1 | **Items 1 and 2 exist already.** The note and frame actions run through `runCommand`, whose `ActionResult` carries `code` (`stale_version`, `forbidden`, `archived`, `not_found`, `invalid`, `locked`, …) and the written row (its version). Since slice 13 (F3) a refusal for a stale version, a permission, the archive or a row not found revalidates the pages; a `locked` refusal does not (`lockedRefusal`), nor does an invalid input. The canvas only narrows the answer to `{ ok: false; message }` in its own types and ignores the code. | `src/app/_actions/note.ts` (`noteCommand`), `frame.ts` (`onCanvas`, `refreshed`); `run-command.ts` (`REFRESHING_REFUSALS`); `useNotes.ts:28` (`WriteResult`), `useFrames.ts` (`WriteResult`, `FAILED`), `GroupActions.ts`, `ModelCanvas.tsx` (`SaveCardResult`) | **Step 2 is smaller than the PRD assumes:** the canvas's result types carry `code` (types only for every write); only a note's own saves and the frame's `updateFrame` use it (F2, F3, F7). No change to `enqueue`/`enqueueGroup`, `runCommand` or the domain. S14A-01 checks the frame name's answer reaching its field (the line, "Not saved", no fresh page after `locked`) instead of "the queue answers with its kind". |
+| F2 | **The canvas's queue never cuts.** After a cutting refusal the canvas does not change `versions.current`, and `grownVersions` skips a row with writes on their way, so every write waiting for the same row is sent with the old version and refused on its own, each with its toast. A note's text save waiting behind its refused status save is refused as stale too (D-66's "Not saved" holds by slice 13's F5, with a second toast). | `ModelCanvas.tsx:611` (`enqueue`), `:620` (`enqueueGroup`); `fresh.ts` (`grownVersions`); `useNotes.ts:156` (`save`) | **(a) Recommended:** the canvas records a cutting refusal per row id (any write on the queue that gets one), and only a note's save (`useNotes.save`) and `updateFrame` waiting behind it answer `cut` without sending and without a toast (as `rowSaves`). Card moves, sizes, frames' layout, the names switch and the deletes are sent as today (N2). (b) No cut: two toasts in S14A-06's case. |
+| F3 | **The answer comes before its fresh page.** The canvas calls the actions directly (not through `useAction`'s transition), so a refusal is handled before the fresh page commits (slice 13 found the same for panels and added `afterPage`). D-66's mark compares the field's stored value with its base: answered first, it shows "Not saved" and turns into the conflict line only when the page lands; "Keep mine" pressed in between would send the old version (`versions.current` grows only with the page, `grownVersions`). | `useNotes.ts` (`save`), `useFrames.ts:936` (`updateFrame`); `use-action.ts` (`afterPage`, 3 s); `useNotes.ts:138` and `useFrames.ts` (the fresh-page effects with `mergeFresh`) | A note's and a frame's **refusal that brings a fresh page is answered once the next `initialNotes` / `initialFrames` has been merged** (3 s at most, as `afterPage`). Small: a list of waiting answers flushed at the end of the fresh-page effect. |
+| F4 | **A note's text has two editors and one optimistic value.** The canvas's editor (`NoteEditor`) is mounted only while editing; the panel's `TextArea` whenever the note is selected and the details panel shows, so both are mounted while a note is edited on the canvas. `commit` and `update` write the typed text into the note's data at once (`patch`), and that value is also the panel field's stored value. After a refusal nothing keeps the base the draft started from, and with the rollback removed the panel field would take the page's value as stored (it has no draft of its own when the text was typed on the canvas). | `useNotes.ts:295` (`commit`), `:350` (`update`), `:156` (`save`, `back`); `NoteLayer.tsx` (`NoteEditor`); `note-panel.tsx:40` (`TextArea`, `value={n.text}`) | **One draft per note, kept by the canvas:** a value store in `useNotes` (`noteDrafts`: text, base, refusal kind), written when a text save starts and cleared when it is stored. The note's data keeps the **stored** text; the canvas shows the draft's text instead (N4's "optimistic" is the draft on its way). The panel's text field adopts it through a new `useDraft` option (a draft given from outside, taken when the field has neither the focus nor a draft of its own; "Use this", "Keep mine" and Escape clear or send it through the canvas). The rule stays in `field-draft.ts` with unit tests. About 150–200 lines; `useDraft` is shared by every panel field, so the option is additive and the slice 13 specs run in step 3. **Question 4.** |
+| F5 | **Q3: how a draft stays on the canvas without redrawing others.** Notes are not React Flow nodes: one `NoteLayer` in a `ViewportPortal`, a memoised `NoteBox` per note, placed from data (`noteAt`). `useNotes` lives in `ModelCanvas`, so every note change today is a canvas commit (the optimistic patch, the answer's `setNotes`, a rollback). Typing in `NoteEditor` is uncontrolled: 0 commits. | `ModelCanvas.tsx:1319` (`useNotes`), `:1623` (`shownNotes`), `:2295` (`NoteLayer`); `NoteLayer.tsx` (`NoteBox`, `memo`); `value-store.ts` | Each `NoteBox` reads its own note's draft from the store with `useSyncExternalStore` and a snapshot of that note only, so a mark, "Use this" or "Keep mine" redraws that note's box and **no canvas commit**. Leaving the editor keeps today's commit (`setEditing`) without the optimistic patch; a stored save keeps its `setNotes`; a refusal's rollback commit goes. S14A-13's bar holds or improves; measured in step 4. |
+| F6 | **Where the mark goes.** `.nt-head` holds the pin label (`on {card}` or "Note") and the ✓ (`margin-left: auto`). The head is drawn at every zoom (below 40 % the body is a plain block). The note's text on the canvas is `user-select: none`. A press on a button inside a note is not a drag (`onNotePointerDown` returns for `button`). | `NoteLayer.tsx` (`NoteBox`); `canvas.css:408-430` | A `<button class="nt-mark">` "Not saved" in `.nt-head` before the ✓, drawn **only** on a note with a refused draft: one element, colours from tokens (`--im-warn`), no opacity, no `will-change`, placed by CSS (no layout read). A click selects the note and opens the details panel on purpose (`openDetails`, CLAUDE.md "Side panels"; a selection is a history place, D-38). The read-only draft is copyable in the panel only (the canvas's text cannot be selected); item 9 already says "not editable" for the canvas. |
+| F7 | **Q2: a frame's name is edited in its panel only.** "Rename…" in the frame's toolbox and a new frame focus `#f-fn`; a double-click on the frame's label collapses it (as in the prototype). The name's `TextField` saves through `ui.updateFrame`, which resolves `true`/`false`: `useDraft` reads `false` as a refusal without a code (`refusalOf("")`), so no line and no "Not saved". The frame is not optimistic (`patchFrames` after success), so the field keeps the typed text (slice 13's stable key). The name has no `keep` (slice 13's list of kept fields). | `frame-panel.tsx:98` (`TextField`, `update`); `useFrames.ts:936` (`updateFrame`); `context.ts:152` (`updateFrame: … => Promise<boolean>`); `canvas-host.tsx:505` ("Rename…"); `FrameLayer.tsx:135` | `updateFrame` resolves the action's answer (`{ ok, code }`, plus `cut` from F2), after the fresh page (F3). Then slice 13's line, "Not saved", Escape and "Keep mine" work in the frame panel **with no further code**. S14A-09 has no canvas part. **Question 6:** add `keep` (a closed panel's draft, as every other name). |
+| F8 | **N3 mostly holds today.** A frame's kind (`Seg`, `f.kind`, not optimistic) and its concept and system (`useChoice`) show the stored value after a refusal, then the fresh page's. A note's status and colour are optimistic and roll back to the earlier value (`back`); the fresh page then brings the newest stored one (`mergeFresh`: the page's row has the higher version). The "earlier value" shows only between the answer and the page. Also changed from the canvas: the ✓ (`toggleNoteStatus`) and the toolbox's colours. | `frame-panel.tsx:51,110`; `useNotes.ts:350` (`update`); `ModelCanvas.tsx:2188`; `canvas-host.tsx:562,566`; `fresh.ts` | Keep the status's and colour's rollback (needed for `invalid`, `locked` and `unexpected`, which bring no page); with F3 the rollback and the page land together. S14A-08 becomes a check of what holds, not new code. |
+| F9 | **A new note's text is not on the queue and is lost on any refusal.** `commit` of the draft note calls `createNote` directly; a refusal drops the draft note and its text, with the toast. The PRD covers saved notes only. | `useNotes.ts:299-329` (`commit`, `DRAFT_NOTE`) | **Recommended:** out of this slice, a known limitation (a create is not a row's save; D-66 speaks of rows). Alternative: keep the new note on the canvas with its text and the mark, saved again on leaving (about 40 lines, one spec). **Question 7.** |
+| F10 | **Q4: leaving and Escape on the canvas today.** Ctrl+Enter or a click outside (blur) ends editing and saves a changed text; Escape cancels: editing ends, nothing is saved, the stored text shows (S3A-07). Enter alone is a new line. The canvas's own Escape does not reach the editor (`stopPropagation`). | `NoteLayer.tsx` (`NoteEditor`); `useNotes.ts` (`commit`, `cancel`); `e2e/slice-03a/S3A-07.spec.ts:33-37` | Escape without a refused draft: unchanged (it already "puts the stored text back"). With one: Escape ends editing and drops the draft ("Use this"). Leaving the editor while a conflict is marked saves nothing (slice 13, F6) and keeps the draft; with "Not saved" it saves again. |
+| F11 | **"Click back at once to go on typing" (item 7, DoD 4).** On the canvas, leaving ends editing; a **double-click** (or "Edit text", "Edit on the canvas") starts it again. The prototype also starts editing on a second press of a selected note (`secondPress`, prototype line 2252); the app does not (not this slice). A second edit while a save is on its way starts from `n.text` (today the optimistic text). `commit` compares with the stored text, so once the optimistic patch is gone, leaving again with the same text while the first save is on its way would send it twice and get "Nothing to change.". | `NoteLayer.tsx:142` (`onDoubleClick`); `useNotes.ts:332` (`text.trim() === n.text.trim()`); `domain/commands/note.ts:157` (`nothingToChange`) | The editor starts from the draft's text; `commit` compares with the text on its way or, with none, the stored one (`FieldDraft.shouldSave`, slice 13's F8). DoD 4 says "double-click back". S14A-05 on the canvas: a double-click while the answer is held. |
+| F12 | **Q6: read-only on the canvas.** `canNote` is the page's (`shell.standing !== "none"`); after a permission's or the archive's fresh page it is false: no drag, no ✓, no double-click. The panel's `can` turns false and its `TextArea` read-only, which keeps a draft readable (slice 13's "copy" mark, once the field knows the refusal). | `c/[canvasId]/page.tsx:162`; `NoteLayer.tsx` (`canNote`); `note-panel.tsx:24` | The store keeps the refused draft as read-only ("copy") until the page is left; the canvas shows its text with the mark; the panel shows "Not saved. You can still copy it.". Nothing else needed. |
+| F13 | **Q5: pinned notes** are drawn by the same `NoteLayer`/`NoteBox` (`data-pinned`), placed at their card's or frame's offset (`noteAt`), edited the same way. A note pinned to a card in a collapsed frame, or a resolved note while resolved notes are hidden (`hideResolved`), is not drawn: its mark does not show. | `ModelCanvas.tsx:1623` (`noteShown`); `NoteLayer.tsx` | Nothing special for pinned notes. A hidden note keeps its draft in the store and shows the mark when drawn again; a known limitation. **Question 9.** |
+| F14 | **Item 12: a closed panel.** With F4 the canvas's store keeps the draft for the page, so the note's text needs no `keep` from `field-drafts.ts`, and the canvas shows the mark. Slice 13's toast on closing a panel with a refused draft ("Not saved: {field} of {object}. Open it again to see your text.") would repeat what the mark says. | `fields.tsx` (`useDraft`'s cleanup, `notSavedAway`); `field-drafts.ts` | No toast when the note's panel closes with a refused draft (the mark shows it). **Question 8.** |
+| F15 | **S14A-13's 20 notes with the mark** need 20 refused drafts. No test hook makes one today, and slice 13's rule is no switch in the app. | `e2e/slice-13/helpers.ts` (`holdUntil`, `changeEntityAsAnna`); `TestHooks.tsx` | Real refusals: the measuring spec changes 20 notes of "Performance test" as Anna through the domain, then edits each on the canvas (about 20 s). No hook. New helpers `changeNoteAsAnna`, `changeFrameAsAnna`. **Question 10.** |
+| F16 | **S14A-02 ("the same toasts as before")** holds by construction with F1 and F2 (a): card moves, frame resizes and the rest are not changed. | — | Keep S14A-02 as a regression spec (a card move and a frame resize refused as stale and after the archive). |
+| F17 | **The element guard.** The seed has no refused draft, so no mark: the viewport counts stay equal; a page total may differ by a JavaScript chunk, as in slice 8. | `S3B-15-elements.spec.ts`; `.data/measure/s9-14-baseline/slice-08.json` | As the PRD; a difference explained in step 4. |
+
+### Q1. The writes through the canvas's queue
+
+Every write through `enqueue` (one row) or `enqueueGroup` (several rows; after every write on its way for any of them).
+The version sent is `versions.current` (the last answer, or a fresh page's grown version) or the row's own: in effect
+`rowSaves`' "newest known", so it can be compared the same way. Every answer is an `ActionResult` with `code` (F1); every
+refusal shows the domain's message as a toast, and a stale, permission, archive or not-found refusal brings the fresh
+page (slice 13), merged by `mergeFresh`. "With the proposal" assumes F1 to F3 (a).
+
+| Write | Where | Queue | Optimistic | Answer on success | After a refusal today | With the proposal |
+| --- | --- | --- | --- | --- | --- | --- |
+| A card's collapse, row filter, names exception (`change` → `saveCard`) | `ModelCanvas.tsx:744` | `enqueue` | yes | version | the card back, toast | unchanged (types) |
+| The names switch (`setNames` → `setCanvasNames`) | `ModelCanvas.tsx:791` | `enqueueGroup` (every card) | yes | versions | names and exceptions back, toast | unchanged |
+| Remove a card from a live canvas (`removeLive`) | `ModelCanvas.tsx:~1090` | `enqueue` | no | name, label | toast | unchanged |
+| Remove a card (`remove`: the left panel, Delete) | `ModelCanvas.tsx:~1112` | `enqueue` | no | — | toast | unchanged |
+| Remove a requirement card | `ModelCanvas.tsx:~1168` | `enqueue` | no | — | toast | unchanged |
+| Remove the selection | `GroupActions.ts:461` | `enqueueGroup` | no | — | toast | unchanged |
+| Moves, widths, drops, align, arrange, fit widths, requirement card moves, D-05's question (`saveLayout` → `moveOnCanvas`) | `useFrames.ts:350` | `enqueueGroup` (frames, cards, notes, requirement cards) | yes | versions | cards, frames, notes, requirement cards back, toast | unchanged |
+| A frame's resize | `useFrames.ts:589` | `enqueueGroup` | yes | versions | size and memberships back, toast | unchanged |
+| Delete a frame | `useFrames.ts:709` | `enqueueGroup` | no | versions | toast | unchanged |
+| Fit a frame to its content | `useFrames.ts:752` | `enqueueGroup` | yes | versions | back, toast ("Nothing to change." silent) | unchanged |
+| Collapse or expand a frame | `useFrames.ts:811` | `enqueueGroup` | yes | version | back, toast | unchanged |
+| Collapse or expand all | `useFrames.ts:847` | `enqueueGroup` | yes | versions | back, toast | unchanged |
+| "Show all"'s layout part (`resetView` → `resetCanvasView`) | `useFrames.ts:906` | `enqueueGroup` | yes | versions | cards and frames back, toast | unchanged |
+| **A frame's name, kind, concept, system, colour (`updateFrame`)** | `useFrames.ts:943` | `enqueueGroup([frame])` | no | the frame | toast; resolves `false` | **resolves `{ ok, code }` after its fresh page (F3); cut behind a cutting refusal (F2)** |
+| Arrange into frames | `useFrames.ts:978` | `enqueueGroup` | no | versions | toast | unchanged |
+| Put in a new frame | `useFrames.ts:1054` | `enqueueGroup` | no | frame, versions | toast | unchanged |
+| **A note's text, status, colour (`commit`, `update` → `save` → `updateNote`)** | `useNotes.ts:295,350` | `enqueue` | yes | the note | `back` (text, status or colour), toast | **text: a draft instead of the rollback (F4); status, colour: the rollback as today (F8); cut (F2); answered after its fresh page (F3)** |
+| A note's width, move, pin, unpin (`save`) | `useNotes.ts:362-475` | `enqueue` | yes | the note | `back`, toast | cut behind a cutting refusal of the same note (F2) |
+| Notes of a selection moved together (`saveMoves` → `moveNotes`) | `useNotes.ts:192` | `enqueueGroup` | yes | versions | back, toast | unchanged |
+| Delete a note (`remove`) | `useNotes.ts:391` | `enqueue` | yes (hidden at once) | — | put back, toast | unchanged |
+| Create a note (`commit` of the draft note → `createNote`) | `useNotes.ts:299` | none | — | the note | the new note and its text dropped, toast | unchanged (F9, question 7) |
+| Create a frame (`createFrame`) | `useFrames.ts:611` | none | no | frame, versions | toast | unchanged |
+
+Off the queue and out of this slice: the canvas's look (`look.tsx`, its own queue) and a canvas's rename in its tab
+(slice 14b, N5).
+
+### Q2. Frames
+
+See F7: the panel only. The name is a `TextField` (stable key since slice 13), the kind a `Seg`, the concept and system
+`useChoice` selects, a free frame's colour buttons. All save through `ui.updateFrame` → `useFrames.updateFrame` →
+`updateFrameAction`, one at a time per frame, not optimistic.
+
+### Q3. Notes on the canvas
+
+See F4 to F6. In short: the notes are one layer in React Flow's viewport portal, not nodes; the draft becomes a value
+store read per note by its memoised box (no canvas commit for the mark, "Use this" or "Keep mine"); the note's data keeps
+the stored text; the mark is one button in the note's header, drawn only with a refused draft, so no new layer.
+
+### Q4. Escape and leaving
+
+See F10 and F11.
+
+### Q5. Pinned notes
+
+See F13: the same component; nothing extra.
+
+### Q6. Read-only
+
+See F12.
+
+### Q7. Slice 13's pieces to reuse
+
+- **The conflict line and "Not saved":** `DraftLine` as it is, in both panels.
+- **The draft's rules:** `useDraft` and `FieldDraft` (`field-draft.ts`). The frame's name uses them unchanged (F7). The
+  note's text needs one additive option, a draft given from outside (F4); `TextArea` passes it on.
+- **`field-drafts.ts`:** for the frame's name if question 6 says `keep`; not for the note's text (F14).
+- **The fresh page after a refusal:** exists for every write (`runCommand`); the canvas adds only the wait (F3).
+- **The hold of a save's answer:** `holdUntil` (`e2e/slice-13/helpers.ts`) matches any server action by its body, so it
+  holds `updateNoteAction` and `updateFrameAction` too (by the note's or frame's id).
+- **The note panel's text field** stays slice 13's `TextArea`, with the draft option; the frame's `TextField` as it is.
+
+### Q8. Earlier tests and docs
+
+**No earlier spec expects a note's rollback or a frame's kind going back** (searched: every spec that uses the notes'
+and frames' fields: `S2B-*`, `S2C-03`, `S3A-*`, `S9-04`, `slice-06b/helpers.ts`, `S13-*`). Expected to pass unchanged:
+
+| Spec | What it checks that the slice touches |
+| --- | --- |
+| `S3A-07` | a note's text in place: Ctrl+Enter saves, undo; **Escape cancels** (F10); width; colour from the toolbox and the panel |
+| `S3A-05`, `S3A-06`, `S3A-10` | pinning, notes in frames, the note panel |
+| `S3A-13` | a reviewer writes notes, a reader only reads; direct commands refused |
+| `S3A-14-idle`, `S2C-12`, `S3B-15-idle`, `S4P-12`, `S3B-13` | canvas and miniature commits (the draft store must add none) |
+| `S2B-01`, `S2B-03`, `S2B-08`, `S2B-13`, `S2C-03` | the frame panel's name, kind, concept, system; a reviewer's frames |
+| `S9-04` | the frame and note panels' saves since slice 9 |
+| `S13-01` to `S13-12`, `e2e/fixes/panel-field-focus.spec.ts` | `useDraft` gets an option (F4): every field's draft rules |
+| `S6B-*` (note places) | the mark's click selects a note: a history place |
+
+**Run in step 2:** S14A-01, S14A-02, S14A-09; S2B-01, S2B-03, S2B-08, S2B-13, S2C-03, S9-04; the canvas's write specs of
+slices 1b, 2a, 2b and 10a (moves, sizes, removes: the types change); then the full run (N6).
+**Run in step 3:** S14A-03 to S14A-08, S14A-10 to S14A-12; the slice 3a specs, S6B's note places, S13-01 to S13-12,
+`panel-field-focus`, the commit specs above.
+
+**Docs:** CLAUDE.md ("Saving in panels": notes and frames on the canvas's queue with their answers, the cut and the wait;
+the draft store; the mark; the new helpers); `docs/known-limitations.md` (remove "A note's text rolls back…"; add F9 if
+question 7 says (a), and F13); `docs/ideas.md` (the entry done, the plan, section 9's entries, the prototype's second
+press, F11); `docs/decisions.md` (D-66, AD-24's note, with your approval); `docs/inventory-prototype-vs-app.md`; README.
+
+### Q9. The data model
+
+**A2 confirmed.** A note's draft and its refusal live in the page's memory (the canvas's store), never in a row or the
+browser's storage (D-66). No new column, no new table, no new kind of change event; `DEV_DB_FORMAT` stays 11
+(`src/data/local/schema.ts`); the seed is not changed (A4).
+
+## Items, decisions and criteria checked
+
+| Item / decision / criterion | Result |
+| --- | --- |
+| Item 1 (refusal kinds) | exists (F1); the canvas's types narrow it |
+| Item 2 (fresh page; none after `locked`; invalid cuts nothing) | the page exists (F1); the cut does not (F2); the order (F3) |
+| Item 3 (the other writes unchanged) | holds with F1 and F2 (a): types only (Q1) |
+| Items 4–7 | need F4, F5, F11 |
+| Item 8 (Escape) | as today without a draft; with one, "Use this" (F10) |
+| Item 9 (other refusals) | F12; `locked` and invalid keep the draft editable; `not_found`: the fresh page removes the note and its draft goes |
+| Items 10, 14 (choices) | mostly hold (F8) |
+| Item 11 (pinned) | the same code (F13) |
+| Item 12 (closed panel) | the store (F14) |
+| Item 13 (frame name) | panel only (F7) |
+| Item 15 (unchanged) | holds; `useDraft` gets an additive option (F4) |
+| N1 | F6; the click opens details on purpose |
+| N2 | with F1 and F2 (a) |
+| N3 | F8 |
+| N4 | the draft is what shows at once (F4) |
+| N5, N6, N8 | as agreed |
+| N7 | F5, F15, F17 |
+| D-20, D-21 | unchanged: a draft is not a new note; every stored change is still one undo step |
+| D-38 | the mark's click is a selection, a history place; a gone note: `SelectionHistory`'s toast as today |
+| D-66 | F3, F10, F14; its sentence on notes and frames replaced as the PRD proposes |
+| AD-12, AD-13 | unchanged: one save, one change event, one undo step; "Keep mine" an ordinary save |
+| AD-24 | F5, F6: no layer, no opacity, no layout read; the LayerTree read in step 4 |
+| S14A-01 | restated (F1): the frame name's answer reaches its field; `locked` without a fresh page; an invalid name (too long) cuts nothing |
+| S14A-02 | a regression check (F16) |
+| S14A-03, S14A-04, S14A-07, S14A-10 | as written |
+| S14A-05 | on the canvas with a double-click back (F11) |
+| S14A-06 | one toast needs F2 (a); else two |
+| S14A-08 | a check of what holds (F8) |
+| S14A-09 | panel only (F7) |
+| S14A-11 | the canvas's text cannot be selected (F6) |
+| S14A-12 | as written; the deleted note leaves the canvas with the fresh page |
+| S14A-13 | 20 real refusals (F15) |
+| S14A-14 | as written |
+
+## Differences between the prototype and the app that the slice touches
+
+- **No save conflicts in the prototype** (PRD section 8): the mark and the lines are new.
+- **A second press on a selected note starts editing** in the prototype (`secondPress`, line 2252); the app needs a
+  double-click (F11). Not changed here; an entry for `docs/ideas.md`.
+- A frame's name is edited in the panel in both (`#f-fn`, "Rename…"); a double-click on its label collapses it in both.
+
+## New and changed user-visible texts (proposals, for approval)
+
+| Where | Text | New / reused |
+| --- | --- | --- |
+| The note's mark on the canvas | "Not saved" | new |
+| Its title and accessible name, editable | "Your text is not saved. Click to see it in the note's panel." | new |
+| Its title and accessible name, read-only | "Not saved. Open the note's panel to copy your text." | new |
+| The note panel's text, the frame panel's name | "Changed meanwhile to:", "Cleared meanwhile.", "Use this", "Keep mine", "Show more", "Show less", "Not saved", "Not saved. You can still copy it." | reused (slice 13) |
+| The conflict toast | "Someone changed this meanwhile." | reused |
+| A frame's name kept for a closed panel (if question 6) | "Not saved: Name of {frame}. Open it again to see your text." | reused pattern (`notSavedAway`) |
+
+No existing text changes.
+
+## Questions for Łukasz
+
+1. **Step 2's scope** (F1, F16): items 1–2 exist; step 2 becomes the canvas's types, the note's and frame's answers with
+   the cut and the wait (F2, F3) and the frame name's line (F7), with S14A-01 restated and the full run (N6). Agreed?
+2. **The cut** (F2): (a) only a note's and a frame's own saves are cut behind a cutting refusal (one toast); every other
+   write as today. Or (b) no cut (two toasts). Recommended: (a).
+3. **Waiting for the fresh page** (F3) before a note's or frame's refusal is answered (3 s at most)? Recommended: yes.
+4. **One draft per note in the canvas's store**, the panel's field adopting it through a new `useDraft` option (F4)?
+   Recommended: yes. (The alternative, mounting the panel's field anew when a canvas draft is refused, breaks slice 13's
+   stable keys.)
+5. **The mark** (F6): a "Not saved" button in the note's header before the ✓, only on a refused note; the texts above?
+6. **The frame's name keeps its draft when its panel closes** (`keep`, F7), as every other name? Recommended: yes.
+7. **A new note refused** (F9): out of the slice, a known limitation (a), or kept on the canvas with the mark (b)?
+   Recommended: (a).
+8. **No toast when the note's panel closes with a refused draft** (F14), since the canvas shows the mark? Recommended:
+   yes.
+9. **A hidden note** (in a collapsed frame, or resolved while those are hidden) shows its mark only when drawn again
+   (F13): accepted as a known limitation? Recommended: yes.
+10. **S14A-13 with 20 real refusals** (F15), no test hook? Recommended: yes.
+11. **DoD step 4 and S14A-05 on the canvas:** "double-click back" to go on typing (F11)? The prototype's second press is
+    an idea for later.
+12. **Steps:** step 2 as question 1; step 3 the note's draft (F4–F6, F10–F14), the choices check (F8), S14A-03 to
+    S14A-08 and S14A-10 to S14A-12; step 4 the measurements; step 5 the closing. Agreed?
+
+## Ideas (not built)
+
+- The prototype's second press on a selected note to edit it (F11).
+- A new note's text kept after a refusal, if question 7 says (a).
