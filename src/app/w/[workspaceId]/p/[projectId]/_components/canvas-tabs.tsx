@@ -46,7 +46,15 @@ export function CanvasTabs({
 
   function closeRename(canvas: ProjectView["canvases"][number]) {
     setRenaming((r) => (r === canvas.id ? null : r));
-    if (renameOnOpen) router.replace(canvasHref(view.workspaceId, view.project.id, canvas.id)); // drop ?rename=1
+  }
+  /**
+   * Drops ?rename=1 the first time the field is left, before its save is sent, as before slice 14b: the router then
+   * applies the save's page before a link clicked right after it (once the field closed on its answer, a late page took
+   * the person back to the canvas from the project home, S0-06).
+   */
+  function leftRename(canvas: ProjectView["canvases"][number]) {
+    const href = canvasHref(view.workspaceId, view.project.id, canvas.id);
+    if (renameOnOpen && window.location.pathname === href && window.location.search.includes("rename=1")) router.replace(href);
   }
 
   return (
@@ -85,7 +93,7 @@ export function CanvasTabs({
             onDoubleClick={() => view.canEdit && setRenaming(canvas.id)}
           >
             {renaming === canvas.id ? (
-              <TabRename view={view} canvas={canvas} onClose={() => closeRename(canvas)} />
+              <TabRename view={view} canvas={canvas} onLeave={() => leftRename(canvas)} onClose={() => closeRename(canvas)} />
             ) : (
               <>
                 {canvas.liveLabel && (
@@ -158,7 +166,7 @@ export function CanvasTabs({
  * on one row after the field (the conflict line, "Not saved", or read-only "Not saved. You can still copy it."). Escape
  * puts the stored name back ("Use this" during a conflict) and closes it; an empty name goes back with "Enter a name.".
  */
-function TabRename({ view, canvas, onClose }: { view: ProjectView; canvas: ProjectView["canvases"][number]; onClose: () => void }) {
+function TabRename({ view, canvas, onLeave, onClose }: { view: ProjectView; canvas: ProjectView["canvases"][number]; onLeave: () => void; onClose: () => void }) {
   const toast = useToast();
   const { saveRow } = useAction();
   const save = async (name: string) => {
@@ -171,6 +179,7 @@ function TabRename({ view, canvas, onClose }: { view: ProjectView; canvas: Proje
   const { bind, defaultValue, commit, keyDown: draftKeyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(canvas.name, save, { prepare: (t) => t.trim(), required: true, onEmpty: () => toast(NAME_REQUIRED, "refusal"), readOnly });
 
   const leave = (el: HTMLInputElement) => {
+    onLeave();
     // a conflict is settled by "Use this" or "Keep mine", never by leaving (D-66); a read-only draft only closes
     if (mark?.kind === "conflict") return;
     if (readOnly || mark?.kind === "copy") return onClose();
@@ -184,6 +193,7 @@ function TabRename({ view, canvas, onClose }: { view: ProjectView; canvas: Proje
     e.stopPropagation();
     if (e.key === "Enter") e.currentTarget.blur();
     if (e.key === "Escape") {
+      onLeave();
       draftKeyDown(e);
       onClose();
     }
