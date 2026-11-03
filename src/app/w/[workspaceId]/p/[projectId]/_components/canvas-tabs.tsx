@@ -37,7 +37,7 @@ export function CanvasTabs({
   renameOnOpen: boolean;
 }) {
   const [renaming, setRenaming] = useState<string | null>(renameOnOpen && view.canEdit ? currentCanvasId : null);
-  const { run } = useAction();
+  const { saveRow } = useAction();
   const router = useRouter();
   const { create, pending } = useNewCanvas(view);
 
@@ -46,10 +46,8 @@ export function CanvasTabs({
     if (renameOnOpen) router.replace(canvasHref(view.workspaceId, view.project.id, canvas.id)); // drop ?rename=1
     const name = value.trim();
     if (!name || name === canvas.name) return;
-    await run(
-      () => renameCanvasAction({ workspaceId: view.workspaceId, canvasId: canvas.id, expectedVersion: canvas.version, name }),
-      `Renamed the canvas to ${name}.`,
-    );
+    // on the save chain of the canvas's row (slice 14b, O1): after its look, its names switch or another rename
+    await saveRow(canvas, (v) => renameCanvasAction({ workspaceId: view.workspaceId, canvasId: canvas.id, expectedVersion: v, name }), `Renamed the canvas to ${name}.`);
   }
 
   return (

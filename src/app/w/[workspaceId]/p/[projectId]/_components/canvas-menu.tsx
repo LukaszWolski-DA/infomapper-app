@@ -2,7 +2,8 @@
 
 // Canvas options, as in the prototype's canvas menu: Rename and "In projects" (D-28); slice 2a adds Duplicate layout,
 // the look (background, grid, "Use this look on all canvases", D-12) and, last, Delete canvas or Remove from this
-// project (D-28). A look change on the open canvas shows at once (`look.tsx`).
+// project (D-28). A look change on the open canvas shows at once (`look.tsx`). The writes of a canvas's row (its look,
+// "Use this look on all canvases", the delete) go on the save chain keyed on that row (slice 14b, O1).
 
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -58,7 +59,7 @@ export function CanvasMenu({
   onRename: () => void;
   trigger: ReactNode;
 }) {
-  const { run } = useAction();
+  const { run, saveRow, saveRows } = useAction();
   const router = useRouter();
   const lookApi = useCanvasLook();
   const open = lookApi?.canvasId === canvas.id ? lookApi : null;
@@ -68,7 +69,7 @@ export function CanvasMenu({
 
   function setLook(patch: LookPatch) {
     if (open) open.setLook(patch);
-    else void run(() => setCanvasLookAction({ workspaceId: view.workspaceId, canvasId: canvas.id, expectedVersion: canvas.version, ...patch }));
+    else void saveRow(canvas, (v) => setCanvasLookAction({ workspaceId: view.workspaceId, canvasId: canvas.id, expectedVersion: v, ...patch }));
   }
 
   async function duplicate() {
@@ -83,12 +84,14 @@ export function CanvasMenu({
   }
 
   async function remove() {
-    const result = await run(
-      () => deleteCanvasAction({ workspaceId: view.workspaceId, projectId: view.project.id, canvasId: canvas.id, expectedVersion: canvas.version }),
+    // taking a shared canvas out of this project writes no canvas row: only a real delete cuts the row's saves behind it
+    const result = await saveRow(
+      canvas,
+      (v) => deleteCanvasAction({ workspaceId: view.workspaceId, projectId: view.project.id, canvasId: canvas.id, expectedVersion: v }),
       others.length
         ? `Took ${canvas.name} out of ${view.project.name}. It is still in ${others.map((p) => p.name).join(", ")}.`
         : `Deleted the canvas ${canvas.name}. The model and its mappings are untouched.`,
-      { undoable: true },
+      { undoable: true, deletes: !others.length },
     );
     // The open canvas went: the next canvas of the project opens.
     if (result.ok && canvas.id === currentCanvasId) {
@@ -144,7 +147,8 @@ export function CanvasMenu({
         <DropdownMenuItem
           className={itemClass}
           data-testid="menu-item-look-all"
-          onSelect={() => void run(() => applyLookToAllCanvasesAction({ workspaceId: view.workspaceId, canvasId: canvas.id }), "All canvases now use this look.")}
+          // it writes every canvas's row without sending a version: the project's canvases are held until its answer
+          onSelect={() => void saveRows(view.canvases.map((c) => ({ id: c.id })), () => applyLookToAllCanvasesAction({ workspaceId: view.workspaceId, canvasId: canvas.id }), "All canvases now use this look.")}
         >
           Use this look on all canvases
         </DropdownMenuItem>

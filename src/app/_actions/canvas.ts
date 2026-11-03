@@ -187,7 +187,10 @@ export async function saveCanvasLookAction(
   return setCanvasLookAction({ ...input, workspaceId });
 }
 
-/** “Use this look on all canvases”: background and grid of one canvas go to every canvas of the workspace. */
+/**
+ * “Use this look on all canvases”: background and grid of one canvas go to every canvas of the workspace. It answers
+ * the version of every canvas it wrote, for the save chain (slice 14b, F1).
+ */
 export async function applyLookToAllCanvasesAction(input: { workspaceId: string; canvasId: string }) {
   return done(
     await runCommand(async (ctx, store, user) => {
@@ -195,6 +198,6 @@ export async function applyLookToAllCanvasesAction(input: { workspaceId: string;
       if (!access) return NOT_FOUND;
       const canvases = await store.canvases.list(access.workspace.id);
       return applyLookToAllCanvases(ctx, access, { canvases }, { canvasId: input?.canvasId });
-    }),
+    }, { versions: true }),
   );
 }

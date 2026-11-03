@@ -1,16 +1,19 @@
 "use client";
 
 // The open canvas's look (D-12) and layer mode (D-22), slice 2a: background, grid, and which lines show. A change
-// shows at once and is saved in `canvas.look` (not an undo step); a refusal puts the old look back. Reviewers and
-// readers may switch the layer mode, but only in their browser: it is not saved and lasts until they leave the canvas.
+// shows at once and is saved in `canvas.look` (not an undo step); after a refusal the newest stored look shows, as a
+// choice field does (D-66, slice 14b). Reviewers and readers may switch the layer mode, but only in their browser: it is
+// not saved and lasts until they leave the canvas. Saves go on the save chain keyed on the canvas's row (`rowSaves`,
+// slice 14b, O1), with its rename, its delete and the names switch, so none is refused because of another.
 // The frame around the tabs and the canvas carries the background (prototype #center[data-bg]).
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useToast } from "@/ui/components/toast";
+import { rowSaves } from "@/ui/row-saves";
 import { DEFAULT_CANVAS_LOOK, type CanvasLook } from "@/domain/types";
 
 export type LookPatch = Partial<CanvasLook>;
-export type SaveLookResult = { ok: true; value: { version: number } } | { ok: false; message: string };
+export type SaveLookResult = { ok: true; value: { version: number } } | { ok: false; code?: string; message: string };
 
 export interface CanvasLookApi {
   canvasId: string;
@@ -19,8 +22,6 @@ export interface CanvasLookApi {
   editable: boolean;
   /** Editors: shown at once and saved. Others: only the layer mode, in this browser. */
   setLook: (patch: LookPatch) => void;
-  /** A newer version of the canvas row written by another command (slice 11's names), for the next look change. */
-  noteVersion: (version: number) => void;
 }
 
 export const CanvasLookCtx = createContext<CanvasLookApi | null>(null);
@@ -49,7 +50,7 @@ export function CanvasLookProvider({
   canvasId: string;
   /** The saved look, fresh with every page. */
   look: CanvasLook;
-  /** The canvas row's version, for the next save (AD-12). */
+  /** The canvas row's version as the page shows it; the chain sends the newest it knows (AD-12). */
   version: number;
   editable: boolean;
   save: (input: { canvasId: string; expectedVersion: number } & LookPatch) => Promise<SaveLookResult>;
@@ -58,16 +59,18 @@ export function CanvasLookProvider({
   const toast = useToast();
   const [look, setLookState] = useState<CanvasLook>(server);
   const pending = useRef(0);
-  const versionRef = useRef(version);
-  const queue = useRef<Promise<void>>(Promise.resolve());
+  // the newest page's look and version, for a save sent later and for a refusal (a ref: no render)
+  const page = useRef({ look: server, version });
+  useEffect(() => {
+    page.current = { look: server, version };
+  });
 
-  // A fresh page brings the saved look and version; a change still on its way keeps what the user picked.
+  // A fresh page brings the saved look; a change still on its way keeps what the user picked.
   const { background, grid, layer } = server;
   useEffect(() => {
     if (pending.current) return;
-    versionRef.current = version;
     setLookState((l) => ({ background, grid, layer: editable ? layer : l.layer }));
-  }, [background, grid, layer, version, editable]);
+  }, [background, grid, layer, editable]);
 
   const setLook = useCallback(
     (patch: LookPatch) => {
@@ -75,33 +78,30 @@ export function CanvasLookProvider({
         if (patch.layer) setLookState((l) => ({ ...l, layer: patch.layer! }));
         return;
       }
-      const before = look;
       setLookState({ ...look, ...patch });
       pending.current += 1;
-      queue.current = queue.current.then(async () => {
-        let result: SaveLookResult;
-        try {
-          result = await save({ canvasId, expectedVersion: versionRef.current, ...patch });
-        } catch {
-          result = { ok: false, message: "Something went wrong. Nothing was saved." };
-        }
-        pending.current -= 1;
-        if (result.ok) versionRef.current = result.value.version;
-        else {
-          setLookState(before);
-          toast(result.message, "refusal");
-        }
-      });
+      void rowSaves
+        .save(canvasId, page.current.version, async (expectedVersion): Promise<SaveLookResult> => {
+          try {
+            return await save({ canvasId, expectedVersion, ...patch });
+          } catch {
+            return { ok: false, message: "Something went wrong. Nothing was saved." };
+          }
+        })
+        .then((result) => {
+          pending.current -= 1;
+          if (result?.ok) return;
+          // refused, or cut behind a refusal (its toast says why): the newest stored look shows (O3); a later page
+          // brings a newer one through the effect above
+          const stored = page.current.look;
+          setLookState((l) => ({ background: stored.background, grid: stored.grid, layer: editable ? stored.layer : l.layer }));
+          if (result) toast(result.message, "refusal");
+        });
     },
     [editable, look, save, canvasId, toast],
   );
 
-  // another write of the canvas row (the names' modes, slice 11) hands its new version over, so the next look change
-  // is not refused as stale
-  const noteVersion = useCallback((v: number) => {
-    versionRef.current = Math.max(versionRef.current, v);
-  }, []);
-  const api = useMemo(() => ({ canvasId, look, editable, setLook, noteVersion }), [canvasId, look, editable, setLook, noteVersion]);
+  const api = useMemo(() => ({ canvasId, look, editable, setLook }), [canvasId, look, editable, setLook]);
   return <CanvasLookCtx.Provider value={api}>{children}</CanvasLookCtx.Provider>;
 }
 
