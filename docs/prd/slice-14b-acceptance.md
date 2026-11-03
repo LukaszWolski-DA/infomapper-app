@@ -390,3 +390,102 @@ notice, and Forward all pass, 3 of 3 times on their own. No application change f
 narrow timing case, for `docs/known-limitations.md` at the closing: Back pressed after a write's toast but before its
 page arrives (a fraction of a second) can lose the entry Forward leads to, as Next.js commits the write's page with a
 push of the address it was started from.
+
+### What changed
+
+- **The rename in the tab** (items 4–5, O2; `canvas-tabs.tsx`, `TabRename`): the field is slice 13's draft (`useDraft`,
+  trimmed, `required`), saved with `saveRow` on the canvas row's chain, and stays open until its answer:
+  - stored: the field closes; nothing to send (the stored name): it closes on leaving;
+  - a conflict: the typed name stays with the line **inside the tab, on one row after the field** ("Changed meanwhile
+    to: {name}", the name cut to 180 px with its full text in the title, "Use this", "Keep mine"); leaving the field
+    saves nothing; "Keep mine" saves the typed name on the newest version (an ordinary undo step); "Use this" and Escape
+    take the stored name and close the field;
+  - stale while the name did not change: "Not saved"; leaving the field again saves it;
+  - archived or forbidden: read-only, selectable, "Not saved. You can still copy it."; leaving or Escape closes it;
+  - locked: "Not saved", editable;
+  - not found: the field closes, the page goes where D-38 says;
+  - empty: back to the stored name with the toast "Enter a name." (`NAME_REQUIRED`, answer 7).
+- **`DraftLine`'s compact form** (`fields.tsx`, `inline`): the same texts and test ids on one row, no fold, buttons 22 px
+  high in the 31 px tab. No popover, no layout read, nothing below the tab bar moves (F4, answer 1).
+- **The look after a refusal** (item 6, O3): done in step 2 (`look.tsx`: the newest page's look after a refusal or a
+  cut); its spec is S14B-07 here.
+- **The change-to-resolve actions** (item 7, O4; `source-changes.tsx`, `useChangeRun`): every action runs through
+  `saveRows`, the change's own row checked (its version from the chain) and the rows it names held
+  (`src/domain/source-changes/held.ts`, with unit tests): the change's table and, for a move, its target column's table,
+  all their columns, the mappings reading those columns with all their inputs, the change's mapping; "Approve again all"
+  holds the mappings it approves. The answer's `versions` reach every row; with F3 a refusal does not cut the held
+  saves.
+- **The bar of 20 ms, measured** (`scripts/bench-source-hold.ts`, 20,000 columns in 2,000 tables, a mapping on every
+  tenth column): holding **the whole source** (26,000 rows) cost 40.6 ms for the first action on a page as `saveRows`
+  stood; two small changes to `saveRows` with the same behaviour (each distinct tail awaited once, one settled promise for
+  all rows, no object spread per row) brought it to **28–30 ms on a fresh chain** and 13–21 ms once the chain knows the
+  rows: **over the bar**. So, as answer 3 says, the **narrow hold**: 13 rows for a column's change, **0.4 ms**. The PRD's
+  O4 said "the whole source"; the narrow hold is its agreed fallback.
+- **The concept's rename in the tree** (question 8): **not in this slice, a note in `docs/ideas.md`.** The tab's compact
+  line does not fit the left panel's narrow field ("Changed meanwhile to: …" with two buttons is wider than the panel),
+  so the tree would need the panels' line under the field, and `NameInput` (which also creates concepts) moved to
+  `useDraft` for renames only, with its own specs: not a small cost.
+- **S6B-06** (above): the spec waits for the delete's own page before Back; no application change for it.
+
+### Specs
+
+- **S14B-04:** Anna renames the canvas through the domain; the tab's rename is refused: the line inside the tab with
+  her name, the typed name kept; "Keep mine" stores it, and Undo brings hers back; again with "Use this", and with
+  Escape: her name, nothing stored.
+- **S14B-05:** Anna changes only the grid; the rename: "Not saved", no line; Enter in the field again stores it.
+- **S14B-06:** archived meanwhile: "Not saved. You can still copy it.", read-only, the text selectable, nothing
+  written; a locked organization (S13-10's way: Anna signs in to Retail Co with its password in another tab): "Not
+  saved", editable.
+- **S14B-07:** archived meanwhile, a grid switch: the stored grid on the canvas (`area-canvas`'s `data-grid`) with the
+  toast; a second case for O3 itself: Anna stores another grid, the page's switch is refused as stale and the canvas
+  shows **Anna's** grid, not the one from before the click.
+- **S14B-08:** "Not needed" on CRM's `customer_segment` with its answer held; the column's note typed and left
+  meanwhile is not stored until the answer, then stored with no conflict toast and no "Not saved". Checked against the
+  code before this step: the note is refused (it fails). **A difference from the criterion:** "a save of another
+  source's column in the same time is not held" cannot be seen in the browser: Next.js sends a page's server actions one
+  at a time, so while one answer is held no other action leaves, whatever the chain does (the first version of the spec
+  found the ERP note unsent until the release). The chain's side is covered by `held.test.ts` (another table's rows are
+  not held) and `row-saves.test.ts`; the spec checks that the ERP note typed meanwhile is stored after the answer
+  without a refusal.
+- All of S14B-04 to S14B-08 passed in their first full run except S14B-08's first version (above); S14B-08 then passed
+  three times on its own.
+
+### Screenshots
+
+`docs/prd/slice-14b-screens/step-3/` (`SCREENS=step-3 npx playwright test e2e/slice-14b/S14B-screens.spec.ts`): the tab
+with the conflict line (`tab-conflict-*`), with "Not saved" (`tab-not-saved-*`) and read-only after the archive
+(`tab-read-only-*`), light and dark.
+
+### New and changed user-visible texts
+
+None new. The tab uses slice 13's texts; an empty canvas name now shows the existing toast "Enter a name." (before: back
+silently).
+
+### A regression found by the earlier specs, fixed: `S0-06` and `?rename=1`
+
+`S0-06` (a new canvas, its name typed, Enter, then at once the Home tab) failed 3 of 3: the page landed on the canvas
+again. Before this step the field dropped `?rename=1` with `router.replace` on the blur, before the rename was sent, so
+Next.js's router applied the rename's page before the Home link. With the field closing on its answer, the drop came
+after the link, and the late page took the person back. Tried first: the drop guarded to the canvas's own address, then
+with `history.replaceState`; neither was enough (the rename's late page itself pushed the canvas's address, as found
+for S6B-06). Fix: `?rename=1` is dropped the first time the field is left, before its save is sent, as before
+(`leftRename`); the field still closes on its answer. `S0-06` then passed 3 of 3 times. Traces of the failing run in
+`.data/measure/s14b-step3-fail/`.
+
+**The pattern behind S0-06 and S6B-06**, for `docs/known-limitations.md` at the closing: a server action's page that
+commits after a link or Back pushes the address the action was started from. The app's saves are answered in tenths of a
+second, so a person meets it only by clicking a link right after a save; both specs now follow the order a person does.
+
+### Runs (step 3)
+
+- **CI:** `npm run lint`, `npm run typecheck` and `npm test` (125 files, 1,593 tests) pass.
+- **Slice 14b:** S14B-01 to S14B-08 pass (15 tests with the tab specs below); S14B-08 three times on its own; the
+  screenshots spec (6) passes.
+- **Earlier specs:** the tabs (`S0-04`, `S0-05`, `S0-06`, `S0-10`), `S6B-06`, the menu (`S2A-09`, `S2A-10`, `S2A-13`),
+  all of slice 7b's source changes: 54 tests, 53 passed, 1 failed (`S0-06`, above); after the fix `S0-06` 3 of 3, and
+  `S0-04`, `S0-05`, `S0-10` with slice 14b's specs again: 15 passed.
+
+### Changed earlier tests (the slice so far)
+
+- `src/ui/row-saves.test.ts`: the held-row cut case asserts slice 14b's rule (F3, answer 2) (step 2).
+- `e2e/slice-06b/S6B-06.spec.ts`: waits for the delete's own page (its tab gone) before Back (step 3).
