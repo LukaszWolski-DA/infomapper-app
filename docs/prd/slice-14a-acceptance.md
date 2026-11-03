@@ -314,7 +314,7 @@ the change; their assertions (the line, "Not saved", `keep`) need the answer's c
 
 **S14A-01's "an invalid input cuts nothing"** cannot be reached from the frame panel: an empty name goes back in the
 browser (D-59) and a frame's name has no length limit (`nameSchema`). It is covered by the unit test ("an invalid input,
-an unexpected error or a cut save cuts nothing"); the PRD's criterion says so in its spec's header. Proposal: accept the
+an unexpected error or a cut save cuts nothing"), and the spec's header says so. Proposal: accept the
 unit test for this part.
 
 ### How to check
