@@ -476,6 +476,25 @@ checked as D-38 says (S12A-12, S6B-06).
 - **Accepted** by Łukasz in slice 12a, step 4. **Later:** `docs/ideas.md`, "Refresh a page restored from the back-forward
   cache".
 
+### Back right after a save can lose Forward (slice 14b)
+
+Back (the browser's, the breadcrumbs row's button or Alt+←) pressed in the short window after a save's answer reaches
+the page and before the page it brings is applied keeps the person on the page Back went to, but drops the entry
+Forward led to. The window is a fraction of a second (50 to 150 ms on the e2e dev server, longer on a canvas page), so a
+person meets it only by pressing Back at once after a save, for example right after typing a name and pressing Tab or
+Enter. Back while the save is still on its way, or after its page has been applied, keeps Forward; a link clicked right
+after a save (the Home tab, the breadcrumbs, another canvas tab, the project switcher) always lands where it leads,
+with Back and Forward intact. Next.js applies a save's page with a push of the address the save started from; a
+navigation discards a save whose answer has not arrived, but Back in the window comes too late for that.
+
+- **Example:** the project home, the name changed and Tab pressed, Back at once: the workspace home, and Forward no
+  longer leads back to the project home.
+- **Found** in slice 14b (`S6B-06`, step 3; checked for links and Back, Łukasz's question after step 3). `S6B-06` waits
+  for the delete's own page before Back. **No fix in this slice.**
+- **For later PRDs:** the app itself never navigates (`router.push`, `router.replace`) after a save's answer: by then
+  the person may have clicked a link, and the address still shows the old page until the link's page arrives, so no
+  check of `window.location` can tell. Slice 14b found this with `?rename=1` (now dropped before the save is sent).
+
 ### Browsers without the Navigation API
 
 Back and Forward, Alt+←/→ and the selection places rest on the Navigation API (Baseline since January 2026: Chrome and

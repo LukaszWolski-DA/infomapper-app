@@ -472,7 +472,7 @@ for S6B-06). Fix: `?rename=1` is dropped the first time the field is left, befor
 (`leftRename`); the field still closes on its answer. `S0-06` then passed 3 of 3 times. Traces of the failing run in
 `.data/measure/s14b-step3-fail/`.
 
-**The pattern behind S0-06 and S6B-06**, for `docs/known-limitations.md` at the closing: a server action's page that
+**The pattern behind S0-06 and S6B-06** (corrected after step 3: two mechanisms, see "Łukasz's answers to step 3"), for `docs/known-limitations.md` at the closing: a server action's page that
 commits after a link or Back pushes the address the action was started from. The app's saves are answered in tenths of a
 second, so a person meets it only by clicking a link right after a save; both specs now follow the order a person does.
 
@@ -489,3 +489,54 @@ second, so a person meets it only by clicking a link right after a save; both sp
 
 - `src/ui/row-saves.test.ts`: the held-row cut case asserts slice 14b's rule (F3, answer 2) (step 2).
 - `e2e/slice-06b/S6B-06.spec.ts`: waits for the delete's own page (its tab gone) before Back (step 3).
+
+## Łukasz's answers to step 3 (3 November 2026)
+
+Step 3 accepted: `S6B-06` waits for the delete's page; the narrow hold for the change-to-resolve actions; `S14B-08` with
+"another source" in `held.test.ts`; the concept's rename in the tree in `docs/ideas.md`; the `S0-06` fix. Before the
+closing: explain in this document whether S0-06 and S6B-06 are one mechanism, and check whether any save on its way
+followed at once by an in-app link (Home, breadcrumbs, another tab, the project switcher) can take the person back to
+the page the save came from or lose Forward; if so, describe the reach in `docs/known-limitations.md` (no fix in this
+slice); if not, say why `?rename=1` was special.
+
+### S0-06 and S6B-06 are not one mechanism (a correction to step 3)
+
+Step 3's report called them one pattern. Checked again, they are two:
+
+- **S6B-06 is Next.js's:** Back pressed in the short window after a save's answer reaches the page and before its fresh
+  page commits loses the entry Forward leads to (below).
+- **S0-06 was the app's own:** the rename's field, closing on its answer, then called `router.replace` to the canvas's
+  address to drop `?rename=1`. By then the person had clicked Home, so that replace took them back to the canvas. The
+  guard tried in step 3 (only while `window.location` is the canvas's) did not help, because the address changes only
+  when the link's page commits: right after the click it was still the canvas's. **Checked:** with no drop of
+  `?rename=1` at all, `S0-06` passes 6 of 6 (`--repeat-each=3`, both tests). So `?rename=1` was special because it was
+  the only place where the app itself navigated after a save's answer. Step 3's fix (the drop at the first leave,
+  before the save is sent) stays; a navigation of the app's own after an answer is the thing to avoid (a note for later
+  PRDs in `docs/known-limitations.md`).
+
+### A save on its way, then a link or Back: what was checked
+
+An exploratory spec (removed after; e2e dev server, Customer 360) made a save and then went elsewhere, in three timings:
+with the save's answer held (`holdUntil`), at once after the answer reached the page, and 50, 150 and 400 ms after it.
+Each run recorded where the person landed, then Back and Forward.
+
+| After the save | Runs | Landed | Back, Forward |
+| --- | --- | --- | --- |
+| The Home tab (an entity's name in its panel) | 1 held, 4 at once | the project home | the canvas, the project home |
+| The first breadcrumb (the workspace) | 1 held, 4 at once | the workspace home | as above |
+| The project switcher, Order management | 1 held, 4 at once | Order management's home | as above |
+| Another canvas tab (Order management, a grid switch) | 4 at once | the other canvas | as above |
+| Back (the project's name on its home) | 1 held, 3 at once, 3 × 400 ms | the workspace home | Forward to the project home works |
+| Back, 50 ms after the answer | 3 | the workspace home | **Forward lost** in 3 of 3 |
+| Back, 150 ms after the answer | 3 | the workspace home | **Forward lost** in 2 of 3 |
+
+**Links: no.** A link right after a save, the answer held or not, always landed where it led, with Back and Forward
+intact. Why, in Next.js 16.3.8's router (`app-router-instance.js`, `dispatchAction`): a navigation marks the router's
+pending action as discarded, so a save whose page has not been applied yet never applies it, and a revalidated
+discarded action only asks for a refresh of the current page once the queue is idle.
+
+**Back: yes, in a narrow window.** Back pressed after the answer reached the page but before its page committed (here
+roughly 50 to 150 ms; a canvas page takes longer to commit than a home) keeps the person where Back took them but loses
+the entry Forward led to. Held answers and Back after 400 ms keep it. It is the same with the breadcrumbs row's Back
+button and Alt+←, which call the browser's Back. Described in `docs/known-limitations.md` ("Back right after a save can
+lose Forward"), without a fix in this slice.
