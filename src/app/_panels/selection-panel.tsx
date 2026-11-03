@@ -11,10 +11,10 @@
 
 import { useContext } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
-import { firstLine } from "@/canvas/note-data";
 import { isCardKey, isFrameKey, isNoteKey, isReqKey, type SelectionKey } from "@/canvas/selection";
 import { Actions, buttonClass, dangerClass, Hint, Kind, Li, List, Section } from "./fields";
 import { usePanel } from "./inspector";
+import { NoteRow } from "./note-row";
 import { feedingSourceCards } from "./model-index";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
@@ -81,12 +81,8 @@ export function SelectionPanel({ keys }: { keys: readonly SelectionKey[] }) {
         {keys.map((k) => {
           const id = idOf(k);
           if (isNoteKey(k)) {
-            const text = ui.noteView(id)?.note.text ?? "";
-            return (
-              <Li key={k} meta="note" onClick={() => ui.select({ t: "note", id })} testId="selection-item">
-                <span className="truncate">{firstLine(text) || "Empty note"}</span>
-              </Li>
-            );
+            // a note with a draft shows its draft (slice 14a)
+            return <NoteRow key={k} id={id} text={ui.noteView(id)?.note.text ?? ""} meta="note" onClick={() => ui.select({ t: "note", id })} testId="selection-item" />;
           }
           if (isReqKey(k)) {
             const r = p.rx.byId.get(id);

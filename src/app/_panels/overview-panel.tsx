@@ -14,6 +14,7 @@ import { firstLine } from "@/canvas/note-data";
 import { LookControls, useCanvasLook } from "@/canvas/look";
 import { Actions, Fold, Hint, Kind, Li, LongList, smallButtonClass, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
+import { NoteRow } from "./note-row";
 import { inputsLabel, typeCheckOf } from "./model-index";
 import { coverage } from "./stats";
 
@@ -93,9 +94,8 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
                 testId="list-canvas-notes"
                 text={(n) => firstLine(n.text)}
                 render={(n) => (
-                  <Li key={n.id} testId="canvas-note-link" onClick={() => ui.showNote(n.id)} meta={n.pinName ?? ""}>
-                    {firstLine(n.text) || "Empty note"}
-                  </Li>
+                  // a note with a draft shows its draft, row by row (slice 14a); the filter reads the stored text
+                  <NoteRow key={n.id} id={n.id} text={n.text} testId="canvas-note-link" onClick={() => ui.showNote(n.id)} meta={n.pinName ?? ""} />
                 )}
               />
             ) : (

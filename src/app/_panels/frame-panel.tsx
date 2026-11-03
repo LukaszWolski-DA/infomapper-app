@@ -47,7 +47,8 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
     setNameFocus(null);
   }, [nameFocus, frameId, setNameFocus]);
 
-  // frames keep the canvas's queue (slice 13, R5): stable keys only, and a choice shows the stored value after a refusal
+  // frames save through the canvas's queue, whose answer says why a save was refused (slice 14a): the name keeps its
+  // draft with slice 13's line, and a choice shows the stored value after a refusal
   const concept = useChoice(view?.frame.conceptId ?? "", (conceptId) => ui.updateFrame(frameId, { conceptId }));
   const system = useChoice(view?.frame.sourceSystemId ?? "", (sourceSystemId) => ui.updateFrame(frameId, { sourceSystemId }));
 
@@ -104,6 +105,7 @@ export function FramePanel({ frameId }: { frameId: Uuid }) {
           onSave={(name) => update({ name })}
           testId="input-frame-name"
           inputRef={nameRef}
+          keep={{ key: fieldKey(f.id, "name"), field: "Name", object: f.name }}
         />
       </Field>
       <Field label="Stands for">

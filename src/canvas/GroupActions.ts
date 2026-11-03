@@ -31,7 +31,7 @@ import type { NoteMove, NoteMover } from "./useNotes";
 import { fitWidth as fitWidthOf } from "./text-fit";
 
 /** What a canvas write returns: the value, or the domain's message for a toast. */
-type WriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
+type WriteResult<T> = { ok: true; value: T } | { ok: false; code?: string; message: string };
 
 export interface GroupWrites {
   removeCards: (items: { canvasItemId: string; expectedVersion: number }[]) => Promise<WriteResult<unknown>>;
@@ -42,7 +42,7 @@ export interface GroupWrites {
 export const NUDGE = { step: 8, big: 32 } as const;
 /** The nudges are saved together once the keys have been still this long. */
 const NUDGE_SAVE_MS = 400;
-const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
+const FAILED = { ok: false as const, code: "unexpected", message: "Something went wrong. Nothing was saved." };
 /** A press that moved less than this is a click. */
 const CLICK_SLOP = 4;
 

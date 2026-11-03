@@ -53,6 +53,7 @@ import { cardHeight, cardWidth, snap8, type Pt, type Rect } from "./geometry";
 import { planLayout, planReframe, type LayoutChange, type PlanCard } from "./layout-plan";
 import type { Selection } from "./line-data";
 import type { NoteData } from "./note-data";
+import { CUT_SAVE, FreshWaits, PAGE_REFUSALS, SaveCuts, type CanvasSave } from "./save-cuts";
 import { rectBetween } from "./selection";
 import type { NoteMover } from "./useNotes";
 import { rowSaves } from "@/ui/row-saves";
@@ -169,7 +170,7 @@ interface Options {
   reqs: MutableRefObject<ReqMover | null>;
 }
 
-const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
+const FAILED = { ok: false as const, code: "unexpected", message: "Something went wrong. Nothing was saved." };
 /** A press that moved less than this is a click. */
 const CLICK_SLOP = 4;
 
@@ -229,11 +230,15 @@ export function useFrames(o: Options) {
   const { initialFrames, readAt } = o;
   /** Frames deleted here (Delete, or rebuilt by “Arrange into frames”), at the version they had then. */
   const deletedHere = useRef(new Map<Uuid, number>());
+  /** The cutting refusals of `updateFrame`, and its answers waiting for the fresh page (slice 14a, F2, F3). */
+  const [cuts] = useState(() => new SaveCuts());
+  const [fresh] = useState(() => new FreshWaits());
   useEffect(() => {
     const pendingOf = (id: Uuid) => pending.current.get(id) ?? 0;
     setFrames((fs) => mergeFresh(fs, initialFrames, { readAt, pendingOf, deletedHere: deletedHere.current, versionOf: (f) => Math.max(f.version, versions.current.get(f.id) ?? 0) }));
     for (const [id, v] of grownVersions(initialFrames, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
-  }, [initialFrames, readAt, pending, versions]);
+    fresh.merged();
+  }, [initialFrames, readAt, pending, versions, fresh]);
 
   const nodes = useCallback(() => cardNodesOf(rf), [rf]);
   /** The frames as the rules see them now (a collapsed one by its block). */
@@ -933,14 +938,25 @@ export function useFrames(o: Options) {
   const { selectCards } = o;
   const selectFrameCards = useCallback((frameId: Uuid) => selectCards(membersOf(frameId).map((n) => n.id)), [selectCards, membersOf]);
 
+  /**
+   * A frame's name, kind, concept, system or colour (its panel). Answers `{ ok, code }` (slice 14a): a cutting refusal
+   * cuts the frame's next `updateFrame` waiting behind it (`cut`, not sent, no toast), and a refusal that brings the
+   * fresh page is answered once its frames are merged, so the panel's fields read the newest stored values (F2, F3).
+   */
   const updateFrame = useCallback(
     (frameId: Uuid, patch: FramePatch) =>
-      new Promise<boolean>((resolve) => {
+      new Promise<CanvasSave>((resolve) => {
         if (!editable || !framesRef.current.some((x) => x.id === frameId)) {
-          resolve(false);
+          resolve({ ok: false, code: editable ? "not_found" : "forbidden" });
           return;
         }
+        const mark = cuts.mark(frameId);
         enqueueGroup([frameId], async () => {
+          if (cuts.cutSince(frameId, mark)) {
+            resolve(CUT_SAVE);
+            return;
+          }
+          const pages = fresh.pages;
           let result: WriteResult<{ frame: Frame }>;
           try {
             result = await writes.updateFrame({ frameId, expectedVersion: ver(frameId), ...patch });
@@ -948,18 +964,22 @@ export function useFrames(o: Options) {
             result = FAILED;
           }
           if (!result.ok) {
+            const code = result.code ?? "unexpected";
+            cuts.refuse(frameId, code);
             toast(result.message, "refusal");
-            resolve(false);
+            const answer = () => resolve({ ok: false, code });
+            if (PAGE_REFUSALS.has(code)) fresh.wait(pages, answer);
+            else answer();
             return;
           }
           const r = result.value.frame;
           versions.current.set(frameId, r.version);
           patchFrames(new Map([[frameId, { name: r.name, kind: r.kind, conceptId: r.concept_id, sourceSystemId: r.source_system_id, color: r.color, version: r.version }]]));
           undo()?.noteSaved();
-          resolve(true);
+          resolve({ ok: true });
         });
       }),
-    [editable, enqueueGroup, writes, ver, toast, versions, patchFrames, undo],
+    [editable, enqueueGroup, writes, ver, toast, versions, patchFrames, undo, cuts, fresh],
   );
 
   /**

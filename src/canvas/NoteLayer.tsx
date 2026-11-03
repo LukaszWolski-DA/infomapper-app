@@ -7,12 +7,16 @@
 // textarea (Ctrl+Enter or a click outside saves, Esc cancels). Footer: the date, and “resolved”. The right edge changes
 // the width. Below 40 % zoom a note draws its header and a plain body of the same height (AD-24 rule 1). Colours are
 // mixed in CSS, never `opacity` (AD-24 rule 4); nothing here re-renders while the canvas is idle or only panned.
+// Slice 14a (D-66): a note shows its text draft (`note-drafts.ts`) instead of the stored text, read per note from the
+// store, so a draft never re-renders the canvas; a refused draft adds the "Not saved" button to the header (one element,
+// only then), which selects the note and opens its panel with the conflict line.
 
 import { memo, useEffect, useLayoutEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { useStore, ViewportPortal } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
 import { LOD_ZOOM } from "./geometry";
 import { noteDate, type NoteData } from "./note-data";
+import { useNoteDraft, type NoteDrafts } from "./note-drafts";
 
 export interface ShownNote {
   note: NoteData;
@@ -35,9 +39,17 @@ interface Props {
   onCommit: (id: Uuid, text: string) => void;
   onCancel: (id: Uuid) => void;
   onHeight: (id: Uuid, h: number) => void;
+  /** The notes' text drafts (slice 14a). */
+  drafts: NoteDrafts;
+  /** The "Not saved" mark clicked: the note selected and its panel open. */
+  onOpenDraft: (id: Uuid) => void;
 }
 
-function NoteLayer({ notes, selectedId, editingId, canNote, onPointerDown, onToggleStatus, onEdit, onCommit, onCancel, onHeight }: Props) {
+/** The mark's title and accessible name (slice 14a). */
+export const MARK_TITLE = "Your text is not saved. Click to see it in the note's panel.";
+export const MARK_TITLE_READ_ONLY = "Not saved. Open the note's panel to copy your text.";
+
+function NoteLayer({ notes, selectedId, editingId, canNote, onPointerDown, onToggleStatus, onEdit, onCommit, onCancel, onHeight, drafts, onOpenDraft }: Props) {
   const lod = useStore((s) => s.transform[2] < LOD_ZOOM);
   return (
     <ViewportPortal>
@@ -56,6 +68,8 @@ function NoteLayer({ notes, selectedId, editingId, canNote, onPointerDown, onTog
             onCommit={onCommit}
             onCancel={onCancel}
             onHeight={onHeight}
+            drafts={drafts}
+            onOpenDraft={onOpenDraft}
           />
         ))}
       </div>
@@ -75,9 +89,14 @@ const NoteBox = memo(function NoteBox({
   onCommit,
   onCancel,
   onHeight,
+  drafts,
+  onOpenDraft,
 }: Omit<Props, "notes" | "selectedId" | "editingId"> & { shown: ShownNote; selected: boolean; editing: boolean; lod: boolean }) {
   const el = useRef<HTMLDivElement>(null);
   const resolved = n.status === "resolved";
+  const draft = useNoteDraft(drafts, n.id);
+  const text = draft ? draft.text : n.text;
+  const refused = draft?.refusal ?? null;
   // its height is measured (it depends on the text) for the tether and the plain body below 40 %; not while it draws
   // that plain body, whose height comes from the measure (measuring it then made the note grow on every round, step 4)
   const height = useRef(0);
@@ -112,6 +131,7 @@ const NoteBox = memo(function NoteBox({
       data-status={n.status}
       data-color={n.color}
       data-pinned={pinName ? "true" : undefined}
+      data-draft={refused ?? undefined}
       title={`${pinName ? `Pinned to ${pinName}. ` : ""}${canNote ? "Double-click to edit." : ""}`}
       onPointerDown={(e) => onPointerDown(e, n.id, (e.target as HTMLElement).closest("[data-note-resize]") ? "resize" : "body")}
       onDoubleClick={(e) => {
@@ -126,6 +146,19 @@ const NoteBox = memo(function NoteBox({
         <span className={`pin${pinName && (pinName.length + 3) * 6.5 > n.width - 64 ? " clip" : ""}`} data-testid="note-pin">
           {pinName ? `on ${pinName}` : "Note"}
         </span>
+        {refused && (
+          <button
+            type="button"
+            className="nt-mark"
+            title={refused === "copy" ? MARK_TITLE_READ_ONLY : MARK_TITLE}
+            aria-label={refused === "copy" ? MARK_TITLE_READ_ONLY : MARK_TITLE}
+            data-testid="note-not-saved"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => onOpenDraft(n.id)}
+          >
+            Not saved
+          </button>
+        )}
         {canNote && (
           <button
             type="button"
@@ -140,14 +173,14 @@ const NoteBox = memo(function NoteBox({
         )}
       </div>
       {editing ? (
-        <NoteEditor text={n.text} onCommit={(t) => onCommit(n.id, t)} onCancel={() => onCancel(n.id)} />
+        <NoteEditor text={text} onCommit={(t) => onCommit(n.id, t)} onCancel={() => onCancel(n.id)} />
       ) : lod ? (
         // the header (26) and the plain body with its bottom margin (8) keep the note as high as it was measured
         <div className="nt-lod" style={{ height: Math.max(20, (measured ?? 80) - 34) }} />
       ) : (
         <>
-          <div className={`nt-body${n.text ? "" : " empty"}`} data-testid="note-text">
-            {n.text || "Empty note"}
+          <div className={`nt-body${text ? "" : " empty"}`} data-testid="note-text">
+            {text || "Empty note"}
           </div>
           <div className="nt-foot">
             {noteDate(n.createdAt)}

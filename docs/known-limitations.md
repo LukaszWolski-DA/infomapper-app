@@ -1003,19 +1003,19 @@ by someone removed later shows "someone" instead of their name; anything written
   way still sends the version it knows and can be refused as a false conflict. The reason: only the server knows which
   tables, columns and mappings an action writes, so the browser cannot hold those rows before it is sent (`saveRows`).
 
-### A note's text rolls back after a refused save; a frame's fields have no line (slice 13; to slice 14a)
+### A new note's text, and a note that is not drawn (slice 14a, step 1 answers 7 and 9; D-66)
 
-Notes save through the canvas's own queue (`useNotes.save`), optimistically: a refused change of a note's text, status
-or colour, made in its panel or on the canvas, puts the note's earlier values back (`back`), and the typed text is lost.
-Frames save through the same queue (`useFrames.updateFrame`): their panel's name keeps a refused value (the stable key
-and the draft of slice 13), but it shows no conflict line or "Not saved", as that queue answers only "stored or not"
-and no refusal's code. Slice 13 (D-66) leaves both out (Łukasz, 1 November 2026); they are slice 14a's scope
-(`docs/ideas.md`, "The plan after slice 13").
+- **A new note that was never saved loses its text when its creation is refused** (a permission, the archive, a locked
+  organization): the draft note and its text go, with the toast (`useNotes.commit`, `DRAFT_NOTE`). A creation is not a
+  row's save; D-66 covers saved notes (`docs/ideas.md`).
+- **A note that is not drawn shows its "Not saved" mark only when it is drawn again:** a note pinned to a card in a
+  collapsed frame, or a resolved note while resolved notes are hidden. Its draft stays in the page's memory meanwhile.
 
 ### A field's draft: what slice 13 does not cover (D-66)
 
 - **A draft is kept for a closed panel only in the panels' text fields with `keep`:** names, aliases, the requirement's
-  ID, name, owner and rule, a relationship's label, a mapping's note, table and column notes, a working label's name.
+  ID, name, owner and rule, a relationship's label, a mapping's note, table and column notes, a working label's name,
+  a frame's name (slice 14a). A note's text is kept by the canvas for the page (slice 14a, `note-drafts.ts`).
   Not in a type's parameters, a custom type or a mapping's rule; not on the project home or in the settings, whose
   drafts end with the page anyway.
 - **A read-only draft** (a permission or the archive) is not kept once its panel closes: it is for copying while it is

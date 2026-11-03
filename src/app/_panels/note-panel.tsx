@@ -3,11 +3,13 @@
 // The note panel (slice 3a, item 11; prototype insNote): “Note on this canvas”, its text (plain text until the editor,
 // AD-30), status Open / Resolved, colour, what it is attached to (the card or frame, with “Unpin”) or “A free note”
 // (with “Pin to”), “Created {date} by {name}.” (Łukasz's step 0 answer 4), and “Edit on the canvas” and “Delete note”.
-// It reads the note from the canvas (`noteView`), so it shows a change at once. Readers see it read-only.
+// It reads the note from the canvas (`noteView`), so it shows a change at once. Readers see it read-only. Slice 14a: the
+// text field shows the note's draft kept by the canvas (`noteDrafts`), refused there or here, with slice 13's line.
 
 import { useContext } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import { noteDate } from "@/canvas/note-data";
+import { useNoteDraft } from "@/canvas/note-drafts";
 import type { Uuid } from "@/domain/ids";
 import { NOTE_COLORS } from "@/domain/types";
 import { Actions, buttonClass, dangerClass, Field, fieldKey, inputClass, Kind, Li, List, Section, Seg, smallButtonClass, TextArea } from "./fields";
@@ -18,6 +20,8 @@ const COLOR_LABEL = { yellow: "Yellow", blue: "Blue", green: "Green", pink: "Pin
 export function NotePanel({ noteId }: { noteId: Uuid }) {
   const p = usePanel();
   const ui = useContext(CanvasUiCtx);
+  const drafts = ui.noteDrafts();
+  const draft = useNoteDraft(drafts, noteId);
   const view = ui.noteView(noteId);
   if (!view) return null;
   const n = view.note;
@@ -44,6 +48,8 @@ export function NotePanel({ noteId }: { noteId: Uuid }) {
           readOnly={!can}
           placeholder="Summary, observation or question."
           onSave={(text) => ui.updateNote(n.id, { text })}
+          // the note's draft lives with the canvas (slice 14a): the field shows a draft refused on the canvas with its line
+          outside={{ draft, drop: () => drafts.drop(n.id) }}
           data-testid="input-note-panel-text"
         />
       </Field>

@@ -74,6 +74,16 @@ const refusalOf = (code: string, base: string): Refusal | null =>
 
 const codeOf = (answer: SaveAnswer): string => (answer && typeof answer === "object" ? (answer.code ?? "") : "");
 
+/**
+ * A draft kept outside the field (slice 14a: a note's text, kept by the canvas for the note and shown on it): the field
+ * shows it and its refusal's mark while it has neither the focus nor its own different text, and drops it with "Use
+ * this" or Escape. Its saves go through the field's `save` as usual; the keeper records them.
+ */
+export interface OutsideDraft {
+  draft: { text: string; base: string; refusal: "mark" | "locked" | "copy" | null } | null;
+  drop: () => void;
+}
+
 /** Points an object ref at the element (a field's `inputRef`). */
 function setRef<E>(ref: { current: E | null } | object, el: E | null): void {
   (ref as { current: E | null }).current = el;
@@ -105,6 +115,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     readOnly?: boolean;
     elementRef?: Ref<E>;
     keep?: DraftKeep;
+    outside?: OutsideDraft;
   } = {},
 ) {
   const toast = useToast();
@@ -139,6 +150,27 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
       setRefusal(null);
     }
   }, [stored, draft]);
+  // a draft kept outside the field (slice 14a): taken while the field has neither the focus nor a text of its own
+  const outside = o.outside?.draft;
+  const hasOutside = !!o.outside;
+  useEffect(() => {
+    const el = element.current;
+    if (!hasOutside || !el || document.activeElement === el) return;
+    if (outside) {
+      if (el.value !== outside.text) el.value = outside.text;
+      const r: Refusal | null = outside.refusal ? { kind: outside.refusal, base: outside.base } : null;
+      if (refusalNow.current?.kind !== r?.kind || refusalNow.current?.base !== r?.base) {
+        refusalNow.current = r;
+        setRefusal(r);
+      }
+    } else if (refusalNow.current || draft.hasDraft(el.value)) {
+      // the draft ended outside (stored, or "Use this" on the canvas): the stored value shows
+      el.value = stored;
+      draft.reset(stored);
+      refusalNow.current = null;
+      setRefusal(null);
+    }
+  }, [outside, hasOutside, stored, draft]);
   const keepKey = o.keep?.key;
   useEffect(() => {
     mounted.current = true;
@@ -237,6 +269,7 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     draft.reset(stored);
     refuse(null);
     if (keepKey) dropDraft(keepKey);
+    o.outside?.drop();
   };
   /** "Keep mine": the draft is saved on the newest version, a deliberate overwrite. */
   const keepMine = () => {
@@ -383,11 +416,12 @@ export function TextArea({
   onSave,
   code,
   ...rest
-}: { value: string; onSave: FieldSave<string>; code?: boolean; keep?: DraftKeep } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
-  const { keep, ...props } = rest;
+}: { value: string; onSave: FieldSave<string>; code?: boolean; keep?: DraftKeep; outside?: OutsideDraft } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
+  const { keep, outside, ...props } = rest;
   const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLTextAreaElement>(value, onSave, {
     readOnly: !!props.readOnly || !!props.disabled,
     keep,
+    outside,
   });
   return (
     <>

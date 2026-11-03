@@ -50,7 +50,9 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 
 ## The plan after slice 13 (Łukasz, 1 November 2026)
 
-- **14a: saving notes and frames by slice 13's rule** (D-66): their canvas queue (`useNotes`, `useFrames`, the note on
+- **14a: done in slice 14a** (D-66): notes and frames on slice 13's rule through the canvas's queue; a note's draft with
+  its "Not saved" mark on the canvas, shown in the panels' lists; no data model change. Next: 14b. The plan was:
+  saving notes and frames by slice 13's rule: their canvas queue (`useNotes`, `useFrames`, the note on
   the canvas in `NoteLayer`) keeps a refused draft with the conflict line instead of rolling it back; AD-24's rules for
   the canvas, with canvas commit counts and measurements (below, "Notes and frames on slice 13's rule").
 - **14b: the writes off the save chain and leaving a page with a draft:** a canvas's name in its tab, the change-to-
@@ -574,7 +576,8 @@ The full e2e run is three parts (`e2e/parts.ts`), each ending at a heap of 1.4 t
 step 4). If a sign-in times out again in a full run, read the memory log (`E2E_MEMORY_LOG=1`) at that test: with the
 heap well above 1.5 GB, move the cuts to four parts (one more entry in `PART_STARTS`, each part about 20 minutes, a
 server start of about 50 s more); at a low heap, the cause is elsewhere and more parts would not help. New slices fall
-into part 3, so it grows first: watch its end heap at each closing.
+into part 3, so it grows first: watch its end heap at each closing. Slice 14a's closing (3 November 2026): part 3's
+heap peaked at 1,788 MB (35 min 35 s), no sign-in timeout; parts 1 and 2 at 1,364 and 1,532 MB.
 
 ## The project home's own large parts (slice 12b, step 2)
 
@@ -636,13 +639,26 @@ font with a Reserved Font Name ("Plex"): rename the font's internal family names
 note the change in `src/app/fonts/ibm-plex/README.md`. Measure the first visit before and after (as the chore's A/B
 did). No work now (Łukasz, 1 November 2026).
 
-## Notes and frames on slice 13's rule (slice 13, step 1 answers, F12)
+## Notes and frames on slice 13's rule (slice 13, step 1 answers, F12): done in slice 14a
+
+**Done in slice 14a** (D-66): a note's text keeps its draft on the canvas and in its panel, with the "Not saved" mark,
+the panels' lists show it; a frame's name has the conflict line; the canvas's queue answers with the refusal's code.
+
 
 Slice 13 leaves notes and frames on the canvas's queue (`useNotes`, `useFrames`): a note's text, edited in its panel or
 on the canvas, rolls back after a refused save (`useNotes.save`, `back`), and the frame panel's fields only got the
 stable key (`docs/known-limitations.md`, "A note's text rolls back after a refused save"). Bring them to D-66: a note's
 text keeps its draft with the conflict line, the frame's name too. It changes canvas code (`useNotes`, `NoteLayer`), so
 it needs canvas commit counts like S13-12's. A candidate for the next scope after slice 13 (Łukasz, 1 November 2026).
+
+## Notes on the canvas: what slice 14a leaves (slice 14a, step 1 answers 7 and 11)
+
+- **A second press on a selected note edits it,** as in the prototype (`secondPress`, prototype line 2252). The app
+  starts editing a note only on a double-click (or "Edit text", "Edit on the canvas"); slice 14a's DoD and S14A-05 use
+  the double-click (F11).
+- **A new note's text kept after its creation is refused** (F9): today the draft note and its text go with the toast
+  (`useNotes.commit`). It could stay on the canvas with its text and the "Not saved" mark and be created again when left
+  (about 40 lines, one spec). A known limitation (`docs/known-limitations.md`).
 
 ## "by {person}" on a conflict line (slice 13, step 1, F20)
 

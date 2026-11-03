@@ -421,6 +421,10 @@ body.connecting .im-canvas .row { cursor: crosshair }
 /* the clip only when the name may not fit (AD-24 rule 4, as `text-fit.ts` for cards) */
 .im-canvas .nt-head .pin.clip { overflow: hidden; text-overflow: ellipsis }
 .im-canvas .nt-head .ib { background: transparent; font-size: 12px; margin-left: auto }
+/* a refused draft's mark (slice 14a): drawn only on such a note, before the ✓; token colours, no opacity (AD-24 rule 4) */
+.im-canvas .nt-head .nt-mark { flex: none; margin-left: auto; margin-right: 2px; padding: 0 6px; height: 18px; border-radius: 9px;
+  background: var(--im-warn-soft); color: var(--im-warn); font-size: 10.5px; font-weight: 600; white-space: nowrap; cursor: pointer }
+.im-canvas .nt-head .nt-mark + .ib { margin-left: 0 }
 .im-canvas .nt-body { padding: 0 10px 4px; white-space: pre-wrap; word-break: break-word; min-height: 20px }
 .im-canvas .nt-body.empty { color: var(--im-ink-3); font-style: italic }
 .im-canvas .nt-lod { margin: 0 10px 8px; border-radius: 3px; background: color-mix(in srgb, var(--npe) 55%, var(--np)) }
