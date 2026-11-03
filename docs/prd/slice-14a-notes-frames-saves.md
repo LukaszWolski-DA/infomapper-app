@@ -1,8 +1,8 @@
 # Slice 14a – Notes and frames keep what was typed (D-66 on the canvas's queue)
 
-Status: **proposal for step 1.** Branch `slice/14a-notes-frames-saves`, from `main` at tag `slice-13` (`3befbf0`, assumption A1). PRD file: `docs/prd/slice-14a-notes-frames-saves.md`; step 1 writes `docs/prd/slice-14a-acceptance.md`.
+Status: **step 1 answered** (Łukasz, 3 November 2026; `docs/prd/slice-14a-acceptance.md`, "Łukasz's answers to step 1"). This PRD is updated to the answers; the copy from `~/Downloads` is commit `6c3c6a1`. Branch `slice/14a-notes-frames-saves`, from `main` at tag `slice-13` (`3befbf0`, assumption A1). PRD file: `docs/prd/slice-14a-notes-frames-saves.md`; step 1 writes `docs/prd/slice-14a-acceptance.md`.
 
-Test regime: a small slice (CLAUDE.md, "Testing"), with one full e2e run (three parts) after the canvas queue's change (step 2) and one at the closing (N6). Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
+Test regime: a small slice (CLAUDE.md, "Testing"): in each step the canvas's, notes' and frames' specs that the step touches (the acceptance's list, Q8) and CI; one full e2e run (three parts, `E2E_MEMORY_LOG=1`) at the closing (N6, changed in the answers). If step 2 turns out wider than F1 (more than the types for the other writes), it stops and the full run after step 2 comes back. Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
 This PRD was written from the docs at slice 13's state:
 - `CLAUDE.md`, `docs/decisions.md` (D-66, AD-24), `docs/known-limitations.md`, `docs/ideas.md`;
@@ -27,7 +27,7 @@ Notes are where people write free text on a canvas. After this slice, D-66 holds
 - **N3. Choice fields follow D-66:** after a refusal they show the newest stored value, with the toast. These are a note's status and colour, and a frame's kind, concept and system.
 - **N4. A note's save stays optimistic** (its text shows at once). After a refusal the draft stays instead of rolling back.
 - **N5. The canvas's look** (grid, background, layer) belongs to slice 14b, with a canvas's rename in its tab, not here.
-- **N6. Test regime B:** a full e2e run after step 2, because the canvas's queue is shared by the canvas's writes; another at the closing.
+- **N6. Test regime (changed in the step 1 answers):** step 2 changes the canvas's other writes in their types only (F1), so there is no full e2e run after it; each step runs the canvas's, notes' and frames' specs it touches, and one full run (three parts, `E2E_MEMORY_LOG=1`) comes at the closing. If step 2 turns out wider than F1, it stops and the full run after step 2 comes back.
 - **N7. Measurements:**
   - canvas commit counts (typing in a note, the mark, "Use this");
   - the element check against `slice-08.json`;
@@ -62,15 +62,18 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
 
 ### The canvas's queue (step 2)
 
-1. **Refusal kinds.** A refused write on the canvas's queue answers with its kind, as the save chain's writes do: stale version, permission, archive, `locked`, not found, invalid input. It answers the stored version after a success.
-2. **A fresh page after a refusal that cuts the queue,** as D-66 says, except `locked` (no fresh page, D-66). An invalid input cuts nothing.
-3. **The other writes on the queue keep their behaviour:**
+Step 1 found (F1) that every note and frame write already goes through `runCommand`: its answer carries the refusal's code and, for a stale version, a permission, the archive or a row not found, the fresh page (slice 13, F3); `locked` and an invalid input bring none. The canvas throws the code away in its own types.
+
+1. **Refusal kinds.** The canvas's result types carry the code of every write's answer (types only for the other writes). A note's saves and a frame's `updateFrame` answer their callers with `{ ok, code }`.
+2. **The cut and the fresh page (F2, F3; answers 2 and 3).** A cutting refusal (stale version, permission, archive, not found, `locked`) of any write on the canvas's queue is recorded for its rows; a note's save and a frame's `updateFrame` waiting behind it answer `cut` without being sent and without a toast. Every other write waiting behind it is sent as today. A note's or frame's refusal that brings the fresh page is answered once that page's notes or frames have been merged (3 s at most, as `afterPage` in slice 13). An invalid input cuts nothing.
+3. **The other writes on the queue keep their behaviour** (Q1's table):
    - card moves and sizes;
    - frames' layout (moving, resizing, collapsing);
    - the names switch;
-   - anything else step 1 finds (Q1).
+   - the removes and deletes, and the rest of Q1's table.
 
-   The same toasts, the same undo steps, the same canvas commits. Only the answer's shape is new; each write's handling of a refusal is unchanged unless items 4–10 change it.
+   The same toasts, the same undo steps, the same canvas commits.
+3a. **A frame's name** (F7, answer 6) gets slice 13's line, "Not saved" and Escape in its panel from item 1's answer, and keeps its draft when its panel closes (`keep`).
 
 ### Notes
 
@@ -79,7 +82,7 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
    - **in the note's panel:** slice 13's conflict line under the text ("Changed meanwhile to: …" or "Cleared meanwhile.", folded to three lines with "Show more"), with "Use this" and "Keep mine". "Keep mine" saves the draft on the newest version: an ordinary undo step;
    - **on the canvas (N1):** the note shows the draft and a small "Not saved" mark. Clicking the mark selects the note and opens its panel, where the line shows. The note's text on the canvas is the draft until the person uses "Use this" or "Keep mine", or presses Escape (item 8).
 6. **A save cut behind a conflict,** or refused as stale while the note's text did not change meanwhile, keeps its draft as "Not saved" in the panel and with the mark on the canvas. The person saves it again by leaving the field, as D-66 says.
-7. **Typing while a save is on its way,** in the panel or on the canvas: the text typed after the save was sent stays, with the focus and the caret, and is saved next (D-66).
+7. **Typing while a save is on its way,** in the panel or on the canvas: the text typed after the save was sent stays, with the focus and the caret, and is saved next (D-66). On the canvas, editing ends when the note is left and starts again with a double-click (answer 11); the editor then starts from the draft's text.
 8. **Escape** in the note's text (panel or canvas) puts the stored text back; while a conflict line shows, it is "Use this" (D-66). Q4 says what Escape does on the canvas today.
 9. **The other refusals:**
    - **Permission or archive:** the panel's text is read-only and the draft stays readable and selectable ("Not saved. You can still copy it."). On the canvas the note is not editable and shows the draft with the mark until the person leaves the page.
@@ -88,12 +91,17 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
    - **Not found (the note was deleted):** its draft goes with it (D-66).
 10. **A note's status and colour** (N3): after a refusal, the newest stored value, with the toast; no rollback to the earlier value.
 11. **Pinned notes** (N8) follow items 4–10. The mark shows on the pinned note where it is drawn.
-12. **A closed panel.** A note's draft lives with the note, so closing its panel does not lose it: the canvas shows it with the mark, and the panel shows it again when it opens. It ends when the page is left or reloaded (D-66: never in the browser's storage).
+12. **A closed panel.** A note's draft lives with the note (one draft per note in the canvas's store, answer 4), so closing its panel does not lose it: the canvas shows it with the mark, and the panel shows it again when it opens; no toast when the panel closes (answer 8). It ends when the page is left or reloaded (D-66: never in the browser's storage).
 
 ### Frames
 
-13. **A frame's name** gets the conflict line, "Not saved" and Escape of slice 13 in its panel. Q2 says whether a frame's name can also be edited on the canvas; if it can, item 5's canvas rule applies to it, with the mark on the frame's title.
-14. **A frame's kind, concept and system** (N3): after a refusal, the newest stored value, with the toast.
+13. **A frame's name** is edited in its panel only (Q2, F7). Item 3a gives it the conflict line, "Not saved", Escape and `keep` of slice 13; it has no mark on the canvas.
+14. **A frame's kind, concept and system** (N3): after a refusal, the newest stored value, with the toast (mostly so today, F8).
+
+### Out of this slice (answers 7 and 9)
+
+- A new note that was never saved loses its text when its creation is refused (F9): a known limitation.
+- A note that is not drawn (in a collapsed frame, or resolved while resolved notes are hidden) shows its mark only when it is drawn again (F13): the same known limitation.
 
 ### Unchanged
 
@@ -111,7 +119,7 @@ Texts in quotes are proposals. The step that builds them lists every new user-fa
 Stop after each step with a short summary of what changed and how to check it. Wait for Łukasz before the next. A new Claude Code session may start at a step's boundary, never inside a step; it starts by reading CLAUDE.md, this PRD and `slice-14a-acceptance.md`.
 
 1. **Critical review** (section 7). Check every item, decision and criterion against the code, `docs/decisions.md` and the earlier slices' acceptance docs. Answer Q1–Q9 in `docs/prd/slice-14a-acceptance.md`, with every new or changed text and the earlier specs that change. No application code. Stop.
-2. **The canvas's queue** (items 1–3): refusal kinds and the fresh page after a refusal, with unit tests. Specs S14A-01 and S14A-02, and the earlier specs of the canvas's writes (Q8). **One full e2e run** (three parts, `E2E_MEMORY_LOG=1`) and CI. Stop.
+2. **The canvas's queue** (items 1–3a): the result types with codes, the cut and the wait for the fresh page for notes' and frames' saves, the frame name's answer and `keep`, with unit tests. Specs S14A-01, S14A-02 and S14A-09, the earlier specs of the canvas's writes, frames and notes (the acceptance's Q8) and CI; no full run (N6). Stop.
 3. **Notes and frames** (items 4–14):
    - the draft;
    - the conflict line in the panels;
@@ -137,19 +145,19 @@ Tests in `e2e/slice-14a/`, one file per criterion, each from a fresh seed; unit 
 
 | ID | Criterion |
 | --- | --- |
-| S14A-01 | **The queue knows the refusal.** A frame's name save refused as stale answers with its kind and brings the fresh page; a `locked` refusal brings no fresh page; an invalid input cuts nothing. |
-| S14A-02 | **The canvas's other writes are unchanged.** A card move and a frame's resize refused (stale and archive) show the same toasts and the same canvas as before the slice; their undo steps are unchanged. |
+| S14A-01 | **The frame name's answer reaches its field.** A frame's name save refused as stale shows the conflict line once the fresh page is in; a frame's name save waiting behind a refused frame write is cut ("Not saved", one toast); a `locked` refusal brings no fresh page and keeps the name editable with "Not saved"; an invalid input (a name too long) cuts nothing. |
+| S14A-02 | **The canvas's other writes are unchanged.** A card move and a frame's resize refused (stale and archive) show the same toasts and the same canvas as before the slice; their undo steps are unchanged. A regression check (F16). |
 | S14A-03 | **A note's text in its panel.** Two sessions on one note; the second's text save is refused: the text stays with "Changed meanwhile to: …"; "Keep mine" stores it (one change event, an undo step); in a repeat, "Use this" shows the first's text and stores nothing. |
 | S14A-04 | **A note's text on the canvas.** The same conflict made on the canvas: the note keeps the typed text and shows "Not saved"; clicking the mark selects the note and opens its panel with the conflict line; "Keep mine" stores it and the mark goes. |
-| S14A-05 | **Typing while a save is on its way,** on the canvas and in the panel: with the answer held, the text typed after the save stays with the focus; leaving the note saves the rest. |
-| S14A-06 | **Not saved.** A note's text save cut behind a conflict on its status keeps its draft as "Not saved" (panel) with the mark (canvas); leaving the field saves it. |
+| S14A-05 | **Typing while a save is on its way,** on the canvas and in the panel: with the answer held, the text typed after the save stays with the focus (on the canvas after a double-click back, starting from the draft); leaving the note saves the rest. |
+| S14A-06 | **Not saved.** A note's text save cut behind a conflict on its status keeps its draft as "Not saved" (panel) with the mark (canvas), with one toast; leaving the field saves it. |
 | S14A-07 | **Escape.** On the canvas and in the panel, Escape puts the stored text back; with the conflict line showing, it is "Use this". |
 | S14A-08 | **Choices.** A refused change of a note's colour and of a frame's kind shows the newest stored value with the toast, not the earlier one. |
-| S14A-09 | **A frame's name.** A conflict on a frame's name shows the line in its panel, with "Use this" and "Keep mine" (and on the canvas's title with the mark, if Q2 finds it editable there). |
+| S14A-09 | **A frame's name.** A conflict on a frame's name shows the line in its panel, with "Use this" and "Keep mine"; Escape is "Use this"; a refused name stays when the panel closes and comes back with its mark when the frame's panel opens again on the same page. |
 | S14A-10 | **Pinned notes.** A pinned note's conflict behaves as S14A-04's, with the mark where the pinned note is drawn. |
 | S14A-11 | **Permission and archive.** A note's text save refused because the workspace was archived meanwhile: the panel's text is read-only and selectable with "Not saved. You can still copy it."; the canvas's note is not editable and shows the draft with the mark. |
 | S14A-12 | **Locked and deleted.** A `locked` refusal keeps the note's draft editable with "Not saved"; a save on a note deleted meanwhile in another session takes the draft with it. |
-| S14A-13 | **The canvas's cost:**<br>• typing 20 characters in a note on the canvas, the mark shown and "Use this" pressed add no canvas commits beyond what the note's own save adds today (`window.__imCanvasCommits`, as S13-12);<br>• `S3B-15-elements.spec.ts` against `.data/measure/s9-14-baseline/slice-08.json`: the viewport counts equal, the page totals as slice 13's, or each difference explained;<br>• a LayerTree read with 20 notes showing the mark against the same notes without it: no more drawing layers;<br>• pan and zoom only if that read shows a change. |
+| S14A-13 | **The canvas's cost:**<br>• typing 20 characters in a note on the canvas, the mark shown and "Use this" pressed add no canvas commits beyond what the note's own save adds today (`window.__imCanvasCommits`, as S13-12);<br>• `S3B-15-elements.spec.ts` against `.data/measure/s9-14-baseline/slice-08.json`: the viewport counts equal, the page totals as slice 13's, or each difference explained;<br>• a LayerTree read with 20 notes showing the mark (20 real refusals, no test hook; answer 10) against the same notes without it: no more drawing layers;<br>• pan and zoom only if that read shows a change. |
 | S14A-14 | CI and the runs of the test regime; changed earlier tests listed with the reason. |
 
 **Definition of done (scenario for the manual acceptance, on Łukasz's model KB, after the backup).**
@@ -157,7 +165,7 @@ Tests in `e2e/slice-14a/`, one file per criterion, each from a fresh seed; unit 
 1. Open the same canvas of "Kanton Basel" in two windows (two sessions).
 2. Change a note's text in the first. In the second, type other text into the same note on the canvas and leave it: the note keeps the text and shows "Not saved". Click the mark: the panel shows the conflict line. "Keep mine", then Undo.
 3. Repeat in the panel and press "Use this".
-4. Type a long text into a note, leave it and click back at once to go on typing: nothing is lost.
+4. Type a long text into a note, leave it and double-click back at once to go on typing: nothing is lost.
 5. Rename a frame in both windows: the second shows the line.
 6. Change a note's colour in both windows: the second shows the first's colour, with the toast.
 
@@ -212,6 +220,8 @@ The slice adds one small mark to notes with a refused draft (rare), and changes 
   - the change-to-resolve actions;
   - a warning when leaving a page with a draft not saved.
 - **A conflict line on the canvas itself** (N1's alternative), if the mark and the panel prove too indirect in use.
+- **A second press on a selected note to edit it,** as in the prototype (answer 11; `docs/ideas.md`).
+- **A new note's text kept after its creation is refused** (answer 7; `docs/ideas.md`, a known limitation).
 
 ## 10. Decisions to accept, and docs in this PR
 
@@ -239,7 +249,7 @@ One sentence with the mark's measured cost (drawing layers, commits), as earlier
 ### Docs in this PR
 
 - **`docs/decisions.md`** (only with Łukasz's approval): D-66's change; AD-24's note.
-- **`docs/known-limitations.md`:** "A note's text rolls back after a refused save; a frame's fields have no line" removed; anything steps 1–4 find and Łukasz accepts.
+- **`docs/known-limitations.md`:** "A note's text rolls back after a refused save; a frame's fields have no line" removed; "A new note's text, and a note not drawn" (answers 7 and 9, written with the answers); anything steps 2–4 find and Łukasz accepts.
 - **`docs/ideas.md`:** "Notes and frames on slice 13's rule" done; the plan: 14a done, next 14b; section 9's entries.
 - **`docs/inventory-prototype-vs-app.md`:** section 8.
 - **README and CLAUDE.md:**

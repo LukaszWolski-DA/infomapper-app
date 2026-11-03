@@ -237,3 +237,29 @@ No existing text changes.
 
 - The prototype's second press on a selected note to edit it (F11).
 - A new note's text kept after a refusal, if question 7 says (a).
+
+## Łukasz's answers to step 1 (3 November 2026)
+
+1. **Yes:** step 2 in F1's scope.
+2. **The cut only for a note's saves and `updateFrame`,** one toast.
+3. **Yes:** a refusal is answered after its fresh page, 3 s at most (as `afterPage` in slice 13).
+4. **Yes:** one draft per note in the canvas's value store, and an option in `useDraft`.
+5. **Yes:** the "Not saved" mark as a button in the note's header, drawn only after a refusal; the texts in the table
+   are accepted.
+6. **Yes:** `keep` for the frame's name.
+7. **A new note's text after a refused creation:** a known limitation, out of the slice.
+8. **Yes:** no toast when the note's panel closes with a refused draft.
+9. **Yes:** a hidden note (a collapsed frame, hidden resolved notes) shows its mark when it is drawn again; added to the
+   known limitation of answer 7.
+10. **Yes:** S14A-13 on 20 real refusals, no test hook.
+11. **Yes:** a double-click in DoD step 4 and S14A-05; the prototype's second press on a selected note goes to
+    `docs/ideas.md`.
+12. **Yes:** steps 2–5 as in this file.
+
+**N6 changed:** step 2 changes the canvas's other writes only in their types, so there is no full e2e run after step 2.
+Each step runs the canvas's, notes' and frames' specs from Q8; one full run (three parts, `E2E_MEMORY_LOG=1`) at the
+closing. If step 2 turns out wider than F1, it stops and the full run after step 2 comes back.
+
+**Done with the answers:** the PRD is updated (status "step 1 answered", N6, items 1–3a, 7, 12–14 and "Out of this
+slice", step 2, S14A-01, S14A-02, S14A-05, S14A-06, S14A-09, S14A-13, DoD step 4, section 9, the docs). `docs/ideas.md`
+has both ideas; `docs/known-limitations.md` has "A new note's text, and a note that is not drawn".

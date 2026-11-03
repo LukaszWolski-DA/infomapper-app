@@ -644,6 +644,15 @@ stable key (`docs/known-limitations.md`, "A note's text rolls back after a refus
 text keeps its draft with the conflict line, the frame's name too. It changes canvas code (`useNotes`, `NoteLayer`), so
 it needs canvas commit counts like S13-12's. A candidate for the next scope after slice 13 (Łukasz, 1 November 2026).
 
+## Notes on the canvas: what slice 14a leaves (slice 14a, step 1 answers 7 and 11)
+
+- **A second press on a selected note edits it,** as in the prototype (`secondPress`, prototype line 2252). The app
+  starts editing a note only on a double-click (or "Edit text", "Edit on the canvas"); slice 14a's DoD and S14A-05 use
+  the double-click (F11).
+- **A new note's text kept after its creation is refused** (F9): today the draft note and its text go with the toast
+  (`useNotes.commit`). It could stay on the canvas with its text and the "Not saved" mark and be created again when left
+  (about 40 lines, one spec). A known limitation (`docs/known-limitations.md`).
+
 ## "by {person}" on a conflict line (slice 13, step 1, F20)
 
 Slice 13's conflict line says "Changed meanwhile to: {value}" without who changed it. A row's `updated_by` names its last
