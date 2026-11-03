@@ -48,6 +48,7 @@ import "@xyflow/react/dist/style.css";
 import "./canvas.css";
 import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
+import { track } from "@/ui/leave-guard";
 import { rowSaves } from "@/ui/row-saves";
 import { applyNames, shownText, withClips, type CanvasNames, type CardData } from "./card-data";
 import { canvasMode, cardMode, NAMES_COLUMN, namesControl, type NameDimension } from "@/domain/model/aliases";
@@ -613,7 +614,8 @@ export function ModelCanvas({
     const next = (queue.current.get(id) ?? Promise.resolve()).then(write).finally(() => {
       pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
     });
-    queue.current.set(id, next);
+    // leaving the page asks first while a write is on its way (slice 14b)
+    queue.current.set(id, track(queue, next));
   }, []);
 
   /** Runs a write for several cards after every write still on its way for any of them (slice 2a). */
@@ -625,6 +627,7 @@ export function ModelCanvas({
         for (const id of ids) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
       });
     for (const id of ids) queue.current.set(id, next);
+    void track(queue, next);
   }, []);
 
   /** Cards removed here, at the version they had then (a late fresh page must not put them back; `mergeFresh`). */

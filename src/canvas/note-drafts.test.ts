@@ -1,4 +1,5 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { asksToStay } from "@/ui/leave-guard";
 import { draftRefusal, inConflict, NoteDrafts, onLeave } from "./note-drafts";
 
 describe("NoteDrafts (slice 14a, D-66)", () => {
@@ -98,5 +99,23 @@ describe("onLeave: leaving a note's editor on the canvas", () => {
     expect(onLeave(refused, "mine", "old")).toBe("save");
     expect(onLeave(refused, "old", "old")).toBe("drop");
     expect(onLeave({ ...refused, refusal: "locked" }, "mine", "old")).toBe("save");
+  });
+
+  it("asks before the page is left while any note has a draft, and no longer once the canvas closes (slice 14b)", () => {
+    vi.stubGlobal("window", { addEventListener: vi.fn(), removeEventListener: vi.fn() });
+    const d = new NoteDrafts();
+    d.start("n", "one", "old");
+    d.start("m", "two", "old");
+    expect(asksToStay()).toBe(true);
+    d.stored("n", "one");
+    expect(asksToStay()).toBe(true);
+    d.refused("m", "stale_version");
+    expect(asksToStay()).toBe(true);
+    d.drop("m");
+    expect(asksToStay()).toBe(false);
+    d.start("n", "three", "one");
+    d.close();
+    expect(asksToStay()).toBe(false);
+    vi.unstubAllGlobals();
   });
 });

@@ -146,6 +146,7 @@ export function useNotes(o: Options) {
   const [fresh] = useState(() => new FreshWaits());
   /** One text draft per note, for the page (slice 14a, `note-drafts.ts`). */
   const [drafts] = useState(() => new NoteDrafts());
+  useEffect(() => () => drafts.close(), [drafts]);
   useEffect(() => {
     const pendingOf = (id: Uuid) => pending.current.get(id) ?? 0;
     setNotes((ns) => mergeFresh(ns, initialNotes, { readAt, pendingOf, deletedHere: deletedHere.current }));

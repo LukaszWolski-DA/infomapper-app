@@ -12,6 +12,10 @@
 // Slice 10a (F3): a write over several rows (moving an attribute renumbers its siblings, a merge, a concept deleted with
 // its entities moved) runs through `saveRows`: after every listed row's saves, holding all of them until its answer, and
 // feeding back every version the answer gives. `save` is its one-row case.
+//
+// Slice 14b: while any save is on its way, leaving the page asks first (`leave-guard.ts`).
+
+import { track } from "./leave-guard";
 
 /**
  * What a save's answer needs to say: whether it was stored, why not, and the row's new version (`value.version`), or
@@ -123,7 +127,7 @@ export class RowSaves {
     });
     const settled = quiet(result);
     for (const p of parts) p.row.tail = settled;
-    return result;
+    return track(this, result);
   }
 
   /**
@@ -146,7 +150,7 @@ export class RowSaves {
   exclusive<T>(step: () => Promise<T>): Promise<T> {
     const run = this.settled().then(step);
     this.gate = quiet(run);
-    return run;
+    return track(this, run);
   }
 }
 
