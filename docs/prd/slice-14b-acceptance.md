@@ -269,3 +269,90 @@ Also agreed: `S13-14` changes (it accepts the warning before its reload), and S1
 session through the domain.
 
 The PRD is updated to these answers (status "step 1 answered").
+
+## Step 2: the e2e parts and the canvas's row (3 November 2026)
+
+### What changed
+
+- **Four e2e parts** (item 1): `PART_STARTS = ["slice-03a", "slice-07a", "slice-10a"]` (`e2e/parts.ts`; the comments
+  in `parts.ts` and `scripts/e2e.ts` say four). `npm run e2e -- --part 4 --list` lists 156 tests in 93 files (slice-10a
+  to slice-14b). New unit test `tests/e2e-parts.test.ts` (F18): four parts, every folder in exactly one part and in
+  order, each later part starting at its cut, a part 0 or 5 refused.
+- **The cut rule** (item 2a, F3, answer 2): `RowSaves.saveRows` cuts on a cutting refusal only the waiting saves of its
+  checked rows; a held row's waiting save is sent after it with the newest version known. `row-saves.test.ts`: the old
+  case "cuts … held ones too" now says the opposite (the held sibling's save is sent with the version its field showed,
+  for every cutting code including `locked`), and a new case: a hold with no checked row cuts nothing when refused.
+- **The canvas's row on the chain** (items 2–3, O1):
+  - **the look** (`look.tsx`): `rowSaves.save(canvasId, page's version, …)`; its own queue, `versionRef` and
+    `noteVersion` are gone. After a refusal (or a cut) it shows the newest page's look (a ref to the page's look, kept
+    in an effect: no render); a later page brings a newer one through the existing effect (F7, O3; the look's refusal
+    spec S14B-07 is step 3's). The look stays in `src/canvas`, which may not import `useAction` (layers): it uses
+    `rowSaves` directly. `SaveLookResult` carries the refusal's `code`;
+  - **the names switch** (`ModelCanvas.setNames`): registers, at the click, a held row for the canvas
+    (`rowSaves.saveRows([{ id: canvasId }], …)`) around its write on the canvas's queue; the write's answer gives the
+    chain its `versions` (the canvas's included); `noteCanvasVersion` is gone, `namesVersion` stays (F2, answer 6);
+  - **the rename in the tab** (`canvas-tabs.tsx`): `saveRow(canvas, …)`; the field's draft and line are step 3's;
+  - **the tab menu** (`canvas-menu.tsx`): another canvas's look `saveRow(canvas, …)`; "Use this look on all canvases"
+    `saveRows` over the project's canvases, all held; the delete `saveRow(…, { undoable: true, deletes: !others.length })`
+    (F6: "Remove from this project" writes no canvas row and cuts nothing);
+  - **the actions:** `applyLookToAllCanvasesAction` answers `{ versions: true }`; `labelCommand` takes
+    `{ versions }`, and `renameLabelAction` and `deleteLabelAction` answer with every row they wrote, the live canvas's
+    included (F1, answer 4).
+- No domain command, message, data or seed change.
+
+### Specs
+
+`e2e/slice-14b/` (fixtures with a 1,536 × 864 window for the names' check boxes; helpers `canvasStored`,
+`startRename`, `renameInTab`, and slice 2a's `canvasIn`, `canvasTab`, `openCanvasMenu`, `tabNames`):
+
+- **S14B-01:** the layer switch's answer held (`holdUntil`), then a grid switch and a rename in the tab, then the answer
+  released: layer, grid and name stored, the rename's toast, no conflict toast, no mark.
+- **S14B-02:** the names switch's answer held, then a rename: both stored, no conflict toast.
+- **S14B-03:** the background's answer held in Order management, then "Delete canvas" on Order lines & products: deleted
+  (with the blue background), no conflict toast; the remaining canvas's delete item is disabled with its title.
+- **S14B-11:** `tests/e2e-parts.test.ts` and `npm run e2e -- --part 4 --list` (above); the full run's four parts and
+  one summary are checked at the closing.
+
+Checked against the old code: with `canvas-tabs.tsx` as at `slice-14a`, S14B-01 and S14B-02 fail (the rename refused,
+the tab keeps "Customer & orders"); restored afterwards. S14B-02 failed once in its first version on the rename's toast
+read before the answer reached the page (the name was stored); it now waits for the toast (`expect.poll`), and passed
+three times on its own.
+
+### A bug found on the way: a click in a canvas tab's menu opened that canvas (since slice 2a)
+
+The tab menu is a Radix portal, and React passes a click in a portal up its own tree: a click on any item of a tab's
+menu ("Delete canvas", a background, "In projects") reached the tab's `onClick`, which pushed that canvas's address. For
+the open canvas's own tab nothing showed; for another canvas's tab the page opened it. Before the chain the delete's
+action started before that push, and the push then landed on the deleted canvas and was redirected with the "moved"
+notice, which is how `S6B-06`'s deleted-canvas case met its toast. On the chain the delete is sent a moment later, after
+the push, so Back went to the pushed entry and no notice came (S6B-06 failed 3 of 3 times on its own; traces kept in
+`.data/measure/s14b-step2-fail/`, with the run's log). Fix (`canvas-tabs.tsx`): the tab opens its canvas only for a
+click inside its own element (`e.currentTarget.contains(e.target)`). Checked: S6B-06's notice comes after Back.
+
+**Still failing, for Łukasz's decision:** `S6B-06`'s last part, "Forward still works" after Back onto the deleted canvas.
+Measured through the Navigation API (three runs, the same each time): after the delete the history is
+`[sign-in, workspace, Order lines, Customer & orders]` at index 3; Back goes to index 2 (Order lines, deleted), the
+background refresh after the traversal (`history-nav.tsx`, `router.refresh()`) finds it gone and the redirect to
+Customer & orders **pushes** a new entry at index 3 over the one Forward led to, so Forward is disabled. A redirect with
+`RedirectType.replace` in `leaveMissingCanvas` does not change it (tried and reverted): the push comes from Next.js's
+handling of a refresh that ends at another address. Until now the test passed only thanks to the extra entry the bug
+above left. Proposal: in step 3, at most half a day, make the page drawn after such a refresh replace the deleted entry
+(for example `history-nav.tsx` stepping back over the pushed entry, or the `?moved=1` cleanup); if that does not work,
+S6B-06 checks Forward only where it can work (Back onto a removed card, as its other case does) and a known limitation
+says that after Back onto a deleted canvas Forward is gone.
+
+### Runs (step 2)
+
+- **CI:** `npm run lint`, `npm run typecheck` and `npm test` (124 files, 1,589 tests) pass.
+- **Slice 14b specs:** S14B-01, -02, -03 pass (and again after the fix above).
+- **Earlier specs the step touches** (one run, 89 tests in 16.0 min): the tabs' rename (`S0-04`, `S0-05`, `S0-06`,
+  `S0-10`, `S6B-06`), the menu and the look (`S2A-03`, `S2A-05`, `S2A-09`, `S2A-10`, `S2A-11`, `S2A-13`, `S2C-02`,
+  `S2C-04`, `S6A-02`, `S6A-03`, `S6A-10`), the names switch (`S11-01` to `S11-05`, `S11-10`, `S11-11`), a label's rename
+  and delete (`S3A-04`, `S3A-13`, `S3B-08`, `S3B-12`, `S13-04`), all of slice 10a (held rows, the canvas's writes on the
+  chain): 88 passed, 1 failed (`S6B-06`, above). After the fix: the tabs' and the menu's specs and slice 14b's (13 tests)
+  pass; `S6B-06` fails 3 of 3 times on its Forward check only.
+
+### Changed earlier tests
+
+- `src/ui/row-saves.test.ts`: the held-row cut case now asserts slice 14b's rule (F3, answer 2).
+- `S6B-06`: not changed yet (Łukasz's decision above).
