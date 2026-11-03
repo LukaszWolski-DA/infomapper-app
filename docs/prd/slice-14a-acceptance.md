@@ -617,6 +617,23 @@ against 9)."
 > cuts the note's or the frame's own saves waiting behind it (one toast), while the canvas's other writes (layout, the
 > names switch, removes) keep their behaviour. A note never saved loses its text when its creation is refused.
 
+### Full e2e run (N6; `E2E_MEMORY_LOG=1 npm run e2e`, from scratch, no dev server running)
+
+537 passed, 3 skipped (the on-demand measurements), no failure and no retry, so no rerun was needed.
+
+| Part | Folders | Time | Child heap peak (80 % threshold 3,255 MB) | Child RSS peak |
+| --- | --- | --- | --- | --- |
+| 1 | fixes to slice-03a | 28 min 10 s | 1,364 MB (42 %) | 1,335 MB |
+| 2 | slice-03b to slice-07b | 28 min 43 s | 1,532 MB (47 %) | 1,588 MB |
+| 3 | slice-07c to slice-14a | 35 min 35 s | 1,788 MB (55 %) | 1,582 MB |
+| Total | | 92 min 28 s | | |
+
+No server restart in any part. Part 3 grew with slice 14a's specs and is now about 200 MB below the 2 GB mark that
+CLAUDE.md names for moving the cuts; the figure is added to `docs/ideas.md` ("A fourth part for the full e2e run"),
+nothing moved here. The
+machine's available memory fell to a few MB at times (page file up to 2.4 GB in part 1) without a timeout. Logs:
+`.data/e2e-memory-20261103-1058-part<n>.*` (git-ignored).
+
 ### Backup of KB
 
 `.data/backups/dev-db-20261103-1200.json` and `.data/backups/kb-model-latest.json`, both byte for byte equal to

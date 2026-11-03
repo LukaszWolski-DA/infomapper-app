@@ -576,7 +576,8 @@ The full e2e run is three parts (`e2e/parts.ts`), each ending at a heap of 1.4 t
 step 4). If a sign-in times out again in a full run, read the memory log (`E2E_MEMORY_LOG=1`) at that test: with the
 heap well above 1.5 GB, move the cuts to four parts (one more entry in `PART_STARTS`, each part about 20 minutes, a
 server start of about 50 s more); at a low heap, the cause is elsewhere and more parts would not help. New slices fall
-into part 3, so it grows first: watch its end heap at each closing.
+into part 3, so it grows first: watch its end heap at each closing. Slice 14a's closing (3 November 2026): part 3's
+heap peaked at 1,788 MB (35 min 35 s), no sign-in timeout; parts 1 and 2 at 1,364 and 1,532 MB.
 
 ## The project home's own large parts (slice 12b, step 2)
 
