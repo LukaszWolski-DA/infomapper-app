@@ -79,7 +79,10 @@ export function CanvasTabs({
             data-testid="tab-canvas"
             title={view.canEdit ? "Double-click to rename" : undefined}
             className={cn(tabClass, "group pl-3 pr-1", on && onClass)}
-            onClick={() => renaming !== canvas.id && router.push(canvasHref(view.workspaceId, view.project.id, canvas.id))}
+            // a click in the tab's menu (a portal) reaches this handler through React's tree: only a click on the tab itself
+            // opens its canvas (slice 14b: on the save chain a delete is sent after this push, which then opened the
+            // deleted canvas)
+            onClick={(e) => e.currentTarget.contains(e.target as Node) && renaming !== canvas.id && router.push(canvasHref(view.workspaceId, view.project.id, canvas.id))}
             onDoubleClick={() => view.canEdit && setRenaming(canvas.id)}
           >
             {renaming === canvas.id ? (
