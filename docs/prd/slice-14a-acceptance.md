@@ -329,3 +329,14 @@ unit test for this part.
 
 None new. The frame panel shows slice 13's texts ("Changed meanwhile to:", "Use this", "Keep mine", "Not saved", "Not
 saved: Name of {frame}. Open it again to see your text.").
+
+## Łukasz's answers to step 2 (3 November 2026)
+
+- **Step 2 accepted.**
+- **S14A-01's "an invalid input cuts nothing"** is checked by the unit test (`src/canvas/save-cuts.test.ts`): accepted.
+- **S14A-01 and S14A-09 were not run against the code before the change:** accepted, as recorded above (they need the
+  answer's code, which `updateFrame` did not give).
+- **Step 3** as the PRD and the answers to step 1 say; a note's saves cut behind a refusal of the same note no longer
+  roll back: they keep the draft as "Not saved" in the panel and with the mark on the canvas (PRD item 6), replacing
+  step 2's interim rollback. A canvas commit count while typing in a note on the canvas as a quick check (the full
+  S14A-13 in step 4).
