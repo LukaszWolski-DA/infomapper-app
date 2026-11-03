@@ -190,8 +190,8 @@ describe("RowSaves.saveRows (slice 10a, F3)", () => {
     expect(one.calls.map((c) => c.version)).toEqual([3, 8]);
   });
 
-  it("a cutting refusal cuts the waiting saves of every row it lists, held ones too; other rows go on", async () => {
-    for (const code of ["stale_version", "forbidden", "archived", "not_found"]) {
+  it("a cutting refusal cuts the waiting saves of its checked rows only; a held row's are sent, with the newest version known (slice 14b, F3)", async () => {
+    for (const code of ["stale_version", "forbidden", "archived", "not_found", "locked"]) {
       const saves = new RowSaves();
       const one = pendingSave();
       const rows = pendingRows(["m"]);
@@ -203,11 +203,29 @@ describe("RowSaves.saveRows (slice 10a, F3)", () => {
       expect(one.calls.map((c) => c.version)).toEqual([9]);
       rows.calls[0]!.answer({ ok: false, code });
       expect(await checked).toBeNull();
-      expect(await held).toBeNull();
+      await tick();
+      // the refused move wrote nothing: the sibling's save goes with the version its field showed
+      expect(one.calls.map((c) => c.version)).toEqual([9, 3]);
       one.calls[0]!.answer(stored(10));
+      one.calls[1]!.answer(stored(4));
       expect(await other).toEqual(stored(10));
-      expect(one.calls).toHaveLength(1);
+      expect(await held).toEqual(stored(4));
     }
+  });
+
+  it("a hold with no checked row (a write whose version only the server reads) cuts nothing when refused", async () => {
+    const saves = new RowSaves();
+    const one = pendingSave();
+    const rows = pendingRows([]);
+    void saves.saveRows([{ id: "canvas" }], rows.send);
+    const waiting = saves.save("canvas", 4, one.send);
+    await tick();
+    expect(one.calls).toHaveLength(0);
+    rows.calls[0]!.answer({ ok: false, code: "stale_version" });
+    await tick();
+    expect(one.calls.map((c) => c.version)).toEqual([4]);
+    one.calls[0]!.answer(stored(5));
+    expect(await waiting).toEqual(stored(5));
   });
 
   it("is not sent when a refusal before it cut one of its checked rows; a held row's cut does not stop it", async () => {
