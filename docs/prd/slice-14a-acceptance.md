@@ -340,3 +340,97 @@ saved: Name of {frame}. Open it again to see your text.").
   roll back: they keep the draft as "Not saved" in the panel and with the mark on the canvas (PRD item 6), replacing
   step 2's interim rollback. A canvas commit count while typing in a note on the canvas as a quick check (the full
   S14A-13 in step 4).
+
+## Step 3: notes and frames (3 November 2026)
+
+Commit `19b76aa`.
+
+### What changed
+
+- **`src/canvas/note-drafts.ts`** (new): one text draft per note, kept by the canvas for the page (`NoteDrafts`: text,
+  base, the value on its way, the refusal's kind), with its rules as pure functions (`draftRefusal`, `inConflict`,
+  `onLeave`) and `useNoteDraft`, a per-note subscription (`useSyncExternalStore`), so a draft, its mark, "Use this" and
+  "Keep mine" never re-render the canvas. Unit tests: `note-drafts.test.ts` (8).
+- **`useNotes`:** a note's text is no longer written into the note's data before it is stored; it is the note's draft
+  (`saveText`, for the canvas and the panel alike). A refusal keeps the draft with its kind (`mark` for a stale version or
+  a cut, `locked`, `copy` for a permission or the archive; unmarked after an invalid input); a note not found takes it
+  with it; a stored save ends it, keeping text typed after it. **Cut text saves no longer roll back** (step 2's interim
+  rollback is gone, step 2 answers). The status, colour, width, moves and pins roll back as before, and the fresh page
+  then shows the newest stored value (F8). A note deleted elsewhere drops its draft with the fresh page (`retain`).
+- **Leaving the canvas's editor** (`commit`, `onLeave`): saves a changed text; with a conflict it keeps the typed text as
+  the draft and saves nothing (D-66, F6 of slice 13); typed back to the stored text it drops the draft. **Escape**
+  (`cancel`) drops a refused draft ("Use this"); without one it cancels as before (S3A-07).
+- **`NoteLayer`:** a note shows its draft's text (the editor starts from it, answer 11) and, after a refusal, the
+  button "Not saved" in its header before the ✓ (`.nt-mark`: token colours, no opacity, no `will-change`, only on a
+  refused note), titled for an editable or a read-only draft. A click selects the note and opens the details panel
+  (`CanvasHost.openDetails`, a new host function the canvas host registers).
+- **`useDraft`'s option `outside`** (`fields.tsx`, additive): a draft kept outside the field is shown, with its refusal's
+  mark, while the field has neither the focus nor its own different text; "Use this" and Escape drop it. The note
+  panel's `TextArea` passes the canvas's draft (`ui.noteDrafts()`), and its save answers again. No `keep` for the note's
+  text, no toast when its panel closes (answer 8).
+- **Frames:** nothing more than step 2 (the name's line, `keep`; the kind, concept and system show the stored value).
+
+### Specs
+
+| Spec | Result |
+| --- | --- |
+| S14A-03: the panel's conflict line, the canvas's draft with the mark, Keep mine one undo step; Use this | passed |
+| S14A-04: the conflict on the canvas, the mark opens the panel's line, Keep mine | passed |
+| S14A-05: typing while the save is held, on the canvas (double-click back) and in the panel | passed (2) |
+| S14A-06: a text save cut behind a refused status: Not saved, the mark, one toast; leaving saves it | passed |
+| S14A-07: Escape on the canvas and in the panel, without and with a refused draft | passed (2) |
+| S14A-08: a note's colour and a frame's kind refused: the newest stored value with the toast | passed (2) |
+| S14A-10: a pinned note's conflict (the view moved so the note is in it, `openWithNote`) | passed |
+| S14A-11: archived meanwhile: the draft with the read-only mark, not editable; the panel read-only and selectable | passed |
+| S14A-12: a locked organization (editable, Not saved); a note deleted meanwhile (the note and its draft go) | passed (2) |
+| One run: `e2e/slice-14a` (S14A-01 to S14A-12), `slice-03a`, `slice-02b`, `slice-13`, `fixes/panel-field-focus`, S2C-03, S2C-12, S9-04, S6B-02, S3B-13, S3B-15-idle, S4P-12 | 90 passed, 1 skipped (the commit check, on demand), 15.4 min |
+| Unit tests (`npm test`) | 1,584 passed |
+| `npm run lint`, `npm run typecheck` | passed |
+
+**The quick commit check** (`COMMITS=1`, `e2e/slice-14a/S14A-13-commits.spec.ts`, the dev server, the demo's free note):
+
+| Phase | Canvas commits |
+| --- | --- |
+| Double-click to edit | 4 |
+| Typing 20 characters (one line) | **0** |
+| Typing 20 more | 0 in the second run; **1** in the first, where the text wrapped to a new line: the note's measured height (`onHeight`, since slice 3a), not the draft |
+| Leaving the editor, the save stored | 4 |
+| Leaving the editor, the save refused (the mark and the fresh page) | 6 |
+| The mark clicked (the note selected, its panel open) | 1 |
+| "Use this" | **0** |
+
+The comparison with slice 13's numbers for the same phases (S14A-13's bar "no commits beyond what the note's own save
+adds today") is step 4's, A/B on both builds.
+
+### Screenshots
+
+`docs/prd/slice-14a-screens/step-3/`, light and dark: `note-mark-*` (the note with its mark on the canvas, at 45 %),
+`note-panel-conflict-*` (its panel with the line), `note-read-only-mark-*` and `note-panel-read-only-*` (after the
+archive), `frame-name-conflict-*` (the frame panel's name with the line).
+
+### How to check
+
+1. Open "Customer & orders" in two windows. Change the free note's text in the first (panel or canvas).
+2. In the second, double-click the same note, type other text, Ctrl+Enter: the toast, the text stays, "Not saved" in
+   the header. Click it: the panel with "Changed meanwhile to: …"; "Keep mine", then Undo.
+3. Repeat and press Escape in the note's editor (or "Use this" in the panel): the other text shows, the mark goes.
+4. Archive the workspace in the first window, then write in a note in the second: the mark stays, the note no longer
+   opens its editor; the panel shows the text read-only with "Not saved. You can still copy it.".
+
+### New and changed user-visible texts (the whole slice)
+
+| Where | Text | New / reused |
+| --- | --- | --- |
+| A note's mark on the canvas | "Not saved" | new |
+| Its title and accessible name, editable | "Your text is not saved. Click to see it in the note's panel." | new |
+| Its title and accessible name, read-only | "Not saved. Open the note's panel to copy your text." | new |
+| The note panel's text, the frame panel's name | "Changed meanwhile to:", "Cleared meanwhile.", "Use this", "Keep mine", "Show more", "Show less", "Not saved", "Not saved. You can still copy it." | reused (slice 13) |
+| A frame's name refused while its panel closes | "Not saved: Name of {frame}. Open it again to see your text." | reused (`notSavedAway`) |
+| The conflict toast | "Someone changed this meanwhile." | reused |
+
+No existing text changed.
+
+### Not done in step 3
+
+- S14A-13 in full (the A/B commit bar, the element guard, the LayerTree read with 20 marks): step 4.
+- The docs (CLAUDE.md, D-66, known limitations, ideas, inventory, README): step 5.
