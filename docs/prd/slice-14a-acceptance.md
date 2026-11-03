@@ -263,3 +263,69 @@ closing. If step 2 turns out wider than F1, it stops and the full run after step
 **Done with the answers:** the PRD is updated (status "step 1 answered", N6, items 1–3a, 7, 12–14 and "Out of this
 slice", step 2, S14A-01, S14A-02, S14A-05, S14A-06, S14A-09, S14A-13, DoD step 4, section 9, the docs). `docs/ideas.md`
 has both ideas; `docs/known-limitations.md` has "A new note's text, and a note that is not drawn".
+
+## Step 2: the canvas's queue (3 November 2026)
+
+Commit `98298e6`. Step 2 stayed within F1: the canvas's other writes changed only in their result types (and their
+`FAILED` constant got the code `unexpected`), so there was no full run after it (N6).
+
+### What changed
+
+- **`src/canvas/save-cuts.ts`** (new, pure): `SaveCuts` (a cutting refusal per row: stale version, permission, archive,
+  not found, `locked`; a save marks the count when it is queued and is cut when it grew meanwhile) and `FreshWaits` (an
+  answer held until the next fresh page's rows are merged, at most 3 s; answered at once when a page was merged since the
+  save was sent). `CanvasSave` is what a note's or frame's save answers: `{ ok: true }` or `{ ok: false, code }`.
+- **`useNotes.save`** (text, status, colour, width, move, pin, unpin) answers `CanvasSave`: a refusal records its cut,
+  puts `back` and shows its toast as before, and answers after the fresh page when it brings one; a save waiting behind a
+  cutting refusal of the same note is not sent, puts its `back`, shows no toast and answers `cut`. `update` returns that
+  answer. The rollback of the note's text is unchanged until step 3 (the draft store).
+- **`useFrames.updateFrame`** answers `CanvasSave` the same way (no rollback: frames are not optimistic). The fresh-page
+  effects of both hooks end with `fresh.merged()`.
+- **Types:** `CanvasUiApi.updateFrame` resolves `CanvasSave`, `updateNote` resolves `CanvasSave | undefined`
+  (`context.ts`, `CanvasProvider.tsx`); `WriteResult` in `useNotes.ts` and `GroupActions.ts` carries `code`.
+- **The frame panel's name** gets slice 13's line, "Not saved", Escape and "Keep mine" from the answer, and `keep`
+  (answer 6). Its concept and system (`useChoice`) read the same answer. The note panel's text still discards the answer
+  (a comment says so) until step 3.
+- **Not changed:** `enqueue`, `enqueueGroup`, `runCommand`, the domain, every other canvas write's handling.
+
+**One behaviour change for notes beyond the panels:** a note's saves waiting behind a cutting refusal of the same note
+(e.g. a move behind a refused text) are no longer sent and refused one by one; they are put back with no toast of
+their own (answer 2). A note's save waiting behind a refused group write (`saveLayout`, `saveMoves`) is not cut, as only
+the note's own saves record cuts.
+
+### Specs
+
+| Spec | Result |
+| --- | --- |
+| S14A-01: stale name, the line, the canvas shows Anna's name | passed |
+| S14A-01: a name save cut behind a refused colour: "Not saved", one toast; leaving saves it | passed |
+| S14A-01: a locked organization: no fresh page, editable, "Not saved" | passed |
+| S14A-02: a card's move refused (stale; archived) | passed (2) |
+| S14A-02: a frame's resize refused (stale; archived) | passed (2) |
+| S14A-09: the line, "Keep mine" one undo step, Escape takes Anna's | passed |
+| S14A-09: "Use this"; a refused name kept while the panel is closed comes back with its line and the toast | passed |
+| Earlier: `e2e/slice-01b`, `slice-02a`, `slice-02b`, `slice-03a`, `slice-10a`, `S2C-03`, `S9-04` | 117 passed (23.0 min), one run |
+| Unit tests (`npm test`) | 1,576 passed, 9 new in `save-cuts.test.ts` |
+| `npm run lint`, `npm run typecheck` | passed |
+
+The nine slice 14a tests passed at the first run (1.7 min). I did not run S14A-01 and S14A-09 against the code before
+the change; their assertions (the line, "Not saved", `keep`) need the answer's code, which `updateFrame` did not give
+(it resolved `true`/`false`). S14A-02 passes before the slice by design (a regression check).
+
+**S14A-01's "an invalid input cuts nothing"** cannot be reached from the frame panel: an empty name goes back in the
+browser (D-59) and a frame's name has no length limit (`nameSchema`). It is covered by the unit test ("an invalid input,
+an unexpected error or a cut save cuts nothing"); the PRD's criterion says so in its spec's header. Proposal: accept the
+unit test for this part.
+
+### How to check
+
+- In two windows of a canvas with a frame: rename the frame in the first, then in the second type another name in its
+  panel and press Enter: the toast, the line "Changed meanwhile to: …" with "Use this" and "Keep mine".
+- Close that panel with Escape outside the field: the toast "Not saved: Name of {frame}. …"; select the frame again: your
+  name with its line.
+- Notes behave as before in the panel and on the canvas (their draft comes in step 3).
+
+### New or changed user-visible texts
+
+None new. The frame panel shows slice 13's texts ("Changed meanwhile to:", "Use this", "Keep mine", "Not saved", "Not
+saved: Name of {frame}. Open it again to see your text.").
