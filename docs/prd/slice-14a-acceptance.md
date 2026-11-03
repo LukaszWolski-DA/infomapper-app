@@ -593,7 +593,7 @@ against 9)."
 ### Docs
 
 - **`docs/decisions.md`:** D-66's sentence on notes and frames replaced (the text below); "Changed in slice 14a (notes
-  and frames); accepted by Łukasz on the day of slice 14a's merge." added to its acceptance; AD-24's sentence on a
+  and frames); accepted by Łukasz on 3 November 2026." added to its acceptance; AD-24's sentence on a
   refused note's mark after slice 11's.
 - **`docs/known-limitations.md`:** "A note's text rolls back after a refused save; a frame's fields have no line"
   removed; "A new note's text, and a note that is not drawn" stays (step 1 answers 7 and 9); the list of fields that
@@ -614,7 +614,7 @@ against 9)."
 > canvas's overview, a card's or frame's "Notes", the selection's list) show the draft too, with "Not saved" after a
 > refusal; a frame's name has the conflict line in its panel and keeps its draft when the panel closes; a note's status
 > and colour and a frame's kind, concept and system show the newest stored value after a refusal; a refusal that cuts
-> cuts the note's or the frame's own saves waiting behind it (one toast), while the canvas's other writes (layout, the
+> the queue also cuts the note's or the frame's own saves waiting behind it (one toast), while the canvas's other writes (layout, the
 > names switch, removes) keep their behaviour. A note never saved loses its text when its creation is refused.
 
 ### Full e2e run (N6; `E2E_MEMORY_LOG=1 npm run e2e`, from scratch, no dev server running)
@@ -666,3 +666,9 @@ window's page does not know what the first one saves until it saves something it
 9. **Optional, read-only:** archive the workspace in A (the workspace home), then write in a note in B: the toast, the
    mark stays, the note no longer opens its editor; the mark opens the panel with "Not saved. You can still copy it.".
    Unarchive afterwards.
+
+## Łukasz's answer to the closing (3 November 2026)
+
+Manual acceptance on KB passed. No Auto-fix. D-66's wording changed to "a refusal that cuts the queue also cuts the
+note's or the frame's own saves waiting behind it (one toast)"; D-66's change and AD-24's sentence accepted on
+3 November 2026. Merge of PR 34 and tag `slice-14a` once both GitHub checks pass.
