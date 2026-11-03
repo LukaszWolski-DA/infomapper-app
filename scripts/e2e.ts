@@ -1,5 +1,5 @@
 // `npm run e2e` (chore e2e reliability, P2 B).
-//   npm run e2e                     the full run in three parts (e2e/parts.ts), each with its own fresh dev server, one result
+//   npm run e2e                     the full run in four parts (e2e/parts.ts), each with its own fresh dev server, one result
 //   npm run e2e -- --part 2         one part on its own, as a normal run
 //   npm run e2e -- <playwright args> one run as before (a file, a folder, --grep …)
 // The full run writes each part's results as a blob report (`blob-report/part-<n>.zip`) and merges them into one summary
