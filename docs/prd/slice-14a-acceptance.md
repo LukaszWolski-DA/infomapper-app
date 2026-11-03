@@ -434,3 +434,58 @@ No existing text changed.
 
 - S14A-13 in full (the A/B commit bar, the element guard, the LayerTree read with 20 marks): step 4.
 - The docs (CLAUDE.md, D-66, known limitations, ideas, inventory, README): step 5.
+
+## Łukasz's answers to step 3 (3 November 2026)
+
+- **Step 3 accepted.**
+- **N4:** list every place that reads a note's text from the canvas's data, whether it shows the draft or the stored
+  value, and whether the person writing sees the difference; record it as a deliberate change of N4, and stop if the
+  person writing would see the old text anywhere.
+- **A screenshot of a note with its mark at 100 %,** light and dark.
+- **Step 4** (S14A-13, A/B against slice-13 in one sitting, the measuring build) after that.
+
+### N4: where a note's text is read (step 3's change, checked 3 November 2026)
+
+Since step 3 a note's text reaches the note's data (`NoteData.text`, `useNotes`) only once it is stored; until then, and
+after a refusal, it is the note's draft (`note-drafts.ts`). Before slice 14a the typed text was written into the data at
+once and rolled back after a refusal.
+
+| Place | Reads | Shows | Seen by the person writing? |
+| --- | --- | --- | --- |
+| The note on the canvas (`NoteLayer`, `NoteBox`: its text, the editor's start) | the draft, else the data | **the draft** | the draft, as typed |
+| The note's height (the tether, the plain body below 40 %, Fit) | the drawn box (`ResizeObserver`, `onHeight`) | the draft's height | — |
+| The note panel's text (`note-panel.tsx`, `TextArea` with `outside`) | the draft, else the stored text | **the draft**, with its line or "Not saved" | the draft |
+| The note's toolbox (`canvas-host.tsx`) | no text | — | — |
+| The Overview's miniature, fading and Focus (`miniNotes`, `fadeNotes`), the tethers | places and colours only | — | — |
+| The left panel's search (`tree-data.ts`) | notes are not searched | — | — |
+| The panels' redraw key (`notesKey`, `ModelCanvas.tsx`) | the stored text | — (not drawn) | — |
+| **The canvas's overview panel, "Notes on this canvas"** (`overview-panel.tsx`, `ui.notesView()`, first line) | the stored text | **the stored text** | **yes**, see below |
+| **A card's or frame's panel, "Notes"** for its pinned notes (`notes-here.tsx`, `ui.notesView()`) | the stored text | **the stored text** | **yes**, see below |
+| **The selection panel's list** with several items (`selection-panel.tsx`, `ui.noteView().note.text`) | the stored text | **the stored text** | **yes**, see below |
+
+**Where the person writing sees the old text (stopped here, as asked):** the three lists show a note's first line from
+the stored text. Two moments:
+
+1. **While a save is on its way** (usually 0.1–0.3 s): the lists still show the earlier text (before slice 14a the
+   typed one, at once). Hardly visible: while a note is written, the note itself is selected and its panel shows, not
+   one of these lists.
+2. **After a refusal, while the draft stays:** the canvas and the note's panel show the person's draft with "Not saved",
+   but the overview panel's list (nothing selected), the pinned note's card or frame panel and a several-item selection
+   show the stored text: the other person's after a conflict, the earlier text after a cut, a permission, the archive or
+   a locked organization. Before slice 14a these lists showed the same stored text, since the draft was lost; now the
+   canvas and the lists differ.
+
+**Proposals:**
+- **(a) The lists show the draft** too, as the canvas does: `notesView` and the selection panel take a note's draft's
+  text when it has one, and the three lists subscribe to the drafts (they are panels beside the canvas, so no canvas
+  commit; nothing reads layout). A refused draft's row gets the meta "not saved" (a fourth new text) so the list says it
+  is not stored. About 30 lines and one spec (S14A-04 extended: the overview's list shows the draft).
+- **(b) The lists stay on the stored text,** recorded as a deliberate part of N4: they list what is stored; the canvas
+  and the note's panel show what was typed. A known limitation.
+
+Recommended: (a), since D-66 says the person's text stays where they see it.
+
+### Screenshots at 100 %
+
+`docs/prd/slice-14a-screens/step-3/note-mark-100-light.png` and `note-mark-100-dark.png` (the screenshot spec's new
+case "a note with its mark at 100 %").

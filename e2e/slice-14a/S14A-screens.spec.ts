@@ -51,7 +51,34 @@ async function start(page: Page, scheme: "light" | "dark", noteId: string) {
   await hydrated(page);
 }
 
+/** Opens the canvas at 100 % with the note near the view's top left. */
+async function openAt100(page: Page, noteId: string) {
+  await openWithNote(page, noteId);
+  const t = await page.locator(".react-flow__viewport").evaluate((e) => {
+    const m = new DOMMatrixReadOnly(getComputedStyle(e).transform);
+    return { x: m.e, y: m.f, z: m.a };
+  });
+  const pane = (await page.locator(".react-flow__pane").boundingBox())!;
+  const b = (await noteBox(page, noteId).boundingBox())!;
+  const at = { x: (b.x - pane.x - t.x) / t.z, y: (b.y - pane.y - t.y) / t.z };
+  await openCanvas(page, canvasUrl(), { x: 240 - at.x, y: 160 - at.y, zoom: 1 });
+}
+
 for (const scheme of ["light", "dark"] as const) {
+  test(`S14A screens (${scheme}): a note with its mark at 100 %`, async ({ page }) => {
+    const note = (await noteWithText(DEMO_NOTES.free))!;
+    await page.emulateMedia({ colorScheme: scheme });
+    await signInAs(page, "Łukasz");
+    await openAt100(page, note.id);
+    await hydrated(page);
+    await changeNoteAsAnna(note.id, { text: "Order lines come from ERP twice a night, at 1 and at 4." });
+    await writeNote(page, note.id, "Order lines come from ERP once a night, at 2. Check the window with the ERP team.");
+    await expect(noteMark(page, note.id)).toBeVisible();
+    await page.keyboard.press("Escape");
+    await page.mouse.move(0, 0);
+    await noteShot(page, note.id, `note-mark-100-${scheme}`);
+  });
+
   test(`S14A screens (${scheme}): a note's conflict on the canvas and in its panel`, async ({ page }) => {
     const note = (await noteWithText(DEMO_NOTES.free))!;
     await start(page, scheme, note.id);
