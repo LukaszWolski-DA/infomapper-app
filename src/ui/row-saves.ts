@@ -98,10 +98,14 @@ export class RowSaves {
     for (const r of rows) if (!listed.get(r.id)?.shown) listed.set(r.id, r);
     const parts = [...listed.values()].map((r) => {
       const row = this.row(r.id);
-      return { ...r, row, n: ++row.started };
+      return { id: r.id, shown: r.shown, row, n: ++row.started };
     });
     const checked = parts.filter((p) => p.shown !== undefined);
-    const result = Promise.all([...parts.map((p) => p.row.tail), this.gate]).then(async (): Promise<R | null> => {
+    // each distinct tail once: a hold over a whole source lists some 26,000 rows, most of them with the same settled
+    // tail (slice 14b, F9)
+    const tails = new Set(parts.map((p) => p.row.tail));
+    tails.add(this.gate);
+    const result = Promise.all(tails).then(async (): Promise<R | null> => {
       if (checked.some((p) => p.n <= p.row.cutThrough)) return null;
       const outcome = await send((id) => {
         const p = checked.find((x) => x.id === id);
@@ -117,7 +121,8 @@ export class RowSaves {
       } else if (outcome.code && CUTS.has(outcome.code)) for (const p of checked) p.row.cutThrough = p.row.started;
       return outcome;
     });
-    for (const p of parts) p.row.tail = quiet(result);
+    const settled = quiet(result);
+    for (const p of parts) p.row.tail = settled;
     return result;
   }
 

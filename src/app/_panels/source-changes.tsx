@@ -29,6 +29,7 @@ import type { ChangeOutcome } from "@/domain/commands/source-change";
 import type { Uuid } from "@/domain/ids";
 import { actionsFor, approveAllPlan, movePlan, moveTargets, type ChangeActionRows } from "@/domain/source-changes/actions";
 import { coverageChangeText } from "@/domain/source-changes/coverage";
+import { mappingRowIds, tableRowIds } from "@/domain/source-changes/held";
 import type { SourceDeleteImpact } from "@/domain/source-changes/delete";
 import { byPriority, isOpen } from "@/domain/source-changes/rules";
 import {
@@ -172,18 +173,38 @@ const DIRECT: Partial<Record<SourceChangeAction, (workspaceId: string, input: { 
   acknowledge: acknowledgeChangeAction,
 };
 
+/**
+ * Runs a change's action on the save chain (slice 14b, O4): the change's own row checked, and held the rows the change
+ * names (`held.ts`: its tables with their columns, mappings and inputs; approve all: its mappings), so the panels' saves
+ * of those rows started meanwhile wait for its answer and send the versions it brings; a refusal does not cut them (F3).
+ */
+function useChangeRun() {
+  const { saveRows, pending } = useAction();
+  const send = <T,>(held: readonly Uuid[], checked: { id: Uuid; shown: number } | null, action: (version: number) => Promise<ActionResult<T>>, success: (value: T) => string) => {
+    const rows = held.map((id) => ({ id }));
+    return saveRows(checked ? [checked, ...rows] : rows, (versionOf) => action(checked ? versionOf(checked.id) : 0), success, { undoable: true });
+  };
+  return { send, pending };
+}
+
 function ChangeCard({ change: c, keys }: { change: SourceChange; keys: ReadonlyMap<string, ReadonlySet<string>> }) {
   const p = usePanel();
   const rows = useChangeRows();
-  const { run, pending } = useAction();
+  const { send, pending } = useChangeRun();
   const [form, setForm] = useState<Form | null>(null);
-  const ref = { changeId: c.id, expectedVersion: c.version };
+  // the change's table (a column's table) and, for a move, its target column's table
+  const tablesOf = (...columnIds: (Uuid | null | undefined)[]) => [c.source_table_id, ...columnIds.map((id) => (id ? p.ix.column.get(id)?.source_table_id : null))].filter((t): t is Uuid => !!t);
+  const run = (action: (ref: { changeId: Uuid; expectedVersion: number }) => Promise<ActionResult<ChangeOutcome>>, alsoColumn?: Uuid) => {
+    const model = { columns: p.ix.model.sourceColumns, mappingInputs: p.ix.model.mappingInputs };
+    const held = [...tableRowIds(model, tablesOf(c.source_column_id, alsoColumn)), ...mappingRowIds(model, c.mapping_id ? [c.mapping_id] : [])];
+    return send(held, { id: c.id, shown: c.version }, (v) => action({ changeId: c.id, expectedVersion: v }), toastText);
+  };
   // approving again and leaving in review answer a review (reviewers too); the rest edits the model (F22)
   const acts = actionsFor(rows, c).filter((a) => (a === "approve" || a === "leave" ? p.canSetStatus : p.editable));
   const act = (a: SourceChangeAction) => {
     if (FORMS.has(a)) return setForm(a as Form);
     const call = DIRECT[a];
-    if (call) void run(() => call(p.workspaceId, ref), toastText, { undoable: true });
+    if (call) void run((ref) => call(p.workspaceId, ref));
   };
   const finish = (r: ActionResult<ChangeOutcome>) => {
     if (r.ok) setForm(null);
@@ -228,15 +249,15 @@ function ChangeCard({ change: c, keys }: { change: SourceChange; keys: ReadonlyM
         {c.detail}
       </p>
       <Impact change={c} keys={keys} />
-      {form === "move" && <MoveForm change={c} rows={rows} onCancel={() => setForm(null)} onMove={(targetColumnId) => void run(() => moveChangeMappingsAction(p.workspaceId, { ...ref, targetColumnId }), toastText, { undoable: true }).then(finish)} pending={pending} />}
-      {form === "map" && <MapForm change={c} onCancel={() => setForm(null)} onMap={(attributeId) => void run(() => mapChangeColumnAction(p.workspaceId, { ...ref, attributeId }), toastText, { undoable: true }).then(finish)} pending={pending} />}
+      {form === "move" && <MoveForm change={c} rows={rows} onCancel={() => setForm(null)} onMove={(targetColumnId) => void run((ref) => moveChangeMappingsAction(p.workspaceId, { ...ref, targetColumnId }), targetColumnId).then(finish)} pending={pending} />}
+      {form === "map" && <MapForm change={c} onCancel={() => setForm(null)} onMap={(attributeId) => void run((ref) => mapChangeColumnAction(p.workspaceId, { ...ref, attributeId })).then(finish)} pending={pending} />}
       {form === "delete" && (
         <SourceDeleteForm
           target={c.kind === "table_left" ? { tableId: c.source_table_id! } : { columnId: c.source_column_id! }}
           retireHint
           pending={pending}
           onCancel={() => setForm(null)}
-          onDelete={() => void run(() => deleteChangeObjectAction(p.workspaceId, ref), toastText, { undoable: true }).then(finish)}
+          onDelete={() => void run((ref) => deleteChangeObjectAction(p.workspaceId, ref)).then(finish)}
         />
       )}
       {!form && acts.length > 0 && (
@@ -463,7 +484,7 @@ export function SourceDeleteForm({
 export function ApproveAgainAll({ importId }: { importId: Uuid }) {
   const p = usePanel();
   const rows = useChangeRows();
-  const { run, pending } = useAction();
+  const { send, pending } = useChangeRun();
   const [open, setOpen] = useState(false);
   // the plan reads only the four-eyes switch of the workspace; the server plans again from its own data
   const plan = useMemo(
@@ -520,7 +541,7 @@ export function ApproveAgainAll({ importId }: { importId: Uuid }) {
         disabled={pending || !n}
         onCancel={() => setOpen(false)}
         onGo={() =>
-          void run(() => approveImportAgainAction(p.workspaceId, { importId, count: n }), toastText, { undoable: true }).then((r) => {
+          void send(mappingRowIds(p.ix.model, plan.approve.map((e) => e.mapping.id)), null, () => approveImportAgainAction(p.workspaceId, { importId, count: n }), toastText).then((r) => {
             if (r.ok) setOpen(false);
           })
         }
