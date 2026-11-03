@@ -1,7 +1,7 @@
 // S14A-13's drawing layers (slice 14a, step 4; measurement build only, MEASURE=1 MEASURE_BUILD=production after
 // `npm run measure:build`): 20 notes on the demo canvas ("Customer & orders", test data in the e2e data file), read with
 // CDP's LayerTree as S11-13 does, three times in one view: without a mark, with the "Not saved" mark on all 20 (20 real
-// refusals: Anna changed each note's text, then this page wrote each one on the canvas; no test hook), and again without
+// refusals: Anna changed each note's text just before this page wrote it on the canvas; no test hook), and again without
 // it after Escape dropped each draft. Results in test-results/S14A-13-layers.json.
 //
 //   MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-14a/S14A-13-layers.spec.ts
@@ -78,12 +78,12 @@ test("S14A-13 layers: 20 notes without the mark, with it (20 real refusals), and
   await page.waitForTimeout(1500);
   const without = await layers(page);
 
+  // Anna changes each note just before this page writes it: a refusal's fresh page brings the newest versions of every
+  // note, so a change made earlier for all of them would be refused only once
   for (const id of ids) {
     const st = await state();
     const n = st.notes.find((x) => x.id === id)!;
     await asUser(SEED_IDS.userAnna, (ctx, access) => updateNote(ctx, access, st, { noteId: id, expectedVersion: n.version, text: `Anna's text for ${n.body_text}` }));
-  }
-  for (const id of ids) {
     await editNote(page, id);
     await page.getByTestId("input-note-text").fill("Mine, refused.");
     await page.keyboard.press("Control+Enter");
@@ -91,6 +91,8 @@ test("S14A-13 layers: 20 notes without the mark, with it (20 real refusals), and
   }
   await page.keyboard.press("Escape");
   await page.mouse.move(2, 400);
+  // the refusals' toasts are layers of their own above the page: read once they are gone
+  await expect(page.locator(`[data-testid="toast"][data-visible="true"]`)).toHaveCount(0, { timeout: 30_000 });
   await page.waitForTimeout(2500);
   const marked = await layers(page);
 
@@ -101,6 +103,7 @@ test("S14A-13 layers: 20 notes without the mark, with it (20 real refusals), and
   }
   await page.keyboard.press("Escape");
   await page.mouse.move(2, 400);
+  await expect(page.locator(`[data-testid="toast"][data-visible="true"]`)).toHaveCount(0, { timeout: 30_000 });
   await page.waitForTimeout(2500);
   const again = await layers(page);
 

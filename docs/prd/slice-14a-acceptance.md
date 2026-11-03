@@ -508,3 +508,76 @@ each row reads only its own note's draft, so typing never redraws a whole list a
 - **S14A-04** extended: with a refused draft the canvas's overview list (nothing selected) and the selection's list
   (the note and a card) show the draft with "Not saved", and after "Keep mine" the overview's row shows it without.
   **S14A-10** extended: the pinned note's card panel ("Notes") shows the draft with "Not saved".
+
+## Step 4: measurements (S14A-13; 3 November 2026)
+
+**Builds:** this branch at `4c5f3d5` (step 3 with N4's lists) and the tag `slice-13` (`3befbf0`) in a worktree
+(`../infomapper-ab-13`, its own `npm ci`, removed after the reading). Commits are counted on each side's e2e dev server
+(the counter exists only in development); the element guard and the LayerTree read run on this branch's measurement
+build (`npm run measure:build`, `MEASURE=1 MEASURE_BUILD=production`). The machine is the reference laptop (AD-24).
+
+### Canvas commits, A/B (`e2e/slice-14a/S14A-13-commits.spec.ts`, `COMMITS=1`, the same file on both sides)
+
+The demo canvas, its free note; each phase read once the counter settles. Two runs per side (the branch first, then
+slice 13); both runs of a side gave the same numbers.
+
+| Phase | slice 13 | branch |
+| --- | --- | --- |
+| Double-click to edit | 4 | 4 |
+| Typing 20 characters (one line) | **0** | **0** |
+| Leaving the editor, the save stored | 5 | **4** |
+| Leaving the editor, the save refused (the toast, the fresh page; on the branch the draft and its mark) | 9 | **6** |
+| Escape, then the mark clicked (the note selected, its panel open) | — | 2 |
+| "Use this" in the panel | — | **0** |
+| A refusal answered while nothing is selected and the overview lists the note (its answer held, Escape, then released) | 6 | **4** |
+
+- **Typing adds nothing** on either side. A new line adds one commit on both, by the note's measured height
+  (`onHeight`, since slice 3a; step 3's first quick check).
+- **The stored save costs one commit less** (5 → 4): the text is no longer written into the note's data before it is
+  stored (the draft shows it), so that commit is gone; the answer's `setNotes` stays.
+- **A refusal costs three fewer** (9 → 6): no optimistic text, no rollback; the draft and its mark change only the
+  note's box and the list rows (the store), not the canvas. The rest is the fresh page.
+- **The mark's click is 2** (Escape's deselection and the click's selection: a selection is a canvas commit); "Use this"
+  is 0. **Under the overview's list** the refusal is 4 against 6: the list's row reads the draft by itself (`NoteRow`).
+- **Bar met:** no phase adds commits beyond what slice 13's note save adds; three phases have fewer.
+
+### Element guard (`S3B-15-elements.spec.ts`, `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json`)
+
+| View | Page | Viewport | `slice-08.json` | slice 13's page |
+| --- | --- | --- | --- | --- |
+| 30 %, expanded | 5,999 | 4,508 | 5,994 / 4,508 | 5,999 |
+| 100 %, expanded | 20,796 | 19,305 | 20,791 / 19,305 | 20,796 |
+| 30 %, collapsed | 2,866 | 1,465 | 2,861 / 1,465 | 2,866 |
+| 100 %, collapsed | 6,308 | 4,907 | 6,303 / 4,907 | 6,308 |
+
+**Passed:** the viewport counts equal slice 8's, and the page totals equal slice 13's (no new element, no new script
+chunk on "Performance test", which has no refused draft).
+
+### Drawing layers (`e2e/slice-14a/S14A-13-layers.spec.ts`, measurement build)
+
+20 free notes on "Customer & orders" (test data in the e2e data file), at 60 %, all in the view. Three reads in one
+sitting: without a mark; with the mark on all 20 (20 real refusals: Anna changed each note just before this page wrote
+it on the canvas, no test hook); and again without it, after Escape dropped each draft. Two runs, the same numbers:
+
+| Read | Drawing layers | Megapixels | Viewport elements | Marks |
+| --- | --- | --- | --- | --- |
+| Without the mark | 13 | 5.2 | 769 | 0 |
+| With the mark (20 refused drafts) | **13** | 5.2 | 789 | 20 |
+| Without it again | 13 | 5.3 | 769 | 0 |
+
+- **No drawing layer more:** the mark is one element per refused note (+20), painted with the note.
+- A first run read 14 layers with the marks: the last refusal's toast was still showing (a layer of its own above the
+  page, outside the canvas). The spec now waits until no toast is visible before each read.
+- **Pan and zoom were not measured**, as the LayerTree read shows no change (PRD section 6, N7).
+
+### AD-24 (proposed sentence, for your approval)
+
+"A refused note's draft (slice 14a) adds one element to that note only, its "Not saved" mark in the header, and no
+drawing layer (20 marked notes in view: 13 layers, as without them); the draft lives outside React's state, so a mark
+or "Use this" adds no canvas commit, and a note's save costs one commit less than before (4 against 5, a refusal 6
+against 9)."
+
+### Other
+
+- `S14A-13-layers.spec.ts` is ignored outside the measurement build (`playwright.config.ts`, as S11-13).
+- Results: `test-results/S14A-13-commits-<side>.json`, `test-results/S14A-13-layers.json` (git-ignored).
