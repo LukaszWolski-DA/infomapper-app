@@ -1,6 +1,6 @@
 # Slice 14b – The canvas's own row on the save chain, the change-to-resolve actions, and leaving a page with a draft
 
-Status: **proposal for step 1.** Branch `slice/14b-canvas-row-and-leaving`, from `main` at tag `slice-14a` (`797dd62`, assumption A1). PRD file: `docs/prd/slice-14b-canvas-row-and-leaving.md`; step 1 writes `docs/prd/slice-14b-acceptance.md`.
+Status: **step 1 answered** (Łukasz, 3 November 2026; `docs/prd/slice-14b-acceptance.md`, "Łukasz's answers to step 1"). This PRD is updated to the answers; the copy from `~/Downloads` is commit `4b819c6`. Branch `slice/14b-canvas-row-and-leaving`, from `main` at tag `slice-14a` (`797dd62`, assumption A1). PRD file: `docs/prd/slice-14b-canvas-row-and-leaving.md`; step 1 writes `docs/prd/slice-14b-acceptance.md`.
 
 Test regime: a small slice (CLAUDE.md, "Testing"), with one full e2e run, in four parts, at the closing (O8). Step 1 checks this PRD against the code (CLAUDE.md, "How we work").
 
@@ -27,15 +27,15 @@ Slices 13 and 14a made every field and note keep what a person typed (D-66). Fou
 
 **Agreed with Łukasz on 3 November 2026 (O1–O8):**
 
-- **O1. One newest version for the canvas's row.** Its writes go on the save chain (`rowSaves`) keyed on the canvas's row: the look, the names switch, the rename and the delete. Each hands its answer's version to the chain, so none is refused because of another.
-- **O2. A conflict on a canvas's rename** keeps the typed name in the tab's field and shows slice 13's line in a small form under the tab ("Changed meanwhile to: …" with "Use this" and "Keep mine"; Escape is "Use this").
+- **O1. One newest version for the canvas's row.** Its writes go on the save chain (`rowSaves`) keyed on the canvas's row: the look (of the open canvas and of any canvas from its tab menu), "Use this look on all canvases", the rename and the delete send the chain's newest version; the names switch, which sends no version of the canvas row (slice 11, F2), holds the row on the chain while it is on its way. Each hands its answer's versions to the chain, so none is refused because of another. A label's rename and delete, which write its live canvas on the server, answer with the versions they wrote (step 1, F1, F2, answers 4 and 6).
+- **O2. A conflict on a canvas's rename** keeps the typed name in the tab's field and shows slice 13's line in a compact form **inside the tab, on one row after the field** ("Changed meanwhile to: …" with "Use this" and "Keep mine"; Escape is "Use this"). No popover: the tab bar clips anything below a tab (step 1, F4, answer 1).
 - **O3. The look after a refusal** shows the newest stored value with the toast, as choice fields do (D-66).
-- **O4. The change-to-resolve actions hold the panel saves** of their source's tables, columns and mappings while they are on their way. Those saves are sent after the answer with the new versions. The browser cannot know which rows an action writes, but it knows the source, so the whole source is held.
+- **O4. The change-to-resolve actions hold the panel saves** of their source's tables, columns and mappings while they are on their way. Those saves are sent after the answer with the new versions. The browser cannot know which rows an action writes, but it knows the source, so the whole source is held (bar: under 20 ms per action on 20,000 columns; only if it fails, the rows the change names). A refusal cuts only the rows whose version was sent, not the held ones; this changes slice 10a's held rows too, deliberately (step 1, F3, F8, F9, answers 2 and 3).
 - **O5. The page warns before it is left** (reload, closed tab, another site) when it has:
   - a refused draft (a conflict line or "Not saved");
   - a note's draft not yet saved;
   - a save on its way;
-  - a focused field with typed text not yet sent.
+  - a focused field with typed text not yet sent: fields that save a row, the canvas's note editor and the rich-text dialog; not the search boxes, the zoom, fields that create something, the import wizard, the sign-in and people forms (step 1, F11, answer 5).
 - **O6. Only the browser's own warning** (`beforeunload`, its fixed text). Navigation inside the app (links, breadcrumbs, the project switcher, Back and Forward between the app's pages) gives no warning; it becomes a known limitation.
 - **O7. The full e2e run in four parts,** as its first change (`PART_STARTS`), checked in the closing's run.
 - **O8. A small slice:** one full run at the closing; no canvas measurement beyond the element check, as nothing new is drawn on the canvas.
@@ -73,17 +73,19 @@ Texts in quotes come from slices 13 and 14a. This slice adds no new user-facing 
 
 ### The e2e run (step 2, first)
 
-1. **Four parts.** `PART_STARTS` gets one more cut, chosen from slice 14a's closing memory log so that each part ends at a similar heap. Step 1 proposes the cuts. `npm run e2e` runs all four; `--part 4` runs one.
+1. **Four parts.** `PART_STARTS = ["slice-03a", "slice-07a", "slice-10a"]`, chosen from slice 14a's closing memory log so that each part ends at a similar heap (step 1, Q7, answer 9), with a unit test of `partFolders`. `npm run e2e` runs all four; `--part 4` runs one.
 
 ### The canvas's row (step 2)
 
-2. **One chain for the canvas's row (O1).** The look, the names switch, the rename and the delete save through `rowSaves` keyed on the canvas's row:
+2. **One chain for the canvas's row (O1).** The look, "Use this look on all canvases", the names switch, the rename and the delete save through `rowSaves` keyed on the canvas's row:
    - they wait for each other as any saves of one row do;
-   - each sends the newest version the chain knows and hands its answer's version back;
-   - a fresh page's version reaches the chain as for any row.
+   - the look, the rename and the delete send the newest version the chain knows; "look-all" holds the project's canvases (it sends no version) and answers with every version it wrote; the names switch stays on the canvas's queue for its cards and holds the canvas row on the chain while it is on its way;
+   - each hands its answer's versions back; a fresh page's version reaches the chain as for any row;
+   - a label's rename and delete answer with the versions they wrote (its live canvas).
 
-   The look stays outside undo (D-12); the names switch and the rename keep their undo steps as today. Step 1 says how the look's own queue and `noteVersion` fold into this (Q1).
-3. **The delete from the canvas's menu** sends the chain's version. Its refusals (the project's last canvas, D-28; a shared canvas) are unchanged.
+   The look's own queue, its version and `noteVersion` go (step 1, Q1). The look stays outside undo (D-12); the names switch and the rename keep their undo steps as today.
+2a. **The cut rule (step 1, F3).** A cutting refusal of a write over several rows cuts the waiting saves of the rows whose version it sent, not of the rows it only held. A deliberate change of slice 10a's behaviour: after a refused move of an attribute, a save of a renumbered sibling waiting behind it is sent with the newest version known instead of being cut.
+3. **The delete from the canvas's menu** sends the chain's version; only a delete that deletes the canvas cuts the row's saves waiting behind it (not "Remove from this project", step 1, F6). Its refusals (the project's last canvas, D-28; a shared canvas) are unchanged.
 
 ### A canvas's rename in its tab (step 3)
 
@@ -93,8 +95,9 @@ Texts in quotes come from slices 13 and 14a. This slice adds no new user-facing 
    - **permission or archive:** the field is read-only and the name stays selectable ("Not saved. You can still copy it.");
    - **locked:** the name stays editable with "Not saved";
    - **not found:** the canvas is gone, and the page goes where D-38 says;
-   - **an empty name** goes back to the stored name (D-59's rule).
-5. **The line's form.** The same component as slice 13's line, in a compact popover under the tab, not a new design. Nothing on the canvas changes, and no layout is read: the popover is placed by CSS under the tab.
+   - **an empty name** goes back to the stored name with the toast "Enter a name." (D-59's rule, as the settings and the requirement panel since slice 13; answer 7).
+5. **The line's form.** The same component as slice 13's line (`DraftLine`) in a compact variant: inside the tab, on one row after the field, the other name truncated with its full text in the title, the panels' small buttons. Not a new design, no popover. Nothing on the canvas changes, and no layout is read (step 1, F4, answer 1).
+5a. **The concept's rename in the tree** (F13): if the compact line fits its field at a small cost, it gets it in step 3; if not, a note in `docs/ideas.md`. Step 3's summary says which and why (answer 8).
 
 ### The look (step 3)
 
@@ -102,7 +105,7 @@ Texts in quotes come from slices 13 and 14a. This slice adds no new user-facing 
 
 ### The change-to-resolve actions (step 3)
 
-7. **Holding the source's rows (O4).** While a change-to-resolve action is on its way, the panel saves of the tables, columns and mappings of that action's source wait. They are sent after the answer, with the versions the answer brings (`rowSaves.answer`). A person typing meanwhile notices nothing: the field keeps its draft (D-66) and saves when the hold ends. Saves of other sources and other objects are not held.
+7. **Holding the source's rows (O4).** While a change-to-resolve action is on its way, the panel saves of the tables, columns, mappings and mapping inputs of that action's source wait (the change's own row is checked: its version comes from the chain). They are sent after the answer, with the versions the answer brings (`rowSaves.answer`). A person typing meanwhile notices nothing: the field keeps its draft (D-66) and saves when the hold ends. Saves of other sources and other objects are not held.
 
 ### Leaving a page with a draft (step 4)
 
@@ -129,7 +132,7 @@ Texts in quotes come from slices 13 and 14a. This slice adds no new user-facing 
 Stop after each step with a short summary of what changed and how to check it. Wait for Łukasz before the next. A new Claude Code session may start at a step's boundary, never inside a step; it starts by reading CLAUDE.md, this PRD and `slice-14b-acceptance.md`.
 
 1. **Critical review** (section 7). Check every item, decision and criterion against the code, `docs/decisions.md` and the earlier slices' acceptance docs. Answer Q1–Q8 in `docs/prd/slice-14b-acceptance.md`, with the e2e cuts proposed, any text the slice must add, and the earlier specs that change. No application code. Stop.
-2. **The e2e parts and the canvas's row** (items 1–3): the fourth part (configuration only); the canvas's row on the chain. Unit tests, specs S14B-01 to S14B-03 and S14B-11, the earlier specs of the canvas's tabs, menu, look and names switch (Q7), and CI. Stop.
+2. **The e2e parts and the canvas's row** (items 1–3): the fourth part (configuration and its unit test); the cut rule (2a); the canvas's row on the chain. Unit tests, specs S14B-01 to S14B-03 and S14B-11, the earlier specs of the canvas's tabs, menu, look and names switch (Q7), and CI. Stop.
 3. **The rename, the look and the change-to-resolve actions** (items 4–7). Specs S14B-04 to S14B-08, the earlier specs of source changes (Q7), and CI. Screenshots: a tab with the conflict line, with "Not saved", read-only; light and dark. Stop.
 4. **Leaving a page** (items 8–9). Spec S14B-09 and CI. Stop.
 5. **Closing:**
@@ -152,7 +155,7 @@ Tests in `e2e/slice-14b/`, one file per criterion, each from a fresh seed; unit 
 | S14B-02 | **Rename after the names switch.** Switch the names to aliases, then at once rename the canvas: stored, no conflict. |
 | S14B-03 | **Delete after the look.** In a project with two canvases, change a canvas's background and at once delete it from its menu: deleted, no refusal. The last canvas's refusal is unchanged. |
 | S14B-04 | **A real conflict on a rename.** Two sessions rename one canvas; the second's is refused: its tab's field keeps the typed name with the line under the tab. "Keep mine" stores it (an undo step); in a repeat, "Use this" (and Escape) shows the first's name and stores nothing. |
-| S14B-05 | **"Not saved" on a rename.** Another session changes only the canvas's look; a rename sent with the older version is refused as stale: the tab shows "Not saved", and leaving the field again stores it. (If item 2 makes this impossible within one session, step 1 says how the spec makes it happen.) |
+| S14B-05 | **"Not saved" on a rename.** Another session changes only the canvas's look (through the domain: within one session item 2 makes it impossible, step 1, F15); a rename sent with the older version is refused as stale: the tab shows "Not saved", and leaving the field again stores it. |
 | S14B-06 | **Read-only and locked.** A rename refused because the workspace was archived meanwhile keeps the typed name read-only and selectable; a `locked` refusal keeps it editable with "Not saved". |
 | S14B-07 | **The look's refusal.** A grid switch refused (archived meanwhile) shows the stored grid with the toast. |
 | S14B-08 | **The change-to-resolve actions.** With an action's answer held, type into a note of a column of the same source and leave the field: nothing is sent; after the answer the note is stored with no conflict and no "Not saved". A save of another source's column in the same time is not held. |
@@ -206,14 +209,15 @@ The slice draws nothing new on the canvas. The tab's line is a popover in the to
 - **A warning on navigation inside the app** (O6's alternative).
 - **Drafts kept across a reload** in the browser's storage (`docs/ideas.md`).
 - **A field-level merge** of two texts.
+- **The import wizard's progress across a reload** (answer 5, `docs/ideas.md`).
 
 ## 10. Decisions to accept, and docs in this PR
 
 ### D-66 (addition, proposal)
 
 "The canvas's own row follows the same rule (slice 14b):
-- its look, the names switch, a rename in its tab and its delete save on one chain with one newest version, so none is refused because of another;
-- a refused rename keeps the typed name in the tab, with the conflict line under it;
+- its look, "Use this look on all canvases", the names switch, a rename in its tab and its delete save on one chain, so none is refused because of another;
+- a refused rename keeps the typed name in the tab, with the conflict line inside the tab after the field; an empty name goes back with "Enter a name.";
 - the look after a refusal shows the newest stored value.
 
 While a change-to-resolve action is on its way, the panel saves of its source's tables, columns and mappings wait for its answer. A page with unsaved text (a refused draft, a note's draft, a save on its way, a focused field with typed text) asks the browser to warn before it is left; navigation inside the app does not warn."

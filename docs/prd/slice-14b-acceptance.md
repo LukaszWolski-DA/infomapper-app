@@ -236,3 +236,36 @@ stays silent as today (Question 7).
 7. **An empty canvas name:** back to the stored name silently as today (recommended), or with "Enter a name."?
 8. **The concept's rename in the tree (F17):** leave it as F13 made it, and note the line for it in `docs/ideas.md`?
 9. **The four parts:** `["slice-03a", "slice-07a", "slice-10a"]`?
+
+## Łukasz's answers to step 1 (3 November 2026)
+
+1. **The tab's line (F4):** inside the tab, on one row after the field, with slice 13's texts; no popover.
+2. **The cut rule (F3):** a refusal cuts only the checked rows' waiting saves, also for slice 10a's held rows. This is a
+   **deliberate change of slice 10a's behaviour.** Example: a person moves the attribute "Email" up in Customer while a
+   save of its sibling "Phone"'s definition waits behind the move (the move renumbers "Phone", so it holds it). Until
+   slice 14a, a move refused as stale also cut the "Phone" save, which came back as cut ("Not saved" since slice 13)
+   though nobody had changed "Phone". From slice 14b the "Phone" save is sent after the refusal with the newest version
+   known and is stored, or refused on its own if "Phone" did change. Only the rows whose version a write sent (its
+   checked rows) are cut by its refusal.
+3. **The source hold (F8, F9):** the whole source; bar under 20 ms per action on 20,000 columns; the narrow hold only if
+   the bar fails.
+4. **The writers the PRD missed (F1):** "Use this look on all canvases" and the live canvas's writes on a label's rename
+   and delete are in this slice (the chain, or answers with `{ versions: true }`).
+5. **The fields that count (F11):** as proposed. The import wizard as an idea in `docs/ideas.md` (its progress is lost on
+   a reload).
+6. **The names switch (F2):** it holds the canvas row on the chain while on its way; `noteVersion` goes; D-66's addition
+   reworded.
+7. **An empty canvas name** goes back with the toast "Enter a name.", as the settings and the requirement panel since
+   slice 13. Checked: an empty **project** name is not silent either: its home's field goes back with "A project needs a
+   name." (`PROJECT_NAME_REQUIRED`, D-59's own text, `project-heading.tsx`, the domain's message too). So no field is
+   silent after this slice and nothing more needs unifying for the behaviour; the texts differ only in that D-59 names
+   the project. Left as D-59 says (changing it would change an accepted decision's text and S9's specs); if wanted
+   later, "Enter a name." everywhere is a one-line change, noted in `docs/ideas.md`.
+8. **The concept's rename in the tree (F17):** if the tab's compact line fits the tree's field at a small cost, step 3
+   adds it; if not, a note in `docs/ideas.md`. Step 3's summary says which and why.
+9. **The four parts:** `PART_STARTS = ["slice-03a", "slice-07a", "slice-10a"]`.
+
+Also agreed: `S13-14` changes (it accepts the warning before its reload), and S14B-05 changes the look as a second
+session through the domain.
+
+The PRD is updated to these answers (status "step 1 answered").

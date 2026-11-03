@@ -67,6 +67,13 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 - **A warning when leaving a page with a draft not saved** (`beforeunload`): in 14b's plan.
 - **A field-level merge** of two texts, showing the differences, beyond "Use this" and "Keep mine".
 - **Drafts kept across a reload,** in the browser's storage (slice 13 keeps them in the page's memory only, answer 7).
+- **The import wizard's progress across a reload** (slice 14b, step 1 answer 5): a reload or a closed tab in the middle
+  of the wizard loses the file, the choices and the review, and slice 14b's warning on leaving does not cover the wizard
+  (it is not a field that saves a row). Either the wizard joins the warning while it has a file, or its state is kept for
+  the tab.
+- **One text for an empty required name** (slice 14b, step 1 answer 7): canvases, settings and requirements say "Enter a
+  name.", a project says "A project needs a name." (D-59). One text everywhere would be a one-line change in
+  `src/domain/commands/project.ts` and D-59's wording, with slice 9's specs.
 
 ## Aliases: what comes later (slice 11, PRD section 9)
 
