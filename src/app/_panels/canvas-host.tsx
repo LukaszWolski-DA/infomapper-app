@@ -262,6 +262,7 @@ export function useCanvasHost({
         openDetails();
         panels.setNameFocus(frameId);
       },
+      openDetails,
     });
     return () => ui.registerHost(null);
   }, [ui, columns.dropColumn, createEntityAt, relate, moveAttribute, editable, deleteLine, panels, openDetails]);

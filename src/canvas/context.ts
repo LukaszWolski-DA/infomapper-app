@@ -8,6 +8,7 @@ import type { TraceTarget } from "@/domain/model/requirements";
 import type { ArrangeMode } from "./arrange";
 import type { FrameData, FrameStats } from "./frame-data";
 import type { NoteData } from "./note-data";
+import { NO_NOTE_DRAFTS, type NoteDrafts } from "./note-drafts";
 import type { Selection } from "./line-data";
 import type { CanvasSave } from "./save-cuts";
 import type { Bundle } from "./line-geometry";
@@ -184,6 +185,8 @@ export interface CanvasHandle {
   editNote: (noteId: Uuid) => void;
   /** Changes a note's text, colour, status or width; saved at once, one undo step each; resolves whether it was saved (slice 14a). */
   updateNote: (noteId: Uuid, patch: NotePatch) => Promise<CanvasSave | undefined>;
+  /** The notes' text drafts (slice 14a), which the note panel's text field adopts. */
+  noteDrafts: () => NoteDrafts;
   pinNote: (noteId: Uuid, pin: { cardId: Uuid } | { frameId: Uuid }) => void;
   unpinNote: (noteId: Uuid) => void;
   /** Deletes a note; the toast offers Undo. */
@@ -330,6 +333,8 @@ export interface CanvasHost {
   deleteLine: (line: { t: "map" | "rel"; id: Uuid }) => void;
   /** A frame was just made (slice 2b): its name is ready to type in the right panel. */
   frameCreated: (frameId: Uuid) => void;
+  /** Shows the details panel (slice 14a: a note's "Not saved" mark leads there on purpose). */
+  openDetails: () => void;
 }
 
 /** The page's undo (slice 1b), for the canvas's own toasts and for card changes saved without a fresh page. */
@@ -424,6 +429,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   newNote: noop,
   editNote: noop,
   updateNote: () => Promise.resolve(undefined),
+  noteDrafts: () => NO_NOTE_DRAFTS,
   pinNote: noop,
   unpinNote: noop,
   deleteNote: noop,

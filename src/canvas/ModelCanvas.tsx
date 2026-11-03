@@ -1898,6 +1898,7 @@ export function ModelCanvas({
       newNote: noteState.newNote,
       editNote: noteState.edit,
       updateNote: noteState.update,
+      noteDrafts: () => noteState.drafts,
       pinNote: noteState.pin,
       unpinNote: noteState.unpin,
       deleteNote: noteState.remove,
@@ -1953,7 +1954,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, noteState.drafts, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store
@@ -2185,6 +2186,14 @@ export function ModelCanvas({
     [saveLayout, onGroupDragStop],
   );
 
+  /** A note's "Not saved" mark (slice 14a): the note selected and its panel open, where the conflict line shows. */
+  const openNoteDraft = useCallback(
+    (id: string) => {
+      select({ t: "note", id });
+      ui.host()?.openDetails();
+    },
+    [select, ui],
+  );
   const toggleNoteStatus = useCallback(
     (id: string) => {
       const n = noteState.noteView(id)?.note;
@@ -2303,6 +2312,8 @@ export function ModelCanvas({
             onCommit={noteState.commit}
             onCancel={noteState.cancel}
             onHeight={noteState.onHeight}
+            drafts={noteState.drafts}
+            onOpenDraft={openNoteDraft}
           />
           <Overview lines={lines} notes={miniNotes} notesDragging={noteState.dragging} />
           {editable && <DropHint store={dropStore} hintRef={hintRef} />}

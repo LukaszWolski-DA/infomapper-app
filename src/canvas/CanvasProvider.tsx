@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { ReactFlowProvider } from "@xyflow/react";
 import { CanvasUiCtx, type CanvasHandle, type CanvasHost, type CanvasMode, type CanvasUiApi, type Notation, type UndoHooks } from "./context";
 import type { Selection } from "./line-data";
+import { NO_NOTE_DRAFTS } from "./note-drafts";
 
 const OVERVIEW_KEY = "infomapper:overview";
 const NOTATION_KEY = "infomapper:notation";
@@ -130,6 +131,7 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       newNote: (where) => handle.current?.newNote(where),
       editNote: (noteId) => handle.current?.editNote(noteId),
       updateNote: (noteId, patch) => handle.current?.updateNote(noteId, patch) ?? Promise.resolve(undefined),
+      noteDrafts: () => handle.current?.noteDrafts() ?? NO_NOTE_DRAFTS,
       pinNote: (noteId, pin) => handle.current?.pinNote(noteId, pin),
       unpinNote: (noteId) => handle.current?.unpinNote(noteId),
       deleteNote: (noteId) => handle.current?.deleteNote(noteId),
