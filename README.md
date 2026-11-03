@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 12b are merged (slice 12b, thumbnails on the canvas tiles: tag `slice-12b`), and so is the e2e reliability chore; slice 13 (one behaviour for a field's save: nothing typed is lost) is complete on its branch `slice/13-field-saves` and awaits Łukasz's acceptance. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 13 are merged (slice 13, one behaviour for a field's save: nothing typed is lost: tag `slice-13`), and so is the e2e reliability chore. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a

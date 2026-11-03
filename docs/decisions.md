@@ -108,7 +108,7 @@ Behaviour reference: `docs/prototype/infomapper-prototype-with-sources.html`. Da
   - a deleted object takes its drafts with it;
   - a draft refused as its panel closes stays in the page's memory, never in the browser's storage: a toast says so ("Not saved: {field} of {object}. Open it again to see your text."), it comes back with its mark when a panel of that object opens again on the same page, and it is gone when the page is left or reloaded.
 
-  Escape in a text field puts the stored value back; while a conflict line shows, it is "Use this". An empty required name goes back to the stored name (D-59). Choice fields (selects, segmented buttons, flags, check boxes) keep no draft: after a refusal they show the newest stored value, with the toast. Notes and frames keep their canvas queue: a note's text still rolls back after a refusal (slice 14a). The workspace settings, the requirement panel and the working label's panel no longer go back on a refusal. The conflict toast is "Someone changed this meanwhile.". Proposed at slice 13's closing (2 November 2026), for Łukasz's acceptance.
+  Escape in a text field puts the stored value back; while a conflict line shows, it is "Use this". An empty required name goes back to the stored name (D-59). Choice fields (selects, segmented buttons, flags, check boxes) keep no draft: after a refusal they show the newest stored value, with the toast. Notes and frames keep their canvas queue: a note's text still rolls back after a refusal (slice 14a). The workspace settings, the requirement panel and the working label's panel no longer go back on a refusal. The conflict toast is "Someone changed this meanwhile.". Accepted by Łukasz, 3 November 2026 (the day slice 13 was merged).
 
 
 ### Way of working

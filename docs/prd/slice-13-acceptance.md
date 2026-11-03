@@ -1,6 +1,6 @@
 # Slice 13 – acceptance
 
-Status: **step 5 (the closing) done, 3 November 2026; D-66 accepted; waiting for Łukasz's manual acceptance on KB, the merge and the tag.**
+Status: **accepted by Łukasz, 3 November 2026 (manual acceptance on KB passed, D-66 accepted); merged into main through PR 33, tag `slice-13`.**
 
 - Branch `slice/13-field-saves`, made on 1 November 2026 from `main` at `e66cc42` (the start commit,
   `e66cc42c4c1fefd9514f3c9a09cc67c7051136d3`), the merge of PR 32 (chore e2e reliability, merged 1 November 2026,
@@ -866,7 +866,7 @@ card's menu still offered "Paste attribute" after the refusal's toast.
 
 PR 33's GitHub checks on that commit: **check** passed (1 min 53 s), **migrations** passed (1 min 30 s).
 
-D-66 accepted by Łukasz as written (3 November 2026); its acceptance date is set to the merge's day.
+D-66 accepted by Łukasz as written; its acceptance date in `docs/decisions.md` is the merge's day, 3 November 2026. Manual acceptance on KB passed (Łukasz, 3 November 2026).
 
 ## For the closing (Łukasz's request, 1 November 2026): done at the closing
 
