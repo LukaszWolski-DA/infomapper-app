@@ -296,7 +296,7 @@ function readView(canvasId: string): SavedView | null {
 const isTyping = (el: EventTarget | null) =>
   el instanceof HTMLElement && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable);
 
-const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
+const FAILED = { ok: false as const, code: "unexpected", message: "Something went wrong. Nothing was saved." };
 const NO_NAMES: CanvasNames & { version: number } = { entity_names: null, attribute_names: null, version: 0 };
 const CARD_KEY = { entity: "entityNames", attribute: "attributeNames" } as const satisfies Record<NameDimension, keyof CardData>;
 /** A card without its exception in one dimension. */

@@ -14,6 +14,8 @@
 // - Step 4 (item 13): Shift+click puts a note in or out of a selection of several; pressing a note that is part of
 //   such a selection drags the whole selection (`groupDrag`); several notes moved together are saved in one change
 //   (`saveMoves`), or with the cards and frames of the selection through `saveLayout`.
+// - Slice 14a (F2, F3): a note's saves answer `{ ok, code }`; a cutting refusal cuts the note's saves waiting behind it
+//   (`cut`, no toast), and a refusal that brings the fresh page is answered once its notes are merged (`save-cuts.ts`).
 
 import { useCallback, useEffect, useMemo, useRef, useState, type MutableRefObject, type PointerEvent as ReactPointerEvent } from "react";
 import { useReactFlow } from "@xyflow/react";
@@ -24,8 +26,9 @@ import type { NotePatch, NoteView, UndoHooks } from "./context";
 import type { Selection } from "./line-data";
 import { grownVersions, mergeFresh } from "./fresh";
 import { noteAt, type NoteData } from "./note-data";
+import { CUT_SAVE, FreshWaits, PAGE_REFUSALS, SaveCuts, type CanvasSave } from "./save-cuts";
 
-type WriteResult<T> = { ok: true; value: T } | { ok: false; message: string };
+type WriteResult<T> = { ok: true; value: T } | { ok: false; code?: string; message: string };
 type NoteResult = Promise<WriteResult<{ note: NoteData }>>;
 type Pin = { canvasItemId?: Uuid; frameId?: Uuid };
 
@@ -41,7 +44,7 @@ export interface NoteWrites {
   moveNotes: (input: { notes: { noteId: Uuid; expectedVersion: number; x: number; y: number }[] }) => Promise<WriteResult<{ versions: Record<string, number> }>>;
 }
 
-const READ_ONLY = () => Promise.resolve({ ok: false as const, message: "Notes cannot be changed here." });
+const READ_ONLY = () => Promise.resolve({ ok: false as const, code: "forbidden", message: "Notes cannot be changed here." });
 /** A canvas without note writes (read-only use). */
 export const NO_NOTE_WRITES: NoteWrites = {
   createNote: READ_ONLY,
@@ -69,7 +72,7 @@ export const DRAFT_NOTE = "note:draft";
 const CLICK_SLOP = 4;
 /** The Note tool's free note: its corner this far up-left of the click (prototype placeNoteAt). */
 const TOOL_OFFSET = { x: 16, y: 13 };
-const FAILED = { ok: false as const, message: "Something went wrong. Nothing was saved." };
+const FAILED = { ok: false as const, code: "unexpected", message: "Something went wrong. Nothing was saved." };
 const snap8 = (v: number) => Math.round(v / 8) * 8;
 
 const swallowNextClick = () => {
@@ -135,11 +138,15 @@ export function useNotes(o: Options) {
   const { initialNotes, readAt } = o;
   /** Notes deleted here, at the version they had then. */
   const deletedHere = useRef(new Map<Uuid, number>());
+  /** The cutting refusals of the notes' saves, and their answers waiting for the fresh page (slice 14a). */
+  const [cuts] = useState(() => new SaveCuts());
+  const [fresh] = useState(() => new FreshWaits());
   useEffect(() => {
     const pendingOf = (id: Uuid) => pending.current.get(id) ?? 0;
     setNotes((ns) => mergeFresh(ns, initialNotes, { readAt, pendingOf, deletedHere: deletedHere.current }));
     for (const [id, v] of grownVersions(initialNotes, (id) => versions.current.get(id), pendingOf)) versions.current.set(id, v);
-  }, [initialNotes, readAt, pending, versions]);
+    fresh.merged();
+  }, [initialNotes, readAt, pending, versions, fresh]);
 
   const noteOf = useCallback((id: Uuid) => notesRef.current.find((n) => n.id === id) ?? null, []);
   const patch = useCallback((id: Uuid, p: Partial<NoteData>) => {
@@ -152,29 +159,47 @@ export function useNotes(o: Options) {
     setNotes((ns) => ns.map((n) => (patches.has(n.id) ? { ...n, ...patches.get(n.id) } : n)));
   }, []);
 
-  /** Saves one change of a note after its earlier ones; a refusal puts `back` and shows the domain's message. */
+  /**
+   * Saves one change of a note after its earlier ones; a refusal puts `back` and shows the domain's message. A cutting
+   * refusal before it cuts it: `back`, no toast, not sent (slice 14a, F2). Answers `{ ok, code }`; a refusal that brings
+   * the fresh page, once its notes are merged (F3).
+   */
   const save = useCallback(
-    (id: Uuid, run: (version: number) => NoteResult, back: Partial<NoteData>) => {
-      enqueue(id, async () => {
-        let result: WriteResult<{ note: NoteData }>;
-        try {
-          result = await run(versions.current.get(id) ?? noteOf(id)?.version ?? 1);
-        } catch {
-          result = FAILED;
-        }
-        if (!result.ok) {
-          patch(id, back);
-          toast(result.message, "refusal");
-          return;
-        }
-        const fresh = result.value.note;
-        versions.current.set(id, fresh.version);
-        // later changes of this note are still on their way: they show already, keep them
-        if ((pending.current.get(id) ?? 0) <= 1) setNotes((ns) => ns.map((n) => (n.id === id ? fresh : n)));
-        undo()?.noteSaved();
-      });
-    },
-    [enqueue, versions, pending, noteOf, patch, toast, undo],
+    (id: Uuid, run: (version: number) => NoteResult, back: Partial<NoteData>): Promise<CanvasSave> =>
+      new Promise((resolve) => {
+        const mark = cuts.mark(id);
+        enqueue(id, async () => {
+          if (cuts.cutSince(id, mark)) {
+            patch(id, back);
+            resolve(CUT_SAVE);
+            return;
+          }
+          const pages = fresh.pages;
+          let result: WriteResult<{ note: NoteData }>;
+          try {
+            result = await run(versions.current.get(id) ?? noteOf(id)?.version ?? 1);
+          } catch {
+            result = FAILED;
+          }
+          if (!result.ok) {
+            const code = result.code ?? "unexpected";
+            cuts.refuse(id, code);
+            patch(id, back);
+            toast(result.message, "refusal");
+            const answer = () => resolve({ ok: false, code });
+            if (PAGE_REFUSALS.has(code)) fresh.wait(pages, answer);
+            else answer();
+            return;
+          }
+          const stored = result.value.note;
+          versions.current.set(id, stored.version);
+          // later changes of this note are still on their way: they show already, keep them
+          if ((pending.current.get(id) ?? 0) <= 1) setNotes((ns) => ns.map((n) => (n.id === id ? stored : n)));
+          undo()?.noteSaved();
+          resolve({ ok: true });
+        });
+      }),
+    [enqueue, versions, pending, noteOf, patch, toast, undo, cuts, fresh],
   );
 
   /** A free note's frame and that frame's place now, for a note at this canvas point. */
@@ -331,7 +356,7 @@ export function useNotes(o: Options) {
       const n = noteOf(id);
       if (!n || text.trim() === n.text.trim()) return;
       patch(id, { text });
-      save(id, (v) => writes.updateNote({ noteId: id, expectedVersion: v, text }), { text: n.text });
+      void save(id, (v) => writes.updateNote({ noteId: id, expectedVersion: v, text }), { text: n.text });
     },
     [noteOf, patch, save, writes, select, toast, versions, undo],
   );
@@ -347,14 +372,15 @@ export function useNotes(o: Options) {
     [select],
   );
 
+  /** A change of a note's text, colour, status or width; answers whether it was stored (slice 14a). */
   const update = useCallback(
-    (id: Uuid, p: NotePatch) => {
+    (id: Uuid, p: NotePatch): Promise<CanvasSave | undefined> => {
       const n = noteOf(id);
-      if (!canNote || !n || id === DRAFT_NOTE) return;
+      if (!canNote || !n || id === DRAFT_NOTE) return Promise.resolve(undefined);
       const back: Partial<NoteData> = {};
       for (const k of Object.keys(p) as (keyof NotePatch)[]) (back as Record<string, unknown>)[k] = n[k];
       patch(id, p);
-      save(id, (v) => writes.updateNote({ noteId: id, expectedVersion: v, ...p }), back);
+      return save(id, (v) => writes.updateNote({ noteId: id, expectedVersion: v, ...p }), back);
     },
     [canNote, noteOf, patch, save, writes],
   );
@@ -367,7 +393,7 @@ export function useNotes(o: Options) {
       const rect = pinTargetRect(cols, placesRef.current());
       if (!rect) return;
       patch(id, { ...pinOffset(rect), pinCardId: cols.pin_canvas_item_id, pinFrameId: cols.pin_frame_id, frameId: null, anchor: null });
-      save(
+      void save(
         id,
         (v) => writes.pinNote({ noteId: id, expectedVersion: v, pin: "cardId" in to ? { canvasItemId: to.cardId } : { frameId: to.frameId } }),
         { x: n.x, y: n.y, pinCardId: n.pinCardId, pinFrameId: n.pinFrameId, frameId: n.frameId, anchor: n.anchor },
@@ -382,7 +408,7 @@ export function useNotes(o: Options) {
       if (!canNote || !n || id === DRAFT_NOTE || (!n.pinCardId && !n.pinFrameId)) return;
       const at = noteAt(n, placesRef.current());
       patch(id, { ...at, pinCardId: null, pinFrameId: null, ...frameFor(at) });
-      save(id, (v) => writes.unpinNote({ noteId: id, expectedVersion: v }), { x: n.x, y: n.y, pinCardId: n.pinCardId, pinFrameId: n.pinFrameId, frameId: n.frameId, anchor: n.anchor });
+      void save(id, (v) => writes.unpinNote({ noteId: id, expectedVersion: v }), { x: n.x, y: n.y, pinCardId: n.pinCardId, pinFrameId: n.pinFrameId, frameId: n.frameId, anchor: n.anchor });
       toast("The note is free now.");
     },
     [canNote, noteOf, patch, save, writes, frameFor, toast],
@@ -461,7 +487,7 @@ export function useNotes(o: Options) {
         swallowNextClick();
         const now = noteOf(id)!;
         if (part === "resize") {
-          if (now.width !== n.width) save(id, (v) => writes.updateNote({ noteId: id, expectedVersion: v, width: now.width }), { width: n.width });
+          if (now.width !== n.width) void save(id, (v) => writes.updateNote({ noteId: id, expectedVersion: v, width: now.width }), { width: n.width });
           return;
         }
         if (now.x === n.x && now.y === n.y) return;
@@ -470,9 +496,9 @@ export function useNotes(o: Options) {
         if (!now.pinCardId && !now.pinFrameId) {
           const at = noteAt(now, placesRef.current());
           patch(id, { ...at, ...frameFor(at) });
-          save(id, (v) => writes.moveNote({ noteId: id, expectedVersion: v, x: at.x, y: at.y }), back);
+          void save(id, (v) => writes.moveNote({ noteId: id, expectedVersion: v, x: at.x, y: at.y }), back);
         } else {
-          save(id, (v) => writes.moveNote({ noteId: id, expectedVersion: v, x: now.x, y: now.y }), back);
+          void save(id, (v) => writes.moveNote({ noteId: id, expectedVersion: v, x: now.x, y: now.y }), back);
         }
       };
       window.addEventListener("pointermove", move);

@@ -9,6 +9,7 @@ import type { ArrangeMode } from "./arrange";
 import type { FrameData, FrameStats } from "./frame-data";
 import type { NoteData } from "./note-data";
 import type { Selection } from "./line-data";
+import type { CanvasSave } from "./save-cuts";
 import type { Bundle } from "./line-geometry";
 import type { ViewReset } from "./useFrames";
 
@@ -148,8 +149,8 @@ export interface CanvasHandle {
   putInNewFrame: (cardIds: readonly Uuid[], fromCard: boolean) => void;
   /** “Arrange into frames by concept and system” (canvas overview). */
   arrangeIntoFrames: () => void;
-  /** Renames a frame or changes what it stands for (the frame panel); resolves whether it was saved. */
-  updateFrame: (frameId: Uuid, patch: FramePatch) => Promise<boolean>;
+  /** Renames a frame or changes what it stands for (the frame panel); resolves whether it was saved, and why not (slice 14a). */
+  updateFrame: (frameId: Uuid, patch: FramePatch) => Promise<CanvasSave>;
   /** Deletes a frame; its cards stay. The toast offers Undo. */
   deleteFrame: (frameId: Uuid) => void;
   fitFrame: (frameId: Uuid) => void;
@@ -181,8 +182,8 @@ export interface CanvasHandle {
   newNote: (where: { at: { x: number; y: number } } | { cardId: Uuid } | { frameId: Uuid }) => void;
   /** Opens a note's text for editing on the canvas (“Edit text”, “Edit on the canvas”). */
   editNote: (noteId: Uuid) => void;
-  /** Changes a note's text, colour, status or width; saved at once, one undo step each. */
-  updateNote: (noteId: Uuid, patch: NotePatch) => void;
+  /** Changes a note's text, colour, status or width; saved at once, one undo step each; resolves whether it was saved (slice 14a). */
+  updateNote: (noteId: Uuid, patch: NotePatch) => Promise<CanvasSave | undefined>;
   pinNote: (noteId: Uuid, pin: { cardId: Uuid } | { frameId: Uuid }) => void;
   unpinNote: (noteId: Uuid) => void;
   /** Deletes a note; the toast offers Undo. */
@@ -409,7 +410,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   frameRefs: () => [],
   putInNewFrame: noop,
   arrangeIntoFrames: noop,
-  updateFrame: () => Promise.resolve(false),
+  updateFrame: () => Promise.resolve({ ok: false, code: "unexpected" }),
   deleteFrame: noop,
   fitFrame: noop,
   zoomToFrame: noop,
@@ -422,7 +423,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   noteView: () => null,
   newNote: noop,
   editNote: noop,
-  updateNote: noop,
+  updateNote: () => Promise.resolve(undefined),
   pinNote: noop,
   unpinNote: noop,
   deleteNote: noop,

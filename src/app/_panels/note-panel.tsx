@@ -43,7 +43,8 @@ export function NotePanel({ noteId }: { noteId: Uuid }) {
           value={n.text}
           readOnly={!can}
           placeholder="Summary, observation or question."
-          onSave={(text) => ui.updateNote(n.id, { text })}
+          // the answer stays unused until the note's draft lives with the canvas (slice 14a, step 3)
+          onSave={(text) => void ui.updateNote(n.id, { text })}
           data-testid="input-note-panel-text"
         />
       </Field>
