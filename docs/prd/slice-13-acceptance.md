@@ -1,6 +1,6 @@
 # Slice 13 – acceptance
 
-Status: **step 5 (the closing) done, 3 November 2026; waiting for Łukasz's acceptance, the merge and the tag.**
+Status: **step 5 (the closing) done, 3 November 2026; D-66 accepted; waiting for Łukasz's manual acceptance on KB, the merge and the tag.**
 
 - Branch `slice/13-field-saves`, made on 1 November 2026 from `main` at `e66cc42` (the start commit,
   `e66cc42c4c1fefd9514f3c9a09cc67c7051136d3`), the merge of PR 32 (chore e2e reliability, merged 1 November 2026,
@@ -850,6 +850,23 @@ card's menu still offered "Paste attribute" after the refusal's toast.
   typecheck passes, 1,567 unit tests pass.
 - The full run was not repeated after the fix (84 min); the fix only takes the wait away from actions that are not a
   row's save.
+
+### The full run after the fix (3 November 2026, 06:59 to 08:23; Łukasz, before the merge)
+
+`E2E_MEMORY_LOG=1 npm run e2e`, from scratch, no dev server running; on `5c1d48b` (the fix `2ccf5aa` and the record).
+
+| Part | Folders | Time | Child heap peak (80 % threshold 3,255 MB) | Child RSS peak |
+| --- | --- | --- | --- | --- |
+| 1 | fixes to slice-03a | 24 min 27 s | 1,454 MB (45 %) | 1,454 MB |
+| 2 | slice-03b to slice-07b | 28 min 11 s | 1,497 MB (46 %) | 1,537 MB |
+| 3 | slice-07c to slice-13 | 30 min 47 s | 1,627 MB (50 %) | 1,568 MB |
+| | **total** | **83 min 26 s** | | |
+
+**515 passed, 2 skipped, 0 failed.** No server restarted (one child per part).
+
+PR 33's GitHub checks on that commit: **check** passed (1 min 53 s), **migrations** passed (1 min 30 s).
+
+D-66 accepted by Łukasz as written (3 November 2026); its acceptance date is set to the merge's day.
 
 ## For the closing (Łukasz's request, 1 November 2026): done at the closing
 
