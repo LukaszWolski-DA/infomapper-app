@@ -3,7 +3,8 @@ import { canvasUrl, changeEntityAsAnna, entityNamed, expectToast, FULL, holdUnti
 
 // S13-14 (item 5a, answer 7): a save refused as its panel closes. The alias's save is held while another entity is
 // selected; its refusal leaves the draft for the page, the toast says so, and the draft comes back with "Not saved"
-// when Customer's panel opens again. It is kept in the page's memory only: after a reload it is gone.
+// when Customer's panel opens again. It is kept in the page's memory only: after a reload it is gone. Since slice 14b
+// the reload asks first (the browser's warning, a kept draft for this page): the test accepts it.
 
 test("S13-14: a draft refused after its panel closed comes back when the panel opens again, and is gone after a reload", async ({ page }) => {
   await recordToasts(page);
@@ -31,7 +32,13 @@ test("S13-14: a draft refused after its panel closed comes back when the panel o
   await expect(notSaved(page.getByTestId("panel-entity"))).toHaveCount(1);
   expect((await entityNamed("Customer")).alias).toBeNull();
 
+  const asked: string[] = [];
+  page.once("dialog", (d) => {
+    asked.push(d.type());
+    void d.accept();
+  });
   await page.reload();
+  expect(asked).toEqual(["beforeunload"]);
   await hydrated(page);
   await openEntityFromTree(page, "Customer");
   await expect(alias()).toHaveValue("");

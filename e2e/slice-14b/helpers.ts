@@ -42,3 +42,44 @@ export async function changeCanvasLookElsewhere(canvasId: string, look: { backgr
 
 /** The tab of a canvas whose field is open (it shows no name then): the one holding the rename field. */
 export const renamingTab = (page: Page) => page.getByTestId("tab-canvas").filter({ has: page.getByTestId("input-canvas-name") });
+
+// ---- step 4: leaving a page (items 8–9) ----
+
+/**
+ * Closes the page as a person closing the tab would (`beforeunload` runs) and expects the browser's warning: the dialog
+ * is dismissed, so the page stays and the test goes on.
+ */
+export async function leaveAsks(page: Page): Promise<void> {
+  const dialog = page.waitForEvent("dialog", { timeout: 5000 });
+  await page.close({ runBeforeUnload: true });
+  const d = await dialog;
+  expect(d.type()).toBe("beforeunload");
+  await d.dismiss();
+  expect(page.isClosed()).toBe(false);
+}
+
+/** Closes the page the same way and expects no warning: the page closes (a test's last step). */
+export async function leaveAsksNothing(page: Page): Promise<void> {
+  const asked: string[] = [];
+  page.on("dialog", (d) => {
+    asked.push(d.type());
+    void d.accept();
+  });
+  const closed = page.waitForEvent("close", { timeout: 5000 });
+  await page.close({ runBeforeUnload: true });
+  await closed;
+  expect(asked).toEqual([]);
+}
+
+/**
+ * Resolves once the page has the answer of its next server action: the response read to its end, and the entity's card
+ * showing `name` from the fresh page it brings. The data file is written before the answer reaches the page, so a
+ * stored row alone does not mean the save is no longer on its way.
+ */
+export function answerOf(page: Page, name: string): () => Promise<void> {
+  const response = page.waitForResponse((r) => r.request().method() === "POST" && !!r.request().headers()["next-action"]);
+  return async () => {
+    await (await response).finished();
+    await expect(page.getByTestId("card-entity").filter({ hasText: name }).first()).toBeVisible();
+  };
+}

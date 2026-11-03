@@ -540,3 +540,76 @@ roughly 50 to 150 ms; a canvas page takes longer to commit than a home) keeps th
 the entry Forward led to. Held answers and Back after 400 ms keep it. It is the same with the breadcrumbs row's Back
 button and Alt+←, which call the browser's Back. Described in `docs/known-limitations.md` ("Back right after a save can
 lose Forward"), without a fix in this slice.
+
+## Step 4: leaving a page (3 November 2026)
+
+### What changed
+
+- **`src/ui/leave-guard.ts`** (items 8–9, O5–O6, Q5, Q6): sources hold the guard under their own key while they have
+  unsaved text and release it when they no longer have (`hold`, `release`, `guard(key, unsaved)`; `track(key, promise)`
+  for saves on their way). The `beforeunload` listener is on `window` only while something holds, and removed with the
+  last release; at the event it calls `preventDefault()` and sets `returnValue` only when a hold (or its check) says
+  yes, and the browser shows its own text. Nothing in it is React state: holding and releasing render nothing. Unit
+  tests in `leave-guard.test.ts`.
+- **The sources** (answer 5's list):
+  - **A field that saves a row** (`useDraft`, so every panel field, the project home's name and description, the
+    settings form, a frame's name, a canvas's name in its tab): held while it has a refused draft (the conflict line,
+    "Not saved", read-only, locked; not a deleted object's) or the focus with typed text not yet sent. The field learns
+    it from the element's own `input`, `focus` and `blur` events (listeners added in its ref callback) and from its
+    refusals, so typing renders nothing. A sent text is a save on its way (below).
+  - **A draft kept for a closed panel** (`field-drafts.ts`): held while any is kept, with a check: one kept for the page
+    shown (its path).
+  - **A note's draft** (`NoteDrafts`): held while any note has one; released when the canvas closes (`close`).
+  - **A note typed in its editor** (`NoteLayer`'s `NoteEditor`): held on input while the text differs from what the
+    editor opened with; released on leaving it (a sent text is the note's draft) and on unmount.
+  - **The rich-text dialog** (`rich-text-editor.tsx`): held while the text differs from what it opened with (or was given
+    by "Use this"); released when the dialog closes.
+  - **A save on its way:** every save on the save chain (`rowSaves.saveRows`, so `save` too, and undo and redo through
+    `exclusive`) and every write on the canvas's queue (`enqueue`, `enqueueGroup`) is tracked.
+  - Not counted, as agreed: the search boxes, the zoom, fields that create something, the import wizard (an idea since
+    step 1), the sign-in and people forms. None of them uses `useDraft`, so none holds.
+- **A draft that leaves with its page is no longer kept** (`useDraft`'s unmount, found while writing S14B-10): a field
+  that unmounts because the person went to another page (a link, Back) kept its draft under the **next** page's path,
+  as Next.js changes the address before the old page's fields unmount. Returning to the old page then dropped it (path
+  mismatch), so the draft was effectively gone, as D-66 says for another page; but on the next page the kept draft
+  counted as that page's and the guard asked for text the person cannot see. Now a field compares the address with the
+  one it mounted on and keeps nothing when it changed. What a person sees is unchanged except one toast: "Not saved:
+  {field} of {object}. Open it again to see your text." no longer shows when a link or Back takes away a refused draft
+  (it pointed to a draft that was already lost). A panel closed on the same page keeps its draft as before (S13-14).
+
+### Specs
+
+- **S14B-09** (8 tests; `leaveAsks`: `page.close({ runBeforeUnload: true })`, the `beforeunload` dialog dismissed so
+  the test goes on; `leaveAsksNothing`: the page closes with no dialog):
+  - a focused field with typed text asks; once saved and its answer on the page, nothing;
+  - a conflict line asks; after "Use this", nothing;
+  - "Not saved" asks; after Escape, nothing;
+  - a note's refused draft asks; dropped with Escape in its editor, nothing;
+  - a note typed in its editor asks; cancelled with Escape, nothing;
+  - a save held on its way (`holdUntil`) asks; after its answer, nothing;
+  - a page without drafts (a field visited, nothing typed) asks nothing;
+  - a reload with typed text asks; accepted, the page reloads and the text is gone.
+- **S14B-10:** a conflict line on the canvas, then the Home tab: no dialog, the project home shows, nothing of the draft
+  stored, and leaving the home asks nothing.
+- **S13-14** changed (answer to step 1): its reload now accepts the browser's warning (a refused draft is kept for the
+  page) and checks it was asked; the rest unchanged.
+- **A note on "after its answer":** the e2e data file is written before the save's answer reaches the page, so a stored
+  row does not yet mean the save is no longer on its way; the specs wait for the response to end and for the fresh page
+  (`answerOf`: the card showing the new name). The first version of S14B-09 read the file and was asked, rightly.
+
+### Runs (step 4)
+
+- **CI:** `npm run lint`, `npm run typecheck` and `npm test` (126 files, 1,599 tests) pass.
+- **Slice 14b:** S14B-09 (8) and S14B-10 pass.
+- **Earlier specs the step touches** (one run, 160 tests in 28.1 min: 159 passed, 1 skipped, the on-demand
+  `S14A-13-commits`): all of slices 13, 14a, 14b, 6b and 10c (every `useDraft` field, the notes' drafts and editor,
+  Back and Forward with fields, copies), and every other spec that reloads a page (41 files) or opens the rich-text
+  dialog (2): a reload with unsaved text would now wait on the warning, which Playwright dismisses by default. Only
+  `S13-14` needed a change. Log in `.data/measure/s14b-step4-run.log`.
+
+### Changed earlier tests (the slice so far)
+
+- `src/ui/row-saves.test.ts`: the held-row cut case asserts slice 14b's rule (F3, answer 2) (step 2).
+- `e2e/slice-06b/S6B-06.spec.ts`: waits for the delete's own page (its tab gone) before Back (step 3).
+- `e2e/slice-13/S13-14.spec.ts`: its reload accepts the browser's warning and checks it was asked (step 4).
+- `src/ui/field-drafts.test.ts`: its window stub has the listener methods the guard uses (step 4).
