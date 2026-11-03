@@ -356,3 +356,37 @@ says that after Back onto a deleted canvas Forward is gone.
 
 - `src/ui/row-saves.test.ts`: the held-row cut case now asserts slice 14b's rule (F3, answer 2).
 - `S6B-06`: not changed yet (Łukasz's decision above).
+
+## Łukasz's answers to step 2 (3 November 2026)
+
+- Step 2 accepted. The fix in `canvas-tabs.tsx` stays: **a bug found in this slice, there since slice 2a** (a click in
+  a canvas tab's menu, a portal, reached the tab's `onClick` and opened that canvas). It hid the Forward failure in
+  `S6B-06`: the extra history entry it pushed was what made Forward look enabled.
+- `S6B-06`: one attempt at a fix in step 3, at most half a day, with the hypothesis that the deleted canvas's page
+  replaces the address on the client (`router.replace`) instead of a redirect from the server. If it fails: S6B-06
+  checks Back and the notice, and Forward after Back onto a deleted canvas becomes a known limitation of D-38. D-38 is not
+  changed.
+- Then the rest of step 3 as the PRD and the step 1 answers say.
+
+## Step 3: the rename, the look and the change-to-resolve actions (3 November 2026)
+
+### S6B-06: the cause, and the hypothesis tested
+
+**The hypothesis was tried and does not change it.** The canvas page caught the missing canvas on the app's own
+navigations (`RSC: 1`, not your own action, a live project) and drew a client component calling `router.replace` instead
+of the server's redirect (`LeaveOnClient`, `LeaveOnClientError` from `leaveMissingCanvas`). S6B-06 still lost Forward 3 of
+3 times. Removed again; nothing of it is in the branch.
+
+**The cause, from the Navigation API's `navigate` events with their stacks:** right after Back's `traverse` to the
+deleted canvas, Next.js's router itself called `history.pushState` for **Customer & orders**, from a commit
+(`commitHookEffectListMount`), before any redirect. That is the delete's own server action committing its router state:
+the toast "Deleted the canvas …" is shown when the action answers, but the page it brings commits a moment later, inside
+the action's transition. The test pressed Back between the two, and the late commit pushed the address the action was
+started from over the entry Forward led to. Before this slice the stray push of the menu bug (step 2) came in between and
+hid it.
+
+**Change:** `S6B-06` waits for the delete's own page (its tab gone) before Back, as a person does; then Back, the
+notice, and Forward all pass, 3 of 3 times on their own. No application change for it; D-38 unchanged. What remains is a
+narrow timing case, for `docs/known-limitations.md` at the closing: Back pressed after a write's toast but before its
+page arrives (a fraction of a second) can lose the entry Forward leads to, as Next.js commits the write's page with a
+push of the address it was started from.
