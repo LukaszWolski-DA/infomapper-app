@@ -71,6 +71,11 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   of the wizard loses the file, the choices and the review, and slice 14b's warning on leaving does not cover the wizard
   (it is not a field that saves a row). Either the wizard joins the warning while it has a file, or its state is kept for
   the tab.
+- **The concept's rename in the tree with slice 13's line** (slice 14b, step 1 answer 8, decided in step 3): since
+  slice 13 (F13) a refused name stays in the tree's field to try again or cancel, without the line. The tab's compact
+  line (one row after the field) does not fit the left panel's narrow field ("Changed meanwhile to: …" with two buttons
+  is wider than the panel); the tree would need the panels' line under the field and `NameInput` moved to `useDraft`
+  for renames only (it also creates concepts), with its own specs. Worth doing with the next change to the tree.
 - **One text for an empty required name** (slice 14b, step 1 answer 7): canvases, settings and requirements say "Enter a
   name.", a project says "A project needs a name." (D-59). One text everywhere would be a one-line change in
   `src/domain/commands/project.ts` and D-59's wording, with slice 9's specs.

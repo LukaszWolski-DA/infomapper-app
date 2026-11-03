@@ -2,8 +2,10 @@
 // stored row. The earlier slices' helpers come through slice 14a's.
 
 import { expect, type Page } from "@playwright/test";
+import { renameCanvas, setCanvasLook } from "../../src/domain/commands/canvas";
+import type { CanvasBackground, CanvasGrid } from "../../src/domain/types";
 import { canvasTab } from "../slice-02a/helpers";
-import { rawDb } from "../slice-14a/helpers";
+import { asUser, rawDb, RETAIL, SEED_IDS, store } from "../slice-14a/helpers";
 
 export * from "../slice-14a/helpers";
 export { canvasIn, canvasTab, openCanvasMenu, tabNames } from "../slice-02a/helpers";
@@ -25,3 +27,18 @@ export async function renameInTab(page: Page, canvasName: string, name: string):
   await field.fill(name);
   await field.press("Enter");
 }
+
+/** A canvas renamed by Anna, as another session would (the page does not know). */
+export async function renameCanvasElsewhere(canvasId: string, name: string): Promise<void> {
+  const canvas = (await store().canvases.get(RETAIL, canvasId))!;
+  await asUser(SEED_IDS.userAnna, (ctx, access) => renameCanvas(ctx, access, { canvas }, { canvasId, expectedVersion: canvas.version, name }));
+}
+
+/** A canvas's look changed by Anna, as another session would: only the row's version and its look change. */
+export async function changeCanvasLookElsewhere(canvasId: string, look: { background?: CanvasBackground; grid?: CanvasGrid }): Promise<void> {
+  const canvas = (await store().canvases.get(RETAIL, canvasId))!;
+  await asUser(SEED_IDS.userAnna, (ctx, access) => setCanvasLook(ctx, access, { canvas }, { canvasId, expectedVersion: canvas.version, ...look }));
+}
+
+/** The tab of a canvas whose field is open (it shows no name then): the one holding the rename field. */
+export const renamingTab = (page: Page) => page.getByTestId("tab-canvas").filter({ has: page.getByTestId("input-canvas-name") });
