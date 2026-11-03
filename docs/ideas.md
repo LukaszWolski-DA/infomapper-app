@@ -50,7 +50,9 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 
 ## The plan after slice 13 (Łukasz, 1 November 2026)
 
-- **14a: saving notes and frames by slice 13's rule** (D-66): their canvas queue (`useNotes`, `useFrames`, the note on
+- **14a: done in slice 14a** (D-66): notes and frames on slice 13's rule through the canvas's queue; a note's draft with
+  its "Not saved" mark on the canvas, shown in the panels' lists; no data model change. Next: 14b. The plan was:
+  saving notes and frames by slice 13's rule: their canvas queue (`useNotes`, `useFrames`, the note on
   the canvas in `NoteLayer`) keeps a refused draft with the conflict line instead of rolling it back; AD-24's rules for
   the canvas, with canvas commit counts and measurements (below, "Notes and frames on slice 13's rule").
 - **14b: the writes off the save chain and leaving a page with a draft:** a canvas's name in its tab, the change-to-
@@ -636,7 +638,11 @@ font with a Reserved Font Name ("Plex"): rename the font's internal family names
 note the change in `src/app/fonts/ibm-plex/README.md`. Measure the first visit before and after (as the chore's A/B
 did). No work now (Łukasz, 1 November 2026).
 
-## Notes and frames on slice 13's rule (slice 13, step 1 answers, F12)
+## Notes and frames on slice 13's rule (slice 13, step 1 answers, F12): done in slice 14a
+
+**Done in slice 14a** (D-66): a note's text keeps its draft on the canvas and in its panel, with the "Not saved" mark,
+the panels' lists show it; a frame's name has the conflict line; the canvas's queue answers with the refusal's code.
+
 
 Slice 13 leaves notes and frames on the canvas's queue (`useNotes`, `useFrames`): a note's text, edited in its panel or
 on the canvas, rolls back after a refused save (`useNotes.save`, `back`), and the frame panel's fields only got the

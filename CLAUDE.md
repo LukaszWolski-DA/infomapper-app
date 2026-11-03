@@ -21,7 +21,9 @@ D-64). Both home pages have the canvas pages' Undo and Redo on the same history,
 with the canvases only it uses, one undo step (slice 12a, D-65). Canvas tiles show a thumbnail of the canvas's layout and
 count its frames, and the workspace home's project tiles show their first canvas's (slice 12b, D-29, AD-32). A text
 field keeps what the person typed across fresh pages and after any refusal; a conflict shows the other value under it
-with "Use this" and "Keep mine" (slice 13, D-66).
+with "Use this" and "Keep mine" (slice 13, D-66). Notes and frames
+follow the same rule: a note's text keeps its draft on the canvas, in its panel and in the panels' lists, with a "Not
+saved" mark after a refusal; a frame's name has the conflict line (slice 14a, D-66).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -205,6 +207,9 @@ SCREENS=<folder> npx playwright test e2e/slice-12a/S12A-screens.spec.ts         
 SCREENS=<folder> npx playwright test e2e/slice-12b/S12B-screens.spec.ts                   # slice 12b: the tiles (seed, empty canvas, collapsed frame, live canvas, workspace home, Performance test) beside the prototype's, light and dark
 SCREENS=<folder> npx playwright test e2e/slice-13/S13-screens.spec.ts                     # slice 13: a conflict on a short field, a long text in the rich-text dialog, Not saved, Cleared meanwhile; light and dark
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-13/S13-head-elements.spec.ts  # slice 13: <head> and <body> on Performance test at 30 %, to compare page totals between builds
+SCREENS=<folder> npx playwright test e2e/slice-14a/S14A-screens.spec.ts                   # slice 14a: a note with its mark (45 % and 100 %), its panel's line, a frame's name's line, a read-only note; light and dark
+COMMITS=1 SIDE=branch npx playwright test e2e/slice-14a/S14A-13-commits.spec.ts           # slice 14a: canvas commits while a note is written, saved, refused, marked, dropped (dev server; the same file runs on slice-13 for an A/B)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-14a/S14A-13-layers.spec.ts # slice 14a: drawing layers with 20 notes without and with the mark (20 real refusals)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spec.ts      # slice 12b: both homes' load, three data sets; LABEL=<name> for an A/B run, LOADS=<n>, COLD=<n> first visits
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
@@ -345,6 +350,20 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     `changeTableNoteAsAnna`, `changeRequirementAsAnna`, `changeProjectAsAnna`, `changeSettingsElsewhere` (as Łukasz,
     since Anna is no admin); read an entity by name (`entityNamed`);
   - read a field's mark (`conflictLine`, `otherValue`, `notSaved`) and press its buttons (`useThis`, `keepMine`).
+
+  Slice 14a's helpers do the following:
+  - write as another session through the domain: a frame (`changeFrameAsAnna`: name, colour, kind and concept), a
+    card collapsed or expanded (`toggleCardAsAnna`), a note's text, colour or status (`changeNoteAsAnna`), a note's
+    delete (`deleteNoteAsAnna`); read a frame's or a note's stored row (`frameRow`, `noteRow`);
+  - open a frame's panel from its name (`openFrame`);
+  - find a note on the canvas by its id, since its text may be a draft (`noteBox`, `noteMark` for its "Not saved",
+    `noteEditor`, `notePanelText`), select it by its header (`selectNote`), edit it with a double-click (`editNote`) and
+    write it with Ctrl+Enter (`writeNote`); open the demo canvas with a note in view (`openWithNote`, for the pinned
+    note, which lies below `WHOLE_CO`'s view).
+
+  A refusal's fresh page brings the newest versions of every note: to get one refusal per note, Anna changes each note
+  just before the page writes it (`S14A-13-layers.spec.ts`). The toast is a drawing layer of its own while visible:
+  read LayerTree once `[data-testid="toast"][data-visible="true"]` is gone.
 
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
@@ -610,4 +629,26 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     a measured height.
   - **A closed panel's draft:** a field with `keep` (`DraftKeep`: its `fieldKey`, field and object names) leaves its
     draft in `src/ui/field-drafts.ts`, the page's memory for its path; it comes back when the field mounts again.
+
+  **Slice 14a (D-66 on the canvas's queue):**
+  - **The canvas's queue and refusals:** the note and frame actions answer `ActionResult` with its code (`runCommand`,
+    slice 13's fresh page after a cutting refusal); the canvas's result types keep `code`. Only a note's saves
+    (`useNotes.save`) and a frame's `updateFrame` use it (`src/canvas/save-cuts.ts`): they answer `CanvasSave`
+    (`{ ok }` or `{ ok: false, code }`), a cutting refusal (stale, forbidden, archived, not found, `locked`) cuts the same
+    note's or frame's saves waiting behind it (`SaveCuts`: `cut`, not sent, no toast), and a refusal that brings the
+    fresh page is answered once its rows are merged (`FreshWaits`, 3 s at most, as `afterPage`). `enqueue`,
+    `enqueueGroup` and every other canvas write are unchanged.
+  - **A note's text draft:** `src/canvas/note-drafts.ts` (`NoteDrafts`, one per note for the page; `draftRefusal`,
+    `inConflict`, `onLeave`; `useNoteDraft`, a per-note subscription). A note's text never goes into its data before it
+    is stored (`saveText`); a refusal keeps the draft with its kind, a stored save ends it, a deleted note drops it
+    (`retain`). The status, colour, width, moves and pins stay optimistic with their rollback. **Read a note's text
+    through its draft wherever it is shown** (the note, its panel, `NoteRow`); `NoteData.text` is the stored text.
+  - **The mark:** `NoteLayer`'s `.nt-mark` button "Not saved" in the note's header, drawn only on a refused draft
+    (titles `MARK_TITLE`, `MARK_TITLE_READ_ONLY`); its click selects the note and opens details (`CanvasHost.openDetails`).
+    Escape in the note's editor drops a refused draft; leaving it during a conflict keeps the text unsaved.
+  - **The panel:** `useDraft`'s option `outside` (`OutsideDraft`: a draft kept elsewhere, shown with its refusal's mark
+    while the field has neither the focus nor its own text; "Use this" and Escape call its `drop`); the note panel's
+    `TextArea` passes `ui.noteDrafts()`'s draft. The lists ("Notes on this canvas", a card's or frame's "Notes", the
+    selection's) render `NoteRow` (`src/app/_panels/note-row.tsx`): each row reads only its own note's draft and says
+    "Not saved" for a refused one. A frame's name has `keep`.
 
