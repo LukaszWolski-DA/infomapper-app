@@ -296,9 +296,10 @@ const isLong = (text: string): boolean => text.split("\n").length > 3 || text.le
  * meanwhile.") with "Use this" and "Keep mine", or "Not saved". A long value is folded to three lines by CSS, with "Show
  * more" / "Show less".
  */
-export function DraftLine({ mark, onUse, onKeep, mono }: { mark: DraftMark; onUse: () => void; onKeep: () => void; mono?: boolean }) {
+export function DraftLine({ mark, onUse, onKeep, mono, inline }: { mark: DraftMark; onUse: () => void; onKeep: () => void; mono?: boolean; inline?: boolean }) {
   const [more, setMore] = useState(false);
   if (!mark) return null;
+  if (inline) return <InlineDraftLine mark={mark} onUse={onUse} onKeep={onKeep} />;
   if (mark.kind === "notSaved" || mark.kind === "copy")
     return (
       <div className="mt-1 text-xs font-medium text-im-warn" data-testid="draft-not-saved">
@@ -332,6 +333,41 @@ export function DraftLine({ mark, onUse, onKeep, mono }: { mark: DraftMark; onUs
         )}
       </div>
     </div>
+  );
+}
+
+const inlineButtonClass = "h-[22px] flex-none rounded border border-im-line bg-im-surface px-2 text-xs font-normal text-im-ink hover:bg-im-hover";
+
+/**
+ * The same mark on one row after a field (slice 14b, a canvas's name in its tab, F4): the other value cut to fit, its full
+ * text in the title; no fold, no layout read. The tab list clips anything below a tab, so it never goes under the field.
+ */
+function InlineDraftLine({ mark, onUse, onKeep }: { mark: NonNullable<DraftMark>; onUse: () => void; onKeep: () => void }) {
+  if (mark.kind === "notSaved" || mark.kind === "copy")
+    return (
+      <span className="flex-none text-xs font-medium text-im-warn" data-testid="draft-not-saved">
+        {mark.kind === "copy" ? "Not saved. You can still copy it." : "Not saved"}
+      </span>
+    );
+  return (
+    <span className="flex h-[28px] flex-none items-center gap-1.5 rounded-md bg-im-warn-soft px-2 text-xs font-normal text-im-ink" data-testid="draft-conflict" role="status">
+      {mark.other ? (
+        <>
+          <span>Changed meanwhile to:</span>
+          <span className="max-w-[180px] truncate font-medium" title={mark.other} data-testid="draft-other">
+            {mark.other}
+          </span>
+        </>
+      ) : (
+        <span data-testid="draft-other">Cleared meanwhile.</span>
+      )}
+      <button type="button" className={inlineButtonClass} onClick={onUse} data-testid="button-use-this">
+        Use this
+      </button>
+      <button type="button" className={inlineButtonClass} onClick={onKeep} data-testid="button-keep-mine">
+        Keep mine
+      </button>
+    </span>
   );
 }
 
