@@ -467,7 +467,7 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   `slice-10a`; `tests/e2e-parts.test.ts`), each with its own fresh dev server, and merges their blob reports into
   one result (`playwright-report/`); failure traces are in `test-results/part-<n>/`. A server's heap grows about 6 MB a
   test, and on 8 GB RAM a heap of 2 GB or more under paging timed out sign-ins; Next.js restarts the server at 80 % of
-  its heap limit (3,255 MB here). Each part ends at about 1.3 to 1.5 GB. When a part's heap (`E2E_MEMORY_LOG=1`) comes
+  its heap limit (3,255 MB here). Each part peaks at about 1.25 to 1.45 GB and takes 20 to 26 minutes (slice 14b's closing). When a part's heap (`E2E_MEMORY_LOG=1`) comes
   near 2 GB, move the cuts or add a part. The full run refuses to start while port 3200 is in use.
 - **Fonts** (P3 B): IBM Plex is hosted in `src/app/fonts/ibm-plex/` (IBM's unmodified WOFF2 files, OFL 1.1, `README.md`
   with their checksums) and loaded through `next/font/local`; no build or start fetches fonts. "Plex" is a Reserved Font

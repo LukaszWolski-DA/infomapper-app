@@ -807,8 +807,10 @@ and a heap under 2 GB passed.
 - **Since the chore:** the full run is three parts, each with its own server (`e2e/parts.ts`), and each part's heap
   peaked at 1.36 to 1.58 GB (42 to 48 % of the 3,255 MB threshold) in step 4's two runs. Neither run had a sign-in
   failure, though the laptop still paged (available memory down to 184 MB, up to 136,000 pages in per second).
+- **Since slice 14b:** four parts (`slice-10a` starts the fourth); at its closing each part's heap peaked at 1.25 to
+  1.42 GB (38 to 44 % of the threshold), no sign-in failure.
 - **If it comes back:** keep the trace and the memory log (`E2E_MEMORY_LOG=1`) and read the heap at that moment; if the
-  heap was well over 1.5 GB, a fourth part is the next step (`docs/ideas.md`).
+  heap was well over 1.5 GB, move the cuts or add a part (`e2e/parts.ts`).
 
 ### The e2e dev server restarts itself at its memory threshold (slice 12a)
 

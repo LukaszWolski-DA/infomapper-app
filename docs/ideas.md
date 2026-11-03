@@ -593,10 +593,15 @@ measured single run both sign-in failures came with the server's heap at 2 GB an
 the run split in three parts (each heap under 1.6 GB) two full runs had none. No test sign-in was added (Łukasz, P4 A).
 The chore's acceptance (`docs/prd/chore-e2e-reliability-acceptance.md`, steps 2 and 4) has the figures.
 
-## A fourth part for the full e2e run, if the sign-in times out again
+## A fourth part for the full e2e run: done in slice 14b
+
+Done in slice 14b (`PART_STARTS`: `slice-03a`, `slice-07a`, `slice-10a`). Its closing's full run (3 November 2026):
+556 passed, 3 skipped, no failure, 96 min 40 s; the parts took 25 min 27 s, 24 min 44 s, 20 min 25 s and 26 min 4 s,
+their heaps peaked at 1,247, 1,331, 1,253 and 1,419 MB (38 to 44 % of the threshold). New slices fall into part 4:
+watch its end heap at each closing. The entry as it was:
 
 The full e2e run is three parts (`e2e/parts.ts`), each ending at a heap of 1.4 to 1.6 GB (the e2e reliability chore,
-step 4). If a sign-in times out again in a full run, read the memory log (`E2E_MEMORY_LOG=1`) at that test: with the
+step 4). If a sign-in timed out again in a full run, read the memory log (`E2E_MEMORY_LOG=1`) at that test: with the
 heap well above 1.5 GB, move the cuts to four parts (one more entry in `PART_STARTS`, each part about 20 minutes, a
 server start of about 50 s more); at a low heap, the cause is elsewhere and more parts would not help. New slices fall
 into part 3, so it grows first: watch its end heap at each closing. Slice 14a's closing (3 November 2026): part 3's

@@ -613,3 +613,69 @@ lose Forward"), without a fix in this slice.
 - `e2e/slice-06b/S6B-06.spec.ts`: waits for the delete's own page (its tab gone) before Back (step 3).
 - `e2e/slice-13/S13-14.spec.ts`: its reload accepts the browser's warning and checks it was asked (step 4).
 - `src/ui/field-drafts.test.ts`: its window stub has the listener methods the guard uses (step 4).
+
+## Łukasz's answers to step 4 (3 November 2026)
+
+Step 4 accepted with both points: no "Not saved: …" toast when a link or Back takes away a refused draft (D-66: the
+draft goes when the page is left), and specs that wait for the answer's end. The rule "the app never navigates after a
+save's answer" moves from `docs/known-limitations.md` to CLAUDE.md (the rules for code, with S0-06 as its example);
+`docs/known-limitations.md` keeps only Back's 50–150 ms window, pointing to the rule.
+
+## Step 5: the closing (3 November 2026)
+
+### Manual acceptance scenario (on Łukasz's model KB, after the backup)
+
+Backup: `.data/backups/dev-db-20261103-2115.json` and `.data/backups/kb-model-latest.json` (SHA-256 begins
+`8a0d7c8ff10c06f7`, the same as `.data/dev-db.json` at the backup). Start with `npm run dev` and sign in to KB.
+
+1. **The canvas's row on one chain.** On a canvas of "Kanton Basel", switch the layer (Logical/Physical) or the grid in
+   the tab's menu and at once double-click the tab and rename the canvas, Enter: the name is stored, no message. Then
+   "Entity aliases" in the top bar and at once a rename: stored. Change the background of a second canvas from its tab's
+   menu and at once delete it (in a project with two or more canvases): deleted, with Undo.
+2. **A conflict on a rename.** Open the same canvas in two windows. Rename it in the first. In the second, rename it
+   without reloading: the tab keeps your name, with "Changed meanwhile to: {first name}", "Use this", "Keep mine" on one
+   row inside the tab. "Keep mine": your name is stored; Undo (top bar) brings the first window's name back. Again with
+   "Use this" (or Escape): the first window's name, nothing stored.
+3. **An empty name.** Double-click a tab, clear the name, Enter: the old name comes back with "Enter a name.".
+4. **A source change.** On a system's panel with changes to resolve (after a re-import), press an action on a column's
+   change ("Not needed", for example) and at once type into that column's note and leave the field: the note is stored,
+   no "Someone changed this meanwhile." and no "Not saved".
+5. **Leaving a page.** Type into a panel field (an entity's description, say) and press F5 before leaving it: the browser
+   warns. Cancel, leave the field, wait a moment, press F5: no warning. With a refused draft ("Not saved" or the
+   conflict line, as in point 2) F5 warns too; after "Use this" it does not.
+6. **Navigation inside the app.** With the conflict line of point 2 showing, click the Home tab: no warning, the project
+   home shows; your text was not stored.
+
+Not in the scenario (covered by specs): read-only and locked refusals in the tab (S14B-06), the look's refusal
+(S14B-07), the held save and notes (S14B-09).
+
+### The full e2e run (four parts, from scratch, `E2E_MEMORY_LOG=1`)
+
+One run, no dev server of mine running: **556 passed, 3 skipped, no failure, no rerun**; 96 min 40 s in all. Log
+`.data/measure/s14b-full-run-1.log`, memory logs `.data/e2e-memory-20261103-2011-part<n>.*` (git-ignored).
+
+| Part | Folders | Time | Heap peak (of the 3,255 MB threshold) | Child RSS peak | Lowest available memory |
+| --- | --- | --- | --- | --- | --- |
+| 1 | fixes to slice-02c | 25 min 27 s | 1,247 MB (38 %) | 1,201 MB | 40 MB |
+| 2 | slice-03a to slice-06b | 24 min 44 s | 1,331 MB (41 %) | 1,380 MB | 339 MB |
+| 3 | slice-07a to slice-09 | 20 min 25 s | 1,253 MB (38 %) | 1,307 MB | 42 MB |
+| 4 | slice-10a to slice-14b | 26 min 4 s | 1,419 MB (44 %) | 1,427 MB | 120 MB |
+
+No server restart in any part. Against slice 14a's closing in three parts (part 3 peaked at 1,788 MB in 35 min 35 s), the
+largest heap is 369 MB lower. The laptop still paged (part 3 up to 338,570 pages in per second during S8-07 and S8-08),
+without a failure.
+
+### S14B-12: element guard (`S3B-15-elements.spec.ts`, `ELEMENTS_BASELINE=.data/measure/s9-14-baseline/slice-08.json`)
+
+After `npm run measure:build`, on the measurement build:
+
+| View | Page | Viewport | `slice-08.json` | slice 14a's page |
+| --- | --- | --- | --- | --- |
+| 30 %, expanded | 5,999 | 4,508 | 5,994 / 4,508 | 5,999 |
+| 100 %, expanded | 20,796 | 19,305 | 20,791 / 19,305 | 20,796 |
+| 30 %, collapsed | 2,866 | 1,465 | 2,861 / 1,465 | 2,866 |
+| 100 %, collapsed | 6,308 | 4,907 | 6,303 / 4,907 | 6,308 |
+
+**Passed:** the viewport counts equal slice 8's and the page totals equal slice 14a's. The tab's conflict line and the
+leave guard add no element while nothing is refused or unsaved; `leave-guard.ts` went into existing chunks (no new
+`<script>`).
