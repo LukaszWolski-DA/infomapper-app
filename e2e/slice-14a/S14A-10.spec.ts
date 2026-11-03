@@ -1,5 +1,6 @@
 import { expect, test } from "./fixtures";
 import {
+  card,
   changeNoteAsAnna,
   DEMO_NOTES,
   expectToast,
@@ -19,7 +20,7 @@ import {
 } from "./helpers";
 
 // S14A-10 (item 11, N8): a pinned note's conflict behaves as S14A-04's, with the mark where the pinned note is drawn
-// (beside its card, with its tether).
+// (beside its card, with its tether); the card's panel lists it by the draft, marked "Not saved" (N4, step 4).
 
 test("S14A-10: a pinned note: the draft with the mark beside its card; the mark opens the line; Keep mine stores it", async ({ page }) => {
   const note = (await noteWithText(DEMO_NOTES.pinned))!;
@@ -36,6 +37,14 @@ test("S14A-10: a pinned note: the draft with the mark beside its card; the mark 
   await expectToast(page, STALE);
   await expect(box.getByTestId("note-text")).toHaveText("Mine: confirmed only.");
   await expect(noteMark(page, note.id)).toBeVisible();
+
+  // the card's panel lists its pinned note by the draft, marked "Not saved" (N4, step 4)
+  await page.keyboard.press("Escape");
+  const head = (await card(page, "order_line").locator(".c-head").first().boundingBox())!;
+  await page.mouse.click(head.x + head.width / 3, head.y + head.height / 2);
+  const row = page.getByTestId("item-note-here").filter({ hasText: "Mine: confirmed only." });
+  await expect(row).toBeVisible();
+  await expect(row.getByTestId("note-row-not-saved")).toHaveText("Not saved");
 
   await page.keyboard.press("Escape");
   await noteMark(page, note.id).click();

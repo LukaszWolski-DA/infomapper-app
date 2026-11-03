@@ -489,3 +489,22 @@ Recommended: (a), since D-66 says the person's text stays where they see it.
 
 `docs/prd/slice-14a-screens/step-3/note-mark-100-light.png` and `note-mark-100-dark.png` (the screenshot spec's new
 case "a note with its mark at 100 %").
+
+## Łukasz's answer on N4 (3 November 2026): (a), done
+
+**(a):** the three lists ("Notes on this canvas", a card's or frame's "Notes", the selection's list) show the note's
+draft as the canvas does; a row with a refused draft says "Not saved", the same text as the note's mark (no new text);
+each row reads only its own note's draft, so typing never redraws a whole list and adds no canvas commit.
+
+**Done** (part of N4 from now on):
+- `src/app/_panels/note-row.tsx` (new): `NoteRow`, a list row that reads its own note's draft (`useNoteDraft`), shows
+  its first line (else the stored text's) and, for a refused draft, "Not saved" (`note-row-not-saved`) in place of its
+  meta. A draft changes when a save starts or is answered, never while typing.
+- `overview-panel.tsx`, `notes-here.tsx`, `selection-panel.tsx` use it; the overview's filter still searches the stored
+  text.
+- The N4 table above changes for those three rows: they now show **the draft**, with "Not saved" after a refusal. The
+  person writing no longer sees the old text anywhere except while a save is on its way in a list that is not shown
+  then (the note being written is selected, so its panel shows).
+- **S14A-04** extended: with a refused draft the canvas's overview list (nothing selected) and the selection's list
+  (the note and a card) show the draft with "Not saved", and after "Keep mine" the overview's row shows it without.
+  **S14A-10** extended: the pinned note's card panel ("Notes") shows the draft with "Not saved".
