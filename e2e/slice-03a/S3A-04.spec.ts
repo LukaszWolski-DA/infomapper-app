@@ -24,13 +24,14 @@ test("S3A-04: the label panel lists what CR-23 marks by kind as links; renaming 
   await items("attribute").filter({ hasText: "segment_code" }).click();
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
 
-  // rename: another label's name (in any case) is refused and the field shows the stored name again; a new one works
+  // rename: another label's name (in any case) is refused and the field keeps the typed name (slice 13); a new one works
   await labelsField(page).getByTestId("button-label-open").click();
   const name = page.getByTestId("input-label-name");
   await name.fill("jira-481");
   await name.press("Enter");
   await expectToast(page, "Another label is already called “JIRA-481”.");
-  await expect(name).toHaveValue("CR-23");
+  await expect(name).toHaveValue("jira-481");
+  expect((await labelNamed("CR-23"))?.id).toBe(cr23.id);
   await name.fill("CR-24");
   await name.press("Enter");
   await expect.poll(async () => (await labelNamed("CR-24"))?.id).toBe(cr23.id);

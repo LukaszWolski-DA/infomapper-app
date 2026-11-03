@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 12a's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 13's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -83,6 +83,13 @@ a missing column's row and mapping line marks (7a); a zoom typed in the top bar 
 
 **Present since the earlier inventory:** back and forward with Alt+←/→ (6b; differences in its acceptance doc); a
 source system's panel as a selection and a history place (7a).
+
+**Slice 13, deliberate differences from the prototype (PRD section 8, D-66):** the prototype is a one-person app with
+no save conflicts, drafts across saves or refusals. In the app every text field keeps its draft across fresh pages and
+after a refusal: a conflict shows the other value under the field (in a rich-text field inside its editor) with "Use
+this" and "Keep mine"; a cut or unchanged field shows "Not saved"; a permission or archive refusal leaves the draft
+readable to copy; Escape in a text field puts the stored value back (the prototype's inspector fields have no Escape).
+Fields look as before apart from these marks.
 
 ## Model
 

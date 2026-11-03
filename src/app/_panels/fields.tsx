@@ -1,11 +1,16 @@
 "use client";
 
 // Building blocks of the right panel, styled after the prototype (.fld, .seg, .flags, .note, .list, .li, .pill,
-// .actions). Text fields save when they lose the focus (prototype "change"); the panel remounts a field, keyed by its
-// stored value (`fieldKey`), once the server has a new one. The panels save through `saveRow` (`useAction`, slice 9):
-// one row's saves one after the other, each with the newest version known when it is sent.
+// .actions). Text fields save when they lose the focus (prototype "change"). The panels save through `saveRow`
+// (`useAction`, slice 9): one row's saves one after the other, each with the newest version known when it is sent.
+// Slice 13 (D-66): a text field keeps what the person typed (its draft, `useDraft`) across the page's fresh values and
+// after a refusal; a choice field shows the newest stored value after a refusal (`useChoice`). Fields are keyed by their
+// object and field (`fieldKey`), never by their stored value.
 
-import { useEffect, useState, type ReactNode, type TextareaHTMLAttributes } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
+import { useToast } from "@/ui/components/toast";
+import { choiceShown, FieldDraft, storedBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
+import { dropDraft, isGone, keepDraft, markGone, takeDraft, unmarkGone, updateDraft } from "@/ui/field-drafts";
 
 export const Kind = ({ children }: { children: ReactNode }) => <div className="mb-1.5 text-[11.5px] text-im-ink-3">{children}</div>;
 
@@ -30,57 +35,345 @@ export const inputClass =
   "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 text-im-ink outline-none focus:border-im-logical disabled:opacity-50 read-only:bg-im-panel";
 
 /**
- * The key of a panel field that shows `value` of the object `id`: the field is mounted anew, and shows the stored
- * value, only when that value changes (its own save, an undo, someone else's write). Keyed by the object's version, a
- * save on leaving one field mounted the next one anew and took the focus Tab had just put there.
+ * The key of a panel field that shows the field `field` of the object `id`: stable while the object lives, so a save's
+ * answer, an undo or another person's write never mounts it anew (slice 13; keyed by the stored value, text typed
+ * during a save's round trip was lost with the field, and keyed by the object's version, a save on leaving one field
+ * mounted the next one anew and took the focus Tab had just put there).
  */
-export const fieldKey = (id: string, field: string, value: string | number | null | undefined): string => `${id}:${field}:${value ?? ""}`;
+export const fieldKey = (id: string, field: string): string => `${id}:${field}`;
 
-/** A text field that saves on Enter or when it loses the focus. An empty required field goes back. */
+/** What a field's save gives back: the action's answer (`ok`, `code`), so the field knows whether it was stored. */
+export type FieldSave<V> = (value: V) => SaveAnswer | Promise<SaveAnswer>;
+
+/** Where a field keeps its draft when its panel closes (slice 13, item 5a): its key, and its name for the toast. */
+export interface DraftKeep {
+  key: string;
+  field: string;
+  object: string;
+}
+
+/**
+ * What a field shows under it after a refusal (slice 13, items 7–9): the other value, "Not saved", or "Not saved. You
+ * can still copy it." (a permission or the archive: the field is read-only, its draft readable).
+ */
+export type DraftMark = { kind: "conflict"; other: string } | { kind: "notSaved" } | { kind: "copy" } | null;
+
+/** Refusals after which the field shows its mark: a stale version, and a save cut behind one. */
+const MARKED = new Set(["stale_version", "cut"]);
+/** Refusals after which the draft stays readable while the page turns the field read-only (item 9). */
+const READ_ONLY = new Set(["forbidden", "archived"]);
+
+/**
+ * A refused draft's state: `mark` (stale or cut: conflict or "Not saved" by its base), `locked` (a locked organization:
+ * "Not saved", still editable), `copy` (read-only), `gone` (its object was deleted: the draft goes with it).
+ */
+type Refusal = { kind: "mark" | "locked" | "copy" | "gone"; base: string };
+
+const refusalOf = (code: string, base: string): Refusal | null =>
+  MARKED.has(code) ? { kind: "mark", base } : code === "locked" ? { kind: "locked", base } : READ_ONLY.has(code) ? { kind: "copy", base } : code === "not_found" ? { kind: "gone", base } : null;
+
+const codeOf = (answer: SaveAnswer): string => (answer && typeof answer === "object" ? (answer.code ?? "") : "");
+
+/** Points an object ref at the element (a field's `inputRef`). */
+function setRef<E>(ref: { current: E | null } | object, el: E | null): void {
+  (ref as { current: E | null }).current = el;
+}
+
+/** The toast of a draft refused after its panel closed (slice 13, item 5a). */
+export const notSavedAway = (field: string, object: string): string => `Not saved: ${field} of ${object}. Open it again to see your text.`;
+
+/**
+ * A text field's draft (slice 13, D-66; the rules in `src/ui/field-draft.ts`): the element is uncontrolled, so typing
+ * renders nothing. A stored value reaches it in an effect, written into the element only while it has neither the
+ * focus nor a draft. `commit` (on leaving the field) saves the text when it differs from the value on its way or the
+ * stored one; `prepare` trims or parses it (null: nothing to save); an empty `required` field goes back to the stored
+ * value (D-59), with `onEmpty` (a toast) where one is wanted.
+ *
+ * After a stale refusal, or a save cut behind one, the refusal's fresh page decides the mark (F5): the field's stored
+ * value differs from the one its draft started from (a conflict: the other value, "Use this", "Keep mine"; leaving the
+ * field saves nothing, F6), or it does not ("Not saved": leaving the field saves it again). Escape puts the stored value
+ * back (while a conflict shows, it is "Use this"). With `keep`, a draft whose field unmounts stays for the page
+ * (`src/ui/field-drafts.ts`) and comes back when the field mounts again.
+ */
+export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
+  stored: string,
+  save: FieldSave<string> | undefined,
+  o: {
+    prepare?: (text: string) => string | null;
+    required?: boolean;
+    onEmpty?: () => void;
+    readOnly?: boolean;
+    elementRef?: Ref<E>;
+    keep?: DraftKeep;
+  } = {},
+) {
+  const toast = useToast();
+  const element = useRef<E | null>(null);
+  const [draft] = useState(() => new FieldDraft(stored));
+  const [initial] = useState(stored);
+  /** The refusal the mark comes from, with the stored value the refused draft started from. */
+  const [refusal, setRefusal] = useState<Refusal | null>(null);
+  // mirrors for what runs after the field unmounted (a late answer, the cleanup)
+  const refusalNow = useRef<Refusal | null>(null);
+  const mounted = useRef(true);
+  const lastText = useRef<string | null>(null);
+  const keepNow = useRef<DraftKeep | undefined>(undefined);
+  const toastNow = useRef(toast);
+  const refuse = (r: Refusal | null) => {
+    refusalNow.current = r;
+    setRefusal(r);
+  };
+
+  useEffect(() => {
+    keepNow.current = o.keep;
+    toastNow.current = toast;
+  });
+  useEffect(() => {
+    const el = element.current;
+    // a DOM write after the commit, never a layout read (CLAUDE.md, slice 6a)
+    const take = el ? draft.receive(stored, el.value, document.activeElement === el) : "keep";
+    if (el && take === "take") el.value = stored;
+    if (take === "end" && refusalNow.current && refusalNow.current.kind !== "copy") {
+      refusalNow.current = null;
+      // the stored value came to equal the draft: its mark goes
+      setRefusal(null);
+    }
+  }, [stored, draft]);
+  const keepKey = o.keep?.key;
+  useEffect(() => {
+    mounted.current = true;
+    if (keepKey) unmarkGone(keepKey);
+    const back = keepKey ? takeDraft(keepKey) : null;
+    const el = element.current;
+    if (back && el) {
+      el.value = back.text;
+      draft.reset(back.base);
+      refusalNow.current = back.refused ? { kind: "mark", base: back.base } : null;
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- a draft kept while the panel was closed (item 5a)
+      if (back.refused) setRefusal({ kind: "mark", base: back.base });
+    }
+    return () => {
+      mounted.current = false;
+      const text = lastText.current;
+      const keep = keepNow.current;
+      if (!keepKey || text === null || !draft.hasDraft(text)) return;
+      // a deleted object takes its draft with it (answer 8); a read-only draft stays until the panel closes (item 9)
+      if (refusalNow.current?.kind === "gone" || refusalNow.current?.kind === "copy" || isGone(keepKey)) return;
+      const refused = !!refusalNow.current;
+      keepDraft(keepKey, { text, base: refusalNow.current?.base ?? draft.taken, refused });
+      // a refused draft whose panel closes (the refusal may land in the same commit as the new selection: a pending
+      // save's transition holds the selection's): the toast says where it is
+      if (refused && keep) toastNow.current(notSavedAway(keep.field, keep.object), "refusal");
+    };
+  }, [keepKey, draft]);
+
+  const { elementRef } = o;
+  /** The element's ref callback; the text it had when it was last detached is what an unmount keeps. */
+  const bind = (el: E | null) => {
+    if (!el && element.current) lastText.current = element.current.value;
+    element.current = el;
+    if (typeof elementRef === "function") elementRef(el);
+    else if (elementRef) setRef(elementRef, el);
+  };
+
+  const mark: DraftMark = !refusal
+    ? null
+    : refusal.kind === "copy"
+      ? { kind: "copy" }
+      : refusal.kind === "mark" && stored !== refusal.base
+        ? { kind: "conflict", other: stored }
+        : refusal.kind === "gone"
+          ? null
+          : { kind: "notSaved" };
+
+  const send = (value: string) => {
+    const n = draft.send(value);
+    const answered = (answer: SaveAnswer) => {
+      const ok = storedBy(answer);
+      draft.answered(n, ok);
+      const keep = keepNow.current;
+      const code = codeOf(answer);
+      // a deleted object (answer 8): its drafts go, and a save cut behind its refusal says nothing more
+      if (ok === false && code === "not_found" && keep) markGone(keep.key);
+      if (!mounted.current) {
+        // the field's panel closed meanwhile: the kept draft is stored, or refused (item 5a)
+        if (keep && ok === true) dropDraft(keep.key);
+        else if (keep && ok === false && !isGone(keep.key) && updateDraft(keep.key, { refused: MARKED.has(code) })) {
+          toastNow.current(notSavedAway(keep.field, keep.object), "refusal");
+        }
+        return;
+      }
+      const r = ok === false ? refusalOf(code, draft.taken) : null;
+      if (r) refuse(r);
+    };
+    Promise.resolve(save!(value)).then(answered, () => answered(false));
+  };
+
+  const commit = () => {
+    const el = element.current;
+    if (!el || o.readOnly || !save) return;
+    // a conflict is settled by "Use this" or "Keep mine", never by leaving the field (F6); a read-only draft is for
+    // copying only
+    if (mark?.kind === "conflict" || mark?.kind === "copy") return;
+    const raw = el.value;
+    const value = o.prepare ? o.prepare(raw) : raw;
+    if (value === null) return;
+    if (o.required && !value) {
+      el.value = stored;
+      draft.reset(stored);
+      refuse(null);
+      o.onEmpty?.();
+      return;
+    }
+    if (value !== raw) el.value = value;
+    if (!draft.shouldSave(value, stored)) return;
+    send(value);
+  };
+
+  /** "Use this": the field takes the newest stored value; the draft ends. */
+  const takeStored = () => {
+    const el = element.current;
+    if (el) el.value = stored;
+    draft.reset(stored);
+    refuse(null);
+    if (keepKey) dropDraft(keepKey);
+  };
+  /** "Keep mine": the draft is saved on the newest version, a deliberate overwrite. */
+  const keepMine = () => {
+    const el = element.current;
+    if (!el || !save) return;
+    draft.reset(stored);
+    refuse(null);
+    const value = o.prepare ? o.prepare(el.value) : el.value;
+    if (value !== null && value !== stored) send(value);
+  };
+  /** Escape puts the stored value back; while a conflict shows, it is "Use this". */
+  const keyDown = (e: KeyboardEvent<E>) => {
+    if (e.key !== "Escape" || o.readOnly || mark?.kind === "copy") return;
+    if (mark?.kind === "conflict" || e.currentTarget.value !== stored) takeStored();
+  };
+  return { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine };
+}
+
+/** The other value's fold: more than three lines or about 240 characters, counted from the text (no layout read). */
+const isLong = (text: string): boolean => text.split("\n").length > 3 || text.length > 240;
+
+/**
+ * The mark under a field after a refusal (slice 13, items 7–8): "Changed meanwhile to: {value}" (or "Cleared
+ * meanwhile.") with "Use this" and "Keep mine", or "Not saved". A long value is folded to three lines by CSS, with "Show
+ * more" / "Show less".
+ */
+export function DraftLine({ mark, onUse, onKeep, mono }: { mark: DraftMark; onUse: () => void; onKeep: () => void; mono?: boolean }) {
+  const [more, setMore] = useState(false);
+  if (!mark) return null;
+  if (mark.kind === "notSaved" || mark.kind === "copy")
+    return (
+      <div className="mt-1 text-xs font-medium text-im-warn" data-testid="draft-not-saved">
+        {mark.kind === "copy" ? "Not saved. You can still copy it." : "Not saved"}
+      </div>
+    );
+  const long = isLong(mark.other);
+  return (
+    <div className="mt-1 rounded-md bg-im-warn-soft px-2.5 py-2 text-xs text-im-ink" data-testid="draft-conflict" role="status">
+      {mark.other ? (
+        <>
+          <div>Changed meanwhile to:</div>
+          <div className={`mt-0.5 whitespace-pre-line break-words ${mono ? "font-mono" : ""} ${long && !more ? "line-clamp-3" : ""}`} data-testid="draft-other">
+            {mark.other}
+          </div>
+        </>
+      ) : (
+        <div data-testid="draft-other">Cleared meanwhile.</div>
+      )}
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        <button type="button" className={smallButtonClass} onClick={onUse} data-testid="button-use-this">
+          Use this
+        </button>
+        <button type="button" className={smallButtonClass} onClick={onKeep} data-testid="button-keep-mine">
+          Keep mine
+        </button>
+        {long && (
+          <button type="button" className={smallButtonClass} onClick={() => setMore((m) => !m)} data-testid="button-draft-more">
+            {more ? "Show less" : "Show more"}
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * A choice field (a select, a check box; slice 13, R4): the choice shows from the click until the stored value changes;
+ * after a refusal the field shows the stored value, which the refusal's fresh page brings.
+ */
+export function useChoice<T>(stored: T, save: FieldSave<T>) {
+  const [chosen, setChosen] = useState<Chosen<T> | null>(null);
+  const value = choiceShown(chosen, stored);
+  const choose = (next: T) => {
+    if (Object.is(next, value)) return;
+    const mine = { value: next, on: stored };
+    setChosen(mine);
+    const back = () => setChosen((c) => (c === mine ? null : c));
+    Promise.resolve(save(next)).then((answer) => storedBy(answer) !== true && back(), back);
+  };
+  return { value, choose };
+}
+
+/** A text field that saves on Enter or when it loses the focus. An empty required field goes back (D-59). */
 export function TextField({
   id,
   value,
   onSave,
   readOnly,
   required,
+  onEmpty,
   testId,
   inputRef,
   mono,
   placeholder,
+  keep,
 }: {
   id?: string;
   value: string;
-  onSave: (value: string) => void;
+  onSave: FieldSave<string>;
   readOnly?: boolean;
   required?: boolean;
+  /** An empty required field went back (a toast, where the server would have refused it: slice 13, F14). */
+  onEmpty?: () => void;
   testId?: string;
-  inputRef?: React.Ref<HTMLInputElement>;
+  inputRef?: Ref<HTMLInputElement>;
   mono?: boolean;
   placeholder?: string;
+  /** Keep the draft when the panel closes (slice 13, item 5a). */
+  keep?: DraftKeep;
 }) {
+  const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(value, onSave, {
+    prepare: (t) => t.trim(),
+    required,
+    onEmpty,
+    readOnly,
+    elementRef: inputRef,
+    keep,
+  });
   return (
-    <input
-      id={id}
-      ref={inputRef}
-      defaultValue={value}
-      readOnly={readOnly}
-      placeholder={placeholder}
-      data-testid={testId}
-      autoComplete="off"
-      className={`${inputClass} ${mono ? "font-mono text-xs" : ""}`}
-      onKeyDown={(e) => {
-        if (e.key === "Enter") e.currentTarget.blur();
-      }}
-      onBlur={(e) => {
-        if (readOnly) return;
-        const v = e.currentTarget.value.trim();
-        if (required && !v) {
-          e.currentTarget.value = value;
-          return;
-        }
-        if (v !== value) onSave(v);
-      }}
-    />
+    <>
+      <input
+        id={id}
+        ref={bind}
+        defaultValue={initial}
+        readOnly={readOnly}
+        placeholder={placeholder}
+        data-testid={testId}
+        autoComplete="off"
+        className={`${inputClass} ${mono ? "font-mono text-xs" : ""}`}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") e.currentTarget.blur();
+          keyDown(e);
+        }}
+        onBlur={commit}
+      />
+      <DraftLine mark={mark} onUse={takeStored} onKeep={keepMine} mono={mono} />
+    </>
   );
 }
 
@@ -90,17 +383,30 @@ export function TextArea({
   onSave,
   code,
   ...rest
-}: { value: string; onSave: (value: string) => void; code?: boolean } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
+}: { value: string; onSave: FieldSave<string>; code?: boolean; keep?: DraftKeep } & Omit<TextareaHTMLAttributes<HTMLTextAreaElement>, "value" | "defaultValue">) {
+  const { keep, ...props } = rest;
+  const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLTextAreaElement>(value, onSave, {
+    readOnly: !!props.readOnly || !!props.disabled,
+    keep,
+  });
   return (
-    <textarea
-      {...rest}
-      defaultValue={value}
-      className={`${inputClass} min-h-[60px] resize-y ${code ? "font-mono text-xs" : ""}`}
-      onBlur={(e) => {
-        rest.onBlur?.(e);
-        if (!rest.readOnly && !rest.disabled && e.currentTarget.value !== value) onSave(e.currentTarget.value);
-      }}
-    />
+    <>
+      <textarea
+        {...props}
+        ref={bind}
+        defaultValue={initial}
+        className={`${inputClass} min-h-[60px] resize-y ${code ? "font-mono text-xs" : ""}`}
+        onKeyDown={(e) => {
+          props.onKeyDown?.(e);
+          keyDown(e);
+        }}
+        onBlur={(e) => {
+          props.onBlur?.(e);
+          commit();
+        }}
+      />
+      <DraftLine mark={mark} onUse={takeStored} onKeep={keepMine} mono={code} />
+    </>
   );
 }
 

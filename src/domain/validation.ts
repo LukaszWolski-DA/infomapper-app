@@ -6,8 +6,11 @@ import { isUuid } from "./ids";
 
 export const uuidSchema = z.string().refine(isUuid, "Not a valid id.");
 
+/** The refusal of an empty name (also shown by the browser when an empty required name goes back, slice 13, F14). */
+export const NAME_REQUIRED = "Enter a name.";
+
 /** A required name: trimmed, not empty. */
-export const nameSchema = z.string().trim().min(1, "Enter a name.");
+export const nameSchema = z.string().trim().min(1, NAME_REQUIRED);
 
 /** An optional text: trimmed; empty becomes null. */
 export const optionalTextSchema = z

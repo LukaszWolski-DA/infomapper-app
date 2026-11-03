@@ -173,11 +173,16 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     }
   }
 
-  async function renameConcept(c: TreeConcept, name: string) {
-    setRenaming(null);
+  /** The field stays open until the answer; a refused name stays in it to try again or cancel (slice 13, F13). */
+  async function renameConcept(c: TreeConcept, name: string): Promise<boolean> {
     const trimmed = name.trim();
-    if (!trimmed || trimmed === c.name) return;
-    await saveRow(c, (v) => renameConceptAction(workspaceId, { conceptId: c.id, expectedVersion: v, name: trimmed }));
+    if (!trimmed || trimmed === c.name) {
+      setRenaming(null);
+      return true;
+    }
+    const result = await saveRow(c, (v) => renameConceptAction(workspaceId, { conceptId: c.id, expectedVersion: v, name: trimmed }));
+    if (result.ok) setRenaming((r) => (r === c.id ? null : r));
+    return result.ok;
   }
 
   async function createConcept(name: string) {
@@ -205,7 +210,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                     initial={c.name}
                     label="Concept name"
                     saveOnBlur
-                    onDone={(name) => (name === null ? setRenaming(null) : void renameConcept(c, name))}
+                    onDone={(name) => (name === null ? setRenaming(null) : renameConcept(c, name))}
                   />
                 ) : (
                   <>
@@ -704,7 +709,8 @@ function NameInput({
   placeholder?: string;
   /** Leaving the field saves (rename); otherwise it cancels (new concept). */
   saveOnBlur?: boolean;
-  onDone: (name: string | null) => void;
+  /** A promise of false (a refused rename) lets the field be finished again: it keeps the text (slice 13). */
+  onDone: (name: string | null) => void | Promise<boolean>;
 }) {
   const ref = useRef<HTMLInputElement>(null);
   const finished = useRef(false);
@@ -715,7 +721,8 @@ function NameInput({
   const finish = (name: string | null) => {
     if (finished.current) return;
     finished.current = true;
-    onDone(name);
+    const done = onDone(name);
+    if (done) void done.then((ok) => !ok && (finished.current = false));
   };
   return (
     <input

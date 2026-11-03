@@ -7,11 +7,13 @@
 // CSS (`field-sizing: content`, Chromium); where that is missing (Firefox, WebKit) its `rows` follow the text's lines,
 // counted from the text in the render and in the input event. Nothing reads a height (item 12; CLAUDE.md, slice 6a).
 
+import { useEffect, useState } from "react";
 import { updateProjectAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
-import { fieldKey } from "@/app/_panels/fields";
+import { DraftLine, fieldKey, useDraft } from "@/app/_panels/fields";
 import { PROJECT_NAME_REQUIRED } from "@/domain/commands/project";
 import { useToast } from "@/ui/components/toast";
+import { rowSaves } from "@/ui/row-saves";
 
 /** The description's lines, for `rows` where `field-sizing` is missing (wrapped lines are not counted). */
 const lines = (text: string) => text.split("\n").length;
@@ -27,65 +29,101 @@ export function ProjectHeading({
   project: { id: string; name: string; description: string | null; version: number };
   editable: boolean;
 }) {
+  // a page that could edit and no longer can (an archive, a role) keeps its fields until its saves are settled, so a
+  // refused draft stays readable (slice 13, item 9); a page that never could shows text
+  const [wasEditable] = useState(editable);
+  if (!editable && !wasEditable) return <HeadingText project={project} />;
+  return <EditableHeading workspaceId={workspaceId} project={project} readOnly={!editable} />;
+}
+
+/** The name and description as text (reviewers and readers, D-59). */
+function HeadingText({ project }: { project: { name: string; description: string | null } }) {
+  return (
+    <>
+      <h1 className="m-0 py-0.5 text-2xl font-semibold leading-tight" data-testid="text-project-name">
+        {project.name}
+      </h1>
+      {project.description && (
+        <p className="m-0 whitespace-pre-line py-0.5 text-im-ink-2" data-testid="text-project-description">
+          {project.description}
+        </p>
+      )}
+    </>
+  );
+}
+
+/** The fields (slice 13, D-66): each keeps its draft across the page's fresh values and after a refusal. */
+function EditableHeading({
+  workspaceId,
+  project,
+  readOnly,
+}: {
+  workspaceId: string;
+  project: { id: string; name: string; description: string | null; version: number };
+  readOnly: boolean;
+}) {
   const { saveRow } = useAction();
   const toast = useToast();
-
-  if (!editable) {
-    return (
-      <>
-        <h1 className="m-0 py-0.5 text-2xl font-semibold leading-tight" data-testid="text-project-name">
-          {project.name}
-        </h1>
-        {project.description && (
-          <p className="m-0 whitespace-pre-line py-0.5 text-im-ink-2" data-testid="text-project-description">
-            {project.description}
-          </p>
-        )}
-      </>
-    );
-  }
-
   const save = (patch: { name?: string; description?: string }) =>
     saveRow(project, (v) => updateProjectAction({ workspaceId, projectId: project.id, expectedVersion: v, ...patch }));
+  const { bind: nameBind, defaultValue: nameInitial, commit: nameCommit, keyDown: nameKeyDown, mark: nameMark, takeStored: nameTake, keepMine: nameKeep } = useDraft<HTMLInputElement>(project.name, (v) => save({ name: v }), {
+    prepare: (t) => t.trim(),
+    required: true,
+    onEmpty: () => toast(PROJECT_NAME_REQUIRED, "refusal"),
+    readOnly,
+  });
+  // trimmed as the server stores it; the lines inside stay
+  const { bind: descriptionBind, defaultValue: descriptionInitial, commit: descriptionCommit, keyDown: descriptionKeyDown, mark: descriptionMark, takeStored: descriptionTake, keepMine: descriptionKeep } = useDraft<HTMLTextAreaElement>(project.description ?? "", (v) => save({ description: v }), { prepare: (t) => t.trim(), readOnly });
+  // read-only now: once the saves on their way are settled, the fields without a refused draft become text again
+  const [quiet, setQuiet] = useState(false);
+  useEffect(() => {
+    if (!readOnly) return;
+    let live = true;
+    void rowSaves.settled().then(() => setTimeout(() => live && setQuiet(true), 0));
+    return () => {
+      live = false;
+    };
+  }, [readOnly]);
+  if (readOnly && quiet && !nameMark && !descriptionMark) return <HeadingText project={project} />;
 
   return (
     <>
       <h1 className="m-0">
         <input
-          key={fieldKey(project.id, "name", project.name)}
+          key={fieldKey(project.id, "name")}
+          ref={nameBind}
           type="text"
-          defaultValue={project.name}
+          readOnly={readOnly}
+          defaultValue={nameInitial}
           aria-label="Project name"
           autoComplete="off"
           data-testid="field-project-name"
           className={`${fieldClass} text-2xl font-semibold leading-tight text-im-ink`}
-          onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
-          onBlur={(e) => {
-            const el = e.currentTarget;
-            const v = el.value.trim();
-            if (!v) {
-              el.value = project.name;
-              toast(PROJECT_NAME_REQUIRED, "refusal");
-              return;
-            }
-            if (v !== project.name) void save({ name: v });
+          onKeyDown={(e) => {
+            if (e.key === "Enter") e.currentTarget.blur();
+            nameKeyDown(e);
           }}
+          onBlur={nameCommit}
         />
       </h1>
+      <DraftLine mark={nameMark} onUse={nameTake} onKeep={nameKeep} />
       <textarea
-        key={fieldKey(project.id, "description", project.description)}
+        key={fieldKey(project.id, "description")}
+        ref={descriptionBind}
+        readOnly={readOnly}
         rows={lines(project.description ?? "")}
-        defaultValue={project.description ?? ""}
+        defaultValue={descriptionInitial}
         placeholder="What is this project about?"
         aria-label="Project description"
         data-testid="field-project-description"
+        // the stored version the page shows: tests wait for a save's fresh page with it (slice 13)
+        data-version={project.version}
         className={`${fieldClass} min-h-6 resize-none text-im-ink-2 [field-sizing:content]`}
         onInput={(e) => (e.currentTarget.rows = lines(e.currentTarget.value))}
-        onBlur={(e) => {
-          const v = e.currentTarget.value;
-          if (v.trim() !== (project.description ?? "")) void save({ description: v });
-        }}
+        onBlur={descriptionCommit}
+        onKeyDown={descriptionKeyDown}
       />
+      <DraftLine mark={descriptionMark} onUse={descriptionTake} onKeep={descriptionKeep} />
     </>
   );
 }

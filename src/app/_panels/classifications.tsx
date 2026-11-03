@@ -25,7 +25,7 @@ import { dataVaultReading, READING_EMPTY, READING_FOOTER, readingText, type Read
 import type { Classification, ClassificationScope, SourceTable } from "@/domain/types";
 import { NOTE_REMOVED, NOTE_SAVED } from "@/domain/commands/source";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } from "@/ui/components/dialog";
-import { buttonClass, dangerClass, Field, fieldKey, Fold, Hint, inputClass, LongList, Li, smallButtonClass, TextArea } from "./fields";
+import { buttonClass, dangerClass, Field, fieldKey, Fold, Hint, inputClass, LongList, Li, smallButtonClass, TextArea, useDraft, DraftLine } from "./fields";
 import { usePanel } from "./inspector";
 
 type Target = { kind: "source_table" | "source_column"; id: Uuid };
@@ -90,15 +90,16 @@ export function SourceNote({ target, name, version, value, placeholder, hint }: 
   return (
     <Field label="Note" htmlFor={id}>
       <TextArea
-        key={fieldKey(target.id, "note", value)}
+        key={fieldKey(target.id, "note")}
         id={id}
         value={value ?? ""}
         readOnly={!p.editable}
         placeholder={placeholder}
         data-testid="input-source-note"
+        keep={{ key: fieldKey(target.id, "note"), field: "Note", object: name }}
         data-version={version}
         onSave={(note) =>
-          void saveRow({ id: target.id, version }, (v) => setSourceNoteAction(p.workspaceId, { target, expectedVersion: v, note: note.trim() ? note : null }), (x) => (x.removed ? NOTE_REMOVED(name) : NOTE_SAVED(name)), {
+          saveRow({ id: target.id, version }, (v) => setSourceNoteAction(p.workspaceId, { target, expectedVersion: v, note: note.trim() ? note : null }), (x) => (x.removed ? NOTE_REMOVED(name) : NOTE_SAVED(name)), {
             undoable: true,
           })
         }
@@ -327,30 +328,34 @@ function Row({ c, all, onRemove }: { c: Classification; all: readonly Classifica
   const [error, setError] = useState<string | null>(null);
   const u = p.ix.classes.uses(c.id);
   const uses = u.tables.length + u.columns.length;
-  const rename = async (input: HTMLInputElement) => {
-    const n = input.value.trim();
-    if (!n || n === c.name) {
-      input.value = c.name;
-      return setError(null);
+  // the name's draft (slice 13): kept across fresh pages and after a refusal, with the message under it; empty goes back
+  const rename = async (n: string) => {
+    if (nameTakenBy(all, c.scope, n, c.id)) {
+      setError(TAKEN_NAME);
+      return null;
     }
-    if (nameTakenBy(all, c.scope, n, c.id)) return setError(TAKEN_NAME);
     const r = await saveRow(c, (v) => renameClassificationAction(p.workspaceId, { classificationId: c.id, expectedVersion: v, name: n }));
-    if (r.ok) setError(null);
-    else setError(r.message);
+    setError(r.ok || r.code === "cut" ? null : r.message);
+    return r;
   };
+  const { bind: nameBind, defaultValue: nameInitial, commit: nameCommit, keyDown: nameKeyDown, mark: nameMark, takeStored: nameTake, keepMine: nameKeep } = useDraft<HTMLInputElement>(c.name, rename, { prepare: (t) => t.trim(), required: true, onEmpty: () => setError(null) });
   return (
     <li className="py-1.5" data-testid="classification-row" data-code={c.code ?? ""}>
       <div className="flex items-center gap-2">
         <span className="flex min-w-0 flex-1 items-center gap-1.5">
           {p.editable ? (
             <input
-              key={fieldKey(c.id, "name", c.name)}
+              key={fieldKey(c.id, "name")}
+              ref={nameBind}
               type="text"
-              defaultValue={c.name}
+              defaultValue={nameInitial}
               aria-label="Name"
               aria-invalid={!!error}
-              onBlur={(e) => void rename(e.currentTarget)}
-              onKeyDown={(e) => e.key === "Enter" && e.currentTarget.blur()}
+              onBlur={nameCommit}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") e.currentTarget.blur();
+                nameKeyDown(e);
+              }}
               className={`${inputClass} h-7`}
               data-testid="input-classification-name"
             />
@@ -378,6 +383,7 @@ function Row({ c, all, onRemove }: { c: Classification; all: readonly Classifica
           {error}
         </p>
       )}
+      <DraftLine mark={nameMark} onUse={nameTake} onKeep={nameKeep} />
     </li>
   );
 }

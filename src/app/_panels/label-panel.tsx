@@ -5,7 +5,7 @@
 // items by kind as links, and “Delete label”, which takes it off every item and leaves the model alone: no question, a
 // toast with Undo, one undo step. The prototype's “Open as live canvas” comes with slice 3b.
 
-import { useContext, useState } from "react";
+import { useContext } from "react";
 import { deleteLabelAction, renameLabelAction } from "@/app/_actions/label";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
@@ -14,7 +14,7 @@ import { useOpenLiveCanvas } from "@/app/_components/live-canvas";
 import type { Uuid } from "@/domain/ids";
 import { targetOf, type LabelTargetKind } from "@/domain/model/labels";
 import type { Label } from "@/domain/types";
-import { Actions, dangerClass, Field, Fold, Kind, Li, LongList, primaryClass, TextField, TypeDot } from "./fields";
+import { Actions, dangerClass, Field, fieldKey, Fold, Kind, Li, LongList, primaryClass, TextField, TypeDot } from "./fields";
 import { usePanel } from "./inspector";
 import { attributeLabel, inputsLabel, typeCheckOf } from "./model-index";
 
@@ -36,8 +36,6 @@ export function LabelPanel({ label }: { label: Label }) {
   const workingContext = useWorkingContext();
   const liveCanvas = p.liveCanvases[label.id] ?? null;
   const openLive = useOpenLiveCanvas(p.workspaceId, p.projectId);
-  /** A refused rename shows the stored name again. */
-  const [reset, setReset] = useState(0);
   const ix = p.ix;
 
   const marked: Record<LabelTargetKind, Marked[]> = { entity: [], attribute: [], mapping: [], source_table: [], source_column: [] };
@@ -65,10 +63,8 @@ export function LabelPanel({ label }: { label: Label }) {
   const parts = SENTENCE.filter(([k]) => marked[k].length).map(([k, one, many]) => `${marked[k].length} ${marked[k].length === 1 ? one : many}`);
   const mono = (k: LabelTargetKind) => k === "mapping" || k === "source_table" || k === "source_column";
 
-  async function rename(name: string) {
-    const r = await saveRow(label, (v) => renameLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: v, name }));
-    if (!r.ok) setReset((n) => n + 1);
-  }
+  // a refused rename keeps the typed name (slice 13, D-66)
+  const rename = (name: string) => saveRow(label, (v) => renameLabelAction(p.workspaceId, { labelId: label.id, expectedVersion: v, name }));
 
   async function remove() {
     // the active context's label: the context goes off first, quietly, and one toast says both, with Undo (slice 3b,
@@ -114,7 +110,7 @@ export function LabelPanel({ label }: { label: Label }) {
     <div data-testid="panel-label">
       <Kind>Working label</Kind>
       <Field label="Name" htmlFor="f-ln">
-        <TextField key={`${label.id}:${label.version}:${reset}`} id="f-ln" value={label.name} required readOnly={!p.editable} onSave={(name) => void rename(name)} testId="input-label-name" />
+        <TextField key={fieldKey(label.id, "name")} id="f-ln" value={label.name} required readOnly={!p.editable} onSave={rename} testId="input-label-name" keep={{ key: fieldKey(label.id, "name"), field: "Name", object: label.name }} />
       </Field>
       <p className="mt-3 text-im-ink-2" data-testid="text-label-marks">
         {parts.length ? `Marks ${parts.join(", ")}.` : "Not used anywhere yet."} Labels belong to your working context, not to the model.

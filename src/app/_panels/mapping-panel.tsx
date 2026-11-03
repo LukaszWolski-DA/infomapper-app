@@ -28,7 +28,7 @@ import { formatColumnType } from "@/domain/model/type-check";
 import type { Mapping, MappingKind, MappingStatus } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { STATUS_LABEL } from "./attribute-panel";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot } from "./fields";
+import { Actions, buttonClass, dangerClass, Field, fieldKey, Fold, GroupedSelect, inputClass, Kind, Li, List, LongList, Note, Seg, TextArea, TypeDot, useDraft, DraftLine } from "./fields";
 import { usePanel } from "./inspector";
 import { RequirementsSection } from "./requirements-section";
 import { ItemLabels } from "./item-labels";
@@ -149,18 +149,21 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
     } else void write((v) => updateMappingAction(p.workspaceId, { ...ref(v), kind: "direct" }));
   }
 
-  function onRuleBlur(text: string) {
-    if (pending) return; // saved with the input
+  /** Leaving the rule saves it (or the transformation with it); null when nothing is sent. */
+  function onRuleBlur(text: string): Promise<boolean> | null {
+    if (pending) return null; // saved with the input
     const value = text.trim();
     if (wantsRule) {
       setWantsRule(false);
-      if (value) void write((v) => updateMappingAction(p.workspaceId, { ...ref(v), kind: "transform", ruleExpression: value }));
-      return;
+      return value ? write((v) => updateMappingAction(p.workspaceId, { ...ref(v), kind: "transform", ruleExpression: value })) : null;
     }
     if (m.kind === "transform" && value !== (m.rule_expression ?? "")) {
-      void write((v) => updateMappingAction(p.workspaceId, { ...ref(v), ruleExpression: value || null }));
+      return write((v) => updateMappingAction(p.workspaceId, { ...ref(v), ruleExpression: value || null }));
     }
+    return null;
   }
+  // the rule's draft (slice 13): kept across fresh pages and after a refusal
+  const { bind: ruleBind, defaultValue: ruleInitial, commit: ruleCommit, keyDown: ruleKeyDown, mark: ruleMark, takeStored: ruleTake, keepMine: ruleKeep } = useDraft<HTMLTextAreaElement>(m.rule_expression ?? "", onRuleBlur, { elementRef: rule, readOnly: !p.editable });
 
   /** A click on an input puts its column name into the rule, at the cursor (D-49). */
   function insert(columnId: Uuid) {
@@ -316,17 +319,23 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
       </Field>
       <Field label="Transformation rule" htmlFor="f-rule">
         <textarea
-          key={fieldKey(m.id, "rule", m.rule_expression)}
-          ref={rule}
+          key={fieldKey(m.id, "rule")}
+          ref={ruleBind}
           id="f-rule"
-          defaultValue={m.rule_expression ?? ""}
+          defaultValue={ruleInitial}
           disabled={!ruleOpen}
           readOnly={!p.editable}
           placeholder={`e.g. CAST(${first?.name ?? "column"} AS date), a lookup, or plain words`}
           data-testid="input-mapping-rule"
           className={`${inputClass} min-h-[60px] resize-y font-mono text-xs`}
-          onBlur={(e) => onRuleBlur(e.currentTarget.value)}
+          onBlur={(e) => {
+            // a transformation chosen and its rule left empty: nothing to save, and the hint goes
+            if (wantsRule && !pending && !e.currentTarget.value.trim()) setWantsRule(false);
+            ruleCommit();
+          }}
+          onKeyDown={ruleKeyDown}
         />
+        <DraftLine mark={ruleMark} onUse={ruleTake} onKeep={ruleKeep} mono />
       </Field>
       {pending && (
         <Note warn testId="note-rule-needed">
@@ -361,12 +370,13 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
       {fourEyesBlocks && <Note warn testId="note-four-eyes">{FOUR_EYES_MESSAGE}</Note>}
       <Field label="Note" htmlFor="f-note">
         <TextArea
-          key={fieldKey(m.id, "note", m.note_text)}
+          key={fieldKey(m.id, "note")}
           id="f-note"
           value={m.note_text ?? ""}
           readOnly={!p.editable}
           placeholder="Why this mapping, open questions, who decided"
-          onSave={(note) => void write((v) => updateMappingAction(p.workspaceId, { ...ref(v), note: note.trim() ? note : null }))}
+          onSave={(note) => write((v) => updateMappingAction(p.workspaceId, { ...ref(v), note: note.trim() ? note : null }))}
+          keep={{ key: fieldKey(m.id, "note"), field: "Note", object: `the mapping to ${attribute?.name ?? "?"}` }}
         />
       </Field>
 

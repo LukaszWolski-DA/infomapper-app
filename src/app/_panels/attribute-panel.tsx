@@ -37,6 +37,10 @@ import {
   smallButtonClass,
   TextField,
   TypeDot,
+  useChoice,
+  useDraft,
+  DraftLine,
+  type FieldSave,
 } from "./fields";
 import { usePanel } from "./inspector";
 import { ItemLabels } from "./item-labels";
@@ -106,7 +110,9 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       updateAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: versionOf(a.id), ...change }),
     );
   // only the part that changed (slice 9, F1): a queued Scale save must not send back the precision this render showed
-  const saveType = (patch: TypeInput) => void saveFollowed({ type: patch });
+  const saveType = (patch: TypeInput) => saveFollowed({ type: patch });
+  // a choice shows the newest stored value after a refusal (slice 13, R4)
+  const dataType = useChoice(a.data_type, (t) => saveType({ dataType: t }));
 
   async function addColumn(columnId: string) {
     const result = await run(() => createMappingAction(p.workspaceId, { attributeId: a.id, sourceColumnId: columnId }));
@@ -143,10 +149,10 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         </button>
       </Kind>
       <Field label="Name" htmlFor="f-an">
-        <TextField key={fieldKey(a.id, "name", a.name)} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => void save({ name })} testId="input-attribute-name" inputRef={nameRef} />
+        <TextField key={fieldKey(a.id, "name")} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-attribute-name" inputRef={nameRef} keep={{ key: fieldKey(a.id, "name"), field: "Name", object: a.name }} />
       </Field>
       <Field label="Alias" htmlFor="f-aalias">
-        <TextField key={fieldKey(a.id, "alias", a.alias)} id="f-aalias" value={a.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => void save({ alias })} testId="input-attribute-alias" />
+        <TextField key={fieldKey(a.id, "alias")} id="f-aalias" value={a.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => save({ alias })} testId="input-attribute-alias" keep={{ key: fieldKey(a.id, "alias"), field: "Alias", object: a.name }} />
       </Field>
 
       <Field label="Position on the entity">
@@ -199,13 +205,13 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         {/* the parameters sit next to the type, and wrap under it when the panel is narrow */}
         <div className="flex flex-wrap gap-2" data-testid="field-attribute-type">
           <select
-            key={fieldKey(a.id, "type", a.data_type)}
+            key={fieldKey(a.id, "type")}
             id="f-at"
-            defaultValue={a.data_type}
+            value={dataType.value}
             disabled={!followEditable}
             className={`${inputClass} min-w-[120px] flex-1 basis-[120px]`}
             data-testid="select-attribute-type"
-            onChange={(e) => saveType({ dataType: e.target.value as LogicalType })}
+            onChange={(e) => dataType.choose(e.target.value as LogicalType)}
           >
             {LOGICAL_TYPES.map((t) => (
               <option key={t} value={t}>
@@ -214,18 +220,18 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
             ))}
           </select>
           {a.data_type === "string" && (
-            <ParamField key={fieldKey(a.id, "length", a.type_length)} label="Length" value={a.type_length} disabled={!followEditable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
+            <ParamField key={fieldKey(a.id, "length")} label="Length" value={a.type_length} disabled={!followEditable} onSave={(n) => saveType({ length: n })} testId="input-type-length" />
           )}
           {a.data_type === "decimal" && (
             <div className="flex flex-none gap-2">
-              <ParamField key={fieldKey(a.id, "precision", a.type_precision)} label="Precision" value={a.type_precision} disabled={!followEditable} onSave={(n) => saveType({ precision: n })} testId="input-type-precision" />
-              <ParamField key={fieldKey(a.id, "scale", a.type_scale)} label="Scale" value={a.type_scale} disabled={!followEditable} onSave={(n) => saveType({ scale: n })} testId="input-type-scale" />
+              <ParamField key={fieldKey(a.id, "precision")} label="Precision" value={a.type_precision} disabled={!followEditable} onSave={(n) => saveType({ precision: n })} testId="input-type-precision" />
+              <ParamField key={fieldKey(a.id, "scale")} label="Scale" value={a.type_scale} disabled={!followEditable} onSave={(n) => saveType({ scale: n })} testId="input-type-scale" />
             </div>
           )}
         </div>
         {a.data_type === "custom" && (
           <div className="mt-2">
-            <TextField key={fieldKey(a.id, "custom", a.custom_type)} value={a.custom_type ?? ""} readOnly={!followEditable} onSave={(customType) => saveType({ customType })} testId="input-type-custom" mono />
+            <TextField key={fieldKey(a.id, "custom")} value={a.custom_type ?? ""} readOnly={!followEditable} onSave={(customType) => saveType({ customType })} testId="input-type-custom" mono />
             <div className="mt-1 text-[11.5px] text-im-ink-3">The type’s name, e.g. uuid.</div>
           </div>
         )}
@@ -263,7 +269,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       )}
 
       <RichTextField
-        key={fieldKey(a.id, "definition", a.definition_html)}
+        key={fieldKey(a.id, "definition")}
         label="Definition"
         html={a.definition_html}
         text={a.definition_text}
@@ -271,7 +277,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         editable={p.editable}
         subtitle="Attribute definition"
         title={attributeLabel(ix, a.id)}
-        onSave={async (html) => (await save({ definition: html })).ok}
+        onSave={(html) => save({ definition: html })}
         testId="field-attribute-definition"
       />
       <ItemLabels target={{ kind: "attribute", id: a.id }} />
@@ -355,30 +361,44 @@ function ParamField({
 }: {
   label: string;
   value: number | null;
-  onSave: (n: number | null) => void;
+  onSave: FieldSave<number | null>;
   disabled?: boolean;
   testId: string;
 }) {
+  // the text is the draft (slice 13); only a whole number or nothing is saved
+  const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(value === null ? "" : String(value), (t) => onSave(t === "" ? null : Number(t)), {
+    readOnly: disabled,
+    prepare: (t) => {
+      const n = toNumber(t);
+      return n === null ? "" : Number.isInteger(n) ? String(n) : null;
+    },
+  });
   return (
+    <>
     <input
+      ref={bind}
       type="number"
       min={0}
       aria-label={label}
       title={label}
       placeholder={label}
-      defaultValue={value ?? ""}
+      defaultValue={initial}
       disabled={disabled}
       data-testid={testId}
       // 84 px, not the input's usual full width (which made the type's parameters run out of the panel)
       className={`${inputClass.replace("w-full", "w-[84px]")} flex-none`}
       onKeyDown={(e) => {
         if (e.key === "Enter") e.currentTarget.blur();
+        keyDown(e);
       }}
-      onBlur={(e) => {
-        const n = toNumber(e.currentTarget.value);
-        if (n !== value && (n === null || Number.isInteger(n))) onSave(n);
-      }}
+      onBlur={commit}
     />
+    {mark && (
+      <div className="basis-full">
+        <DraftLine mark={mark} onUse={takeStored} onKeep={keepMine} />
+      </div>
+    )}
+    </>
   );
 }
 

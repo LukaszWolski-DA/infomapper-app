@@ -29,7 +29,13 @@ export type ActionResult<T = undefined> =
    */
   | { ok: true; value: T; live?: LiveOutcome; versions?: Record<string, number> }
   /** `fields`: the domain's field messages, when it gave some (slice 7a: P8's refusal says `review: "stale"`). */
-  | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected" | "cut"; message: string; fields?: Record<string, string> };
+  | { ok: false; code: DomainErrorCode | "unauthenticated" | "unexpected" | "cut" | "locked"; message: string; fields?: Record<string, string> };
+
+/**
+ * The refusals after which the row's waiting saves are cut (`src/ui/row-saves.ts`); each brings the fresh page. A
+ * locked organization's (`locked`) cuts them too, but brings none: its page would be the password form.
+ */
+const REFRESHING_REFUSALS = new Set<string>(["stale_version", "forbidden", "archived", "not_found"]);
 
 /** How `runCommand` runs a write. */
 export interface CommandOptions {
@@ -54,7 +60,9 @@ export type Saved<T extends object = object> = T & { version: number };
  * refused as stale is built again from fresh data (slice 4a: the requirement key counter, `fresh-retry.ts`). A write
  * into an organization this session has not unlocked is refused before anything is applied (slice 8, F3). With
  * `versions`, the answer carries the new version of every row written, the settled changes and the live step's included
- * (slice 10a, F2).
+ * (slice 10a, F2). A refusal for a stale version, a permission, the archive or a row not found revalidates the pages, so
+ * its answer brings the fresh page (slice 13, F3); a locked organization's does not, as its page would ask for the
+ * password.
  */
 export async function runCommand<T>(
   build: (ctx: CommandContext, store: DataStore, user: AppUser) => Promise<CommandResult<T>>,
@@ -94,7 +102,11 @@ export async function runCommand<T>(
     };
   };
   try {
-    return options.freshOnStale ? await retryWhenStale(once, (r) => !r.ok && r.code === "stale_version") : await once();
+    const result = options.freshOnStale ? await retryWhenStale(once, (r) => !r.ok && r.code === "stale_version") : await once();
+    // a refusal that cuts the row's waiting saves brings the fresh page in the same answer (slice 13, F3): the newest
+    // stored values and versions, and what the person may still do
+    if (!result.ok && REFRESHING_REFUSALS.has(result.code)) revalidatePath("/", "layout");
+    return result;
   } catch (e) {
     // No row content in the log (personal data, rich text): only what kind of error it was.
     console.error("Write failed:", e instanceof Error ? `${e.name}: ${e.message}` : "unknown error");

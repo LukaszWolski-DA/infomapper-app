@@ -30,7 +30,7 @@ describe("the lock (slice 8, P4, F3)", () => {
     expect(await lockedRefusal(store, new Set([SEED_IDS.orgInfoMate]), SEED_IDS.orgInfoMate)).toBeNull();
     expect(await lockedRefusal(store, new Set([SEED_IDS.orgInfoMate]), SEED_IDS.orgRetailCo)).toEqual({
       ok: false,
-      code: "forbidden",
+      code: "locked",
       message: "Unlock Retail Co first: open it and enter its password.",
     });
   });

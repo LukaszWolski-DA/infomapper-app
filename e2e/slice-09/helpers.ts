@@ -33,7 +33,7 @@ export async function groupsOf(objectId: string): Promise<{ group: string; after
   return events.map((e) => ({ group: e.change_group_id, after: e.after_image as Record<string, unknown> | null }));
 }
 
-export const STALE = "Someone changed this meanwhile. Reload to see the latest version.";
+export const STALE = "Someone changed this meanwhile.";
 
 // ---- the project home (step 3, D-59) ----
 

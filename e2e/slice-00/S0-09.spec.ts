@@ -57,6 +57,6 @@ test("S0-09: every successful write adds change events sharing one change group,
   await expectToast(second.page, "Data Vault 2.0 mode is on.");
   expect(await events()).toHaveLength(5);
   await owner.page.getByTestId("input-workspace-name").press("Enter"); // still on version 2: refused
-  await expectToast(owner.page, "Someone changed this meanwhile. Reload to see the latest version.");
+  await expectToast(owner.page, "Someone changed this meanwhile.");
   expect(await events()).toHaveLength(5);
 });

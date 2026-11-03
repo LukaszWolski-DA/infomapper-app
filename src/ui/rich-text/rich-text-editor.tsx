@@ -5,7 +5,7 @@
 // canvas page does not carry Tiptap. Esc and Cancel with unsaved changes ask first; Ctrl + Enter saves.
 
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
-import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
 import { editorExtensions, linkTarget, TEXT_COLORS, type TextColor } from "./extensions";
 
 export const FOOTER_HINT = "Ctrl + Enter saves, Esc cancels";
@@ -18,6 +18,8 @@ export interface RichTextEditorHandle {
   save: () => void;
   /** Puts the focus back into the text (after a click outside the dialog moved it away). */
   focus: () => void;
+  /** Puts `html` into the editor as its new starting text (a conflict's "Use this", slice 13). */
+  replace: (html: string) => void;
 }
 
 export interface RichTextEditorProps {
@@ -29,6 +31,8 @@ export interface RichTextEditorProps {
   onSave: (html: string, changed: boolean) => void;
   onDiscard: () => void;
   handle?: Ref<RichTextEditorHandle>;
+  /** Shown above the footer: a refused save's line (slice 13). */
+  notice?: ReactNode;
 }
 
 const COLOR_TITLES: Record<TextColor, string> = { warn: "Colour: warning", attn: "Colour: attention", ok: "Colour: confirmed", info: "Colour: information" };
@@ -44,7 +48,7 @@ function firstEmptyHint(editor: Editor): number | null {
   return at;
 }
 
-export default function RichTextEditor({ html, template, saving, onSave, onDiscard, handle }: RichTextEditorProps) {
+export default function RichTextEditor({ html, template, saving, onSave, onDiscard, handle, notice }: RichTextEditorProps) {
   const [armed, setArmed] = useState(false);
   const [linking, setLinking] = useState(false);
   const [url, setUrl] = useState("");
@@ -110,7 +114,13 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
     editor?.commands.focus();
   };
 
-  useImperativeHandle(handle, () => ({ escape: () => (linking ? closeLink() : tryCancel()), save, focus: () => editor?.commands.focus() }));
+  const replace = (next: string) => {
+    if (!editor) return;
+    editor.commands.setContent(next, { emitUpdate: true });
+    start.current = editor.getHTML();
+    setArmed(false);
+  };
+  useImperativeHandle(handle, () => ({ escape: () => (linking ? closeLink() : tryCancel()), save, focus: () => editor?.commands.focus(), replace }));
   useEffect(() => {
     if (linking) urlInput.current?.focus();
   }, [linking]);
@@ -223,6 +233,7 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
       <div className="min-h-[300px] flex-1 overflow-auto">
         <EditorContent editor={editor} className="h-full" />
       </div>
+      {notice}
       <div className="flex items-center gap-2 border-t border-im-line px-4 py-2.5 text-xs text-im-ink-3">
         <span className={armed ? "font-medium text-im-warn" : ""} data-testid="text-rte-message" role={armed ? "alert" : undefined}>
           {armed ? UNSAVED_WARNING : FOOTER_HINT}

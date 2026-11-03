@@ -9,7 +9,8 @@ export interface DomainError {
   fields?: Record<string, string>;
 }
 
-export const STALE_VERSION_MESSAGE = "Someone changed this meanwhile. Reload to see the latest version.";
+/** A stale version (AD-12). The refusal's answer brings the fresh page (slice 13), so there is nothing to reload. */
+export const STALE_VERSION_MESSAGE = "Someone changed this meanwhile.";
 export const ARCHIVED_MESSAGE = "This workspace is archived, so it is read-only.";
 
 export function domainError(code: DomainErrorCode, message: string, fields?: Record<string, string>): DomainError {

@@ -19,7 +19,9 @@ copied and pasted into any entity; the copy follows its original's type and Pers
 and attributes have an alias; each canvas shows names or aliases in two dimensions, with exceptions per card (slice 11,
 D-64). Both home pages have the canvas pages' Undo and Redo on the same history, and a project is deleted from its home
 with the canvases only it uses, one undo step (slice 12a, D-65). Canvas tiles show a thumbnail of the canvas's layout and
-count its frames, and the workspace home's project tiles show their first canvas's (slice 12b, D-29, AD-32).
+count its frames, and the workspace home's project tiles show their first canvas's (slice 12b, D-29, AD-32). A text
+field keeps what the person typed across fresh pages and after any refusal; a conflict shows the other value under it
+with "Use this" and "Keep mine" (slice 13, D-66).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -201,6 +203,8 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-11/S11-13.spec.
 SCREENS=<folder> npx playwright test e2e/slice-11/S11-screens.spec.ts                     # slice 11: names and aliases, mixed, exceptions, More, the panel field
 SCREENS=<folder> npx playwright test e2e/slice-12a/S12A-screens.spec.ts                   # slice 12a: the delete section (shared and own canvases, armed, the only project), the homes' Undo, light and dark
 SCREENS=<folder> npx playwright test e2e/slice-12b/S12B-screens.spec.ts                   # slice 12b: the tiles (seed, empty canvas, collapsed frame, live canvas, workspace home, Performance test) beside the prototype's, light and dark
+SCREENS=<folder> npx playwright test e2e/slice-13/S13-screens.spec.ts                     # slice 13: a conflict on a short field, a long text in the rich-text dialog, Not saved, Cleared meanwhile; light and dark
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-13/S13-head-elements.spec.ts  # slice 13: <head> and <body> on Performance test at 30 %, to compare page totals between builds
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spec.ts      # slice 12b: both homes' load, three data sets; LABEL=<name> for an A/B run, LOADS=<n>, COLD=<n> first visits
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
@@ -333,6 +337,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
 
   "Performance test – 20 canvases" (`scripts/lib/many-canvases.ts`, `addManyCanvases`) is written only into the e2e
   data file or the bench's copy, never into the seed or `.data/dev-db.json`.
+
+  Slice 13's helpers do the following:
+  - hold a server action's answer until the test releases it (`holdUntil`: `held`, `release`, `given`; slice 10c's
+    `holdAnswer` with a release instead of a fixed time) and read a field's caret (`caretOf`, `expectCaretAtEnd`);
+  - write as another session through the domain, so the page does not know: `changeEntityAsAnna`,
+    `changeTableNoteAsAnna`, `changeRequirementAsAnna`, `changeProjectAsAnna`, `changeSettingsElsewhere` (as Łukasz,
+    since Anna is no admin); read an entity by name (`entityNamed`);
+  - read a field's mark (`conflictLine`, `otherValue`, `notSaved`) and press its buttons (`useThis`, `keepMine`).
 
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
@@ -559,7 +571,8 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   shown one if newer); a stale version, a permission or the archive cuts the saves waiting behind it (one toast), an
   invalid input does not. Every panel save action returns `Saved<T>` (`{ version, … }`); undo and redo run as
   `rowSaves.exclusive` and feed back the versions they wrote. A command takes only the fields that changed (an
-  attribute's type: absent keeps, `null` clears). Fields are keyed by their stored value (`fieldKey`).
+  attribute's type: absent keeps, `null` clears). Fields are keyed by object and field (`fieldKey(id, field)`), never
+  by their stored value (slice 13).
   **Slice 10a:**
   - **Canvas writes are on the chain:** a line's status, split, swap and delete, an attribute's delete, a column dropped
     on a mapping, "move to the frame's concept", and the panels' writes on rows their fields save (deletes, "Mark as
@@ -576,3 +589,25 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - **Rows only the server knows:** the change-to-resolve actions return `versions`, and `run` feeds them to
     `rowSaves.answer`. Still off the chain: a canvas's rename and delete, and that action's own window
     (`docs/known-limitations.md`).
+
+  **Slice 13 (D-66):**
+  - **The draft:** a text field is uncontrolled and keeps what was typed (`useDraft` in `src/app/_panels/fields.tsx`; the
+    rules in `src/ui/field-draft.ts`, `FieldDraft`). A stored value is written into the element in an effect only
+    while the field has neither the focus nor a draft. Leaving it compares with the value on its way, else with the
+    stored one (no "Nothing to change."). Every field's `onSave` returns its save's answer (`FieldSave`). **A new text
+    field that saves a row uses `TextField`, `TextArea` or `useDraft` and returns the save.** Choice fields use
+    `useChoice`: no draft, the newest stored value after a refusal.
+  - **A refusal that cuts brings the fresh page:** `runCommand` revalidates after `stale_version`, `forbidden`,
+    `archived` and `not_found`, and `useAction`'s `saveRow` and `saveRows` answer such a refusal only once the transition
+    that applies its page has committed (`afterPage`), so the field sees the newest value and version; a plain `run`
+    answers at once (a paste's refusal empties the clipboard with its toast, S10C-08). A locked organization's refusal
+    has its own code `locked` (`lockedRefusal`): it cuts, but brings no fresh page (the password form).
+  - **The mark** (`DraftLine`): after a stale or cut refusal, the conflict line ("Changed meanwhile to: …", "Use this",
+    "Keep mine") when the field's stored value differs from its draft's base, else "Not saved"; while the line shows,
+    leaving the field saves nothing. A permission or archive refusal: read-only, "Not saved. You can still copy it.";
+    `locked`: "Not saved", editable; `not_found`: the draft goes. Escape puts the stored value back. Rich-text fields
+    show the line in their dialog (`RichConflict`, the editor's `notice` and `replace`). Folds use `line-clamp`, never
+    a measured height.
+  - **A closed panel's draft:** a field with `keep` (`DraftKeep`: its `fieldKey`, field and object names) leaves its
+    draft in `src/ui/field-drafts.ts`, the page's memory for its path; it comes back when the field mounts again.
+
