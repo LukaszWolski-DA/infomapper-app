@@ -1662,3 +1662,75 @@ so does the prototype's `relGeom(r, (n - 1) * 20)`, so the prototype nests loops
 lines between two cards (R-7's reason, two pills), loops keep D-61's 16 px; or 20 px for both with D-61 changed in 15b's
 PR. Nothing in step 2 depends on it.
 
+
+## 15b step 2: the data (4 November 2026)
+
+### What changed
+
+- **`relationship.from_role`, `to_role`** (RP-A, D-68): text, null when not named, on InfoMapper's relationship.
+  - The type is `Relationship` (`src/domain/types.ts`), and the migration is
+    `20261104110000_relationship_roles.sql`.
+  - The local file's **format 13** (`upgradeDb`, `src/data/local/file.ts`) adds both as null on every relationship,
+    with no change event and no log line. It is written back at once and not repeated.
+  - Undo reads an older change event's image without them as null (`IMAGE_DEFAULTS`, `undo.ts`, as `model_level` in
+    15a).
+  - Everything that writes a relationship today writes them as null: `createRelationship`, the seed, the large seed
+    and the fixtures. No command sets them yet (step 3).
+- **`cube_key`** (RP-B): InfoCube's third table.
+  - Registered in all three of the registry's records:
+    - `INFOCUBE_UNDO`: parents relationship and attribute, noun "key link";
+    - `INFOCUBE_RULES`: foreign keys, plus one live link per relationship and one per attribute;
+    - `InfoCubeDb`, the file's shape.
+  - The migration is `20261104110100_infocube_keys.sql` (two partial unique indexes, RLS), with the schema check's
+    list.
+  - A link goes with its relationship or its attribute in the same change group through 15a's `moduleCascade`, and
+    one undo brings both back. Clearing the attribute's FK flag writes nothing of InfoCube's (R3: the link stays,
+    inactive).
+- **The Sales star** (`addSalesStar`, RP-F):
+  - Dim Date's role "Order date" on its relationships to Fact Sales and Fact Orders.
+  - A second Fact Sales – Dim Date relationship, "Ship date", with `ship_date_key` (Integer, FK) after `date_key`.
+  - Every one of the six relationships linked explicitly to its fact's key (RP-C).
+  - The facts' measures as the prototype's demo has them: `quantity`, `net_amount`, `total_amount`, `line_count`
+    additive; `unit_price` and `discount_pct` non-additive.
+- **KB:** backed up before the branch's first run (`.data/backups/dev-db-20261104-2113.json` and
+  `kb-model-latest.json`, equal to `.data/dev-db.json`). The app upgrades KB to format 13 when it first reads it: two
+  null columns on each of its relationships. KB has no facts, so nothing else changes.
+- **`.data/demo-db.json`** (15a's star, format 12, no links) is upgraded the same way when `npm run demo` reads it. Its
+  links and roles come only with `npm run demo -- --reset` (R6: no link by name).
+
+### Earlier tests changed, and why
+
+- **The "current format" checks** in `organization-store.test.ts`, `requirement-store.test.ts`, `upgrade-8.test.ts`,
+  `working-layer-store.test.ts` and `upgrade-12.test.ts` said `12`. They now read `DEV_DB_FORMAT`, so the next format
+  does not touch them again. `upgrade-12.test.ts` strips the roles from its format-11 file too, since the file now goes
+  on to 13.
+- **`tests/infocube-star.test.ts`:**
+  - the star's six relationships with roles and keys, the key attributes' order, and the measures;
+  - the dimension's preview tested on the star's own two Dim Date – Fact Sales relationships, in place of one added by
+    the test;
+  - Fact Sales' preview now has 15a's "4 measures – deleted" row.
+- **`e2e/slice-15a/S15-14.spec.ts`:** Dim Date's preview says "3 relationships – deleted" (was 2: the Ship date one is
+  new). It also checks that the three key links go with the delete and come back with the undo.
+- **To be read in step 5:** `S15-layers.spec.ts` (measurement only), whose star now has one line and one pill more.
+
+### New tests
+
+- `src/data/local/upgrade-13.test.ts` covers the upgrade: null roles, counts, no change event, written back, not
+  repeated with roles set.
+- `tests/infocube-keys.test.ts` covers:
+  - the link cascades with its relationship and with its attribute, and one undo brings it back;
+  - an FK flag cleared writes only the attribute (R3);
+  - the store's two live unique rules and the foreign key;
+  - a 15a star file upgraded to 13: InfoCube's rows as they were, no link by name (R6).
+
+### Checks (4 November 2026)
+
+- `npm run lint` and `npm run typecheck` clean; `npm test` 135 files, 1,679 tests passed.
+- The slice-15a specs: 9 passed (S15-14 after its update above).
+- **One full e2e run** (`npm run e2e`, from scratch, no dev server running), because the step touches the table
+  registry (`cube_key` in undo, the local adapter's rules and the data file's shape) and the local adapter (format 13):
+  563 passed, 3 skipped, 2 failed, 91 min 37 s (part 1: 23 min 6 s; part 2: 23 min 21 s; part 3: 19 min 25 s; part 4:
+  25 min 44 s). The two failures, kept with the log in `.data/e2e-15b-step2-fail/` (git-ignored):
+  - S7B-12 and S7C-02 expected the file written back as format 12, a literal, as the seven unit tests changed above.
+    Not a flake and no product bug: both now read `DEV_DB_FORMAT`, and each passed three times on its own (with lint and
+    typecheck clean).

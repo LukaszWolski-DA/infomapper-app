@@ -7,6 +7,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import type { Page } from "@playwright/test";
+import { DEV_DB_FORMAT } from "../../src/data/local/schema";
 import { E2E_DB } from "../config";
 import { card } from "../slice-01a/helpers";
 import { setCard } from "../slice-06a/helpers";
@@ -76,8 +77,8 @@ test("S7C-02: a format-7 file's flags become classifications and show as before;
   await expect(page.getByTestId("panel-source-column").locator("h2")).toHaveText("cust_no");
   expect(fs.existsSync(REPORT)).toBe(true);
   expect(await whatShows(page)).toEqual(before);
-  // format 10 since slice 10c
-  expect((JSON.parse(fs.readFileSync(E2E_DB, "utf8")) as { format: number }).format).toBe(12);
+  // written back as the current format
+  expect((JSON.parse(fs.readFileSync(E2E_DB, "utf8")) as { format: number }).format).toBe(DEV_DB_FORMAT);
   expect(await classesOf(custNo)).toEqual(["BK"]);
   expect(await classesOf(fname)).toEqual(["PII"]);
 
