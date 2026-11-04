@@ -1175,3 +1175,18 @@ session. If anything is not as expected, KB can be restored from the fresh backu
   to slice-06b) 22 min 28 s, part 3 (slice-07a to slice-09) 19 min 12 s, part 4 (slice-10a to slice-15a) 25 min 7 s.
   Log: `.data/e2e-15a-step5.log`.
 - Before the merge: two full runs in a row (CLAUDE.md).
+
+## Łukasz's answers after step 5 (4 November 2026)
+
+- **Test regime** (replaces slice 4b-2's and 5a's, for every slice): after each step the slice's specs, the earlier
+  specs of what the step touched, and CI; a failing test run three times on its own; one full e2e run in a step that
+  touches shared infrastructure (undo and change groups, the save chain, the canvas's layers, the table registry, the
+  local adapter), with the reason in its report; before a merge one full run. In `CLAUDE.md`'s Testing section and the
+  PRD's section 4; PRDs no longer call a slice small or large.
+- **Decisions entered in `docs/decisions.md`:** AD-33 shortened to the principle, the composition root, the lint rule
+  (its probes named) and the two extension points that bind every module (the table registry with its guard test, the
+  cascade in the same change group); the others are listed in `CLAUDE.md`. AD-34 with "fed from the logical model
+  through dimensional mappings". AD-35 as quoted. D-67 as quoted, without "first part": one D-decision per sub-slice,
+  D-68 for 15b, D-69 with AD-36 for 15c (the PRD's O11 and section 10).
+- **No new e2e run:** docs only; step 5's full run (565 passed) is 15a's run before the merge. The merge waits for the
+  manual acceptance on KB.

@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 14b are merged (slice 14b, the canvas's row on the save chain and a warning before a page with unsaved text is left: tag `slice-14b`), and so is the e2e reliability chore; slice 15a (InfoCube's first part: the module boundary, facts and dimensions as entities of the dimensional level, the licence and the workspace's switch, AD-33 to AD-35) is on its branch, waiting for the manual acceptance. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 14b are merged (slice 14b, the canvas's row on the save chain and a warning before a page with unsaved text is left: tag `slice-14b`), and so is the e2e reliability chore; slice 15a (InfoCube's first part: the module boundary, facts and dimensions as entities of the dimensional level, the licence and the workspace's switch, AD-33 to AD-35 and D-67) is on its branch, waiting for the manual acceptance. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a

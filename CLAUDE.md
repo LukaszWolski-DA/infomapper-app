@@ -86,7 +86,8 @@ Imports go one way: `app` → `canvas` → `ui` → `domain`; `app` and `canvas`
 `ui`, `canvas`, `app`), each under its layer's rules; a module part may import InfoMapper's layers, **InfoMapper's layers
 never import a module** (lint, with probes in `tests/layer-rules.test.ts`). `src/compose/` is the **composition root**:
 the only code that names the modules, imported only by `src/app` (it may import `domain`, `data`, `ui`, `canvas` and the
-modules, never `app`). A module reaches InfoMapper only through these extension points:
+modules, never `app`). A module reaches InfoMapper only through these extension points (AD-33 names the first two and points here: keep this
+list up to date in each sub-slice):
 - **Tables:** the table registry (`src/compose/tables.ts`: `UNDO_TABLES`, `STORE_SCHEMA`, `ComposedDb`). The build fails
   when a module's table is missing from undo, the local adapter's rules or the data file's shape;
   `tests/table-registry.test.ts` (the guard test) checks every table the migrations create against them, and a table
@@ -139,13 +140,15 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 - `domain`: Vitest unit tests next to the code (`*.test.ts`). Every business rule gets a test.
 - Each slice: Playwright end-to-end tests in `e2e/slice-XX/`, one per acceptance criterion in the PRD, named after
   the criterion id. They run against a seeded local database, never against production.
-- **Full e2e runs** (Łukasz, slice 4b-2): after each step one full run (`npm run e2e`, from scratch, no dev server
-  running); if a test fails, run that file three times on its own to tell a flake from a bug. Before a merge: two full
-  runs in a row. Report each run's time and its parts' times. Keep a failing run's traces (`test-results/part-<n>/`) and
-  log before any rerun.
-- **Small slices** (Łukasz, slice 5a): after each step the slice's specs and the earlier specs of what the step
-  touched, plus CI (lint, typecheck, unit tests); a failing test run three times on its own; one full e2e run before
-  the merge. The PRD says which kind a slice is.
+- **Test runs** (Łukasz, 4 November 2026; one regime for every slice, replacing slice 4b-2's and 5a's):
+  - After each step: the slice's specs, the earlier specs of what the step touched, and CI (lint, typecheck, unit
+    tests). A failing test is run three times on its own to tell a flake from a bug.
+  - **Exception:** a step that touches shared infrastructure (undo and change groups, the save chain, the canvas's
+    layers, the table registry, the local adapter) runs one full e2e run (`npm run e2e`, from scratch, no dev server
+    running) in that step, and its report says why.
+  - Before a merge: one full e2e run.
+  - Report each full run's time and its parts' times. Keep a failing run's traces (`test-results/part-<n>/`) and log
+    before any rerun. PRDs no longer call a slice small or large.
 - Use `data-testid` attributes for elements tests need; name them after the components (e.g. `card-entity`,
   `panel-inspector`, `nav-breadcrumbs`).
 - **Łukasz's test model** (since slice 8's manual acceptance, 28 October 2026): the organization KB with the workspace

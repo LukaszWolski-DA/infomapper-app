@@ -29,9 +29,9 @@ named. Findings (F), extension points (E), questions (O, Q) and differences (P) 
 - **O9.** Reviewers approve dimensional mappings (their status), with four-eyes, as for InfoMapper's mappings (AD-05,
   AD-06). A deliberate difference from the prototype (section 8).
 - **O10.** Four sub-slices, 15a to 15d (section 4).
-- **O11.** AD-33 to AD-36 and D-67 are reserved; each enters `docs/decisions.md` at the closing of the sub-slice that
-  builds it: AD-33, AD-34, AD-35 in 15a; AD-36 in 15c; D-67 when its parts are built (15a: roles and the level rule
-  of relationships; 15c: dimensional mappings).
+- **O11.** AD-33 to AD-36 and D-67 to D-69 are reserved; each enters `docs/decisions.md` at the closing of the sub-slice
+  that builds it, one D-decision per sub-slice: AD-33, AD-34, AD-35 and D-67 in 15a (entered 4 November 2026); D-68 in
+  15b; D-69 with AD-36 in 15c (Łukasz, 4 November 2026).
 - **O12.** D-51's first rule applies to dimensional mappings (15c): a change of inputs, kind or rule sends an approved one
   back to review and clears its approval; a note alone does not. The prototype lacks it (section 8).
 - **O13.** ~~The read-only check while InfoCube is off~~ (dropped by the change to C-7 below) refuses writes to dimensional entities and attributes, to
@@ -230,7 +230,7 @@ Claude Code session may start at a step's boundary, never inside a step; it star
 2. **After Łukasz's answers:** this PRD is updated to them (section 0) and cut into four sub-slices (O10). Each has its
    own branch and tag, and follows the steps below; step 1 (the review) was done once for all four.
    - **15a – Boundary, level, licence, facts and dimensions as entities** (branch `slice/15a-boundary-level-licence`,
-     tag `slice-15a`; a **large** slice for the test regime). The module's folder, `src/compose/` and the lint rules
+     tag `slice-15a`). The module's folder, `src/compose/` and the lint rules
      (acceptance doc Q2); the table registry (E1); `model_level`; `cube_entity`, `cube_measure`; the licence and the
      switch and C-7's check; the Cube tab and the Model tab's filter; New fact and New dimension (tab and
      toolbox); the card's role, cube and fact edge; the panel's Role; relationships within a
@@ -247,18 +247,24 @@ Claude Code session may start at a step's boundary, never inside a step; it star
      - **15a step 4 – interface:** the settings box; the Cube tab; New fact and New dimension; the card; the panels'
        Role; the delete preview's rows; the star for development and slice 15's specs; the specs.
      - **15a step 5 – measurement:** the element guard, the LayerTree read, the page's bytes (`model_level`).
-     - **15a step 6 – closing:** AD-33, AD-34, AD-35, D-67's first part; the docs; two full runs; the manual check.
-   - **15b – The dimensional description** (small): the fact section (grain, measures, dimensions with their keys,
+     - **15a step 6 – closing** (done in step 5): AD-33, AD-34, AD-35, D-67; the docs; one full run; the manual check.
+   - **15b – The dimensional description:** the fact section (grain, measures, dimensions with their keys,
      hints with the key-name match, Q16), the dimension section (SCD, used by), the Measure section, the Σ marks.
-     Criteria S15-08 and S15-07's hints.
-   - **15c – Dimensional mappings** (large): `cube_mapping`, `cube_mapping_input` (M1, AD-36), format 13; drag in both
+     Criteria S15-08 and S15-07's hints; D-68.
+   - **15c – Dimensional mappings:** `cube_mapping`, `cube_mapping_input` (M1, AD-36), format 13; drag in both
      directions, lit targets and refusals (O4); the line kind with hover, Focus, bundles and the miniature; the mapping
      panel with reviewers' approval and four-eyes (O9) and D-51's first rule (O12); the line's menu, Delete, history
      places; "Create dimension from this…"; "Comes from the logical model", "Feeds facts and dimensions"; X-2, X-3,
      cascades and undo; the "fed" coverage on cards and in the Overview; the star's mappings; the dense canvas
-     measurement. Criteria S15-05, 09, 11, 12, 13, 14 (the mappings' rows), 18; D-67's second part.
-   - **15d – Requirements and the bus matrix** (small): X-5 (scope, coverage, the lens), B-8, REQ-210 in the star;
+     measurement. Criteria S15-05, 09, 11, 12, 13, 14 (the mappings' rows), 18; D-69 and AD-36.
+   - **15d – Requirements and the bus matrix:** X-5 (scope, coverage, the lens), B-8, REQ-210 in the star;
      criteria S15-15, 16, 19.
+   - **Tests in every sub-slice** (CLAUDE.md, Łukasz, 4 November 2026; one regime, no small or large slices): after each
+     step the sub-slice's specs, the earlier specs of what the step touched, and CI (lint, typecheck, unit tests); a
+     failing test run three times on its own. A step that touches shared infrastructure (undo and change groups, the
+     save chain, the canvas's layers, the table registry, the local adapter) runs one full e2e run in that step and its
+     report says why: in 15c the data step (format 13, `cube_mapping` and `cube_mapping_input` in the registry, undo and
+     the cascades) and the line kind (the canvas's layers) do. Before the merge: one full e2e run.
 
 ## 5. Acceptance criteria
 
@@ -436,28 +442,22 @@ performance), each with the files and functions behind it and a proposal.
 
 ### Decisions (proposals; numbers to confirm in step 1, the text quoted for approval in the closing)
 
-- **AD-33 (C-1)** InfoCube is a module of the one application: its code in its own folder, wired in at one
-  registration point; InfoMapper's code never imports it, a lint rule checks this; modules enter InfoMapper only
-  through named extension points (the first: dependencies in delete previews).
-- **AD-34 (C-2, C-3, C-4)** An entity has a model level, `logical` or `dimensional`, set at creation and never changed.
-  Facts and dimensions are dimensional entities; their dimensional description lives only in InfoCube's tables, which
-  point to InfoMapper's, never the other way. The model level is the one InfoMapper column InfoCube needs.
-- **D-67 (C-5, C-6)** A dimensional entity has a role, Fact or Dimension, in place of the stereotype. A relationship
-  joins two entities of the same level; levels meet only through dimensional mappings, logical attribute(s) →
-  dimensional attribute.
-- **AD-35 (C-7, as changed on 4 November 2026)** Modules are licensed per organization and turned on per workspace by an
-  owner or admin, off by default; turning one on needs the organization's licence. A module is turned off only while the
-  workspace has none of its objects, so turning it off deletes nothing; while it is off, nothing creates or brings back
-  one of its objects (a create, copy, paste, undo or redo). Ending a licence is not a command yet.
-  A workspace's copy stays in its organization and takes the module's switch and objects with it; a transfer, or a copy
-  into another organization, of a workspace with a module on is refused unless that organization holds the module's
-  licence ("{organization} has no InfoCube licence. Delete this workspace's facts and dimensions and turn InfoCube off,
-  or transfer it to an organization with the licence."); a workspace with the module off moves freely. A module is on
-  when its workspace's switch is; the licence is read when it is turned on (Q6 as changed).
+- **AD-33, AD-34, AD-35 and D-67** were entered in `docs/decisions.md` at 15a's closing (4 November 2026), with the text
+  Łukasz approved: AD-33 keeps the principle, the composition root, the lint rule and the two extension points that
+  bind every module (the table registry with its guard test, the cascade of a module's rows in the same change group);
+  the other extension points are listed in `CLAUDE.md`, kept up to date in each sub-slice. The text there is the one the
+  code follows.
+- **D-68 (15b)** The dimensional description in the panels: a fact's grain, measures and dimensions with their keys and
+  hints; a dimension's SCD type and the facts that use it; a measure's section; the Σ marks. Its final text is quoted
+  for approval at 15b's closing.
+- **D-69 (15c, with AD-36)** Dimensional mappings on the canvas and in their panel: logical attribute(s) → dimensional
+  attribute, drawn in both directions with lit targets and refusals (O4), approved by reviewers with four-eyes (O9),
+  sent back to review by D-51's first rule (O12); the "fed" coverage. Its final text is quoted for approval at 15c's
+  closing.
 - **AD-36 (Q-6)** Dimensional mappings are InfoCube's own tables (`cube_mapping`, `cube_mapping_input`), pointing to
   InfoMapper's attributes; InfoMapper's `mapping` stays source column(s) → attribute (M1, accepted with step 1).
 
-Each enters `docs/decisions.md` at the closing of the sub-slice that builds it (O11).
+Each enters `docs/decisions.md` at the closing of the sub-slice that builds it, one D-decision per sub-slice (O11).
 
 ### Assumptions to confirm
 
