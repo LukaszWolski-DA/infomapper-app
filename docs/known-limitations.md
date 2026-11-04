@@ -41,6 +41,17 @@ deletes).
 
 - **The database slice (last, AD-31):** the same check in the write's transaction, as for the last owner.
 
+### InfoCube off with facts or dimensions under concurrent writes (slice 15a; fixed in the local adapter)
+
+InfoCube is turned off only while the workspace has no facts or dimensions, and while it is off nothing creates or
+brings back one (C-7 as changed on 4 November 2026). The settings command counts the facts and dimensions from what it
+read, and a create, paste, undo or redo reads the workspace's switch; a turn-off and a new fact sent at the same moment
+each check before the other writes. The local adapter counts again inside its serialised write, for the workspaces a
+write touches (their row or an entity in them), and refuses with the turn-off's or the create's message
+(`offWithDimensional` in `src/data/local/store.ts`, tested in `tests/infocube-c7.test.ts`).
+
+- **The database slice (last, AD-31):** the same check in the write's transaction, as for the last owner.
+
 ### A late fresh page could show an older state (slice 3a step 5; fixed for notes, frames and cards in slice 3b)
 
 After a write the canvas takes the server's fresh page. A page started by one write can read the data before a later
@@ -1133,3 +1144,15 @@ Firefox and WebKit fall back to the field's `rows`, taken from the text's line b
 event (`project-heading.tsx`), never from a measured height (PRD item 12). A long line that wraps is not counted, so
 there the field shows fewer lines than the text has and scrolls inside. Later: drop the fallback once those browsers
 support `field-sizing`, or measure in the `input` event only.
+
+## Modules (slice 15a, AD-33)
+
+### Ending a licence has no command (slice 15a, C-7)
+
+An organization's licence for a module is a row of `organization_licence`. In development the seed and a script grant
+one (Q6, slice 15a step 4); nothing in the app grants or ends one, and nothing ends one at all in this slice (the
+script only grants). InfoCube is on when the workspace's switch is on (`workspace.infocube`); the licence is read only
+when it is turned on. A licence row removed by hand leaves the switch on and its facts and dimensions editable. Turning InfoCube on
+needs the licence; turning it off does not, so an owner or admin can still turn it off once the facts and dimensions
+are deleted. When a command ends licences, it decides for the workspaces that have InfoCube on (for example: refused
+while any has facts or dimensions, as turning InfoCube off is).

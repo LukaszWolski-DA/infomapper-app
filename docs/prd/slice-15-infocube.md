@@ -16,8 +16,9 @@ named. Findings (F), extension points (E), questions (O, Q) and differences (P) 
   InfoCube data; a unit test checks that every hook returns nothing with an empty registry.
 - **O2.** As the prototype: the InfoCube box is always shown in the workspace settings. Without a licence its check box
   is disabled with "{organization} has no InfoCube licence."; modelers (and reviewers, readers) see it disabled.
-- **O3.** As the prototype: undo and redo are let through while InfoCube is off (listed in `docs/known-limitations.md`).
-- **O4.** As the prototype: while InfoCube is off the dimensional drag targets still light, and the drop is refused with
+- **O3.** ~~Undo and redo are let through while InfoCube is off.~~ Dropped by the change to C-7 below.
+- **O4.** (Without effect since the change to C-7 below: while InfoCube is off there is no dimensional target.) As the
+  prototype: while InfoCube is off the dimensional drag targets still light, and the drop is refused with
   the C-7 message. The spec's "no dimensional drag targets" is a known difference (acceptance doc).
 - **O5.** The Sales star is a step for development (`npm run seed`, `reset-dev-data`) and for slice 15's specs only;
   earlier specs' data has no InfoCube data and no licence.
@@ -33,10 +34,20 @@ named. Findings (F), extension points (E), questions (O, Q) and differences (P) 
   of relationships; 15c: dimensional mappings).
 - **O12.** D-51's first rule applies to dimensional mappings (15c): a change of inputs, kind or rule sends an approved one
   back to review and clears its approval; a note alone does not. The prototype lacks it (section 8).
-- **O13. The read-only check while InfoCube is off** refuses writes to dimensional entities and attributes, to
+- **O13.** ~~The read-only check while InfoCube is off~~ (dropped by the change to C-7 below) refuses writes to dimensional entities and attributes, to
   relationships with a dimensional end, and to InfoCube's description rows (`cube_entity`, `cube_measure`, later
   `cube_mapping`, `cube_mapping_input`). Deletes of dimensional mappings pass only as the cascade of a command on a
   logical object, so S15-04's "deleting a logical entity works" holds. Domain tests cover it.
+- **The change to C-7 (Łukasz, 4 November 2026), in place of the read-only mode:**
+  - InfoCube is turned off only while the workspace has no facts or dimensions (live dimensional entities); otherwise
+    refused, in the panel and by direct call, with (proposal, for Łukasz's approval) "InfoCube can be turned off only
+    when this workspace has no facts or dimensions. It has {n}: delete them first."
+  - While it is off, every path that creates or brings back a dimensional entity is refused: create, copy, paste, undo
+    and redo. Nothing else needs a read-only check (there is no dimensional entity to change), so O3 and O13 are dropped.
+  - Ending a licence: no command in this slice (`docs/known-limitations.md`).
+  - Copying a workspace and transferring it to an organization without the licence (AD-09): not built; the acceptance
+    doc checks what the code allows and proposes a rule.
+  - The spec's IC-14 no longer matches (acceptance doc); the spec is not edited.
 - **Q16.** The dimension key by the key-name match, as one domain function, listed in `docs/known-limitations.md` until
   role-playing replaces it (15b).
 - **On the risks.** 15a starts with the table registry and a guard test: every table in the schema is known to undo and
@@ -71,7 +82,8 @@ modelling module"). Its first iteration is built in the prototype and accepted (
 - **C-6. Levels meet only through dimensional mappings.** A relationship joins two entities of the same level.
 - **C-7. Licence and activation.** An organization holds the licence; an owner or admin turns InfoCube on per workspace
   (beside Data Vault 2.0 mode). Off by default. Off never deletes anything: facts and dimensions stay, read-only, and
-  InfoCube still reports its dependencies in InfoMapper's delete previews.
+  InfoCube still reports its dependencies in InfoMapper's delete previews. **Changed on 4 November 2026** (section 0):
+  InfoCube is turned off only without facts or dimensions, and while off nothing creates or brings one back.
 
 **Principles from `docs/ideas.md` that this slice must keep:** InfoMapper works without InfoCube (principle 2);
 impact analysis crosses the modules through one extension point (principle 3); requirements and concepts are shared
@@ -130,8 +142,8 @@ The steps that build them list every new user-facing text for approval.
    how the module's own code follows the layers (Q2).
 2. **One registration point** where the application wires the module in (the composition root), and **named extension
    points** in InfoMapper for everything InfoCube adds to it: delete previews (X-1), panel sections, the left panel's
-   tab, marks on cards, a line kind, drag targets and refusals, menu items, the requirement scope, the read-only check
-   of C-7. Without the registration InfoMapper behaves exactly as before. Step 1 lists them and proposes the smallest
+   tab, marks on cards, a line kind, drag targets and refusals, menu items, the requirement scope, C-7's
+   check on what adds or brings back a fact or dimension. Without the registration InfoMapper behaves exactly as before. Step 1 lists them and proposes the smallest
    set (Q3).
 
 ### Data
@@ -161,13 +173,14 @@ The steps that build them list every new user-facing text for approval.
 
 ### Behaviour (B-1 to B-8, X-1 to X-6)
 
-9. **Licence and activation (C-7):** the setting in workspace settings for owners and admins, always shown, disabled
-   without the licence (O2); off: no Cube tab, no New fact or New dimension; drops onto dimensional targets refused
-   with the C-7 message (O4); facts
-   and dimensions read-only with a hatched header, a note in their panels, and every change to them, their attributes,
-   their relationships or InfoCube's data refused by the domain with "InfoCube is off in this workspace, so facts and
-   dimensions are read-only. An owner or admin can turn it on in the workspace settings." Moving cards stays allowed.
-   Delete previews still list InfoCube's rows.
+9. **Licence and activation (C-7, as changed on 4 November 2026):** the setting in workspace settings for owners and
+   admins, always shown, disabled without the licence (O2). Turning it on needs the organization's licence; turning it
+   off is refused while the workspace has facts or dimensions, with "InfoCube can be turned off only when this workspace
+   has no facts or dimensions. It has {n}: delete them first." (proposal), in the panel and by direct call. Off: no Cube
+   tab, no New fact or New dimension, and no fact or dimension exists; every path that would create or bring one back
+   (create, copy, paste, undo, redo) is refused by the domain with "InfoCube is off in this workspace, so no fact or
+   dimension can be added or brought back. An owner or admin can turn it on in the workspace settings." (proposal).
+   Delete previews list InfoCube's rows (a fact's delete while InfoCube is on).
 10. **The Cube tab (B-1)** with New fact, New dimension, Bus matrix; facts, then dimensions, by concept, with the Model
     tab's row actions. **The Model tab lists logical entities only.**
 11. **Creating (B-2):** New fact and New dimension in the Cube tab and in the canvas toolbox ("New fact here", "New
@@ -219,8 +232,8 @@ Claude Code session may start at a step's boundary, never inside a step; it star
    - **15a – Boundary, level, licence, facts and dimensions as entities** (branch `slice/15a-boundary-level-licence`,
      tag `slice-15a`; a **large** slice for the test regime). The module's folder, `src/compose/` and the lint rules
      (acceptance doc Q2); the table registry (E1); `model_level`; `cube_entity`, `cube_measure`; the licence and the
-     switch; the read-only check (O13); the Cube tab and the Model tab's filter; New fact and New dimension (tab and
-     toolbox); the card's role, cube, fact edge and hatch; the panel's Role and the off note; relationships within a
+     switch and C-7's check; the Cube tab and the Model tab's filter; New fact and New dimension (tab and
+     toolbox); the card's role, cube and fact edge; the panel's Role; relationships within a
      level and the turn; the level rules (Q4); a dimensional entity's delete preview and the cascade of its own rows;
      the star's entities, roles and relationships (O5). Criteria S15-01, 02, 03, 04 (without mappings), 06, 07, 10, 14
      (without mappings), 17. Steps:
@@ -228,11 +241,11 @@ Claude Code session may start at a step's boundary, never inside a step; it star
        with its guard test; `entity.model_level`, `workspace.infocube`, `organization_licence`, `cube_entity`,
        `cube_measure` (types, local schema rules, migration, the schema check); the local file's format 12 and its
        upgrade; undo's image defaults (F6); KB's backup. No behaviour change.
-     - **15a step 3 – domain:** the level on create and names within a level; the licence and the switch; the read-only
-       check (O13) with its domain tests; the relationship rules; the module's commands for facts and dimensions; the
+     - **15a step 3 – domain:** the level on create and names within a level; the licence and the switch; C-7 (turned off
+       only without facts or dimensions; nothing adds or brings one back while off) with its domain tests; the relationship rules; the module's commands for facts and dimensions; the
        cascade and dependents of dimensional objects; paste within a level (O6); the level filters of Q4.
      - **15a step 4 – interface:** the settings box; the Cube tab; New fact and New dimension; the card; the panels'
-       Role and off note; the delete preview's rows; the star for development and slice 15's specs; the specs.
+       Role; the delete preview's rows; the star for development and slice 15's specs; the specs.
      - **15a step 5 – measurement:** the element guard, the LayerTree read, the page's bytes (`model_level`).
      - **15a step 6 – closing:** AD-33, AD-34, AD-35, D-67's first part; the docs; two full runs; the manual check.
    - **15b – The dimensional description** (small): the fact section (grain, measures, dimensions with their keys,
@@ -257,7 +270,7 @@ take their criteria from this list. Every change is checked with undo and redo.
 | S15-01 | **Boundary.** The lint rule fails a test file that imports the module from InfoMapper's code; the existing e2e specs pass with the module registered and no InfoCube data; with an empty registry every hook returns nothing (unit test; O1). |
 | S15-02 | **Data.** The migration and the schema check pass. The local file's upgrade sets every entity `logical`, every workspace off, no licences; keeps every count; writes no change event; is not repeated (unit test). An old change event without `model_level` is undone as `logical`. |
 | S15-03 | **Licence and activation.** With the licence, an owner and an admin turn the InfoCube setting on; a modeler sees it disabled and a direct call is refused. Without the licence the box shows its check box disabled with "{organization} has no InfoCube licence." and a direct call is refused (O2). |
-| S15-04 | **Off (IC-14).** With InfoCube off: no Cube tab, hatched dimensional headers, the panel note; renaming Fact Sales, editing its grain, adding an attribute, drawing a relationship to a dimension and any dimensional mapping change are refused with the C-7 message, also by direct call; a drop onto a dimensional target is refused with it (O4); moving a dimensional card works; deleting a logical entity works and its preview lists InfoCube's rows; undo and redo are let through (O3). |
+| S15-04 | **Off (C-7 as changed on 4 November 2026; replaces IC-14).** With InfoCube on and Fact Sales in the workspace, turning InfoCube off is refused with "InfoCube can be turned off only when this workspace has no facts or dimensions. It has {n}: delete them first.", in the settings and by direct call; after deleting every fact and dimension it is turned off. While off: no Cube tab, no New fact or New dimension; a direct call to create a fact or dimension, a paste into one, and the undo of the deleted facts' delete (and the redo of a fact's create) are refused with the C-7 message, and the step stays in the history; deleting a logical entity works. |
 | S15-05 | **Open the Sales star (IC-01).** Facts, dimensions and logical cards; dimensional lines from logical rows to dimensional rows; Σ and ∅Σ marks. |
 | S15-06 | **Tabs (IC-02).** The Model tab lists the logical entities only; the Cube tab lists facts and dimensions by concept. |
 | S15-07 | **New fact (IC-03).** A fact card with its name selected; Role Fact; the hints "No grain yet" and "No dimension keys". One undo removes it. The same from the canvas toolbox, and for a dimension. |
@@ -277,7 +290,8 @@ take their criteria from this list. Every change is checked with undo and redo.
 **Definition of done (manual acceptance on Łukasz's model KB, after the backup and the upgrade):** turn InfoCube on in
 KB's workspace; create a dimension from a logical entity; create a fact, relate it to the dimension, add its key and two
 measures; map a logical attribute by drag; open the bus matrix; delete a logical attribute that feeds the fact and
-undo; turn InfoCube off and check the read-only state.
+undo; try to turn InfoCube off (refused, with the number of facts and dimensions), delete the facts and dimensions,
+turn it off, and try to undo the delete (refused).
 
 ## 6. Performance
 
@@ -391,8 +405,11 @@ performance), each with the files and functions behind it and a proposal.
 - **D-51's first rule for dimensional mappings** (O12): a change of inputs, kind or rule sends an approved one back to
   review and clears its approval; a note alone does not. The prototype keeps the status.
 - **Paste within one level only** (O6); the prototype has no paste.
-- **The read-only check is the domain's, on the write set** (O13, F4), not a comparison and rollback as `permitChange`;
-  undo and redo pass while off, as in the prototype (O3).
+- **No read-only mode** (C-7 as changed on 4 November 2026): the prototype turns InfoCube off with facts and dimensions
+  in place, read-only, hatched, with a note in their panels, and lets undo and redo through. The app refuses to turn it
+  off while the workspace has facts or dimensions, and while it is off refuses whatever would create or bring one back
+  (create, copy, paste, undo, redo); so there is no hatch, no off note and no read-only check. The check is the
+  domain's, on the write set (`levelWritesRefusal`, F4), and the local adapter counts again (concurrent writes).
 - The rest of the acceptance doc's list P1–P26 as answered there.
 
 ## 9. Left for later
@@ -422,9 +439,10 @@ performance), each with the files and functions behind it and a proposal.
 - **D-67 (C-5, C-6)** A dimensional entity has a role, Fact or Dimension, in place of the stereotype. A relationship
   joins two entities of the same level; levels meet only through dimensional mappings, logical attribute(s) →
   dimensional attribute.
-- **AD-35 (C-7)** Modules are licensed per organization and turned on per workspace by an owner or admin, off by
-  default. Turning a module off or ending its licence deletes nothing: its objects stay read-only, and it still reports
-  its dependencies.
+- **AD-35 (C-7, as changed on 4 November 2026)** Modules are licensed per organization and turned on per workspace by an
+  owner or admin, off by default; turning one on needs the organization's licence. A module is turned off only while the
+  workspace has none of its objects, so turning it off deletes nothing; while it is off, nothing creates or brings back
+  one of its objects (a create, copy, paste, undo or redo). Ending a licence is not a command yet.
 - **AD-36 (Q-6)** Dimensional mappings are InfoCube's own tables (`cube_mapping`, `cube_mapping_input`), pointing to
   InfoMapper's attributes; InfoMapper's `mapping` stays source column(s) → attribute (M1, accepted with step 1).
 

@@ -740,3 +740,132 @@ switch back to it or restore a backup" and never suggests the reset; no known-li
   inside the conflict's window. A timing flake of the measurement under the full run's load, not a change of this step
   (nothing on the canvas or the save path changed). Not recorded before; if it comes back, the spec should wait for the
   own save's page to settle (`settledCommits`) before writing as Anna.
+
+## Before step 3: the branch's start and the upgrade's change events (4 November 2026)
+
+- **Where `slice/15a-boundary-level-licence` started:** at `f2a08e3` ("docs: slice 15 PRD updated to step 1's answers,
+  cut into 15a-15d"), the tip of `slice/15-infocube` (its reflog: "Created from HEAD" at `f2a08e3`). It carries the PRD
+  (`e6116b7`, updated in `f2a08e3`), the spec and the prototype (`e6116b7`) and this acceptance doc (`bac163a`,
+  answers in `f2a08e3`). `slice/15-infocube` has no commit after it.
+- **The format-12 upgrade writes no change event:** the step from 11 (`upgradeDb` in `src/data/local/file.ts`) sets
+  `model_level` and `infocube` on the rows and adds the empty `organization_licence`, and nothing else;
+  `upgrade-12.test.ts` checks that `change_event` is equal before and after and that nothing is logged.
+
+## The change to C-7 (Łukasz, 4 November 2026)
+
+In place of the read-only mode: InfoCube is turned off only while the workspace has no facts or dimensions, and while it
+is off nothing creates or brings one back (create, copy, paste, undo, redo). O3 and O13 are dropped; O4 has no effect
+(no dimensional target exists while off). The PRD is updated (section 0, C-7's note, items 2 and 9, the steps, S15-04,
+the definition of done, section 8, AD-35's text).
+
+- **The spec's IC-14 no longer matches.** IC-14 turns InfoCube off with Fact Sales in place and expects the Cube tab
+  gone, hatched dimensional headers and the rename refused with the C-7 message. In the app turning off is refused while
+  Fact Sales exists ("… It has {n}: delete them first."); once the facts and dimensions are deleted it is turned off,
+  and then there is nothing to hatch or rename. S15-04 replaces IC-14 for the app; the spec is not edited.
+- **What goes from the prototype:** the hatch (`cubeoff`), the panels' off note, `CUBE_OFF` as the refusal of edits and
+  drops (l. 1414, 2572), undo and redo passing while off. PRD section 8 lists it.
+- **Q6's "on = the switch and a live licence" no longer holds:** a licence that ends would turn a workspace with facts
+  off without writing it, which the new rule forbids. **Proposal:** InfoCube is on when `workspace.infocube` is (the
+  domain reads only that); the licence is read when it is turned on. Q6's development script grants only (`licence.ts
+  grant`, no `end`), and ending a licence is not a command in this slice (`docs/known-limitations.md`, "Ending a licence
+  has no command").
+
+### Copying a workspace and transferring it (AD-09): what the code allows, and a proposal
+
+- **Today:** neither exists. AD-09 names "create (empty or copy) … transfer to another organization", but no command,
+  action or screen copies or transfers a workspace (`grep` for copy, duplicate, clone, transfer in `src/` finds only the
+  roles table's wording "incl. delete and transfer" on the workspace home, `page.tsx` l. 288). `docs/ideas.md` keeps the
+  lifecycle for later (l. 570), and step 1's E24 says a transfer must check the receiving organization's licence.
+- **Proposed rule (not built):**
+  - **A copy** stays in its organization and copies `infocube` with the facts and dimensions; a copy into another
+    organization follows the transfer's rule.
+  - **A transfer** (or a copy into another organization) of a workspace with InfoCube on is refused unless the receiving
+    organization holds the licence: "{organization} has no InfoCube licence. Delete this workspace's facts and dimensions
+    and turn InfoCube off, or transfer it to an organization with the licence." A workspace with InfoCube off transfers
+    freely (it has no facts or dimensions).
+  - Both commands iterate the table registry (E1), so a module's rows go with the workspace.
+
+## 15a step 3: the domain (4 November 2026)
+
+### What changed
+
+- **C-7** (`src/domain/model/levels.ts`, `updateWorkspaceSettings`):
+  - `updateWorkspaceSettings` takes `infocube` and, from the action, `InfoCubeSwitchState` (the licence, the
+    organization's name, the live facts and dimensions). On needs the licence ("{organization} has no InfoCube
+    licence.", `forbidden`); off is refused while the workspace has facts or dimensions (`invalid`, Łukasz's text with
+    {n}); owners and admins only, not archived (the settings' right). Without the state a change is refused.
+  - `levelWritesRefusal(workspace, writes)`: while InfoCube is off, an entity inserted or brought back (deleted to live)
+    at the dimensional level is refused with "InfoCube is off in this workspace, so no fact or dimension can be added or
+    brought back. An owner or admin can turn it on in the workspace settings." (proposal, `forbidden`). It runs on every
+    command's writes in `runCommand` (reading the workspace only when the writes touch an entity) and inside
+    `revertChangeGroup`: the refused undo or redo keeps its step, for when InfoCube is on again (a `conflict` would have
+    dropped it).
+  - The local adapter counts again in its serialised write (`offWithDimensional`), as for the last owner: a turn-off and
+    a new fact sent at once (`docs/known-limitations.md`).
+  - "Copy" in Łukasz's list: no command copies an entity today (`createEntity` is the only insert of an entity); 15c's
+    "Create dimension from this…" will go through the same check.
+- **Level rules:**
+  - The level is set at creation: `createEntity` takes `CreateEntityOptions { level, defaultName }` from code, never
+    from the input (the input stays strict). No command changes it, and `levelWritesRefusal` refuses any write that
+    would (`invalid`); an old image without the column is logical.
+  - Relationships (`createRelationship`): both ends of one level, else the prototype's text ("Facts and dimensions
+    relate to each other. To trace a fact to the logical model, map its attributes.", `invalid`). With `oneEnd` the
+    relationship starts there; the action reads it through the composition root (`relationshipOneEnd`, InfoCube's
+    `dimensionEnd`): between a fact and a dimension, the dimension is the 1..1 end. **Swap direction is not checked:**
+    the prototype swaps any relationship, and only creation turns it.
+  - Paste (`pasteAttribute`): the state has the original's entity; a paste across levels is refused with "An attribute
+    is pasted within one level only: a logical entity's into a logical entity, a fact's or dimension's into a fact or
+    dimension." (proposal, `invalid`).
+  - Names: the default name's numbering and the duplicate-name warning compare within one level (create and rename).
+  - A stereotype on a fact or dimension is refused ("A fact or dimension has a role, not a stereotype.", Q4).
+  - **Data Vault 2.0 readings on logical entities only:** the app has no reading of entities. Its Data Vault reading is
+    a source table's (`data-vault-reading.ts`, slice 7c, F9); the prototype's entity panel hints (l. 5172, "Data Vault
+    hints read the logical model only") were never built. So the rule holds with no code; whoever builds entity hints
+    filters by `isLogical`.
+- **Cascades** (`src/domain/commands/module-cascade.ts`, E14): after any command, `runCommand` soft-deletes every live
+  module row whose registered parent (`UndoTables.parents`, the same registration undo checks) the writes delete, in the
+  same change group (`withModuleCascades`, shaped as `withSettledChanges`); only the module tables that can follow are
+  read (`store.modules.list`). Deleting a fact takes its `cube_entity` and its attributes' `cube_measure`; deleting a
+  measure's attribute takes its `cube_measure`; one undo brings everything back. The undo history still names the step
+  by the entity ("Delete entity …"). 15c's rule that a mapping goes whole with any input is the module's own.
+- **InfoCube's command** `createCubeEntity` (`src/modules/infocube/domain/commands.ts`): `createEntity` at the
+  dimensional level ("New fact", "New dimension", numbered among dimensional names) and the `cube_entity` row (a fact
+  without a grain, a dimension of SCD type 1), refused while off. Its action and buttons are step 4.
+- **Store:** `organizations.listLicences` and `modules.list(workspaceId, table)` (`ports.ts`, the local store).
+- **Not in this step:** the key-name match (15b), dimensional mappings' cascades (15c), the Q4 level filters of what
+  screens list and count (the Model tab, the counts in `src/app/_panels/stats.ts`, pickers, consistency; step 4 with
+  their screens), the actions for New fact and New dimension (step 4).
+
+### S13-12 (test change only)
+
+The full run's failure in step 2 (own save 0, conflict 6) came from `settledCommits` returning before the own save's
+fresh page arrived: the counter had been still for 500 ms while the server answered under load. The spec now waits for
+the card's row to show the saved name (and Anna's name after the conflict), both drawn only by the fresh page, then for
+the counter to settle. Run three times on its own: 3 of 3 passed, own save 3, conflict 3 each time.
+
+### The newer-format message (moved from `docs/ideas.md`)
+
+`readDb` now refuses a file a newer branch wrote with "{file} has format {n}, newer than this branch's 12: a newer branch
+wrote it. Nothing was changed. Switch back to that branch, or restore a backup of the file from .data/backups/ that has
+this branch's format." (`newerFormatMessage`); an older file no upgrade reaches keeps its hint to run `npm run
+reset-dev-data`. `model-store.test.ts` checks the text, that it never names the reset, and that the file is unchanged.
+It helps from this branch on: `main` still has the old text until 15a is merged.
+
+### Earlier tests changed, and why
+
+- Paste's state has the original's entity: `aliases.test.ts`, `attribute.test.ts`, `undo.test.ts`,
+  `model-store.test.ts`, `e2e/slice-10c/helpers.ts` (`pasteAs`).
+- `tests/table-registry.test.ts`: its modeler has InfoCube on, and its file's workspace too, since a dimension is now
+  refused where InfoCube is off.
+- `e2e/slice-13/S13-12.spec.ts` (above).
+
+### Checks (4 November 2026)
+
+- `npm run lint` and `npm run typecheck`: clean.
+- `npm test`: 132 files, 1,653 tests passed.
+- `e2e/slice-13/S13-12.spec.ts` on its own, three times: 3 of 3 passed (own save 3, conflict 3 each time).
+- Full e2e run (`npm run e2e`, from scratch, no dev server running): 556 passed, 3 skipped (the measuring specs),
+  90 min 41 s. Part 1 (to `slice-02c`) 24 min 40 s, part 2 (`slice-03a` to `slice-06b`) 23 min 9 s, part 3 (`slice-07a`
+  to `slice-09`) 18 min 54 s, part 4 (`slice-10a` to `slice-14b`) 23 min 58 s. S13-12 in the run: own save 3, conflict
+  3. The server's "The destination stream closed early." lines (182) are the ones step 2's run had too (180): a test
+  leaving a page while it streams.
