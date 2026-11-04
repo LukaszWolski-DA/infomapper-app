@@ -1614,3 +1614,51 @@ RP-10 (the bus matrix's dots) goes to 15d with S15-16.
   columns). D-68 covers the behaviour; `docs/data-model-v2.md` gets the columns and `cube_key` in step 5. A separate
   AD is not proposed (AD-34's "the one InfoMapper column InfoCube needs" stays true: the roles are InfoMapper's own,
   generic, RP-A). Confirm.
+
+## Łukasz's answers to 15b step 1 (4 November 2026)
+
+- **R1:** yes, the InfoCube box as the prototype (ticked and enabled while on, even without the licence).
+- **R2:** yes, on one condition: the role fields use the same words as the cardinality fields on a relationship to
+  itself (D-61). Those say "At the right end" and "At the top end" (`relationship-panel.tsx`, D-61's text), so the roles
+  are "Role at the right end" and "Role at the top end".
+- **R3:** not as proposed. **A key link whose attribute is not a foreign key is inactive:** panels, hints and the key
+  select ignore it, nothing deletes it. RP-06 behaves the same for the person, and undo needs nothing. Turning the flag
+  back on brings the link back: a deliberate difference from the prototype (PRD section 8). What it means for the
+  commands:
+  - an inactive link still holds its relationship's and its attribute's live unique rule, so linking another key to
+    that relationship, Add key on it, and linking that attribute elsewhere soft-delete the inactive link in the same
+    change group (as an active one);
+  - the delete preview's "Carries …" row and the attribute panel's "Carries" read active links only;
+  - deleting the relationship or the attribute still takes the link along (`moduleCascade`).
+  - **Does 15c need follow-ups anyway (Łukasz asked)?** Not for this, but for Q-5: "a dimensional mapping goes whole
+    when any of its inputs goes". `moduleCascade` deletes a module row whose *parent* is deleted. A
+    `cube_mapping_input` goes with its logical attribute that way, but its `cube_mapping` is that input's parent, not its
+    child, so the mapping itself would stay with one input fewer. 15c needs a module rule for it. Either:
+    - `moduleCascade` learns "a row goes when any of its registered children goes" (a second kind of parent, in the
+      same registration), which needs no follow-ups; or
+    - InfoCube's deletes write the whole mapping themselves; that does not cover a logical attribute deleted by
+      InfoMapper's command.
+    The first is proposed for 15c's step 1; it is a delete cascade, not an update rule. **No update follow-up is needed
+    in 15c** as specified.
+- **R4:** reuse the delete with its second click (D-47, slice 10c) for an attribute that is a measure or carries a key;
+  no new dialog. **As read here:** the attribute's `ConfirmDelete` (`attribute-panel.tsx` l. 334–342, `armedDeleteText`'s
+  `also`/`then`, and the canvas's Delete in `canvas-host.tsx` l. 611) asks the second click whenever InfoCube reports
+  rows, and its text names them ("Click again to delete, with 1 measure; Fact Sales loses its key for Dim Date as Ship
+  date" or similar, proposed with the texts in step 4). If the rows do not fit, a screenshot goes to Łukasz before
+  anything else is built there.
+- **R5:** yes (a class and `::after`, no element).
+- **R6:** no script and no function: only the demo and e2e files have facts, and both are seeded explicitly. **RP-13 is
+  dropped** from the app's criteria; it stays a prototype scenario. `.data/demo-db.json` has 15a's star without links:
+  `npm run demo -- --reset` gives it the new star (README, step 5).
+- **R7:** yes, source relationships keep 16 px.
+- **D-68** covers grain, SCD, measures, hints and role-playing; it describes role names as an InfoMapper feature of every
+  relationship, which InfoCube reads. At 15b's closing AD-34 gets one sentence: "InfoCube also reads relationship roles,
+  which InfoMapper keeps for every relationship (D-68)." Both texts are quoted to Łukasz then.
+
+**Found while recording the answers (for Łukasz, step 4): D-61 and the prototype's 20 px.** D-61 says a relationship to
+itself's "further loops on one card nest outside it, their ends 16 px further from the corner". The app's loops take the
+same offset as the lines (`relGeom` → `loopGeom(A, off)`, `src/canvas/geometry.ts` l. 270–271; `line-data.ts` l. 130), and
+so does the prototype's `relGeom(r, (n - 1) * 20)`, so the prototype nests loops 20 px apart too. Proposal: 20 px for
+lines between two cards (R-7's reason, two pills), loops keep D-61's 16 px; or 20 px for both with D-61 changed in 15b's
+PR. Nothing in step 2 depends on it.
+

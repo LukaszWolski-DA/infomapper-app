@@ -56,6 +56,22 @@ named. Findings (F), extension points (E), questions (O, Q) and differences (P) 
   relationship (two nullable columns, a new local file format), the key links in InfoCube's own table, no match by
   name. The bus matrix's dots (R-8, RP-10) stay with the bus matrix in 15d. 15b's data step touches the table registry
   and the local adapter and gets a full e2e run (CLAUDE.md).
+- **15b step 1's answers (Łukasz, 4 November 2026), acceptance doc "Łukasz's answers to 15b step 1":**
+  - **R1:** the InfoCube box as the prototype: ticked and enabled while on, even without the licence.
+  - **R2:** on a relationship to itself the role fields use the cardinality fields' words (D-61: "At the right end",
+    "At the top end"): "Role at the right end", "Role at the top end".
+  - **R3:** no module follow-up. **A key link whose attribute is not a foreign key is inactive:** panels, hints and the
+    key select ignore it, nothing deletes it; turning the flag back on brings the link back (section 8).
+  - **R4:** an attribute that is a measure or carries a key is deleted with the attribute's second click (slice 10c,
+    `ConfirmDelete`), its text naming the module's rows; no new dialog. A screenshot to Łukasz first if the rows do not
+    fit.
+  - **R5:** the Σ marks are a class and `::after`, no element.
+  - **R6:** no one-time link by name in the app, no script and no function: only the demo and e2e files have facts, and
+    both are seeded with explicit links. **RP-13 is dropped from the app's criteria** (it stays a prototype scenario).
+  - **R7:** source relationships keep 16 px.
+  - **D-68** covers grain, SCD, measures, hints and role-playing, and describes role names as an InfoMapper feature of
+    every relationship that InfoCube reads. At 15b's closing AD-34 gets one sentence: "InfoCube also reads relationship
+    roles, which InfoMapper keeps for every relationship (D-68)." Both texts are quoted to Łukasz then.
 - **On the risks.** 15a starts with the table registry and a guard test: every table in the schema is known to undo and
   to the local adapter, or the build fails. Łukasz's KB file is backed up before the branch's first dev or e2e run; what
   `readDb` on `main` does with a newer format is reported (and listed if it does not refuse).
@@ -282,7 +298,8 @@ Claude Code session may start at a step's boundary, never inside a step; it star
        defaults, the migration, the star's roles and links; KB's backup. A full e2e run (the table registry, the local
        adapter).
      - **15b step 3 – domain:** the roles in `updateRelationship` and `swapRelationship`; InfoCube's commands for grain,
-       SCD, measures, links and Add key; the links' removal (cascade, and a module follow-up on the FK flag); the derived
+       SCD, measures, links and Add key; the links' removal with their relationship or attribute (cascade), an
+       inactive link while its attribute is no foreign key (R3); the derived
        rows and hints; the attribute's delete preview rows; domain tests. A full e2e run (change groups and undo).
      - **15b step 4 – interface:** the panels' sections and fields, the pill and the 20 px, the Σ marks, the attribute's
        delete with module rows; the specs.
@@ -329,7 +346,7 @@ take their criteria from this list. Every change is checked with undo and redo.
 | S15-17 | **Level rules (X-6, Q4).** Data Vault hints absent on dimensional entities; the duplicate-name warning within one level; the status bar counts logical attributes only; every other place from Q4 as answered. |
 | S15-18 | **Performance** (section 6). |
 | S15-19 | CI and the runs of the test regime; changed earlier tests listed with the reason. |
-| RP-01 to RP-14 | **Role-playing (15b, except RP-10 in 15d)** as the role-playing spec's scenarios, each with undo and redo; the acceptance doc's "15b step 1" maps them to specs and unit tests (RP-13 is a unit test). |
+| RP-01 to RP-14 | **Role-playing (15b, except RP-10 in 15d and RP-13, dropped: R6)** as the role-playing spec's scenarios, each with undo and redo; the acceptance doc's "15b step 1" maps them to specs and unit tests. |
 
 **Definition of done (manual acceptance on Łukasz's model KB, after the backup and the upgrade):** turn InfoCube on in
 KB's workspace; create a dimension from a logical entity; create a fact, relate it to the dimension, add its key and two
@@ -454,6 +471,15 @@ performance), each with the files and functions behind it and a proposal.
   off while the workspace has facts or dimensions, and while it is off refuses whatever would create or bring one back
   (create, copy, paste, undo, redo); so there is no hatch, no off note and no read-only check. The check is the
   domain's, on the write set (`levelWritesRefusal`, F4), and the local adapter counts again (concurrent writes).
+- **An inactive key link** (15b, R3): when a fact's key loses its FK flag, the prototype drops its link while indexing;
+  the app keeps the `cube_key` row and ignores it (panels, hints, the key select, the delete preview) while the
+  attribute is no foreign key, so turning the flag back on brings the link back. Nothing but the link's relationship's
+  or attribute's delete removes it, and undo needs no rule for it.
+- **No one-time link by name** (15b, R6): the prototype links older saved models once by the key-name rule; the app has
+  no such models (only the seeded demo and e2e files have facts) and seeds explicit links.
+- **An attribute's delete with InfoCube's rows** (15b, R4): the attribute's second click names them; the prototype opens
+  a dialog.
+- **The Σ marks have no title** of their own (15b, R5): a class and `::after` on the row.
 - The rest of the acceptance doc's list P1–P26 as answered there.
 
 ## 9. Left for later
