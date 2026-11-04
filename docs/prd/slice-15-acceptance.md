@@ -1190,3 +1190,10 @@ session. If anything is not as expected, KB can be restored from the fresh backu
   D-68 for 15b, D-69 with AD-36 for 15c (the PRD's O11 and section 10).
 - **No new e2e run:** docs only; step 5's full run (565 passed) is 15a's run before the merge. The merge waits for the
   manual acceptance on KB.
+
+## Manual acceptance on KB (4 November 2026)
+
+Łukasz ran 15a's definition of done on his KB model (after a backup): the licence granted with `scripts/licence.ts`,
+InfoCube turned on, a fact and a dimension created and related, a logical entity's relationship to the fact refused,
+turning InfoCube off refused, both deleted, InfoCube turned off, the delete's undo refused. **Passed.** Slice 15a is
+accepted; it is merged into `main` and tagged `slice-15a`. 15b starts only with Łukasz's go.
