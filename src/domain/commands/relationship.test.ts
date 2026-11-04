@@ -80,6 +80,31 @@ describe("relationships in the right panel", () => {
     expect(swapRelationship(makeCtx(), access("modeler"), between, ref)).toMatchObject({ ok: true, value: { relationship: { from_entity_id: ids.salesOrder, to_entity_id: ids.customer } } });
   });
 
+  it("sets a role at each end, trimmed; empty is none; on any level (slice 15b, RP-A, RP-14)", () => {
+    const r = updateRelationship(makeCtx(), access("modeler"), state, { ...ref, fromRole: " billing ", toRole: "shipping" });
+    expect(r).toMatchObject({ ok: true, value: { relationship: { from_role: "billing", to_role: "shipping", label: "places", version: 2 } } });
+    const named = { relationship: relationship({ from_role: "billing" }) };
+    expect(updateRelationship(makeCtx(), access("modeler"), named, { ...ref, fromRole: "  " })).toMatchObject({ ok: true, value: { relationship: { from_role: null } } });
+    expect(updateRelationship(makeCtx(), access("modeler"), named, { ...ref, fromRole: "billing" })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(updateRelationship(makeCtx(), access("reviewer"), state, { ...ref, fromRole: "billing" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+  });
+
+  it("swaps the roles with their ends (slice 15b)", () => {
+    const named = { relationship: relationship({ from_role: "billing", to_role: null }) };
+    expect(swapRelationship(makeCtx(), access("modeler"), named, ref)).toMatchObject({
+      ok: true,
+      value: { relationship: { from_entity_id: ids.salesOrder, to_entity_id: ids.customer, from_role: null, to_role: "billing" } },
+    });
+  });
+
+  it("swaps a relationship to itself whose ends differ only in their roles; equal roles change nothing (slice 15b)", () => {
+    const ends = { from_entity_id: ids.customer, to_entity_id: ids.customer, from_min: 0 as const, from_max: "n" as const, to_min: 0 as const, to_max: "n" as const };
+    const roles = { relationship: relationship({ ...ends, from_role: "parent", to_role: "child" }) };
+    expect(swapRelationship(makeCtx(), access("modeler"), roles, ref)).toMatchObject({ ok: true, value: { relationship: { from_role: "child", to_role: "parent", from_max: "n", to_max: "n" } } });
+    const same = { relationship: relationship({ ...ends, from_role: "part", to_role: "part" }) };
+    expect(swapRelationship(makeCtx(), access("modeler"), same, ref)).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+  });
+
   it("deletes softly", () => {
     const r = deleteRelationship(makeCtx(), access("modeler"), state, ref);
     expect(r.ok && r.writeSet.writes).toMatchObject([{ table: "relationship", row: { deleted_at: NOW, version: 2 } }]);

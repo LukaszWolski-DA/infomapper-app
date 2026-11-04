@@ -43,8 +43,7 @@ describe("the upgrade to format 13 (slice 15b, RP-A)", () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
 
     const upgraded = await readDb(file);
-    expect(DEV_DB_FORMAT).toBe(13);
-    expect(upgraded.format).toBe(13);
+    expect(upgraded.format).toBe(DEV_DB_FORMAT);
     expect(upgraded.relationship.every((r) => r.from_role === null && r.to_role === null)).toBe(true);
     expect(counts(upgraded)).toEqual(counts(db));
     expect(upgraded.change_event).toEqual(db.change_event);
@@ -58,7 +57,7 @@ describe("the upgrade to format 13 (slice 15b, RP-A)", () => {
     await asFormat12();
     await readDb(file);
     const onDisk = JSON.parse(await readFile(file, "utf8")) as DevDb;
-    expect(onDisk.format).toBe(13);
+    expect(onDisk.format).toBe(DEV_DB_FORMAT);
     expect(onDisk.relationship.every((r) => r.from_role === null && r.to_role === null)).toBe(true);
   });
 

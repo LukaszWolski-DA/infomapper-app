@@ -11,7 +11,7 @@ import { STORE_SCHEMA, UNDO_TABLES } from "@/compose";
 import { addModuleDemoData } from "@/compose/seed";
 import { seedDevData } from "@/data/local/dev-data";
 import { readDb } from "@/data/local/file";
-import { findViolation, type DevDb } from "@/data/local/schema";
+import { DEV_DB_FORMAT, findViolation, type DevDb } from "@/data/local/schema";
 import { buildSeed, SEED_IDS } from "@/data/local/seed";
 import { buildWriteSet, type CommandContext, type CommandResult, type WriteSet } from "@/domain/changes";
 import { deleteAttribute, updateAttribute } from "@/domain/commands/attribute";
@@ -20,6 +20,8 @@ import { deleteRelationship } from "@/domain/commands/relationship";
 import { revertChangeGroup, type WorkspaceRows } from "@/domain/commands/undo";
 import { makeCtx, member, workspace } from "@/domain/__fixtures__/domain";
 import type { WorkspaceAccess } from "@/domain/permissions";
+import { addKey, linkKey, type KeyState } from "@/modules/infocube/domain/commands";
+import { cubeIndex } from "@/modules/infocube/domain/keys";
 import type { CubeKey } from "@/modules/infocube/domain/types";
 
 const WS = SEED_IDS.wsRetailDwh;
@@ -104,6 +106,53 @@ describe("a key link goes with its relationship or its attribute (RP-B, RP-07, R
     const ctx = makeCtx();
     const cleared = withCascades(ctx, rows, ok(updateAttribute(ctx, modeler(), { attribute: key as never, attributes: rows.attribute as never }, { attributeId: key.id, expectedVersion: key.version, isForeignKey: false })).writeSet);
     expect(cleared.writes.map((w) => w.table)).toEqual(["attribute"]);
+    // the panels read it as no key while the flag is off, and as the key again once it is back (RP-06 with R3)
+    const after = apply(rows, cleared);
+    expect(cubeIndex(keyState(after)).keyOf(shipDate(after).id)).toBeNull();
+    const back = apply(after, ok(revertChangeGroup(makeCtx(), modeler(), { events: cleared.events, rows: after as unknown as WorkspaceRows }, "undo", UNDO_TABLES)).writeSet);
+    expect(cubeIndex(keyState(back)).keyOf(shipDate(back).id)?.name).toBe("ship_date_key");
+  });
+});
+
+/** The model and InfoCube's rows a key command reads. */
+const keyState = (rows: Rows): KeyState =>
+  ({ entities: rows.entity, attributes: rows.attribute, relationships: rows.relationship, cubeEntities: rows.cube_entity, cubeMeasures: rows.cube_measure, cubeKeys: rows.cube_key }) as unknown as KeyState;
+
+describe("Add key and a key's link in undo and redo (R-3, RP-04)", () => {
+  it("adds the key, renumbers and links it in one change group; one undo removes the attribute and the link, the role stays; redo brings both", () => {
+    // Fact Sales' Ship date relationship without its link: Add key makes ship_date_key_2 (ship_date_key is taken)
+    const start = starRows();
+    const rel = shipDate(start);
+    const unlinked = ok(linkKey(makeCtx(), modeler(), keyState(start), { relationshipId: rel.id, currentKeyId: linkOf(start, rel.id).id, attributeId: null }));
+    const rows = apply(start, unlinked.writeSet);
+    const ctx = makeCtx();
+    const added = ok(addKey(ctx, modeler(), keyState(rows), { relationshipId: rel.id, currentKeyId: null }));
+    expect(added.value.name).toBe("ship_date_key_2");
+    const groups = new Set(added.writeSet.events.map((e) => e.change_group_id));
+    expect(groups).toEqual(new Set([added.writeSet.changeGroupId]));
+    const after = apply(rows, added.writeSet);
+    // Fact Sales' attributes in their order: the new key after the last key attribute, the rest renumbered
+    const factId = (rows.attribute!.find((a) => a.name === "ship_date_key") as { entity_id: string }).entity_id;
+    const order = (r: Rows) =>
+      (r.attribute as unknown as { entity_id: string; name: string; sort_order: number; deleted_at: string | null }[])
+        .filter((a) => a.entity_id === factId && a.deleted_at === null)
+        .sort((x, y) => x.sort_order - y.sort_order)
+        .map((a) => `${a.sort_order}:${a.name}`);
+    const before = order(rows);
+    const keys = before.filter((n) => /_key/.test(n)).length;
+    expect(order(after)).toEqual([...before.slice(0, keys), `${keys}:ship_date_key_2`, ...before.slice(keys).map((n) => n.replace(/^\d+/, (d) => String(Number(d) + 1)))]);
+    expect(cubeIndex(keyState(after)).keyOf(rel.id)?.name).toBe("ship_date_key_2");
+
+    const undone = ok(revertChangeGroup(makeCtx(), modeler(), { events: added.writeSet.events, rows: after as unknown as WorkspaceRows }, "undo", UNDO_TABLES));
+    const back = apply(after, undone.writeSet);
+    expect(back.attribute!.find((a) => a.id === added.value.attributeId)!.deleted_at).not.toBeNull();
+    expect((back.cube_key as unknown as CubeKey[]).find((k) => k.id === added.value.keyId)!.deleted_at).not.toBeNull();
+    expect(order(back)).toEqual(before);
+    expect(shipDate(back)).toBeTruthy(); // the relationship and its role stay
+    expect(cubeIndex(keyState(back)).keyOf(rel.id)).toBeNull();
+
+    const redone = apply(back, ok(revertChangeGroup(makeCtx(), modeler(), { events: undone.writeSet.events, rows: back as unknown as WorkspaceRows }, "redo", UNDO_TABLES)).writeSet);
+    expect(cubeIndex(keyState(redone)).keyOf(rel.id)?.name).toBe("ship_date_key_2");
   });
 });
 
@@ -152,7 +201,7 @@ describe("the format-13 upgrade of a 15a file with the star (R6)", () => {
     const old = { ...without(db, ["cube_key"]), format: 12, relationship: db.relationship.map((r) => without(r, ["from_role", "to_role"])) } as unknown as FileDb;
     await writeFile(file, JSON.stringify(old), "utf8");
     const upgraded = (await readDb(file)) as FileDb;
-    expect(upgraded.format).toBe(13);
+    expect(upgraded.format).toBe(DEV_DB_FORMAT);
     expect(upgraded.relationship.every((r) => r.from_role === null && r.to_role === null)).toBe(true);
     expect(upgraded.cube_entity).toEqual(old.cube_entity);
     expect(upgraded.cube_measure).toEqual(old.cube_measure);
