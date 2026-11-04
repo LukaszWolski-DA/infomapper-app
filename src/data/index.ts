@@ -2,11 +2,16 @@
 // which refuses to start in production.
 
 import { devDbPath } from "./local/file";
+import type { LocalSchema } from "./local/schema";
 import { createLocalDataStore } from "./local/store";
 import type { DataStore } from "./ports";
 
 export type { DataStore } from "./ports";
 
-export function getDataStore(): DataStore {
-  return createLocalDataStore(devDbPath());
+/**
+ * `schema`: the tables the store knows (slice 15a, AD-33); InfoMapper's alone by default. Code that writes or undoes
+ * passes the composition root's (`STORE_SCHEMA` from `@/compose`), so a module's rows are stored and undone.
+ */
+export function getDataStore(schema?: LocalSchema): DataStore {
+  return createLocalDataStore(devDbPath(), schema);
 }

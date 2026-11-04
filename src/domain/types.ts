@@ -57,6 +57,20 @@ export interface OrganizationMember {
   created_at: Timestamp;
 }
 
+/** The modules an organization may hold a licence for (slice 15a, C-7, AD-35). */
+export const LICENSED_MODULES = ["infocube"] as const;
+export type LicensedModule = (typeof LICENSED_MODULES)[number];
+
+/**
+ * An organization's licence for a module (slice 15a, C-7): one live row per organization and module; ending it
+ * soft-deletes the row. An organization's row, not a workspace's (no `workspace_id`, as `organization_access`); outside
+ * undo.
+ */
+export interface OrganizationLicence extends VersionedColumns {
+  organization_id: Uuid;
+  module: LicensedModule;
+}
+
 /**
  * An organization's password for signing in during development (slice 8, F5): a table of its own, so the hash never
  * travels with an organization row. Read only on the server; its change events carry a marker instead of the hash
@@ -79,6 +93,8 @@ export interface Workspace extends VersionedColumns {
   doc_language: DocLanguage;
   dv2_mode: boolean;
   four_eyes: boolean;
+  /** InfoCube turned on here by an owner or admin (slice 15a, C-7); it works only while the organization holds the licence. */
+  infocube: boolean;
   archived_at: Timestamp | null;
   archived_by: Uuid | null;
   requirement_key_next: number;
@@ -96,6 +112,13 @@ export interface WorkspaceMember {
 
 export const STEREOTYPES = ["object", "link", "dictionary", "context", "informative"] as const;
 export type Stereotype = (typeof STEREOTYPES)[number];
+
+/**
+ * An entity's model level (slice 15a, C-3, AD-34): set when it is created, never changed. InfoMapper knows the level,
+ * not what the dimensional level means (C-4): a dimensional entity's description is a module's.
+ */
+export const MODEL_LEVELS = ["logical", "dimensional"] as const;
+export type ModelLevel = (typeof MODEL_LEVELS)[number];
 
 export const LOGICAL_TYPES = ["string", "integer", "decimal", "boolean", "date", "datetime", "json", "custom"] as const;
 export type LogicalType = (typeof LOGICAL_TYPES)[number];
@@ -118,6 +141,9 @@ export interface Entity extends StandardColumns {
   name: string;
   /** Another name (slice 11, D-64): free text, trimmed, null when empty. A canvas may show it instead of the name. */
   alias: string | null;
+  /** Set on create, never changed (slice 15a, C-3); every entity from before slice 15a is logical. */
+  model_level: ModelLevel;
+  /** A dimensional entity keeps `object`, never shown or changed (C-5; slice 15 acceptance, Q4). */
   stereotype: Stereotype;
   definition_html: string | null;
   definition_text: string | null;
@@ -603,12 +629,13 @@ export interface ChangeEvent {
   context_label_id: Uuid | null;
 }
 
-/** The tables a command may write, with their row types. */
-export interface WritableRows {
+/** InfoMapper's own tables a command may write, with their row types. */
+export interface CoreWritableRows {
   app_user: AppUser;
   organization: Organization;
   organization_member: OrganizationMember;
   organization_access: OrganizationAccess;
+  organization_licence: OrganizationLicence;
   workspace: Workspace;
   workspace_member: WorkspaceMember;
   project: Project;
@@ -638,7 +665,18 @@ export interface WritableRows {
   project_pinned_label: ProjectPinnedLabel;
   note: Note;
 }
+export type CoreTable = keyof CoreWritableRows;
+
+/**
+ * The tables a command may write: InfoMapper's and the modules' (slice 15a, AD-33). A module adds its own by augmenting
+ * this interface from its domain part (`declare module "@/domain/types"`); InfoMapper's code never names them, and
+ * `src/compose/tables.ts` checks that each one is known to undo and to the local adapter.
+ */
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type -- the modules augment it
+export interface WritableRows extends CoreWritableRows {}
 export type WritableTable = keyof WritableRows;
+/** A module's table: a writable table that is not InfoMapper's own. */
+export type ModuleTable = Exclude<WritableTable, CoreTable>;
 
 /**
  * Link tables without an id or `deleted_at`: their rows are removed, not soft-deleted (data model, change_event). The

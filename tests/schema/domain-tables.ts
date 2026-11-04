@@ -12,6 +12,8 @@ import type { ColumnKind, ColumnShape, TableShape } from "./compare-schema";
 
 const ROOT = path.resolve(__dirname, "../..");
 export const DEV_DB_FILE = path.join(ROOT, "src/data/local/schema.ts");
+/** The whole file, InfoMapper's tables and the modules' (slice 15a, AD-33): the interface the schema check reads. */
+export const COMPOSED_DB_FILE = path.join(ROOT, "src/compose/tables.ts");
 
 /** Type aliases whose name tells the column type (both are `string` to TypeScript). */
 const NAMED: Record<string, ColumnKind> = { Uuid: "uuid", Timestamp: "timestamptz" };
@@ -21,7 +23,7 @@ interface Found {
   nullable: boolean;
 }
 
-export function domainTables(file = DEV_DB_FILE, interfaceName = "DevDb"): TableShape[] {
+export function domainTables(file = COMPOSED_DB_FILE, interfaceName = "ComposedDb"): TableShape[] {
   const program = ts.createProgram([file], {
     strict: true,
     noEmit: true,

@@ -10,6 +10,7 @@
 // remembered, so that its page, drawn again, goes to the workspace home with only this step's toast (F2, Q-A).
 
 import { revalidatePath } from "next/cache";
+import { STORE_SCHEMA, UNDO_TABLES } from "@/compose";
 import { getDataStore } from "@/data";
 import { writtenVersions, type CommandContext } from "@/domain/changes";
 import { revertChangeGroup } from "@/domain/commands/undo";
@@ -59,7 +60,7 @@ export async function undoAction(
   if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
   const { user } = session;
   if (mode !== "undo" && mode !== "redo") return { ok: false, code: "invalid", message: "Undo or redo?" };
-  const store = getDataStore();
+  const store = getDataStore(STORE_SCHEMA);
   const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
   if (!workspace) return { ok: false, code: "not_found", message: "This workspace does not exist." };
   const locked = await lockedRefusal(store, session.unlocked, workspace.organization_id);
@@ -79,7 +80,7 @@ export async function undoAction(
     };
 
     const ctx: CommandContext = { actorId: user.id, now: new Date().toISOString(), newId: () => uuidv7() };
-    const reverted = revertChangeGroup(ctx, access, { events: step.events, rows: await store.model.loadForUndo(workspace.id) }, mode);
+    const reverted = revertChangeGroup(ctx, access, { events: step.events, rows: await store.model.loadForUndo(workspace.id) }, mode, UNDO_TABLES);
     if (!reverted.ok) return reverted.error.code === "conflict" ? drop() : { ok: false, code: reverted.error.code, message: reverted.error.message };
     // live canvases follow what the undo changed in labels and the model (slice 3b), in the same change group; an undo
     // or redo never links the working context or labels a card it brings back (`revert`)

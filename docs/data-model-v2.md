@@ -45,7 +45,7 @@ Table groups (AD-10):
 
 | Group | Tables |
 | --- | --- |
-| Tenancy and access | `app_user`, `organization`, `organization_access`, `organization_member`, `workspace`, `workspace_member`, `invitation` |
+| Tenancy and access | `app_user`, `organization`, `organization_access`, `organization_licence`, `organization_member`, `workspace`, `workspace_member`, `invitation` |
 | Model | `concept`, `entity`, `attribute`, `relationship` |
 | Sources | `source_system`, `source_table`, `source_column`, `source_relationship`, `source_relationship_column`, `source_import`, `source_change`, `classification`, `classification_link` |
 | Mappings | `mapping`, `mapping_input` |
@@ -53,6 +53,7 @@ Table groups (AD-10):
 | Working layer | `label`, `label_link`, `note` |
 | Organisation of work | `project`, `project_canvas`, `project_pinned_label`, `canvas`, `canvas_item`, `frame` |
 | History | `change_event`, `baseline` |
+| Modules (section 15) | InfoCube: `cube_entity`, `cube_measure` |
 
 ---
 
@@ -137,6 +138,20 @@ format 9 gave every organization without a row the development password `demo-pa
 Change events carry the marker `"(changed)"` or `"(unchanged)"` in place of `access_hash` in both images, never the
 value (`SECRET_COLUMNS` in `src/domain/changes.ts`).
 
+### `organization_licence`
+An organization's licence for a module (slice 15a, C-7, AD-35): one live row per organization and module; ending the
+licence soft-deletes it. An organization's row, not a workspace's (no `workspace_id`, as `organization_access`). Outside
+undo. A module works in a workspace while the workspace's switch is on **and** its organization holds the licence; a
+licence that ends turns every workspace off without writing them. Granted in development by the seed (InfoMate) and a
+script, never in the app (slice 15 PRD, section 8). Migration `20261104100000_model_level_and_licences.sql`; the local
+data file's format 12 gave every file an empty table.
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| `id`, `version`, `created_*`, `updated_*`, `deleted_at` | | | standard (no `workspace_id`) |
+| `organization_id` | uuid | no | FK `organization` |
+| `module` | text | no | `infocube`; unique per organization among live rows |
+
 ### `organization_member`
 A person can belong to several organizations (AD-01).
 
@@ -168,6 +183,7 @@ One model with its people, settings and baselines (AD-01, AD-07 – AD-09).
 | `doc_language` | text | no | `en`, `pl`, `de` |
 | `dv2_mode` | boolean | no | Data Vault 2.0 hints (AD-08), default false |
 | `four_eyes` | boolean | no | author cannot approve own change (AD-06), default false |
+| `infocube` | boolean | no | InfoCube turned on by an owner or admin (slice 15a, C-7), default false; works only with the organization's licence; outside undo |
 | `archived_at` | timestamptz | yes | set = read-only (AD-09) |
 | `archived_by` | uuid | yes | |
 | `requirement_key_next` | integer | no | next number for `REQ-…`, default 101 |
@@ -218,8 +234,15 @@ again in its serialised write; the database slice does it in the write's transac
 | `concept_id` | uuid | no | FK `concept` |
 | `name` | text | no | not unique; the domain warns on duplicates (B-25) |
 | `alias` | text | yes | another name, free text (slice 11, D-64); trimmed, an empty alias is null; not unique, no warning |
-| `stereotype` | text | no | `object`, `link`, `dictionary`, `context`, `informative` |
+| `model_level` | text | no | `logical` (default), `dimensional` (slice 15a, C-3, AD-34); set on create, never changed |
+| `stereotype` | text | no | `object`, `link`, `dictionary`, `context`, `informative`; a dimensional entity keeps `object`, unused (C-5) |
 | `definition_html`, `definition_text` | text | yes | rich text (D-42) |
+
+**The model level (slice 15a, C-2 to C-4, AD-34).** Facts and dimensions are entities with the level `dimensional`;
+their dimensional description lives only in a module's tables (section 15), which point to `entity` and `attribute`,
+never the other way. The level is the one column of InfoMapper's that InfoCube needs. Migration
+`20261104100000_model_level_and_licences.sql` adds it with its CHECK; the local data file's format 12 made every entity
+`logical` (no change events, no log line), and undo reads an older change event's image without the column as `logical`.
 
 ### `attribute`
 | Column | Type | Null | Notes |
@@ -646,3 +669,39 @@ the last view of each canvas, navigation history. They can move to a `user_prefe
 UX decisions (backlog document): D-02, D-04, D-07, D-08, D-10, D-12, D-20 – D-22, D-25, D-26, D-28 – D-31, D-36,
 D-37, D-40 – D-42, D-44, D-47.
 Architecture decisions (decision map): AD-01, AD-03, AD-05, AD-06, AD-08 – AD-19, AD-23, AD-26 – AD-28.
+
+## 15. Modules (slice 15a, AD-33)
+
+A module's tables are in the same database, beside InfoMapper's (C-1). They point to InfoMapper's rows, never the other
+way (C-4); InfoMapper's code never names them. The composition root (`src/compose/tables.ts`) registers each with the
+local adapter (its rules) and with undo (in the history or outside it, its parents); the build fails when one is
+missing, and the AD-31 schema check reads the whole file through it (`ComposedDb`). In the local data file a module's
+table is absent until its first row; a module's tables are not part of the file's format.
+
+### InfoCube: `cube_entity`
+Exactly one row per dimensional entity (spec, data model): its role in place of the stereotype (C-5), a fact's grain, a
+dimension's SCD type. Migration `20261104100100_infocube_entities.sql`. In the undo history (parent `entity`).
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `entity_id` | uuid | no | FK `entity` (a dimensional one); unique among live rows |
+| `role` | text | no | `fact`, `dimension` |
+| `grain` | text | yes | a fact's grain, plain text ("One order line"); null for a dimension |
+| `scd_type` | smallint | yes | a dimension's type: 0 keep, 1 overwrite (default), 2 history; null for a fact |
+
+CHECK `cube_entity_shape_ck`: a fact has no SCD type; a dimension has no grain and an SCD type of 0, 1 or 2.
+
+### InfoCube: `cube_measure`
+An attribute of a fact that is a measure: one row per such attribute (spec, data model). In the undo history (parent
+`attribute`).
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `attribute_id` | uuid | no | FK `attribute` (of a fact); unique among live rows |
+| `additivity` | text | no | `additive`, `semi`, `non` |
+| `semi_note` | text | yes | "Not additive across …" for a semi-additive measure |
+
+Deleting an entity or an attribute soft-deletes its InfoCube rows in the same change group (the domain cascades, AD-23;
+slice 15a step 3). Dimensional mappings (`cube_mapping`, `cube_mapping_input`) come with slice 15c (AD-36).

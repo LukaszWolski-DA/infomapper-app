@@ -1,6 +1,7 @@
 import "server-only";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { STORE_SCHEMA, UNDO_TABLES } from "@/compose";
 import { getDataStore, type DataStore } from "@/data";
 import { buildWriteSet, writtenVersions, type CommandContext, type CommandResult, type WriteSet } from "@/domain/changes";
 import { completeLiveWrites, touchesLiveCanvases, type LiveOutcome } from "@/domain/commands/live";
@@ -71,7 +72,7 @@ export async function runCommand<T>(
   const session = await getSession();
   if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
   const { user } = session;
-  const store = getDataStore();
+  const store = getDataStore(STORE_SCHEMA);
   const once = async (): Promise<ActionResult<T>> => {
     const ctx: CommandContext = { actorId: user.id, now: new Date().toISOString(), newId: () => uuidv7() };
     const result = await build(ctx, store, user);
@@ -124,7 +125,7 @@ export async function runCommandAs<T>(
   actorId: string,
   build: (ctx: CommandContext, store: DataStore) => Promise<CommandResult<T>>,
 ): Promise<ActionResult<T>> {
-  const store = getDataStore();
+  const store = getDataStore(STORE_SCHEMA);
   try {
     const ctx: CommandContext = { actorId, now: new Date().toISOString(), newId: () => uuidv7() };
     const result = await build(ctx, store);
@@ -204,7 +205,7 @@ const EMPTY_LIVE_STATE = {
 /** A change of the model or the layout can be undone; settings, people and a canvas's look cannot. */
 async function remember(store: DataStore, userId: AppUser["id"], writeSet: WriteSet): Promise<void> {
   const workspaceId = writeSet.events[0]?.workspace_id;
-  if (!workspaceId || !isUndoable(writeSet.events)) return;
-  const step = { changeGroupId: writeSet.changeGroupId, label: writeSet.label ?? changeLabel(writeSet.events), events: writeSet.events };
+  if (!workspaceId || !isUndoable(writeSet.events, UNDO_TABLES)) return;
+  const step = { changeGroupId: writeSet.changeGroupId, label: writeSet.label ?? changeLabel(writeSet.events, UNDO_TABLES.nouns), events: writeSet.events };
   await store.undoHistory.update(workspaceId, userId, (h) => recordChange(h, step));
 }

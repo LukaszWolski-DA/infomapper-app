@@ -83,6 +83,7 @@ export function createEntity(
     concept_id: conceptId,
     name: name ?? freeDefaultName(state.entities),
     alias: null,
+    model_level: "logical",
     stereotype: "object",
     definition_html: null,
     definition_text: null,

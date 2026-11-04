@@ -20,7 +20,9 @@ import type {
   MappingInput,
   Note,
   Organization,
+  ModuleTable,
   OrganizationAccess,
+  OrganizationLicence,
   OrganizationMember,
   Project,
   ProjectCanvas,
@@ -37,7 +39,9 @@ import type {
   SourceTable,
   Workspace,
   WorkspaceMember,
+  WritableRows,
 } from "@/domain/types";
+import { UNDOABLE_TABLES } from "@/domain/commands/undo";
 import {
   CARDINALITY_MAX,
   CHANGE_OPERATIONS,
@@ -46,10 +50,12 @@ import {
   DOC_LANGUAGES,
   FRAME_KINDS,
   IMPORT_CHANNELS,
+  LICENSED_MODULES,
   LIVE_LEVELS,
   LOGICAL_TYPES,
   MAPPING_KINDS,
   MAPPING_STATUSES,
+  MODEL_LEVELS,
   NOTE_COLORS,
   NOTE_STATUSES,
   ORGANIZATION_ROLES,
@@ -80,9 +86,13 @@ import {
  * changes its imports leave (`deriveSourceChanges`, F1), a format-7 file the classifications its flags said and its
  * hand-typed comments as notes (`upgrade-8.ts`), a format-8 file the password `demo-pass` for every organization (F7,
  * F18: no change events, one log line), a format-9 file the null link on every attribute (slice 10c, F11: no change
- * events, no log line), a format-10 file the null aliases and names (slice 11: no change events, no log line). It is written back at once; an older file is refused with a hint to run "npm run reset-dev-data".
+ * events, no log line), a format-10 file the null aliases and names (slice 11: no change events, no log line), a
+ * format-11 file every entity's model level `logical`, every workspace's InfoCube off and no licences (slice 15a: no
+ * change events, no log line). 12 = slice 15a (`model_level` on entities, `infocube` on workspaces,
+ * `organization_licence`). It is written back at once; an older file is refused with a hint to run "npm run
+ * reset-dev-data". A module's tables are not part of the format (AD-33): a file without one has none of its rows yet.
  */
-export const DEV_DB_FORMAT = 11;
+export const DEV_DB_FORMAT = 12;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -90,6 +100,7 @@ export interface DevDb {
   organization: Organization[];
   organization_member: OrganizationMember[];
   organization_access: OrganizationAccess[];
+  organization_licence: OrganizationLicence[];
   workspace: Workspace[];
   workspace_member: WorkspaceMember[];
   project: Project[];
@@ -124,12 +135,21 @@ export interface DevDb {
 export type DevTable = Exclude<keyof DevDb, "format">;
 export type AnyRow = Record<string, unknown>;
 
+/**
+ * A module's tables in the same file (slice 15a, AD-33): beside InfoMapper's, under their own names, absent until a
+ * module writes its first row. InfoMapper's code never names them; their rules come with the store's schema.
+ */
+export type ModuleDb = { [T in ModuleTable]?: WritableRows[T][] };
+/** Any table the store may hold: InfoMapper's and the modules'. */
+export type StoreTable = DevTable | ModuleTable;
+
 export const emptyDb = (): DevDb => ({
   format: DEV_DB_FORMAT,
   app_user: [],
   organization: [],
   organization_member: [],
   organization_access: [],
+  organization_licence: [],
   workspace: [],
   workspace_member: [],
   project: [],
@@ -161,10 +181,10 @@ export const emptyDb = (): DevDb => ({
   change_event: [],
 });
 
-interface TableRules {
+export interface TableRules {
   key: readonly string[];
   /** column -> referenced table (always its `id`). Null values are allowed where the column is nullable. */
-  foreignKeys: Readonly<Record<string, DevTable>>;
+  foreignKeys: Readonly<Record<string, StoreTable>>;
   /**
    * Unique indexes besides the key; `live` = only rows with deleted_at null, `where` = a further condition
    * (partial indexes such as "where entity_id is not null and deleted_at is null"), `lower` = columns compared in lower
@@ -175,12 +195,12 @@ interface TableRules {
 }
 
 const audit = { created_by: "app_user", updated_by: "app_user" } as const;
-const oneOf = (values: readonly string[], column: string) => (row: AnyRow) => values.includes(row[column] as string);
+export const oneOf = (values: readonly string[], column: string) => (row: AnyRow) => values.includes(row[column] as string);
 const isSet = (v: unknown) => v !== null && v !== undefined;
 /** A nullable closed value (`x is null or x in (...)`). */
 const noneOrOneOf = (values: readonly string[], column: string) => (row: AnyRow) => row[column] === null || values.includes(row[column] as string);
-/** Standard model columns: the workspace and the audit users. */
-const model = { workspace_id: "workspace", ...audit } as const;
+/** Standard model columns: the workspace and the audit users (a module's tables use them too, slice 15a). */
+export const model = { workspace_id: "workspace", ...audit } as const;
 
 function typeParamsFit(r: AnyRow): boolean {
   const length = r.type_length as number | null;
@@ -209,6 +229,13 @@ export const RULES: Record<DevTable, TableRules> = {
   organization_access: {
     key: ["organization_id"],
     foreignKeys: { organization_id: "organization", changed_by: "app_user" },
+  },
+  // slice 15a (C-7): one live licence per organization and module
+  organization_licence: {
+    key: ["id"],
+    foreignKeys: { organization_id: "organization", ...audit },
+    unique: [{ columns: ["organization_id", "module"], live: true }],
+    checks: [{ name: "organization_licence_module_ck", test: oneOf(LICENSED_MODULES, "module") }],
   },
   workspace: {
     key: ["id"],
@@ -244,7 +271,10 @@ export const RULES: Record<DevTable, TableRules> = {
   entity: {
     key: ["id"],
     foreignKeys: { ...model, concept_id: "concept" },
-    checks: [{ name: "entity_stereotype_ck", test: oneOf(STEREOTYPES, "stereotype") }],
+    checks: [
+      { name: "entity_stereotype_ck", test: oneOf(STEREOTYPES, "stereotype") },
+      { name: "entity_model_level_ck", test: oneOf(MODEL_LEVELS, "model_level") },
+    ],
   },
   attribute: {
     key: ["id"],
@@ -512,14 +542,46 @@ export const RULES: Record<DevTable, TableRules> = {
 
 export const TABLES = Object.keys(RULES) as DevTable[];
 
-/** The rows of a table as plain records, for the generic rules below and the adapter. */
-export const rowsOf = (db: DevDb, table: DevTable): AnyRow[] => db[table] as unknown as AnyRow[];
+/**
+ * The tables a store knows (slice 15a, AD-33): InfoMapper's rules and the registered modules', and the tables undo
+ * reads. Made once by `localSchema`; `src/compose/tables.ts` makes the application's.
+ */
+export interface LocalSchema {
+  readonly rules: Readonly<Record<string, TableRules>>;
+  readonly tables: readonly string[];
+  /** The tables `loadForUndo` reads: InfoMapper's undoable ones and the modules'. */
+  readonly undoable: readonly string[];
+}
 
-export const keyOf = (table: DevTable, row: AnyRow): string => RULES[table].key.map((c) => String(row[c])).join("|");
+/** InfoMapper's rules with a module's added; a name InfoMapper already has is refused. */
+export function localSchema(moduleRules: Readonly<Partial<Record<ModuleTable, TableRules>>>, undoable: readonly string[] = UNDOABLE_TABLES): LocalSchema {
+  const rules: Record<string, TableRules> = { ...RULES };
+  for (const [table, r] of Object.entries(moduleRules) as [string, TableRules | undefined][]) {
+    if (!r) continue;
+    if (table in rules) throw new Error(`The table ${table} is InfoMapper's or registered twice.`);
+    rules[table] = r;
+  }
+  return { rules, tables: Object.keys(rules), undoable };
+}
+
+/** InfoMapper's tables only: tests, scripts and earlier specs' helpers that write no module rows. */
+export const CORE_SCHEMA: LocalSchema = localSchema({});
+
+/**
+ * The rows of a table as plain records, for the generic rules below and the adapter. A module's table may be absent from
+ * the file (no rows yet): read as empty.
+ */
+export const rowsOf = (db: DevDb, table: StoreTable): AnyRow[] => ((db as unknown as Record<string, AnyRow[] | undefined>)[table] ?? []);
+
+export const keyOf = (table: StoreTable, row: AnyRow, schema: LocalSchema = CORE_SCHEMA): string => {
+  const rules = schema.rules[table];
+  if (!rules) throw new Error(`The store does not know the table ${table}: register it (src/compose/tables.ts).`);
+  return rules.key.map((c) => String(row[c])).join("|");
+};
 
 export interface IntegrityViolation {
-  kind: "duplicate_key" | "unique" | "foreign_key" | "check";
-  table: DevTable;
+  kind: "duplicate_key" | "unique" | "foreign_key" | "check" | "unknown_table";
+  table: StoreTable;
   detail: string;
 }
 
@@ -529,9 +591,17 @@ export interface IntegrityViolation {
  * other tables cannot break: writes never take an id away (deletes are soft; removed link rows are no foreign key's
  * target).
  */
-export function findViolation(db: DevDb, scope?: { tables: ReadonlySet<DevTable>; newEvents: number }): IntegrityViolation | null {
-  const idsCache = new Map<DevTable, Set<string>>();
-  const ids = (table: DevTable) => {
+export function findViolation(
+  db: DevDb,
+  scope?: { tables: ReadonlySet<StoreTable>; newEvents: number },
+  schema: LocalSchema = CORE_SCHEMA,
+): IntegrityViolation | null {
+  // a table the schema does not know (a module's rows without its registration) is refused, never skipped (slice 15a)
+  const present = scope ? [...scope.tables] : (Object.keys(db).filter((k) => k !== "format") as StoreTable[]);
+  const unknown = present.find((t) => !schema.rules[t]);
+  if (unknown) return { kind: "unknown_table", table: unknown, detail: `no rules for ${unknown}` };
+  const idsCache = new Map<StoreTable, Set<string>>();
+  const ids = (table: StoreTable) => {
     let set = idsCache.get(table);
     if (!set) {
       set = new Set(rowsOf(db, table).map((r) => String(r.id)));
@@ -540,16 +610,16 @@ export function findViolation(db: DevDb, scope?: { tables: ReadonlySet<DevTable>
     return set;
   };
 
-  for (const table of TABLES) {
+  for (const table of schema.tables as StoreTable[]) {
     const isEvents = table === "change_event";
     if (scope && !isEvents && !scope.tables.has(table)) continue;
-    const rules = RULES[table];
+    const rules = schema.rules[table]!;
     const rows = rowsOf(db, table);
     const keys = new Set<string>();
     const firstChecked = scope && isEvents ? rows.length - scope.newEvents : 0;
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i]!;
-      const key = keyOf(table, row);
+      const key = keyOf(table, row, schema);
       if (keys.has(key)) return { kind: "duplicate_key", table, detail: `duplicate key ${key}` };
       keys.add(key);
       if (i < firstChecked) continue;
@@ -575,7 +645,7 @@ export function findViolation(db: DevDb, scope?: { tables: ReadonlySet<DevTable>
       }
     }
   }
-  if (scope && !["canvas", "canvas_item", "frame", "note"].some((t) => scope.tables.has(t as DevTable))) return null;
+  if (scope && !["canvas", "canvas_item", "frame", "note"].some((t) => scope.tables.has(t as StoreTable))) return null;
   return crossTableViolation(db);
 }
 

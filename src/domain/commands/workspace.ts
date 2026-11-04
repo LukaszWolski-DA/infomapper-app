@@ -77,6 +77,7 @@ export function newWorkspaceRows(
     doc_language: "en",
     dv2_mode: false,
     four_eyes: false,
+    infocube: false,
     archived_at: null,
     archived_by: null,
     requirement_key_next: 101,

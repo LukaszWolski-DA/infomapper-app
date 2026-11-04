@@ -635,7 +635,7 @@ describe("collapsed frames and the other frame commands (slice 2c)", () => {
 
 // ---- undo (AD-13): one step restores a frame and its cards together ----
 
-type Rows = { -readonly [T in keyof WorkspaceRows]: WorkspaceRows[T][number][] };
+type Rows = { -readonly [T in keyof WorkspaceRows]: NonNullable<WorkspaceRows[T]>[number][] };
 
 function rowsOf(items: CanvasItem[], frames: Frame[], entities: Entity[] = model.entities): Rows {
   return {

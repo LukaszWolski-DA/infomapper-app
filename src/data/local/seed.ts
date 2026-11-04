@@ -95,6 +95,7 @@ export function buildSeed(now: Date = new Date()): DevDb {
       doc_language: w.lang,
       dv2_mode: w.dv2 ?? false,
       four_eyes: w.fourEyes ?? false,
+      infocube: false,
       archived_at: w.archived ? at : null,
       archived_by: w.archived ? users[by].id : null,
       requirement_key_next: 101,
