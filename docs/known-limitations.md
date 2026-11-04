@@ -41,6 +41,17 @@ deletes).
 
 - **The database slice (last, AD-31):** the same check in the write's transaction, as for the last owner.
 
+### InfoCube off with facts or dimensions under concurrent writes (slice 15a; fixed in the local adapter)
+
+InfoCube is turned off only while the workspace has no facts or dimensions, and while it is off nothing creates or
+brings back one (C-7 as changed on 4 November 2026). The settings command counts the facts and dimensions from what it
+read, and a create, paste, undo or redo reads the workspace's switch; a turn-off and a new fact sent at the same moment
+each check before the other writes. The local adapter counts again inside its serialised write, for the workspaces a
+write touches (their row or an entity in them), and refuses with the turn-off's or the create's message
+(`offWithDimensional` in `src/data/local/store.ts`, tested in `tests/infocube-c7.test.ts`).
+
+- **The database slice (last, AD-31):** the same check in the write's transaction, as for the last owner.
+
 ### A late fresh page could show an older state (slice 3a step 5; fixed for notes, frames and cards in slice 3b)
 
 After a write the canvas takes the server's fresh page. A page started by one write can read the data before a later
@@ -1133,3 +1144,38 @@ Firefox and WebKit fall back to the field's `rows`, taken from the text's line b
 event (`project-heading.tsx`), never from a measured height (PRD item 12). A long line that wraps is not counted, so
 there the field shows fewer lines than the text has and scrolls inside. Later: drop the fallback once those browsers
 support `field-sizing`, or measure in the `input` event only.
+
+## Modules (slice 15a, AD-33)
+
+### Ending a licence has no command (slice 15a, C-7)
+
+An organization's licence for a module is a row of `organization_licence`. In development the Sales star's step of
+`npm run seed`, `npm run reset-dev-data` and `npm run demo` grants InfoMate one, and `npx tsx scripts/licence.ts grant
+"<organization name>" infocube [--file <db>]` grants one in any local file (slice 15a step 4); nothing in the app grants
+or ends one, and nothing ends one at all in this slice (the script only grants). InfoCube is on when the workspace's
+switch is on (`workspace.infocube`); the licence is read only when it is turned on. A licence row removed by hand leaves
+the switch on and its facts and dimensions editable. Turning InfoCube on needs the licence; turning it off does not, so
+an owner or admin can still turn it off once the facts and dimensions are deleted. When a command ends licences, it
+decides for the workspaces that have InfoCube on (for example: refused while any has facts or dimensions, as turning
+InfoCube off is).
+
+### A workspace's copy and transfer (slice 15a, AD-35)
+
+The rule for a workspace with a module on is accepted (a copy stays in its organization and takes the switch and the
+module's objects; a transfer or a copy into another organization without the licence is refused, with its message in
+AD-35), but the app has no copy or transfer of a workspace yet, so nothing applies it. The command that brings them
+(AD-09) applies it and iterates the table registry, so a module's rows go with the workspace.
+
+### What slice 15a leaves to 15b to 15d (slice 15a, step 4 and 5)
+
+- **The details panel** counts facts and dimensions with the canvas's cards ("11 entities … on Sales star") and lists
+  them under "Mapping coverage" as "0 of n": a dimensional entity's coverage is "fed" (P17), which comes with the
+  dimensional mappings (15c).
+- **A column dropped on a fact or a dimension** is refused with B-6's toast ("Source columns map to the logical model.
+  …"), but nothing is dimmed while the column is dragged (B-6's dimmed targets, 15c). The same refusal holds for "Add a
+  source column" in a fact's or dimension's attribute panel and for "Map to an attribute" of a change to resolve; the
+  panel still offers the button (15c decides what it shows).
+- **A collapsed frame's block** shows a fact or a dimension without its role (`docs/ideas.md`).
+- **The page's data:** a workspace with InfoCube on sends its facts' and dimensions' roles and the Cube tab's rows with
+  every canvas page, also a canvas without facts or dimensions (about 1.2 KB, 0.4 KB gzipped, on "Retail Co – DWH" with
+  the Sales star; `docs/prd/slice-15-acceptance.md`, step 5).

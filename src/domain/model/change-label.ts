@@ -86,7 +86,8 @@ const only = (e: ChangeEvent, columns: readonly string[]) => {
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
-export function changeLabel(events: readonly ChangeEvent[]): string {
+/** `nouns`: the modules' tables' nouns (slice 15a, `UndoTables.nouns`); InfoMapper's own are above. */
+export function changeLabel(events: readonly ChangeEvent[], nouns: Readonly<Record<string, string>> = {}): string {
   if (events.length === 0) return "Change";
   // slice 7a: an import, by its source (“Import crm_snapshot.csv”)
   const imported = events.find((e) => e.object_type === "source_import" && e.operation !== "update");
@@ -235,7 +236,7 @@ export function changeLabel(events: readonly ChangeEvent[]): string {
   if (kept && mappings.some((e) => e.operation === "delete")) return "Merge mappings";
 
   const main = PRIORITY.map((t) => events.find((e) => e.object_type === t)).find(Boolean) ?? events[0]!;
-  const noun = NOUN[main.object_type] ?? main.object_type;
+  const noun = NOUN[main.object_type] ?? nouns[main.object_type] ?? main.object_type;
   if (main.object_type === "canvas_item") return main.operation === "delete" ? "Remove card" : main.operation === "create" ? "Place card" : "Change card";
   switch (main.operation) {
     case "create":

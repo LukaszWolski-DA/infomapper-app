@@ -2,6 +2,7 @@
 // inputs in order, labels, the type check of a mapping (D-01), the BK suggestion (AD-28) and an entity's feeding
 // sources. Pure TypeScript, built once per model in the browser.
 
+import { isLogical } from "@/domain/model/levels";
 import type { Uuid } from "@/domain/ids";
 import { indexOf, type ClassificationIndex } from "@/domain/model/classifications";
 import { suggestsBusinessKey } from "@/domain/model/mapping-rules";
@@ -135,7 +136,8 @@ export function columnOptions(ix: ModelIndex, tablesHere: ReadonlySet<Uuid>, exc
 
 /** Attributes to pick from (“Map to an attribute” in the column panel): grouped by entity, entities on this canvas first (prototype attrOptions). */
 export function attributeOptions(ix: ModelIndex, entitiesHere: ReadonlySet<Uuid>): ColumnGroup[] {
-  const entities = [...ix.model.entities].sort((a, b) => Number(entitiesHere.has(b.id)) - Number(entitiesHere.has(a.id)));
+  // logical entities only (slice 15a, Q4, F13): a column maps to the logical model
+  const entities = ix.model.entities.filter(isLogical).sort((a, b) => Number(entitiesHere.has(b.id)) - Number(entitiesHere.has(a.id)));
   return entities
     .map((e) => ({
       label: `${e.name}${entitiesHere.has(e.id) ? "" : " (not on canvas)"}`,

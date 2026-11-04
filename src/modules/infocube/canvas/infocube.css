@@ -1,0 +1,16 @@
+/* InfoCube on InfoMapper's pages (slice 15a, B-3, AD-24): a fact's or dimension's role with the cube where a logical
+   entity's stereotype stands, and a fact's thicker left edge (prototype `.stereo.cube`, `.ent.fact`). The cube is a CSS
+   mask on a pseudo-element, so a card gets no element for it (acceptance doc Q11, P11); the classes come from the
+   card's role (`EntityRole`). */
+.im-cube-mask,
+.im-canvas .stereo.role.cube::before,
+.im-mark.cube {
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23000' stroke-width='1.4' stroke-linejoin='round'%3E%3Cpath d='M6 1.2l4.3 2.4v4.8L6 10.8 1.7 8.4V3.6z'/%3E%3Cpath d='M1.7 3.6L6 6l4.3-2.4M6 6v4.8'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' fill='none' stroke='%23000' stroke-width='1.4' stroke-linejoin='round'%3E%3Cpath d='M6 1.2l4.3 2.4v4.8L6 10.8 1.7 8.4V3.6z'/%3E%3Cpath d='M1.7 3.6L6 6l4.3-2.4M6 6v4.8'/%3E%3C/svg%3E") center / contain no-repeat;
+  background: currentColor;
+}
+.im-canvas .stereo.role.cube { display: inline-flex; align-items: center; gap: 3px; color: var(--im-ink); font-weight: 600 }
+.im-canvas .stereo.role.cube::before { content: ""; width: 11px; height: 11px; flex: none }
+.im-mark.cube { display: inline-block; width: 11px; height: 11px; flex: none }
+.im-canvas .ent.fact .c-head::before { width: 8px }
+.im-canvas .ent.fact .c-head { padding-left: 18px }

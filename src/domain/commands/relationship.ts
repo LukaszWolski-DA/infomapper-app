@@ -3,6 +3,9 @@
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult } from "../changes";
+import { domainError } from "../errors";
+import type { Uuid } from "../ids";
+import { CROSS_LEVEL_RELATIONSHIP_MESSAGE, sameLevel } from "../model/levels";
 import type { WorkspaceAccess } from "../permissions";
 import { CARDINALITY_MAX, type Entity, type Relationship } from "../types";
 import { optionalTextSchema, uuidSchema, versionSchema } from "../validation";
@@ -13,14 +16,25 @@ import { begin, current, done, found, nothingToChange, softDelete } from "./shar
 const createRelationshipInput = z.object({ fromEntityId: uuidSchema, toEntityId: uuidSchema }).strict();
 export type CreateRelationshipInput = z.input<typeof createRelationshipInput>;
 
+export interface CreateRelationshipState {
+  from: Entity | null;
+  to: Entity | null;
+  /**
+   * Which of the two entities must be the 1..1 end, when a module says so (slice 15a, D-67, E9): between a fact and a
+   * dimension the dimension, as the prototype turns it. Null or absent: the ends as drawn.
+   */
+  oneEnd?: Uuid | null;
+}
+
 /**
  * A relationship with the prototype's default ends, 1 to 0..n, and no label yet; the panel then sets the label and the
  * cardinality. From an entity to itself (D-61) the ends are 0..1 to 0..n: a parent, optional, and its children.
+ * Slice 15a (C-6): the two entities are of one level; with `oneEnd` the relationship starts there (its 1..1 end).
  */
 export function createRelationship(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: { from: Entity | null; to: Entity | null },
+  state: CreateRelationshipState,
   input: unknown,
 ): CommandResult<{ relationship: Relationship }> {
   const parsed = begin(access, "model.edit", createRelationshipInput, input);
@@ -30,12 +44,15 @@ export function createRelationship(
   if (!from.ok) return fail(from.error);
   const to = found(state.to, access, toEntityId, "entity");
   if (!to.ok) return fail(to.error);
+  if (!sameLevel(from.row, to.row)) return fail(domainError("invalid", CROSS_LEVEL_RELATIONSHIP_MESSAGE));
+  const turned = state.oneEnd === toEntityId && fromEntityId !== toEntityId;
+  const [start, end] = turned ? [toEntityId, fromEntityId] : [fromEntityId, toEntityId];
 
   const relationship: Relationship = {
     ...newRowColumns(ctx),
     workspace_id: access.workspace.id,
-    from_entity_id: fromEntityId,
-    to_entity_id: toEntityId,
+    from_entity_id: start,
+    to_entity_id: end,
     label: null,
     from_min: fromEntityId === toEntityId ? 0 : 1,
     from_max: "1",

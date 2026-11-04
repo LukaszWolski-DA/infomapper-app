@@ -9,6 +9,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { addAttributeAction, updateEntityAction } from "@/app/_actions/model";
 import type { UpdateEntityInput } from "@/domain/commands/entity";
 import { useAction } from "@/app/_components/use-action";
+import { useModules } from "@/app/_components/modules";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { STEREOTYPES, type Entity, type Stereotype } from "@/domain/types";
@@ -31,6 +32,7 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** `cardId` is null when the entity has no card on this canvas (a go-to link's fallback, slice 4a): its panel only. */
 export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uuid | null }) {
   const p = usePanel();
+  const role = useModules().roles[e.id];
   const move = useMoveAttribute(p.ix, p.workspaceId);
   /** Dragging in the attribute list: which attribute, and where it would go. */
   const [order, setOrder] = useState<{ dragging: string | null; over: { id: string; after: boolean } | null }>({ dragging: null, over: null });
@@ -83,6 +85,17 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         <TextField key={fieldKey(e.id, "alias")} id="f-ealias" value={e.alias ?? ""} readOnly={!p.editable} placeholder="Another name, e.g. a translation" onSave={(alias) => save({ alias })} testId="input-entity-alias" keep={{ key: fieldKey(e.id, "alias"), field: "Alias", object: e.name }} />
       </Field>
       <div className="grid grid-cols-2 gap-2.5">
+        {role ? (
+          // a fact or dimension has its role, not a stereotype (slice 15a, D-67, Q4): read only
+          <Field label="Role">
+            <div className="flex min-h-8 items-center py-1.5" data-testid="text-entity-role">
+              <span className="flex items-center gap-1 font-semibold" title={role.title}>
+                <span className={`im-mark ${role.mark}`} aria-hidden />
+                {role.text}
+              </span>
+            </div>
+          </Field>
+        ) : (
         <Field label="Stereotype" htmlFor="f-es">
           <select
             key={fieldKey(e.id, "stereotype")}
@@ -100,6 +113,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
             ))}
           </select>
         </Field>
+        )}
         <Field label="Concept" htmlFor="f-ec">
           <select
             key={fieldKey(e.id, "concept")}
@@ -208,6 +222,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         )}
       </Fold>
 
+      {!role && (
       <Fold title="Feeding sources" count={feeds.length}>
         {feeds.length ? (
           <LongList
@@ -248,6 +263,7 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
           </div>
         )}
       </Fold>
+      )}
 
       {relationships.length > 0 && (
         <Fold title="Relationships" count={relationships.length}>

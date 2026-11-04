@@ -47,8 +47,9 @@ export function useAction() {
           }
           // the versions a write answers with (slice 10a, F2): the next saves of those rows send them
           if (result.ok && result.versions) rowSaves.answer(result.versions);
-          if (!result.ok) toast(result.message, "refusal");
-          else if (success) {
+          if (!result.ok) {
+            if (!options?.quiet) toast(result.message, "refusal");
+          } else if (success) {
             const undo = options?.undoable ? (ui.undo()?.undo ?? undoNow ?? undefined) : undefined;
             toast(typeof success === "function" ? success(result.value) : success, "info", undo ? { label: "Undo", run: undo } : undefined);
           }
@@ -91,11 +92,14 @@ export function useAction() {
   return { run, saveRow, saveRows, pending };
 }
 
-/** A save's options: “Undo” in its toast (`undoable`), and whether it deletes its row (`deletes`, slice 10a). */
-type SaveOptions = { undoable?: boolean; deletes?: boolean };
+/**
+ * A save's options: “Undo” in its toast (`undoable`), whether it deletes its row (`deletes`, slice 10a), and `quiet`: a
+ * refusal shows no toast, as its field shows it in place (InfoCube's switch, slice 15a).
+ */
+type SaveOptions = { undoable?: boolean; deletes?: boolean; quiet?: boolean };
 
 /** `run`'s options: “Undo” in its toast, and whether a refusal waits for the fresh page (a row's save, slice 13). */
-type RunOptions = { undoable?: boolean; afterPage?: boolean };
+type RunOptions = { undoable?: boolean; afterPage?: boolean; quiet?: boolean };
 
 /** The refusals whose answer brings the fresh page (`runCommand`, slice 13, F3). */
 const REFRESHING = new Set<string>(["stale_version", "forbidden", "archived", "not_found"]);

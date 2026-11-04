@@ -819,7 +819,7 @@ describe("undo and redo keep copies in step (slice 10c, F1, S10C-13)", () => {
     ok(updateAttribute(ctx, modeler, { attribute: attr(rows, id), attributes: rows.attribute as Attribute[] }, { attributeId: id, expectedVersion: attr(rows, id).version, type: { dataType: "string", length } }));
   /** Customer.customer_id pasted into Sales Order. */
   const paste = (rows: Rows) =>
-    ok(pasteAttribute(makeCtx(), modeler, { entity: find(rows, "entity", ids.salesOrder) as never, original: attr(rows, ids.customerId), attributes: rows.attribute as Attribute[] }, { entityId: ids.salesOrder, attributeId: ids.customerId }));
+    ok(pasteAttribute(makeCtx(), modeler, { entity: find(rows, "entity", ids.salesOrder) as never, original: attr(rows, ids.customerId), originalEntity: find(rows, "entity", attr(rows, ids.customerId).entity_id) as never, attributes: rows.attribute as Attribute[] }, { entityId: ids.salesOrder, attributeId: ids.customerId }));
   /** The seed with Sales Order.customer_id, a live copy of Customer.customer_id. */
   const withCopy = (): Rows => {
     const rows = seed();

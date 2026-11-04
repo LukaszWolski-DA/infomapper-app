@@ -5,14 +5,15 @@
 import type { Write, WriteSet } from "@/domain/changes";
 import { LAST_OWNER } from "@/domain/commands/people";
 import { LAST_PROJECT_MESSAGE } from "@/domain/commands/project";
-import { UNDOABLE_TABLES, type WorkspaceRows } from "@/domain/commands/undo";
+import { INFOCUBE_OFF_MESSAGE, turnOffRefusedMessage } from "@/domain/model/levels";
+import type { WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
 import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-history";
 import type { LostOriginal, ProjectCanvas } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
 import { assertNotProduction, readDbCached, writeDb } from "./file";
-import { findViolation, keyOf, rowsOf, type AnyRow, type DevDb, type DevTable, type IntegrityViolation } from "./schema";
+import { CORE_SCHEMA, findViolation, keyOf, rowsOf, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
 
 const live = <R extends { deleted_at: string | null }>(rows: R[]): R[] => rows.filter((r) => r.deleted_at === null);
 
@@ -32,7 +33,12 @@ function serialise<T>(file: string, task: () => Promise<T>): Promise<T> {
 // so a module reload in development does not empty them.
 const histories: Map<string, UndoHistory> = ((globalThis as { __infomapperUndo?: Map<string, UndoHistory> }).__infomapperUndo ??= new Map());
 
-export function createLocalDataStore(file: string): DataStore {
+/**
+ * `schema`: the tables this store knows (slice 15a, AD-33). InfoMapper's alone by default; the application passes
+ * `src/compose/tables.ts`'s, with the modules' tables. A write to a table it does not know is refused before anything is
+ * written.
+ */
+export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SCHEMA): DataStore {
   assertNotProduction();
   const load = () => readDbCached(file);
 
@@ -132,6 +138,15 @@ export function createLocalDataStore(file: string): DataStore {
       },
       getAccess: async (organizationId) =>
         (await load()).organization_access.find((a) => a.organization_id === organizationId) ?? null,
+      listLicences: async (organizationId) => live((await load()).organization_licence).filter((l) => l.organization_id === organizationId),
+    },
+
+    modules: {
+      list: async (workspaceId, table) => {
+        if (!schema.rules[table]) throw new Error(`The store does not know the table ${table}.`);
+        const rows = rowsOf(await load(), table) as unknown as { workspace_id: Uuid; deleted_at: string | null }[];
+        return rows.filter((r) => r.workspace_id === workspaceId && r.deleted_at === null) as never;
+      },
     },
 
     workspaces: {
@@ -201,7 +216,7 @@ export function createLocalDataStore(file: string): DataStore {
 
         const db = await load();
         const rows = {} as Record<string, unknown[]>;
-        for (const table of UNDOABLE_TABLES) rows[table] = (db[table] as readonly { workspace_id: Uuid }[]).filter((r) => r.workspace_id === workspaceId);
+        for (const table of schema.undoable) rows[table] = rowsOf(db, table as StoreTable).filter((r) => r.workspace_id === workspaceId);
         return rows as unknown as WorkspaceRows;
       },
     },
@@ -283,21 +298,25 @@ export function createLocalDataStore(file: string): DataStore {
       },
     },
 
-    apply: (writeSet) => serialise(file, () => applyToFile(file, writeSet)),
+    apply: (writeSet) => serialise(file, () => applyToFile(file, writeSet, schema)),
   };
 }
 
-async function applyToFile(file: string, writeSet: WriteSet): Promise<ApplyResult> {
+async function applyToFile(file: string, writeSet: WriteSet, schema: LocalSchema): Promise<ApplyResult> {
   // Copy on write (slice 7a): the cached file is frozen, so only the tables this write touches get new arrays; their
   // written rows are new objects, every other row is shared with the cache.
   const current = await readDbCached(file);
   const next = { ...current } as DevDb;
-  const touched = new Set<DevTable>(writeSet.writes.map((w) => w.table));
-  const rowsOfNext = next as unknown as Record<DevTable, unknown[]>;
-  for (const table of touched) rowsOfNext[table] = [...(current[table] as readonly unknown[])];
-  const index = new KeyIndex(next);
+  const touched = new Set<StoreTable>(writeSet.writes.map((w) => w.table));
+  // slice 15a: a table this store does not know is refused before anything is written, never skipped
+  const unknown = [...touched].find((t) => !schema.rules[t]);
+  if (unknown) return { ok: false, error: domainError("invalid", `The store does not know the table ${unknown}.`) };
+  const rowsOfNext = next as unknown as Record<StoreTable, unknown[]>;
+  // a module's table may not be in the file yet: its first write starts it
+  for (const table of touched) rowsOfNext[table] = [...((current as unknown as Record<string, readonly unknown[] | undefined>)[table] ?? [])];
+  const index = new KeyIndex(next, schema);
   for (const write of writeSet.writes) {
-    const error = applyWrite(next, index, write);
+    const error = applyWrite(next, index, write, schema);
     if (error) return { ok: false, error };
   }
   next.change_event = [...current.change_event, ...structuredClone(writeSet.events)];
@@ -309,8 +328,12 @@ async function applyToFile(file: string, writeSet: WriteSet): Promise<ApplyResul
   // The last project (slice 12a, F8): two deletes at once, or a delete and an undo of "Create project", each counted the
   // projects from what it read. Counted again here, for the workspaces whose projects this write deletes.
   if (workspaceWithoutProject(next, writeSet.writes)) return { ok: false, error: domainError("invalid", LAST_PROJECT_MESSAGE) };
+  // InfoCube off with facts or dimensions (slice 15a, C-7): a fact created while another session turned InfoCube off, or
+  // the other way round, each checked what it read. Counted again here, for the workspaces this write touches.
+  const off = offWithDimensional(next, writeSet.writes);
+  if (off) return { ok: false, error: off.turnedOff ? domainError("invalid", turnOffRefusedMessage(off.count)) : domainError("forbidden", INFOCUBE_OFF_MESSAGE) };
   // only what this write can have broken: the touched tables and the new change events
-  const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length });
+  const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length }, schema);
   if (violation) return { ok: false, error: violationError(violation) };
   await writeDb(file, next);
   return { ok: true };
@@ -322,6 +345,22 @@ function workspaceWithoutOwner(db: DevDb, writes: readonly Write[]): string | nu
   for (const workspaceId of touched) {
     const members = db.workspace_member.filter((m) => m.workspace_id === workspaceId);
     if (members.length > 0 && !members.some((m) => m.role === "owner")) return db.workspace.find((w) => w.id === workspaceId)?.name ?? "This workspace";
+  }
+  return null;
+}
+
+/**
+ * A workspace this write touched (its row, or an entity in it) that is left with InfoCube off and live dimensional
+ * entities: `turnedOff` when the write is what turned it off.
+ */
+function offWithDimensional(db: DevDb, writes: readonly Write[]): { count: number; turnedOff: boolean } | null {
+  const touched = new Set<Uuid>();
+  for (const w of writes) if (w.table === "workspace" || w.table === "entity") touched.add(w.table === "workspace" ? (w.row as { id: Uuid }).id : (w.row as { workspace_id: Uuid }).workspace_id);
+  for (const workspaceId of touched) {
+    const workspace = db.workspace.find((w) => w.id === workspaceId);
+    if (!workspace || workspace.infocube) continue;
+    const count = db.entity.filter((e) => e.workspace_id === workspaceId && e.deleted_at === null && e.model_level === "dimensional").length;
+    if (count) return { count, turnedOff: writes.some((w) => w.table === "workspace" && (w.row as { id: Uuid }).id === workspaceId) };
   }
   return null;
 }
@@ -339,30 +378,33 @@ function workspaceWithoutProject(db: DevDb, writes: readonly Write[]): boolean {
  * of thousands of rows; searching the table for each one was quadratic).
  */
 class KeyIndex {
-  private readonly tables = new Map<DevTable, Map<string, number>>();
-  constructor(private readonly db: DevDb) {}
-  of(table: DevTable): Map<string, number> {
+  private readonly tables = new Map<StoreTable, Map<string, number>>();
+  constructor(
+    private readonly db: DevDb,
+    private readonly schema: LocalSchema,
+  ) {}
+  of(table: StoreTable): Map<string, number> {
     let index = this.tables.get(table);
     if (!index) {
-      index = new Map(rowsOf(this.db, table).map((r, i) => [keyOf(table, r), i]));
+      index = new Map(rowsOf(this.db, table).map((r, i) => [keyOf(table, r, this.schema), i]));
       this.tables.set(table, index);
     }
     return index;
   }
   /** After a row was removed from the middle: positions shift, so the table is indexed again on its next use. */
-  drop(table: DevTable): void {
+  drop(table: StoreTable): void {
     this.tables.delete(table);
   }
 }
 
-function applyWrite(db: DevDb, keys: KeyIndex, write: Write): DomainError | null {
-  const table: DevTable = write.table;
+function applyWrite(db: DevDb, keys: KeyIndex, write: Write, schema: LocalSchema): DomainError | null {
+  const table: StoreTable = write.table;
   const rows = rowsOf(db, table);
   const positions = keys.of(table);
 
   if (write.kind === "insert") {
     const row = write.row as unknown as AnyRow;
-    const key = keyOf(table, row);
+    const key = keyOf(table, row, schema);
     if (positions.has(key)) return domainError("conflict", "This already exists.");
     positions.set(key, rows.length);
     rows.push(structuredClone(row));
@@ -370,7 +412,7 @@ function applyWrite(db: DevDb, keys: KeyIndex, write: Write): DomainError | null
   }
 
   const before = write.before as unknown as AnyRow;
-  const key = keyOf(table, before);
+  const key = keyOf(table, before, schema);
   const index = positions.get(key);
   if (index === undefined) return notFound("record");
   const stored = rows[index]!;
@@ -382,7 +424,7 @@ function applyWrite(db: DevDb, keys: KeyIndex, write: Write): DomainError | null
   }
 
   const row = write.row as unknown as AnyRow;
-  if (keyOf(table, row) !== key) return domainError("invalid", "The key of a row cannot change.");
+  if (keyOf(table, row, schema) !== key) return domainError("invalid", "The key of a row cannot change.");
   if ("version" in before) {
     if (stored.version !== before.version) return staleVersion();
     if (row.version !== (before.version as number) + 1) return domainError("invalid", "The new version must be the read version + 1.");
@@ -402,5 +444,7 @@ function violationError(v: IntegrityViolation): DomainError {
       return domainError("not_found", `This refers to something that does not exist (${v.table}: ${v.detail}).`);
     case "check":
       return domainError("invalid", `A data rule was broken (${v.detail}).`);
+    case "unknown_table":
+      return domainError("invalid", `The store does not know the table ${v.table}.`);
   }
 }

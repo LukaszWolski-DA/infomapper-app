@@ -94,3 +94,27 @@ describe("relationships in the right panel", () => {
     });
   });
 });
+
+describe("createRelationship within one level (slice 15a, C-6, D-67)", () => {
+  const fact = entity(ids.customer, { model_level: "dimensional" });
+  const dimension = entity(ids.salesOrder, { model_level: "dimensional" });
+  const input = { fromEntityId: ids.customer, toEntityId: ids.salesOrder };
+
+  it("refuses a relationship between a logical entity and a fact or dimension, in both directions", () => {
+    const message = "Facts and dimensions relate to each other. To trace a fact to the logical model, map its attributes.";
+    expect(createRelationship(makeCtx(), access("modeler"), { from: entity(ids.customer), to: dimension }, input)).toMatchObject({ ok: false, error: { code: "invalid", message } });
+    expect(createRelationship(makeCtx(), access("modeler"), { from: fact, to: entity(ids.salesOrder) }, input)).toMatchObject({ ok: false, error: { code: "invalid", message } });
+  });
+
+  it("turns a fact – dimension relationship so the dimension is the 1..1 end", () => {
+    // drawn from the fact to the dimension: it starts at the dimension
+    const turned = createRelationship(makeCtx(), access("modeler"), { from: fact, to: dimension, oneEnd: ids.salesOrder }, input);
+    expect(turned.ok && turned.value.relationship).toMatchObject({ from_entity_id: ids.salesOrder, to_entity_id: ids.customer, from_min: 1, from_max: "1", to_min: 0, to_max: "n" });
+    // drawn from the dimension: as drawn
+    const asDrawn = createRelationship(makeCtx(), access("modeler"), { from: fact, to: dimension, oneEnd: ids.customer }, input);
+    expect(asDrawn.ok && asDrawn.value.relationship).toMatchObject({ from_entity_id: ids.customer, to_entity_id: ids.salesOrder });
+    // two dimensions, or two logical entities: as drawn
+    const plain = createRelationship(makeCtx(), access("modeler"), { from: fact, to: dimension, oneEnd: null }, input);
+    expect(plain.ok && plain.value.relationship).toMatchObject({ from_entity_id: ids.customer, to_entity_id: ids.salesOrder });
+  });
+});

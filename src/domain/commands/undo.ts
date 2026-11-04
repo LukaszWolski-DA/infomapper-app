@@ -21,10 +21,20 @@
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
 import { followOriginals } from "../model/copies";
+import { levelWritesRefusal } from "../model/levels";
 import { keyTakenMessage, requirementKey, restoreKeyTakenMessage } from "../model/requirements";
 import type { Uuid } from "../ids";
 import { checkPermission, type WorkspaceAccess, type WorkspaceAction } from "../permissions";
-import { LINK_TABLES, type Attribute, type ChangeEvent, type LinkTable, type RowImage, type WritableRows } from "../types";
+import {
+  LINK_TABLES,
+  type Attribute,
+  type ChangeEvent,
+  type CoreTable,
+  type LinkTable,
+  type ModuleTable,
+  type RowImage,
+  type WritableRows,
+} from "../types";
 
 export const UNDO_REFUSED_MESSAGE = "This can't be undone because it was changed afterwards.";
 export const REDO_REFUSED_MESSAGE = "This can't be redone because it was changed afterwards.";
@@ -64,10 +74,61 @@ export const UNDOABLE_TABLES = [
 ] as const;
 export type UndoableTable = (typeof UNDOABLE_TABLES)[number];
 
-/** The workspace's current rows of every undoable table, deleted rows included. */
-export type WorkspaceRows = { [T in UndoableTable]: readonly WritableRows[T][] };
+/** InfoMapper's tables outside the undo history: people, organizations, their licences, workspace settings. */
+export const OUTSIDE_UNDO = [
+  "app_user",
+  "organization",
+  "organization_member",
+  "organization_access",
+  "organization_licence",
+  "workspace",
+  "workspace_member",
+] as const;
+
+// Every InfoMapper table is in the undo history or outside it, or the build fails (slice 15a): a table neither list
+// names would make every change group that writes it silently not undoable (acceptance doc F5).
+type Unclassified = Exclude<CoreTable, UndoableTable | (typeof OUTSIDE_UNDO)[number]>;
+type ClassifiedTwice = Extract<UndoableTable, (typeof OUTSIDE_UNDO)[number]>;
+export const CORE_TABLES_CLASSIFIED: [Unclassified | ClassifiedTwice] extends [never] ? true : Unclassified | ClassifiedTwice = true;
+
+/** How undo treats a module's table (slice 15a, AD-33): registered by the module, joined in `src/compose/tables.ts`. */
+export interface ModuleUndoTable {
+  /** Columns that point to a parent row whose deletion the domain cascades; the parent may be any table. */
+  parents: readonly (readonly [column: string, table: string])[];
+  /** What the undo toast calls a row of it when it names the step ("Delete {noun}"). */
+  noun: string;
+  /** The action a person needs to write its row again (AD-05); `model.edit` when absent. */
+  action?: (e: ChangeEvent) => WorkspaceAction;
+  /** A column added after rows were recorded: the value an older image without it stands for (F6). */
+  defaults?: Readonly<Record<string, unknown>>;
+}
+/** A module's table is in the undo history or outside it, as InfoMapper's are. */
+export type ModuleTableClass = ModuleUndoTable | "outside undo";
+
+/** The tables undo knows: InfoMapper's and the registered modules'. Made once by `undoTables`. */
+export interface UndoTables {
+  readonly undoable: readonly string[];
+  /** The modules' tables among them, in registration order (slice 15a: their rows follow their parents' deletes). */
+  readonly modules: readonly string[];
+  readonly outside: ReadonlySet<string>;
+  readonly parents: Readonly<Record<string, readonly (readonly [string, string])[]>>;
+  readonly nouns: Readonly<Record<string, string>>;
+  readonly actions: Readonly<Record<string, (e: ChangeEvent) => WorkspaceAction>>;
+  readonly defaults: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+}
+
+/** The workspace's current rows of every undoable table, deleted rows included; a module's under its table's name. */
+export type WorkspaceRows = { [T in UndoableTable]: readonly WritableRows[T][] } & { [T in ModuleTable]?: readonly WritableRows[T][] };
 
 type AnyRow = RowImage;
+
+/**
+ * Columns added to InfoMapper's tables after rows were recorded, with the value an older change event's image without
+ * them stands for (slice 15a, F6): such an image is compared and written back with it, not with null.
+ */
+const IMAGE_DEFAULTS: Partial<Record<UndoableTable, Readonly<Record<string, unknown>>>> = {
+  entity: { model_level: "logical" },
+};
 
 /** Columns that point to a parent row whose deletion the domain cascades (data model, section 11). */
 const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, UndoableTable])[]>> = {
@@ -111,20 +172,54 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   ],
 };
 
-const isUndoableTable = (table: string): table is UndoableTable => (UNDOABLE_TABLES as readonly string[]).includes(table);
+/**
+ * InfoMapper's tables and the modules' given (slice 15a): every module table is in the undo history or outside it, with
+ * its parents, noun, action and image defaults. A name InfoMapper already has is refused.
+ */
+export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleTableClass>>>): UndoTables {
+  const undoable: string[] = [...UNDOABLE_TABLES];
+  const outside = new Set<string>(OUTSIDE_UNDO);
+  const registered: string[] = [];
+  const parents: Record<string, readonly (readonly [string, string])[]> = { ...PARENTS };
+  const nouns: Record<string, string> = {};
+  const actions: Record<string, (e: ChangeEvent) => WorkspaceAction> = {};
+  const defaults: Record<string, Readonly<Record<string, unknown>>> = { ...IMAGE_DEFAULTS };
+  for (const [table, spec] of Object.entries(modules) as [string, ModuleTableClass | undefined][]) {
+    if (!spec) continue;
+    if (undoable.includes(table) || outside.has(table)) throw new Error(`The table ${table} is InfoMapper's or registered twice.`);
+    if (spec === "outside undo") {
+      outside.add(table);
+      continue;
+    }
+    undoable.push(table);
+    registered.push(table);
+    if (spec.parents.length) parents[table] = spec.parents;
+    nouns[table] = spec.noun;
+    if (spec.action) actions[table] = spec.action;
+    if (spec.defaults) defaults[table] = spec.defaults;
+  }
+  return { undoable, outside, parents, nouns, actions, defaults, modules: registered };
+}
+
+/** InfoMapper's tables only: what undo knows without a module (tests, and InfoMapper with an empty registry). */
+export const CORE_UNDO_TABLES = undoTables({});
 
 const isLinkTable = (table: string): table is LinkTable => (LINK_TABLES as readonly string[]).includes(table);
 
 /** Link tables have no id or version: the key is the pair, and a row is removed rather than soft-deleted. */
-const keyOf = (table: UndoableTable, row: AnyRow): string =>
+const keyOf = (table: string, row: AnyRow): string =>
   table === "project_canvas"
     ? `${String(row.project_id)}|${String(row.canvas_id)}`
     : table === "project_pinned_label"
       ? `${String(row.project_id)}|${String(row.label_id)}`
       : String(row.id);
 
-const isLiveRow = (table: UndoableTable, row: AnyRow | undefined): boolean =>
+const isLiveRow = (table: string, row: AnyRow | undefined): boolean =>
   !!row && (isLinkTable(table) || row.deleted_at === null);
+
+/** A table's current rows in the workspace's rows (a module's may be absent: none yet). */
+const rowsIn = (rows: WorkspaceRows, table: string): readonly AnyRow[] =>
+  ((rows as unknown as Record<string, readonly AnyRow[] | undefined>)[table] ?? []);
 
 const BOOKKEEPING = new Set(["version", "updated_at", "updated_by"]);
 
@@ -139,16 +234,26 @@ function isKeyCounter(e: ChangeEvent): boolean {
  * A change group can be undone when every row it wrote is in the undo history's tables and no canvas look changed.
  * The requirement key counter alone is not an undo step.
  */
-export function isUndoable(events: readonly ChangeEvent[]): boolean {
+export function isUndoable(events: readonly ChangeEvent[], tables: UndoTables = CORE_UNDO_TABLES): boolean {
   const rows = events.filter((e) => !isKeyCounter(e));
   return (
     rows.length > 0 &&
     rows.every(
       (e) =>
-        isUndoableTable(e.object_type) &&
+        isUndoableTable(tables, e.object_type) &&
         !(e.object_type === "canvas" && e.before_image && e.after_image && !sameValue(e.before_image.look, e.after_image.look)),
     )
   );
+}
+
+/**
+ * Whether undo takes a table's rows. A table undo does not know at all is a mistake, not a step outside undo (slice
+ * 15a): it would make every group that writes it silently not undoable, so it throws.
+ */
+function isUndoableTable(tables: UndoTables, table: string): boolean {
+  if (tables.undoable.includes(table)) return true;
+  if (tables.outside.has(table)) return false;
+  throw new Error(`Undo does not know the table ${table}: register it (src/compose/tables.ts).`);
 }
 // slice 7a: approving clears an import's `review_reason`, so a reviewer's approval may change it too
 const STATUS_COLUMNS = new Set(["status", "approved_by", "approved_at", "review_reason"]);
@@ -167,7 +272,9 @@ function statusOnly(e: ChangeEvent, columns: ReadonlySet<string> = STATUS_COLUMN
  * The action a person needs to write this event's row again (AD-05); reviewers can only change a mapping's or a
  * requirement's status.
  */
-function actionFor(e: ChangeEvent): WorkspaceAction {
+function actionFor(e: ChangeEvent, tables: UndoTables): WorkspaceAction {
+  const moduleAction = tables.actions[e.object_type];
+  if (moduleAction) return moduleAction(e);
   switch (e.object_type) {
     case "mapping":
       return statusOnly(e) ? "mapping.set_status" : "model.edit";
@@ -219,34 +326,36 @@ export function revertChangeGroup(
   access: WorkspaceAccess,
   state: RevertState,
   mode: "undo" | "redo",
+  tables: UndoTables = CORE_UNDO_TABLES,
 ): CommandResult<{ changeGroupId: Uuid }> {
   const refused = () => refusal(mode);
   const events = state.events;
   const workspaceId = access.workspace.id;
-  if (!isUndoable(events) || events.some((e) => e.workspace_id !== workspaceId)) {
+  if (!isUndoable(events, tables) || events.some((e) => e.workspace_id !== workspaceId)) {
     return fail(domainError("invalid", NOT_UNDOABLE_MESSAGE));
   }
   if (events.some((e) => e.user_id !== ctx.actorId)) {
     return fail(domainError("forbidden", "You can only undo your own changes."));
   }
-  for (const action of new Set(events.filter((e) => !isKeyCounter(e)).map(actionFor))) {
+  for (const action of new Set(events.filter((e) => !isKeyCounter(e)).map((e) => actionFor(e, tables)))) {
     const denied = checkPermission(access, action);
     if (denied) return fail(denied);
   }
 
   // The rows as they are now, then as they will be after the revert.
-  const now = new Map<UndoableTable, Map<string, AnyRow>>();
-  for (const table of UNDOABLE_TABLES) {
-    const rows = (state.rows[table] as readonly unknown[] as readonly AnyRow[]).filter((r) => r.workspace_id === workspaceId);
+  const now = new Map<string, Map<string, AnyRow>>();
+  for (const table of tables.undoable) {
+    const rows = rowsIn(state.rows, table).filter((r) => r.workspace_id === workspaceId);
     now.set(table, new Map(rows.map((r) => [keyOf(table, r), r])));
   }
   const after = new Map([...now].map(([t, rows]) => [t, new Map(rows)]));
-  const touched: { table: UndoableTable; key: string; wasLive: boolean }[] = [];
+  const touched: { table: string; key: string; wasLive: boolean }[] = [];
   const writes: Write[] = [];
 
   for (const e of [...events].reverse()) {
     if (isKeyCounter(e)) continue;
-    const table = e.object_type as UndoableTable;
+    const table = e.object_type;
+    const defaults = tables.defaults[table] ?? {};
     const rows = after.get(table)!;
     const image = (e.after_image ?? e.before_image)!;
     const key = keyOf(table, image);
@@ -269,24 +378,28 @@ export function revertChangeGroup(
       continue;
     }
 
-    if (!current || !e.after_image || !unchangedSince(table, current, e.after_image)) return fail(refused());
+    if (!current || !e.after_image || !unchangedSince(table, current, e.after_image, defaults)) return fail(refused());
     const base = e.before_image ?? { ...current, deleted_at: ctx.now };
-    // a column added to the table after the step was recorded is absent from the image: written as null, never left out
-    // of the row (slice 10c, F10)
-    const added = Object.fromEntries(Object.keys(current).filter((k) => !(k in base)).map((k) => [k, null]));
+    // a column added to the table after the step was recorded is absent from the image: written as null (or as the
+    // value such an image stands for, slice 15a: `model_level` logical), never left out of the row (slice 10c, F10)
+    const added = Object.fromEntries(Object.keys(current).filter((k) => !(k in base)).map((k) => [k, k in defaults ? defaults[k] : null]));
     const row: AnyRow = { ...added, ...structuredClone(base), version: (current.version as number) + 1, updated_at: ctx.now, updated_by: ctx.actorId };
     if (table === "canvas") row.look = structuredClone(current.look);
     writes.push({ kind: "update", table, before: current, row } as unknown as Write);
     rows.set(key, row);
   }
 
-  if (!consistent(after, touched)) return fail(refused());
+  if (!consistent(after, touched, tables)) return fail(refused());
   const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched);
   if (keyClash) return fail(keyClash);
   // copies stay in step with their originals (slice 10c, F1): an undo or redo of a followed field, a paste or a
   // “Stop following” writes the copies that differ, in the same group; an original brought back writes none, as its
   // copies kept its values
   const followed = followOriginals(ctx, (state.rows.attribute as readonly Attribute[]).filter((a) => a.workspace_id === workspaceId), writes);
+  // the level rules (slice 15a, C-7): while InfoCube is off no undo or redo brings back or adds a fact or dimension; the
+  // step stays in the history, for when InfoCube is on again
+  const levels = levelWritesRefusal(access.workspace, followed.writes);
+  if (levels) return fail(levels);
   const writeSet = buildWriteSet(ctx, workspaceId, followed.writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
 }
@@ -295,10 +408,12 @@ export function revertChangeGroup(
  * The row's content is what the step left (its after-image), version and updated_* aside, and for a canvas its look
  * (D-12). An undo before it only raised the version, so the next older step still matches.
  */
-function unchangedSince(table: UndoableTable, current: AnyRow, image: AnyRow): boolean {
+function unchangedSince(table: string, current: AnyRow, image: AnyRow, defaults: Readonly<Record<string, unknown>>): boolean {
   const keys = new Set([...Object.keys(current), ...Object.keys(image)]);
-  // a column added to the table after the step was recorded is null on the row and absent from the image (slice 7a)
-  return [...keys].every((k) => BOOKKEEPING.has(k) || (table === "canvas" && k === "look") || sameValue(current[k] ?? null, image[k] ?? null));
+  // a column added to the table after the step was recorded is null on the row and absent from the image (slice 7a),
+  // or has the value such an image stands for (slice 15a)
+  const fromImage = (k: string) => (k in image ? image[k] : k in defaults ? defaults[k] : null);
+  return [...keys].every((k) => BOOKKEEPING.has(k) || (table === "canvas" && k === "look") || sameValue(current[k] ?? null, fromImage(k) ?? null));
 }
 
 /**
@@ -306,15 +421,19 @@ function unchangedSince(table: UndoableTable, current: AnyRow, image: AnyRow): b
  * children; a card that comes back is not on its canvas twice; a canvas keeps at least one project and a project at
  * least one canvas (D-28); the workspace keeps at least one live project (slice 12a, F7).
  */
-function consistent(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: readonly { table: UndoableTable; key: string; wasLive: boolean }[]): boolean {
-  const live = (table: UndoableTable, id: unknown) => typeof id === "string" && isLiveRow(table, rows.get(table)!.get(id));
+function consistent(
+  rows: Map<string, Map<string, AnyRow>>,
+  touched: readonly { table: string; key: string; wasLive: boolean }[],
+  tables: UndoTables,
+): boolean {
+  const live = (table: string, id: unknown) => typeof id === "string" && isLiveRow(table, rows.get(table)?.get(id));
   // built once per revert (slice 7a: an import's undo touches tens of thousands of rows): the parents that have live
   // children, and the live cards per canvas and element
   let parentsWithChildren: Set<string> | null = null;
-  const hasLiveChild = (table: UndoableTable, key: string) => {
+  const hasLiveChild = (table: string, key: string) => {
     if (!parentsWithChildren) {
       parentsWithChildren = new Set();
-      for (const [childTable, refs] of Object.entries(PARENTS) as [UndoableTable, readonly (readonly [string, UndoableTable])[]][]) {
+      for (const [childTable, refs] of Object.entries(tables.parents)) {
         for (const child of rows.get(childTable)!.values()) {
           if (!isLiveRow(childTable, child)) continue;
           for (const [column, parent] of refs) if (typeof child[column] === "string") parentsWithChildren.add(`${parent}|${child[column] as string}`);
@@ -338,7 +457,7 @@ function consistent(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: read
   for (const { table, key, wasLive } of touched) {
     const row = rows.get(table)!.get(key);
     if (isLiveRow(table, row)) {
-      for (const [column, parent] of PARENTS[table] ?? []) {
+      for (const [column, parent] of tables.parents[table] ?? []) {
         if (row![column] !== null && !live(parent, row![column])) return false;
       }
       // a card that comes back must not be on its canvas twice (itself counted once)
@@ -363,7 +482,7 @@ function consistent(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: read
  * A requirement that is live after the revert and whose key, in any case, another live requirement has (Łukasz, step
  * 0): bringing back a deleted one, or giving one its old key back.
  */
-function requirementKeyClash(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: readonly { table: UndoableTable; key: string; wasLive: boolean }[]): DomainError | null {
+function requirementKeyClash(rows: Map<string, Map<string, AnyRow>>, touched: readonly { table: string; key: string; wasLive: boolean }[]): DomainError | null {
   const requirements = [...rows.get("requirement")!.values()].filter((r) => r.deleted_at === null);
   for (const { table, key, wasLive } of touched) {
     if (table !== "requirement") continue;
@@ -379,7 +498,7 @@ function requirementKeyClash(rows: Map<UndoableTable, Map<string, AnyRow>>, touc
 
 /** Slice 7c: a classification live after the revert whose name another live one of its scope has (answer F10). */
 export const CLASSIFICATION_NAME_CLASH = (name: string) => `This can't be undone: another classification is called ${name} now.`;
-function classificationNameClash(rows: Map<UndoableTable, Map<string, AnyRow>>, touched: readonly { table: UndoableTable; key: string }[]): DomainError | null {
+function classificationNameClash(rows: Map<string, Map<string, AnyRow>>, touched: readonly { table: string; key: string }[]): DomainError | null {
   const live = [...rows.get("classification")!.values()].filter((r) => r.deleted_at === null);
   for (const { table, key } of touched) {
     if (table !== "classification") continue;

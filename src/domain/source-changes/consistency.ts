@@ -8,6 +8,7 @@
 //   Each line names the canvas it opens on (F15, prototype `goTo`): the first project canvas in tab order with both
 //   ends' cards, else one end's, else the project's first canvas.
 
+import { isLogical } from "../model/levels";
 import type { Uuid } from "../ids";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "../model/type-check";
 import type { RequirementIndex } from "../model/requirement-index";
@@ -83,7 +84,9 @@ export function modelConsistency(
   changes: readonly SourceChange[],
 ): Consistency {
   const live = <R extends { deleted_at: string | null }>(rows: readonly R[]) => rows.filter((r) => r.deleted_at === null);
-  const attribute = new Map(live(model.attributes).map((a) => [a.id, a]));
+  // the logical model only (slice 15a, Q4): the validator for the dimensional level is out of scope
+  const logical = new Set(live(model.entities).filter(isLogical).map((e) => e.id));
+  const attribute = new Map(live(model.attributes).filter((a) => logical.has(a.entity_id)).map((a) => [a.id, a]));
   const entityName = new Map(live(model.entities).map((e) => [e.id, e.name]));
   const column = new Map(live(model.sourceColumns).map((c) => [c.id, c]));
   const tableName = new Map(live(model.sourceTables).map((t) => [t.id, t.name]));

@@ -1,6 +1,7 @@
 // Counts shown around the model (prototype renderStatus, insOverview, renderHome, renderWsHome, renderTabs): the status
 // bar and the overview of a canvas, the project home, the workspace home and the canvas tabs. Pure TypeScript.
 
+import { isLogical } from "@/domain/model/levels";
 import type { Uuid } from "@/domain/ids";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
 import { coverageParts } from "@/domain/model/requirements";
@@ -20,6 +21,12 @@ export function coverage(ix: ModelIndex, entityIds: readonly Uuid[]): { entity: 
     });
 }
 
+/** A live logical entity of the model (slice 15a, Q4). */
+const logicalIn = (ix: ModelIndex, id: Uuid) => {
+  const e = ix.entity.get(id);
+  return !!e && isLogical(e);
+};
+
 export interface CanvasStatus {
   /** Attributes of the entities on this canvas, and how many of them are mapped. */
   attributes: number;
@@ -34,7 +41,8 @@ export interface CanvasStatus {
 /** The status bar (prototype renderStatus): mapped attributes on this canvas; mappings, drafts, type problems and
  * relationships of the model. */
 export function canvasStatus(ix: ModelIndex, entityIdsHere: readonly Uuid[]): CanvasStatus {
-  const cov = coverage(ix, entityIdsHere);
+  // "Mapped attributes on canvas" counts logical attributes only (slice 15a, X-6, Q4)
+  const cov = coverage(ix, entityIdsHere.filter((id) => logicalIn(ix, id)));
   return {
     attributes: cov.reduce((n, c) => n + c.attributes, 0),
     mapped: cov.reduce((n, c) => n + c.mapped, 0),
@@ -57,7 +65,8 @@ export interface WorkspaceStats {
 export function workspaceStats(model: WorkspaceModel): WorkspaceStats {
   const ix = indexModel(model);
   return {
-    entities: model.entities.length,
+    // logical entities (slice 15a, Q4): facts and dimensions are not counted here
+    entities: model.entities.filter(isLogical).length,
     sourceTables: model.sourceTables.length,
     mappings: model.mappings.length,
     approved: model.mappings.filter((m) => m.status === "approved").length,
@@ -79,7 +88,8 @@ export function projectStats(model: WorkspaceModel, items: readonly CanvasItem[]
   const entities = new Set<Uuid>(), tables = new Set<Uuid>();
   for (const i of items) {
     if (!canvases.has(i.canvas_id)) continue;
-    if (i.entity_id && ix.entity.has(i.entity_id)) entities.add(i.entity_id);
+    // logical entities only, as the workspace home (slice 15a, Q4)
+    if (i.entity_id && logicalIn(ix, i.entity_id)) entities.add(i.entity_id);
     if (i.source_table_id && ix.table.has(i.source_table_id)) tables.add(i.source_table_id);
   }
   const cov = coverage(ix, [...entities]);

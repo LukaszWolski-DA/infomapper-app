@@ -16,6 +16,7 @@ import { createConceptAction, createEntityAction, renameConceptAction } from "@/
 import { createRequirementAction } from "@/app/_actions/requirement";
 import { KIND_NAMES } from "@/domain/model/requirements";
 import { useAction } from "@/app/_components/use-action";
+import type { ActionResult } from "@/app/_lib/run-command";
 import { DotsIcon, itemClass, menuClass, sectionClass } from "@/app/w/[workspaceId]/p/[projectId]/_components/canvas-menu";
 import { readPreference, writePreference } from "@/canvas/CanvasProvider";
 import { CanvasUiCtx, CARD_DRAG_TYPE, REQ_DRAG_TYPE, type CardTarget } from "@/canvas/context";
@@ -35,6 +36,7 @@ import type { ImportData } from "./import/wizard-model";
 import { NewSourceTableDialog } from "./new-source-table-dialog";
 import { useImported } from "./import/use-imported";
 import { usePanels, type LeftTab } from "./panels-context";
+import { useModules } from "../_components/modules";
 import { useSidePanels } from "../_components/side-panels";
 import { CoverageBar, coverageTitle, KindIcon, ReqDot } from "./requirement-ui";
 import { requirementNameFocus } from "./requirements-section";
@@ -48,18 +50,24 @@ import {
   requirementGroup,
   schemaGroup,
   systemGroup,
+  tabConceptGroup,
+  tabSectionGroup,
   type Presence,
   type TreeConcept,
   type TreeData,
   type TreeFilter,
+  type TreeTab,
 } from "./tree-data";
+
+/** A module's create answers as `createEntityAction` does (`EntityCreateResult` is its shape in `src/ui`). */
+type CreateResult = ActionResult<{ entityId: string; canvasItemId: string | null; name: string }>;
 
 const SHUT_KEY = "infomapper:tree-shut";
 const CANVAS_ONLY_KEY = "infomapper:tree-canvas-only";
 const PROJECT_ONLY_KEY = "infomapper:tree-project-only";
 
 type Tab = LeftTab;
-const TAB_NAMES: Record<Tab, string> = { model: "Model", sources: "Sources", requirements: "Requirements" };
+const TAB_NAMES: Record<string, string> = { model: "Model", sources: "Sources", requirements: "Requirements" };
 
 export interface LeftPanelProps {
   workspaceId: string;
@@ -77,8 +85,9 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const { run, saveRow } = useAction();
-  const { setNameFocus, setLastConcept, leftTab: tab, setLeftTab: setTab } = usePanels();
+  const { setNameFocus, setLastConcept, lastConcept, leftTab: chosenTab, setLeftTab: setTab } = usePanels();
   const imported = useImported();
+  const modules = useModules();
   // slice 5a (Q4): creating something whose name is typed in the details panel, and a requirement's click, open it
   // when hidden; an entity's or a table's click selects or places its card and, on a narrow screen, closes this panel
   const { openDetails, closeLeftOverlay } = useSidePanels();
@@ -106,6 +115,8 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     if (readPreference(PROJECT_ONLY_KEY) === "1") setProjectOnly(true);
   }, []);
 
+  // a module's tab that is gone (InfoCube turned off) shows the Model tab
+  const tab: Tab = ["model", "sources", "requirements"].includes(chosenTab) || tree.tabs.some((t) => t.id === chosenTab) ? chosenTab : "model";
   const filter: TreeFilter = { q, canvasOnly, projectOnly };
   const searching = !!q.trim();
 
@@ -493,24 +504,121 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     ];
   };
 
-  const content = tab === "model" ? modelTree() : tab === "sources" ? sourceTree() : requirementTree();
+  // ---- a module's tab (slice 15a, B-1; prototype cubeTree): its creates, then each group's entities by concept ----
+  async function createFromTab(createKey: string) {
+    const create = modules.creates.find((c) => c.key === createKey);
+    if (!create) return;
+    // the concept last used for a new entity, else the first (prototype createEntity from the panel)
+    const concept = tree.concepts.find((c) => c.id === lastConcept()) ?? tree.concepts[0];
+    if (!concept) {
+      toast("Create a concept first (left panel, New concept).");
+      return;
+    }
+    const spot = ui.freeSpot();
+    const result = await run(() => create.action(workspaceId, { conceptId: concept.id, placement: { canvasId, ...spot, height: newCardHeight(0), frames: ui.frameRefs() } }) as Promise<CreateResult>);
+    if (!result.ok) return;
+    setLastConcept(concept.id);
+    toast(`Created ${result.value.name} in ${concept.name}. Type its name now; change the concept in the panel.`);
+    const cardId = result.value.canvasItemId;
+    if (cardId) {
+      openDetails();
+      ui.select({ t: "card", id: cardId });
+      setNameFocus(cardId);
+    }
+  }
+  const moduleTree = (t: TreeTab) => {
+    const creates = editable && !searching ? modules.creates.filter((c) => t.creates.includes(c.key)) : [];
+    const filtering = searching || canvasOnly || projectOnly;
+    const sections = t.sections
+      .map((sec) => ({ sec, groups: filterConcepts(sec.concepts, filter).filter((g) => g.items.length > 0) }))
+      .filter(({ groups }) => groups.length > 0 || !filtering);
+    if (!sections.length && !creates.length) return null;
+    return (
+      <>
+        {creates.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 px-2.5 pb-0.5 pt-1.5">
+            {creates.map((c) => (
+              <button key={c.key} type="button" className={`${smallButton} whitespace-nowrap`} data-testid={c.testId} onClick={() => void createFromTab(c.key)}>
+                {c.button}
+              </button>
+            ))}
+          </div>
+        )}
+        {sections.map(({ sec, groups }) => {
+          const key = tabSectionGroup(sec.key);
+          const opened = isOpen(shut, key, q);
+          const count = groups.reduce((n, g) => n + g.items.length, 0);
+          return (
+            <div key={sec.key} data-testid="tree-tab-section" data-section={sec.key}>
+              <GroupHead open={opened} count={filtering ? count : sec.total} dot={<span className={`im-mark ${sec.mark}`} aria-hidden />} onClick={() => fold(key)} sticky testId="tree-section-head">
+                {sec.title}
+              </GroupHead>
+              {opened &&
+                (groups.length ? (
+                  groups.map(({ concept: c, items }) => {
+                    const sub = tabConceptGroup(sec.key, c.id);
+                    return (
+                      <div key={c.id} data-testid="tree-concept" data-concept-id={c.id}>
+                        {/* a concept inside a group, one step in (prototype cubeTree's sub-heads) */}
+                        <div className="flex items-center pl-3">
+                          <GroupHead open={isOpen(shut, sub, q)} count={items.length} dot={<i className="size-2 flex-none rounded-[2px]" style={{ background: c.color }} />} onClick={() => fold(sub)} testId="tree-concept-head">
+                            {c.name}
+                          </GroupHead>
+                        </div>
+                        {isOpen(shut, sub, q) &&
+                          items.map(({ item: e, hint }) => (
+                            <TreeItem
+                              key={e.id}
+                              kind="ent"
+                              name={e.name}
+                              hint={hint}
+                              meta={e.stereotype}
+                              presence={e.presence}
+                              dragData={{ target: { entityId: e.id }, rows: e.fields.length }}
+                              onClick={() => open({ entityId: e.id }, e.cardId, e.fields.length)}
+                            />
+                          ))}
+                      </div>
+                    );
+                  })
+                ) : (
+                  <div className="py-1 pl-[30px] pr-3 pb-2 text-xs text-im-ink-3" data-testid="text-section-empty">
+                    {sec.empty}
+                    {editable ? sec.emptyCreate : ""}
+                  </div>
+                ))}
+            </div>
+          );
+        })}
+      </>
+    );
+  };
+
+  const moduleTab = tree.tabs.find((t) => t.id === tab);
+  const content = moduleTab ? moduleTree(moduleTab) : tab === "model" ? modelTree() : tab === "sources" ? sourceTree() : requirementTree();
+  const tabIds: string[] = ["model", "sources", "requirements", ...tree.tabs.map((t) => t.id)];
 
   return (
     <>
       <div className="flex gap-0.5 px-2.5 pt-2.5" role="tablist">
-        {(["model", "sources", "requirements"] as const).map((t) => (
-          <button
-            key={t}
-            type="button"
-            role="tab"
-            aria-selected={tab === t}
-            data-testid={`tab-${t}`}
-            onClick={() => setTab(t)}
-            className="h-[30px] flex-1 rounded-t-md border-b-2 border-transparent text-[12.5px] font-medium text-im-ink-3 aria-selected:border-im-ink aria-selected:text-im-ink"
-          >
-            {TAB_NAMES[t]}
-          </button>
-        ))}
+        {tabIds.map((t) => {
+          const moduleOne = tree.tabs.find((x) => x.id === t);
+          return (
+            <button
+              key={t}
+              type="button"
+              role="tab"
+              aria-selected={tab === t}
+              data-testid={`tab-${t}`}
+              title={moduleOne?.title}
+              onClick={() => setTab(t)}
+              // four tabs fit at 12 px (slice 15a, P18)
+              className={`h-[30px] flex-1 rounded-t-md border-b-2 border-transparent ${tabIds.length > 3 ? "text-[12px]" : "text-[12.5px]"} font-medium text-im-ink-3 aria-selected:border-im-ink aria-selected:text-im-ink`}
+            >
+              {moduleOne?.name ?? TAB_NAMES[t]}
+            </button>
+          );
+        })}
       </div>
       <div className="relative m-2.5">
         <svg viewBox="0 0 16 16" className="pointer-events-none absolute left-[9px] top-2 size-4 fill-none stroke-im-ink-3 stroke-[1.6]" aria-hidden>
@@ -566,7 +674,8 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
       {deleting && (
         <DeleteConceptDialog
           workspaceId={workspaceId}
-          concept={deleting}
+          // every entity of the concept, both levels: a concept with only facts is not empty (slice 15a, Q4)
+          concept={{ ...deleting, entities: [...deleting.entities, ...tree.tabs.flatMap((t) => t.sections.flatMap((sec) => sec.concepts.filter((x) => x.id === deleting.id).flatMap((x) => x.entities)))] }}
           others={tree.concepts.filter((c) => c.id !== deleting.id)}
           frames={conceptFrames[deleting.id] ?? 0}
           onClose={() => setDeleting(null)}

@@ -6,7 +6,8 @@
 import { revalidatePath } from "next/cache";
 import type { DataStore } from "@/data";
 import { createProject, deleteProject, updateProject } from "@/domain/commands/project";
-import { archiveWorkspace, createWorkspace, unarchiveWorkspace, updateWorkspaceSettings } from "@/domain/commands/workspace";
+import { archiveWorkspace, createWorkspace, unarchiveWorkspace, updateWorkspaceSettings, type InfoCubeSwitchState } from "@/domain/commands/workspace";
+import { dimensionalCount } from "@/domain/model/levels";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { rememberGoneProject } from "../_lib/gone-project";
@@ -20,6 +21,21 @@ async function loadAccess(store: DataStore, workspaceId: unknown, userId: Uuid):
   const workspace = await store.workspaces.get(workspaceId);
   if (!workspace) return null;
   return { workspace, member: await store.workspaces.getMember(workspace.id, userId) };
+}
+
+/** What turning InfoCube on or off needs (slice 15a, C-7): the licence, the organization's name, the facts and dimensions. */
+async function infoCubeSwitch(store: DataStore, access: WorkspaceAccess): Promise<InfoCubeSwitchState> {
+  const { organization_id: organizationId, id } = access.workspace;
+  const [organization, licences, model] = await Promise.all([
+    store.organizations.get(organizationId),
+    store.organizations.listLicences(organizationId),
+    store.model.load(id),
+  ]);
+  return {
+    licensed: licences.some((l) => l.module === "infocube"),
+    organizationName: organization?.name ?? "This organization",
+    dimensionalEntities: dimensionalCount(model.entities, id),
+  };
 }
 
 function done<T>(result: ActionResult<T>): ActionResult<T> {
@@ -47,12 +63,13 @@ export async function updateWorkspaceSettingsAction(input: {
   docLanguage?: string;
   dv2Mode?: boolean;
   fourEyes?: boolean;
+  infocube?: boolean;
 }) {
   return done(
     await runCommand(async (ctx, store, user) => {
       const access = await loadAccess(store, input?.workspaceId, user.id);
       if (!access) return NOT_FOUND;
-      const result = updateWorkspaceSettings(ctx, access, input);
+      const result = updateWorkspaceSettings(ctx, access, input, input?.infocube === undefined ? undefined : await infoCubeSwitch(store, access));
       return result.ok ? { ...result, value: { version: result.value.workspace.version } } : result;
     }),
   );

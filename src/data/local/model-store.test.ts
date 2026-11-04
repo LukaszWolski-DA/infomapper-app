@@ -1,7 +1,7 @@
 // The local adapter for the model tables (slice 1a, step 2): the demo model, reads, the data model's checks,
 // domain commands applied end to end, and seed:large. Frames since slice 2b.
 
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -24,7 +24,8 @@ import type { WorkspaceAccess } from "@/domain/permissions";
 import type { CanvasItem, Entity, Frame } from "@/domain/types";
 import type { DataStore, WorkspaceModel } from "../ports";
 import { seedDevData, seedLargeData } from "./dev-data";
-import { readDb } from "./file";
+import { newerFormatMessage, readDb } from "./file";
+import { DEV_DB_FORMAT } from "./schema";
 import { buildSeed, SEED_IDS } from "./seed";
 import { LARGE_IDS, LARGE_LIVE_LABEL } from "./seed-large";
 import { liveMembership } from "@/domain/model/live";
@@ -513,6 +514,16 @@ describe("frames (slice 2b)", () => {
 });
 
 describe("file format", () => {
+  it("refuses a file a newer branch wrote, leaves it as it is and never suggests a reset (slice 15a)", async () => {
+    const newer = JSON.stringify({ ...(await readDb(file)), format: DEV_DB_FORMAT + 1 });
+    await writeFile(file, newer, "utf8");
+    const refusal = await store.model.load(RETAIL).then(() => null, (e: Error) => e.message);
+    expect(refusal).toBe(newerFormatMessage(file, DEV_DB_FORMAT + 1));
+    expect(refusal).toContain("Switch back to that branch, or restore a backup");
+    expect(refusal).not.toContain("reset-dev-data");
+    expect(await readFile(file, "utf8")).toBe(newer);
+  });
+
   it("refuses a slice 0 file and says how to fix it", async () => {
     await writeFile(file, JSON.stringify({ ...(await readDb(file)), format: 1 }), "utf8");
     await expect(store.model.load(RETAIL)).rejects.toThrow('Run "npm run reset-dev-data"');
@@ -661,7 +672,7 @@ describe("copies through the adapter (slice 10c)", () => {
     let m = await store.model.load(RETAIL);
     const original = m.attributes.find((a) => a.is_primary_key)!;
     const target = m.entities.find((e) => e.id !== original.entity_id)!;
-    const pasted = pasteAttribute(ctxFor(anna), access, { entity: target, original, attributes: m.attributes }, { entityId: target.id, attributeId: original.id });
+    const pasted = pasteAttribute(ctxFor(anna), access, { entity: target, original, originalEntity: m.entities.find((e) => e.id === original.entity_id)!, attributes: m.attributes }, { entityId: target.id, attributeId: original.id });
     if (!pasted.ok) throw new Error(pasted.error.message);
     expect(await store.apply(pasted.writeSet)).toEqual({ ok: true });
 

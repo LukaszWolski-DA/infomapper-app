@@ -5,47 +5,21 @@
 // dropped column, attribute order, a new relationship. Mappings are in mapping.ts. Slice 10c: paste a copy of an
 // attribute; a change of a followed field writes the copies too and answers with every version written.
 
-import { revalidatePath } from "next/cache";
-import { getDataStore, type DataStore } from "@/data";
-import type { CommandContext, CommandResult } from "@/domain/changes";
+import { moduleEntityDependents, relationshipOneEnd, STORE_SCHEMA } from "@/compose";
+import { getDataStore } from "@/data";
 import { addAttribute, createAttributeFromColumn, deleteAttribute, pasteAttribute, reorderAttribute, updateAttribute, type PasteAttributeInput, type UpdateAttributeInput } from "@/domain/commands/attribute";
 import { createConcept, deleteConcept, renameConcept } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity, type UpdateEntityInput } from "@/domain/commands/entity";
 import { createRelationship, deleteRelationship, swapRelationship, updateRelationship, type UpdateRelationshipInput } from "@/domain/commands/relationship";
 import { createSourceTable, deleteSourceTable, type CreateSourceTableInput } from "@/domain/commands/source";
-import type { Uuid } from "@/domain/ids";
-import type { WorkspaceModel } from "@/domain/types";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
 import { entityImpact, type EntityImpact } from "@/domain/model/impact";
-import type { WorkspaceAccess } from "@/domain/permissions";
 import { getSession } from "../_lib/session";
 import { lockedRefusal } from "../_lib/unlock";
-import { runCommand, type ActionResult, type CommandOptions, type Saved } from "../_lib/run-command";
+import { loadAccess, modelCommand } from "../_lib/model-command";
+import { type ActionResult, type Saved } from "../_lib/run-command";
 
-const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
-
-async function loadAccess(store: DataStore, workspaceId: unknown, userId: Uuid): Promise<WorkspaceAccess | null> {
-  if (typeof workspaceId !== "string") return null;
-  const workspace = await store.workspaces.get(workspaceId);
-  if (!workspace) return null;
-  return { workspace, member: await store.workspaces.getMember(workspace.id, userId) };
-}
-
-/** Runs a model command with the workspace's live model loaded; on success the pages are fresh again. */
-async function modelCommand<T>(
-  workspaceId: unknown,
-  build: (ctx: CommandContext, access: WorkspaceAccess, model: WorkspaceModel, store: DataStore) => Promise<CommandResult<T>> | CommandResult<T>,
-  options: CommandOptions = {},
-): Promise<ActionResult<T>> {
-  const result = await runCommand<T>(async (ctx, store, user) => {
-    const access = await loadAccess(store, workspaceId, user.id);
-    if (!access) return NOT_FOUND;
-    return build(ctx, access, await store.model.load(access.workspace.id), store);
-  }, options);
-  if (result.ok) revalidatePath("/", "layout");
-  return result;
-}
 
 const byId = <R extends { id: string }>(rows: readonly R[], id: unknown): R | null => rows.find((r) => r.id === id) ?? null;
 
@@ -108,11 +82,12 @@ export async function updateEntityAction(workspaceId: string, input: UpdateEntit
 }
 
 /** What deleting an entity takes with it (D-47), for the dialog. Reading only. */
-export async function entityImpactAction(workspaceId: string, entityId: string): Promise<ActionResult<EntityImpact>> {
+/** `modules`: the modules' rows of the preview (slice 15a, X-1, X-4), after InfoMapper's. */
+export async function entityImpactAction(workspaceId: string, entityId: string): Promise<ActionResult<EntityImpact & { modules: [string, string][] }>> {
   const session = await getSession();
   if (!session) return { ok: false, code: "unauthenticated", message: "Your session has ended. Sign in again." };
   const { user } = session;
-  const store = getDataStore();
+  const store = getDataStore(STORE_SCHEMA);
   const access = await loadAccess(store, workspaceId, user.id);
   if (!access?.member) return { ok: false, code: "not_found", message: "This workspace does not exist." };
   const locked = await lockedRefusal(store, session.unlocked, access.workspace.organization_id);
@@ -131,7 +106,8 @@ export async function entityImpactAction(workspaceId: string, entityId: string):
   const projectCanvases = (await Promise.all(projects.map((p) => store.canvases.listLinksOfProject(ws, p.id)))).flat();
   const rows = { entity, ...model, canvasItems };
   const index = buildRequirementIndex(requirements, requirementLinks, model);
-  return { ok: true, value: entityImpact(rows, { canvases, projects, projectCanvases, requirements: index }) };
+  const modules = await moduleEntityDependents(store, ws, entity.id, model);
+  return { ok: true, value: { ...entityImpact(rows, { canvases, projects, projectCanvases, requirements: index }), modules } };
 }
 
 /**
@@ -198,9 +174,11 @@ export async function updateAttributeAction(workspaceId: string, input: UpdateAt
  * entity has another attribute of that name (F12).
  */
 export async function pasteAttributeAction(workspaceId: string, input: PasteAttributeInput): Promise<ActionResult<{ attributeId: string; nameTaken: boolean }>> {
-  return modelCommand(workspaceId, (ctx, access, { entities, attributes }) =>
-    pasteAttribute(ctx, access, { entity: byId(entities, input?.entityId), original: byId(attributes, input?.attributeId), attributes }, input),
-  );
+  return modelCommand(workspaceId, (ctx, access, { entities, attributes }) => {
+    const original = byId(attributes, input?.attributeId);
+    // the original's entity, for its level (slice 15a, O6)
+    return pasteAttribute(ctx, access, { entity: byId(entities, input?.entityId), original, originalEntity: byId(entities, original?.entity_id), attributes }, input);
+  });
 }
 
 /**
@@ -235,8 +213,12 @@ export async function createRelationshipAction(
   workspaceId: string,
   input: { fromEntityId: string; toEntityId: string },
 ): Promise<ActionResult<{ relationshipId: string }>> {
-  return modelCommand(workspaceId, (ctx, access, { entities }) => {
-    const result = createRelationship(ctx, access, { from: byId(entities, input?.fromEntityId), to: byId(entities, input?.toEntityId) }, input);
+  return modelCommand(workspaceId, async (ctx, access, { entities }, store) => {
+    const from = byId(entities, input?.fromEntityId);
+    const to = byId(entities, input?.toEntityId);
+    // between a fact and a dimension the relationship starts at the dimension (slice 15a, D-67)
+    const oneEnd = from && to ? await relationshipOneEnd(store, access.workspace.id, from.id, to.id) : null;
+    const result = createRelationship(ctx, access, { from, to, oneEnd }, input);
     return result.ok ? { ...result, value: { relationshipId: result.value.relationship.id } } : result;
   });
 }

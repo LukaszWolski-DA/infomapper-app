@@ -192,3 +192,33 @@ describe("the search finds aliases (slice 11, item 14, F13)", () => {
     expect(found("Kopia")).toEqual([]);
   });
 });
+
+describe("the level in the left panel (slice 15a, B-1, Q4)", () => {
+  // Sales Order is a fact here; the Cube tab's group lists it by concept, the Model tab does not
+  const dimensional = { ...model, entities: [entity(ids.customer), entity(ids.salesOrder, { concept_id: ids.conceptSales, model_level: "dimensional" })] };
+  const tab = { id: "cube", name: "Cube", title: "t", creates: ["fact"], sections: [{ key: "cube:fact", title: "Facts", mark: "cube", empty: "No facts yet.", emptyCreate: "", entities: [{ id: ids.salesOrder, meta: "no grain" }] }, { key: "cube:dimension", title: "Dimensions", mark: "cube", empty: "No dimensions yet.", emptyCreate: "", entities: [] }] };
+  const levels = buildTree(dimensional, items, ids.canvas1, [ids.canvas1], undefined, [], [tab]);
+
+  it("lists logical entities only in the Model tab, and a module's tab its own by concept with their meta", () => {
+    expect(levels.concepts.map((c) => [c.name, c.entities.map((e) => e.name)])).toEqual([
+      ["Customer", ["Customer"]],
+      ["Sales", []],
+    ]);
+    expect(levels.tabs.map((t) => t.sections.map((s) => [s.title, s.total, s.concepts.map((c) => [c.name, c.entities.map((e) => [e.name, e.stereotype, e.presence])])]))).toEqual([
+      [
+        ["Facts", 1, [["Sales", [["Sales Order", "no grain", "elsewhere"]]]]],
+        ["Dimensions", 0, []],
+      ],
+    ]);
+  });
+
+  it("searches each tab within its own level, and folds a tab's groups and their concepts", () => {
+    expect(filterConcepts(levels.concepts, { q: "sales", canvasOnly: false }).flatMap((g) => g.items)).toEqual([]);
+    expect(filterConcepts(levels.tabs[0]!.sections[0]!.concepts, { q: "sales", canvasOnly: false }).flatMap((g) => g.items.map((i) => i.item.name))).toEqual(["Sales Order"]);
+    expect(allGroups(levels, "cube")).toEqual(["cube:fact", `cube:fact:${ids.conceptSales}`, "cube:dimension"]);
+  });
+
+  it("has no module tab without a module", () => {
+    expect(tree.tabs).toEqual([]);
+  });
+});

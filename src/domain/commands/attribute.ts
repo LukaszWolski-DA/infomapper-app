@@ -8,6 +8,7 @@ import { domainError, notFound, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { indexOf } from "../model/classifications";
 import { attributePath, changesFollowed, COPIED_GONE, followOriginals, FOLLOWS_LOST_REFUSAL, FOLLOWS_REFUSAL } from "../model/copies";
+import { CROSS_LEVEL_PASTE_MESSAGE, mappingTargetRefusal, sameLevel } from "../model/levels";
 import { plainTextPair } from "../model/plain-text";
 import { sanitizeRich } from "../model/rich-text";
 import { attributeNamedAfter } from "../model/mapping-choice";
@@ -230,6 +231,8 @@ export interface PasteAttributeState {
   entity: Entity | null;
   /** The attribute that was copied; null or deleted when it is gone. */
   original: Attribute | null;
+  /** The original's entity, for its level (slice 15a, O6): an attribute is pasted within one level. */
+  originalEntity: Entity | null;
   /** The workspace's live attributes. */
   attributes: readonly Attribute[];
 }
@@ -255,6 +258,9 @@ export function pasteAttribute(
   if (!entity.ok) return fail(entity.error);
   const original = state.original;
   if (!isLive(original, workspaceId) || original.id !== attributeId) return fail(domainError("not_found", COPIED_GONE));
+  const from = state.originalEntity;
+  if (!from || from.id !== original.entity_id) return fail(domainError("not_found", COPIED_GONE));
+  if (!sameLevel(from, entity.row)) return fail(domainError("invalid", CROSS_LEVEL_PASTE_MESSAGE));
 
   const siblings = state.attributes.filter((a) => isLive(a, workspaceId) && a.entity_id === entityId);
   const attribute: Attribute = {
@@ -367,6 +373,8 @@ export function createAttributeFromColumn(
   if (!entity.ok) return fail(entity.error);
   const column = found(state.column, access, sourceColumnId, "source column");
   if (!column.ok) return fail(column.error);
+  const level = mappingTargetRefusal(entity.row);
+  if (level) return fail(level);
   const siblings = state.attributes.filter((a) => isLive(a, workspaceId) && a.entity_id === entityId);
 
   const existing = attributeNamedAfter(siblings, column.row);

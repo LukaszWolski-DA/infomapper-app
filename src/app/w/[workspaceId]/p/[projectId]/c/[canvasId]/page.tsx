@@ -19,6 +19,10 @@ import { labelForLiveCanvasAction, removeFromLiveCanvasAction } from "@/app/_act
 import { liveNoticesFor } from "@/app/_lib/live-notices";
 import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
 import { AppShell } from "@/app/_components/app-shell";
+import { ModulesProvider } from "@/app/_components/modules";
+import { moduleView, STORE_SCHEMA } from "@/compose";
+import { CREATE_ACTIONS } from "@/compose/actions";
+import { NO_MODULES } from "@/ui/modules";
 import { MovedNotice } from "@/app/_components/moved-notice";
 import { ViewStateBar } from "@/app/_components/view-state-bar";
 import { UndoButtons, UndoProvider } from "@/app/_components/undo";
@@ -85,7 +89,8 @@ export default async function CanvasPage({
   const renameOnOpen = query.rename === "1";
   const shell = await loadShell({ workspaceId, projectId, canvasId });
   const view = await loadProjectView(shell);
-  const store = getDataStore();
+  // the composition root's tables: the modules' rows are read for the page (slice 15a)
+  const store = getDataStore(STORE_SCHEMA);
   const ws = shell.workspace.id;
   // when the data is read: a page that arrives late must not put back an older state, nor hide a card, frame or note
   // created after it (slice 3a step 5, slice 3b step 1: `mergeFresh`)
@@ -121,6 +126,8 @@ export default async function CanvasPage({
   const fourEyes = !!workspace?.four_eyes;
   const events = fourEyes ? await store.changeEvents.list(ws) : [];
   const contentAuthors = Object.fromEntries(model.mappings.map((m) => [m.id, fourEyes ? lastContentEditor(m, events) : ""]).filter(([, u]) => u));
+  // the modules' part (slice 15a, AD-33): roles on cards and in panels, their tabs and creates
+  const modules = workspace ? await moduleView(store, workspace, model, CREATE_ACTIONS) : NO_MODULES;
   const liveCanvases = new Set(canvases.map((c) => c.id));
   const items = allItems.filter((i) => liveCanvases.has(i.canvas_id));
   // a live canvas (slice 3b): its label, what that label makes relevant (computed once here, never while rendering),
@@ -141,13 +148,14 @@ export default async function CanvasPage({
       : null,
     sourceChanges,
     canvas,
+    modules.roles,
   );
   // requirements (slice 4a): the index is built once per page here for the left panel; the panels build theirs once
   // per data version in the browser
   const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
   // requirement cards (slice 4b-2): this canvas's cards with a requirement, drawn from the same index
   const requirementCards = buildRequirementCards(items.filter((i) => i.canvas_id === canvasId), requirementIndex);
-  const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id), requirementIndex, sourceChanges);
+  const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id), requirementIndex, sourceChanges, modules.tabs);
   // the status bar's requirements for the whole workspace (PRD item 31), and who last changed each requirement's content
   // for the panel's four-eyes hint (AD-06; only with four-eyes on, the server checks again)
   const requirementCounts = { count: requirementIndex.requirements.length, covered: requirementIndex.coveredCount };
@@ -214,6 +222,7 @@ export default async function CanvasPage({
         editable={editable}
         save={saveCanvasLookAction.bind(null, ws)}
       >
+      <ModulesProvider view={modules}>
       <PanelsProvider>
         <UndoProvider workspaceId={ws} projectId={projectId} canvasId={canvasId} state={undoState}>
           <WorkingContextProvider workspaceId={ws} userId={shell.user.id} labels={countedLabels} initial={contextCookie} canLabel={editable}>
@@ -353,6 +362,7 @@ export default async function CanvasPage({
           </WorkingContextProvider>
         </UndoProvider>
       </PanelsProvider>
+      </ModulesProvider>
       </CanvasLookProvider>
     </CanvasProvider>
   );

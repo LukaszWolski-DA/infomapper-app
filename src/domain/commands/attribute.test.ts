@@ -268,7 +268,7 @@ describe("pasteAttribute (slice 10c, items 4, 5)", () => {
   const attributes = [attribute(customerId, { definition_html: "<p>The customer.</p>", definition_text: "The customer." }), attribute(email), attribute(orderId)];
   const paste = (entityId: string, attributeId: string, over: { role?: Parameters<typeof access>[0]; ws?: object; rows?: Attribute[] } = {}) => {
     const rows = over.rows ?? attributes;
-    return pasteAttribute(makeCtx(), access(over.role ?? "modeler", over.ws ?? {}), { entity: entity(entityId), original: rows.find((a) => a.id === attributeId) ?? null, attributes: rows }, { entityId, attributeId });
+    return pasteAttribute(makeCtx(), access(over.role ?? "modeler", over.ws ?? {}), { entity: entity(entityId), original: rows.find((a) => a.id === attributeId) ?? null, originalEntity: entity(rows.find((a) => a.id === attributeId)?.entity_id ?? entityId), attributes: rows }, { entityId, attributeId });
   };
   const inserted = (r: ReturnType<typeof paste>): Attribute => {
     if (!r.ok) throw new Error(r.error.message);
@@ -320,7 +320,7 @@ describe("pasteAttribute (slice 10c, items 4, 5)", () => {
   it("refuses a deleted original, an unknown entity, a reviewer and an archived workspace", () => {
     expect(paste(salesOrder, customerId, { rows: [attribute(customerId, { deleted_at: NOW })] })).toMatchObject({ ok: false, error: { code: "not_found", message: COPIED_GONE } });
     expect(
-      pasteAttribute(makeCtx(), access("modeler"), { entity: entity(salesOrder, { deleted_at: NOW }), original: attributes[0]!, attributes }, { entityId: salesOrder, attributeId: customerId }),
+      pasteAttribute(makeCtx(), access("modeler"), { entity: entity(salesOrder, { deleted_at: NOW }), original: attributes[0]!, originalEntity: entity(attributes[0]!.entity_id), attributes }, { entityId: salesOrder, attributeId: customerId }),
     ).toMatchObject({ ok: false, error: { code: "not_found" } });
     expect(paste(salesOrder, customerId, { role: "reviewer" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
     expect(paste(salesOrder, customerId, { role: "owner", ws: archived })).toMatchObject({ ok: false, error: { code: "archived" } });
@@ -411,5 +411,29 @@ describe("following and Stop following (slice 10c, items 6, 9, 10; F1 to F5)", (
       ok: false,
       error: { code: "forbidden" },
     });
+  });
+});
+
+describe("pasteAttribute within one level (slice 15a, O6)", () => {
+  const { salesOrder } = ids;
+  const original = attribute(customerId);
+  const paste = (into: ReturnType<typeof entity>, from: ReturnType<typeof entity>) =>
+    pasteAttribute(makeCtx(), access("modeler"), { entity: into, original, originalEntity: from, attributes: [original] }, { entityId: into.id, attributeId: customerId });
+  const logical = (id: string) => entity(id);
+  const dimensional = (id: string) => entity(id, { model_level: "dimensional" });
+
+  it("pastes within the logical level and within the dimensional level", () => {
+    expect(paste(logical(salesOrder), logical(customer)).ok).toBe(true);
+    expect(paste(dimensional(salesOrder), dimensional(customer)).ok).toBe(true);
+  });
+
+  it("refuses a paste across levels, both ways", () => {
+    const message = "An attribute can be pasted only within one level: logical into logical, fact or dimension into fact or dimension.";
+    expect(paste(dimensional(salesOrder), logical(customer))).toMatchObject({ ok: false, error: { code: "invalid", message } });
+    expect(paste(logical(salesOrder), dimensional(customer))).toMatchObject({ ok: false, error: { code: "invalid", message } });
+  });
+
+  it("refuses when the original's entity is not the one given (the original is gone)", () => {
+    expect(paste(logical(salesOrder), logical(salesOrder))).toMatchObject({ ok: false, error: { code: "not_found" } });
   });
 });

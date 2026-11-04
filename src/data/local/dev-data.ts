@@ -2,20 +2,30 @@
 
 import { existsSync } from "node:fs";
 import { assertNotProduction, readDb, removeDb, writeDb } from "./file";
+import type { DevDb } from "./schema";
 import { buildSeed } from "./seed";
 import { addLargeWorkspace } from "./seed-large";
 
-export async function seedDevData(file: string): Promise<"created" | "exists"> {
+/** What a caller adds to the fresh seed: the modules' demo data, from the composition root (slice 15a, O5). */
+export type SeedExtra = (db: DevDb) => unknown;
+
+function seeded(extra?: SeedExtra): DevDb {
+  const db = buildSeed();
+  extra?.(db);
+  return db;
+}
+
+export async function seedDevData(file: string, extra?: SeedExtra): Promise<"created" | "exists"> {
   assertNotProduction();
   if (existsSync(file)) return "exists";
-  await writeDb(file, buildSeed());
+  await writeDb(file, seeded(extra));
   return "created";
 }
 
-export async function resetDevData(file: string): Promise<void> {
+export async function resetDevData(file: string, extra?: SeedExtra): Promise<void> {
   assertNotProduction();
   await removeDb(file);
-  await writeDb(file, buildSeed());
+  await writeDb(file, seeded(extra));
 }
 
 /** Adds the workspace “Performance test” (seeding the demo data first if there is no file yet). */

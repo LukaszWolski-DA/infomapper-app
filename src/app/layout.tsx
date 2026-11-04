@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { ToastProvider } from "@/ui/components/toast";
 import "./globals.css";
+import "@/compose/styles";
 
 // The prototype uses IBM Plex Sans and IBM Plex Mono. IBM's own files, hosted with the app (chore e2e reliability, P3 B:
 // no build or start fetches fonts from the network); their source and licence are in fonts/ibm-plex/README.md.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { MAPPING_TO_DIMENSIONAL_MESSAGE } from "../model/levels";
 import type { CommandContext } from "../changes";
 import { ids, requirement, requirementLink, workspace } from "../__fixtures__/domain";
 import { attributeNamed, columnNamed, importId, tableNamed, withMapping } from "../__fixtures__/import";
@@ -235,6 +236,14 @@ describe("map, not needed, decide column by column, mark as needed (items 14, 15
     expect(changeIn(after, c.id).resolution).toBe("Mapped to Customer.created_at (draft)");
     const again = { ...after, changes: s.model.changes };
     expect(mapToAttribute(ctx(), rowsOf(again), c.id, createdAt.id, ids.ws)).toEqual({ ok: false, error: { code: "conflict", message: "That mapping already exists." } });
+  });
+
+  it("map to an attribute of a fact or a dimension is refused (slice 15a step 5, B-6's refusal)", () => {
+    const s = scenario();
+    const c = s.change("dbo.customers.created_on");
+    const createdAt = attributeNamed(s.model, "created_at");
+    const dimensional = { ...s.model, entities: s.model.entities.map((e) => (e.id === createdAt.entity_id ? { ...e, model_level: "dimensional" as const } : e)) };
+    expect(mapToAttribute(ctx(), rowsOf(dimensional), c.id, createdAt.id, ids.ws)).toEqual({ ok: false, error: { code: "invalid", message: MAPPING_TO_DIMENSIONAL_MESSAGE } });
   });
 
   it("not needed on a column and on a table; mark as needed takes it back (P10)", () => {

@@ -8,10 +8,11 @@ import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, notFound } from "../errors";
 import type { Uuid } from "../ids";
+import { mappingTargetRefusal } from "../model/levels";
 import { afterContentChange, checkFourEyes, checkMappingShape } from "../model/mapping-rules";
 import { plainTextPair } from "../model/plain-text";
 import type { WorkspaceAccess } from "../permissions";
-import { MAPPING_KINDS, MAPPING_STATUSES, type Attribute, type LabelLink, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
+import { MAPPING_KINDS, MAPPING_STATUSES, type Attribute, type Entity, type LabelLink, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
 import { uuidSchema, versionSchema } from "../validation";
 import { linksOnItems, softDeleteLinks } from "./label";
 import { softDeleteRequirementLinks } from "./requirement";
@@ -49,6 +50,8 @@ export type CreateMappingInput = z.input<typeof createMappingInput>;
 
 export interface CreateMappingState {
   attribute: Attribute | null;
+  /** The attribute's entity (slice 15a): a fact's or a dimension's attribute takes no source column (B-6). */
+  entity?: Pick<Entity, "model_level"> | null;
   column: SourceColumn | null;
   /** Live mappings of the attribute and their inputs, to refuse the same mapping twice. */
   mappings: readonly Mapping[];
@@ -69,6 +72,8 @@ export function createMapping(
   if (!attribute.ok) return fail(attribute.error);
   const column = found(state.column, access, sourceColumnId, "source column");
   if (!column.ok) return fail(column.error);
+  const level = mappingTargetRefusal(state.entity);
+  if (level) return fail(level);
 
   const workspaceId = access.workspace.id;
   const mappingIds = new Set(state.mappings.filter((m) => isLive(m, workspaceId) && m.attribute_id === attributeId).map((m) => m.id));

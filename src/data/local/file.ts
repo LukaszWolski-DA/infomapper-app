@@ -37,6 +37,11 @@ export function assertNotProduction(): void {
   if (!isLocalModeAllowed()) throw new ProductionRefusedError();
 }
 
+/** The refusal of a file a newer branch wrote (slice 15a): nothing is read or written. */
+export const newerFormatMessage = (file: string, format: number): string =>
+  `${file} has format ${format}, newer than this branch's ${DEV_DB_FORMAT}: a newer branch wrote it. Nothing was changed. ` +
+  "Switch back to that branch, or restore a backup of the file from .data/backups/ that has this branch's format.";
+
 export async function readDb(file: string): Promise<DevDb> {
   assertNotProduction();
   let text: string;
@@ -50,6 +55,9 @@ export async function readDb(file: string): Promise<DevDb> {
   const was = db.format as number;
   const now = new Date().toISOString();
   const { report, passwordsGiven } = upgradeDb(db, now, () => uuidv7());
+  // a newer branch wrote the file (slice 15a): it may hold someone's own model, so the way back is that branch or a
+  // backup, never a reset, which would replace it with the demo data
+  if (typeof db.format === "number" && db.format > DEV_DB_FORMAT) throw new Error(newerFormatMessage(file, db.format));
   if (db.format !== DEV_DB_FORMAT) {
     throw new Error(`${file} has format ${String(db.format)}, expected ${DEV_DB_FORMAT}. Run "npm run reset-dev-data".`);
   }
@@ -77,7 +85,8 @@ export async function readDb(file: string): Promise<DevDb> {
  * F18: no change events); the count comes back for the caller's log line. From 9, every attribute gets
  * `copied_from_attribute_id` null (slice 10c, F11: no change events, no log line). From 10, entities and attributes
  * get `alias` null and canvases and canvas items `entity_names` and `attribute_names` null (slice 11; no change
- * events, no log line).
+ * events, no log line). From 11, every entity gets `model_level` logical, every workspace `infocube` false, and the
+ * file an empty `organization_licence` (slice 15a; no change events, no log line).
  */
 export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number } {
   let report: Upgrade8Report | null = null;
@@ -150,7 +159,13 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
     for (const a of db.attribute) a.alias ??= null;
     for (const c of db.canvas) Object.assign(c, { entity_names: c.entity_names ?? null, attribute_names: c.attribute_names ?? null });
     for (const i of db.canvas_item) Object.assign(i, { entity_names: i.entity_names ?? null, attribute_names: i.attribute_names ?? null });
-    Object.assign(db, { format: DEV_DB_FORMAT });
+    Object.assign(db, { format: 11 });
+  }
+  // slice 15a: every entity logical, every workspace's InfoCube off, no licences (C-3, C-7; no change events, no log line)
+  if ((db.format as number) === 11) {
+    for (const e of db.entity) e.model_level ??= "logical";
+    for (const w of db.workspace) w.infocube ??= false;
+    Object.assign(db, { format: DEV_DB_FORMAT, organization_licence: (db as Partial<DevDb>).organization_licence ?? [] });
   }
   return { report, passwordsGiven };
 }

@@ -8,7 +8,8 @@ import type { CardSubject } from "@/domain/model/frames";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
 import { cardShownNames } from "@/domain/model/aliases";
 import type { Canvas, CanvasItem, LiveLevel, NameMode, RowFilter, SourceChange, WorkspaceModel } from "@/domain/types";
-import { lineNeedsClip, rowNeedsClip, titleNeedsClip } from "./text-fit";
+import type { EntityRole } from "@/ui/modules";
+import { lineNeedsClip, ROLE_MARK, rowNeedsClip, titleNeedsClip } from "./text-fit";
 
 export type CardKind = "ent" | "src";
 
@@ -68,8 +69,10 @@ export interface CardData {
   /** The entity card's exceptions to the canvas's names or aliases, only when set (slice 11, D-64). */
   entityNames?: NameMode;
   attributeNames?: NameMode;
-  /** Entity: stereotype (`Object`); source: path (`CRM / crmprod.dbo`). */
+  /** Entity: stereotype (`Object`), or a dimensional entity's role (`Fact`); source: path (`CRM / crmprod.dbo`). */
   line1: string;
+  /** A dimensional entity's role (slice 15a, D-67): its text is `line1`, with a mark and the card's classes. */
+  role?: EntityRole;
   /** Entity: `in Customer`; source: empty. */
   line1b: string;
   /** Entity: concept colour; source: null (physical colour). */
@@ -138,6 +141,8 @@ export function buildCards(
   changes: readonly SourceChange[] = [],
   /** The canvas's names or aliases (slice 11): what the cards show on the first paint. */
   canvas?: CanvasNames,
+  /** Dimensional entities' roles, from the modules (slice 15a, E7); none without a module. */
+  roles: Readonly<Record<Uuid, EntityRole>> = {},
 ): CardData[] {
   const labelsOf = (key: string) => labelNames.get(key)?.join(", ") || null;
   const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
@@ -226,13 +231,16 @@ export function buildCards(
           labels: labelsOf(`attribute:${a.id}`),
           ...(live ? { relevant: live.relevantRows.has(a.id) } : {}),
         }));
+      const role = roles[entity.id];
       cards.push({
         ...base,
         kind: "ent",
         targetId: entity.id,
         name: entity.name,
         ...(entity.alias ? { alias: entity.alias } : {}),
-        line1: cap(entity.stereotype),
+        // a fact or dimension shows its role where a logical entity's stereotype stands (D-67)
+        line1: role ? role.text : cap(entity.stereotype),
+        ...(role ? { role } : {}),
         // a context card says why it is here (prototype entCard, slice 3b)
         line1b: live && item.live_level === "context" ? "context only" : `in ${concept?.name ?? "–"}`,
         liveTitle: live && item.live_level === "context" ? `Context: the entity itself is not labeled ${live.labelName}, only some of its attributes are` : null,
@@ -292,7 +300,7 @@ export function withClips(card: Omit<CardData, "clipName" | "clipLine1">): CardD
     ...card,
     rows: card.rows.map((r) => ({ ...r, clip: rowNeedsClip({ ...r, name: shownText(r) }, card.kind, dual, width) })),
     clipName: titleNeedsClip(shownText(card), card.kind, `${card.mapped}/${card.rows.length}`, width),
-    clipLine1: lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, width, !!card.labels),
+    clipLine1: lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, width, !!card.labels, 0, 0, card.role ? ROLE_MARK : 0),
   };
 }
 

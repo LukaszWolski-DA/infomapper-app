@@ -1,6 +1,7 @@
 // The local data file's upgrade from format 10 to 11 (slice 11, item 5; S11-12): entities and attributes get `alias`
 // null, canvases and canvas items `entity_names` and `attribute_names` null, nothing else changes, no change event and
-// no log line; the file is written back at once, and a file at format 11 is read as it is.
+// no log line; the file is written back at once, and a file at format 11 is read as it is. Since slice 15a the file goes
+// on to format 12 (`upgrade-12.test.ts`).
 
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -54,7 +55,6 @@ describe("the upgrade to format 11 (slice 11, S11-12)", () => {
 
     const upgraded = await readDb(file);
     expect(upgraded.format).toBe(DEV_DB_FORMAT);
-    expect(DEV_DB_FORMAT).toBe(11);
     expect(allNull(upgraded.entity, ["alias"])).toBe(true);
     expect(allNull(upgraded.attribute, ["alias"])).toBe(true);
     expect(allNull(upgraded.canvas, NAMES)).toBe(true);
@@ -71,11 +71,11 @@ describe("the upgrade to format 11 (slice 11, S11-12)", () => {
     await asFormat10();
     await readDb(file);
     const onDisk = JSON.parse(await readFile(file, "utf8")) as DevDb;
-    expect(onDisk.format).toBe(11);
+    expect(onDisk.format).toBe(DEV_DB_FORMAT);
     expect(allNull(onDisk.entity, ["alias"]) && allNull(onDisk.canvas, NAMES) && allNull(onDisk.canvas_item, NAMES)).toBe(true);
   });
 
-  it("reads a file at format 11 as it is: aliases and names kept, the file not written again", async () => {
+  it("reads a file at the current format as it is: aliases and names kept, the file not written again", async () => {
     const db = await readDb(file);
     const [entity] = db.entity;
     const [canvas] = db.canvas;

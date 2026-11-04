@@ -5,6 +5,8 @@ import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, t
 import { notFound, staleVersion } from "../errors";
 import type { Uuid } from "../ids";
 import { builtinClassificationRows } from "../model/classifications";
+import { domainError } from "../errors";
+import { noLicenceMessage, turnOffRefusedMessage } from "../model/levels";
 import { checkCreateWorkspace, checkPermission, type WorkspaceAccess } from "../permissions";
 import {
   DEFAULT_CANVAS_LOOK,
@@ -77,6 +79,7 @@ export function newWorkspaceRows(
     doc_language: "en",
     dv2_mode: false,
     four_eyes: false,
+    infocube: false,
     archived_at: null,
     archived_by: null,
     requirement_key_next: 101,
@@ -139,15 +142,32 @@ const updateSettingsInput = z
     docLanguage: z.enum(DOC_LANGUAGES).optional(),
     dv2Mode: z.boolean().optional(),
     fourEyes: z.boolean().optional(),
+    /** InfoCube on or off (slice 15a, C-7): with the organization's licence, and off only without facts or dimensions. */
+    infocube: z.boolean().optional(),
   })
   .strict();
 export type UpdateWorkspaceSettingsInput = z.input<typeof updateSettingsInput>;
 
-/** Changes any of name, client, description, documentation language, Data Vault 2.0 mode and four-eyes. */
+/**
+ * What turning InfoCube on or off needs (slice 15a, C-7), read by the action only when the input has `infocube`: whether
+ * the organization holds the licence, its name for the refusal, and the workspace's live facts and dimensions.
+ */
+export interface InfoCubeSwitchState {
+  licensed: boolean;
+  organizationName: string;
+  dimensionalEntities: number;
+}
+
+/**
+ * Changes any of name, client, description, documentation language, Data Vault 2.0 mode, four-eyes and InfoCube.
+ * InfoCube (slice 15a, C-7): owners and admins (the settings' right), on only with the organization's licence, off only
+ * while the workspace has no facts or dimensions. Without `infoCube` state a change of it is refused.
+ */
 export function updateWorkspaceSettings(
   ctx: CommandContext,
   access: WorkspaceAccess,
   input: unknown,
+  infoCube?: InfoCubeSwitchState,
 ): CommandResult<{ workspace: Workspace }> {
   const denied = checkPermission(access, "workspace.edit_settings");
   if (denied) return fail(denied);
@@ -165,6 +185,13 @@ export function updateWorkspaceSettings(
   if (p.docLanguage !== undefined) patch.doc_language = p.docLanguage;
   if (p.dv2Mode !== undefined) patch.dv2_mode = p.dv2Mode;
   if (p.fourEyes !== undefined) patch.four_eyes = p.fourEyes;
+  if (p.infocube !== undefined && p.infocube !== workspace.infocube) {
+    // the action reads the state whenever the input has `infocube`; without it nothing is assumed
+    if (!infoCube) return fail(domainError("invalid", "InfoCube can be turned on or off only from the workspace settings."));
+    if (p.infocube && !infoCube.licensed) return fail(domainError("forbidden", noLicenceMessage(infoCube.organizationName)));
+    if (!p.infocube && infoCube.dimensionalEntities > 0) return fail(domainError("invalid", turnOffRefusedMessage(infoCube.dimensionalEntities)));
+    patch.infocube = p.infocube;
+  }
 
   const row = nextVersion(ctx, workspace, patch);
   return {

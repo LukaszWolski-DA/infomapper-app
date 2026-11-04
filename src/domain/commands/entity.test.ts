@@ -204,3 +204,43 @@ describe("createEntity on a canvas with frames (D-46, slice 2b)", () => {
     });
   });
 });
+
+describe("the model level of entities (slice 15a, C-3, X-6)", () => {
+  const dim = (id: string, over: Parameters<typeof entity>[1] = {}) => entity(id, { model_level: "dimensional", ...over });
+  const state = { concept: concept(), entities: [entity(customer), dim(salesOrder, { name: "New entity" })], canvas: null };
+
+  it("creates a logical entity unless a module's command asks for its level", () => {
+    const r = createEntity(makeCtx(), access("modeler"), state, { conceptId: conceptCustomer });
+    expect(r.ok && r.writeSet.writes[0]).toMatchObject({ row: { model_level: "logical", name: "New entity" } });
+    const d = createEntity(makeCtx(), access("modeler"), state, { conceptId: conceptCustomer }, { level: "dimensional", defaultName: "New fact" });
+    expect(d.ok && d.writeSet.writes[0]).toMatchObject({ row: { model_level: "dimensional", name: "New fact" } });
+    // the level is not part of the input: a browser cannot ask for it
+    expect(createEntity(makeCtx(), access("modeler"), state, { conceptId: conceptCustomer, modelLevel: "dimensional" })).toMatchObject({ ok: false, error: { code: "invalid" } });
+  });
+
+  it("numbers default names and warns about duplicates within one level only", () => {
+    // a dimensional "New entity" does not take the logical default name
+    const logical = createEntity(makeCtx(), access("modeler"), state, { conceptId: conceptCustomer });
+    expect(logical.ok && logical.writeSet.writes[0]).toMatchObject({ row: { name: "New entity" } });
+    const again = createEntity(makeCtx(), access("modeler"), state, { conceptId: conceptCustomer }, { level: "dimensional" });
+    expect(again.ok && again.writeSet.writes[0]).toMatchObject({ row: { name: "New entity 2" } });
+    // "Customer" is logical: a fact may be called so without a warning, a second logical one warns
+    expect(createEntity(makeCtx(), access("modeler"), state, { conceptId: conceptCustomer, name: "Customer" }, { level: "dimensional" })).toMatchObject({ ok: true, value: { warning: null } });
+    expect(createEntity(makeCtx(), access("modeler"), state, { conceptId: conceptCustomer, name: "Customer" })).toMatchObject({ ok: true, value: { warning: duplicateNameWarning("Customer") } });
+    // a rename compares within the entity's own level
+    const fact = dim(salesOrder, { name: "Fact Sales" });
+    const entities = [entity(customer), fact];
+    expect(updateEntity(makeCtx(), access("modeler"), { entity: fact, entities, concept: null }, { entityId: salesOrder, expectedVersion: 1, name: "Customer" })).toMatchObject({ ok: true, value: { warning: null } });
+  });
+
+  it("refuses a stereotype on a fact or dimension (C-5), and never changes a level", () => {
+    const fact = dim(salesOrder);
+    expect(updateEntity(makeCtx(), access("modeler"), { entity: fact, entities: [fact], concept: null }, { entityId: salesOrder, expectedVersion: 1, stereotype: "link" })).toMatchObject({
+      ok: false,
+      error: { code: "invalid", message: "A fact or dimension has a role, not a stereotype." },
+    });
+    expect(updateEntity(makeCtx(), access("modeler"), { entity: fact, entities: [fact], concept: null }, { entityId: salesOrder, expectedVersion: 1, modelLevel: "logical" })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    const renamed = updateEntity(makeCtx(), access("modeler"), { entity: fact, entities: [fact], concept: null }, { entityId: salesOrder, expectedVersion: 1, name: "Fact Sales" });
+    expect(renamed.ok && renamed.value.entity.model_level).toBe("dimensional");
+  });
+});

@@ -245,7 +245,7 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
 
   for (const [key, concept, name, stereotype, definition] of ENTITIES) {
     const text = plainTextPair(definition);
-    const row: Entity = { ...std(`entity:${key}`), concept_id: id(`concept:${concept}`), name, alias: null, stereotype, definition_html: text.html, definition_text: text.text };
+    const row: Entity = { ...std(`entity:${key}`), concept_id: id(`concept:${concept}`), name, alias: null, model_level: "logical", stereotype, definition_html: text.html, definition_text: text.text };
     db.entity.push(row);
     ATTRIBUTES[key]!.forEach(([attr, type, flags], i) => {
       db.attribute.push({

@@ -18,6 +18,7 @@ import { ArchiveBox, UnarchiveButton } from "./_components/lifecycle";
 import { NewProjectTile } from "./_components/new-project-tile";
 import { AddPersonBox, OrganizationAccessBox, RemovePersonButton, RoleSelect } from "./_components/people";
 import { SettingsForm } from "./_components/settings-form";
+import { settingsBoxes } from "@/compose/settings";
 import { workspacePeople } from "@/app/_lib/people";
 
 const TABS = ["overview", "people", "settings"] as const;
@@ -305,6 +306,7 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
           {tab === "settings" && (
             <SettingsForm
               editable={can(access, "workspace.edit_settings")}
+              modules={await settingsBoxes(store, access)}
               dataVaultUses={dataVaultUses(indexOf(model))}
               initial={{
                 workspaceId: workspace.id,

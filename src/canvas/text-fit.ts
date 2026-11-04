@@ -65,11 +65,14 @@ export const reqMarkWidth = (n: number): number => (n > 0 ? 4 + 6 + 2 + 6 * Stri
  * Whether a card's first line (stereotype and concept, or the source path, with a label mark and the open-notes mark)
  * may not fit beside the card tools.
  */
-export function lineNeedsClip(parts: string[], kind: "ent" | "src", width: number = CARD_W, mark = false, notes = 0, requirements = 0): boolean {
+/** A role's mark before its text in a card's header (slice 15a): the 11 px cube and its 3 px gap. */
+export const ROLE_MARK = 14;
+
+export function lineNeedsClip(parts: string[], kind: "ent" | "src", width: number = CARD_W, mark = false, notes = 0, requirements = 0, lead = 0): boolean {
   // filter button with its longest label, collapse button, and on entities the relate button (slice 1b)
   const tools = 64 + 20 + 1 + (kind === "ent" ? 21 : 0);
   const text = kind === "src" ? monoWidth(parts.join(""), 11) : parts.reduce((w, p) => w + sansWidth(p, 11), 0) + 6 * (parts.length - 1);
-  return text + (mark ? MARK + 6 : 0) + noteMarkWidth(notes) + reqMarkWidth(requirements) > width - 14 - 8 - 6 - tools - SAFETY;
+  return lead + text + (mark ? MARK + 6 : 0) + noteMarkWidth(notes) + reqMarkWidth(requirements) > width - 14 - 8 - 6 - tools - SAFETY;
 }
 
 /**
