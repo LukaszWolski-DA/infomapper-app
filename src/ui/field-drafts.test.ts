@@ -1,7 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { dropDraft, isGone, keepDraft, markGone, takeDraft, unmarkGone, updateDraft } from "./field-drafts";
+import { asksToStay, isListening } from "./leave-guard";
 
-const at = (pathname: string) => vi.stubGlobal("window", { location: { pathname } });
+const at = (pathname: string) => vi.stubGlobal("window", { location: { pathname }, addEventListener: vi.fn(), removeEventListener: vi.fn() });
 
 describe("field drafts of closed panels (slice 13, item 5a)", () => {
   afterEach(() => vi.unstubAllGlobals());
@@ -38,5 +39,16 @@ describe("field drafts of closed panels (slice 13, item 5a)", () => {
     expect(takeDraft("e3:name")).not.toBeNull();
     unmarkGone("e2:name");
     expect(isGone("e2:alias")).toBe(false);
+  });
+
+  it("asks before the page is left while a draft is kept for the page shown, not for another (slice 14b)", () => {
+    at("/w/1/p/2/c/3");
+    keepDraft("e2:name", { text: "Client", base: "Customer", refused: true });
+    expect(asksToStay()).toBe(true);
+    at("/w/1/p/2");
+    expect(asksToStay()).toBe(false);
+    at("/w/1/p/2/c/3");
+    dropDraft("e2:name");
+    expect(isListening()).toBe(false);
   });
 });

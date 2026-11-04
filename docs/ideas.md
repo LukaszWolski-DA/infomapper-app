@@ -55,18 +55,41 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   saving notes and frames by slice 13's rule: their canvas queue (`useNotes`, `useFrames`, the note on
   the canvas in `NoteLayer`) keeps a refused draft with the conflict line instead of rolling it back; AD-24's rules for
   the canvas, with canvas commit counts and measurements (below, "Notes and frames on slice 13's rule").
-- **14b: the writes off the save chain and leaving a page with a draft:** a canvas's name in its tab, the change-to-
-  resolve actions, and the canvas's look as slice 14a's step 1 decides (`docs/known-limitations.md`, "Writes still off
-  the save chain"); a warning when leaving a page with a draft not saved (`beforeunload`).
-- **Then InfoCube,** starting with a concept document.
+- **14b: done in slice 14b** (D-66): the canvas's row on one chain (look, look on all canvases, names switch, rename,
+  delete, the live canvas's writes), the rename's line inside the tab, the change-to-resolve actions holding their
+  change's tables, the browser's warning before a page with unsaved text is left; no data model change. The plan was:
+  a canvas's name in its tab, the change-to-resolve actions, and the canvas's look (`docs/known-limitations.md`,
+  "Writes still off the save chain"); a warning when leaving a page with a draft not saved (`beforeunload`).
+- **Next: InfoCube,** starting with a concept document.
 - **Then the model validator** (below, "A model validator").
 - **The database slice last** (AD-31).
 
 ## A field's draft: what comes later (slice 13, PRD section 9)
 
-- **A warning when leaving a page with a draft not saved** (`beforeunload`): in 14b's plan.
+- **A warning when leaving a page with a draft not saved** (`beforeunload`): done in slice 14b for a reload, a closed
+  tab and another site.
+- **A warning on navigation inside the app** (slice 14b, O6's alternative): a link, the breadcrumbs, the project
+  switcher, Back and Forward with a draft on the page ask first, with the app's own dialog (Next.js has no hook for
+  it; the links and the history watcher would ask `leave-guard.ts`'s `asksToStay`). Not built: the browser's own
+  warning only (O6).
+- **Back right after a save keeps Forward** (slice 14b, `docs/known-limitations.md`): Back in the 50 to 150 ms after a
+  save's answer reaches the page, before its page commits, loses the entry Forward led to. A fix would hold Back (the
+  breadcrumbs row's button and Alt+←) until the router's pending action has committed, or report it to Next.js; the
+  browser's own Back button cannot be held.
 - **A field-level merge** of two texts, showing the differences, beyond "Use this" and "Keep mine".
 - **Drafts kept across a reload,** in the browser's storage (slice 13 keeps them in the page's memory only, answer 7).
+- **The import wizard's progress across a reload** (slice 14b, step 1 answer 5): a reload or a closed tab in the middle
+  of the wizard loses the file, the choices and the review, and slice 14b's warning on leaving does not cover the wizard
+  (it is not a field that saves a row). Either the wizard joins the warning while it has a file, or its state is kept for
+  the tab.
+- **The concept's rename in the tree with slice 13's line** (slice 14b, step 1 answer 8, decided in step 3): since
+  slice 13 (F13) a refused name stays in the tree's field to try again or cancel, without the line. The tab's compact
+  line (one row after the field) does not fit the left panel's narrow field ("Changed meanwhile to: …" with two buttons
+  is wider than the panel); the tree would need the panels' line under the field and `NameInput` moved to `useDraft`
+  for renames only (it also creates concepts), with its own specs. Worth doing with the next change to the tree.
+- **One text for an empty required name** (slice 14b, step 1 answer 7): canvases, settings and requirements say "Enter a
+  name.", a project says "A project needs a name." (D-59). One text everywhere would be a one-line change in
+  `src/domain/commands/project.ts` and D-59's wording, with slice 9's specs.
 
 ## Aliases: what comes later (slice 11, PRD section 9)
 
@@ -570,10 +593,15 @@ measured single run both sign-in failures came with the server's heap at 2 GB an
 the run split in three parts (each heap under 1.6 GB) two full runs had none. No test sign-in was added (Łukasz, P4 A).
 The chore's acceptance (`docs/prd/chore-e2e-reliability-acceptance.md`, steps 2 and 4) has the figures.
 
-## A fourth part for the full e2e run, if the sign-in times out again
+## A fourth part for the full e2e run: done in slice 14b
+
+Done in slice 14b (`PART_STARTS`: `slice-03a`, `slice-07a`, `slice-10a`). Its closing's full run (3 November 2026):
+556 passed, 3 skipped, no failure, 96 min 40 s; the parts took 25 min 27 s, 24 min 44 s, 20 min 25 s and 26 min 4 s,
+their heaps peaked at 1,247, 1,331, 1,253 and 1,419 MB (38 to 44 % of the threshold). New slices fall into part 4:
+watch its end heap at each closing. The entry as it was:
 
 The full e2e run is three parts (`e2e/parts.ts`), each ending at a heap of 1.4 to 1.6 GB (the e2e reliability chore,
-step 4). If a sign-in times out again in a full run, read the memory log (`E2E_MEMORY_LOG=1`) at that test: with the
+step 4). If a sign-in timed out again in a full run, read the memory log (`E2E_MEMORY_LOG=1`) at that test: with the
 heap well above 1.5 GB, move the cuts to four parts (one more entry in `PART_STARTS`, each part about 20 minutes, a
 server start of about 50 s more); at a low heap, the cause is elsewhere and more parts would not help. New slices fall
 into part 3, so it grows first: watch its end heap at each closing. Slice 14a's closing (3 November 2026): part 3's

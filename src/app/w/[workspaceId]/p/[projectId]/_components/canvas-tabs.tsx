@@ -1,13 +1,17 @@
 "use client";
 
 // Canvas tabs above the canvas, as in the prototype: Home, one tab per canvas of the project (double-click to
-// rename, ⋯ for options) and "New canvas".
+// rename, ⋯ for options) and "New canvas". The rename keeps what was typed until its answer (slice 14b, D-66): after a
+// refusal the field stays with slice 13's line on one row inside the tab (F4).
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 import { renameCanvasAction } from "@/app/_actions/canvas";
 import { useAction } from "@/app/_components/use-action";
+import { DraftLine, useDraft } from "@/app/_panels/fields";
+import { NAME_REQUIRED } from "@/domain/validation";
+import { useToast } from "@/ui/components/toast";
 import { canvasHref, projectHref } from "@/app/_lib/paths";
 import type { ProjectView } from "@/app/_lib/project-view";
 import { TagIcon } from "@/app/_panels/labels-field";
@@ -37,19 +41,20 @@ export function CanvasTabs({
   renameOnOpen: boolean;
 }) {
   const [renaming, setRenaming] = useState<string | null>(renameOnOpen && view.canEdit ? currentCanvasId : null);
-  const { run } = useAction();
   const router = useRouter();
   const { create, pending } = useNewCanvas(view);
 
-  async function rename(canvas: ProjectView["canvases"][number], value: string) {
-    setRenaming(null);
-    if (renameOnOpen) router.replace(canvasHref(view.workspaceId, view.project.id, canvas.id)); // drop ?rename=1
-    const name = value.trim();
-    if (!name || name === canvas.name) return;
-    await run(
-      () => renameCanvasAction({ workspaceId: view.workspaceId, canvasId: canvas.id, expectedVersion: canvas.version, name }),
-      `Renamed the canvas to ${name}.`,
-    );
+  function closeRename(canvas: ProjectView["canvases"][number]) {
+    setRenaming((r) => (r === canvas.id ? null : r));
+  }
+  /**
+   * Drops ?rename=1 the first time the field is left, before its save is sent, as before slice 14b: the router then
+   * applies the save's page before a link clicked right after it (once the field closed on its answer, a late page took
+   * the person back to the canvas from the project home, S0-06).
+   */
+  function leftRename(canvas: ProjectView["canvases"][number]) {
+    const href = canvasHref(view.workspaceId, view.project.id, canvas.id);
+    if (renameOnOpen && window.location.pathname === href && window.location.search.includes("rename=1")) router.replace(href);
   }
 
   return (
@@ -81,28 +86,14 @@ export function CanvasTabs({
             data-testid="tab-canvas"
             title={view.canEdit ? "Double-click to rename" : undefined}
             className={cn(tabClass, "group pl-3 pr-1", on && onClass)}
-            onClick={() => renaming !== canvas.id && router.push(canvasHref(view.workspaceId, view.project.id, canvas.id))}
+            // a click in the tab's menu (a portal) reaches this handler through React's tree: only a click on the tab itself
+            // opens its canvas (slice 14b: on the save chain a delete is sent after this push, which then opened the
+            // deleted canvas)
+            onClick={(e) => e.currentTarget.contains(e.target as Node) && renaming !== canvas.id && router.push(canvasHref(view.workspaceId, view.project.id, canvas.id))}
             onDoubleClick={() => view.canEdit && setRenaming(canvas.id)}
           >
             {renaming === canvas.id ? (
-              <input
-                autoFocus
-                aria-label="Canvas name"
-                data-testid="input-canvas-name"
-                defaultValue={canvas.name}
-                onFocus={(e) => e.currentTarget.select()}
-                onClick={(e) => e.stopPropagation()}
-                onKeyDown={(e) => {
-                  e.stopPropagation();
-                  if (e.key === "Enter") e.currentTarget.blur();
-                  if (e.key === "Escape") {
-                    e.currentTarget.value = canvas.name;
-                    e.currentTarget.blur();
-                  }
-                }}
-                onBlur={(e) => void rename(canvas, e.currentTarget.value)}
-                className="h-6 w-[180px] rounded border border-im-logical bg-im-surface px-1.5 font-medium"
-              />
+              <TabRename view={view} canvas={canvas} onLeave={() => leftRename(canvas)} onClose={() => closeRename(canvas)} />
             ) : (
               <>
                 {canvas.liveLabel && (
@@ -166,5 +157,71 @@ export function CanvasTabs({
         </button>
       )}
     </div>
+  );
+}
+
+/**
+ * A canvas's name in its tab (slice 14b, items 4–5): slice 13's draft (`useDraft`) saved on the save chain of the
+ * canvas's row. The field stays until its answer: a stored name closes it; a refusal keeps the typed name with its mark
+ * on one row after the field (the conflict line, "Not saved", or read-only "Not saved. You can still copy it."). Escape
+ * puts the stored name back ("Use this" during a conflict) and closes it; an empty name goes back with "Enter a name.".
+ */
+function TabRename({ view, canvas, onLeave, onClose }: { view: ProjectView; canvas: ProjectView["canvases"][number]; onLeave: () => void; onClose: () => void }) {
+  const toast = useToast();
+  const { saveRow } = useAction();
+  const save = async (name: string) => {
+    const result = await saveRow(canvas, (v) => renameCanvasAction({ workspaceId: view.workspaceId, canvasId: canvas.id, expectedVersion: v, name }), `Renamed the canvas to ${name}.`);
+    // stored, or the canvas is gone (its page goes where D-38 says)
+    if (result.ok || result.code === "not_found") onClose();
+    return result;
+  };
+  const readOnly = !view.canEdit;
+  const { bind, defaultValue, commit, keyDown: draftKeyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(canvas.name, save, { prepare: (t) => t.trim(), required: true, onEmpty: () => toast(NAME_REQUIRED, "refusal"), readOnly });
+
+  const leave = (el: HTMLInputElement) => {
+    onLeave();
+    // a conflict is settled by "Use this" or "Keep mine", never by leaving (D-66); a read-only draft only closes
+    if (mark?.kind === "conflict") return;
+    if (readOnly || mark?.kind === "copy") return onClose();
+    const name = el.value.trim();
+    commit();
+    // nothing to send (the stored name, or empty: back to it with the toast): the field closes; a sent save closes it
+    // on its answer
+    if (!name || name === canvas.name) onClose();
+  };
+  const keyDown = (e: KeyboardEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    if (e.key === "Enter") e.currentTarget.blur();
+    if (e.key === "Escape") {
+      onLeave();
+      draftKeyDown(e);
+      onClose();
+    }
+  };
+  return (
+    <>
+      <input
+        ref={bind}
+        autoFocus
+        aria-label="Canvas name"
+        data-testid="input-canvas-name"
+        defaultValue={defaultValue}
+        readOnly={readOnly || mark?.kind === "copy"}
+        onFocus={(e) => e.currentTarget.select()}
+        onClick={(e) => e.stopPropagation()}
+        onKeyDown={keyDown}
+        onBlur={(e) => leave(e.currentTarget)}
+        className="h-6 w-[180px] rounded border border-im-logical bg-im-surface px-1.5 font-medium read-only:border-im-line"
+      />
+      <DraftLine
+        inline
+        mark={mark}
+        onUse={() => {
+          takeStored();
+          onClose();
+        }}
+        onKeep={keepMine}
+      />
+    </>
   );
 }

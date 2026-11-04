@@ -48,6 +48,7 @@ import "@xyflow/react/dist/style.css";
 import "./canvas.css";
 import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
+import { track } from "@/ui/leave-guard";
 import { rowSaves } from "@/ui/row-saves";
 import { applyNames, shownText, withClips, type CanvasNames, type CardData } from "./card-data";
 import { canvasMode, cardMode, NAMES_COLUMN, namesControl, type NameDimension } from "@/domain/model/aliases";
@@ -613,7 +614,8 @@ export function ModelCanvas({
     const next = (queue.current.get(id) ?? Promise.resolve()).then(write).finally(() => {
       pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
     });
-    queue.current.set(id, next);
+    // leaving the page asks first while a write is on its way (slice 14b)
+    queue.current.set(id, track(queue, next));
   }, []);
 
   /** Runs a write for several cards after every write still on its way for any of them (slice 2a). */
@@ -625,6 +627,7 @@ export function ModelCanvas({
         for (const id of ids) pending.current.set(id, (pending.current.get(id) ?? 1) - 1);
       });
     for (const id of ids) queue.current.set(id, next);
+    void track(queue, next);
   }, []);
 
   /** Cards removed here, at the version they had then (a late fresh page must not put them back; `mergeFresh`). */
@@ -787,10 +790,12 @@ export function ModelCanvas({
     showNames({ entity_names: pageNames.entity_names, attribute_names: pageNames.attribute_names });
   }, [pageNames.entity_names, pageNames.attribute_names, pageNames.version, showNames]);
 
-  const noteCanvasVersion = useCanvasLook()?.noteVersion;
   /**
    * “Entity aliases” or “Attribute aliases” clicked (item 8): the canvas's mode at once and every card's exception in
-   * that dimension cleared, saved as one change after every card write on its way (F2); a refusal puts both back.
+   * that dimension cleared, saved as one change after every card write on its way (F2); a refusal puts both back. The
+   * write sends no version of the canvas row (it reads it as it stands), so it holds that row on the save chain while it
+   * is on its way (slice 14b, O1): the look, a rename or a delete started meanwhile wait for it and send the version it
+   * answers.
    */
   const setNames = useCallback(
     (dimension: NameDimension, mode: NameMode): Promise<boolean> =>
@@ -811,32 +816,37 @@ export function ModelCanvas({
         namesPending.current += 1;
         showNames(next, (c) => (exceptions.has(c.id) ? withoutException(c, dimension) : c));
         const ids = cards.map((c) => c.id);
-        enqueueGroup(ids, async () => {
-          let result: Awaited<ReturnType<FrameWrites["setCanvasNames"]>>;
-          try {
-            result = await frameWrites.setCanvasNames({ dimension, mode, cards: ids.map((id) => ({ canvasItemId: id, expectedVersion: versions.current.get(id) ?? 1 })) });
-          } catch {
-            result = FAILED;
-          }
-          namesPending.current -= 1;
-          if (!result.ok) {
-            showNames(before, (c) => (exceptions.has(c.id) ? { ...c, [key]: exceptions.get(c.id) } : c));
-            toast(result.message, "refusal");
-            resolve(false);
-            return;
-          }
-          for (const [id, v] of Object.entries(result.value.versions)) {
-            if (id !== canvasId) versions.current.set(id, v);
-            else {
-              noteCanvasVersion?.(v);
-              namesVersion.current = Math.max(namesVersion.current, v);
-            }
-          }
-          ui.undo()?.noteSaved();
-          resolve(true);
-        });
+        type NamesResult = Awaited<ReturnType<FrameWrites["setCanvasNames"]>>;
+        // held from the click; its answer's versions reach the chain (the canvas row's included)
+        void rowSaves.saveRows([{ id: canvasId }], () =>
+          new Promise<{ ok: boolean; code?: string; versions?: Record<string, number> }>((done) =>
+            enqueueGroup(ids, async () => {
+              let result: NamesResult;
+              try {
+                result = await frameWrites.setCanvasNames({ dimension, mode, cards: ids.map((id) => ({ canvasItemId: id, expectedVersion: versions.current.get(id) ?? 1 })) });
+              } catch {
+                result = FAILED;
+              }
+              namesPending.current -= 1;
+              if (!result.ok) {
+                showNames(before, (c) => (exceptions.has(c.id) ? { ...c, [key]: exceptions.get(c.id) } : c));
+                toast(result.message, "refusal");
+                resolve(false);
+                done({ ok: false, code: result.code });
+                return;
+              }
+              for (const [id, v] of Object.entries(result.value.versions)) {
+                if (id !== canvasId) versions.current.set(id, v);
+                else namesVersion.current = Math.max(namesVersion.current, v);
+              }
+              ui.undo()?.noteSaved();
+              resolve(true);
+              done({ ok: true, versions: result.value.versions });
+            }),
+          ),
+        );
       }),
-    [editable, cardsNow, showNames, enqueueGroup, frameWrites, toast, canvasId, noteCanvasVersion, ui],
+    [editable, cardsNow, showNames, enqueueGroup, frameWrites, toast, canvasId, ui],
   );
 
   // ---- card width (D-37, C-09): saved like every change of positions and widths, frames decided again ----

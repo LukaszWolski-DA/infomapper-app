@@ -14,6 +14,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { useStore, ViewportPortal } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
+import { guard, release } from "@/ui/leave-guard";
 import { LOD_ZOOM } from "./geometry";
 import { noteDate, type NoteData } from "./note-data";
 import { useNoteDraft, type NoteDrafts } from "./note-drafts";
@@ -193,7 +194,10 @@ const NoteBox = memo(function NoteBox({
   );
 });
 
-/** Writing a note in place (prototype startEditNote): grows with the text; Ctrl+Enter or leaving it saves, Esc cancels. */
+/**
+ * Writing a note in place (prototype startEditNote): grows with the text; Ctrl+Enter or leaving it saves, Esc cancels.
+ * Text typed and not yet sent holds the leave guard (slice 14b).
+ */
 function NoteEditor({ text, onCommit, onCancel }: { text: string; onCommit: (text: string) => void; onCancel: () => void }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   const cancelled = useRef(false);
@@ -209,6 +213,7 @@ function NoteEditor({ text, onCommit, onCancel }: { text: string; onCommit: (tex
     grow();
     ta.focus();
     ta.setSelectionRange(ta.value.length, ta.value.length);
+    return () => release(ref);
   }, []);
   return (
     <textarea
@@ -217,7 +222,11 @@ function NoteEditor({ text, onCommit, onCancel }: { text: string; onCommit: (tex
       placeholder="Summary, observation or question…"
       data-testid="input-note-text"
       className="nodrag nowheel"
-      onInput={grow}
+      onInput={(e) => {
+        grow();
+        // typed and not yet sent: leaving the page asks first (slice 14b); a sent text is the note's draft
+        guard(ref, e.currentTarget.value !== text);
+      }}
       onPointerDown={(e) => e.stopPropagation()}
       onKeyDown={(e) => {
         e.stopPropagation();
@@ -229,7 +238,11 @@ function NoteEditor({ text, onCommit, onCancel }: { text: string; onCommit: (tex
           e.currentTarget.blur();
         }
       }}
-      onBlur={(e) => (cancelled.current ? onCancel() : onCommit(e.currentTarget.value))}
+      onBlur={(e) => {
+        release(ref);
+        if (cancelled.current) onCancel();
+        else onCommit(e.currentTarget.value);
+      }}
     />
   );
 }

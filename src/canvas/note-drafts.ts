@@ -8,9 +8,11 @@
 //   or "Not saved", by its base), `locked` ("Not saved", editable), `copy` (a permission or the archive: read-only); an
 //   invalid input keeps it for correcting, unmarked; a note not found takes it with it.
 // The store is outside React's state: a note's box reads its own draft (`useNoteDraft`), so a draft, its mark, "Use this"
-// or "Keep mine" never re-render the canvas (S14A-13).
+// or "Keep mine" never re-render the canvas (S14A-13). While any note has a draft, leaving the page asks first (slice
+// 14b, `leave-guard.ts`).
 
 import { useSyncExternalStore } from "react";
+import { guard, release } from "@/ui/leave-guard";
 
 export type NoteDraftRefusal = "mark" | "locked" | "copy";
 
@@ -62,7 +64,13 @@ export class NoteDrafts {
   private set(id: string, d: NoteDraft | null): void {
     if (d) this.drafts.set(id, d);
     else if (!this.drafts.delete(id)) return;
+    guard(this, this.drafts.size > 0);
     for (const l of this.listeners) l();
+  }
+
+  /** The canvas closed: its drafts go with its page, and leaving no longer asks for them. */
+  close(): void {
+    release(this);
   }
 
   /** A save of `text` starts; `stored` is the note's stored text now. */

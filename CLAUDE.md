@@ -23,7 +23,10 @@ count its frames, and the workspace home's project tiles show their first canvas
 field keeps what the person typed across fresh pages and after any refusal; a conflict shows the other value under it
 with "Use this" and "Keep mine" (slice 13, D-66). Notes and frames
 follow the same rule: a note's text keeps its draft on the canvas, in its panel and in the panels' lists, with a "Not
-saved" mark after a refusal; a frame's name has the conflict line (slice 14a, D-66).
+saved" mark after a refusal; a frame's name has the conflict line (slice 14a, D-66). The canvas's own row saves on the
+same chain (its look, the names switch, a rename in its tab, its delete), a refused rename keeps the typed name in the
+tab with the conflict line, the change-to-resolve actions hold the panel saves of their change's tables, and a page
+with unsaved text asks the browser to warn before it is reloaded or closed (slice 14b, D-66).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -153,7 +156,7 @@ npm run lint             # ESLint, including the layer rules (eslint-plugin-boun
 npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
-npm run e2e -- --part 2   # one of the full run's three parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
+npm run e2e -- --part 2   # one of the full run's four parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
 E2E_MEMORY_LOG=1 npm run e2e   # with the e2e server's and the machine's memory every 5 s (.data/e2e-memory-<time>-part<n>.*; scripts/e2e-memory-report.ts)
 MEASURE=1 npx playwright test e2e/slice-01a/S1A-14.spec.ts   # canvas performance in headed Chrome (S1A-14)
 MEASURE=1 npx playwright test e2e/slice-01b/S1B-09.spec.ts   # card resize (C-09), same way
@@ -208,6 +211,8 @@ SCREENS=<folder> npx playwright test e2e/slice-12b/S12B-screens.spec.ts         
 SCREENS=<folder> npx playwright test e2e/slice-13/S13-screens.spec.ts                     # slice 13: a conflict on a short field, a long text in the rich-text dialog, Not saved, Cleared meanwhile; light and dark
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-13/S13-head-elements.spec.ts  # slice 13: <head> and <body> on Performance test at 30 %, to compare page totals between builds
 SCREENS=<folder> npx playwright test e2e/slice-14a/S14A-screens.spec.ts                   # slice 14a: a note with its mark (45 % and 100 %), its panel's line, a frame's name's line, a read-only note; light and dark
+SCREENS=<folder> npx playwright test e2e/slice-14b/S14B-screens.spec.ts                   # slice 14b: a canvas's tab after a refused rename (the line, Not saved, read-only); light and dark
+npx tsx scripts/bench-source-hold.ts                          # slice 14b: holding a change's rows on the save chain, 20,000 columns (bar 20 ms; the whole source missed it)
 COMMITS=1 SIDE=branch npx playwright test e2e/slice-14a/S14A-13-commits.spec.ts           # slice 14a: canvas commits while a note is written, saved, refused, marked, dropped (dev server; the same file runs on slice-13 for an A/B)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-14a/S14A-13-layers.spec.ts # slice 14a: drawing layers with 20 notes without and with the mark (20 real refusals)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spec.ts      # slice 12b: both homes' load, three data sets; LABEL=<name> for an A/B run, LOADS=<n>, COLD=<n> first visits
@@ -365,6 +370,20 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   just before the page writes it (`S14A-13-layers.spec.ts`). The toast is a drawing layer of its own while visible:
   read LayerTree once `[data-testid="toast"][data-visible="true"]` is gone.
 
+  Slice 14b's helpers do the following:
+  - read a canvas's stored row (`canvasStored`); start and write a rename in a tab (`startRename`, `renameInTab`) and
+    find the tab being renamed (`renamingTab`);
+  - change a canvas as another session through the domain: its name (`renameCanvasElsewhere`) and its look
+    (`changeCanvasLookElsewhere`), as Anna;
+  - close the page as a closed tab does (`page.close({ runBeforeUnload: true })`) and expect the browser's warning
+    (`leaveAsks`, the dialog dismissed so the test goes on) or none (`leaveAsksNothing`, the page closes);
+  - wait until the page has a save's answer (`answerOf`: the response read to its end and the card showing the new
+    name). The e2e data file is written before the answer reaches the page: a stored row alone does not mean the save
+    is no longer on its way (the page still asks before it is left).
+
+  Playwright dismisses a dialog it has no handler for: a spec that reloads or leaves a page with unsaved text (a refused
+  draft, a kept draft of a closed panel, a save on its way) handles the `beforeunload` dialog (`S13-14`).
+
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
   nothing re-renders a canvas with collapsed frames while it is idle or panned and zoomed, `S3A-14-idle.spec.ts` the same
@@ -443,11 +462,12 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   and total objects, paint, layerize; as `S6A-09-hand.spec.ts` does) rather than unprepared medians to the screen, whose
   run-to-run spread (up to 12 ms in slice 6a) is larger than what is measured.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
-- **The full run in three parts** (chore e2e reliability, P2 B): `npm run e2e` (`scripts/e2e.ts`) runs the folders in
-  three parts (`e2e/parts.ts`, `PART_STARTS`), each with its own fresh dev server, and merges their blob reports into
+- **The full run in four parts** (chore e2e reliability, P2 B; the fourth since slice 14b): `npm run e2e`
+  (`scripts/e2e.ts`) runs the folders in four parts (`e2e/parts.ts`, `PART_STARTS`: from `slice-03a`, `slice-07a`,
+  `slice-10a`; `tests/e2e-parts.test.ts`), each with its own fresh dev server, and merges their blob reports into
   one result (`playwright-report/`); failure traces are in `test-results/part-<n>/`. A server's heap grows about 6 MB a
   test, and on 8 GB RAM a heap of 2 GB or more under paging timed out sign-ins; Next.js restarts the server at 80 % of
-  its heap limit (3,255 MB here). Each part ends at about 1.3 to 1.5 GB. When a part's heap (`E2E_MEMORY_LOG=1`) comes
+  its heap limit (3,255 MB here). Each part peaks at about 1.25 to 1.45 GB and takes 20 to 26 minutes (slice 14b's closing). When a part's heap (`E2E_MEMORY_LOG=1`) comes
   near 2 GB, move the cuts or add a part. The full run refuses to start while port 3200 is in use.
 - **Fonts** (P3 B): IBM Plex is hosted in `src/app/fonts/ibm-plex/` (IBM's unmodified WOFF2 files, OFL 1.1, `README.md`
   with their checksums) and loaded through `next/font/local`; no build or start fetches fonts. "Plex" is a Reserved Font
@@ -521,8 +541,8 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   paint, `ModelCanvas` on node builds, `patchCard`, fresh pages and a switch. **Read `shownText`, never `name`, for
   anything drawn on a card** (header, rows, low-zoom block, a collapsed frame's list, their titles, fit width, the drop
   hint). **The switch:** `ui.setNames` → `ModelCanvas.setNames` shows the modes and the cleared exceptions in one
-  commit, then `setCanvasNamesAction` on the canvas's queue (`enqueueGroup`); its answer's canvas version goes to the
-  look provider (`noteVersion`, `look.tsx`). A fresh page brings the names keyed on the canvas row's version too
+  commit, then `setCanvasNamesAction` on the canvas's queue (`enqueueGroup`), holding the canvas's row on the save
+  chain while it is on its way (`rowSaves.saveRows`, slice 14b); its answer's versions go to the chain. A fresh page brings the names keyed on the canvas row's version too
   (`names.version`): the switch's own page may be replaced by a later one. The check boxes (`NamesSwitch.tsx`, “More”)
   read `namesState` (`names-state.ts`), which `ModelCanvas` publishes from an effect with `namesControl`, as
   `viewCounts`. The tint is the class `alt` on `.c-head` and on `.c-body`/`.c-lod` (`--im-alias-soft`). The search
@@ -600,14 +620,15 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     siblings are renumbered), a merge, a concept deleted with "move to", the D-05 drop. A row with `shown` is checked:
     `send` gets its newest version. A row without it is held: its version is not sent. All listed rows wait for the
     write, and the answer's `versions` (`runCommand`'s option `{ versions: true }`, `writtenVersions`) reach every row.
-  - **Held rows:** a cut on a held row does not stop a several-row save; only a cut on a checked row does. A held row's
-    version is not sent and the server reads it as it stands, so the save cannot overwrite anyone's change; the move
+  - **Held rows:** a cut on a held row does not stop a several-row save; only a cut on a checked row does. Since slice
+    14b a refusal cuts only its checked rows' waiting saves, not the held rows' (their version was not sent; a held
+    row's save is sent after it with the newest version known). A held row's version is not sent and the server reads it as it stands, so the save cannot overwrite anyone's change; the move
     (or a concept's "move to") is a separate intent of the person (Łukasz, slice 10a).
   - **Cuts:** "not found" cuts like a stale version, and a write with `{ deletes: true }` that succeeds cuts the saves
     of its rows waiting behind it, with no toast (they would be refused as not found). A cut delete shows no Undo toast.
-  - **Rows only the server knows:** the change-to-resolve actions return `versions`, and `run` feeds them to
-    `rowSaves.answer`. Still off the chain: a canvas's rename and delete, and that action's own window
-    (`docs/known-limitations.md`).
+  - **Rows only the server knows:** the change-to-resolve actions return `versions`, and since slice 14b run through
+    `saveRows` (`useChangeRun` in `source-changes.tsx`): the change's row checked, the rows of its table held
+    (`src/domain/source-changes/held.ts`, below). Still off the chain: only the role select (`docs/known-limitations.md`).
 
   **Slice 13 (D-66):**
   - **The draft:** a text field is uncontrolled and keeps what was typed (`useDraft` in `src/app/_panels/fields.tsx`; the
@@ -651,4 +672,37 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     `TextArea` passes `ui.noteDrafts()`'s draft. The lists ("Notes on this canvas", a card's or frame's "Notes", the
     selection's) render `NoteRow` (`src/app/_panels/note-row.tsx`): each row reads only its own note's draft and says
     "Not saved" for a refused one. A frame's name has `keep`.
+
+  **Slice 14b (the canvas's row, the source hold, leaving a page):**
+  - **The canvas's row is one chain:** the look of the open canvas (`look.tsx`, `rowSaves.save` with the newest page's
+    version; after a refusal the newest page's look shows), a non-open canvas's look and its delete from the tab menu
+    (`saveRow`), "Use this look on all canvases" (`saveRows` over every canvas, `{ versions: true }`), the names switch
+    (holds the row, above) and the tab's rename. A label's rename and delete answer with the versions they wrote (the
+    live canvas's).
+  - **The rename in the tab** (`TabRename`, `canvas-tabs.tsx`): `useDraft` (trimmed, `required`: an empty name goes
+    back with "Enter a name."), saved with `saveRow`; the field stays until its answer and shows the line inside the
+    tab, on one row after the field: `DraftLine`'s compact form (`inline`, `InlineDraftLine`: the same texts and test
+    ids, the other value cut to 180 px with its title, 22 px buttons). A click in the tab's menu (a portal) reaches the
+    tab's `onClick` through React's tree: only a click on the tab itself opens its canvas.
+  - **The source hold** (`held.ts`): `tableRowIds` (the change's tables, their columns, the mappings reading them with
+    all their inputs) and `mappingRowIds`. The whole source was over the 20 ms bar on 20,000 columns
+    (`scripts/bench-source-hold.ts`); a later rule that holds more rows measures it the same way.
+  - **Leaving a page** (`src/ui/leave-guard.ts`): a source holds the guard under its own key while it has unsaved text
+    (`hold`, `release`, `guard(key, unsaved)`, `track(key, promise)` for saves); the `beforeunload` listener is on
+    `window` only while something holds; nothing renders for it. Sources: `useDraft` (a refused draft, or the focus with
+    typed text, from the element's own `input`, `focus` and `blur` events), kept drafts for the page shown
+    (`field-drafts.ts`), `NoteDrafts` (released by `close` with the canvas), the note editor, the rich-text editor, and
+    every save on `rowSaves` (with undo and redo) and on the canvas's queue. **A new text field that saves a row** gets
+    it through `useDraft`; a new store of unsaved text calls `guard`; a new kind of write outside the chain and the
+    canvas's queue is `track`ed. Fields that create something, search boxes and the zoom do not hold.
+  - **A draft that leaves with its page is not kept** (`useDraft`'s unmount compares the address with the one it
+    mounted on): Next.js changes the address before the old page's fields unmount, so a draft kept then would count as
+    the next page's. No "Not saved: ... Open it again" toast for it (D-66: the draft goes with the page).
+  - **The app never navigates after a save's answer** (`router.push`, `router.replace` in a save's callback): by then
+    the person may have clicked a link, and the address still shows the old page until the link's page commits, so no
+    check of `window.location` can tell. Example, S0-06 in slice 14b: the tab's rename dropped `?rename=1` with
+    `router.replace` when its answer came; a person who had already clicked Home was taken back to the canvas. The drop
+    now happens when the field is first left, before the save is sent (`leftRename`). Do what a page change needs
+    before the save is sent, or leave it to the server's answer (its fresh page). Next.js's own late page is a separate
+    case: `docs/known-limitations.md`, "Back right after a save can lose Forward".
 

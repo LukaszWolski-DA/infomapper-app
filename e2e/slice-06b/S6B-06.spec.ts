@@ -73,6 +73,9 @@ test("S6B-06: Back onto a deleted canvas opens the project's first canvas with t
   const menu = await openCanvasMenu(page, "Order lines & products");
   await menu.getByTestId("menu-item-delete-canvas").click();
   await expectToast(page, "Deleted the canvas Order lines & products. The model and its mappings are untouched.");
+  // the delete's own page first (its tab gone): the toast comes before it, and a page that lands after Back pushes the
+  // address it was asked from over the entry Forward leads to (slice 14b, step 3)
+  await expect(page.getByTestId("tab-canvas-name")).toHaveText(["Customer & orders"]);
 
   await backButton(page).click();
   await expectToast(page, "This canvas is no longer in Order management. Opened Customer & orders.");

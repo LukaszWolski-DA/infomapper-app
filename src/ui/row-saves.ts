@@ -12,6 +12,10 @@
 // Slice 10a (F3): a write over several rows (moving an attribute renumbers its siblings, a merge, a concept deleted with
 // its entities moved) runs through `saveRows`: after every listed row's saves, holding all of them until its answer, and
 // feeding back every version the answer gives. `save` is its one-row case.
+//
+// Slice 14b: while any save is on its way, leaving the page asks first (`leave-guard.ts`).
+
+import { track } from "./leave-guard";
 
 /**
  * What a save's answer needs to say: whether it was stored, why not, and the row's new version (`value.version`), or
@@ -84,8 +88,10 @@ export class RowSaves {
    * its way; saves of those rows started meanwhile wait for it. `send` gets the newest known version of each checked row.
    * It is not sent when a refusal before it cut one of its checked rows (a held row's version is not sent, so its cut
    * does not stop it). On success the answer's `versions` reach every row, and its `value.version` the first checked
-   * row; a cutting refusal cuts the waiting saves of every row it lists. With `deletes` (the write deletes its checked
-   * rows), a success cuts the checked rows' saves waiting behind it too: they would be refused as not found (F5).
+   * row; a cutting refusal cuts the waiting saves of its checked rows only: a held row's version was not sent, so the
+   * refusal says nothing about it, and its waiting saves are sent after it (slice 14b, F3). With `deletes` (the write
+   * deletes its checked rows), a success cuts the checked rows' saves waiting behind it too: they would be refused as
+   * not found (F5).
    */
   saveRows<R extends SaveOutcome>(
     rows: readonly SaveRowsRow[],
@@ -96,10 +102,14 @@ export class RowSaves {
     for (const r of rows) if (!listed.get(r.id)?.shown) listed.set(r.id, r);
     const parts = [...listed.values()].map((r) => {
       const row = this.row(r.id);
-      return { ...r, row, n: ++row.started };
+      return { id: r.id, shown: r.shown, row, n: ++row.started };
     });
     const checked = parts.filter((p) => p.shown !== undefined);
-    const result = Promise.all([...parts.map((p) => p.row.tail), this.gate]).then(async (): Promise<R | null> => {
+    // each distinct tail once: a hold over a whole source lists some 26,000 rows, most of them with the same settled
+    // tail (slice 14b, F9)
+    const tails = new Set(parts.map((p) => p.row.tail));
+    tails.add(this.gate);
+    const result = Promise.all(tails).then(async (): Promise<R | null> => {
       if (checked.some((p) => p.n <= p.row.cutThrough)) return null;
       const outcome = await send((id) => {
         const p = checked.find((x) => x.id === id);
@@ -112,11 +122,12 @@ export class RowSaves {
         const first = checked[0];
         if (v !== null && first) first.row.answered = Math.max(first.row.answered, v);
         if (options.deletes) for (const p of checked) p.row.cutThrough = p.row.started;
-      } else if (outcome.code && CUTS.has(outcome.code)) for (const p of parts) p.row.cutThrough = p.row.started;
+      } else if (outcome.code && CUTS.has(outcome.code)) for (const p of checked) p.row.cutThrough = p.row.started;
       return outcome;
     });
-    for (const p of parts) p.row.tail = quiet(result);
-    return result;
+    const settled = quiet(result);
+    for (const p of parts) p.row.tail = settled;
+    return track(this, result);
   }
 
   /**
@@ -139,7 +150,7 @@ export class RowSaves {
   exclusive<T>(step: () => Promise<T>): Promise<T> {
     const run = this.settled().then(step);
     this.gate = quiet(run);
-    return run;
+    return track(this, run);
   }
 }
 

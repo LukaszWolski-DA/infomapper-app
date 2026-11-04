@@ -11,6 +11,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type R
 import { useToast } from "@/ui/components/toast";
 import { choiceShown, FieldDraft, storedBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
 import { dropDraft, isGone, keepDraft, markGone, takeDraft, unmarkGone, updateDraft } from "@/ui/field-drafts";
+import { guard, release } from "@/ui/leave-guard";
 
 export const Kind = ({ children }: { children: ReactNode }) => <div className="mb-1.5 text-[11.5px] text-im-ink-3">{children}</div>;
 
@@ -130,8 +131,22 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
   const lastText = useRef<string | null>(null);
   const keepNow = useRef<DraftKeep | undefined>(undefined);
   const toastNow = useRef(toast);
-  const refuse = (r: Refusal | null) => {
+  /**
+   * The leave guard (slice 14b): held while the field has a refused draft (any mark but a deleted object's) or the focus
+   * with typed text not yet sent; a sent text is a save on its way, which the save chain holds.
+   */
+  const [guardNow] = useState(() => (focused?: boolean) => {
+    const el = element.current;
+    const r = refusalNow.current;
+    const typed = !!el && (focused ?? document.activeElement === el) && draft.hasDraft(el.value);
+    guard(draft, (!!r && r.kind !== "gone") || typed);
+  });
+  const [setRefusalNow] = useState(() => (r: Refusal | null) => {
     refusalNow.current = r;
+    guardNow();
+  });
+  const refuse = (r: Refusal | null) => {
+    setRefusalNow(r);
     setRefusal(r);
   };
 
@@ -145,11 +160,11 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
     const take = el ? draft.receive(stored, el.value, document.activeElement === el) : "keep";
     if (el && take === "take") el.value = stored;
     if (take === "end" && refusalNow.current && refusalNow.current.kind !== "copy") {
-      refusalNow.current = null;
+      setRefusalNow(null);
       // the stored value came to equal the draft: its mark goes
       setRefusal(null);
     }
-  }, [stored, draft]);
+  }, [stored, draft, setRefusalNow]);
   // a draft kept outside the field (slice 14a): taken while the field has neither the focus nor a text of its own
   const outside = o.outside?.draft;
   const hasOutside = !!o.outside;
@@ -160,27 +175,28 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
       if (el.value !== outside.text) el.value = outside.text;
       const r: Refusal | null = outside.refusal ? { kind: outside.refusal, base: outside.base } : null;
       if (refusalNow.current?.kind !== r?.kind || refusalNow.current?.base !== r?.base) {
-        refusalNow.current = r;
+        setRefusalNow(r);
         setRefusal(r);
       }
     } else if (refusalNow.current || draft.hasDraft(el.value)) {
       // the draft ended outside (stored, or "Use this" on the canvas): the stored value shows
       el.value = stored;
       draft.reset(stored);
-      refusalNow.current = null;
+      setRefusalNow(null);
       setRefusal(null);
     }
-  }, [outside, hasOutside, stored, draft]);
+  }, [outside, hasOutside, stored, draft, setRefusalNow]);
   const keepKey = o.keep?.key;
   useEffect(() => {
     mounted.current = true;
+    const page = window.location.pathname;
     if (keepKey) unmarkGone(keepKey);
     const back = keepKey ? takeDraft(keepKey) : null;
     const el = element.current;
     if (back && el) {
       el.value = back.text;
       draft.reset(back.base);
-      refusalNow.current = back.refused ? { kind: "mark", base: back.base } : null;
+      setRefusalNow(back.refused ? { kind: "mark", base: back.base } : null);
       // eslint-disable-next-line react-hooks/set-state-in-effect -- a draft kept while the panel was closed (item 5a)
       if (back.refused) setRefusal({ kind: "mark", base: back.base });
     }
@@ -191,18 +207,30 @@ export function useDraft<E extends HTMLInputElement | HTMLTextAreaElement>(
       if (!keepKey || text === null || !draft.hasDraft(text)) return;
       // a deleted object takes its draft with it (answer 8); a read-only draft stays until the panel closes (item 9)
       if (refusalNow.current?.kind === "gone" || refusalNow.current?.kind === "copy" || isGone(keepKey)) return;
+      // the field went with its page (a link, Back): its draft goes, as on another page (D-66); the address is already
+      // the next page's, so a draft kept now would count as that page's (slice 14b, the leave guard)
+      if (window.location.pathname !== page) return;
       const refused = !!refusalNow.current;
       keepDraft(keepKey, { text, base: refusalNow.current?.base ?? draft.taken, refused });
       // a refused draft whose panel closes (the refusal may land in the same commit as the new selection: a pending
       // save's transition holds the selection's): the toast says where it is
       if (refused && keep) toastNow.current(notSavedAway(keep.field, keep.object), "refusal");
     };
-  }, [keepKey, draft]);
+  }, [keepKey, draft, setRefusalNow]);
+
+  // the field unmounted: a draft it leaves to `field-drafts` is held there
+  useEffect(() => () => release(draft), [draft]);
+  /** Typing, focus and blur change what the guard holds: read from the element, so no render is needed. */
+  const [onType] = useState(() => (e: Event) => guardNow(e.type === "blur" ? false : undefined));
 
   const { elementRef } = o;
   /** The element's ref callback; the text it had when it was last detached is what an unmount keeps. */
   const bind = (el: E | null) => {
     if (!el && element.current) lastText.current = element.current.value;
+    for (const type of ["input", "focus", "blur"]) {
+      element.current?.removeEventListener(type, onType);
+      el?.addEventListener(type, onType);
+    }
     element.current = el;
     if (typeof elementRef === "function") elementRef(el);
     else if (elementRef) setRef(elementRef, el);
@@ -296,9 +324,10 @@ const isLong = (text: string): boolean => text.split("\n").length > 3 || text.le
  * meanwhile.") with "Use this" and "Keep mine", or "Not saved". A long value is folded to three lines by CSS, with "Show
  * more" / "Show less".
  */
-export function DraftLine({ mark, onUse, onKeep, mono }: { mark: DraftMark; onUse: () => void; onKeep: () => void; mono?: boolean }) {
+export function DraftLine({ mark, onUse, onKeep, mono, inline }: { mark: DraftMark; onUse: () => void; onKeep: () => void; mono?: boolean; inline?: boolean }) {
   const [more, setMore] = useState(false);
   if (!mark) return null;
+  if (inline) return <InlineDraftLine mark={mark} onUse={onUse} onKeep={onKeep} />;
   if (mark.kind === "notSaved" || mark.kind === "copy")
     return (
       <div className="mt-1 text-xs font-medium text-im-warn" data-testid="draft-not-saved">
@@ -332,6 +361,41 @@ export function DraftLine({ mark, onUse, onKeep, mono }: { mark: DraftMark; onUs
         )}
       </div>
     </div>
+  );
+}
+
+const inlineButtonClass = "h-[22px] flex-none rounded border border-im-line bg-im-surface px-2 text-xs font-normal text-im-ink hover:bg-im-hover";
+
+/**
+ * The same mark on one row after a field (slice 14b, a canvas's name in its tab, F4): the other value cut to fit, its full
+ * text in the title; no fold, no layout read. The tab list clips anything below a tab, so it never goes under the field.
+ */
+function InlineDraftLine({ mark, onUse, onKeep }: { mark: NonNullable<DraftMark>; onUse: () => void; onKeep: () => void }) {
+  if (mark.kind === "notSaved" || mark.kind === "copy")
+    return (
+      <span className="flex-none text-xs font-medium text-im-warn" data-testid="draft-not-saved">
+        {mark.kind === "copy" ? "Not saved. You can still copy it." : "Not saved"}
+      </span>
+    );
+  return (
+    <span className="flex h-[28px] flex-none items-center gap-1.5 rounded-md bg-im-warn-soft px-2 text-xs font-normal text-im-ink" data-testid="draft-conflict" role="status">
+      {mark.other ? (
+        <>
+          <span>Changed meanwhile to:</span>
+          <span className="max-w-[180px] truncate font-medium" title={mark.other} data-testid="draft-other">
+            {mark.other}
+          </span>
+        </>
+      ) : (
+        <span data-testid="draft-other">Cleared meanwhile.</span>
+      )}
+      <button type="button" className={inlineButtonClass} onClick={onUse} data-testid="button-use-this">
+        Use this
+      </button>
+      <button type="button" className={inlineButtonClass} onClick={onKeep} data-testid="button-keep-mine">
+        Keep mine
+      </button>
+    </span>
   );
 }
 

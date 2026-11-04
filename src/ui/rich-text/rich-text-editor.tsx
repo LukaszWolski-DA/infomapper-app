@@ -2,10 +2,12 @@
 
 // The editor inside the rich-text dialog (slice 4a, PRD items 16–17, prototype #rte): toolbar, an inline link field,
 // the content, and the footer. Loaded only when a dialog opens for the first time (`rich-text-dialog.tsx`), so the
-// canvas page does not carry Tiptap. Esc and Cancel with unsaved changes ask first; Ctrl + Enter saves.
+// canvas page does not carry Tiptap. Esc and Cancel with unsaved changes ask first; Ctrl + Enter saves. While the text
+// differs from what the dialog opened with (or was given by "Use this"), leaving the page asks first (slice 14b).
 
 import { EditorContent, useEditor, useEditorState, type Editor } from "@tiptap/react";
 import { useEffect, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from "react";
+import { guard, release } from "../leave-guard";
 import { editorExtensions, linkTarget, TEXT_COLORS, type TextColor } from "./extensions";
 
 export const FOOTER_HINT = "Ctrl + Enter saves, Esc cancels";
@@ -77,7 +79,10 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
       if (hint !== null) e.chain().focus().setTextSelection(hint).run();
       else e.commands.focus("end");
     },
-    onUpdate: () => setArmed(false),
+    onUpdate: ({ editor: e }) => {
+      setArmed(false);
+      guard(start, start.current !== null && e.getHTML() !== start.current);
+    },
   });
   const active = useEditorState({
     editor,
@@ -118,8 +123,11 @@ export default function RichTextEditor({ html, template, saving, onSave, onDisca
     if (!editor) return;
     editor.commands.setContent(next, { emitUpdate: true });
     start.current = editor.getHTML();
+    release(start);
     setArmed(false);
   };
+  // the dialog closed (saved, discarded or its object gone): nothing of it is left to lose
+  useEffect(() => () => release(start), []);
   useImperativeHandle(handle, () => ({ escape: () => (linking ? closeLink() : tryCancel()), save, focus: () => editor?.commands.focus(), replace }));
   useEffect(() => {
     if (linking) urlInput.current?.focus();

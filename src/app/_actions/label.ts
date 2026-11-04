@@ -14,15 +14,21 @@ import { runCommand, type ActionResult, type Saved } from "../_lib/run-command";
 const NOT_FOUND = { ok: false as const, error: { code: "not_found" as const, message: "This workspace does not exist." } };
 const str = (v: unknown) => (typeof v === "string" ? v : "");
 
+/**
+ * Runs a label's command. With `versions`, the answer carries every row it wrote: a label's rename and delete also
+ * write its live canvas's row, which only the server knows, so the save chain takes that version from here (slice 14b,
+ * F1).
+ */
 async function labelCommand<T>(
   workspaceId: unknown,
   build: (ctx: CommandContext, access: WorkspaceAccess, store: DataStore) => Promise<CommandResult<T>>,
+  options: { versions?: boolean } = {},
 ): Promise<ActionResult<T>> {
   const result = await runCommand<T>(async (ctx, store, user) => {
     const workspace = typeof workspaceId === "string" ? await store.workspaces.get(workspaceId) : null;
     if (!workspace) return NOT_FOUND;
     return build(ctx, { workspace, member: await store.workspaces.getMember(workspace.id, user.id) }, store);
-  });
+  }, options);
   if (result.ok) revalidatePath("/", "layout");
   return result;
 }
@@ -58,7 +64,7 @@ export async function renameLabelAction(workspaceId: string, input: { labelId: s
     const [labels, canvases] = await Promise.all([store.labels.list(ws), store.canvases.list(ws)]);
     const r = renameLabel(ctx, access, { labels, canvases }, input);
     return r.ok ? { ...r, value: { name: r.value.label.name, version: r.value.label.version } } : r;
-  });
+  }, { versions: true });
 }
 
 /** Deletes a label with its links and project pins (one undo step); the model is untouched. */
@@ -74,7 +80,7 @@ export async function deleteLabelAction(workspaceId: string, input: { labelId: s
     ]);
     const r = deleteLabel(ctx, access, { label, links, pins, canvases, canvasItems }, input);
     return r.ok ? { ...r, value: { name: r.value.name, hadLiveCanvas: r.value.liveCanvasId !== null } } : r;
-  });
+  }, { versions: true });
 }
 
 /** Pins a label to a project's home or unpins it (one undo step each, slice 12a). */
