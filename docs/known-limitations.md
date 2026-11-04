@@ -1149,9 +1149,10 @@ support `field-sizing`, or measure in the `input` event only.
 
 ### Ending a licence has no command (slice 15a, C-7)
 
-An organization's licence for a module is a row of `organization_licence`. In development the seed and a script grant
-one (Q6, slice 15a step 4); nothing in the app grants or ends one, and nothing ends one at all in this slice (the
-script only grants). InfoCube is on when the workspace's switch is on (`workspace.infocube`); the licence is read only
+An organization's licence for a module is a row of `organization_licence`. In development the Sales star's step of
+`npm run seed` and `npm run reset-dev-data` grants InfoMate one, and `npx tsx scripts/licence.ts grant "<organization
+name>" infocube [--file <db>]` grants one in any local file (slice 15a step 4); nothing in the app grants or ends one,
+and nothing ends one at all in this slice (the script only grants). InfoCube is on when the workspace's switch is on (`workspace.infocube`); the licence is read only
 when it is turned on. A licence row removed by hand leaves the switch on and its facts and dimensions editable. Turning InfoCube on
 needs the licence; turning it off does not, so an owner or admin can still turn it off once the facts and dimensions
 are deleted. When a command ends licences, it decides for the workspaces that have InfoCube on (for example: refused

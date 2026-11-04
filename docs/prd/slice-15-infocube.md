@@ -425,6 +425,12 @@ performance), each with the files and functions behind it and a proposal.
   panel; dimensional mappings from a source column; SCD per attribute, beyond 0–2, technical SCD columns; reading LDM
   from another workspace; DDL or physical design; a separate canvas type.
 - **The "+" per concept in the Cube tab** (Q-8 of the spec, open).
+- **Copying and transferring a workspace** (AD-09, not built; the rule accepted by Łukasz on 4 November 2026): a copy
+  stays in its organization and copies `workspace.infocube` with the facts and dimensions; a transfer, or a copy into
+  another organization, of a workspace with InfoCube on is refused unless the receiving organization holds the licence,
+  with "{organization} has no InfoCube licence. Delete this workspace's facts and dimensions and turn InfoCube off, or
+  transfer it to an organization with the licence."; a workspace with InfoCube off transfers freely. Both commands
+  iterate the table registry (E1), so a module's rows go with the workspace.
 
 ## 10. Decisions to accept, and docs in this PR
 
@@ -443,6 +449,11 @@ performance), each with the files and functions behind it and a proposal.
   owner or admin, off by default; turning one on needs the organization's licence. A module is turned off only while the
   workspace has none of its objects, so turning it off deletes nothing; while it is off, nothing creates or brings back
   one of its objects (a create, copy, paste, undo or redo). Ending a licence is not a command yet.
+  A workspace's copy stays in its organization and takes the module's switch and objects with it; a transfer, or a copy
+  into another organization, of a workspace with a module on is refused unless that organization holds the module's
+  licence ("{organization} has no InfoCube licence. Delete this workspace's facts and dimensions and turn InfoCube off,
+  or transfer it to an organization with the licence."); a workspace with the module off moves freely. A module is on
+  when its workspace's switch is; the licence is read when it is turned on (Q6 as changed).
 - **AD-36 (Q-6)** Dimensional mappings are InfoCube's own tables (`cube_mapping`, `cube_mapping_input`), pointing to
   InfoMapper's attributes; InfoMapper's `mapping` stays source column(s) → attribute (M1, accepted with step 1).
 

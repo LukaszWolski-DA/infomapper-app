@@ -869,3 +869,138 @@ It helps from this branch on: `main` still has the old text until 15a is merged.
   to `slice-09`) 18 min 54 s, part 4 (`slice-10a` to `slice-14b`) 23 min 58 s. S13-12 in the run: own save 3, conflict
   3. The server's "The destination stream closed early." lines (182) are the ones step 2's run had too (180): a test
   leaving a page while it streams.
+
+## Łukasz's answers after step 3 (4 November 2026)
+
+- **Q6:** InfoCube is on when the workspace's switch is on; the licence is checked only when someone turns it on.
+- **Copy and transfer:** the rule above is accepted as a rule, not built; it is in the PRD's section 9 and in AD-35's
+  proposed text, with its message.
+- **Swap direction:** not checked, as the prototype.
+- **Messages:** approved as proposed, except a paste across levels, which is now "An attribute can be pasted only within
+  one level: logical into logical, fact or dimension into fact or dimension." (`CROSS_LEVEL_PASTE_MESSAGE`).
+
+## 15a step 4: the interface (4 November 2026)
+
+### What changed
+
+- **How a module reaches the pages (E3, E6, E7, E13, E18):** `src/ui/modules.ts` defines what a page gets as plain data
+  and server actions (`ModuleView`: each dimensional entity's role, the left panel's module tabs, the entities a module
+  creates; `DependentRow` for a delete preview). The composition root builds it: `moduleView` (`src/compose/view.ts`,
+  reading InfoCube's rows only when the model has a dimensional entity), `CREATE_ACTIONS` (`src/compose/actions.ts`, apart
+  from the index so the domain's and the store's callers never load server actions), `settingsBoxes`
+  (`src/compose/settings.tsx`), the module's CSS (`src/compose/styles.ts`, loaded by the root layout) and the star
+  (`src/compose/seed.ts`). The canvas page hands it to `ModulesProvider` (`src/app/_components/modules.tsx`), `buildTree`
+  and `buildCards`. InfoMapper's layers name no module (the lint rule passes).
+  - The canvas page and the entity's impact read through the composed store (`getDataStore(STORE_SCHEMA)`): with
+    InfoMapper's tables alone `modules.list` refuses InfoCube's tables.
+  - `modelCommand` moved from `_actions/model.ts` to `_lib/model-command.ts`: an export of a "use server" file is a
+    server action itself, and InfoCube's actions (`src/modules/infocube/app/actions.ts`) use it.
+- **Workspace settings (O2):** the InfoCube box after Data Vault 2.0 mode (`InfoCubeBox`, `src/modules/infocube/app/`),
+  shown to everyone; its check box enabled for owners and admins with the licence; "{organization} has no InfoCube
+  licence." or "Licensed for {organization}."; a refusal stays under the check box (`text-infocube-refusal`) and shows no
+  toast (`useAction`'s new `quiet` option); it saves the workspace's row on the settings' chain.
+- **The Cube tab (B-1):** a fourth tab while InfoCube is on, its title "InfoCube: facts and dimensions"; New fact and New
+  dimension at its top for editors; Facts, then Dimensions, each by concept (one step in), with "grain set"/"no grain"
+  and "SCD {n}" on the right; the Model tab's click, drag, presence dots, search (within the tab's level), folding and
+  "Only on this canvas". Four tabs are 12 px (P18). A tab that goes (InfoCube turned off) shows the Model tab.
+  **The Model tab lists logical entities only**; a concept's delete dialog still counts both levels (Q4).
+- **New fact here, New dimension here (B-2)** in the canvas's toolbox after "New entity here", only while on. Both
+  creates place the card as "New entity here" does (the concept of a concept frame, else the last used), select it, open
+  the details and select the name; one undo step each (`createCubeEntity`).
+- **The card (B-3, part):** the role ("Fact", "Dimension") where the stereotype stands, the cube as a CSS mask on the
+  span's `::before`, the classes `dimn fact`/`dimn dimension` on the card, a fact's 8 px edge and 18 px padding
+  (`src/modules/infocube/canvas/infocube.css`); `withClips` counts the mark's 14 px (`ROLE_MARK`).
+- **The entity panel:** Role (read only, with the cube) in place of Stereotype for a fact or dimension; "Feeding sources"
+  is not shown for one (Q4: no column feeds it).
+- **The relationship refusal** between levels: the domain's message as the canvas's toast (`relate` shows every refusal).
+- **Delete preview (X-4, without 15c's mappings):** a fact's "Fact – deleted" or "its grain (“…”) deleted"; a
+  dimension's "Dimension – SCD type {n} deleted" and "{n} facts – lose this dimension: …", each fact once; "{n}
+  measures – deleted"; after InfoMapper's rows (`entityImpactAction`'s `modules`).
+- **The Q4 level filters:**
+
+  | Place | Done |
+  | --- | --- |
+  | Model tab, its search | logical only (`buildTree`); the Cube tab searches its own entities |
+  | A concept's delete dialog | every entity of the concept, both levels |
+  | Duplicate-name warning, stereotype | step 3 (domain); the toolbox's "Create entity “…”" offer compares logical names |
+  | Status bar | "Mapped attributes on canvas" counts logical cards' attributes (`canvasStatus`) |
+  | Workspace home, project home | "entities" and the project's attributes count logical entities (`workspaceStats`, `projectStats`) |
+  | Canvas tiles and tab counts | unchanged: every card |
+  | Model consistency | logical attributes only (`modelConsistency`) |
+  | Import review | logical entities and attributes only (`impactIndex`) |
+  | Feeding sources | not shown for a dimensional entity |
+  | Attribute pickers | logical only (`attributeOptions`, "Map to an attribute") |
+  | Paste | step 3 (domain); the toast is its refusal |
+  | Data Vault 2.0 readings | nothing to do (step 3) |
+
+- **The Sales star (O5, Q13 (b)):** `addSalesStar` (`src/modules/infocube/data/sales-star.ts`): Fact Sales, Fact Orders,
+  Dim Customer, Dim Product, Dim Date with the prototype's attributes, roles, grains and SCD types; the five relationships
+  with each dimension at the 1..1 end; the canvas "Sales star" in Order management with the six logical and five
+  dimensional cards at the prototype's places; InfoMate's licence; InfoCube on in "Retail Co – DWH". No measures,
+  dimensional mappings or REQ-210 (15b to 15d). `npm run seed` and `npm run reset-dev-data` add it; the e2e reseed does
+  not (`resetDevData`'s new `extra`); slice 15a's fixtures add it (`test.use({ star: false })` for the plain seed). It
+  writes no change event.
+- **`scripts/licence.ts grant "<organization name>" infocube [--file <db>]`:** adds the licence row (no change event,
+  refuses production, an unknown module or an ambiguous name); grants only.
+
+### New user-facing texts (for approval)
+
+| Where | Text |
+| --- | --- |
+| Settings box, heading | "InfoCube" |
+| Settings box, text | "Dimensional modelling on top of the logical model: facts, dimensions, and mappings from logical attributes. It can be turned off only while the workspace has no facts or dimensions." (the prototype's second sentence was "Turning it off keeps everything; facts and dimensions become read-only.") |
+| Settings box, check box | "Use InfoCube in this workspace" (prototype) |
+| Settings box, licence line | "Licensed for {organization}." / "{organization} has no InfoCube licence." (prototype) |
+| Toast, turned on | "InfoCube is on: facts and dimensions are in the Cube tab." (prototype) |
+| Toast, turned off | "InfoCube is off." (the prototype's "InfoCube is off. Facts and dimensions stay, read-only.") |
+| Refusal under the check box | step 3's "InfoCube can be turned off only when this workspace has no facts or dimensions. It has {n}: delete them first." |
+| Left panel tab | "Cube", title "InfoCube: facts and dimensions" (prototype) |
+| Cube tab | "New fact", "New dimension", "Facts", "Dimensions", "No facts yet." / "No dimensions yet." with " Use New fact above." / " Use New dimension above." for editors, "grain set", "no grain", "SCD {n}" (prototype) |
+| Toolbox | "New fact here", "New dimension here" (prototype) |
+| Toast after a create | InfoMapper's "Created {name} in {concept}. Type its name now; change the concept in the panel." |
+| Default names | "New fact", "New dimension", numbered within the level (step 3) |
+| Card role | "Fact", "Dimension"; titles "A fact: one row per its grain (InfoCube)", "A dimension (InfoCube)" (the prototype's without "is off here: read-only") |
+| Entity panel | "Role" |
+| Delete preview | "Fact" – "deleted" / "its grain (“{grain}”) deleted"; "Dimension" – "SCD type {n} deleted"; "{n} fact(s)" – "lose this dimension: {names}"; "{n} measure(s)" – "deleted" (prototype) |
+| Script | "{organization} holds the infocube licence now. Turn it on per workspace in its settings." and its refusals |
+
+### Not in this step, and why
+
+- **A collapsed frame's block rows (E8)** show no role: the PRD's step 4 list and Łukasz's list name the card only.
+- **The details panel's canvas summary** counts every card ("11 entities … on Sales star") and its "Mapping coverage"
+  lists facts and dimensions with "0 of n": the coverage of a dimensional entity is "fed" (P17), built in 15c with the
+  dimensional mappings.
+- **A column dropped on a fact or dimension** is not refused yet: the refusal and its toast are B-6's (15c).
+- **The page's bytes** (`model_level` on every entity, PRD section 6) stay for step 5.
+- **S15-02** is unit tests only (`upgrade-12.test.ts`, `table-registry.test.ts`): nothing of it is on a page.
+
+### Tests
+
+- **Unit:** `tests/infocube-star.test.ts` (the star against the store's rules, once, no change events, not in the plain
+  seed; `moduleView` while on and off; a dimension's preview rows, each fact once); `tree-data.test.ts` (the Model tab
+  logical only, a module tab's groups, search and folding); `canvas.test.ts` (a card's role, the mark's width in the clip);
+  `stats.test.ts` (logical counts); `model-index.test.ts` (pickers).
+- **e2e** (`e2e/slice-15a/`, the star by default): S15-01 (plain seed: three tabs, no roles, no InfoCube toolbox items,
+  the preview unchanged), S15-03 (box without and with the licence, owner, modeler, admin, direct calls), S15-04 (the
+  turn-off refused with 5, the deletes, off; no tab, no creates, a direct create refused; the undo refused and kept, the
+  logical delete; on again, the two undos), S15-06, S15-07, S15-10, S15-14, S15-17.
+- **Measurement** (`S15-layers.spec.ts`, the measurement build): see Checks.
+- **Screenshots:** `SCREENS=step-4 npx playwright test e2e/slice-15a/S15A-screens.spec.ts` →
+  `docs/prd/slice-15a-screens/step-4/` (the star at 50 % and 100 %, the Cube tab, the Role, Dim Date's preview, the box
+  licensed, refused and without the licence; light and dark).
+- **Earlier tests changed:** none. `playwright.config.ts` leaves `S15-layers.spec.ts` out of the normal run.
+
+### Checks (4 November 2026)
+
+- `npm run lint` and `npm run typecheck`: clean.
+- `npm test`: 133 files, 1,667 tests passed.
+- `e2e/slice-15a/` alone: 8 of 8 passed (after fixing three of the new specs' own mistakes: the canvas tabs counted with
+  the left panel's, a refusal's wording, a second identical toast that the recorder does not count again).
+- **Element guard** (`S3B-15-elements.spec.ts`, measurement build, against `slice-08.json`): passed; viewport counts
+  equal (4,508 / 19,305 / 1,465 / 4,907); page totals 6,000 / 20,797 / 2,867 / 6,309, the same as since slice 11 (slice
+  8's +1 and slice 11's +6 against `slice-07b`): nothing of InfoCube is on "Performance test".
+- **Layers** (`S15-layers.spec.ts`, measurement build): the Sales star at 50 % with its five roles and two fact edges:
+  11 drawing layers, 4.2 MP, 775 viewport elements; the same cards without roles: 11, 4.2 MP, 775. The marks add no
+  element and no layer (AD-24).
+- **Full e2e run** (`npm run e2e`, from scratch, no dev server running): 564 passed, 3 skipped, 94 min 33 s; part 1
+  26 min 18 s, part 2 23 min 43 s, part 3 19 min 0 s, part 4 (slice-10a to slice-15a) 25 min 31 s. No failure.
