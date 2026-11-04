@@ -37,6 +37,11 @@ export function assertNotProduction(): void {
   if (!isLocalModeAllowed()) throw new ProductionRefusedError();
 }
 
+/** The refusal of a file a newer branch wrote (slice 15a): nothing is read or written. */
+export const newerFormatMessage = (file: string, format: number): string =>
+  `${file} has format ${format}, newer than this branch's ${DEV_DB_FORMAT}: a newer branch wrote it. Nothing was changed. ` +
+  "Switch back to that branch, or restore a backup of the file from .data/backups/ that has this branch's format.";
+
 export async function readDb(file: string): Promise<DevDb> {
   assertNotProduction();
   let text: string;
@@ -50,6 +55,9 @@ export async function readDb(file: string): Promise<DevDb> {
   const was = db.format as number;
   const now = new Date().toISOString();
   const { report, passwordsGiven } = upgradeDb(db, now, () => uuidv7());
+  // a newer branch wrote the file (slice 15a): it may hold someone's own model, so the way back is that branch or a
+  // backup, never a reset, which would replace it with the demo data
+  if (typeof db.format === "number" && db.format > DEV_DB_FORMAT) throw new Error(newerFormatMessage(file, db.format));
   if (db.format !== DEV_DB_FORMAT) {
     throw new Error(`${file} has format ${String(db.format)}, expected ${DEV_DB_FORMAT}. Run "npm run reset-dev-data".`);
   }
