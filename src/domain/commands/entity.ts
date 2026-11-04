@@ -2,12 +2,13 @@
 
 import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult, type Write } from "../changes";
-import { notFound } from "../errors";
+import { domainError, notFound } from "../errors";
 import type { Uuid } from "../ids";
 import { entityCascade, type EntityRows } from "../model/impact";
+import { DIMENSIONAL_STEREOTYPE_MESSAGE, isDimensional } from "../model/levels";
 import { sanitizeRich } from "../model/rich-text";
 import type { WorkspaceAccess } from "../permissions";
-import { STEREOTYPES, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type LabelLink, type Note, type RequirementLink } from "../types";
+import { STEREOTYPES, type ModelLevel, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type LabelLink, type Note, type RequirementLink } from "../types";
 import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, isLive, nothingToChange, richTextSchema, softDelete } from "./shared";
 import { cardHeightSchema, frameRefsSchema, joinFrames, newCanvasItem, positionSchema } from "./canvas-item";
@@ -23,15 +24,25 @@ export const duplicateNameWarning = (name: string): string =>
 
 const sameName = (a: string, b: string) => a.toLocaleLowerCase() === b.toLocaleLowerCase();
 
-function hasDuplicate(entities: readonly Entity[], name: string, exceptId: Uuid | null): boolean {
-  return entities.some((e) => e.id !== exceptId && e.deleted_at === null && sameName(e.name, name));
+/** Names are compared within one model level (slice 15a, X-6, F10): a fact may share a logical entity's name. */
+function hasDuplicate(entities: readonly Entity[], name: string, exceptId: Uuid | null, level: ModelLevel): boolean {
+  return entities.some((e) => e.id !== exceptId && e.deleted_at === null && e.model_level === level && sameName(e.name, name));
 }
 
-/** “New entity”, or “New entity 2”, “New entity 3”… when the name is taken. */
-function freeDefaultName(entities: readonly Entity[]): string {
-  let name = DEFAULT_ENTITY_NAME;
-  for (let n = 2; hasDuplicate(entities, name, null); n++) name = `${DEFAULT_ENTITY_NAME} ${n}`;
+/** “New entity”, or “New entity 2”, “New entity 3”… when the name is taken in the level (a module's base name too). */
+function freeDefaultName(entities: readonly Entity[], level: ModelLevel, base = DEFAULT_ENTITY_NAME): string {
+  let name = base;
+  for (let n = 2; hasDuplicate(entities, name, null, level); n++) name = `${base} ${n}`;
   return name;
+}
+
+/**
+ * How a module creates an entity through this command (slice 15a, E5): its level, set here and never changed, and the
+ * default name's base ("New fact"). Not part of the input: no browser chooses a level.
+ */
+export interface CreateEntityOptions {
+  level: ModelLevel;
+  defaultName?: string;
 }
 
 // ---- create ----
@@ -69,6 +80,7 @@ export function createEntity(
   access: WorkspaceAccess,
   state: CreateEntityState,
   input: unknown,
+  options: CreateEntityOptions = { level: "logical" },
 ): CommandResult<{ entityId: Uuid; canvasItemId: Uuid | null; warning: string | null }> {
   const parsed = begin(access, "model.edit", createEntityInput, input);
   if (!parsed.ok) return fail(parsed.error);
@@ -81,9 +93,9 @@ export function createEntity(
     ...newRowColumns(ctx),
     workspace_id: workspaceId,
     concept_id: conceptId,
-    name: name ?? freeDefaultName(state.entities),
+    name: name ?? freeDefaultName(state.entities, options.level, options.defaultName),
     alias: null,
-    model_level: "logical",
+    model_level: options.level,
     stereotype: "object",
     definition_html: null,
     definition_text: null,
@@ -96,7 +108,7 @@ export function createEntity(
     if (!joined.ok) return fail(joined.error);
     writes.push({ kind: "insert", table: "canvas_item", row: item }, ...joined.writes);
   }
-  const warning = name && hasDuplicate(state.entities, name, null) ? duplicateNameWarning(name) : null;
+  const warning = name && hasDuplicate(state.entities, name, null, options.level) ? duplicateNameWarning(name) : null;
   return done(ctx, access, { entityId: entity.id, canvasItemId: item?.id ?? null, warning }, writes);
 }
 
@@ -144,7 +156,10 @@ export function updateEntity(
   const patch: Partial<Entity> = {};
   if (name !== undefined && name !== before.name) patch.name = name;
   if (alias !== undefined && alias !== before.alias) patch.alias = alias;
-  if (stereotype !== undefined && stereotype !== before.stereotype) patch.stereotype = stereotype;
+  if (stereotype !== undefined && stereotype !== before.stereotype) {
+    if (isDimensional(before)) return fail(domainError("invalid", DIMENSIONAL_STEREOTYPE_MESSAGE));
+    patch.stereotype = stereotype;
+  }
   if (conceptId !== undefined && conceptId !== before.concept_id) {
     if (!isLive(state.concept, access.workspace.id) || state.concept.id !== conceptId) return fail(notFound("concept"));
     patch.concept_id = conceptId;
@@ -156,7 +171,7 @@ export function updateEntity(
   if (Object.keys(patch).length === 0) return fail(nothingToChange());
 
   const row = nextVersion(ctx, before, patch);
-  const warning = patch.name && hasDuplicate(state.entities, patch.name, before.id) ? duplicateNameWarning(patch.name) : null;
+  const warning = patch.name && hasDuplicate(state.entities, patch.name, before.id, before.model_level) ? duplicateNameWarning(patch.name) : null;
   return done(ctx, access, { entity: row, warning }, [{ kind: "update", table: "entity", before, row }]);
 }
 

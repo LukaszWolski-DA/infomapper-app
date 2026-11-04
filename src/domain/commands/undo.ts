@@ -21,6 +21,7 @@
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
 import { followOriginals } from "../model/copies";
+import { levelWritesRefusal } from "../model/levels";
 import { keyTakenMessage, requirementKey, restoreKeyTakenMessage } from "../model/requirements";
 import type { Uuid } from "../ids";
 import { checkPermission, type WorkspaceAccess, type WorkspaceAction } from "../permissions";
@@ -107,6 +108,8 @@ export type ModuleTableClass = ModuleUndoTable | "outside undo";
 /** The tables undo knows: InfoMapper's and the registered modules'. Made once by `undoTables`. */
 export interface UndoTables {
   readonly undoable: readonly string[];
+  /** The modules' tables among them, in registration order (slice 15a: their rows follow their parents' deletes). */
+  readonly modules: readonly string[];
   readonly outside: ReadonlySet<string>;
   readonly parents: Readonly<Record<string, readonly (readonly [string, string])[]>>;
   readonly nouns: Readonly<Record<string, string>>;
@@ -176,6 +179,7 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
 export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleTableClass>>>): UndoTables {
   const undoable: string[] = [...UNDOABLE_TABLES];
   const outside = new Set<string>(OUTSIDE_UNDO);
+  const registered: string[] = [];
   const parents: Record<string, readonly (readonly [string, string])[]> = { ...PARENTS };
   const nouns: Record<string, string> = {};
   const actions: Record<string, (e: ChangeEvent) => WorkspaceAction> = {};
@@ -188,12 +192,13 @@ export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleT
       continue;
     }
     undoable.push(table);
+    registered.push(table);
     if (spec.parents.length) parents[table] = spec.parents;
     nouns[table] = spec.noun;
     if (spec.action) actions[table] = spec.action;
     if (spec.defaults) defaults[table] = spec.defaults;
   }
-  return { undoable, outside, parents, nouns, actions, defaults };
+  return { undoable, outside, parents, nouns, actions, defaults, modules: registered };
 }
 
 /** InfoMapper's tables only: what undo knows without a module (tests, and InfoMapper with an empty registry). */
@@ -391,6 +396,10 @@ export function revertChangeGroup(
   // “Stop following” writes the copies that differ, in the same group; an original brought back writes none, as its
   // copies kept its values
   const followed = followOriginals(ctx, (state.rows.attribute as readonly Attribute[]).filter((a) => a.workspace_id === workspaceId), writes);
+  // the level rules (slice 15a, C-7): while InfoCube is off no undo or redo brings back or adds a fact or dimension; the
+  // step stays in the history, for when InfoCube is on again
+  const levels = levelWritesRefusal(access.workspace, followed.writes);
+  if (levels) return fail(levels);
   const writeSet = buildWriteSet(ctx, workspaceId, followed.writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
 }

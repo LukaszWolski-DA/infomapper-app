@@ -5,7 +5,7 @@
 // migrations against them at run time.
 
 import { readdirSync, readFileSync } from "node:fs";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
@@ -69,7 +69,8 @@ describe("an empty registry (S15-01)", () => {
 // ---- undo with a module's rows ----
 
 const ctx = makeCtx();
-const modeler = access("modeler");
+// InfoCube on: a dimension is created and brought back (C-7)
+const modeler = access("modeler", { infocube: true });
 const DIM = "01900000-0000-7000-8000-0000000d0001";
 const CUBE = "01900000-0000-7000-8000-0000000d0002";
 const std = { workspace_id: ids.ws, version: 1, created_at: ctx.now, created_by: ids.actor, updated_at: ctx.now, updated_by: ids.actor, deleted_at: null };
@@ -190,9 +191,13 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-/** A dimensional entity and its InfoCube row in the seeded file's first workspace. */
+/**
+ * A dimensional entity and its InfoCube row in the seeded file's first workspace, with InfoCube turned on there (the
+ * adapter refuses a fact or dimension where it is off, C-7, step 3).
+ */
 async function dimensionIn(db: DevDb, cubeId = CUBE) {
-  const ws = db.workspace[0]!;
+  const ws = { ...db.workspace[0]!, infocube: true };
+  await writeFile(file, JSON.stringify({ ...db, workspace: db.workspace.map((w) => (w.id === ws.id ? ws : w)) }), "utf8");
   const by = db.app_user[0]!.id;
   const at = "2026-11-04T10:00:00.000Z";
   const base = { workspace_id: ws.id, version: 1, created_at: at, created_by: by, updated_at: at, updated_by: by, deleted_at: null };

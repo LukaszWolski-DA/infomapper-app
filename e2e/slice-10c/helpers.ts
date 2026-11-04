@@ -39,7 +39,7 @@ export async function attributesOf(entityName: string): Promise<Attribute[]> {
 export async function pasteAs(entityName: string, original: Attribute): Promise<string> {
   const model = await loadModel();
   const entity = (await ids()).entity(entityName);
-  const r = await asLukasz((ctx, access) => pasteAttribute(ctx, access, { entity, original, attributes: model.attributes }, { entityId: entity.id, attributeId: original.id }));
+  const r = await asLukasz((ctx, access) => pasteAttribute(ctx, access, { entity, original, originalEntity: model.entities.find((e) => e.id === original.entity_id) ?? null, attributes: model.attributes }, { entityId: entity.id, attributeId: original.id }));
   return r.attributeId;
 }
 

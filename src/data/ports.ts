@@ -16,8 +16,10 @@ import type {
   Label,
   LabelLink,
   Note,
+  ModuleTable,
   Organization,
   OrganizationAccess,
+  OrganizationLicence,
   OrganizationMember,
   Project,
   ProjectCanvas,
@@ -28,6 +30,7 @@ import type {
   SourceImport,
   Workspace,
   WorkspaceMember,
+  WritableRows,
   WorkspaceModel,
 } from "@/domain/types";
 
@@ -67,6 +70,17 @@ export interface OrganizationRepository {
    * data, an action's result or a log line.
    */
   getAccess(organizationId: Uuid): Promise<OrganizationAccess | null>;
+  /** The organization's live licences (slice 15a, C-7): one per module it may use. */
+  listLicences(organizationId: Uuid): Promise<OrganizationLicence[]>;
+}
+
+/**
+ * A module's tables, read by name (slice 15a, AD-33): the store knows them from the composition root's schema. A table
+ * not in the file yet has no rows.
+ */
+export interface ModuleRowRepository {
+  /** The workspace's live rows of the table. */
+  list<T extends ModuleTable>(workspaceId: Uuid, table: T): Promise<WritableRows[T][]>;
 }
 
 export interface WorkspaceRepository {
@@ -179,6 +193,7 @@ export interface DataStore {
   requirements: RequirementRepository;
   changeEvents: ChangeEventRepository;
   undoHistory: UndoHistoryRepository;
+  modules: ModuleRowRepository;
   /**
    * Applies the rows and change events of one command together or not at all (AD-13). Refuses a stale version,
    * unknown ids, duplicate keys and broken rules with the same error a database would cause.

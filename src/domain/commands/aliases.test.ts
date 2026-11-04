@@ -98,13 +98,13 @@ describe("an attribute's alias", () => {
 describe("pasteAttribute and the alias (P10, D-63's addition)", () => {
   it("copies the original's alias once, with the name and definition", () => {
     const original = attribute(customerId, { alias: "Numer klienta" });
-    const r = ok(pasteAttribute(makeCtx(), access("modeler"), { entity: entity(salesOrder), original, attributes: [original] }, { entityId: salesOrder, attributeId: customerId }));
+    const r = ok(pasteAttribute(makeCtx(), access("modeler"), { entity: entity(salesOrder), original, originalEntity: entity(original.entity_id), attributes: [original] }, { entityId: salesOrder, attributeId: customerId }));
     const w = r.writeSet.writes[0]!;
     if (w.kind !== "insert" || w.table !== "attribute") throw new Error("not an attribute insert");
     expect(w.row).toMatchObject({ name: "customer_id", alias: "Numer klienta", copied_from_attribute_id: customerId });
     // an original without an alias gives a copy without one
     const plain = attribute(customerId);
-    const p = ok(pasteAttribute(makeCtx(), access("modeler"), { entity: entity(salesOrder), original: plain, attributes: [plain] }, { entityId: salesOrder, attributeId: customerId }));
+    const p = ok(pasteAttribute(makeCtx(), access("modeler"), { entity: entity(salesOrder), original: plain, originalEntity: entity(plain.entity_id), attributes: [plain] }, { entityId: salesOrder, attributeId: customerId }));
     expect((p.writeSet.writes[0] as { row: Attribute }).row.alias).toBeNull();
   });
 });

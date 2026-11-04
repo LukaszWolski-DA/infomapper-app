@@ -183,3 +183,47 @@ describe("archiveWorkspace and unarchiveWorkspace (AD-09)", () => {
     expect(unarchiveWorkspace(makeCtx(), access("owner", archived), { workspaceId: ids.ws, expectedVersion: 4 })).toMatchObject({ ok: false, error: { code: "stale_version" } });
   });
 });
+
+describe("updateWorkspaceSettings: InfoCube on and off (slice 15a, C-7)", () => {
+  const licensed = { licensed: true, organizationName: "Retail Co", dimensionalEntities: 0 };
+  const turn = (infocube: boolean) => ({ workspaceId: ids.ws, expectedVersion: 3, infocube });
+
+  it("lets an owner or an admin turn it on with the organization's licence, and off without facts or dimensions", () => {
+    for (const role of ["owner", "admin"] as const) {
+      const r = updateWorkspaceSettings(makeCtx(), access(role), turn(true), licensed);
+      expect(r.ok && r.value.workspace).toMatchObject({ infocube: true, version: 4 });
+      const off = updateWorkspaceSettings(makeCtx(), access(role, { infocube: true }), turn(false), licensed);
+      expect(off.ok && off.value.workspace.infocube).toBe(false);
+    }
+  });
+
+  it("refuses a modeler, a reviewer, a reader and an archived workspace", () => {
+    for (const role of ["modeler", "reviewer", "reader"] as const) {
+      expect(updateWorkspaceSettings(makeCtx(), access(role), turn(true), licensed)).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    }
+    expect(updateWorkspaceSettings(makeCtx(), access("owner", archived), turn(true), licensed)).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+
+  it("refuses to turn it on without the licence, with the organization's name (O2)", () => {
+    expect(updateWorkspaceSettings(makeCtx(), access("owner"), turn(true), { ...licensed, licensed: false })).toMatchObject({
+      ok: false,
+      error: { code: "forbidden", message: "Retail Co has no InfoCube licence." },
+    });
+  });
+
+  it("refuses to turn it off while the workspace has facts or dimensions, with their number", () => {
+    expect(updateWorkspaceSettings(makeCtx(), access("owner", { infocube: true }), turn(false), { ...licensed, dimensionalEntities: 3 })).toMatchObject({
+      ok: false,
+      error: { code: "invalid", message: "InfoCube can be turned off only when this workspace has no facts or dimensions. It has 3: delete them first." },
+    });
+    // turning it off needs no licence: an ended licence still lets an owner turn it off
+    const off = updateWorkspaceSettings(makeCtx(), access("owner", { infocube: true }), turn(false), { ...licensed, licensed: false });
+    expect(off.ok).toBe(true);
+  });
+
+  it("refuses a change of InfoCube without its state, and ignores a value that does not change it", () => {
+    expect(updateWorkspaceSettings(makeCtx(), access("owner"), turn(true))).toMatchObject({ ok: false, error: { code: "invalid" } });
+    const same = updateWorkspaceSettings(makeCtx(), access("owner"), { ...turn(false), name: "Retail DWH" });
+    expect(same.ok && same.value.workspace).toMatchObject({ infocube: false, name: "Retail DWH" });
+  });
+});

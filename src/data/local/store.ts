@@ -5,6 +5,7 @@
 import type { Write, WriteSet } from "@/domain/changes";
 import { LAST_OWNER } from "@/domain/commands/people";
 import { LAST_PROJECT_MESSAGE } from "@/domain/commands/project";
+import { INFOCUBE_OFF_MESSAGE, turnOffRefusedMessage } from "@/domain/model/levels";
 import type { WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
@@ -137,6 +138,15 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
       },
       getAccess: async (organizationId) =>
         (await load()).organization_access.find((a) => a.organization_id === organizationId) ?? null,
+      listLicences: async (organizationId) => live((await load()).organization_licence).filter((l) => l.organization_id === organizationId),
+    },
+
+    modules: {
+      list: async (workspaceId, table) => {
+        if (!schema.rules[table]) throw new Error(`The store does not know the table ${table}.`);
+        const rows = rowsOf(await load(), table) as unknown as { workspace_id: Uuid; deleted_at: string | null }[];
+        return rows.filter((r) => r.workspace_id === workspaceId && r.deleted_at === null) as never;
+      },
     },
 
     workspaces: {
@@ -318,6 +328,10 @@ async function applyToFile(file: string, writeSet: WriteSet, schema: LocalSchema
   // The last project (slice 12a, F8): two deletes at once, or a delete and an undo of "Create project", each counted the
   // projects from what it read. Counted again here, for the workspaces whose projects this write deletes.
   if (workspaceWithoutProject(next, writeSet.writes)) return { ok: false, error: domainError("invalid", LAST_PROJECT_MESSAGE) };
+  // InfoCube off with facts or dimensions (slice 15a, C-7): a fact created while another session turned InfoCube off, or
+  // the other way round, each checked what it read. Counted again here, for the workspaces this write touches.
+  const off = offWithDimensional(next, writeSet.writes);
+  if (off) return { ok: false, error: off.turnedOff ? domainError("invalid", turnOffRefusedMessage(off.count)) : domainError("forbidden", INFOCUBE_OFF_MESSAGE) };
   // only what this write can have broken: the touched tables and the new change events
   const violation = findViolation(next, { tables: touched, newEvents: writeSet.events.length }, schema);
   if (violation) return { ok: false, error: violationError(violation) };
@@ -331,6 +345,22 @@ function workspaceWithoutOwner(db: DevDb, writes: readonly Write[]): string | nu
   for (const workspaceId of touched) {
     const members = db.workspace_member.filter((m) => m.workspace_id === workspaceId);
     if (members.length > 0 && !members.some((m) => m.role === "owner")) return db.workspace.find((w) => w.id === workspaceId)?.name ?? "This workspace";
+  }
+  return null;
+}
+
+/**
+ * A workspace this write touched (its row, or an entity in it) that is left with InfoCube off and live dimensional
+ * entities: `turnedOff` when the write is what turned it off.
+ */
+function offWithDimensional(db: DevDb, writes: readonly Write[]): { count: number; turnedOff: boolean } | null {
+  const touched = new Set<Uuid>();
+  for (const w of writes) if (w.table === "workspace" || w.table === "entity") touched.add(w.table === "workspace" ? (w.row as { id: Uuid }).id : (w.row as { workspace_id: Uuid }).workspace_id);
+  for (const workspaceId of touched) {
+    const workspace = db.workspace.find((w) => w.id === workspaceId);
+    if (!workspace || workspace.infocube) continue;
+    const count = db.entity.filter((e) => e.workspace_id === workspaceId && e.deleted_at === null && e.model_level === "dimensional").length;
+    if (count) return { count, turnedOff: writes.some((w) => w.table === "workspace" && (w.row as { id: Uuid }).id === workspaceId) };
   }
   return null;
 }

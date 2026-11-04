@@ -6,7 +6,9 @@ import { getDataStore, type DataStore } from "@/data";
 import { buildWriteSet, writtenVersions, type CommandContext, type CommandResult, type WriteSet } from "@/domain/changes";
 import { completeLiveWrites, touchesLiveCanvases, type LiveOutcome } from "@/domain/commands/live";
 import { CONTEXT_LABEL_GONE, contextTargets } from "@/domain/model/live";
+import { cascadingModuleTables, moduleCascade } from "@/domain/commands/module-cascade";
 import { isUndoable } from "@/domain/commands/undo";
+import { levelWritesRefusal, writesEntities } from "@/domain/model/levels";
 import type { DomainErrorCode } from "@/domain/errors";
 import { ACCOUNT_EXISTS_MESSAGE } from "@/domain/commands/organization";
 import { uuidv7 } from "@/domain/ids";
@@ -14,7 +16,7 @@ import { changeLabel } from "@/domain/model/change-label";
 import { recordChange } from "@/domain/model/undo-history";
 import { isOpen } from "@/domain/source-changes/rules";
 import { settleAfterWrites } from "@/domain/source-changes/settle";
-import type { AppUser } from "@/domain/types";
+import type { AppUser, ModuleTable, Workspace } from "@/domain/types";
 import { contextCookieName, parseContextCookie } from "@/ui/working-context-cookie";
 import { retryWhenStale } from "./fresh-retry";
 import { recordLiveNotices } from "./live-notices";
@@ -83,8 +85,11 @@ export async function runCommand<T>(
       if (locked) return locked;
     }
     const workspaceId = result.writeSet.events[0]?.workspace_id;
+    const levels = await levelRefusal(store, result.writeSet);
+    if (levels) return { ok: false, code: levels.code, message: levels.message };
+    const cascaded = await withModuleCascades(ctx, store, result.writeSet);
     const contextLabelId = workspaceId ? parseContextCookie((await cookies()).get(contextCookieName(user.id, workspaceId))?.value)?.labelId : null;
-    const settled = await withSettledChanges(ctx, store, result.writeSet);
+    const settled = await withSettledChanges(ctx, store, cascaded);
     const completed = await withLiveCanvases(ctx, store, user, settled, { contextLabelId });
     if (!completed.ok) {
       // the context's label is gone: a fresh page lets the browser switch the context off (slice 3b, PRD item 3)
@@ -167,6 +172,33 @@ export async function withLiveCanvases(
   const full = touches || contextTargets(writeSet.writes, writeSet.mainTargets, writeSet.followers).length > 0;
   const state = full ? await loadLiveState(store, workspaceId) : { ...EMPTY_LIVE_STATE, labels: await store.labels.list(workspaceId) };
   return completeLiveWrites(ctx, access, state, writeSet, { revert: options.revert, contextLabelId });
+}
+
+/**
+ * The level rules (slice 15a, C-7, `levelWritesRefusal`) on any command's writes: read the workspace only when the writes
+ * touch an entity, as it stands after them (a settings write carries its new row).
+ */
+async function levelRefusal(store: DataStore, writeSet: WriteSet) {
+  const workspaceId = writeSet.events[0]?.workspace_id;
+  if (!workspaceId || !writesEntities(writeSet.writes)) return null;
+  const written = writeSet.writes.find((w) => w.table === "workspace");
+  const workspace = written ? ((written as { row: Workspace }).row) : await store.workspaces.get(workspaceId);
+  return workspace ? levelWritesRefusal(workspace, writeSet.writes) : null;
+}
+
+/**
+ * The modules' rows that go with what the writes delete (slice 15a, E14, `moduleCascade`), in the same change group:
+ * read only the module tables that can follow these deletes.
+ */
+export async function withModuleCascades(ctx: CommandContext, store: DataStore, writeSet: WriteSet): Promise<WriteSet> {
+  const workspaceId = writeSet.events[0]?.workspace_id;
+  const tables = workspaceId ? cascadingModuleTables(writeSet.writes, UNDO_TABLES) : [];
+  if (!workspaceId || !tables.length) return writeSet;
+  const rows = Object.fromEntries(await Promise.all(tables.map(async (t) => [t, await store.modules.list(workspaceId, t as ModuleTable)] as const)));
+  const extra = moduleCascade(ctx, writeSet.writes, UNDO_TABLES, rows);
+  if (!extra.length) return writeSet;
+  const rebuilt = buildWriteSet(ctx, workspaceId, [...writeSet.writes, ...extra]);
+  return { ...writeSet, writes: rebuilt.writes, events: rebuilt.events.map((e) => ({ ...e, change_group_id: writeSet.changeGroupId })) };
 }
 
 /** The tables whose writes can settle a change to resolve (slice 7b, `settleAfterWrites`). */

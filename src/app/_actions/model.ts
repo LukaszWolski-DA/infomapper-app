@@ -5,6 +5,7 @@
 // dropped column, attribute order, a new relationship. Mappings are in mapping.ts. Slice 10c: paste a copy of an
 // attribute; a change of a followed field writes the copies too and answers with every version written.
 
+import { relationshipOneEnd } from "@/compose";
 import { revalidatePath } from "next/cache";
 import { getDataStore, type DataStore } from "@/data";
 import type { CommandContext, CommandResult } from "@/domain/changes";
@@ -198,9 +199,11 @@ export async function updateAttributeAction(workspaceId: string, input: UpdateAt
  * entity has another attribute of that name (F12).
  */
 export async function pasteAttributeAction(workspaceId: string, input: PasteAttributeInput): Promise<ActionResult<{ attributeId: string; nameTaken: boolean }>> {
-  return modelCommand(workspaceId, (ctx, access, { entities, attributes }) =>
-    pasteAttribute(ctx, access, { entity: byId(entities, input?.entityId), original: byId(attributes, input?.attributeId), attributes }, input),
-  );
+  return modelCommand(workspaceId, (ctx, access, { entities, attributes }) => {
+    const original = byId(attributes, input?.attributeId);
+    // the original's entity, for its level (slice 15a, O6)
+    return pasteAttribute(ctx, access, { entity: byId(entities, input?.entityId), original, originalEntity: byId(entities, original?.entity_id), attributes }, input);
+  });
 }
 
 /**
@@ -235,8 +238,12 @@ export async function createRelationshipAction(
   workspaceId: string,
   input: { fromEntityId: string; toEntityId: string },
 ): Promise<ActionResult<{ relationshipId: string }>> {
-  return modelCommand(workspaceId, (ctx, access, { entities }) => {
-    const result = createRelationship(ctx, access, { from: byId(entities, input?.fromEntityId), to: byId(entities, input?.toEntityId) }, input);
+  return modelCommand(workspaceId, async (ctx, access, { entities }, store) => {
+    const from = byId(entities, input?.fromEntityId);
+    const to = byId(entities, input?.toEntityId);
+    // between a fact and a dimension the relationship starts at the dimension (slice 15a, D-67)
+    const oneEnd = from && to ? await relationshipOneEnd(store, access.workspace.id, from.id, to.id) : null;
+    const result = createRelationship(ctx, access, { from, to, oneEnd }, input);
     return result.ok ? { ...result, value: { relationshipId: result.value.relationship.id } } : result;
   });
 }
