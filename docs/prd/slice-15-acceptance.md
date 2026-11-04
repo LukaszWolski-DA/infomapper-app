@@ -1734,3 +1734,116 @@ PR. Nothing in step 2 depends on it.
   - S7B-12 and S7C-02 expected the file written back as format 12, a literal, as the seven unit tests changed above.
     Not a flake and no product bug: both now read `DEV_DB_FORMAT`, and each passed three times on its own (with lint and
     typecheck clean).
+
+## Łukasz's answers to 15b step 2 (4 November 2026)
+
+- **Step 2 accepted.**
+- **The line offset:** 20 px for lines between two cards and for loops. D-61's 16 px becomes 20 px at 15b's closing, its
+  text quoted to Łukasz then. If e2e specs check loops at 16 px and the change spreads widely, stop and tell him; loops
+  then keep 16 px. **Checked in step 3:** one spec checks a relationship's loop at 16 px (`S10A-08.spec.ts` l. 144,
+  `expectLoopAt(b, 16)`); `S10B-02`'s 16 px is a source key, which keeps 16 px (R7). The change is small and goes ahead
+  in step 4.
+- **Every literal file format in the tests reads `DEV_DB_FORMAT`** (step 3, below).
+
+## 15b step 3: the domain (4 November 2026)
+
+### What changed
+
+- **The literal file formats in the tests.** What a test expects after a read now reads `DEV_DB_FORMAT`:
+  - `src/data/local/upgrade-13.test.ts`: `upgraded.format` and `onDisk.format` (`13`); the check
+    `DEV_DB_FORMAT === 13` is removed;
+  - `tests/infocube-keys.test.ts`: the 15a file's upgraded `format` (`13`);
+  - with step 2's (seven unit tests, `e2e/slice-07b/S7B-12.spec.ts` and `e2e/slice-07c/S7C-02.spec.ts`), no test
+    expects a format number any more. The old formats the upgrade tests write as their input (`format: 6`, `7`, `10`,
+    `11`, `12` …) describe the old files and stay.
+- **Roles (InfoMapper, RP-A):** `updateRelationship` takes `fromRole` and `toRole` (trimmed, empty = none, absent =
+  unchanged; any level). `swapRelationship` swaps the roles with their ends. On a relationship to itself, "Nothing to
+  change." also needs equal roles. A key link stays with a swapped relationship (it points to the relationship).
+- **InfoCube's commands** (`src/modules/infocube/domain/commands.ts`), each one change group and one undo step, with
+  InfoMapper's rights and the archive (`model.edit`):
+  - `updateCubeEntity`: a fact's grain (trimmed, empty = none) or a dimension's SCD type (0, 1, 2), on InfoCube's row at
+    its version. Refused: a grain on a dimension ("Only a fact has a grain."), a type on a fact ("Only a dimension has
+    an SCD type.").
+  - `setMeasure`: on makes an attribute of a fact a measure, Additive for Integer and Decimal, Non-additive otherwise.
+    It answers the toast for a foreign key ("{name} is a foreign key. A dimension key is usually not a measure."); the
+    measure is made all the same, as the prototype does. Off soft-deletes the measure at its version. Refused on
+    another attribute: "Only an attribute of a fact can be a measure."
+  - `updateMeasure`: the additivity and "Not additive across". Leaving semi-additive clears the note. A note on another
+    additivity is refused: "Only a semi-additive measure has “Not additive across”."
+  - `linkKey` ("Key in {fact}", R-1):
+    - links a foreign key of the relationship's fact, or none;
+    - picking another key replaces the relationship's live link in the same change group, an inactive one too (R3);
+    - an attribute that carries another relationship is refused: "{attribute} already carries {dimension as role}.
+      Pick another key.";
+    - not a foreign key of the fact: "{attribute} is not a foreign key of {fact}.";
+    - a relationship that does not join a fact and a dimension: "This relationship does not join a fact and a
+      dimension.";
+    - nothing is written on the attribute.
+  - `addKey` (R-3), one change group:
+    - a new attribute of the fact, named by `keyName`, of the primary key's type and parameters, a foreign key, not
+      nullable;
+    - placed after the fact's last key attribute (primary or foreign); the attributes are renumbered 0..n-1, only the
+      changed rows written;
+    - its link; an inactive link of the relationship is deleted in the same group;
+    - the working context labels the new attribute only (as `reorderAttribute`);
+    - toast "Added {name}, the key of {dimension as role}.";
+    - refused while the relationship has an active key ("{fact} already has a key for {dimension as role}: {key}.") or
+      the dimension has no primary key ("{dimension} has no primary key yet.").
+  - **The link's optimistic check.** A link is never updated, only made or deleted, so `linkKey` and `addKey` take the
+    relationship's live link as the page knows it (`currentKeyId`, null for none). Any other live link is a stale
+    version.
+  - **`linkKey` requires a foreign key.** It writes nothing on the attribute; the prototype sets the flag when it
+    links. The select offers foreign keys only, and a direct call with another attribute is refused, so the flag is
+    always on already.
+- **The derived reads** (`src/modules/infocube/domain/keys.ts`, `cubeIndex` built once per read):
+  - **Active links only.** A link counts while its relationship and attribute are live and the attribute is a foreign
+    key of the relationship's fact. An inactive link (R3) is ignored everywhere and active again with the flag.
+  - `factKeys`: one row per relationship to a dimension, in the model's order, with the role at the dimension's end
+    (whichever way the relationship runs), the active key and the dimension's primary key.
+  - `factHints`: B-5's grain, "no dimension keys" and measure-type hints, and R-4's key hints, in the prototype's order,
+    each with its target (the grain, the fact, a relationship, an attribute). `NO_HINTS` is the "Nothing to check" line.
+  - `usedBy`: one row per relationship, the facts in the order they first relate. `carries`: what a foreign key
+    carries.
+  - `attributeDependents`: an attribute's delete preview rows. "Carries {dimension as role} – the link is deleted; the
+    relationship stays" (active links only) and "1 measure – deleted".
+  - `keyName`: R-3's naming rule as a function of its own.
+- **C-7:** nothing new. While InfoCube is off there are no facts or dimensions, so none of these commands finds
+  anything to write.
+
+### Not done in step 3 (step 4)
+
+- The server actions and their loaders: which rows a command reads (`KeyState` is the workspace's model and InfoCube's
+  rows), and the rows a save holds on the chain.
+- `ModuleView`'s new data for the panels, and the attribute's delete preview through the composition root.
+- The 20 px offset.
+
+### New and changed tests
+
+- `src/modules/infocube/domain/keys.test.ts` (18 tests):
+  - `keyName`;
+  - `factKeys`: order, the role's end, an inactive link and its flag back, a deleted link;
+  - every hint, with RP-03, RP-06, RP-08 and RP-12;
+  - `usedBy` (RP-11) and `carries`;
+  - the delete preview rows (RP-07), none for an inactive link.
+- `src/modules/infocube/domain/description-and-keys.test.ts` (23 tests): grain and SCD, measures and their refusals,
+  `linkKey` (RP-05; replacing an inactive link), and `addKey` (RP-04: name, type, place, renumbering, link, one change
+  group; the numbered name; the inactive link; its refusals).
+- `src/modules/infocube/domain/__fixtures__/star.ts`: a small star for those tests.
+- `tests/infocube-keys.test.ts`:
+  - Add key on the real star, through the composed undo registry: one undo removes the attribute and the link and
+    restores the order (the relationship and its role stay), and a redo brings both back;
+  - RP-06's flag cleared and undone, read through the index.
+- `src/domain/commands/relationship.test.ts`: roles set, trimmed and cleared (RP-14), swapped with their ends, and a
+  relationship to itself whose ends differ only in their roles.
+
+### Checks (4 and 5 November 2026)
+
+- `npm run lint` and `npm run typecheck`: clean.
+- `npm test`: 137 files, 1,720 tests passed.
+- One full e2e run (`npm run e2e`, from scratch, no dev server running). It was run because step 3 touches change
+  groups and undo (Add key's group, the swap). Result: 565 passed, 3 skipped (the measuring and on-demand specs), no
+  failures, no retries. Total 90 min 3 s:
+  - part 1, fixes to slice-02c: 24 min 31 s;
+  - part 2, slice-03a to slice-06b: 22 min 54 s;
+  - part 3, slice-07a to slice-09: 18 min 5 s;
+  - part 4, slice-10a to slice-15a: 24 min 33 s.
