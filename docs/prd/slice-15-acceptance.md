@@ -657,3 +657,22 @@ proposal.
    small to show a cost.
 6. **Requirement coverage through feeds (E20)** becomes recursive. The requirement index is rebuilt on every write
    (known limitation), so `bench-requirement-index` is re-run in 15d with feeds.
+
+## Łukasz's answers to step 1 (4 November 2026)
+
+O1 yes (`src/compose/` the only composition root; S15-01 reworded); O2 as the prototype (the box always shown, disabled
+without a licence); O3 as the prototype (undo and redo pass while off; a known limitation); O4 as the prototype (targets
+light while off, the drop refused with the C-7 message); O5 (b); O6 paste within one level only; O7 REQ-210 keeps its
+key; O8 yes (see below); O9 reviewers approve with four-eyes (a difference from the prototype); O10 four sub-slices;
+O11 the numbers reserved, each entering at its sub-slice's closing; Q16 the key-name match as one function. New: O12
+(D-51's first rule for dimensional mappings, 15c) and O13 (the read-only check's scope, domain tests). The PRD's section
+0 holds them in full.
+
+- **The spec's difference (O4).** The spec (C-7, "what off means") says the dimensional drag targets disappear while
+  InfoCube is off; the app follows the prototype: they light, and the drop is refused with the C-7 message. The spec is
+  not changed (it is copied unchanged).
+- **O8's condition holds:** frames' and notes' page data already drop the audit columns and keep `version`
+  (`FrameData` in `src/canvas/frame-data.ts` l. 11, `NoteData` in `note-data.ts` l. 12; a note keeps `createdAt` and
+  `createdBy` for its "Created … by …" line). InfoCube's rows reach the page the same way.
+- **P2, P4, P5 and P6** are answered: P2 and P5 as the prototype, P4's undo as the prototype, P6 as InfoMapper's
+  mappings (PRD section 8).
