@@ -3,7 +3,9 @@
 
 import type { Uuid } from "@/domain/ids";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
+import { isLogical } from "@/domain/model/levels";
 import { coverageParts } from "@/domain/model/requirements";
+import type { ModuleTab } from "@/ui/modules";
 import { REQUIREMENT_KINDS, type CanvasItem, type RequirementKind, type SourceChange, type WorkspaceModel } from "@/domain/types";
 
 /** Where an element has cards: on this canvas (filled dot), only on other canvases (ring), or nowhere. */
@@ -90,11 +92,36 @@ export interface TreeRequirement {
   presence: Presence;
 }
 
+/** A group of a module's tab (slice 15a, E6): its entities by concept, as the Model tab's. */
+export interface TreeTabSection {
+  key: string;
+  title: string;
+  mark: string;
+  empty: string;
+  emptyCreate: string;
+  /** Concepts with at least one of the group's entities, in panel order. */
+  concepts: TreeConcept[];
+  /** How many entities the group has. */
+  total: number;
+}
+
+/** A module's tab of the left panel (slice 15a, B-1). */
+export interface TreeTab {
+  id: string;
+  name: string;
+  title: string;
+  creates: string[];
+  sections: TreeTabSection[];
+}
+
 export interface TreeData {
+  /** The Model tab: logical entities only (slice 15a, B-1, Q4). */
   concepts: TreeConcept[];
   systems: TreeSystem[];
   /** In the index's order: by kind, then by key. */
   requirements: TreeRequirement[];
+  /** The modules' tabs (slice 15a); none without a module. */
+  tabs: TreeTab[];
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -112,6 +139,8 @@ export function buildTree(
   requirements?: RequirementIndex,
   /** The workspace's changes to resolve (slice 7b): each system's open count. */
   changes: readonly SourceChange[] = [],
+  /** The modules' tabs (slice 15a): which entities each group lists. */
+  moduleTabs: readonly ModuleTab[] = [],
 ): TreeData {
   const here = new Map<Uuid, Uuid>(), elsewhere = new Set<Uuid>(), inProject = new Set<Uuid>();
   const projectCanvases = new Set(projectCanvasIds);
@@ -143,25 +172,44 @@ export function buildTree(
     if (c.missing_since && !c.retired_since) columnsMissing.add(c.source_table_id);
   }
 
+  const treeEntity = (e: WorkspaceModel["entities"][number], meta: string): TreeEntity => ({
+    id: e.id,
+    version: e.version,
+    name: e.name,
+    stereotype: meta,
+    fields: fieldsOf.get(e.id) ?? [],
+    ...(e.alias ? { alias: e.alias } : {}),
+    ...(aliasesOf.has(e.id) ? { aliases: aliasesOf.get(e.id) } : {}),
+    presence: presence(e.id),
+    inProject: inProject.has(e.id),
+    cardId: here.get(e.id) ?? null,
+  });
   const concepts = model.concepts.map<TreeConcept>((c) => ({
     id: c.id,
     version: c.version,
     name: c.name,
     color: c.color,
-    entities: model.entities
-      .filter((e) => e.concept_id === c.id)
-      .map((e) => ({
-        id: e.id,
-        version: e.version,
-        name: e.name,
-        stereotype: cap(e.stereotype),
-        fields: fieldsOf.get(e.id) ?? [],
-        ...(e.alias ? { alias: e.alias } : {}),
-        ...(aliasesOf.has(e.id) ? { aliases: aliasesOf.get(e.id) } : {}),
-        presence: presence(e.id),
-        inProject: inProject.has(e.id),
-        cardId: here.get(e.id) ?? null,
-      })),
+    entities: model.entities.filter((e) => e.concept_id === c.id && isLogical(e)).map((e) => treeEntity(e, cap(e.stereotype))),
+  }));
+  const entityById = new Map(model.entities.map((e) => [e.id, e]));
+  const tabs = moduleTabs.map<TreeTab>((t) => ({
+    id: t.id,
+    name: t.name,
+    title: t.title,
+    creates: t.creates,
+    sections: t.sections.map((sec) => {
+      const meta = new Map(sec.entities.map((x) => [x.id, x.meta]));
+      const groups = model.concepts
+        .map<TreeConcept>((c) => ({
+          id: c.id,
+          version: c.version,
+          name: c.name,
+          color: c.color,
+          entities: model.entities.filter((e) => e.concept_id === c.id && meta.has(e.id)).map((e) => treeEntity(e, meta.get(e.id)!)),
+        }))
+        .filter((c) => c.entities.length > 0);
+      return { key: sec.key, title: sec.title, mark: sec.mark, empty: sec.empty, emptyCreate: sec.emptyCreate, concepts: groups, total: sec.entities.filter((x) => entityById.has(x.id)).length };
+    }),
   }));
 
   const openBySystem = new Map<Uuid, number>();
@@ -208,7 +256,7 @@ export function buildTree(
     };
   });
 
-  return { concepts, systems, requirements: reqs };
+  return { concepts, systems, requirements: reqs, tabs };
 }
 
 // ---- filtering (search, “Only on this canvas”) ----
@@ -299,9 +347,14 @@ export const conceptGroup = (conceptId: Uuid) => `model:${conceptId}`;
 export const systemGroup = (systemId: Uuid) => `src:${systemId}`;
 export const schemaGroup = (systemId: Uuid, schema: string) => `src:${systemId}/${schema}`;
 export const requirementGroup = (kind: RequirementKind) => `req:${kind}`;
+/** A module tab's group (`cube:fact`), and a concept inside it (`cube:fact:<concept>`; prototype `cubeTree`). */
+export const tabSectionGroup = (sectionKey: string) => sectionKey;
+export const tabConceptGroup = (sectionKey: string, conceptId: Uuid) => `${sectionKey}:${conceptId}`;
 
 /** Every group key of a tab, for collapse all and expand all. */
-export function allGroups(tree: TreeData, tab: "model" | "sources" | "requirements"): string[] {
+export function allGroups(tree: TreeData, tab: string): string[] {
+  const moduleTab = tree.tabs.find((t) => t.id === tab);
+  if (moduleTab) return moduleTab.sections.flatMap((sec) => [tabSectionGroup(sec.key), ...sec.concepts.map((c) => tabConceptGroup(sec.key, c.id))]);
   if (tab === "model") return tree.concepts.map((c) => conceptGroup(c.id));
   if (tab === "requirements") return REQUIREMENT_KINDS.map(requirementGroup);
   return tree.systems.flatMap((s) => [systemGroup(s.id), ...s.schemas.map((sc) => schemaGroup(s.id, sc.name))]);

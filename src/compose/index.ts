@@ -3,3 +3,4 @@
 
 export { relationshipOneEnd } from "./model";
 export { STORE_SCHEMA, UNDO_TABLES } from "./tables";
+export { moduleEntityDependents, moduleView, type CreateActions } from "./view";

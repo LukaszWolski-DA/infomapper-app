@@ -1,6 +1,7 @@
 // The import wizard's state and the texts it derives (slice 7a, PRD items 20–27; prototype `W`, `canGo`, `footNote`,
 // `targetName`, and the review's `impact`). Pure functions over the page's data; the dialog is `import-wizard.tsx`.
 
+import { isLogical } from "@/domain/model/levels";
 import { applyPlan } from "@/domain/import/apply";
 import type { DdlTranslation } from "@/domain/import/ddl";
 import { materialize } from "@/domain/import/materialize";
@@ -124,8 +125,9 @@ export function planCoverage(model: ImportModel, plan: ImportPlan, data: Pick<Im
 
 /** Lookups the review's impact needs, built once per model. */
 export function impactIndex(data: Pick<ImportData, "model" | "requirements" | "requirementLinks">) {
-  const attribute = new Map(data.model.attributes.map((a) => [a.id, a]));
-  const entity = new Map(data.model.entities.map((e) => [e.id, e]));
+  // the logical model only (slice 15a, Q4): a source never maps to a fact or a dimension
+  const entity = new Map(data.model.entities.filter(isLogical).map((e) => [e.id, e]));
+  const attribute = new Map(data.model.attributes.filter((a) => entity.has(a.entity_id)).map((a) => [a.id, a]));
   const mapping = new Map(data.model.mappings.map((m) => [m.id, m]));
   const keyOf = new Map(data.requirements.filter((r) => r.deleted_at === null).map((r) => [r.id, r.key]));
   // an attribute's requirements: linked to it, or to a mapping that fills it (its panel's Requirements section)

@@ -24,6 +24,9 @@
 
 import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
+import { useModules } from "@/app/_components/modules";
+import { isLogical } from "@/domain/model/levels";
+import type { EntityCreate } from "@/ui/modules";
 import { createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, pasteAttributeAction, swapRelationshipAction } from "@/app/_actions/model";
 import { attributeClipboard, useClippedAttribute } from "@/app/_components/attribute-clipboard";
 import { useAction } from "@/app/_components/use-action";
@@ -127,8 +130,10 @@ export function useCanvasHost({
     if (held && held.workspaceId !== workspaceId) attributeClipboard.set(null);
   }, [workspaceId]);
 
+  const modules = useModules();
+  /** "New entity here", or a module's create ("New fact here", slice 15a, E18): the same placement and focus. */
   const createEntityAt = useCallback(
-    async (at: { x: number; y: number }, name?: string) => {
+    async (at: { x: number; y: number }, name?: string, create?: EntityCreate) => {
       if (!editable) return;
       const concepts = [...ix.model.concepts].sort((a, b) => a.sort_order - b.sort_order);
       const last = panels.lastConcept();
@@ -140,13 +145,12 @@ export function useCanvasHost({
         toast("Create a concept first (left panel, New concept).");
         return;
       }
+      // with its height the new card joins the frame it lands in (slice 2b)
+      const placement = { canvasId, x: snap8(at.x), y: snap8(at.y), height: newCardHeight(0), frames: ui.frameRefs() };
       const result = await run(() =>
-        createEntityAction(workspaceId, {
-          conceptId: concept.id,
-          ...(name ? { name } : {}),
-          // with its height the new card joins the frame it lands in (slice 2b)
-          placement: { canvasId, x: snap8(at.x), y: snap8(at.y), height: newCardHeight(0), frames: ui.frameRefs() },
-        }),
+        create
+          ? (create.action(workspaceId, { conceptId: concept.id, placement }) as ReturnType<typeof createEntityAction>)
+          : createEntityAction(workspaceId, { conceptId: concept.id, ...(name ? { name } : {}), placement }),
       );
       if (!result.ok) return;
       panels.setLastConcept(concept.id);
@@ -366,7 +370,8 @@ export function useCanvasHost({
         },
       }));
     const name = query.trim();
-    if (name && !ix.model.entities.some((e) => e.name.toLowerCase() === name.toLowerCase())) {
+    // names are compared within one level (slice 15a, Q4): this creates a logical entity
+    if (name && !ix.model.entities.some((e) => isLogical(e) && e.name.toLowerCase() === name.toLowerCase())) {
       found.unshift({
         key: "new",
         label: `Create entity “${name}”`,
@@ -386,6 +391,8 @@ export function useCanvasHost({
       if (editable) {
         items.push({ search });
         items.push({ label: "New entity here", kbd: "E", act: () => void createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }) });
+        // a module's creates, after it (prototype: "New fact here", "New dimension here"; slice 15a, B-2)
+        for (const c of modules.creates) items.push({ label: c.here, act: () => void createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }, undefined, c) });
       }
       // a note here: its corner up-left of the click, as the prototype's “Add a note here”
       if (canNote) items.push({ label: "Add a note here", act: () => ui.newNote({ at: { x: req.at.x - 110, y: req.at.y - 20 } }) });

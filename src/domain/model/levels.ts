@@ -26,7 +26,7 @@ export const CROSS_LEVEL_RELATIONSHIP_MESSAGE =
   "Facts and dimensions relate to each other. To trace a fact to the logical model, map its attributes.";
 /** A paste of an attribute into an entity of the other level (O6). */
 export const CROSS_LEVEL_PASTE_MESSAGE =
-  "An attribute is pasted within one level only: a logical entity's into a logical entity, a fact's or dimension's into a fact or dimension.";
+  "An attribute can be pasted only within one level: logical into logical, fact or dimension into fact or dimension.";
 /** A write that changes an entity's level: no command does, so this is a guard. */
 export const LEVEL_CHANGE_MESSAGE = "An entity's level is set when it is created and never changes.";
 /** A stereotype on a fact or dimension, which has a role instead (C-5, Q4). */

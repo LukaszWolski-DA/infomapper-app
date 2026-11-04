@@ -152,3 +152,18 @@ describe("requirements on the project home (slice 4a, PRD item 30)", () => {
     expect(best(projectRequirements(index, [...items, ...cards], [ids.canvas2, ids.canvas1]))["REQ-101"]).toBe(ids.canvas2);
   });
 });
+
+describe("counts within the logical level (slice 15a, X-6, Q4)", () => {
+  // Customer is a fact here: its attributes leave the status bar's count, and both homes count logical entities only
+  const dims = { ...model, entities: [entity(ids.customer, { model_level: "dimensional" }), entity(ids.salesOrder)] };
+  const dix = indexModel(dims);
+
+  it("counts the mapped attributes of logical cards only in the status bar", () => {
+    expect(canvasStatus(dix, [ids.customer, ids.salesOrder])).toMatchObject({ attributes: 0, mapped: 0, mappings: 2 });
+  });
+
+  it("counts logical entities on the workspace home and the project home", () => {
+    expect(workspaceStats(dims).entities).toBe(1);
+    expect(projectStats(dims, items, [ids.canvas1, ids.canvas2])).toMatchObject({ entities: 1, attributes: 0 });
+  });
+});

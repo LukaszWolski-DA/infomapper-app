@@ -20,6 +20,7 @@ import type { SourceChange, WorkspaceModel } from "@/domain/types";
 import { buildCards, visibleRows, type CardData } from "./card-data";
 import { besideAnchor, besideSpots, cardHeight, contentBounds, EDGE_SPEED, edgePush, fitViewport, freeSpot, newCardHeight, stackSpot, typedZoom, zoomAround } from "./geometry";
 import { splitName } from "./names";
+import { lineNeedsClip, ROLE_MARK } from "./text-fit";
 
 // Customer (customer_id, email) and CRM customers (cust_id, email, first_name):
 // email → email fits; first_name varchar(50) → customer_id integer is a type problem; a deleted mapping is ignored.
@@ -332,5 +333,25 @@ describe("buildCards: the BK badge and the Keys filter read the Business key cla
   it("a renamed Business key keeps the badge; a removed one takes it away", () => {
     expect(source(withBk(builtins().map((c) => (c.code === "BK" ? { ...c, name: "Klucz biznesowy" } : c)))).rows[2]!.bk).toBe(true);
     expect(source(withBk(builtins().map((c) => (c.code === "BK" ? { ...c, deleted_at: NOW } : c)))).rows[2]!.bk).toBe(false);
+  });
+});
+
+describe("buildCards: a dimensional entity's role (slice 15a, B-3, D-67)", () => {
+  const role = { text: "Fact", title: "A fact: one row per its grain (InfoCube)", card: "dimn fact", mark: "cube" };
+  const withRole = buildCards(model, items, undefined, null, [], undefined, { [ids.customer]: role });
+
+  it("shows the role where the stereotype stands, with its classes; a card without a role is unchanged", () => {
+    const c = withRole.find((x) => x.name === "Customer")!;
+    expect([c.line1, c.role]).toEqual(["Fact", role]);
+    expect(card("Customer").role).toBeUndefined();
+    expect(card("Customer").line1).toBe("Object");
+  });
+
+  it("counts the mark's width when it decides whether the first line is clipped", () => {
+    // some width fits "Fact in Customer" without the mark, and not with it
+    const parts = ["Fact", "in Customer relationship management"];
+    const flips = Array.from({ length: 401 }, (_, i) => 200 + i).filter((w) => !lineNeedsClip(parts, "ent", w) && lineNeedsClip(parts, "ent", w, false, 0, 0, ROLE_MARK));
+    expect(flips.length).toBeGreaterThan(0);
+    expect(flips.length).toBeLessThanOrEqual(ROLE_MARK);
   });
 });

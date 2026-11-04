@@ -11,7 +11,8 @@ import { readPreference, writePreference } from "@/canvas/CanvasProvider";
 
 const LAST_CONCEPT_KEY = "infomapper:last-concept";
 
-export type LeftTab = "model" | "sources" | "requirements";
+/** InfoMapper's three tabs, or a module's tab by its id (slice 15a, E6). */
+export type LeftTab = "model" | "sources" | "requirements" | (string & {});
 
 interface PanelsApi {
   /** The left panel's open tab. */

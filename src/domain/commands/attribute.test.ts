@@ -428,7 +428,7 @@ describe("pasteAttribute within one level (slice 15a, O6)", () => {
   });
 
   it("refuses a paste across levels, both ways", () => {
-    const message = "An attribute is pasted within one level only: a logical entity's into a logical entity, a fact's or dimension's into a fact or dimension.";
+    const message = "An attribute can be pasted only within one level: logical into logical, fact or dimension into fact or dimension.";
     expect(paste(dimensional(salesOrder), logical(customer))).toMatchObject({ ok: false, error: { code: "invalid", message } });
     expect(paste(logical(salesOrder), dimensional(customer))).toMatchObject({ ok: false, error: { code: "invalid", message } });
   });

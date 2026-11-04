@@ -12,7 +12,7 @@ import { CanvasCardsCtx, DiagnosisCtx } from "./context";
 import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
 import { splitName } from "./names";
 import type { RequirementMark } from "./requirement-marks";
-import { lineNeedsClip } from "./text-fit";
+import { lineNeedsClip, ROLE_MARK } from "./text-fit";
 
 /**
  * `pinnedNotes`: the notes pinned to the card that are shown (slice 3a); `reqMark`: its requirement marker (slice 4b-1).
@@ -142,7 +142,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   // the open-notes mark takes room in the first line too (slice 3a): checked only on cards that have one
   const clipLine1 =
     card.clipLine1 ||
-    ((pinnedNotes > 0 || !!reqMark) && lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, card.width ?? undefined, !!card.labels, pinnedNotes, reqMark?.n ?? 0));
+    ((pinnedNotes > 0 || !!reqMark) && lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, card.width ?? undefined, !!card.labels, pinnedNotes, reqMark?.n ?? 0, card.role ? ROLE_MARK : 0));
 
   // A click on a row selects the row, anywhere else on the card the card; the card tools do their own thing.
   // Shift+click anywhere on the card puts the card in or out of a selection of several (slice 2a).
@@ -162,7 +162,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   return (
     <div
       onClick={onClick}
-      className={`card ${card.kind}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${card.clipName ? " clip-name" : ""}${clipLine1 ? " clip-l1" : ""}${card.liveLevel === "context" ? " ctx" : ""}`}
+      className={`card ${card.kind}${card.role ? ` ${card.role.card}` : ""}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${card.clipName ? " clip-name" : ""}${clipLine1 ? " clip-l1" : ""}${card.liveLevel === "context" ? " ctx" : ""}`}
       title={card.liveTitle ?? undefined}
       style={isEnt ? ({ "--cc": card.color ?? NO_CONCEPT_COLOR } as React.CSSProperties) : undefined}
       data-testid={isEnt ? "card-entity" : "card-source"}
@@ -176,7 +176,14 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
         <div className="c-l1">
           {isEnt ? (
             <>
-              <span className="stereo">{card.line1}</span>
+              {card.role ? (
+                // the role and its mark (a CSS mask, no element; slice 15a, AD-24)
+                <span className={`stereo role ${card.role.mark}`} title={card.role.title} data-testid="card-role">
+                  {card.line1}
+                </span>
+              ) : (
+                <span className="stereo">{card.line1}</span>
+              )}
               <span>{card.line1b}</span>
             </>
           ) : (

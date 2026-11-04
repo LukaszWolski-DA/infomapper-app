@@ -22,7 +22,7 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const { saveRow, pending } = useAction();
-  const [impact, setImpact] = useState<EntityImpact | null>(null);
+  const [impact, setImpact] = useState<(EntityImpact & { modules: [string, string][] }) | null>(null);
   // Read once per entity; the parent may re-render with a new onClose meanwhile.
   const refusal = useRef({ toast, onClose });
   useEffect(() => {
@@ -65,6 +65,8 @@ export function DeleteEntityDialog({ entity: e, onClose }: { entity: Entity; onC
         // slice 10c (F8): no row without copies
         ...(copiesRow ? [copiesRow] : []),
         [count(impact.projects.length, "project"), impact.projects.length ? impact.projects.map((x) => x.name).join(", ") : "–"],
+        // the modules' rows (slice 15a, X-1, X-4; prototype moduleDependents): a fact's or dimension's own
+        ...impact.modules,
       ]
     : [];
 

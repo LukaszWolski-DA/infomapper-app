@@ -10,6 +10,7 @@
 // mode off says how many uses of Data Vault classifications stay stored.
 
 import { DATA_VAULT_MODE_TEXT, dataVaultOffMessage } from "@/domain/model/classifications";
+import type { ReactNode } from "react";
 import type { DocLanguage } from "@/domain/types";
 import { updateWorkspaceSettingsAction } from "@/app/_actions/workspace";
 import { useAction } from "@/app/_components/use-action";
@@ -45,8 +46,11 @@ const SAVED_MESSAGE = (patch: Patch, dataVaultUses: number): string => {
 const fieldClass =
   "min-h-8 w-full rounded-md border border-im-line bg-im-surface px-2 py-1.5 disabled:opacity-60 disabled:cursor-default";
 
-/** `dataVaultUses`: the workspace's uses of Data Vault classifications (answer F16), for the mode-off message. */
-export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial: SettingsValues; editable: boolean; dataVaultUses?: number }) {
+/**
+ * `dataVaultUses`: the workspace's uses of Data Vault classifications (answer F16), for the mode-off message. `modules`:
+ * the modules' boxes after Data Vault 2.0 mode (slice 15a, O2), from the composition root.
+ */
+export function SettingsForm({ initial, editable, dataVaultUses = 0, modules }: { initial: SettingsValues; editable: boolean; dataVaultUses?: number; modules?: ReactNode }) {
   const { saveRow } = useAction();
   const toast = useToast();
 
@@ -144,6 +148,7 @@ export function SettingsForm({ initial, editable, dataVaultUses = 0 }: { initial
         <label className="flex items-center gap-2">
           <input type="checkbox" data-testid="checkbox-dv2" checked={dv2.value} disabled={dis} onChange={(e) => dv2.choose(e.currentTarget.checked)} /> Data Vault 2.0 mode
         </label>
+        {modules}
         <h4 className="m-0 mb-1 mt-4 text-[13.5px] font-semibold">Process</h4>
         <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">
           Four-eyes: the author of a change to a mapping or requirement cannot approve it. Every approval is logged

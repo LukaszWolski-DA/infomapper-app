@@ -13,7 +13,7 @@ import {
   sourceTable,
 } from "@/domain/__fixtures__/domain";
 import type { WorkspaceModel } from "@/domain/types";
-import { attributeLabel, businessKeyHint, fedEntities, mappingsOfColumn, columnLabel, columnOptions, feedingSources, indexModel, inputsLabel, targetPosition, typeCheckOf } from "./model-index";
+import { attributeLabel, attributeOptions, businessKeyHint, fedEntities, mappingsOfColumn, columnLabel, columnOptions, feedingSources, indexModel, inputsLabel, targetPosition, typeCheckOf } from "./model-index";
 
 // Customer.email ← customer.email (fits); Customer.customer_id ← customer.cust_id (BK column) and customer.first_name
 // as a transform without a rule: first_name varchar(50) does not fit integer.
@@ -92,5 +92,13 @@ describe("targetPosition (attribute order, D-36)", () => {
     expect(targetPosition(0, 5, "up")).toBeNull();
     expect(targetPosition(4, 5, "bottom")).toBeNull();
     expect(targetPosition(-1, 5, "up")).toBeNull();
+  });
+});
+
+describe("attribute pickers within the logical level (slice 15a, Q4, F13)", () => {
+  it("offers a logical entity's attributes, never a fact's or a dimension's", () => {
+    expect(attributeOptions(ix, new Set([ids.customer])).map((g) => g.label)).toEqual(["Customer"]);
+    const dims = indexModel({ ...model, entities: [entity(ids.customer, { model_level: "dimensional" })] });
+    expect(attributeOptions(dims, new Set([ids.customer]))).toEqual([]);
   });
 });
