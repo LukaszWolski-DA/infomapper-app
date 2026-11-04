@@ -356,6 +356,8 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
       to_min: toMin,
       to_max: "n",
       description: null,
+      from_role: null,
+      to_role: null,
     });
   }
 

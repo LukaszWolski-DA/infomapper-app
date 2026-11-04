@@ -16,7 +16,7 @@ import type { WorkspaceAccess } from "@/domain/permissions";
 import type { DataStore } from "../ports";
 import { seedDevData } from "./dev-data";
 import { readDb } from "./file";
-import { findViolation } from "./schema";
+import { DEV_DB_FORMAT, findViolation } from "./schema";
 import { buildSeed, SEED_IDS } from "./seed";
 import { seedId } from "./seed-model";
 import { createLocalDataStore } from "./store";
@@ -242,6 +242,6 @@ describe("file format", () => {
     await writeFile(file, JSON.stringify(old), "utf8");
     expect(await store.labels.list(RETAIL)).toEqual([]);
     expect(await store.notes.list(RETAIL)).toEqual([]);
-    expect((await readDb(file)).format).toBe(12);
+    expect((await readDb(file)).format).toBe(DEV_DB_FORMAT);
   });
 });

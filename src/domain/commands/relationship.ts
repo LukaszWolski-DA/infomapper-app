@@ -59,6 +59,8 @@ export function createRelationship(
     to_min: 0,
     to_max: "n",
     description: null,
+    from_role: null,
+    to_role: null,
   };
   return done(ctx, access, { relationship }, [{ kind: "insert", table: "relationship", row: relationship }]);
 }

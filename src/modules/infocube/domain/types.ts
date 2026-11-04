@@ -37,10 +37,22 @@ export interface CubeMeasure extends StandardColumns {
   semi_note: string | null;
 }
 
+/**
+ * A key link (slice 15b, role-playing RP-B): this relationship between a fact and a dimension is carried by this
+ * attribute of the fact. One link per relationship and one per attribute among live rows. Picked or added, never
+ * matched by name (RP-C). While its attribute is no foreign key the link is inactive: read as absent, kept, back when
+ * the flag is (R3).
+ */
+export interface CubeKey extends StandardColumns {
+  relationship_id: Uuid;
+  attribute_id: Uuid;
+}
+
 /** InfoCube's tables with their row types. */
 export interface InfoCubeRows {
   cube_entity: CubeEntity;
   cube_measure: CubeMeasure;
+  cube_key: CubeKey;
 }
 export type InfoCubeTable = keyof InfoCubeRows;
 

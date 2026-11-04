@@ -91,6 +91,8 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
         "organization_access", "organization_licence",
         // slice 15a: InfoCube's tables, through the composition root (AD-33)
         "cube_entity", "cube_measure",
+        // slice 15b: the key links (role-playing)
+        "cube_key",
       ].sort(),
     );
     for (const t of NOT_IN_DOMAIN_YET) expect(tables.map((x) => x.table)).not.toContain(t);

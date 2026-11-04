@@ -187,6 +187,12 @@ export interface Relationship extends StandardColumns {
   to_min: CardinalityMin;
   to_max: CardinalityMax;
   description: string | null;
+  /**
+   * A role name for each end (slice 15b, D-68): what the entity at that end is in this relationship ("Ship date",
+   * "billing"). Any relationship, any level; trimmed, null when not named. InfoCube reads the role at a dimension's end.
+   */
+  from_role: string | null;
+  to_role: string | null;
 }
 
 // ---- Sources (data model section 5) ----

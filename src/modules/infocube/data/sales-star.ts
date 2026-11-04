@@ -3,14 +3,15 @@
 // facts, the canvas "Sales star" in Order management, InfoMate's licence and InfoCube on in "Retail Co – DWH".
 //
 // A step for the development file (`npm run seed`, `npm run reset-dev-data`) and slice 15's specs only: earlier specs'
-// data has no InfoCube data and no licence, so their counts and the element guard stay as they were. Measures and
-// dimensional mappings come with 15b and 15c, REQ-210 with 15d.
+// data has no InfoCube data and no licence, so their counts and the element guard stay as they were. Since slice 15b
+// the facts' measures, Dim Date's roles (Order date, and Ship date with `ship_date_key`, RP-F) and every relationship's
+// key link; dimensional mappings come with 15c, REQ-210 with 15d.
 
 import { seedId } from "@/data/local/seed-model";
 import type { DevDb } from "@/data/local/schema";
 import type { Uuid } from "@/domain/ids";
 import { DEFAULT_CANVAS_LOOK, type Attribute, type CanvasItem, type LogicalType } from "@/domain/types";
-import type { CubeEntity, CubeRole, ScdType } from "../domain/types";
+import type { Additivity, CubeEntity, CubeRole, ScdType } from "../domain/types";
 import type { InfoCubeDb } from "./tables";
 
 /** The seed's fixed ids this step reads (`SEED_IDS` in `src/data/local/seed.ts`, which this module may not import). */
@@ -31,20 +32,36 @@ const STAR: [key: string, concept: string, name: string, role: CubeRole, definit
 ];
 
 const ATTRIBUTES: Record<string, [name: string, type: LogicalType, flags?: "PK" | "FK"][]> = {
-  sales: [["date_key", "integer", "FK"], ["customer_key", "integer", "FK"], ["product_key", "integer", "FK"], ["order_number", "string"], ["quantity", "integer"], ["unit_price", "decimal"], ["discount_pct", "decimal"], ["net_amount", "decimal"]],
+  sales: [["date_key", "integer", "FK"], ["ship_date_key", "integer", "FK"], ["customer_key", "integer", "FK"], ["product_key", "integer", "FK"], ["order_number", "string"], ["quantity", "integer"], ["unit_price", "decimal"], ["discount_pct", "decimal"], ["net_amount", "decimal"]],
   cust: [["customer_key", "integer", "PK"], ["customer_number", "string"], ["segment_code", "string"], ["city", "string"], ["country_name", "string"]],
   prod: [["product_key", "integer", "PK"], ["sku", "string"], ["product_name", "string"], ["category_code", "string"]],
   date: [["date_key", "integer", "PK"], ["calendar_date", "date"], ["year", "integer"], ["month", "integer"], ["day_of_week", "string"]],
   orders: [["date_key", "integer", "FK"], ["customer_key", "integer", "FK"], ["order_number", "string"], ["total_amount", "decimal"], ["line_count", "integer"]],
 };
 
-/** Each dimension's relationships to the facts: the dimension is the 1..1 end (D-67). */
-const RELATIONSHIPS: [dimension: string, fact: string, label: string][] = [
-  ["cust", "sales", "describes"],
-  ["prod", "sales", "describes"],
-  ["date", "sales", "dates"],
-  ["cust", "orders", "describes"],
-  ["date", "orders", "dates"],
+/**
+ * Each dimension's relationships to the facts: the dimension is the 1..1 end (D-67). Slice 15b (role-playing RP-F): Dim
+ * Date plays Order date and Ship date in Fact Sales and Order date in Fact Orders, its role at its own end; each
+ * relationship is carried by the fact's key named here, linked explicitly (RP-C: never matched by name). The second
+ * Fact Sales – Dim Date relationship has a key of its own in the ids (`:ship`).
+ */
+const RELATIONSHIPS: [dimension: string, fact: string, label: string, role: string | null, key: string, id?: string][] = [
+  ["cust", "sales", "describes", null, "customer_key"],
+  ["prod", "sales", "describes", null, "product_key"],
+  ["date", "sales", "dates", "Order date", "date_key"],
+  ["date", "sales", "dates", "Ship date", "ship_date_key", "ship"],
+  ["cust", "orders", "describes", null, "customer_key"],
+  ["date", "orders", "dates", "Order date", "date_key"],
+];
+
+/** The facts' measures and their additivity, as the prototype's demo (`cubeDemo`, `cubeDemoV2`); slice 15b. */
+const MEASURES: [fact: string, attribute: string, additivity: Additivity][] = [
+  ["sales", "quantity", "additive"],
+  ["sales", "unit_price", "non"],
+  ["sales", "discount_pct", "non"],
+  ["sales", "net_amount", "additive"],
+  ["orders", "total_amount", "additive"],
+  ["orders", "line_count", "additive"],
 ];
 
 /** The prototype's positions on "Sales star": the logical model on the left, the star on the right. */
@@ -76,7 +93,8 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
   if (!["customer", "address", "order", "line", "product", "country"].every((k) => db.entity.some((e) => e.id === model(`entity:${k}`)))) return false;
   const std = (key: string) => ({ id: id(key), workspace_id: ws, version: 1, created_at: at, created_by: t.authorId, updated_at: at, updated_by: t.authorId, deleted_at: null });
   const cubeEntities = (db.cube_entity ??= []);
-  db.cube_measure ??= [];
+  const cubeMeasures = (db.cube_measure ??= []);
+  const cubeKeys = (db.cube_key ??= []);
 
   for (const [key, concept, name, role, definition, grain, scd] of STAR) {
     db.entity.push({
@@ -116,9 +134,14 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
     cubeEntities.push(cube);
   }
 
-  for (const [dimension, fact, label] of RELATIONSHIPS) {
+  for (const [fact, attr, additivity] of MEASURES) {
+    cubeMeasures.push({ ...std(`cube-measure:${fact}.${attr}`), attribute_id: id(`attribute:${fact}.${attr}`), additivity, semi_note: null });
+  }
+
+  for (const [dimension, fact, label, role, key, variant] of RELATIONSHIPS) {
+    const relationship = `relationship:${dimension}>${fact}${variant ? `:${variant}` : ""}`;
     db.relationship.push({
-      ...std(`relationship:${dimension}>${fact}`),
+      ...std(relationship),
       from_entity_id: id(`entity:${dimension}`),
       to_entity_id: id(`entity:${fact}`),
       label,
@@ -127,7 +150,10 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
       to_min: 0,
       to_max: "n",
       description: null,
+      from_role: role,
+      to_role: null,
     });
+    cubeKeys.push({ ...std(`cube-key:${relationship}`), relationship_id: id(relationship), attribute_id: id(`attribute:${fact}.${key}`) });
   }
 
   const canvasId = salesStarCanvasId(ws);

@@ -9,11 +9,11 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { moduleEntityDependents, moduleView, STORE_SCHEMA } from "@/compose";
 import { addModuleDemoData } from "@/compose/seed";
 import { resetDevData } from "@/data/local/dev-data";
-import { readDb, writeDb } from "@/data/local/file";
+import { readDb } from "@/data/local/file";
 import { findViolation, type DevDb } from "@/data/local/schema";
 import { buildSeed, SEED_IDS } from "@/data/local/seed";
 import { createLocalDataStore } from "@/data/local/store";
-import { starId } from "@/modules/infocube/data/sales-star";
+import type { InfoCubeDb } from "@/modules/infocube/data/tables";
 
 const WS = SEED_IDS.wsRetailDwh;
 const ACTIONS = { fact: async () => ({ ok: false as const, message: "" }), dimension: async () => ({ ok: false as const, message: "" }) };
@@ -28,8 +28,8 @@ describe("the Sales star (O5)", () => {
     expect(db.change_event.length).toBe(events);
   });
 
-  it("adds five dimensional entities with their roles, five relationships, the canvas, the licence and the switch, once", () => {
-    const db = buildSeed() as DevDb & { cube_entity?: { entity_id: string; role: string; grain: string | null; scd_type: number | null }[] };
+  it("adds five dimensional entities with their roles, six relationships with their roles and keys, the measures, the canvas, the licence and the switch, once", () => {
+    const db = buildSeed() as DevDb & Partial<InfoCubeDb>;
     addModuleDemoData(db);
     expect(addModuleDemoData(db)).toBe(false);
     const dims = db.entity.filter((e) => e.workspace_id === WS && e.model_level === "dimensional").map((e) => e.name);
@@ -42,11 +42,37 @@ describe("the Sales star (O5)", () => {
       ["Fact Orders", "fact", "One sales order", null],
     ]);
     const fact = named(db, "Fact Sales");
-    // every dimension is the 1..1 end of its relationships to the facts (D-67)
-    expect(db.relationship.filter((r) => r.to_entity_id === fact.id).map((r) => [db.entity.find((e) => e.id === r.from_entity_id)!.name, r.from_max, r.to_max])).toEqual([
-      ["Dim Customer", "1", "n"],
-      ["Dim Product", "1", "n"],
-      ["Dim Date", "1", "n"],
+    // every dimension is the 1..1 end of its relationships to the facts (D-67); slice 15b: Dim Date plays two roles in
+    // Fact Sales, each relationship carried by its own key, linked explicitly (RP-F, RP-C)
+    const name = (id: string) => db.entity.find((e) => e.id === id)?.name ?? db.attribute.find((a) => a.id === id)?.name;
+    const keyOf = (relationshipId: string) => name(db.cube_key!.find((k) => k.relationship_id === relationshipId && k.deleted_at === null)!.attribute_id);
+    expect(db.relationship.filter((r) => r.to_entity_id === fact.id).map((r) => [name(r.from_entity_id), r.from_max, r.to_max, r.from_role, r.to_role, keyOf(r.id)])).toEqual([
+      ["Dim Customer", "1", "n", null, null, "customer_key"],
+      ["Dim Product", "1", "n", null, null, "product_key"],
+      ["Dim Date", "1", "n", "Order date", null, "date_key"],
+      ["Dim Date", "1", "n", "Ship date", null, "ship_date_key"],
+    ]);
+    const orders = named(db, "Fact Orders");
+    expect(db.relationship.filter((r) => r.to_entity_id === orders.id).map((r) => [name(r.from_entity_id), r.from_role, keyOf(r.id)])).toEqual([
+      ["Dim Customer", null, "customer_key"],
+      ["Dim Date", "Order date", "date_key"],
+    ]);
+    expect(db.cube_key).toHaveLength(6);
+    // the key attributes are the facts' foreign keys, ship_date_key right after date_key
+    expect(db.attribute.filter((a) => a.entity_id === fact.id).sort((x, y) => x.sort_order - y.sort_order).map((a) => [a.name, a.is_foreign_key]).slice(0, 4)).toEqual([
+      ["date_key", true],
+      ["ship_date_key", true],
+      ["customer_key", true],
+      ["product_key", true],
+    ]);
+    // the facts' measures (prototype cubeDemo, cubeDemoV2)
+    expect(db.cube_measure!.map((m) => [name(m.attribute_id), m.additivity, m.semi_note])).toEqual([
+      ["quantity", "additive", null],
+      ["unit_price", "non", null],
+      ["discount_pct", "non", null],
+      ["net_amount", "additive", null],
+      ["total_amount", "additive", null],
+      ["line_count", "additive", null],
     ]);
     const canvas = db.canvas.find((c) => c.name === "Sales star")!;
     expect(db.project_canvas.find((l) => l.canvas_id === canvas.id)?.project_id).toBe(SEED_IDS.projOrderManagement);
@@ -99,18 +125,20 @@ describe("the pages' module view from the star (E6, E7, E13)", () => {
   });
 
   it("lists a dimension's own rows in its delete preview, each fact once (X-4)", async () => {
-    // a second relationship between Dim Date and Fact Sales: the fact is still listed once
+    // the star has two relationships between Dim Date and Fact Sales (Order date, Ship date; slice 15b): the fact is
+    // listed once
     const db = await readDb(file);
-    const rel = db.relationship.find((r) => r.id === starId(WS, "relationship:date>sales"))!;
-    db.relationship.push({ ...rel, id: starId(WS, "relationship:date>sales#2"), label: "ships" });
-    await writeDb(file, db);
+    expect(db.relationship.filter((r) => r.from_entity_id === named(db, "Dim Date").id && r.to_entity_id === named(db, "Fact Sales").id)).toHaveLength(2);
     const store = createLocalDataStore(file, STORE_SCHEMA);
     const model = await store.model.load(WS);
     expect(await moduleEntityDependents(store, WS, named(db, "Dim Date").id, model)).toEqual([
       ["Dimension", "SCD type 0 deleted"],
       ["2 facts", "lose this dimension: Fact Sales, Fact Orders"],
     ]);
-    expect(await moduleEntityDependents(store, WS, named(db, "Fact Sales").id, model)).toEqual([["Fact", "its grain (“One order line”) deleted"]]);
+    expect(await moduleEntityDependents(store, WS, named(db, "Fact Sales").id, model)).toEqual([
+      ["Fact", "its grain (“One order line”) deleted"],
+      ["4 measures", "deleted"],
+    ]);
     expect(await moduleEntityDependents(store, WS, named(db, "Customer").id, model)).toEqual([]);
   });
 });
