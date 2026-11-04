@@ -1163,3 +1163,15 @@ the app first reads it (every entity logical, every workspace off, no licence; a
 
 **After:** KB keeps the licence and the switch off; the model is as before step 3, apart from the change events of the
 session. If anything is not as expected, KB can be restored from the fresh backup.
+
+### Checks (4 November 2026)
+
+- `npm run lint` and `npm run typecheck`: clean.
+- `npm test`: 133 files, 1,671 tests passed (four new: the mapping refusal in `levels.test.ts` three times, the change to
+  resolve's "Map to an attribute" in `source-changes/actions.test.ts`).
+- `e2e/slice-15a/S15-mapping.spec.ts` alone: passed.
+- **Full e2e run** (`npm run e2e`, from scratch, no dev server running; 16:43 to 18:13): 565 passed, 3 skipped (the
+  on-demand specs), none failed, none flaky; 89 min 25 s. Part 1 (fixes to slice-02c) 22 min 38 s, part 2 (slice-03a
+  to slice-06b) 22 min 28 s, part 3 (slice-07a to slice-09) 19 min 12 s, part 4 (slice-10a to slice-15a) 25 min 7 s.
+  Log: `.data/e2e-15a-step5.log`.
+- Before the merge: two full runs in a row (CLAUDE.md).
