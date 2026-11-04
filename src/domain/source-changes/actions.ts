@@ -13,6 +13,7 @@ import { nextVersion, newRowColumns, type CommandContext } from "../changes";
 import { domainError, notFound, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { rewriteRule } from "../import/plan";
+import { mappingTargetRefusal } from "../model/levels";
 import { afterContentChange, checkFourEyes } from "../model/mapping-rules";
 import { formatColumnType } from "../model/type-check";
 import type { Attribute, Entity, Mapping, MappingInput, SourceChange, SourceColumn, SourceTable, Workspace } from "../types";
@@ -232,6 +233,8 @@ export function mapToAttribute(ctx: CommandContext, rows: ChangeActionRows, chan
   if (!column) return { ok: false, error: notFound("source column") };
   const attribute = live(rows.attributes).find((a) => a.id === attributeId);
   if (!attribute) return { ok: false, error: notFound("attribute") };
+  const level = mappingTargetRefusal(live(rows.entities).find((e) => e.id === attribute.entity_id));
+  if (level) return { ok: false, error: level };
   if (mappingsReading(rows, column.id).some((m) => m.mapping.attribute_id === attributeId)) return refuse("That mapping already exists.");
   const mapping: Mapping = {
     ...newRowColumns(ctx),

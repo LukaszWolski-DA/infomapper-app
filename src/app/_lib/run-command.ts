@@ -8,7 +8,7 @@ import { completeLiveWrites, touchesLiveCanvases, type LiveOutcome } from "@/dom
 import { CONTEXT_LABEL_GONE, contextTargets } from "@/domain/model/live";
 import { cascadingModuleTables, moduleCascade } from "@/domain/commands/module-cascade";
 import { isUndoable } from "@/domain/commands/undo";
-import { levelWritesRefusal, writesEntities } from "@/domain/model/levels";
+import { levelWritesRefusal, mappingWritesRefusal, writesEntities, writesMappingTargets } from "@/domain/model/levels";
 import type { DomainErrorCode } from "@/domain/errors";
 import { ACCOUNT_EXISTS_MESSAGE } from "@/domain/commands/organization";
 import { uuidv7 } from "@/domain/ids";
@@ -175,12 +175,20 @@ export async function withLiveCanvases(
 }
 
 /**
- * The level rules (slice 15a, C-7, `levelWritesRefusal`) on any command's writes: read the workspace only when the writes
- * touch an entity, as it stands after them (a settings write carries its new row).
+ * The level rules (slice 15a, C-7, `levelWritesRefusal`; a mapping's target, `mappingWritesRefusal`) on any command's
+ * writes: read the model only when the writes add or retarget a mapping, the workspace only when they touch an entity,
+ * as it stands after them (a settings write carries its new row).
  */
 async function levelRefusal(store: DataStore, writeSet: WriteSet) {
   const workspaceId = writeSet.events[0]?.workspace_id;
-  if (!workspaceId || !writesEntities(writeSet.writes)) return null;
+  if (!workspaceId) return null;
+  if (writesMappingTargets(writeSet.writes)) {
+    // a mapping's target is a logical attribute (slice 15a step 5, B-6's refusal): whatever command added the mapping
+    const model = await store.model.load(workspaceId);
+    const refusal = mappingWritesRefusal(writeSet.writes, model.entities, model.attributes);
+    if (refusal) return refusal;
+  }
+  if (!writesEntities(writeSet.writes)) return null;
   const written = writeSet.writes.find((w) => w.table === "workspace");
   const workspace = written ? ((written as { row: Workspace }).row) : await store.workspaces.get(workspaceId);
   return workspace ? levelWritesRefusal(workspace, writeSet.writes) : null;

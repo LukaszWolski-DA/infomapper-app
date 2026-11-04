@@ -7,7 +7,7 @@
 
 import { domainError, type DomainError } from "../errors";
 import type { Write } from "../changes";
-import type { Entity, ModelLevel, Workspace } from "../types";
+import type { Attribute, Entity, Mapping, ModelLevel, Workspace } from "../types";
 
 export const isLogical = (e: Pick<Entity, "model_level">): boolean => e.model_level === "logical";
 export const isDimensional = (e: Pick<Entity, "model_level">): boolean => e.model_level === "dimensional";
@@ -31,6 +31,41 @@ export const CROSS_LEVEL_PASTE_MESSAGE =
 export const LEVEL_CHANGE_MESSAGE = "An entity's level is set when it is created and never changes.";
 /** A stereotype on a fact or dimension, which has a role instead (C-5, Q4). */
 export const DIMENSIONAL_STEREOTYPE_MESSAGE = "A fact or dimension has a role, not a stereotype.";
+
+/** A source column mapped to a fact's or a dimension's attribute (B-6's refusal, the prototype's text; slice 15a step 5). */
+export const MAPPING_TO_DIMENSIONAL_MESSAGE =
+  "Source columns map to the logical model. Map the column to a logical attribute, then that attribute to the fact or dimension.";
+
+export const mappingToDimensional = (): DomainError => domainError("invalid", MAPPING_TO_DIMENSIONAL_MESSAGE);
+
+/** A mapping's target must be a logical attribute: the refusal when its entity is a fact or a dimension. */
+export const mappingTargetRefusal = (entity: Pick<Entity, "model_level"> | null | undefined): DomainError | null =>
+  entity && isDimensional(entity) ? mappingToDimensional() : null;
+
+/** Whether a write set adds a mapping or points one at another attribute: only then is `mappingWritesRefusal` read. */
+export const writesMappingTargets = (writes: readonly Write[]): boolean =>
+  writes.some((w) => w.table === "mapping" && (w.kind === "insert" || (w.kind === "update" && (w.before as Mapping).attribute_id !== (w.row as Mapping).attribute_id)));
+
+/**
+ * The guard on any write set (runCommand): no mapping is added or pointed at an attribute of a fact or a dimension,
+ * whatever command built it. `entities` and `attributes` are the model as stored; attributes the writes insert count too.
+ */
+export function mappingWritesRefusal(writes: readonly Write[], entities: readonly Entity[], attributes: readonly Attribute[]): DomainError | null {
+  if (!writesMappingTargets(writes)) return null;
+  const entityOf = new Map(attributes.map((a) => [a.id, a.entity_id]));
+  for (const w of writes) if (w.table === "attribute") entityOf.set((w.row as Attribute).id, (w.row as Attribute).entity_id);
+  const levelOfEntity = new Map(entities.map((e) => [e.id, e]));
+  for (const w of writes) if (w.table === "entity") levelOfEntity.set((w.row as Entity).id, w.row as Entity);
+  for (const w of writes) {
+    if (w.table !== "mapping") continue;
+    const row = w.row as Mapping;
+    if (w.kind === "update" && (w.before as Mapping).attribute_id === row.attribute_id) continue;
+    const entityId = entityOf.get(row.attribute_id);
+    const refusal = mappingTargetRefusal(entityId ? levelOfEntity.get(entityId) : undefined);
+    if (refusal) return refusal;
+  }
+  return null;
+}
 
 export const infocubeOff = (): DomainError => domainError("forbidden", INFOCUBE_OFF_MESSAGE);
 

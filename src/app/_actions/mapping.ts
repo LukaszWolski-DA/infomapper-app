@@ -69,6 +69,7 @@ export async function createMappingAction(
       access,
       {
         attribute: byId(model.attributes, input?.attributeId),
+        entity: byId(model.entities, byId(model.attributes, input?.attributeId)?.entity_id),
         column: byId(model.sourceColumns, input?.sourceColumnId),
         mappings: model.mappings,
         mappingInputs: model.mappingInputs,

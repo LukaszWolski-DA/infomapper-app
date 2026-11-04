@@ -8,7 +8,7 @@ import { domainError, notFound, type DomainError } from "../errors";
 import type { Uuid } from "../ids";
 import { indexOf } from "../model/classifications";
 import { attributePath, changesFollowed, COPIED_GONE, followOriginals, FOLLOWS_LOST_REFUSAL, FOLLOWS_REFUSAL } from "../model/copies";
-import { CROSS_LEVEL_PASTE_MESSAGE, sameLevel } from "../model/levels";
+import { CROSS_LEVEL_PASTE_MESSAGE, mappingTargetRefusal, sameLevel } from "../model/levels";
 import { plainTextPair } from "../model/plain-text";
 import { sanitizeRich } from "../model/rich-text";
 import { attributeNamedAfter } from "../model/mapping-choice";
@@ -373,6 +373,8 @@ export function createAttributeFromColumn(
   if (!entity.ok) return fail(entity.error);
   const column = found(state.column, access, sourceColumnId, "source column");
   if (!column.ok) return fail(column.error);
+  const level = mappingTargetRefusal(entity.row);
+  if (level) return fail(level);
   const siblings = state.attributes.filter((a) => isLive(a, workspaceId) && a.entity_id === entityId);
 
   const existing = attributeNamedAfter(siblings, column.row);
