@@ -676,3 +676,67 @@ O11 the numbers reserved, each entering at its sub-slice's closing; Q16 the key-
   `createdBy` for its "Created … by …" line). InfoCube's rows reach the page the same way.
 - **P2, P4, P5 and P6** are answered: P2 and P5 as the prototype, P4's undo as the prototype, P6 as InfoMapper's
   mappings (PRD section 8).
+
+## 15a step 2: the table registry, the model level, licences and InfoCube's tables (4 November 2026)
+
+Commits `158a8f0` (data, registry, migrations, format 12) and `2fe6c66` (lint rules for modules and the composition
+root), on `slice/15a-boundary-level-licence`.
+
+### What changed
+
+- **The registry (the risk's guard).** Undo's tables are `undoTables(modules)` (`src/domain/commands/undo.ts`): the
+  core's undoable tables, `OUTSIDE_UNDO` (people, organizations, licences, workspaces; a compile check that every core
+  table is in one of the two), and each module's tables with their parents, noun, defaults. The local adapter's rules are
+  `localSchema(moduleRules, undoable)` (`src/data/local/schema.ts`). `src/compose/tables.ts` fills both from typed
+  records over `ModuleTable` (a module table missing from either does not compile) and exports `UNDO_TABLES` and
+  `STORE_SCHEMA`, which `runCommand` and the undo action use. An unknown table is refused loudly: undo throws, the store
+  refuses before writing ("The store does not know the table …"), `findViolation` reports `unknown_table`.
+  `tests/table-registry.test.ts` fails when the migrations' tables and the schema's differ, or a table is neither in undo
+  nor outside it; it also checks that the empty registry equals the core (O1) and undoes and redoes a module row.
+- **The model level and licences:** `entity.model_level` (`logical`/`dimensional`, CHECK), `workspace.infocube`
+  (false), table `organization_licence` (unique live module per organization, CHECK on the module). Undo reads an old
+  image without `model_level` as logical (`IMAGE_DEFAULTS`).
+- **InfoCube's tables** in `src/modules/infocube/`: `cube_entity` (role, grain, SCD type; shape CHECK) and
+  `cube_measure` (additivity, note), their rules and undo parents; the module augments `WritableRows` by declaration
+  merging, so the core names no module table.
+- **Migrations** `20261104100000_model_level_and_licences.sql`, `20261104100100_infocube_entities.sql` (RLS on every
+  new table). The schema check (AD-31) reads `ComposedDb`: on a temporary Postgres "The schema matches the domain: 36
+  tables, 480 columns".
+- **Format 12** of the local file: entities logical, workspaces off, an empty `organization_licence`; no module table in
+  the file until a module writes one (`upgrade-12.test.ts`).
+- **Lint (S15-01):** module parts `infocube-<layer>` follow the layers' directions; no InfoMapper layer imports a module
+  or the composition root, only `src/app` imports `src/compose`; a module's domain part is pure (`tests/layer-rules.test.ts`).
+- `docs/data-model-v2.md`: `organization_licence`, `workspace.infocube`, `entity.model_level`, section 15 (modules).
+
+### Earlier tests changed, and why
+
+- The hard-coded format 11 became 12: `organization-store.test.ts`, `requirement-store.test.ts`, `upgrade-8.test.ts`,
+  `working-layer-store.test.ts`, `e2e/slice-07b/S7B-12.spec.ts`, `e2e/slice-07c/S7C-02.spec.ts`.
+- `upgrade-11.test.ts`: the file now goes on to format 12, so it compares with `DEV_DB_FORMAT`.
+- `frame.test.ts`: its `Rows` type maps `WorkspaceRows`, whose module keys are optional (`NonNullable`).
+- `tests/schema/compare-schema.test.ts`: the expected tables include the three new ones.
+- Row creators give `model_level: "logical"` and `infocube: false` (seeds, fixtures, `createEntity`, new workspaces).
+
+### KB
+
+Backed up before the branch's first run: `.data/backups/dev-db-20261104-0921.json` and `kb-model-latest.json`, both
+identical to `.data/dev-db.json` (format 11). Nothing on this branch has opened the KB file yet; the dev server's first
+read will upgrade it to 12.
+
+**main on a format-12 file:** `readDb` (main's `src/data/local/file.ts`) upgrades nothing and throws before writing:
+"… has format 12, expected 11. Run "npm run reset-dev-data"." It refuses, so the file is safe. The hint is the risk:
+`reset-dev-data` wipes the file and seeds it again without a backup, so following it on KB's file loses the model. The way
+back is the backup above. Proposal (an idea, `docs/ideas.md`): a newer format's message says "made by a newer branch;
+switch back to it or restore a backup" and never suggests the reset; no known-limitations entry needed, as main refuses.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: clean. `npm test`: 128 files, 1,618 tests passed.
+- Full e2e run (from scratch, 09:43–11:15): 555 passed, 3 skipped, 1 failed; total 91 min 57 s. Part 1: 24 min 58 s;
+  part 2: 23 min 53 s; part 3: 19 min 12 s; part 4: 23 min 54 s.
+- The failure: `S13-12` (canvas commits of a conflict against an own save): own save 0, conflict 6, where it expects
+  equal counts. The log and the trace are kept in `.data/e2e-15a-step2-failure/`. Run three times on its own: passed 3 of
+  3 (own save 3, conflict 3 each time). The failing run's sum is the same 6: the own save's fresh page committed late,
+  inside the conflict's window. A timing flake of the measurement under the full run's load, not a change of this step
+  (nothing on the canvas or the save path changed). Not recorded before; if it comes back, the spec should wait for the
+  own save's page to settle (`settledCommits`) before writing as Anna.

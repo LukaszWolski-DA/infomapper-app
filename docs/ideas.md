@@ -702,3 +702,10 @@ refusal's answer, and the project home needs the workspace's people (`workspaceP
 `clientHeight`) to decide whether "Show more" shows. It sits beside the canvas, which CLAUDE.md's rule "nothing above the
 canvas reads layout during a commit" covers. Decide from the text (lines and characters, as slice 13's conflict line
 does) or with a `ResizeObserver`, and check with a phase trace that a panel switch costs less.
+
+## A newer local file's message (slice 15a step 2)
+
+main's `readDb` refuses a file of a newer format with "… has format 12, expected 11. Run "npm run reset-dev-data"." The
+refusal keeps the file safe, but the hint wipes it without a backup: on Łukasz's KB file that loses his model. Say instead
+that a newer branch made the file and to switch back to it or restore a backup from `.data/backups/`, and never suggest
+the reset for a newer format (only for an older one no upgrade reaches).
