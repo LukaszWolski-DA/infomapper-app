@@ -26,7 +26,10 @@ follow the same rule: a note's text keeps its draft on the canvas, in its panel 
 saved" mark after a refusal; a frame's name has the conflict line (slice 14a, D-66). The canvas's own row saves on the
 same chain (its look, the names switch, a rename in its tab, its delete), a refused rename keeps the typed name in the
 tab with the conflict line, the change-to-resolve actions hold the panel saves of their change's tables, and a page
-with unsaved text asks the browser to warn before it is reloaded or closed (slice 14b, D-66).
+with unsaved text asks the browser to warn before it is reloaded or closed (slice 14b, D-66). InfoCube is the first
+module (slice 15a, AD-33 to AD-35): an organization's licence and a workspace's switch, facts and dimensions as entities
+of the dimensional level with a role, a Cube tab, relationships and paste within a level, and source columns mapped to
+logical attributes only.
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -78,6 +81,30 @@ tests/       repository-level checks outside the layers (e.g. the layer rules). 
 Imports go one way: `app` → `canvas` → `ui` → `domain`; `app` and `canvas` may also skip a step (e.g. `canvas` → `domain`);
 `app` → `data` → `domain`. `ui` never imports from `canvas`. `domain` imports nothing from the other layers.
 `npm run lint` enforces this (`eslint.config.mjs`).
+
+**Modules (AD-33, slice 15a).** A module's code is in `src/modules/<module>/` in the same five parts (`domain`, `data`,
+`ui`, `canvas`, `app`), each under its layer's rules; a module part may import InfoMapper's layers, **InfoMapper's layers
+never import a module** (lint, with probes in `tests/layer-rules.test.ts`). `src/compose/` is the **composition root**:
+the only code that names the modules, imported only by `src/app` (it may import `domain`, `data`, `ui`, `canvas` and the
+modules, never `app`). A module reaches InfoMapper only through these extension points:
+- **Tables:** the table registry (`src/compose/tables.ts`: `UNDO_TABLES`, `STORE_SCHEMA`, `ComposedDb`). The build fails
+  when a module's table is missing from undo, the local adapter's rules or the data file's shape;
+  `tests/table-registry.test.ts` (the guard test) checks every table the migrations create against them, and a table
+  that is not registered is refused loudly, never skipped. Read a module's table only through a store made with
+  `getDataStore(STORE_SCHEMA)` (the default store knows InfoMapper's tables only and throws).
+- **Cascades:** `moduleCascade` (`src/domain/commands/module-cascade.ts`, run by `runCommand`): a module's rows that
+  point to a deleted InfoMapper row go in the same change group; the parents are the ones the module registered for undo.
+- **Rules InfoMapper's commands take as arguments** (`src/compose/model.ts`, e.g. `relationshipOneEnd`) and the level
+  rules on every write set (`src/domain/model/levels.ts`: `levelWritesRefusal`, `mappingWritesRefusal`).
+- **Pages:** `ModuleView` (`src/ui/modules.ts`, built by `moduleView` in `src/compose/view.ts`): plain data and server
+  actions (an entity's role, left panel tabs, creates for the tab and the toolbox), handed down through
+  `ModulesProvider`, `buildTree` and `buildCards`; delete previews (`moduleEntityDependents`); the settings' boxes
+  (`settingsBoxes`); the module's CSS (`src/compose/styles.ts`); its demo data (`src/compose/seed.ts`).
+- Server actions a module's `app` part needs from InfoMapper live outside "use server" files (`src/app/_lib/model-command.ts`):
+  every export of a "use server" file is a server action. `CREATE_ACTIONS` is in `src/compose/actions.ts`, apart from
+  the index, so tests that import `@/compose` never load server-only code.
+- **A new module** adds its folder, its name to `modules` in `eslint.config.mjs`, its tables to the registry's three
+  records and a migration, and its pieces to `src/compose/`; InfoMapper's code does not change.
 
 **Writes (AD-23).**
 - Every write goes through the server (server actions or route handlers) and then through a `domain` command.
@@ -147,6 +174,8 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 ```
 npm run seed             # demo data into .data/dev-db.json (only if it does not exist yet)
 npm run reset-dev-data   # replace .data/dev-db.json with fresh demo data
+npm run demo             # the demo data with the Sales star in .data/demo-db.json (seeded if missing; -- --reset), on http://127.0.0.1:3001 beside npm run dev; never touches .data/dev-db.json
+npx tsx scripts/licence.ts grant "<organization name>" infocube [--file <db>]   # slice 15a: a module's licence in a local file (development only)
 npm run seed:large       # add the workspace "Performance test" (the spike's 100 cards, labels and notes; slice 4b-2: a second canvas with 12 requirement cards) to .data/dev-db.json
 npm run dev              # local app on http://localhost:3000; sign in at /sign-in by picking a test user
 npm run build            # production build (npm start serves it; no dev sign-in, no local data)
@@ -215,6 +244,8 @@ SCREENS=<folder> npx playwright test e2e/slice-14b/S14B-screens.spec.ts         
 npx tsx scripts/bench-source-hold.ts                          # slice 14b: holding a change's rows on the save chain, 20,000 columns (bar 20 ms; the whole source missed it)
 COMMITS=1 SIDE=branch npx playwright test e2e/slice-14a/S14A-13-commits.spec.ts           # slice 14a: canvas commits while a note is written, saved, refused, marked, dropped (dev server; the same file runs on slice-13 for an A/B)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-14a/S14A-13-layers.spec.ts # slice 14a: drawing layers with 20 notes without and with the mark (20 real refusals)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-15a/S15-layers.spec.ts       # slice 15a: layers and elements on the Sales star with and without roles
+SCREENS=<folder> npx playwright test e2e/slice-15a/S15A-screens.spec.ts                   # slice 15a: the star, the Cube tab, the Role, a delete preview, the InfoCube box; light and dark
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spec.ts      # slice 12b: both homes' load, three data sets; LABEL=<name> for an A/B run, LOADS=<n>, COLD=<n> first visits
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
@@ -383,6 +414,15 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
 
   Playwright dismisses a dialog it has no handler for: a spec that reloads or leaves a page with unsaved text (a refused
   draft, a kept draft of a closed panel, a save on its way) handles the `beforeunload` dialog (`S13-14`).
+
+  Slice 15a's fixtures add the Sales star (`addModuleDemoData`: InfoMate's licence, InfoCube on in "Retail Co – DWH",
+  the canvas "Sales star" with five facts and dimensions); `test.use({ star: false })` starts from the plain seed every
+  earlier spec uses. Its helpers do the following:
+  - read InfoCube's rows and the model through the composed store (`cubeStore`, `cubeEntities`, `liveEntityNamed`,
+    `workspaceRow`), and the star's ids and view (`STAR`, `starUrl`, `STAR_VIEW`, `entityIdOf`);
+  - read the settings' box (`settingsUrl`, `infocubeBox`, `infocubeCheck`) and a card's role (`roleOf`);
+  - run a domain command as a person without the page (`refusalAs`, `switchRefusal`), grant the licence as test data
+    (`grantLicence`) and delete an entity through its impact dialog (`deleteFromModel`).
 
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
@@ -575,6 +615,19 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - **F3:** nothing of the thumbnails goes into `loadProjectView` or the canvas page.
   - `NOTE_MINI` is in `src/ui/note-colors.ts` and `NO_CONCEPT_COLOR` in `src/domain/model/concept-colors.ts`, shared
     with the canvas.
+- **InfoCube** (slice 15a, AD-33 to AD-35):
+  - **The level** (`entity.model_level`, set on create, never changed) and its rules are InfoMapper's
+    (`src/domain/model/levels.ts`): relationships and paste within a level, names compared within a level, a mapping's
+    target a logical attribute, and while InfoCube is off nothing creates or brings back a dimensional entity (C-7 as
+    changed: it is turned off only without facts or dimensions; the local adapter counts again). The texts are there.
+  - **InfoMapper's lists and counts are logical only** (Q4): the Model tab, the stats, consistency, the import review,
+    the pickers; canvas tiles and tab counts count every card. **A later list or count that reads entities decides its
+    level** and says so in its PRD.
+  - **The role on a card** is `CardData.role` (`buildCards`' roles from `ModuleView`): the text where the stereotype
+    stands, the cube a CSS mask on `.stereo.role.cube::before`, a fact's edge a class (`dimn fact`); `withClips` counts
+    the mark's 14 px (`ROLE_MARK`). No element more (S15-layers).
+  - **The star** is written only by `npm run seed`, `npm run reset-dev-data`, `npm run demo` and slice 15a's fixtures,
+    never by the e2e reseed of earlier slices, so their specs and the element guard stay comparable.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a

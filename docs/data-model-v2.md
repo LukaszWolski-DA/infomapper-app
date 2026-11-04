@@ -141,8 +141,9 @@ value (`SECRET_COLUMNS` in `src/domain/changes.ts`).
 ### `organization_licence`
 An organization's licence for a module (slice 15a, C-7, AD-35): one live row per organization and module; ending the
 licence soft-deletes it. An organization's row, not a workspace's (no `workspace_id`, as `organization_access`). Outside
-undo. A module works in a workspace while the workspace's switch is on **and** its organization holds the licence; a
-licence that ends turns every workspace off without writing them. Granted in development by the seed (InfoMate) and a
+undo. A module is on in a workspace while the workspace's switch is on; the licence is read only when someone turns the
+switch on (Q6 as changed by Łukasz, 4 November 2026). Ending a licence is not a command yet
+(`docs/known-limitations.md`). Granted in development by the seed (InfoMate) and a
 script, never in the app (slice 15 PRD, section 8). Migration `20261104100000_model_level_and_licences.sql`; the local
 data file's format 12 gave every file an empty table.
 
@@ -412,7 +413,7 @@ It is a model object, independent of any canvas (D-02).
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
 | standard columns | | | |
-| `attribute_id` | uuid | no | FK `attribute`; an attribute can have several mappings (e.g. one per source system) |
+| `attribute_id` | uuid | no | FK `attribute`; an attribute can have several mappings (e.g. one per source system). Since slice 15a (step 5) a logical entity's attribute only: a mapping onto a fact's or a dimension's attribute is refused by the commands and by the guard on every write (`mappingWritesRefusal`); InfoCube's own mappings come with slice 15c (AD-36) |
 | `kind` | text | no | `direct` (copy one column) or `transform` (rule) |
 | `rule_expression` | text | yes | required when `kind = 'transform'`; code field, not rich text (D-42) |
 | `status` | text | no | `draft`, `review`, `approved` |

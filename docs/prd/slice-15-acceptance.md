@@ -1004,3 +1004,162 @@ It helps from this branch on: `main` still has the old text until 15a is merged.
   element and no layer (AD-24).
 - **Full e2e run** (`npm run e2e`, from scratch, no dev server running): 564 passed, 3 skipped, 94 min 33 s; part 1
   26 min 18 s, part 2 23 min 43 s, part 3 19 min 0 s, part 4 (slice-10a to slice-15a) 25 min 31 s. No failure.
+
+## Łukasz's answers after step 4 (4 November 2026)
+
+- Step 4 accepted; every new text approved as listed.
+- **A mapping's target:** a source column mapped to a dimensional attribute is refused in the domain now, with the
+  prototype's toast, so that no such mapping exists on `main` before 15c; dimmed targets and the rest of B-6 stay in 15c.
+- **A safe way to look at the Sales star** without touching KB: proposed and documented in this step.
+- **A collapsed frame's block without the role:** an entry in `docs/ideas.md`.
+- **Step 5 is measurement and closing** (the PRD's steps 5 and 6 in one).
+
+## 15a step 5: measurement and closing (4 November 2026)
+
+### What changed
+
+- **A mapping's target is a logical attribute** (`src/domain/model/levels.ts`): `MAPPING_TO_DIMENSIONAL_MESSAGE` is the
+  prototype's B-6 text, "Source columns map to the logical model. Map the column to a logical attribute, then that
+  attribute to the fact or dimension." (approved with step 4's list, as the prototype's).
+  - The commands refuse it: `createMapping` ("Add a source column"; its state carries the attribute's entity),
+    `createAttributeFromColumn` (a column dropped on a header, also onto an attribute of the column's name) and
+    `mapToAttribute` ("Map to an attribute" of a change to resolve).
+  - **The guard on every write set:** `runCommand` reads the model when a write set adds a mapping or points one at
+    another attribute (`writesMappingTargets`) and refuses it with the same text (`mappingWritesRefusal`; an attribute
+    the same writes insert counts). So a later command cannot add such a mapping by mistake. Undo needs no check: a
+    level never changes, so no stored mapping points at a dimensional attribute.
+  - Tests: `levels.test.ts` (3: the two commands, the guard), `actions.test.ts` (1: "Map to an attribute"),
+    `e2e/slice-15a/S15-mapping.spec.ts` (the toast through a fact's attribute panel; nothing written).
+- **`npm run demo`** (`scripts/demo.ts`): the demo data with the Sales star in `.data/demo-db.json` (seeded if missing,
+  `-- --reset` starts it over), served by a second dev server on **http://127.0.0.1:3001** beside `npm run dev`.
+  - It refuses `.data/dev-db.json` by name, builds into `.next-demo` (Next.js refuses a second dev server on one build
+    folder; git-ignored, in `tsconfig.json` and lint's ignores) and listens on 127.0.0.1 only: cookies are kept per host
+    name, so signing in there never replaces the session of http://localhost:3000.
+  - Any other command reads another file through the existing `INFOMAPPER_DEV_DB`
+    (`INFOMAPPER_DEV_DB=.data/demo-db.json npm run reset-dev-data` works too); `INFOMAPPER_DEMO_DB` names another demo file.
+  - Checked: the server started, the test users' list signed in, and "Sales star" showed its 11 cards; KB's file was
+    unchanged (1,565,772 bytes, 3 November 08:41). README's command table has the row.
+- **`docs/ideas.md`:** "A fact's or a dimension's role in a collapsed frame's block".
+
+### The page's bytes
+
+Measured as slice 10c's F20 and S12B-bytes count them: the canvas page's document as the server sends it (markup and
+RSC payload), fetched in the signed-in page, its size plain and gzipped, and the bytes of every `model_level` in it
+(`,\"model_level\":\"logical\"`, escaped in the payload). The dev server (`npm run dev` on copies), so the absolute sizes
+are a development build's; what the column adds is the same bytes in a production build. **KB was read from a raw copy
+only** (`cp`; the app never opened `.data/dev-db.json`), and the copy was deleted afterwards.
+
+| Page | Entities in the workspace | Document | gzip | `model_level` | its share | gzip share |
+| --- | --- | --- | --- | --- | --- | --- |
+| KB, Kanton Basel – LDM (InfoCube off) | 8 | 283,794 B | 31,838 B | 224 B (8 × 28) | 0.08 % | 15 B |
+| Sales star (InfoCube on, 6 logical + 5 dimensional) | 11 | 320,107 B | 34,988 B | 328 B | 0.10 % | 27 B |
+| Customer & orders, same workspace | 11 | 313,716 B | 35,334 B | 328 B | 0.10 % | 27 B |
+
+**What InfoCube adds besides the column** (A/B on the same copy: the five facts and dimensions made logical, their
+InfoCube rows deleted, InfoCube off, as `S15-layers` does; the same cards and lines):
+
+| Page | InfoCube on | Without | Difference | gzip difference |
+| --- | --- | --- | --- | --- |
+| Sales star | 320,107 B | 318,215 B | +1,892 B (0.6 %) | +539 B |
+| Customer & orders (no fact or dimension on it) | 313,716 B | 312,513 B | +1,203 B (0.4 %) | +465 B |
+
+- The five roles (a role's text, title, class and mark per entity), the Cube tab's rows and the two creates go with
+  every canvas page of a workspace with InfoCube on, also a canvas without facts or dimensions (`moduleView` reads the
+  whole model's roles; the tab lists the workspace's). On the star the cards' roles add the rest.
+- **The data file:** KB's raw copy upgraded by the app to format 12: 1,565,772 → 1,566,346 bytes (+574: 20 entities ×
+  24 bytes of `"model_level":"logical",`, 4 workspaces × 17 of `"infocube":false,`, and `"organization_licence":[],`);
+  every table's row count the same; every entity logical, every workspace off, no licence. This is a rehearsal of KB's
+  upgrade at the manual acceptance.
+- No bar was set (PRD section 6: measure, not gate). Nothing here needs a change.
+
+### The decisions' final text (for Łukasz's approval; not yet in `docs/decisions.md`)
+
+Each follows the PRD's proposal (section 10) and adds what 15a built. **D-67's first part** (O11: the roles and the
+level rule of relationships, built in 15a) is drafted too; Łukasz decides whether it enters now or with 15c.
+
+> **AD-33** InfoCube is a module of the one application (slice 15a). Its code lives in `src/modules/infocube/`, in
+> InfoMapper's five parts (domain, data, ui, canvas, app), each under its layer's rules; InfoMapper's layers never import
+> a module, and `npm run lint` checks it, with probes. `src/compose/` is the composition root: the only code that names
+> the modules, imported only by `src/app`. A module enters InfoMapper only through named extension points, each plain
+> data or a function the composition root hands over: its tables (the table registry: undo, the local adapter's rules and
+> the data file's shape; the build fails when a module's table is missing from one of them, and a guard test checks
+> every table the migrations create against them), the cascade of its rows when an InfoMapper row they point to is
+> deleted (same change group), rules InfoMapper's commands take as arguments, dependencies in delete previews, what a
+> page shows of it (a role per entity, left panel tabs, creates in a tab and the canvas's toolbox), a box in the
+> workspace settings, its stylesheet and its demo data. A module's tables point to InfoMapper's, never the other way.
+> With no module registered, InfoMapper behaves as before.
+
+> **AD-34** An entity has a model level, `logical` or `dimensional`, set when it is created and never changed; a write
+> that would change it is refused. Facts and dimensions are dimensional entities; their dimensional description (role,
+> grain, SCD type, measures) lives only in InfoCube's tables, which point to InfoMapper's. The model level is the one
+> InfoMapper column InfoCube needs. InfoMapper's rules read it: a relationship joins two entities of one level, an
+> attribute is pasted within one level, the duplicate-name warning compares within one level, and a source column maps
+> only to a logical attribute (dimensional attributes are fed from the logical model, AD-36). InfoMapper's lists and
+> counts are of the logical level (the Model tab, the homes' and the status bar's counts, model consistency, the import
+> review, the attribute pickers); canvas tiles and tab counts count every card.
+
+> **AD-35** Modules are licensed per organization and turned on per workspace by an owner or admin, off by default;
+> turning one on needs the organization's licence. A module is on when its workspace's switch is; the licence is read
+> only when it is turned on. A module is turned off only while the workspace has none of its objects, so turning it off
+> deletes nothing; while it is off, nothing creates or brings back one of its objects (a create, copy, paste, undo or
+> redo). The settings show the module's box to everyone; without the licence it says "{organization} has no InfoCube
+> licence." and its check box is disabled. Granting and ending a licence are not commands yet: in development a script
+> grants one. A workspace's copy stays in its organization and takes the module's switch and objects with it; a
+> transfer, or a copy into another organization, of a workspace with a module on is refused unless that organization
+> holds the module's licence ("{organization} has no InfoCube licence. Delete this workspace's facts and dimensions and
+> turn InfoCube off, or transfer it to an organization with the licence."); a workspace with the module off moves
+> freely.
+
+> **D-67** (first part, slice 15a) A dimensional entity has a role, Fact or Dimension, in place of the stereotype: on its
+> card where the stereotype stands, with a cube mark, a fact's card with a thicker left edge, and in its panel as Role.
+> A relationship joins two entities of the same level; between a fact and a dimension the dimension is at the one end.
+> The levels meet only through dimensional mappings, logical attribute(s) → dimensional attribute (15c). The left
+> panel's Cube tab lists facts, then dimensions, by concept, with New fact and New dimension; the Model tab lists logical
+> entities.
+
+### Docs changed in this step
+
+- `docs/data-model-v2.md`: `organization_licence` as Q6 changed it (on with the switch; the licence read when turned
+  on); `mapping.attribute_id` a logical entity's attribute only.
+- `docs/known-limitations.md`: the licence (with `npm run demo`); a workspace's copy and transfer not built; what 15a
+  leaves to 15b to 15d (the details panel's coverage, B-6's dimmed targets, a block's role, the page's roles on every
+  canvas).
+- `docs/inventory-prototype-vs-app.md`: a section InfoCube (missing, planned 15b to 15d; present; deliberate
+  differences) and its summary row.
+- `README.md`: the status line, 15a's sentence, the acceptance list, `npm run demo`, the licence script, the measuring
+  and screenshot specs.
+- `CLAUDE.md`: "What this is"; **Modules (AD-33)** under the architecture rules (the boundary, the composition root,
+  the table registry and its guard test, the extension points, server actions outside "use server" files, how a new
+  module is added); the commands; slice 15a's fixtures and helpers; an InfoCube note (the level, logical-only lists, the
+  role on a card, where the star is written).
+- `docs/decisions.md`: **not yet**, until Łukasz approves the text above.
+
+### 15a's definition of done: Łukasz's manual acceptance on KB
+
+**Before:** stop every dev server; back up KB (`.data/backups/dev-db-<yyyymmdd-hhmm>.json` and
+`.data/backups/kb-model-latest.json`). The newest backup, `dev-db-20261104-0921.json`, equals KB today (SHA-256
+`8a0d7c8f…`); a fresh one is taken right before the session in case KB changed. The branch upgrades KB to format 12 when
+the app first reads it (every entity logical, every workspace off, no licence; as rehearsed on the copy above).
+
+1. `npx tsx scripts/licence.ts grant "KB" infocube` (the organization's name as KB's file has it). Expected: "KB holds the
+   infocube licence now. Turn it on per workspace in its settings."
+2. `npm run dev`; sign in as Lukasz_KB; Kanton Basel → Settings: the InfoCube box says "Licensed for KB."; tick "Use
+   InfoCube in this workspace". Expected: the toast "InfoCube is on: facts and dimensions are in the Cube tab."
+3. Open a canvas (LDM); the left panel has the Cube tab. **Create a fact** (Cube tab → New fact, or the canvas's toolbox
+   → New fact here) and **a dimension** (New dimension). Expected: each card shows its role with the cube, the fact a
+   thicker left edge; the name is selected; the panel shows Role; each is one undo step.
+4. **Relate them:** draw a relationship between the fact and the dimension. Expected: it is made with the dimension at
+   the one end.
+5. **Relate a logical entity to the fact.** Expected: refused with "Facts and dimensions relate to each other. To trace
+   a fact to the logical model, map its attributes."
+6. **Turn InfoCube off** in Settings. Expected: refused under the check box with "InfoCube can be turned off only when
+   this workspace has no facts or dimensions. It has 2: delete them first."; the box stays ticked.
+7. **Delete both** (each from its panel, through the impact dialog: the fact's "Fact – deleted"; the dimension's
+   "Dimension – SCD type … deleted" and "1 fact – lose this dimension: …" if the fact is still there).
+8. **Turn InfoCube off.** Expected: "InfoCube is off."; the Cube tab and the toolbox's two items are gone.
+9. **Undo the delete** (the top bar's Undo, or Ctrl+Z on the canvas). Expected: refused with "InfoCube is off in this
+   workspace, so no fact or dimension can be added or brought back. An owner or admin can turn it on in the workspace
+   settings."; nothing comes back.
+
+**After:** KB keeps the licence and the switch off; the model is as before step 3, apart from the change events of the
+session. If anything is not as expected, KB can be restored from the fresh backup.
