@@ -702,3 +702,9 @@ refusal's answer, and the project home needs the workspace's people (`workspaceP
 `clientHeight`) to decide whether "Show more" shows. It sits beside the canvas, which CLAUDE.md's rule "nothing above the
 canvas reads layout during a commit" covers. Decide from the text (lines and characters, as slice 13's conflict line
 does) or with a `ResizeObserver`, and check with a phase trace that a panel switch costs less.
+
+## A fact's or a dimension's role in a collapsed frame's block (slice 15a, step 4, E8)
+
+- A collapsed frame lists its cards in a block (slice 2c). A fact or a dimension shows its name there like any entity,
+  without its role or the cube mark the card has. The block could show the role as the card's header does (one class on
+  the row, a CSS mask, no element more; `blockHeight` and the thumbnails unchanged). Łukasz, step 4: an idea for later.
