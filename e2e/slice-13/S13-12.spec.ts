@@ -5,6 +5,9 @@ import { asUser, attributeOf, canvasCommits, canvasUrl, conflictLine, FULL, hydr
 // S13-12 (PRD section 6, F19): typing in a panel field and pressing "Use this" add no canvas commit
 // (`window.__imCanvasCommits`, development); the conflict's fresh page, with its line, adds as many as the fresh page
 // of an own save of the same field (both rename the card's row). The counts are printed for the step's record.
+//   Slice 15a step 3: each count is read once its fresh page has arrived (the card's row shows the new name), then the
+// counter has settled. Under the full run's load the own save's page once arrived after the counter had been still for
+// half a second, so its commits were counted with the conflict's (own save 0, conflict 6).
 
 async function renameAsAnna(from: string, name: string) {
   const model = await loadModel();
@@ -31,6 +34,7 @@ test("S13-12: typing and Use this add no canvas commit; a conflict's fresh page 
   // an own save of the name: its fresh page renames the card's row
   await name.press("Enter");
   await expect.poll(async () => (await loadModel()).attributes.some((x) => x.name === "customer_id_twenty_characters_x")).toBe(true);
+  await expect(rowNamed(page, "Customer", "customer_id_twenty_characters_x")).toBeVisible();
   const saved = await settledCommits(page, canvasCommits);
 
   // a conflict on the same field: the refusal's fresh page renames the row to Anna's name, and the line shows
@@ -38,6 +42,7 @@ test("S13-12: typing and Use this add no canvas commit; a conflict's fresh page 
   await name.fill("customer_key");
   await name.press("Enter");
   await expect(conflictLine(panel)).toBeVisible();
+  await expect(rowNamed(page, "Customer", "customer_no")).toBeVisible();
   const conflicted = await settledCommits(page, canvasCommits);
 
   await useThis(panel).click();
