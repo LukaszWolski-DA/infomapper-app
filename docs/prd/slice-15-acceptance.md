@@ -2871,6 +2871,14 @@ own** with the current code (5 November 2026, 23:30): slice-01b 233 s (step 3: 2
 step 5's run: 445 s and 358 s). Machine load during the run, not a regression; S2C-03's sign-in timeout fits it (3/3 on
 its own).
 
+### Part 4's rerun (15c's run before the merge, with step 5's parts 1 to 3)
+
+`npm run e2e -- --part 4` after the two changes (5 November 2026, from 23:25): 210 passed, 2 skipped, none failed;
+35 min 36 s (step 3's part 4: 28 min 38 s, fewer specs). The 195 tests in both runs took 1,859 s against step 3's
+1,641 s (1.13×, within the 1.0× to 1.15× of the calm folders above); 15c's specs added since step 3 take about 200 s.
+With step 5's parts 1 to 3 (S2C-03 3/3 on its own, a flake) this is 15c's full run. Log:
+`.data/e2e-15c-close-part4.log`.
+
 ### Docs
 
 - `CLAUDE.md`: 15c in "What this is"; the extension points: `goesWhole`, `rowFeeds` with `EntityRole.feed` and
