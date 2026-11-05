@@ -1,7 +1,8 @@
 "use client";
 
 // The InfoCube box of the workspace settings (slice 15a, C-7, O2; prototype `wsSettings`): shown to everyone, its
-// check box enabled for owners and admins when the organization holds the licence. Turning it on needs the licence;
+// check box enabled for owners and admins when the organization holds the licence, and while on whatever the licence
+// (slice 15b, R1). Turning it on needs the licence;
 // turning it off is refused while the workspace has facts or dimensions, and the refusal stays under the check box.
 // It saves the workspace's row on the same chain as the other settings (slice 9).
 
@@ -51,8 +52,9 @@ export function InfoCubeBox({ workspaceId, version, on, licensed, organizationNa
         <input
           type="checkbox"
           data-testid="checkbox-infocube"
-          checked={choice.value && licensed}
-          disabled={!canSwitch || !licensed}
+          // as the prototype (slice 15b, R1): while on it stays ticked and enabled, licence or not, so it can be turned off
+          checked={choice.value}
+          disabled={!canSwitch || (!licensed && !choice.value)}
           onChange={(e) => choice.choose(e.currentTarget.checked)}
         />{" "}
         Use InfoCube in this workspace

@@ -9,7 +9,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode, type Ref, type TextareaHTMLAttributes } from "react";
 import { useToast } from "@/ui/components/toast";
-import { choiceShown, FieldDraft, storedBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
+import { choiceLanded, choiceShown, FieldDraft, storedBy, type Chosen, type SaveAnswer } from "@/ui/field-draft";
 import { dropDraft, isGone, keepDraft, markGone, takeDraft, unmarkGone, updateDraft } from "@/ui/field-drafts";
 import { guard, release } from "@/ui/leave-guard";
 
@@ -405,6 +405,8 @@ function InlineDraftLine({ mark, onUse, onKeep }: { mark: NonNullable<DraftMark>
  */
 export function useChoice<T>(stored: T, save: FieldSave<T>) {
   const [chosen, setChosen] = useState<Chosen<T> | null>(null);
+  // the choice is stored (slice 15b): forget it, so an undo that brings the old value back shows it (A → B → A showed B)
+  if (chosen && choiceLanded(chosen, stored)) setChosen(null);
   const value = choiceShown(chosen, stored);
   const choose = (next: T) => {
     if (Object.is(next, value)) return;
@@ -645,6 +647,16 @@ export function GroupedSelect({
  * The second click's text of a delete (slice 1b; slice 10c, F7): "Click again to delete", ", with {also}" for what goes
  * with it, "; {then}" for what it changes elsewhere (an attribute's copies).
  */
+/**
+ * The parts of an attribute's second click (slice 15b, R4): its mappings and a module's rows ("2 mappings and 1
+ * measure"), its copies and what a module's rows change elsewhere, joined with "; "; undefined when there is none.
+ */
+export function attributeDeleteParts(mappings: number, copies: string | undefined, modules: { also: readonly string[]; then: readonly string[] } | undefined) {
+  const also = [...(mappings ? [`${mappings} mapping${mappings > 1 ? "s" : ""}`] : []), ...(modules?.also ?? [])];
+  const then = [...(copies ? [copies] : []), ...(modules?.then ?? [])];
+  return { also: also.length ? also.join(" and ") : undefined, then: then.length ? then.join("; ") : undefined };
+}
+
 export const armedDeleteText = (also?: string, then?: string): string => `Click again to delete${also ? `, with ${also}` : ""}${then ? `; ${then}` : ""}`;
 
 /** A delete that asks for a second click; `armedText` replaces the armed default (slice 12a: "Click again to delete the project"). */

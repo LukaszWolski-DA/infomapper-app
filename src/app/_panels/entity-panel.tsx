@@ -10,6 +10,7 @@ import { addAttributeAction, updateEntityAction } from "@/app/_actions/model";
 import type { UpdateEntityInput } from "@/domain/commands/entity";
 import { useAction } from "@/app/_components/use-action";
 import { useModules } from "@/app/_components/modules";
+import { PANEL_SECTIONS } from "@/compose/panels";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import { STEREOTYPES, type Entity, type Stereotype } from "@/domain/types";
@@ -144,6 +145,10 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         onSave={saveDefinition}
         testId="field-entity-definition"
       />
+      {/* the modules' sections (slice 15b): a fact's or a dimension's */}
+      {PANEL_SECTIONS.entity.map((S, i) => (
+        <S key={i} entity={e} />
+      ))}
 
       <ItemLabels target={{ kind: "entity", id: e.id }} />
 

@@ -51,6 +51,11 @@ export interface CardRow {
    * `chg` for any other open change. A class on the row; `retired` and `missing` win.
    */
   change?: "new" | "chg";
+  /**
+   * A module's classes on the row (slice 15b, R5): a measure's `meas add`, `meas semi` or `meas non`; the module's CSS
+   * draws the glyph as a pseudo-element, so the row gets no element. Only when set.
+   */
+  mark?: string;
 }
 
 export interface CardData {
@@ -143,6 +148,8 @@ export function buildCards(
   canvas?: CanvasNames,
   /** Dimensional entities' roles, from the modules (slice 15a, E7); none without a module. */
   roles: Readonly<Record<Uuid, EntityRole>> = {},
+  /** Classes on attributes' rows, from the modules (slice 15b: the Σ marks); none without a module. */
+  rowMarks: Readonly<Record<Uuid, string>> = {},
 ): CardData[] {
   const labelsOf = (key: string) => labelNames.get(key)?.join(", ") || null;
   const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
@@ -230,6 +237,7 @@ export function buildCards(
           clip: false,
           labels: labelsOf(`attribute:${a.id}`),
           ...(live ? { relevant: live.relevantRows.has(a.id) } : {}),
+          ...(rowMarks[a.id] ? { mark: rowMarks[a.id] } : {}),
         }));
       const role = roles[entity.id];
       cards.push({

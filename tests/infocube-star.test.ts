@@ -118,10 +118,26 @@ describe("the pages' module view from the star (E6, E7, E13)", () => {
     ]);
   });
 
+  it("gives the Σ marks, an attribute's delete with InfoCube's rows and the module's page rows (slice 15b, R4, R5, O8)", async () => {
+    const store = createLocalDataStore(file, STORE_SCHEMA);
+    const [workspace, model] = await Promise.all([store.workspaces.get(WS), store.model.load(WS)]);
+    const view = await moduleView(store, workspace!, model, ACTIONS);
+    const attr = (entity: string, name: string) => model.attributes.find((a) => a.name === name && a.entity_id === model.entities.find((e) => e.name === entity)!.id)!.id;
+    expect(Object.keys(view.rowMarks)).toHaveLength(6);
+    expect(view.rowMarks[attr("Fact Sales", "quantity")]).toBe("meas add");
+    expect(view.rowMarks[attr("Fact Sales", "unit_price")]).toBe("meas non");
+    expect(view.attributeDeletes[attr("Fact Sales", "quantity")]).toEqual({ also: ["1 measure"], then: [] });
+    expect(view.attributeDeletes[attr("Fact Sales", "ship_date_key")]).toEqual({ also: [], then: ["the link to Dim Date as Ship date is deleted, the relationship stays"] });
+    expect(view.attributeDeletes[attr("Fact Sales", "order_number")]).toBeUndefined();
+    const rows = view.data.infocube as { cubeEntities: object[]; cubeMeasures: object[]; cubeKeys: object[] };
+    expect([rows.cubeEntities.length, rows.cubeMeasures.length, rows.cubeKeys.length]).toEqual([5, 6, 6]);
+    for (const r of [...rows.cubeEntities, ...rows.cubeMeasures, ...rows.cubeKeys]) expect(Object.keys(r).some((k) => k.startsWith("created_") || k.startsWith("updated_"))).toBe(false);
+  });
+
   it("gives nothing for a workspace with InfoCube off and no facts or dimensions", async () => {
     const store = createLocalDataStore(file, STORE_SCHEMA);
     const [workspace, model] = await Promise.all([store.workspaces.get(SEED_IDS.wsBankX), store.model.load(SEED_IDS.wsBankX)]);
-    expect(await moduleView(store, workspace!, model, ACTIONS)).toEqual({ roles: {}, tabs: [], creates: [] });
+    expect(await moduleView(store, workspace!, model, ACTIONS)).toEqual({ roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, data: {} });
   });
 
   it("lists a dimension's own rows in its delete preview, each fact once (X-4)", async () => {

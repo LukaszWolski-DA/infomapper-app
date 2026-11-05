@@ -64,15 +64,34 @@ export interface EntityCreate {
   action: (workspaceId: string, input: EntityCreateInput) => Promise<EntityCreateResult>;
 }
 
+/**
+ * What an attribute's delete takes along in a module (slice 15b, R4), for its second click (`armedDeleteText`): `also`
+ * what is deleted with it ("1 measure"), `then` what it changes elsewhere ("the link to Dim Date as Ship date is
+ * deleted; the relationship stays").
+ */
+export interface AttributeDelete {
+  also: string[];
+  then: string[];
+}
+
 /** Everything the modules give a canvas page; empty without a module (or with it off). */
 export interface ModuleView {
   /** Each dimensional entity's role, by entity id. */
   roles: Record<Uuid, EntityRole>;
   tabs: ModuleTab[];
   creates: EntityCreate[];
+  /** Classes on an attribute's row on cards, by attribute id (slice 15b: a measure's `meas add`; R5, no element). */
+  rowMarks: Record<Uuid, string>;
+  /** An attribute's delete with module rows asks the second click (slice 15b, R4), by attribute id. */
+  attributeDeletes: Record<Uuid, AttributeDelete>;
+  /**
+   * Each module's own rows for its panel sections (`src/compose/panels.ts`), by module: plain rows without
+   * `created_*` and `updated_*` (O8). InfoMapper never reads them.
+   */
+  data: Readonly<Record<string, unknown>>;
 }
 
-export const NO_MODULES: ModuleView = { roles: {}, tabs: [], creates: [] };
+export const NO_MODULES: ModuleView = { roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, data: {} };
 
 /** A row of a delete preview that a module adds (X-1): what, and what happens to it. */
 export type DependentRow = [what: string, happens: string];

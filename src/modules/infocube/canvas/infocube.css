@@ -14,3 +14,10 @@
 .im-mark.cube { display: inline-block; width: 11px; height: 11px; flex: none }
 .im-canvas .ent.fact .c-head::before { width: 8px }
 .im-canvas .ent.fact .c-head { padding-left: 18px }
+/* A measure's mark on its row (slice 15b, B-3, R5; prototype `.row .meas`): Σ additive, Σ~ semi-additive, ∅Σ
+   non-additive, a class on the row and a pseudo-element before its type, so the row gets no element. The type span is
+   the row's one element that never clips, so the mark goes there (the name's `::after` would be cut with a long name). */
+.im-canvas .row.meas .dt::before { display: inline-block; min-width: 18px; margin-right: 6px; text-align: center; font-family: var(--font-plex-mono), ui-monospace, monospace; font-size: 10.5px; color: var(--im-ink-2) }
+.im-canvas .row.meas.add .dt::before { content: "Σ" }
+.im-canvas .row.meas.semi .dt::before { content: "Σ~" }
+.im-canvas .row.meas.non .dt::before { content: "∅Σ"; color: var(--im-ink-3) }

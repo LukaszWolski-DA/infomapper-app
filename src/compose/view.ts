@@ -6,7 +6,8 @@ import type { DataStore } from "@/data";
 import type { Uuid } from "@/domain/ids";
 import type { Workspace, WorkspaceModel } from "@/domain/types";
 import { NO_MODULES, type DependentRow, type EntityCreate, type ModuleView } from "@/ui/modules";
-import { cubeSections, entityDependents, ROLE_NAMES, ROLE_TITLES, rolesOf } from "@/modules/infocube/domain/view";
+import { cubeIndex } from "@/modules/infocube/domain/keys";
+import { attributeDeletes, cubePageRows, cubeSections, entityDependents, measureMarks, ROLE_NAMES, ROLE_TITLES, rolesOf } from "@/modules/infocube/domain/view";
 
 /** The creates' server actions, by key: `src/compose/actions.ts` for pages (server actions stay out of this file). */
 export type CreateActions = Record<"fact" | "dimension", EntityCreate["action"]>;
@@ -20,10 +21,19 @@ const creates = (actions: CreateActions): EntityCreate[] => [
 export async function moduleView(store: DataStore, workspace: Workspace, model: WorkspaceModel, actions: CreateActions): Promise<ModuleView> {
   const hasDimensional = model.entities.some((e) => e.model_level === "dimensional");
   if (!workspace.infocube && !hasDimensional) return NO_MODULES;
-  const cube = hasDimensional ? await store.modules.list(workspace.id, "cube_entity") : [];
+  const [cube, measures, keys] = hasDimensional
+    ? await Promise.all([store.modules.list(workspace.id, "cube_entity"), store.modules.list(workspace.id, "cube_measure"), store.modules.list(workspace.id, "cube_key")])
+    : [[], [], []];
   const roles: ModuleView["roles"] = {};
   for (const [entityId, c] of rolesOf(cube)) roles[entityId] = { text: ROLE_NAMES[c.role], title: ROLE_TITLES[c.role], card: `dimn ${c.role}`, mark: "cube" };
-  if (!workspace.infocube) return { ...NO_MODULES, roles };
+  // slice 15b: the Σ marks, an attribute's delete with InfoCube's rows (R4) and the rows of the panels' sections
+  const index = cubeIndex({ entities: model.entities, attributes: model.attributes, relationships: model.relationships, cubeEntities: cube, cubeMeasures: measures, cubeKeys: keys });
+  const described = {
+    rowMarks: measureMarks(index, model.attributes),
+    attributeDeletes: attributeDeletes(index, model.attributes),
+    data: hasDimensional ? { infocube: cubePageRows(cube, measures, keys) } : {},
+  };
+  if (!workspace.infocube) return { ...NO_MODULES, roles, ...described };
   const sections = cubeSections(model.entities, cube).map(({ role, entities }) => ({
     key: `cube:${role}`,
     title: role === "fact" ? "Facts" : "Dimensions",
@@ -34,6 +44,7 @@ export async function moduleView(store: DataStore, workspace: Workspace, model: 
   }));
   return {
     roles,
+    ...described,
     tabs: [{ id: "cube", name: "Cube", title: "InfoCube: facts and dimensions", sections, creates: ["fact", "dimension"] }],
     creates: creates(actions),
   };

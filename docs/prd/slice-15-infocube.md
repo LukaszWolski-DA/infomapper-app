@@ -480,6 +480,14 @@ performance), each with the files and functions behind it and a proposal.
 - **An attribute's delete with InfoCube's rows** (15b, R4): the attribute's second click names them; the prototype opens
   a dialog.
 - **The Σ marks have no title** of their own (15b, R5): a class and `::after` on the row.
+- **A key is linked only to an existing foreign key** (15b step 3, accepted 5 November 2026): `linkKey` refuses an
+  attribute that is not a foreign key of the fact and never sets the flag; the prototype's `linkKey` sets it. Add key
+  writes a new attribute that is a foreign key.
+- **A measure on a foreign key** (15b step 3, accepted): allowed, with the warning "{name} is a foreign key. A dimension
+  key is usually not a measure."; the prototype turns it on without a word.
+- **A new measure's additivity by its type** (15b step 3, accepted): additive for Integer and Decimal, non-additive
+  otherwise; the prototype starts every measure additive.
+- **Leaving semi-additive clears the note** (15b step 3, accepted); the prototype keeps the note, hidden.
 - The rest of the acceptance doc's list P1–P26 as answered there.
 
 ## 9. Left for later
