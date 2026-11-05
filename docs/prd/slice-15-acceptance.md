@@ -2047,3 +2047,11 @@ KB was backed up before it: `.data/backups/dev-db-20261105-0925.json` and `kb-mo
 - AD-34's sentence and D-61's 20 px approved as written; D-68 approved with its hints sentence changed to the list
   `factHints` gives (there is no "fact without measures" hint). All three entered in `docs/decisions.md`. The merge
   waits for his manual acceptance.
+
+## 15b's manual acceptance (5 November 2026)
+
+- **Passed** (Łukasz, 5 November 2026): on the demo (`npm run demo -- --reset`) the Order date and Ship date pills; a
+  third Dim Date – Fact Sales relationship with a role, Add key and undo; grain and measures in Fact Sales; SCD type and
+  Used by in Dim Date; `ship_date_key` deleted with its second click, then undo. On KB (backed up first,
+  `.data/backups/dev-db-20261105-0925.json`): the upgrade to format 13; a role on a logical relationship in its pill and
+  sentences; undo.
