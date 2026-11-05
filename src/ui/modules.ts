@@ -21,6 +21,12 @@ export interface EntityRole {
    * model" ("{n} of {m} attributes fed from the logical model"); absent: InfoMapper's "mapped".
    */
   coverage?: string;
+  /**
+   * Slice 15c (P17, F19, C10): the Overview's word after "{n} of {m}" ("fed") and its tooltip ("Attributes fed from the
+   * logical model"); the entity panel's attribute list's title ("Attributes and their logical feed") and the text of a
+   * row without a feed ("no feed"). The counts are `ModuleView.rowFeeds`'.
+   */
+  feed?: { word: string; title: string; list: string; none: string };
 }
 
 /**
@@ -31,6 +37,8 @@ export interface EntityRole {
 export interface RowFeed {
   n: number;
   title: string;
+  /** The entity panel's list (slice 15c, C10): what feeds the row ("Customer.segment_code", "ƒ 3 attributes"); empty without. */
+  list: string;
 }
 
 /** One group of a module's tab: its entities by concept, each with its own right-side text (`grain set`, `SCD 1`). */
@@ -87,6 +95,8 @@ export interface EntityCreate {
 export interface AttributeDelete {
   also: string[];
   then: string[];
+  /** What the delete's toast counts besides InfoMapper's mappings (slice 15c, P10): "1 dimensional mapping". */
+  toast?: string[];
 }
 
 /** Everything the modules give a canvas page; empty without a module (or with it off). */

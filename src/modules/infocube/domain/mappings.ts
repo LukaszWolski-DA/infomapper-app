@@ -314,8 +314,11 @@ export function createOnHeader(
     ...writes,
     ...cardWrites,
   ]);
-  // the active context labels the new attribute (as Add key)
-  if (result.ok) result.writeSet.mainTargets = [{ kind: "attribute", id: attribute.id }];
+  // the active context labels the new attribute (as Add key); the step's name says both rows (Łukasz, 15c step 4)
+  if (result.ok) {
+    result.writeSet.mainTargets = [{ kind: "attribute", id: attribute.id }];
+    result.writeSet.label = "Create attribute and its mapping";
+  }
   return result;
 }
 
@@ -519,6 +522,16 @@ export function deleteCubeMapping(ctx: CommandContext, access: WorkspaceAccess, 
 }
 
 // ---- "Create dimension from this…" (B-2) ----
+
+/**
+ * The dialog's proposed name (Łukasz, 15c step 3; prototype `askDimFrom`): "Dim {entity}", or the first of
+ * "Dim {entity} 2", 3… that no fact or dimension is called (`taken`, case ignored by the caller).
+ */
+export function proposedDimensionName(entity: string, taken: (name: string) => boolean): string {
+  let name = `Dim ${entity}`;
+  for (let n = 2; taken(name); n++) name = `Dim ${entity} ${n}`;
+  return name;
+}
 
 /** The card's gap to the right of the original (the prototype's 80). */
 export const DIMENSION_GAP = 80;
@@ -746,14 +759,16 @@ export function mappingDependents(index: MappingIndex, of: { entityId: Uuid } | 
  * An attribute's second click (X-3, R4): "{n} dimensional mappings" among what goes with it and, for a logical one,
  * "{facts and dimensions} lose their feed from the logical model". Only attributes with dimensional mappings.
  */
-export function mappingAttributeDeletes(index: MappingIndex, attributes: readonly { id: Uuid; deleted_at: string | null }[]): Record<Uuid, { also: string[]; then: string[] }> {
-  const out: Record<Uuid, { also: string[]; then: string[] }> = {};
+export function mappingAttributeDeletes(index: MappingIndex, attributes: readonly { id: Uuid; deleted_at: string | null }[]): Record<Uuid, { also: string[]; then: string[]; toast: string[] }> {
+  const out: Record<Uuid, { also: string[]; then: string[]; toast: string[] }> = {};
   for (const a of attributes) {
     if (a.deleted_at !== null) continue;
     const mappings = mappingsGoingWith(index, [a.id]);
     if (!mappings.length) continue;
     const names = index.levelOf(a.id) === "logical" ? losingFeed(index, mappings) : [];
-    out[a.id] = { also: [counted(mappings.length, "dimensional mapping")], then: names.length ? [`${names.join(", ")} ${loseFeed(names)}`] : [] };
+    const n = counted(mappings.length, "dimensional mapping");
+    // the delete's toast counts them beside InfoMapper's mappings (P10)
+    out[a.id] = { also: [n], then: names.length ? [`${names.join(", ")} ${loseFeed(names)}`] : [], toast: [n] };
   }
   return out;
 }

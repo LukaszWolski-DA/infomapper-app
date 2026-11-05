@@ -12,7 +12,8 @@ test("RP-07: deleting ship_date_key names its link on the second click; the rela
   await openAttribute(page, "Fact Sales", "quantity");
   const del = page.getByTestId("button-delete-attribute");
   await del.click();
-  await expect(del).toHaveText("Click again to delete, with 1 measure");
+  // slice 15c (X-3): quantity is fed from the logical model, so its dimensional mapping is named too
+  await expect(del).toHaveText("Click again to delete, with 1 measure and 1 dimensional mapping");
 
   await openAttribute(page, "Fact Sales", "ship_date_key");
   await del.click();

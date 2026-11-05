@@ -145,8 +145,8 @@ describe("the cards' feeds (C12, X4, P17)", () => {
   it("a dimensional row counts its dimensional mappings, with their inputs as the tooltip; the bar says fed", () => {
     const s = star();
     const feeds = cubeRowFeeds(s.index, s.model.attributes);
-    expect(feeds[s.attr("Dim Customer", "segment_code").id]).toEqual({ n: 1, title: "from Customer.segment_code" });
-    expect(feeds[s.attr("Dim Customer", "customer_key").id]).toEqual({ n: 0, title: NOT_FED });
+    expect(feeds[s.attr("Dim Customer", "segment_code").id]).toEqual({ n: 1, title: "from Customer.segment_code", list: "Customer.segment_code" });
+    expect(feeds[s.attr("Dim Customer", "customer_key").id]).toEqual({ n: 0, title: NOT_FED, list: "" });
     expect(feeds[s.attr("Fact Sales", "net_amount").id]?.title).toBe("from Order Line.quantity + Order Line.unit_price + Order Line.discount_pct");
     // logical attributes are InfoMapper's: not in the feeds
     expect(feeds[s.attr("Customer", "segment_code").id]).toBeUndefined();

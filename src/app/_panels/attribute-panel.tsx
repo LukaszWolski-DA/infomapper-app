@@ -69,10 +69,13 @@ type TypeInput = NonNullable<Change["type"]>;
  * The toast after an attribute's delete: “Attribute deleted”, “… together with 2 mappings”, then “. 2 copies no longer
  * follow it” (slice 10c, F7).
  */
-export const attributeDeleted = (mappings: number, copies: number): string =>
-  `Attribute deleted${mappings ? ` together with ${mappings} mapping${mappings > 1 ? "s" : ""}` : ""}${
+export const attributeDeleted = (mappings: number, copies: number, modules: readonly string[] = []): string => {
+  // slice 15c (P10): a module's counts after InfoMapper's ("together with 2 mappings and 1 dimensional mapping")
+  const together = [...(mappings ? [`${mappings} mapping${mappings > 1 ? "s" : ""}`] : []), ...modules];
+  return `Attribute deleted${together.length ? ` together with ${together.join(" and ")}` : ""}${
     copies ? `. ${copies} ${copies === 1 ? "copy no longer follows" : "copies no longer follow"} it` : ""
   }`;
+};
 
 /** A number field for a type parameter: empty means none. */
 const toNumber = (v: string): number | null => (v.trim() === "" ? null : Number(v));
@@ -133,7 +136,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
     const result = await saveRow(
       a,
       (v) => deleteAttributeAction(p.workspaceId, { attributeId: a.id, expectedVersion: v }),
-      attributeDeleted(mappings.length, copies.length),
+      attributeDeleted(mappings.length, copies.length, moduleDelete?.toast),
       { undoable: true, deletes: true },
     );
     if (result.ok) ui.select(null);
@@ -294,6 +297,8 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       <ItemLabels target={{ kind: "attribute", id: a.id }} />
       <RequirementsSection target={{ kind: "attribute", id: a.id }} />
 
+      {/* a fact's or a dimension's attribute is fed from the logical model, never from a column (slice 15c, C10) */}
+      {entity?.model_level !== "dimensional" && (
       <Fold title="Comes from" count={mappings.length}>
         {mappings.length ? (
           <LongList
@@ -324,6 +329,10 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
           </Field>
         )}
       </Fold>
+      )}
+      {PANEL_SECTIONS.attributeFeeds.map((S, i) => (
+        <S key={i} attribute={a} />
+      ))}
 
       {copies.length > 0 && (
         <Fold title="Copies" count={copies.length} testId="fold-attribute-copies">

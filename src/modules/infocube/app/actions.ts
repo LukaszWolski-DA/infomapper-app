@@ -25,16 +25,24 @@ import {
 import type { CubeRole } from "../domain/types";
 import { lastContentEditor } from "@/domain/model/mapping-rules";
 import {
+  addCubeMappingInput,
   createCubeMapping,
+  createDimensionFrom,
   createOnHeader,
   CUBE_MAPPING_LOG,
   deleteCubeMapping,
+  removeCubeMappingInput,
+  retargetCubeMapping,
   setCubeMappingStatus,
   updateCubeMapping,
+  type AddCubeMappingInputInput,
   type CreateCubeMappingInput,
+  type CreateDimensionFromInput,
   type CreateOnHeaderInput,
   type DeleteCubeMappingInput,
   type MappingModel,
+  type RemoveCubeMappingInputInput,
+  type RetargetCubeMappingInput,
   type SetCubeMappingStatusInput,
   type UpdateCubeMappingInput,
 } from "../domain/mappings";
@@ -161,5 +169,45 @@ export async function deleteCubeMappingAction(workspaceId: string, input: Delete
   return modelCommand(workspaceId, async (ctx, access, model, store) => {
     const result = deleteCubeMapping(ctx, access, await mappingState(store, access.workspace.id, model), input);
     return result.ok ? { ...result, value: null } : result;
+  });
+}
+
+// ---- slice 15c step 5: the mapping's panel, "Create dimension from this…" ----
+
+/** "Add a logical attribute": the last input; a second one makes a direct copy a transformation (X2). */
+export async function addCubeMappingInputAction(
+  workspaceId: string,
+  input: AddCubeMappingInputInput,
+): Promise<ActionResult<{ version: number; toast: string; notice: string | null; becameTransform: boolean }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => addCubeMappingInput(ctx, access, await mappingState(store, access.workspace.id, model), input));
+}
+
+/** × "Stop reading this attribute" (never on the last input). */
+export async function removeCubeMappingInputAction(workspaceId: string, input: RemoveCubeMappingInputInput): Promise<ActionResult<{ version: number; notice: string | null }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => removeCubeMappingInput(ctx, access, await mappingState(store, access.workspace.id, model), input));
+}
+
+/** "Target attribute": another fact's or dimension's attribute. */
+export async function retargetCubeMappingAction(workspaceId: string, input: RetargetCubeMappingInput): Promise<ActionResult<{ version: number; toast: string; notice: string | null }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => retargetCubeMapping(ctx, access, await mappingState(store, access.workspace.id, model), input));
+}
+
+/** "Create dimension from this…" (B-2): the dimension, its key, the copies and their mappings, its card; one undo step. */
+export async function createDimensionFromAction(
+  workspaceId: string,
+  input: CreateDimensionFromInput,
+): Promise<ActionResult<{ entityId: string; canvasItemId: string | null; name: string; keyName: string; toast: string; warning: string | null }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => {
+    const ws = access.workspace.id;
+    const canvasId = typeof input?.placement?.canvasId === "string" ? input.placement.canvasId : "";
+    const [state, canvas, frames, items] = await Promise.all([
+      mappingState(store, ws, model),
+      canvasId ? store.canvases.get(ws, canvasId) : Promise.resolve(null),
+      canvasId ? store.frames.listOfCanvas(ws, canvasId) : Promise.resolve([]),
+      store.canvasItems.list(ws),
+    ]);
+    const original = model.entities.find((e) => e.id === input?.entityId) ?? null;
+    const concept = model.concepts.find((c) => c.id === original?.concept_id) ?? null;
+    return createDimensionFrom(ctx, access, { ...state, create: { concept, entities: model.entities, canvas, frames }, items, original }, input);
   });
 }

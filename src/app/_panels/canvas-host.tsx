@@ -26,7 +26,7 @@
 //   dimensional cards under the veil and refuses a drop on them in the browser (B-6's toast); no "Map from a column…"
 //   on a dimensional row (difference 9).
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
 import { useModules } from "@/app/_components/modules";
 import { isLogical, MAPPING_TO_DIMENSIONAL_MESSAGE } from "@/domain/model/levels";
@@ -381,6 +381,8 @@ export function useCanvasHost({
       items.push({ sep: true });
       // on a live canvas removing a card takes its label off, after the question (PRD item 11)
       items.push({ label: live ? "Remove from this canvas (unlabel)…" : "Remove from this canvas", danger: true, act: () => ui.remove(card.id) });
+      // a module's items (slice 15c, P19: "Create dimension from this…"), then the delete
+      if (isEnt) for (const e of exts) items.push(...(e.h.cardMenu?.(card.targetId) ?? []));
       if (isEnt) items.push({ label: "Delete from model…", danger: true, act: () => setDeleting(card.targetId) });
     } else {
       if (canNote) items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });
@@ -674,7 +676,7 @@ export function useCanvasHost({
               void saveRow(
                 a,
                 (v) => deleteAttributeAction(workspaceId, { attributeId: a.id, expectedVersion: v }),
-                attributeDeleted(n, copies.length),
+                attributeDeleted(n, copies.length, modules.attributeDeletes[a.id]?.toast),
                 { undoable: true, deletes: true },
               ).then((r) => {
                 if (r.ok) ui.select(null);
@@ -706,6 +708,7 @@ export function useCanvasHost({
       {columns.choiceElement}
       {toolbox && offersSomething && <Toolbox key={`${toolbox.screen.x}:${toolbox.screen.y}`} items={toolboxItems} at={toolbox.screen} onClose={closeToolbox} />}
       {deletingEntity && <DeleteEntityDialog entity={deletingEntity} onClose={() => setDeleting(null)} />}
+      {exts.map((e) => (e.h.overlay ? <Fragment key={e.kind}>{e.h.overlay}</Fragment> : null))}
     </>
   );
 

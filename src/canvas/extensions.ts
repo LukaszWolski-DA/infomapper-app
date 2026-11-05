@@ -3,7 +3,7 @@
 // one per kind in the composition root (`src/compose/canvas.ts`); the host calls its hook once per render with the
 // page's model and cards, and knows nothing else of it.
 
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceModel } from "@/domain/types";
 import type { RowDrag, RowDrop } from "./context";
@@ -39,6 +39,10 @@ export interface CanvasExtHandlers {
   rowDrag: (attributeId: Uuid) => RowDrag | null;
   /** An entity row's drop that `rowDrag` allowed. */
   drop: (drop: RowDrop) => void;
+  /** Items of an entity card's header menu, before "Delete from model…" (slice 15c, P19: "Create dimension from this…"). */
+  cardMenu?: (entityId: Uuid) => ExtMenuItem[];
+  /** What the module draws beside the canvas host's dialogs (its own dialog while open), else null. */
+  overlay?: ReactNode;
 }
 
 export interface CanvasExtension {

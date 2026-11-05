@@ -69,10 +69,14 @@ export interface ThumbnailIndex {
   labelLinks: readonly LabelLink[];
 }
 
-/** The page's index from its live rows: the model, the requirements, the labels and their links. */
+/**
+ * The page's index from its live rows: the model, the requirements, the labels and their links. Slice 15c (C12): a
+ * module's `rowFeeds` count the rows it feeds in place of source mappings, as `buildCards` counts them, so a card
+ * filtered to Mapped or Not mapped has the canvas's height.
+ */
 export function thumbnailIndex(
   model: WorkspaceModel,
-  rest: { requirements: readonly { id: Uuid }[]; labels: readonly { id: Uuid }[]; labelLinks: readonly LabelLink[] },
+  rest: { requirements: readonly { id: Uuid }[]; labels: readonly { id: Uuid }[]; labelLinks: readonly LabelLink[]; rowFeeds?: Readonly<Record<Uuid, { n: number }>> },
 ): ThumbnailIndex {
   const classes = indexOf(model);
   const attributes = new Map(model.attributes.map((a) => [a.id, a]));
@@ -96,7 +100,7 @@ export function thumbnailIndex(
   }
   const rowsOfEntity = new Map<Uuid, Row[]>();
   for (const a of model.attributes) {
-    const row = { id: a.id, mappings: mappings.get(a.id) ?? 0, pk: a.is_primary_key, fk: a.is_foreign_key, bk: a.is_business_key };
+    const row = { id: a.id, mappings: rest.rowFeeds?.[a.id]?.n ?? mappings.get(a.id) ?? 0, pk: a.is_primary_key, fk: a.is_foreign_key, bk: a.is_business_key };
     (rowsOfEntity.get(a.entity_id) ?? rowsOfEntity.set(a.entity_id, []).get(a.entity_id)!).push(row);
   }
   const rowsOfTable = new Map<Uuid, Row[]>();

@@ -165,6 +165,8 @@ describe("creating a dimensional mapping (B-6)", () => {
     expect(made.writeSet.writes[3]).toMatchObject({ row: { collapsed: false, row_filter: "all" } });
     expect(made.value.toast).toBe("Added list_price to Dim Product, fed from Product.list_price. Rename it on the right.");
     expect(made.writeSet.mainTargets).toEqual([{ kind: "attribute", id: copy.id }]);
+    // the undo step names both rows (Łukasz, 15c step 4)
+    expect(made.writeSet.label).toBe("Create attribute and its mapping");
     expect(new Set(made.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
     const after = apply(at, made.writeSet);
     const back = apply(after, undo(after, made.writeSet));
@@ -477,10 +479,10 @@ describe("the derived reads", () => {
       cubeKeys: (rows.cube_key ?? []) as never,
     });
     const deletes = attributeDeletes(keys, attributes, index);
-    expect(deletes[attr(rows, "Customer", "segment_code").id]).toEqual({ also: ["1 dimensional mapping"], then: ["Dim Customer loses its feed from the logical model"] });
-    expect(deletes[attr(rows, "Order Line", "quantity").id]).toEqual({ also: ["2 dimensional mappings"], then: ["Fact Sales loses its feed from the logical model"] });
+    expect(deletes[attr(rows, "Customer", "segment_code").id]).toEqual({ also: ["1 dimensional mapping"], then: ["Dim Customer loses its feed from the logical model"], toast: ["1 dimensional mapping"] });
+    expect(deletes[attr(rows, "Order Line", "quantity").id]).toEqual({ also: ["2 dimensional mappings"], then: ["Fact Sales loses its feed from the logical model"], toast: ["2 dimensional mappings"] });
     expect(deletes[attr(rows, "Order Line", "order_id").id]).toBeUndefined();
     // a fact's measure with its mapping: both, the measure first
-    expect(deletes[attr(rows, "Fact Sales", "quantity").id]).toEqual({ also: ["1 measure", "1 dimensional mapping"], then: [] });
+    expect(deletes[attr(rows, "Fact Sales", "quantity").id]).toEqual({ also: ["1 measure", "1 dimensional mapping"], then: [], toast: ["1 dimensional mapping"] });
   });
 });

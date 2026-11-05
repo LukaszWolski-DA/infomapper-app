@@ -33,3 +33,22 @@ test("S15-23: Dim Customer's fed bar, its rows' dots and the Mapped filter; a de
   await page.reload();
   await expect(dim.locator(".row[data-row] .nm")).toHaveText(["customer_key"]);
 });
+
+// Step 5 (P17, F19): the Overview's "Mapping coverage" counts a fact's or a dimension's feeds as "{n} of {m} fed",
+// titled "Attributes fed from the logical model"; a logical entity keeps "{n} of {m}". After a delete and its undo.
+test("S15-23: the Overview's {n} of {m} fed; a delete and its undo", async ({ page }) => {
+  await signInAs(page, "Łukasz");
+  await openStar(page);
+  const coverage = page.getByTestId("list-coverage").getByTestId("item-coverage");
+  const row = (name: string) => coverage.filter({ hasText: name }).first();
+  await expect(row("Dim Customer")).toContainText("4 of 5 fed");
+  await expect(row("Dim Customer")).toHaveAttribute("title", "Attributes fed from the logical model");
+  await expect(row("Dim Date")).toContainText("0 of 5 fed");
+  await expect(row("Order Line")).not.toContainText("fed");
+
+  await clickCubeLine(page, cubeMappingId("cust.segment_code"));
+  await page.keyboard.press("Delete");
+  await expect(row("Dim Customer")).toContainText("3 of 5 fed");
+  await undo(page);
+  await expect(row("Dim Customer")).toContainText("4 of 5 fed");
+});

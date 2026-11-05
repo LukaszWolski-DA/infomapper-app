@@ -6,17 +6,27 @@ import type { Uuid } from "@/domain/ids";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
 import { coverageParts } from "@/domain/model/requirements";
 import type { CanvasItem, Entity, Frame, Note, RequirementKind, RequirementStatus, WorkspaceModel } from "@/domain/types";
+import type { ModuleView } from "@/ui/modules";
 import { indexModel, typeCheckOf, type ModelIndex } from "./model-index";
 
 const isMapped = (ix: ModelIndex, attributeId: Uuid) => (ix.mappingsOf.get(attributeId) ?? []).length > 0;
 
-/** Mapping coverage of each entity on a canvas: its attributes and how many have a mapping. */
-export function coverage(ix: ModelIndex, entityIds: readonly Uuid[]): { entity: Entity; attributes: number; mapped: number }[] {
+/**
+ * Mapping coverage of each entity on a canvas: its attributes and how many have a mapping. Slice 15c (P17, F19): an
+ * entity whose rows a module feeds counts its module's feeds (`rowFeeds`) and carries the module's words ("fed").
+ */
+export function coverage(
+  ix: ModelIndex,
+  entityIds: readonly Uuid[],
+  modules: Pick<ModuleView, "roles" | "rowFeeds"> = { roles: {}, rowFeeds: {} },
+): { entity: Entity; attributes: number; mapped: number; feed?: { word: string; title: string } }[] {
   return entityIds
     .map((id) => ix.entity.get(id))
     .filter((e): e is Entity => !!e)
     .map((entity) => {
       const attributes = ix.attributesOf.get(entity.id) ?? [];
+      const feed = modules.roles[entity.id]?.feed;
+      if (feed) return { entity, attributes: attributes.length, mapped: attributes.filter((a) => (modules.rowFeeds[a.id]?.n ?? 0) > 0).length, feed };
       return { entity, attributes: attributes.length, mapped: attributes.filter((a) => isMapped(ix, a.id)).length };
     });
 }

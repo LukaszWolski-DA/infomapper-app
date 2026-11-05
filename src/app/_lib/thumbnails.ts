@@ -22,7 +22,7 @@ export function thumbnailHrefs(
   workspaceId: Uuid,
   canvases: readonly Pick<Canvas, "id" | "live_label_id">[],
   rows: CanvasRows,
-  page: { model: WorkspaceModel; requirements: readonly { id: Uuid }[]; labels: readonly { id: Uuid }[]; labelLinks: readonly LabelLink[] },
+  page: { model: WorkspaceModel; requirements: readonly { id: Uuid }[]; labels: readonly { id: Uuid }[]; labelLinks: readonly LabelLink[]; rowFeeds?: Readonly<Record<Uuid, { n: number }>> },
 ): Map<Uuid, string | null> {
   const made = canvasThumbnails(canvases, rows, thumbnailIndex(page.model, page));
   return new Map(

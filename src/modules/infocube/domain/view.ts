@@ -98,6 +98,8 @@ export interface CubePageRows {
   /** Slice 15c: the dimensional mappings and their inputs (the drag's plan, the line's menu, the panels). */
   cubeMappings: PageRow<CubeMapping>[];
   cubeMappingInputs: PageRow<CubeMappingInput>[];
+  /** Each mapping's last content editor while four-eyes is on (O9; `moduleView`): the panel's note before approving. */
+  contentAuthors?: Record<Uuid, Uuid>;
 }
 
 export function cubePageRows(
@@ -120,17 +122,25 @@ export function cubePageRows(
 export const FED_COVERAGE = "fed from the logical model";
 /** A dimensional row's dot without a feed (prototype `attrRow`). */
 export const NOT_FED = "Not fed from the logical model";
+/** The Overview's and the entity panel's words for a fact's or a dimension's feeds (prototype l. 2276, `insEntity`). */
+export const FEED_WORDS = { word: "fed", title: "Attributes fed from the logical model", list: "Attributes and their logical feed", none: "no feed" } as const;
 
 /**
  * Every dimensional attribute's state on cards (C12; prototype `attrRow`): how many dimensional mappings feed it (any
  * status) and the dot's tooltip, one "from {inputs}" line per mapping, or "Not fed from the logical model".
  */
-export function cubeRowFeeds(index: MappingIndex, attributes: readonly { id: Uuid; deleted_at: string | null }[]): Record<Uuid, { n: number; title: string }> {
-  const out: Record<Uuid, { n: number; title: string }> = {};
+export function cubeRowFeeds(index: MappingIndex, attributes: readonly { id: Uuid; deleted_at: string | null }[]): Record<Uuid, { n: number; title: string; list: string }> {
+  const out: Record<Uuid, { n: number; title: string; list: string }> = {};
   for (const a of attributes) {
     if (a.deleted_at !== null || index.levelOf(a.id) !== "dimensional") continue;
     const ms = index.mappingsTo(a.id);
-    out[a.id] = { n: ms.length, title: ms.length ? ms.map((m) => `from ${index.inputsOf(m.id).map((i) => index.label(i.attribute_id)).join(" + ")}`).join("\n") : NOT_FED };
+    const inputs = ms.map((m) => index.inputsOf(m.id));
+    out[a.id] = {
+      n: ms.length,
+      title: ms.length ? inputs.map((list) => `from ${list.map((i) => index.label(i.attribute_id)).join(" + ")}`).join("\n") : NOT_FED,
+      // the entity panel's list (prototype `insEntity`): one input's label, or "ƒ {n} attributes"
+      list: inputs.map((list) => (list.length > 1 ? `ƒ ${list.length} attributes` : index.label(list[0]?.attribute_id ?? ""))).join(", "),
+    };
   }
   return out;
 }
@@ -161,8 +171,8 @@ export function attributeDeletes(
   index: CubeIndex,
   attributes: readonly { id: Uuid; deleted_at: string | null }[],
   mappings?: MappingIndex,
-): Record<Uuid, { also: string[]; then: string[] }> {
-  const out: Record<Uuid, { also: string[]; then: string[] }> = mappings ? mappingAttributeDeletes(mappings, attributes) : {};
+): Record<Uuid, { also: string[]; then: string[]; toast?: string[] }> {
+  const out: Record<Uuid, { also: string[]; then: string[]; toast?: string[] }> = mappings ? mappingAttributeDeletes(mappings, attributes) : {};
   for (const a of attributes) {
     if (a.deleted_at !== null) continue;
     const carried = carries(index, a.id);
@@ -172,6 +182,7 @@ export function attributeDeletes(
     out[a.id] = {
       also: [...(measure ? ["1 measure"] : []), ...(fed?.also ?? [])],
       then: [...(carried ? [linkGoes(dimensionAs(index, carried))] : []), ...(fed?.then ?? [])],
+      ...(fed?.toast ? { toast: fed.toast } : {}),
     };
   }
   return out;

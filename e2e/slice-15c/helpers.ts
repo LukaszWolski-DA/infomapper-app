@@ -8,8 +8,9 @@ import { uuidv7 } from "../../src/domain/ids";
 import type { WorkspaceAccess } from "../../src/domain/permissions";
 import { starId } from "../../src/modules/infocube/data/sales-star";
 import type { CubeMapping, CubeMappingInput } from "../../src/modules/infocube/domain/types";
-import { RETAIL, SEED_IDS } from "../slice-01a/helpers";
+import { card, RETAIL, SEED_IDS } from "../slice-01a/helpers";
 import { cubeStore } from "../slice-15a/helpers";
+import { model } from "../slice-15b/helpers";
 
 export * from "../slice-15b/helpers";
 export { makeFrame, place } from "../slice-02b/helpers";
@@ -103,4 +104,47 @@ export async function startDrag(page: Page, from: Locator): Promise<{ x: number;
   await page.mouse.down();
   for (let i = 1; i <= 4; i++) await page.mouse.move(start.x + i * 5, start.y + i * 3);
   return start;
+}
+
+// ---- step 5: the panels and dialogs ----
+
+/** A live attribute's id by its entity's and its own name (logical attributes are the seed's, not the star's). */
+export async function attributeIdOf(entity: string, name: string): Promise<string> {
+  const m = await model();
+  const e = m.entities.find((x) => x.name === entity && x.deleted_at === null)!;
+  return m.attributes.find((a) => a.entity_id === e.id && a.name === name && a.deleted_at === null)!.id;
+}
+
+/** A dimensional mapping's stored row and its live inputs' attributes, in order. */
+export async function cubeMappingRow(mappingId: string): Promise<CubeMapping | undefined> {
+  return (await cubeStore().modules.list(RETAIL, "cube_mapping")).find((m) => m.id === mappingId);
+}
+export async function cubeInputsOf(mappingId: string): Promise<string[]> {
+  return (await liveCubeInputs())
+    .filter((i) => i.mapping_id === mappingId)
+    .sort((a, b) => a.sort_order - b.sort_order)
+    .map((i) => i.attribute_id);
+}
+
+/** Opens a mapping's panel by clicking its line, and waits for the panel at the row's stored version. */
+export async function openCubeMapping(page: Page, mappingId: string): Promise<Locator> {
+  await clickCubeLine(page, mappingId);
+  const row = await cubeMappingRow(mappingId);
+  const panel = page.locator(`[data-testid="panel-cube-mapping"][data-mapping="${mappingId}"]`);
+  await panel.and(page.locator(`[data-version="${row!.version}"]`)).waitFor();
+  return panel;
+}
+
+/** Waits for the open mapping panel to show the stored version (the next edit sends it). */
+export async function expectCubePanelAt(page: Page, mappingId: string): Promise<void> {
+  const row = await cubeMappingRow(mappingId);
+  await page.locator(`[data-testid="panel-cube-mapping"][data-mapping="${mappingId}"][data-version="${row!.version}"]`).waitFor();
+}
+
+/** The toolbox of a card's header (a right-click on its name) and one of its items by its text. */
+export async function cardMenuItem(page: Page, cardName: string, label: string): Promise<Locator> {
+  await card(page, cardName).getByTestId("card-name").click({ button: "right" });
+  const menu = page.getByTestId("menu-toolbox");
+  await menu.waitFor();
+  return menu.getByRole("menuitem", { name: label, exact: true });
 }

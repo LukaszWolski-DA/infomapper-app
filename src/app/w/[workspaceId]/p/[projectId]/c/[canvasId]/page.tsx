@@ -127,7 +127,7 @@ export default async function CanvasPage({
   const events = fourEyes ? await store.changeEvents.list(ws) : [];
   const contentAuthors = Object.fromEntries(model.mappings.map((m) => [m.id, fourEyes ? lastContentEditor(m, events) : ""]).filter(([, u]) => u));
   // the modules' part (slice 15a, AD-33): roles on cards and in panels, their tabs and creates
-  const modules = workspace ? await moduleView(store, workspace, model, CREATE_ACTIONS) : NO_MODULES;
+  const modules = workspace ? await moduleView(store, workspace, model, CREATE_ACTIONS, events) : NO_MODULES;
   const liveCanvases = new Set(canvases.map((c) => c.id));
   const items = allItems.filter((i) => liveCanvases.has(i.canvas_id));
   // a live canvas (slice 3b): its label, what that label makes relevant (computed once here, never while rendering),

@@ -4,6 +4,7 @@
 
 import type { CanvasExtension } from "@/canvas/extensions";
 import { CUBE_MAPPING_KIND } from "@/modules/infocube/canvas/lines";
-import { CubeMappingPanel, useCubeCanvas } from "@/modules/infocube/app/canvas-ext";
+import { useCubeCanvas } from "@/modules/infocube/app/canvas-ext";
+import { CubeMappingPanel } from "@/modules/infocube/app/mapping-panel";
 
 export const CANVAS_EXTENSIONS: readonly CanvasExtension[] = [{ kind: CUBE_MAPPING_KIND, useHandlers: useCubeCanvas, Panel: CubeMappingPanel }];

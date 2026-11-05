@@ -8,7 +8,7 @@
 // draws the lines from `cubeLines`. Every write is a module command: the delete and the status on the save chain with
 // the mapping's row checked, a header drop on the card's queue (it opens the card).
 
-import { useContext, useMemo } from "react";
+import { useCallback, useContext, useMemo, useState } from "react";
 import { useModules } from "@/app/_components/modules";
 import { useAction } from "@/app/_components/use-action";
 import { useSidePanels } from "@/app/_components/side-panels";
@@ -16,14 +16,13 @@ import { CanvasUiCtx, type RowDropTarget } from "@/canvas/context";
 import type { CanvasExtContext, CanvasExtHandlers, ExtMenuItem } from "@/canvas/extensions";
 import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
-import { Kind } from "@/app/_panels/fields";
-import { usePanel } from "@/app/_panels/inspector";
-import { CubeIcon } from "../ui/cube-icon";
 import { CUBE_MAPPING_KIND } from "../canvas/lines";
 import { MAPPING_EXISTS_SELECTED, mappingIndex, planDrop, type MappingIndex } from "../domain/mappings";
 import type { CubeMapping, CubeMappingInput, CubeMappingStatus } from "../domain/types";
 import type { CubePageRows } from "../domain/view";
 import { createCubeMappingAction, createOnHeaderAction, deleteCubeMappingAction, setCubeMappingStatusAction, updateCubeMappingAction } from "./actions";
+import { CreateDimensionDialog } from "./create-dimension-dialog";
+import { ruleFocus } from "./rule-focus";
 
 /** "That mapping no longer exists." (a history place, D-38; InfoMapper's mapping's text). */
 export const CUBE_MAPPING_GONE = "That mapping no longer exists.";
@@ -53,6 +52,20 @@ export const traceOf = (index: MappingIndex, id: Uuid): string => {
   return m ? `${index.inputsOf(id).map((i) => index.label(i.attribute_id)).join(" + ")} → ${index.label(m.attribute_id)}` : "";
 };
 
+/** "Delete mapping", the Delete key: on the save chain with the mapping's row checked; true once deleted. */
+export function useCubeMappingDelete(workspaceId: string, index: MappingIndex) {
+  const { saveRow } = useAction();
+  return useCallback(
+    async (id: Uuid) => {
+      const m = index.mapping(id);
+      if (!m) return false;
+      const r = await saveRow(m, (v) => deleteCubeMappingAction(workspaceId, { mappingId: m.id, expectedVersion: v }), "Mapping deleted", { undoable: true, deletes: true });
+      return r.ok;
+    },
+    [saveRow, index, workspaceId],
+  );
+}
+
 export function useCubeCanvas(context: CanvasExtContext): CanvasExtHandlers {
   const { workspaceId, editable, canSetStatus, model, cards } = context;
   const ui = useContext(CanvasUiCtx);
@@ -60,6 +73,10 @@ export function useCubeCanvas(context: CanvasExtContext): CanvasExtHandlers {
   const { run, saveRow } = useAction();
   const { openDetails } = useSidePanels();
   const index = useMappingIndex(model);
+  const deleteMapping = useCubeMappingDelete(workspaceId, index);
+  // "Create dimension from this…" (B-2): offered while InfoCube is on (its creates are there only then)
+  const on = useModules().creates.length > 0;
+  const [dimensionFrom, setDimensionFrom] = useState<Uuid | null>(null);
   const levelOfEntity = useMemo(() => new Map(model.entities.map((e) => [e.id, e.model_level])), [model.entities]);
   const cardOfEntity = useMemo(() => new Map(cards.filter((c) => c.kind === "ent").map((c) => [c.targetId, c.id])), [cards]);
 
@@ -70,10 +87,9 @@ export function useCubeCanvas(context: CanvasExtContext): CanvasExtHandlers {
     const onto = (t: RowDropTarget) => ("attributeId" in t ? { attributeId: t.attributeId } : "entityId" in t ? { entityId: t.entityId } : { columnId: t.columnId });
 
     const remove = (id: Uuid) => {
-      const m = index.mapping(id);
-      if (!m || !editable) return;
-      void saveRow(m, (v) => deleteCubeMappingAction(workspaceId, { mappingId: m.id, expectedVersion: v }), "Mapping deleted", { undoable: true, deletes: true }).then((r) => {
-        if (r.ok) ui.select(null);
+      if (!editable) return;
+      void deleteMapping(id).then((ok) => {
+        if (ok) ui.select(null);
       });
     };
 
@@ -97,6 +113,8 @@ export function useCubeCanvas(context: CanvasExtContext): CanvasExtHandlers {
           label: "Edit transformation rule…",
           act: () => {
             openDetails();
+            // the panel puts the cursor in the rule once it is a transformation
+            ruleFocus.set(m.id);
             if (m.kind === "transform") return;
             void saveRow(m, (v) => updateCubeMappingAction(workspaceId, { mappingId: m.id, expectedVersion: v, kind: "transform" }), "It is a transformation now. Describe the rule.");
           },
@@ -110,6 +128,9 @@ export function useCubeCanvas(context: CanvasExtContext): CanvasExtHandlers {
       gone: (id) => (index.mapping(id) ? null : CUBE_MAPPING_GONE),
       menu,
       remove,
+      cardMenu: (entityId) =>
+        editable && on && levelOfEntity.get(entityId) === "logical" ? [{ label: "Create dimension from this…", act: () => setDimensionFrom(entityId), testId: "menu-create-dimension" }] : [],
+      overlay: dimensionFrom ? <CreateDimensionDialog entityId={dimensionFrom} onClose={() => setDimensionFrom(null)} /> : null,
       rowDrag: (attributeId) => {
         const level = index.levelOf(attributeId);
         if (!level) return null;
@@ -152,29 +173,5 @@ export function useCubeCanvas(context: CanvasExtContext): CanvasExtHandlers {
         }
       },
     };
-  }, [index, cards, levelOfEntity, cardOfEntity, ui, toast, run, saveRow, editable, canSetStatus, workspaceId, openDetails]);
-}
-
-/**
- * The dimensional mapping's panel (slice 15c; prototype `insCmap`): its kind with the InfoCube badge and its trace, so a
- * selected line shows what it is. Step 5 adds its fields (inputs, target, kind, rule, status, note, delete).
- */
-export function CubeMappingPanel({ id }: { id: Uuid }) {
-  const index = useMappingIndex(usePanel().ix.model);
-  const m = index.mapping(id);
-  if (!m) return null;
-  return (
-    <div data-testid="panel-cube-mapping" data-mapping={id} data-status={m.status}>
-      <Kind>
-        Dimensional mapping{" "}
-        <span className="stereo cube inline-flex items-center gap-1 font-medium">
-          <CubeIcon />
-          InfoCube
-        </span>
-      </Kind>
-      <div className="mt-2 font-mono text-[12px] text-im-ink-2" data-testid="cube-mapping-trace">
-        {traceOf(index, id)}
-      </div>
-    </div>
-  );
+  }, [index, cards, levelOfEntity, cardOfEntity, ui, toast, run, saveRow, editable, canSetStatus, workspaceId, openDetails, deleteMapping, on, dimensionFrom]);
 }
