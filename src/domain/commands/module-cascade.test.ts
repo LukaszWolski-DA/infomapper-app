@@ -49,4 +49,42 @@ describe("moduleCascade (E14)", () => {
     const extra = moduleCascade(ctx, [softDelete("entity", fact)], chained, { cube_entity: [cube], cube_measure: [onCube] });
     expect(extra.map((w) => w.table)).toEqual(["cube_entity", "cube_measure"]);
   });
+
+  describe("goesWhole (slice 15c, Q-5)", () => {
+    const mapped = undoTables({
+      cube_mapping: { parents: [["attribute_id", "attribute"]], noun: "dimensional mapping", goesWhole: [["cube_mapping_input", "mapping_id", "attribute_id"]] },
+      cube_mapping_input: { parents: [["mapping_id", "cube_mapping"], ["attribute_id", "attribute"]], noun: "dimensional mapping input" },
+    } as never);
+    const target = attribute(ids.customerId, { entity_id: ids.customer });
+    const [a, b, c] = ["in-a", "in-b", "in-c"].map((id) => attribute(id, { entity_id: ids.salesOrder }));
+    const mapping = { ...std, id: "map1", attribute_id: target.id };
+    const other = { ...std, id: "map2", attribute_id: target.id };
+    const inputs = [a!, b!, c!].map((x, i) => ({ ...std, id: `i${i}`, mapping_id: "map1", attribute_id: x.id, sort_order: i }));
+    const otherInput = { ...std, id: "i9", mapping_id: "map2", attribute_id: "elsewhere", sort_order: 0 };
+    const rows = { cube_mapping: [mapping, other], cube_mapping_input: [...inputs, otherInput] };
+    const deletedIds = (extra: Write[]) => extra.map((w) => `${w.table}:${(w as { row: { id: string } }).row.id}`).sort();
+
+    it("takes a mapping whole when one of its inputs goes with its attribute, with its other inputs", () => {
+      const writes = [softDelete("attribute", b!)];
+      expect(cascadingModuleTables(writes, mapped).sort()).toEqual(["cube_mapping", "cube_mapping_input"]);
+      expect(deletedIds(moduleCascade(ctx, writes, mapped, rows))).toEqual(["cube_mapping:map1", "cube_mapping_input:i0", "cube_mapping_input:i1", "cube_mapping_input:i2"]);
+    });
+
+    it("leaves the mapping when an input is removed on purpose", () => {
+      const removed: Write = { kind: "update", table: "cube_mapping_input", before: inputs[1], row: { ...inputs[1], deleted_at: ctx.now, version: 2 } } as unknown as Write;
+      expect(moduleCascade(ctx, [removed], mapped, rows)).toEqual([]);
+    });
+
+    it("takes the mapping and its inputs when its target goes, and leaves the other mappings", () => {
+      const writes = [softDelete("attribute", target)];
+      expect(deletedIds(moduleCascade(ctx, writes, mapped, rows))).toEqual([
+        "cube_mapping:map1", "cube_mapping:map2", "cube_mapping_input:i0", "cube_mapping_input:i1", "cube_mapping_input:i2", "cube_mapping_input:i9",
+      ]);
+    });
+
+    it("writes each row once when several inputs go together", () => {
+      const extra = moduleCascade(ctx, [softDelete("attribute", a!), softDelete("attribute", c!)], mapped, rows);
+      expect(deletedIds(extra)).toEqual(["cube_mapping:map1", "cube_mapping_input:i0", "cube_mapping_input:i1", "cube_mapping_input:i2"]);
+    });
+  });
 });

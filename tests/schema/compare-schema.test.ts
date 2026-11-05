@@ -93,6 +93,8 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
         "cube_entity", "cube_measure",
         // slice 15b: the key links (role-playing)
         "cube_key",
+        // slice 15c: the dimensional mappings (M1)
+        "cube_mapping", "cube_mapping_input",
       ].sort(),
     );
     for (const t of NOT_IN_DOMAIN_YET) expect(tables.map((x) => x.table)).not.toContain(t);

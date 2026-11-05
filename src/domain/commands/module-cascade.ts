@@ -3,8 +3,9 @@
 // the same change group, so one undo brings everything back. The parents are the ones each module registered for undo
 // (`UndoTables.parents`): one registration says both what a revert must find live and what a delete takes along.
 // InfoMapper's own commands keep their cascades (`entityCascade`); this step only adds the modules' rows, after any
-// command, so no InfoMapper command names a module table. Whether a mapping of a module goes whole when one of its
-// inputs goes is the module's own rule (15c), not this one.
+// command, so no InfoMapper command names a module table. Since slice 15c a module table may also go whole with a row
+// that points to it (`goesWhole`, Q-5): a dimensional mapping goes when the cascade deletes one of its inputs because the
+// input's logical attribute went; its other inputs then follow by `parents`. An input removed on purpose leaves it.
 
 import type { CommandContext, Write } from "../changes";
 import type { UndoTables } from "./undo";
@@ -30,10 +31,12 @@ export function cascadingModuleTables(writes: readonly Write[], tables: UndoTabl
   // a module's rows may point to another module row (15c's inputs to their mapping): follow until nothing is added
   const reach = new Set(deleted.keys());
   const out: string[] = [];
+  const reached = (table: string) =>
+    (tables.parents[table] ?? []).some(([, parent]) => reach.has(parent)) || (tables.goesWhole[table] ?? []).some(([child]) => reach.has(child));
   for (let grew = true; grew; ) {
     grew = false;
     for (const table of tables.modules) {
-      if (out.includes(table) || !(tables.parents[table] ?? []).some(([, parent]) => reach.has(parent))) continue;
+      if (out.includes(table) || !reached(table)) continue;
       out.push(table);
       reach.add(table);
       grew = true;
@@ -55,18 +58,31 @@ export function moduleCascade(
   const deleted = deletedBy(writes);
   const written = new Set(writes.map((w) => `${w.table}:${String(((w.kind === "remove" ? w.before : w.row) as { id?: unknown }).id ?? "")}`));
   const extra: Write[] = [];
+  // the rows this cascade deleted because a parent went, with the column of that parent (`goesWhole`'s `via`)
+  const cascaded = new Map<string, Map<string, Set<string>>>();
+  const takenWhole = (table: string, row: Row) =>
+    (tables.goesWhole[table] ?? []).some(([child, column, via]) =>
+      ((rows[child] ?? []) as Row[]).some((c) => String(c[column]) === row.id && cascaded.get(child)?.get(via)?.has(c.id)));
   for (let grew = true; grew; ) {
     grew = false;
     for (const table of tables.modules) {
       const parents = tables.parents[table] ?? [];
       for (const row of (rows[table] ?? []) as Row[]) {
         if (row.deleted_at !== null || written.has(`${table}:${row.id}`)) continue;
-        if (!parents.some(([column, parent]) => deleted.get(parent)?.has(String(row[column])))) continue;
+        const via = parents.filter(([column, parent]) => deleted.get(parent)?.has(String(row[column]))).map(([column]) => column);
+        if (!via.length && !takenWhole(table, row)) continue;
         extra.push({ kind: "update", table, before: row, row: { ...row, deleted_at: ctx.now, version: row.version + 1, updated_at: ctx.now, updated_by: ctx.actorId } } as unknown as Write);
         written.add(`${table}:${row.id}`);
         let ids = deleted.get(table);
         if (!ids) deleted.set(table, (ids = new Set()));
         ids.add(row.id);
+        let byColumn = cascaded.get(table);
+        if (!byColumn) cascaded.set(table, (byColumn = new Map()));
+        for (const column of via) {
+          let set = byColumn.get(column);
+          if (!set) byColumn.set(column, (set = new Set()));
+          set.add(row.id);
+        }
         grew = true;
       }
     }
