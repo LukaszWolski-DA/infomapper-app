@@ -2310,3 +2310,56 @@ The recommendations are accepted, with these details:
   from step 2 to step 3.
 - **X9:** yes (AD-36's added sentence, quoted at the closing).
 - The 11 expected differences from the prototype are accepted.
+
+## 15c step 2: the data (5 November 2026)
+
+### What changed
+
+- **`cube_mapping` and `cube_mapping_input`** (M1; `src/modules/infocube/domain/types.ts`): a mapping's target
+  (`attribute_id`), `kind` (`direct`, `transform`), `rule_expression`, `status` (`draft`, `review`, `approved`), a
+  plain-text `note`, `approved_by` and `approved_at`; an input's `mapping_id`, logical `attribute_id` and `sort_order`.
+- **The registry** (`src/modules/infocube/domain/tables.ts`, `data/tables.ts`; joined in `src/compose/tables.ts` as
+  15a's and 15b's tables):
+  - undo parents: a mapping's target; an input's mapping and logical attribute; nouns "dimensional mapping" and
+    "dimensional mapping input";
+  - `action`: a status-only change needs `mapping.set_status` (reviewers, O9), as on InfoMapper's mappings
+    (`statusOnlyEvent`, exported from `undo.ts`), anything else `model.edit`;
+  - the local rules: the foreign keys, `cube_mapping_kind_ck`, `cube_mapping_status_ck`, `cube_mapping_approval_ck`
+    (approved exactly when `approved_at` is set, as `mapping_approval_ck`), one live input per attribute and mapping.
+    No rule check: the prototype's second input makes a transformation with an empty rule and asks for it (X2).
+- **Q-5 (X2): `goesWhole`**, a new optional field of a module's undo table (`ModuleUndoTable`, `undo.ts`), applied by
+  `moduleCascade` (`module-cascade.ts`). `cube_mapping` registers `[["cube_mapping_input", "mapping_id",
+  "attribute_id"]]`: a mapping goes when the cascade deletes one of its inputs **because the input's attribute went**;
+  its other inputs then go by `parents`. An input removed on purpose leaves its mapping. Undo does not run the cascade
+  again (15a's Q7); the step's events hold every row.
+- **The migration** `20261105110000_infocube_mappings.sql`: both tables, the three CHECKs, indexes on `workspace_id`
+  and the attributes, the partial unique index on `(mapping_id, attribute_id)`, RLS on both.
+- **No format bump** (C1): a module's tables are not part of the local file's format; KB's file is unchanged by this
+  step (backed up first: `.data/backups/dev-db-20261105-1030.json`, format 13).
+- **The star's 20 mappings** (`sales-star.ts`, `MAPPINGS`): the prototype's `cubeDemo` and `cubeDemoV2`, with their
+  rules and Dim Customer.city's note; approved ones with `approved_by` (Anna, the star's author) and `approved_at`.
+- `isContentChange` and `listForMapping` are **not** changed in this step: they move to step 3 (X8).
+
+### Tests
+
+- `module-cascade.test.ts`: four new cases for `goesWhole` (one input of three with its attribute, an input removed on
+  purpose, the target, two inputs at once).
+- `tests/infocube-mappings.test.ts` (new), through the composition root's registry: the star's 20 mappings (statuses,
+  kinds, inputs, approvals, IC-10's figures, the unfed attributes, every input logical and every target dimensional);
+  Order Line.quantity's delete takes its direct mapping and net_amount's three-input mapping whole, one change group,
+  undo and redo; Dim Customer.city's delete takes its mapping; Order Line's delete takes six; an input removed on
+  purpose leaves its mapping; the star's file read at the current format with no violation, a second live input and an
+  approval without its date refused.
+- `tests/table-registry.test.ts` and `tests/schema/compare-schema.test.ts`: the two tables in their lists; an empty
+  registry has no `goesWhole`.
+
+### Checks
+
+- `npm run lint` and `npm run typecheck`: clean. `npm test`: 138 files, 1,733 tests (+10: four `goesWhole` tests in
+  `module-cascade.test.ts`, six in `tests/infocube-mappings.test.ts`).
+- Full e2e run in four parts, from scratch, on 02964c1 (the step touches shared infrastructure: the table registry, the
+  module cascade and undo's module registration): 582 passed, 3 skipped, 0 failed, 1 h 34 min (10:39 to 12:13).
+  Parts: 21 min 50 s (111 passed), 24 min 7 s (135 passed), 19 min 8 s (140 passed, 1 skipped), 28 min 31 s (196
+  passed, 2 skipped).
+- KB backed up before the step (`.data/backups/dev-db-20261105-1030.json`, `kb-model-latest.json`, format 13); the
+  local file's format is unchanged (module tables are not part of it).
