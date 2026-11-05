@@ -2363,3 +2363,150 @@ The recommendations are accepted, with these details:
   passed, 2 skipped).
 - KB backed up before the step (`.data/backups/dev-db-20261105-1030.json`, `kb-model-latest.json`, format 13); the
   local file's format is unchanged (module tables are not part of it).
+
+## 15c step 3: the domain (5 November 2026)
+
+### What changed
+
+- **Four-eyes reads any kind of mapping's change log** (C11, X8):
+  - `MappingLog` (`src/domain/model/mapping-rules.ts`) names a mapping's table, its inputs' table and the columns whose
+    change is content.
+  - `MAPPING_LOG` is InfoMapper's (`mapping`, `mapping_input`; kind and rule). It is the default of
+    `lastContentEditor`, `isContentChange` (now exported) and `changeEvents.listForMapping` (`src/data/ports.ts`,
+    `src/data/local/store.ts`), so InfoMapper's callers are unchanged.
+  - InfoCube's is `CUBE_MAPPING_LOG` (`cube_mapping`, `cube_mapping_input`; kind, rule and the target, X5).
+- **InfoCube's mapping commands** (`src/modules/infocube/domain/mappings.ts`). Each is one change group and one undo
+  step, under `model.edit` (InfoMapper's rights and the archive) unless said otherwise:
+  - `createCubeMapping`: a logical attribute onto a dimensional one, as a direct Draft mapping with one input. Toast:
+    "Mapped {E.a} to {E.b}", with ". The types differ ({t1} → {t2})." when the types differ.
+  - `createOnHeader`: a logical attribute onto a fact's or dimension's header.
+    - It makes a plain copy, placed last: the name, the type and its parameters, Personal data and the definition; no
+      key, nullable, no `copied_from_attribute_id`. The mapping is made with it.
+    - The card it was dropped on opens, and its row filter goes to All unless it is already All or Mapped (the
+      prototype).
+    - When the entity already has an attribute of that name (case ignored), the drop maps onto that attribute instead.
+    - Toast: "Added {a} to {E}, fed from {E.a}. Rename it on the right." The working context labels the new attribute.
+  - `addCubeMappingInput`: adds the attribute as the last input.
+    - **A second input on a direct copy makes it a transformation (X2).**
+    - Toast: "It reads {E.a} too, so it is a transformation now. Describe the rule." (otherwise "It reads {E.a} too.").
+    - It returns `becameTransform`, so the panel can put the cursor in the rule.
+  - `removeCubeMappingInput`: refused on the last input; a transformation stays one.
+  - `updateCubeMapping`: the kind, the rule (trimmed) and the note (plain text, trimmed).
+    - Direct with more than one input is refused.
+    - A transformation may have no rule yet, as in the prototype; the store has no rule check (step 2).
+  - `retargetCubeMapping`: another dimensional attribute as the target; toast "Re-pointed to {E.a}". Re-pointing onto
+    the identical mapping (the same inputs in the same order) is refused: "That mapping already exists." (difference 8).
+  - `setCubeMappingStatus`: runs under `mapping.set_status`, so reviewers may set it (O9).
+    - With four-eyes on, the last content editor cannot approve (`checkFourEyes`: "Four-eyes is on: someone else has to
+      approve your change.").
+    - Approving records `approved_by` and `approved_at`; leaving Approved clears both.
+  - `deleteCubeMapping`: the mapping and its inputs.
+  - **D-51's first rule (O12)** (`cubeAfterContentChange`):
+    - a change of inputs (added or removed), kind, rule or target sends an approved mapping to In review and clears its
+      approval, with InfoMapper's notice "This mapping was approved; your change sends it back to review.";
+    - a note alone keeps the approval;
+    - undo brings the approval back with who and when.
+- **The refusals, with the prototype's texts:**
+  - a dimensional input: "A dimensional attribute is fed from the logical model. Drag a logical attribute onto it.";
+  - a logical target: "A logical attribute maps onto a fact or a dimension. To relate two logical entities, draw a
+    relationship.";
+  - the identical mapping on a create: "That mapping already exists. It is selected now." (`conflict`; the page selects
+    the existing one);
+  - a duplicate input: "It already reads that attribute.";
+  - direct with more than one input: "A direct copy reads one attribute. Remove the others first.";
+  - a source column onto a dimensional attribute: unchanged, 15a's `MAPPING_TO_DIMENSIONAL_MESSAGE`.
+- **The drop's plan** (`planDrop`, the prototype's `findDrop`, step 1's drag table): a drag from either end gives one of
+  these, and the canvas uses it in step 4:
+  - a mapping, always logical → dimensional;
+  - a copy on a header;
+  - the existing mapping (`exists`);
+  - a refusal's toast;
+  - nothing: a logical row on a column (X1), a logical row on a logical header, a dimensional row on a header.
+- **"Create dimension from this…"** (`createDimensionFrom`, B-2), one change group:
+  - the entity at the dimensional level in the original's concept, with InfoCube's row (dimension, SCD type 1), made
+    through `createCubeEntity`, which now takes the default name's base;
+  - its name: the dialog's, or "Dim {entity}", numbered within the level ("Dim Product 2");
+  - its definition: "From {entity}:" followed by the original's, when the original has one (the prototype);
+  - `{entity}_key` first: Integer, primary key, not nullable, "Surrogate key of the dimension.";
+  - a plain copy of each ticked attribute in the original's order, each with a direct Draft mapping from its original;
+  - its card at the original card's height, 80 px to the right of it, when the original is on the dialog's canvas;
+  - toast: "Created {name} with {n} attributes fed from {entity}, plus its key {key}."; a typed name that is already
+    taken gets InfoMapper's duplicate-name warning.
+- **The derived reads** (`mappingIndex`, built once per read):
+  - `feedsOf` ("Feeds facts and dimensions") and `fedFrom` ("Comes from the logical model", with the inputs joined by
+    " + ");
+  - `rowFeeds`: each dimensional attribute with at least one dimensional mapping, of any status, and how many. In
+    step 4 the card's bar, its row states and the Mapped / Not mapped filter (X4) read it;
+  - `fedCount`: the Overview's "{n} of {m} fed";
+  - `mappingDependents` (X-2, X-4):
+    - "{n} dimensional mappings – deleted, {k} of them approved";
+    - for a logical entity or attribute also "{facts and dimensions} – lose their feed from the logical model" ("loses
+      its feed …" for one), the names sorted;
+    - `entityDependents` now takes these rows for both levels; before, a logical entity's preview had no InfoCube rows;
+  - `mappingAttributeDeletes` (X-3): the second click's "{n} dimensional mappings" and "{E} loses its feed from the
+    logical model", joined to 15b's measure and key link in `attributeDeletes`;
+  - `entityDependents` and `attributeDeletes` take the index as a new last argument. `src/compose/view.ts` passes it in
+    step 5, so nothing shows in the app yet.
+
+### Not done in step 3
+
+- Step 4: the lines' builder (it needs the canvas's card ends and collapsed frames), the `ext` selection and the drag.
+- Step 5:
+  - the server actions with their loaders, and the rows a save holds on the chain;
+  - `ModuleView`'s mapping rows;
+  - `rowFeeds` and the previews through the composition root;
+  - the panels and the dialog.
+
+### New texts (for approval in step 5, with the panel)
+
+- "A mapping reads at least one attribute. Delete the mapping instead." (removing the last input; the panel offers no ×
+  there).
+- "A dimension is created from a logical entity." (a guard: the menu item is on logical cards only).
+
+### Tests
+
+`tests/infocube-mapping-commands.test.ts` (19 tests) runs on the Sales star through the composed undo registry:
+
+- **Create:** the rows, and the toast with and without the types. The refusals: a dimensional input, a logical target,
+  the identical mapping, a reviewer, the archive.
+- **`planDrop`:**
+  - in both directions;
+  - onto a header, new and same-named;
+  - the existing mapping;
+  - each refusal;
+  - the drops that do nothing.
+- **A header drop:** the copy and its place, the card opened, one change group, one undo removes both.
+- **The panel's edits:**
+  - inputs: X2, the duplicate, a dimensional input, a stale version;
+  - the last input;
+  - kind, rule and note;
+  - re-pointing: a logical target, the identical mapping;
+  - delete with undo.
+- **D-51:** each kind of content change sends the mapping back to review, the note does not. Its undo restores who and
+  when; redo sends it back again.
+- **Status:**
+  - a reviewer sets the status and nothing else, and may undo their own approval;
+  - four-eyes through the change log with `CUBE_MAPPING_LOG`: a note is no content, InfoMapper's log reads none of
+    InfoCube's events, and a re-point and an added input count as content.
+- **Create dimension from Product:**
+  - Dim Product 2 with `product_key`, the copies, the mappings and the card to the right, nothing changed in Product;
+  - a typed name;
+  - no card without a placement;
+  - a dimensional entity refused;
+  - undo and redo.
+- **The derived reads:**
+  - feeds both ways;
+  - the cards' feeds: 20 fed attributes, Dim Customer 4 of 5;
+  - S15-12's figures: 6 dimensional mappings, 4 approved; "Fact Orders, Fact Sales – lose their feed from the logical
+    model";
+  - Country's one mapping;
+  - Dim Customer's preview with its 4 mappings, and Dim Date's without any;
+  - the second clicks of Customer.segment_code, Order Line.quantity and a fact's measure.
+
+### Checks
+
+- `npm run lint` and `npm run typecheck`: clean.
+- `npm test`: 139 files and 1,752 tests passed. Before the step it was 1,733; the new file adds 19.
+- The step changes the change-log read that four-eyes uses (X8), and it changes change groups and undo, so it got a full e2e run (`npm run e2e`, from scratch, no dev server running):
+  - **582 passed, 3 skipped, 0 failed**, in 1 h 38 min (12:48:57 to 14:26:25);
+  - part 1 took 25:02, part 2 24:12, part 3 19:32 and part 4 28:38.
