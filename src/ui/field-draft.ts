@@ -93,3 +93,9 @@ export interface Chosen<T> {
 }
 
 export const choiceShown = <T>(chosen: Chosen<T> | null, stored: T): T => (chosen && Object.is(chosen.on, stored) ? chosen.value : stored);
+
+/**
+ * Whether a choice is stored (slice 15b): the stored value came to equal it. `useChoice` then forgets it, so a later
+ * change back to the value it was made on (an undo) shows as stored instead of the old choice again.
+ */
+export const choiceLanded = <T>(chosen: Chosen<T>, stored: T): boolean => !Object.is(chosen.on, chosen.value) && Object.is(stored, chosen.value);
