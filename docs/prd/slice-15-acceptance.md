@@ -2041,3 +2041,9 @@ KB was backed up before it: `.data/backups/dev-db-20261105-0925.json` and `kb-mo
 1. The first page upgrades the file to format 13 (the relationships' roles, null); nothing else changes.
 2. A logical relationship: a role typed shows in its sentences (" as {role}") and on the line's pill.
 3. Undo takes the role back.
+
+## Łukasz's answers to 15b step 5 (5 November 2026)
+
+- AD-34's sentence and D-61's 20 px approved as written; D-68 approved with its hints sentence changed to the list
+  `factHints` gives (there is no "fact without measures" hint). All three entered in `docs/decisions.md`. The merge
+  waits for his manual acceptance.
