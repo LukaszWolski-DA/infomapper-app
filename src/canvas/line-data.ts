@@ -1,6 +1,7 @@
 // The lines of one canvas, as plain data: mappings (with all their inputs, D-49) and relationships between the cards
 // on it, built on the server next to the cards. Which lines a selection emphasises is decided here too. Slice 10b
-// (D-62): relationships between source tables, a list of their own (`sources`).
+// (D-62): relationships between source tables, a list of their own (`sources`). Slice 15c (C7): a module's lines between
+// two entity rows, a list of their own (`modules`), drawn from what the module says (a class, a colour, an end mark).
 
 import type { Uuid } from "@/domain/ids";
 import { checkMappingTypes } from "@/domain/model/type-check";
@@ -67,11 +68,35 @@ export interface SourceLineData {
   missing?: true;
 }
 
+/**
+ * A module's line from one or more entity rows to another entity row (slice 15c, C7; InfoCube's dimensional mapping):
+ * one path per input from its row to the target's row. InfoMapper draws it from this and knows nothing of its meaning;
+ * the module's CSS styles it by `cls`. Its selection is `{ t: "ext", kind, id }`.
+ */
+export interface ModuleLineData {
+  /** The kind of object it stands for (the selection's `kind`): `cube_mapping`. */
+  kind: string;
+  id: Uuid;
+  /** Inputs whose card is on this canvas, in their order. */
+  inputs: { rowId: Uuid; cardId: Uuid }[];
+  target: { rowId: Uuid; cardId: Uuid };
+  /** Classes on the line's group, after `lnk`: `cmap draft`. */
+  cls: string;
+  /** The stroke's colour (`--lc`). */
+  colour: string;
+  /** The mark at the target's end. */
+  endMark: "diamond";
+  /** A chip on the first input's path (`ƒ`); absent: none. */
+  chip?: string;
+}
+
 export interface CanvasLines {
   mappings: MapLineData[];
   relationships: RelLineData[];
   /** Relationships between source tables (slice 10b); absent: none. Code that does not know them leaves them out. */
   sources?: SourceLineData[];
+  /** The modules' lines between entity rows (slice 15c); absent: none. Code that does not know them leaves them out. */
+  modules?: ModuleLineData[];
 }
 
 /** Mapping lines need the attribute's card and at least one input card; relationships need both entity cards. */
@@ -179,11 +204,15 @@ export type Selection =
    * always this kind.
    */
   | { t: "element"; kind: "entity" | "attribute" | "source_table" | "source_column" | "source_system"; id: Uuid }
+  /** A module's object (slice 15c, C8, F15): a dimensional mapping's line (`kind` "cube_mapping"). */
+  | { t: "ext"; kind: string; id: Uuid }
   | null;
 
 export interface Related {
   maps: Set<Uuid>;
   rels: Set<Uuid>;
+  /** The modules' lines (slice 15c); absent: none. */
+  exts?: Set<Uuid>;
 }
 
 /**
@@ -193,7 +222,7 @@ export interface Related {
 export function relatedLines(sel: Selection, lines: CanvasLines): Related | null {
   // a bundle's lines are known to the canvas, which emphasises them itself (slice 2c)
   if (!sel || sel.t === "card" || sel.t === "multi" || sel.t === "frame" || sel.t === "bundle" || sel.t === "label" || sel.t === "note" || sel.t === "req" || sel.t === "element") return null;
-  const maps = new Set<Uuid>(), rels = new Set<Uuid>();
+  const maps = new Set<Uuid>(), rels = new Set<Uuid>(), exts = new Set<Uuid>();
   switch (sel.t) {
     case "map":
       maps.add(sel.id);
@@ -201,26 +230,42 @@ export function relatedLines(sel: Selection, lines: CanvasLines): Related | null
     case "rel":
       rels.add(sel.id);
       break;
+    case "ext":
+      exts.add(sel.id);
+      break;
     case "row":
       for (const m of lines.mappings) {
         if (m.attributeId === sel.id || m.inputs.some((i) => i.columnId === sel.id)) maps.add(m.id);
       }
+      // a module's lines both ways (slice 15c, prototype hoverRows)
+      for (const l of lines.modules ?? []) if (l.target.rowId === sel.id || l.inputs.some((i) => i.rowId === sel.id)) exts.add(l.id);
       break;
   }
-  return { maps, rels };
+  return exts.size ? { maps, rels, exts } : { maps, rels };
 }
 
 /** The rows a hover marks: the hovered row and the rows at the other end of its mappings, or a mapping's rows. */
 export function hoverRows(hover: Selection, lines: CanvasLines): { cardId: string; rowId: string }[] {
-  if (!hover || (hover.t !== "row" && hover.t !== "map")) return [];
+  if (!hover || (hover.t !== "row" && hover.t !== "map" && hover.t !== "ext")) return [];
   const out = new Map<string, { cardId: string; rowId: string }>();
   const add = (cardId: string, rowId: string) => out.set(`${cardId}|${rowId}`, { cardId, rowId });
   if (hover.t === "row") add(hover.cardId, hover.id);
-  for (const m of lines.mappings) {
-    const hit = hover.t === "map" ? m.id === hover.id : m.attributeId === hover.id || m.inputs.some((i) => i.columnId === hover.id);
-    if (!hit) continue;
-    add(m.cardId, m.attributeId);
-    for (const i of m.inputs) add(i.cardId, i.columnId);
+  if (hover.t !== "ext") {
+    for (const m of lines.mappings) {
+      const hit = hover.t === "map" ? m.id === hover.id : m.attributeId === hover.id || m.inputs.some((i) => i.columnId === hover.id);
+      if (!hit) continue;
+      add(m.cardId, m.attributeId);
+      for (const i of m.inputs) add(i.cardId, i.columnId);
+    }
+  }
+  // a module's lines (slice 15c): a row lights them both ways, a line its rows
+  if (hover.t !== "map") {
+    for (const l of lines.modules ?? []) {
+      const hit = hover.t === "ext" ? l.id === hover.id : l.target.rowId === hover.id || l.inputs.some((i) => i.rowId === hover.id);
+      if (!hit) continue;
+      add(l.target.cardId, l.target.rowId);
+      for (const i of l.inputs) add(i.cardId, i.rowId);
+    }
   }
   return [...out.values()];
 }

@@ -323,8 +323,11 @@ Claude Code session may start at a step's boundary, never inside a step; it star
      failing test run three times on its own. A step that touches shared infrastructure (undo and change groups, the
      save chain, the canvas's layers, the table registry, the local adapter) runs one full e2e run in that step and its
      report says why: in 15c the data step (`cube_mapping` and `cube_mapping_input` in the registry, undo and the
-     cascades), the domain step (the change-log function behind four-eyes, X8) and the canvas step (the line layer, the
-     drag) do. Before the merge: one full e2e run.
+     cascades) and the domain step (the change-log function behind four-eyes, X8) do. **The canvas step (step 4) runs
+     no full run** (Łukasz, 5 November 2026): the slice's specs and every earlier spec folder that touches the canvas
+     (lines, drag, frames, Focus, layers, the miniature), named in its report. **The full run comes once, at the end of
+     step 5** (the panels), and counts as 15c's run before the merge if step 6 changes docs only. Otherwise, before the
+     merge: one full e2e run.
 
 ## 5. Acceptance criteria
 

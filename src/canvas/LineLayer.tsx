@@ -22,6 +22,10 @@
 // Slice 10b (D-62): relationships between source tables, `SourcePath`: the same geometry (`relGeom`, the loop for a key
 // to itself), grey and thinner, no cardinality and no label, an arrow path at the referenced table; dashed when the
 // source no longer declares it. Four elements per line; their own group, first, so they paint below the other lines.
+// Slice 15c (C7): a module's lines between entity rows (`ModulePath`; InfoCube's dimensional mappings): one curve per
+// input from its row to the target's row, a start dot and a diamond at the target, an optional chip on the first curve,
+// in the module's colour and classes. A group per line and four elements per input (+3 with a chip); their own group,
+// drawn only when the canvas has one (as the source lines', S10B-10).
 
 import { Fragment, memo, useContext, useState, type ReactNode } from "react";
 import { EdgeLabelRenderer, useStore, useStoreApi, type InternalNode } from "@xyflow/react";
@@ -29,11 +33,11 @@ import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type Notation } from "./context";
 import { blockNodeId, type BlockNodeT } from "./BlockNode";
 import { arrowHead, cardRect, ieMarker, LOD_ZOOM, multText, relGeom, umlMarker, type Placed, type Pt, type Rect } from "./geometry";
-import { bundleGeom, mapGeom, placedOf, traceGeom, type Bundle, type BundleEnd, type BundleGeom, type MapGeom, type TraceCardPlace } from "./line-geometry";
+import { bundleGeom, mapGeom, moduleGeom, placedOf, traceGeom, type Bundle, type BundleEnd, type BundleGeom, type MapGeom, type ModuleGeom, type TraceCardPlace } from "./line-geometry";
 import { REQ_CARD, requirementCardHeight } from "./requirement-card-data";
 import type { ReqNodeT } from "./RequirementCardNode";
 import type { TraceData } from "./trace-data";
-import { relatedLines, type CanvasLines, type MapLineData, type RelLineData, type Related, type Selection, type SourceLineData } from "./line-data";
+import { relatedLines, type CanvasLines, type MapLineData, type ModuleLineData, type RelLineData, type Related, type Selection, type SourceLineData } from "./line-data";
 import { useValue, type ValueStore } from "./value-store";
 
 interface LineProps {
@@ -158,6 +162,47 @@ const SourcePath = memo(
   (a, b) => a.sig === b.sig,
 );
 
+/** A diamond of side 6 at a point, turned 45° (prototype `cube-end`): one path, no transform. */
+const diamond = (p: Pt) => {
+  const r = (v: number) => +v.toFixed(2);
+  return `M${r(p.x)},${r(p.y - 4.24)}L${r(p.x + 4.24)},${r(p.y)}L${r(p.x)},${r(p.y + 4.24)}L${r(p.x - 4.24)},${r(p.y)}Z`;
+};
+
+/**
+ * A module's line (slice 15c, C7): its group with the module's classes and colour, and per input a hit target, the
+ * stroke, a start dot and the diamond at the target (the dots and diamonds left out below 40 %, as a mapping's dots);
+ * the chip on the first curve.
+ */
+const ModulePath = memo(
+  function ModulePath({ line, geom, dots, className, onSelect, testId = "line-module" }: LineProps & { line: ModuleLineData; geom: ModuleGeom; dots: boolean; testId?: string }) {
+    return (
+      <g className={className} style={{ ["--lc" as string]: line.colour }} data-testid={testId} data-ext={line.id} data-ext-kind={line.kind} onClick={onSelect}>
+        {geom.paths.map((d, i) => (
+          <path key={`h${i}`} className="hit" d={d} />
+        ))}
+        {geom.paths.map((d, i) => (
+          <path key={`s${i}`} className="s" d={d} />
+        ))}
+        {dots && geom.starts.map((p, i) => <circle key={`e${i}`} className="end" cx={p.x} cy={p.y} r={2.6} />)}
+        {dots && line.endMark === "diamond" && geom.ends.map((p, i) => <path key={`d${i}`} className="cube-end" data-testid="end-diamond" d={diamond(p)} />)}
+        {geom.chip && (
+          <g className="chip" data-testid="node-f">
+            <circle cx={geom.chip.x} cy={geom.chip.y} r={8} />
+            <text x={geom.chip.x} y={geom.chip.y}>
+              {geom.chip.text}
+            </text>
+          </g>
+        )}
+      </g>
+    );
+  },
+  (a, b) => a.sig === b.sig,
+);
+
+/** A module line's signature: what its drawing depends on. */
+const moduleSig = (geom: ModuleGeom, dots: boolean, className: string, l: ModuleLineData) => `${geom.paths.join("")}|${dots}|${className}|${l.colour}|${geom.chip?.text ?? ""}`;
+const moduleClass = (l: ModuleLineData, geom: ModuleGeom, state = "") => `lnk ${l.cls}${geom.part ? " part" : ""}${state}`;
+
 /** A bundle of two or more mappings, or of relationships (slice 2c, prototype .lnk.bundle). */
 const BundlePath = memo(
   function BundlePath({ bundleKey, geom, className, onSelect }: LineProps & { bundleKey: string; geom: Exclude<BundleGeom, { kind: "single" }> }) {
@@ -207,6 +252,8 @@ const NO_TETHERS: readonly { id: string; x1: number; y1: number; x2: number; y2:
 const NO_TRACES: readonly TraceData[] = [];
 const NO_SOURCES: readonly SourceLineData[] = [];
 const NO_SOURCE_IDS: ReadonlySet<string> = new Set();
+const NO_MODULE_LINES: readonly ModuleLineData[] = [];
+const NO_IDS: ReadonlySet<string> = new Set();
 
 /** A trace line (slice 4b-2): a dashed path and, at 40 % and above, its end dot; two elements, no group (S3A-14). */
 const TracePath = memo(
@@ -335,9 +382,9 @@ function LineLayer({
     drawn.set(id, { key, el });
     return el;
   };
-  const state = (kind: "map" | "rel", id: string) => {
+  const state = (kind: "map" | "rel" | "ext", id: string) => {
     const sel = selection?.t === kind && selection.id === id ? " sel" : "";
-    const hl = related && (kind === "map" ? related.maps : related.rels).has(id) ? " hl" : "";
+    const hl = related && (kind === "map" ? related.maps : kind === "rel" ? related.rels : (related.exts ?? NO_IDS)).has(id) ? " hl" : "";
     return sel + hl;
   };
 
@@ -383,6 +430,19 @@ function LineLayer({
       );
     });
     if (el) sources.push(el);
+  }
+  const exts: ReactNode[] = [];
+  for (const l of lines.modules ?? NO_MODULE_LINES) {
+    const key = `${cardKey(l.target.cardId)}|${l.inputs.map((i) => cardKey(i.cardId)).join(",")}|${dots}|${state("ext", l.id)}|${objectId(l)}`;
+    const el = reuse(`ext:${l.id}`, key, () => {
+      const geom = moduleGeom(l, lookup);
+      if (!geom) return null;
+      const className = moduleClass(l, geom, state("ext", l.id));
+      return (
+        <ModulePath key={l.id} sig={moduleSig(geom, dots, className, l)} line={l} geom={geom} dots={dots} className={className} onSelect={() => onSelect({ t: "ext", kind: l.kind, id: l.id })} />
+      );
+    });
+    if (el) exts.push(el);
   }
   const maps: ReactNode[] = [];
   for (const l of lines.mappings) {
@@ -472,6 +532,8 @@ function LineLayer({
         {sources.length > 0 && <g>{sources}</g>}
         <g>{rels}</g>
         <g>{maps}</g>
+        {/* only with a module's line (slice 15c), as the source lines' group */}
+        {exts.length > 0 && <g>{exts}</g>}
         <g>{bundled}</g>
         <g>{traced}</g>
         <g>
@@ -548,6 +610,12 @@ export const HoverLines = memo(function HoverLines({
           const className = `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""} hl`;
           return <BundlePath key={b.key} sig="" bundleKey={b.key} geom={geom} className={className} onSelect={NOOP} />;
         })}
+      {(lines.modules ?? NO_MODULE_LINES)
+        .filter((l) => hover.exts?.has(l.id))
+        .map((l) => {
+          const geom = moduleGeom(l, lookup);
+          return geom && <ModulePath key={l.id} sig="" line={l} geom={geom} dots={dots} className={moduleClass(l, geom, " hl")} onSelect={NOOP} testId="hover-module" />;
+        })}
     </svg>
   );
 });
@@ -561,6 +629,7 @@ export const LitLines = memo(function LitLines({
   maps,
   rels,
   sources = NO_SOURCE_IDS,
+  exts = NO_IDS,
   lines,
   bundles = NO_BUNDLES,
   blocks = NO_BLOCKS,
@@ -570,6 +639,8 @@ export const LitLines = memo(function LitLines({
 }: {
   maps: ReadonlySet<string>;
   rels: ReadonlySet<string>;
+  /** The modules' lines with every card lit (slice 15c). */
+  exts?: ReadonlySet<string>;
   /** Relationships between source tables with both cards lit (slice 10b, D-62). */
   sources?: ReadonlySet<string>;
   /** Focus's lit trace lines (slice 4b-2, PRD item 21: both ends lit). */
@@ -626,6 +697,14 @@ export const LitLines = memo(function LitLines({
           }
           const className = geom.kind === "rel" ? "lnk rel bundle" : `lnk map bundle${geom.draft ? " draft" : ""}${geom.warn ? " warn" : ""}`;
           return <BundlePath key={b.key} sig={`${geom.d}|${className}|${geom.kind === "map" ? geom.count : geom.label}|${geom.width}`} bundleKey={b.key} geom={geom} className={className} onSelect={NOOP} />;
+        })}
+      {(lines.modules ?? NO_MODULE_LINES)
+        .filter((l) => exts.has(l.id))
+        .map((l) => {
+          const geom = moduleGeom(l, lookup);
+          if (!geom) return null;
+          const className = moduleClass(l, geom);
+          return <ModulePath key={l.id} sig={moduleSig(geom, dots, className, l)} line={l} geom={geom} dots={dots} className={className} onSelect={NOOP} testId="lit-module" />;
         })}
       {traceSegments(traces, lookup, lines, bundles, blocks, mapsById).map((g) => (
         <TracePath key={g.id} sig={`${g.x1},${g.y1},${g.x2},${g.y2},${dots}`} id={g.id} x1={g.x1} y1={g.y1} x2={g.x2} y2={g.y2} dot={dots} lit />

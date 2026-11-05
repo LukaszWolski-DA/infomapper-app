@@ -42,7 +42,7 @@ export const SCD_SENTENCE: Record<ScdType, string> = {
 export const SCD_TECHNICAL = "Technical columns (valid from, valid to, current) are a physical matter and are not modelled here.";
 const NUMERIC = new Set<Attribute["data_type"]>(["integer", "decimal"]);
 
-const NO_ROWS: CubePageRows = { cubeEntities: [], cubeMeasures: [], cubeKeys: [] };
+const NO_ROWS: CubePageRows = { cubeEntities: [], cubeMeasures: [], cubeKeys: [], cubeMappings: [], cubeMappingInputs: [] };
 
 /**
  * The index of the model and InfoCube's rows on this page, once per data version. The page's rows come without

@@ -13,7 +13,7 @@ import { useToast } from "@/ui/components/toast";
 import type { CardData } from "./card-data";
 import { CanvasUiCtx } from "./context";
 import { currentFade, fadeKey, focusOn, requestFade, type FocusTarget } from "./fade";
-import type { Selection } from "./line-data";
+import type { CanvasLines, Selection } from "./line-data";
 import { useValue } from "./value-store";
 
 export const FOCUS_HINT = "Focus fades everything not connected to what you select.";
@@ -24,7 +24,12 @@ export const FOCUS_HINT = "Focus fades everything not connected to what you sele
  * requirement cards for their requirements, slice 4b-2) or a requirement. Nothing for no selection, a note, a label, a bundle or an element not on this canvas: then Focus
  * stays on and fades nothing (prototype `relatedOf`).
  */
-export function focusTargetOf(selection: Selection, cards: readonly Pick<CardData, "id" | "kind" | "targetId" | "frameId">[]): FocusTarget | null {
+export function focusTargetOf(
+  selection: Selection,
+  cards: readonly Pick<CardData, "id" | "kind" | "targetId" | "frameId">[],
+  /** The canvas's lines: a module's object is focused through its line's cards (slice 15c). */
+  lines?: Pick<CanvasLines, "modules">,
+): FocusTarget | null {
   if (!selection) return null;
   const byId = new Map(cards.map((c) => [c.id, c]));
   const several = (frameIds: ReadonlySet<string>, entities: Uuid[], tables: Uuid[], requirements: Uuid[] = []): FocusTarget | null => {
@@ -61,6 +66,13 @@ export function focusTargetOf(selection: Selection, cards: readonly Pick<CardDat
     }
     case "req":
       return { t: "requirement", id: selection.id };
+    case "ext": {
+      // a module's object (slice 15c, C8): the entities of its line's cards; nothing when it has no line here
+      const line = lines?.modules?.find((l) => l.id === selection.id);
+      if (!line) return null;
+      const entities = [line.target, ...line.inputs].map((e) => byId.get(e.cardId)).filter((c) => c?.kind === "ent").map((c) => c!.targetId);
+      return { t: "ext", id: selection.id, entities: [...new Set(entities)].sort() };
+    }
     default:
       return null;
   }

@@ -21,11 +21,17 @@
 // - Slice 10c (D-63): “Copy” in an attribute row's menu puts it in the page's clipboard (`attribute-clipboard.ts`);
 //   “Paste attribute “…”” in an entity card header's menu pastes a copy and opens its panel with the name selected. An
 //   attribute's delete asks for a second click when it has mappings or copies, naming the copies.
+// - Slice 15c (C4, C5, C7, C8): a module's objects on the canvas (`CANVAS_EXTENSIONS`): an entity row's drag and drop,
+//   the line's menu, Delete, a history place's text. A column's drag on a canvas with facts or dimensions keeps the
+//   dimensional cards under the veil and refuses a drop on them in the browser (B-6's toast); no "Map from a column…"
+//   on a dimensional row (difference 9).
 
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
 import { deleteMappingAction, setMappingStatusAction, splitMappingAction } from "@/app/_actions/mapping";
 import { useModules } from "@/app/_components/modules";
-import { isLogical } from "@/domain/model/levels";
+import { isLogical, MAPPING_TO_DIMENSIONAL_MESSAGE } from "@/domain/model/levels";
+import { CANVAS_EXTENSIONS } from "@/compose/canvas";
+import type { CanvasExtHandlers } from "@/canvas/extensions";
 import type { EntityCreate } from "@/ui/modules";
 import { createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, pasteAttributeAction, swapRelationshipAction } from "@/app/_actions/model";
 import { attributeClipboard, useClippedAttribute } from "@/app/_components/attribute-clipboard";
@@ -33,7 +39,7 @@ import { useAction } from "@/app/_components/use-action";
 import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
 import { newCardHeight } from "@/canvas/geometry";
 import { FILTER_LABEL, filtersOf } from "@/canvas/CardNode";
-import { CanvasUiCtx, type RowFilter, type ToolboxRequest } from "@/canvas/context";
+import { CanvasUiCtx, type RowDrag, type RowDragFrom, type RowFilter, type ToolboxRequest } from "@/canvas/context";
 import { isCardKey, isReqKey } from "@/canvas/selection";
 import { focusOn } from "@/canvas/fade";
 import { toggleFocus } from "@/canvas/Focus";
@@ -131,6 +137,42 @@ export function useCanvasHost({
   }, [workspaceId]);
 
   const modules = useModules();
+  // the modules' objects on the canvas (slice 15c): one hook per registered kind, in the registry's fixed order
+  const extContext = useMemo(() => ({ workspaceId, canvasId, editable, canSetStatus, model: ix.model, cards }), [workspaceId, canvasId, editable, canSetStatus, ix.model, cards]);
+  const exts: { kind: string; h: CanvasExtHandlers }[] = [];
+  // a fixed list: the same hooks in the same order on every render
+  for (const e of CANVAS_EXTENSIONS) exts.push({ kind: e.kind, h: e.useHandlers(extContext) });
+  const extOf = (kind: string) => exts.find((e) => e.kind === kind)?.h;
+
+  /**
+   * A row's drag (slice 15c): a column's maps onto logical entity rows and cards; with facts or dimensions on the
+   * canvas they stay under the veil and a drop on them is refused with B-6's toast. An entity row's is a module's.
+   */
+  const rowDrag = (from: RowDragFrom): RowDrag | null => {
+    if ("attributeId" in from) {
+      for (const e of exts) {
+        const d = e.h.rowDrag(from.attributeId);
+        if (d) return d;
+      }
+      return null;
+    }
+    const dimensional = new Set(cards.filter((c) => c.kind === "ent" && ix.entity.get(c.targetId) && !isLogical(ix.entity.get(c.targetId)!)).map((c) => c.targetId));
+    const onDimensional = (entityId: string | undefined) => !!entityId && dimensional.has(entityId);
+    return {
+      lit: dimensional.size ? { entities: cards.filter((c) => c.kind === "ent" && !dimensional.has(c.targetId)).map((c) => c.targetId), tables: cards.filter((c) => c.kind === "src").map((c) => c.targetId) } : null,
+      plan: (t) => {
+        if ("columnId" in t) return "none";
+        return onDimensional("attributeId" in t ? ix.attribute.get(t.attributeId)?.entity_id : t.entityId) ? { refuse: MAPPING_TO_DIMENSIONAL_MESSAGE } : "ok";
+      },
+    };
+  };
+  const rowDragRef = useRef(rowDrag);
+  const extsRef = useRef(exts);
+  useEffect(() => {
+    rowDragRef.current = rowDrag;
+    extsRef.current = exts;
+  });
+
   /** "New entity here", or a module's create ("New fact here", slice 15a, E18): the same placement and focus. */
   const createEntityAt = useCallback(
     async (at: { x: number; y: number }, name?: string, create?: EntityCreate) => {
@@ -253,8 +295,18 @@ export function useCanvasHost({
   );
 
   useEffect(() => {
+    const ext = (kind: string) => extsRef.current.find((e) => e.kind === kind)?.h;
     ui.registerHost({
       dropColumn: columns.dropColumn,
+      rowDrag: (from) => rowDragRef.current(from),
+      dropRow: (drop) => {
+        // the module whose drag it is decides (only one module drags entity rows today)
+        for (const e of extsRef.current) if (e.h.rowDrag(drop.attributeId)) return e.h.drop(drop);
+      },
+      deleteExt: (kind, id) => {
+        if (editable) ext(kind)?.remove(id);
+      },
+      extGone: (kind, id) => ext(kind)?.gone(id) ?? null,
       createEntityAt: (at, name) => void createEntityAt(at, name),
       relate: (from, to) => void relate(from, to),
       openToolbox: setToolbox,
@@ -456,6 +508,11 @@ export function useCanvasHost({
       }
       return items;
     }
+    if (t.kind === "ext") {
+      // a module's line (slice 15c): its own menu
+      items.push(...(extOf(t.extKind)?.menu(t.id) ?? []));
+      return items;
+    }
     if (t.kind === "rel") {
       const r = ix.model.relationships.find((x) => x.id === t.relationshipId);
       if (!r) return items;
@@ -593,7 +650,9 @@ export function useCanvasHost({
           items.push({ label: "Move to the top", kbd: "Ctrl Shift ↑", disabled: pos <= 0, act: move("top") });
           items.push({ label: "Move to the bottom", kbd: "Ctrl Shift ↓", disabled: pos >= last, act: move("bottom") });
           items.push({ sep: true });
-          items.push({ label: "Map from a column…", act: () => focusDetails("f-addc") });
+          // a fact or a dimension is fed from the logical model, not from columns (slice 15c, difference 9)
+          const entity = ix.entity.get(a.entity_id);
+          if (entity && isLogical(entity)) items.push({ label: "Map from a column…", act: () => focusDetails("f-addc") });
           items.push({
             label: "Copy",
             act: () => {

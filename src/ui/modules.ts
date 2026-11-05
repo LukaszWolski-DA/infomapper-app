@@ -16,6 +16,21 @@ export interface EntityRole {
   card: string;
   /** Classes on the header's first span (`cube`): the mark before the text. */
   mark: string;
+  /**
+   * What the coverage bar counts on this card, when the module counts its rows (slice 15c, P17): "fed from the logical
+   * model" ("{n} of {m} attributes fed from the logical model"); absent: InfoMapper's "mapped".
+   */
+  coverage?: string;
+}
+
+/**
+ * A row's state when a module counts it (slice 15c, C12): how many of the module's lines reach it (its dot, the
+ * coverage bar, the Mapped / Not mapped filter) and the dot's tooltip ("from Customer.segment_code", "Not fed from the
+ * logical model").
+ */
+export interface RowFeed {
+  n: number;
+  title: string;
 }
 
 /** One group of a module's tab: its entities by concept, each with its own right-side text (`grain set`, `SCD 1`). */
@@ -84,6 +99,8 @@ export interface ModuleView {
   rowMarks: Record<Uuid, string>;
   /** An attribute's delete with module rows asks the second click (slice 15b, R4), by attribute id. */
   attributeDeletes: Record<Uuid, AttributeDelete>;
+  /** The rows a module counts on cards (slice 15c: every dimensional attribute), by attribute id. */
+  rowFeeds: Record<Uuid, RowFeed>;
   /**
    * Each module's own rows for its panel sections (`src/compose/panels.ts`), by module: plain rows without
    * `created_*` and `updated_*` (O8). InfoMapper never reads them.
@@ -91,7 +108,7 @@ export interface ModuleView {
   data: Readonly<Record<string, unknown>>;
 }
 
-export const NO_MODULES: ModuleView = { roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, data: {} };
+export const NO_MODULES: ModuleView = { roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, rowFeeds: {}, data: {} };
 
 /** A row of a delete preview that a module adds (X-1): what, and what happens to it. */
 export type DependentRow = [what: string, happens: string];

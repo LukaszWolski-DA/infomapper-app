@@ -118,6 +118,11 @@ export interface CanvasHandle {
    * its header and rows show, name or alias.
    */
   cardView: (cardId: Uuid) => { collapsed: boolean; rowFilter: RowFilter; entityNames: NameMode; attributeNames: NameMode } | null;
+  /**
+   * A model write that also writes a card (slice 15c: a header drop opens the card): run on the card's queue after its
+   * writes on their way, with the card's version known then; the answer's `versions` give the card its new one.
+   */
+  withCard: <T extends { ok: boolean; versions?: Record<string, number> }>(cardId: Uuid, write: (expectedVersion: number) => Promise<T>) => Promise<T>;
   /** Selects every card on the canvas (Ctrl+A, toolbox “Select all”; slice 2a). */
   selectAll: () => void;
   /** The selected cards aligned, stacked or lined up, in one change (slice 2a). */
@@ -210,7 +215,19 @@ export interface CanvasHandle {
 }
 
 /** A selection place that no longer exists, by kind (slice 6b, item 7: its toast). */
-export type PlaceGone = "card" | "row" | "map" | "rel" | "frame" | "note" | "req" | "label" | "element" | "source_system";
+export type PlaceGone =
+  | "card"
+  | "row"
+  | "map"
+  | "rel"
+  | "frame"
+  | "note"
+  | "req"
+  | "label"
+  | "element"
+  | "source_system"
+  /** A module's object (slice 15c): the module's own text ("That mapping no longer exists."). */
+  | { text: string };
 
 /** A note as the panels list it (the card and frame panels, the canvas overview). */
 export interface NoteListItem {
@@ -284,6 +301,32 @@ export interface ColumnDrop {
   at: { x: number; y: number };
 }
 
+/** Where a row's drag starts (slice 15c): a source column's row or an entity's attribute row. */
+export type RowDragFrom = { columnId: Uuid } | { attributeId: Uuid };
+
+/** What a row's drag may be dropped on (slice 15c): an attribute's row, an entity card elsewhere, a column's row. */
+export type RowDropTarget = { attributeId: Uuid } | { entityId: Uuid } | { columnId: Uuid };
+
+/** What a drop there would do: map (the row under the mouse is marked), nothing, or a refusal shown on the release. */
+export type RowDropVerdict = "ok" | "none" | { refuse: string };
+
+/**
+ * A drag the page allowed (slice 15c): the cards that stay lit under the veil while it lasts (X3; null: no veil), and
+ * what a drop on each target would do.
+ */
+export interface RowDrag {
+  lit: { entities: readonly Uuid[]; tables: readonly Uuid[] } | null;
+  plan: (target: RowDropTarget) => RowDropVerdict;
+}
+
+/** An entity row's drop (slice 15c): where it started and where it landed. */
+export interface RowDrop {
+  attributeId: Uuid;
+  target: RowDropTarget;
+  /** The drop point on the screen. */
+  at: { x: number; y: number };
+}
+
 /** What a right-click without moving was on (slice 1b, D-19). The canvas has already selected it. */
 export type ToolboxTarget =
   | { kind: "canvas" }
@@ -300,7 +343,9 @@ export type ToolboxTarget =
   /** A note (slice 3a): before the card or frame under it. */
   | { kind: "note"; noteId: Uuid }
   /** A requirement's card (slice 4b-2): the requirement is selected. */
-  | { kind: "requirement"; requirementId: Uuid; cardId: Uuid };
+  | { kind: "requirement"; requirementId: Uuid; cardId: Uuid }
+  /** A module's line (slice 15c): its object is selected. */
+  | { kind: "ext"; extKind: string; id: Uuid };
 
 export interface ToolboxRequest {
   target: ToolboxTarget;
@@ -322,6 +367,17 @@ export type CanvasMode = { kind: "entity" } | { kind: "relate"; fromCardId: Uuid
  */
 export interface CanvasHost {
   dropColumn: (drop: ColumnDrop) => void;
+  /**
+   * A row's drag (slice 15c, C4, C5): what the page says of a drag from a source column's row or an entity's row, once
+   * it starts; null: no drag from this row (an entity row without a module's drag).
+   */
+  rowDrag: (from: RowDragFrom) => RowDrag | null;
+  /** An entity row dropped (slice 15c): the module decides (`RowDrag.plan` said "ok" or gave a refusal). */
+  dropRow: (drop: RowDrop) => void;
+  /** Delete or Backspace with a module's object selected (slice 15c): deleted at once, with Undo in the toast. */
+  deleteExt: (kind: string, id: Uuid) => void;
+  /** The module's text when its object no longer exists (a history place, slice 15c); null while it does. */
+  extGone: (kind: string, id: Uuid) => string | null;
   /** The Entity tool or “New entity here”: a new entity whose card's top left is at a canvas point. */
   createEntityAt: (at: { x: number; y: number }, name?: string) => void;
   /** A relationship from one entity card to another (relate button or “Draw a relationship from here”). */
@@ -402,6 +458,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   placeBeside: noop,
   settled: () => Promise.resolve(),
   cardView: () => null,
+  withCard: (_cardId, write) => write(1),
   selectAll: noop,
   arrangeSelection: noop,
   fitSelectionWidths: noop,

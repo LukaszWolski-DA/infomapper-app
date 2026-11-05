@@ -7,7 +7,7 @@ import type { CardNodeT } from "./CardNode";
 import type { CanvasLayer } from "@/domain/types";
 import { BLOCK } from "@/domain/model/frames";
 import { cardRect, cardWidth, clamp, curve, fNode, HEAD_H, relGeom, rowEnd, type End, type Placed, type Pt, type Rect } from "./geometry";
-import type { CanvasLines, MapLineData, RelLineData, SourceLineData } from "./line-data";
+import type { CanvasLines, MapLineData, ModuleLineData, RelLineData, SourceLineData } from "./line-data";
 
 export const placedOf = (n: InternalNode | undefined): Placed | null =>
   n && !n.hidden ? { x: n.internals.positionAbsolute.x, y: n.internals.positionAbsolute.y, card: (n as unknown as CardNodeT).data.card } : null;
@@ -81,6 +81,40 @@ export function mapGeom(line: MapLineData, lookup: Map<string, InternalNode>): M
   };
 }
 
+/** Where a module's line runs (slice 15c, C7; prototype `renderLines`' InfoCube part): one curve per drawn input. */
+export interface ModuleGeom {
+  /** One curve per input, from its row to the target's row. */
+  paths: string[];
+  /** Each curve's start (the dots) and end (the diamonds). */
+  starts: Pt[];
+  ends: Pt[];
+  /** The chip on the first curve's middle; null without. */
+  chip: { x: number; y: number; text: string } | null;
+  /** An end at a header's middle: a collapsed card or a hidden row. */
+  part: boolean;
+}
+
+export function moduleGeom(line: ModuleLineData, lookup: Map<string, InternalNode>): ModuleGeom | null {
+  const target = placedOf(lookup.get(line.target.cardId));
+  if (!target) return null;
+  const z = rowEnd(target, line.target.rowId);
+  const paths: string[] = [], starts: Pt[] = [], ends: Pt[] = [];
+  let chip: ModuleGeom["chip"] = null;
+  let part = z.hidden;
+  for (const i of line.inputs) {
+    const p = placedOf(lookup.get(i.cardId));
+    if (!p) continue;
+    const a = rowEnd(p, i.rowId);
+    part ||= a.hidden;
+    const g = curve(a, z);
+    if (!paths.length && line.chip) chip = { x: g.mid.x, y: g.mid.y, text: line.chip };
+    paths.push(g.d);
+    starts.push({ x: g.p0.x, y: g.p0.y });
+    ends.push({ x: g.p3.x, y: g.p3.y });
+  }
+  return paths.length ? { paths, starts, ends, chip, part } : null;
+}
+
 // ---- bundled lines (slice 2c, D-07; prototype “Semantic zoom”, endOf) ----
 // Every mapping or relationship with an end in a collapsed frame is grouped per pair of ends, where an end is the
 // collapsed frame (its block), or a row (mappings: the attribute, or one input column) or an entity card
@@ -107,6 +141,8 @@ export interface BundledLines {
   relationships: RelLineData[];
   /** Relationships between source tables with both cards drawn (slice 10b): never bundled, never counted (D-62). */
   sources?: SourceLineData[];
+  /** The modules' lines with every card drawn (slice 15c, X6): never bundled, never counted. */
+  modules?: ModuleLineData[];
   bundles: Bundle[];
 }
 
@@ -158,7 +194,10 @@ export function bundleLines(lines: CanvasLines, collapsedFrameOf: (cardId: strin
   }
   // relationships between source tables (slice 10b, D-62): left out when either card is in a collapsed frame
   const sources = layer === "mappings" ? [] : (lines.sources ?? []).filter((r) => !collapsedFrameOf(r.fromCardId) && !collapsedFrameOf(r.toCardId));
-  return { mappings, relationships, ...(sources.length ? { sources } : {}), bundles: [...bundles.values()] };
+  // the modules' lines (slice 15c, X6; prototype): left out when any of their cards is in a collapsed frame
+  const modules =
+    layer === "relationships" ? [] : (lines.modules ?? []).filter((l) => !collapsedFrameOf(l.target.cardId) && l.inputs.every((i) => !collapsedFrameOf(i.cardId)));
+  return { mappings, relationships, ...(sources.length ? { sources } : {}), ...(modules.length ? { modules } : {}), bundles: [...bundles.values()] };
 }
 
 /** A bundle's stroke grows with its count (prototype: 1.6 + 1.3 · log2 n, at most 4 more). */

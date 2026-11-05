@@ -5,6 +5,7 @@
 // a requirement, or an element whose card is not on this canvas (slice 4a: the go-to links' fallback), a source system
 // (slice 7a, with its changes to resolve since 7b); with nothing selected, an overview of this canvas.
 
+import { CANVAS_EXTENSIONS } from "@/compose/canvas";
 import { createContext, useContext, useMemo, type ReactNode } from "react";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
@@ -226,6 +227,10 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
     body = <SourceColumnPanel key={sel.id} column={ix.column.get(sel.id)!} />;
   } else if (sel?.t === "element" && sel.kind === "source_system" && ix.model.sourceSystems.some((s) => s.id === sel.id)) {
     body = <SystemPanel key={sel.id} system={ix.model.sourceSystems.find((s) => s.id === sel.id)!} />;
+  } else if (sel?.t === "ext" && CANVAS_EXTENSIONS.some((e) => e.kind === sel.kind)) {
+    // a module's object (slice 15c): its own panel
+    const Panel = CANVAS_EXTENSIONS.find((e) => e.kind === sel.kind)!.Panel;
+    body = <Panel key={sel.id} id={sel.id} />;
   } else if (sel?.t === "rel" && ix.model.relationships.some((r) => r.id === sel.id)) {
     body = <RelationshipPanel key={sel.id} relationship={ix.model.relationships.find((r) => r.id === sel.id)!} />;
   }

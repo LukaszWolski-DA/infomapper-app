@@ -6,7 +6,7 @@ import type { Uuid } from "@/domain/ids";
 import type { Entity, Relationship, StandardColumns } from "@/domain/types";
 import { carries, dimensionAs, type CubeIndex } from "./keys";
 import { mappingAttributeDeletes, mappingDependents, type MappingIndex } from "./mappings";
-import type { Additivity, CubeEntity, CubeKey, CubeMeasure, CubeRole } from "./types";
+import type { Additivity, CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure, CubeRole } from "./types";
 
 export const ROLE_NAMES: Record<CubeRole, string> = { fact: "Fact", dimension: "Dimension" };
 
@@ -95,10 +95,44 @@ export interface CubePageRows {
   cubeEntities: PageRow<CubeEntity>[];
   cubeMeasures: PageRow<CubeMeasure>[];
   cubeKeys: PageRow<CubeKey>[];
+  /** Slice 15c: the dimensional mappings and their inputs (the drag's plan, the line's menu, the panels). */
+  cubeMappings: PageRow<CubeMapping>[];
+  cubeMappingInputs: PageRow<CubeMappingInput>[];
 }
 
-export function cubePageRows(cubeEntities: readonly CubeEntity[], cubeMeasures: readonly CubeMeasure[], cubeKeys: readonly CubeKey[]): CubePageRows {
-  return { cubeEntities: live(cubeEntities).map(pageRow), cubeMeasures: live(cubeMeasures).map(pageRow), cubeKeys: live(cubeKeys).map(pageRow) };
+export function cubePageRows(
+  cubeEntities: readonly CubeEntity[],
+  cubeMeasures: readonly CubeMeasure[],
+  cubeKeys: readonly CubeKey[],
+  cubeMappings: readonly CubeMapping[] = [],
+  cubeMappingInputs: readonly CubeMappingInput[] = [],
+): CubePageRows {
+  return {
+    cubeEntities: live(cubeEntities).map(pageRow),
+    cubeMeasures: live(cubeMeasures).map(pageRow),
+    cubeKeys: live(cubeKeys).map(pageRow),
+    cubeMappings: live(cubeMappings).map(pageRow),
+    cubeMappingInputs: live(cubeMappingInputs).map(pageRow),
+  };
+}
+
+/** The coverage bar's word on a fact's or a dimension's card (slice 15c, P17; prototype `entCard`). */
+export const FED_COVERAGE = "fed from the logical model";
+/** A dimensional row's dot without a feed (prototype `attrRow`). */
+export const NOT_FED = "Not fed from the logical model";
+
+/**
+ * Every dimensional attribute's state on cards (C12; prototype `attrRow`): how many dimensional mappings feed it (any
+ * status) and the dot's tooltip, one "from {inputs}" line per mapping, or "Not fed from the logical model".
+ */
+export function cubeRowFeeds(index: MappingIndex, attributes: readonly { id: Uuid; deleted_at: string | null }[]): Record<Uuid, { n: number; title: string }> {
+  const out: Record<Uuid, { n: number; title: string }> = {};
+  for (const a of attributes) {
+    if (a.deleted_at !== null || index.levelOf(a.id) !== "dimensional") continue;
+    const ms = index.mappingsTo(a.id);
+    out[a.id] = { n: ms.length, title: ms.length ? ms.map((m) => `from ${index.inputsOf(m.id).map((i) => index.label(i.attribute_id)).join(" + ")}`).join("\n") : NOT_FED };
+  }
+  return out;
 }
 
 /** A measure row's classes on a card (R5): the glyph is the module's CSS, `::after` on the row's type. */

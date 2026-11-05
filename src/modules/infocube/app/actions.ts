@@ -23,6 +23,21 @@ import {
   type UpdateMeasureInput,
 } from "../domain/commands";
 import type { CubeRole } from "../domain/types";
+import { lastContentEditor } from "@/domain/model/mapping-rules";
+import {
+  createCubeMapping,
+  createOnHeader,
+  CUBE_MAPPING_LOG,
+  deleteCubeMapping,
+  setCubeMappingStatus,
+  updateCubeMapping,
+  type CreateCubeMappingInput,
+  type CreateOnHeaderInput,
+  type DeleteCubeMappingInput,
+  type MappingModel,
+  type SetCubeMappingStatusInput,
+  type UpdateCubeMappingInput,
+} from "../domain/mappings";
 
 const create = (role: CubeRole) =>
   async function (
@@ -96,4 +111,55 @@ export async function linkKeyAction(workspaceId: string, input: LinkKeyInput): P
 /** Add key: the new foreign key, the fact's order and the link in one undo step; answers every version it wrote. */
 export async function addKeyAction(workspaceId: string, input: AddKeyInput): Promise<ActionResult<{ attributeId: string; keyId: string; name: string; toast: string }>> {
   return modelCommand(workspaceId, async (ctx, access, model, store) => addKey(ctx, access, await keyState(store, access.workspace.id, model), input), { versions: true });
+}
+
+// ---- slice 15c: dimensional mappings on the canvas (B-6, C4, C7, O9) ----
+
+/** The model and InfoCube's mapping rows a mapping command reads. */
+async function mappingState(store: DataStore, workspaceId: string, model: WorkspaceModel): Promise<MappingModel> {
+  const [cubeMappings, cubeMappingInputs] = await Promise.all([store.modules.list(workspaceId, "cube_mapping"), store.modules.list(workspaceId, "cube_mapping_input")]);
+  return { entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs };
+}
+
+/** A logical attribute dropped on a dimensional one (either way round): a direct Draft mapping. */
+export async function createCubeMappingAction(workspaceId: string, input: CreateCubeMappingInput): Promise<ActionResult<{ mappingId: string; toast: string }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => createCubeMapping(ctx, access, await mappingState(store, access.workspace.id, model), input));
+}
+
+/** A logical attribute dropped on a fact's or a dimension's header: its copy and the mapping, the card opened. */
+export async function createOnHeaderAction(workspaceId: string, input: CreateOnHeaderInput): Promise<ActionResult<{ mappingId: string; attributeId: string; toast: string }>> {
+  return modelCommand(
+    workspaceId,
+    async (ctx, access, model, store) => {
+      const state = await mappingState(store, access.workspace.id, model);
+      const cardId = input?.card?.canvasItemId;
+      const card = typeof cardId === "string" ? ((await store.canvasItems.list(access.workspace.id)).find((i) => i.id === cardId) ?? null) : null;
+      return createOnHeader(ctx, access, { ...state, card }, input);
+    },
+    { versions: true },
+  );
+}
+
+/** The line's menu: Draft, In review, Approved; reviewers too, four-eyes from InfoCube's change log. */
+export async function setCubeMappingStatusAction(workspaceId: string, input: SetCubeMappingStatusInput): Promise<ActionResult<{ version: number }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => {
+    const state = await mappingState(store, access.workspace.id, model);
+    const mapping = state.cubeMappings.find((m) => m.id === input?.mappingId);
+    const events = mapping ? await store.changeEvents.listForMapping(access.workspace.id, mapping.id, CUBE_MAPPING_LOG) : [];
+    const contentAuthorId = mapping ? lastContentEditor(mapping, events, CUBE_MAPPING_LOG) : ctx.actorId;
+    return setCubeMappingStatus(ctx, access, { ...state, contentAuthorId }, input);
+  });
+}
+
+/** The kind, the rule, the note ("Edit transformation rule…" makes it a transformation). */
+export async function updateCubeMappingAction(workspaceId: string, input: UpdateCubeMappingInput): Promise<ActionResult<{ version: number; notice: string | null }>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => updateCubeMapping(ctx, access, await mappingState(store, access.workspace.id, model), input));
+}
+
+/** "Delete mapping", the Delete key: the mapping and its inputs. */
+export async function deleteCubeMappingAction(workspaceId: string, input: DeleteCubeMappingInput): Promise<ActionResult<null>> {
+  return modelCommand(workspaceId, async (ctx, access, model, store) => {
+    const result = deleteCubeMapping(ctx, access, await mappingState(store, access.workspace.id, model), input);
+    return result.ok ? { ...result, value: null } : result;
+  });
 }

@@ -247,7 +247,8 @@
 
 /* ---------- mapping by drag (slice 1b, D-48; prototype .tmp, .row.drop, .card.drop, body.connecting) ---------- */
 .im-canvas .draft-layer .tmp { fill: none; stroke: var(--im-ink-2); stroke-width: 1.6; stroke-dasharray: 4 4 }
-body.connecting .im-canvas .row { cursor: crosshair }
+/* slice 15c: the dragged row only, with the pointer captured on it (a class on body restyled every row) */
+.im-canvas .row.drag-from { cursor: crosshair }
 .im-canvas .row.drop { background: var(--im-map-soft); box-shadow: inset 0 0 0 1.5px var(--im-map) }
 .im-canvas .card.drop { box-shadow: 0 0 0 2px var(--im-map), 0 10px 24px -12px var(--im-shadow) }
 

@@ -8,7 +8,7 @@ import type { CardSubject } from "@/domain/model/frames";
 import { checkMappingTypes, formatAttributeType, formatColumnType } from "@/domain/model/type-check";
 import { cardShownNames } from "@/domain/model/aliases";
 import type { Canvas, CanvasItem, LiveLevel, NameMode, RowFilter, SourceChange, WorkspaceModel } from "@/domain/types";
-import type { EntityRole } from "@/ui/modules";
+import type { EntityRole, RowFeed } from "@/ui/modules";
 import { lineNeedsClip, ROLE_MARK, rowNeedsClip, titleNeedsClip } from "./text-fit";
 
 export type CardKind = "ent" | "src";
@@ -150,6 +150,8 @@ export function buildCards(
   roles: Readonly<Record<Uuid, EntityRole>> = {},
   /** Classes on attributes' rows, from the modules (slice 15b: the Σ marks); none without a module. */
   rowMarks: Readonly<Record<Uuid, string>> = {},
+  /** The rows a module counts (slice 15c: a dimensional attribute's feeds); none without a module. */
+  rowFeeds: Readonly<Record<Uuid, RowFeed>> = {},
 ): CardData[] {
   const labelsOf = (key: string) => labelNames.get(key)?.join(", ") || null;
   const attributeById = new Map(model.attributes.map((a) => [a.id, a]));
@@ -195,6 +197,9 @@ export function buildCards(
     for (const c of columns) note(c.id, warn, `to ${attrLabel}`, link);
   }
   const rowState = (id: Uuid, empty: string) => {
+    // a row a module counts (slice 15c, C12): its lines, not source mappings
+    const fed = rowFeeds[id];
+    if (fed) return { mappings: fed.n, warn: false, title: fed.title };
     const r = info.get(id);
     return { mappings: r?.n ?? 0, warn: r?.warn ?? false, title: r ? r.lines.join("\n") : empty };
   };

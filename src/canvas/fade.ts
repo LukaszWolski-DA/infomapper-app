@@ -13,7 +13,11 @@ import { createValueStore } from "./value-store";
  * a column, a mapping, a relationship, or several entities and tables for a frame or a multi-selection) or a
  * requirement.
  */
-export type FocusTarget = LitTarget | { t: "requirement"; id: Uuid };
+export type FocusTarget =
+  | LitTarget
+  | { t: "requirement"; id: Uuid }
+  /** A module's object (slice 15c, C8): the entities of its line's cards; its line is lit with them. */
+  | { t: "ext"; id: Uuid; entities: readonly Uuid[] };
 
 /**
  * What to light; the canvas fades the rest (cards and notes under a veil at about the prototype's 25 %, lines under it):

@@ -52,6 +52,11 @@ export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | 
     if (!data) return null;
     const target = focusTarget(request.focus);
     let lit: Lit;
+    if (target.t === "ext") {
+      // a module's object (slice 15c): its cards; its line is lit with them (`litModules`), nothing else
+      lit = { entities: new Set(target.entities), tables: new Set(), rows: new Map(), mappings: new Set(), relationships: new Set() };
+      return { key: fadeKey(request), lit };
+    }
     if (target.t === "requirement") {
       if (!index?.byId.has(target.id)) return null;
       lit = requirementFocusLit(data.model, index.scope(target.id));
@@ -132,6 +137,20 @@ export function litSources(lines: Pick<CanvasLines, "sources">, lookup: Map<stri
     const a = lookup.get(l.fromCardId), z = lookup.get(l.toCardId);
     if (a && z && isLitCard(a, lit) && isLitCard(z, lit)) out.add(l.id);
   }
+  return out;
+}
+
+/**
+ * The modules' lines that stay lit (slice 15c, C7): every card of the line lit (its target's and its inputs'), under
+ * Focus and in the Changes view alike, as the source lines (`litSources`). The rest fade with the veil.
+ */
+export function litModules(lines: Pick<CanvasLines, "modules">, lookup: Map<string, AnyNode>, lit: Lit): Set<string> {
+  const out = new Set<string>();
+  const lighted = (cardId: string) => {
+    const n = lookup.get(cardId);
+    return !!n && isLitCard(n, lit);
+  };
+  for (const l of lines.modules ?? []) if (lighted(l.target.cardId) && l.inputs.length && l.inputs.every((i) => lighted(i.cardId))) out.add(l.id);
   return out;
 }
 

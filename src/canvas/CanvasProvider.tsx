@@ -104,6 +104,7 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       placeBeside: (cards, anchorCardId, side) => handle.current?.placeBeside(cards, anchorCardId, side),
       settled: () => handle.current?.settled() ?? Promise.resolve(),
       cardView: (cardId) => handle.current?.cardView(cardId) ?? null,
+      withCard: (cardId, write) => (handle.current ? handle.current.withCard(cardId, write) : write(1)),
       selectAll: () => handle.current?.selectAll(),
       arrangeSelection: (mode) => handle.current?.arrangeSelection(mode),
       fitSelectionWidths: () => handle.current?.fitSelectionWidths(),

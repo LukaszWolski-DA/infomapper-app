@@ -73,7 +73,8 @@ export interface MappingModel {
 
 const live = <T extends { deleted_at: string | null }>(r: T | null | undefined): r is T => !!r && r.deleted_at === null;
 const byOrder = (a: Attribute, b: Attribute) => a.sort_order - b.sort_order || a.name.localeCompare(b.name);
-const madeFirst = (a: CubeMapping, b: CubeMapping) => a.created_at.localeCompare(b.created_at) || a.id.localeCompare(b.id);
+/** In the order they were made: by `created_at`, else by id (UUID v7; the page's rows come without `created_*`, O8). */
+const madeFirst = (a: CubeMapping, b: CubeMapping) => (a.created_at ?? "").localeCompare(b.created_at ?? "") || a.id.localeCompare(b.id);
 
 /** One read of the dimensional mappings, built once per page or command. */
 export interface MappingIndex {
@@ -511,7 +512,10 @@ export function deleteCubeMapping(ctx: CommandContext, access: WorkspaceAccess, 
   const index = mappingIndex(state);
   const got = mappingAt(access, index, state, parsed.data.mappingId, parsed.data.expectedVersion);
   if (!got.ok) return fail(got.error);
-  return done(ctx, access, undefined, [...got.inputs.map((i) => softDelete(ctx, "cube_mapping_input", i)), softDelete(ctx, "cube_mapping", got.row)]);
+  const result = done(ctx, access, undefined, [...got.inputs.map((i) => softDelete(ctx, "cube_mapping_input", i)), softDelete(ctx, "cube_mapping", got.row)]);
+  // the step is named by the mapping, not its first written row (an input)
+  if (result.ok) result.writeSet.label = "Delete dimensional mapping";
+  return result;
 }
 
 // ---- "Create dimension from this…" (B-2) ----

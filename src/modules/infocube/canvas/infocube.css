@@ -21,3 +21,15 @@
 .im-canvas .row.meas.add .dt::before { content: "Σ" }
 .im-canvas .row.meas.semi .dt::before { content: "Σ~" }
 .im-canvas .row.meas.non .dt::before { content: "∅Σ"; color: var(--im-ink-3) }
+/* A dimensional mapping's line (slice 15c, C7; prototype `.cmap`): a logical row to a dimensional row in the target's
+   concept colour (`--lc`, from the line), dashed while Draft or In review, a start dot and a diamond at the target, ƒ
+   for a transformation. InfoMapper's line rules give the width, the selection, the hover and the fading. */
+.im-canvas .cmap .s { stroke: var(--lc) }
+.im-canvas .cmap.draft .s { stroke-dasharray: 6 4 }
+.im-canvas .cmap.review .s { stroke-dasharray: 10 3 2 3 }
+.im-canvas .cmap.part .s { stroke-opacity: .45 }
+.im-canvas .cmap .end { fill: var(--lc) }
+.im-canvas .cmap .chip circle { stroke: var(--lc) }
+.im-canvas .cmap .chip text { fill: var(--lc) }
+.im-canvas .cmap .cube-end { fill: var(--im-surface); stroke: var(--lc); stroke-width: 1.3; pointer-events: none }
+.im-canvas .dimmed .lnk.cmap:not(.hl) .cube-end { stroke-opacity: .12; fill-opacity: .12 }

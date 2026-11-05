@@ -20,7 +20,7 @@ import { liveNoticesFor } from "@/app/_lib/live-notices";
 import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
 import { AppShell } from "@/app/_components/app-shell";
 import { ModulesProvider } from "@/app/_components/modules";
-import { moduleView, STORE_SCHEMA } from "@/compose";
+import { moduleLines, moduleView, STORE_SCHEMA } from "@/compose";
 import { CREATE_ACTIONS } from "@/compose/actions";
 import { NO_MODULES } from "@/ui/modules";
 import { MovedNotice } from "@/app/_components/moved-notice";
@@ -40,7 +40,7 @@ import { buildCards, type CardData } from "@/canvas/card-data";
 import { buildRequirementCards } from "@/canvas/requirement-card-data";
 import { buildFrames, conceptsOf } from "@/canvas/frame-data";
 import { FrameToolButton } from "@/canvas/FrameToolButton";
-import { buildLines, type Selection } from "@/canvas/line-data";
+import { buildLines, type CanvasLines, type ModuleLineData, type Selection } from "@/canvas/line-data";
 import { buildNotes } from "@/canvas/note-data";
 import { NoteToolButton } from "@/canvas/NoteToolButton";
 import { MoreTools } from "@/canvas/MoreTools";
@@ -150,6 +150,7 @@ export default async function CanvasPage({
     canvas,
     modules.roles,
     modules.rowMarks,
+    modules.rowFeeds,
   );
   // requirements (slice 4a): the index is built once per page here for the left panel; the panels build theirs once
   // per data version in the browser
@@ -295,7 +296,7 @@ export default async function CanvasPage({
               canvasId={canvasId}
               cards={cards}
               names={{ entity_names: canvas.entity_names, attribute_names: canvas.attribute_names, version: canvas.version }}
-              lines={buildLines(model, cards, labelNames, liveMappings)}
+              lines={withModuleLines(buildLines(model, cards, labelNames, liveMappings), moduleLines(modules, model, cards))}
               editable={editable}
               saveCard={updateCardAction.bind(null, ws)}
               placeCard={placeCardAction.bind(null, ws, canvasId)}
@@ -409,3 +410,8 @@ const CanvasTools = ({ editable, canNote }: { editable: boolean; canNote: boolea
     <MoreTools editable={editable} canNote={canNote} />
   </>
 );
+
+/** The modules' lines beside InfoMapper's (slice 15c): absent when there are none, so nothing more is drawn. */
+function withModuleLines(lines: CanvasLines, modules: ModuleLineData[]): CanvasLines {
+  return modules.length ? { ...lines, modules } : lines;
+}
