@@ -1922,6 +1922,13 @@ export function ModelCanvas({
       centerOn,
       showPlace,
       freeSpot: () => freeSpot(viewRect(), occupied()),
+      besideSpot: (anchorCardId, height, side, gap) => {
+        const anchor = rf.getNode(anchorCardId) as CardNodeT | undefined;
+        if (!anchor) return null;
+        const block = frameRectsNow().find(({ f }) => f.collapsed && f.id === anchor.data.card.frameId)?.r ?? null;
+        const a = besideAnchor({ x: anchor.position.x, y: anchor.position.y, w: cardWidth(anchor.data.card), h: cardHeight(anchor.data.card) }, block);
+        return besideSpots(a, side, [height], occupied(), CARD_W, gap)[0] ?? null;
+      },
       fitWidth,
       placeBeside: (cards, anchorCardId, side) => void placeBeside(cards, anchorCardId, side),
       settled,
@@ -2010,7 +2017,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, withCard, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, noteState.drafts, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, frameRectsNow, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, withCard, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, noteState.drafts, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store

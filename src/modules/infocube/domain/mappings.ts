@@ -17,7 +17,6 @@ import type { CreateEntityState } from "@/domain/commands/entity";
 import { begin, current, done, found, nextSortOrder, nothingToChange, softDelete } from "@/domain/commands/shared";
 import { domainError, notFound } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
-import { cardWidthOf } from "@/domain/model/frames";
 import { isDimensional, isLogical } from "@/domain/model/levels";
 import { BACK_TO_REVIEW_MESSAGE, checkFourEyes, type MappingLog } from "@/domain/model/mapping-rules";
 import { plainTextPair } from "@/domain/model/plain-text";
@@ -548,10 +547,15 @@ const dimensionFromInput = z
       .transform((v) => (v ? v : undefined)),
     /** The ticked attributes of the entity, in any order (the copies keep the entity's). */
     attributeIds: z.array(uuidSchema).max(2000),
-    /** The canvas the dialog was opened on: the card goes to the right of the original's there, joining a frame as a placed card. */
+    /**
+     * The canvas the dialog was opened on and the free spot the canvas found right of the original's card
+     * (`besideSpots`); the card joins a frame as a placed card.
+     */
     placement: z
       .object({
         canvasId: uuidSchema,
+        x: z.number().finite(),
+        y: z.number().finite(),
         height: z.number().finite().positive().max(1_000_000).optional(),
         frames: z.array(z.object({ frameId: uuidSchema, expectedVersion: versionSchema }).strict()).max(200).optional(),
       })
@@ -605,7 +609,7 @@ export function createDimensionFrom(
       conceptId: e.concept_id,
       ...(name ? { name } : {}),
       ...(item && placement
-        ? { placement: { canvasId: placement.canvasId, x: item.x + cardWidthOf(item) + DIMENSION_GAP, y: item.y, ...(placement.height ? { height: placement.height } : {}), frames: placement.frames } }
+        ? { placement: { canvasId: placement.canvasId, x: placement.x, y: placement.y, ...(placement.height ? { height: placement.height } : {}), frames: placement.frames } }
         : {}),
     },
     `Dim ${e.name}`,
@@ -646,7 +650,7 @@ export function createDimensionFrom(
     const copy: Attribute = { ...plainCopy(ctx, access.workspace.id, a, dimensionId), sort_order: n + 1 };
     writes.push({ kind: "insert", table: "attribute", row: copy }, ...mappingWrites(ctx, access.workspace.id, a.id, copy.id).writes);
   });
-  return done(
+  const result = done(
     ctx,
     access,
     {
@@ -659,6 +663,9 @@ export function createDimensionFrom(
     },
     writes,
   );
+  // the step's name says what was made (Łukasz, 15c step 5), not createEntity's "Create entity"
+  if (result.ok) result.writeSet.label = "Create dimension";
+  return result;
 }
 
 const plainTextAsDefinition = (text: string) => {

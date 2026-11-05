@@ -64,18 +64,29 @@ test("S15-11: Create dimension from Product with two attributes unticked; the nu
   // nothing changed in Product
   expect(after.attributes.filter((a) => a.entity_id === product.id && a.deleted_at === null)).toHaveLength(before.attributes.filter((a) => a.entity_id === product.id && a.deleted_at === null).length);
 
-  // its card: 80 px to the right of Product's, at its height; selected, its panel open
+  // its card: in the column 80 px right of Product's, from its top down, the first spot that covers no card (besideSpots,
+  // Łukasz, 15c step 5); selected, its panel open
   const items = (await cubeStore().canvasItems.list(RETAIL)).filter((i) => i.canvas_id === STAR && i.deleted_at === null);
   const original = items.find((i) => i.entity_id === product.id)!;
   const made = items.find((i) => i.entity_id === dim.id)!;
-  expect(made.y).toBe(original.y);
-  expect(made.x).toBe(original.x + cardWidthOf(original) + 80);
+  // snapped to the 8 px grid, as every placed card
+  expect(Math.abs(made.x - (original.x + cardWidthOf(original) + 80))).toBeLessThanOrEqual(4);
+  expect(made.y).toBeGreaterThanOrEqual(original.y);
   await expect(card(page, "Dim Product 2")).toHaveCount(1);
+  const box = (await card(page, "Dim Product 2").boundingBox())!;
+  for (const other of await page.locator(".react-flow__node").filter({ has: page.getByTestId("card-name") }).all()) {
+    const name = await other.getByTestId("card-name").first().textContent();
+    if (name === "Dim Product 2") continue;
+    const b = (await other.boundingBox())!;
+    const overlaps = box.x < b.x + b.width && b.x < box.x + box.width && box.y < b.y + b.height && b.y < box.y + box.height;
+    expect(overlaps, `Dim Product 2 covers ${name}`).toBe(false);
+  }
   await expect(page.getByTestId("panel-entity").getByTestId("input-entity-name")).toHaveValue("Dim Product 2");
   await expect(page.getByTestId("panel-entity")).toContainText("Attributes and their logical feed");
 
-  // one undo step takes it all
+  // one undo step, "Create dimension", takes it all
   await undoButton(page).click();
+  await expect.poll(() => toasts(page)).toContain("Undone: Create dimension");
   await expect(card(page, "Dim Product 2")).toHaveCount(0);
   await expect.poll(async () => await liveEntityNamed("Dim Product 2")).toBeUndefined();
   await expect.poll(async () => (await liveCubeMappings()).length).toBe(20);

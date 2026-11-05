@@ -356,7 +356,7 @@ describe("Create dimension from this… (B-2)", () => {
         items: rows.canvas_item as unknown as CanvasItem[],
         create: { concept: concept as never, entities: live(rows.entity as unknown as Entity[]), canvas: canvas as never, frames: [] },
       },
-      { entityId: product.id, attributeIds: ticked.map((n) => attr(rows, "Product", n).id), placement: { canvasId: canvas.id }, ...input },
+      { entityId: product.id, attributeIds: ticked.map((n) => attr(rows, "Product", n).id), placement: { canvasId: canvas.id, x: 1200, y: 96 }, ...input },
     );
   };
 
@@ -386,9 +386,9 @@ describe("Create dimension from this… (B-2)", () => {
     ]);
     const ins = w.filter((x) => x.table === "cube_mapping_input").map((x) => x.row as unknown as CubeMappingInput);
     expect(ins.map((i) => (rows.attribute as unknown as Attribute[]).find((a) => a.id === i.attribute_id)!.name)).toEqual(["product_id", "sku", "list_price"]);
-    // the card to the right of Product's, at its height
-    const original = (rows.canvas_item as unknown as CanvasItem[]).find((i) => i.entity_id === product.id && i.canvas_id === (w.find((x) => x.table === "canvas_item")!.row as unknown as CanvasItem).canvas_id)!;
-    expect(w.find((x) => x.table === "canvas_item")!.row).toMatchObject({ entity_id: entity.id, x: original.x + (original.width ?? 256) + 80, y: original.y });
+    // the card at the free spot the canvas found (besideSpots, in the browser); the step's name
+    expect(w.find((x) => x.table === "canvas_item")!.row).toMatchObject({ entity_id: entity.id, x: 1200, y: 96 });
+    expect(made.writeSet.label).toBe("Create dimension");
     // nothing changes in Product
     expect(w.some((x) => x.kind === "update")).toBe(false);
     expect(new Set(made.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);

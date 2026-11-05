@@ -95,6 +95,7 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       centerOn: (cardId) => handle.current?.centerOn(cardId),
       showPlace: (sel) => handle.current?.showPlace(sel) ?? null,
       freeSpot: () => handle.current?.freeSpot() ?? { x: 40, y: 40 },
+      besideSpot: (anchorCardId, height, side, gap) => handle.current?.besideSpot(anchorCardId, height, side, gap) ?? null,
       registerCanvas: (h) => {
         handle.current = h;
       },

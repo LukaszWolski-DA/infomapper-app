@@ -18,7 +18,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogTitle } f
 import { useToast } from "@/ui/components/toast";
 import { CubeIcon } from "../ui/cube-icon";
 import { typeWord } from "../domain/keys";
-import { proposedDimensionName } from "../domain/mappings";
+import { DIMENSION_GAP, proposedDimensionName } from "../domain/mappings";
 import { createDimensionFromAction } from "./actions";
 
 export function CreateDimensionDialog({ entityId, onClose }: { entityId: Uuid; onClose: () => void }) {
@@ -42,8 +42,11 @@ export function CreateDimensionDialog({ entityId, onClose }: { entityId: Uuid; o
 
   async function create() {
     const original = p.cardOf(entityId);
-    // with the original's card here, the new card goes to its right and joins the frame it lands in (slice 2b)
-    const placement = original ? { canvasId: p.canvasId, height: newCardHeight(ticked.size + 1), frames: ui.frameRefs() } : undefined;
+    // with the original's card here, the new card goes to its right, in the first spot that covers no other card
+    // (the canvas's `besideSpots`, as "Place sources beside"), and joins the frame it lands in (slice 2b)
+    const height = newCardHeight(ticked.size + 1);
+    const spot = original ? ui.besideSpot(original, height, "right", DIMENSION_GAP) : null;
+    const placement = spot ? { canvasId: p.canvasId, ...spot, height, frames: ui.frameRefs() } : undefined;
     const result = await run(
       () => createDimensionFromAction(p.workspaceId, { entityId, ...(typed ? { name: typed } : {}), attributeIds: attributes.filter((a) => ticked.has(a.id)).map((a) => a.id), ...(placement ? { placement } : {}) }),
       (v) => v.toast,

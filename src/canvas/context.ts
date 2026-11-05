@@ -97,6 +97,11 @@ export interface CanvasHandle {
   showPlace: (sel: Selection) => PlaceGone | null;
   /** A free spot near the middle of the view for a new entity (D-46). */
   freeSpot: () => { x: number; y: number };
+  /**
+   * Where a new card of the given height goes beside a card on this canvas (`besideSpots`: a column `gap` px to its
+   * side, from its top down, moved down until it covers nothing); null without that card. Slice 15c: a module's new card.
+   */
+  besideSpot: (anchorCardId: Uuid, height: number, side: "left" | "right", gap?: number) => { x: number; y: number } | null;
   /** Places an element with the top middle of its card at a canvas point (toolbox “Add an entity or table here”). */
   placeAt: (target: CardTarget, rows: number, at: { x: number; y: number }) => void;
   /** “Fit width to names” (D-37): the narrowest width at which every name of the card fits. */
@@ -452,6 +457,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   centerOn: noop,
   showPlace: () => null,
   freeSpot: () => ({ x: 0, y: 0 }),
+  besideSpot: () => null,
   placeAt: noop,
   fitWidth: noop,
   setCardView: noop,
