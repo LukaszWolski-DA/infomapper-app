@@ -1847,3 +1847,141 @@ PR. Nothing in step 2 depends on it.
   - part 2, slice-03a to slice-06b: 22 min 54 s;
   - part 3, slice-07a to slice-09: 18 min 5 s;
   - part 4, slice-10a to slice-15a: 24 min 33 s.
+
+## Łukasz's answers to 15b step 3 (5 November 2026)
+
+- Step 3 accepted. The differences from the prototype are accepted and recorded in the PRD's section 8: linking needs an
+  existing foreign key; a measure on a foreign key is allowed with its warning; a new measure's additivity by its type;
+  leaving semi-additive clears the note.
+
+## 15b step 4: the interface (5 November 2026)
+
+### What changed
+
+- **Actions** (`src/modules/infocube/app/actions.ts`): `updateCubeEntityAction` (grain, SCD type), `setMeasureAction`,
+  `updateMeasureAction`, `linkKeyAction`, `addKeyAction` (answers every version it wrote: the renumbered attributes).
+- **What the page gets** (`ModuleView`, `src/ui/modules.ts`; built in `src/compose/view.ts`), three new fields:
+  - `rowMarks`: classes on an attribute's row by attribute id (the Σ marks, `measureMarks`);
+  - `attributeDeletes`: what an attribute's delete takes along, for its second click (`attributeDeletes` in the
+    module's `view.ts`);
+  - `data`: each module's own rows for its panel sections, without `created_*` and `updated_*` (O8, `cubePageRows`).
+    InfoMapper never reads it.
+
+  They are read only when the workspace has a dimensional entity, as 15a's roles.
+- **The panels' sections, a new extension point** (`src/compose/panels.ts`, `PANEL_SECTIONS`): the entity, attribute and
+  relationship panels render every module's section of their kind where the prototype has InfoCube's, and know nothing
+  else of them. InfoCube's are `src/modules/infocube/app/sections.tsx`; each derives its rows in the browser from the
+  model and `data` (`cubeIndex`, `factHints`, `usedBy`), once per data version.
+  - **Fact** (after the definition): Grain (`TextField` with `keep`, D-66), Measures, Dimensions one row per
+    relationship with "Add key" on a row without a key (disabled with its title while the dimension has no primary
+    key), Hints (each opens what it names: Grain gets the cursor, a relationship or an attribute its panel).
+  - **Dimension**: the SCD segment with its sentence, Used by (a row opens its fact).
+  - **A fact's attribute** (after the flags): Carries (a foreign key only), Measure with Additivity, "Not additive
+    across" (semi-additive only) and the type hint.
+  - **A fact – dimension relationship** (after the cardinalities): "InfoCube", "Key in {fact}", Add key.
+  - Every write is on the save chain: grain, SCD and additivity with their row checked; a measure turned on with its
+    attribute held, turned off with the measure's row (`deletes`); a key's link with the relationship and the picked
+    attribute held; Add key with the relationship and the fact's attributes held (they are renumbered).
+- **Roles on every relationship** (InfoMapper's, `relationship-panel.tsx`): two `TextField`s with `keep` after the verb
+  phrase, "Role of {entity}", and on a relationship to itself (R2) the cardinality fields' words. **What those say on a
+  relationship to itself (D-61, slice 10a):** "At the right end" (the from end) and "At the top end" (the to end); so
+  the roles are "Role at the right end" and "Role at the top end". The sentences add " as {role}" after the entity the
+  role belongs to.
+- **The pill and 20 px** (`line-data.ts`): `pillText` gives the line's pill the roles ("{from} / {to}", one alone), else
+  the verb phrase; parallel relationships and nested loops are 20 px apart (`RELATIONSHIP_GAP`); source lines keep
+  16 px (R7). The comments in `line-data.ts` and `geometry.ts` say so. Step 2's check holds: only S10A-08's loop
+  (l. 144) changed, to 20.
+- **The Σ marks (R5)**: the row's classes `meas add`, `meas semi`, `meas non` (`CardRow.mark`, through `buildCards`' new
+  `rowMarks`), the glyph in the module's CSS as a pseudo-element; `rowNeedsClip` counts its 18 px (`ROW_MARK`). **One
+  difference from R5's wording:** the glyph is `::before` on the row's type span, not `::after`. The prototype draws the
+  mark just before the type, and the type is the one span of the row that is never cut (a `::after` on the name would
+  go with a long name's ellipsis). Still no element.
+- **An attribute's delete (R4)**: the panel's and the canvas menu's second click add InfoCube's rows through
+  `attributeDeleteParts` (`fields.tsx`): "with 1 measure", and "the link to {dimension}{ as role} is deleted, the
+  relationship stays". **The rows fit** (checked on the star at 1,440 × 900: the armed button wraps to two lines, as
+  slice 10c's copies text does), so no screenshot was needed before building it.
+- **The InfoCube box (R1)**: ticked and enabled while InfoCube is on, licence or not.
+- **A fix in a shared field (found by RP-05):** `useChoice` (slice 13) kept a choice made on value A after it was stored
+  as B, so an undo back to A showed B again. It now forgets a stored choice (`choiceLanded`, `src/ui/field-draft.ts`,
+  unit-tested). This affected InfoMapper's own choice fields too (e.g. a stereotype changed and undone).
+
+### New user-facing texts (for approval)
+
+All are the prototype's unless a prototype text is given beside them.
+
+| Where | Text | Prototype |
+| --- | --- | --- |
+| Relationship panel | "Role of {entity}", placeholder "e.g. Ship date" | same |
+| Relationship to itself | "Role at the right end", "Role at the top end" (R2) | "Role of {name}" twice |
+| Sentences | "Each {from} {verb} {phrase} {to}{ as role}.", "Each {to} belongs to {phrase} {from}{ as role}." | same |
+| Relationship's section | "InfoCube", "Key in {fact}", "None", "Add key", "{dimension} has no primary key yet." | same |
+| Add key's toast | "Added {name}, the key of {dimension}{ as role}." | same |
+| The pill | "{from role} / {to role}", one role alone, else the verb phrase | same |
+| Fact | "Fact", "Grain", placeholder "One row per … e.g. one order line" | same |
+| Fact | "Measures", rows "{name}" with "{Σ mark} {Additivity}{, note}"; "None yet. Open a numeric attribute and turn on Measure." | same |
+| Fact | "Dimensions", rows "{dimension}{ as role}" with "key {name}" or "no key", "Add key"; "None yet. Draw a relationship to a dimension." | same |
+| Fact | "Hints", "Nothing to check: grain, keys and measures look complete.", and step 3's hint texts | same |
+| Dimension | "Dimension", "Slowly changing dimension type", "0 · keep", "1 · overwrite", "2 · history" | same |
+| Dimension | "Values never change once loaded.", "A change overwrites the old value; no history.", "A change adds a new version; the old one stays with its validity.", each followed by "Technical columns (valid from, valid to, current) are a physical matter and are not modelled here." | same |
+| Dimension | "Used by", rows "{fact}{ as role}" with "key {name}" or "no key"; "No fact uses it yet." | same |
+| A fact's attribute | "Carries", a row "{dimension}{ as role}" with "relationship"; "No dimension. Pick this key in a relationship to a dimension." | same |
+| A fact's attribute | "Measure" (section and flag), "A foreign key carries a dimension's key; it is not a measure.", "Not a measure: a degenerate dimension or a descriptive value of the fact." | same |
+| A fact's attribute | "Additivity", "Additive", "Semi-additive", "Non-additive"; "Not additive across", placeholder "e.g. Date (a balance)" | same |
+| A fact's attribute | "Its type is {Type}. Measures are usually Integer or Decimal." | same ("not set" without a type cannot happen in the app) |
+| Measure on a foreign key | toast "{attribute} is a foreign key. A dimension key is usually not a measure." (accepted in step 3) | none |
+| An attribute's second click | "Click again to delete, with 1 measure"; "…; the link to {dimension}{ as role} is deleted, the relationship stays" (joined with the mappings and copies as before) | a dialog "Delete {name}?" with the rows "1 measure – deleted" and "Carries {dimension}{ as role} – the link is deleted; the relationship stays" |
+
+The commands' refusals (step 3: "Only a fact has a grain.", "Only an attribute of a fact can be a measure.",
+"{attribute} already carries {dimension}{ as role}. Pick another key.", …) reach the page only by a direct call or a
+concurrent change; the panels never offer what they refuse.
+
+### Other differences from the prototype in this step
+
+- The sections are InfoMapper's folds ("Fact", "Dimension", "Measure", "InfoCube"), each with a box like the
+  prototype's `.cubebox`; the prototype's are plain `h3` headings.
+- A Σ mark has no tooltip (R5); its additivity is in the attribute's panel and the fact's Measures.
+
+### Not in this step
+
+- Screenshots light and dark (step 1 proposed them for step 4; step 4's go did not ask for them). They can go with
+  step 5.
+- `CLAUDE.md`'s list of extension points (the panels' sections, `rowMarks`, `attributeDeletes`, `data`) and the other
+  docs: step 5, with D-68, the AD-34 sentence and D-61's 20 px.
+- RP-09 is slice 15a's S15-14 (passes); RP-10 is 15d's; RP-13 is dropped (R6).
+
+### Tests
+
+- **e2e, `e2e/slice-15b/`** (one file per criterion; fixtures and helpers built on 15a's):
+  - `S15-03.spec.ts` (R1): on without a licence, the box ticked and enabled with the no-licence line;
+  - `S15-07.spec.ts` (hints): a new fact's two hints; the grain hint focuses Grain;
+  - `S15-08.spec.ts`: grain cleared and undone; `quantity` semi-additive across "Date" (Σ~ on the row and in Measures,
+    two undo steps); `order_number` as a measure with its type hint; `customer_key` as a measure with the toast; a
+    reviewer read-only;
+  - `S15-08b.spec.ts`: SCD 0 → 2 → 1 with the sentences and the Cube tab's "SCD n", two undos; "grain set" and "no
+    grain";
+  - `RP-01` (pills, 20 px), `RP-02` (Dimensions), `RP-03` (a third relationship's hints), `RP-04` (role, Add key, undo,
+    redo), `RP-05` (the key select, None, undo), `RP-06` (FK cleared: the inactive link kept), `RP-07` (the second
+    click, delete, undo), `RP-08` (the relationship deleted, undo), `RP-11` (Used by), `RP-12` (a primary key renamed),
+    `RP-14` (a logical relationship's role, swap, undo, redo; R2 on a loop).
+- **Changed earlier test:** `e2e/slice-10a/S10A-08.spec.ts` l. 144: the second loop at 20 px (was 16), and its end more
+  than 19 px from the first's (was 15).
+- **Unit:** `lines.test.ts` (20 px, `pillText`), `tests/infocube-star.test.ts` (the module view's marks, deletes and page
+  rows; the empty view's new fields), `field-draft.test.ts` (`choiceLanded`).
+- **Measurement (asked for in this step):**
+  - the element guard (`S3B-15-elements.spec.ts` against `slice-08.json`): passes, viewport counts equal; page totals
+    6,000 / 20,797 / 2,867 / 6,309, as since slice 11;
+  - `e2e/slice-15b/S15B-layers.spec.ts` (new, measurement build only, in `playwright.config.ts`'s list): the star with
+    its six Σ marks and the role pills, then with the measures deleted and the roles cleared: **10 drawing layers,
+    4.2 MP and 791 viewport elements both times**. 15a's `S15-layers` on the same build: 10, 4.2 and 791 with and
+    without roles.
+
+### Checks
+
+- `npm run lint` and `npm run typecheck` clean; `npm test` 137 files, 1,723 tests pass.
+- The slice's specs (`e2e/slice-15a/`, `e2e/slice-15b/`) and the earlier specs the step touched pass.
+- **One full run** (`npm run e2e`, from scratch), because the step touches shared infrastructure: the line layer (20 px)
+  and `useChoice` (every choice field). 581 passed, 3 skipped, 1 failed in 96 min 38 s: part 1 27 min 21 s, part 2
+  23 min 35 s, part 3 19 min 10 s, part 4 26 min 31 s. The failure was `S10A-10` l. 36: its label helper matched by
+  substring, so "At the right end" also found the new "Role at the right end" (two labels). Not a flake: the helper now
+  matches the whole label; `S10A-10` passed three times on its own (15 of 15). Traces and log kept in
+  `test-results/kept-15b-step4/`.
