@@ -2510,3 +2510,175 @@ The recommendations are accepted, with these details:
 - The step changes the change-log read that four-eyes uses (X8), and it changes change groups and undo, so it got a full e2e run (`npm run e2e`, from scratch, no dev server running):
   - **582 passed, 3 skipped, 0 failed**, in 1 h 38 min (12:48:57 to 14:26:25);
   - part 1 took 25:02, part 2 24:12, part 3 19:32 and part 4 28:38.
+
+## Łukasz's answers to 15c step 3 (5 November 2026)
+
+Step 3 accepted; both new texts approved ("A mapping reads at least one attribute. Delete the mapping instead.", "A
+dimension is created from a logical entity."). For step 5: the Create dimension dialog proposes a numbered name when
+"Dim {entity}" is taken, and warns on a duplicate, as the prototype does. **Test regime for step 4:** e2e specs for the
+canvas criteria; no full run in step 4 (the slice's specs and every earlier spec folder that touches the canvas, named
+below); the full run comes once, at the end of step 5, and counts as 15c's run before the merge if step 6 changes docs
+only. The PRD's step list says so (section 4); step 1's "Proposed steps" above gave step 4 a full run.
+
+## 15c step 4: the canvas (5 November 2026)
+
+### What changed
+
+- **A module's lines in InfoMapper's line layer** (C7): `CanvasLines.modules` (`ModuleLineData` in
+  `src/canvas/line-data.ts`): a line from one or more entity rows to another entity row, with the module's kind, classes,
+  colour, end mark and chip. InfoMapper draws it and knows nothing of its meaning:
+  - `moduleGeom` (`line-geometry.ts`): one curve per input, row to row (a collapsed card or a hidden row at the header's
+    middle, `part`), the chip on the first curve;
+  - `ModulePath` (`LineLayer.tsx`): a group per line with `--lc`; per input a hit target, the stroke, a start dot and a
+    diamond (one path); the chip's three elements. The dots and diamonds are left out below 40 %, as a mapping's dots.
+    Their own `<g>`, drawn only when the canvas has one (slice 10b's rule);
+  - the layers (D-22): Relationships hides them, Mappings keeps them;
+  - collapsed frames (X6): a line with any card in a collapsed frame is left out, not bundled, not counted
+    (`bundleLines`);
+  - the miniature draws none (it reads mappings and relationships only).
+- **InfoCube's lines** (`src/modules/infocube/canvas/lines.ts`, `cubeLines`): every dimensional mapping whose target's
+  card and at least one input's card are on the canvas; classes `cmap draft|review|approved`, the target's concept
+  colour (InfoMapper's `NO_CONCEPT_COLOR` without one), the diamond, ƒ for a transformation. Their CSS is InfoCube's
+  (`infocube.css`: Draft `6 4`, In review `10 3 2 3`, Approved solid). The page builds them on the server next to
+  InfoMapper's (`moduleLines` in `src/compose/view.ts`, from `ModuleView.data`, which now carries the mapping rows).
+- **Hover and selection** (C7, C8): a row lights its dimensional lines both ways and the rows at their ends; a line's
+  hover lights its rows (`relatedLines`, `hoverRows`, `HoverLines`). A row's selection emphasises them as it does a
+  mapping's. A selected dimensional line is thicker and fades nothing (prototype l. 2066).
+- **The `ext` selection** (F15, C8): `{ t: "ext"; kind; id }`.
+  - The click on a line selects it.
+  - The right-click opens its menu (`ToolboxTarget` `ext`), and the Delete key deletes it.
+  - The details panel shows the module's panel (`CANVAS_EXTENSIONS` in `src/compose/canvas.ts`). Step 4's panel is its
+    kind, the InfoCube badge and its trace ("Order Line.quantity + … → Fact Sales.net_amount"); step 5 adds its fields.
+  - It is a history place (D-38): `placeOf` takes it as it is. `showPlace` asks the module whether it still exists
+    (`host.extGone`), and `SelectionHistory` shows the module's text ("That mapping no longer exists.").
+- **Focus** (C8): Focus on a selected line lights its cards (`FocusTarget` `ext`). A dimensional line is lit when every
+  card it touches is lit (`litModules`, as `litSources`): under Focus, in the Changes view and in the veil.
+- **The extension point** (`src/canvas/extensions.ts`, `CanvasExtension`): a module registers a kind with a hook
+  (`gone`, `menu`, `remove`, `rowDrag`, `drop`) and its panel. The canvas host (`canvas-host.tsx`) calls the hooks in
+  the registry's fixed order. The host's new handlers are `rowDrag`, `dropRow`, `deleteExt` and `extGone`.
+- **The drag** (B-6, C4, C5, X3; `ColumnDrag.tsx`):
+  - A drag now starts from an entity's attribute row too, when the page allows it (`host.rowDrag`).
+  - InfoCube allows it from a logical row while a fact or a dimension is on the canvas, and from a dimensional row
+    always.
+  - Each target under the mouse (an attribute row, a card's header, a column's row) is planned by the module
+    (`planDrop`). Only a target that maps gets `.drop`; a refusal is its toast on the release.
+  - The drop:
+    - a mapping onto a row: `createCubeMappingAction`, then the new line is selected;
+    - onto a header: `createOnHeaderAction` on the card's queue (`ui.withCard`, new: it sends the card's version and
+      takes the answer's), then the new attribute is selected;
+    - onto the existing mapping: it is selected, with "That mapping already exists. It is selected now.".
+  - **The veil**: from the drag's start, `requestFade({ lit })` keeps the cards that can take it lit (from a logical
+    row the facts and dimensions, from a dimensional row the logical cards). The fading asked for before comes back
+    after it (Focus, the Changes view).
+  - **A column's drag** keeps InfoMapper's path. On a canvas with facts or dimensions the veil keeps every other card
+    lit, and a drop on a dimensional row or header is refused in the browser with B-6's toast (15a's text).
+- **Server actions** (InfoCube's `app/actions.ts`; the drag and the menu need them in this step):
+  `createCubeMappingAction`, `createOnHeaderAction`, `setCubeMappingStatusAction` (four-eyes from InfoCube's change
+  log), `updateCubeMappingAction`, `deleteCubeMappingAction`. The delete and the status are on the save chain with the
+  mapping's row checked (`saveRow`). The delete's undo step is named "Delete dimensional mapping" (the first row it
+  writes is an input).
+- **The line's menu** (prototype l. 3985–3990):
+  - its head "{inputs} → {target}";
+  - Draft, In review and Approved for those who may set the status (reviewers too, O9);
+  - "Edit transformation rule…": a direct mapping becomes a transformation, with the toast "It is a transformation now.
+    Describe the rule." (P20). The details panel opens; the cursor goes into the rule in step 5;
+  - "Delete mapping" (Del).
+- **A dimensional row's menu** has no "Map from a column…" (difference 9).
+- **The cards' feeds** (C12, P17, X4):
+  - `ModuleView.rowFeeds` gives every dimensional attribute's count and tooltip ("from Customer.segment_code",
+    "Not fed from the logical model"). `buildCards` reads it in place of source mappings for those rows.
+  - The card's bar says "{n} of {m} attributes fed from the logical model" (`EntityRole.coverage`).
+  - Mapped and Not mapped on a dimensional card read the feeds.
+
+### Differences from the prototype in this step (for your decision)
+
+1. **No tooltip on a dimensional line.** The prototype has a `<title>` "{E.a} → {E.b} (dimensional mapping)" on each
+   input's group. It would be one more element per line (AD-24). InfoMapper's mapping lines have none either. The menu's
+   head and the panel name the mapping.
+2. **Focus on a selected line** lights its two cards and every dimensional line between them (the "both cards lit"
+   rule, as source lines). The prototype lights that one mapping. On the star: Customer.customer_number's and
+   segment_code's lines when segment_code's is focused.
+3. **A header drop's undo step** is named by its first row: "Undone: Create attribute" (the prototype has no step
+   names).
+
+### Not done in step 4
+
+- Step 5: the mapping panel's fields, the rule's cursor after "Edit transformation rule…", the Overview's "{n} of {m}
+  fed", the delete previews (X-2 to X-4) and the delete toast, "Create dimension from this…".
+- **A finding for step 5:** a home's thumbnail draws a dimensional card under Mapped or Not mapped with InfoMapper's
+  source mappings (`thumbnailIndex` counts them), so its height can differ from the canvas's. The thumbnails get the
+  feeds with the homes' other module reads in step 5.
+
+### New user-facing texts
+
+- "Delete dimensional mapping": the undo step's name ("Undone: Delete dimensional mapping").
+- Every other text is the prototype's or already approved: the menu's items and head, "Mapping deleted", "That mapping
+  no longer exists.", "Not fed from the logical model", "from {inputs}", "{n} of {m} attributes fed from the logical
+  model", "Dimensional mapping" with "InfoCube", "It is a transformation now. Describe the rule." (P20), and B-6's
+  toast for a column (15a).
+
+### Measurement (S15-18, X7; measurement build)
+
+- **"Performance test – star"** (`scripts/lib/star-canvas.ts`, written only into the e2e data file by the spec):
+  - 40 logical cards and 50 facts and dimensions. Step 1 planned 50 logical cards; the large model has 41 logical
+    entities, and the one with 200 attributes is left out.
+  - Either 300 dimensional lines (60 transformations with two inputs) or 300 relationships between the same cards.
+  - At 50 %, the lines' variant has 25 drawing layers, 13.0 MP and 10,691 viewport elements; the relationships'
+    variant 25, 12.8 MP and 10,570. `e2e/slice-15c/S15-18.spec.ts`.
+- **Pans as presented frames** (balanced, one discarded warm-up per variant, 4 rounds):
+
+  | Variant | fps per round | Median |
+  | --- | --- | --- |
+  | lines | 56.8, 57.4, 56.7, 51.5 | 56.8 |
+  | relationships | 58.0, 57.6, 58.3, 56.0 | 57.8 |
+
+  The relationships' run-to-run spread is 56.0 to 58.3. The lines' median and three of their four rounds are inside
+  it; one round is low (51.5).
+  An earlier sitting without a warm-up gave 51.3 / 54.0 / 55.4 against 56.7 / 54.1 / 54.9.
+- **The veil at a drag's start** (20 drags, from a settled screen, traced to the screen):
+
+  | Build | In page (median) | To the screen (median) | Main thread |
+  | --- | --- | --- | --- |
+  | first | 67 ms | 75 ms | 63 ms |
+  | final | 18.7 ms | 29.3 ms | 17.9 ms |
+
+  The release went from 59 ms to 21 ms (15.3 ms of main thread). **The bar (a median under 16 ms) is not met.**
+  - Two causes were found and fixed. The drag's line was `ModelCanvas` state, so every move re-rendered all cards: it
+    is now a value store (`DraftLines`). The class `connecting` on `body` restyled every row at the start and the
+    end: the crosshair is now the dragged row's, with the pointer captured on it.
+  - What is left, per drag start: layerize 7.6 ms (the canvas's ~10,700 elements), the drop target's hit test 3.6 ms,
+    script 3.6 ms, commit 2.3 ms; style 12 elements. The release, which draws no veil, costs nearly the same, so the
+    veil's own share is small. The rest is this canvas's cost of any frame.
+- **Sales star** (`e2e/slice-15c/S15C-layers.spec.ts`), with the 20 lines against without them:
+  - 7 drawing layers against 10, 4.2 MP both times (Chrome groups the star into fewer layers with the lines);
+  - 921 viewport elements against 791. The +130 are exactly the kind's: 1 group, 20 lines, 4 × 22 inputs, 3 × 7 ƒ.
+- **Element guard** (`S3B-15-elements` against `slice-08.json`) on "Performance test": equal viewport counts (4,508 /
+  19,305 / 1,465 / 4,907; page totals 6,000 / 20,797 / 2,867 / 6,309, as since slice 11).
+
+### Tests
+
+- **New e2e specs** in `e2e/slice-15c/` (fixtures: 15a's star; helpers listed in `helpers.ts`):
+  - `S15-05` (the lines, colours, dashes, diamonds, ƒ, the layers);
+  - `S15-09` (three tests: the header drop with its undo; the reverse direction, an existing mapping, the refusals;
+    the veil and a column's refusal);
+  - `S15-22` (two tests: hover, Focus, collapsed frames, the miniature; the menu, Delete with Undo, history places);
+  - `S15-23` (the fed bar, the dots, Mapped and Not mapped, after a delete and its undo).
+  - The measuring specs are `S15-18` and `S15C-layers` (measurement build only, in `playwright.config.ts`'s list).
+- **New unit tests:** `tests/infocube-lines.test.ts` (7): the star's lines, cards left out, the composition root, a
+  row's lines both ways, collapsed frames and layers, Focus on a line, the feeds on cards.
+- **Changed:** `tests/infocube-star.test.ts`. The role now has `coverage` and the view `rowFeeds`.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: clean. `npm test`: 140 files, 1,759 tests.
+- Slice 15c's specs: 7 passed. One failed on its first run: a mapping deleted outside the page was still the page's
+  until a reload. The spec now reloads before Back; the page reads the same data as InfoMapper's own places. Then 2 of
+  2 passed.
+- **The earlier spec folders that touch the canvas**, after the last change (no full run, Łukasz's regime for step 4):
+
+  | Run | Folders | Covers | Result |
+  | --- | --- | --- | --- |
+  | 1 | `slice-01a`, `slice-01b`, `slice-02a`, `slice-02b`, `slice-02c`, `slice-03b`, `slice-04p`, `slice-04b1` | lines, the column's drag, hover, layers, frames and bundles, the miniature, the overlay and fading, Focus | 123 passed, 27 min 37 s |
+  | 2 | `slice-06b`, `slice-07b`, `slice-10a`, `slice-10b`, `slice-15a`, `slice-15b`, `slice-15c` | history places, the Changes view, line menus, source lines, InfoCube | 135 passed, 19 min 28 s |
+
+  No failure.
