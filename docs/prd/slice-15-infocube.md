@@ -374,6 +374,7 @@ header edge (a class), and a new line kind with a diamond end. Bars are proposal
 | Drawing layers | LayerTree read on the Sales star against a logical canvas of the same size | dimensional marks and lines add no drawing layer per card (AD-24) |
 | Pan and zoom, first render | `npm run measure:canvas` as in slice 14b, against `slice-14b` | within the sitting's run-to-run spread |
 | A dense dimensional canvas | step 1 proposes whether a measuring canvas with facts, dimensions and dimensional lines is needed (Q11) | – |
+| The veil at a drag's start (15c, X3) | `e2e/slice-15c/S15-18.spec.ts` on "Performance test – star", traced to the screen | **the veil adds at most 5 ms to a drag frame without the veil on the same canvas** (Łukasz, 5 November 2026; replaces 15c step 1's "median under 16 ms", whose intent was to rule out a restyle of every card, slice 5a: 75–140 ms) |
 
 **Nothing above the canvas reads layout during a commit** (CLAUDE.md). The Cube tab, the bus matrix dialog and the
 panels' InfoCube sections derive everything from the model.
