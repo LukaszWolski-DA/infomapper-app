@@ -6,6 +6,7 @@ import type { Write, WriteSet } from "@/domain/changes";
 import { LAST_OWNER } from "@/domain/commands/people";
 import { LAST_PROJECT_MESSAGE } from "@/domain/commands/project";
 import { INFOCUBE_OFF_MESSAGE, turnOffRefusedMessage } from "@/domain/model/levels";
+import { MAPPING_LOG } from "@/domain/model/mapping-rules";
 import type { WorkspaceRows } from "@/domain/commands/undo";
 import { domainError, notFound, staleVersion, type DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
@@ -270,12 +271,12 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
 
     changeEvents: {
       list: async (workspaceId) => (await load()).change_event.filter((e) => e.workspace_id === workspaceId),
-      listForMapping: async (workspaceId, mappingId) =>
+      listForMapping: async (workspaceId, mappingId, log = MAPPING_LOG) =>
         (await load()).change_event.filter(
           (e) =>
             e.workspace_id === workspaceId &&
-            ((e.object_type === "mapping" && e.object_id === mappingId) ||
-              (e.object_type === "mapping_input" && (e.after_image ?? e.before_image)?.mapping_id === mappingId)),
+            ((e.object_type === log.mapping && e.object_id === mappingId) ||
+              (e.object_type === log.input && (e.after_image ?? e.before_image)?.mapping_id === mappingId)),
         ),
       listForRequirement: async (workspaceId, requirementId) =>
         (await load()).change_event.filter((e) => e.workspace_id === workspaceId && e.object_type === "requirement" && e.object_id === requirementId),

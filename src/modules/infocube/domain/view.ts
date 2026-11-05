@@ -5,6 +5,7 @@
 import type { Uuid } from "@/domain/ids";
 import type { Entity, Relationship, StandardColumns } from "@/domain/types";
 import { carries, dimensionAs, type CubeIndex } from "./keys";
+import { mappingAttributeDeletes, mappingDependents, type MappingIndex } from "./mappings";
 import type { Additivity, CubeEntity, CubeKey, CubeMeasure, CubeRole } from "./types";
 
 export const ROLE_NAMES: Record<CubeRole, string> = { fact: "Fact", dimension: "Dimension" };
@@ -40,18 +41,20 @@ const counted = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 /**
  * What deleting a fact or a dimension takes with it (X-4, prototype `cubeDependents`), as rows of its delete preview:
  * its role with a fact's grain or a dimension's SCD type; for a dimension, the facts that lose it, each once however
- * many relationships join them (PRD section 2); its measures. Nothing for a logical entity (its dimensional mappings'
- * rows come in 15c).
+ * many relationships join them (PRD section 2); its measures. Slice 15c: with `mappings`, the dimensional mappings that
+ * go with it (X-4), and for a logical entity the mappings that read its attributes and the facts and dimensions that
+ * lose their feed (X-2).
  */
 export function entityDependents(
   entityId: Uuid,
   model: { entities: readonly Entity[]; relationships: readonly Relationship[]; attributes: readonly { id: Uuid; entity_id: Uuid; deleted_at: string | null }[] },
   cubeEntities: readonly CubeEntity[],
   cubeMeasures: readonly CubeMeasure[],
+  mappings?: MappingIndex,
 ): [string, string][] {
   const roles = rolesOf(cubeEntities);
   const own = roles.get(entityId);
-  if (!own) return [];
+  if (!own) return mappings ? mappingDependents(mappings, { entityId }) : [];
   const rows: [string, string][] = [];
   if (own.role === "fact") rows.push([ROLE_NAMES.fact, own.grain?.trim() ? `its grain (“${own.grain.trim()}”) deleted` : "deleted"]);
   else {
@@ -70,6 +73,7 @@ export function entityDependents(
   const attributes = new Set(model.attributes.filter((a) => a.entity_id === entityId && a.deleted_at === null).map((a) => a.id));
   const measures = live(cubeMeasures).filter((m) => attributes.has(m.attribute_id)).length;
   if (measures) rows.push([counted(measures, "measure"), "deleted"]);
+  if (mappings) rows.push(...mappingDependents(mappings, { entityId }));
   return rows;
 }
 
@@ -116,16 +120,25 @@ export const linkGoes = (what: string) => `the link to ${what} is deleted, the r
 
 /**
  * What an attribute's delete takes along (R4, R-9), for its second click: its measure, and the link of the key it
- * carries while that link is active. Only attributes with one of them.
+ * carries while that link is active. Only attributes with one of them. Slice 15c: with `mappings`, its dimensional
+ * mappings and, for a logical attribute, the facts and dimensions that lose their feed (X-3).
  */
-export function attributeDeletes(index: CubeIndex, attributes: readonly { id: Uuid; deleted_at: string | null }[]): Record<Uuid, { also: string[]; then: string[] }> {
-  const out: Record<Uuid, { also: string[]; then: string[] }> = {};
+export function attributeDeletes(
+  index: CubeIndex,
+  attributes: readonly { id: Uuid; deleted_at: string | null }[],
+  mappings?: MappingIndex,
+): Record<Uuid, { also: string[]; then: string[] }> {
+  const out: Record<Uuid, { also: string[]; then: string[] }> = mappings ? mappingAttributeDeletes(mappings, attributes) : {};
   for (const a of attributes) {
     if (a.deleted_at !== null) continue;
     const carried = carries(index, a.id);
     const measure = index.measureOf(a.id);
     if (!carried && !measure) continue;
-    out[a.id] = { also: measure ? ["1 measure"] : [], then: carried ? [linkGoes(dimensionAs(index, carried))] : [] };
+    const fed = out[a.id];
+    out[a.id] = {
+      also: [...(measure ? ["1 measure"] : []), ...(fed?.also ?? [])],
+      then: [...(carried ? [linkGoes(dimensionAs(index, carried))] : []), ...(fed?.then ?? [])],
+    };
   }
   return out;
 }
