@@ -2291,3 +2291,22 @@ Changed earlier specs: none expected (no dimensional content in earlier specs' d
 - **X7.** The dense canvas "Performance test – star" and the bars above.
 - **X8.** The new criteria S15-20 to S15-23 and the six steps.
 - **X9.** AD-36 with the proposed sentence on Q-5, labels and requirement links.
+
+## Łukasz's answers to 15c step 1 (5 November 2026)
+
+The recommendations are accepted, with these details:
+
+- **X1:** out of 15c; a logical row dragged onto a source column is an InfoMapper idea (`docs/ideas.md`).
+- **X2:** yes. The × is not offered on a mapping's last input ("Delete mapping" does that). **A second input on a direct
+  mapping** switches it to a transformation, as the prototype does (l. 2980: `if (m.from.length > 1) m.kind =
+  "transform"`), with "It reads {E.a} too, so it is a transformation now. Describe the rule." and the cursor in the
+  rule; the prototype shows the × only with more than one input (l. 2350), so the app matches it.
+- **X3:** the veil, also for a column's drag on a canvas with dimensional cards.
+- **X4, X5, X6:** yes.
+- **X7:** yes, with these bars: the pans on "Performance test – star" within the sitting's run-to-run spread of the same
+  cards joined by 300 relationships; the veil at a drag's start at a **median under 16 ms**.
+- **X8:** yes. In addition, the domain step changes the change-log function behind four-eyes (`isContentChange`,
+  `listForMapping`), which InfoMapper's own approvals use, so **step 3 gets a full e2e run too**; the function moves
+  from step 2 to step 3.
+- **X9:** yes (AD-36's added sentence, quoted at the closing).
+- The 11 expected differences from the prototype are accepted.

@@ -6,7 +6,7 @@ Status: **step 1 done and answered** (Łukasz, 4 November 2026); updated to the 
 (A1 holds). **15b** (role-playing in it, RQ-3): step 1 done on 4 November 2026 on branch
 `slice/15b-grain-measures-roles` from tag `slice-15a` (acceptance doc, "15b step 1"). **15c** (dimensional mappings):
 step 1 done on 5 November 2026 on branch `slice/15c-dimensional-mappings` from tag `slice-15b` (acceptance doc, "15c step
-1"; questions X1–X9 open).
+1"; answered on 5 November 2026, "Łukasz's answers to 15c step 1").
 
 ## 0. Answers to step 1 (Łukasz, 4 November 2026)
 
@@ -323,7 +323,8 @@ Claude Code session may start at a step's boundary, never inside a step; it star
      failing test run three times on its own. A step that touches shared infrastructure (undo and change groups, the
      save chain, the canvas's layers, the table registry, the local adapter) runs one full e2e run in that step and its
      report says why: in 15c the data step (`cube_mapping` and `cube_mapping_input` in the registry, undo and the
-     cascades) and the canvas step (the line layer, the drag) do. Before the merge: one full e2e run.
+     cascades), the domain step (the change-log function behind four-eyes, X8) and the canvas step (the line layer, the
+     drag) do. Before the merge: one full e2e run.
 
 ## 5. Acceptance criteria
 
@@ -494,6 +495,14 @@ performance), each with the files and functions behind it and a proposal.
 - **A new measure's additivity by its type** (15b step 3, accepted): additive for Integer and Decimal, non-additive
   otherwise; the prototype starts every measure additive.
 - **Leaving semi-additive clears the note** (15b step 3, accepted); the prototype keeps the note, hidden.
+- **15c's expected differences** (accepted 5 November 2026, acceptance doc "15c step 1"): reviewers approve with
+  four-eyes and D-51's first rule (O9, O12); Q-5 by the command in one undo step, not by indexing; dimming with the
+  fading veil, not a page-wide class; an approval is logged (`approved_by`, `approved_at`); a plain-text note; "Edit
+  transformation rule…" says "It is a transformation now. Describe the rule." (P20); the attribute's delete names
+  dimensional mappings on its second click and its toast counts both kinds (R4, P10); re-pointing the target is content
+  for D-51 and refused onto an identical mapping; no "Map from a column…" or "Add a source column" on a dimensional
+  attribute; a dimensional card's "Mapped" filter reads its feeds; "Create dimension from this…" makes plain attributes,
+  not D-63 copies.
 - **The sections are InfoMapper's folds** (15b step 4, accepted): "Fact", "Dimension", "Measure" and the relationship's
   "InfoCube" fold like the panels' other sections; the prototype has plain headings.
 - **Roles on a relationship to itself** (15b, R2): "Role at the right end" and "Role at the top end", D-61's words for

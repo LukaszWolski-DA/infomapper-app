@@ -159,6 +159,10 @@ The prototype also starts a mapping drag from an attribute row and drops it on a
 only for a column dragged onto an attribute or an entity's header, so this is not built. (Auto-scroll near the canvas
 edge, mentioned here before, was built in step 2 at Łukasz's request.)
 
+**Slice 15c** (X1, Łukasz, 5 November 2026): InfoCube's dimensional mappings start a drag from an entity's row (logical
+or dimensional), but a logical row dropped onto a source column stays out of 15c: it is InfoMapper's behaviour, not
+InfoCube's. When it is built, it reuses 15c's row drag (`resolveDrop`) and the veil that dims what cannot take the drop.
+
 ## Feeding sources: drag from the panel onto the canvas (slice 1b, step 5)
 
 In the prototype, a feeding source (or fed entity) in the right panel can also be dragged onto the canvas and lands
