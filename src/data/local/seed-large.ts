@@ -245,6 +245,8 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
       to_min: r.toMin,
       to_max: r.toMax === "N" ? "n" : "1",
       description: null,
+      from_role: null,
+      to_role: null,
     });
   }
 

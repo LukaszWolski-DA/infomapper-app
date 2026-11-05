@@ -24,7 +24,7 @@ import {
 const relationshipRow = (id: string) => async () => (await loadModel()).relationships.find((r) => r.id === id);
 
 
-const field = (page: Page, label: string) => page.getByTestId("panel-relationship").locator("label").filter({ hasText: label });
+const field = (page: Page, label: string) => page.getByTestId("panel-relationship").locator("label").filter({ hasText: new RegExp(`^${label}$`) });
 
 test("S10A-10: the panel is titled “Customer and Customer”, its end fields “At the right end” and “At the top end”; the label and both ends are saved", async ({ page }) => {
   const rel = await selfRelationship("Customer");

@@ -42,9 +42,16 @@ export interface RelLineData {
   fromMax: CardinalityMax;
   toMin: CardinalityMin;
   toMax: CardinalityMax;
-  /** Parallel relationships between the same two entities are drawn 16 px apart, as in the prototype. */
+  /**
+   * Parallel relationships between the same two entities, and loops on one card, are drawn 20 px apart (slice 15b,
+   * R-7): two 18 px pills never overlap.
+   */
   offset: number;
 }
+
+/** The pill's text (slice 15b, RP-D, R-7; prototype): the roles "{from} / {to}", one role alone, else the verb phrase. */
+export const pillText = (r: { label: string | null; from_role: string | null; to_role: string | null }): string | null =>
+  [r.from_role, r.to_role].map((x) => x?.trim() ?? "").filter(Boolean).join(" / ") || r.label;
 
 /** A foreign key between two source tables (slice 10b, D-62): read-only, from an import; drawn between the table cards. */
 export interface SourceLineData {
@@ -54,7 +61,7 @@ export interface SourceLineData {
   fromCardId: Uuid;
   /** The card of the referenced table (the same card for a key to itself: a loop, D-61). */
   toCardId: Uuid;
-  /** Several keys between the same two tables are drawn 16 px apart, as parallel relationships are. */
+  /** Several keys between the same two tables are drawn 16 px apart (they have no pill; slice 15b's R7 keeps 16 px). */
   offset: number;
   /** The source no longer declares it (`missing_since`): drawn dashed. */
   missing?: true;
@@ -111,6 +118,8 @@ export function buildLines(
   }
 
   const pairs = new Map<string, number>();
+  /** 20 px between parallel relationships and nested loops (slice 15b, R-7); source lines keep 16 (R7). */
+  const RELATIONSHIP_GAP = 20;
   const relationships: RelLineData[] = [];
   for (const r of model.relationships) {
     const from = entityCard.get(r.from_entity_id), to = entityCard.get(r.to_entity_id);
@@ -122,12 +131,13 @@ export function buildLines(
       id: r.id,
       fromCardId: from,
       toCardId: to,
-      label: r.label,
+      // the pill: the roles, else the verb phrase (slice 15b)
+      label: pillText(r),
       fromMin: r.from_min,
       fromMax: r.from_max,
       toMin: r.to_min,
       toMax: r.to_max,
-      offset: (n - 1) * 16,
+      offset: (n - 1) * RELATIONSHIP_GAP,
     });
   }
 

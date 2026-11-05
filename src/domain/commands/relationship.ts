@@ -59,6 +59,8 @@ export function createRelationship(
     to_min: 0,
     to_max: "n",
     description: null,
+    from_role: null,
+    to_role: null,
   };
   return done(ctx, access, { relationship }, [{ kind: "insert", table: "relationship", row: relationship }]);
 }
@@ -77,6 +79,9 @@ const updateRelationshipInput = z
     toMin: min.optional(),
     toMax: z.enum(CARDINALITY_MAX).optional(),
     description: optionalTextSchema.optional(),
+    /** A role name per end (slice 15b, RP-A, D-68): trimmed, empty = none; any relationship, any level. */
+    fromRole: optionalTextSchema.optional(),
+    toRole: optionalTextSchema.optional(),
   })
   .strict();
 export type UpdateRelationshipInput = z.input<typeof updateRelationshipInput>;
@@ -88,6 +93,8 @@ const COLUMNS = [
   ["toMin", "to_min"],
   ["toMax", "to_max"],
   ["description", "description"],
+  ["fromRole", "from_role"],
+  ["toRole", "to_role"],
 ] as const;
 
 export function updateRelationship(
@@ -116,8 +123,9 @@ const refInput = z.object(ref).strict();
 export type RelationshipRefInput = z.input<typeof refInput>;
 
 /**
- * Swaps the two ends: the entities and their cardinalities change places. On a relationship from an entity to itself
- * only the cardinalities do, so with equal ends there is nothing to change (slice 10a, F10).
+ * Swaps the two ends: the entities, their cardinalities and their roles (slice 15b, RP-A) change places. On a
+ * relationship from an entity to itself only the cardinalities and the roles do, so with equal ends there is nothing to
+ * change (slice 10a, F10). A key link (InfoCube) stays with the relationship.
  */
 export function swapRelationship(
   ctx: CommandContext,
@@ -130,7 +138,7 @@ export function swapRelationship(
   const got = current(state.relationship, access, parsed.data.relationshipId, parsed.data.expectedVersion, "relationship");
   if (!got.ok) return fail(got.error);
   const r = got.row;
-  if (r.from_entity_id === r.to_entity_id && r.from_min === r.to_min && r.from_max === r.to_max) return fail(nothingToChange());
+  if (r.from_entity_id === r.to_entity_id && r.from_min === r.to_min && r.from_max === r.to_max && r.from_role === r.to_role) return fail(nothingToChange());
   const row = nextVersion(ctx, r, {
     from_entity_id: r.to_entity_id,
     to_entity_id: r.from_entity_id,
@@ -138,6 +146,8 @@ export function swapRelationship(
     from_max: r.to_max,
     to_min: r.from_min,
     to_max: r.from_max,
+    from_role: r.to_role,
+    to_role: r.from_role,
   });
   return done(ctx, access, { relationship: row }, [{ kind: "update", table: "relationship", before: r, row }]);
 }

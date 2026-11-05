@@ -141,8 +141,8 @@ test("S10A-08: a second self-relationship nests outside the first", async ({ pag
   await expect(relationshipLine(page, second.id)).toHaveCount(1);
   const a = await shape(page, first.id, "Customer"), b = await shape(page, second.id, "Customer");
   expectLoopAt(a);
-  expectLoopAt(b, 16);
-  expect(b.end.x).toBeLessThan(a.end.x - 15);
+  expectLoopAt(b, 20); // 20 px apart since slice 15b (R-7, D-61 changed)
+  expect(b.end.x).toBeLessThan(a.end.x - 19);
   const corner = (p: { x: number; y: number }) => Math.hypot(p.x - a.card.right, p.y - a.card.top);
   expect(corner(b.mid)).toBeGreaterThan(corner(a.mid) + 20);
   // the labels do not overlap

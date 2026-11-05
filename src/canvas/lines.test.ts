@@ -15,7 +15,7 @@ import {
 import type { WorkspaceModel } from "@/domain/types";
 import { buildCards } from "./card-data";
 import { curve, fNode, ieMarker, multText, relGeom, rowEnd, umlMarker, type Placed } from "./geometry";
-import { buildLines, hoverRows, relatedLines } from "./line-data";
+import { buildLines, hoverRows, pillText, relatedLines } from "./line-data";
 
 // Customer (customer_id, email) and Sales Order on the canvas, CRM customer as the source.
 // email ← email (direct, approved); customer_id ← cust_id + first_name (combined transform, D-49).
@@ -83,11 +83,18 @@ describe("buildLines", () => {
     expect(buildLines(model, cards.filter((c) => c.id !== ids.itemCustomer)).mappings).toEqual([]);
   });
 
-  it("offsets parallel relationships between the same entities by 16 px", () => {
+  it("offsets parallel relationships between the same entities by 20 px (slice 15b, R-7)", () => {
     expect(lines.relationships.map((r) => [r.label, r.fromCardId, r.toCardId, r.offset])).toEqual([
       ["places", ids.itemCustomer, orderCard, 0],
-      ["pays for", ids.itemCustomer, orderCard, 16],
+      ["pays for", ids.itemCustomer, orderCard, 20],
     ]);
+  });
+
+  it("puts the roles on the pill, one alone, else the verb phrase (slice 15b, RP-D)", () => {
+    expect(pillText({ label: "dates", from_role: "Order date", to_role: null })).toBe("Order date");
+    expect(pillText({ label: "dates", from_role: " billing ", to_role: "shipping" })).toBe("billing / shipping");
+    expect(pillText({ label: "dates", from_role: null, to_role: "  " })).toBe("dates");
+    expect(pillText({ label: null, from_role: null, to_role: null })).toBeNull();
   });
 
   it("leaves out relationships to entities that are not on the canvas", () => {

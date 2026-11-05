@@ -1197,3 +1197,861 @@ session. If anything is not as expected, KB can be restored from the fresh backu
 InfoCube turned on, a fact and a dimension created and related, a logical entity's relationship to the fact refused,
 turning InfoCube off refused, both deleted, InfoCube turned off, the delete's undo refused. **Passed.** Slice 15a is
 accepted; it is merged into `main` and tagged `slice-15a`. 15b starts only with Łukasz's go.
+
+## 15b step 1: grain, measures and role-playing against the code (4 November 2026)
+
+No application code in this step. Łukasz's brief: 15b builds grain, SCD, measures and their hints as planned, plus
+role-playing dimensions from `docs/infocube/role-playing-spec.md` (RQ-3, option 2); the key-name match (Q16) is never
+built; the bus matrix's dots (R-8, RP-10) stay with the bus matrix in 15d.
+
+### The starting point
+
+- Branch `slice/15b-grain-measures-roles` from tag `slice-15a` (`2bdeb10`, the merge of PR 36); the working tree was
+  clean.
+- Łukasz's two files, checked before copying: `infomapper-prototype-with-sources.html`, 646,126 bytes, SHA-256
+  `bf2251d9…5c71`; `infocube-role-playing-spec.md`, 11,939 bytes, SHA-256 `991efcdc…a54a`. Both as given.
+- They were copied unchanged to `docs/prototype/infomapper-prototype-with-sources.html` and
+  `docs/infocube/role-playing-spec.md`, checked with `cmp` and SHA-256 after the copy and on the staged blobs (no CR in
+  either file, so `.gitattributes`' `eol=lf` keeps the bytes). One commit, `fa8f5d9` (`docs:`).
+- The PRD is updated for 15b: section 0 (RQ-3, Q16 never built), section 2 (the two files), section 3 (`cube_key`, the
+  relationship's roles, items 14 and 14a), section 4 (15b and its steps), section 5 (RP-01 to RP-14), section 9, section
+  10 (D-68).
+
+### The prototype's changes against 15a's copy
+
+The diff is 178 lines. What 15b takes from it:
+
+- **Role-playing:**
+  - `roleAt`, `asRole`;
+  - `factKeys`, now one row per relationship;
+  - `addKey`, `linkKey`;
+  - the R-4 hints in `factHints`;
+  - the fact's Dimensions rows, which open the relationship;
+  - the dimension's "Used by", one row per relationship;
+  - the "Carries" field in `cubeMeasureSection`;
+  - `relKeySection`;
+  - `insRel`'s two role fields and its sentences;
+  - the swap, which swaps the roles too;
+  - the key row of an attribute in `cubeDependents`;
+  - the one-time link by name in `cubeIndex`;
+  - `cubeDemoV3`, the star's roles, Ship date and links;
+  - the pill, which shows the roles, else the verb;
+  - 20 px between two relationships of one pair of cards (was 16).
+- **The bus matrix's dots** (R-8): stay with the bus matrix in 15d.
+- **C-7 (R-10), now as 15a built it.** The read-only mode is gone: the hatched header, the panels' note and
+  `cubeTouched` are removed. `cubeOn` is the switch alone. Turning InfoCube off with facts or dimensions is refused
+  under the check box with 15a's text, and the toast "InfoCube is off." Create, undo and redo of a dimensional entity
+  are refused while off (`dimsAdded`) with 15a's message, and a refused undo keeps its step. The settings text and the
+  cards' titles are 15a's. **One detail differs:**
+  - The prototype's check box shows the switch as stored and stays enabled for an owner or admin while InfoCube is on,
+    even without the licence, so it can be turned off.
+  - 15a's `InfoCubeBox` (`src/modules/infocube/app/infocube-box.tsx` l. 54–55) shows `on && licensed` and is disabled
+    without the licence.
+  - This only shows when a licence row disappears while InfoCube is on. Ending a licence is not a command (AD-35), so
+    today that happens only by editing the file by hand.
+  - **Proposal (R1):** align the box with the prototype in 15b step 4. It is two conditions; otherwise it is a listed
+    difference.
+- **The prototype's licence button** ("The InfoCube licence for … ended. Workspaces using InfoCube keep it on; …") is
+  prototype-only, as in 15a.
+
+### Where the spec meets the code
+
+**1. The relationship (RP-A): InfoMapper's.**
+
+- **Today's code:**
+  - `Relationship` (`src/domain/types.ts` l. 181) has no roles.
+  - `updateRelationship` (`src/domain/commands/relationship.ts` l. 93) writes only the changed columns of `COLUMNS`
+    (l. 84).
+  - The panel is `relationship-panel.tsx`: its sentences at l. 56–61, the verb phrase as a `TextField` with `keep`
+    (slice 13) at l. 63.
+- **Proposal:**
+  - Add `from_role` and `to_role` (text, null) to the type, `fromRole`/`toRole` to `updateRelationshipInput`
+    (`optionalTextSchema`: trimmed, empty = null) and two entries to `COLUMNS`.
+  - The panel gets two `TextField`s after the verb phrase, with `keep` like the verb phrase: one undo step per edit, the
+    draft rules of D-66, no new save path.
+  - The sentences add " as {role}" after the entity it belongs to (R-1).
+  - **On a relationship to itself** the panel names its ends after the loop ("At the right end", "At the top end",
+    slice 10a). The prototype's "Role of {from}" and "Role of {to}" would read the same name twice there, so the
+    proposal (R2) is "Role at the right end" and "Role at the top end".
+  - `createRelationship` writes both as null.
+  - InfoMapper's other places that show a relationship stay as they are, as in the prototype: the entity panel's
+    "Relationships" fold (`entity-panel.tsx` l. 268), the bundle panel's rows (`bundle-panel.tsx` l. 59) and the delete
+    dialog's count.
+- **Swap** (`swapRelationship`, l. 122):
+  - It moves the entities and cardinalities; it must move the roles too (`from_role` ↔ `to_role`), as the prototype
+    does.
+  - **Its "nothing to change" check (l. 133) must count the roles.** On a relationship to itself with equal
+    cardinalities and two different roles, a swap does change something.
+  - The key link points to the relationship's id, so a swap keeps it with no extra write (RP-B: "Turning a relationship
+    keeps the link").
+- **The canvas:**
+  - `buildLines` (`src/canvas/line-data.ts` l. 115–131) gives each relationship `label: r.label`.
+  - `RelPath` draws the pill from `line.label` (`LineLayer.tsx` l. 123–137).
+  - **Proposal:** `buildLines` sets the pill's text to "{from role} / {to role}", one role alone, else the verb phrase
+    (R-7). The memo's `sig` already changes with the text, and the pill keeps its `rect` and `text`: **no element
+    more** (RP-D, AD-24).
+  - The offset becomes `(n - 1) * 20` for relationships only. Source relationships (l. 143, slice 10b) keep 16 px: the
+    spec and the prototype change only relationships, and a source line has no pill.
+  - Bundles' "n relationships", the miniature and the thumbnails do not draw the pill, so they are unchanged.
+- **Earlier specs to rerun for the 20 px:**
+  - slice 1b's relationships;
+  - slice 10a's self-relationships: `clickLine`, `LOOP_VIEW`, `relationshipLine`;
+  - S10A-12 (branch only), if loops take the offset (`relGeom`'s loop spacing).
+  - The element guard is not affected ("Performance test" has relationships, but counts, not positions, are compared).
+
+**2. The key link (RP-B): InfoCube's table `cube_key`.**
+
+- The module's third table, beside 15a's two (`src/modules/infocube/domain/types.ts`, `tables.ts`, `data/tables.ts`).
+  Columns: `relationship_id` and `attribute_id` (both not null), the standard columns and `workspace_id`.
+- **The table registry** (AD-33):
+  - the type in `InfoCubeRows`;
+  - `INFOCUBE_UNDO`: `parents: [["relationship_id", "relationship"], ["attribute_id", "attribute"]]`, noun "key link";
+  - `INFOCUBE_RULES`: `unique: [{ columns: ["relationship_id"], live: true }, { columns: ["attribute_id"], live: true }]`
+    (one key per relationship, one relationship per attribute);
+  - `ComposedDb`;
+  - a migration with the two foreign keys, two partial unique indexes (`where deleted_at is null`) and RLS.
+  - The guard test (`tests/table-registry.test.ts`) fails until all four are there. The schema check passes.
+- **What the rules check beyond uniqueness:**
+  - The relationship joins a fact and a dimension, and the attribute belongs to that fact.
+  - These are the module's commands' checks, not the adapter's, as `cube_measure`'s "only on attributes of a fact" is
+    in 15a (`commands.ts`).
+- **The page:**
+  - `moduleView` (`src/compose/view.ts` l. 23) reads `cube_entity` only. 15b adds `cube_measure` and `cube_key` for the
+    panels and the Σ marks.
+  - It reads them only when the workspace has a dimensional entity, as today.
+  - The rows go with `id`, `version` and their content, without `created_*`/`updated_*` (O8).
+  - Measured in step 5 (page bytes on the star).
+
+**3. Linking, Add key and the attribute's FK flag.**
+
+- **Linking** (R-1's select) is a module command:
+  - `linkKey(relationshipId, attributeId | null)`: soft-delete the relationship's link and the attribute's other link,
+    insert the new one.
+  - It sets `is_foreign_key` only when the attribute did not have it. The select offers only the fact's foreign keys
+    that carry nothing else, so normally nothing is written to the attribute.
+  - One change group, saved on the chain with the relationship's link held and the attribute checked.
+- **Add key** (R-3) is a module command:
+  - It inserts an attribute through InfoMapper's `addAttribute` rules, named `{role}_{pk}`, without repeating the
+    shared word. The rule is in one domain function with its tests: Ship date + `date_key` → `ship_date_key`; Bill to +
+    `customer_key` → `bill_to_customer_key`.
+  - The name is numbered if taken, with `_2` as the prototype does.
+  - The type is the dimension's primary key's (all five type columns), FK on, not nullable.
+  - It is placed after the fact's last key attribute, renumbering the siblings as `reorderAttribute` does
+    (`attribute.ts` l. 428).
+  - It inserts the `cube_key` row.
+  - One change group: "One undo removes the attribute and the link; the role stays" (RP-04). The siblings are held on
+    the chain, as an attribute's move is (`saveRows`, slice 10a).
+  - Refused while the dimension has no primary key ("{dimension} has no primary key yet.").
+  - The toast is "Added {name}, the key of {dimension}{ as role}.".
+- **The FK flag cleared** (RP-06). InfoMapper's `updateAttribute` (`attribute.ts` l. 173) writes `is_foreign_key`, and
+  must not know InfoCube.
+  - The link's removal is a module rule on an update, not a delete, so `moduleCascade`
+    (`src/domain/commands/module-cascade.ts`, deletes only) does not cover it.
+  - **Proposal (R3), a new extension point: module follow-ups.**
+    - A function per module, `(writes, rows) => Write[]`, registered in `src/compose/model.ts`.
+    - It runs in `runCommand` after the cascade (`withModuleCascades`, `run-command.ts` l. 201) and returns
+      soft-deletes for InfoCube's links whose attribute is no longer a foreign key (or no longer the fact's), in the
+      same change group.
+    - It is also passed to `revertChangeGroup` (undo and redo), as `followOriginals` is (`undo.ts` l. 398).
+  - **Why undo needs it too:** an older step "turn FK on" undone after that attribute was linked in a later step. The
+    link did not write the attribute, so undo's version check (`undo.ts` l. 2: refused when a row changed since) lets the
+    revert through, and without the follow-up the link would survive on an attribute that is no longer a key.
+  - `CLAUDE.md`'s list of extension points gets it (AD-33).
+- **Deletes** (RP-07, RP-08):
+  - The link goes with its relationship or its attribute through `moduleCascade`, once `cube_key` registers both
+    parents: deleteRelationship, deleteAttribute, deleteEntity (its relationships and attributes, `entityCascade`) and
+    a concept's delete.
+  - One undo brings both back: `revertChangeGroup` restores the group's rows, and the parents are live again first.
+  - The relationship and the attribute stay when only the link goes.
+  - "The relationship no longer joins a fact and a dimension" **cannot happen in the app**: no command changes a
+    relationship's ends (swap keeps the pair), the model level never changes (AD-34), and a `cube_entity`'s role is
+    never changed. So no rule is needed for it, beyond the commands' checks on link.
+- **Undo's uniqueness:** an undo that brings back a link while its relationship or attribute has another live link is
+  refused by the adapter's unique rule with the undo conflict message ("…changed since"), as 15a's `cube_entity`.
+- **Paste** (`pasteAttribute`, l. 247) copies a primary key as a foreign key (l. 279). A dimension's `date_key` pasted
+  into a fact is a foreign key with no link, so R-4 shows "date_key is a foreign key but carries no dimension." This is
+  RP-C: no match by name.
+
+**4. Grain, SCD, measures (as planned for 15b).**
+
+- These are module commands on 15a's tables:
+  - `setGrain`: text, trimmed, empty = null; the grain is a `TextField` with `keep`, as D-66 asks;
+  - `setScdType`: 0 to 2;
+  - `setMeasure` on or off: the row inserted, or soft-deleted;
+  - `setAdditivity`: semi keeps the note, any other clears it;
+  - `setSemiNote`: a `TextField`.
+- Each is one change group on the chain, saved with its `cube_entity` or `cube_measure` row checked (`saveRow`).
+- A new measure is Additive for Integer and Decimal, Non-additive otherwise. A foreign key made a measure gets the
+  toast "{attribute} is a foreign key. A dimension key is usually not a measure."
+- Turning a measure off and on again inserts a new row; the live unique rule allows it.
+- The rights are InfoMapper's `model.edit`, so reviewers cannot edit (S15-08). C-7 needs nothing here: while off there
+  is no dimensional entity.
+
+**5. Derived rows and hints, in the module's domain (no data).**
+
+- `factKeys(fact)`: one row per relationship between the fact and a dimension, `{ relationship, dimension, role, key }`.
+  The role is the one at the dimension's end.
+- `usedBy(dimension)`: the same rows from the dimension's side.
+- `factHints(fact)`: B-5's grain and measure hints, and R-4's key hints in the prototype's order.
+- They are pure functions with unit tests, run in the browser from the model and the module's rows, as the panels
+  derive InfoMapper's sections today.
+- The Cube tab's "grain set" and "no grain" already follow the row (`tabMeta`).
+
+**6. Delete previews (R-9).**
+
+- **A dimension** ("{n} facts – lose this dimension", each fact once) is in 15a (`entityDependents`), covered by
+  S15-14 and RP-09.
+- **An attribute** has no preview dialog in the app.
+  - Its delete asks a second click when it has mappings or copies (`attribute-panel.tsx` l. 334–342,
+    `armedDeleteText`; the canvas's Delete in `canvas-host.tsx` l. 611).
+  - The prototype opens a dialog (`askDeleteAttr`) whenever a module reports dependents. In 15b those are the measure's
+    "1 measure – deleted" and the key's "Carries {dimension} as {role} – the link is deleted; the relationship stays".
+  - 15c's X-3 needs the same dialog for a logical attribute that feeds a dimensional one.
+  - **Proposal (R4):** in 15b, an attribute with module dependents opens a dialog like the entity's (`delete-entity-dialog.tsx`,
+    the prototype's text "Other parts of the model depend on it. You can undo it right after.", a table of rows,
+    "Cancel" and "Delete {name}"). It is fed by a new `moduleAttributeDependents` beside `moduleEntityDependents`
+    (`src/compose/view.ts` l. 47).
+  - Without module rows the delete stays as it is.
+  - The alternative is the second click with the rows in its text, then the dialog in 15c.
+- **A relationship:** no dialog, as today; its link goes in the same undo step.
+
+**7. The Σ marks on the card (B-3).**
+
+- Step 1 of the slice (Q11) proposed one `<i class="meas">` per measure row (+1 element per measure row). The
+  prototype draws a `span.meas` with a title.
+- **Proposal (R5): no element.** A class on the row (`meas add`, `meas semi`, `meas non`) and the glyph as `::after`
+  content, as 15a's role mark is a mask on an existing span (CLAUDE.md, the InfoCube note). The tooltip goes on the
+  row's existing title, if it has one, and is otherwise dropped.
+- `withClips` counts the glyph's width, as `ROLE_MARK`.
+- The marks come to the cards from `ModuleView` (`rowMarks` by attribute id, as `roles`), through `buildCards`.
+- Below 40 % the rows are not drawn, so neither are the marks.
+- Measured in step 5: S15-layers on the star (layers and elements) and the element guard ("Performance test" has no
+  measures: equal counts).
+
+### The one-time link from names (RP-C's migration, RP-13)
+
+- **What the prototype does:** once per saved model (`C.kv`), for every fact–dimension relationship without a link: if
+  the fact has exactly one foreign key named as the dimension's primary key, and it carries nothing else, link them.
+- **What the app has to work with:**
+  - **The seed's star** (`src/modules/infocube/data/sales-star.ts`, `addSalesStar`) is written by `npm run seed`,
+    `reset-dev-data`, `npm run demo` and slice 15a's fixtures.
+    - **Proposal:** it writes the roles, the second Fact Sales – Dim Date relationship (Ship date), `ship_date_key`
+      after `date_key`, and the three links explicitly, as `cubeDemoV3` does: no name rule.
+    - The e2e star is fresh in every test, so slice 15a's specs see it.
+    - **Two of them change:** S15-14 now counts Dim Date's relationships with the Ship date one, and S15-layers has one
+      line and pill more. They are listed in step 2.
+  - **The format upgrade** (12 → 13, `upgradeDb` in `src/data/local/file.ts` l. 91) is InfoMapper's data layer. It adds
+    `from_role` and `to_role` as null.
+    - It cannot apply InfoCube's rule: it would have to read `cube_entity`, and InfoMapper's layers never name a module
+      (AD-33).
+    - `readDb(file)` (l. 45) and its cache (`readDbCached`, l. 195) take no schema, so a module step passed through
+      `STORE_SCHEMA` would run only when the composed store happened to read the file first. When InfoMapper's default
+      store reads it first, it writes format 13 back without the links, for good.
+  - **The files that have fact–dimension relationships today** (read 4 November 2026):
+    - `.data/demo-db.json` (the 15a star, 5 dimensional entities) and `.data/e2e-db.json` (reseeded per test).
+    - KB's `.data/dev-db.json` has **none**: 0 live dimensional entities after the manual acceptance deleted both.
+    - Every other file under `.data/` has none either.
+- **Proposal (R6):**
+  - The rule is one pure module function, `keysFromNames(model, cube rows)` → new `cube_key` rows, with RP-13 as its
+    unit test (the prototype's three conditions, and no role invented).
+  - It is applied **by a development script**: `npx tsx scripts/infocube-keys.ts link-by-name [--file <db>]`, like
+    `scripts/licence.ts`. It refuses production, writes no change event and is not an undo step, as the spec says ("Logged
+    nowhere, not an undo step"). It prints how many links it made.
+  - The format upgrade adds only the null roles.
+  - `npm run demo -- --reset` gives the demo file the new star with its explicit links; without `--reset`, the 15a
+    star there shows the R-4 hints until the script is run or the keys are picked.
+  - This holds while every file is local (AD-29). The database slice gets a SQL migration with the same rule, written
+    then.
+- **The alternative (R6 b):**
+  - A module upgrade hook in the data layer, registered by the composition root and run by every `readDb`.
+  - It needs a registry the data layer reads without importing a module, plus a guard that no store reads a file before
+    the registration. That is a new extension point with an ordering rule, for one file Łukasz can reset.
+  - Not recommended.
+
+### Undo, change events, the table registry: summary
+
+| Change | Where | Undo | Registry |
+| --- | --- | --- | --- |
+| `from_role`, `to_role` | `relationship` (InfoMapper), format 13, migration | one step per field; old change events without them are undone as null (`IMAGE_DEFAULTS`, `undo.ts` l. 130, as `model_level` in 15a) | InfoMapper's table, no change |
+| `cube_key` | InfoCube, migration | in the history; parents relationship and attribute | `UNDO_TABLES`, `STORE_SCHEMA`, `ComposedDb`, the guard test |
+| Link, Add key, grain, SCD, measures | module commands | one step each (Add key: the attribute, its siblings' order, the link) | – |
+| FK cleared, relationship or attribute deleted | follow-up (R3) and `moduleCascade` | in the same step; undo and redo run the follow-up | – |
+
+**Step 2 touches the table registry and the local adapter, and step 3 touches change groups and undo (the follow-up
+in `runCommand` and in `revertChangeGroup`).** By the test regime each of them gets a full e2e run.
+
+### Differences between the prototype and the app that 15b touches
+
+| # | What | Prototype | App (proposal) |
+| --- | --- | --- | --- |
+| R1 | InfoCube box without the licence while on | checked, enabled for owners and admins | today: unchecked, disabled; proposal: as the prototype |
+| R2 | Role fields on a relationship to itself | "Role of {name}" twice | "Role at the right end", "Role at the top end" (slice 10a's names of the ends) |
+| R4 | Attribute delete with module rows | a dialog (`askDeleteAttr`) | proposal: the same dialog, built in 15b for 15c's X-3 too |
+| R5 | Σ marks | a `span` with a title per measure row | a class and `::after`, no element |
+| R6 | One-time link by name | on load, once per model | a development script with the same rule as a unit-tested function |
+| R7 | Source relationships' offset | not changed (no pill) | stays 16 px |
+| R8 | Missing links after a hand-made change | dropped while indexing (`cubeIndex`) | deleted by the commands in the change group (cascade, follow-up), never on read |
+| R9 | Measure off | the row removed | soft-deleted (AD-23) |
+
+The prototype's remaining InfoCube-off texts are 15a's, so nothing else differs there.
+
+### Proposed steps
+
+**Step 2 – data** (a full e2e run: the table registry, the local adapter):
+
+- `relationship.from_role`/`to_role`: the type, the local schema, format 13 and its upgrade (null, no change event,
+  not repeated), undo's image defaults, the migration.
+- `cube_key`: the type, the registry's three records, the rules, the migration, the guard test.
+- The star with roles, Ship date, `ship_date_key` and three links.
+- KB's backup before the branch's first dev or e2e run (format 13).
+- Earlier tests that change (S15-14, the star's counts), with the reason.
+
+**Step 3 – domain** (a full e2e run: change groups and undo):
+
+- The roles in `updateRelationship` and `swapRelationship` (with the self-relationship's check).
+- InfoCube's commands: grain, SCD, measure, additivity, semi note, link, Add key (with the name rule).
+- The follow-up (R3) in `runCommand` and undo.
+- `factKeys`, `usedBy`, `factHints`, `keysFromNames` and the script.
+- `moduleAttributeDependents`.
+- Domain tests for every rule, including RP-13.
+
+**Step 4 – interface:**
+
+- The relationship panel's roles, sentences and InfoCube section.
+- The fact's and the dimension's sections.
+- The attribute's Measure section and "Carries".
+- The pill and the 20 px.
+- The Σ marks.
+- The attribute's delete dialog (R4).
+- The box (R1, if accepted).
+- The specs, and the screenshots light and dark.
+
+**Step 5 – measurement and closing:**
+
+- The element guard against `slice-08.json`.
+- S15-layers on the star with the marks and the second pill.
+- The page's bytes with the module's rows.
+- D-68's text for approval.
+- The docs: `data-model-v2.md`, `known-limitations.md`, the inventory, README, CLAUDE.md's extension points and
+  commands.
+- One full run before the merge; the manual acceptance on KB.
+
+### Proposed criteria and their tests
+
+| ID | What | Test |
+| --- | --- | --- |
+| S15-07 (hints) | A new fact's panel shows "No grain yet. …" and "No dimension keys. …" | e2e `S15-07.spec.ts` (extends 15a's) |
+| S15-08 | Grain cleared → its hint, undo; `quantity` semi-additive across "Date" → Σ~ and in Measures; `order_number` as a measure → the type hint; a foreign key as a measure → the toast; each one undo step; a reviewer sees them read-only | e2e |
+| S15-08b | SCD type 0/1/2 with its sentence; the Cube tab's "SCD n" and "grain set"/"no grain" follow | e2e |
+| RP-01 | The star: two lines Dim Date – Fact Sales, pills "Order date" and "Ship date", 20 px apart | e2e |
+| RP-02 | Fact Sales' Dimensions, one row per relationship with its key; no key hints | e2e |
+| RP-03 | A third relationship Dim Date → Fact Sales: "Dim Date is related 3 times. Name each role." and "Dim Date is related, but no key carries it." | e2e |
+| RP-04 | Role "Payment date", Add key → `payment_date_key` (Integer, FK) after the last key, linked, hints gone; one undo removes the attribute and the link, the role stays; redo | e2e + unit (name rule) |
+| RP-05 | The Ship date key select: `ship_date_key` selected, `date_key` not offered | e2e |
+| RP-06 | FK cleared on `ship_date_key` → link gone, its hint; undo restores both (and the older-step undo case of R3) | e2e + unit |
+| RP-07 | Delete `ship_date_key`: the preview row "Carries Dim Date as Ship date – the link is deleted; the relationship stays"; undo | e2e |
+| RP-08 | Delete the Ship date relationship: line gone, "ship_date_key is a foreign key but carries no dimension."; undo restores both | e2e |
+| RP-09 | Delete Dim Date: "2 facts – lose this dimension: Fact Sales, Fact Orders", each once | e2e (S15-14 as changed) |
+| RP-11 | Dim Date's Used by: three rows, per relationship, with keys | e2e |
+| RP-12 | Rename Dim Date's `date_key` to `date_sk`: links unchanged, no key hints | e2e |
+| RP-13 | A model with 15a's star and no links → `keysFromNames` links by the old rule, nothing else changes | unit (and the script on a copy) |
+| RP-14 | A logical relationship with the role "billing": the pill, the sentences, no InfoCube section; swap moves the role | e2e |
+| S15-19 | CI, the full runs of steps 2 and 3 and before the merge; earlier tests changed, with reasons | – |
+| S15-18 (15b part) | Element guard equal; layers on the star with marks and pills; page bytes | measurement |
+
+RP-10 (the bus matrix's dots) goes to 15d with S15-16.
+
+### New user-facing texts (for approval in step 4; all the prototype's)
+
+- **Relationship panel:** "Role of {entity}" (R2 on a relationship to itself), placeholder "e.g. Ship date"; the
+  sentences "… {entity} as {role}."; "InfoCube"; "Key in {fact}"; "None"; "Add key"; "{dimension} has no primary key
+  yet."; the toast "Added {name}, the key of {dimension}{ as role}."
+- **Fact section:**
+  - "Grain", placeholder "One row per … e.g. one order line";
+  - "Measures", with "None yet. Open a numeric attribute and turn on Measure.";
+  - "Dimensions": rows "{dimension}{ as role}" with "key {name}" or "no key", and "None yet. Draw a relationship to a
+    dimension.";
+  - "Hints", with "Nothing to check: grain, keys and measures look complete.";
+  - the hints of B-5 (grain, measure type) and R-4.
+- **Dimension section:**
+  - "Slowly changing dimension type": "0 · keep", "1 · overwrite", "2 · history";
+  - the sentences "Values never change once loaded.", "A change overwrites the old value; no history.", "A change adds
+    a new version; the old one stays with its validity.", and "Technical columns (valid from, valid to, current) are a
+    physical matter and are not modelled here.";
+  - "Used by": rows "{fact}{ as role}" with "key {name}" or "no key", and "No fact uses it yet."
+- **Attribute of a fact:**
+  - "Carries": a row "{dimension}{ as role}" with "relationship", or "No dimension. Pick this key in a relationship to a
+    dimension.";
+  - "Measure": "Measure"; "A foreign key carries a dimension's key; it is not a measure."; "Not a measure: a degenerate
+    dimension or a descriptive value of the fact.";
+  - "Additivity": "Additive", "Semi-additive", "Non-additive";
+  - "Not additive across", placeholder "e.g. Date (a balance)";
+  - "Its type is {type}. Measures are usually Integer or Decimal.";
+  - the toast "{attribute} is a foreign key. A dimension key is usually not a measure."
+- **Delete previews:**
+  - "Carries {dimension}{ as role}" – "the link is deleted; the relationship stays";
+  - "{n} measure(s)" – "deleted";
+  - for R4's dialog: "Delete {name}?", "Other parts of the model depend on it. You can undo it right after.", "Cancel",
+    "Delete {name}".
+
+### Questions for Łukasz
+
+- **R1.** Align the InfoCube box with the prototype (checked and enabled while on, even without the licence)?
+  Recommended: yes, in step 4.
+- **R2.** On a relationship to itself, "Role at the right end" and "Role at the top end"? Recommended: yes.
+- **R3.** The new extension point "module follow-ups" (after the cascade in `runCommand`, and in undo and redo) for the
+  link's removal when the FK flag is cleared? Recommended: yes. The alternative, InfoMapper's `updateAttribute`
+  refusing to clear the flag of a linked key, would make InfoMapper know about links.
+- **R4.** An attribute's delete with module rows: the prototype's dialog now, for 15c too? Or the second click with the
+  rows in its text? Recommended: the dialog.
+- **R5.** The Σ marks as a class with `::after`, the prototype's title folded into the row's or dropped? Recommended:
+  yes (0 elements).
+- **R6.** The one-time link by name as a unit-tested function run by a development script, the format upgrade adding
+  only the null roles? Recommended: yes (KB has no fact–dimension relationship; `npm run demo -- --reset` gives the
+  demo the explicit links).
+- **R7.** Source relationships keep 16 px? Recommended: yes.
+- **D-68 and the data:** the roles on InfoMapper's relationship are a data model change for every workspace (two
+  columns). D-68 covers the behaviour; `docs/data-model-v2.md` gets the columns and `cube_key` in step 5. A separate
+  AD is not proposed (AD-34's "the one InfoMapper column InfoCube needs" stays true: the roles are InfoMapper's own,
+  generic, RP-A). Confirm.
+
+## Łukasz's answers to 15b step 1 (4 November 2026)
+
+- **R1:** yes, the InfoCube box as the prototype (ticked and enabled while on, even without the licence).
+- **R2:** yes, on one condition: the role fields use the same words as the cardinality fields on a relationship to
+  itself (D-61). Those say "At the right end" and "At the top end" (`relationship-panel.tsx`, D-61's text), so the roles
+  are "Role at the right end" and "Role at the top end".
+- **R3:** not as proposed. **A key link whose attribute is not a foreign key is inactive:** panels, hints and the key
+  select ignore it, nothing deletes it. RP-06 behaves the same for the person, and undo needs nothing. Turning the flag
+  back on brings the link back: a deliberate difference from the prototype (PRD section 8). What it means for the
+  commands:
+  - an inactive link still holds its relationship's and its attribute's live unique rule, so linking another key to
+    that relationship, Add key on it, and linking that attribute elsewhere soft-delete the inactive link in the same
+    change group (as an active one);
+  - the delete preview's "Carries …" row and the attribute panel's "Carries" read active links only;
+  - deleting the relationship or the attribute still takes the link along (`moduleCascade`).
+  - **Does 15c need follow-ups anyway (Łukasz asked)?** Not for this, but for Q-5: "a dimensional mapping goes whole
+    when any of its inputs goes". `moduleCascade` deletes a module row whose *parent* is deleted. A
+    `cube_mapping_input` goes with its logical attribute that way, but its `cube_mapping` is that input's parent, not its
+    child, so the mapping itself would stay with one input fewer. 15c needs a module rule for it. Either:
+    - `moduleCascade` learns "a row goes when any of its registered children goes" (a second kind of parent, in the
+      same registration), which needs no follow-ups; or
+    - InfoCube's deletes write the whole mapping themselves; that does not cover a logical attribute deleted by
+      InfoMapper's command.
+    The first is proposed for 15c's step 1; it is a delete cascade, not an update rule. **No update follow-up is needed
+    in 15c** as specified.
+- **R4:** reuse the delete with its second click (D-47, slice 10c) for an attribute that is a measure or carries a key;
+  no new dialog. **As read here:** the attribute's `ConfirmDelete` (`attribute-panel.tsx` l. 334–342, `armedDeleteText`'s
+  `also`/`then`, and the canvas's Delete in `canvas-host.tsx` l. 611) asks the second click whenever InfoCube reports
+  rows, and its text names them ("Click again to delete, with 1 measure; Fact Sales loses its key for Dim Date as Ship
+  date" or similar, proposed with the texts in step 4). If the rows do not fit, a screenshot goes to Łukasz before
+  anything else is built there.
+- **R5:** yes (a class and `::after`, no element).
+- **R6:** no script and no function: only the demo and e2e files have facts, and both are seeded explicitly. **RP-13 is
+  dropped** from the app's criteria; it stays a prototype scenario. `.data/demo-db.json` has 15a's star without links:
+  `npm run demo -- --reset` gives it the new star (README, step 5).
+- **R7:** yes, source relationships keep 16 px.
+- **D-68** covers grain, SCD, measures, hints and role-playing; it describes role names as an InfoMapper feature of every
+  relationship, which InfoCube reads. At 15b's closing AD-34 gets one sentence: "InfoCube also reads relationship roles,
+  which InfoMapper keeps for every relationship (D-68)." Both texts are quoted to Łukasz then.
+
+**Found while recording the answers (for Łukasz, step 4): D-61 and the prototype's 20 px.** D-61 says a relationship to
+itself's "further loops on one card nest outside it, their ends 16 px further from the corner". The app's loops take the
+same offset as the lines (`relGeom` → `loopGeom(A, off)`, `src/canvas/geometry.ts` l. 270–271; `line-data.ts` l. 130), and
+so does the prototype's `relGeom(r, (n - 1) * 20)`, so the prototype nests loops 20 px apart too. Proposal: 20 px for
+lines between two cards (R-7's reason, two pills), loops keep D-61's 16 px; or 20 px for both with D-61 changed in 15b's
+PR. Nothing in step 2 depends on it.
+
+
+## 15b step 2: the data (4 November 2026)
+
+### What changed
+
+- **`relationship.from_role`, `to_role`** (RP-A, D-68): text, null when not named, on InfoMapper's relationship.
+  - The type is `Relationship` (`src/domain/types.ts`), and the migration is
+    `20261104110000_relationship_roles.sql`.
+  - The local file's **format 13** (`upgradeDb`, `src/data/local/file.ts`) adds both as null on every relationship,
+    with no change event and no log line. It is written back at once and not repeated.
+  - Undo reads an older change event's image without them as null (`IMAGE_DEFAULTS`, `undo.ts`, as `model_level` in
+    15a).
+  - Everything that writes a relationship today writes them as null: `createRelationship`, the seed, the large seed
+    and the fixtures. No command sets them yet (step 3).
+- **`cube_key`** (RP-B): InfoCube's third table.
+  - Registered in all three of the registry's records:
+    - `INFOCUBE_UNDO`: parents relationship and attribute, noun "key link";
+    - `INFOCUBE_RULES`: foreign keys, plus one live link per relationship and one per attribute;
+    - `InfoCubeDb`, the file's shape.
+  - The migration is `20261104110100_infocube_keys.sql` (two partial unique indexes, RLS), with the schema check's
+    list.
+  - A link goes with its relationship or its attribute in the same change group through 15a's `moduleCascade`, and
+    one undo brings both back. Clearing the attribute's FK flag writes nothing of InfoCube's (R3: the link stays,
+    inactive).
+- **The Sales star** (`addSalesStar`, RP-F):
+  - Dim Date's role "Order date" on its relationships to Fact Sales and Fact Orders.
+  - A second Fact Sales – Dim Date relationship, "Ship date", with `ship_date_key` (Integer, FK) after `date_key`.
+  - Every one of the six relationships linked explicitly to its fact's key (RP-C).
+  - The facts' measures as the prototype's demo has them: `quantity`, `net_amount`, `total_amount`, `line_count`
+    additive; `unit_price` and `discount_pct` non-additive.
+- **KB:** backed up before the branch's first run (`.data/backups/dev-db-20261104-2113.json` and
+  `kb-model-latest.json`, equal to `.data/dev-db.json`). The app upgrades KB to format 13 when it first reads it: two
+  null columns on each of its relationships. KB has no facts, so nothing else changes.
+- **`.data/demo-db.json`** (15a's star, format 12, no links) is upgraded the same way when `npm run demo` reads it. Its
+  links and roles come only with `npm run demo -- --reset` (R6: no link by name).
+
+### Earlier tests changed, and why
+
+- **The "current format" checks** in `organization-store.test.ts`, `requirement-store.test.ts`, `upgrade-8.test.ts`,
+  `working-layer-store.test.ts` and `upgrade-12.test.ts` said `12`. They now read `DEV_DB_FORMAT`, so the next format
+  does not touch them again. `upgrade-12.test.ts` strips the roles from its format-11 file too, since the file now goes
+  on to 13.
+- **`tests/infocube-star.test.ts`:**
+  - the star's six relationships with roles and keys, the key attributes' order, and the measures;
+  - the dimension's preview tested on the star's own two Dim Date – Fact Sales relationships, in place of one added by
+    the test;
+  - Fact Sales' preview now has 15a's "4 measures – deleted" row.
+- **`e2e/slice-15a/S15-14.spec.ts`:** Dim Date's preview says "3 relationships – deleted" (was 2: the Ship date one is
+  new). It also checks that the three key links go with the delete and come back with the undo.
+- **To be read in step 5:** `S15-layers.spec.ts` (measurement only), whose star now has one line and one pill more.
+
+### New tests
+
+- `src/data/local/upgrade-13.test.ts` covers the upgrade: null roles, counts, no change event, written back, not
+  repeated with roles set.
+- `tests/infocube-keys.test.ts` covers:
+  - the link cascades with its relationship and with its attribute, and one undo brings it back;
+  - an FK flag cleared writes only the attribute (R3);
+  - the store's two live unique rules and the foreign key;
+  - a 15a star file upgraded to 13: InfoCube's rows as they were, no link by name (R6).
+
+### Checks (4 November 2026)
+
+- `npm run lint` and `npm run typecheck` clean; `npm test` 135 files, 1,679 tests passed.
+- The slice-15a specs: 9 passed (S15-14 after its update above).
+- **One full e2e run** (`npm run e2e`, from scratch, no dev server running), because the step touches the table
+  registry (`cube_key` in undo, the local adapter's rules and the data file's shape) and the local adapter (format 13):
+  563 passed, 3 skipped, 2 failed, 91 min 37 s (part 1: 23 min 6 s; part 2: 23 min 21 s; part 3: 19 min 25 s; part 4:
+  25 min 44 s). The two failures, kept with the log in `.data/e2e-15b-step2-fail/` (git-ignored):
+  - S7B-12 and S7C-02 expected the file written back as format 12, a literal, as the seven unit tests changed above.
+    Not a flake and no product bug: both now read `DEV_DB_FORMAT`, and each passed three times on its own (with lint and
+    typecheck clean).
+
+## Łukasz's answers to 15b step 2 (4 November 2026)
+
+- **Step 2 accepted.**
+- **The line offset:** 20 px for lines between two cards and for loops. D-61's 16 px becomes 20 px at 15b's closing, its
+  text quoted to Łukasz then. If e2e specs check loops at 16 px and the change spreads widely, stop and tell him; loops
+  then keep 16 px. **Checked in step 3:** one spec checks a relationship's loop at 16 px (`S10A-08.spec.ts` l. 144,
+  `expectLoopAt(b, 16)`); `S10B-02`'s 16 px is a source key, which keeps 16 px (R7). The change is small and goes ahead
+  in step 4.
+- **Every literal file format in the tests reads `DEV_DB_FORMAT`** (step 3, below).
+
+## 15b step 3: the domain (4 November 2026)
+
+### What changed
+
+- **The literal file formats in the tests.** What a test expects after a read now reads `DEV_DB_FORMAT`:
+  - `src/data/local/upgrade-13.test.ts`: `upgraded.format` and `onDisk.format` (`13`); the check
+    `DEV_DB_FORMAT === 13` is removed;
+  - `tests/infocube-keys.test.ts`: the 15a file's upgraded `format` (`13`);
+  - with step 2's (seven unit tests, `e2e/slice-07b/S7B-12.spec.ts` and `e2e/slice-07c/S7C-02.spec.ts`), no test
+    expects a format number any more. The old formats the upgrade tests write as their input (`format: 6`, `7`, `10`,
+    `11`, `12` …) describe the old files and stay.
+- **Roles (InfoMapper, RP-A):** `updateRelationship` takes `fromRole` and `toRole` (trimmed, empty = none, absent =
+  unchanged; any level). `swapRelationship` swaps the roles with their ends. On a relationship to itself, "Nothing to
+  change." also needs equal roles. A key link stays with a swapped relationship (it points to the relationship).
+- **InfoCube's commands** (`src/modules/infocube/domain/commands.ts`), each one change group and one undo step, with
+  InfoMapper's rights and the archive (`model.edit`):
+  - `updateCubeEntity`: a fact's grain (trimmed, empty = none) or a dimension's SCD type (0, 1, 2), on InfoCube's row at
+    its version. Refused: a grain on a dimension ("Only a fact has a grain."), a type on a fact ("Only a dimension has
+    an SCD type.").
+  - `setMeasure`: on makes an attribute of a fact a measure, Additive for Integer and Decimal, Non-additive otherwise.
+    It answers the toast for a foreign key ("{name} is a foreign key. A dimension key is usually not a measure."); the
+    measure is made all the same, as the prototype does. Off soft-deletes the measure at its version. Refused on
+    another attribute: "Only an attribute of a fact can be a measure."
+  - `updateMeasure`: the additivity and "Not additive across". Leaving semi-additive clears the note. A note on another
+    additivity is refused: "Only a semi-additive measure has “Not additive across”."
+  - `linkKey` ("Key in {fact}", R-1):
+    - links a foreign key of the relationship's fact, or none;
+    - picking another key replaces the relationship's live link in the same change group, an inactive one too (R3);
+    - an attribute that carries another relationship is refused: "{attribute} already carries {dimension as role}.
+      Pick another key.";
+    - not a foreign key of the fact: "{attribute} is not a foreign key of {fact}.";
+    - a relationship that does not join a fact and a dimension: "This relationship does not join a fact and a
+      dimension.";
+    - nothing is written on the attribute.
+  - `addKey` (R-3), one change group:
+    - a new attribute of the fact, named by `keyName`, of the primary key's type and parameters, a foreign key, not
+      nullable;
+    - placed after the fact's last key attribute (primary or foreign); the attributes are renumbered 0..n-1, only the
+      changed rows written;
+    - its link; an inactive link of the relationship is deleted in the same group;
+    - the working context labels the new attribute only (as `reorderAttribute`);
+    - toast "Added {name}, the key of {dimension as role}.";
+    - refused while the relationship has an active key ("{fact} already has a key for {dimension as role}: {key}.") or
+      the dimension has no primary key ("{dimension} has no primary key yet.").
+  - **The link's optimistic check.** A link is never updated, only made or deleted, so `linkKey` and `addKey` take the
+    relationship's live link as the page knows it (`currentKeyId`, null for none). Any other live link is a stale
+    version.
+  - **`linkKey` requires a foreign key.** It writes nothing on the attribute; the prototype sets the flag when it
+    links. The select offers foreign keys only, and a direct call with another attribute is refused, so the flag is
+    always on already.
+- **The derived reads** (`src/modules/infocube/domain/keys.ts`, `cubeIndex` built once per read):
+  - **Active links only.** A link counts while its relationship and attribute are live and the attribute is a foreign
+    key of the relationship's fact. An inactive link (R3) is ignored everywhere and active again with the flag.
+  - `factKeys`: one row per relationship to a dimension, in the model's order, with the role at the dimension's end
+    (whichever way the relationship runs), the active key and the dimension's primary key.
+  - `factHints`: B-5's grain, "no dimension keys" and measure-type hints, and R-4's key hints, in the prototype's order,
+    each with its target (the grain, the fact, a relationship, an attribute). `NO_HINTS` is the "Nothing to check" line.
+  - `usedBy`: one row per relationship, the facts in the order they first relate. `carries`: what a foreign key
+    carries.
+  - `attributeDependents`: an attribute's delete preview rows. "Carries {dimension as role} – the link is deleted; the
+    relationship stays" (active links only) and "1 measure – deleted".
+  - `keyName`: R-3's naming rule as a function of its own.
+- **C-7:** nothing new. While InfoCube is off there are no facts or dimensions, so none of these commands finds
+  anything to write.
+
+### Not done in step 3 (step 4)
+
+- The server actions and their loaders: which rows a command reads (`KeyState` is the workspace's model and InfoCube's
+  rows), and the rows a save holds on the chain.
+- `ModuleView`'s new data for the panels, and the attribute's delete preview through the composition root.
+- The 20 px offset.
+
+### New and changed tests
+
+- `src/modules/infocube/domain/keys.test.ts` (18 tests):
+  - `keyName`;
+  - `factKeys`: order, the role's end, an inactive link and its flag back, a deleted link;
+  - every hint, with RP-03, RP-06, RP-08 and RP-12;
+  - `usedBy` (RP-11) and `carries`;
+  - the delete preview rows (RP-07), none for an inactive link.
+- `src/modules/infocube/domain/description-and-keys.test.ts` (23 tests): grain and SCD, measures and their refusals,
+  `linkKey` (RP-05; replacing an inactive link), and `addKey` (RP-04: name, type, place, renumbering, link, one change
+  group; the numbered name; the inactive link; its refusals).
+- `src/modules/infocube/domain/__fixtures__/star.ts`: a small star for those tests.
+- `tests/infocube-keys.test.ts`:
+  - Add key on the real star, through the composed undo registry: one undo removes the attribute and the link and
+    restores the order (the relationship and its role stay), and a redo brings both back;
+  - RP-06's flag cleared and undone, read through the index.
+- `src/domain/commands/relationship.test.ts`: roles set, trimmed and cleared (RP-14), swapped with their ends, and a
+  relationship to itself whose ends differ only in their roles.
+
+### Checks (4 and 5 November 2026)
+
+- `npm run lint` and `npm run typecheck`: clean.
+- `npm test`: 137 files, 1,720 tests passed.
+- One full e2e run (`npm run e2e`, from scratch, no dev server running). It was run because step 3 touches change
+  groups and undo (Add key's group, the swap). Result: 565 passed, 3 skipped (the measuring and on-demand specs), no
+  failures, no retries. Total 90 min 3 s:
+  - part 1, fixes to slice-02c: 24 min 31 s;
+  - part 2, slice-03a to slice-06b: 22 min 54 s;
+  - part 3, slice-07a to slice-09: 18 min 5 s;
+  - part 4, slice-10a to slice-15a: 24 min 33 s.
+
+## Łukasz's answers to 15b step 3 (5 November 2026)
+
+- Step 3 accepted. The differences from the prototype are accepted and recorded in the PRD's section 8: linking needs an
+  existing foreign key; a measure on a foreign key is allowed with its warning; a new measure's additivity by its type;
+  leaving semi-additive clears the note.
+
+## 15b step 4: the interface (5 November 2026)
+
+### What changed
+
+- **Actions** (`src/modules/infocube/app/actions.ts`): `updateCubeEntityAction` (grain, SCD type), `setMeasureAction`,
+  `updateMeasureAction`, `linkKeyAction`, `addKeyAction` (answers every version it wrote: the renumbered attributes).
+- **What the page gets** (`ModuleView`, `src/ui/modules.ts`; built in `src/compose/view.ts`), three new fields:
+  - `rowMarks`: classes on an attribute's row by attribute id (the Σ marks, `measureMarks`);
+  - `attributeDeletes`: what an attribute's delete takes along, for its second click (`attributeDeletes` in the
+    module's `view.ts`);
+  - `data`: each module's own rows for its panel sections, without `created_*` and `updated_*` (O8, `cubePageRows`).
+    InfoMapper never reads it.
+
+  They are read only when the workspace has a dimensional entity, as 15a's roles.
+- **The panels' sections, a new extension point** (`src/compose/panels.ts`, `PANEL_SECTIONS`): the entity, attribute and
+  relationship panels render every module's section of their kind where the prototype has InfoCube's, and know nothing
+  else of them. InfoCube's are `src/modules/infocube/app/sections.tsx`; each derives its rows in the browser from the
+  model and `data` (`cubeIndex`, `factHints`, `usedBy`), once per data version.
+  - **Fact** (after the definition): Grain (`TextField` with `keep`, D-66), Measures, Dimensions one row per
+    relationship with "Add key" on a row without a key (disabled with its title while the dimension has no primary
+    key), Hints (each opens what it names: Grain gets the cursor, a relationship or an attribute its panel).
+  - **Dimension**: the SCD segment with its sentence, Used by (a row opens its fact).
+  - **A fact's attribute** (after the flags): Carries (a foreign key only), Measure with Additivity, "Not additive
+    across" (semi-additive only) and the type hint.
+  - **A fact – dimension relationship** (after the cardinalities): "InfoCube", "Key in {fact}", Add key.
+  - Every write is on the save chain: grain, SCD and additivity with their row checked; a measure turned on with its
+    attribute held, turned off with the measure's row (`deletes`); a key's link with the relationship and the picked
+    attribute held; Add key with the relationship and the fact's attributes held (they are renumbered).
+- **Roles on every relationship** (InfoMapper's, `relationship-panel.tsx`): two `TextField`s with `keep` after the verb
+  phrase, "Role of {entity}", and on a relationship to itself (R2) the cardinality fields' words. **What those say on a
+  relationship to itself (D-61, slice 10a):** "At the right end" (the from end) and "At the top end" (the to end); so
+  the roles are "Role at the right end" and "Role at the top end". The sentences add " as {role}" after the entity the
+  role belongs to.
+- **The pill and 20 px** (`line-data.ts`): `pillText` gives the line's pill the roles ("{from} / {to}", one alone), else
+  the verb phrase; parallel relationships and nested loops are 20 px apart (`RELATIONSHIP_GAP`); source lines keep
+  16 px (R7). The comments in `line-data.ts` and `geometry.ts` say so. Step 2's check holds: only S10A-08's loop
+  (l. 144) changed, to 20.
+- **The Σ marks (R5)**: the row's classes `meas add`, `meas semi`, `meas non` (`CardRow.mark`, through `buildCards`' new
+  `rowMarks`), the glyph in the module's CSS as a pseudo-element; `rowNeedsClip` counts its 18 px (`ROW_MARK`). **One
+  difference from R5's wording:** the glyph is `::before` on the row's type span, not `::after`. The prototype draws the
+  mark just before the type, and the type is the one span of the row that is never cut (a `::after` on the name would
+  go with a long name's ellipsis). Still no element.
+- **An attribute's delete (R4)**: the panel's and the canvas menu's second click add InfoCube's rows through
+  `attributeDeleteParts` (`fields.tsx`): "with 1 measure", and "the link to {dimension}{ as role} is deleted, the
+  relationship stays". **The rows fit** (checked on the star at 1,440 × 900: the armed button wraps to two lines, as
+  slice 10c's copies text does), so no screenshot was needed before building it.
+- **The InfoCube box (R1)**: ticked and enabled while InfoCube is on, licence or not.
+- **A fix in a shared field (found by RP-05):** `useChoice` (slice 13) kept a choice made on value A after it was stored
+  as B, so an undo back to A showed B again. It now forgets a stored choice (`choiceLanded`, `src/ui/field-draft.ts`,
+  unit-tested). This affected InfoMapper's own choice fields too (e.g. a stereotype changed and undone).
+
+### New user-facing texts (for approval)
+
+All are the prototype's unless a prototype text is given beside them.
+
+| Where | Text | Prototype |
+| --- | --- | --- |
+| Relationship panel | "Role of {entity}", placeholder "e.g. Ship date" | same |
+| Relationship to itself | "Role at the right end", "Role at the top end" (R2) | "Role of {name}" twice |
+| Sentences | "Each {from} {verb} {phrase} {to}{ as role}.", "Each {to} belongs to {phrase} {from}{ as role}." | same |
+| Relationship's section | "InfoCube", "Key in {fact}", "None", "Add key", "{dimension} has no primary key yet." | same |
+| Add key's toast | "Added {name}, the key of {dimension}{ as role}." | same |
+| The pill | "{from role} / {to role}", one role alone, else the verb phrase | same |
+| Fact | "Fact", "Grain", placeholder "One row per … e.g. one order line" | same |
+| Fact | "Measures", rows "{name}" with "{Σ mark} {Additivity}{, note}"; "None yet. Open a numeric attribute and turn on Measure." | same |
+| Fact | "Dimensions", rows "{dimension}{ as role}" with "key {name}" or "no key", "Add key"; "None yet. Draw a relationship to a dimension." | same |
+| Fact | "Hints", "Nothing to check: grain, keys and measures look complete.", and step 3's hint texts | same |
+| Dimension | "Dimension", "Slowly changing dimension type", "0 · keep", "1 · overwrite", "2 · history" | same |
+| Dimension | "Values never change once loaded.", "A change overwrites the old value; no history.", "A change adds a new version; the old one stays with its validity.", each followed by "Technical columns (valid from, valid to, current) are a physical matter and are not modelled here." | same |
+| Dimension | "Used by", rows "{fact}{ as role}" with "key {name}" or "no key"; "No fact uses it yet." | same |
+| A fact's attribute | "Carries", a row "{dimension}{ as role}" with "relationship"; "No dimension. Pick this key in a relationship to a dimension." | same |
+| A fact's attribute | "Measure" (section and flag), "A foreign key carries a dimension's key; it is not a measure.", "Not a measure: a degenerate dimension or a descriptive value of the fact." | same |
+| A fact's attribute | "Additivity", "Additive", "Semi-additive", "Non-additive"; "Not additive across", placeholder "e.g. Date (a balance)" | same |
+| A fact's attribute | "Its type is {Type}. Measures are usually Integer or Decimal." | same ("not set" without a type cannot happen in the app) |
+| Measure on a foreign key | toast "{attribute} is a foreign key. A dimension key is usually not a measure." (accepted in step 3) | none |
+| An attribute's second click | "Click again to delete, with 1 measure"; "…; the link to {dimension}{ as role} is deleted, the relationship stays" (joined with the mappings and copies as before) | a dialog "Delete {name}?" with the rows "1 measure – deleted" and "Carries {dimension}{ as role} – the link is deleted; the relationship stays" |
+
+The commands' refusals (step 3: "Only a fact has a grain.", "Only an attribute of a fact can be a measure.",
+"{attribute} already carries {dimension}{ as role}. Pick another key.", …) reach the page only by a direct call or a
+concurrent change; the panels never offer what they refuse.
+
+### Other differences from the prototype in this step
+
+- The sections are InfoMapper's folds ("Fact", "Dimension", "Measure", "InfoCube"), each with a box like the
+  prototype's `.cubebox`; the prototype's are plain `h3` headings.
+- A Σ mark has no tooltip (R5); its additivity is in the attribute's panel and the fact's Measures.
+
+### Not in this step
+
+- Screenshots light and dark (step 1 proposed them for step 4; step 4's go did not ask for them). They can go with
+  step 5.
+- `CLAUDE.md`'s list of extension points (the panels' sections, `rowMarks`, `attributeDeletes`, `data`) and the other
+  docs: step 5, with D-68, the AD-34 sentence and D-61's 20 px.
+- RP-09 is slice 15a's S15-14 (passes); RP-10 is 15d's; RP-13 is dropped (R6).
+
+### Tests
+
+- **e2e, `e2e/slice-15b/`** (one file per criterion; fixtures and helpers built on 15a's):
+  - `S15-03.spec.ts` (R1): on without a licence, the box ticked and enabled with the no-licence line;
+  - `S15-07.spec.ts` (hints): a new fact's two hints; the grain hint focuses Grain;
+  - `S15-08.spec.ts`: grain cleared and undone; `quantity` semi-additive across "Date" (Σ~ on the row and in Measures,
+    two undo steps); `order_number` as a measure with its type hint; `customer_key` as a measure with the toast; a
+    reviewer read-only;
+  - `S15-08b.spec.ts`: SCD 0 → 2 → 1 with the sentences and the Cube tab's "SCD n", two undos; "grain set" and "no
+    grain";
+  - `RP-01` (pills, 20 px), `RP-02` (Dimensions), `RP-03` (a third relationship's hints), `RP-04` (role, Add key, undo,
+    redo), `RP-05` (the key select, None, undo), `RP-06` (FK cleared: the inactive link kept), `RP-07` (the second
+    click, delete, undo), `RP-08` (the relationship deleted, undo), `RP-11` (Used by), `RP-12` (a primary key renamed),
+    `RP-14` (a logical relationship's role, swap, undo, redo; R2 on a loop).
+- **Changed earlier test:** `e2e/slice-10a/S10A-08.spec.ts` l. 144: the second loop at 20 px (was 16), and its end more
+  than 19 px from the first's (was 15).
+- **Unit:** `lines.test.ts` (20 px, `pillText`), `tests/infocube-star.test.ts` (the module view's marks, deletes and page
+  rows; the empty view's new fields), `field-draft.test.ts` (`choiceLanded`).
+- **Measurement (asked for in this step):**
+  - the element guard (`S3B-15-elements.spec.ts` against `slice-08.json`): passes, viewport counts equal; page totals
+    6,000 / 20,797 / 2,867 / 6,309, as since slice 11;
+  - `e2e/slice-15b/S15B-layers.spec.ts` (new, measurement build only, in `playwright.config.ts`'s list): the star with
+    its six Σ marks and the role pills, then with the measures deleted and the roles cleared: **10 drawing layers,
+    4.2 MP and 791 viewport elements both times**. 15a's `S15-layers` on the same build: 10, 4.2 and 791 with and
+    without roles.
+
+### Checks
+
+- `npm run lint` and `npm run typecheck` clean; `npm test` 137 files, 1,723 tests pass.
+- The slice's specs (`e2e/slice-15a/`, `e2e/slice-15b/`) and the earlier specs the step touched pass.
+- **One full run** (`npm run e2e`, from scratch), because the step touches shared infrastructure: the line layer (20 px)
+  and `useChoice` (every choice field). 581 passed, 3 skipped, 1 failed in 96 min 38 s: part 1 27 min 21 s, part 2
+  23 min 35 s, part 3 19 min 10 s, part 4 26 min 31 s. The failure was `S10A-10` l. 36: its label helper matched by
+  substring, so "At the right end" also found the new "Role at the right end" (two labels). Not a flake: the helper now
+  matches the whole label; `S10A-10` passed three times on its own (15 of 15). Traces and log kept in
+  `test-results/kept-15b-step4/`.
+
+## Łukasz's answers to 15b step 4 (5 November 2026)
+
+- Step 4 accepted: every new text approved, the Σ mark as a `::before` on the type span accepted, the other differences
+  accepted (recorded in the PRD's section 8). No screenshots. Step 4's full run is 15b's run before the merge unless
+  step 5 changes code.
+
+## 15b step 5: closing (5 November 2026)
+
+### RP-09
+
+Covered by slice 15a's `S15-14` as changed in step 2: the star has two relationships from Dim Date to Fact Sales
+(Order date, Ship date), and the preview's row must read exactly "2 facts lose this dimension: Fact Orders, Fact Sales"
+(either order), so a fact listed twice fails it. No new spec.
+
+### Docs
+
+- `CLAUDE.md`: the summary paragraph; the extension points (`ModuleView`'s `rowMarks`, `attributeDeletes`, `data`; the
+  panels' sections `PANEL_SECTIONS`); InfoCube's 15b notes; slice 15b's helpers and the whole-label rule (S10A-10); the
+  layers command.
+- `docs/data-model-v2.md`: `relationship.from_role`, `to_role` (format 13); `cube_key`; a measure's additivity by type.
+- `docs/known-limitations.md`: "What slice 15b leaves for later".
+- `docs/inventory-prototype-vs-app.md`: 15b's items present, its deliberate differences.
+- `README.md`: the status (15a merged, 15b on its branch), what 15b brings, the layers command.
+- `docs/ideas.md`: the plan (15a and 15b done, next 15c and 15d); the open question decided by C-2.
+- The PRD's section 8: the Σ mark's `::before`, the folds, R2's labels, 20 px.
+
+No code changed in step 5, so no new full run: step 4's (581 passed; S10A-10's locator fixed, 3 of 3 on its own) is
+15b's run before the merge.
+
+### Decisions for approval (not yet in `docs/decisions.md`)
+
+- **D-68 (new):** see the chat report; the text entered is the one Łukasz approves.
+- **AD-34 (one sentence appended):** "InfoCube also reads relationship roles, which InfoMapper keeps for every
+  relationship (D-68)."
+- **D-61 (16 px → 20 px):** "Further loops on one card nest outside it, their ends 20 px further from the corner."
+
+### Manual acceptance (15b's definition of done)
+
+KB was backed up before it: `.data/backups/dev-db-20261105-0925.json` and `kb-model-latest.json` (format 12).
+
+**On the demo** (`npm run demo -- --reset`, http://127.0.0.1:3001, the Sales star in "Retail Co – DWH"):
+1. Dim Date – Fact Sales shows two lines with the pills "Order date" and "Ship date", 20 px apart.
+2. A third Dim Date – Fact Sales relationship (draw it): Fact Sales' Hints name it; give it a role in its panel; "Add
+   key" writes the key with its toast; one Undo takes the key back.
+3. Fact Sales: Grain typed and saved; a measure's Additivity changed (the Σ mark on the row follows); a measure turned
+   on and off.
+4. Dim Date: the SCD type changed with its sentence; Used by lists Fact Sales twice (Order date, Ship date) and Fact
+   Orders.
+5. `ship_date_key` in Fact Sales: Delete, the second click names "the link to Dim Date as Ship date is deleted, the
+   relationship stays"; delete; Undo brings the attribute and its link back.
+
+**On KB** (`npm run dev`, http://localhost:3000):
+1. The first page upgrades the file to format 13 (the relationships' roles, null); nothing else changes.
+2. A logical relationship: a role typed shows in its sentences (" as {role}") and on the line's pill.
+3. Undo takes the role back.
+
+## Łukasz's answers to 15b step 5 (5 November 2026)
+
+- AD-34's sentence and D-61's 20 px approved as written; D-68 approved with its hints sentence changed to the list
+  `factHints` gives (there is no "fact without measures" hint). All three entered in `docs/decisions.md`. The merge
+  waits for his manual acceptance.
+
+## 15b's manual acceptance (5 November 2026)
+
+- **Passed** (Łukasz, 5 November 2026): on the demo (`npm run demo -- --reset`) the Order date and Ship date pills; a
+  third Dim Date – Fact Sales relationship with a role, Add key and undo; grain and measures in Fact Sales; SCD type and
+  Used by in Dim Date; `ship_date_key` deleted with its second click, then undo. On KB (backed up first,
+  `.data/backups/dev-db-20261105-0925.json`): the upgrade to format 13; a role on a logical relationship in its pill and
+  sentences; undo.

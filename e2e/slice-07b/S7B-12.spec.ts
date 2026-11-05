@@ -3,6 +3,7 @@
 // “Raised when slice 7b was installed.”, and is written back as format 7.
 
 import fs from "node:fs";
+import { DEV_DB_FORMAT } from "../../src/data/local/schema";
 import { E2E_DB } from "../config";
 import { expect, test } from "./fixtures";
 import { card, crmChanges, loadChanges, openSystem } from "./helpers";
@@ -32,7 +33,7 @@ test("S7B-12: a format-6 file gets the open changes its imports left, marked as 
   await expect(card(page, "type_conflict", "dbo.customers.email_addr")).toHaveAttribute("data-severity", "high");
   await expect(card(page, "business_key_changed", "dbo.customers.cust_no")).toBeVisible();
 
-  // written back at once, now as format 10 (slice 10c)
-  expect((JSON.parse(fs.readFileSync(E2E_DB, "utf8")) as { format: number }).format).toBe(12);
+  // written back at once, as the current format
+  expect((JSON.parse(fs.readFileSync(E2E_DB, "utf8")) as { format: number }).format).toBe(DEV_DB_FORMAT);
   expect((await loadChanges()).every((c) => c.source_import_id !== null)).toBe(true);
 });

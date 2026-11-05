@@ -248,7 +248,7 @@ export const cardRect = (p: Placed): Rect => ({ x: p.x, y: p.y, w: cardWidth(p.c
 /**
  * A relationship from an entity to itself (slice 10a, D-61): a loop at the card's top right corner. The from end leaves
  * the right edge at the header's middle, the to end comes back through the top edge near the corner, both at right
- * angles, so the end marks draw as on any line. Further loops on one card (`off`: 16, 32 …) move both ends `off` away
+ * angles, so the end marks draw as on any line. Further loops on one card (`off`: 20, 40 … since slice 15b, R-7) move both ends `off` away
  * from the corner, as parallel lines do, and bulge out further, so they nest outside the first with their labels apart
  * (the outer point moves `1.375 × off` out along both axes); on a collapsed card the from end stays on the card.
  */

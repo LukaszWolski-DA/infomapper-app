@@ -11,6 +11,8 @@ import { useContext, useEffect, useRef } from "react";
 import { createMappingAction } from "@/app/_actions/mapping";
 import { deleteAttributeAction, updateAttributeAction } from "@/app/_actions/model";
 import { useAction } from "@/app/_components/use-action";
+import { useModules } from "@/app/_components/modules";
+import { PANEL_SECTIONS } from "@/compose/panels";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { UpdateAttributeInput } from "@/domain/commands/attribute";
 import { copiesBelow, copiesStopFollowing } from "@/domain/model/copies";
@@ -21,6 +23,7 @@ import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import {
   Actions,
+  attributeDeleteParts,
   ConfirmDelete,
   dangerClass,
   Field,
@@ -92,6 +95,9 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   const original = originalId ? ix.attribute.get(originalId) : undefined;
   const lost = originalId && !original ? ix.model.lostOriginals.find((o) => o.id === originalId) : undefined;
   const copies = attributeCopiesImpact(ix.model.attributes, ix.model.entities, a.id);
+  // what a module's rows lose with it (slice 15b, R4): a measure, a key's link; the second click names them
+  const moduleDelete = useModules().attributeDeletes[a.id];
+  const deleteParts = attributeDeleteParts(mappings.length, copies.length ? copiesStopFollowing(copies.map((c) => c.label)) : undefined, moduleDelete);
   // a copy's type and Personal data follow its original while it has a link, live or deleted (F2)
   const followEditable = p.editable && !originalId;
   const follows = original ? attributeLabel(ix, original.id) : null;
@@ -268,6 +274,11 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
         </Note>
       )}
 
+      {/* the modules' sections (slice 15b): a fact's attribute's "Carries" and Measure */}
+      {PANEL_SECTIONS.attribute.map((S, i) => (
+        <S key={i} attribute={a} />
+      ))}
+
       <RichTextField
         key={fieldKey(a.id, "definition")}
         label="Definition"
@@ -331,13 +342,13 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
 
       {p.editable && (
         <Actions>
-          {mappings.length || copies.length ? (
+          {deleteParts.also || deleteParts.then ? (
             // With mappings or copies it still asks (slice 1b, item 13; slice 10c, F7); without, it goes at once with Undo
             // in the toast.
             <ConfirmDelete
               label="Delete attribute"
-              also={mappings.length ? `${mappings.length} mapping${mappings.length > 1 ? "s" : ""}` : undefined}
-              then={copies.length ? copiesStopFollowing(copies.map((c) => c.label)) : undefined}
+              also={deleteParts.also}
+              then={deleteParts.then}
               onConfirm={() => void remove()}
               testId="button-delete-attribute"
             />

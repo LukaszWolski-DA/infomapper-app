@@ -45,7 +45,7 @@ import { useToast } from "@/ui/components/toast";
 import { attributeDeleted, STATUS_LABEL } from "./attribute-panel";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
 import { useMapColumn } from "./map-column";
-import { armedDeleteText } from "./fields";
+import { armedDeleteText, attributeDeleteParts } from "./fields";
 import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, columnLabel, fedEntities, feedingSourceCards, feedingSources, inputsLabel, type ModelIndex } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -605,10 +605,12 @@ export function useCanvasHost({
           // the same confirmation as in the attribute panel: with mappings or copies it asks for a second click (F7)
           const n = (ix.mappingsOf.get(a.id) ?? []).length;
           const copies = attributeCopiesImpact(ix.model.attributes, ix.model.entities, a.id).map((c) => c.label);
+          // and a module's rows (slice 15b, R4): a measure, a key's link
+          const parts = attributeDeleteParts(n, copies.length ? copiesStopFollowing(copies) : undefined, modules.attributeDeletes[a.id]);
           items.push({
             label: "Delete attribute",
             danger: true,
-            ...(n || copies.length ? { confirm: armedDeleteText(n ? `${n} mapping${n > 1 ? "s" : ""}` : undefined, copies.length ? copiesStopFollowing(copies) : undefined) } : {}),
+            ...(parts.also || parts.then ? { confirm: armedDeleteText(parts.also, parts.then) } : {}),
             act: () =>
               void saveRow(
                 a,

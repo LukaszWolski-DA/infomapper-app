@@ -9,7 +9,7 @@ import { BUILTIN_CLASSIFICATIONS, indexOf } from "@/domain/model/classifications
 import { suggestsBusinessKey } from "@/domain/model/mapping-rules";
 import type { ChangeEvent } from "@/domain/types";
 import { readDb } from "./file";
-import { findViolation } from "./schema";
+import { DEV_DB_FORMAT, findViolation } from "./schema";
 import { buildSeed, SEED_IDS } from "./seed";
 import { seedId } from "./seed-model";
 import { createLocalDataStore } from "./store";
@@ -75,7 +75,7 @@ describe("the upgrade to format 8 (slice 7c)", () => {
     await writeFile(file, JSON.stringify(format7()), "utf8");
     vi.spyOn(console, "log").mockImplementation(() => {});
     const db = await readDb(file);
-    expect(db.format).toBe(12);
+    expect(db.format).toBe(DEV_DB_FORMAT);
     for (const ws of db.workspace) {
       const list = db.classification.filter((c) => c.workspace_id === ws.id);
       expect(list.map((c) => [c.code, c.name, c.scope, c.origin])).toEqual(BUILTIN_CLASSIFICATIONS.map((b) => [b.code, b.name, b.scope, b.origin]));

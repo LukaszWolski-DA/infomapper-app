@@ -149,6 +149,7 @@ export default async function CanvasPage({
     sourceChanges,
     canvas,
     modules.roles,
+    modules.rowMarks,
   );
   // requirements (slice 4a): the index is built once per page here for the left panel; the panels build theirs once
   // per data version in the browser

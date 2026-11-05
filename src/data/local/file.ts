@@ -86,7 +86,8 @@ export async function readDb(file: string): Promise<DevDb> {
  * `copied_from_attribute_id` null (slice 10c, F11: no change events, no log line). From 10, entities and attributes
  * get `alias` null and canvases and canvas items `entity_names` and `attribute_names` null (slice 11; no change
  * events, no log line). From 11, every entity gets `model_level` logical, every workspace `infocube` false, and the
- * file an empty `organization_licence` (slice 15a; no change events, no log line).
+ * file an empty `organization_licence` (slice 15a; no change events, no log line). From 12, every relationship gets
+ * `from_role` and `to_role` null (slice 15b; no change events, no log line).
  */
 export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number } {
   let report: Upgrade8Report | null = null;
@@ -165,7 +166,12 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
   if ((db.format as number) === 11) {
     for (const e of db.entity) e.model_level ??= "logical";
     for (const w of db.workspace) w.infocube ??= false;
-    Object.assign(db, { format: DEV_DB_FORMAT, organization_licence: (db as Partial<DevDb>).organization_licence ?? [] });
+    Object.assign(db, { format: 12, organization_licence: (db as Partial<DevDb>).organization_licence ?? [] });
+  }
+  // slice 15b: every relationship's two roles null (RP-A; no change events, no log line)
+  if ((db.format as number) === 12) {
+    for (const r of db.relationship) Object.assign(r, { from_role: r.from_role ?? null, to_role: r.to_role ?? null });
+    Object.assign(db, { format: DEV_DB_FORMAT });
   }
   return { report, passwordsGiven };
 }

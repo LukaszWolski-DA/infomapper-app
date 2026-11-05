@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 15a's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 15b's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences. The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -277,8 +277,6 @@ changes their own row (F12); every people change follows the app's roles, archiv
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| A fact's description | grain, measures with their aggregation, the dimensions with their keys, hints (the key-name match); the Measure section; the Σ marks on rows | the entity panel's fact section; the card's rows | 15b |
-| A dimension's description | SCD type, "used by" | the entity panel's dimension section | 15b |
 | Dimensional mappings | logical attribute(s) → a fact's or dimension's attribute: drag in both directions with lit and dimmed targets, the line kind, the mapping panel, "Create dimension from this…", "Comes from the logical model", "Feeds facts and dimensions" | B-6; the canvas's drag and its lines; the mapping panel | 15c (AD-36) |
 | "Fed" coverage | a dimensional entity's coverage on its card, in the Overview and in the details panel's "Mapping coverage" (today "0 of n") | P17 | 15c |
 | Requirements on facts and dimensions, the bus matrix | X-5's scope and coverage, the lens; B-8; REQ-210 | the Cube tab's "Bus matrix", the requirement panel | 15d |
@@ -291,6 +289,19 @@ here" and "New dimension here" in the canvas's toolbox; a card's role with the c
 panel's Role; relationships only within a level, with the dimension at a fact's relationship's one end; paste within a
 level; a source column maps only to a logical attribute (B-6's toast); the delete preview's InfoCube rows; the Sales star
 in the demo data (`npm run demo`).
+
+**Present (slice 15b):** a fact's section (Grain, Measures, Dimensions one row per relationship with its key and "Add
+key", Hints that open what they name); a dimension's section (the SCD type with its sentence, Used by); a fact's
+attribute's Carries and Measure (Additivity, "Not additive across", the type hint); the Σ marks on a card's rows; a role
+per end of every relationship in its panel, its sentences and its line's pill; a fact – dimension relationship's "Key in
+{fact}" and "Add key"; an attribute's delete naming its measure and key link; the Sales star's Order date and Ship date.
+
+**Deliberate differences (slice 15b, PRD section 8):** a key is linked only to an existing foreign key; a measure on a
+foreign key is allowed with a warning; a new measure's additivity follows its type; leaving semi-additive clears the
+note; an inactive key link is kept and ignored (R3); no one-time link by name (R6); the attribute's delete names
+InfoCube's rows on its second click, not in a dialog (R4); the Σ marks have no title and are a `::before` on the type
+(R5); the sections are folds; a relationship to itself labels its roles by its ends (R2); parallel relationships and
+loops 20 px apart, source relationships 16 px (R7).
 
 **Deliberate differences (slice 15a, PRD section 8):** no "Prototype: grant / end licence" button (a script grants a
 licence in development); InfoCube is turned off only while the workspace has no facts or dimensions, and while it is off

@@ -3,7 +3,8 @@
 Status: **step 1 done and answered** (Łukasz, 4 November 2026); updated to the answers and cut into four sub-slices
 (section 0). PRD file: `docs/prd/slice-15-infocube.md`; step 1's review: `docs/prd/slice-15-acceptance.md`. Branch
 `slice/15-infocube` for step 1; each sub-slice has its own branch (section 4). Start: `main` at tag `slice-14b`
-(A1 holds).
+(A1 holds). **15b** (role-playing in it, RQ-3): step 1 done on 4 November 2026 on branch
+`slice/15b-grain-measures-roles` from tag `slice-15a` (acceptance doc, "15b step 1").
 
 ## 0. Answers to step 1 (Łukasz, 4 November 2026)
 
@@ -48,8 +49,29 @@ named. Findings (F), extension points (E), questions (O, Q) and differences (P) 
   - Copying a workspace and transferring it to an organization without the licence (AD-09): not built; the acceptance
     doc checks what the code allows and proposes a rule.
   - The spec's IC-14 no longer matches (acceptance doc); the spec is not edited.
-- **Q16.** The dimension key by the key-name match, as one domain function, listed in `docs/known-limitations.md` until
-  role-playing replaces it (15b).
+- **Q16.** ~~The dimension key by the key-name match, as one domain function, listed in `docs/known-limitations.md` until
+  role-playing replaces it (15b).~~ **Never built** (RQ-3 below).
+- **RQ-3 (Łukasz, 4 November 2026, option 2): role-playing dimensions are built in 15b**, from
+  `docs/infocube/role-playing-spec.md` (R-1 to R-10, RP-A to RP-F, RP-01 to RP-14). A role name per end of InfoMapper's
+  relationship (two nullable columns, a new local file format), the key links in InfoCube's own table, no match by
+  name. The bus matrix's dots (R-8, RP-10) stay with the bus matrix in 15d. 15b's data step touches the table registry
+  and the local adapter and gets a full e2e run (CLAUDE.md).
+- **15b step 1's answers (Łukasz, 4 November 2026), acceptance doc "Łukasz's answers to 15b step 1":**
+  - **R1:** the InfoCube box as the prototype: ticked and enabled while on, even without the licence.
+  - **R2:** on a relationship to itself the role fields use the cardinality fields' words (D-61: "At the right end",
+    "At the top end"): "Role at the right end", "Role at the top end".
+  - **R3:** no module follow-up. **A key link whose attribute is not a foreign key is inactive:** panels, hints and the
+    key select ignore it, nothing deletes it; turning the flag back on brings the link back (section 8).
+  - **R4:** an attribute that is a measure or carries a key is deleted with the attribute's second click (slice 10c,
+    `ConfirmDelete`), its text naming the module's rows; no new dialog. A screenshot to Łukasz first if the rows do not
+    fit.
+  - **R5:** the Σ marks are a class and `::after`, no element.
+  - **R6:** no one-time link by name in the app, no script and no function: only the demo and e2e files have facts, and
+    both are seeded with explicit links. **RP-13 is dropped from the app's criteria** (it stays a prototype scenario).
+  - **R7:** source relationships keep 16 px.
+  - **D-68** covers grain, SCD, measures, hints and role-playing, and describes role names as an InfoMapper feature of
+    every relationship that InfoCube reads. At 15b's closing AD-34 gets one sentence: "InfoCube also reads relationship
+    roles, which InfoMapper keeps for every relationship (D-68)." Both texts are quoted to Łukasz then.
 - **On the risks.** 15a starts with the table registry and a guard test: every table in the schema is known to undo and
   to the local adapter, or the build fails. Łukasz's KB file is backed up before the branch's first dev or e2e run; what
   `readDb` on `main` does with a newer format is reported (and listed if it does not refuse).
@@ -101,6 +123,15 @@ impact analysis crosses the modules through one extension point (principle 3); r
   `cubeIndex`, `createCubeMap`, `askDimFrom`, `createDimFrom`, `createRel`, `cubeTouched`, `permitChange`, `cubeTree`,
   `openBusMatrix`, the dimensional lines in the line layer (the `cmap` group, `.cube-end`), and the requirement scope
   lines (`sc.up`, `sc.cmaps`, `attrOk`, `attrFed`).
+- **15b replaces the prototype once more** with the role-playing version (646,126 bytes, SHA-256
+  `bf2251d937d1eb675163729a34a41ed121ca66ea66f58a8d84483bc4c5575c71`, copied unchanged on 4 November 2026). Its new or
+  changed code: `roleAt`, `asRole`, `factKeys` (one row per relationship), `addKey`, `linkKey`, `factHints`,
+  `relKeySection`, `insRel`'s role fields and sentences, `cubeMeasureSection`'s "Carries", `cubeDependents`' key row,
+  `cubeIndex`'s key links and their one-time link by name, `cubeDemoV3`, the line layer's pill and 20 px, the bus
+  matrix's dots, and C-7 aligned with 15a (`dimsAdded`, `CUBE_OFF_REFUSED`; R-10).
+- **The role-playing spec:** `docs/infocube/role-playing-spec.md` (11,939 bytes, SHA-256
+  `991efcdcc3b84745e594d2ebcf98645ba62da5f66bd6af1a3476a25ea9dea54a`), referred to as R-1 to R-10, RP-A to RP-F and
+  RP-01 to RP-14.
 - **The behaviour spec:** `infocube-iteration-1-spec.md` (18,790 bytes, SHA-256
   `f9647a12375c4cda2c2c690b619c75cc3e5a696b908d03b51b16a7d5c0002033`), to be put into the repository in step 1 (Q1
   proposes where). Its sections are referred to below as B-1 to B-8, X-1 to X-6, IC-01 to IC-14, Q-1 to Q-8.
@@ -157,6 +188,10 @@ The steps that build them list every new user-facing text for approval.
      facts), `scd_type` (smallint 0, 1, 2, dimensions; default 1). Exactly one row per dimensional entity.
    - `cube_measure`: `attribute_id` (FK, unique), `additivity` (`additive`, `semi`, `non`), `semi_note` (text). Only on
      attributes of a fact.
+   - `cube_key` (15b, RP-B): `relationship_id` (FK, unique among live rows), `attribute_id` (FK, unique among live
+     rows): this relationship between a fact and a dimension is carried by this attribute of the fact.
+   - **On InfoMapper's `relationship` (15b, RP-A):** `from_role`, `to_role`, text, nullable, trimmed, empty = null; any
+     relationship, any level. The local data file's format 13 adds them as null.
    - **Dimensional mappings:** logical attribute(s) → a dimensional attribute, `kind`, `rule_expression`, `status`,
      note, approval. **Their table is Q-6 of the spec, to be decided in step 1** (Q5): InfoCube's own pair
      (`cube_mapping`, `cube_mapping_input`) or a second input type on `mapping_input`.
@@ -190,9 +225,14 @@ The steps that build them list every new user-facing text for approval.
     on measure rows; the coverage bar counting rows fed from the logical model.
 13. **Panels (B-4)** for dimensional entities, their attributes, logical attributes that feed them ("Feeds facts and
     dimensions"), and dimensional mappings.
-14. **Hints in a fact's panel (B-5)**, read only, with the prototype's variants. **The dimension key is derived by the
-    key-name match** (the spec's "built rule, to be replaced by role-playing"), in one domain function, so role-playing
-    replaces one function; listed in `docs/known-limitations.md`. Q16 asks Łukasz to confirm.
+14. **Hints in a fact's panel (B-5 with R-4, 15b)**, read only: B-5's grain and measure hints, and R-4's key hints in
+    place of B-5's key hints. **No key-name match** (RQ-3): a key is linked explicitly (R-1, R-3).
+14a. **Role-playing (15b, role-playing spec):** the role fields and the sentences in every relationship's panel and the
+    InfoCube section "Key in {fact}" with Add key (R-1, R-3); one row per relationship in the fact's Dimensions (R-2)
+    and the dimension's Used by (R-5); "Carries" in a fact's foreign key's panel (R-6); the pill and the 20 px between
+    two relationships of one pair of cards (R-7); the key row in the attribute's delete preview (R-9); the links' removal
+    with their relationship, their attribute or its FK flag, in the same undo step; the demo's Ship date (RP-F). The bus
+    matrix's dots (R-8) come with the bus matrix (15d).
 15. **Dimensional mappings (B-6):** drag in both directions, onto rows and headers, dimmed targets and the refusal
     toasts; the line in the target's concept colour with a diamond end, dashed until Approved, ƒ for a transformation;
     click, right-click, Delete and undo as for mappings.
@@ -248,9 +288,23 @@ Claude Code session may start at a step's boundary, never inside a step; it star
        Role; the delete preview's rows; the star for development and slice 15's specs; the specs.
      - **15a step 5 – measurement:** the element guard, the LayerTree read, the page's bytes (`model_level`).
      - **15a step 6 – closing** (done in step 5): AD-33, AD-34, AD-35, D-67; the docs; one full run; the manual check.
-   - **15b – The dimensional description:** the fact section (grain, measures, dimensions with their keys,
-     hints with the key-name match, Q16), the dimension section (SCD, used by), the Measure section, the Σ marks.
-     Criteria S15-08 and S15-07's hints; D-68.
+   - **15b – Grain, measures, roles** (branch `slice/15b-grain-measures-roles`, tag `slice-15b`; with role-playing,
+     RQ-3): the fact section (grain, measures, Dimensions one row per relationship, hints B-5 with R-4), the dimension
+     section (SCD, Used by per relationship), the Measure section and "Carries", the Σ marks; the relationship's roles
+     (InfoMapper), the key links (`cube_key`), Add key, the pill and the 20 px, the delete preview's key row; the star's
+     roles, Ship date and links. Criteria S15-07's hints, S15-08, RP-01 to RP-09 and RP-11 to RP-14; D-68. Steps
+     (proposed, acceptance doc "15b step 1"):
+     - **15b step 2 – data:** `relationship.from_role`/`to_role`, `cube_key`, format 13 and its upgrade, undo's image
+       defaults, the migration, the star's roles and links; KB's backup. A full e2e run (the table registry, the local
+       adapter).
+     - **15b step 3 – domain:** the roles in `updateRelationship` and `swapRelationship`; InfoCube's commands for grain,
+       SCD, measures, links and Add key; the links' removal with their relationship or attribute (cascade), an
+       inactive link while its attribute is no foreign key (R3); the derived
+       rows and hints; the attribute's delete preview rows; domain tests. A full e2e run (change groups and undo).
+     - **15b step 4 – interface:** the panels' sections and fields, the pill and the 20 px, the Σ marks, the attribute's
+       delete with module rows; the specs.
+     - **15b step 5 – measurement and closing:** the element guard, the layers on the star, the page's bytes; D-68; the
+       docs; one full run; the manual check on KB.
    - **15c – Dimensional mappings:** `cube_mapping`, `cube_mapping_input` (M1, AD-36), format 13; drag in both
      directions, lit targets and refusals (O4); the line kind with hover, Focus, bundles and the miniature; the mapping
      panel with reviewers' approval and four-eyes (O9) and D-51's first rule (O12); the line's menu, Delete, history
@@ -292,6 +346,7 @@ take their criteria from this list. Every change is checked with undo and redo.
 | S15-17 | **Level rules (X-6, Q4).** Data Vault hints absent on dimensional entities; the duplicate-name warning within one level; the status bar counts logical attributes only; every other place from Q4 as answered. |
 | S15-18 | **Performance** (section 6). |
 | S15-19 | CI and the runs of the test regime; changed earlier tests listed with the reason. |
+| RP-01 to RP-14 | **Role-playing (15b, except RP-10 in 15d and RP-13, dropped: R6)** as the role-playing spec's scenarios, each with undo and redo; the acceptance doc's "15b step 1" maps them to specs and unit tests. |
 
 **Definition of done (manual acceptance on Łukasz's model KB, after the backup and the upgrade):** turn InfoCube on in
 KB's workspace; create a dimension from a logical entity; create a fact, relate it to the dimension, add its key and two
@@ -416,13 +471,37 @@ performance), each with the files and functions behind it and a proposal.
   off while the workspace has facts or dimensions, and while it is off refuses whatever would create or bring one back
   (create, copy, paste, undo, redo); so there is no hatch, no off note and no read-only check. The check is the
   domain's, on the write set (`levelWritesRefusal`, F4), and the local adapter counts again (concurrent writes).
+- **An inactive key link** (15b, R3): when a fact's key loses its FK flag, the prototype drops its link while indexing;
+  the app keeps the `cube_key` row and ignores it (panels, hints, the key select, the delete preview) while the
+  attribute is no foreign key, so turning the flag back on brings the link back. Nothing but the link's relationship's
+  or attribute's delete removes it, and undo needs no rule for it.
+- **No one-time link by name** (15b, R6): the prototype links older saved models once by the key-name rule; the app has
+  no such models (only the seeded demo and e2e files have facts) and seeds explicit links.
+- **An attribute's delete with InfoCube's rows** (15b, R4): the attribute's second click names them; the prototype opens
+  a dialog.
+- **The Σ marks have no title** of their own (15b, R5): a class on the row and a `::before` on its type span (15b step 4,
+  accepted 5 November 2026: the prototype draws the mark before the type, and the type is the one span never cut).
+- **A key is linked only to an existing foreign key** (15b step 3, accepted 5 November 2026): `linkKey` refuses an
+  attribute that is not a foreign key of the fact and never sets the flag; the prototype's `linkKey` sets it. Add key
+  writes a new attribute that is a foreign key.
+- **A measure on a foreign key** (15b step 3, accepted): allowed, with the warning "{name} is a foreign key. A dimension
+  key is usually not a measure."; the prototype turns it on without a word.
+- **A new measure's additivity by its type** (15b step 3, accepted): additive for Integer and Decimal, non-additive
+  otherwise; the prototype starts every measure additive.
+- **Leaving semi-additive clears the note** (15b step 3, accepted); the prototype keeps the note, hidden.
+- **The sections are InfoMapper's folds** (15b step 4, accepted): "Fact", "Dimension", "Measure" and the relationship's
+  "InfoCube" fold like the panels' other sections; the prototype has plain headings.
+- **Roles on a relationship to itself** (15b, R2): "Role at the right end" and "Role at the top end", D-61's words for
+  the ends; the prototype says "Role of {name}" twice.
+- **Parallel relationships and nested loops 20 px apart** (15b), so a role pill fits between them; source relationships
+  keep 16 px (R7).
 - The rest of the acceptance doc's list P1–P26 as answered there.
 
 ## 9. Left for later
 
-- **Role-playing dimensions** (agreed next for InfoCube): a role name per relationship end and an explicit link from a
-  fact's key to its relationship, replacing the key-name match. Specified and prototyped separately; Łukasz decides
-  its options (role name in InfoMapper's relationship or in InfoCube; the key link's data; the canvas) before it.
+- ~~**Role-playing dimensions**~~: specified, prototyped and moved into 15b (RQ-3). Left for later, as the spec says:
+  roles in a dimension's relationship to itself, composite keys, role views, a generic link from a logical foreign
+  key to its relationship (K2), a dialog when a relationship is deleted.
 - **Backlog (Łukasz, 1 November 2026):** junk, bridge and outrigger dimensions; the fact type (transaction, periodic
   snapshot, accumulating snapshot); factless and aggregate facts; hierarchies in dimensions.
 - **Q-5's alternative:** a multi-input mapping that loses one input stays and goes back to review (it would change
@@ -447,9 +526,11 @@ performance), each with the files and functions behind it and a proposal.
   bind every module (the table registry with its guard test, the cascade of a module's rows in the same change group);
   the other extension points are listed in `CLAUDE.md`, kept up to date in each sub-slice. The text there is the one the
   code follows.
-- **D-68 (15b)** The dimensional description in the panels: a fact's grain, measures and dimensions with their keys and
-  hints; a dimension's SCD type and the facts that use it; a measure's section; the Σ marks. Its final text is quoted
-  for approval at 15b's closing.
+- **D-68 (15b)** The dimensional description and role-playing: a fact's grain, measures and dimensions, one row per
+  relationship with the key that carries it, and its hints; a dimension's SCD type and the facts that use it, per
+  relationship; a measure's section; the Σ marks; a role name per end of any relationship (InfoMapper's, RP-A), shown
+  in its sentences and on its pill; the key link in InfoCube (RP-B), picked or added, never matched by name (RP-C). Its
+  final text is quoted for approval at 15b's closing.
 - **D-69 (15c, with AD-36)** Dimensional mappings on the canvas and in their panel: logical attribute(s) → dimensional
   attribute, drawn in both directions with lit targets and refusals (O4), approved by reviewers with four-eyes (O9),
   sent back to review by D-51's first rule (O12); the "fed" coverage. Its final text is quoted for approval at 15c's
@@ -475,7 +556,7 @@ Each enters `docs/decisions.md` at the closing of the sub-slice that builds it, 
 - **`docs/data-model-v2.md`:** `entity.model_level`; InfoCube's tables in a section of their own; the licence and the
   workspace setting; the new format and its upgrade.
 - **`supabase/migrations/`:** the new migrations.
-- **`docs/known-limitations.md`:** the key-name match until role-playing (if Q16 says build it); Q-5's rule; anything
+- **`docs/known-limitations.md`:** ~~the key-name match until role-playing~~ (never built, RQ-3); Q-5's rule; anything
   the steps find and Łukasz accepts.
 - **`docs/ideas.md`:** the InfoCube section updated (its open question is decided by C-2); the plan: InfoCube iteration
   1 done, next role-playing, then the model validator; the stale line "Next: InfoCube, starting with a concept

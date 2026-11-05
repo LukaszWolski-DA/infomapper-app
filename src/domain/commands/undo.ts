@@ -128,6 +128,7 @@ type AnyRow = RowImage;
  */
 const IMAGE_DEFAULTS: Partial<Record<UndoableTable, Readonly<Record<string, unknown>>>> = {
   entity: { model_level: "logical" },
+  relationship: { from_role: null, to_role: null },
 };
 
 /** Columns that point to a parent row whose deletion the domain cascades (data model, section 11). */

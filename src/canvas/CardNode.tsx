@@ -93,7 +93,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
   const status = row.mappings === 0 ? "" : row.warn ? " warn" : " ok";
   return (
     <div
-      className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}${row.retired ? " old" : row.missing ? " gone" : row.change ? ` ${row.change}` : ""}`}
+      className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}${row.retired ? " old" : row.missing ? " gone" : row.change ? ` ${row.change}` : ""}${row.mark ? ` ${row.mark}` : ""}`}
       data-testid={kind === "ent" ? "row-attribute" : "row-column"}
       data-row={row.id}
       title={row.retired ? "Retired: historical" : row.missing ? "Missing from source" : row.change ? CHANGED_TITLE : undefined}

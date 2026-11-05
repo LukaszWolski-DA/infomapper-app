@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { choiceShown, FieldDraft, storedBy } from "./field-draft";
+import { choiceLanded, choiceShown, FieldDraft, storedBy } from "./field-draft";
 
 describe("FieldDraft (slice 13, D-66)", () => {
   it("takes a fresh stored value only without the focus and without a draft", () => {
@@ -77,6 +77,15 @@ describe("FieldDraft (slice 13, D-66)", () => {
     expect(storedBy(false)).toBe(false);
     expect(storedBy(undefined)).toBeUndefined();
     expect(storedBy(null)).toBeUndefined();
+  });
+});
+
+describe("choiceLanded (slice 15b)", () => {
+  it("is true once the stored value equals the choice, so an undo back to the old value shows it", () => {
+    const chosen = { value: "hub", on: "entity" };
+    expect(choiceLanded(chosen, "entity")).toBe(false); // on its way
+    expect(choiceLanded(chosen, "hub")).toBe(true); // stored: forgotten, then an undo shows "entity"
+    expect(choiceLanded(chosen, "link")).toBe(false); // another value: choiceShown shows it anyway
   });
 });
 

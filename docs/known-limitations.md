@@ -1179,3 +1179,14 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
 - **The page's data:** a workspace with InfoCube on sends its facts' and dimensions' roles and the Cube tab's rows with
   every canvas page, also a canvas without facts or dimensions (about 1.2 KB, 0.4 KB gzipped, on "Retail Co – DWH" with
   the Sales star; `docs/prd/slice-15-acceptance.md`, step 5).
+
+### What slice 15b leaves for later (slice 15b, step 4 and 5)
+
+- **The page's data grows with InfoCube's rows:** a workspace with facts or dimensions sends its live `cube_entity`,
+  `cube_measure` and `cube_key` rows (without `created_*` and `updated_*`) with every canvas page, also a canvas without
+  facts or dimensions, for the panels' sections to derive their rows in the browser (`ModuleView.data`).
+- **Roles in a dimension's relationship to itself**, composite keys, role views, a generic link from a logical foreign
+  key to its relationship and a dialog when a relationship is deleted are left for later (PRD section 9).
+- **An inactive key link is kept** while its attribute is no foreign key (R3): it is read as absent everywhere, and the
+  relationship's key select offers the fact's other foreign keys; turning the flag back on brings the link back.
+- **Turning a foreign key into a measure** is allowed with a warning toast only; nothing marks it later.

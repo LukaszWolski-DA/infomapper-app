@@ -10,6 +10,7 @@ import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { CardinalityMax, CardinalityMin, Relationship } from "@/domain/types";
 import { Actions, buttonClass, dangerClass, Field, fieldKey, Kind, Seg, TextField } from "./fields";
+import { PANEL_SECTIONS } from "@/compose/panels";
 import { usePanel } from "./inspector";
 
 /** The four cardinalities the prototype offers (CARDS). */
@@ -23,6 +24,15 @@ type Card = (typeof CARDS)[number][0];
 
 const phrase = (min: CardinalityMin, max: CardinalityMax) =>
   max === "n" ? (min ? "one or more" : "zero or more") : min ? "exactly one" : "zero or one";
+
+/** " as {role}" after the entity a role belongs to (slice 15b, RP-A, R-1); nothing without one. */
+const as = (role: string | null) => (role?.trim() ? ` as ${role.trim()}` : "");
+
+/**
+ * The role fields' labels (slice 15b, R2): "Role of {entity}"; on a relationship to itself the cardinality fields' words
+ * (D-61): "Role at the right end", "Role at the top end".
+ */
+export const roleLabel = (self: boolean, end: "from" | "to", name: string) => (self ? `Role at the ${end === "from" ? "right" : "top"} end` : `Role of ${name}`);
 
 const split = (v: Card): { min: CardinalityMin; max: CardinalityMax } => {
   const [min, max] = v.split(",");
@@ -54,10 +64,12 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
       </h2>
       <div className="mt-2.5 rounded-md bg-im-hover px-3 py-2.5 text-[12.5px]" data-testid="relationship-sentences">
         <p>
-          Each {from} {r.label || "is related to"} {phrase(r.to_min, r.to_max)} {to}.
+          Each {from} {r.label || "is related to"} {phrase(r.to_min, r.to_max)} {to}
+          {as(r.to_role)}.
         </p>
         <p className="mt-1">
-          Each {to} belongs to {phrase(r.from_min, r.from_max)} {from}.
+          Each {to} belongs to {phrase(r.from_min, r.from_max)} {from}
+          {as(r.from_role)}.
         </p>
       </div>
       <Field label="Verb phrase" htmlFor="f-rl">
@@ -69,6 +81,31 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
           onSave={(label) => save({ label: label || null })}
           keep={{ key: fieldKey(r.id, "label"), field: "Label", object: `${from} – ${to}` }}
           testId="input-relationship-label"
+        />
+      </Field>
+      {/* a role per end (slice 15b, RP-A): on any relationship, InfoMapper's; InfoCube reads the dimension's */}
+      <Field label={roleLabel(self, "from", from)} htmlFor="f-rfr">
+        <TextField
+          key={fieldKey(r.id, "fromRole")}
+          id="f-rfr"
+          value={r.from_role ?? ""}
+          readOnly={!p.editable}
+          placeholder="e.g. Ship date"
+          onSave={(fromRole) => save({ fromRole })}
+          keep={{ key: fieldKey(r.id, "fromRole"), field: roleLabel(self, "from", from), object: `${from} – ${to}` }}
+          testId="input-relationship-from-role"
+        />
+      </Field>
+      <Field label={roleLabel(self, "to", to)} htmlFor="f-rtr">
+        <TextField
+          key={fieldKey(r.id, "toRole")}
+          id="f-rtr"
+          value={r.to_role ?? ""}
+          readOnly={!p.editable}
+          placeholder="e.g. Ship date"
+          onSave={(toRole) => save({ toRole })}
+          keep={{ key: fieldKey(r.id, "toRole"), field: roleLabel(self, "to", to), object: `${from} – ${to}` }}
+          testId="input-relationship-to-role"
         />
       </Field>
       <Field label={self ? "At the right end" : `At the ${from} end`}>
@@ -95,6 +132,10 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
           }}
         />
       </Field>
+      {/* the modules' sections (slice 15b): a fact – dimension relationship's key */}
+      {PANEL_SECTIONS.relationship.map((S, i) => (
+        <S key={i} relationship={r} />
+      ))}
       {p.editable && (
         <Actions>
           <button

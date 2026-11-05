@@ -1,7 +1,8 @@
 // The local data file's upgrade from format 11 to 12 (slice 15a, item 7; S15-02): every entity gets `model_level`
 // logical, every workspace `infocube` false, and the file an empty `organization_licence`; nothing else changes, no
 // change event and no log line; the file is written back at once, and a file at format 12 is read as it is (the upgrade
-// is not repeated). A module's tables are not part of the format (AD-33): the upgraded file has none.
+// is not repeated). A module's tables are not part of the format (AD-33): the upgraded file has none. Since slice 15b
+// the file goes on to format 13 (`upgrade-13.test.ts`): the relationships' roles, null.
 
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
@@ -35,6 +36,7 @@ async function asFormat11(): Promise<DevDb> {
     format: 11,
     entity: db.entity.map((e) => without(e, ["model_level"])),
     workspace: db.workspace.map((w) => without(w, ["infocube"])),
+    relationship: db.relationship.map((r) => without(r, ["from_role", "to_role"])),
   };
   await writeFile(file, JSON.stringify(old), "utf8");
   return db;
@@ -50,7 +52,6 @@ describe("the upgrade to format 12 (slice 15a, S15-02)", () => {
 
     const upgraded = await readDb(file);
     expect(upgraded.format).toBe(DEV_DB_FORMAT);
-    expect(DEV_DB_FORMAT).toBe(12);
     expect(upgraded.entity.every((e) => e.model_level === "logical")).toBe(true);
     expect(upgraded.workspace.every((w) => w.infocube === false)).toBe(true);
     expect(upgraded.organization_licence).toEqual([]);
@@ -68,12 +69,12 @@ describe("the upgrade to format 12 (slice 15a, S15-02)", () => {
     await asFormat11();
     await readDb(file);
     const onDisk = JSON.parse(await readFile(file, "utf8")) as DevDb;
-    expect(onDisk.format).toBe(12);
+    expect(onDisk.format).toBe(DEV_DB_FORMAT);
     expect(onDisk.entity.every((e) => e.model_level === "logical") && onDisk.workspace.every((w) => w.infocube === false)).toBe(true);
     expect(onDisk.organization_licence).toEqual([]);
   });
 
-  it("is not repeated: a file at format 12 is read as it is, a dimensional entity and a switched-on workspace kept", async () => {
+  it("is not repeated: a file at the current format is read as it is, a dimensional entity and a switched-on workspace kept", async () => {
     const db = await readDb(file);
     const [entity] = db.entity;
     const [workspace] = db.workspace;

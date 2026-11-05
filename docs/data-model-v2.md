@@ -53,7 +53,7 @@ Table groups (AD-10):
 | Working layer | `label`, `label_link`, `note` |
 | Organisation of work | `project`, `project_canvas`, `project_pinned_label`, `canvas`, `canvas_item`, `frame` |
 | History | `change_event`, `baseline` |
-| Modules (section 15) | InfoCube: `cube_entity`, `cube_measure` |
+| Modules (section 15) | InfoCube: `cube_entity`, `cube_measure`, `cube_key` |
 
 ---
 
@@ -287,6 +287,7 @@ alias, and source tables and columns have none.
 | `from_min`, `to_min` | smallint | no | 0 or 1 |
 | `from_max`, `to_max` | text | no | `1` or `n` |
 | `description` | text | yes | |
+| `from_role`, `to_role` | text | yes | what the entity at that end is in this relationship ("Ship date"), any relationship and level; trimmed, null when not named (slice 15b, D-68). Shown in the sentences and on the line's pill; InfoCube reads the role at a dimension's end. Migration `20261104110000_relationship_roles.sql`; the local data file's format 13 added them as null |
 
 Notation (crow’s foot or UML) is a display choice per user, not data (D-22).
 
@@ -704,5 +705,22 @@ An attribute of a fact that is a measure: one row per such attribute (spec, data
 | `additivity` | text | no | `additive`, `semi`, `non` |
 | `semi_note` | text | yes | "Not additive across …" for a semi-additive measure |
 
-Deleting an entity or an attribute soft-deletes its InfoCube rows in the same change group (the domain cascades, AD-23;
-slice 15a step 3). Dimensional mappings (`cube_mapping`, `cube_mapping_input`) come with slice 15c (AD-36).
+A new measure's additivity follows its attribute's type (additive for Integer and Decimal, else non-additive); leaving
+semi-additive clears `semi_note` (slice 15b).
+
+### InfoCube: `cube_key`
+A relationship between a fact and a dimension carried by an attribute of the fact (slice 15b, role-playing RP-B, RP-C):
+picked in the relationship's panel or written by "Add key", never matched by name. Migration
+`20261104110100_infocube_keys.sql`. In the undo history (parents `relationship` and `attribute`).
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `relationship_id` | uuid | no | FK `relationship` (fact – dimension); unique among live rows |
+| `attribute_id` | uuid | no | FK `attribute` (a foreign key of the fact); unique among live rows |
+
+A link is written only to an attribute that is a foreign key of the fact. While the attribute is no foreign key the
+link is kept and read as absent (inactive, R3): turning the flag back on brings it back.
+
+Deleting an entity, an attribute or a relationship soft-deletes its InfoCube rows in the same change group (the domain
+cascades, AD-23; slice 15a step 3, the key links slice 15b). Dimensional mappings (`cube_mapping`, `cube_mapping_input`) come with slice 15c (AD-36).

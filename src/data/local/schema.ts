@@ -88,12 +88,13 @@ import {
  * F18: no change events, one log line), a format-9 file the null link on every attribute (slice 10c, F11: no change
  * events, no log line), a format-10 file the null aliases and names (slice 11: no change events, no log line), a
  * format-11 file every entity's model level `logical`, every workspace's InfoCube off and no licences (slice 15a: no
- * change events, no log line). 12 = slice 15a (`model_level` on entities, `infocube` on workspaces,
- * `organization_licence`). It is written back at once; an older file no upgrade reaches is refused with a hint to
+ * change events, no log line), a format-12 file every relationship's two roles null (slice 15b: no change events, no log
+ * line). 12 = slice 15a (`model_level` on entities, `infocube` on workspaces, `organization_licence`), 13 = slice 15b
+ * (`from_role` and `to_role` on relationships). It is written back at once; an older file no upgrade reaches is refused with a hint to
  * run "npm run reset-dev-data", a newer one (a newer branch wrote it) with the advice to switch back to that branch or
  * restore a backup, never a reset (`newerFormatMessage`, slice 15a). A module's tables are not part of the format (AD-33): a file without one has none of its rows yet.
  */
-export const DEV_DB_FORMAT = 12;
+export const DEV_DB_FORMAT = 13;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
