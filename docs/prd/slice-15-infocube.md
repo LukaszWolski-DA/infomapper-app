@@ -4,7 +4,9 @@ Status: **step 1 done and answered** (Łukasz, 4 November 2026); updated to the 
 (section 0). PRD file: `docs/prd/slice-15-infocube.md`; step 1's review: `docs/prd/slice-15-acceptance.md`. Branch
 `slice/15-infocube` for step 1; each sub-slice has its own branch (section 4). Start: `main` at tag `slice-14b`
 (A1 holds). **15b** (role-playing in it, RQ-3): step 1 done on 4 November 2026 on branch
-`slice/15b-grain-measures-roles` from tag `slice-15a` (acceptance doc, "15b step 1").
+`slice/15b-grain-measures-roles` from tag `slice-15a` (acceptance doc, "15b step 1"). **15c** (dimensional mappings):
+step 1 done on 5 November 2026 on branch `slice/15c-dimensional-mappings` from tag `slice-15b` (acceptance doc, "15c step
+1"; questions X1–X9 open).
 
 ## 0. Answers to step 1 (Łukasz, 4 November 2026)
 
@@ -305,20 +307,23 @@ Claude Code session may start at a step's boundary, never inside a step; it star
        delete with module rows; the specs.
      - **15b step 5 – measurement and closing:** the element guard, the layers on the star, the page's bytes; D-68; the
        docs; one full run; the manual check on KB.
-   - **15c – Dimensional mappings:** `cube_mapping`, `cube_mapping_input` (M1, AD-36), format 13; drag in both
+   - **15c – Dimensional mappings** (branch `slice/15c-dimensional-mappings`, tag `slice-15c`; steps and criteria as
+     proposed in the acceptance doc, "15c step 1"; **no format bump**: a module's tables are not part of the local
+     file's format, AD-33, C1): `cube_mapping`, `cube_mapping_input` (M1, AD-36); drag in both
      directions, lit targets and refusals (O4); the line kind with hover, Focus, bundles and the miniature; the mapping
      panel with reviewers' approval and four-eyes (O9) and D-51's first rule (O12); the line's menu, Delete, history
      places; "Create dimension from this…"; "Comes from the logical model", "Feeds facts and dimensions"; X-2, X-3,
      cascades and undo; the "fed" coverage on cards and in the Overview; the star's mappings; the dense canvas
-     measurement. Criteria S15-05, 09, 11, 12, 13, 14 (the mappings' rows), 18; D-69 and AD-36.
+     measurement. Criteria S15-05, 09, 11, 12, 13, 14 (the mappings' rows), 18, and the proposed S15-20 to S15-23; D-69
+     and AD-36.
    - **15d – Requirements and the bus matrix:** X-5 (scope, coverage, the lens), B-8, REQ-210 in the star;
      criteria S15-15, 16, 19.
    - **Tests in every sub-slice** (CLAUDE.md, Łukasz, 4 November 2026; one regime, no small or large slices): after each
      step the sub-slice's specs, the earlier specs of what the step touched, and CI (lint, typecheck, unit tests); a
      failing test run three times on its own. A step that touches shared infrastructure (undo and change groups, the
      save chain, the canvas's layers, the table registry, the local adapter) runs one full e2e run in that step and its
-     report says why: in 15c the data step (format 13, `cube_mapping` and `cube_mapping_input` in the registry, undo and
-     the cascades) and the line kind (the canvas's layers) do. Before the merge: one full e2e run.
+     report says why: in 15c the data step (`cube_mapping` and `cube_mapping_input` in the registry, undo and the
+     cascades) and the canvas step (the line layer, the drag) do. Before the merge: one full e2e run.
 
 ## 5. Acceptance criteria
 
@@ -543,7 +548,8 @@ Each enters `docs/decisions.md` at the closing of the sub-slice that builds it, 
 ### Assumptions to confirm
 
 - **A1.** The slice starts from `main` at tag `slice-14b`; slice 14b is merged.
-- **A2.** The data model changes of items 3–5 in two formats (12 in 15a, 13 in 15c) and two migrations;
+- **A2.** The data model changes of items 3–5 in two formats (12 in 15a, 13 in 15b for the roles; 15c needs none, C1)
+  and a migration per sub-slice;
   `organization_licence` has no `workspace_id` (an organization's row, as `organization_access`); `entity.stereotype`
   keeps its CHECK (a dimensional entity holds `object`, unused).
 - **A3.** KB is backed up before the branch's first dev or e2e run of 15a and of 15c, and before each manual
