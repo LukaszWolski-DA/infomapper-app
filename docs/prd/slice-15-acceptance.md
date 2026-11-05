@@ -1985,3 +1985,59 @@ concurrent change; the panels never offer what they refuse.
   substring, so "At the right end" also found the new "Role at the right end" (two labels). Not a flake: the helper now
   matches the whole label; `S10A-10` passed three times on its own (15 of 15). Traces and log kept in
   `test-results/kept-15b-step4/`.
+
+## Łukasz's answers to 15b step 4 (5 November 2026)
+
+- Step 4 accepted: every new text approved, the Σ mark as a `::before` on the type span accepted, the other differences
+  accepted (recorded in the PRD's section 8). No screenshots. Step 4's full run is 15b's run before the merge unless
+  step 5 changes code.
+
+## 15b step 5: closing (5 November 2026)
+
+### RP-09
+
+Covered by slice 15a's `S15-14` as changed in step 2: the star has two relationships from Dim Date to Fact Sales
+(Order date, Ship date), and the preview's row must read exactly "2 facts lose this dimension: Fact Orders, Fact Sales"
+(either order), so a fact listed twice fails it. No new spec.
+
+### Docs
+
+- `CLAUDE.md`: the summary paragraph; the extension points (`ModuleView`'s `rowMarks`, `attributeDeletes`, `data`; the
+  panels' sections `PANEL_SECTIONS`); InfoCube's 15b notes; slice 15b's helpers and the whole-label rule (S10A-10); the
+  layers command.
+- `docs/data-model-v2.md`: `relationship.from_role`, `to_role` (format 13); `cube_key`; a measure's additivity by type.
+- `docs/known-limitations.md`: "What slice 15b leaves for later".
+- `docs/inventory-prototype-vs-app.md`: 15b's items present, its deliberate differences.
+- `README.md`: the status (15a merged, 15b on its branch), what 15b brings, the layers command.
+- `docs/ideas.md`: the plan (15a and 15b done, next 15c and 15d); the open question decided by C-2.
+- The PRD's section 8: the Σ mark's `::before`, the folds, R2's labels, 20 px.
+
+No code changed in step 5, so no new full run: step 4's (581 passed; S10A-10's locator fixed, 3 of 3 on its own) is
+15b's run before the merge.
+
+### Decisions for approval (not yet in `docs/decisions.md`)
+
+- **D-68 (new):** see the chat report; the text entered is the one Łukasz approves.
+- **AD-34 (one sentence appended):** "InfoCube also reads relationship roles, which InfoMapper keeps for every
+  relationship (D-68)."
+- **D-61 (16 px → 20 px):** "Further loops on one card nest outside it, their ends 20 px further from the corner."
+
+### Manual acceptance (15b's definition of done)
+
+KB was backed up before it: `.data/backups/dev-db-20261105-0925.json` and `kb-model-latest.json` (format 12).
+
+**On the demo** (`npm run demo -- --reset`, http://127.0.0.1:3001, the Sales star in "Retail Co – DWH"):
+1. Dim Date – Fact Sales shows two lines with the pills "Order date" and "Ship date", 20 px apart.
+2. A third Dim Date – Fact Sales relationship (draw it): Fact Sales' Hints name it; give it a role in its panel; "Add
+   key" writes the key with its toast; one Undo takes the key back.
+3. Fact Sales: Grain typed and saved; a measure's Additivity changed (the Σ mark on the row follows); a measure turned
+   on and off.
+4. Dim Date: the SCD type changed with its sentence; Used by lists Fact Sales twice (Order date, Ship date) and Fact
+   Orders.
+5. `ship_date_key` in Fact Sales: Delete, the second click names "the link to Dim Date as Ship date is deleted, the
+   relationship stays"; delete; Undo brings the attribute and its link back.
+
+**On KB** (`npm run dev`, http://localhost:3000):
+1. The first page upgrades the file to format 13 (the relationships' roles, null); nothing else changes.
+2. A logical relationship: a role typed shows in its sentences (" as {role}") and on the line's pill.
+3. Undo takes the role back.

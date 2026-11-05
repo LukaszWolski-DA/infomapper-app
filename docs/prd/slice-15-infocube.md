@@ -479,7 +479,8 @@ performance), each with the files and functions behind it and a proposal.
   no such models (only the seeded demo and e2e files have facts) and seeds explicit links.
 - **An attribute's delete with InfoCube's rows** (15b, R4): the attribute's second click names them; the prototype opens
   a dialog.
-- **The Σ marks have no title** of their own (15b, R5): a class and `::after` on the row.
+- **The Σ marks have no title** of their own (15b, R5): a class on the row and a `::before` on its type span (15b step 4,
+  accepted 5 November 2026: the prototype draws the mark before the type, and the type is the one span never cut).
 - **A key is linked only to an existing foreign key** (15b step 3, accepted 5 November 2026): `linkKey` refuses an
   attribute that is not a foreign key of the fact and never sets the flag; the prototype's `linkKey` sets it. Add key
   writes a new attribute that is a foreign key.
@@ -488,6 +489,12 @@ performance), each with the files and functions behind it and a proposal.
 - **A new measure's additivity by its type** (15b step 3, accepted): additive for Integer and Decimal, non-additive
   otherwise; the prototype starts every measure additive.
 - **Leaving semi-additive clears the note** (15b step 3, accepted); the prototype keeps the note, hidden.
+- **The sections are InfoMapper's folds** (15b step 4, accepted): "Fact", "Dimension", "Measure" and the relationship's
+  "InfoCube" fold like the panels' other sections; the prototype has plain headings.
+- **Roles on a relationship to itself** (15b, R2): "Role at the right end" and "Role at the top end", D-61's words for
+  the ends; the prototype says "Role of {name}" twice.
+- **Parallel relationships and nested loops 20 px apart** (15b), so a role pill fits between them; source relationships
+  keep 16 px (R7).
 - The rest of the acceptance doc's list P1–P26 as answered there.
 
 ## 9. Left for later

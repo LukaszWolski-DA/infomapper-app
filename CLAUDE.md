@@ -29,7 +29,9 @@ tab with the conflict line, the change-to-resolve actions hold the panel saves o
 with unsaved text asks the browser to warn before it is reloaded or closed (slice 14b, D-66). InfoCube is the first
 module (slice 15a, AD-33 to AD-35): an organization's licence and a workspace's switch, facts and dimensions as entities
 of the dimensional level with a role, a Cube tab, relationships and paste within a level, and source columns mapped to
-logical attributes only.
+logical attributes only. A fact has a grain, measures (Σ marks on its rows) and its dimensions with the keys that carry
+them; a dimension has an SCD type; every relationship has a role name per end, on its pill, so one dimension plays
+several roles (slice 15b, D-68).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -100,7 +102,16 @@ list up to date in each sub-slice):
 - **Pages:** `ModuleView` (`src/ui/modules.ts`, built by `moduleView` in `src/compose/view.ts`): plain data and server
   actions (an entity's role, left panel tabs, creates for the tab and the toolbox), handed down through
   `ModulesProvider`, `buildTree` and `buildCards`; delete previews (`moduleEntityDependents`); the settings' boxes
-  (`settingsBoxes`); the module's CSS (`src/compose/styles.ts`); its demo data (`src/compose/seed.ts`).
+  (`settingsBoxes`); the module's CSS (`src/compose/styles.ts`); its demo data (`src/compose/seed.ts`). Since slice
+  15b `ModuleView` also has `rowMarks` (classes on an attribute's card row by attribute id, through `buildCards`' last
+  argument to `CardRow.mark`; `withClips` counts `ROW_MARK`), `attributeDeletes` (what an attribute's delete takes
+  along, for its second click: `also` and `then`, joined by `attributeDeleteParts` in `src/app/_panels/fields.tsx`, the
+  panel's and the canvas menu's) and `data` (each module's own rows for its panel sections, keyed by the module,
+  without `created_*` and `updated_*`; InfoMapper never reads it).
+- **Panel sections** (slice 15b): `PANEL_SECTIONS` (`src/compose/panels.ts`): the entity, attribute and relationship
+  panels render every module's section of their kind (the entity's after its definition, the attribute's before it,
+  the relationship's before its actions) and pass only the panel's own props. A module's section saves on the chain
+  (`saveRow`, `saveRows`, `useChoice`, `TextField` with `keep`) through its own actions.
 - Server actions a module's `app` part needs from InfoMapper live outside "use server" files (`src/app/_lib/model-command.ts`):
   every export of a "use server" file is a server action. `CREATE_ACTIONS` is in `src/compose/actions.ts`, apart from
   the index, so tests that import `@/compose` never load server-only code.
@@ -248,6 +259,7 @@ npx tsx scripts/bench-source-hold.ts                          # slice 14b: holdi
 COMMITS=1 SIDE=branch npx playwright test e2e/slice-14a/S14A-13-commits.spec.ts           # slice 14a: canvas commits while a note is written, saved, refused, marked, dropped (dev server; the same file runs on slice-13 for an A/B)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-14a/S14A-13-layers.spec.ts # slice 14a: drawing layers with 20 notes without and with the mark (20 real refusals)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-15a/S15-layers.spec.ts       # slice 15a: layers and elements on the Sales star with and without roles
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-15b/S15B-layers.spec.ts      # slice 15b: layers and elements on the Sales star with and without the Σ marks and role pills
 SCREENS=<folder> npx playwright test e2e/slice-15a/S15A-screens.spec.ts                   # slice 15a: the star, the Cube tab, the Role, a delete preview, the InfoCube box; light and dark
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spec.ts      # slice 12b: both homes' load, three data sets; LABEL=<name> for an A/B run, LOADS=<n>, COLD=<n> first visits
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
@@ -426,6 +438,15 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - read the settings' box (`settingsUrl`, `infocubeBox`, `infocubeCheck`) and a card's role (`roleOf`);
   - run a domain command as a person without the page (`refusalAs`, `switchRefusal`), grant the licence as test data
     (`grantLicence`) and delete an entity through its impact dialog (`deleteFromModel`).
+
+  Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
+  - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,
+    `keyOf`) and add a third Dim Date – Fact Sales relationship as test data (`thirdDateRelationship`);
+  - open the star and a panel (`openStar`, `openEntity`, `openAttribute`, `openRelationshipFromFact`) and read the
+    sections (`factSection`, `hints`, `hintsOk`, `dimensionRows`, `dimensionRow`, `usedByRows`, `measureRows`);
+  - read a line's pill and where it starts (`pillOf`, `pillCentre`, `pathStart`).
+  A field located by its label matches the whole label: a role's label ("Role at the right end") contains the end's
+  ("At the right end", S10A-10).
 
   The undo history lives in the server's memory and is empty again after each reseed.
 - In development the canvas counts its commits in `window.__imCanvasCommits` (slice 2c): `S2C-12.spec.ts` checks that
@@ -629,6 +650,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - **The role on a card** is `CardData.role` (`buildCards`' roles from `ModuleView`): the text where the stereotype
     stands, the cube a CSS mask on `.stereo.role.cube::before`, a fact's edge a class (`dimn fact`); `withClips` counts
     the mark's 14 px (`ROLE_MARK`). No element more (S15-layers).
+  - **15b** (D-68): the actions are in `src/modules/infocube/app/actions.ts`, the sections in `sections.tsx` (they derive
+    their rows in the browser from the model and `ModuleView.data` with `cubeIndex`, once per data version), the page's
+    rows in `view.ts` (`cubePageRows`, `measureMarks`, `attributeDeletes`). The Σ marks are the row's classes `meas add`,
+    `meas semi`, `meas non` and a `::before` on its type span (`infocube.css`), no element (S15B-layers). Roles are
+    InfoMapper's (`relationship.from_role`, `to_role`; `roleLabel` and the sentences in `relationship-panel.tsx`, the
+    pill `pillText` in `line-data.ts`); a key link (`cube_key`) is written only to an existing foreign key and kept,
+    inactive, while its attribute is no foreign key. Parallel relationships and nested loops are `RELATIONSHIP_GAP`
+    (20 px) apart; source relationships keep 16 px.
   - **The star** is written only by `npm run seed`, `npm run reset-dev-data`, `npm run demo` and slice 15a's fixtures,
     never by the e2e reseed of earlier slices, so their specs and the element guard stay comparable.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine

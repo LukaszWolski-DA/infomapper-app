@@ -60,7 +60,10 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   change's tables, the browser's warning before a page with unsaved text is left; no data model change. The plan was:
   a canvas's name in its tab, the change-to-resolve actions, and the canvas's look (`docs/known-limitations.md`,
   "Writes still off the save chain"); a warning when leaving a page with a draft not saved (`beforeunload`).
-- **Next: InfoCube,** starting with a concept document.
+- **InfoCube, iteration 1** (`docs/prd/slice-15-infocube.md`): **15a done** (the module boundary, facts and dimensions,
+  the licence and the switch; AD-33 to AD-35, D-67), **15b done** (grain, measures, SCD type, role-playing dimensions;
+  D-68); next 15c (dimensional mappings and "fed" coverage, AD-36, D-69) and 15d (requirements on facts and dimensions,
+  the bus matrix).
 - **Then the model validator** (below, "A model validator").
 - **The database slice last** (AD-31).
 
@@ -542,7 +545,8 @@ dimensions, perhaps bridge and junk dimensions).
 5. **Requirements and concepts are shared**, so requirement coverage and "everything about a concept" span both layers:
    source → LDM → dimensional → requirement.
 
-**Open question for the module's design.** Are facts and dimensions InfoCube's own tables, or InfoMapper entities with a
+**Open question for the module's design** (decided by C-2 in slice 15: entities of the dimensional level, with
+InfoCube's tables for their description). Are facts and dimensions InfoCube's own tables, or InfoMapper entities with a
 layer, plus InfoCube's tables for their dimensional description? Own tables give a clean module boundary; entities with a
 layer reuse panels, relationships, copied attributes (D-63), aliases (D-64) and the canvas.
 
