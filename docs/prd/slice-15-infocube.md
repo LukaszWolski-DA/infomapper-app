@@ -506,7 +506,21 @@ performance), each with the files and functions behind it and a proposal.
   dimensional mappings on its second click and its toast counts both kinds (R4, P10); re-pointing the target is content
   for D-51 and refused onto an identical mapping; no "Map from a column…" or "Add a source column" on a dimensional
   attribute; a dimensional card's "Mapped" filter reads its feeds; "Create dimension from this…" makes plain attributes,
-  not D-63 copies.
+  not D-63 copies. All are built (15c's closing, 5 November 2026).
+- **15c's further differences** (accepted at steps 4 and 5, 5 November 2026):
+  - no tooltip on a dimensional line (one element more per line, AD-24); the menu's head and the panel name it;
+  - Focus on a selected dimensional line lights its two cards and every dimensional line between them (source lines'
+    rule); the prototype lights the one mapping;
+  - one toast for a panel change that also sends an approved mapping back to review: the panel's text, then D-51's
+    notice; the prototype shows two, the second replacing the first;
+  - "Create dimension from this…" warns of a taken name with InfoMapper's duplicate-name text, under the field and as a
+    toast; the prototype's says "Another fact or dimension is already called {name}. Rename one of them if they
+    differ.";
+  - the new dimension's card goes in the canvas's first free spot in the column 80 px right of its original
+    (`besideSpots`, Łukasz, 15c step 5), so it never covers a card; the prototype places it 80 px right, at the
+    original's height;
+  - the undo steps are named: "Create dimensional mapping", "Change dimensional mapping", "Delete dimensional mapping",
+    "Create attribute and its mapping", "Create dimension"; the prototype has no step names.
 - **The sections are InfoMapper's folds** (15b step 4, accepted): "Fact", "Dimension", "Measure" and the relationship's
   "InfoCube" fold like the panels' other sections; the prototype has plain headings.
 - **Roles on a relationship to itself** (15b, R2): "Role at the right end" and "Role at the top end", D-61's words for

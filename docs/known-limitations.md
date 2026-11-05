@@ -1168,13 +1168,12 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
 
 ### What slice 15a leaves to 15b to 15d (slice 15a, step 4 and 5)
 
-- **The details panel** counts facts and dimensions with the canvas's cards ("11 entities … on Sales star") and lists
-  them under "Mapping coverage" as "0 of n": a dimensional entity's coverage is "fed" (P17), which comes with the
-  dimensional mappings (15c).
+- **The details panel** counts facts and dimensions with the canvas's cards ("11 entities … on Sales star"). ~~It lists
+  them under "Mapping coverage" as "0 of n"~~: since slice 15c "{n} of {m} fed" (P17).
 - **A column dropped on a fact or a dimension** is refused with B-6's toast ("Source columns map to the logical model.
-  …"), but nothing is dimmed while the column is dragged (B-6's dimmed targets, 15c). The same refusal holds for "Add a
-  source column" in a fact's or dimension's attribute panel and for "Map to an attribute" of a change to resolve; the
-  panel still offers the button (15c decides what it shows).
+  …"); since slice 15c the fading veil lights only the logical cards while a column or a row is dragged, and a fact's or
+  dimension's attribute panel no longer offers "Add a source column". "Map to an attribute" of a change to resolve is
+  still refused with the same toast when its pick is a dimensional attribute.
 - **A collapsed frame's block** shows a fact or a dimension without its role (`docs/ideas.md`).
 - **The page's data:** a workspace with InfoCube on sends its facts' and dimensions' roles and the Cube tab's rows with
   every canvas page, also a canvas without facts or dimensions (about 1.2 KB, 0.4 KB gzipped, on "Retail Co – DWH" with
@@ -1190,3 +1189,21 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
 - **An inactive key link is kept** while its attribute is no foreign key (R3): it is read as absent everywhere, and the
   relationship's key select offers the fact's other foreign keys; turning the flag back on brings the link back.
 - **Turning a foreign key into a measure** is allowed with a warning toast only; nothing marks it later.
+
+### What slice 15c leaves for later (slice 15c, steps 4 to 6)
+
+- **No tooltip on a dimensional line** (accepted, 15c step 4): the prototype's `<title>` would be one more element per
+  line (AD-24); InfoMapper's mapping lines have none either. The line's menu and the panel name the mapping.
+- **Focus on a selected dimensional line** lights its two cards and every dimensional line between them (the "both cards
+  lit" rule of source lines, accepted in 15c step 4); the prototype lights the one mapping.
+- **Labels and requirement links cannot point to a dimensional mapping** (C13, AD-36): a dimensional mapping carries no
+  working label and is not traced to a requirement; the prototype has neither.
+- **A logical row dropped onto a source column** makes nothing (X1): it would be an ordinary source mapping, InfoMapper's
+  behaviour, not InfoCube's (`docs/ideas.md`).
+- **The page's data grows with InfoCube's mappings:** a workspace with facts or dimensions sends its live
+  `cube_mapping` and `cube_mapping_input` rows, and while four-eyes is on each mapping's last content editor, with every
+  canvas page (`ModuleView.data.infocube`), also a canvas without facts or dimensions.
+- **The new dimension's card** from "Create dimension from this…" goes in the first free spot of the column 80 px right
+  of its original (`besideSpots`, as "Place sources beside"); with the original not on the canvas it gets no card.
+- **The veil's cost at a drag's start** is relative (the PRD's section 6, accepted 5 November 2026): at most 5 ms more
+  than a drag frame without the veil on the same canvas; measured 18.7 ms in the page against about 15 ms without it.

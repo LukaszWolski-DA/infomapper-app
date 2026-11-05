@@ -62,8 +62,8 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   "Writes still off the save chain"); a warning when leaving a page with a draft not saved (`beforeunload`).
 - **InfoCube, iteration 1** (`docs/prd/slice-15-infocube.md`): **15a done** (the module boundary, facts and dimensions,
   the licence and the switch; AD-33 to AD-35, D-67), **15b done** (grain, measures, SCD type, role-playing dimensions;
-  D-68); next 15c (dimensional mappings and "fed" coverage, AD-36, D-69) and 15d (requirements on facts and dimensions,
-  the bus matrix).
+  D-68), **15c done** (dimensional mappings and "fed" coverage, "Create dimension from this…"; AD-36, D-69); next 15d
+  (requirements on facts and dimensions, the bus matrix).
 - **Then the model validator** (below, "A model validator").
 - **The database slice last** (AD-31).
 
@@ -161,7 +161,7 @@ edge, mentioned here before, was built in step 2 at Łukasz's request.)
 
 **Slice 15c** (X1, Łukasz, 5 November 2026): InfoCube's dimensional mappings start a drag from an entity's row (logical
 or dimensional), but a logical row dropped onto a source column stays out of 15c: it is InfoMapper's behaviour, not
-InfoCube's. When it is built, it reuses 15c's row drag (`resolveDrop`) and the veil that dims what cannot take the drop.
+InfoCube's. When it is built, it reuses 15c's row drag (the canvas extension's `rowDrag` and `drop`, `RowDrag` in `src/canvas/context.ts`) and the veil that dims what cannot take the drop.
 
 ## Feeding sources: drag from the panel onto the canvas (slice 1b, step 5)
 

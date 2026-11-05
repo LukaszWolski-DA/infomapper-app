@@ -2828,3 +2828,112 @@ Reused unchanged: the four-eyes note and refusal, D-51's notice, the step 3 text
   run 2 had three spec errors (the menu item's role, an attribute that is mapped, the toast replaced by the notice).
 - Verified in the browser on the demo (port 3001): the panel, adding and removing an input, the card menu, the dialog
   with "Dim Product 2" and the warning, the entity's and the attribute's sections.
+
+## Łukasz's answers to 15c step 5 (5 November 2026)
+
+- Step 5 accepted, with two changes: the undo step of "Create dimension from this…" is "Create dimension" (not
+  "Create entity"); the new dimension's card goes in the app's free-spot placement, starting to the right of the
+  original, so it never covers another card.
+- All other texts and deviations accepted.
+- Before step 6: compare the same specs' durations in step 3's full run and step 5's, and find the cause if the
+  slowdown sits in canvas or panel specs.
+
+## 15c step 6: closing (5 November 2026)
+
+### The two changes
+
+- **"Create dimension"**: `createDimensionFrom` names its write set (`src/modules/infocube/domain/mappings.ts`).
+- **The free spot:** the canvas's `besideSpots` (`src/canvas/geometry.ts`, the function behind "Place sources beside"
+  and "Place fed entities beside", B-08): a column beside the anchor card, from its top down, each card moved down in
+  16 px steps until it covers no card, collapsed frame, note or requirement card (`occupied`). The canvas handle has a
+  new `besideSpot(anchorCardId, height, side, gap)` (`src/canvas/context.ts`, `ModelCanvas.tsx`) that runs it for one
+  card, beside a collapsed frame's block when the original is hidden in one; `besideSpots` takes the gap as an
+  argument (default 160 px, `BESIDE_GAP`); the dialog passes InfoCube's 80 px (`DIMENSION_GAP`, the prototype's) and
+  sends the spot with the placement, which the command now requires (`x`, `y`).
+- Tests: `infocube-mapping-commands.test.ts` (the placement as sent, the step's name); S15-11 checks the column, that
+  the card covers no other card on the screen, and "Undone: Create dimension".
+
+### The full run's durations (step 3 against step 5)
+
+The same 582 tests, by folder, from step 3's log (`.data/e2e-15c-step3.log`) and step 5's blob reports:
+
+| Part | Folders | Step 3 → step 5 |
+| --- | --- | --- |
+| 1 | fixes, slice-00 to slice-02c | fixes 0.94×; slice-00 1.33×, 01a 1.40×, 01b 1.94×, 02a 1.72×, 02b 1.97×, 02c 1.68× |
+| 2 | slice-03a to slice-06b | 03a 1.36×, 03b 1.31×, 04a 1.22×, 04b1 1.21×, then 04b2 to 06b 1.04× to 1.07× |
+| 3 | slice-07a to slice-09 | 1.05× to 1.12× |
+| 4 | slice-10a to slice-15c | 10a 1.10× rising to 14a 1.38×, 14b 1.57×, 15a 2.21× (S15-mapping's timeout), 15b 1.29× |
+
+All tests 7,333 s against 5,566 s (1.32×), the median test 1.16×. The slowdown follows the clock, not the code: it is
+large at part 1 and at part 4's end, while the canvas and panel folders in between (05a, 06a, 06b, 07a to 11) are at
+1.0× to 1.15×, and part 1's folders touch nothing step 5 changed (no dimensional entity in their data). **Rerun on its
+own** with the current code (5 November 2026, 23:30): slice-01b 233 s (step 3: 229 s), slice-02b 160 s (step 3: 182 s;
+step 5's run: 445 s and 358 s). Machine load during the run, not a regression; S2C-03's sign-in timeout fits it (3/3 on
+its own).
+
+### Docs
+
+- `CLAUDE.md`: 15c in "What this is"; the extension points: `goesWhole`, `rowFeeds` with `EntityRole.feed` and
+  `moduleRowFeeds`, `AttributeDelete.toast`, the change events for a module's four-eyes, `CanvasLines.modules` and the
+  `ext` selection, `CANVAS_EXTENSIONS` with `cardMenu` and `overlay`, `PANEL_SECTIONS.attributeFeeds`; the InfoCube
+  bullet's 15c line.
+- `docs/data-model-v2.md`: `cube_mapping` and `cube_mapping_input`; no format bump (C1).
+- `docs/known-limitations.md`: 15a's lines that 15c settles; "What slice 15c leaves for later".
+- `docs/inventory-prototype-vs-app.md`: 15c present, its deliberate differences; the rows removed.
+- `README.md`: 15b merged, 15c on its branch; what 15c brings.
+- `docs/ideas.md`: 15c done in the plan; X1's line names the real functions (`rowDrag`, `drop`; it said
+  `resolveDrop`, which does not exist).
+- The PRD's section 8: "All are built", and 15c's further differences.
+
+### Decisions, for approval (not entered yet)
+
+**D-69** (UX), proposed text:
+
+> **D-69** Dimensional mappings (slice 15c). A fact's or a dimension's attribute is fed from the logical model by a
+> dimensional mapping: one or more logical attributes → one dimensional attribute, a direct copy or a transformation
+> with its rule, with a status (Draft, In review, Approved) and a note. On the canvas it is a line from each logical row
+> to the dimensional row, in the target's concept colour, dashed until Approved, with a diamond at the target and ƒ on a
+> transformation. A logical row dragged onto a dimensional row, or a dimensional row onto a logical row, maps them as a
+> Draft direct copy; a logical row dropped on a dimensional header adds an attribute named after it, mapped, in one undo
+> step. While a row is dragged, the cards of the other level stay lit and the rest is veiled; a drop within one level or
+> a source column onto a dimensional row is refused with a toast that says what to do, and a drop onto a pair already
+> mapped selects that mapping.
+> The mapping's panel shows its trace, its inputs with Add and Remove (never the last), its target (re-pointed there),
+> the kind, the rule, the status and the note. Reviewers set the status; with four-eyes the person who last changed a
+> mapping's content cannot approve it. A change of inputs, kind, rule or target sends an approved mapping back to review
+> (D-51's first rule); a note alone does not. A dimensional attribute's panel shows "Comes from the logical model" in
+> place of source columns; a logical attribute that feeds something shows "Feeds facts and dimensions". A fact's or a
+> dimension's coverage counts its attributes that are fed ("{n} of {m} fed"): on its card, its rows' dots, the Mapped
+> filter, the entity panel and the Overview. "Create dimension from this…" on a logical card makes "Dim {entity}"
+> (numbered when the name is taken) with a surrogate key and a copy of each ticked attribute, each mapped from its
+> original as a Draft, its card beside the original's, in one undo step. Deleting a logical attribute deletes the
+> dimensional mappings that read it, whole; its second click and an entity's delete preview name them and what loses
+> its feed.
+
+**AD-36** (architecture): the text from step 1 (Q5) and, in bold, the added sentence (X9):
+
+> **AD-36** Dimensional mappings are InfoCube's own tables (`cube_mapping`, `cube_mapping_input`), pointing to
+> InfoMapper's attributes; InfoMapper's `mapping` stays source column(s) → attribute. **A dimensional mapping goes whole
+> when one of its inputs goes with its attribute (Q-5); it carries no working label and no requirement link.**
+
+They go into `docs/decisions.md` (D-69 under "InfoCube" after D-68, AD-36 under "Modules" after AD-35) only once
+Łukasz approves the text.
+
+### 15c's definition of done for the manual acceptance
+
+**On the demo** (`npm run demo -- --reset`, http://127.0.0.1:3001, "Retail Co – DWH" → Sales star):
+
+1. The star's dimensional lines: dashed for Draft and In review, solid for Approved, ƒ on a transformation.
+2. A drag from a logical row onto a dimensional row (a Draft line, its toast), then Undo; a drag onto a dimensional
+   header (a new attribute and its line), then Undo ("Undone: Create attribute and its mapping").
+3. A refused drop (e.g. a logical row onto a logical row): its toast, nothing written.
+4. The mapping panel: on a direct mapping, "Add a logical attribute" makes it a transformation with the cursor in the
+   rule; on an approved mapping, changing the rule sends it back to review (the notice); as a reviewer (Piotr), approve
+   it.
+5. "Create dimension from this…" on Product: the dialog's proposed name, the card beside Product covering nothing,
+   then Undo ("Undone: Create dimension").
+6. Order Line's delete preview: "6 dimensional mappings – deleted, 4 of them approved" and "Fact Orders, Fact Sales –
+   lose their feed from the logical model", then Cancel.
+
+**On KB** (after a backup in `.data/backups/`): the app opens; deleting a logical attribute and undoing it works as
+before.
