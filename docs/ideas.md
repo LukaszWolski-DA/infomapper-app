@@ -563,6 +563,15 @@ end (role-playing dimensions).
 **Until then.** No InfoMapper decision should close this path. When generalising changes to resolve or building the
 validator, design them for reuse by modules.
 
+**Backlog (Łukasz, 1 November 2026; `docs/prd/slice-15-infocube.md`, section 9):** junk, bridge and outrigger
+dimensions; the fact type (transaction, periodic snapshot, accumulating snapshot); factless and aggregate facts;
+hierarchies in dimensions.
+
+- **Factless facts and the fact type** (Łukasz, 5 November 2026): a fact without measures is legitimate (a factless
+  fact), so there is deliberately no "no measures" hint (D-68's hints, `factHints`). When the fact type is built, the
+  Measures section's empty text ("None yet. Open a numeric attribute and turn on Measure.") should change for factless
+  facts.
+
 ## Deleting a project: what comes later (slice 12a, PRD section 9)
 
 - **From the workspace home:** a menu on a project's tile with "Delete project" (considered for slice 12a, not built: a
