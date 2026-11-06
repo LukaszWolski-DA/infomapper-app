@@ -2962,3 +2962,376 @@ before.
   drop, the mapping panel (an input added to a direct mapping, the rule of an approved one changed, approved as a
   reviewer), "Create dimension from this…" on Product with undo, Order Line's delete preview, cancelled. On KB (backed up
   first, `.data/backups/dev-db-20261105-2332.json`): the app opens; a logical attribute's delete and undo as before.
+
+## 15d step 1: requirements through dimensional mappings and the bus matrix, against the code (6 November 2026)
+
+### The starting point
+
+- `main` = `0c6bb1d` (`0c6bb1defe8c91dabfe8e7eef5e74a914b20fee6`, the merge of PR 39, chore CI e2e).
+  - The branch `slice/15d-requirements-bus-matrix` is cut from it, with no upstream, so it is never pushed to `main`.
+  - The working tree was clean.
+- **KB was backed up before any run:** `.data/backups/dev-db-20261106-1525.json` and `.data/backups/kb-model-latest.json`
+  (3,752,669 bytes).
+  - No dev or e2e server ran in this step.
+  - The only command run was `scripts/bench-requirement-index.ts` (Q6), which reads no data file.
+- **The prototype is `docs/prototype/infomapper-prototype-with-sources.html`:** 646,126 bytes, SHA-256
+  `bf2251d9…5c75c71`, 15b's role-playing copy, unchanged since `fa8f5d9`. 15d needs no new copy.
+  - The reading list names `docs/infocube/infomapper-prototype-with-sources.html`, which does not exist; `docs/infocube/`
+    holds the two specs only.
+  - Its code for 15d:
+    - `reqScope` l. 4544 (`sc.up`, `sc.cmaps`);
+    - `srcOk`, `attrOk`, `attrFed` and `reqCoverage` l. 4558–4568;
+    - `relatedOf` "req" l. 1867–1903 (`addCube`);
+    - `applyHighlight` l. 1904 (the lens colours `sc.up` rows);
+    - `reqsTouching`, `reqMark` and `reqsFor` l. 4569–4600;
+    - `openBusMatrix` l. 5650–5663 and its click handler l. 5664–5670;
+    - the Cube tab's button l. 2206;
+    - REQ-210 in `cubeDemo` l. 1574–1578.
+- **The PRD's 15d part:**
+  - section 0, "Before 15d";
+  - section 3, items 13 ("Fed from concepts"), 17 (B-8), 19 (X-5) and 21 (REQ-210);
+  - section 4's 15d bullet;
+  - S15-15, S15-16, S15-19 and RP-10;
+  - D-70 in section 10.
+
+### Findings
+
+| # | Finding | Files and functions | Proposal |
+| --- | --- | --- | --- |
+| D1 | **Links to facts, dimensions and their attributes already work, with no data change.** `requirement_link.entity_id` and `attribute_id` point to `entity` and `attribute` at either level (initial migration l. 339–358). `linkRequirement` only checks that the target is live (`requirement.ts` l. 282), and 15a's Q4 kept AD-15's link tables "unchanged for dimensional entities and attributes". The panels' "Link to a requirement…" and a requirement dropped on a dimensional row or card use the same paths. What does not work is everything after the link. A dimensional attribute has no source mapping (refused, B-6), so `lookupModel`'s `coverageOf` (`requirements.ts` l. 189) says `not_mapped` for every one of them, and the scope stops at the dimensional rows. | `20261002000000_initial_schema.sql`, `commands/requirement.ts`, `requirements.ts` | No migration, no format change, no command change. S15-15 links once through the panel; the seed has the other links. |
+| D2 | **No recursion is needed: coverage through feeds is one level deep.** E20 (15a step 1) proposed "coverage recursive with a memo and a cycle guard". Under AD-36 a dimensional mapping's inputs are logical and its target is dimensional (the module's commands; `mappingWritesRefusal`, `levels.ts` l. 53). A level never changes (AD-34), so a feed's input is always covered by source mappings only. The prototype is one level deep too: `attrOk` reads `srcOk` of the inputs. | `requirements.ts` `lookupModel`; `modules/infocube/domain/mappings.ts` | A dimensional attribute is **covered** when one of its feeds is approved and every input is covered by today's rule (`counts`, including the type check and the missing column). As a guard without recursion, an input that is not a live logical attribute counts as not covered. No memo beyond today's `states` map. |
+| D3 | **`lookupModel` cannot read InfoCube's rows (AD-33).** `ScopeModel` is InfoMapper's `WorkspaceModel` (l. 97), and the module's mappings are not in it. | `requirements.ts` l. 97, 143; `requirement-index.ts` l. 42 | Add an InfoMapper type that says nothing of InfoCube: `AttributeFeeds = Readonly<Record<Uuid, readonly { id: Uuid; approved: boolean; inputs: readonly Uuid[] }[]>>`, meaning "what feeds this attribute from other attributes". It is an optional last argument of `lookupModel`, `buildRequirementIndex` and `coverageDelta`; without it, behaviour is exactly today's. InfoMapper decides by the level, which it knows (AD-34): a dimensional attribute reads `feeds`, a logical one its mappings. The module builds the record (`cubeRequirementFeeds(mappingIndex)`): every status, `approved` per mapping, the inputs in order. |
+| D4 | **Ten callers build the index or the delta, and seven of them need the feeds.** The seven: the canvas page (`page.tsx` l. 157: the tree, requirement cards, status bar, `?req=`); the project home (l. 80: its requirements, consistency); the workspace home (l. 76: "{n} of {m} requirements covered"); the inspector (`inspector.tsx` l. 136); the canvas (`fade-canvas.tsx` l. 79: the lens and Focus); the import review (`wizard-model.ts` l. 123, `coverageDelta`); and a source's delete preview (`delete.ts` l. 240, through `sourceDeleteImpactAction`, `source-change.ts` l. 158). `entityImpactAction` (`_actions/model.ts` l. 108) uses only `of` (D-34), which feeds do not change. `TestHooks` and the benches are measuring code. | as listed | The canvas page, the inspector and the canvas take the feeds from `ModuleView.data`, which already holds `cube_mapping` and `cube_mapping_input`. A pure `requirementFeeds(view)` in `src/compose/view.ts`, memoised per data version, derives them, so the page gets **no new bytes**. The homes and `sourceDeleteImpactAction` read them through the composed store: `moduleRowFeeds` becomes `moduleFeeds`, one read for both the cards' `rowFeeds` and the requirement feeds. The import wizard gets them with `ImportData`. Without them, the review would not name a requirement linked to Fact Sales.quantity when an import sends Order Line.quantity's mapping back to review. |
+| D5 | **The coverage buckets need one more reason, not one more bucket.** The app has three states (`covered`, `not_approved`, `not_mapped`), the panel's gap reasons "unmapped" and "not approved" (`requirement-panel.tsx` l. 82–84) and D-41's three-part bar. REQ-210's Dim Customer.segment_code has an **approved** feed whose input has no source mapping. By the prototype (`attrFed`) it is "mapped, not approved", so the panel would say "not approved" of an approved mapping. | `requirements.ts` `AttributeCoverage`, `RequirementCoverage`; `requirement-panel.tsx`; `requirement-card-data.ts` | Keep the three states and the bar: the item is fed but does not count yet, so it is the bar's middle part. Give `RequirementCoverage` a `feedGaps: Uuid[]`, used for the reason only: the `notApproved` items whose approved feed reads an uncovered attribute. The panel's reasons for a dimensional item: "not fed" (no feed; a logical one keeps "unmapped"), "not approved" (no approved feed) and "logical feed not covered" (`feedGaps`). The grid's rows ("Mapped, not approved yet", "Not mapped") stay. Question Y3. |
+| D6 | **The scope: E20's split holds, with two named sets.** Today `scope.attributes` always equals `scope.attributeItems`: links to attributes and the attributes of linked mappings (`scopeOfLinks` l. 223–248). | `requirements.ts` `RequirementScope`, `scopeOfLinks`; `lit.ts` `requirementFocusLit` l. 78, `scopeContains` l. 170; `coverage-colours.ts` | This applies to every **dimensional attribute in scope** that is linked itself, never one brought in by an entity link (D-31: nothing is pulled in implicitly). For each of its feeds, in any status (the prototype's `sc.cmaps`): the feed's id goes to a new `scope.feeds`; its inputs go to `scope.attributes` and to a new `scope.feeding` (the prototype's `sc.up`); their entities go to `scope.entities`. They do not go to `attributeItems`, so they are not counted. Nothing else needs to change. Focus lights the feeding cards with their source mappings and tables, because `requirementFocusLit` already lights every scope attribute's mappings with their tables. A requirement card stays lit under Focus on Customer or Customer.segment_code (`scopeContains`). A linked fact (an entity item) brings no feeds, as a linked logical entity brings no attributes. |
+| D7 | **The lens's colours (D-32) need the feeding rows.** `coverageColours` (l. 34) colours `attributeItems` only. The prototype colours `sc.up` rows by their own coverage, blue or orange (`applyHighlight`). | `coverage-colours.ts`; `requirement-index.ts` | The index exposes `attributeCoverage(id)`, the lookup's `coverageOf`. `coverageColours` colours the `scope.feeding` rows covered or gap and adds them to the cards' summaries below 40 %. The colours light no line, as today: a linked logical attribute's source mappings are not lit either, and D-32 lights linked mappings only. The rows are `CoverageLayer`'s existing marks: one more mark per feeding row while a requirement is selected, nothing at rest. |
+| D8 | **Focus would light too many dimensional lines.** `litModules` (`fade-canvas.tsx` l. 147) lights every module line whose cards are all lit, which was 15c's rule, accepted for a selected mapping. Under REQ-210's Focus, Order Line and Fact Sales are both lit, so four of their lines would light: quantity, unit_price, discount_pct and net_amount. The prototype lights only the one mapping in scope (`sc.cmaps`), and InfoMapper's own source mappings light only the scope's (`requirementFocusLit`). | `lit.ts` `Lit`, `requirementFocusLit`, `mergeLit`; `fade-canvas.tsx` `litModules`; `FadeLayer.tsx` l. 106 | Add `Lit.lines?: ReadonlySet<Uuid>`, set only by `requirementFocusLit` from `scope.feeds`. `litModules` then lights a line when its cards are lit **and**, if `lines` is set, the line is in it. Every other Focus (an entity, a frame, a multi-selection, a mapping) keeps 15c's rule. `mergeLit` leaves `lines` out, so a multi-selection with a requirement keeps the card rule. The known limitation "Focus on a selected dimensional line" stays as it is. Question Y2. |
+| D9 | **"Via" (D-34) does not follow feeds, but the prototype's markers do.** `of` (`requirement-index.ts` l. 84) is built from links only. Fact Sales, Dim Customer and Dim Date get REQ-210 "via attribute" and a requirement marker (`requirementMarks`, one `<i class="rmark">` each); Customer and Order Line get nothing. The prototype's `reqsFor` and `reqMark` read the scope (`reqsTouching`), so its Customer and Order Line show REQ-210 too. 15a's E21 left "via dimensional mapping" out of iteration 1. | `requirement-index.ts` `of`; `requirement-marks.ts`; D-34 | Keep D-34 as it is (E21): an element lists what is linked to it, to its attributes or to the mappings onto them; the lens and Focus show the upstream. It is a known difference (P30 below). Question Y4. |
+| D10 | **Nothing above the canvas changes for the lens.** The colours and the veil belong to the overlay (slices 4p and 4b-1); 15d changes only their inputs. | `CoverageLayer.tsx`, `FadeLayer.tsx` | Nothing beyond D7 and D8. Earlier specs on the lens and Focus have no dimensional content and run unchanged; S4P-12's and S4B1-06's commit counts hold. |
+| D11 | **The bus matrix opens from the left panel, which has no model for readers.** The Cube tab's top shows only the creates, and only to editors (`left-panel.tsx` l. 530). The prototype shows its "Bus matrix" button to everyone, and New fact and New dimension to those with full rights only (l. 2206). `ModuleTab` has no slot for a button that is not a create (`src/ui/modules.ts` l. 59). The left panel gets the page's model only as `ImportData`, and only for editors (`page.tsx` l. 213). | `left-panel.tsx` `moduleTree`; `src/ui/modules.ts`; `page.tsx` | `ModuleTab.actions` (`{ key, label, title, testId }[]`), shown after the creates for every role while the tab is not searched. A client registry `TAB_DIALOGS` in `src/compose/`, beside `PANEL_SECTIONS`, holds the module's dialog, which the left panel opens. When it opens, the dialog asks a server action for its rows: `busMatrixAction`, with read access, from `cubeIndex(…).factKeys`, as `entityImpactAction` does. Nothing goes on the page, nothing is computed until it opens, and it shows the newest state. |
+| D12 | **The bus matrix's cost is in `factKeys`.** `factKeys(factId)` scans every relationship (`keys.ts` l. 123), so one open costs F facts × R relationships. On 50 facts, 100 dimensions and 300 relationships that is 15,000 steps on the server and a table of 5,000 cells in the dialog. | `keys.ts` `cubeIndex` | Group the relationships by fact once in `cubeIndex`; the panels' Dimensions rows gain from it too. No bar; a unit test on a generated 50 × 100 model checks that the rows are right. The dialog's table scrolls inside the dialog, with its header row and first column sticky, and reads no layout (CLAUDE.md). |
+| D13 | **Opening an object from the dialog follows the inspector's go-to rule, not the tree's.** A click in the tree places a missing card (`left-panel.tsx` `open`, l. 162). The panels' links select the card if it is on the canvas and otherwise open the element's panel (`goEntity`, `inspector.tsx` l. 159). A relationship's panel shows whether or not its line is drawn (`inspector.tsx` l. 234). The prototype selects, centres, and shows the toast "It is not on this canvas; its details are on the right." | `inspector.tsx` `goEntity`; `ModelCanvas.tsx` `showPlace` | A name follows `goEntity`'s rule (select and centre the card, otherwise the element's panel), with `openDetails()`, and closes the dialog. A dot selects `{ t: "rel", id }` with `openDetails()` and does not move the view, as every relationship selection from a panel. No toast: the app's go-to links have none. |
+| D14 | **"Fed from concepts" has a natural place.** A dimensional entity's panel hides InfoMapper's "Feeding sources" (`entity-panel.tsx` l. 230, `!role`), with "Attributes and their logical feed" above that spot. The module's sections render after the definition (`PANEL_SECTIONS.entity`, l. 153), not there. | `entity-panel.tsx`; `src/compose/panels.ts` | A fold **"Fed from concepts"** where a logical entity has "Feeding sources", through a new slot `PANEL_SECTIONS.entityFeeds` (like 15c's `attributeFeeds`). It is derived in the browser from `ModuleView.data` with `mappingIndex`. For each concept it counts the dimensional entity's attributes that have at least one dimensional mapping (any status) reading an attribute of that concept's logical entities. One row per concept, in the Model tab's concept order: its colour, its name, "{n} attributes"; the row's title names the logical entities. An attribute fed from two concepts counts in both. The rows are not clickable, since there is no concept selection. See Q2 below. |
+| D15 | **New facts and dimensions already take the last concept used (Q-8).** The Cube tab's New fact and New dimension take `lastConcept()`, otherwise the first concept (`left-panel.tsx` l. 512). The toolbox's "New fact here" takes a concept frame's concept (D-46), otherwise the last, otherwise the first (`canvas-host.tsx` l. 181–186). New entity and the Model tab's "+" set the same preference (`panels-context.tsx` l. 56). "Create dimension from this…" takes its entity's concept (B-2). | as listed | Nothing to build; the "+" per concept stays in section 9. |
+| D16 | **REQ-210 adds three requirement markers to the star**, one `<i class="rmark">` each on Fact Sales, Dim Customer and Dim Date (D-32). `S15-layers` and `S15B-layers` compare the star with and without their own marks on the same data, so they still hold. The element guard ("Performance test") has no REQ-210. The demo's Order management project home gains one requirement in its count. | `requirement-marks.ts`; `e2e/slice-15a/S15-layers.spec.ts`, `e2e/slice-15b/S15B-layers.spec.ts` | Expected; the step's report lists it. |
+
+### Q1. X-5 against the code
+
+- **Links:** D1. No data change.
+- **Scope:** D3 and D6.
+  - E20's `feedsOf` becomes the plain `AttributeFeeds` record: InfoMapper's type, built by the module.
+  - The inputs go to `scope.attributes` and the new `scope.feeding`, not to `attributeItems`.
+  - The feeds' ids go to `scope.feeds`, and the inputs' entities to `scope.entities`.
+  - Their sources follow from the existing rule: `requirementFocusLit` lights every scope attribute's mappings with
+    their tables.
+- **Coverage:** D2 and D5. One level, no recursion: an approved feed with every input covered. The type warning on a
+  direct copy whose types differ (15c's panel) does not count against it, as in the spec's `attrOk` (question Y1).
+- **The lens:** D7 (the colours) and D8 (Focus).
+- **Shared code that changes:**
+  - `src/domain/model/requirements.ts`:
+    - `AttributeFeeds` and `lookupModel(model, feeds?)`;
+    - the dimensional rule in `coverageOf`;
+    - `scope.feeding`, `scope.feeds` and `RequirementCoverage.feedGaps`;
+    - `requirementScope`, `requirementCoverage` and `countsForCoverage` keep their signatures (the feeds are optional).
+  - `src/domain/model/requirement-index.ts`: the optional `feeds`, `attributeCoverage(id)`, and `EMPTY_SCOPE` with the new
+    sets.
+  - `src/domain/model/lit.ts`: `Lit.lines`, set by `requirementFocusLit`.
+  - `src/domain/source-changes/coverage.ts`: `coverageDelta(…, feeds?)`. For a lost dimensional item, the reasons come
+    from its feeds' inputs' mappings ("{attribute}: mapping back to review", as today), and from a feed's own status
+    when it is no longer approved.
+  - `src/canvas/`:
+    - `fade-canvas.tsx`: `FadeData.feeds`, `useRequirementIndex` and `litModules`;
+    - `coverage-colours.ts`;
+    - `TestHooks.tsx`, and `requirement-index-synthetic.ts` with a synthetic variant that has feeds.
+  - `src/app/`:
+    - the canvas page, both homes and the inspector;
+    - `requirement-panel.tsx` (the reasons);
+    - `wizard-model.ts` with `ImportData`;
+    - `sourceDeleteImpactAction`.
+  - `src/compose/view.ts`: `requirementFeeds(view)` and `moduleFeeds` (was `moduleRowFeeds`).
+  - The module: `cubeRequirementFeeds`.
+  - **The canvas's layers** (shared infrastructure in CLAUDE.md): `FadeLayer`'s lit lines and `CoverageLayer`'s rows get
+    new inputs (D7, D8). There is no new layer and no new element at rest.
+- **Earlier specs that cover it:** they have no dimensional content and must pass unchanged.
+  - slice-04a: S4A-01 to 04, 06 and 08 to 14 (the Requirements tab, the panel's coverage).
+  - slice-04b1: S4B1-01, 03 to 06, 08 and 09 (scope, colours, Focus, markers, "via").
+  - slice-04b2: S4B2-01, 02, 05 to 09 and 12 (cards, bars, traces under Focus).
+  - slice-04p: S4P-09, S4P-12 and the fading spec; S4P-11 measures the index in the browser.
+  - slice-05a S5A-04 and slice-06b S6B-02.
+  - slice-07b: S7B-02 and 06 (coverage in the import review and on the project home).
+  - slice-09 S9-04, and slice-13 S13-04 and 07.
+  - slice-15c S15-23: the "fed" coverage, which must not move.
+- **Unit tests:** `requirements.test.ts`, `requirement-index.test.ts`, `lit.test.ts`, `coverage-colours.test.ts`,
+  `requirement-card-data.test.ts`, `requirement-marks.test.ts`, `consistency.test.ts`, `raise.test.ts`,
+  `stats.test.ts` and `tree-data.test.ts`.
+
+### Q2. "Fed from concepts"
+
+- **Where:** a fold in a fact's and a dimension's panel, where "Feeding sources" stands for a logical entity, after
+  "Attributes and their logical feed" (D14).
+- **How:** derived from `ModuleView.data`, counting feeds in any status, as the card's "fed" bar does (P17). No new data.
+- **Examples from the seed:**
+  - Fact Sales: "Sales · 8 attributes" (Sales Order and Order Line; `ship_date_key` is not fed).
+  - Dim Customer: "Customer · 3 attributes" (Customer and Customer Address) and "Reference data · 1 attribute"
+    (Country).
+  - Dim Date: none.
+- **Does "any status" contradict a requirement's coverage?** No more than InfoMapper does already.
+  - A logical card's bar counts the attributes with **any** mapping ("{n} of {m} attributes mapped", `card-data.ts`
+    l. 263), while a requirement counts approved mappings only ("covered").
+  - "Fed" is InfoCube's "mapped"; "covered" stays the requirement's word at both levels, and the panel never says
+    "covered" for a feed.
+  - So Fact Sales reads "8 of 9 attributes fed" beside REQ-210's "0 of 3 covered", just as a logical entity may read
+    "4 of 4 mapped" beside a requirement at 0.
+- **Wording (proposal):**
+  - the title "Fed from concepts";
+  - a row "{concept}" with "{n} attribute" or "{n} attributes";
+  - the row's tooltip "From {Order Line, Sales Order}, any status";
+  - without a feed, "Not fed from the logical model yet."
+
+### Q3. The bus matrix (B-8, R-8, RP-10)
+
+- **Where it opens:** the Cube tab's "Bus matrix" button (title "Facts × dimensions"), after New fact and New dimension
+  (D11).
+  - Every role sees it; it is hidden while the tab is searched, as in the prototype.
+  - It needs InfoCube on, since the tab exists only then.
+- **What it shows** (prototype `openBusMatrix`): a dialog "{workspace} · InfoCube" / "Bus matrix" with an introduction.
+  - Facts are the rows, each with its grain, or "no grain" in the warning colour.
+  - Dimensions are the columns, each with "SCD {n}".
+  - Each cell has one dot per relationship (`factKeys` filtered by the dimension): ● with an active key, ○ without one
+    (also for an inactive link, R3).
+  - A dot's title is "{fact} uses {dimension} as {role}: {key}" or "…, but no key carries it"; without a role, the role
+    part is left out.
+  - A footer "Used by" says "{n} fact(s)" per dimension, "conformed" from two facts on, "unused" for none. It counts
+    facts, not relationships (R-8).
+  - Then a legend and Close.
+  - Without facts and dimensions, there is no dialog, only the toast "No facts or dimensions yet."
+- **What it opens:** a name opens its entity and a dot its relationship, and the dialog closes (D13).
+- **Order:** facts, then dimensions, as the Cube tab lists them (by concept, then in the model's order), so the two
+  agree. The prototype uses the model's order (a difference, P31).
+- **Conformed dimensions** are derived: two or more facts have a relationship to them. Nothing is stored.
+- **Cost:** D12.
+- **On the star:** 2 facts × 3 dimensions and 7 relationships. Fact Sales × Dim Date shows ●●: "Order date"
+  (`date_key`) and "Ship date" (`ship_date_key`).
+
+### Q4. REQ-210 in the star
+
+- **Where the rows go:** into `addSalesStar` (`src/modules/infocube/data/sales-star.ts`). It writes the star for
+  `npm run seed`, `reset-dev-data`, `npm run demo` and slice 15's fixtures, never the earlier specs' reseed.
+- **The rows** (prototype l. 1576–1577):
+  - One `requirement` row: key REQ-210, kind `data`, name "Net sales by customer segment and month".
+    - Description "Sales reports show net sales per customer segment per calendar month.", stored as sanitised HTML
+      and its text.
+    - Status `draft`, priority `must`, owner "Head of Sales", no reference, no parent.
+  - Three `requirement_link` rows: to Fact Sales.net_amount, Dim Customer.segment_code and Dim Date.month.
+  - No requirement card on the canvas (the prototype's `reqs: {}`).
+  - No change events, as for the rest of the star.
+  - The counter stays at 106 (O7): the key is written as given.
+- **The mappings are 15c's:**
+  - net_amount's transformation of Order Line.quantity, unit_price and discount_pct is In review;
+  - segment_code's direct copy of Customer.segment_code is approved;
+  - Dim Date has no feed;
+  - in the demo LDM, Customer.segment_code and Order Line's three attributes have no source mappings (F16,
+    `seed-model.ts`).
+- **S15-15's 0/3:** 0 of 3 covered, D-41's bar 0 · 2 · 1.
+  - net_amount: not approved (its feed is In review).
+  - segment_code: "logical feed not covered" (an approved feed, but Customer.segment_code has no source mapping).
+  - month: "not fed".
+- **What the lens and Focus show:**
+  - The lens colours the three rows and the four feeding rows orange: Order Line.quantity, unit_price, discount_pct and
+    Customer.segment_code.
+  - Under Focus, Fact Sales, Dim Customer, Dim Date, Order Line and Customer stay lit, with the two dimensional lines in
+    scope. net_amount's three paths are one line, and segment_code's is the other.
+- **"Their sources" are none in the demo.** So S15-15 adds an approved source mapping onto Customer.segment_code, from a
+  table placed on the star, as test data. Then the table lights under Focus and REQ-210 reads 1 of 3.
+
+### Q5. Q-8
+
+The spec's default is what the app does already (D15). Nothing to build; the "+" per concept stays in section 9.
+
+### Q6. The bench
+
+- **Today** (`npx tsx scripts/bench-requirement-index.ts`, Node, this laptop, 6 November 2026, two runs of 30 builds):
+  - medians 27.5 and 23.7 ms, fastest 19.3 and 18.5 ms, slowest 45.1 and 37.7 ms;
+  - the model: 500 requirements, 5,000 attributes, 2,000 mappings and 3,000 links; 53 of the 500 requirements covered;
+  - the browser's figure is slice 4p's S4P-11, 12.7 ms (the known limitation "The requirement index is rebuilt on every
+    write").
+- **With feeds:** `syntheticIndexInput({ feeds: true })` adds to the same model:
+  - 100 dimensional entities with 10 attributes each;
+  - 1,500 dimensional feeds reading the logical attributes, every fifth a transformation with three inputs, a third not
+    approved;
+  - 300 more links to dimensional attributes.
+  - The bench prints both variants in one run. `S4P-11-index.spec.ts` gets the same variant for the browser
+    (`__imIndexTiming("synthetic-feeds")`, measurement build).
+- **Bar (proposal):**
+  - The known limitation's rule stays the gate: an incremental rebuild only above a 50 ms median or a 100 ms p95 in the
+    browser.
+  - The feeds add **at most 25 %** to the build on the same model without them (Node, the same run).
+  - The figures go into the known limitation.
+
+### Q7. D-70
+
+- **The number is free:** `docs/decisions.md` ends at D-69 and AD-36. D-70 appears only in this PRD, and in the chore's
+  acceptance doc, which names it as part of this PRD.
+- **Draft:**
+
+> **D-70** Requirements on facts and dimensions, and the bus matrix (slice 15d). A requirement links to facts,
+> dimensions and their attributes as to logical ones (D-31's items). A dimensional attribute in scope brings its
+> dimensional mappings and the logical attributes they read, with their entities and their sources, into the scope;
+> they are not items. A dimensional attribute is covered when one of its dimensional mappings is approved and every
+> logical attribute it reads is covered by D-31's rule; an entity item when any of its attributes is covered. The lens
+> (D-32) colours the logical attributes that feed the scope by their own coverage, and Focus on a requirement lights
+> its dimensional mappings, not every line between the lit cards. The bus matrix, from the Cube tab, shows facts with
+> their grain against dimensions with their SCD type: one dot per relationship, filled when a key carries it, hollow
+> when none does, its tooltip naming the role and the key; a dimension used by two or more facts is conformed, by none
+> unused. A name opens its entity and a dot its relationship; nothing is stored. A fact's or a dimension's concept is
+> what it belongs to (a fact's business process or subject area, a dimension's subject), not where its data comes from:
+> it gives the colour, the Cube tab's groups and the concept frames. Where the data comes from is derived: "Fed from
+> concepts" in its panel lists the concepts of the logical entities that feed it, each with how many of its
+> attributes they feed, in any status.
+
+### Q8. Steps, test regime and closing
+
+1. **Step 1** (this one): the review. No application code.
+2. **Step 2 – domain and data:**
+   - `AttributeFeeds`, with the scope, coverage, `feedGaps`, the index's `attributeCoverage`, `coverageDelta` and
+     `Lit.lines`;
+   - the module's `cubeRequirementFeeds`, and `requirementFeeds(view)` and `moduleFeeds` in `src/compose/`;
+   - every caller listed in D4;
+   - the bus matrix's rows (`busMatrix(cubeIndex)`, with D12's grouping) and its action;
+   - REQ-210 in `addSalesStar`;
+   - the synthetic model and the bench with feeds;
+   - unit tests, one per rule above, and with the module absent each gives exactly today's result.
+   - **Tests:** slice 15's specs, the earlier specs of Q1's list, and CI. No full run, because nothing in CLAUDE.md's
+     list of shared infrastructure changes. Many pages read the index, so all of Q1's list runs, by folder.
+3. **Step 3 – the lens and the panels:**
+   - the colours of the feeding rows (D7), and `litModules` with `Lit.lines` (D8);
+   - the requirement panel's reasons (D5);
+   - "Fed from concepts" (D14, `PANEL_SECTIONS.entityFeeds`);
+   - the bus matrix (`ModuleTab.actions`, `TAB_DIALOGS`, the dialog);
+   - specs S15-15, S15-16, RP-10 and S15-24, and every new text for approval.
+   - **Tests:** the step's specs, Q1's list, every earlier folder that touches the overlay and fading (slice-04p,
+     04b1, 04b2, 06a's view-state bar, 15c), and CI.
+   - **One full run in this step,** because it changes the inputs of two of the canvas's layers, `FadeLayer` and
+     `CoverageLayer`. It is the last code step, so this run also counts as **15d's run before the merge** if step 4
+     changes docs only: one GitHub Actions run for both, as asked.
+4. **Step 4 – measurement, and the closing of slice 15:**
+   - the bench, and S4P-11 with feeds;
+   - the element guard (`S3B-15-elements.spec.ts` against S9-14's baseline): equal viewport counts on "Performance
+     test", which has neither REQ-210 nor dimensional content;
+   - `S15-layers` once with REQ-210's markers (D16);
+   - D-70 and the docs;
+   - the manual acceptance on the demo and on KB.
+   - A code change in this step means one more full run before the merge.
+
+**The docs at slice 15's closing (step 4):**
+
+- **`docs/decisions.md`:** D-70 after D-69, only once Łukasz approves the text. D-31 and D-32 get "(Extended by
+  D-70.)" if he agrees.
+- **`README.md`:**
+  - the status line: 15c is merged, and "the CI e2e chore is on its branch" is stale (it is merged); slice 15 is done
+    with 15d;
+  - the 15d sentence;
+  - the acceptance link "(15a, 15b)" becomes "(15a to 15d)";
+  - the bench's row.
+- **`CLAUDE.md`:**
+  - "What this is" gets 15d;
+  - the extension points: `AttributeFeeds` on `buildRequirementIndex`, `lookupModel` and `coverageDelta`;
+    `requirementFeeds` and `moduleFeeds` (was `moduleRowFeeds`); `Lit.lines`; `ModuleTab.actions` with `TAB_DIALOGS`;
+    `PANEL_SECTIONS.entityFeeds`;
+  - the InfoCube bullet's 15d line;
+  - the bench in "Commands".
+- **`docs/ideas.md`:**
+  - the plan: InfoCube iteration 1 is done; next comes the InfoMapper slice "InfoMapper's canvas and menus", then the
+    InfoCube backlog of section 9;
+  - E21's "via dimensional mapping" as an idea, if Y4 is answered "not now".
+- **`docs/inventory-prototype-vs-app.md`:** l. 38 and l. 280 ("requirements on facts and dimensions and the bus matrix",
+  15d) become present, with the deliberate differences P27–P31.
+- **`docs/known-limitations.md`:**
+  - "The requirement index is rebuilt on every write" gets the feeds' figures;
+  - "What slice 15c leaves for later" gains 15d's items (P30, the bus matrix's order);
+  - 15a's "What slice 15a leaves to 15b to 15d" has no 15d item among its four lines, so it is only checked.
+- **`docs/data-model-v2.md`:** nothing, since there is no data change.
+- **`docs/prd/slice-15-infocube.md`:** the status line (15d done) and section 8's 15d differences.
+- **`docs/prd/chore-ci-e2e.md`:** its status line still says "waiting for Łukasz's merge". It becomes "merged on
+  6 November 2026 (PR 39, `0c6bb1d`)", in step 4's docs commit, or now in a commit of its own if he prefers.
+
+### New and changed criteria
+
+| ID | Criterion | Test |
+| --- | --- | --- |
+| S15-15 | REQ-210 reads 0 of 3, with the bar 0 · 2 · 1 and D5's reasons. The lens colours its three rows and the four feeding rows. Focus lights Fact Sales, Dim Customer, Dim Date, Order Line and Customer with the two lines in scope, and not Fact Sales' other lines from Order Line. As test data, an approved source mapping onto Customer.segment_code lights its table and makes it 1 of 3. A link to Dim Product.sku from its panel, and its undo. | e2e + unit |
+| S15-16 | The bus matrix: 2 facts × 3 dimensions, with grains and SCD types; Dim Customer and Dim Date conformed; Dim Product used by 1 fact. A name opens its entity (on the canvas and not), and a dot its relationship. Readers open it too. Without facts and dimensions, the toast. | e2e + unit |
+| RP-10 | Fact Sales × Dim Date shows ●●, with the titles "Fact Sales uses Dim Date as Order date: date_key" and "… as Ship date: ship_date_key". Each dot opens its relationship. With `ship_date_key`'s FK flag cleared, its dot is ○ with "…, but no key carries it". | e2e |
+| S15-24 (new) | "Fed from concepts" on Fact Sales ("Sales · 8 attributes"), on Dim Customer ("Customer · 3", "Reference data · 1") and on Dim Date ("Not fed from the logical model yet."); then after a new feed from another concept, and after its undo. | e2e + unit |
+| S15-19 | CI and the runs of the test regime (GitHub Actions); the changed earlier tests listed with the reason (none expected beyond D16). | – |
+
+### Differences from the prototype that 15d touches
+
+- **P27:** the lens is the app's (D-32, slice 4b-1). Selecting REQ-210 colours rows without fading, and Focus fades. The
+  prototype's lens always fades.
+- **P28:** a linked fact or dimension brings no attributes into the scope (D-31). In the prototype, an entity link adds
+  all of the entity's attributes, and so all their feeds.
+- **P29:** Focus on a requirement lights only its dimensional mappings (D8), as in the prototype. Focus on anything else
+  keeps 15c's "both cards lit" rule.
+- **P30:** no "via" through feeds, and no requirement marker on the feeding logical cards (D9, D-34). The prototype shows
+  REQ-210 on Customer and Order Line.
+- **P31:** the bus matrix opens objects by the app's go-to rule, without a toast, and lists facts and dimensions in the
+  Cube tab's order (D13, Q3).
+- **New in the app:** the gap reasons "not fed" and "logical feed not covered" (D5; the prototype gives no reason per
+  item), and "Fed from concepts" (the prototype has none).
+
+### Questions for Łukasz
+
+- **Y1.** A dimensional mapping counts for coverage without a type check, as in the spec's `attrOk`; the direct copy's
+  type warning stays a warning. Agreed? Or should a direct copy whose types differ not count, like D-31's type conflict?
+- **Y2.** Focus on a requirement lights only its dimensional mappings (D8, `Lit.lines`), while every other Focus keeps
+  the card rule. Agreed?
+- **Y3.** The reasons "not fed" and "logical feed not covered" (D5), with the three buckets and D-41's bar unchanged.
+  Agreed, or a fourth bucket?
+- **Y4.** D-34 stays as it is: no "via" through feeds and no marker on the feeding logical cards (P30). Agreed, or "via
+  dimensional mapping" now?
+- **Y5.** The bus matrix gets its rows from a server action when it opens (D11), for every role. Agreed, or rows on the
+  page?
+- **Y6.** "Fed from concepts" where "Feeding sources" stands, not clickable, counting feeds in any status (D14, Q2).
+  Agreed?
+- **Y7.** The bench's bar (Q6): the known limitation's rule, and the feeds add at most 25 %.
+- **Y8.** The four steps and their test regime (Q8), with step 3's run counting as the run before the merge.
+- **Y9.** D-70's draft, and "(Extended by D-70.)" on D-31 and D-32.
+- **Y10.** The new texts below.
+
+### New and changed user-facing texts (Q9, for approval)
+
+**The requirement panel's reasons for a gap (D5):**
+
+- "not fed": a fact's or a dimension's attribute without a dimensional mapping (a logical one keeps "unmapped").
+- "logical feed not covered": an approved dimensional mapping whose logical attributes are not all covered.
+- "not approved": unchanged, also for a dimensional attribute whose mappings are not approved.
+
+**The Cube tab and the bus matrix** (prototype `openBusMatrix`, l. 2206 and 5650–5663):
+
+- The button "Bus matrix", with the title "Facts × dimensions".
+- The dialog's head "{workspace} · InfoCube", and its title "Bus matrix".
+- The introduction: "Which dimensions each fact uses. A dimension used by more than one fact is conformed: it must mean
+  the same in all of them. Built from the relationships; click a name to open it."
+- The corner "Fact" with "grain" below it; under a fact, its grain or "no grain"; under a dimension, "SCD {n}".
+- A dot's title:
+  - "{fact} uses {dimension} as {role}: {key}";
+  - without a role, "{fact} uses {dimension}: {key}";
+  - without a key, "{fact} uses {dimension} as {role}, but no key carries it".
+- The footer: "Used by"; "1 fact" or "{n} facts"; "conformed"; "unused".
+- The legend: "● the fact carries the dimension's key · ○ related, key missing".
+- The button "Close".
+- The toast "No facts or dimensions yet."
+- Not taken over from the prototype: "It is not on this canvas; its details are on the right." (D13).
+
+**"Fed from concepts"** (D14, Q2; not in the prototype):
+
+- The fold's title "Fed from concepts".
+- A row: "{concept}" with "1 attribute" or "{n} attributes"; its title "From {Order Line, Sales Order}, any status".
+- Without a feed: "Not fed from the logical model yet."
+
+**The seed's REQ-210** (the prototype's texts):
+
+- the name "Net sales by customer segment and month";
+- the description "Sales reports show net sales per customer segment per calendar month.";
+- the owner "Head of Sales".
