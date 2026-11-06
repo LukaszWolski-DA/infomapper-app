@@ -1,6 +1,6 @@
 # Chore – Full e2e runs in GitHub Actions
 
-Status: **step 1 done and answered** (Łukasz, 6 November 2026); **step 2 done** (6 November 2026), waiting for Łukasz's decisions on its four failures. Branch `chore/ci-e2e`, from `main` at tag `slice-15c` (assumption A1).
+Status: **step 1 done and answered** (Łukasz, 6 November 2026); **step 2 done and answered** (6 November 2026); **step 3 done** (6 November 2026): two full runs, the pull request; waiting for Łukasz's merge. Branch `chore/ci-e2e`, from `main` at tag `slice-15c` (assumption A1).
 PRD file: `docs/prd/chore-ci-e2e.md`; step 1 writes `docs/prd/chore-ci-e2e-acceptance.md`. A chore: no change to the
 application's behaviour, the data model or the local data file. Step 1 checks this PRD against the code, the e2e setup
 and GitHub (CLAUDE.md, "How we work").
@@ -39,6 +39,12 @@ Where this section and a later one disagree, this section wins. The findings beh
   `tests/e2e-parts.test.ts` covers it.
 - **The memory log's machine half on Linux:** the smallest portable way (`os.freemem()` or `/proc/meminfo`); Windows's
   stays as it is.
+- **The trial input `parts`** (added in step 2, kept by Łukasz's answer 5 to step 2): a dispatch with `parts` (e.g.
+  `1 7`) runs those parts only, for trying the workflow; it is not a full run (its summary and CLAUDE.md say so).
+- **Step 2's four failures** (Łukasz's answers to step 2, in the acceptance doc): S6A-07 and S10A-05 fixed in the tests
+  without changing an assertion; S2B-06's right drag (off Windows) and S6A-10 at 1,201 px (on Linux) moved unchanged
+  into tests of their own and marked `test.fail` with a condition, each with its known limitation; both fixed in the
+  slice "InfoMapper's canvas and menus". CI-03's "pass" counts these as expected failures.
 - **Step 2** as section 4 says, with the above: the workflow made to work with `workflow_dispatch` runs of a part or a
   folder at a time (not full runs), then one full run on the branch, its failures checked with `rounds` 3. The branch is
   pushed for the runs; no pull request yet.

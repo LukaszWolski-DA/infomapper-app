@@ -173,15 +173,36 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 - `domain`: Vitest unit tests next to the code (`*.test.ts`). Every business rule gets a test.
 - Each slice: Playwright end-to-end tests in `e2e/slice-XX/`, one per acceptance criterion in the PRD, named after
   the criterion id. They run against a seeded local database, never against production.
-- **Test runs** (Łukasz, 4 November 2026; one regime for every slice, replacing slice 4b-2's and 5a's):
+- **Test runs** (Łukasz, 4 November 2026; one regime for every slice, replacing slice 4b-2's and 5a's; the full run and
+  the single-file check in GitHub Actions since chore CI e2e, 6 November 2026):
   - After each step: the slice's specs, the earlier specs of what the step touched, and CI (lint, typecheck, unit
-    tests). A failing test is run three times on its own to tell a flake from a bug.
+    tests). A failing test is run three times on its own to tell a flake from a bug: the single-file check below.
   - **Exception:** a step that touches shared infrastructure (undo and change groups, the save chain, the canvas's
-    layers, the table registry, the local adapter) runs one full e2e run (`npm run e2e`, from scratch, no dev server
-    running) in that step, and its report says why.
+    layers, the table registry, the local adapter) runs one full e2e run in that step, and its report says why.
   - Before a merge: one full e2e run.
-  - Report each full run's time and its parts' times. Keep a failing run's traces (`test-results/part-<n>/`) and log
-    before any rerun. PRDs no longer call a slice small or large.
+  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its seven parts
+    (`e2e/parts.ts`) side by side on GitHub's Linux runners, each with its own fresh dev server, no retries; one job
+    merges their reports. Start it by hand (`gh workflow run e2e.yml --ref <branch>`, or "Run workflow" on the Actions
+    page) or with the label `full-e2e` on the pull request (it tests the branch's head commit). A push starts none; a
+    second full run for the same branch cancels the first. A run with the input `parts` (e.g. `1 7`) is for trying the
+    workflow and is **not a full run** (its summary says so).
+  - **The single-file check:** `gh workflow run e2e.yml --ref <branch> -f files="e2e/<folder>/<spec>.ts ..." -f
+    rounds=3`: `rounds` jobs side by side, each with its own fresh dev server, each running the files once (paths under
+    `e2e/` only, checked before a server starts).
+  - **What a run leaves** (14 days, on the run's page): the job summary (the commit, counts, failed tests, each part's
+    time, heap peak against the runner's restart threshold, lowest available memory and restarts printed, and the folder
+    times); the artifact `report` (the merged HTML report with the failures' traces, and `report.json`); per part
+    `part-<n>` (`test-results/part-<n>/`: traces, `server.log` with the dev server's output, the memory log
+    `e2e-memory-ci-part<n>.*.jsonl`, `part.json`); per check round `check-round-<n>`. Download with
+    `gh run download <run id> -n <artifact>`. Never upload `.data/` (it holds the session secret).
+  - Report each full run's link, commit, wall-clock, its parts' times and heap peaks, and passed / failed / skipped /
+    expected failures. Expected failures are `test.fail` with a condition and a known limitation, only on Łukasz's
+    decision (S2B-06's right drag off Windows, S6A-10 at 1,201 px on Linux). PRDs no longer call a slice small or large.
+  - **The local run is the fallback** when GitHub is down: `npm run e2e` (from scratch, no dev server running) runs the
+    same parts one after another on the laptop (about 95 minutes); a single-file check is the same `npm run e2e --
+    <file>` three times, one after another, each with a fresh server. Keep a failing local run's traces
+    (`test-results/part-<n>/`) and log before any rerun. The e2e run has been run in Europe/Warsaw only (the workflow
+    sets `TZ`).
 - Use `data-testid` attributes for elements tests need; name them after the components (e.g. `card-entity`,
   `panel-inspector`, `nav-breadcrumbs`).
 - **Łukasz's test model** (since slice 8's manual acceptance, 28 October 2026): the organization KB with the workspace
@@ -221,7 +242,11 @@ npm run lint             # ESLint, including the layer rules (eslint-plugin-boun
 npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
-npm run e2e -- --part 2   # one of the full run's four parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
+npm run e2e -- --part 2   # one of the full run's seven parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
+npm run e2e -- --list    # each part's files, as CI runs them (--part <n>: one part); starts no server
+gh workflow run e2e.yml --ref <branch>                                          # the full run in GitHub Actions (or the label full-e2e on the pull request)
+gh workflow run e2e.yml --ref <branch> -f files="e2e/slice-06a/S6A-07.spec.ts" -f rounds=3   # a single-file check: 3 jobs side by side, each with a fresh server
+gh run download <run id> -n report                                              # a run's merged HTML report and report.json (also part-<n>, check-round-<n>)
 E2E_MEMORY_LOG=1 npm run e2e   # with the e2e server's and the machine's memory every 5 s (.data/e2e-memory-<time>-part<n>.*; scripts/e2e-memory-report.ts)
 MEASURE=1 npx playwright test e2e/slice-01a/S1A-14.spec.ts   # canvas performance in headed Chrome (S1A-14)
 MEASURE=1 npx playwright test e2e/slice-01b/S1B-09.spec.ts   # card resize (C-09), same way
@@ -548,13 +573,17 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   and total objects, paint, layerize; as `S6A-09-hand.spec.ts` does) rather than unprepared medians to the screen, whose
   run-to-run spread (up to 12 ms in slice 6a) is larger than what is measured.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
-- **The full run in four parts** (chore e2e reliability, P2 B; the fourth since slice 14b): `npm run e2e`
-  (`scripts/e2e.ts`) runs the folders in four parts (`e2e/parts.ts`, `PART_STARTS`: from `slice-03a`, `slice-07a`,
-  `slice-10a`; `tests/e2e-parts.test.ts`), each with its own fresh dev server, and merges their blob reports into
-  one result (`playwright-report/`); failure traces are in `test-results/part-<n>/`. A server's heap grows about 6 MB a
-  test, and on 8 GB RAM a heap of 2 GB or more under paging timed out sign-ins; Next.js restarts the server at 80 % of
-  its heap limit (3,255 MB here). Each part peaks at about 1.25 to 1.45 GB and takes 20 to 26 minutes (slice 14b's closing). When a part's heap (`E2E_MEMORY_LOG=1`) comes
-  near 2 GB, move the cuts or add a part. The full run refuses to start while port 3200 is in use.
+- **The full run in seven parts** (chore e2e reliability, P2 B; seven since chore CI e2e): `npm run e2e`
+  (`scripts/e2e.ts`) runs the folders in seven parts (`e2e/parts.ts`, `PART_STARTS`: from `slice-02b`, `slice-04a`,
+  `slice-07a`, `slice-08`, `slice-10c`, `slice-14a`; `tests/e2e-parts.test.ts`), each with its own fresh dev server, one
+  after another locally and side by side in CI, and merges their blob reports into one result (`playwright-report/`);
+  failure traces and the server's output (`server.log`, `scripts/e2e-server.ts`) are in `test-results/part-<n>/`.
+  `npm run e2e -- --list` prints each part's files (`--part <n>`: one part); CI runs exactly these. A server's heap
+  grows about 6 MB a test, and on 8 GB RAM a heap of 2 GB or more under paging timed out sign-ins; Next.js restarts the
+  server at 80 % of its heap limit (half the RAM: 3,255 MB on the laptop, 6,431 MB on GitHub's 16 GB runner). In chore
+  CI e2e's runs each part peaked at about 0.9 to 1.4 GB and took 5 to 11 minutes on the runner. When a part's heap
+  (`E2E_MEMORY_LOG=1`; the summary in CI) comes near 2 GB, move the cuts or add a part. The local full run refuses to
+  start while port 3200 is in use.
 - **Fonts** (P3 B): IBM Plex is hosted in `src/app/fonts/ibm-plex/` (IBM's unmodified WOFF2 files, OFL 1.1, `README.md`
   with their checksums) and loaded through `next/font/local`; no build or start fetches fonts. "Plex" is a Reserved Font
   Name: never subset or change the files; replace them only with other unmodified files from IBM.

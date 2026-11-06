@@ -728,7 +728,57 @@ the 14 days the dependency rule asks for. `package.json` has `"overrides": { "@t
   8 days old, so removing it would break the 14-day rule again. `fast-equals` stays at 5.4.3. **Review again from
   28 October 2026** (5.4.5 is then 14 days old), with the `next` pull request, using the same steps.
 
+## Found on GitHub's Linux runners (chore CI e2e, 6 November 2026)
+
+Both found by the first full run in GitHub Actions; both pass on Windows. On Łukasz's decision the failing assertion is
+a test of its own, marked as an expected failure (`test.fail`) where the limitation applies; both are fixed in the slice
+"InfoMapper's canvas and menus" (`docs/ideas.md`).
+
+### A right-button pan opens the toolbox on Linux and macOS
+
+On Linux and macOS the `contextmenu` event comes on the right button's press, before any move, so a right-button pan
+opens the toolbox. The canvas opens the toolbox in `onContextMenu` (`src/canvas/CanvasModes.tsx:198`) unless the mouse
+has moved more than `CLICK_SLOP` since the right button went down (`rightDown`, `onPointerDownCapture`, line 150);
+Windows fires `contextmenu` when the button comes up, after the drag, so there the check works. Middle-button and
+Space + drag pans are not affected. Seen on Linux (GitHub's runner); macOS fires `contextmenu` the same way but has not
+been run. Test: "S2B-06: inside a frame, a right drag pans; nothing moves, no toolbox"
+(`e2e/slice-02b/S2B-06.spec.ts`), an expected failure on every platform but Windows.
+
+- **Later:** fixed in the slice "InfoMapper's canvas and menus" (for example: open the toolbox on the right button's
+  release when the press did not move, and ignore a `contextmenu` that comes before it).
+
+### The top bar overflows by 1 px at 1,201 px on Linux
+
+At 1,201 px, with the working context on and both panels shown, the top bar's content (`bar-top`) is 1 px wider than
+the bar with Linux's text drawing, so the bar scrolls by 1 px. 1,201 px is the narrowest width of its step (Focus, Changes and
+the notation still in the bar, the names' check boxes in "More", the working context's label cut at 90 px), and there
+the three switchers already shrink to their 52 px minimum (`top-bar.tsx`): the bar's only slack. The same IBM Plex
+files measure wider on the runner: the layer switch (`switch-layer`) 137 px against 136 on Windows, the notation switch
+(`switch-notation`) 84 against 83, the user indicator (`indicator-user`) 79 against 77; 4 px together, against the 3 px
+the workspace switcher still had above its minimum on Windows. Every other width passes. Test: "S6A-10: at 1,201 px the
+top bar does not scroll" (`e2e/slice-06a/S6A-10.spec.ts`), an expected failure on Linux only.
+
+- **Later:** fixed in the slice "InfoMapper's canvas and menus" without depending on font metrics: the working
+  context's label (`button-context`, `working-context.tsx`) as the bar's flexible item (it may shrink, the browser
+  truncates it, the full name stays its tooltip) instead of the fixed `max-w-[90px]` step, so a font's extra pixels
+  come out of the label, never from the bar's scroll.
+
 ## End-to-end tests (slice 1a, step 6)
+
+### The full e2e run in GitHub Actions (chore CI e2e, 6 November 2026)
+
+Since chore CI e2e the full run is the workflow "E2E" (`.github/workflows/e2e.yml`): the seven parts of `e2e/parts.ts`
+side by side on GitHub's Linux runners (4 cores, 16 GB), each with its own fresh dev server, no retries, in about 12
+minutes instead of the laptop's 93 to 97 (CLAUDE.md, "Testing").
+
+- **What it settles:** the load-driven slowdowns of local full runs (sign-in timeouts under memory pressure, the dev
+  server's restart at its threshold, below): on the runner the heap limit is 8,039 MB and the restart threshold
+  6,431 MB, and the parts' heaps peaked at 931 to 1,405 MB (at most 22 % of it), with at least 9 GB available.
+- **What it leaves:** a run on Linux, not on the Windows laptop: two of the app's limitations show only there (above,
+  "Found on GitHub's Linux runners"), and a platform difference may hide the other way; the local run stays the
+  fallback when GitHub is down. Production-build e2e runs wait for the database slice (AD-31); one worker per part.
+- **Time zone:** the e2e run has not been run in another time zone than Europe/Warsaw (the workflow sets `TZ`).
+
 
 ### “The destination stream closed early” in the e2e server log
 

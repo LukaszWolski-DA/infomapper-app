@@ -498,3 +498,83 @@ By part (laptop → runner, s): 1: 909 → 493; 2: 854 → 420; 3: 982 → 554; 
 **Left for step 3:** your decisions on the four; the docs (section 7, the known limitation with the time-zone sentence,
 CLAUDE.md with both ways of the single-file check); the summary's first line (it prints the merged report's own
 "duration", which means nothing for parts run side by side); the second full run; the pull request.
+
+### Łukasz's answers to step 2 (6 November 2026)
+
+1. **S6A-07 and S10A-05:** fix the tests as proposed (S6A-07 waits for the stored note before the reload; S10A-05
+   holds the refusal with `holdUntil` until Delete is clicked). No assertion changes. For S6A-07, also check the app:
+   when a save is queued and not yet sent and the page is reloaded or closed, does D-66's warning before unload appear
+   (is a queued save counted as unsaved)? Answer from the code with file and line; if it is not counted, add a known
+   limitation ("a queued save can be lost on reload without a warning") and do not fix it here.
+2. **S2B-06:** no app change. The failing check is an expected failure on every platform but Windows (`test.fail` with
+   a condition on `process.platform` and a description naming the known limitation); if the spec checks more than the
+   failing assertion, that assertion moves unchanged into a test of its own first, so the expected failure covers only
+   it. The known limitation: on Linux and macOS the `contextmenu` event comes on the button's press, before any move,
+   so a right-button pan opens the toolbox (`src/canvas/CanvasModes.tsx:198`); fixed in the slice "InfoMapper's canvas
+   and menus".
+3. **S6A-10:** no app change and no slack in the assertion. The same treatment as S2B-06, on Linux only and only at
+   1,201 px (a test of its own if needed). The known limitation names the element that is 1 px too wide and a fix that
+   would not depend on font metrics; fixed in the same later slice.
+4. **`docs/ideas.md`:** appendix A's entry as written, plus two items at its end: "4. A right-button pan opens the
+   toolbox on Linux and macOS (S2B-06, known limitation)." and "5. The top bar overflows by 1 px at 1,201 px with
+   Linux's text drawing (S6A-10, known limitation)." This chore marked done in the plan.
+5. **Keep the trial input `parts`;** CLAUDE.md says a run with it is not a full run.
+
+Then the rest of step 3 as the PRD says, two full runs in a row on the final commit, and the pull request (no merge).
+
+**Answer to 1, from the code: a queued save is counted.** A note's status (the ✓ and ↺ in its header) is saved by
+`useNotes`' `update` (`src/canvas/useNotes.ts:418`) through `save` (line 176), which puts the write on the canvas's
+queue with `enqueue` (line 180). `enqueue` (`src/canvas/ModelCanvas.tsx:633-640`) chains the write behind the note's
+earlier ones and hands the whole chain, waiting included, to `track(queue, next)` (line 639) at the moment it is
+queued, before anything is sent; `track` (`src/ui/leave-guard.ts:52-63`) holds the guard until that promise settles,
+and `onBeforeUnload` (line 22) asks while anything holds. The panels' saves do the same: `rowSaves.saveRows` returns
+`track(this, result)` for a save still waiting for its row's tail (`src/ui/row-saves.ts:130`), and undo and redo through
+`exclusive` (line 153). A save that waits in Next.js's own queue of server actions (S6A-07's case: the app's write had
+called the action, whose POST waited behind the first one's) is still an unsettled promise in the app's chain, so it is
+held too. So no known limitation is added. Why the reload in S6A-07 went ahead all the same (the trace shows it did,
+aborting the POST) is Playwright's handling of the dialog in a spec without a handler, not looked into further; it
+does not change the answer.
+
+## Step 3 – the decisions, the docs, two full runs
+
+(6 November 2026.) No local e2e run (a dev server ran on port 3000); every e2e run below is a GitHub Actions run.
+
+### What changed
+
+| File | What | Why |
+| --- | --- | --- |
+| `e2e/slice-06a/S6A-07.spec.ts` | before the reload, waits until both notes' statuses are stored (`noteWithText`) | answer 1 |
+| `e2e/slice-10a/S10A-05.spec.ts` | the delete cut by a refusal: the stale refusal's answer held (`holdUntil`, slice 13) until the Delete is queued behind it; **also** the third test (a save behind a delete): the status's answer held until the note is queued | answer 1; the third test failed 1 of 3 in the first check below, the same race (the panel closed under the Tab), the same fix |
+| `e2e/slice-02b/S2B-06.spec.ts` | the right-drag pan moved unchanged into "S2B-06: inside a frame, a right drag pans; nothing moves, no toolbox", `test.fail(process.platform !== "win32", …)`; the setup and the pan into `openArea` and `panFrom` | answer 2 |
+| `e2e/slice-06a/S6A-10.spec.ts` | the scroll at 1,201 px moved unchanged into "S6A-10: at 1,201 px the top bar does not scroll" (2,560 → 1,300 → 1,201 px, the widths printed), `test.fail(process.platform === "linux", …)`; the loop checks every other assertion at 1,201 px as before | answer 3 |
+| `scripts/e2e-summary.ts` | the first line counts expected failures (`test.fail` that failed, which Playwright counts as "expected") and lists them; no longer the merged report's own duration | step 2's note |
+| `CLAUDE.md`, `README.md` | "Testing" and "Commands": the full run is the workflow's run on the commit the report names, how to start it, the single-file check with `rounds`, `parts` not a full run, what a run leaves and where, expected failures, the local run as the fallback; seven parts | section 7, answer 5 |
+| `docs/known-limitations.md` | "Found on GitHub's Linux runners" (the two limitations); "The full e2e run in GitHub Actions" (what it settles, what it leaves, the time zone) | answers 2 and 3, section 7 |
+| `docs/ideas.md` | appendix A's entry with items 4 and 5 (after item 3, before its closing paragraph); the chore done in the plan | answer 4 |
+| `docs/prd/chore-ci-e2e.md` | the status; section 0: the `parts` input and the four failures | step 3 |
+
+**S6A-10: the element.** At 1,201 px the runner printed (`check-round-3` of run 42190898919) against the laptop's
+(15c's step 3 log): the three switchers at their 52 px minimum (laptop 52, 55, 52), `switch-layer` 137 (136),
+`switch-notation` 84 (83), `indicator-user` 79 (77), the rest equal. Linux's text drawing makes three labelled controls
+4 px wider together; the laptop's only slack at that width was 3 px of the workspace switcher. The known limitation
+names them and the fix: the working context's label as the bar's flexible item instead of a fixed 90 px step.
+
+### Checks on their own
+
+- **Run [42190898919](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42190898919)** (commit `249e391`,
+  the four files, rounds 3): S6A-07 3 of 3; S10A-05's delete test 3 of 3; both expected failures failed as marked in
+  every round (S2B-06's right drag, S6A-10 at 1,201 px), and their other tests passed; **S10A-05's third test failed 1
+  of 3** (round 2: `note.press("Tab")` waited 60 s for a panel the delete had closed).
+- **Run [42192220732](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42192220732)** (commit `011d936`,
+  S10A-05 and S6A-07, rounds 5): all three S10A-05 tests and S6A-07 passed in 5 of 5 rounds.
+
+### CI-02 and CI-07 locally
+
+`npm run e2e -- --list` on the laptop: 57, 57, 64, 46, 48, 56 and 57 files in parts 1 to 7, 385 in all, as in step 2.
+Lint, typecheck and unit tests (141 files, 1,766 tests) pass. The workflow's triggers are `workflow_dispatch` and
+`pull_request` `labeled` only: no `push`.
+
+### The two full runs
+
+On the final commit, one after the other with no commit between them: their links, figures and the criteria with
+their evidence are in the pull request's description (so that the tested commit stays the branch's head).
