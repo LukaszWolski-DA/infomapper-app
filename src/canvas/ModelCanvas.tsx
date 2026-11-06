@@ -33,7 +33,7 @@
 // shown (open, and resolved unless hidden); Fit everything counts the notes shown; resolved notes are hidden when the person chose so (`hideResolved`);
 // `focusNoteId` selects a note on arrival (the project home's open notes).
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   applyNodeChanges,
   ReactFlow,
@@ -461,7 +461,10 @@ export function ModelCanvas({
       const [x, y, zoom] = view ? [view.x, view.y, view.zoom] : storeApi.getState().transform;
       const next = { x, y, zoom, left: left ?? Math.round(root.getBoundingClientRect().left) };
       const last = lastStored.current;
-      if (onlyIfChanged && last && last.left === next.left && Math.abs(last.x - x) < 0.01 && Math.abs(last.y - y) < 0.01 && Math.abs(last.zoom - zoom) < 1e-6) return;
+      // before the first view is set there is nothing of this canvas's to store (React Flow's default view)
+      if (onlyIfChanged && !last) return;
+      // the view only: a window that changes the left edge alone (crossing 1,000 px) is no move of the view
+      if (onlyIfChanged && last && Math.abs(last.x - x) < 0.01 && Math.abs(last.y - y) < 0.01 && Math.abs(last.zoom - zoom) < 1e-6) return;
       lastStored.current = next;
       writePreference(viewKey(canvasId), JSON.stringify(next));
     },
@@ -492,6 +495,16 @@ export function ModelCanvas({
   // change's end: the view shown now is stored instead, with the left edge of now, unless it is what the app's own
   // change already stored (slice 16, item 6): that late call is no new move
   const onMoveEnd = useCallback(() => storeView(undefined, undefined, true), [storeView]);
+  // a move less than 150 ms before the page is left (a link, a reload, a closed tab) is stored before it goes: on
+  // `pagehide`, and when the canvas unmounts (a layout effect's cleanup runs while its root is still in the document)
+  useLayoutEffect(() => {
+    const flush = () => storeView(undefined, undefined, true);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [storeView]);
 
   // ---- the grid (D-12): one CSS background behind the pane, on its own layer. Panning moves that layer by less than
   // one grid step (no repaint); zooming changes the step. Set without a render. ----
