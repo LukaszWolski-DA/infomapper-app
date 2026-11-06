@@ -5,13 +5,13 @@
 // A step for the development file (`npm run seed`, `npm run reset-dev-data`) and slice 15's specs only: earlier specs'
 // data has no InfoCube data and no licence, so their counts and the element guard stay as they were. Since slice 15b
 // the facts' measures, Dim Date's roles (Order date, and Ship date with `ship_date_key`, RP-F) and every relationship's
-// key link; dimensional mappings come with 15c, REQ-210 with 15d.
+// key link. Since slice 15c the prototype's 20 dimensional mappings (`cubeDemo`, `cubeDemoV2`); REQ-210 comes with 15d.
 
 import { seedId } from "@/data/local/seed-model";
 import type { DevDb } from "@/data/local/schema";
 import type { Uuid } from "@/domain/ids";
 import { DEFAULT_CANVAS_LOOK, type Attribute, type CanvasItem, type LogicalType } from "@/domain/types";
-import type { Additivity, CubeEntity, CubeRole, ScdType } from "../domain/types";
+import type { Additivity, CubeEntity, CubeMappingKind, CubeMappingStatus, CubeRole, ScdType } from "../domain/types";
 import type { InfoCubeDb } from "./tables";
 
 /** The seed's fixed ids this step reads (`SEED_IDS` in `src/data/local/seed.ts`, which this module may not import). */
@@ -64,6 +64,37 @@ const MEASURES: [fact: string, attribute: string, additivity: Additivity][] = [
   ["orders", "line_count", "additive"],
 ];
 
+const DATE_KEY_RULE = "CONVERT(int, FORMAT(order_date, 'yyyyMMdd'))";
+const CUSTOMER_KEY_RULE = "Look up customer_key in Dim Customer by customer_id, the version valid on order_date";
+
+/**
+ * The prototype's dimensional mappings (slice 15c; `cubeDemo` l. 1556–1565, `cubeDemoV2` l. 1580–1599): the target as
+ * "{star key}.{attribute}", the inputs as "{demo model key}.{attribute}". Approved unless named; unfed: Dim Date's
+ * attributes, the dimensions' keys and `ship_date_key`. IC-10's figures follow: Order Line feeds six, four approved.
+ */
+const MAPPINGS: [target: string, inputs: string[], kind: CubeMappingKind, rule: string | null, status: CubeMappingStatus, note?: string][] = [
+  ["sales.date_key", ["order.order_date"], "transform", DATE_KEY_RULE, "approved"],
+  ["sales.customer_key", ["order.customer_id"], "transform", CUSTOMER_KEY_RULE, "approved"],
+  ["sales.product_key", ["line.product_id"], "transform", "Look up product_key in Dim Product by product_id", "approved"],
+  ["sales.order_number", ["order.order_number"], "direct", null, "approved"],
+  ["sales.quantity", ["line.quantity"], "direct", null, "approved"],
+  ["sales.unit_price", ["line.unit_price"], "direct", null, "approved"],
+  ["sales.discount_pct", ["line.discount_pct"], "direct", null, "approved"],
+  ["sales.net_amount", ["line.quantity", "line.unit_price", "line.discount_pct"], "transform", "quantity * unit_price * (1 - discount_pct / 100)", "review"],
+  ["cust.customer_number", ["customer.customer_number"], "direct", null, "approved"],
+  ["cust.segment_code", ["customer.segment_code"], "direct", null, "approved"],
+  ["cust.city", ["address.city"], "direct", null, "draft", "A customer can have several addresses. Which one feeds the dimension: the latest, or the billing address?"],
+  ["cust.country_name", ["country.country_name"], "direct", null, "approved"],
+  ["prod.sku", ["product.sku"], "direct", null, "approved"],
+  ["prod.product_name", ["product.product_name"], "direct", null, "approved"],
+  ["prod.category_code", ["product.category_code"], "direct", null, "approved"],
+  ["orders.date_key", ["order.order_date"], "transform", DATE_KEY_RULE, "approved"],
+  ["orders.customer_key", ["order.customer_id"], "transform", CUSTOMER_KEY_RULE, "approved"],
+  ["orders.order_number", ["order.order_number"], "direct", null, "approved"],
+  ["orders.total_amount", ["order.total_amount"], "direct", null, "approved"],
+  ["orders.line_count", ["line.order_line_id"], "transform", "COUNT(order_line_id) per order", "draft"],
+];
+
 /** The prototype's positions on "Sales star": the logical model on the left, the star on the right. */
 const LAYOUT: [kind: "entity" | "star", key: string, x: number, y: number][] = [
   ["entity", "customer", 40, 40],
@@ -95,6 +126,8 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
   const cubeEntities = (db.cube_entity ??= []);
   const cubeMeasures = (db.cube_measure ??= []);
   const cubeKeys = (db.cube_key ??= []);
+  const cubeMappings = (db.cube_mapping ??= []);
+  const cubeMappingInputs = (db.cube_mapping_input ??= []);
 
   for (const [key, concept, name, role, definition, grain, scd] of STAR) {
     db.entity.push({
@@ -154,6 +187,23 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
       to_role: null,
     });
     cubeKeys.push({ ...std(`cube-key:${relationship}`), relationship_id: id(relationship), attribute_id: id(`attribute:${fact}.${key}`) });
+  }
+
+  for (const [target, inputs, kind, rule, status, note] of MAPPINGS) {
+    const mapping = `cube-mapping:${target}`;
+    cubeMappings.push({
+      ...std(mapping),
+      attribute_id: id(`attribute:${target}`),
+      kind,
+      rule_expression: rule,
+      status,
+      note: note ?? null,
+      approved_by: status === "approved" ? t.authorId : null,
+      approved_at: status === "approved" ? at : null,
+    });
+    inputs.forEach((input, i) => {
+      cubeMappingInputs.push({ ...std(`${mapping}<${input}`), mapping_id: id(mapping), attribute_id: model(`attribute:${input}`), sort_order: i });
+    });
   }
 
   const canvasId = salesStarCanvasId(ws);

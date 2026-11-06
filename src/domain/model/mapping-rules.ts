@@ -37,31 +37,44 @@ export function checkMappingShape(kind: MappingKind, ruleExpression: string | nu
 }
 
 /**
+ * Where a kind of mapping is in the change log (slice 15c, C11): its table, its inputs' table and the columns whose change
+ * counts as content. InfoMapper's mappings by default; a module passes its own (InfoCube's dimensional mappings count a
+ * re-pointed target too, X5).
+ */
+export interface MappingLog {
+  mapping: string;
+  input: string;
+  content: readonly string[];
+}
+export const MAPPING_LOG: MappingLog = { mapping: "mapping", input: "mapping_input", content: ["kind", "rule_expression"] };
+
+/**
  * Who last changed what a mapping does: its inputs, kind or rule (AD-06). Read from the change log, because no column
  * records it (Łukasz, 3 October 2026). Status and note changes do not count. Without any such event (seeded data),
  * the mapping's creator is the author.
  */
-export function lastContentEditor(mapping: Mapping, events: readonly ChangeEvent[]): Uuid {
+export function lastContentEditor(mapping: { id: Uuid; created_by: Uuid }, events: readonly ChangeEvent[], log: MappingLog = MAPPING_LOG): Uuid {
   let last: ChangeEvent | null = null;
   for (const e of events) {
-    if (!isContentChange(mapping.id, e)) continue;
+    if (!isContentChange(mapping.id, e, log)) continue;
     if (!last || e.occurred_at >= last.occurred_at) last = e;
   }
   return last?.user_id ?? mapping.created_by;
 }
 
-function isContentChange(mappingId: Uuid, e: ChangeEvent): boolean {
-  if (e.object_type === "mapping_input") {
+/** Whether a change event changed what the mapping does (`lastContentEditor`). */
+export function isContentChange(mappingId: Uuid, e: ChangeEvent, log: MappingLog = MAPPING_LOG): boolean {
+  if (e.object_type === log.input) {
     return (e.after_image ?? e.before_image)?.mapping_id === mappingId;
   }
-  if (e.object_type !== "mapping" || e.object_id !== mappingId) return false;
+  if (e.object_type !== log.mapping || e.object_id !== mappingId) return false;
   if (e.operation === "create") return true;
   const before = e.before_image ?? {};
   const after = e.after_image ?? {};
   // slice 7a (step 1, answer 7): an import that sent the approved mapping back to review counts as its last editor, so
   // with four-eyes on the person who imported does not approve it again
   if (before.status === "approved" && after.status === "review" && typeof after.review_reason === "string") return true;
-  return before.kind !== after.kind || before.rule_expression !== after.rule_expression;
+  return log.content.some((c) => before[c] !== after[c]);
 }
 
 /** Four-eyes (AD-06): with the setting on, the last content author cannot approve. */

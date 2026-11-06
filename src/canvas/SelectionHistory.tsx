@@ -19,7 +19,7 @@ import { CanvasUiCtx, type PlaceGone } from "./context";
 import { useValue } from "./value-store";
 import type { Selection } from "./line-data";
 
-const GONE: Record<PlaceGone, string> = {
+const GONE: Record<Exclude<PlaceGone, { text: string }>, string> = {
   card: "That card is no longer on this canvas.",
   row: "That row is no longer on this canvas.",
   map: "That mapping no longer exists.",
@@ -104,7 +104,7 @@ export function SelectionHistory({ canvasId, labelIds }: { canvasId: string; lab
       return;
     }
     const gone = ui.showPlace(target);
-    if (gone) toast(GONE[gone]);
+    if (gone) toast(typeof gone === "string" ? GONE[gone] : gone.text);
   });
 
   useEffect(() => {

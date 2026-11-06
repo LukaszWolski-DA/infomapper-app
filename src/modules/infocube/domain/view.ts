@@ -5,7 +5,8 @@
 import type { Uuid } from "@/domain/ids";
 import type { Entity, Relationship, StandardColumns } from "@/domain/types";
 import { carries, dimensionAs, type CubeIndex } from "./keys";
-import type { Additivity, CubeEntity, CubeKey, CubeMeasure, CubeRole } from "./types";
+import { mappingAttributeDeletes, mappingDependents, type MappingIndex } from "./mappings";
+import type { Additivity, CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure, CubeRole } from "./types";
 
 export const ROLE_NAMES: Record<CubeRole, string> = { fact: "Fact", dimension: "Dimension" };
 
@@ -40,18 +41,20 @@ const counted = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`
 /**
  * What deleting a fact or a dimension takes with it (X-4, prototype `cubeDependents`), as rows of its delete preview:
  * its role with a fact's grain or a dimension's SCD type; for a dimension, the facts that lose it, each once however
- * many relationships join them (PRD section 2); its measures. Nothing for a logical entity (its dimensional mappings'
- * rows come in 15c).
+ * many relationships join them (PRD section 2); its measures. Slice 15c: with `mappings`, the dimensional mappings that
+ * go with it (X-4), and for a logical entity the mappings that read its attributes and the facts and dimensions that
+ * lose their feed (X-2).
  */
 export function entityDependents(
   entityId: Uuid,
   model: { entities: readonly Entity[]; relationships: readonly Relationship[]; attributes: readonly { id: Uuid; entity_id: Uuid; deleted_at: string | null }[] },
   cubeEntities: readonly CubeEntity[],
   cubeMeasures: readonly CubeMeasure[],
+  mappings?: MappingIndex,
 ): [string, string][] {
   const roles = rolesOf(cubeEntities);
   const own = roles.get(entityId);
-  if (!own) return [];
+  if (!own) return mappings ? mappingDependents(mappings, { entityId }) : [];
   const rows: [string, string][] = [];
   if (own.role === "fact") rows.push([ROLE_NAMES.fact, own.grain?.trim() ? `its grain (“${own.grain.trim()}”) deleted` : "deleted"]);
   else {
@@ -70,6 +73,7 @@ export function entityDependents(
   const attributes = new Set(model.attributes.filter((a) => a.entity_id === entityId && a.deleted_at === null).map((a) => a.id));
   const measures = live(cubeMeasures).filter((m) => attributes.has(m.attribute_id)).length;
   if (measures) rows.push([counted(measures, "measure"), "deleted"]);
+  if (mappings) rows.push(...mappingDependents(mappings, { entityId }));
   return rows;
 }
 
@@ -91,10 +95,54 @@ export interface CubePageRows {
   cubeEntities: PageRow<CubeEntity>[];
   cubeMeasures: PageRow<CubeMeasure>[];
   cubeKeys: PageRow<CubeKey>[];
+  /** Slice 15c: the dimensional mappings and their inputs (the drag's plan, the line's menu, the panels). */
+  cubeMappings: PageRow<CubeMapping>[];
+  cubeMappingInputs: PageRow<CubeMappingInput>[];
+  /** Each mapping's last content editor while four-eyes is on (O9; `moduleView`): the panel's note before approving. */
+  contentAuthors?: Record<Uuid, Uuid>;
 }
 
-export function cubePageRows(cubeEntities: readonly CubeEntity[], cubeMeasures: readonly CubeMeasure[], cubeKeys: readonly CubeKey[]): CubePageRows {
-  return { cubeEntities: live(cubeEntities).map(pageRow), cubeMeasures: live(cubeMeasures).map(pageRow), cubeKeys: live(cubeKeys).map(pageRow) };
+export function cubePageRows(
+  cubeEntities: readonly CubeEntity[],
+  cubeMeasures: readonly CubeMeasure[],
+  cubeKeys: readonly CubeKey[],
+  cubeMappings: readonly CubeMapping[] = [],
+  cubeMappingInputs: readonly CubeMappingInput[] = [],
+): CubePageRows {
+  return {
+    cubeEntities: live(cubeEntities).map(pageRow),
+    cubeMeasures: live(cubeMeasures).map(pageRow),
+    cubeKeys: live(cubeKeys).map(pageRow),
+    cubeMappings: live(cubeMappings).map(pageRow),
+    cubeMappingInputs: live(cubeMappingInputs).map(pageRow),
+  };
+}
+
+/** The coverage bar's word on a fact's or a dimension's card (slice 15c, P17; prototype `entCard`). */
+export const FED_COVERAGE = "fed from the logical model";
+/** A dimensional row's dot without a feed (prototype `attrRow`). */
+export const NOT_FED = "Not fed from the logical model";
+/** The Overview's and the entity panel's words for a fact's or a dimension's feeds (prototype l. 2276, `insEntity`). */
+export const FEED_WORDS = { word: "fed", title: "Attributes fed from the logical model", list: "Attributes and their logical feed", none: "no feed" } as const;
+
+/**
+ * Every dimensional attribute's state on cards (C12; prototype `attrRow`): how many dimensional mappings feed it (any
+ * status) and the dot's tooltip, one "from {inputs}" line per mapping, or "Not fed from the logical model".
+ */
+export function cubeRowFeeds(index: MappingIndex, attributes: readonly { id: Uuid; deleted_at: string | null }[]): Record<Uuid, { n: number; title: string; list: string }> {
+  const out: Record<Uuid, { n: number; title: string; list: string }> = {};
+  for (const a of attributes) {
+    if (a.deleted_at !== null || index.levelOf(a.id) !== "dimensional") continue;
+    const ms = index.mappingsTo(a.id);
+    const inputs = ms.map((m) => index.inputsOf(m.id));
+    out[a.id] = {
+      n: ms.length,
+      title: ms.length ? inputs.map((list) => `from ${list.map((i) => index.label(i.attribute_id)).join(" + ")}`).join("\n") : NOT_FED,
+      // the entity panel's list (prototype `insEntity`): one input's label, or "ƒ {n} attributes"
+      list: inputs.map((list) => (list.length > 1 ? `ƒ ${list.length} attributes` : index.label(list[0]?.attribute_id ?? ""))).join(", "),
+    };
+  }
+  return out;
 }
 
 /** A measure row's classes on a card (R5): the glyph is the module's CSS, `::after` on the row's type. */
@@ -116,16 +164,26 @@ export const linkGoes = (what: string) => `the link to ${what} is deleted, the r
 
 /**
  * What an attribute's delete takes along (R4, R-9), for its second click: its measure, and the link of the key it
- * carries while that link is active. Only attributes with one of them.
+ * carries while that link is active. Only attributes with one of them. Slice 15c: with `mappings`, its dimensional
+ * mappings and, for a logical attribute, the facts and dimensions that lose their feed (X-3).
  */
-export function attributeDeletes(index: CubeIndex, attributes: readonly { id: Uuid; deleted_at: string | null }[]): Record<Uuid, { also: string[]; then: string[] }> {
-  const out: Record<Uuid, { also: string[]; then: string[] }> = {};
+export function attributeDeletes(
+  index: CubeIndex,
+  attributes: readonly { id: Uuid; deleted_at: string | null }[],
+  mappings?: MappingIndex,
+): Record<Uuid, { also: string[]; then: string[]; toast?: string[] }> {
+  const out: Record<Uuid, { also: string[]; then: string[]; toast?: string[] }> = mappings ? mappingAttributeDeletes(mappings, attributes) : {};
   for (const a of attributes) {
     if (a.deleted_at !== null) continue;
     const carried = carries(index, a.id);
     const measure = index.measureOf(a.id);
     if (!carried && !measure) continue;
-    out[a.id] = { also: measure ? ["1 measure"] : [], then: carried ? [linkGoes(dimensionAs(index, carried))] : [] };
+    const fed = out[a.id];
+    out[a.id] = {
+      also: [...(measure ? ["1 measure"] : []), ...(fed?.also ?? [])],
+      then: [...(carried ? [linkGoes(dimensionAs(index, carried))] : []), ...(fed?.then ?? [])],
+      ...(fed?.toast ? { toast: fed.toast } : {}),
+    };
   }
   return out;
 }

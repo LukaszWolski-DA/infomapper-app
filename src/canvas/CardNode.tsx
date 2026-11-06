@@ -237,7 +237,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
           <span className="c-name" data-testid="card-name" title={shownText(card)}>
             {shownText(card)}
           </span>
-          <span className="cov" title={`${card.mapped} of ${total} ${isEnt ? "attributes mapped" : "columns used"}`}>
+          <span className="cov" title={`${card.mapped} of ${total} ${isEnt ? `attributes ${card.role?.coverage ?? "mapped"}` : "columns used"}`}>
             <i style={{ width: `${total ? (card.mapped / total) * 100 : 0}%` }} />
           </span>
           <span className="cov-t">

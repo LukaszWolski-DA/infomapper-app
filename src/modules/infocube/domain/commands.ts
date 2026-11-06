@@ -29,8 +29,10 @@ export function createCubeEntity(
   state: CreateEntityState,
   role: CubeRole,
   input: unknown,
+  /** The default name's base (slice 15c: "Dim {entity}" for "Create dimension from this…"). */
+  defaultName: string = DEFAULT_NAME[role],
 ): CommandResult<{ entityId: Uuid; canvasItemId: Uuid | null; warning: string | null }> {
-  const made = createEntity(ctx, access, state, input, { level: "dimensional", defaultName: DEFAULT_NAME[role] });
+  const made = createEntity(ctx, access, state, input, { level: "dimensional", defaultName });
   if (!made.ok) return made;
   if (!access.workspace.infocube) return { ok: false, error: infocubeOff() };
   const cube: CubeEntity = {

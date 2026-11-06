@@ -138,8 +138,8 @@ export const BESIDE_GAP = 160;
  * Where feeding sources (left) or fed entities (right) land next to a card (prototype placeNear, B-08): a column
  * 160 px beside it, from its top down, each card moved down until it covers no other card, 32 px apart.
  */
-export function besideSpots(anchor: Rect, side: "left" | "right", heights: readonly number[], occupied: readonly Rect[], w = CARD_W): Pt[] {
-  const x = snap8(side === "left" ? anchor.x - w - BESIDE_GAP : anchor.x + anchor.w + BESIDE_GAP);
+export function besideSpots(anchor: Rect, side: "left" | "right", heights: readonly number[], occupied: readonly Rect[], w = CARD_W, gap = BESIDE_GAP): Pt[] {
+  const x = snap8(side === "left" ? anchor.x - w - gap : anchor.x + anchor.w + gap);
   const taken = [...occupied];
   const spots: Pt[] = [];
   let y = snap8(anchor.y);

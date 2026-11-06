@@ -8,6 +8,7 @@ import { getSession } from "@/app/_lib/session";
 import { workspaceAccess } from "@/app/_lib/shell";
 import { thumbnailKey } from "@/app/_lib/thumbnails";
 import { getDataStore } from "@/data";
+import { moduleRowFeeds } from "@/compose";
 import { canvasThumbnail, thumbnailDrawing, thumbnailIndex } from "@/domain/model/thumbnail";
 import { thumbnailSymbolFile } from "@/ui/thumbnail-svg";
 
@@ -32,7 +33,8 @@ export async function GET(request: Request, ctx: RouteContext<"/w/[workspaceId]/
     store.labels.listLinks(ws),
     store.requirements.list(ws),
   ]);
-  const drawing = thumbnailDrawing(canvasThumbnail(canvas, { items, frames, notes }, thumbnailIndex(model, { requirements, labels, labelLinks })));
+  const rowFeeds = await moduleRowFeeds(ws, model);
+  const drawing = thumbnailDrawing(canvasThumbnail(canvas, { items, frames, notes }, thumbnailIndex(model, { requirements, labels, labelLinks, rowFeeds })));
   const current = drawing !== null && new URL(request.url).searchParams.get("v") === thumbnailKey(drawing);
   return new Response(thumbnailSymbolFile(drawing), {
     headers: {

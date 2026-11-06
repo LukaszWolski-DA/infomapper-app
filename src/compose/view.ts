@@ -2,12 +2,32 @@
 // handed down as plain data and server actions (`src/ui/modules.ts`). Without module rows, and with InfoCube off,
 // nothing is read beyond the workspace's switch.
 
-import type { DataStore } from "@/data";
+import { getDataStore, type DataStore } from "@/data";
+import { STORE_SCHEMA } from "./tables";
 import type { Uuid } from "@/domain/ids";
-import type { Workspace, WorkspaceModel } from "@/domain/types";
+import type { ChangeEvent, Workspace, WorkspaceModel } from "@/domain/types";
+import { lastContentEditor } from "@/domain/model/mapping-rules";
 import { NO_MODULES, type DependentRow, type EntityCreate, type ModuleView } from "@/ui/modules";
+import type { CardData } from "@/canvas/card-data";
+import type { ModuleLineData } from "@/canvas/line-data";
+import { cubeLines } from "@/modules/infocube/canvas/lines";
 import { cubeIndex } from "@/modules/infocube/domain/keys";
-import { attributeDeletes, cubePageRows, cubeSections, entityDependents, measureMarks, ROLE_NAMES, ROLE_TITLES, rolesOf } from "@/modules/infocube/domain/view";
+import { CUBE_MAPPING_LOG, mappingIndex } from "@/modules/infocube/domain/mappings";
+import type { CubeMapping, CubeMappingInput } from "@/modules/infocube/domain/types";
+import {
+  attributeDeletes,
+  cubePageRows,
+  cubeRowFeeds,
+  cubeSections,
+  entityDependents,
+  FED_COVERAGE,
+  FEED_WORDS,
+  measureMarks,
+  ROLE_NAMES,
+  ROLE_TITLES,
+  rolesOf,
+  type CubePageRows,
+} from "@/modules/infocube/domain/view";
 
 /** The creates' server actions, by key: `src/compose/actions.ts` for pages (server actions stay out of this file). */
 export type CreateActions = Record<"fact" | "dimension", EntityCreate["action"]>;
@@ -17,21 +37,41 @@ const creates = (actions: CreateActions): EntityCreate[] => [
   { key: "dimension", button: "New dimension", here: "New dimension here", testId: "button-new-dimension", action: actions.dimension },
 ];
 
-/** The modules' part of a canvas page: the roles on cards and in panels, the Cube tab and its creates (only while on). */
-export async function moduleView(store: DataStore, workspace: Workspace, model: WorkspaceModel, actions: CreateActions): Promise<ModuleView> {
+/**
+ * The modules' part of a canvas page: the roles on cards and in panels, the Cube tab and its creates (only while on).
+ * `events`: the workspace's change events when four-eyes is on (slice 15c, O9), for each dimensional mapping's last
+ * content editor (the panel says beforehand who may not approve; the server checks again).
+ */
+export async function moduleView(store: DataStore, workspace: Workspace, model: WorkspaceModel, actions: CreateActions, events: readonly ChangeEvent[] = []): Promise<ModuleView> {
   const hasDimensional = model.entities.some((e) => e.model_level === "dimensional");
   if (!workspace.infocube && !hasDimensional) return NO_MODULES;
-  const [cube, measures, keys] = hasDimensional
-    ? await Promise.all([store.modules.list(workspace.id, "cube_entity"), store.modules.list(workspace.id, "cube_measure"), store.modules.list(workspace.id, "cube_key")])
-    : [[], [], []];
+  const [cube, measures, keys, cubeMappings, cubeMappingInputs] = hasDimensional
+    ? await Promise.all([
+        store.modules.list(workspace.id, "cube_entity"),
+        store.modules.list(workspace.id, "cube_measure"),
+        store.modules.list(workspace.id, "cube_key"),
+        store.modules.list(workspace.id, "cube_mapping"),
+        store.modules.list(workspace.id, "cube_mapping_input"),
+      ])
+    : [[], [], [], [], []];
   const roles: ModuleView["roles"] = {};
-  for (const [entityId, c] of rolesOf(cube)) roles[entityId] = { text: ROLE_NAMES[c.role], title: ROLE_TITLES[c.role], card: `dimn ${c.role}`, mark: "cube" };
+  for (const [entityId, c] of rolesOf(cube)) roles[entityId] = { text: ROLE_NAMES[c.role], title: ROLE_TITLES[c.role], card: `dimn ${c.role}`, mark: "cube", coverage: FED_COVERAGE, feed: FEED_WORDS };
+  // slice 15c: a dimensional row's feeds on cards (C12)
+  const mappings = mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs });
   // slice 15b: the Σ marks, an attribute's delete with InfoCube's rows (R4) and the rows of the panels' sections
   const index = cubeIndex({ entities: model.entities, attributes: model.attributes, relationships: model.relationships, cubeEntities: cube, cubeMeasures: measures, cubeKeys: keys });
   const described = {
     rowMarks: measureMarks(index, model.attributes),
-    attributeDeletes: attributeDeletes(index, model.attributes),
-    data: hasDimensional ? { infocube: cubePageRows(cube, measures, keys) } : {},
+    attributeDeletes: attributeDeletes(index, model.attributes, mappings),
+    rowFeeds: hasDimensional ? cubeRowFeeds(mappings, model.attributes) : {},
+    data: hasDimensional
+      ? {
+          infocube: {
+            ...cubePageRows(cube, measures, keys, cubeMappings, cubeMappingInputs),
+            contentAuthors: workspace.four_eyes ? contentAuthorsOf(cubeMappings, events) : {},
+          },
+        }
+      : {},
   };
   if (!workspace.infocube) return { ...NO_MODULES, roles, ...described };
   const sections = cubeSections(model.entities, cube).map(({ role, entities }) => ({
@@ -50,9 +90,46 @@ export async function moduleView(store: DataStore, workspace: Workspace, model: 
   };
 }
 
-/** The modules' rows in an entity's delete preview (X-1, X-4). */
+/**
+ * The modules' lines on a canvas (slice 15c, C7): InfoCube's dimensional mappings between the cards on it, from the
+ * page's rows (`ModuleView.data`); none without them.
+ */
+export function moduleLines(view: ModuleView, model: WorkspaceModel, cards: readonly Pick<CardData, "id" | "kind" | "targetId">[]): ModuleLineData[] {
+  const rows = view.data.infocube as CubePageRows | undefined;
+  if (!rows?.cubeMappings.length) return [];
+  // the page's rows come without `created_*` (O8): the lines read none of them
+  return cubeLines(model, { cubeMappings: rows.cubeMappings as CubeMapping[], cubeMappingInputs: rows.cubeMappingInputs as CubeMappingInput[] }, cards);
+}
+
+/**
+ * The rows a module feeds, for the homes' thumbnails (slice 15c, C12): as on the canvas's cards (`ModuleView.rowFeeds`).
+ * Nothing is read while the model has no fact or dimension. The homes read InfoMapper's tables through the default
+ * store, which does not know a module's: this read takes the composed store unless given one.
+ */
+export async function moduleRowFeeds(workspaceId: Uuid, model: WorkspaceModel, store: DataStore = getDataStore(STORE_SCHEMA)): Promise<Record<Uuid, { n: number }>> {
+  if (!model.entities.some((e) => e.model_level === "dimensional" && e.deleted_at === null)) return {};
+  const [cubeMappings, cubeMappingInputs] = await Promise.all([store.modules.list(workspaceId, "cube_mapping"), store.modules.list(workspaceId, "cube_mapping_input")]);
+  return cubeRowFeeds(mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs }), model.attributes);
+}
+
+/** Each live dimensional mapping's last content editor (four-eyes, O9), by mapping id. */
+function contentAuthorsOf(mappings: readonly CubeMapping[], events: readonly ChangeEvent[]): Record<Uuid, Uuid> {
+  return Object.fromEntries(mappings.filter((m) => m.deleted_at === null).map((m) => [m.id, lastContentEditor(m, events, CUBE_MAPPING_LOG)]));
+}
+
+/**
+ * The modules' rows in an entity's delete preview (X-1, X-4; slice 15c X-2): a fact's or a dimension's own rows and its
+ * dimensional mappings; a logical entity's dimensional mappings and the facts and dimensions that lose their feed.
+ * Nothing is read while the model has no fact or dimension.
+ */
 export async function moduleEntityDependents(store: DataStore, workspaceId: Uuid, entityId: Uuid, model: WorkspaceModel): Promise<DependentRow[]> {
-  if (!model.entities.some((e) => e.id === entityId && e.model_level === "dimensional")) return [];
-  const [cube, measures] = await Promise.all([store.modules.list(workspaceId, "cube_entity"), store.modules.list(workspaceId, "cube_measure")]);
-  return entityDependents(entityId, model, cube, measures);
+  if (!model.entities.some((e) => e.model_level === "dimensional" && e.deleted_at === null)) return [];
+  const [cube, measures, cubeMappings, cubeMappingInputs] = await Promise.all([
+    store.modules.list(workspaceId, "cube_entity"),
+    store.modules.list(workspaceId, "cube_measure"),
+    store.modules.list(workspaceId, "cube_mapping"),
+    store.modules.list(workspaceId, "cube_mapping_input"),
+  ]);
+  const mappings = mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs });
+  return entityDependents(entityId, model, cube, measures, mappings);
 }

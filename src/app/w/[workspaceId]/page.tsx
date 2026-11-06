@@ -19,6 +19,7 @@ import { NewProjectTile } from "./_components/new-project-tile";
 import { AddPersonBox, OrganizationAccessBox, RemovePersonButton, RoleSelect } from "./_components/people";
 import { SettingsForm } from "./_components/settings-form";
 import { settingsBoxes } from "@/compose/settings";
+import { moduleRowFeeds } from "@/compose";
 import { workspacePeople } from "@/app/_lib/people";
 
 const TABS = ["overview", "people", "settings"] as const;
@@ -91,7 +92,9 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     ]);
     for (const [projectId, canvasId] of links) if (canvasId) firstCanvas.set(projectId, canvasId);
     const shown = canvases.filter((c) => [...firstCanvas.values()].includes(c.id));
-    thumbnails = thumbnailHrefs(workspaceId, shown, { items, frames, notes }, { model, requirements, labels, labelLinks });
+    // a fact's or a dimension's rows count their feeds, as on the canvas (slice 15c, C12)
+    const rowFeeds = await moduleRowFeeds(workspaceId, model);
+    thumbnails = thumbnailHrefs(workspaceId, shown, { items, frames, notes }, { model, requirements, labels, labelLinks, rowFeeds });
   }
 
   // Undo and Redo, buttons and keys, on the person's history of the workspace (slice 12a, D-65)

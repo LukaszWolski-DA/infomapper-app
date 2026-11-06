@@ -53,7 +53,7 @@ Table groups (AD-10):
 | Working layer | `label`, `label_link`, `note` |
 | Organisation of work | `project`, `project_canvas`, `project_pinned_label`, `canvas`, `canvas_item`, `frame` |
 | History | `change_event`, `baseline` |
-| Modules (section 15) | InfoCube: `cube_entity`, `cube_measure`, `cube_key` |
+| Modules (section 15) | InfoCube: `cube_entity`, `cube_measure`, `cube_key`, `cube_mapping`, `cube_mapping_input` |
 
 ---
 
@@ -722,5 +722,38 @@ picked in the relationship's panel or written by "Add key", never matched by nam
 A link is written only to an attribute that is a foreign key of the fact. While the attribute is no foreign key the
 link is kept and read as absent (inactive, R3): turning the flag back on brings it back.
 
+### InfoCube: `cube_mapping`
+A dimensional mapping (slice 15c, AD-36, D-69): it feeds one attribute of a fact or a dimension from the logical model.
+InfoMapper's `mapping` stays source column(s) → attribute. Migration `20261105110000_infocube_mappings.sql`. In the undo
+history (parent `attribute`, the target). Labels and requirement links do not point to it (C13).
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `attribute_id` | uuid | no | FK `attribute`: the target, a dimensional attribute (the domain's check) |
+| `kind` | text | no | `direct` (exactly one input, AD-26) or `transform`; CHECK `cube_mapping_kind_ck` |
+| `rule_expression` | text | yes | a transformation's rule, plain text |
+| `status` | text | no | `draft`, `review`, `approved`; CHECK `cube_mapping_status_ck`. Reviewers set it (`mapping.set_status`); with four-eyes the last content editor cannot approve |
+| `note` | text | yes | plain text, like a mapping's note |
+| `approved_by` | uuid | yes | FK `app_user`: who approved it (AD-06) |
+| `approved_at` | timestamptz | yes | set exactly when `status` is `approved`; CHECK `cube_mapping_approval_ck` |
+
+A change of the inputs, the kind, the rule or the target sends an approved mapping back to review and clears its
+approval (D-51's first rule); a note alone does not.
+
+### InfoCube: `cube_mapping_input`
+A logical attribute a dimensional mapping reads, in order (slice 15c). In the undo history (parents `cube_mapping` and
+`attribute`).
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `mapping_id` | uuid | no | FK `cube_mapping` |
+| `attribute_id` | uuid | no | FK `attribute`: a logical attribute (the domain's check); one live input per attribute and mapping (`cube_mapping_input_ux`) |
+| `sort_order` | integer | no | the inputs' order |
+
 Deleting an entity, an attribute or a relationship soft-deletes its InfoCube rows in the same change group (the domain
-cascades, AD-23; slice 15a step 3, the key links slice 15b). Dimensional mappings (`cube_mapping`, `cube_mapping_input`) come with slice 15c (AD-36).
+cascades, AD-23; slice 15a step 3, the key links slice 15b, the dimensional mappings slice 15c). A dimensional mapping
+goes whole when one of its inputs goes with its attribute (Q-5, `goesWhole`); an input removed in the panel leaves the
+mapping (the panel offers × only while it has more than one). The local data file needs no new format for these tables
+(C1): they appear in it with InfoCube's first mapping.

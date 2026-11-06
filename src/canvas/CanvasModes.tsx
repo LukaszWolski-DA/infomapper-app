@@ -209,6 +209,8 @@ export function useCanvasModes(editable: boolean) {
       const noteId = el.closest<HTMLElement>("[data-note]")?.dataset.note;
       const mappingId = noteId ? undefined : el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
       const relationshipId = el.closest<SVGElement>("[data-relationship]")?.dataset.relationship;
+      // a module's line (slice 15c)
+      const ext = noteId || mappingId ? null : el.closest<SVGElement>("[data-ext]");
       const bundleKey = el.closest<SVGElement>("[data-bundle]")?.dataset.bundle;
       // a requirement card (slice 4b-2): selecting it is selecting the requirement
       const reqCard = noteId ? null : el.closest<HTMLElement>("[data-requirement]");
@@ -230,6 +232,9 @@ export function useCanvasModes(editable: boolean) {
       } else if (mappingId) {
         target = { kind: "map", mappingId };
         select({ t: "map", id: mappingId });
+      } else if (ext) {
+        target = { kind: "ext", extKind: ext.dataset.extKind!, id: ext.dataset.ext! };
+        select({ t: "ext", kind: ext.dataset.extKind!, id: ext.dataset.ext! });
       } else if (bundleKey) {
         // a bundle of lines at a collapsed frame (slice 2c, prototype ctxFor “bundle”)
         target = { kind: "bundle", key: bundleKey };

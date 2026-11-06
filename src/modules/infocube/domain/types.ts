@@ -2,7 +2,7 @@
 // and attributes, never the other way. InfoMapper's code never imports this module; `src/compose/` wires it in (AD-33).
 
 import type { Uuid } from "@/domain/ids";
-import type { StandardColumns } from "@/domain/types";
+import type { StandardColumns, Timestamp } from "@/domain/types";
 
 /** A dimensional entity's role (C-5): in place of the stereotype. */
 export const CUBE_ROLES = ["fact", "dimension"] as const;
@@ -48,11 +48,46 @@ export interface CubeKey extends StandardColumns {
   attribute_id: Uuid;
 }
 
+/** How a dimensional mapping carries its value (spec, data model; AD-26): a direct copy reads exactly one attribute. */
+export const CUBE_MAPPING_KINDS = ["direct", "transform"] as const;
+export type CubeMappingKind = (typeof CUBE_MAPPING_KINDS)[number];
+
+/** A dimensional mapping's status, as InfoMapper's mappings' (spec, B-4; O9: reviewers approve). */
+export const CUBE_MAPPING_STATUSES = ["draft", "review", "approved"] as const;
+export type CubeMappingStatus = (typeof CUBE_MAPPING_STATUSES)[number];
+
+/**
+ * A dimensional mapping (slice 15c, M1, AD-36): logical attribute(s) → this attribute of a fact or dimension. Its inputs
+ * are `cube_mapping_input` rows. It goes whole when one of its inputs goes with its logical attribute (Q-5, `goesWhole`).
+ * The note is plain text, as the prototype's field. An approval is logged (AD-06): who and when, cleared when it leaves
+ * Approved.
+ */
+export interface CubeMapping extends StandardColumns {
+  /** The dimensional target. */
+  attribute_id: Uuid;
+  kind: CubeMappingKind;
+  rule_expression: string | null;
+  status: CubeMappingStatus;
+  note: string | null;
+  approved_by: Uuid | null;
+  approved_at: Timestamp | null;
+}
+
+/** One input of a dimensional mapping: a logical attribute, in the mapping's order. Unique per mapping among live rows. */
+export interface CubeMappingInput extends StandardColumns {
+  mapping_id: Uuid;
+  /** The logical attribute it reads. */
+  attribute_id: Uuid;
+  sort_order: number;
+}
+
 /** InfoCube's tables with their row types. */
 export interface InfoCubeRows {
   cube_entity: CubeEntity;
   cube_measure: CubeMeasure;
   cube_key: CubeKey;
+  cube_mapping: CubeMapping;
+  cube_mapping_input: CubeMappingInput;
 }
 export type InfoCubeTable = keyof InfoCubeRows;
 

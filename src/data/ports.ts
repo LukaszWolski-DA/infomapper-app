@@ -7,6 +7,7 @@ import type { WorkspaceRows } from "@/domain/commands/undo";
 import type { DomainError } from "@/domain/errors";
 import type { Uuid } from "@/domain/ids";
 import type { UndoHistory } from "@/domain/model/undo-history";
+import type { MappingLog } from "@/domain/model/mapping-rules";
 import type {
   AppUser,
   Canvas,
@@ -161,8 +162,11 @@ export interface RequirementRepository {
 export interface ChangeEventRepository {
   /** The change log of a workspace, oldest first. */
   list(workspaceId: Uuid): Promise<ChangeEvent[]>;
-  /** Events about one mapping and its inputs, oldest first (four-eyes, AD-06). */
-  listForMapping(workspaceId: Uuid, mappingId: Uuid): Promise<ChangeEvent[]>;
+  /**
+   * Events about one mapping and its inputs, oldest first (four-eyes, AD-06). `log` names the tables (slice 15c, C11):
+   * InfoMapper's `mapping` and `mapping_input` by default, a module's own otherwise.
+   */
+  listForMapping(workspaceId: Uuid, mappingId: Uuid, log?: Pick<MappingLog, "mapping" | "input">): Promise<ChangeEvent[]>;
   /** Events about one requirement, oldest first (four-eyes, AD-06; slice 4a). */
   listForRequirement(workspaceId: Uuid, requirementId: Uuid): Promise<ChangeEvent[]>;
 }

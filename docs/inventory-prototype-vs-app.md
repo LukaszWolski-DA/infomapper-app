@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 15b's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 15c's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences. The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences; at slice 15c's close (5 November 2026) dimensional mappings and "fed" coverage were marked present, with their deliberate differences. The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -35,7 +35,7 @@ docs (some are repeated below where they explain an item).
 | Labels and notes | rich text in notes | known limitation |
 | Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer | baselines: decision only (AD-03, AD-14); the rest: – |
 | Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
-| InfoCube | a fact's and a dimension's description (grain, measures, SCD, hints, Σ marks); dimensional mappings and "fed" coverage; requirements on facts and dimensions and the bus matrix | slices 15b, 15c, 15d (`docs/prd/slice-15-infocube.md`) |
+| InfoCube | requirements on facts and dimensions and the bus matrix | slice 15d (`docs/prd/slice-15-infocube.md`) |
 
 ## Canvas
 
@@ -277,8 +277,6 @@ changes their own row (F12); every people change follows the app's roles, archiv
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Dimensional mappings | logical attribute(s) → a fact's or dimension's attribute: drag in both directions with lit and dimmed targets, the line kind, the mapping panel, "Create dimension from this…", "Comes from the logical model", "Feeds facts and dimensions" | B-6; the canvas's drag and its lines; the mapping panel | 15c (AD-36) |
-| "Fed" coverage | a dimensional entity's coverage on its card, in the Overview and in the details panel's "Mapping coverage" (today "0 of n") | P17 | 15c |
 | Requirements on facts and dimensions, the bus matrix | X-5's scope and coverage, the lens; B-8; REQ-210 | the Cube tab's "Bus matrix", the requirement panel | 15d |
 | A role in a collapsed frame's block | the block lists a fact or dimension without its role | the frame's block | idea |
 
@@ -289,6 +287,25 @@ here" and "New dimension here" in the canvas's toolbox; a card's role with the c
 panel's Role; relationships only within a level, with the dimension at a fact's relationship's one end; paste within a
 level; a source column maps only to a logical attribute (B-6's toast); the delete preview's InfoCube rows; the Sales star
 in the demo data (`npm run demo`).
+
+**Present (slice 15c):** dimensional mappings on the canvas (lines from logical rows to dimensional rows in the target's
+colour, dashed until Approved, a diamond at the target, ƒ on a transformation; hover, Focus, the line's menu, Delete,
+Back and Forward); the drag in both directions with the veil, onto a row or a dimensional header, and its refusals; the
+mapping's panel (the trace, inputs with Add and ×, the target, the kind, the rule, the status, the note, Delete); "Comes
+from the logical model" and "Feeds facts and dimensions" in the attribute panel; "Attributes and their logical feed" in
+the entity panel; "fed" coverage on the card, its rows' dots, the Mapped filter, the Overview ("{n} of {m} fed") and the
+homes' thumbnails; the delete previews and the attribute's second click with dimensional mappings; "Create dimension
+from this…" with its dialog; the Sales star's 20 dimensional mappings.
+
+**Deliberate differences (slice 15c, PRD section 8):** reviewers approve with four-eyes (O9); D-51's first rule sends an
+approved mapping back to review (O12); Q-5 by the command in one undo step; dimming with the fading veil; an approval is
+logged; a plain-text note; "Edit transformation rule…" says "It is a transformation now. Describe the rule." (P20); the
+attribute's delete names dimensional mappings on its second click and its toast counts both kinds (R4, P10);
+re-pointing the target is content for D-51 and refused onto an identical mapping; no "Map from a column…" or "Add a
+source column" on a dimensional attribute; a dimensional card's Mapped filter reads its feeds; "Create dimension from
+this…" makes plain attributes, its card in the canvas's free spot beside the original, InfoMapper's duplicate-name
+warning; no tooltip on a dimensional line; Focus lights every dimensional line between two lit cards; one toast with the
+panel's text and D-51's notice; the undo steps' names.
 
 **Present (slice 15b):** a fact's section (Grain, Measures, Dimensions one row per relationship with its key and "Add
 key", Hints that open what they name); a dimension's section (the SCD type with its sentence, Used by); a fact's

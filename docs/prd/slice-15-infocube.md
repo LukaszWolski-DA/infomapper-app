@@ -4,7 +4,9 @@ Status: **step 1 done and answered** (Łukasz, 4 November 2026); updated to the 
 (section 0). PRD file: `docs/prd/slice-15-infocube.md`; step 1's review: `docs/prd/slice-15-acceptance.md`. Branch
 `slice/15-infocube` for step 1; each sub-slice has its own branch (section 4). Start: `main` at tag `slice-14b`
 (A1 holds). **15b** (role-playing in it, RQ-3): step 1 done on 4 November 2026 on branch
-`slice/15b-grain-measures-roles` from tag `slice-15a` (acceptance doc, "15b step 1").
+`slice/15b-grain-measures-roles` from tag `slice-15a` (acceptance doc, "15b step 1"). **15c** (dimensional mappings):
+step 1 done on 5 November 2026 on branch `slice/15c-dimensional-mappings` from tag `slice-15b` (acceptance doc, "15c step
+1"; answered on 5 November 2026, "Łukasz's answers to 15c step 1").
 
 ## 0. Answers to step 1 (Łukasz, 4 November 2026)
 
@@ -305,20 +307,27 @@ Claude Code session may start at a step's boundary, never inside a step; it star
        delete with module rows; the specs.
      - **15b step 5 – measurement and closing:** the element guard, the layers on the star, the page's bytes; D-68; the
        docs; one full run; the manual check on KB.
-   - **15c – Dimensional mappings:** `cube_mapping`, `cube_mapping_input` (M1, AD-36), format 13; drag in both
+   - **15c – Dimensional mappings** (branch `slice/15c-dimensional-mappings`, tag `slice-15c`; steps and criteria as
+     proposed in the acceptance doc, "15c step 1"; **no format bump**: a module's tables are not part of the local
+     file's format, AD-33, C1): `cube_mapping`, `cube_mapping_input` (M1, AD-36); drag in both
      directions, lit targets and refusals (O4); the line kind with hover, Focus, bundles and the miniature; the mapping
      panel with reviewers' approval and four-eyes (O9) and D-51's first rule (O12); the line's menu, Delete, history
      places; "Create dimension from this…"; "Comes from the logical model", "Feeds facts and dimensions"; X-2, X-3,
      cascades and undo; the "fed" coverage on cards and in the Overview; the star's mappings; the dense canvas
-     measurement. Criteria S15-05, 09, 11, 12, 13, 14 (the mappings' rows), 18; D-69 and AD-36.
+     measurement. Criteria S15-05, 09, 11, 12, 13, 14 (the mappings' rows), 18, and the proposed S15-20 to S15-23; D-69
+     and AD-36.
    - **15d – Requirements and the bus matrix:** X-5 (scope, coverage, the lens), B-8, REQ-210 in the star;
      criteria S15-15, 16, 19.
    - **Tests in every sub-slice** (CLAUDE.md, Łukasz, 4 November 2026; one regime, no small or large slices): after each
      step the sub-slice's specs, the earlier specs of what the step touched, and CI (lint, typecheck, unit tests); a
      failing test run three times on its own. A step that touches shared infrastructure (undo and change groups, the
      save chain, the canvas's layers, the table registry, the local adapter) runs one full e2e run in that step and its
-     report says why: in 15c the data step (format 13, `cube_mapping` and `cube_mapping_input` in the registry, undo and
-     the cascades) and the line kind (the canvas's layers) do. Before the merge: one full e2e run.
+     report says why: in 15c the data step (`cube_mapping` and `cube_mapping_input` in the registry, undo and the
+     cascades) and the domain step (the change-log function behind four-eyes, X8) do. **The canvas step (step 4) runs
+     no full run** (Łukasz, 5 November 2026): the slice's specs and every earlier spec folder that touches the canvas
+     (lines, drag, frames, Focus, layers, the miniature), named in its report. **The full run comes once, at the end of
+     step 5** (the panels), and counts as 15c's run before the merge if step 6 changes docs only. Otherwise, before the
+     merge: one full e2e run.
 
 ## 5. Acceptance criteria
 
@@ -365,6 +374,7 @@ header edge (a class), and a new line kind with a diamond end. Bars are proposal
 | Drawing layers | LayerTree read on the Sales star against a logical canvas of the same size | dimensional marks and lines add no drawing layer per card (AD-24) |
 | Pan and zoom, first render | `npm run measure:canvas` as in slice 14b, against `slice-14b` | within the sitting's run-to-run spread |
 | A dense dimensional canvas | step 1 proposes whether a measuring canvas with facts, dimensions and dimensional lines is needed (Q11) | – |
+| The veil at a drag's start (15c, X3) | `e2e/slice-15c/S15-18.spec.ts` on "Performance test – star", traced to the screen | **the veil adds at most 5 ms to a drag frame without the veil on the same canvas** (Łukasz, 5 November 2026; replaces 15c step 1's "median under 16 ms", whose intent was to rule out a restyle of every card, slice 5a: 75–140 ms) |
 
 **Nothing above the canvas reads layout during a commit** (CLAUDE.md). The Cube tab, the bus matrix dialog and the
 panels' InfoCube sections derive everything from the model.
@@ -489,6 +499,28 @@ performance), each with the files and functions behind it and a proposal.
 - **A new measure's additivity by its type** (15b step 3, accepted): additive for Integer and Decimal, non-additive
   otherwise; the prototype starts every measure additive.
 - **Leaving semi-additive clears the note** (15b step 3, accepted); the prototype keeps the note, hidden.
+- **15c's expected differences** (accepted 5 November 2026, acceptance doc "15c step 1"): reviewers approve with
+  four-eyes and D-51's first rule (O9, O12); Q-5 by the command in one undo step, not by indexing; dimming with the
+  fading veil, not a page-wide class; an approval is logged (`approved_by`, `approved_at`); a plain-text note; "Edit
+  transformation rule…" says "It is a transformation now. Describe the rule." (P20); the attribute's delete names
+  dimensional mappings on its second click and its toast counts both kinds (R4, P10); re-pointing the target is content
+  for D-51 and refused onto an identical mapping; no "Map from a column…" or "Add a source column" on a dimensional
+  attribute; a dimensional card's "Mapped" filter reads its feeds; "Create dimension from this…" makes plain attributes,
+  not D-63 copies. All are built (15c's closing, 5 November 2026).
+- **15c's further differences** (accepted at steps 4 and 5, 5 November 2026):
+  - no tooltip on a dimensional line (one element more per line, AD-24); the menu's head and the panel name it;
+  - Focus on a selected dimensional line lights its two cards and every dimensional line between them (source lines'
+    rule); the prototype lights the one mapping;
+  - one toast for a panel change that also sends an approved mapping back to review: the panel's text, then D-51's
+    notice; the prototype shows two, the second replacing the first;
+  - "Create dimension from this…" warns of a taken name with InfoMapper's duplicate-name text, under the field and as a
+    toast; the prototype's says "Another fact or dimension is already called {name}. Rename one of them if they
+    differ.";
+  - the new dimension's card goes in the canvas's first free spot in the column 80 px right of its original
+    (`besideSpots`, Łukasz, 15c step 5), so it never covers a card; the prototype places it 80 px right, at the
+    original's height;
+  - the undo steps are named: "Create dimensional mapping", "Change dimensional mapping", "Delete dimensional mapping",
+    "Create attribute and its mapping", "Create dimension"; the prototype has no step names.
 - **The sections are InfoMapper's folds** (15b step 4, accepted): "Fact", "Dimension", "Measure" and the relationship's
   "InfoCube" fold like the panels' other sections; the prototype has plain headings.
 - **Roles on a relationship to itself** (15b, R2): "Role at the right end" and "Role at the top end", D-61's words for
@@ -543,7 +575,8 @@ Each enters `docs/decisions.md` at the closing of the sub-slice that builds it, 
 ### Assumptions to confirm
 
 - **A1.** The slice starts from `main` at tag `slice-14b`; slice 14b is merged.
-- **A2.** The data model changes of items 3–5 in two formats (12 in 15a, 13 in 15c) and two migrations;
+- **A2.** The data model changes of items 3–5 in two formats (12 in 15a, 13 in 15b for the roles; 15c needs none, C1)
+  and a migration per sub-slice;
   `organization_licence` has no `workspace_id` (an organization's row, as `organization_access`); `entity.stereotype`
   keeps its CHECK (a dimensional entity holds `object`, unused).
 - **A3.** KB is backed up before the branch's first dev or e2e run of 15a and of 15c, and before each manual

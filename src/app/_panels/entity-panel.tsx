@@ -33,7 +33,11 @@ const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 /** `cardId` is null when the entity has no card on this canvas (a go-to link's fallback, slice 4a): its panel only. */
 export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uuid | null }) {
   const p = usePanel();
-  const role = useModules().roles[e.id];
+  const modules = useModules();
+  const role = modules.roles[e.id];
+  // a fact's or a dimension's rows are fed by a module (slice 15c, C10): its list's title, texts and counts
+  const feed = role?.feed;
+  const feedOf = (id: Uuid) => (feed ? (modules.rowFeeds[id]?.list ?? "") : (ix.mappingsOf.get(id) ?? []).map((m) => inputsLabel(ix, m.id)).join(", "));
   const move = useMoveAttribute(p.ix, p.workspaceId);
   /** Dragging in the attribute list: which attribute, and where it would go. */
   const [order, setOrder] = useState<{ dragging: string | null; over: { id: string; after: boolean } | null }>({ dragging: null, over: null });
@@ -152,19 +156,15 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
 
       <ItemLabels target={{ kind: "entity", id: e.id }} />
 
-      <Fold title="Attributes and their sources" count={attributes.length}>
+      <Fold title={feed?.list ?? "Attributes and their sources"} count={attributes.length}>
         {attributes.length ? (
           <LongList
             items={attributes}
             testId="list-entity-attributes"
-            text={(a) => `${a.name} ${(ix.mappingsOf.get(a.id) ?? []).map((m) => inputsLabel(ix, m.id)).join(" ")}`}
+            text={(a) => `${a.name} ${feedOf(a.id)}`}
             render={(a) => {
-              const ms = ix.mappingsOf.get(a.id) ?? [];
-              const meta = ms.length ? (
-                <span className="font-mono text-xs">{ms.map((m) => inputsLabel(ix, m.id)).join(", ")}</span>
-              ) : (
-                <span className="italic">unmapped</span>
-              );
+              const fed = feedOf(a.id);
+              const meta = fed ? <span className="font-mono text-xs">{fed}</span> : <span className="italic">{feed?.none ?? "unmapped"}</span>;
               if (!p.editable) {
                 return (
                   <Li key={a.id} onClick={() => p.goAttribute(a.id)} meta={meta}>

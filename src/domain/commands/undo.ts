@@ -101,6 +101,12 @@ export interface ModuleUndoTable {
   action?: (e: ChangeEvent) => WorkspaceAction;
   /** A column added after rows were recorded: the value an older image without it stands for (F6). */
   defaults?: Readonly<Record<string, unknown>>;
+  /**
+   * Rows of another module table that point to this one and take it along, whole, when the cascade deletes them because
+   * their own parent in `via` went (slice 15c, Q-5): `[table, column pointing here, via]`. A row of that table deleted on
+   * purpose (not by the cascade) leaves this one; its other rows then go with it by `parents`.
+   */
+  goesWhole?: readonly (readonly [table: string, column: string, via: string])[];
 }
 /** A module's table is in the undo history or outside it, as InfoMapper's are. */
 export type ModuleTableClass = ModuleUndoTable | "outside undo";
@@ -115,6 +121,8 @@ export interface UndoTables {
   readonly nouns: Readonly<Record<string, string>>;
   readonly actions: Readonly<Record<string, (e: ChangeEvent) => WorkspaceAction>>;
   readonly defaults: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
+  /** By module table: the rows that take it along whole (`ModuleUndoTable.goesWhole`, slice 15c). */
+  readonly goesWhole: Readonly<Record<string, readonly (readonly [string, string, string])[]>>;
 }
 
 /** The workspace's current rows of every undoable table, deleted rows included; a module's under its table's name. */
@@ -185,6 +193,7 @@ export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleT
   const nouns: Record<string, string> = {};
   const actions: Record<string, (e: ChangeEvent) => WorkspaceAction> = {};
   const defaults: Record<string, Readonly<Record<string, unknown>>> = { ...IMAGE_DEFAULTS };
+  const goesWhole: Record<string, readonly (readonly [string, string, string])[]> = {};
   for (const [table, spec] of Object.entries(modules) as [string, ModuleTableClass | undefined][]) {
     if (!spec) continue;
     if (undoable.includes(table) || outside.has(table)) throw new Error(`The table ${table} is InfoMapper's or registered twice.`);
@@ -198,8 +207,9 @@ export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleT
     nouns[table] = spec.noun;
     if (spec.action) actions[table] = spec.action;
     if (spec.defaults) defaults[table] = spec.defaults;
+    if (spec.goesWhole?.length) goesWhole[table] = spec.goesWhole;
   }
-  return { undoable, outside, parents, nouns, actions, defaults, modules: registered };
+  return { undoable, outside, parents, nouns, actions, defaults, goesWhole, modules: registered };
 }
 
 /** InfoMapper's tables only: what undo knows without a module (tests, and InfoMapper with an empty registry). */
@@ -263,6 +273,9 @@ const SETTLE_COLUMNS = new Set(["status", "resolution", "resolved_by", "resolved
 const MAPPING_CHANGE_KINDS = new Set(["type_conflict", "business_key_changed", "rule_updated"]);
 
 /** Whether an update changed only status columns (a reviewer's approval). */
+/** Whether an event changed only a status and its approval (a module's `action` reads it, slice 15c). */
+export const statusOnlyEvent = (e: ChangeEvent): boolean => statusOnly(e);
+
 function statusOnly(e: ChangeEvent, columns: ReadonlySet<string> = STATUS_COLUMNS): boolean {
   if (!e.before_image || !e.after_image) return false;
   const changed = Object.keys({ ...e.before_image, ...e.after_image }).filter((k) => !BOOKKEEPING.has(k) && !sameValue(e.before_image![k], e.after_image![k]));

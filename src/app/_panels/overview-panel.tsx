@@ -8,6 +8,7 @@
 // one, and “Show resolved notes on the canvas”, this person's preference in this browser (not saved, no undo step).
 
 import { useContext } from "react";
+import { useModules } from "@/app/_components/modules";
 import { CanvasUiCtx } from "@/canvas/context";
 import { frameColor } from "@/canvas/frame-data";
 import { firstLine } from "@/canvas/note-data";
@@ -24,7 +25,7 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
   const look = useCanvasLook();
   const frames = ui.framesView();
   const conceptColor = (id: string) => p.ix.model.concepts.find((c) => c.id === id)?.color;
-  const cov = coverage(p.ix, entityIds);
+  const cov = coverage(p.ix, entityIds, useModules());
   const problems = p.ix.model.mappings.filter((m) => !typeCheckOf(p.ix, m).ok);
   const ents = cov.length;
   const notes = ui.notesView();
@@ -55,8 +56,9 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
             items={cov}
             testId="list-coverage"
             text={(c) => c.entity.name}
-            render={({ entity, attributes, mapped }) => (
-              <Li key={entity.id} onClick={() => p.goEntity(entity.id)} meta={`${mapped} of ${attributes}`}>
+            render={({ entity, attributes, mapped, feed }) => (
+              // a fact's or a dimension's: "{n} of {m} fed", "Attributes fed from the logical model" (slice 15c, P17)
+              <Li key={entity.id} onClick={() => p.goEntity(entity.id)} meta={`${mapped} of ${attributes}${feed ? ` ${feed.word}` : ""}`} title={feed?.title} testId="item-coverage">
                 <span className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate">{entity.name}</span>
                   <span className="h-[5px] w-[60px] flex-none overflow-hidden rounded-[3px] bg-im-line">

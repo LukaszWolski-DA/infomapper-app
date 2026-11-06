@@ -95,6 +95,7 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       centerOn: (cardId) => handle.current?.centerOn(cardId),
       showPlace: (sel) => handle.current?.showPlace(sel) ?? null,
       freeSpot: () => handle.current?.freeSpot() ?? { x: 40, y: 40 },
+      besideSpot: (anchorCardId, height, side, gap) => handle.current?.besideSpot(anchorCardId, height, side, gap) ?? null,
       registerCanvas: (h) => {
         handle.current = h;
       },
@@ -104,6 +105,7 @@ export function CanvasProvider({ children, userId = "" }: { children: ReactNode;
       placeBeside: (cards, anchorCardId, side) => handle.current?.placeBeside(cards, anchorCardId, side),
       settled: () => handle.current?.settled() ?? Promise.resolve(),
       cardView: (cardId) => handle.current?.cardView(cardId) ?? null,
+      withCard: (cardId, write) => (handle.current ? handle.current.withCard(cardId, write) : write(1)),
       selectAll: () => handle.current?.selectAll(),
       arrangeSelection: (mode) => handle.current?.arrangeSelection(mode),
       fitSelectionWidths: () => handle.current?.fitSelectionWidths(),

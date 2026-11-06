@@ -14,6 +14,7 @@ import { findViolation, type DevDb } from "@/data/local/schema";
 import { buildSeed, SEED_IDS } from "@/data/local/seed";
 import { createLocalDataStore } from "@/data/local/store";
 import type { InfoCubeDb } from "@/modules/infocube/data/tables";
+import { FEED_WORDS } from "@/modules/infocube/domain/view";
 
 const WS = SEED_IDS.wsRetailDwh;
 const ACTIONS = { fact: async () => ({ ok: false as const, message: "" }), dimension: async () => ({ ok: false as const, message: "" }) };
@@ -106,7 +107,7 @@ describe("the pages' module view from the star (E6, E7, E13)", () => {
     const [workspace, model] = await Promise.all([store.workspaces.get(WS), store.model.load(WS)]);
     const view = await moduleView(store, workspace!, model, ACTIONS);
     const db = await readDb(file);
-    expect(view.roles[named(db, "Fact Sales").id]).toEqual({ text: "Fact", title: "A fact: one row per its grain (InfoCube)", card: "dimn fact", mark: "cube" });
+    expect(view.roles[named(db, "Fact Sales").id]).toEqual({ text: "Fact", title: "A fact: one row per its grain (InfoCube)", card: "dimn fact", mark: "cube", coverage: "fed from the logical model", feed: FEED_WORDS });
     expect(view.roles[named(db, "Dim Date").id]).toMatchObject({ text: "Dimension", card: "dimn dimension" });
     expect(view.roles[named(db, "Customer").id]).toBeUndefined();
     expect(view.tabs.map((t) => [t.id, t.name, t.sections.map((s) => [s.title, s.entities.map((e) => e.meta)])])).toEqual([
@@ -126,9 +127,12 @@ describe("the pages' module view from the star (E6, E7, E13)", () => {
     expect(Object.keys(view.rowMarks)).toHaveLength(6);
     expect(view.rowMarks[attr("Fact Sales", "quantity")]).toBe("meas add");
     expect(view.rowMarks[attr("Fact Sales", "unit_price")]).toBe("meas non");
-    expect(view.attributeDeletes[attr("Fact Sales", "quantity")]).toEqual({ also: ["1 measure"], then: [] });
+    // slice 15c (X-3, P10): its dimensional mapping too, which the delete's toast counts
+    expect(view.attributeDeletes[attr("Fact Sales", "quantity")]).toEqual({ also: ["1 measure", "1 dimensional mapping"], then: [], toast: ["1 dimensional mapping"] });
     expect(view.attributeDeletes[attr("Fact Sales", "ship_date_key")]).toEqual({ also: [], then: ["the link to Dim Date as Ship date is deleted, the relationship stays"] });
-    expect(view.attributeDeletes[attr("Fact Sales", "order_number")]).toBeUndefined();
+    // no measure and no key, but fed (slice 15c, X-3)
+    expect(view.attributeDeletes[attr("Fact Sales", "order_number")]).toEqual({ also: ["1 dimensional mapping"], then: [], toast: ["1 dimensional mapping"] });
+    expect(view.attributeDeletes[attr("Dim Date", "date_key")]).toBeUndefined();
     const rows = view.data.infocube as { cubeEntities: object[]; cubeMeasures: object[]; cubeKeys: object[] };
     expect([rows.cubeEntities.length, rows.cubeMeasures.length, rows.cubeKeys.length]).toEqual([5, 6, 6]);
     for (const r of [...rows.cubeEntities, ...rows.cubeMeasures, ...rows.cubeKeys]) expect(Object.keys(r).some((k) => k.startsWith("created_") || k.startsWith("updated_"))).toBe(false);
@@ -137,7 +141,7 @@ describe("the pages' module view from the star (E6, E7, E13)", () => {
   it("gives nothing for a workspace with InfoCube off and no facts or dimensions", async () => {
     const store = createLocalDataStore(file, STORE_SCHEMA);
     const [workspace, model] = await Promise.all([store.workspaces.get(SEED_IDS.wsBankX), store.model.load(SEED_IDS.wsBankX)]);
-    expect(await moduleView(store, workspace!, model, ACTIONS)).toEqual({ roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, data: {} });
+    expect(await moduleView(store, workspace!, model, ACTIONS)).toEqual({ roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, rowFeeds: {}, data: {} });
   });
 
   it("lists a dimension's own rows in its delete preview, each fact once (X-4)", async () => {
@@ -154,7 +158,13 @@ describe("the pages' module view from the star (E6, E7, E13)", () => {
     expect(await moduleEntityDependents(store, WS, named(db, "Fact Sales").id, model)).toEqual([
       ["Fact", "its grain (“One order line”) deleted"],
       ["4 measures", "deleted"],
+      // slice 15c (X-4)
+      ["8 dimensional mappings", "deleted, 7 of them approved"],
     ]);
-    expect(await moduleEntityDependents(store, WS, named(db, "Customer").id, model)).toEqual([]);
+    // a logical entity's (slice 15c, X-2): the mappings reading its attributes and what loses its feed
+    expect(await moduleEntityDependents(store, WS, named(db, "Customer").id, model)).toEqual([
+      ["2 dimensional mappings", "deleted, 2 of them approved"],
+      ["Dim Customer", "loses its feed from the logical model"],
+    ]);
   });
 });

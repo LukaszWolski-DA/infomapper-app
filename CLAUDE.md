@@ -31,7 +31,10 @@ module (slice 15a, AD-33 to AD-35): an organization's licence and a workspace's 
 of the dimensional level with a role, a Cube tab, relationships and paste within a level, and source columns mapped to
 logical attributes only. A fact has a grain, measures (Σ marks on its rows) and its dimensions with the keys that carry
 them; a dimension has an SCD type; every relationship has a role name per end, on its pill, so one dimension plays
-several roles (slice 15b, D-68).
+several roles (slice 15b, D-68). Dimensional mappings feed a fact's or a dimension's attributes from logical attributes:
+lines between rows, drawn by a drag in either direction, with their own panel, approved by reviewers with four-eyes and
+sent back to review by D-51's first rule; a dimensional entity's coverage counts what is fed, and "Create dimension from
+this…" makes a dimension from a logical entity (slice 15c, AD-36, D-69).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -97,6 +100,8 @@ list up to date in each sub-slice):
   `getDataStore(STORE_SCHEMA)` (the default store knows InfoMapper's tables only and throws).
 - **Cascades:** `moduleCascade` (`src/domain/commands/module-cascade.ts`, run by `runCommand`): a module's rows that
   point to a deleted InfoMapper row go in the same change group; the parents are the ones the module registered for undo.
+  Since slice 15c a table may also go whole with a row that points to it (`goesWhole` in its undo registration, Q-5):
+  a dimensional mapping goes when the cascade deletes one of its inputs; an input removed on purpose leaves it.
 - **Rules InfoMapper's commands take as arguments** (`src/compose/model.ts`, e.g. `relationshipOneEnd`) and the level
   rules on every write set (`src/domain/model/levels.ts`: `levelWritesRefusal`, `mappingWritesRefusal`).
 - **Pages:** `ModuleView` (`src/ui/modules.ts`, built by `moduleView` in `src/compose/view.ts`): plain data and server
@@ -107,11 +112,28 @@ list up to date in each sub-slice):
   argument to `CardRow.mark`; `withClips` counts `ROW_MARK`), `attributeDeletes` (what an attribute's delete takes
   along, for its second click: `also` and `then`, joined by `attributeDeleteParts` in `src/app/_panels/fields.tsx`, the
   panel's and the canvas menu's) and `data` (each module's own rows for its panel sections, keyed by the module,
-  without `created_*` and `updated_*`; InfoMapper never reads it).
+  without `created_*` and `updated_*`; InfoMapper never reads it). Since slice 15c:
+  - `rowFeeds` (by attribute id: `n` inputs, the row dot's `title`, the entity panel's `list` text): a module's own
+    coverage of a row, read by the card's dot, the Mapped filter, the coverage bar, the entity panel, the Overview
+    (`coverage` in `stats.ts`) and the thumbnails; `EntityRole.feed` gives the words ("fed", "no feed", the titles).
+    The homes and the thumbnail route read it through `moduleRowFeeds` (`src/compose/view.ts`, the composed store);
+  - `AttributeDelete.toast` (the delete toast's parts, P10);
+  - `moduleView` takes the page's change events: a module's four-eyes reads its own change log with
+    `lastContentEditor(row, events, log)` (`MappingLog`, `src/domain/model/mapping-rules.ts`).
+- **Canvas lines and objects** (slice 15c): `CanvasLines.modules` (`ModuleLineData`, `src/canvas/line-data.ts`; built
+  by `moduleLines` in `src/compose/view.ts`): lines between entity rows, drawn from what the module says (a class, a
+  colour, an end mark, a chip). Code that does not know them leaves them out (as `sources`); hover, Focus, the Changes
+  view, collapsed frames and the miniature handle them. Their selection is `{ t: "ext", kind, id }`, a history place.
+  `CANVAS_EXTENSIONS` (`src/compose/canvas.ts`, apart from the index): per kind a `CanvasExtension`: `useHandlers`, a
+  hook the canvas host calls once per render with `CanvasExtContext` (its line's text when gone, its menu, Delete, a
+  row's drag with what it lights and its drops, `cardMenu` items before "Delete from model…", an `overlay` such as its
+  own dialog), and its `Panel` in the details panel (`src/canvas/extensions.ts`).
 - **Panel sections** (slice 15b): `PANEL_SECTIONS` (`src/compose/panels.ts`): the entity, attribute and relationship
   panels render every module's section of their kind (the entity's after its definition, the attribute's before it,
   the relationship's before its actions) and pass only the panel's own props. A module's section saves on the chain
-  (`saveRow`, `saveRows`, `useChoice`, `TextField` with `keep`) through its own actions.
+  (`saveRow`, `saveRows`, `useChoice`, `TextField` with `keep`) through its own actions. Since slice 15c
+  `attributeFeeds`: after InfoMapper's "Comes from", which a dimensional attribute does not show (its feeds are the
+  module's).
 - Server actions a module's `app` part needs from InfoMapper live outside "use server" files (`src/app/_lib/model-command.ts`):
   every export of a "use server" file is a server action. `CREATE_ACTIONS` is in `src/compose/actions.ts`, apart from
   the index, so tests that import `@/compose` never load server-only code.
@@ -658,6 +680,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     pill `pillText` in `line-data.ts`); a key link (`cube_key`) is written only to an existing foreign key and kept,
     inactive, while its attribute is no foreign key. Parallel relationships and nested loops are `RELATIONSHIP_GAP`
     (20 px) apart; source relationships keep 16 px.
+  - **15c** (AD-36, D-69): dimensional mappings are `cube_mapping` and `cube_mapping_input` (logical attribute(s) →
+    dimensional attribute), their commands in `src/modules/infocube/domain/mappings.ts` (one undo step each; the header
+    drop is "Create attribute and its mapping", Create dimension "Create dimension"), the lines in `canvas/lines.ts`,
+    the hook `useCubeCanvas` (`app/canvas-ext.tsx`: the row drag and drops, the veil, the menu, "Create dimension from
+    this…"), the panel `mapping-panel.tsx`, the attribute sections `feeds.tsx`. D-51's first rule and four-eyes are
+    InfoMapper's (`BACK_TO_REVIEW_MESSAGE`, `checkFourEyes`, `CUBE_MAPPING_LOG`). A dimensional attribute has no source
+    mapping; its "Mapped" filter, dot and coverage read `rowFeeds`. A new card beside another goes in the canvas's free
+    spot (`ui.besideSpot`, `besideSpots`).
   - **The star** is written only by `npm run seed`, `npm run reset-dev-data`, `npm run demo` and slice 15a's fixtures,
     never by the e2e reseed of earlier slices, so their specs and the element guard stay comparable.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine

@@ -66,7 +66,7 @@ import { DropHint, DropTargetMark, moveDropHint } from "./RequirementDrop";
 import type { LabelTarget } from "@/domain/model/labels";
 import { NOTE_TOOL_HINT, RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
-import { DraftLine, useColumnDrag } from "./ColumnDrag";
+import { DraftLines, useColumnDrag } from "./ColumnDrag";
 import { NUDGE, useGroupActions, type GroupWrites } from "./GroupActions";
 import { conceptAsk, frameChips, frameColor, frameShape, frameStats, memberCounts, type FrameData } from "./frame-data";
 import { conceptQuestions, frameAt as smallestFrameAt } from "@/domain/model/frames";
@@ -87,7 +87,7 @@ import SelectionOverlay from "./SelectionOverlay";
 import { afterLasso, allKeys, cardKey, frameKey, fromKeys, lassoHits, noteKey, reqKey, toggleCard as toggledSelection, toggleItem, unitsOf, type ItemBox } from "./selection";
 import { fitWidth as fitWidthOf } from "./text-fit";
 import { readPreference, writePreference } from "./CanvasProvider";
-import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, REQ_CARD_DRAG_TYPE, REQ_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis, type NoteListItem } from "./context";
+import { CanvasCardsCtx, CanvasUiCtx, CARD_DRAG_TYPE, DiagnosisCtx, REQ_CARD_DRAG_TYPE, REQ_DRAG_TYPE, type CanvasCardsApi, type CardTarget, type ColumnDrop, type Diagnosis, type RowDrag, type RowDragFrom, type RowDrop, type RowDropTarget, type NoteListItem } from "./context";
 import {
   besideAnchor,
   besideSpots,
@@ -353,9 +353,10 @@ export function ModelCanvas({
         : layer === "all"
         ? allLines
         : layer === "relationships"
-        ? { ...allLines, mappings: [] }
+        ? // and a module's lines between rows (slice 15c: InfoCube's mappings are mappings)
+          { mappings: [], relationships: allLines.relationships, ...(allLines.sources ? { sources: allLines.sources } : {}) }
         : // Mappings also hides the relationships between source tables (slice 10b, D-62)
-          { mappings: allLines.mappings, relationships: [] },
+          { mappings: allLines.mappings, relationships: [], ...(allLines.modules ? { modules: allLines.modules } : {}) },
     [allLines, layer, diagnosis.noLines],
   );
   const { selection, select, registerCanvas } = ui;
@@ -386,9 +387,23 @@ export function ModelCanvas({
   const [hoverStore] = useState(() =>
     createValueStore<Selection>(null, (a, b) => a?.t === b?.t && (a && "id" in a ? a.id : null) === (b && "id" in b ? b.id : null)),
   );
-  const related = useMemo(() => relatedLines(selection, lines), [selection, lines]);
+  // a selected module's line fades nothing (slice 15c; prototype: only a mapping, a relationship, a row or a bundle does)
+  const related = useMemo(() => (selection?.t === "ext" ? null : relatedLines(selection, lines)), [selection, lines]);
   const onColumnDrop = useCallback((drop: ColumnDrop) => ui.host()?.dropColumn(drop), [ui]);
-  const { draft, onPointerDown } = useColumnDrag(editable, onColumnDrop);
+  // slice 15c: the page says what a row's drag does (a column's maps onto entity rows and cards, as before, while it has
+  // no say); an entity row's drag only when it allows one
+  const rowDrags = useMemo(
+    () => ({
+      drag: (from: RowDragFrom): RowDrag | null =>
+        ui.host()?.rowDrag(from) ?? ("columnId" in from ? { lit: null, plan: (t: RowDropTarget) => ("columnId" in t ? "none" : "ok") } : null),
+      drop: (drop: RowDrop) => ui.host()?.dropRow(drop),
+      refuse: (text: string) => toast(text),
+      // no hover while dragging (the hover's own handler skips moves with a button down)
+      start: () => hoverStore.set(null),
+    }),
+    [ui, toast, hoverStore],
+  );
+  const { draftStore, onPointerDown } = useColumnDrag(editable, onColumnDrop, rowDrags);
   const modes = useCanvasModes(editable);
 
   // ---- view: the remembered one, else fit everything ----
@@ -553,6 +568,12 @@ export function ModelCanvas({
       if ((e.key === "Delete" || e.key === "Backspace") && editable && (selection?.t === "map" || selection?.t === "rel")) {
         e.preventDefault();
         ui.host()?.deleteLine({ t: selection.t, id: selection.id });
+        return;
+      }
+      // a module's object (slice 15c): its own delete, with Undo in the toast
+      if ((e.key === "Delete" || e.key === "Backspace") && editable && selection?.t === "ext") {
+        e.preventDefault();
+        ui.host()?.deleteExt(selection.kind, selection.id);
         return;
       }
       if ((e.key === "Delete" || e.key === "Backspace") && editable && selection?.t === "frame") {
@@ -764,6 +785,24 @@ export function ModelCanvas({
       });
     },
     [patchCard, saveCard, toast, enqueue, ui],
+  );
+
+  /** A model write that also writes a card, on the card's queue (slice 15c, `withCard`). */
+  const withCard = useCallback(
+    <T extends { ok: boolean; versions?: Record<string, number> }>(id: string, write: (expectedVersion: number) => Promise<T>): Promise<T> =>
+      new Promise<T>((resolve, reject) => {
+        enqueue(id, async () => {
+          try {
+            const result = await write(versions.current.get(id) ?? 1);
+            const v = result.ok ? result.versions?.[id] : undefined;
+            if (v !== undefined) versions.current.set(id, v);
+            resolve(result);
+          } catch (e) {
+            reject(e);
+          }
+        });
+      }),
+    [enqueue],
   );
 
   // ---- names or aliases (slice 11, D-64): the canvas's two modes, applied to every entity card in one commit ----
@@ -1362,7 +1401,7 @@ export function ModelCanvas({
   });
   const cardData = useMemo(() => nodes.map((n) => n.data.card), [nodes]);
   // what Focus is on for this selection (slice 4b-1, item 21); Focus itself is a store of its own (`FocusDriver`)
-  const focusTarget = useMemo(() => focusTargetOf(selection, cardData), [selection, cardData]);
+  const focusTarget = useMemo(() => focusTargetOf(selection, cardData, lines), [selection, cardData, lines]);
   const reqIdsKey = useMemo(() => reqNodes.map((n) => n.data.card.requirementId).join(","), [reqNodes]);
   // The panels that show frames draw again when frames, their cards or the cards' numbers change; not on a move.
   const layoutKey = useMemo(
@@ -1833,6 +1872,12 @@ export function ModelCanvas({
         case "rel":
           if (model && !model.relationships.some((r) => r.id === sel.id)) gone = "rel";
           break;
+        case "ext": {
+          // a module's object (slice 15c, C8): selected without moving the view, as a mapping; the module says if it is gone
+          const text = ui.host()?.extGone(sel.kind, sel.id);
+          if (text) gone = { text };
+          break;
+        }
         case "frame": {
           const f = frameRectsNow().find(({ f }) => f.id === sel.id);
           if (!f) gone = "frame";
@@ -1865,7 +1910,7 @@ export function ModelCanvas({
       if (rect && (rect.x + rect.w < v.x || rect.x > v.x + v.w || rect.y + rect.h < v.y || rect.y > v.y + v.h)) centerOnRect(rect);
       return null;
     },
-    [fadeData, rf, frameRectsNow, notesNow, reqNodeOf, select, viewRect, centerOnRect],
+    [fadeData, rf, frameRectsNow, notesNow, reqNodeOf, select, viewRect, centerOnRect, ui],
   );
 
   useEffect(() => {
@@ -1877,9 +1922,17 @@ export function ModelCanvas({
       centerOn,
       showPlace,
       freeSpot: () => freeSpot(viewRect(), occupied()),
+      besideSpot: (anchorCardId, height, side, gap) => {
+        const anchor = rf.getNode(anchorCardId) as CardNodeT | undefined;
+        if (!anchor) return null;
+        const block = frameRectsNow().find(({ f }) => f.collapsed && f.id === anchor.data.card.frameId)?.r ?? null;
+        const a = besideAnchor({ x: anchor.position.x, y: anchor.position.y, w: cardWidth(anchor.data.card), h: cardHeight(anchor.data.card) }, block);
+        return besideSpots(a, side, [height], occupied(), CARD_W, gap)[0] ?? null;
+      },
       fitWidth,
       placeBeside: (cards, anchorCardId, side) => void placeBeside(cards, anchorCardId, side),
       settled,
+      withCard,
       cardView: (id) => {
         const card = (rf.getNode(id) as CardNodeT | undefined)?.data.card;
         if (!card) return null;
@@ -1964,7 +2017,7 @@ export function ModelCanvas({
       },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, noteState.drafts, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, frameRectsNow, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, withCard, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, noteState.drafts, notesNow, nameOf, select, centerOnRect, live, toast]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store
@@ -2213,7 +2266,7 @@ export function ModelCanvas({
   );
 
   // ---- hover (C-10): a row of a card or a mapping line; nothing while dragging, drawing a lasso or with a tool on ----
-  const busy = !!draft || !!ui.mode || resize.resizing || frameState.busy || noteState.dragging;
+  const busy = !!ui.mode || resize.resizing || frameState.busy || noteState.dragging;
   const onHoverOver = useCallback(
     (e: React.PointerEvent) => {
       if (e.buttons) return;
@@ -2221,7 +2274,11 @@ export function ModelCanvas({
       const row = el.closest<HTMLElement>(".row[data-row]");
       const cardId = row?.closest<HTMLElement>("[data-card]")?.dataset.card;
       const mappingId = el.closest<SVGElement>("[data-mapping]")?.dataset.mapping;
-      hoverStore.set(row && cardId ? { t: "row", cardId, id: row.dataset.row! } : mappingId ? { t: "map", id: mappingId } : null);
+      // a module's line (slice 15c)
+      const ext = row || mappingId ? null : el.closest<SVGElement>("[data-ext]");
+      hoverStore.set(
+        row && cardId ? { t: "row", cardId, id: row.dataset.row! } : mappingId ? { t: "map", id: mappingId } : ext ? { t: "ext", kind: ext.dataset.extKind!, id: ext.dataset.ext! } : null,
+      );
     },
     [hoverStore],
   );
@@ -2365,7 +2422,7 @@ export function ModelCanvas({
           </OverlayLayer>
           <FocusDriver target={focusTarget} canvasId={canvasId} />
           <ChangesDriver data={fadeData} canvasId={canvasId} />
-          {draft && <DraftLine draft={draft} />}
+          <DraftLines store={draftStore} />
           {modes.relateFrom && modes.cursor && <RelateLine fromCardId={modes.relateFrom} cursor={modes.cursor} />}
         </ReactFlow>
         {asking && <ConceptQuestion question={asking.question} onAnswer={asking.answer} kind={asking.kind} />}
