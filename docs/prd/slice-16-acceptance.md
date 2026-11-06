@@ -344,3 +344,77 @@ Item 4, item 6 and item 7 add no text.
   - S16-10 keeps links' menus.
 
 The PRD has a section 0 with these answers; where it and a later section disagree, section 0 wins.
+
+## Step 2: the fixes, items 4 to 6 (6 November 2026)
+
+### What changed
+
+- **Item 4, the right-button pan** (`src/canvas/CanvasModes.tsx`):
+  - The right press records whether it has come up (`rightDown.released`).
+  - A `contextmenu` that comes while the right button is still down waits for the release (`rightPending`). That is
+    the case on Linux and macOS, which fire it on the press.
+  - A window `pointerup` of the right button (capture phase; `pointerup`, since d3-zoom swallows the mouse events of
+    a pan) then opens the toolbox for the pressed element, if the mouse moved no more than `CLICK_SLOP`. A right drag
+    pans with no toolbox.
+  - Windows fires `contextmenu` after the release: the press is already up, and today's check runs unchanged.
+  - A `contextmenu` with no right press (the keyboard's menu key, a touch long-press) opens the toolbox at once, as
+    before.
+  - The toolbox's code moved into `openToolboxAt`, unchanged.
+- **Item 5, the top bar** (`top-bar.tsx`, `working-context.tsx`):
+  - `bar-tools` may shrink (`min-w-0`, `shrink-[0.001]`). Its tiny weight lets the three switchers shorten first, as
+    before; only what is still missing once they are at their 52 px minimum comes out of the tools.
+  - In the tools, the working context's wrapper and button are the only items that shrink (`min-w-0`). The label keeps
+    its caps (180, 90, 56, 40 px) as maximums and gets a minimum of 40 px (`min-w-10`).
+  - While a context is on, the button's title is "Working on {name}. Everything you create or change in the model gets
+    this label." While off, today's help text stays.
+- **Item 6, the view's save** (`ModelCanvas.tsx`):
+  - One `storeView(view?, left?)` writes `infomapper:view:<canvas id>` with the view and the left edge of the same
+    moment, and does nothing once the canvas's root is gone.
+  - The first view stores at once with the view it sets, as does the fit (its target, before its 250 ms animation).
+  - `shiftView` stores at once too. It runs in the panel's event, before the panel's new width reaches the layout, so
+    its left edge is the current one minus `dx`.
+  - `onMoveEnd` ignores React Flow's argument (the view captured 150 ms earlier) and stores the view shown now. Every
+    move the person makes is still stored (the Hand tool, the zoom, the miniature: F15).
+
+### New specs (`e2e/slice-16/`)
+
+- **S16-07**, three tests:
+  - a right drag on an empty canvas and inside a frame pans, with no toolbox and the frame unmoved;
+  - a right press shows no toolbox until the release, then one at the mouse;
+  - a `contextmenu` with no right press (what the menu key sends) opens the toolbox at once. Playwright cannot press
+    the menu key on a canvas element, so the test dispatches the event the browser sends.
+- **S16-08:** at 13 widths from 2,560 to 800 px (S6A-10's, plus 1,250) the bar never scrolls and the label keeps 40 px
+  at least. At 1,201 px the label is truncated, and the title names the context. On Windows the label measured 106 px
+  wide down to 1,880 px, 105 px at 1,600 and 1,536, 90 px from 1,300 to 1,201, 56 px from 1,200 to 1,100 and 40 px at
+  1,000 and 800.
+- **S16-09**, two tests:
+  - the stored view matches the view shown and the current left edge, read once without waiting, after the open, after
+    hiding the left panel and after a fit. The fit's target is stored at the click.
+  - the window crosses 1,000 px right after an open. React Flow's late save may come before or after the crossing, so
+    the stored left edge is 264 or 0, and the reload shows the model where that view had it.
+
+### Earlier tests changed, and why
+
+| Spec | Change | Why |
+| --- | --- | --- |
+| `e2e/slice-02b/S2B-06.spec.ts` | the right-drag test loses `test.fail(process.platform !== "win32", …)` | item 4: it passes on every platform |
+| `e2e/slice-06a/S6A-10.spec.ts` | the 1,201 px test loses `test.fail(process.platform === "linux", …)`; the loop checks the scroll at 1,201 px too (`if (width !== 1201)` removed) | item 5 |
+
+`viewStored` (`e2e/slice-05a/helpers.ts`) stays in S5A-07 and S6A-11, as the PRD says. React Flow's late `onMoveEnd`
+still stores the view, now as a consistent pair, so a test that writes the key itself waits for it first.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`, `npm test`: pass (142 files, 1,779 tests), locally. The `ci.yml` workflow runs only on
+  pull requests and pushes to `main`; the branch has no pull request yet.
+- **Locally on Windows, `50a3b45`:**
+  - S2B-06: 2 of 2;
+  - the new specs with S6A-10, S5A-07 and S6A-11;
+  - D-54's specs: S5A-03, S6A-06, S6B-04, S6B-05, S9-13;
+  - right-click and right-drag specs: S1B-07, S2A-07, S3A-13, S4B1-08, S10A-09, S11-10, S15-22;
+  - the working context: S3B-01, S3B-04.
+
+  All passed.
+- **Single-file check on the runner**, `50a3b45`, rounds 3
+  ([42275302033](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42275302033)): S2B-06, S6A-10, S5A-07,
+  S6A-11, S16-07, S16-08 and S16-09, **15 passed in each of the three rounds**.

@@ -452,12 +452,18 @@ export function ModelCanvas({
    * the left edge are read at the same moment (`view` when the app has just set it, else the view shown now), and
    * nothing is stored once the canvas is gone (a page being left still runs React Flow's timer).
    */
+  /** What this canvas stored last: React Flow's late call after the app's own change finds it unchanged and stores nothing. */
+  const lastStored = useRef<{ x: number; y: number; zoom: number; left: number } | null>(null);
   const storeView = useCallback(
-    (view?: Viewport, left?: number) => {
+    (view?: Viewport, left?: number, onlyIfChanged = false) => {
       const root = rootRef.current;
       if (!root?.isConnected) return;
       const [x, y, zoom] = view ? [view.x, view.y, view.zoom] : storeApi.getState().transform;
-      writePreference(viewKey(canvasId), JSON.stringify({ x, y, zoom, left: left ?? Math.round(root.getBoundingClientRect().left) }));
+      const next = { x, y, zoom, left: left ?? Math.round(root.getBoundingClientRect().left) };
+      const last = lastStored.current;
+      if (onlyIfChanged && last && last.left === next.left && Math.abs(last.x - x) < 0.01 && Math.abs(last.y - y) < 0.01 && Math.abs(last.zoom - zoom) < 1e-6) return;
+      lastStored.current = next;
+      writePreference(viewKey(canvasId), JSON.stringify(next));
     },
     [canvasId, storeApi],
   );
@@ -483,8 +489,9 @@ export function ModelCanvas({
   );
 
   // React Flow calls it 150 ms after any view change (`panOnScroll`), the app's own ones too, with the view of the
-  // change's end: the view shown now is stored instead, with the left edge of now (slice 16, item 6)
-  const onMoveEnd = useCallback(() => storeView(), [storeView]);
+  // change's end: the view shown now is stored instead, with the left edge of now, unless it is what the app's own
+  // change already stored (slice 16, item 6): that late call is no new move
+  const onMoveEnd = useCallback(() => storeView(undefined, undefined, true), [storeView]);
 
   // ---- the grid (D-12): one CSS background behind the pane, on its own layer. Panning moves that layer by less than
   // one grid step (no repaint); zooming changes the step. Set without a render. ----
