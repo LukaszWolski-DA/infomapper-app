@@ -598,3 +598,15 @@ their evidence are in the pull request's description (so that the tested commit 
 
 If both runs are green: stop, the pull request is ready for Łukasz's merge command. If either is not: stop and report the
 failure with its trace and an isolated check (rounds 3); fix nothing before his answer. No merge.
+
+### The five files on Windows (answer 4)
+
+One local run on the laptop after Łukasz stopped his dev server (`npm run e2e -- <the five files>`, commit `4a53043`,
+2.6 min): **10 passed**, nothing skipped. S2B-06 2 of 2 (the right drag, an expected failure off Windows, passes as an
+ordinary test), S2C-03 2 of 2, S6A-07 1 of 1, S6A-10 2 of 2 (1,201 px, an expected failure on Linux only, passes),
+S10A-05 3 of 3.
+
+### The two full runs
+
+On the final commit, the first started by the label `full-e2e` on PR #39, the second by `workflow_dispatch` after the
+first had ended: their links, figures and the criteria with their evidence are in the pull request's description.
