@@ -3367,3 +3367,108 @@ The spec's default is what the app does already (D15). Nothing to build; the "+"
 - **Y9 and Y10:** not decided yet. Step 2's report quotes D-70's draft, the extensions on D-31 and D-32, and every new or
   changed interface text in full, for approval before step 3.
 - **S15-24:** accepted. **P27–P31:** one sentence each in step 2's report; accepted then.
+
+## 15d step 2: the domain (6 November 2026)
+
+### What changed
+
+- **Docs first** (`c178263`, Y8): README's status line (the CI chore merged, 15d on its branch) and
+  `chore-ci-e2e.md`'s status line ("merged on 6 November 2026, PR 39, `0c6bb1d`").
+- **`AttributeFeeds`** (`src/domain/model/requirements.ts`; D3):
+  - `{ id, approved, typeConflict, inputs }` per dimensional mapping, keyed by its target attribute;
+  - an optional last argument of `lookupModel`, `buildRequirementIndex`, `requirementScope`, `requirementCoverage`,
+    `requirementsOf` and `coverageDelta`; without it every result is today's (the unit tests of slices 4a to 7b pass
+    unchanged).
+- **Coverage by D-31's rule at the dimensional level** (Y1, D2): a dimensional attribute is covered when one of its
+  feeds is approved, has no type conflict and reads only live logical attributes that are covered by their own
+  mappings. One level, no recursion; an input that is not a live logical attribute counts as not covered.
+  - InfoMapper decides by the level (`isDimensional`); a logical attribute keeps its own rule.
+  - `feedReason(id)`: `logical_feed` (an approved feed without a type conflict whose inputs are not all covered),
+    `type_conflict` (the only approved feeds have a type conflict), else null.
+- **The scope** (D6): for every dimensional attribute in scope, each feed's id goes to `scope.feeds`, its inputs to
+  `scope.attributes` and to `scope.feeding` (not items), their entities to `scope.entities`. Both sets are present only
+  when there is a feed, so every earlier scope reads as before.
+- **The index** exposes `attributeCoverage(id)`, `feedReason(id)` and `isDimensional(id)` for the panel and the lens.
+- **The feeds in all seven places** (D4):
+  - the canvas page (server: `requirementFeeds(modules, model)` for the tree, the requirement cards, the status bar);
+  - the project home and the workspace home (`moduleFeeds`: one read of the dimensional mappings for the thumbnails'
+    `rowFeeds` and the requirement feeds);
+  - the inspector, the canvas (lens and Focus) and the import review: in the browser, through `RequirementFeedsCtx`
+    (`src/canvas/fade-canvas.tsx`), which `ModulesProvider` fills from the page's module rows once per data version
+    (`src/compose/feeds.ts`, pure, no data layer); **no new bytes on the page**;
+  - a source's delete preview (`sourceDeleteImpactAction` → `sourceDeleteImpact`'s `feeds` → `coverageDelta`).
+  - **Two deviations from step 1's proposal**, both smaller: `FadeData` and `ImportData` did not grow (the context
+    serves the canvas, the inspector and the wizard alike); `moduleRowFeeds` stays as a one-line wrapper of the new
+    `moduleFeeds`, so the thumbnail route and its unit test are unchanged.
+- **`coverageDelta`** (the import review, a source's delete): a lost dimensional item's reasons come from the mappings of
+  its approved feeds' inputs ("segment_code: mapping back to review", InfoMapper's text unchanged).
+- **The requirement panel's reasons** (D5, Y3): "not fed" for a dimensional attribute without a feed (a logical one keeps
+  "unmapped"); for an item with mappings none of which counts: "not approved" (as today), "logical feed not covered" or
+  "type conflict". The warning dot follows the bucket (mapped, not approved), no longer the text.
+- **InfoCube** (`src/modules/infocube/domain/`):
+  - `hasTypeConflict` (D-31's rule with 15c's `typesDiffer`: a transformation with a rule passes; otherwise any input
+    whose type differs from the target's) and `cubeRequirementFeeds`;
+  - `fedFromConcepts` (D14) and `conceptFeeds` in `src/compose/feeds.ts`;
+  - `bus-matrix.ts`: `busMatrix` (facts and dimensions as the Cube tab lists them, one dot per relationship with its
+    key and title, facts per dimension) and its texts; `busMatrixAction` through `modelRead` (`src/app/_lib/
+    model-command.ts`: the session, a member in any role, an unlocked organization, the composed store, the store's
+    read only; Y5);
+  - `cubeIndex.factKeys` groups the relationships by fact once (D12).
+- **REQ-210** in `addSalesStar`, with its key, three links and no card; the counter untouched. An existing demo file
+  gets it only with `npm run demo -- --reset` (the star is written once); KB has no star and no REQ-210.
+- **The bench** (`scripts/bench-requirement-index.ts`, `syntheticIndexInput({ feeds: true })`): both variants in one run.
+
+### Y1's check on the star's seed
+
+- **REQ-210 stays at 0 of 3** (`tests/infocube-requirements.test.ts`): net_amount "not approved" (its feed is In
+  review), segment_code "logical feed not covered" (approved, no type conflict, Customer.segment_code without a source
+  mapping), month "not fed".
+- **No approved feed of the star has a type conflict** (`typesDiffer` compares the type words without lengths: Customer.
+  segment_code `string(3)` → Dim Customer.segment_code `string` is no conflict).
+- **The type conflict's text:** InfoMapper's existing wording is "{attribute}: type conflict", a reason line of the
+  coverage delta that names the attribute. The requirement panel's gap row already shows the attribute beside its
+  reason, so the unchanged text would name it twice; the panel says **"type conflict"** (a new text, listed for Y10).
+  In the coverage delta the existing text is used unchanged.
+- **Found on the way, not changed:** a logical attribute whose only approved mapping has a type conflict shows "not
+  approved" in the panel today. "type conflict" would fit it too; an idea for later, not 15d.
+
+### The bench (Y7, Node, this laptop, three runs of 30 builds each)
+
+| Run | Without feeds (median) | With feeds (median) | With / without |
+| --- | ---: | ---: | ---: |
+| 1 | 27.3 ms | 25.5 ms | −6 % |
+| 2 | 24.8 ms | 25.4 ms | +2 % |
+| 3 | 25.0 ms | 25.0 ms | 0 % |
+
+With feeds: 6,000 attributes, 1,500 feeds, 3,300 links. The median with feeds (25.0–25.5 ms) is within step 1's
+23.7–27.5 ms, well under the bar of +25 %.
+
+### Tests
+
+- **New:** `tests/infocube-requirements.test.ts`, 12 tests:
+  - REQ-210's rows, its 0 of 3 with the three reasons, its scope (the four feeding attributes and the five entities),
+    the index without feeds as before, 1 of 3 with an approved source mapping on Customer.segment_code;
+  - the coverage rule (approved, type conflict, an input that is not logical), the star's feeds without type
+    conflicts, `moduleFeeds` against `requirementFeeds`;
+  - `coverageDelta` naming REQ-210 when Customer.segment_code's mapping goes back to review;
+  - "Fed from concepts" on Fact Sales ("Sales · 8", Order Line and Sales Order), Dim Customer ("Customer · 3",
+    "Reference data · 1"), Dim Date and a logical entity (none);
+  - the bus matrix on the star (order, grains, SCD types, facts per dimension, Fact Sales × Dim Date's two titles, the
+    hollow dot without `ship_date_key`'s FK flag) and on a generated 50 × 100 model with 300 relationships.
+- **Earlier tests changed:** none.
+- **CI locally:** `npm run lint`, `npm run typecheck`, `npm test` (142 files, 1,778 tests) pass.
+- **e2e (Q1's list and slice 15's, by folder, GitHub Actions on `ca0542b`, two single-file checks of one round each,
+  no full run, Y8):** 135 passed, 0 failed, 0 skipped, 0 flaky.
+  - [42240992841](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42240992841): slice-04a (14),
+    slice-04b1 (14), slice-04b2 (11), slice-04p (4, the measuring specs skip themselves); 43 passed, 5 min 56 s of
+    tests, 16 min 22 s for the job (the package mirror, a known limitation).
+  - [42240997822](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42240997822): S5A-04 (9), S6B-02 (1),
+    slice-07b (31), S9-04 (9), S13-04 and S13-07 (2), slice-15a (9), slice-15b (17), slice-15c (14); 92 passed,
+    8 min 43 s of tests, 10 min 9 s for the job.
+
+### Not in this step (step 3, Y8)
+
+The lens's colours of the feeding rows (D7), `Lit.lines` and `litModules` (D8), "Fed from concepts" in the panel, the
+bus matrix's button and dialog (`ModuleTab.actions`, `TAB_DIALOGS`), the specs S15-15, S15-16, RP-10 and S15-24, the
+closing docs with D-70, and the one full run on the final commit. Until then Focus on a requirement already lights the
+feeding cards and, by 15c's card rule, every dimensional line between lit cards.
