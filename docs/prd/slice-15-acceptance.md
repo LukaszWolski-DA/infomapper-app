@@ -3472,3 +3472,19 @@ The lens's colours of the feeding rows (D7), `Lit.lines` and `litModules` (D8), 
 bus matrix's button and dialog (`ModuleTab.actions`, `TAB_DIALOGS`), the specs S15-15, S15-16, RP-10 and S15-24, the
 closing docs with D-70, and the one full run on the final commit. Until then Focus on a requirement already lights the
 feeding cards and, by 15c's card rule, every dimensional line between lit cards.
+
+## Łukasz's answers to 15d step 2 (6 November 2026)
+
+- **D-70:** approved as quoted in step 2's report. **The extensions on D-31 and D-32:** approved as quoted. All three
+  enter `docs/decisions.md` in step 3, with the closing docs.
+- **Texts:** approved as listed, with two changes:
+  1. The bus matrix's intro ends "…Built from the relationships; click a name or a dot to open it."
+  2. The "Fed from concepts" row's tooltip: "From Order Line and Sales Order (mappings in any status)"; with three or
+     more entities "From A, B and C (mappings in any status)".
+- **P27–P31:** accepted.
+- **New (option A):** a logical attribute whose only approved mappings have a type conflict shows "type conflict" in the
+  requirement panel instead of "not approved", the same rule as a fact's or a dimension's attribute, so both levels share
+  one set of reasons. Every earlier spec or unit test that asserts "not approved" for that case is listed and changed
+  only with its reason; if more than a few need changing, stop and report first. D-70 gets one sentence if needed ("…the
+  panel names a type conflict at both levels"); the final text is quoted in step 3's report.
+- **Then step 3 as agreed**, ending in one full run on the final commit in GitHub Actions. No merge.
