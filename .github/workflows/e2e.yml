@@ -21,6 +21,9 @@ on:
         type: number
   pull_request:
     types: [labeled]
+  # TEMPORARY (step 2): registers the workflow with GitHub so it can be dispatched before it is on main; runs no job
+  push:
+    branches: [chore/ci-e2e]
 
 permissions:
   contents: read
