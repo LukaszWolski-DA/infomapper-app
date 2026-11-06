@@ -2954,3 +2954,11 @@ before.
   ignored, `sameNamed`); "The status is set as for InfoMapper's mappings, reviewers included; with four-eyes the person
   who last changed a mapping's content cannot approve it."
 - The merge waits for Łukasz's manual acceptance.
+
+## 15c's manual acceptance (6 November 2026)
+
+- **Passed** (Łukasz, 6 November 2026), against the definition of done in "15c step 6": on the demo (`npm run demo --
+  --reset`) the star's dimensional lines, a drag onto a dimensional row and onto a header with their undos, a refused
+  drop, the mapping panel (an input added to a direct mapping, the rule of an approved one changed, approved as a
+  reviewer), "Create dimension from this…" on Product with undo, Order Line's delete preview, cancelled. On KB (backed up
+  first, `.data/backups/dev-db-20261105-2332.json`): the app opens; a logical attribute's delete and undo as before.
