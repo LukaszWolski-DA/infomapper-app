@@ -5,7 +5,7 @@
 // double-click or its keyboard.
 
 import { expect, test } from "./fixtures";
-import { SEED_IDS, box, canvasArea, cardNodes, commitCounters, dragGrip, expectCanvasWidth, grip, openCanvas, panelWidth, signInAs, togglePanel, viewportTransform } from "./helpers";
+import { SEED_IDS, box, canvasArea, cardNodes, commitCounters, dragGrip, expectCanvasWidth, grip, openCanvas, panelWidth, signInAs, togglePanel, viewStored, viewportTransform } from "./helpers";
 
 test("S5A-07: hiding and showing either panel add no canvas commit and no miniature commit", async ({ page }) => {
   await signInAs(page, "Łukasz");
@@ -42,6 +42,7 @@ test("S5A-07: the first view after a load is placed for the canvas's real size, 
   expect(t.zoom).toBeCloseTo(view.zoom, 3);
 
   // no remembered view: fitted into the whole canvas, which starts at the window's left edge
+  await viewStored(page); // the canvas's own late save of the view must not come after the removal
   await page.evaluate((id) => localStorage.removeItem(`infomapper:view:${id}`), SEED_IDS.canvasCustomerOrders);
   await openCanvas(page);
   const area = await box(canvasArea(page));
