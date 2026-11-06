@@ -319,3 +319,28 @@ Item 4, item 6 and item 7 add no text.
   browser's menu, against the prototype (F17)?
 - **Y8 (decisions):** D-71's draft, the four notes, and the extra note on D-28?
 - **Y9 (texts):** the table above.
+
+## Łukasz's answers to step 1 (6 November 2026)
+
+- **Y1.** "Add attribute" directly before "Paste attribute" in the card header's menu.
+- **Y2.** Yes: the same menu, with the move items and the switches, on the project home's tiles.
+- **Y3.** Yes: reviewers and readers have no switches, as they have no tab menu.
+- **Y4.** Yes: two full runs, one at the end of step 2, one at the end of step 3.
+- **Y5.** Approved: "Working on {name}. Everything you create or change in the model gets this label."
+- **Y6.** Yes, the proposed method: every save reads the view and the left edge at the same moment, the app's own view
+  changes save at once, and nothing saves after the canvas is gone.
+- **Y7.** Yes: text fields inside the canvas keep the browser's menu, as item 7's rule says; recorded in the PRD's
+  section 8 as a difference from the prototype.
+- **Y8, Y9.** Not decided yet: D-71's draft with its notes (D-22, D-28, D-39, D-54, D-62) and every new UI text in full,
+  including the chips' titles, are quoted in step 2's report.
+- **Item 2 (option A):** `moveCanvas`, and undo learns to revert an update of a link-table row, as a general rule for
+  link tables, not one made for tabs, with unit tests. D-71 states that the first canvas in a project's order is the
+  one the workspace home's thumbnail shows and the one labels and consistency links open.
+- **Accepted as proposed:**
+  - the two optional look keys, stored only while a kind is hidden (no migration, S2A-08 unchanged);
+  - S16-11 allows one miniature commit for "Between entities" and none for source relationships;
+  - the measurement uses S11-13;
+  - P7–P9 with the corrections;
+  - S16-10 keeps links' menus.
+
+The PRD has a section 0 with these answers; where it and a later section disagree, section 0 wins.

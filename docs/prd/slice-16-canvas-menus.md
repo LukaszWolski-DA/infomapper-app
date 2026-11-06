@@ -9,6 +9,46 @@ This PRD was written from the docs at slice 15d's closing and from the prototype
 reading the code**. The prototype (`docs/prototype/infomapper-prototype-with-sources.html`) comes with this PRD in its
 new version: it shows items 1 to 3 and 7.
 
+## 0. Answers to step 1 (Łukasz, 6 November 2026)
+
+Where this section and a later one disagree, this section wins. The findings (F1–F19) and questions (Y1–Y9) are in
+`docs/prd/slice-16-acceptance.md`, "Step 1".
+
+- **Item 1 (Y1):** "Add attribute" stands directly before "Paste attribute" in an entity card header's menu. The app has
+  no "Link to a requirement…" there (F1). As "Paste attribute", it selects the new row, opens the details panel (D-54)
+  and selects the name.
+- **Item 2:**
+  - **Option A:** a `moveCanvas` command, and undo learns to revert an update of a link-table row, as a general rule
+    for link tables, not one made for tabs, with unit tests (F4).
+  - **Rights:** the command checks `canvas.edit_projects` (P7 as corrected).
+  - **The first canvas:** the first canvas in a project's order is the one the workspace home's thumbnail shows, and the
+    one labels and consistency links open. D-71 says so (F6).
+  - **Tiles (Y2):** the same menu, with the move items and the switches, is on the project home's tiles.
+- **Item 3:**
+  - **The keys:** two optional `canvas.look` keys, `hideEntityRelationships` and `hideSourceRelationships`, stored only
+    while a kind is hidden (true). Showing a kind removes its key. No migration and no local file format change;
+    S2A-08 stays unchanged (F8).
+  - **Reviewers and readers (Y3):** they have no switches, as they have no tab menu. A chip's × shows the kind in their
+    browser only.
+  - **P8:** confirmed. "Use this look on all canvases" copies only background and grid; "Duplicate layout" copies the
+    whole look.
+  - **P9:** confirmed.
+  - **The miniature** follows "Between entities" as it follows the layer (F10).
+- **Item 5 (Y5):** the working context's label may shrink (with its caps as maximums). While a context is on, its title
+  is "Working on {name}. Everything you create or change in the model gets this label." (approved).
+- **Item 6 (Y6):** every save reads the view and the left edge at the same moment, the app's own view changes save at
+  once, and nothing saves after the canvas is gone (F15). The sentence "`onMoveEnd` saves only after the person's own
+  moves" is dropped: React Flow's `null` event cannot tell those moves apart.
+- **Item 7 (Y7):** text fields inside the canvas (a note's editor, the Changes select, the toolbox's search) keep the
+  browser's menu, as item 7's rule says; section 8 lists it. One predicate is shared by the document listener, the
+  canvas and the toolbox (F17). Links keep their menu, and S16-10 checks it: a home tile and a breadcrumb keep it
+  (F18).
+- **S16-11 (F11):** measured as `S11-13.spec.ts`, beside the layer switch. One miniature commit is allowed for "Between
+  entities", none for "Between source tables".
+- **Runs (Y4):** two full runs, at the end of step 2 and at the end of step 3.
+- **Not decided yet (Y8, Y9):** D-71's text with its notes (D-22, D-28, D-39, D-54, D-62) and every new UI text,
+  quoted in step 2's report.
+
 ## 1. Why this slice
 
 Seven items from Łukasz's testing of slice 15c and of this slice's prototype, and from the first full runs in GitHub
@@ -200,6 +240,12 @@ or costs more than it assumes, with files and lines and a proposal. No applicati
 - The prototype draws source relationships in a simplified way (no self loop, no live canvas, no context cards); the
   app's lines follow D-62.
 - Items 4 to 6 are the app's own bugs; the prototype has nothing to change.
+- Inside the canvas the prototype cancels every right click (`vp`'s `contextmenu`), text fields included. The app's
+  text fields there (a note's editor, the Changes select, the toolbox's search) keep the browser's menu, as item 7's
+  rule says (Y7, section 0).
+- "Add attribute" stands before "Paste attribute", not before "Link to a requirement…", which the app's card menu does
+  not have (Y1).
+- The move items and the switches are also in the project home's tile menu (Y2).
 
 ## 9. Left for later
 
