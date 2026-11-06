@@ -631,3 +631,83 @@ decides the merge." `retries` stays 0.
 
 The S13-09 fix pushed; then Łukasz decides whether the chore merges with a known limitation and a separate fix before
 15d.
+
+### S13-09's fix
+
+The test now waits for the rename's answer and for the page to show the renamed version (the description field's
+`data-version`) before it clicks Undo (`e2e/slice-13/S13-09.spec.ts:18-24`; `answerOf`'s way, written for the project
+home, since slice 14b's helper waits for a card). No assertion changes. On the runner 3 of 3
+([42210449249](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42210449249), commit `55c34ea`); on
+Windows one local run, 2 of 2.
+
+### S5A-07 and S6A-11: the diagnosis (read only, nothing changed)
+
+**The hypothesis is rejected.** The first view is not computed before the left panel's remembered width applies. Both
+failures have one other cause: after every viewport change the canvas writes the remembered view about 150 ms late,
+reading the canvas's left edge only then; the old page still does it while the next page loads; and both tests change
+the window or the stored view inside those 150 ms.
+
+**(a) The order, from the code.**
+1. The panel widths are in the first HTML. The server reads the layout cookie, and `SidePanelsProvider` starts from it
+   (`src/app/_components/side-panels.tsx:88`). `SidePanelsGrid` writes the columns inline in that render (lines
+   167-168). `display: grid` and the narrow rule (up to 1,000 px: one column, the panels over the canvas) are in
+   `globals.css:206-209`, the page's stylesheet in `<head>`.
+2. The first view is set once, in an effect, after React Flow has measured its pane (`sized`,
+   `src/canvas/ModelCanvas.tsx:367`; the effect at 1720-1731). It reads the measured width and height for a fit
+   (`fitView`, 428-447). For a stored view it reads the canvas root's left edge with `getBoundingClientRect()`
+   (line 1726) and moves `x` by `saved.left - left` (1727). `data-ready` is set in the same effect (1730). This order
+   cannot vary: the effect runs only after a layout in which the grid and its columns already exist.
+3. What can vary is the **write** of the view. `onMoveEnd` (`ModelCanvas.tsx:464-468`) stores `{ x, y, zoom, left }`,
+   reading `left` when it runs. React Flow calls it after programmatic `setViewport` calls too, not only after the
+   person's pans: the first view, `shiftView` and the fit. It calls it from a timer, 150 ms because the canvas has
+   `panOnScroll` (`ModelCanvas.tsx:2334`; `createPanZoomEndHandler` in
+   `node_modules/@xyflow/system/dist/esm/index.mjs:2865-2889`), and later when the main thread is busy. So every open
+   writes the view it just set again, 150 ms or more after `data-ready`. The old document keeps running until the next
+   page's document replaces it, so its timer may fire during a reload or a navigation, after the test's own
+   `localStorage` change.
+
+**The two traces** (run 2's `part-3` artifact):
+- **S5A-07** (`S5A-07.spec.ts:36-53`):
+  - The stored view `{ x: 120, y: 45, zoom: 0.7 }` opens; `data-ready` is seen at about +3,487 ms.
+  - The test removes the stored view at +3,509 ms and navigates to the canvas at +3,514 ms, 22 to 27 ms after
+    `data-ready`.
+  - The old page's `onMoveEnd`, due about 150 ms after its first view, writes the view back.
+  - The new page then opens the stored view and not the fit. Its last frame is the stored view (70 %, the cards as at
+    `x` 120), so the cards' right edge is at 1,122 px against the canvas's 940.
+- **S6A-11** (`S6A-11.spec.ts:51-57`, the **1,000 px window** step; the 520 px step at line 49 passed):
+  - After the 520 px reload, `data-ready` is seen at about +3,660 ms.
+  - The test writes the 264 px view at +3,664 ms, sets the window to 1,000 px at +3,670 and reloads at +3,714.
+  - At 1,000 px the narrow rule puts the canvas at the window's left edge, while the view's `x` is still the 520 px
+    page's. The old page's `onMoveEnd`, due after the 520 px page's first view, then writes that `x` with `left: 0` over
+    the test's view.
+  - The new page corrects by `0 - 0`, so Customer stands 520 px left of where it stood. The last frame equals the old
+    page's frame right after the resize.
+
+**(b) App or test.** It can only happen in practice in the tests. Both specs change the stored view
+(`localStorage.setItem` or `removeItem`) or the window less than 150 ms after the canvas set its view, and then load the
+next page at once. A person cannot change the stored view behind the app's back. The app itself would give the same
+wrong first view in one case: the window crosses 1,000 px (or the left panel's width changes without `shiftView`)
+within about 150 ms after a viewport change, and the canvas is reopened before the next move writes the view again.
+The next open is then off by the panel's width. That needs a window resize within a sixth of a second after a pan or
+an open; I would record it as a known limitation, not something a person meets.
+
+**(c) One cause explains both:** the late write in `onMoveEnd`, racing the test's own change of the stored view or the
+window.
+
+**(d) The smallest fix.**
+- **In the tests** (no assertion changes): before a test changes the stored view or the window, wait until the
+  canvas's own write after its view has happened. For example, a helper `viewStored(page)` in `e2e/slice-05a/helpers.ts`
+  polls `localStorage[infomapper:view:<id>]` until it holds the view now shown (`viewportTransform`) with the canvas's
+  current `left`. It is called in `S5A-07.spec.ts` before `removeItem` (line 45), and in `S6A-11.spec.ts` before each
+  `setItem` (lines 46 and 52).
+- **Optionally in the app**, as a separate fix: `onMoveEnd` writes only after the person's own moves (an event with a
+  `sourceEvent`), and the code that sets the view itself writes it at once with the `left` of that moment (the first
+  view, `shiftView`, the fit; `ModelCanvas.tsx:451, 457, 1728`). This removes the late write, and with it the window
+  case in (b).
+- **The specs that cover this code** (the stored view, its `left` correction, the shifts):
+  - slice 5a: `S5A-03` (the panels move the view) and `S5A-07`;
+  - slice 6a: `S6A-06` and `S6A-11` (D-54's left edge);
+  - slice 6b: `S6B-04` and `S6B-05` (a place on another canvas opens at its remembered view), and `S6B-10`
+    (measurement only);
+  - `e2e/slice-01a/helpers.ts`' `openCanvas` (every spec that opens a canvas at a view writes the view before the
+    page loads, so it is not affected).
