@@ -15,8 +15,13 @@ test("S13-09: an undo on the project home shows the stored name in the field; th
   await description.blur();
   await expect.poll(async () => (await loadProject()).description).toBe("One view of the customer.");
   await name.fill("Customer 360 – 2026");
+  // the data file is written before the answer reaches the page (slice 14b's answerOf): Undo waits for the rename's
+  // answer and the page showing its version, or it may come while the rename is still on its way (chore CI e2e)
+  const renamed = page.waitForResponse((r) => r.request().method() === "POST" && !!r.request().headers()["next-action"] && (r.request().postData() ?? "").includes("Customer 360 – 2026"));
   await name.press("Enter");
   await expect.poll(async () => (await loadProject()).name).toBe("Customer 360 – 2026");
+  await (await renamed).finished();
+  await expect(description).toHaveAttribute("data-version", String((await loadProject()).version));
 
   await undoButton(page).click();
   await expectToast(page, "Undone: Rename project");
