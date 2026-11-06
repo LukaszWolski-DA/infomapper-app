@@ -3335,3 +3335,35 @@ The spec's default is what the app does already (D15). Nothing to build; the "+"
 - the name "Net sales by customer segment and month";
 - the description "Sales reports show net sales per customer segment per calendar month.";
 - the owner "Head of Sales".
+
+## Łukasz's answers to 15d step 1 (6 November 2026)
+
+- **Y1 (changed after the first answer):** a dimensional mapping counts for coverage by D-31's rule, as InfoMapper's:
+  approved and without a type conflict. A transformation with a rule always passes; a direct copy, or a transformation
+  without a rule, fails when an input's type does not fit the target (15c's `typesDiffer`). D-70 says coverage follows
+  D-31's rule at both levels. In the gap reasons, a dimensional attribute whose only approved feed has a type conflict
+  shows InfoMapper's existing type-conflict wording if it fits unchanged, otherwise a new text listed with Y10. Step 2
+  verifies that REQ-210 stays at 0 of 3 with the star's seed. (The first answer, "no type check", was given on the
+  assumption that InfoMapper's mappings check no types for coverage; they do: `counts` in `lookupModel` and
+  `countsForCoverage` call `checkMappingTypes`, and D-31 says "without a type conflict".)
+- **Y2:** yes. Focus on a requirement lights only its own dimensional mappings; every other Focus keeps 15c's rule.
+- **Y3:** yes. The two new reasons, the three-part bar, no fourth bucket.
+- **Y4:** yes. "Via" in element panels as it is; no marker on Customer and Order Line.
+- **Y5:** yes, for every role who can open the workspace, on these conditions: a read only, through the existing
+  repository, with the usual permission check, no new layer or cache. The dialog is a snapshot taken when it opens; a
+  known limitation.
+- **Y6:** yes, placed and counted as proposed.
+- **Y7:** yes, made precise: in Node, the median with feeds at most 25 % above today's (23.7–27.5 ms); the known
+  limitation's browser rule stays as it is. Measured on the laptop (AD-24).
+- **Y8, changed:**
+  - **Step 2 (domain):** the first commit fixes the stale docs (README's CI chore line, `chore-ci-e2e.md`'s status
+    line). Then `AttributeFeeds`, coverage with feeds in all seven places, the gap reasons, the bus matrix's rows (read on
+    demand), "Fed from concepts"' derivation, REQ-210 in the seeds and the bench with feeds. Specs by folder and the
+    earlier specs Q1 lists; no full run.
+  - **Step 3 (lens, panels, bus matrix, and the closing):** the interface, then all closing docs and D-70 (after
+    Łukasz's approval of its text), then **one** full run on the final commit. It counts both for the canvas's layers
+    and as the run before the merge.
+  - **Step 4:** Łukasz's manual acceptance only. A fix found there gets its own full run.
+- **Y9 and Y10:** not decided yet. Step 2's report quotes D-70's draft, the extensions on D-31 and D-32, and every new or
+  changed interface text in full, for approval before step 3.
+- **S15-24:** accepted. **P27–P31:** one sentence each in step 2's report; accepted then.
