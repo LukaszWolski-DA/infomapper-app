@@ -14,7 +14,7 @@ import type { UpdateRequirementInput } from "@/domain/commands/requirement";
 import { targetOf } from "@/domain/model/labels";
 import { templateHtml } from "@/domain/model/requirement-templates";
 import { coverageText } from "./requirement-ui";
-import { coverageParts, ENTITY_GAP_REASON, fourEyesRequirementMessage, KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
+import { coverageParts, ENTITY_GAP_REASON, FEED_REASONS, NOT_FED_REASON, fourEyesRequirementMessage, KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
 import { REQUIREMENT_KINDS, REQUIREMENT_PRIORITIES, REQUIREMENT_STATUSES, type Requirement, type RequirementLink } from "@/domain/types";
 import { NAME_REQUIRED } from "@/domain/validation";
 import { useToast } from "@/ui/components/toast";
@@ -79,9 +79,10 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
 
   // slice 4b-1 (PRD item 11): entity items first, then attribute items as before; a click goes to the element
   const gaps = [
-    ...coverage.entityGaps.map((id) => ({ id, why: ENTITY_GAP_REASON, label: ix.entity.get(id)?.name ?? "", go: () => p.goEntity(id) })),
-    ...coverage.notMapped.map((id) => ({ id, why: "unmapped", label: attributeLabel(ix, id), go: () => p.goAttribute(id) })),
-    ...coverage.notApproved.map((id) => ({ id, why: "not approved", label: attributeLabel(ix, id), go: () => p.goAttribute(id) })),
+    ...coverage.entityGaps.map((id) => ({ id, why: ENTITY_GAP_REASON, mapped: false, label: ix.entity.get(id)?.name ?? "", go: () => p.goEntity(id) })),
+    // slice 15d (D5, Y1, Y3): a fact's or a dimension's attribute is "not fed"; with an approved feed it says why that does not count
+    ...coverage.notMapped.map((id) => ({ id, why: p.rx.isDimensional(id) ? NOT_FED_REASON : "unmapped", mapped: false, label: attributeLabel(ix, id), go: () => p.goAttribute(id) })),
+    ...coverage.notApproved.map((id) => ({ id, why: FEED_REASONS[p.rx.feedReason(id) ?? "none"], mapped: true, label: attributeLabel(ix, id), go: () => p.goAttribute(id) })),
   ];
   const traced = (k: RequirementLink) => {
     const t = targetOf(k);
@@ -223,7 +224,7 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
         <List testId="list-req-gaps">
           {gaps.map((g) => (
             <button key={g.id} type="button" className="mt-0.5 flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-im-hover" onClick={g.go} data-testid="item-req-gap" data-why={g.why}>
-              <span className={`size-2.5 flex-none rounded-full ${g.why === "not approved" ? "bg-im-warn" : "shadow-[inset_0_0_0_1.5px_var(--im-ink-3)]"}`} />
+              <span className={`size-2.5 flex-none rounded-full ${g.mapped ? "bg-im-warn" : "shadow-[inset_0_0_0_1.5px_var(--im-ink-3)]"}`} />
               <span className="min-w-0 flex-1 truncate">{g.label}</span>
               <span className="whitespace-nowrap text-[11.5px] text-im-ink-3">{g.why}</span>
             </button>

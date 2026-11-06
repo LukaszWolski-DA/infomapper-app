@@ -97,6 +97,25 @@ export const canBeParent = (requirements: readonly Requirement[], id: Uuid, pare
 export type ScopeModel = Pick<WorkspaceModel, "entities" | "attributes" | "mappings" | "mappingInputs" | "sourceTables" | "sourceColumns">;
 
 /**
+ * One mapping that feeds an attribute from other attributes (slice 15d, D-70): a module's own mapping (InfoCube's
+ * dimensional mapping, AD-36), as InfoMapper reads it without knowing the module. `typeConflict` is the module's own
+ * type check by D-31's rule (Y1): a transformation with a rule passes; otherwise every input's type must fit the target.
+ */
+export interface AttributeFeed {
+  id: Uuid;
+  approved: boolean;
+  typeConflict: boolean;
+  /** The attributes it reads, in their order. */
+  inputs: readonly Uuid[];
+}
+
+/** What feeds each dimensional attribute (slice 15d), by the target attribute's id; absent or empty: nothing. */
+export type AttributeFeeds = Readonly<Record<Uuid, readonly AttributeFeed[]>>;
+
+/** Why a dimensional attribute with an approved feed does not count (slice 15d, D5, Y1). */
+export type FeedReason = "logical_feed" | "type_conflict";
+
+/**
  * A requirement's scope (D-31; slice 4b-1, PRD item 9). The five sets say what it touches on a canvas (cards, rows and
  * lines for Focus and the coverage colours); the two item sets say what its coverage counts.
  */
@@ -110,6 +129,13 @@ export interface RequirementScope {
   entityItems: Set<Uuid>;
   /** Linked attributes and the attributes of linked mappings: one coverage item each. */
   attributeItems: Set<Uuid>;
+  /**
+   * Slice 15d (D-70): the logical attributes that feed a dimensional attribute in scope and are not items themselves (the
+   * prototype's `sc.up`); also in `attributes`. Present only when there are any.
+   */
+  feeding?: Set<Uuid>;
+  /** Slice 15d: the feeds (a module's mappings) of the dimensional attributes in scope; present only when there are any. */
+  feeds?: Set<Uuid>;
 }
 
 /** An attribute's state for coverage (D-31). */
@@ -138,9 +164,23 @@ export interface ModelLookup {
   entities: Set<Uuid>;
   tables: Set<Uuid>;
   coverageOf: (attributeId: Uuid) => AttributeCoverage;
+  /** Slice 15d: a live attribute of a dimensional entity. */
+  isDimensional: (attributeId: Uuid) => boolean;
+  /** Slice 15d: the feeds of a dimensional attribute (none for a logical one). */
+  feedsOf: (attributeId: Uuid) => readonly AttributeFeed[];
+  /** Slice 15d: why a dimensional attribute with an approved feed is not covered; null otherwise. */
+  feedReason: (attributeId: Uuid) => FeedReason | null;
 }
 
-export function lookupModel(model: ScopeModel): ModelLookup {
+const NO_FEEDS: readonly AttributeFeed[] = [];
+
+/**
+ * `feeds` (slice 15d): the modules' mappings onto dimensional attributes. A dimensional attribute is covered by D-31's
+ * rule one level up (D-70): one of its feeds approved, without a type conflict, and every attribute it reads a live
+ * logical attribute covered by its own mappings. No recursion: a feed reads logical attributes only (AD-36); an input that
+ * is not one counts as not covered.
+ */
+export function lookupModel(model: ScopeModel, feeds: AttributeFeeds = {}): ModelLookup {
   const attribute = new Map<Uuid, Attribute>();
   const attributesOf = new Map<Uuid, Attribute[]>();
   const attributeOrder = new Map<Uuid, number>();
@@ -185,15 +225,34 @@ export function lookupModel(model: ScopeModel): ModelLookup {
     // slice 7a (step 1, answer 9): a mapping from a column missing from source covers nothing
     return !!a && !inputs.some((c) => c.missing_since !== null) && checkMappingTypes(m, a, inputs).ok;
   };
+  const level = new Map(live(model.entities).map((e) => [e.id, e.model_level]));
+  const levelOf = (attributeId: Uuid) => {
+    const a = attribute.get(attributeId);
+    return a && level.get(a.entity_id);
+  };
+  const isDimensional = (attributeId: Uuid) => levelOf(attributeId) === "dimensional";
+  const feedsOf = (attributeId: Uuid) => (isDimensional(attributeId) ? (feeds[attributeId] ?? NO_FEEDS) : NO_FEEDS);
   const states = new Map<Uuid, AttributeCoverage>();
+  const inputsCovered = (f: AttributeFeed) => f.inputs.length > 0 && f.inputs.every((i) => levelOf(i) === "logical" && coverageOf(i) === "covered");
   const coverageOf = (attributeId: Uuid): AttributeCoverage => {
     let state = states.get(attributeId);
     if (!state) {
-      const ms = mappingsOf.get(attributeId) ?? [];
-      state = !ms.length ? "not_mapped" : ms.some(counts) ? "covered" : "not_approved";
+      if (isDimensional(attributeId)) {
+        const fs = feedsOf(attributeId);
+        state = !fs.length ? "not_mapped" : fs.some((f) => f.approved && !f.typeConflict && inputsCovered(f)) ? "covered" : "not_approved";
+      } else {
+        const ms = mappingsOf.get(attributeId) ?? [];
+        state = !ms.length ? "not_mapped" : ms.some(counts) ? "covered" : "not_approved";
+      }
       states.set(attributeId, state);
     }
     return state;
+  };
+  const feedReason = (attributeId: Uuid): FeedReason | null => {
+    if (!isDimensional(attributeId) || coverageOf(attributeId) !== "not_approved") return null;
+    const approved = feedsOf(attributeId).filter((f) => f.approved);
+    if (approved.some((f) => !f.typeConflict)) return "logical_feed";
+    return approved.length ? "type_conflict" : null;
   };
   return {
     attribute,
@@ -208,6 +267,9 @@ export function lookupModel(model: ScopeModel): ModelLookup {
     entities: new Set(live(model.entities).map((e) => e.id)),
     tables: new Set(live(model.sourceTables).map((t) => t.id)),
     coverageOf,
+    isDimensional,
+    feedsOf,
+    feedReason,
   };
 }
 
@@ -245,6 +307,20 @@ export function scopeOfLinks(lookup: ModelLookup, links: readonly RequirementLin
     } else if (t.kind === "source_table" && lookup.tables.has(t.id)) {
       scope.tables.add(t.id);
     } else if (t.kind === "source_column") addColumn(t.id);
+  }
+  // slice 15d (D-70): a dimensional attribute in scope brings its feeds and the logical attributes they read, with their
+  // entities; they are not items. Their sources follow: Focus lights every scope attribute's mappings with their tables.
+  for (const id of [...scope.attributes]) {
+    for (const f of lookup.feedsOf(id)) {
+      (scope.feeds ??= new Set()).add(f.id);
+      for (const input of f.inputs) {
+        const a = lookup.attribute.get(input);
+        if (!a || lookup.isDimensional(input)) continue;
+        scope.attributes.add(a.id);
+        scope.entities.add(a.entity_id);
+        if (!scope.attributeItems.has(a.id)) (scope.feeding ??= new Set()).add(a.id);
+      }
+    }
   }
   return scope;
 }
@@ -284,6 +360,19 @@ export function coverageParts(parts: RequirementCoverage["parts"]): string {
 /** A gap's reason for an entity item (PRD item 11). */
 export const ENTITY_GAP_REASON = "no approved mapping on any attribute";
 
+/** Slice 15d (D5, Y3): a gap's reason for a fact's or a dimension's attribute without a dimensional mapping. */
+export const NOT_FED_REASON = "not fed";
+
+/**
+ * Slice 15d (D5, Y1, Y3): a gap's reason for an attribute item with mappings, none of which counts: InfoMapper's "not
+ * approved", and for a fact's or a dimension's attribute with an approved feed why it does not count.
+ */
+export const FEED_REASONS: Record<FeedReason | "none", string> = {
+  none: "not approved",
+  logical_feed: "logical feed not covered",
+  type_conflict: "type conflict",
+};
+
 /** Coverage of a scope, attributes in model order. */
 export function coverageOfScope(lookup: ModelLookup, scope: RequirementScope): RequirementCoverage {
   const entities = [...scope.entityItems].filter((id) => lookup.entities.has(id));
@@ -311,8 +400,8 @@ export function coverageOfScope(lookup: ModelLookup, scope: RequirementScope): R
  * and its table; linked tables; linked columns with their table. Its items: linked entities, linked attributes, the
  * attributes of linked mappings. Deleted links and elements are left out.
  */
-export const requirementScope = (requirementId: Uuid, links: readonly RequirementLink[], model: ScopeModel): RequirementScope =>
-  scopeOfLinks(lookupModel(model), links.filter((k) => k.requirement_id === requirementId));
+export const requirementScope = (requirementId: Uuid, links: readonly RequirementLink[], model: ScopeModel, feeds?: AttributeFeeds): RequirementScope =>
+  scopeOfLinks(lookupModel(model, feeds), links.filter((k) => k.requirement_id === requirementId));
 
 /**
  * Whether a mapping counts for coverage: approved, and the mapping panel's type check (`checkMappingTypes`) passes on
@@ -327,8 +416,8 @@ export function countsForCoverage(mapping: Mapping, model: ScopeModel): boolean 
 }
 
 /** Coverage of one requirement (prototype `reqCoverage`, D-31), computed from the mappings on read. */
-export function requirementCoverage(requirementId: Uuid, links: readonly RequirementLink[], model: ScopeModel): RequirementCoverage {
-  const lookup = lookupModel(model);
+export function requirementCoverage(requirementId: Uuid, links: readonly RequirementLink[], model: ScopeModel, feeds?: AttributeFeeds): RequirementCoverage {
+  const lookup = lookupModel(model, feeds);
   return coverageOfScope(lookup, scopeOfLinks(lookup, links.filter((k) => k.requirement_id === requirementId)));
 }
 

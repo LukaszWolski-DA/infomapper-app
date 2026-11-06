@@ -4,7 +4,9 @@
 // Each is InfoMapper's entity create at the dimensional level with InfoCube's row, one change group and one undo step;
 // the card is placed as "New entity here" places it.
 
-import { modelCommand } from "@/app/_lib/model-command";
+import { modelCommand, modelRead } from "@/app/_lib/model-command";
+import { busMatrix, type BusMatrix } from "../domain/bus-matrix";
+import { cubeIndex } from "../domain/keys";
 import type { ActionResult } from "@/app/_lib/run-command";
 import type { DataStore } from "@/data";
 import type { WorkspaceModel } from "@/domain/types";
@@ -210,4 +212,14 @@ export async function createDimensionFromAction(
     const concept = model.concepts.find((c) => c.id === original?.concept_id) ?? null;
     return createDimensionFrom(ctx, access, { ...state, create: { concept, entities: model.entities, canvas, frames }, items, original }, input);
   });
+}
+
+// ---- slice 15d: the bus matrix (B-8, R-8, RP-10) ----
+
+/**
+ * The bus matrix's rows, read when its dialog opens (Y5): for every role who can open the workspace, through the store,
+ * nothing written; the dialog is a snapshot of that moment.
+ */
+export async function busMatrixAction(workspaceId: string): Promise<ActionResult<BusMatrix>> {
+  return modelRead(workspaceId, async (access, model, store) => busMatrix(cubeIndex(await keyState(store, access.workspace.id, model)), model.entities, model.concepts));
 }

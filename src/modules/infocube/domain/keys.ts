@@ -102,6 +102,15 @@ export function cubeIndex(model: CubeModel): CubeIndex {
     return ends && key && key.is_foreign_key && key.entity_id === ends.fact ? key : null;
   };
   const pkOf = (entityId: Uuid) => attributesOf.get(entityId)?.find((a) => a.is_primary_key) ?? null;
+  let byFact: Map<Uuid, { r: Relationship; dimension: Uuid }[]> | undefined;
+  const groupByFact = () => {
+    const out = new Map<Uuid, { r: Relationship; dimension: Uuid }[]>();
+    for (const r of relationships) {
+      const ends = factEnds(r, roleOf);
+      if (ends) (out.get(ends.fact) ?? out.set(ends.fact, []).get(ends.fact)!).push({ r, dimension: ends.dimension });
+    }
+    return out;
+  };
 
   return {
     roleOf,
@@ -121,11 +130,9 @@ export function cubeIndex(model: CubeModel): CubeIndex {
     measureOf: (id) => measures.get(id),
     factKeys(factId) {
       if (roleOf(factId) !== "fact") return [];
-      return relationships.flatMap((r) => {
-        const ends = factEnds(r, roleOf);
-        if (!ends || ends.fact !== factId) return [];
-        return [{ relationshipId: r.id, factId, dimensionId: ends.dimension, role: roleAt(r, ends.dimension), key: keyOf(r.id), pk: pkOf(ends.dimension) }];
-      });
+      // the relationships grouped by fact once (slice 15d, D12: the bus matrix asks for every fact)
+      byFact ??= groupByFact();
+      return (byFact.get(factId) ?? []).map(({ r, dimension }) => ({ relationshipId: r.id, factId, dimensionId: dimension, role: roleAt(r, dimension), key: keyOf(r.id), pk: pkOf(dimension) }));
     },
   };
 }

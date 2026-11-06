@@ -23,6 +23,7 @@ import { ReviewStep } from "./review-step";
 import { ScopeStep } from "./scope-step";
 import { SourceStep } from "./source-step";
 import { canGo, footNote, impactIndex, planCoverage, targetName, targetOf, type ImportData, type Step, type WizardState } from "./wizard-model";
+import { useRequirementFeeds } from "../../_components/modules";
 
 const STEPS: [Step, string][] = [
   [1, "Source"],
@@ -83,7 +84,8 @@ export function ImportWizard({
   }, [state, s.read, s.mode, s.systemId, s.newName, s.scope, s.compare, s.renames, s.hintsOff]);
   const index = useMemo(() => impactIndex(data), [data]);
   // the review's coverage callout (slice 7b, item 9): once per plan, about 95 ms at the 30,000-row limit (step 2)
-  const coverage = useMemo(() => (plan && s.step === 3 ? planCoverage(state.model, plan, data) : []), [plan, s.step, state, data]);
+  const feeds = useRequirementFeeds();
+  const coverage = useMemo(() => (plan && s.step === 3 ? planCoverage(state.model, plan, data, feeds) : []), [plan, s.step, state, data, feeds]);
   const name = targetName(s, model);
 
   /**

@@ -30,6 +30,7 @@ import { SelectionPanel } from "./selection-panel";
 import { SourceColumnPanel, SourceTablePanel } from "./source-panels";
 import { SystemPanel } from "./system-panel";
 import type { TreeData } from "./tree-data";
+import { useRequirementFeeds } from "../_components/modules";
 
 export interface InspectorProps {
   workspaceId: string;
@@ -133,7 +134,8 @@ export function Inspector({ model, cards, tree, ...rest }: InspectorProps) {
   const ui = useContext(CanvasUiCtx);
   const ix = useMemo(() => indexModel(model), [model]);
   const { requirements, requirementLinks } = rest;
-  const rx = useMemo(() => buildRequirementIndex(requirements, requirementLinks, model), [requirements, requirementLinks, model]);
+  const feeds = useRequirementFeeds();
+  const rx = useMemo(() => buildRequirementIndex(requirements, requirementLinks, model, feeds), [requirements, requirementLinks, model, feeds]);
   const cardOf = useMemo(() => {
     const cardByTarget = new Map(cards.map((c) => [c.targetId, c.id]));
     return (id: Uuid) => cardByTarget.get(id) ?? null;

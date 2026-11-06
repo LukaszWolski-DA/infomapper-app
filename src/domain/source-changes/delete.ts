@@ -40,6 +40,7 @@ import type {
   SourceRelationshipColumn,
   SourceTable,
 } from "../types";
+import type { AttributeFeeds } from "../model/requirements";
 import { coverageDelta, type CoverageDelta } from "./coverage";
 import { isOpen, settle, type Edit } from "./rules";
 import { DELETED_INPUT_REASON, RESOLUTION, SETTLED } from "./texts";
@@ -189,7 +190,8 @@ export interface SourceDeleteImpact {
 export function sourceDeleteImpact(
   rows: SourceDeleteRows,
   cascade: SourceDeleteCascade,
-  context: { canvases: readonly Canvas[]; requirements: readonly Requirement[]; requirementLinks: readonly RequirementLink[] },
+  /** `feeds` (slice 15d, D4): what feeds the facts and dimensions, so a requirement on one is named too. */
+  context: { canvases: readonly Canvas[]; requirements: readonly Requirement[]; requirementLinks: readonly RequirementLink[]; feeds?: AttributeFeeds },
 ): SourceDeleteImpact {
   const attributes = new Map(rows.attributes.map((a) => [a.id, a]));
   const entities = new Map(rows.entities.map((e) => [e.id, e]));
@@ -237,6 +239,6 @@ export function sourceDeleteImpact(
       .filter((c) => canvasIds.has(c.id))
       .map(({ id, name }) => ({ id, name }))
       .sort((a, b) => a.name.localeCompare(b.name)),
-    coverage: coverageDelta(context.requirements, context.requirementLinks, before, after),
+    coverage: coverageDelta(context.requirements, context.requirementLinks, before, after, context.feeds),
   };
 }

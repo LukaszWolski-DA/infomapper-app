@@ -6,7 +6,7 @@ import { projectOpenNotes, projectRequirements, projectStats } from "@/app/_pane
 import { canvasHref } from "@/app/_lib/paths";
 import { thumbnailHrefs } from "@/app/_lib/thumbnails";
 import { getDataStore } from "@/data";
-import { moduleRowFeeds } from "@/compose";
+import { moduleFeeds } from "@/compose";
 import type { Uuid } from "@/domain/ids";
 import { projectLabels, type ProjectLabelContext } from "@/domain/model/labels";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
@@ -77,7 +77,9 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   });
 
   // Requirements whose scope touches the project's canvases (slice 4a): one index for the page
-  const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
+  // what feeds the facts and dimensions (slice 15d, D4): the requirements follow dimensional mappings; the thumbnails count them
+  const { rowFeeds, feeds } = await moduleFeeds(ws, model);
+  const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model, feeds);
   const projectReqs = projectRequirements(requirementIndex, items, view.canvases.map((c) => c.id));
   const reqCovered = projectReqs.filter((r) => r.done).length;
 
@@ -95,7 +97,6 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   // Thumbnails and frame counts (slice 12b): one index for the page, the canvases' rows grouped once
   const tabCanvases = view.canvases.flatMap((c) => allCanvases.filter((x) => x.id === c.id));
   // a fact's or a dimension's rows count their feeds, as on the canvas (slice 15c, C12)
-  const rowFeeds = await moduleRowFeeds(ws, model);
   const hrefs = thumbnailHrefs(ws, tabCanvases, { items, frames, notes }, { model, requirements, labels, labelLinks: links, rowFeeds });
   const thumbnails = Object.fromEntries(view.canvases.map((c) => [c.id, <CanvasThumbnail key={c.id} href={hrefs.get(c.id) ?? null} />]));
   const frameCounts = Object.fromEntries(view.canvases.map((c) => [c.id, frames.filter((f) => f.canvas_id === c.id).length]));
