@@ -375,6 +375,13 @@ The PRD has a section 0 with these answers; where it and a later section disagre
     its left edge is the current one minus `dx`.
   - `onMoveEnd` ignores React Flow's argument (the view captured 150 ms earlier) and stores the view shown now. Every
     move the person makes is still stored (the Hand tool, the zoom, the miniature: F15).
+  - **From the full runs** (below):
+    - `onMoveEnd` stores only a view that differs from the one the canvas stored last (`lastStored`). Its call after
+      the canvas's own change is that change's echo, not a move. It compares the view only, so a window that only moves
+      the left edge (crossing 1,000 px) stores nothing.
+    - A changed view is stored on `pagehide` and when the canvas unmounts (a layout effect's cleanup, while the root
+      is still in the document). That covers a move less than 150 ms before the page is left.
+    - Nothing is stored before the canvas's first view is set.
 
 ### New specs (`e2e/slice-16/`)
 
@@ -418,3 +425,106 @@ still stores the view, now as a consistent pair, so a test that writes the key i
 - **Single-file check on the runner**, `50a3b45`, rounds 3
   ([42275302033](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42275302033)): S2B-06, S6A-10, S5A-07,
   S6A-11, S16-07, S16-08 and S16-09, **15 passed in each of the three rounds**.
+- **The full runs:**
+
+  | Run | Commit | Result | What it found |
+  | --- | --- | --- | --- |
+  | [42277805323](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42277805323) | `50a3b45` | 609 passed, 2 failed, 3 skipped | S5A-07 and S6A-11. `viewStored` returned on the canvas's immediate save, and React Flow's later call of the same change overwrote the key the test had just written or removed. Fixed in `4d91ae6`: no store of a view the canvas stored last. |
+  | [42281346684](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42281346684) | `4d91ae6` | 608 passed, 3 failed, 3 skipped | **S6A-11:** the comparison still included the left edge, so a crossing of 1,000 px stored again; it now compares the view only. **S9-11:** a typed zoom right before leaving the page was only stored by React Flow's timer; it is now stored on `pagehide` and unmount. **S11-06:** both names check boxes were unchecked at the end, the clicks lost; 3 of 3 in the next check. The single-file check of that commit ([42281342169](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42281342169)) failed S6A-11 in round 3. Fixed in `c763747`. |
+  | **[42286373952](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42286373952)** | **`c763747`** | **610 passed, 1 failed, 0 flaky, 3 skipped, 0 expected failures** | **S7C-02:** the customers card drew no rows on the first open. The fit's zoom there is 41 %, just above the 40 % below which cards draw no rows. It passed 3 of 3 on the runner ([42288577371](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42288577371)) and 3 of 3 locally on the same commit: a flake, as once in slice 11's closing run (`docs/known-limitations.md`). |
+
+- **The step's full run, `c763747`:**
+  - wall-clock 13 min 52 s (20:12:37 to 20:26:29);
+  - parts:
+
+    | Part | Time | Heap peak |
+    | --- | --- | --- |
+    | 1 | 9 min 37 s | 1,207 MB |
+    | 2 | 9 min 16 s | 1,116 MB |
+    | 3 | 11 min 8 s | 1,096 MB |
+    | 4 | 5 min 51 s | 1,281 MB |
+    | 5 | 6 min 15 s | 1,381 MB |
+    | 6 | 5 min 31 s | 1,210 MB |
+    | 7 | 6 min 0 s | 1,334 MB |
+
+    No part came near the 6,431 MB restart threshold, and none printed a restart.
+  - S2B-06's right drag and S6A-10's 1,201 px test passed as ordinary tests, so the run has no expected failures.
+- **Single-file check of `c763747`**, rounds 3
+  ([42284492468](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42284492468)): S2B-06, S6A-10, S5A-07,
+  S6A-11, S9-11, S11-06, S16-07, S16-08 and S16-09, **21 passed in each round**.
+- **Locally on Windows, `c763747`:**
+  - S2B-06: 2 of 2;
+  - D-54's specs with S9-11, S11-06, S2A-08 and S16-09: 19 of 19;
+  - S7C-02: 3 of 3.
+- `npm run lint`, `npm run typecheck`, `npm test` (1,779): pass on `c763747`.
+
+### For Łukasz's decision (Y8, Y9): D-71 and the new texts, quoted in full
+
+**D-71 (draft, with step 1's answers):**
+
+> **D-71** The canvas's tabs, relationship lines by kind, the header's "Add attribute", the browser's menu, and the
+> view's save (slice 16).
+>
+> **Moving a canvas.** A canvas tab's menu, which is also a canvas tile's menu on the project home, moves the canvas:
+> Move left, Move right, Move to start and Move to end, after Duplicate layout. A move changes the current project's
+> order only (a canvas may be in several, D-28). Each move is one undo step, "Move canvas", for those who may edit. An
+> item that would not move the canvas is disabled, and with one canvas the items are not shown. The first canvas in a
+> project's order is the one the workspace home's thumbnail shows (D-29), and the one labels and consistency links
+> open.
+>
+> **Relationship lines by kind.** The same menu, after "Use this look on all canvases", shows or hides relationship
+> lines by kind:
+> - Between entities: logical and dimensional, with self loops and the bundles of collapsed frames;
+> - Between source tables (D-62).
+>
+> They are kept per canvas with its look, outside undo (D-12). They filter within the layers that show relationships,
+> and the miniature follows them as it follows the layer. "Use this look on all canvases" does not copy them;
+> "Duplicate layout" does. A hidden kind is a chip in the view-state bar (D-39), "Entity relationships hidden" or
+> "Source relationships hidden", in every layer, removed by its × or by "Show all". Reviewers and readers have no
+> switches, since they have no tab menu; their chip's × shows the kind in their browser only.
+>
+> **Add attribute.** An entity card header's menu adds an attribute as its panel does, directly before "Paste
+> attribute", for those who may edit the model. The details panel opens with its name selected (D-54).
+>
+> **The browser's menu.** The browser's own context menu is not shown in the app, except on text fields (inside the
+> canvas too), selects, the description editor, links and selected text. Where the app has a menu, a right click opens
+> it. Where the browser fires its context menu on the right button's press, the canvas's toolbox opens on the release,
+> and a right drag pans without it.
+>
+> **The view's save.** The canvas stores its remembered view at once after its own view changes (the first view, the
+> left panel, the fit) and after any move, each time with the view and the left edge of the same moment. A view the
+> canvas already stored is not stored again. A changed view is stored before the page is left, and nothing is stored
+> once the canvas is gone.
+
+**Notes on the decisions it changes**, each ending "(Extended by D-71.)":
+
+- **D-22:** "A canvas also keeps two switches beside its layer: relationship lines between entities and between source
+  tables, which filter within Everything and Relationships."
+- **D-28:** "The order of a project's canvases is the project's own: moving a canvas in one project leaves its place in
+  another."
+- **D-39:**
+  - the list: "(Focus, layer, hidden relationship kinds, filters, collapsed cards, collapsed frames, hidden resolved
+    notes, active tool)";
+  - the sentence on undo: "Focus, the layer, the hidden relationship kinds, hidden resolved notes and the tool are view
+    state outside undo".
+- **D-54:** "The view is stored at once after the canvas's own view changes, and every store takes the view and the
+  left edge at the same moment; a view already stored is not stored again, and a changed view is stored before the page
+  is left."
+- **D-62:** "They show in the layers Everything and Relationships" becomes "They show in the layers Everything and
+  Relationships, unless the canvas hides relationships between source tables (D-71)".
+
+**Every new user-facing text:**
+
+| Where | Text |
+| --- | --- |
+| an entity card header's menu, before "Paste attribute" | Add attribute |
+| a canvas tab's and a canvas tile's menu, after "Duplicate layout" | Move left · Move right · Move to start · Move to end |
+| the Undo button's title after a move | Undo Move canvas |
+| the same menu, a section after "Use this look on all canvases" | Relationship lines |
+| its two check items | Between entities · Between source tables |
+| the view-state bar's chips | Entity relationships hidden · Source relationships hidden |
+| the chips' titles | Lines between entities are hidden on this canvas · Lines between source tables are hidden on this canvas |
+| the working context button's title while a context is on (approved, Y5; in the app since step 2) | Working on {name}. Everything you create or change in the model gets this label. |
+
+Unchanged texts the new items use: "Create attribute" (the undo name of "Add attribute") and "Nothing to change." (a
+move the stored order would not make).
