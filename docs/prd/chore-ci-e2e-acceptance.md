@@ -637,7 +637,7 @@ The S13-09 fix pushed; then Łukasz decides whether the chore merges with a know
 The test now waits for the rename's answer and for the page to show the renamed version (the description field's
 `data-version`) before it clicks Undo (`e2e/slice-13/S13-09.spec.ts:18-24`; `answerOf`'s way, written for the project
 home, since slice 14b's helper waits for a card). No assertion changes. On the runner 3 of 3
-([42210449249](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42210449249), commit `55c34ea`); on
+([42210449249](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42210449249), commit `7d320f3`); on
 Windows one local run, 2 of 2.
 
 ### S5A-07 and S6A-11: the diagnosis (read only, nothing changed)
