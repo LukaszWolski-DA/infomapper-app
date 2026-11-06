@@ -377,7 +377,14 @@ export function revertChangeGroup(
     touched.push({ table, key, wasLive: isLiveRow(table, now.get(table)!.get(key)) });
 
     if (isLinkTable(table)) {
-      if (e.after_image) {
+      if (e.before_image && e.after_image) {
+        // The link was changed in place (slice 16: a canvas's tab order), its key the same: it must still be as the
+        // step left it, and gets its earlier columns back. A link has no version, so the store checks the whole row.
+        if (!current || !sameValue(current, e.after_image)) return fail(refused());
+        const row = structuredClone(e.before_image);
+        writes.push({ kind: "update", table, before: current, row } as unknown as Write);
+        rows.set(key, row);
+      } else if (e.after_image) {
         // The link was added: it must still be there as it was, and goes again.
         if (!current || !sameValue(current, e.after_image)) return fail(refused());
         writes.push({ kind: "remove", table, before: current } as unknown as Write);

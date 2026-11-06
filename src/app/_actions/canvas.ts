@@ -11,12 +11,14 @@ import {
   createCanvas,
   deleteCanvas,
   duplicateCanvas,
+  moveCanvas,
   removeCanvasFromProject,
   renameCanvas,
   setCanvasLook,
   type CanvasMembershipState,
+  type CanvasMove,
 } from "@/domain/commands/canvas";
-import type { CanvasBackground, CanvasGrid, CanvasLayer } from "@/domain/types";
+import type { CanvasLookPatch } from "@/domain/model/canvas-look";
 import type { Uuid } from "@/domain/ids";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import { rememberNextCanvas } from "../_lib/next-canvas";
@@ -107,6 +109,19 @@ export async function removeCanvasFromProjectAction(input: { workspaceId: string
   return done(result);
 }
 
+/** Moves a canvas among the project's tabs (slice 16, item 2): one undo step "Move canvas". */
+export async function moveCanvasAction(input: { workspaceId: string; projectId: string; canvasId: string; to: CanvasMove }) {
+  return done(
+    await runCommand(async (ctx, store, user) => {
+      const access = await loadAccess(store, input?.workspaceId, user.id);
+      if (!access) return NOT_FOUND;
+      const projectId = str(input?.projectId);
+      const [project, projectLinks] = await Promise.all([store.projects.get(access.workspace.id, projectId), store.canvases.listLinksOfProject(access.workspace.id, projectId)]);
+      return moveCanvas(ctx, access, { project, projectLinks }, { projectId: input?.projectId, canvasId: input?.canvasId, to: input?.to });
+    }),
+  );
+}
+
 export async function duplicateCanvasAction(input: { workspaceId: string; projectId: string; canvasId: string }) {
   return done(
     await runCommand(async (ctx, store, user) => {
@@ -153,15 +168,11 @@ export async function deleteCanvasAction(input: { workspaceId: string; projectId
   return done(result);
 }
 
-/** Background, grid or layer mode of one canvas (D-12, D-22): saved, not an undo step. Returns the new version. */
-export async function setCanvasLookAction(input: {
-  workspaceId: string;
-  canvasId: string;
-  expectedVersion: number;
-  background?: CanvasBackground;
-  grid?: CanvasGrid;
-  layer?: CanvasLayer;
-}) {
+/**
+ * Background, grid or layer mode of one canvas (D-12, D-22), or its relationship lines by kind (slice 16, D-71): saved,
+ * not an undo step. Returns the new version.
+ */
+export async function setCanvasLookAction(input: { workspaceId: string; canvasId: string; expectedVersion: number } & CanvasLookPatch) {
   return done(
     await runCommand(async (ctx, store, user) => {
       const access = await loadAccess(store, input?.workspaceId, user.id);
@@ -173,6 +184,8 @@ export async function setCanvasLookAction(input: {
         background: input?.background,
         grid: input?.grid,
         layer: input?.layer,
+        hideEntityRelationships: input?.hideEntityRelationships,
+        hideSourceRelationships: input?.hideSourceRelationships,
       });
       return result.ok ? { ...result, value: { version: result.value.canvas.version } } : result;
     }),
@@ -182,7 +195,7 @@ export async function setCanvasLookAction(input: {
 /** The same, with the workspace bound first (the canvas page passes it to the canvas's look). */
 export async function saveCanvasLookAction(
   workspaceId: string,
-  input: { canvasId: string; expectedVersion: number; background?: CanvasBackground; grid?: CanvasGrid; layer?: CanvasLayer },
+  input: { canvasId: string; expectedVersion: number } & CanvasLookPatch,
 ) {
   return setCanvasLookAction({ ...input, workspaceId });
 }

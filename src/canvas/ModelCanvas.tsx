@@ -345,20 +345,26 @@ export function ModelCanvas({
   const look = useCanvasLook()?.look;
   const layer = look?.layer ?? "all";
   const grid = look?.grid ?? "dots";
-  // Layer mode (D-22): Mappings hides the relationship lines, Relationships the mapping lines; cards stay.
-  const lines = useMemo<CanvasLines>(
-    () =>
-      diagnosis.noLines
-        ? { mappings: [], relationships: [] }
-        : layer === "all"
+  // Slice 16 (item 3, D-71): relationship lines hidden by kind, within the layers that show them
+  const hideEntityRelationships = look?.hideEntityRelationships === true;
+  const hideSourceRelationships = look?.hideSourceRelationships === true;
+  // Layer mode (D-22): Mappings hides the relationship lines, Relationships the mapping lines; cards stay. The hidden
+  // kinds go here too, so the bundles, Focus, the Changes view, hover and the miniature follow them as they follow the
+  // layer: entity relationships with their self loops and bundles (both levels), and the source lines (D-62).
+  const lines = useMemo<CanvasLines>(() => {
+    if (diagnosis.noLines) return { mappings: [], relationships: [] };
+    const layered: CanvasLines =
+      layer === "all"
         ? allLines
         : layer === "relationships"
-        ? // and a module's lines between rows (slice 15c: InfoCube's mappings are mappings)
-          { mappings: [], relationships: allLines.relationships, ...(allLines.sources ? { sources: allLines.sources } : {}) }
-        : // Mappings also hides the relationships between source tables (slice 10b, D-62)
-          { mappings: allLines.mappings, relationships: [], ...(allLines.modules ? { modules: allLines.modules } : {}) },
-    [allLines, layer, diagnosis.noLines],
-  );
+          ? // and a module's lines between rows (slice 15c: InfoCube's mappings are mappings)
+            { mappings: [], relationships: allLines.relationships, ...(allLines.sources ? { sources: allLines.sources } : {}) }
+          : // Mappings also hides the relationships between source tables (slice 10b, D-62)
+            { mappings: allLines.mappings, relationships: [], ...(allLines.modules ? { modules: allLines.modules } : {}) };
+    if (!hideEntityRelationships && !(hideSourceRelationships && layered.sources)) return layered;
+    const { sources, ...rest } = layered;
+    return { ...rest, relationships: hideEntityRelationships ? [] : rest.relationships, ...(sources && !hideSourceRelationships ? { sources } : {}) };
+  }, [allLines, layer, diagnosis.noLines, hideEntityRelationships, hideSourceRelationships]);
   const { selection, select, registerCanvas } = ui;
   const toast = useToast();
   const rf = useReactFlow();

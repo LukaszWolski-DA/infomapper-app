@@ -19,6 +19,7 @@
 import { memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { EdgeLabelRenderer, useReactFlow, useStore } from "@xyflow/react";
 import { useToast } from "@/ui/components/toast";
+import { keepsBrowserMenu } from "@/ui/browser-menu";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type ToolboxTarget } from "./context";
 import { cardKey, frameKey, noteKey, reqKey } from "./selection";
@@ -278,6 +279,9 @@ export function useCanvasModes(editable: boolean) {
    */
   const onContextMenu = useCallback(
     (e: ReactMouseEvent) => {
+      // a text field inside the canvas (a note's editor, the Changes view's select) keeps the browser's menu: paste,
+      // spelling (slice 16, item 7, D-71)
+      if (keepsBrowserMenu(e)) return;
       e.preventDefault();
       const down = rightDown.current;
       if (down && !down.released) {

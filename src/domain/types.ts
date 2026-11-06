@@ -485,6 +485,12 @@ export interface CanvasLook {
   background: CanvasBackground;
   grid: CanvasGrid;
   layer: CanvasLayer;
+  /**
+   * Relationship lines hidden by kind (slice 16, item 3, D-71): present, as true, only while that kind is hidden, so
+   * a look stored before slice 16 reads as both shown (`src/domain/model/canvas-look.ts`).
+   */
+  hideEntityRelationships?: true;
+  hideSourceRelationships?: true;
 }
 
 export const DEFAULT_CANVAS_LOOK: CanvasLook = { background: "grey", grid: "dots", layer: "all" };

@@ -21,6 +21,8 @@
 // - Slice 10c (D-63): “Copy” in an attribute row's menu puts it in the page's clipboard (`attribute-clipboard.ts`);
 //   “Paste attribute “…”” in an entity card header's menu pastes a copy and opens its panel with the name selected. An
 //   attribute's delete asks for a second click when it has mappings or copies, naming the copies.
+// - Slice 16 (item 1, D-71): “Add attribute” in an entity card header's menu, directly before “Paste attribute”: the
+//   entity panel's command, its panel opened with the name selected (D-54); the card's collapse and filter stay.
 // - Slice 15c (C4, C5, C7, C8): a module's objects on the canvas (`CANVAS_EXTENSIONS`): an entity row's drag and drop,
 //   the line's menu, Delete, a history place's text. A column's drag on a canvas with facts or dimensions keeps the
 //   dimensional cards under the veil and refuses a drop on them in the browser (B-6's toast); no "Map from a column…"
@@ -33,7 +35,7 @@ import { isLogical, MAPPING_TO_DIMENSIONAL_MESSAGE } from "@/domain/model/levels
 import { CANVAS_EXTENSIONS } from "@/compose/canvas";
 import type { CanvasExtHandlers } from "@/canvas/extensions";
 import type { EntityCreate } from "@/ui/modules";
-import { createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, pasteAttributeAction, swapRelationshipAction } from "@/app/_actions/model";
+import { addAttributeAction, createEntityAction, createRelationshipAction, deleteAttributeAction, deleteRelationshipAction, pasteAttributeAction, swapRelationshipAction } from "@/app/_actions/model";
 import { attributeClipboard, useClippedAttribute } from "@/app/_components/attribute-clipboard";
 import { useAction } from "@/app/_components/use-action";
 import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
@@ -272,6 +274,23 @@ export function useCanvasHost({
     [editable, ix, run, workspaceId, ui, openDetails, panels],
   );
 
+  /**
+   * “Add attribute” (slice 16, item 1): the entity panel's command from the card header's menu. It leads to the new
+   * attribute's name, so a hidden details panel opens (D-54), as for “Paste attribute”. A collapsed card or a row filter
+   * that hides the new row stays as it is: the panel shows the attribute.
+   */
+  const addAttributeTo = useCallback(
+    async (card: HostCard) => {
+      if (!editable || card.kind !== "ent") return;
+      const result = await run(() => addAttributeAction(workspaceId, { entityId: card.targetId }));
+      if (!result.ok) return;
+      ui.select({ t: "row", cardId: card.id, id: result.value.attributeId });
+      openDetails();
+      panels.setNameFocus(result.value.attributeId);
+    },
+    [editable, run, workspaceId, ui, openDetails, panels],
+  );
+
   /** Deletes a mapping or a relationship at once; the toast offers Undo (slice 1b). */
   const deleteLine = useCallback(
     async (line: { t: "map" | "rel"; id: Uuid }) => {
@@ -356,6 +375,7 @@ export function useCanvasHost({
         },
       });
       items.push({ label: "Relate to itself", act: () => void relateToItself(card) });
+      items.push({ label: "Add attribute", act: () => void addAttributeTo(card) });
       if (clipped) items.push({ label: `Paste attribute “${clipped.name}”`, act: () => void pasteInto(card, clipped.id) });
     }
     if (editable) {

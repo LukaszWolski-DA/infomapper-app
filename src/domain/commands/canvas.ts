@@ -7,6 +7,7 @@ import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, t
 import { domainError, notFound, staleVersion } from "../errors";
 import type { Uuid } from "../ids";
 import { canvasMode, NAME_DIMENSIONS, NAMES_COLUMN, type NameDimension } from "../model/aliases";
+import { applyLookPatch, sameLook } from "../model/canvas-look";
 import { isElementCard } from "../model/card-kinds";
 import { checkPermission, type WorkspaceAccess } from "../permissions";
 import {
@@ -199,6 +200,62 @@ export function removeCanvasFromProject(
   };
 }
 
+// ---- a canvas's place among the project's tabs (slice 16, item 2, D-71) ----
+
+export const CANVAS_MOVES = ["left", "right", "start", "end"] as const;
+export type CanvasMove = (typeof CANVAS_MOVES)[number];
+export const MOVE_CANVAS_LABEL = "Move canvas";
+
+const moveInput = z.object({ projectId: uuidSchema, canvasId: uuidSchema, to: z.enum(CANVAS_MOVES) }).strict();
+export type MoveCanvasInput = z.input<typeof moveInput>;
+
+/** Where a tab goes in the project's order (the canvas ids in tab order), or null when it would not move. */
+export function movedOrder(order: readonly Uuid[], canvasId: Uuid, to: CanvasMove): Uuid[] | null {
+  const from = order.indexOf(canvasId);
+  if (from < 0) return null;
+  const at = to === "left" ? from - 1 : to === "right" ? from + 1 : to === "start" ? 0 : order.length - 1;
+  if (at < 0 || at >= order.length || at === from) return null;
+  const next = order.filter((id) => id !== canvasId);
+  next.splice(at, 0, canvasId);
+  return next;
+}
+
+/**
+ * Moves a canvas among the current project's tabs: one step left or right, or to the start or the end. Only this
+ * project's order changes (a canvas may be in several, D-28). The project's links are numbered 0…n−1 in the new order
+ * and only those whose number changes are written: one undo step "Move canvas". A move the stored order would not make
+ * (the first tab to the left, two quick clicks on the last step) changes nothing.
+ */
+export function moveCanvas(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: { project: Project | null; projectLinks: readonly ProjectCanvas[] },
+  input: unknown,
+): CommandResult {
+  const denied = checkPermission(access, "canvas.edit_projects");
+  if (denied) return fail(denied);
+  const parsed = parseInput(moveInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const workspaceId = access.workspace.id;
+  const { project } = state;
+  if (!isLive(project, workspaceId) || project.id !== parsed.data.projectId) return fail(notFound("project"));
+  // the links as the store lists them, in tab order (sort order, then when they were added)
+  const links = state.projectLinks.filter((l) => l.project_id === project.id && l.workspace_id === workspaceId);
+  if (!links.some((l) => l.canvas_id === parsed.data.canvasId)) return fail(domainError("not_found", `This canvas is not in ${project.name}.`));
+  const order = movedOrder(
+    links.map((l) => l.canvas_id),
+    parsed.data.canvasId,
+    parsed.data.to,
+  );
+  if (!order) return fail(nothingToChange());
+  const writes: Write[] = [];
+  order.forEach((canvasId, i) => {
+    const before = links.find((l) => l.canvas_id === canvasId)!;
+    if (before.sort_order !== i) writes.push({ kind: "update", table: "project_canvas", before, row: { ...before, sort_order: i } });
+  });
+  return { ok: true, value: undefined, writeSet: { ...buildWriteSet(ctx, workspaceId, writes), label: MOVE_CANVAS_LABEL } };
+}
+
 // ---- duplicate layout (slice 2a) ----
 
 const duplicateInput = z.object({ projectId: uuidSchema, canvasId: uuidSchema }).strict();
@@ -376,12 +433,16 @@ const lookInput = z
     background: z.enum(CANVAS_BACKGROUNDS).optional(),
     grid: z.enum(CANVAS_GRIDS).optional(),
     layer: z.enum(CANVAS_LAYERS).optional(),
+    /** Relationship lines by kind (slice 16, item 3): true hides, false shows. */
+    hideEntityRelationships: z.boolean().optional(),
+    hideSourceRelationships: z.boolean().optional(),
   })
   .strict();
 export type SetCanvasLookInput = z.input<typeof lookInput>;
 
 /**
- * Background, grid and layer mode of one canvas. Saved with a new version and a change event like any write
+ * Background, grid and layer mode of one canvas, and since slice 16 its relationship lines hidden by kind (D-71).
+ * Saved with a new version and a change event like any write
  * (AD-12, AD-13), but not an undo step (D-12), and undo of other steps leaves the look alone (`undo.ts`).
  */
 export function setCanvasLook(
@@ -394,15 +455,11 @@ export function setCanvasLook(
   if (denied) return fail(denied);
   const parsed = parseInput(lookInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { canvasId, expectedVersion, background, grid, layer } = parsed.data;
+  const { canvasId, expectedVersion, ...patch } = parsed.data;
   const { canvas } = state;
   if (!isLive(canvas, access.workspace.id) || canvas.id !== canvasId) return fail(notFound("canvas"));
   if (expectedVersion !== canvas.version) return fail(staleVersion());
-  const look: CanvasLook = {
-    background: background ?? canvas.look.background,
-    grid: grid ?? canvas.look.grid,
-    layer: layer ?? canvas.look.layer,
-  };
+  const look: CanvasLook = applyLookPatch(canvas.look, patch);
   if (sameLook(look, canvas.look)) return fail(domainError("invalid", "Nothing to change."));
 
   const row = nextVersion(ctx, canvas, { look });
@@ -438,7 +495,6 @@ export function applyLookToAllCanvases(
   return { ok: true, value: { changed: writes.length }, writeSet: buildWriteSet(ctx, workspaceId, writes) };
 }
 
-const sameLook = (a: CanvasLook, b: CanvasLook) => a.background === b.background && a.grid === b.grid && a.layer === b.layer;
 
 // ---- what hides things on a canvas, removed (slice 6a, D-39) ----
 
