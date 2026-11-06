@@ -729,3 +729,9 @@ CI-07, CI-03 in its new wording. A failure is diagnosed as before (trace, rounds
 **Done:** `viewStored` (`e2e/slice-05a/helpers.ts`); S5A-07 calls it before `removeItem` (line 45), S6A-11 before
 each of its three `setItem` calls (lines 28, 47 and 54: the first test's one too, which follows the left panel's hide
 and its `shiftView`).
+
+**Checked:** on the runner (commit `d144cb7`, rounds 3) S5A-07 3 of 3
+([42215627381](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42215627381)) and S6A-11 3 of 3
+([42215631987](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42215631987)); on Windows one local run
+of both files, 5 of 5. The known limitation is "The canvas saves its view about 150 ms late" (`docs/known-limitations.md`,
+"Side panels"); `docs/ideas.md` has item 6. The full run on the final commit: in PR #39's description.
