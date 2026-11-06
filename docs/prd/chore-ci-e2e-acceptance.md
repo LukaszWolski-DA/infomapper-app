@@ -332,3 +332,169 @@ speed bar is inside `if (MEASURE)` (`S1A-14.spec.ts:218-224`, `S1B-09.spec.ts:11
 `S2A-14.spec.ts:100, 176`). What remains on the runner is their test timeouts (S1A-14: 240 s, S1B-10: 180 s).
 
 ## Step 2 – the workflow and one full run
+
+(6 November 2026.) No local e2e run; every run below is a GitHub Actions run of `.github/workflows/e2e.yml` on this
+branch.
+
+### What changed
+
+| File | What | Why |
+| --- | --- | --- |
+| `e2e/parts.ts` | `PART_STARTS = ["slice-02b", "slice-04a", "slice-07a", "slice-08", "slice-10c", "slice-14a"]` (seven parts); `listedFiles` (the files of Playwright's JSON list) | answer 1; the per-part list |
+| `scripts/e2e.ts` | `--list` prints each part's files as its run finds them (`--list --part <n>`: one part): seven `playwright test --list` side by side, no server; with `--part` and `E2E_MEMORY_LOG=1` the memory file is named by its part | the per-part list (CI-02, CI-07); Q4 |
+| `scripts/e2e-server.ts` (new) | starts `next dev --port <port>` with its stdout and stderr in a file | answer 2 |
+| `playwright.config.ts` | the dev `webServer` runs `scripts/e2e-server.ts 3200 <output folder>/server.log` (`test-results/part-<n>/server.log`, or `test-results/server.log` for a run of files); `retries: 0` everywhere | answer 2 (Playwright clears the output folder before it starts the server, `createGlobalSetupTasks`, so the log is the part's own); P4 |
+| `e2e/memory-reporter.ts` | off Windows, the machine's half: `os.freemem()` (libuv reads `MemAvailable`) and `os.totalmem()` every 5 s into `.system.jsonl`, field `availableMb` as on Windows; Windows's PowerShell script unchanged | the finding on the memory log |
+| `tests/e2e-parts.test.ts` | seven parts; `listedFiles`; the wrapper's `--list`: every file once, in its part's folders, the same set as one plain `playwright test --list`, with S1A-14, S1B-09, S1B-10 and S2A-14 and without the measurement build's specs (about 13 s) | the per-part list, CI-02 |
+| `.github/workflows/e2e.yml` (new) | below | P2 to P6 as answered |
+| `scripts/e2e-summary.ts` (new) | the job summary: counts, the failed tests with file and first error line, each part's duration, exit, heap peak against the limit and the 80 % threshold, lowest available memory, the restart line counted in `server.log`, the folder times; for a check, each round's tests | P5 |
+
+**The workflow.** `workflow_dispatch` with `files` (empty: the full run), `rounds` (default 3) and `parts` (some parts
+only, for trying the workflow; such a run is not a full run and its summary says so), and `pull_request` `labeled` with
+`full-e2e`. Jobs:
+
+- `plan`: checks out `pull_request.head.sha` or the dispatched commit, reads the part count from `e2e/parts.ts` with
+  plain Node, and checks the inputs through environment variables: `files` against `^e2e/[A-Za-z0-9._/-]+$`, no `..`,
+  each path present; `rounds` 1 to 10; `parts` 1 to the part count. A bad input fails here, before any server starts.
+- `part`: a matrix over the parts, `fail-fast: false`, 45 min each: `npm ci`, `npx playwright install --with-deps
+  chromium`, `npm run e2e -- --part <n>` with `E2E_BLOB=1` and `E2E_MEMORY_LOG=1`. It uploads `blob-part-<n>` and
+  `part-<n>` (`test-results/part-<n>/`: `server.log`, the memory log, `part.json`, the failures' traces).
+- `report` (always): merges the blobs into the HTML and JSON reports, writes the summary, uploads `report`.
+- `check`: a matrix over the rounds, `npm run e2e -- <files>`; uploads its HTML and JSON reports and `test-results/`.
+
+Concurrency as answered (full runs `e2e-full-<branch>`; checks, `parts` runs and other labels `e2e-own-<run id>`);
+`permissions: contents: read`; artifacts kept 14 days; `TZ: Europe/Warsaw`; `NEXT_TELEMETRY_DISABLED=1` (the server log
+showed Next.js's telemetry notice on the runner). Only named folders are uploaded, never `.data/`.
+
+**Not in the PRD: dispatching before the workflow is on `main`.** GitHub refused the first dispatch: "workflow e2e.yml
+not found on the default branch" (HTTP 404). A workflow can be dispatched on another branch once GitHub knows it, and
+GitHub learns of a workflow when it runs once. So one commit added a `push` trigger for this branch only (`1666bd9`):
+its run skipped every job, as `plan`'s `if` allows only a dispatch or the label. The next commit (`e22f43f`) removed the
+trigger again. Since then `gh workflow run 409026223 --ref chore/ci-e2e` works. Once the workflow is on `main` this is
+not needed; the branch's final diff has no `push` trigger.
+
+### The trial runs (not full runs)
+
+| Run | What | Result |
+| --- | --- | --- |
+| [42177065028](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42177065028) | `files: e2e/fixes`, `rounds: 1` | 2 passed. The job took 1 min 18 s, 55 s of it before the first test (checkout 3 s, Node 3 s, `npm ci` 31 s, Chromium with its packages 15 s); the server answered in 15 s; `server.log`, the memory log (15,984 MB machine, 13,864 MB available) and the reports in the artifact. |
+| [42177341211](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42177341211) | `parts: 1` | 71 passed, among them S0-10 (its own server stopped by SIGTERM to its process group; no change needed) and S2C-11 (Vitest started from the spec); 12 min 21 s; heap peak 1,199 MB of an 8,039 MB limit; merge and summary worked. |
+
+### The full run
+
+**Run [42178915299](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42178915299)**, commit
+`5995d7af18789ab0a9e07374e595199e164e0840` (`5995d7a`), dispatched on `chore/ci-e2e`.
+
+- **Wall-clock 12 min 1 s** (created 07:08:33, last job done 07:20:34 UTC), against 93 to 97 min for the laptop's last
+  full runs (`.data/e2e-15c-step2.log`, `.data/e2e-15c-step3.log`).
+- **599 tests: 592 passed, 4 failed, 3 skipped** (the same 3 as locally); `retries: 0`, so nothing counts as flaky.
+- **Actions minutes:** about 72 (seven part jobs of 5.9 to 10.7 min, plan and report about 1 min each); free here.
+
+| Part | Folders | Job | The run step (`part.json`) | Exit | Heap peak | Of the threshold (6,431 MB) | Lowest available | Restart in `server.log` |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | --- |
+| 1 | fixes to slice-02a | 9 min 35 s | 8 min 34 s | 0 | 1,405 MB | 22 % | 9,044 MB | no |
+| 2 | slice-02b to slice-03b | 8 min 22 s | 7 min 21 s | 1 | 1,389 MB | 22 % | 10,827 MB | no |
+| 3 | slice-04a to slice-06b | 10 min 44 s | 9 min 36 s | 1 | 1,051 MB | 16 % | 11,543 MB | no |
+| 4 | slice-07a to slice-07c | 10 min 39 s | 9 min 21 s | 0 | 931 MB | 14 % | 11,429 MB | no |
+| 5 | slice-08 to slice-10b | 10 min 8 s | 8 min 45 s | 1 | 1,022 MB | 16 % | 10,757 MB | no |
+| 6 | slice-10c to slice-13 | 5 min 54 s | 4 min 59 s | 0 | 1,238 MB | 19 % | 11,312 MB | no |
+| 7 | slice-14a to slice-15c | 9 min 4 s | 7 min 51 s | 0 | 1,102 MB | 17 % | 11,491 MB | no |
+
+The runner's heap limit is 8,039 MB (Next.js's 50 % of 15,984 MB), the restart threshold 80 % of it, 6,431 MB. CI-04's
+margin (20 % below the threshold, 5,145 MB) holds with room: the highest peak is 22 % of the threshold. No server
+printed the restart. "The run step" is `npm run e2e -- --part <n>` (the server's start, the warm-up, the tests); "Job"
+adds about 1 min of checkout, `npm ci` and Chromium.
+
+**The parts' balance (answer 1):** part 6 is the shortest (4 min 59 s), parts 3 and 4 the longest (9 min 36 s and 9 min
+21 s). None is clearly longer than the rest, so the cuts stay. Part 4 (slice-07a to 07c) gains least from the runner
+(0.71× the laptop), part 6 most (0.46×).
+
+### The failures
+
+All four fail on the runner, and none failed in 15c's full runs on the laptop (`.data/e2e-15c-step2.log`,
+`.data/e2e-15c-step3.log`, `.data/e2e-15c-close-part4.log`). Each was checked on its own with `rounds: 3`: three jobs
+side by side, each with a fresh server. Traces: in the full run's `report` artifact (the merged HTML report holds them)
+and its `part-<n>` artifacts; the checks' traces in their `check-round-<n>` artifacts. Memory: the parts peaked at 14 to
+22 % of the threshold and available memory never fell below 9 GB; none of the four lines up with memory.
+
+| Test | Error | On its own (rounds 3) | Reading |
+| --- | --- | --- | --- |
+| **S2B-06** (`e2e/slice-02b/S2B-06.spec.ts:43`, part 2) | `menu-toolbox`: expected 0, got 1, after a right-button drag inside a frame | **fails 3 of 3** ([42180451489](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42180451489)) | **About the app.** `onContextMenu` (`src/canvas/CanvasModes.tsx:198-205`) opens the toolbox unless the mouse moved between the right button's press (`rightDown`, line 150) and the `contextmenu` event. Windows fires `contextmenu` when the right button comes up, after the drag; Linux and macOS fire it when the button goes down, before any move. So on Linux and macOS a right-drag pan opens the toolbox. Not a matter of the test setup. |
+| **S6A-10** (`e2e/slice-06a/S6A-10.spec.ts:52`, part 3) | "1201: the bar scrolls": `scrollWidth - clientWidth` = 1 at 1,201 px | **fails 3 of 3** ([42180466852](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42180466852)) | **About the app, small.** At 1,201 px the top bar's content is 1 px wider than the bar with Linux's text rendering (the same IBM Plex files, other hinting and fallback fonts); every other width passes. The bar has no slack at that step (1,201 to 1,300 px: the context's label cut at 90 px and "More" with the names' check boxes). Which control spills over is not printed: the spec fails before its table. |
+| **S6A-07** (`e2e/slice-06a/S6A-07.spec.ts:40`, part 3) | after the reload "Open notes on canvas 1", expected 2 | **fails 1 of 3** ([42180459331](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42180459331)) | **A race in the test.** The trace: the note's second click (reopen) at +0 ms, while the first click's save is still on its way (141 ms); Next.js sends server actions one after another, so the reopen's POST waits behind it; the test reloads at +62 ms; the reopen's POST goes out at +125 ms and the reload aborts it. The spec waits for the count on the page, not for the stored write, before it reloads (Playwright goes through the page's leave warning when the spec has no dialog handler). On the laptop the first save answered before the reload. |
+| **S10A-05** (`e2e/slice-10a/S10A-05.spec.ts:63`, part 5) | the mapping was deleted; expected it kept | **fails 2 of 3** ([42180474543](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42180474543)) | **A race in the test.** The trace: the status change's POST at +0 (refused as stale, answered after 305 ms); the Delete click starts at +253 ms and takes effect after the refusal has settled, so it no longer waits behind it: it is sent at +570 ms with the fresh version and succeeds. The spec needs the refusal to arrive after the second click; the runner's server answers in about 300 ms, the laptop's more slowly. |
+
+**Proposals, for Łukasz's decision (nothing changed yet):**
+
+- **S2B-06:** a finding about the app, for 15d or a fix of its own: no toolbox on a right-drag on platforms that fire
+  `contextmenu` on the press (for example: open it on the right button's release when the press did not move). It
+  touches the canvas's input (AD-24) and is outside this chore (no application change). Meanwhile: a known limitation
+  ("on Linux and macOS a right-drag opens the toolbox"), and the spec stays red in CI unless you decide otherwise.
+- **S6A-10:** a pixel of slack at the 1,201 px step (for example the context's label cut at 89 px), an application
+  change; or the spec accepts 1 px of scroll at 1,201 px on Linux. I would rather not loosen the assertion.
+- **S6A-07:** in the test, wait for the note's stored status (`loadNotes`) before the reload; no assertion changes.
+- **S10A-05:** in the test, hold the refused answer until the Delete is clicked (`holdUntil`, slice 13's helper), so the
+  delete waits behind it on any machine; no assertion changes.
+
+### The runner's folder times against the laptop's
+
+Laptop: 15c's step 3 full run (`.data/e2e-15c-step3.log`; `slice-15c` from `.data/e2e-15c-close-part4.log`), the sum of
+the tests' own times. Runner: this run (`report.json`, the same sum; a failing test counts its wait until the timeout,
+at most 15 s more).
+
+| Folder | Laptop (s) | Runner (s) | Runner / laptop |
+| --- | ---: | ---: | ---: |
+| fixes | 16 | 8 | 0.50 |
+| slice-00 | 161 | 112 | 0.70 |
+| slice-01a | 213 | 111 | 0.52 |
+| slice-01b | 229 | 115 | 0.50 |
+| slice-02a | 290 | 147 | 0.51 |
+| slice-02b | 182 | 90 | 0.49 |
+| slice-02c | 255 | 105 | 0.41 |
+| slice-03a | 196 | 104 | 0.53 |
+| slice-03b | 221 | 121 | 0.55 |
+| slice-04a | 180 | 96 | 0.53 |
+| slice-04b1 | 124 | 75 | 0.60 |
+| slice-04b2 | 136 | 70 | 0.51 |
+| slice-04p | 42 | 27 | 0.64 |
+| slice-05a | 218 | 118 | 0.54 |
+| slice-06a | 147 | 96 | 0.65 |
+| slice-06b | 135 | 72 | 0.53 |
+| slice-07a | 227 | 163 | 0.72 |
+| slice-07b | 249 | 171 | 0.69 |
+| slice-07c | 278 | 200 | 0.72 |
+| slice-08 | 127 | 79 | 0.62 |
+| slice-09 | 225 | 138 | 0.61 |
+| slice-10a | 327 | 218 | 0.67 |
+| slice-10b | 87 | 58 | 0.67 |
+| slice-10c | 119 | 58 | 0.49 |
+| slice-11 | 108 | 50 | 0.46 |
+| slice-12a | 133 | 63 | 0.47 |
+| slice-12b | 76 | 34 | 0.45 |
+| slice-13 | 174 | 77 | 0.44 |
+| slice-14a | 199 | 115 | 0.58 |
+| slice-14b | 172 | 94 | 0.55 |
+| slice-15a | 99 | 57 | 0.58 |
+| slice-15b | 154 | 86 | 0.56 |
+| slice-15c | 188 | 92 | 0.49 |
+| **All** | **5,687** | **3,220** | **0.57** |
+
+By part (laptop → runner, s): 1: 909 → 493; 2: 854 → 420; 3: 982 → 554; 4: 754 → 534; 5: 766 → 493; 6: 610 → 282;
+7: 812 → 444. Step 1's estimate (0.75 to 1.0×, wall-clock 18 to 22 min) was too cautious: 0.57× and 12 min.
+
+### Against the criteria so far
+
+- **CI-01:** a dispatch starts the full run (after the registration above); the label and the cancel are checked in step
+  3, with the pull request.
+- **CI-02:** the same 385 files per part (`npm run e2e -- --list`, `tests/e2e-parts.test.ts`); 599 tests with 3
+  skipped, as locally.
+- **CI-03:** not yet: the four failures above.
+- **CI-04:** 12 min; every part's peak at most 22 % of the threshold; no restart printed.
+- **CI-05:** the merged HTML report, the traces, `server.log` and the memory log per part, the summary; 14 days.
+- **CI-06:** the four checks above, three jobs each, side by side.
+- **CI-07:** nothing changed outside `.github/`, `e2e/`, `scripts/`, `playwright.config.ts`, `tests/e2e-parts.test.ts`
+  and the docs.
+
+**Left for step 3:** your decisions on the four; the docs (section 7, the known limitation with the time-zone sentence,
+CLAUDE.md with both ways of the single-file check); the summary's first line (it prints the merged report's own
+"duration", which means nothing for parts run side by side); the second full run; the pull request.

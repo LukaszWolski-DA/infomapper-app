@@ -1,6 +1,6 @@
 # Chore – Full e2e runs in GitHub Actions
 
-Status: **step 1 done and answered** (Łukasz, 6 November 2026); step 2 on the way. Branch `chore/ci-e2e`, from `main` at tag `slice-15c` (assumption A1).
+Status: **step 1 done and answered** (Łukasz, 6 November 2026); **step 2 done** (6 November 2026), waiting for Łukasz's decisions on its four failures. Branch `chore/ci-e2e`, from `main` at tag `slice-15c` (assumption A1).
 PRD file: `docs/prd/chore-ci-e2e.md`; step 1 writes `docs/prd/chore-ci-e2e-acceptance.md`. A chore: no change to the
 application's behaviour, the data model or the local data file. Step 1 checks this PRD against the code, the e2e setup
 and GitHub (CLAUDE.md, "How we work").
