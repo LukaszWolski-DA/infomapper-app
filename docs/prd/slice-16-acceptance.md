@@ -528,3 +528,31 @@ still stores the view, now as a consistent pair, so a test that writes the key i
 
 Unchanged texts the new items use: "Create attribute" (the undo name of "Add attribute") and "Nothing to change." (a
 move the stored order would not make).
+
+## Łukasz's answers to step 2 (6 November 2026)
+
+- **Y8:** D-71 approved as quoted, with its notes on D-22, D-28, D-39, D-54 and D-62. They go into `docs/decisions.md`
+  in step 3 with the closing docs, verbatim, ending "Accepted by Łukasz, 6 November 2026."
+- **Y9:** every text approved as listed. One sentence on when "Nothing to change." can appear for a move, since the
+  items that would not move the canvas are disabled (assumption: two quick clicks).
+- **S7C-02 is not closed as a flake.** Before step 3's code it is diagnosed from run 42286373952's trace, read-only:
+  - the zoom at the moment the card decides whether to draw its rows, against the fit's final 41 % and the 40 %
+    threshold;
+  - whether the fit passes below 40 % on its way, or the rows are decided from the zoom before the fit;
+  - app or test;
+  - whether item 6's change can affect it (it also failed once in slice 11's closing run).
+
+  Then:
+  - a race in the test is fixed without assertion changes;
+  - a bug in the app that is small and in code this slice already touches gets a proposed fix, and step 3 waits for
+    Łukasz's answer;
+  - otherwise it becomes a known limitation with its mechanism.
+- **Step 3:**
+  - items 1, 2, 3 and 7;
+  - `moveCanvas`, and undo reverting an update of a link-table row as a general rule for link tables, with unit tests;
+  - specs S16-01 to S16-06, S16-10 and S16-11 (S11-13 for the switch, the element counts, `npm run measure:canvas` on
+    the laptop per AD-24);
+  - the closing docs;
+  - one full run on the final commit;
+  - the pull request with the run, every earlier test changed with its reason, and the manual acceptance steps;
+  - no merge.
