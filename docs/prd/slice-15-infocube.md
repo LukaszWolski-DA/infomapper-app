@@ -8,7 +8,9 @@ Status: **step 1 done and answered** (Łukasz, 4 November 2026); updated to the 
 step 1 done on 5 November 2026 on branch `slice/15c-dimensional-mappings` from tag `slice-15b` (acceptance doc, "15c step
 1"; answered on 5 November 2026, "Łukasz's answers to 15c step 1"). **15a, 15b and 15c are merged** (tags `slice-15a`,
 `slice-15b`, `slice-15c`). **15d** starts after the chore "Full e2e runs in GitHub Actions" (`docs/prd/chore-ci-e2e.md`;
-Łukasz, 6 November 2026), from `main` at that chore's merge.
+Łukasz, 6 November 2026), from `main` at that chore's merge. **15d** (requirements and the bus matrix): step 1 done on
+6 November 2026 on branch `slice/15d-requirements-bus-matrix` from `main` at `0c6bb1d` (acceptance doc, "15d step 1";
+answered the same day), steps 2 and 3 done (D-70 entered); waiting for Łukasz's manual acceptance and merge.
 
 ## 0. Answers to step 1 (Łukasz, 4 November 2026)
 
@@ -92,6 +94,26 @@ named. Findings (F), extension points (E), questions (O, Q) and differences (P) 
   - **Three InfoMapper items from the same testing are not in slice 15:** "Add attribute" in a card header's menu, the
     canvas tabs' order from a tab's menu, and relationship lines shown or hidden by kind. They are a slice of their own
     after slice 15 (`docs/ideas.md`, "InfoMapper's canvas and menus: a slice after slice 15").
+- **15d step 1's answers (Łukasz, 6 November 2026), acceptance doc "Łukasz's answers to 15d step 1":**
+  - **Coverage (Y1, changed):** a dimensional attribute is covered by D-31's rule at both levels: an approved
+    dimensional mapping without a type conflict (a transformation with a rule always passes; a direct copy, or a
+    transformation without a rule, fails when an input's type does not fit the target, 15c's `typesDiffer`) whose
+    logical attributes are all covered. One level deep, no recursion.
+  - **Focus (Y2):** Focus on a requirement lights only its own dimensional mappings; every other Focus keeps 15c's rule.
+  - **Gaps (Y3):** new reasons for a dimensional item ("not fed", "logical feed not covered", and the type conflict's);
+    the three-part bar (D-41) and three buckets stay.
+  - **"Via" (Y4):** D-34 unchanged; no marker on the feeding logical cards.
+  - **The bus matrix (Y5):** for every role who can open the workspace; its rows are a read on demand through the
+    existing repository with the usual permission check, no new layer or cache; the dialog is a snapshot taken when it
+    opens (a known limitation).
+  - **"Fed from concepts" (Y6):** where "Feeding sources" stands for a logical entity, not clickable, any status.
+  - **The bench (Y7):** in Node, the median with feeds at most 25 % above today's (23.7–27.5 ms); the browser rule of the
+    known limitation stays.
+  - **Steps (Y8):** step 2 domain (its first commit fixes the stale docs); step 3 the interface and the closing docs with
+    D-70, then **one** full run on the final commit (the canvas's layers and the run before the merge); step 4 Łukasz's
+    manual acceptance only (a fix there gets its own full run).
+  - **Texts and D-70 (Y9, Y10):** quoted in step 2's report for approval before step 3. **S15-24** accepted; P27–P31
+    accepted in step 2's report.
 - **On the risks.** 15a starts with the table registry and a guard test: every table in the schema is known to undo and
   to the local adapter, or the build fails. Łukasz's KB file is backed up before the branch's first dev or e2e run; what
   `readDb` on `main` does with a newer format is reported (and listed if it does not refuse).
@@ -548,6 +570,12 @@ performance), each with the files and functions behind it and a proposal.
   the ends; the prototype says "Role of {name}" twice.
 - **Parallel relationships and nested loops 20 px apart** (15b), so a role pill fits between them; source relationships
   keep 16 px (R7).
+- **15d's differences** (accepted 6 November 2026, acceptance doc "15d step 1" and "Łukasz's answers to 15d step 2"):
+  P27 the lens colours without fading, Focus fades; P28 a linked fact or dimension brings no feeds; P29 Focus on a
+  requirement lights its own dimensional mappings, every other Focus keeps 15c's rule; P30 no "via" through feeds and
+  no marker on the feeding logical cards; P31 the bus matrix opens objects by the app's go-to rule without a toast, in
+  the Cube tab's order. Also the panel's reasons at both levels (option A), "Fed from concepts", and the bus matrix
+  for every role, read when it opens. All are built.
 - The rest of the acceptance doc's list P1–P26 as answered there.
 
 ## 9. Left for later

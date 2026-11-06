@@ -20,7 +20,7 @@ import { liveNoticesFor } from "@/app/_lib/live-notices";
 import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pinNoteAction, unpinNoteAction, updateNoteAction } from "@/app/_actions/note";
 import { AppShell } from "@/app/_components/app-shell";
 import { ModulesProvider } from "@/app/_components/modules";
-import { moduleLines, moduleView, STORE_SCHEMA } from "@/compose";
+import { moduleLines, moduleView, requirementFeeds, STORE_SCHEMA } from "@/compose";
 import { CREATE_ACTIONS } from "@/compose/actions";
 import { NO_MODULES } from "@/ui/modules";
 import { MovedNotice } from "@/app/_components/moved-notice";
@@ -154,7 +154,7 @@ export default async function CanvasPage({
   );
   // requirements (slice 4a): the index is built once per page here for the left panel; the panels build theirs once
   // per data version in the browser
-  const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
+  const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model, requirementFeeds(modules, model));
   // requirement cards (slice 4b-2): this canvas's cards with a requirement, drawn from the same index
   const requirementCards = buildRequirementCards(items.filter((i) => i.canvas_id === canvasId), requirementIndex);
   const tree = buildTree(model, items, canvasId, view.canvases.map((c) => c.id), requirementIndex, sourceChanges, modules.tabs);
@@ -224,7 +224,7 @@ export default async function CanvasPage({
         editable={editable}
         save={saveCanvasLookAction.bind(null, ws)}
       >
-      <ModulesProvider view={modules}>
+      <ModulesProvider view={modules} model={model}>
       <PanelsProvider>
         <UndoProvider workspaceId={ws} projectId={projectId} canvasId={canvasId} state={undoState}>
           <WorkingContextProvider workspaceId={ws} userId={shell.user.id} labels={countedLabels} initial={contextCookie} canLabel={editable}>

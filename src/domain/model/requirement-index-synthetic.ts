@@ -2,11 +2,14 @@
 // requirements in chains of parents, 5,000 attributes on 500 entities, 3,000 columns in 300 tables, 2,000 mappings
 // (every fifth a transformation with two inputs, a third of them drafts) and 3,000 links to all five kinds of target.
 // Not used by the application; `scripts/bench-requirement-index.ts` and the measuring hook (`window.__imIndexTiming`) use
-// it.
+// it. Slice 15d: `{ feeds: true }` adds 100 dimensional entities with 10 attributes each, 1,500 feeds reading the
+// logical attributes (every fifth a transformation with three inputs, a third not approved, every eleventh with a type
+// conflict) and 300 more links to dimensional attributes; the feeds come back as `feeds`.
 
 import type { Attribute, Entity, Mapping, MappingInput, Requirement, RequirementLink, SourceColumn, SourceTable } from "../types";
+import type { AttributeFeed, AttributeFeeds } from "./requirements";
 
-export function syntheticIndexInput() {
+export function syntheticIndexInput(options: { feeds?: boolean } = {}) {
   const std = (id: string) => ({ id, workspace_id: "ws", version: 1, created_at: "t", created_by: "u", updated_at: "t", updated_by: "u", deleted_at: null });
   const id = (kind: string, n: number) => `${kind}-${n}`;
 
@@ -100,6 +103,20 @@ export function syntheticIndexInput() {
               : { source_column_id: id("col", i % COLUMNS) };
     return { ...std(id("k", i)), requirement_id: id("r", i % REQUIREMENTS), ...none, ...target };
   });
+  const feeds: Record<string, AttributeFeed[]> = {};
+  if (options.feeds) {
+    const DIMENSIONAL = 100, PER = 10, FEEDS = 1500, MORE_LINKS = 300;
+    for (let d = 0; d < DIMENSIONAL; d++) {
+      entities.push({ ...entities[0]!, ...std(id("de", d)), name: `D${d}`, model_level: "dimensional" });
+      for (let k = 0; k < PER; k++) attributes.push({ ...attributes[0]!, ...std(id("da", d * PER + k)), entity_id: id("de", d), name: `d${k}`, sort_order: k });
+    }
+    for (let i = 0; i < FEEDS; i++) {
+      const target = id("da", i % (DIMENSIONAL * PER));
+      const inputs = i % 5 === 0 ? [0, 1, 2].map((n) => id("a", (i * 3 + n * 11) % ATTRIBUTES)) : [id("a", (i * 3) % ATTRIBUTES)];
+      (feeds[target] ??= []).push({ id: id("f", i), approved: i % 3 !== 0, typeConflict: i % 11 === 0, inputs });
+    }
+    for (let i = 0; i < MORE_LINKS; i++) links.push({ ...std(id("dk", i)), requirement_id: id("r", (i * 7) % REQUIREMENTS), ...none, attribute_id: id("da", (i * 13) % (DIMENSIONAL * PER)) });
+  }
   const model = { entities, attributes, mappings, mappingInputs, sourceTables, sourceColumns };
-  return { requirements, links, model };
+  return { requirements, links, model, feeds: feeds as AttributeFeeds };
 }

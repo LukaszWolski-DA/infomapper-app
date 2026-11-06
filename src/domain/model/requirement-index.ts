@@ -10,7 +10,10 @@ import {
   coverageOfScope,
   lookupModel,
   scopeOfLinks,
+  type AttributeCoverage,
+  type AttributeFeeds,
   type ElementRequirements,
+  type GapReason,
   type RequirementCoverage,
   type RequirementScope,
   type ScopeModel,
@@ -32,6 +35,12 @@ export interface RequirementIndex {
   of: (target: TraceTarget) => ElementRequirements;
   /** How many requirements are covered (the status bar, the project home). */
   coveredCount: number;
+  /** An attribute's own coverage state (slice 15d: the lens colours the attributes that feed a scope by it). */
+  attributeCoverage: (attributeId: Uuid) => AttributeCoverage;
+  /** Slice 15d: why an attribute with approved mappings or feeds is not covered (both levels); null otherwise. */
+  gapReason: (attributeId: Uuid) => GapReason | null;
+  /** Slice 15d: an attribute of a fact or a dimension (the panel's "not fed"). */
+  isDimensional: (attributeId: Uuid) => boolean;
 }
 
 const EMPTY_SCOPE: RequirementScope = { entities: new Set(), attributes: new Set(), mappings: new Set(), tables: new Set(), columns: new Set(), entityItems: new Set(), attributeItems: new Set() };
@@ -39,8 +48,9 @@ const EMPTY_COVERAGE: RequirementCoverage = { total: 0, covered: [], notApproved
 const byKey = (a: Requirement, b: Requirement) => a.key.localeCompare(b.key, "en", { numeric: true, sensitivity: "base" });
 const KIND_ORDER = new Map(REQUIREMENT_KINDS.map((k, i) => [k, i]));
 
-export function buildRequirementIndex(requirements: readonly Requirement[], links: readonly RequirementLink[], model: ScopeModel): RequirementIndex {
-  const lookup = lookupModel(model);
+/** `feeds` (slice 15d): the modules' mappings onto dimensional attributes (`lookupModel`); absent: none. */
+export function buildRequirementIndex(requirements: readonly Requirement[], links: readonly RequirementLink[], model: ScopeModel, feeds?: AttributeFeeds): RequirementIndex {
+  const lookup = lookupModel(model, feeds);
   const reqs = requirements.filter((r) => r.deleted_at === null).sort((a, b) => KIND_ORDER.get(a.kind)! - KIND_ORDER.get(b.kind)! || byKey(a, b));
   const byId = new Map(reqs.map((r) => [r.id, r]));
 
@@ -122,6 +132,9 @@ export function buildRequirementIndex(requirements: readonly Requirement[], link
     children: (id) => children.get(id) ?? [],
     of,
     coveredCount,
+    attributeCoverage: lookup.coverageOf,
+    gapReason: lookup.gapReason,
+    isDimensional: lookup.isDimensional,
   };
 }
 
@@ -132,5 +145,5 @@ export function buildRequirementIndex(requirements: readonly Requirement[], link
  * or to mappings reading them (“via mapping”); a mapping's and a column's own only. No “via entity”. A requirement is
  * listed once, as direct when it is both. For many elements, build the index once instead.
  */
-export const requirementsOf = (target: TraceTarget, requirements: readonly Requirement[], links: readonly RequirementLink[], model: ScopeModel): ElementRequirements =>
-  buildRequirementIndex(requirements, links, model).of(target);
+export const requirementsOf = (target: TraceTarget, requirements: readonly Requirement[], links: readonly RequirementLink[], model: ScopeModel, feeds?: AttributeFeeds): ElementRequirements =>
+  buildRequirementIndex(requirements, links, model, feeds).of(target);

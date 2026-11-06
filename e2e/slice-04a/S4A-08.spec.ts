@@ -44,10 +44,11 @@ test("S4A-08: coverage: the seed's figures in the panel and the bars; approving 
     await expect(requirementRow(page, key).getByTestId("bar-req-coverage")).toHaveAttribute("title", title);
   }
 
-  // the conflict makes quantity a gap: mapped, not approved
+  // the conflict makes quantity a gap: mapped, not approved; since slice 15d (option A) its reason names the type
+  // conflict, as for a fact's or a dimension's attribute
   await openRequirement(page, "REQ-104");
   await expect(coverageText(page)).toHaveText("1 of 4 covered");
-  await expect(gaps(page)).resolves.toEqual(["Order Line.unit_price unmapped", "Order Line.discount_pct unmapped", "Order Line.quantity not approved"]);
+  await expect(gaps(page)).resolves.toEqual(["Order Line.unit_price unmapped", "Order Line.discount_pct unmapped", "Order Line.quantity type conflict"]);
 
   // traced only to a table: no attribute in scope, not covered
   await openRequirement(page, "REQ-106");

@@ -35,7 +35,6 @@ docs (some are repeated below where they explain an item).
 | Labels and notes | rich text in notes | known limitation |
 | Projects and workspace | baselines; workspace export, export and delete, duplicate, transfer | baselines: decision only (AD-03, AD-14); the rest: – |
 | Settings and roles | inviting people by e-mail (slice 8 adds them at once instead) | database (AD-04) |
-| InfoCube | requirements on facts and dimensions and the bus matrix | slice 15d (`docs/prd/slice-15-infocube.md`) |
 
 ## Canvas
 
@@ -277,7 +276,6 @@ changes their own row (F12); every people change follows the app's roles, archiv
 
 | Item | What it is | Where in the prototype | Planned |
 | --- | --- | --- | --- |
-| Requirements on facts and dimensions, the bus matrix | X-5's scope and coverage, the lens; B-8; REQ-210 | the Cube tab's "Bus matrix", the requirement panel | 15d |
 | A role in a collapsed frame's block | the block lists a fact or dimension without its role | the frame's block | idea |
 
 **Present (slice 15a):** the InfoCube box in the workspace settings (the licence line, the check box for owners and
@@ -287,6 +285,21 @@ here" and "New dimension here" in the canvas's toolbox; a card's role with the c
 panel's Role; relationships only within a level, with the dimension at a fact's relationship's one end; paste within a
 level; a source column maps only to a logical attribute (B-6's toast); the delete preview's InfoCube rows; the Sales star
 in the demo data (`npm run demo`).
+
+**Present (slice 15d):** requirements on facts, dimensions and their attributes, their scope through dimensional
+mappings to the logical attributes and their sources, coverage by D-31's rule at both levels, the lens's feeding rows
+and Focus on a requirement's own dimensional lines; the requirement panel's reasons ("not fed", "logical feed not
+covered", "type conflict"); the bus matrix from the Cube tab (facts with their grain, dimensions with their SCD type,
+one dot per relationship, conformed and unused); "Fed from concepts" in a fact's and a dimension's panel; REQ-210 in
+the Sales star.
+
+**Deliberate differences (slice 15d, PRD section 8):** selecting a requirement colours its scope without fading, and
+only Focus fades (P27); a linked fact or dimension brings no attributes, and so no feeds, into the scope (P28); Focus on
+a requirement lights only its own dimensional mappings, every other Focus every dimensional line between two lit cards
+(P29); no requirement "via" a dimensional mapping in element panels and no marker on the feeding logical cards (P30);
+the bus matrix opens a name or a dot by the app's go-to rule without a toast and lists facts and dimensions in the Cube
+tab's order (P31); the panel's reasons for an item, also "type conflict" at the logical level (option A); "Fed from
+concepts" (not in the prototype); the bus matrix for every role, read when it opens.
 
 **Present (slice 15c):** dimensional mappings on the canvas (lines from logical rows to dimensional rows in the target's
 colour, dashed until Approved, a diamond at the target, ƒ on a transformation; hover, Focus, the line's menu, Delete,

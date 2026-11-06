@@ -3,7 +3,9 @@
 //   - attribute items: their rows blue (covered) or orange (gap);
 //   - entity items: their cards' headers blue or orange (covered when any of the entity's attributes is, D-31);
 //   - linked columns: their rows blue; linked tables: their headers blue;
-//   - linked mappings: their lines lit, as the hover highlight draws them.
+//   - linked mappings: their lines lit, as the hover highlight draws them;
+//   - slice 15d (D-70): the logical attributes that feed a dimensional attribute in scope, blue or orange by their own
+//     coverage.
 // Below 40 % rows are not drawn (AD-24 rule 1), so a card's summary stands for them (item 19; Łukasz chose a dot at the
 // header's right end): orange when any of the card's items in scope is a gap, else blue. A collapsed frame's block
 // carries the same dot on each member's row.
@@ -43,6 +45,12 @@ export function coverageColours(index: RequirementIndex | null, requirementId: U
   };
   for (const a of scope.attributeItems) {
     const c: CoverageColour = covered.has(a) ? "covered" : "gap";
+    out.rows.set(a, c);
+    sum(entityOf(a), c);
+  }
+  // slice 15d (D7, D-70): the logical attributes that feed the scope, by their own coverage (the prototype's `sc.up`)
+  for (const a of scope.feeding ?? []) {
+    const c: CoverageColour = index.attributeCoverage(a) === "covered" ? "covered" : "gap";
     out.rows.set(a, c);
     sum(entityOf(a), c);
   }

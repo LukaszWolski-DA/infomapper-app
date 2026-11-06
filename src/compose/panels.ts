@@ -6,7 +6,7 @@
 import type { ComponentType } from "react";
 import type { Attribute, Entity, Relationship } from "@/domain/types";
 import { CubeAttributeSection, CubeEntitySection, CubeRelationshipSection } from "@/modules/infocube/app/sections";
-import { CubeAttributeFeeds } from "@/modules/infocube/app/feeds";
+import { CubeAttributeFeeds, CubeEntityFeeds } from "@/modules/infocube/app/feeds";
 
 export interface PanelSections {
   /** After the entity's definition (prototype `cubeEntitySection`). */
@@ -18,6 +18,11 @@ export interface PanelSections {
    * does not show (prototype `cubeAttrSection`: "Comes from the logical model", "Feeds facts and dimensions").
    */
   attributeFeeds: ComponentType<{ attribute: Attribute }>[];
+  /**
+   * Where a logical entity's "Feeding sources" are (slice 15d, D14), which a fact or a dimension does not show: "Fed from
+   * concepts".
+   */
+  entityFeeds: ComponentType<{ entity: Entity }>[];
   /** After the relationship's cardinalities (prototype `relKeySection`). */
   relationship: ComponentType<{ relationship: Relationship }>[];
 }
@@ -26,5 +31,6 @@ export const PANEL_SECTIONS: PanelSections = {
   entity: [CubeEntitySection],
   attribute: [CubeAttributeSection],
   attributeFeeds: [CubeAttributeFeeds],
+  entityFeeds: [CubeEntityFeeds],
   relationship: [CubeRelationshipSection],
 };

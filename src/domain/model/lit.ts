@@ -31,6 +31,11 @@ export interface Lit {
   relationships: Set<Uuid>;
   /** Requirements whose cards stay lit (slice 4b-2, PRD item 21); absent: none. */
   requirements?: ReadonlySet<Uuid>;
+  /**
+   * The modules' lines a requirement's Focus lights (slice 15d, D8, Y2): its own dimensional mappings only. Absent (every
+   * other Focus): a module's line is lit when its cards are (15c's rule).
+   */
+  lines?: ReadonlySet<Uuid>;
 }
 
 export type LitModel = Pick<WorkspaceModel, "attributes" | "mappings" | "mappingInputs" | "relationships" | "sourceColumns">;
@@ -83,6 +88,7 @@ export function requirementFocusLit(model: LitModel, scope: RequirementScope): L
   for (const a of scope.attributes) for (const m of l.mappingsOfAttribute.get(a) ?? []) addMapping(lit, l, m);
   for (const c of scope.columns) for (const m of l.mappingsOfColumn.get(c) ?? []) addMapping(lit, l, m);
   for (const m of scope.mappings) addMapping(lit, l, m);
+  lit.lines = new Set(scope.feeds ?? []);
   return lit;
 }
 
@@ -152,7 +158,10 @@ export function targetLit(model: LitModel, target: LitTarget): Lit {
   return lit;
 }
 
-/** Everything `b` lights added to `a` (a multi-selection's items, slice 4b-2). */
+/**
+ * Everything `b` lights added to `a` (a multi-selection's items, slice 4b-2). `b`'s `lines` are not taken over (slice
+ * 15d): a multi-selection keeps 15c's rule for the modules' lines.
+ */
 export function mergeLit(a: Lit, b: Lit): Lit {
   for (const e of b.entities) a.entities.add(e);
   for (const t of b.tables) a.tables.add(t);

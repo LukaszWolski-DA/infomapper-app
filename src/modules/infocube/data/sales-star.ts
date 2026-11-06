@@ -5,7 +5,7 @@
 // A step for the development file (`npm run seed`, `npm run reset-dev-data`) and slice 15's specs only: earlier specs'
 // data has no InfoCube data and no licence, so their counts and the element guard stay as they were. Since slice 15b
 // the facts' measures, Dim Date's roles (Order date, and Ship date with `ship_date_key`, RP-F) and every relationship's
-// key link. Since slice 15c the prototype's 20 dimensional mappings (`cubeDemo`, `cubeDemoV2`); REQ-210 comes with 15d.
+// key link. Since slice 15c the prototype's 20 dimensional mappings (`cubeDemo`, `cubeDemoV2`); since slice 15d REQ-210.
 
 import { seedId } from "@/data/local/seed-model";
 import type { DevDb } from "@/data/local/schema";
@@ -109,6 +109,15 @@ const LAYOUT: [kind: "entity" | "star", key: string, x: number, y: number][] = [
   ["star", "sales", 1140, 280],
   ["star", "orders", 1140, 640],
 ];
+
+/** REQ-210 (slice 15d, the prototype's texts): net sales by customer segment and month, on the star's attributes. */
+export const REQ_210 = {
+  key: "REQ-210",
+  name: "Net sales by customer segment and month",
+  description: "Sales reports show net sales per customer segment per calendar month.",
+  owner: "Head of Sales",
+  links: ["sales.net_amount", "cust.segment_code", "date.month"],
+} as const;
 
 /** The star's ids, derived from the workspace as the demo model's are (`seedId`). */
 export const starId = (workspaceId: Uuid, key: string) => seedId(workspaceId, `infocube:${key}`);
@@ -238,6 +247,38 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
 
   if (!db.organization_licence.some((l) => l.organization_id === t.organizationId && l.module === "infocube" && l.deleted_at === null)) {
     db.organization_licence.push({ ...std("licence"), organization_id: t.organizationId, module: "infocube" });
+  }
+  // slice 15d (O7, X-5; prototype `cubeDemo`): REQ-210 with its key as given, the requirement counter untouched; three
+  // links to the star's attributes, no card on the canvas. Its coverage is 0 of 3 on purpose: the logical attributes
+  // behind them have no source mappings.
+  if (!db.requirement.some((r) => r.workspace_id === ws && r.key.toLowerCase() === REQ_210.key.toLowerCase())) {
+    const requirementId = id("requirement:req-210");
+    db.requirement.push({
+      ...std("requirement:req-210"),
+      key: REQ_210.key,
+      kind: "data",
+      name: REQ_210.name,
+      description_html: `<p>${REQ_210.description}</p>`,
+      description_text: REQ_210.description,
+      expression: null,
+      severity: null,
+      status: "draft",
+      priority: "must",
+      owner_name: REQ_210.owner,
+      external_ref: null,
+      parent_id: null,
+    });
+    for (const target of REQ_210.links) {
+      db.requirement_link.push({
+        ...std(`requirement-link:req-210:${target}`),
+        requirement_id: requirementId,
+        entity_id: null,
+        attribute_id: id(`attribute:${target}`),
+        mapping_id: null,
+        source_table_id: null,
+        source_column_id: null,
+      });
+    }
   }
   const workspace = db.workspace.find((w) => w.id === ws);
   if (workspace) workspace.infocube = true;

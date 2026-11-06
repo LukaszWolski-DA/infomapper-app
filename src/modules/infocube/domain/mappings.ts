@@ -20,6 +20,7 @@ import type { Uuid } from "@/domain/ids";
 import { isDimensional, isLogical } from "@/domain/model/levels";
 import { BACK_TO_REVIEW_MESSAGE, checkFourEyes, type MappingLog } from "@/domain/model/mapping-rules";
 import { plainTextPair } from "@/domain/model/plain-text";
+import type { AttributeFeed, AttributeFeeds } from "@/domain/model/requirements";
 import { sanitizeRich } from "@/domain/model/rich-text";
 import type { WorkspaceAccess } from "@/domain/permissions";
 import type { Attribute, CanvasItem, Entity } from "@/domain/types";
@@ -726,7 +727,82 @@ export function fedCount(index: MappingIndex, entityIds: readonly Uuid[]): { fed
   return { fed, total };
 }
 
-const counted = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+/**
+ * Whether a dimensional mapping has a type conflict by D-31's rule (slice 15d, Y1): a transformation with a rule handles
+ * the conversion; otherwise every input's type must be the target's (`typesDiffer`, the panel's warning).
+ */
+export function hasTypeConflict(index: MappingIndex, m: CubeMapping): boolean {
+  if (m.kind === "transform" && m.rule_expression?.trim()) return false;
+  const target = index.attribute(m.attribute_id);
+  return index.inputsOf(m.id).some((i) => typesDiffer(index.attribute(i.attribute_id), target) !== null);
+}
+
+/**
+ * What InfoMapper's requirements read of the dimensional mappings (slice 15d, D3, X-5; `AttributeFeeds`): every live
+ * mapping onto a live dimensional attribute, any status, with its approval, its type conflict and its live inputs.
+ */
+export function cubeRequirementFeeds(index: MappingIndex, attributes: readonly { id: Uuid; deleted_at: string | null }[]): AttributeFeeds {
+  const out: Record<Uuid, AttributeFeed[]> = {};
+  for (const a of attributes) {
+    if (a.deleted_at !== null || index.levelOf(a.id) !== "dimensional") continue;
+    const ms = index.mappingsTo(a.id);
+    if (!ms.length) continue;
+    out[a.id] = ms.map((m) => ({
+      id: m.id,
+      approved: m.status === "approved",
+      typeConflict: hasTypeConflict(index, m),
+      inputs: index.inputsOf(m.id).map((i) => i.attribute_id),
+    }));
+  }
+  return out;
+}
+
+/** One row of "Fed from concepts" (slice 15d, D14, Y6): a concept, how many attributes it feeds, and from which entities. */
+export interface ConceptFeed {
+  conceptId: Uuid;
+  /** The dimensional entity's attributes with a mapping (any status) reading an attribute of this concept's entities. */
+  attributes: number;
+  /** Those logical entities' names, in the model's order of names. */
+  entities: string[];
+}
+
+/**
+ * "Fed from concepts" of a fact or a dimension (section 0, "Before 15d"; D-70): the concepts of the logical entities whose
+ * attributes feed its attributes through dimensional mappings in any status, each with how many of its attributes it
+ * feeds (an attribute fed from two concepts counts in both), in `conceptOrder` (the Model tab's).
+ */
+export function fedFromConcepts(
+  index: MappingIndex,
+  entityId: Uuid,
+  conceptOf: (entityId: Uuid) => Uuid | null | undefined,
+  conceptOrder: readonly Uuid[],
+): ConceptFeed[] {
+  const e = index.entity(entityId);
+  if (!e || !isDimensional(e)) return [];
+  const by = new Map<Uuid, { attributes: Set<Uuid>; entities: Set<string> }>();
+  for (const a of index.attributesOf(entityId)) {
+    for (const m of index.mappingsTo(a.id)) {
+      for (const i of index.inputsOf(m.id)) {
+        const input = index.attribute(i.attribute_id);
+        const from = input && index.entity(input.entity_id);
+        const concept = from && conceptOf(from.id);
+        if (!from || !concept) continue;
+        const row = by.get(concept) ?? by.set(concept, { attributes: new Set(), entities: new Set() }).get(concept)!;
+        row.attributes.add(a.id);
+        row.entities.add(from.name);
+      }
+    }
+  }
+  const rank = (id: Uuid) => {
+    const n = conceptOrder.indexOf(id);
+    return n < 0 ? conceptOrder.length : n;
+  };
+  return [...by]
+    .sort(([a], [b]) => rank(a) - rank(b))
+    .map(([conceptId, r]) => ({ conceptId, attributes: r.attributes.size, entities: [...r.entities].sort((x, y) => x.localeCompare(y)) }));
+}
+
+const counted =(n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
 const unique = <T>(list: readonly T[]) => [...new Set(list)];
 
 /** The mappings a delete takes along: those onto a dimensional attribute and those reading a logical one (Q-5). */

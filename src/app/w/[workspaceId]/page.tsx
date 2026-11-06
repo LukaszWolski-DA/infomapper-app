@@ -19,7 +19,7 @@ import { NewProjectTile } from "./_components/new-project-tile";
 import { AddPersonBox, OrganizationAccessBox, RemovePersonButton, RoleSelect } from "./_components/people";
 import { SettingsForm } from "./_components/settings-form";
 import { settingsBoxes } from "@/compose/settings";
-import { moduleRowFeeds } from "@/compose";
+import { moduleFeeds } from "@/compose";
 import { workspacePeople } from "@/app/_lib/people";
 
 const TABS = ["overview", "people", "settings"] as const;
@@ -73,7 +73,9 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
 
   const stats = workspaceStats(model);
   // the whole workspace's requirements and how many are covered, as the canvas status bar (slice 4a)
-  const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model);
+  // what feeds the facts and dimensions (slice 15d, D4): the requirements follow dimensional mappings; the thumbnails count them
+  const { rowFeeds, feeds } = await moduleFeeds(workspaceId, model);
+  const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model, feeds);
   const counts = new Map(shell.projects.map((p) => [p.id, p.canvasCount]));
 
   // Each project tile shows its first canvas's thumbnail, in tab order (slice 12b, P8; prototype renderWsHome): the
@@ -93,7 +95,6 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
     for (const [projectId, canvasId] of links) if (canvasId) firstCanvas.set(projectId, canvasId);
     const shown = canvases.filter((c) => [...firstCanvas.values()].includes(c.id));
     // a fact's or a dimension's rows count their feeds, as on the canvas (slice 15c, C12)
-    const rowFeeds = await moduleRowFeeds(workspaceId, model);
     thumbnails = thumbnailHrefs(workspaceId, shown, { items, frames, notes }, { model, requirements, labels, labelLinks, rowFeeds });
   }
 

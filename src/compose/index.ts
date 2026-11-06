@@ -3,4 +3,5 @@
 
 export { relationshipOneEnd } from "./model";
 export { STORE_SCHEMA, UNDO_TABLES } from "./tables";
-export { moduleEntityDependents, moduleLines, moduleRowFeeds, moduleView, type CreateActions } from "./view";
+export { moduleEntityDependents, moduleFeeds, moduleLines, moduleRowFeeds, moduleView, type CreateActions } from "./view";
+export { conceptFeeds, NO_FEEDS, requirementFeeds } from "./feeds";

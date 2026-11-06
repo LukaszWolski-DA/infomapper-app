@@ -7,7 +7,7 @@
 import type { Uuid } from "../ids";
 import type { ImportModel } from "../import/model";
 import { buildRequirementIndex } from "../model/requirement-index";
-import type { ScopeModel } from "../model/requirements";
+import type { AttributeFeeds, ScopeModel } from "../model/requirements";
 import { checkMappingTypes } from "../model/type-check";
 import type { Mapping, Requirement, RequirementLink, SourceColumn } from "../types";
 
@@ -34,9 +34,19 @@ const live = <R extends { deleted_at: string | null }>(rows: readonly R[]) => ro
 /** “4 of 6 → 3 of 6”. */
 export const coverageChangeText = (d: CoverageDelta): string => `${d.before.covered} of ${d.before.total} → ${d.after.covered} of ${d.after.total}`;
 
-export function coverageDelta(requirements: readonly Requirement[], links: readonly RequirementLink[], before: ScopeModel, after: ScopeModel): CoverageDelta[] {
-  const ixBefore = buildRequirementIndex(requirements, links, before);
-  const ixAfter = buildRequirementIndex(requirements, links, after);
+/**
+ * `feeds` (slice 15d): the modules' mappings onto dimensional attributes, the same before and after (an import or a
+ * source's delete changes no module row); a fact's or a dimension's attribute loses its coverage through the logical
+ * attributes it reads, and the reasons name their mappings.
+ */
+export function coverageDelta(requirements: readonly Requirement[], links: readonly RequirementLink[], before: ScopeModel, after: ScopeModel, feeds?: AttributeFeeds): CoverageDelta[] {
+  const ixBefore = buildRequirementIndex(requirements, links, before, feeds);
+  const ixAfter = buildRequirementIndex(requirements, links, after, feeds);
+  /** The attributes whose mappings decide an attribute's coverage: its own, or its approved feeds' inputs (slice 15d). */
+  const deciding = (id: Uuid): Uuid[] => {
+    const fed = (feeds?.[id] ?? []).filter((f) => f.approved && !f.typeConflict);
+    return fed.length ? [...new Set(fed.flatMap((f) => f.inputs))] : [id];
+  };
   const attributes = new Map(live(before.attributes).map((a) => [a.id, a]));
   const entities = new Map(live(before.entities).map((e) => [e.id, e]));
   const columnsBefore = new Map(live(before.sourceColumns).map((c) => [c.id, c]));
@@ -75,7 +85,7 @@ export function coverageDelta(requirements: readonly Requirement[], links: reado
     const lost = new Set(b.covered.filter((id) => !a.covered.includes(id)));
     const why = new Set<string>();
     for (const id of lost) {
-      const attributeIds = attributes.has(id) ? [id] : live(before.attributes).filter((x) => x.entity_id === id).map((x) => x.id);
+      const attributeIds = (attributes.has(id) ? [id] : live(before.attributes).filter((x) => x.entity_id === id).map((x) => x.id)).flatMap(deciding);
       for (const m of live(before.mappings)) {
         if (!attributeIds.includes(m.attribute_id) || m.status !== "approved") continue;
         const reason = whyMapping(m);

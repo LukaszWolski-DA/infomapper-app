@@ -227,6 +227,8 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
         )}
       </Fold>
 
+      {/* slice 15d (D14): a fact's or a dimension's "Fed from concepts" stands where "Feeding sources" does */}
+      {role && PANEL_SECTIONS.entityFeeds.map((S, i) => <S key={i} entity={e} />)}
       {!role && (
       <Fold title="Feeding sources" count={feeds.length}>
         {feeds.length ? (

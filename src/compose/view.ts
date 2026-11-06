@@ -11,8 +11,10 @@ import { NO_MODULES, type DependentRow, type EntityCreate, type ModuleView } fro
 import type { CardData } from "@/canvas/card-data";
 import type { ModuleLineData } from "@/canvas/line-data";
 import { cubeLines } from "@/modules/infocube/canvas/lines";
+import { BUS_MATRIX_TEXTS } from "@/modules/infocube/domain/bus-matrix";
 import { cubeIndex } from "@/modules/infocube/domain/keys";
-import { CUBE_MAPPING_LOG, mappingIndex } from "@/modules/infocube/domain/mappings";
+import { CUBE_MAPPING_LOG, cubeRequirementFeeds, mappingIndex } from "@/modules/infocube/domain/mappings";
+import type { AttributeFeeds } from "@/domain/model/requirements";
 import type { CubeMapping, CubeMappingInput } from "@/modules/infocube/domain/types";
 import {
   attributeDeletes,
@@ -85,7 +87,17 @@ export async function moduleView(store: DataStore, workspace: Workspace, model: 
   return {
     roles,
     ...described,
-    tabs: [{ id: "cube", name: "Cube", title: "InfoCube: facts and dimensions", sections, creates: ["fact", "dimension"] }],
+    tabs: [
+      {
+        id: "cube",
+        name: "Cube",
+        title: "InfoCube: facts and dimensions",
+        sections,
+        creates: ["fact", "dimension"],
+        // slice 15d (B-8): the bus matrix, for every role
+        actions: [{ key: "bus-matrix", label: BUS_MATRIX_TEXTS.button, title: BUS_MATRIX_TEXTS.buttonTitle, testId: "button-bus-matrix" }],
+      },
+    ],
     creates: creates(actions),
   };
 }
@@ -102,14 +114,21 @@ export function moduleLines(view: ModuleView, model: WorkspaceModel, cards: read
 }
 
 /**
- * The rows a module feeds, for the homes' thumbnails (slice 15c, C12): as on the canvas's cards (`ModuleView.rowFeeds`).
- * Nothing is read while the model has no fact or dimension. The homes read InfoMapper's tables through the default
- * store, which does not know a module's: this read takes the composed store unless given one.
+ * What a module feeds, for pages and actions that read the store themselves (slice 15c, C12; slice 15d, D4): the rows it
+ * counts on cards, for the homes' thumbnails (as `ModuleView.rowFeeds`), and the requirement feeds (as
+ * `requirementFeeds` on a canvas page). Nothing is read while the model has no fact or dimension. The homes read
+ * InfoMapper's tables through the default store, which does not know a module's: this read takes the composed store
+ * unless given one.
  */
-export async function moduleRowFeeds(workspaceId: Uuid, model: WorkspaceModel, store: DataStore = getDataStore(STORE_SCHEMA)): Promise<Record<Uuid, { n: number }>> {
-  if (!model.entities.some((e) => e.model_level === "dimensional" && e.deleted_at === null)) return {};
+export async function moduleFeeds(
+  workspaceId: Uuid,
+  model: { entities: readonly WorkspaceModel["entities"][number][]; attributes: readonly WorkspaceModel["attributes"][number][] },
+  store: DataStore = getDataStore(STORE_SCHEMA),
+): Promise<{ rowFeeds: Record<Uuid, { n: number }>; feeds: AttributeFeeds }> {
+  if (!model.entities.some((e) => e.model_level === "dimensional" && e.deleted_at === null)) return { rowFeeds: {}, feeds: {} };
   const [cubeMappings, cubeMappingInputs] = await Promise.all([store.modules.list(workspaceId, "cube_mapping"), store.modules.list(workspaceId, "cube_mapping_input")]);
-  return cubeRowFeeds(mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs }), model.attributes);
+  const index = mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs });
+  return { rowFeeds: cubeRowFeeds(index, model.attributes), feeds: cubeRequirementFeeds(index, model.attributes) };
 }
 
 /** Each live dimensional mapping's last content editor (four-eyes, O9), by mapping id. */
@@ -133,3 +152,7 @@ export async function moduleEntityDependents(store: DataStore, workspaceId: Uuid
   const mappings = mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs });
   return entityDependents(entityId, model, cube, measures, mappings);
 }
+
+/** The rows a module counts on cards, for the thumbnails (slice 15c): `moduleFeeds`' `rowFeeds`. */
+export const moduleRowFeeds = async (workspaceId: Uuid, model: WorkspaceModel, store?: DataStore): Promise<Record<Uuid, { n: number }>> =>
+  (await moduleFeeds(workspaceId, model, store)).rowFeeds;

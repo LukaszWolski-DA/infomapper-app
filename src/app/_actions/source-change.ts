@@ -5,6 +5,7 @@
 // step; the toast reads “{resolution}: {label}” with Undo (step 4).
 
 import { revalidatePath } from "next/cache";
+import { moduleFeeds } from "@/compose";
 import type { DataStore } from "@/data";
 import { writtenVersions, type CommandContext, type CommandResult } from "@/domain/changes";
 import {
@@ -168,5 +169,7 @@ export async function sourceDeleteImpactAction(workspaceId: string, target: { ta
   const rows = { ...state, relationships: state.relationships ?? [], relationshipColumns: state.relationshipColumns ?? [], canvasItems: state.canvasItems ?? [] };
   const cascade = target && typeof target === "object" ? sourceDeleteCascade(rows, "tableId" in target ? { tableId: target.tableId } : { columnId: target.columnId }) : null;
   if (!cascade) return { ok: false, code: "not_found", message: "This table or column does not exist any more." };
-  return { ok: true, value: sourceDeleteImpact(rows, cascade, { canvases, requirements, requirementLinks: state.requirementLinks ?? [] }) };
+  // a requirement on a fact or a dimension loses its coverage through the logical attributes it reads (slice 15d, D4)
+  const { feeds } = await moduleFeeds(workspace.id, rows);
+  return { ok: true, value: sourceDeleteImpact(rows, cascade, { canvases, requirements, requirementLinks: state.requirementLinks ?? [], feeds }) };
 }

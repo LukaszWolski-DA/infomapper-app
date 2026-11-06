@@ -34,7 +34,10 @@ them; a dimension has an SCD type; every relationship has a role name per end, o
 several roles (slice 15b, D-68). Dimensional mappings feed a fact's or a dimension's attributes from logical attributes:
 lines between rows, drawn by a drag in either direction, with their own panel, approved by reviewers with four-eyes and
 sent back to review by D-51's first rule; a dimensional entity's coverage counts what is fed, and "Create dimension from
-this…" makes a dimension from a logical entity (slice 15c, AD-36, D-69).
+this…" makes a dimension from a logical entity (slice 15c, AD-36, D-69). Requirements link to facts, dimensions and
+their attributes; their scope and coverage run through dimensional mappings (D-31's rule at both levels), the lens and
+Focus follow them, a fact's or a dimension's panel shows "Fed from concepts", and the Cube tab's "Bus matrix" shows
+facts against dimensions, one dot per relationship (slice 15d, D-70).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -137,6 +140,25 @@ list up to date in each sub-slice):
 - Server actions a module's `app` part needs from InfoMapper live outside "use server" files (`src/app/_lib/model-command.ts`):
   every export of a "use server" file is a server action. `CREATE_ACTIONS` is in `src/compose/actions.ts`, apart from
   the index, so tests that import `@/compose` never load server-only code.
+- **Requirements and the Cube tab's dialogs** (slice 15d):
+  - `AttributeFeeds` (`src/domain/model/requirements.ts`): what feeds a dimensional attribute (`{ id, approved,
+    typeConflict, inputs }` per mapping), an optional last argument of `lookupModel`, `buildRequirementIndex`,
+    `requirementScope`, `requirementCoverage`, `requirementsOf` and `coverageDelta`; without it every result is the old
+    one. The module builds it (`cubeRequirementFeeds`); a canvas page derives it from `ModuleView.data` with
+    `requirementFeeds` (`src/compose/feeds.ts`, pure), and `ModulesProvider` (with the page's `model`) provides it to
+    the browser as `RequirementFeedsCtx` (`src/canvas/fade-canvas.tsx`, `useRequirementFeeds`): the canvas, the
+    inspector and the import review read it. The homes and `sourceDeleteImpactAction` read it with `moduleFeeds`
+    (`src/compose/view.ts`; `moduleRowFeeds` is its `rowFeeds`). **A later caller of the requirement index** passes the
+    feeds.
+  - The scope's `feeding` and `feeds` (present only with a feed), the index's `attributeCoverage`, `gapReason`
+    (`GAP_REASONS`, one set at both levels) and `isDimensional`; `Lit.lines` (a requirement's Focus lights only its own
+    module lines; `litModules`).
+  - `ModuleTab.actions` (`src/ui/modules.ts`): buttons after a tab's creates, for every role, that open the dialog
+    `TAB_DIALOGS[key]` (`src/compose/tab-dialogs.ts`) with `TabDialogProps` (`openEntity`, `openRelationship`); the bus
+    matrix reads its rows on demand through `modelRead` (`src/app/_lib/model-command.ts`: session, membership, an
+    unlocked organization, a read only).
+  - `PANEL_SECTIONS.entityFeeds`: where a logical entity's "Feeding sources" are, which a fact or a dimension does
+    not show ("Fed from concepts").
 - **A new module** adds its folder, its name to `modules` in `eslint.config.mjs`, its tables to the registry's three
   records and a migration, and its pieces to `src/compose/`; InfoMapper's code does not change.
 
@@ -269,7 +291,7 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-10-c08.
 npx tsx scripts/c08-waiting.ts .data/measure/s4p10-traces/<time>                           # C-08's waiting after the document, from the raw traces
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-04p/S4P-11-index.spec.ts   # the requirement index in the browser
 SCREENS=<folder> npx playwright test e2e/slice-04p/S4P-04-screens.spec.ts                   # screenshots beside the prototype
-npx tsx scripts/bench-requirement-index.ts                    # the requirement index on 500 requirements, 5,000 attributes (not a gate)
+npx tsx scripts/bench-requirement-index.ts                    # the requirement index on 500 requirements, 5,000 attributes (not a gate); slice 15d: also with 1,500 feeds (bar +25 %)
 npm run measure:canvas -- --to-screen --rounds 3 --no-build --against slice-04p             # slice 4b-1: interactions to the screen, pans as presented frames (traced)
 npm run measure:canvas -- --to-screen --only fading,pan,c10,lasso,c08,colours --rounds 1 --no-build --against slice-04p  # a subset
 npx tsx scripts/to-screen.ts <folder>                         # analyse saved traces again: switches to the screen, pans as presented frames
@@ -717,6 +739,11 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     InfoMapper's (`BACK_TO_REVIEW_MESSAGE`, `checkFourEyes`, `CUBE_MAPPING_LOG`). A dimensional attribute has no source
     mapping; its "Mapped" filter, dot and coverage read `rowFeeds`. A new card beside another goes in the canvas's free
     spot (`ui.besideSpot`, `besideSpots`).
+  - **15d** (D-70): the coverage rule and the reasons in `requirements.ts` (`lookupModel`'s `coverageOf`, `gapReason`;
+    `hasTypeConflict` in the module, 15c's `typesDiffer`), the lens in `coverage-colours.ts` (`scope.feeding`) and
+    `lit.ts` (`Lit.lines`), "Fed from concepts" (`fedFromConcepts`, `CubeEntityFeeds` in `app/feeds.tsx`), the bus
+    matrix (`domain/bus-matrix.ts`, `busMatrixAction`, `app/bus-matrix-dialog.tsx`; a snapshot when it opens), REQ-210
+    in `addSalesStar` (its key as given, the counter untouched).
   - **The star** is written only by `npm run seed`, `npm run reset-dev-data`, `npm run demo` and slice 15a's fixtures,
     never by the e2e reseed of earlier slices, so their specs and the element guard stay comparable.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine

@@ -5,12 +5,12 @@
 // covered or gap in the overlay above the cards (`LitRows`). The veil is `FadeLayer.tsx`'s. Slice 4b-2, step 6: the
 // requirement cards a Focus lights (the domain's `litRequirements`, PRD item 21, C) and the trace lines with both ends lit.
 
-import { memo, useMemo } from "react";
+import { createContext, memo, useContext, useMemo } from "react";
 import { useStore, type InternalNode } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
 import { litRequirements, mergeLit, requirementFocusLit, targetLit, type Lit, type LitModel, type LitRowColour } from "@/domain/model/lit";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
-import type { ScopeModel } from "@/domain/model/requirements";
+import type { AttributeFeeds, ScopeModel } from "@/domain/model/requirements";
 import type { Requirement, RequirementLink, SourceChange, WorkspaceModel } from "@/domain/types";
 import type { BlockNodeT } from "./BlockNode";
 import type { CardNodeT } from "./CardNode";
@@ -76,8 +76,16 @@ export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | 
  */
 export function useRequirementIndex(data: FadeData | undefined) {
   const model = data?.model, requirements = data?.requirements, links = data?.requirementLinks;
-  return useMemo(() => (model && requirements && links ? buildRequirementIndex([...requirements], [...links], model) : null), [model, requirements, links]);
+  const feeds = useContext(RequirementFeedsCtx);
+  return useMemo(() => (model && requirements && links ? buildRequirementIndex([...requirements], [...links], model, feeds) : null), [model, requirements, links, feeds]);
 }
+
+/**
+ * What feeds the dimensional attributes (slice 15d, D4): the app derives it from the modules' page rows once per data
+ * version and provides it here, so the canvas's and the panels' requirement index follow dimensional mappings without
+ * knowing a module (AD-33). Absent: no feeds.
+ */
+export const RequirementFeedsCtx = createContext<AttributeFeeds | undefined>(undefined);
 
 type AnyNode = InternalNode;
 
@@ -150,7 +158,8 @@ export function litModules(lines: Pick<CanvasLines, "modules">, lookup: Map<stri
     const n = lookup.get(cardId);
     return !!n && isLitCard(n, lit);
   };
-  for (const l of lines.modules ?? []) if (lighted(l.target.cardId) && l.inputs.length && l.inputs.every((i) => lighted(i.cardId))) out.add(l.id);
+  // slice 15d (D8, Y2): under a requirement's Focus only its own dimensional mappings
+  for (const l of lines.modules ?? []) if ((!lit.lines || lit.lines.has(l.id)) && lighted(l.target.cardId) && l.inputs.length && l.inputs.every((i) => lighted(i.cardId))) out.add(l.id);
   return out;
 }
 

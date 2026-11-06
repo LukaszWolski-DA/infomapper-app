@@ -7,6 +7,7 @@ import type { DdlTranslation } from "@/domain/import/ddl";
 import { materialize } from "@/domain/import/materialize";
 import type { ImportModel } from "@/domain/import/model";
 import { coverageDelta, scopeModelOf, type CoverageDelta } from "@/domain/source-changes/coverage";
+import type { AttributeFeeds } from "@/domain/model/requirements";
 import type { ImportPlan, ImportTarget, MissingScope, PlanColumn } from "@/domain/import/plan";
 import type { StandardRead } from "@/domain/import/standard";
 import type { Requirement, RequirementLink, SourceChange, WorkspaceModel } from "@/domain/types";
@@ -113,14 +114,15 @@ export interface ImpactLine {
  * on the model as the plan leaves it, over the whole plan (not only what the review renders). Ids of new rows do not
  * matter for coverage, so the review makes its own.
  */
-export function planCoverage(model: ImportModel, plan: ImportPlan, data: Pick<ImportData, "requirements" | "requirementLinks">): CoverageDelta[] {
+/** `feeds` (slice 15d, D4): what feeds the facts and dimensions, so a requirement on one is named too. */
+export function planCoverage(model: ImportModel, plan: ImportPlan, data: Pick<ImportData, "requirements" | "requirementLinks">, feeds?: AttributeFeeds): CoverageDelta[] {
   if (!data.requirements.some((r) => r.deleted_at === null)) return [];
   const now = new Date().toISOString();
   let n = 0;
   const applied = applyPlan(model, plan, { actorId: "review", now, newId: () => `review-${++n}` });
   if (!applied.ok) return [];
   const after = materialize(model, applied.changes, { workspaceId: "review", actorId: "review", now });
-  return coverageDelta(data.requirements, data.requirementLinks, scopeModelOf(model), scopeModelOf(after));
+  return coverageDelta(data.requirements, data.requirementLinks, scopeModelOf(model), scopeModelOf(after), feeds);
 }
 
 /** Lookups the review's impact needs, built once per model. */
