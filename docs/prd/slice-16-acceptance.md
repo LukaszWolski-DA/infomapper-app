@@ -556,3 +556,32 @@ move the stored order would not make).
   - one full run on the final commit;
   - the pull request with the run, every earlier test changed with its reason, and the manual acceptance steps;
   - no merge.
+
+## S7C-02: the diagnosis (6 November 2026, read-only, from run 42286373952's trace)
+
+- **Where it failed:** the second `whatShows` (after the format-7 upgrade), not the first. `before` had the rows and
+  the badge; the reread after the upgrade got none.
+- **The zoom at the moment the card decides:** a card draws its rows while the zoom is at least `LOD_ZOOM` (0.4,
+  `geometry.ts` l. 19), read reactively from the store (`CardNode.tsx` l. 133). The trace's DOM snapshots show the
+  viewport's scale still changing after `data-ready`:
+  - first cycle: 0.381 → 0.370 → 0.372 → 0.380 → 0.405 → 0.408. The read came at 0.405, so 40 rows were in the DOM.
+  - second cycle: 0.4015 → 0.399 → 0.394 → 0.395 → 0.399. The read came at 0.394–0.395, so there were no rows (the
+    card's low-zoom block).
+  - The fit's "41 %" in the error context is the end of the last open, after its animation.
+- **What moves the view:** an open with `?row=` selects the row, then centres its card with `centerOnRect`
+  (`ModelCanvas.tsx` l. 964–972): `setViewport` at the same zoom, `duration: 250`. React Flow animates through d3-zoom,
+  whose default interpolation (`interpolateZoom`) zooms out in the middle of a long move. From an arrival zoom of about
+  0.40–0.41 that dip passes below 0.4 for part of the 250 ms. The rows are not decided from the zoom before the fit:
+  they follow the zoom at every moment.
+- **App or test: the test.** `whatShows` reads the rows once (`evaluateAll`, no retry) right after `data-ready` and the
+  panel's title, while the arrival animation may still run. The app ends in the right state.
+- **Item 6:** it cannot create the race, which comes from the arrival animation and d3's interpolation; both are older
+  than slice 16. It can change the odds:
+  - the second open starts from the view stored when the first visit was left;
+  - since item 6 that is the view shown at that moment (stored on `pagehide` or unmount), possibly mid-animation;
+  - before it, the view was whatever React Flow's 150 ms timer had stored.
+
+  A different start gives a different path. Slice 11's closing run had a different symptom (the page drew nothing),
+  with an unknown cause.
+- **The fix, in the test only, no assertion changed:** `whatShows` waits until the view has settled before it reads
+  (`viewSettled`: the same viewport transform on two reads 150 ms apart). Locally 3 of 3.
