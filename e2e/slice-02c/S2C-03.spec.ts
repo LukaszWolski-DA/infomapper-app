@@ -82,6 +82,9 @@ test("S2C-03: the block is selected by a click and moved by its header with its 
     const b = blockEl(page, "Area");
     return (await b.boundingBox()) !== null;
   }).toBe(true);
+  // the undo's page may still lag the data: wait until the block is drawn where the undo put it before clicking by
+  // position (chore CI e2e: the right click once hit the empty canvas where the drag had left it)
+  await expectBlockAt(page, start.frame);
   const labels = await toolboxLabels(page, await blockHeadPoint(page, "Area"));
   expect(labels).toContain("Expand");
   expect(labels).not.toContain("Collapse into one block");

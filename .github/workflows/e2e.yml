@@ -154,7 +154,8 @@ jobs:
 
   report:
     needs: [plan, part]
-    if: always() && needs.plan.outputs.mode == 'full'
+    # not after a cancel (a newer full run of the same branch replaced this one)
+    if: ${{ !cancelled() && needs.plan.outputs.mode == 'full' }}
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
