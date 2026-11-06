@@ -3573,3 +3573,14 @@ then `npm run dev`, http://localhost:3000):
    does not fit (if KB has one) now says "type conflict" instead of "not approved".
 9. If KB has InfoCube on with a fact or a dimension: its panel shows "Fed from concepts", and the Cube tab's Bus matrix
    opens.
+
+## 15d's manual acceptance (6 November 2026)
+
+- **Passed** (Łukasz, 6 November 2026), against "Łukasz's manual acceptance (step 4)" above, on the demo
+  (`npm run demo -- --reset`) and on KB. Step 6 as corrected in the pull request
+  ([#40](https://github.com/LukaszWolski-DA/infomapper-app/pull/40)): REQ-210 reads "0 of 4 covered" after the link
+  (bar 0 · 3 · 1; "Dim Product.sku · logical feed not covered", its feed reading Product.sku, which has no source mapping
+  in the seed), "0 of 3 covered" after its undo.
+- The full run before the merge is [42249127241](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42249127241)
+  on `0b247ae`; this record is a docs-only commit after it.
+- **Slice 15 (InfoCube iteration 1: 15a to 15d) is closed** with this merge, tagged `slice-15d`.
