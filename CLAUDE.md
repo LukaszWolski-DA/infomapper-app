@@ -37,7 +37,12 @@ sent back to review by D-51's first rule; a dimensional entity's coverage counts
 this…" makes a dimension from a logical entity (slice 15c, AD-36, D-69). Requirements link to facts, dimensions and
 their attributes; their scope and coverage run through dimensional mappings (D-31's rule at both levels), the lens and
 Focus follow them, a fact's or a dimension's panel shows "Fed from concepts", and the Cube tab's "Bus matrix" shows
-facts against dimensions, one dot per relationship (slice 15d, D-70).
+facts against dimensions, one dot per relationship (slice 15d, D-70). An entity card header's menu adds an attribute; a
+canvas tab's menu (also a tile's on the project home) moves the canvas in its project's order, one undo step, and hides
+relationship lines by kind (between entities, between source tables) with a chip in the view-state bar; the browser's
+context menu is not shown in the app outside text fields, the description editor, links and selected text; a right drag
+pans without a toolbox on every platform, the top bar never scrolls, and the canvas stores its view at once after its own
+changes (slice 16, D-71).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -219,7 +224,8 @@ versions, change events in the same write, uniqueness and the “exactly one tar
     `gh run download <run id> -n <artifact>`. Never upload `.data/` (it holds the session secret).
   - Report each full run's link, commit, wall-clock, its parts' times and heap peaks, and passed / failed / skipped /
     expected failures. Expected failures are `test.fail` with a condition and a known limitation, only on Łukasz's
-    decision (S2B-06's right drag off Windows, S6A-10 at 1,201 px on Linux). PRDs no longer call a slice small or large.
+    decision (none since slice 16, which fixed S2B-06's right drag off Windows and S6A-10 at 1,201 px on Linux). PRDs no
+    longer call a slice small or large.
   - **The local run is the fallback** when GitHub is down: `npm run e2e` (from scratch, no dev server running) runs the
     same parts one after another on the laptop (about 95 minutes); a single-file check is the same `npm run e2e --
     <file>` three times, one after another, each with a fresh server. Keep a failing local run's traces
@@ -330,6 +336,8 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-14a/S14A-13-lay
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-15a/S15-layers.spec.ts       # slice 15a: layers and elements on the Sales star with and without roles
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-15b/S15B-layers.spec.ts      # slice 15b: layers and elements on the Sales star with and without the Σ marks and role pills
 SCREENS=<folder> npx playwright test e2e/slice-15a/S15A-screens.spec.ts                   # slice 15a: the star, the Cube tab, the Role, a delete preview, the InfoCube box; light and dark
+COMMITS=1 npx playwright test e2e/slice-16/S16-11-commits.spec.ts                         # slice 16: commits of the relationship kinds' switches against the layer switch (dev server, on demand)
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-16/S16-11.spec.ts         # slice 16: the switches to the screen beside the layer switch, layers and elements with a kind hidden
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spec.ts      # slice 12b: both homes' load, three data sets; LABEL=<name> for an A/B run, LOADS=<n>, COLD=<n> first visits
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
@@ -746,6 +754,30 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     in `addSalesStar` (its key as given, the counter untouched).
   - **The star** is written only by `npm run seed`, `npm run reset-dev-data`, `npm run demo` and slice 15a's fixtures,
     never by the e2e reseed of earlier slices, so their specs and the element guard stay comparable.
+- **InfoMapper's canvas and menus** (slice 16, D-71):
+  - **Add attribute** in an entity card header's menu (`addAttributeTo`, `canvas-host.tsx`), directly before "Paste
+    attribute": the panel's command, the row selected, `openDetails()`, the name focused (`setNameFocus`).
+  - **Tab order:** `moveCanvas` (`src/domain/commands/canvas.ts`, `movedOrder`; `moveCanvasAction`): the project's links
+    numbered 0…n−1 in the new order, only the changed ones written, label "Move canvas", `canvas.edit_projects`. **Undo
+    reverts an update of a link-table row** as a rule for every link table (`revertChangeGroup`, `undo.ts`: both images,
+    the row as the step left it, its earlier columns back; the local adapter compares the whole row). The menu
+    (`canvas-menu.tsx`) is the tab's and the project home tile's.
+  - **Relationship lines by kind:** `canvas.look`'s `hideEntityRelationships` and `hideSourceRelationships`, present as
+    `true` only while hidden, so older looks and the SQL default read as shown. **The rules in one place:**
+    `src/domain/model/canvas-look.ts` (`applyLookPatch`, `isHidden`, `sameLook`), used by `setCanvasLook`, `look.tsx`
+    (reviewers and readers change the layer and the kinds in their browser only), the menu and the chips
+    (`HIDDEN_KINDS` in `view-state-bar.tsx`; "Show all" clears them with the layer in one patch). The canvas filters them
+    in the layer's `useMemo` (`ModelCanvas.tsx`), so bundles, Focus, the Changes view, hover and the miniature follow.
+  - **No browser menu:** `keepsBrowserMenu` (`src/ui/browser-menu.ts`: text fields, selects, `contenteditable`, links,
+    selected text) is the one rule for `NoBrowserMenu` (the root layout's document listener), the canvas's
+    `onContextMenu` and the toolbox. **A new surface with a menu of its own** opens it on `contextmenu` and calls
+    `preventDefault` itself; a new text field needs nothing.
+  - **The right button** (`CanvasModes.tsx`): a `contextmenu` while the right button is down waits for its `pointerup`
+    (`rightPending`); Windows, the keyboard and touch keep the old path.
+  - **The view's save** (`storeView`, `ModelCanvas.tsx`): the view and the left edge of one moment; the app's own changes
+    store at once; `onMoveEnd` stores only a changed view (`lastStored`); `pagehide` and the unmount store a changed
+    view; nothing before the first view or once the canvas is gone. **A later view change made by the app** calls
+    `storeView` with the view it sets.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a
