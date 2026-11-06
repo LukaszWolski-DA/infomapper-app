@@ -1,6 +1,7 @@
 import type { Browser } from "@playwright/test";
 import { expect, test } from "./fixtures";
 import { canvasUrl, expectToast, ids, lineMenu, loadModel, mappingLine, openCanvas, pointOnLine, recordToasts, signInAs, STALE, toasts } from "./helpers";
+import { holdUntil } from "../slice-13/helpers";
 
 // A real conflict stays refused (item 4, P5): another session changed the mapping, so the write from the line's menu
 // is refused once, and the saves of that mapping waiting behind it are not sent. S0-08 and S9-03 run unchanged.
@@ -53,10 +54,15 @@ test("S10A-05: a delete from the line's menu cut by a refusal before it shows no
   await first.getByTestId("panel-mapping").locator("#f-note").press("Tab");
   await expect.poll(async () => (await birthDate()).version).toBe(mapping.version + 1);
 
+  // the refusal's answer is held until the Delete is in the chain behind it: on a fast server it came back first, and a
+  // Delete sent after it settles goes out with the fresh version (chore CI e2e)
+  const refusal = await holdUntil(second, mapping.id);
   const line = mappingLine(second, mapping.id);
   const next = mapping.status === "review" ? "Approved" : "In review";
   await lineMenu(second, line, next); // refused: stale
+  await expect.poll(refusal.held).toBe(true);
   await lineMenu(second, line, "Delete mapping"); // waits behind it, then cut
+  refusal.release();
   await expectToast(second, STALE);
 
   await second.waitForTimeout(1500);
