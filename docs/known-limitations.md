@@ -778,6 +778,11 @@ minutes instead of the laptop's 93 to 97 (CLAUDE.md, "Testing").
   "Found on GitHub's Linux runners"), and a platform difference may hide the other way; the local run stays the
   fallback when GitHub is down. Production-build e2e runs wait for the database slice (AD-31); one worker per part.
 - **Time zone:** the e2e run has not been run in another time zone than Europe/Warsaw (the workflow sets `TZ`).
+- **A slow package mirror** (Łukasz's answer 3 to step 3): in each of step 3's two full runs one part's job spent
+  about 9.5 minutes in `npx playwright install --with-deps chromium`, downloading Chromium's font packages from
+  Ubuntu's mirror at 39 kB/s (15 to 24 s on the other jobs). That makes a full run 18 to 21 minutes instead of about 12.
+  **Later:** Playwright's own container image pinned to 1.63.0 (its dependencies preinstalled), validated with S6A-10's
+  text drawing, as its fonts decide the bar's widths (above, "The top bar overflows by 1 px at 1,201 px on Linux").
 
 
 ### “The destination stream closed early” in the e2e server log

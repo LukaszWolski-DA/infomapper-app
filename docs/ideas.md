@@ -67,6 +67,9 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 - **Chore CI e2e: done** (6 November 2026): the full e2e run and the single-file check in GitHub Actions, seven parts
   side by side in about 12 minutes (`.github/workflows/e2e.yml`, `docs/prd/chore-ci-e2e-acceptance.md`); the local run
   is the fallback.
+  Left for later: Playwright's own container image pinned to 1.63.0 (dependencies preinstalled) instead of
+  `playwright install --with-deps`, whose Ubuntu mirror once took about 9.5 minutes in one job per run
+  (`docs/known-limitations.md`); validate it with S6A-10's text drawing.
 - **Then the model validator** (below, "A model validator").
 - **The database slice last** (AD-31).
 

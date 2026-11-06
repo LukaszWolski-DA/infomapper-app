@@ -578,3 +578,23 @@ Lint, typecheck and unit tests (141 files, 1,766 tests) pass. The workflow's tri
 
 On the final commit, one after the other with no commit between them: their links, figures and the criteria with
 their evidence are in the pull request's description (so that the tested commit stays the branch's head).
+
+### Łukasz's answers to step 3 (6 November 2026)
+
+1. **S2C-03:** fix the race as proposed: before the right click, wait with `expectBlockAt(page, start.frame)` until
+   the block is drawn where the undo put it. No assertion changes.
+2. **The workflow's report job:** `if: !cancelled()` instead of `always()`, in the same commit.
+3. **The slow Ubuntu mirror** in `playwright install --with-deps`: no change now. A known limitation: one job per run
+   may spend about 9.5 minutes there (39 kB/s from Ubuntu's mirror), which makes a full run 18 to 21 minutes instead of
+   about 12; the option for later is Playwright's own container image pinned to 1.63.0 (dependencies preinstalled), to
+   be validated with S6A-10's text drawing. The same option in the chore's entry in `docs/ideas.md`, under "left for
+   later".
+4. **Windows:** Łukasz stops his dev server on port 3000 first. Then one local run of five files: S2B-06, S2C-03,
+   S6A-07, S6A-10, S10A-05 (`npm run e2e -- <files>`). On Windows the tests split out for the expected failures must
+   pass as ordinary tests. Each file's result reported; if anything fails, stop before any full run.
+5. **Two full runs in a row** on the final commit, the second started only after the first has ended (one concurrency
+   group): the first by adding the label `full-e2e` to PR #39, the second by `workflow_dispatch`, so the pull request
+   shows a finished E2E run. The PR description updated with both runs and CI-01 to CI-07 with their evidence.
+
+If both runs are green: stop, the pull request is ready for Łukasz's merge command. If either is not: stop and report the
+failure with its trace and an isolated check (rounds 3); fix nothing before his answer. No merge.
