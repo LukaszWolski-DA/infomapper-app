@@ -549,6 +549,26 @@ a hidden panel).
 
 - **Accepted** by Łukasz in slice 5a, step 1 (answer 5). **Later:** not planned.
 
+### The canvas saves its view about 150 ms late
+
+The canvas remembers its view in the browser (`infomapper:view:<canvas id>`, D-54) in `onMoveEnd`
+(`src/canvas/ModelCanvas.tsx:464-468`), which stores `{ x, y, zoom, left }` and reads `left`, the canvas's left edge
+on the screen, only when it runs. React Flow calls it from a timer, 150 ms after a viewport change because the canvas
+has `panOnScroll` (`ModelCanvas.tsx:2334`; `createPanZoomEndHandler` in
+`node_modules/@xyflow/system/dist/esm/index.mjs:2865-2889`), later when the page is busy. It calls it after the app's own
+view changes too: the first view on open (`ModelCanvas.tsx:1728`), the view moved with the left panel (`shiftView`,
+457) and the fit (451). A page that is being left still runs the timer until the next page replaces it.
+
+- **The only case a person can meet:** the window crosses 1,000 px (where the panels start to slide over the canvas and
+  its left edge becomes 0) within about 150 ms after a pan or an open, and the canvas is reopened before its next save.
+  The saved `x` then belongs to the old left edge while `left` is the new one, so the next open is off by the left
+  panel's width.
+- **Found** by S5A-07 and S6A-11 on GitHub's runner (chore CI e2e): both changed the stored view or the window within
+  those 150 ms, and the old page's late save came after it. The tests now wait for the canvas's own save first
+  (`viewStored`, `e2e/slice-05a/helpers.ts`).
+- **Later:** fixed in the slice "InfoMapper's canvas and menus": the app's own view changes save the view at once,
+  with the left edge of that moment, and `onMoveEnd` saves only after the person's own moves.
+
 ### The top bar on narrow windows
 
 **Closed in slice 6a** ([PRD](prd/slice-06a-view-state-bar.md), [acceptance](prd/slice-06a-acceptance.md)): measured in slice 6a, the tools were cut off from about 1,700 px (not 1,100 px as

@@ -711,3 +711,21 @@ window.
     (measurement only);
   - `e2e/slice-01a/helpers.ts`' `openCanvas` (every spec that opens a canvas at a view writes the view before the
     page loads, so it is not affected).
+
+### Łukasz's answers to the diagnosis of S5A-07 and S6A-11 (6 November 2026)
+
+1. **The tests:** `viewStored(page)` in `e2e/slice-05a/helpers.ts` as proposed (it waits until the stored view matches
+   the view shown, with the current left), called in `S5A-07.spec.ts` before `removeItem` and in `S6A-11.spec.ts`
+   before each `setItem`. No assertion changes. Each file checked alone with rounds 3 on the runner, and both once
+   locally on Windows (one run).
+2. **No app change in this chore.** A known limitation with the mechanism, the only case a person can meet, the fix for
+   later and where: the slice "InfoMapper's canvas and menus".
+3. **`docs/ideas.md`,** that slice's entry: item "6. The canvas saves its view about 150 ms late, also after its own
+   view changes (known limitation; S5A-07, S6A-11)."
+
+Then one full run on the final commit, by `workflow_dispatch`, and PR #39's description updated with it and CI-01 to
+CI-07, CI-03 in its new wording. A failure is diagnosed as before (trace, rounds 3); nothing fixed before his answer.
+
+**Done:** `viewStored` (`e2e/slice-05a/helpers.ts`); S5A-07 calls it before `removeItem` (line 45), S6A-11 before
+each of its three `setItem` calls (lines 28, 47 and 54: the first test's one too, which follows the left panel's hide
+and its `shiftView`).

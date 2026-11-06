@@ -602,6 +602,7 @@ work at every model level, and need no new table.
    step 1.
 4. A right-button pan opens the toolbox on Linux and macOS (S2B-06, known limitation).
 5. The top bar overflows by 1 px at 1,201 px with Linux's text drawing (S6A-10, known limitation).
+6. The canvas saves its view about 150 ms late, also after its own view changes (known limitation; S5A-07, S6A-11).
 
 The fourth observation of the same testing, the concept of a fact or a dimension, is decided in
 `docs/prd/slice-15-infocube.md`, section 0, "Before 15d".
