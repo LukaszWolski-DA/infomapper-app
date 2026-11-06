@@ -1,0 +1,255 @@
+name: E2E
+
+# The full e2e run in GitHub Actions (chore CI e2e): by hand (Run workflow, any branch) or by the label `full-e2e` on a
+# pull request; never on a push. The parts of e2e/parts.ts run side by side, each with its own fresh dev server, as the
+# local `npm run e2e` runs them one after another; one job merges their reports. With `files` set, a single-file check
+# instead: `rounds` jobs side by side, each with its own fresh dev server, each running the files once.
+# No retries (playwright.config.ts). The lint, typecheck and unit tests stay in ci.yml.
+
+on:
+  workflow_dispatch:
+    inputs:
+      files:
+        description: "Spec files or folders under e2e/, separated by spaces (empty: the full run)"
+        required: false
+        default: ""
+        type: string
+      rounds:
+        description: "With files: how many separate runs, side by side (1 to 10)"
+        required: false
+        default: 3
+        type: number
+      parts:
+        description: "Without files: only these parts, e.g. 1 7 (for trying the workflow; not a full run). Empty: all parts"
+        required: false
+        default: ""
+        type: string
+  pull_request:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+# Full runs share one group per branch: a new one cancels the one still running. A single-file check, a run of some parts
+# only, and a label other than full-e2e get a group of their own (the run's id): they neither cancel nor are cancelled.
+concurrency:
+  group: ${{ ((github.event_name == 'workflow_dispatch' && (inputs.files != '' || inputs.parts != '')) || (github.event_name == 'pull_request' && github.event.label.name != 'full-e2e')) && format('e2e-own-{0}', github.run_id) || format('e2e-full-{0}', github.head_ref || github.ref_name) }}
+  cancel-in-progress: true
+
+env:
+  # the laptop's zone (Windows's "Central European Standard Time"); the runner's own is UTC
+  TZ: Europe/Warsaw
+  NEXT_TELEMETRY_DISABLED: "1"
+
+jobs:
+  plan:
+    if: github.event_name == 'workflow_dispatch' || github.event.label.name == 'full-e2e'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      mode: ${{ steps.plan.outputs.mode }}
+      matrix: ${{ steps.plan.outputs.matrix }}
+      files: ${{ steps.plan.outputs.files }}
+      sha: ${{ steps.plan.outputs.sha }}
+    steps:
+      # a label run tests the branch's head commit, not GitHub's merge commit (P6)
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      - id: plan
+        env:
+          FILES: ${{ inputs.files }}
+          ROUNDS: ${{ inputs.rounds }}
+          PARTS: ${{ inputs.parts }}
+        run: |
+          set -euo pipefail
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          if [ -z "${FILES:-}" ]; then
+            count=$(node --no-warnings --input-type=module -e "const p = await import('./e2e/parts.ts'); console.log(p.PART_COUNT)")
+            if [ -z "${PARTS:-}" ]; then
+              parts=$(seq -s, 1 "$count" | sed 's/^/[/; s/$/]/')
+              echo "Full run, parts $parts, commit $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              read -r -a chosen <<< "$PARTS"
+              for p in "${chosen[@]}"; do
+                if ! [[ "$p" =~ ^[0-9]+$ ]] || [ "$p" -lt 1 ] || [ "$p" -gt "$count" ]; then echo "::error::parts must be numbers 1 to $count, not $p"; exit 1; fi
+              done
+              parts="[$(IFS=,; echo "${chosen[*]}")]"
+              echo "Parts $parts only (not a full run), commit $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo "mode=full" >> "$GITHUB_OUTPUT"
+            echo "matrix=$parts" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          # files: paths under e2e/ only, letters, digits and . _ - / (no .., no other character), each of them present
+          read -r -a list <<< "$FILES"
+          for f in "${list[@]}"; do
+            if ! [[ "$f" =~ ^e2e/[A-Za-z0-9._/-]+$ ]] || [[ "$f" == *..* ]]; then echo "::error::Not a path under e2e/: $f"; exit 1; fi
+            if [ ! -e "$f" ]; then echo "::error::No such file or folder: $f"; exit 1; fi
+          done
+          if ! [[ "${ROUNDS:-}" =~ ^[0-9]+$ ]] || [ "$ROUNDS" -lt 1 ] || [ "$ROUNDS" -gt 10 ]; then echo "::error::rounds must be 1 to 10, not ${ROUNDS:-}"; exit 1; fi
+          echo "mode=check" >> "$GITHUB_OUTPUT"
+          echo "matrix=$(seq -s, 1 "$ROUNDS" | sed 's/^/[/; s/$/]/')" >> "$GITHUB_OUTPUT"
+          echo "files=${list[*]}" >> "$GITHUB_OUTPUT"
+          echo "Single-file check: ${list[*]}, $ROUNDS rounds, commit $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+
+  part:
+    needs: plan
+    if: needs.plan.outputs.mode == 'full'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Part ${{ matrix.part }}
+        id: run
+        env:
+          PART: ${{ matrix.part }}
+          E2E_BLOB: "1"
+          E2E_MEMORY_LOG: "1"
+          E2E_MEMORY_FILE: ${{ github.workspace }}/.data/e2e-memory-ci-part${{ matrix.part }}
+        run: |
+          start=$(date +%s)
+          set +e
+          npm run e2e -- --part "$PART"
+          code=$?
+          set -e
+          mkdir -p "test-results/part-$PART"
+          echo "{\"part\":$PART,\"start\":$start,\"end\":$(date +%s),\"exit\":$code}" > "test-results/part-$PART/part.json"
+          cp .data/e2e-memory-ci-part"$PART".*.jsonl "test-results/part-$PART/" 2>/dev/null || true
+          echo "exit=$code" >> "$GITHUB_OUTPUT"
+      # named files only, never .data/ (it holds the server's session secret)
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: blob-part-${{ matrix.part }}
+          path: blob-report/part-${{ matrix.part }}.zip
+          retention-days: 14
+          if-no-files-found: warn
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: part-${{ matrix.part }}
+          path: test-results/part-${{ matrix.part }}/
+          retention-days: 14
+          if-no-files-found: warn
+      - if: steps.run.outputs.exit != '0'
+        run: |
+          echo "::error::Part ${{ matrix.part }} failed (exit ${{ steps.run.outputs.exit }})"
+          exit 1
+
+  report:
+    needs: [plan, part]
+    # not after a cancel (a newer full run of the same branch replaced this one)
+    if: ${{ !cancelled() && needs.plan.outputs.mode == 'full' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: blob-part-*
+          path: blob-report
+          merge-multiple: true
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: part-*
+          path: parts
+      - name: Merge the parts' reports
+        env:
+          PLAYWRIGHT_JSON_OUTPUT_NAME: report.json
+          PLAYWRIGHT_HTML_OPEN: never
+        run: npx playwright merge-reports --reporter=html,json blob-report
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "Commit \`${{ needs.plan.outputs.sha }}\`, run ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            npx tsx scripts/e2e-summary.ts full report.json parts
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: report
+          path: |
+            playwright-report/
+            report.json
+          retention-days: 14
+          if-no-files-found: warn
+      - if: needs.part.result != 'success'
+        run: |
+          echo "::error::A part failed"
+          exit 1
+
+  check:
+    needs: plan
+    if: needs.plan.outputs.mode == 'check'
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        round: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.plan.outputs.sha }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Round ${{ matrix.round }}
+        id: run
+        env:
+          FILES: ${{ needs.plan.outputs.files }}
+          E2E_MEMORY_LOG: "1"
+          E2E_MEMORY_FILE: ${{ github.workspace }}/.data/e2e-memory-ci-check
+          PLAYWRIGHT_JSON_OUTPUT_NAME: report.json
+          PLAYWRIGHT_HTML_OPEN: never
+        run: |
+          read -r -a list <<< "$FILES"
+          set +e
+          npm run e2e -- "${list[@]}" --reporter=list,html,json,./e2e/memory-reporter.ts
+          code=$?
+          set -e
+          cp .data/e2e-memory-ci-check.*.jsonl test-results/ 2>/dev/null || true
+          npx tsx scripts/e2e-summary.ts check report.json "${{ matrix.round }}" >> "$GITHUB_STEP_SUMMARY" || true
+          echo "exit=$code" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: check-round-${{ matrix.round }}
+          path: |
+            test-results/
+            playwright-report/
+            report.json
+          retention-days: 14
+          if-no-files-found: warn
+      - if: steps.run.outputs.exit != '0'
+        run: |
+          echo "::error::Round ${{ matrix.round }} failed (exit ${{ steps.run.outputs.exit }})"
+          exit 1

@@ -68,6 +68,24 @@ export const viewportTransform = (page: Page) =>
     return { x: m.e, y: m.f, zoom: m.a };
   });
 
+/**
+ * Waits until the canvas has stored the view it shows, with its current left edge (chore CI e2e): it stores the view
+ * from React Flow's 150 ms timer after every view change, its own too (`onMoveEnd`, `docs/known-limitations.md`), so a
+ * test that changes the stored view or the window right after a view change must wait for that save first.
+ */
+export async function viewStored(page: Page): Promise<void> {
+  const canvasId = new URL(page.url()).pathname.split("/c/")[1]!.split("/")[0]!;
+  await expect
+    .poll(async () => {
+      const shown = await viewportTransform(page);
+      const left = Math.round((await box(canvasArea(page))).x);
+      const raw = await page.evaluate((k) => localStorage.getItem(k), `infomapper:view:${canvasId}`);
+      const v = raw ? (JSON.parse(raw) as { x: number; y: number; zoom: number; left?: number }) : null;
+      return !!v && v.left === left && Math.abs(v.x - shown.x) < 0.5 && Math.abs(v.y - shown.y) < 0.5 && Math.abs(v.zoom - shown.zoom) < 1e-3;
+    })
+    .toBe(true);
+}
+
 export const projectHome = (projectId: string = SEED_IDS.projCustomer360) => `/w/${SEED_IDS.wsRetailDwh}/p/${projectId}`;
 
 // ---- step 3: the grips ----

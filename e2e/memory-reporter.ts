@@ -2,9 +2,12 @@
 // It writes when each test begins and ends to `<E2E_MEMORY_FILE>.tests.jsonl`, the measuring conditions at the start
 // and the end (scripts/measure-conditions.ts), and starts scripts/e2e-memory-system.ps1 for the machine's memory. The
 // server's own figures come from scripts/e2e-memory-probe.cjs; `scripts/e2e-memory-report.ts` puts the three together.
+// Off Windows (GitHub Actions' Linux runners, chore CI e2e) the machine's half is only the available memory, from
+// `os.freemem()` (libuv reads Linux's MemAvailable) every 5 s, in the same file and field as the PowerShell script's.
 
 import { spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync } from "node:fs";
+import os from "node:os";
 import path from "node:path";
 import type { FullResult, Reporter, TestCase, TestResult } from "@playwright/test/reporter";
 import { conditions } from "../scripts/measure-conditions";
@@ -12,10 +15,18 @@ import { conditions } from "../scripts/measure-conditions";
 export default class MemoryReporter implements Reporter {
   private readonly base = process.env.E2E_MEMORY_FILE;
   private system: ChildProcess | null = null;
+  private timer: ReturnType<typeof setInterval> | null = null;
   private n = 0;
 
   constructor() {
-    if (!this.base || process.platform !== "win32") return;
+    if (!this.base) return;
+    if (process.platform !== "win32") {
+      const sample = () => this.append("system", { availableMb: Math.round(os.freemem() / 1024 / 1024), totalMb: Math.round(os.totalmem() / 1024 / 1024) });
+      sample();
+      this.timer = setInterval(sample, 5_000);
+      this.timer.unref();
+      return;
+    }
     const script = path.resolve("scripts", "e2e-memory-system.ps1");
     this.system = spawn(
       "powershell",
@@ -25,9 +36,13 @@ export default class MemoryReporter implements Reporter {
   }
 
   private write(line: object) {
+    this.append("tests", line);
+  }
+
+  private append(kind: "tests" | "system", line: object) {
     if (!this.base) return;
     try {
-      appendFileSync(`${this.base}.tests.jsonl`, JSON.stringify({ t: new Date().toISOString(), ...line }) + "\n");
+      appendFileSync(`${this.base}.${kind}.jsonl`, JSON.stringify({ t: new Date().toISOString(), ...line }) + "\n");
     } catch {
       // a lost line is fine; the run must not fail on its log
     }
@@ -49,6 +64,7 @@ export default class MemoryReporter implements Reporter {
   onEnd(result: FullResult) {
     this.write({ event: "conditions", at: "end", status: result.status, ...conditions() });
     this.system?.kill();
+    if (this.timer) clearInterval(this.timer);
   }
 
   printsToStdio() {

@@ -3,7 +3,7 @@
 // resolved ones never, hidden or shown. Customer & orders has two open notes and one resolved.
 
 import { expect, test } from "./fixtures";
-import { canvasUrl, DEMO_NOTES, noteEl, openCanvas, signInAs, viewBar, WHOLE_CO } from "./helpers";
+import { canvasUrl, DEMO_NOTES, noteEl, noteWithText, openCanvas, signInAs, viewBar, WHOLE_CO } from "./helpers";
 
 test("S6A-07: the status bar counts the canvas's open notes and has no Focus chip", async ({ page }) => {
   await page.setViewportSize({ width: 2400, height: 900 }); // the resolved note clear of the Overview
@@ -35,7 +35,9 @@ test("S6A-07: the status bar counts the canvas's open notes and has no Focus chi
   await noteEl(page, DEMO_NOTES.resolved).getByTestId("button-note-resolve").click();
   await expect(notes).toHaveText("Open notes on canvas 2");
 
-  // after a reload the page's count and the canvas's agree
+  // after a reload the page's count and the canvas's agree; the reload waits until both statuses are stored, as a
+  // reload while the second save is still on its way would abort it (chore CI e2e: on GitHub's runner it did)
+  await expect.poll(async () => [(await noteWithText(DEMO_NOTES.free))?.status, (await noteWithText(DEMO_NOTES.resolved))?.status]).toEqual(["resolved", "open"]);
   await page.reload();
   await expect(notes).toHaveText("Open notes on canvas 2");
 });

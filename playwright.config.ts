@@ -16,7 +16,11 @@ if (MEMORY_LOG && !process.env.E2E_MEMORY_FILE) {
 // folders (e2e/parts.ts), its traces in their own folder so the next part does not clear them; E2E_BLOB=1 (the full
 // run) writes a blob report that scripts/e2e.ts merges with the other parts'.
 const PART = process.env.E2E_PART ? Number(process.env.E2E_PART) : undefined;
-const partMatch = PART === undefined ? {} : { testMatch: partFolders(PART).map((f) => `${f}/**/*.spec.ts`), outputDir: `test-results/part-${PART}` };
+const OUTPUT_DIR = PART === undefined ? "test-results" : `test-results/part-${PART}`;
+const partMatch = PART === undefined ? {} : { testMatch: partFolders(PART).map((f) => `${f}/**/*.spec.ts`), outputDir: OUTPUT_DIR };
+// The dev server's output goes to a file in the run's output folder, not to the console (chore CI e2e, Łukasz's answer
+// 2); Playwright clears that folder before it starts the server (scripts/e2e-server.ts).
+const SERVER_LOG = `${OUTPUT_DIR}/server.log`;
 const blob: ["blob", { outputFile: string }][] = PART !== undefined && process.env.E2E_BLOB ? [["blob", { outputFile: `blob-report/part-${PART}.zip` }]] : [];
 
 const memoryEnv: Record<string, string> = MEMORY_LOG
@@ -45,7 +49,8 @@ export default defineConfig({
   fullyParallel: false,
   workers: 1,
   forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 1 : 0,
+  // no retries anywhere (chore CI e2e, P4): a retry would hide a flake; a failing test is checked on its own instead
+  retries: 0,
   reporter: [["list"], ...(blob.length > 0 ? blob : [["html", { open: "never" }] as ["html", { open: string }]]), ...(MEMORY_LOG ? [["./e2e/memory-reporter.ts"] as ["./e2e/memory-reporter.ts"]] : [])],
   use: {
     baseURL,
@@ -74,7 +79,7 @@ export default defineConfig({
     : {
         // The server starts before globalSetup, so it seeds its data file itself.
         // a fresh build folder every run: the server is stopped by force at the end, so nothing of the last run is reused
-        command: `npx tsx scripts/clean-e2e-build.ts .next-e2e && npm run reset-dev-data && npm run dev -- --port ${E2E_PORT}`,
+        command: `npx tsx scripts/clean-e2e-build.ts .next-e2e && npm run reset-dev-data && npx tsx scripts/e2e-server.ts ${E2E_PORT} ${SERVER_LOG}`,
         url: `${baseURL}/sign-in`,
         // the test hooks (slice 4p) are on in the e2e dev server only
         env: { INFOMAPPER_DEV_DB: E2E_DB, NEXT_DIST_DIR: ".next-e2e", INFOMAPPER_TEST_HOOKS: "1", ...memoryEnv },

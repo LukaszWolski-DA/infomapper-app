@@ -64,6 +64,12 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   the licence and the switch; AD-33 to AD-35, D-67), **15b done** (grain, measures, SCD type, role-playing dimensions;
   D-68), **15c done** (dimensional mappings and "fed" coverage, "Create dimension from this…"; AD-36, D-69); next 15d
   (requirements on facts and dimensions, the bus matrix).
+- **Chore CI e2e: done** (6 November 2026): the full e2e run and the single-file check in GitHub Actions, seven parts
+  side by side in about 12 minutes (`.github/workflows/e2e.yml`, `docs/prd/chore-ci-e2e-acceptance.md`); the local run
+  is the fallback.
+  Left for later: Playwright's own container image pinned to 1.63.0 (dependencies preinstalled) instead of
+  `playwright install --with-deps`, whose Ubuntu mirror once took about 9.5 minutes in one job per run
+  (`docs/known-limitations.md`); validate it with S6A-10's text drawing.
 - **Then the model validator** (below, "A model validator").
 - **The database slice last** (AD-31).
 
@@ -575,6 +581,31 @@ hierarchies in dimensions.
   fact), so there is deliberately no "no measures" hint (D-68's hints, `factHints`). When the fact type is built, the
   Measures section's empty text ("None yet. Open a numeric attribute and turn on Measure.") should change for factless
   facts.
+
+## InfoMapper's canvas and menus: a slice after slice 15 (Łukasz, 6 November 2026)
+
+From Łukasz's testing of slice 15c, agreed as a slice of its own after slice 15's closing. All three are InfoMapper's,
+work at every model level, and need no new table.
+
+1. **"Add attribute" in a card header's menu**, above "Link to a requirement…", as the entity panel's button: a new
+   attribute with its name selected for typing, one undo step; shown to those who may edit the model. The prototype
+   has it in the panel only.
+2. **The canvas tabs' order from a tab's menu:** "Move left", "Move right", "Move to start", "Move to end", the items
+   that would not move the tab disabled. It changes `project_canvas.sort_order` in the current project only (a
+   canvas may be in several, D-28), one undo step each. Dragging tabs: later.
+3. **Relationship lines shown or hidden by kind:** two switches, "Relationships between entities" (logical and
+   dimensional) and "Relationships between source tables" (D-62). They filter within the layer modes that show
+   relationships (Everything, Relationships); the modes stay as they are (D-22). Kept per canvas as keys in
+   `canvas.look` (not undone, as the layer is not); a hidden kind is a chip in the view-state bar (D-39), cleared by
+   its × or "Show all". The switch to the screen is measured on the dense canvas (lines in one SVG layer, AD-24). The
+   entry "Source relationships: a layer switch of their own" (slice 10b) is decided with this item in that slice's
+   step 1.
+4. A right-button pan opens the toolbox on Linux and macOS (S2B-06, known limitation).
+5. The top bar overflows by 1 px at 1,201 px with Linux's text drawing (S6A-10, known limitation).
+6. The canvas saves its view about 150 ms late, also after its own view changes (known limitation; S5A-07, S6A-11).
+
+The fourth observation of the same testing, the concept of a fact or a dimension, is decided in
+`docs/prd/slice-15-infocube.md`, section 0, "Before 15d".
 
 ## Deleting a project: what comes later (slice 12a, PRD section 9)
 

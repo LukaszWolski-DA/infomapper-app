@@ -5,7 +5,7 @@
 // opens exactly as stored.
 
 import { expect, test, type Page } from "./fixtures";
-import { canvasUrl, CO, cardAt, expectCardAt, grip, openCanvas, panelWidth, signInAs, togglePanel, viewportTransform, WHOLE_CO } from "./helpers";
+import { canvasUrl, CO, cardAt, expectCardAt, grip, openCanvas, panelWidth, signInAs, togglePanel, viewStored, viewportTransform, WHOLE_CO } from "./helpers";
 
 const stored = (page: Page) => page.evaluate((k) => JSON.parse(localStorage.getItem(k) ?? "null") as { x: number; y: number; zoom: number; left?: number } | null, `infomapper:view:${CO}`);
 
@@ -25,6 +25,7 @@ test("S6A-11: an old view opens as stored; a view saved with the left panel show
   // only the correction on open can bring the card to its place after the reload
   await togglePanel(page, "left");
   await expectCardAt(page, "Customer", at);
+  await viewStored(page); // the canvas's own late save of the view must not come after this one
   await page.evaluate(([k, v]) => localStorage.setItem(k, v), [`infomapper:view:${CO}`, JSON.stringify(saved)] as const);
   await page.reload();
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true");
@@ -43,12 +44,14 @@ test("S6A-11: a view saved with the left panel at 264 px opens in place at 520 p
   await grip(page, "left").focus();
   for (let i = 0; i < 4; i++) await page.keyboard.press("Shift+ArrowRight");
   await expect.poll(() => panelWidth(page, "left")).toBe(520);
+  await viewStored(page); // the canvas's own late save of the view must not come after this one
   await page.evaluate(([k, v]) => localStorage.setItem(k, v), [`infomapper:view:${CO}`, JSON.stringify(saved)] as const);
   await page.reload();
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true");
   await expectCardAt(page, "Customer", at);
 
   // a 1,000 px window: the canvas starts at the window's left edge
+  await viewStored(page); // the canvas's own late save of the view must not come after this one
   await page.evaluate(([k, v]) => localStorage.setItem(k, v), [`infomapper:view:${CO}`, JSON.stringify(saved)] as const);
   await page.setViewportSize({ width: 1000, height: 900 });
   await page.reload();

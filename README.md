@@ -2,7 +2,7 @@
 
 A data-modeling tool for data warehouse work: logical entities, physical source tables and the mappings between them, on one canvas.
 
-**Status:** slices 0 to 14b are merged (slice 14b, the canvas's row on the save chain and a warning before a page with unsaved text is left: tag `slice-14b`), and so is the e2e reliability chore; slice 15a (InfoCube's first part: the module boundary, facts and dimensions as entities of the dimensional level, the licence and the workspace's switch, AD-33 to AD-35 and D-67) is merged (tag `slice-15a`); slice 15b (a fact's grain, measures and dimensions, a dimension's SCD type, role-playing dimensions with a role per end of every relationship, D-68) is merged (tag `slice-15b`); slice 15c (dimensional mappings from the logical model and "fed" coverage, AD-36, D-69) is on its branch, waiting for the manual acceptance. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
+**Status:** slices 0 to 14b are merged (slice 14b, the canvas's row on the save chain and a warning before a page with unsaved text is left: tag `slice-14b`), and so is the e2e reliability chore; slice 15a (InfoCube's first part: the module boundary, facts and dimensions as entities of the dimensional level, the licence and the workspace's switch, AD-33 to AD-35 and D-67) is merged (tag `slice-15a`); slice 15b (a fact's grain, measures and dimensions, a dimension's SCD type, role-playing dimensions with a role per end of every relationship, D-68) is merged (tag `slice-15b`); slice 15c (dimensional mappings from the logical model and "fed" coverage, AD-36, D-69) is merged (tag `slice-15c`); the CI e2e chore (the full e2e run in GitHub Actions) is on its branch. On a React Flow canvas: slice 0's sign-in, organizations, workspaces, projects and
 canvases; slice 1a's model (concepts, entities, attributes, relationships, source systems, tables and columns, and
 mappings with one or more inputs); slice 1b's modeling on the canvas (drag a column onto an attribute to map it, draw
 relationships, create entities with the Entity tool or the right-click toolbox, reorder attributes, widen cards, see a
@@ -112,8 +112,11 @@ else `.data/session-secret`, made on first use.
 | `npm run lint` | ESLint, including the layer rules (AD-19) |
 | `npm run typecheck` | Route types, then TypeScript (strict) |
 | `npm test` | Vitest unit tests (`src/**/*.test.ts`, `tests/`) |
-| `npm run e2e` | Playwright end-to-end tests (`e2e/`) in four parts by folder (`e2e/parts.ts`), each with its own fresh dev server on port 3200 and `.data/e2e-db.json`, freshly seeded before every test; one merged result (`playwright-report/`), failure traces in `test-results/part-<n>/`. It refuses to start while something listens on port 3200 |
+| `npm run e2e` | Playwright end-to-end tests (`e2e/`) in seven parts by folder (`e2e/parts.ts`), each with its own fresh dev server on port 3200 and `.data/e2e-db.json`, freshly seeded before every test; one merged result (`playwright-report/`), failure traces in `test-results/part-<n>/`. It refuses to start while something listens on port 3200 |
 | `npm run e2e -- --part <n>` | One part on its own; `npm run e2e -- <files or folders>` is one run as before |
+| `npm run e2e -- --list` | Each part's files, as CI runs them (`--part <n>`: one part); starts no server |
+| `gh workflow run e2e.yml --ref <branch>` | **The full run:** the workflow "E2E" (`.github/workflows/e2e.yml`) runs the seven parts side by side on GitHub's Linux runners, each with its own fresh dev server, no retries, and merges their reports (about 12 minutes). Also by the label `full-e2e` on a pull request; never on a push. The run's page has the summary (each part's time, heap peak and restarts) and, for 14 days, the artifacts `report` (merged HTML report with traces), `part-<n>` (traces, `server.log`, memory log) |
+| `gh workflow run e2e.yml --ref <branch> -f files="e2e/<folder>/<spec>.ts" -f rounds=3` | A single-file check: `rounds` jobs side by side, each with a fresh dev server, each running the files once (artifacts `check-round-<n>`). The input `parts` (e.g. `1 7`) runs some parts only, for trying the workflow: not a full run |
 | `E2E_MEMORY_LOG=1 npm run e2e` | The same with a memory log: the e2e server's heap and resident memory and the machine's available memory, page file and paging every 5 s, per part in `.data/e2e-memory-<time>-part<n>.*`; read it with `npx tsx scripts/e2e-memory-report.ts .data/e2e-memory-<time>-part<n>` |
 | `npm run seed` | Creates the demo data in `.data/dev-db.json` if it does not exist yet |
 | `npm run reset-dev-data` | Replaces `.data/dev-db.json` with fresh demo data |
@@ -167,8 +170,9 @@ else `.data/session-secret`, made on first use.
 | `DIAG=nolines` or `DIAG=blocks` with `MEASURE_BUILD=production` | Measurement-only diagnosis (slice 2a): the canvas without its line layer, or every card as its below-40 % block; results get `-diag-…` in their name. Slice 2b: `DIAG=noframes`, `DIAG=nolabels`; slice 2c: `DIAG=collapsed` (every frame shown collapsed, nothing saved; what needs drawn cards is recorded as not applicable); slice 3a: `DIAG=nonotes` (no notes), `DIAG=nolabelmarks` (no label marks) |
 | `npm run schema:check` | Applies `supabase/migrations/` to a Postgres and compares the schema with the domain's tables (AD-31; CI runs it) |
 
-**Tests per step:** a large slice runs one full e2e run after each step and two before the merge; a small slice (since
-5a) runs the tests of what the step touched plus CI after each step and one full run before the merge (CLAUDE.md).
+**Tests per step** (CLAUDE.md, "Testing"): after each step the specs of what it touched plus CI, a full run in a step
+that touches shared infrastructure, and one full run before a merge. The full run is the workflow's run on the commit
+the report names; the local `npm run e2e` (about 95 minutes on the laptop) is the fallback when GitHub is down.
 
 Optional variables are listed in `.env.example`.
 
