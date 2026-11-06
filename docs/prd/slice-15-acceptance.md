@@ -2945,3 +2945,12 @@ They go into `docs/decisions.md` (D-69 under "InfoCube" after D-68, AD-36 under 
 
 **On KB** (after a backup in `.data/backups/`): the app opens; deleting a logical attribute and undoing it works as
 before.
+
+### Łukasz's answers to the decisions (6 November 2026)
+
+- **AD-36** approved as drafted; entered in `docs/decisions.md` after AD-35.
+- **D-69** approved with two changes, entered after D-68: a logical row dropped on a dimensional header "maps it to the
+  attribute of that name, or adds one" (the app does: `createOnHeader` maps onto an attribute of that name, case
+  ignored, `sameNamed`); "The status is set as for InfoMapper's mappings, reviewers included; with four-eyes the person
+  who last changed a mapping's content cannot approve it."
+- The merge waits for Łukasz's manual acceptance.
