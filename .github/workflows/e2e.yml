@@ -19,21 +19,27 @@ on:
         required: false
         default: 3
         type: number
+      parts:
+        description: "Without files: only these parts, e.g. 1 7 (for trying the workflow; not a full run). Empty: all parts"
+        required: false
+        default: ""
+        type: string
   pull_request:
     types: [labeled]
 
 permissions:
   contents: read
 
-# Full runs share one group per branch: a new one cancels the one still running. A single-file check, and a label other
-# than full-e2e, get a group of their own (the run's id): they neither cancel nor are cancelled.
+# Full runs share one group per branch: a new one cancels the one still running. A single-file check, a run of some parts
+# only, and a label other than full-e2e get a group of their own (the run's id): they neither cancel nor are cancelled.
 concurrency:
-  group: ${{ ((github.event_name == 'workflow_dispatch' && inputs.files != '') || (github.event_name == 'pull_request' && github.event.label.name != 'full-e2e')) && format('e2e-own-{0}', github.run_id) || format('e2e-full-{0}', github.head_ref || github.ref_name) }}
+  group: ${{ ((github.event_name == 'workflow_dispatch' && (inputs.files != '' || inputs.parts != '')) || (github.event_name == 'pull_request' && github.event.label.name != 'full-e2e')) && format('e2e-own-{0}', github.run_id) || format('e2e-full-{0}', github.head_ref || github.ref_name) }}
   cancel-in-progress: true
 
 env:
   # the laptop's zone (Windows's "Central European Standard Time"); the runner's own is UTC
   TZ: Europe/Warsaw
+  NEXT_TELEMETRY_DISABLED: "1"
 
 jobs:
   plan:
@@ -57,14 +63,25 @@ jobs:
         env:
           FILES: ${{ inputs.files }}
           ROUNDS: ${{ inputs.rounds }}
+          PARTS: ${{ inputs.parts }}
         run: |
           set -euo pipefail
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
           if [ -z "${FILES:-}" ]; then
-            parts=$(node --no-warnings --input-type=module -e "const p = await import('./e2e/parts.ts'); console.log(JSON.stringify(Array.from({ length: p.PART_COUNT }, (_, i) => i + 1)))")
+            count=$(node --no-warnings --input-type=module -e "const p = await import('./e2e/parts.ts'); console.log(p.PART_COUNT)")
+            if [ -z "${PARTS:-}" ]; then
+              parts=$(seq -s, 1 "$count" | sed 's/^/[/; s/$/]/')
+              echo "Full run, parts $parts, commit $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              read -r -a chosen <<< "$PARTS"
+              for p in "${chosen[@]}"; do
+                if ! [[ "$p" =~ ^[0-9]+$ ]] || [ "$p" -lt 1 ] || [ "$p" -gt "$count" ]; then echo "::error::parts must be numbers 1 to $count, not $p"; exit 1; fi
+              done
+              parts="[$(IFS=,; echo "${chosen[*]}")]"
+              echo "Parts $parts only (not a full run), commit $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
+            fi
             echo "mode=full" >> "$GITHUB_OUTPUT"
             echo "matrix=$parts" >> "$GITHUB_OUTPUT"
-            echo "Full run, parts $parts, commit $(git rev-parse HEAD)" >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           # files: paths under e2e/ only, letters, digits and . _ - / (no .., no other character), each of them present
