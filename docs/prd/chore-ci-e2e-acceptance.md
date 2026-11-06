@@ -322,7 +322,7 @@ Recorded in the PRD as its section 0, "Answers to step 1".
 **Answer 5, the local "three times on its own" today.** `npm run e2e -- <file>` three times one after another: each run
 is its own `playwright test`, whose `webServer` cleans `.next-e2e`, reseeds and starts a fresh dev server (nothing
 listens on 3200 between them, so `reuseExistingServer` reuses nothing), and stops it at the end (the acceptance docs'
-"3 of 3 on its own", e.g. `docs/prd/slice-15-acceptance.md`, S13-12 in 15b). The CI check is the same in what matters,
+"3 of 3 on its own", e.g. S13-12 in `docs/prd/slice-15-acceptance.md`). The CI check is the same in what matters,
 a fresh server and a fresh seed per round; it differs in running the rounds side by side on three machines rather than
 one after another on one. **Proposal:** CLAUDE.md describes both, the CI check (`rounds` 3) as the rule and the local
 loop as the fallback, with one line on the difference.
