@@ -79,12 +79,16 @@ test("S10A-05: a save waiting behind a delete of the same row is not sent and sh
   const at = await pointOnLine(line);
   await page.mouse.click(at.x, at.y);
   const note = page.getByTestId("panel-mapping").locator("#f-note");
-  // a status first, so the delete and the note behind it both wait in the chain
+  // a status first, so the delete and the note behind it both wait in the chain; its answer is held until the note is
+  // queued too: on a fast server the status and the delete were done before the note was typed (chore CI e2e)
+  const status = await holdUntil(page, mapping.id);
   const next = mapping.status === "review" ? "Approved" : "In review";
   await lineMenu(page, line, next);
+  await expect.poll(status.held).toBe(true);
   await lineMenu(page, line, "Delete mapping");
   await note.fill("Too late");
   await note.press("Tab");
+  status.release();
 
   await expect.poll(async () => (await loadModel()).mappings.some((m) => m.id === mapping.id)).toBe(false);
   await page.waitForTimeout(1500);
