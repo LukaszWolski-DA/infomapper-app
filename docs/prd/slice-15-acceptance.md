@@ -3488,3 +3488,88 @@ feeding cards and, by 15c's card rule, every dimensional line between lit cards.
   only with its reason; if more than a few need changing, stop and report first. D-70 gets one sentence if needed ("…the
   panel names a type conflict at both levels"); the final text is quoted in step 3's report.
 - **Then step 3 as agreed**, ending in one full run on the final commit in GitHub Actions. No merge.
+
+## 15d step 3: the lens, the panels, the bus matrix, and slice 15's closing (6 November 2026)
+
+### What changed
+
+- **One set of reasons at both levels (option A):** `gapReason` (was `feedReason`) also answers "type conflict" for a
+  logical attribute whose approved mappings all have a type conflict (`checkMappingTypes`); `GAP_REASONS` holds the
+  texts. Without approved mappings, or with one that fails for another reason (a column missing from source), the reason
+  stays "not approved".
+- **The lens** (D7, D8, Y2):
+  - `coverageColours` colours `scope.feeding` rows by their own coverage (`attributeCoverage`) and counts them in the
+    cards' summaries below 40 %;
+  - `Lit.lines`: `requirementFocusLit` sets it from `scope.feeds`; `litModules` lights a module line only if it is in
+    it; `mergeLit` does not take it over, so every other Focus (a multi-selection with a requirement included) keeps
+    15c's rule.
+- **"Fed from concepts"** (D14, Y6): `CubeEntityFeeds` (`src/modules/infocube/app/feeds.tsx`) in the new slot
+  `PANEL_SECTIONS.entityFeeds`, which the entity panel renders for a fact or a dimension where a logical entity has
+  "Feeding sources"; the row's tooltip as changed by Łukasz ("From Order Line and Sales Order (mappings in any status)").
+- **The bus matrix** (D11, D13, Y5): `ModuleTab.actions` and `TabDialogProps` (`src/ui/modules.ts`), the registry
+  `TAB_DIALOGS` (`src/compose/tab-dialogs.ts`), the left panel's button after the creates for every role (not while
+  searching), its go-to rule (`openEntity`: the card selected and centred, else the element's panel; `openRelationship`;
+  the details panel opens), and the dialog (`bus-matrix-dialog.tsx`), whose rows `busMatrixAction` reads when it opens.
+  The intro ends "…click a name or a dot to open it." (Łukasz).
+- **The closing docs:** `docs/decisions.md` (D-70 after D-69; "(Extended by D-70: …)" on D-31 and D-32); README (status,
+  15d's sentence, the acceptance link, the bench's row); CLAUDE.md ("What this is", the extension points "Requirements
+  and the Cube tab's dialogs", the InfoCube bullet's 15d line, the bench's command); `docs/ideas.md` (InfoCube iteration
+  1 done, next "InfoMapper's canvas and menus"; "Requirements through dimensional mappings: what comes later");
+  `docs/inventory-prototype-vs-app.md` (15d present, P27–P31; the two "15d" rows removed); `docs/known-limitations.md`
+  (the index with feeds; "What slice 15d leaves for later": the snapshot, no "via", no feeds from a linked entity, the
+  order); the PRD (status line, section 8's 15d differences).
+
+### Earlier tests changed, and why
+
+- **`e2e/slice-04a/S4A-08.spec.ts`:** Order Line.quantity's approved direct mapping from `order_line.item_code` has a type
+  conflict; its gap's reason was "not approved" and is now **"type conflict"** (option A: one set of reasons at both
+  levels). The only earlier test that asserts the reason in that case; no unit test did.
+- Nothing else. `tests/infocube-requirements.test.ts` (15d's own) follows the rename and has one test more (option A).
+
+### New specs (`e2e/slice-15d/`)
+
+| ID | File | What it checks |
+| --- | --- | --- |
+| S15-15 | `S15-15.spec.ts` (2 tests) | REQ-210 0 of 3 with "logical feed not covered", "not fed", "not approved"; the lens's 7 gap rows (3 items, 4 feeding); Focus: 5 cards, only the two lines in scope; with an approved source mapping on Customer.segment_code and its table on the star: 1 of 3, the two covered rows, 6 cards lit; a link from Dim Product.sku's panel and its undo |
+| S15-16 | `S15-16.spec.ts` (3 tests) | the button's tooltip; 2 facts × 3 dimensions with grains and SCD types; "2 facts conformed", "1 fact"; 6 dots; the intro and the legend; a name and a dot open their objects, the dialog closes; Close; a reader (Kasia) on a canvas without the star opens Fact Sales' panel; "Sales analytics" with InfoCube on and no facts: the toast, no dialog |
+| RP-10 | `RP-10.spec.ts` | Fact Sales × Dim Date ●● with both titles; the Ship date dot opens its relationship; with `ship_date_key`'s FK flag cleared the dot is ○ "…, but no key carries it" |
+| S15-24 | `S15-24.spec.ts` | Fact Sales "Sales 8 attributes", Dim Customer "Customer 3", "Reference data 1" with their tooltips; Dim Date's "Not fed from the logical model yet."; a feed from Product adds "Product 1 attribute", its undo takes it away |
+| S15-19 | – | the runs below and the changed tests above |
+
+### Checks before the full run
+
+- `npm run lint`, `npm run typecheck`, `npm test` (142 files, 1,779 tests): pass.
+- Locally (Windows, `npm run e2e`): `e2e/slice-15d` 7 of 7 after two test fixes (the add select's labels carry the
+  type; `switchRefusal` only checks the switch, so the spec writes it as test data); S4A-08, S4B1-05, S4B1-06 and S15-22:
+  8 of 8.
+- **The full run** on the final commit, in GitHub Actions: in the step's report and the pull request (Y8: one run, for
+  the canvas's layers and as the run before the merge).
+
+### Łukasz's manual acceptance (step 4)
+
+**On the demo** (`npm run demo -- --reset` in PowerShell, then http://127.0.0.1:3001, "Retail Co – DWH" → Order
+management → Sales star; the reset is needed: an existing demo file has the star without REQ-210):
+
+1. Requirements tab → REQ-210: "0 of 3 covered"; gaps "Dim Date.month · not fed", "Fact Sales.net_amount · not approved",
+   "Dim Customer.segment_code · logical feed not covered".
+2. With REQ-210 selected: the three rows and Order Line.quantity, unit_price, discount_pct and Customer.segment_code
+   orange; nothing faded.
+3. Focus on: Fact Sales, Dim Customer, Dim Date, Order Line and Customer lit; of the dimensional lines only net_amount's
+   (three paths) and segment_code's; Focus off.
+4. Fact Sales' panel: "Fed from concepts" with "Sales · 8 attributes", its tooltip "From Order Line and Sales Order
+   (mappings in any status)"; no "Feeding sources". Dim Customer: "Customer · 3", "Reference data · 1".
+5. Cube tab → Bus matrix: Fact Orders and Fact Sales × Dim Customer (SCD 2), Dim Product (SCD 1), Dim Date (SCD 0);
+   Fact Sales × Dim Date ●● with the titles "… as Order date: date_key" and "… as Ship date: ship_date_key"; the footer
+   "2 facts conformed", "1 fact", "2 facts conformed". Click Dim Product: the dialog closes and its card is selected;
+   open it again and click a dot: the relationship's panel.
+6. Dim Product.sku's panel → "Link to a requirement…" → REQ-210: the requirement reads "… of 4 covered"; Undo: "0 of 3".
+7. As a reader (Kasia Zielińska) on "Customer & orders": the Cube tab's Bus matrix opens; New fact and New dimension
+   are not there.
+
+**On KB** (after a backup: `Copy-Item .data\dev-db.json .data\backups\dev-db-$(Get-Date -Format yyyyMMdd-HHmm).json`,
+then `npm run dev`, http://localhost:3000):
+
+8. The app opens; a requirement's panel shows its coverage as before; an attribute with an approved mapping whose type
+   does not fit (if KB has one) now says "type conflict" instead of "not approved".
+9. If KB has InfoCube on with a fact or a dimension: its panel shows "Fed from concepts", and the Cube tab's Bus matrix
+   opens.

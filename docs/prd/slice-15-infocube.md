@@ -8,7 +8,9 @@ Status: **step 1 done and answered** (Łukasz, 4 November 2026); updated to the 
 step 1 done on 5 November 2026 on branch `slice/15c-dimensional-mappings` from tag `slice-15b` (acceptance doc, "15c step
 1"; answered on 5 November 2026, "Łukasz's answers to 15c step 1"). **15a, 15b and 15c are merged** (tags `slice-15a`,
 `slice-15b`, `slice-15c`). **15d** starts after the chore "Full e2e runs in GitHub Actions" (`docs/prd/chore-ci-e2e.md`;
-Łukasz, 6 November 2026), from `main` at that chore's merge.
+Łukasz, 6 November 2026), from `main` at that chore's merge. **15d** (requirements and the bus matrix): step 1 done on
+6 November 2026 on branch `slice/15d-requirements-bus-matrix` from `main` at `0c6bb1d` (acceptance doc, "15d step 1";
+answered the same day), steps 2 and 3 done (D-70 entered); waiting for Łukasz's manual acceptance and merge.
 
 ## 0. Answers to step 1 (Łukasz, 4 November 2026)
 
@@ -568,6 +570,12 @@ performance), each with the files and functions behind it and a proposal.
   the ends; the prototype says "Role of {name}" twice.
 - **Parallel relationships and nested loops 20 px apart** (15b), so a role pill fits between them; source relationships
   keep 16 px (R7).
+- **15d's differences** (accepted 6 November 2026, acceptance doc "15d step 1" and "Łukasz's answers to 15d step 2"):
+  P27 the lens colours without fading, Focus fades; P28 a linked fact or dimension brings no feeds; P29 Focus on a
+  requirement lights its own dimensional mappings, every other Focus keeps 15c's rule; P30 no "via" through feeds and
+  no marker on the feeding logical cards; P31 the bus matrix opens objects by the app's go-to rule without a toast, in
+  the Cube tab's order. Also the panel's reasons at both levels (option A), "Fed from concepts", and the bus matrix
+  for every role, read when it opens. All are built.
 - The rest of the acceptance doc's list P1–P26 as answered there.
 
 ## 9. Left for later

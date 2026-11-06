@@ -455,6 +455,10 @@ attributes, 2,000 mappings and 3,000 links one build takes a median of 12.7 ms i
   “Performance test” in under 1.2 ms.
 - **Measure it again** if a real workspace grows well beyond the synthetic model, or if 4b's lens reads it more often
   than once per data version.
+- **With feeds** (slice 15d, Y7): the same model with 1,000 dimensional attributes, 1,500 dimensional mappings read as
+  feeds and 300 more links builds in a median of 25.0–25.5 ms in Node on the laptop, against 24.8–27.3 ms without
+  them in the same runs (−6 % to +2 %; the bar is +25 %; `scripts/bench-requirement-index.ts`). The browser's rule
+  above stays; the browser was not measured with feeds.
 
 ## Screens compared with the prototype (slice 4a, step 5)
 
@@ -1282,3 +1286,14 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
   of its original (`besideSpots`, as "Place sources beside"); with the original not on the canvas it gets no card.
 - **The veil's cost at a drag's start** is relative (the PRD's section 6, accepted 5 November 2026): at most 5 ms more
   than a drag frame without the veil on the same canvas; measured 18.7 ms in the page against about 15 ms without it.
+
+### What slice 15d leaves for later (slice 15d)
+
+- **The bus matrix is a snapshot** (Y5): its rows are read when the dialog opens; a change made meanwhile, here or in
+  another session, shows when it is opened again.
+- **No "via" through dimensional mappings** (P30, D-34): a logical entity or attribute that feeds a requirement's
+  dimensional attribute does not list the requirement in its panel, and its card carries no marker for it; the lens
+  and Focus show the upstream (`docs/ideas.md`).
+- **A linked fact or dimension brings no feeds** (P28, D-31): only a linked dimensional attribute's dimensional
+  mappings enter the scope; an entity item's coverage still counts any covered attribute.
+- **The bus matrix's order** is the Cube tab's (by concept, then the model's order), not the prototype's (P31).

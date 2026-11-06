@@ -62,8 +62,10 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   "Writes still off the save chain"); a warning when leaving a page with a draft not saved (`beforeunload`).
 - **InfoCube, iteration 1** (`docs/prd/slice-15-infocube.md`): **15a done** (the module boundary, facts and dimensions,
   the licence and the switch; AD-33 to AD-35, D-67), **15b done** (grain, measures, SCD type, role-playing dimensions;
-  D-68), **15c done** (dimensional mappings and "fed" coverage, "Create dimension from this…"; AD-36, D-69); next 15d
-  (requirements on facts and dimensions, the bus matrix).
+  D-68), **15c done** (dimensional mappings and "fed" coverage, "Create dimension from this…"; AD-36, D-69), **15d done**
+  (requirements on facts and dimensions, "Fed from concepts", the bus matrix; D-70): **InfoCube iteration 1 is done.**
+- **Next: the slice "InfoMapper's canvas and menus"** (below, "InfoMapper's canvas and menus: a slice after slice
+  15"), then the InfoCube backlog (`docs/prd/slice-15-infocube.md`, section 9).
 - **Chore CI e2e: done** (6 November 2026): the full e2e run and the single-file check in GitHub Actions, seven parts
   side by side in about 12 minutes (`.github/workflows/e2e.yml`, `docs/prd/chore-ci-e2e-acceptance.md`); the local run
   is the fallback.
@@ -756,3 +758,11 @@ does) or with a `ResizeObserver`, and check with a phase trace that a panel swit
 - A collapsed frame lists its cards in a block (slice 2c). A fact or a dimension shows its name there like any entity,
   without its role or the cube mark the card has. The block could show the role as the card's header does (one class on
   the row, a CSS mask, no element more; `blockHeight` and the thumbnails unchanged). Łukasz, step 4: an idea for later.
+
+## Requirements through dimensional mappings: what comes later (slice 15d)
+
+- **"Via dimensional mapping"** in element panels (E21, Y4): a logical entity or attribute that feeds a fact's or a
+  dimension's attribute in a requirement's scope could list that requirement indirectly, and its card carry the
+  marker, as the prototype's `reqsFor` does. Not built (D-34 unchanged, P30).
+- **A browser figure for the index with feeds** (`__imIndexTiming` with the synthetic feeds): only Node was measured
+  in slice 15d (Y7).
