@@ -45,6 +45,11 @@ Where this section and a later one disagree, this section wins. The findings beh
   without changing an assertion; S2B-06's right drag (off Windows) and S6A-10 at 1,201 px (on Linux) moved unchanged
   into tests of their own and marked `test.fail` with a condition, each with its known limitation; both fixed in the
   slice "InfoMapper's canvas and menus". CI-03's "pass" counts these as expected failures.
+- **CI-03 changed** (Łukasz's answers on run 2's failures, step 3): the runner is about twice as fast as the laptop and
+  shows timing races the laptop hid, and each run finds different rare ones, so "green twice in a row" never settles.
+  CI-03 is now: "Full runs on the final commit in which every failure is diagnosed and either fixed (a race in a test,
+  without assertion changes) or recorded as a known limitation with its mechanism and where it will be fixed; Łukasz
+  decides the merge." `retries` stays 0.
 - **Step 2** as section 4 says, with the above: the workflow made to work with `workflow_dispatch` runs of a part or a
   folder at a time (not full runs), then one full run on the branch, its failures checked with `rounds` 3. The branch is
   pushed for the runs; no pull request yet.
@@ -136,7 +141,7 @@ Stop after each step with a short summary and wait for Łukasz.
 | --- | --- |
 | CI-01 | **Triggers.** A `workflow_dispatch` run and the `full-e2e` label each start the full run; a push without the label starts none; a second run for the same ref cancels the first. |
 | CI-02 | **The same tests.** The CI run runs every spec the local full run runs (the file lists compared, by `--list` per part), and none of the `MEASURE=1` specs; skipped tests are the same as locally. |
-| CI-03 | **Green twice.** Two full runs in a row on the final commit pass with `retries: 0`. A failure on the way is reported with its trace and the memory at that moment, and Łukasz decides what happens to it; nothing is skipped or quarantined without his decision. |
+| CI-03 | **Every failure diagnosed** (changed by Łukasz, 6 November 2026; was "Green twice"). Full runs on the final commit in which every failure is diagnosed and either fixed (a race in a test, without assertion changes) or recorded as a known limitation with its mechanism and where it will be fixed; Łukasz decides the merge. `retries` stays 0. |
 | CI-04 | **Time and memory.** Each full run takes at most 30 minutes wall-clock (target 25); each part's duration and memory peak are reported; no part's peak comes within 20 % of the runner's restart threshold and no server prints the restart. |
 | CI-05 | **What a run leaves.** One merged HTML report, the failures' traces, the server and memory logs per part, and the job summary of P5, downloadable for 14 days. |
 | CI-06 | **The single-file check.** A `workflow_dispatch` run with `files` set to one spec and `repeat_each` 3 runs that spec three times on its own and reports each. |

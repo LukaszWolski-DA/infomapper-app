@@ -610,3 +610,24 @@ S10A-05 3 of 3.
 
 On the final commit, the first started by the label `full-e2e` on PR #39, the second by `workflow_dispatch` after the
 first had ended: their links, figures and the criteria with their evidence are in the pull request's description.
+
+### Łukasz's answers: run 2's failures (6 November 2026)
+
+**Why:** the runner is about twice as fast as the laptop and shows timing races the laptop hid; each run finds
+different rare ones. "Green twice in a row" then never settles. **CI-03 changes** (section 0 and the criterion's row in
+the PRD) to: "Full runs on the final commit in which every failure is diagnosed and either fixed (a race in a test,
+without assertion changes) or recorded as a known limitation with its mechanism and where it will be fixed; Łukasz
+decides the merge." `retries` stays 0.
+
+1. **S13-09:** fix the race as proposed: wait for the rename's answer (`answerOf`, slice 14b) before clicking Undo. No
+   assertion changes. Checked alone with rounds 3 on the runner, and locally on Windows once.
+2. **S5A-07 and S6A-11:** a read-only diagnosis, no change yet. The hypothesis to confirm or reject: the first view of
+   a canvas is sometimes computed before the remembered width of the left panel (D-54) is applied, so it fits or
+   corrects for the wrong canvas width. From the code and the two traces: (a) the order in which the page applies the
+   remembered panel widths and computes the first view, and whether it can vary; (b) app or test: can a person get the
+   same wrong first view, on what conditions; if only the test can, what in the test makes it possible; (c) whether
+   one cause explains both; (d) the smallest fix, its files, and the earlier specs that cover that code. No full run in
+   this step.
+
+The S13-09 fix pushed; then Łukasz decides whether the chore merges with a known limitation and a separate fix before
+15d.
