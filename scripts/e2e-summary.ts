@@ -10,7 +10,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import path from "node:path";
 
 type Result = { status: string; duration: number; error?: { message?: string } };
-type Test = { status: string; results: Result[] };
+type Test = { status: string; expectedStatus?: string; results: Result[] };
 type Spec = { title: string; file: string; line: number; tests: Test[] };
 type Suite = { title: string; file?: string; specs?: Spec[]; suites?: Suite[] };
 type Report = { suites?: Suite[]; stats?: { expected: number; unexpected: number; flaky: number; skipped: number; duration: number } };
@@ -33,13 +33,21 @@ const minutes = (ms: number) => `${Math.floor(ms / 60_000)} min ${Math.round((ms
 const firstLine = (text = "") => text.replace(/\x1b\[[0-9;]*m/g, "").split("\n").find((l) => l.trim())?.trim().slice(0, 200) ?? "";
 const out: string[] = [];
 
+/** Tests marked `test.fail` that failed, as marked: Playwright's "expected" with the expected status "failed". */
+const expectedFailures = specs.filter((sp) => sp.tests.some((t) => t.expectedStatus === "failed" && t.status === "expected"));
 const s = report.stats;
 if (!s) out.push("**No report:** Playwright's JSON report is missing (a part or the merge failed before it).", "");
 else
   out.push(
-    `**${s.expected} passed, ${s.unexpected} failed, ${s.flaky} flaky, ${s.skipped} skipped** (Playwright's own time ${minutes(s.duration)}).`,
+    // a merged report's own duration spans the parts' runs side by side, not one run: the parts' table has the times
+    `**${s.expected - expectedFailures.length} passed, ${s.unexpected} failed, ${s.flaky} flaky, ${s.skipped} skipped, ${expectedFailures.length} expected failures** (test.fail: Playwright counts them as expected).`,
     "",
   );
+if (expectedFailures.length > 0) {
+  out.push("### Expected failures", "", "| File | Test |", "| --- | --- |");
+  for (const sp of expectedFailures) out.push(`| \`${sp.file}:${sp.line}\` | ${sp.title.replace(/\|/g, "\\|").slice(0, 120)} |`);
+  out.push("");
+}
 
 const failed = specs.filter((sp) => sp.tests.some((t) => t.status === "unexpected" || t.status === "flaky"));
 if (failed.length > 0) {
