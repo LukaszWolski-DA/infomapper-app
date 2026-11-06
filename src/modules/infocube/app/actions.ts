@@ -221,5 +221,5 @@ export async function createDimensionFromAction(
  * nothing written; the dialog is a snapshot of that moment.
  */
 export async function busMatrixAction(workspaceId: string): Promise<ActionResult<BusMatrix>> {
-  return modelRead(workspaceId, async (access, model, store) => busMatrix(cubeIndex(await keyState(store, access.workspace.id, model)), model.entities, model.concepts));
+  return modelRead(workspaceId, async (access, model, store) => busMatrix(cubeIndex(await keyState(store, access.workspace.id, model)), model.entities, model.concepts, access.workspace.name));
 }

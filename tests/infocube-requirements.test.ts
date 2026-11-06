@@ -14,7 +14,7 @@ import { SEED_IDS } from "@/data/local/seed";
 import { createLocalDataStore } from "@/data/local/store";
 import type { DataStore } from "@/data/ports";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
-import { FEED_REASONS, NOT_FED_REASON, type AttributeFeeds } from "@/domain/model/requirements";
+import { GAP_REASONS, NOT_FED_REASON, type AttributeFeeds } from "@/domain/model/requirements";
 import { coverageDelta } from "@/domain/source-changes/coverage";
 import type { Mapping, MappingInput, WorkspaceModel } from "@/domain/types";
 import { busMatrix } from "@/modules/infocube/domain/bus-matrix";
@@ -81,10 +81,10 @@ describe("REQ-210 in the star (Q4, S15-15)", () => {
     expect(c.covered).toEqual([]);
     expect(new Set(c.notApproved)).toEqual(new Set([net, segment]));
     expect(c.notMapped).toEqual([month]);
-    expect(ix.feedReason(net)).toBeNull();
-    expect(ix.feedReason(segment)).toBe("logical_feed");
+    expect(ix.gapReason(net)).toBeNull();
+    expect(ix.gapReason(segment)).toBe("logical_feed");
     expect(ix.isDimensional(month)).toBe(true);
-    expect([FEED_REASONS[ix.feedReason(net) ?? "none"], FEED_REASONS[ix.feedReason(segment) ?? "none"], NOT_FED_REASON]).toEqual(["not approved", "logical feed not covered", "not fed"]);
+    expect([GAP_REASONS[ix.gapReason(net) ?? "none"], GAP_REASONS[ix.gapReason(segment) ?? "none"], NOT_FED_REASON]).toEqual(["not approved", "logical feed not covered", "not fed"]);
   });
 
   it("brings the feeds and the logical attributes they read into the scope, not as items (D6)", async () => {
@@ -130,8 +130,8 @@ describe("coverage through feeds (D2, Y1)", () => {
     expect(at({ [segment]: [{ ...feed, approved: false }] }).attributeCoverage(segment)).toBe("not_approved");
     const conflict = at({ [segment]: [{ ...feed, typeConflict: true }] });
     expect(conflict.attributeCoverage(segment)).toBe("not_approved");
-    expect(conflict.feedReason(segment)).toBe("type_conflict");
-    expect(FEED_REASONS.type_conflict).toBe("type conflict");
+    expect(conflict.gapReason(segment)).toBe("type_conflict");
+    expect(GAP_REASONS.type_conflict).toBe("type conflict");
     // an input that is not a live logical attribute counts as not covered (no recursion)
     expect(at({ [segment]: [{ ...feed, inputs: [attribute("Dim Customer", "city").id] }] }).attributeCoverage(segment)).toBe("not_approved");
     expect(at({}).coverage(req210.id).notMapped).toContain(segment);
@@ -238,5 +238,19 @@ describe("the bus matrix's rows (B-8, R-8, RP-10)", () => {
     expect(m.dimensions).toHaveLength(100);
     expect(dots).toHaveLength(300);
     expect(dots.every((d) => d.key === null)).toBe(true);
+  });
+});
+
+describe("one set of reasons at both levels (option A)", () => {
+  it("a logical attribute whose approved mappings all have a type conflict gives \"type conflict\"; a draft one \"not approved\"", async () => {
+    const { model, requirements, links, attribute } = await star();
+    const quantity = attribute("Order Line", "quantity").id;
+    // an approved direct mapping from a text column onto an integer attribute: a type conflict
+    const conflict = approvedSourceMapping(model, quantity, "item_code");
+    const ix = buildRequirementIndex(requirements, links, conflict);
+    expect(ix.attributeCoverage(quantity)).toBe("not_approved");
+    expect(ix.gapReason(quantity)).toBe("type_conflict");
+    const draft = { ...conflict, mappings: conflict.mappings.map((m) => (m.id === "test-mapping" ? { ...m, status: "draft" as const } : m)) };
+    expect(buildRequirementIndex(requirements, links, draft).gapReason(quantity)).toBeNull();
   });
 });

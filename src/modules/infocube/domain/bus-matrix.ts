@@ -12,7 +12,7 @@ export const BUS_MATRIX_TEXTS = {
   title: "Bus matrix",
   head: (workspace: string) => `${workspace} · InfoCube`,
   intro:
-    "Which dimensions each fact uses. A dimension used by more than one fact is conformed: it must mean the same in all of them. Built from the relationships; click a name to open it.",
+    "Which dimensions each fact uses. A dimension used by more than one fact is conformed: it must mean the same in all of them. Built from the relationships; click a name or a dot to open it.",
   fact: "Fact",
   grain: "grain",
   noGrain: "no grain",
@@ -35,6 +35,8 @@ export interface BusDot {
 }
 
 export interface BusMatrix {
+  /** The workspace's name, for the dialog's head. */
+  workspace: string;
   facts: { id: Uuid; name: string; grain: string | null }[];
   dimensions: { id: Uuid; name: string; scd: number; facts: number }[];
   /** The dots by fact, then by dimension, in the relationships' order. */
@@ -49,7 +51,12 @@ export const dotTitle = (fact: string, dimension: string, role: string | null, k
  * The matrix's rows: facts, then dimensions, as the Cube tab lists them (by concept in the concepts' order, then the
  * model's order of entities). A dimension's count is of facts, not relationships (R-8).
  */
-export function busMatrix(index: CubeIndex, entities: readonly Pick<Entity, "id" | "name" | "concept_id" | "deleted_at">[], concepts: readonly Pick<Concept, "id" | "sort_order">[]): BusMatrix {
+export function busMatrix(
+  index: CubeIndex,
+  entities: readonly Pick<Entity, "id" | "name" | "concept_id" | "deleted_at">[],
+  concepts: readonly Pick<Concept, "id" | "sort_order">[],
+  workspace = "",
+): BusMatrix {
   const rank = new Map([...concepts].sort((a, b) => a.sort_order - b.sort_order).map((c, i) => [c.id, i]));
   const ordered = entities
     .map((e, i) => ({ e, i }))
@@ -70,6 +77,7 @@ export function busMatrix(index: CubeIndex, entities: readonly Pick<Entity, "id"
     cells[f.id] = row;
   }
   return {
+    workspace,
     facts: facts.map((f) => ({ id: f.id, name: f.name, grain: index.cubeOf(f.id)?.grain?.trim() || null })),
     dimensions: dimensions.map((d) => ({ id: d.id, name: d.name, scd: index.cubeOf(d.id)?.scd_type ?? 1, facts: users.get(d.id)?.size ?? 0 })),
     cells,

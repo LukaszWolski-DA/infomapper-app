@@ -63,6 +63,29 @@ export interface ModuleTab {
   sections: ModuleTabSection[];
   /** The creates' keys shown at the tab's top, in order (`fact`, `dimension`). */
   creates: string[];
+  /**
+   * Buttons after the creates that open a module's dialog (slice 15d, D11: "Bus matrix"), for every role while the tab is
+   * not searched; the dialog is the composition root's `TAB_DIALOGS[key]`.
+   */
+  actions?: TabAction[];
+}
+
+/** A button of a module's tab that opens its dialog (slice 15d). */
+export interface TabAction {
+  key: string;
+  label: string;
+  title: string;
+  testId: string;
+}
+
+/** What a tab's dialog gets from the left panel (slice 15d): how to open an entity and a relationship, and its close. */
+export interface TabDialogProps {
+  workspaceId: string;
+  /** The app's go-to rule: select and centre the entity's card here, else its panel; the details panel opens. */
+  openEntity: (entityId: Uuid) => void;
+  /** The relationship's panel; the view does not move. */
+  openRelationship: (relationshipId: Uuid) => void;
+  onClose: () => void;
 }
 
 /** What a create action takes: InfoMapper's `createEntityAction` input. */

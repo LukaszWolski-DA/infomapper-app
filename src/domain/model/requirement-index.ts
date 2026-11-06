@@ -13,7 +13,7 @@ import {
   type AttributeCoverage,
   type AttributeFeeds,
   type ElementRequirements,
-  type FeedReason,
+  type GapReason,
   type RequirementCoverage,
   type RequirementScope,
   type ScopeModel,
@@ -37,8 +37,8 @@ export interface RequirementIndex {
   coveredCount: number;
   /** An attribute's own coverage state (slice 15d: the lens colours the attributes that feed a scope by it). */
   attributeCoverage: (attributeId: Uuid) => AttributeCoverage;
-  /** Slice 15d: why a fact's or a dimension's attribute with an approved feed is not covered; null otherwise. */
-  feedReason: (attributeId: Uuid) => FeedReason | null;
+  /** Slice 15d: why an attribute with approved mappings or feeds is not covered (both levels); null otherwise. */
+  gapReason: (attributeId: Uuid) => GapReason | null;
   /** Slice 15d: an attribute of a fact or a dimension (the panel's "not fed"). */
   isDimensional: (attributeId: Uuid) => boolean;
 }
@@ -133,7 +133,7 @@ export function buildRequirementIndex(requirements: readonly Requirement[], link
     of,
     coveredCount,
     attributeCoverage: lookup.coverageOf,
-    feedReason: lookup.feedReason,
+    gapReason: lookup.gapReason,
     isDimensional: lookup.isDimensional,
   };
 }

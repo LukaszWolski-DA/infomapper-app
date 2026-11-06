@@ -14,7 +14,7 @@ import type { UpdateRequirementInput } from "@/domain/commands/requirement";
 import { targetOf } from "@/domain/model/labels";
 import { templateHtml } from "@/domain/model/requirement-templates";
 import { coverageText } from "./requirement-ui";
-import { coverageParts, ENTITY_GAP_REASON, FEED_REASONS, NOT_FED_REASON, fourEyesRequirementMessage, KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
+import { coverageParts, ENTITY_GAP_REASON, GAP_REASONS, NOT_FED_REASON, fourEyesRequirementMessage, KIND_NAMES, PRIORITY_NAMES, STATUS_NAMES, usesExpression, usesSeverity } from "@/domain/model/requirements";
 import { REQUIREMENT_KINDS, REQUIREMENT_PRIORITIES, REQUIREMENT_STATUSES, type Requirement, type RequirementLink } from "@/domain/types";
 import { NAME_REQUIRED } from "@/domain/validation";
 import { useToast } from "@/ui/components/toast";
@@ -80,9 +80,10 @@ export function RequirementPanel({ requirement: r }: { requirement: Requirement 
   // slice 4b-1 (PRD item 11): entity items first, then attribute items as before; a click goes to the element
   const gaps = [
     ...coverage.entityGaps.map((id) => ({ id, why: ENTITY_GAP_REASON, mapped: false, label: ix.entity.get(id)?.name ?? "", go: () => p.goEntity(id) })),
-    // slice 15d (D5, Y1, Y3): a fact's or a dimension's attribute is "not fed"; with an approved feed it says why that does not count
+    // slice 15d (D5, Y1, Y3, option A): a fact's or a dimension's attribute is "not fed"; with approved mappings or feeds
+    // the reason says why they do not count, the same set at both levels
     ...coverage.notMapped.map((id) => ({ id, why: p.rx.isDimensional(id) ? NOT_FED_REASON : "unmapped", mapped: false, label: attributeLabel(ix, id), go: () => p.goAttribute(id) })),
-    ...coverage.notApproved.map((id) => ({ id, why: FEED_REASONS[p.rx.feedReason(id) ?? "none"], mapped: true, label: attributeLabel(ix, id), go: () => p.goAttribute(id) })),
+    ...coverage.notApproved.map((id) => ({ id, why: GAP_REASONS[p.rx.gapReason(id) ?? "none"], mapped: true, label: attributeLabel(ix, id), go: () => p.goAttribute(id) })),
   ];
   const traced = (k: RequirementLink) => {
     const t = targetOf(k);

@@ -11,7 +11,8 @@
 // dot (item 33); each system's open button selects the system and opens its panel.
 
 import { newCardHeight } from "@/canvas/geometry";
-import { useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { useCallback, useContext, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
+import { TAB_DIALOGS } from "@/compose/tab-dialogs";
 import { createConceptAction, createEntityAction, renameConceptAction } from "@/app/_actions/model";
 import { createRequirementAction } from "@/app/_actions/requirement";
 import { KIND_NAMES } from "@/domain/model/requirements";
@@ -504,6 +505,30 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     ];
   };
 
+  // ---- a module's dialog from its tab (slice 15d, D11, D13): the inspector's go-to rule, not the tree's place ----
+  const [tabDialog, setTabDialog] = useState<string | null>(null);
+  const closeTabDialog = useCallback(() => setTabDialog(null), []);
+  const cardOfEntity = (entityId: string): string | null => {
+    for (const c of tree.concepts) for (const e of c.entities) if (e.id === entityId) return e.cardId;
+    for (const t of tree.tabs) for (const sec of t.sections) for (const c of sec.concepts) for (const e of c.entities) if (e.id === entityId) return e.cardId;
+    return null;
+  };
+  const openEntity = (entityId: string) => {
+    closeLeftOverlay();
+    const cardId = cardOfEntity(entityId);
+    if (cardId) {
+      ui.select({ t: "card", id: cardId });
+      ui.centerOn(cardId);
+    } else ui.select({ t: "element", kind: "entity", id: entityId });
+    openDetails();
+  };
+  const openRelationship = (relationshipId: string) => {
+    closeLeftOverlay();
+    ui.select({ t: "rel", id: relationshipId });
+    openDetails();
+  };
+  const TabDialog = tabDialog ? TAB_DIALOGS[tabDialog] : undefined;
+
   // ---- a module's tab (slice 15a, B-1; prototype cubeTree): its creates, then each group's entities by concept ----
   async function createFromTab(createKey: string) {
     const create = modules.creates.find((c) => c.key === createKey);
@@ -532,14 +557,21 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     const sections = t.sections
       .map((sec) => ({ sec, groups: filterConcepts(sec.concepts, filter).filter((g) => g.items.length > 0) }))
       .filter(({ groups }) => groups.length > 0 || !filtering);
-    if (!sections.length && !creates.length) return null;
+    // slice 15d (D11): a module's dialogs ("Bus matrix"), for every role, not while searching (prototype cubeTree)
+    const actions = !searching ? t.actions.filter((a) => TAB_DIALOGS[a.key]) : [];
+    if (!sections.length && !creates.length && !actions.length) return null;
     return (
       <>
-        {creates.length > 0 && (
+        {(creates.length > 0 || actions.length > 0) && (
           <div className="flex flex-wrap gap-1.5 px-2.5 pb-0.5 pt-1.5">
             {creates.map((c) => (
               <button key={c.key} type="button" className={`${smallButton} whitespace-nowrap`} data-testid={c.testId} onClick={() => void createFromTab(c.key)}>
                 {c.button}
+              </button>
+            ))}
+            {actions.map((a) => (
+              <button key={a.key} type="button" className={`${smallButton} whitespace-nowrap`} title={a.title} data-testid={a.testId} onClick={() => setTabDialog(a.key)}>
+                {a.label}
               </button>
             ))}
           </div>
@@ -670,6 +702,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
         </div>
       )}
       {addingTable && <NewSourceTableDialog workspaceId={workspaceId} systems={tree.systems.map((s) => s.name)} onClose={() => setAddingTable(false)} />}
+      {TabDialog && <TabDialog workspaceId={workspaceId} openEntity={openEntity} openRelationship={openRelationship} onClose={closeTabDialog} />}
       {importing && importData && <ImportWizard workspaceId={workspaceId} data={importData} onClose={() => setImporting(false)} onImported={imported} />}
       {deleting && (
         <DeleteConceptDialog

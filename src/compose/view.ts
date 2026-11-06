@@ -11,6 +11,7 @@ import { NO_MODULES, type DependentRow, type EntityCreate, type ModuleView } fro
 import type { CardData } from "@/canvas/card-data";
 import type { ModuleLineData } from "@/canvas/line-data";
 import { cubeLines } from "@/modules/infocube/canvas/lines";
+import { BUS_MATRIX_TEXTS } from "@/modules/infocube/domain/bus-matrix";
 import { cubeIndex } from "@/modules/infocube/domain/keys";
 import { CUBE_MAPPING_LOG, cubeRequirementFeeds, mappingIndex } from "@/modules/infocube/domain/mappings";
 import type { AttributeFeeds } from "@/domain/model/requirements";
@@ -86,7 +87,17 @@ export async function moduleView(store: DataStore, workspace: Workspace, model: 
   return {
     roles,
     ...described,
-    tabs: [{ id: "cube", name: "Cube", title: "InfoCube: facts and dimensions", sections, creates: ["fact", "dimension"] }],
+    tabs: [
+      {
+        id: "cube",
+        name: "Cube",
+        title: "InfoCube: facts and dimensions",
+        sections,
+        creates: ["fact", "dimension"],
+        // slice 15d (B-8): the bus matrix, for every role
+        actions: [{ key: "bus-matrix", label: BUS_MATRIX_TEXTS.button, title: BUS_MATRIX_TEXTS.buttonTitle, testId: "button-bus-matrix" }],
+      },
+    ],
     creates: creates(actions),
   };
 }

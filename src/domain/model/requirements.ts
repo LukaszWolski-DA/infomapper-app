@@ -112,8 +112,12 @@ export interface AttributeFeed {
 /** What feeds each dimensional attribute (slice 15d), by the target attribute's id; absent or empty: nothing. */
 export type AttributeFeeds = Readonly<Record<Uuid, readonly AttributeFeed[]>>;
 
-/** Why a dimensional attribute with an approved feed does not count (slice 15d, D5, Y1). */
-export type FeedReason = "logical_feed" | "type_conflict";
+/**
+ * Why an attribute item with approved mappings does not count (slice 15d, D5, Y1, option A): a fact's or a dimension's
+ * attribute whose approved feed reads uncovered attributes, or an attribute at either level whose approved mappings all
+ * have a type conflict.
+ */
+export type GapReason = "logical_feed" | "type_conflict";
 
 /**
  * A requirement's scope (D-31; slice 4b-1, PRD item 9). The five sets say what it touches on a canvas (cards, rows and
@@ -168,8 +172,8 @@ export interface ModelLookup {
   isDimensional: (attributeId: Uuid) => boolean;
   /** Slice 15d: the feeds of a dimensional attribute (none for a logical one). */
   feedsOf: (attributeId: Uuid) => readonly AttributeFeed[];
-  /** Slice 15d: why a dimensional attribute with an approved feed is not covered; null otherwise. */
-  feedReason: (attributeId: Uuid) => FeedReason | null;
+  /** Slice 15d: why an attribute with approved mappings or feeds is not covered (both levels); null otherwise. */
+  gapReason: (attributeId: Uuid) => GapReason | null;
 }
 
 const NO_FEEDS: readonly AttributeFeed[] = [];
@@ -248,8 +252,14 @@ export function lookupModel(model: ScopeModel, feeds: AttributeFeeds = {}): Mode
     }
     return state;
   };
-  const feedReason = (attributeId: Uuid): FeedReason | null => {
-    if (!isDimensional(attributeId) || coverageOf(attributeId) !== "not_approved") return null;
+  const gapReason = (attributeId: Uuid): GapReason | null => {
+    if (coverageOf(attributeId) !== "not_approved") return null;
+    if (!isDimensional(attributeId)) {
+      // slice 15d (option A): a logical attribute whose approved mappings all have a type conflict
+      const approved = (mappingsOf.get(attributeId) ?? []).filter((m) => m.status === "approved");
+      const a = attribute.get(attributeId);
+      return !!a && approved.length > 0 && approved.every((m) => !checkMappingTypes(m, a, inputsOf.get(m.id) ?? []).ok) ? "type_conflict" : null;
+    }
     const approved = feedsOf(attributeId).filter((f) => f.approved);
     if (approved.some((f) => !f.typeConflict)) return "logical_feed";
     return approved.length ? "type_conflict" : null;
@@ -269,7 +279,7 @@ export function lookupModel(model: ScopeModel, feeds: AttributeFeeds = {}): Mode
     coverageOf,
     isDimensional,
     feedsOf,
-    feedReason,
+    gapReason,
   };
 }
 
@@ -364,10 +374,10 @@ export const ENTITY_GAP_REASON = "no approved mapping on any attribute";
 export const NOT_FED_REASON = "not fed";
 
 /**
- * Slice 15d (D5, Y1, Y3): a gap's reason for an attribute item with mappings, none of which counts: InfoMapper's "not
- * approved", and for a fact's or a dimension's attribute with an approved feed why it does not count.
+ * Slice 15d (D5, Y1, Y3, option A): a gap's reason for an attribute item with mappings, none of which counts: "not
+ * approved", or why its approved ones do not count, one set of reasons at both levels.
  */
-export const FEED_REASONS: Record<FeedReason | "none", string> = {
+export const GAP_REASONS: Record<GapReason | "none", string> = {
   none: "not approved",
   logical_feed: "logical feed not covered",
   type_conflict: "type conflict",

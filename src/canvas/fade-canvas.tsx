@@ -158,7 +158,8 @@ export function litModules(lines: Pick<CanvasLines, "modules">, lookup: Map<stri
     const n = lookup.get(cardId);
     return !!n && isLitCard(n, lit);
   };
-  for (const l of lines.modules ?? []) if (lighted(l.target.cardId) && l.inputs.length && l.inputs.every((i) => lighted(i.cardId))) out.add(l.id);
+  // slice 15d (D8, Y2): under a requirement's Focus only its own dimensional mappings
+  for (const l of lines.modules ?? []) if ((!lit.lines || lit.lines.has(l.id)) && lighted(l.target.cardId) && l.inputs.length && l.inputs.every((i) => lighted(i.cardId))) out.add(l.id);
   return out;
 }
 

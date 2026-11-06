@@ -5,7 +5,7 @@ import type { Uuid } from "@/domain/ids";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
 import { isLogical } from "@/domain/model/levels";
 import { coverageParts } from "@/domain/model/requirements";
-import type { ModuleTab } from "@/ui/modules";
+import type { ModuleTab, TabAction } from "@/ui/modules";
 import { REQUIREMENT_KINDS, type CanvasItem, type RequirementKind, type SourceChange, type WorkspaceModel } from "@/domain/types";
 
 /** Where an element has cards: on this canvas (filled dot), only on other canvases (ring), or nowhere. */
@@ -111,6 +111,8 @@ export interface TreeTab {
   name: string;
   title: string;
   creates: string[];
+  /** Slice 15d: the buttons that open a module's dialog (`ModuleTab.actions`). */
+  actions: TabAction[];
   sections: TreeTabSection[];
 }
 
@@ -197,6 +199,7 @@ export function buildTree(
     name: t.name,
     title: t.title,
     creates: t.creates,
+    actions: t.actions ?? [],
     sections: t.sections.map((sec) => {
       const meta = new Map(sec.entities.map((x) => [x.id, x.meta]));
       const groups = model.concepts
