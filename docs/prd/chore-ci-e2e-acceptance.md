@@ -283,3 +283,52 @@ conditions), `scripts/e2e-memory-system.ps1`: measurement stays on the laptop (A
 4. **`TZ: Europe/Warsaw`** in the workflow, so the runner reads times as the laptop does?
 5. **`repeat_each` as the single-file check** (one run, a warm server after the first round) in place of three
    separate runs, also in CLAUDE.md's wording?
+
+### Łukasz's answers to step 1 (6 November 2026)
+
+1. **Seven parts**, cut from the laptop's folder times now (the table in P2), in step 2 already. One list of parts for CI
+   and the local run. Step 3 corrects the cuts from the runner's own folder times only if a part is clearly longer than
+   the rest.
+2. **The dev server's output goes to a file in both places** (`test-results/part-<n>/server.log`), not to the console.
+   In CI it is part of the part's artifacts; CI-04's "no restart printed" is read from it.
+3. **Yes**, create the label `full-e2e` in step 2.
+4. **Yes**, `TZ: Europe/Warsaw` in the workflow. One sentence in `docs/known-limitations.md`: the e2e run has not been
+   run in another time zone.
+5. **The single-file check is not `repeat_each`:** a `workflow_dispatch` input `rounds` (default 3) starts that many jobs
+   in parallel, each with its own fresh dev server, each running the `files` once. Say how the local "three times on its
+   own" is done today; if it differs, propose whether CLAUDE.md should describe both.
+
+On the findings:
+
+- Label runs check out `github.event.pull_request.head.sha`, so a run's commit is the branch's head commit, the one the
+  report names (P6).
+- Concurrency: full runs (dispatch without `files`, or the label) share one group per branch name (`head_ref` for a pull
+  request, `ref_name` for a dispatch), `cancel-in-progress: true`. A single-file check gets a group of its own per run
+  (with `run_id`) and neither cancels nor is cancelled.
+- The `files` input reaches the script only through an environment variable, validated against a pattern (paths under
+  `e2e/`, no other characters a path does not need); anything else fails the job before a server starts.
+- CI-02 becomes: CI runs exactly the local full run's list per part, including S1A-14, S1B-09, S1B-10 and S2A-14; the
+  `MEASURE=1`-only specs are skipped as locally. If any of those four asserts a duration, name it as a risk on the
+  runner.
+- Add a per-part list to the wrapper (`npm run e2e -- --list` prints the files of each part, with `--part <n>` one
+  part), with `tests/e2e-parts.test.ts` covering it.
+- The memory log's machine half on Linux: propose the smallest portable way (`os.freemem()` or `/proc/meminfo`), keep
+  Windows's as it is.
+- Remove the PRD's "minutes used up" and Windows's multiplier from P1 and P6 (the repository is public); the local run
+  stays the fallback when GitHub is down.
+
+Recorded in the PRD as its section 0, "Answers to step 1".
+
+**Answer 5, the local "three times on its own" today.** `npm run e2e -- <file>` three times one after another: each run
+is its own `playwright test`, whose `webServer` cleans `.next-e2e`, reseeds and starts a fresh dev server (nothing
+listens on 3200 between them, so `reuseExistingServer` reuses nothing), and stops it at the end (the acceptance docs'
+"3 of 3 on its own", e.g. `docs/prd/slice-15-acceptance.md`, S13-12 in 15b). The CI check is the same in what matters,
+a fresh server and a fresh seed per round; it differs in running the rounds side by side on three machines rather than
+one after another on one. **Proposal:** CLAUDE.md describes both, the CI check (`rounds` 3) as the rule and the local
+loop as the fallback, with one line on the difference.
+
+**On the four specs (CI-02):** none of S1A-14, S1B-09, S1B-10 and S2A-14 asserts a duration without `MEASURE`: every
+speed bar is inside `if (MEASURE)` (`S1A-14.spec.ts:218-224`, `S1B-09.spec.ts:116`, `S1B-10.spec.ts:149-156`,
+`S2A-14.spec.ts:100, 176`). What remains on the runner is their test timeouts (S1A-14: 240 s, S1B-10: 180 s).
+
+## Step 2 – the workflow and one full run

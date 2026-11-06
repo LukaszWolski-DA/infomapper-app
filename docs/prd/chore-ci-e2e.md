@@ -1,12 +1,47 @@
 # Chore – Full e2e runs in GitHub Actions
 
-Status: **proposed** (Łukasz, 6 November 2026). Branch `chore/ci-e2e`, from `main` at tag `slice-15c` (assumption A1).
+Status: **step 1 done and answered** (Łukasz, 6 November 2026); step 2 on the way. Branch `chore/ci-e2e`, from `main` at tag `slice-15c` (assumption A1).
 PRD file: `docs/prd/chore-ci-e2e.md`; step 1 writes `docs/prd/chore-ci-e2e-acceptance.md`. A chore: no change to the
 application's behaviour, the data model or the local data file. Step 1 checks this PRD against the code, the e2e setup
 and GitHub (CLAUDE.md, "How we work").
 
 This PRD was written from the docs at slice 15c's closing (CLAUDE.md, `docs/prd/chore-e2e-reliability-acceptance.md`,
 `docs/prd/slice-15-acceptance.md`), **without reading the code or `.github/`**.
+
+## 0. Answers to step 1 (Łukasz, 6 November 2026)
+
+Where this section and a later one disagree, this section wins. The findings behind it are in
+`docs/prd/chore-ci-e2e-acceptance.md`, "Step 1".
+
+- **The repository is public:** standard runners are free and unlimited. P1's Windows multiplier and P6's "minutes
+  used up" are void; the local `npm run e2e` stays the fallback when GitHub is down.
+- **Seven parts** (P2), cut from the laptop's folder times now, in step 2 already: `PART_STARTS = ["slice-02b",
+  "slice-04a", "slice-07a", "slice-08", "slice-10c", "slice-14a"]`. One list for CI and the local run. Step 3 corrects
+  the cuts from the runner's folder times only if a part is clearly longer than the rest.
+- **The dev server's output** goes to a file in both places, `test-results/part-<n>/server.log`, not to the console. In
+  CI it is part of the part's artifacts; CI-04's "no server prints the restart" is read from it.
+- **The label** `full-e2e` is created in step 2.
+- **`TZ: Europe/Warsaw`** in the workflow; one sentence in `docs/known-limitations.md`: the e2e run has not been run in
+  another time zone.
+- **The single-file check is not `repeat_each`** (replaces P4's inputs and CI-06): a `workflow_dispatch` input `rounds`
+  (default 3) starts that many jobs side by side, each with its own fresh dev server, each running `files` once.
+- **Label runs** check out `github.event.pull_request.head.sha`: a run's commit is the branch's head commit, the one a
+  report names (P6).
+- **Concurrency** (P3): full runs (a dispatch without `files`, or the label) share one group per branch name
+  (`head_ref` for a pull request, `ref_name` for a dispatch), `cancel-in-progress: true`. A single-file check has a group
+  of its own per run (with `run_id`) and neither cancels nor is cancelled.
+- **`files`** reaches the script only through an environment variable, checked against a pattern (paths under `e2e/`,
+  no character a path does not need); anything else fails the job before a server starts.
+- **CI-02 becomes:** CI runs exactly the local full run's list per part, S1A-14, S1B-09, S1B-10 and S2A-14 included;
+  the `MEASURE=1`-only specs are skipped as locally. If one of those four asserts a duration, it is named as a risk on
+  the runner.
+- **A per-part list in the wrapper:** `npm run e2e -- --list` prints the files of each part, with `--part <n>` one part;
+  `tests/e2e-parts.test.ts` covers it.
+- **The memory log's machine half on Linux:** the smallest portable way (`os.freemem()` or `/proc/meminfo`); Windows's
+  stays as it is.
+- **Step 2** as section 4 says, with the above: the workflow made to work with `workflow_dispatch` runs of a part or a
+  folder at a time (not full runs), then one full run on the branch, its failures checked with `rounds` 3. The branch is
+  pushed for the runs; no pull request yet.
 
 ## 1. Why this chore
 
