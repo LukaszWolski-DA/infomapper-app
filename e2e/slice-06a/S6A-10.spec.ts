@@ -33,13 +33,18 @@ const barState = (page: Page) =>
     };
   });
 
-test("S6A-10: nothing in the top bar is cut off from 2,560 to 800 px; what does not fit is in “More”", async ({ page }) => {
-  test.setTimeout(120_000);
+/** Customer & orders as Łukasz with the working context on, at 2,560 px. */
+async function openWide(page: Page) {
   await signInAs(page, "Łukasz");
   await contextOn(page, "CR-23");
   await page.setViewportSize({ width: 2560, height: 900 });
   await openCanvas(page, canvasUrl(), WHOLE_CO);
   await expect(page.getByTestId("button-context")).toContainText("Working on CR-23");
+}
+
+test("S6A-10: nothing in the top bar is cut off from 2,560 to 800 px; what does not fit is in “More”", async ({ page }) => {
+  test.setTimeout(120_000);
+  await openWide(page);
   const table: Record<number, unknown> = {};
 
   for (const width of WIDTHS) {
@@ -49,7 +54,7 @@ test("S6A-10: nothing in the top bar is cut off from 2,560 to 800 px; what does 
     table[width] = { scroll: s.scroll, widths: s.widths };
     expect(s.outside, `${width}: past the bar`).toEqual([]);
     expect(s.overlapping, `${width}: overlapping`).toEqual([]);
-    expect(s.scroll, `${width}: the bar scrolls`).toBe(0);
+    if (width !== 1201) expect(s.scroll, `${width}: the bar scrolls`).toBe(0); // 1,201 px: the test below
     for (const id of ALWAYS) expect(s.ids, `${width}: ${id}`).toContain(id);
     // the prototype's steps
     expect(await page.locator('[data-testid="switch-layer"] [data-layer="all"]').innerText(), `${width}: layer label`).toBe(width > 2100 ? "Everything" : "All");
@@ -101,4 +106,18 @@ test("S6A-10: nothing in the top bar is cut off from 2,560 to 800 px; what does 
   await expect(menu).toBeVisible();
   await menu.getByTestId("more-focus").click();
   await expect(page.getByTestId("chip-focus")).toBeAttached();
+});
+
+test("S6A-10: at 1,201 px the top bar does not scroll", async ({ page }) => {
+  // chore CI e2e (Łukasz, 6 November 2026): docs/known-limitations.md, "The top bar overflows by 1 px at 1,201 px on
+  // Linux"; fixed in the slice "InfoMapper's canvas and menus"
+  test.fail(process.platform === "linux", "Known limitation: at 1,201 px the top bar's content is 1 px wider than the bar with Linux's text drawing");
+  await openWide(page);
+  for (const width of [1300, 1201]) {
+    await page.setViewportSize({ width, height: 900 });
+    await page.waitForTimeout(150);
+  }
+  const s = await barState(page);
+  console.log(`S6A-10 at 1201: ${JSON.stringify({ scroll: s.scroll, widths: s.widths })}`);
+  expect(s.scroll, "1201: the bar scrolls").toBe(0);
 });

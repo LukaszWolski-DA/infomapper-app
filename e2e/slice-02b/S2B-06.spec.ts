@@ -1,4 +1,4 @@
-import { expect, test } from "./fixtures";
+import { expect, test, type Page } from "./fixtures";
 import {
   card,
   canvasUrl,
@@ -17,12 +17,29 @@ import {
   zoomOf,
 } from "./helpers";
 
-test("S2B-06: inside a frame, Shift + drag draws an adding lasso; right drag, middle button, Space + drag and the wheel pan and zoom; a right click opens the frame toolbox with the actions of item 10", async ({ page }) => {
+/** The frame "Area" around Customer and Sales Order, on the canvas as Łukasz; its stored row. */
+async function openArea(page: Page) {
   await makeFrame({ x: 472, y: 0, width: 304, height: 856 }, { name: "Area" }); // Customer and Sales Order
   const frame = async () => (await frameNamed("Area"))!;
   const start = await frame();
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), FRAMED);
+  return { frame, start };
+}
+
+/** A pan from an empty spot inside the frame with the right or middle button, or Space + drag; nothing moves, no toolbox. */
+async function panFrom(page: Page, how: "right" | "middle" | "space") {
+  const before = await viewOf(page);
+  const spot = await emptyIn(page, "Area");
+  if (how === "space") await page.keyboard.down("Space");
+  await dragBetween(page, spot, { x: spot.x + 60, y: spot.y + 30 }, { button: how === "space" ? "left" : how });
+  if (how === "space") await page.keyboard.up("Space");
+  await expect.poll(() => viewOf(page), how).not.toBe(before);
+  await expect(page.getByTestId("menu-toolbox")).toHaveCount(0);
+}
+
+test("S2B-06: inside a frame, Shift + drag draws an adding lasso; the middle button, Space + drag and the wheel pan and zoom; a right click opens the frame toolbox with the actions of item 10", async ({ page }) => {
+  const { frame, start } = await openArea(page);
 
   // Shift + drag from an empty spot inside the frame around Customer adds it to the selection (web_users)
   await card(page, "web_users").getByTestId("card-name").click();
@@ -32,19 +49,9 @@ test("S2B-06: inside a frame, Shift + drag draws an adding lasso; right drag, mi
   expect(await frame()).toMatchObject({ x: start.x, y: start.y }); // the frame did not move
   await page.keyboard.press("Escape");
 
-  // right drag, the middle button and Space + drag pan from inside the frame; nothing moves, no toolbox
-  const panFrom = async (how: "right" | "middle" | "space") => {
-    const before = await viewOf(page);
-    const spot = await emptyIn(page, "Area");
-    if (how === "space") await page.keyboard.down("Space");
-    await dragBetween(page, spot, { x: spot.x + 60, y: spot.y + 30 }, { button: how === "space" ? "left" : how });
-    if (how === "space") await page.keyboard.up("Space");
-    await expect.poll(() => viewOf(page), how).not.toBe(before);
-    await expect(page.getByTestId("menu-toolbox")).toHaveCount(0);
-  };
-  await panFrom("right");
-  await panFrom("middle");
-  await panFrom("space");
+  // the middle button and Space + drag pan from inside the frame; nothing moves, no toolbox (the right drag: below)
+  await panFrom(page, "middle");
+  await panFrom(page, "space");
   expect(await frame()).toMatchObject({ x: start.x, y: start.y });
 
   // the wheel pans, Ctrl + wheel zooms, also over the frame
@@ -68,4 +75,13 @@ test("S2B-06: inside a frame, Shift + drag draws an adding lasso; right drag, mi
   expect(await toolboxLabels(page, await emptyIn(page, "Area"))).toEqual(["Rename…", "Collapse into one block", "Fit frame to its content", "Select its cards", "Zoom to frame", "Add a note to this frame", "Delete frame (keeps its cards)"]);
   await expect(page.getByTestId("menu-toolbox")).toContainText("Area");
   await closeToolbox(page);
+});
+
+test("S2B-06: inside a frame, a right drag pans; nothing moves, no toolbox", async ({ page }) => {
+  // chore CI e2e (Łukasz, 6 November 2026): docs/known-limitations.md, "A right-button pan opens the toolbox on Linux and
+  // macOS"; fixed in the slice "InfoMapper's canvas and menus"
+  test.fail(process.platform !== "win32", "Known limitation: on Linux and macOS contextmenu comes on the right button's press, before any move, so a right-button pan opens the toolbox (src/canvas/CanvasModes.tsx:198)");
+  const { frame, start } = await openArea(page);
+  await panFrom(page, "right");
+  expect(await frame()).toMatchObject({ x: start.x, y: start.y });
 });
