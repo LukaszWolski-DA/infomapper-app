@@ -6,7 +6,9 @@ Status: **step 1 done and answered** (Łukasz, 4 November 2026); updated to the 
 (A1 holds). **15b** (role-playing in it, RQ-3): step 1 done on 4 November 2026 on branch
 `slice/15b-grain-measures-roles` from tag `slice-15a` (acceptance doc, "15b step 1"). **15c** (dimensional mappings):
 step 1 done on 5 November 2026 on branch `slice/15c-dimensional-mappings` from tag `slice-15b` (acceptance doc, "15c step
-1"; answered on 5 November 2026, "Łukasz's answers to 15c step 1").
+1"; answered on 5 November 2026, "Łukasz's answers to 15c step 1"). **15a, 15b and 15c are merged** (tags `slice-15a`,
+`slice-15b`, `slice-15c`). **15d** starts after the chore "Full e2e runs in GitHub Actions" (`docs/prd/chore-ci-e2e.md`;
+Łukasz, 6 November 2026), from `main` at that chore's merge.
 
 ## 0. Answers to step 1 (Łukasz, 4 November 2026)
 
@@ -74,6 +76,22 @@ named. Findings (F), extension points (E), questions (O, Q) and differences (P) 
   - **D-68** covers grain, SCD, measures, hints and role-playing, and describes role names as an InfoMapper feature of
     every relationship that InfoCube reads. At 15b's closing AD-34 gets one sentence: "InfoCube also reads relationship
     roles, which InfoMapper keeps for every relationship (D-68)." Both texts are quoted to Łukasz then.
+- **Before 15d (Łukasz, 6 November 2026, from his testing of 15c):**
+  - **The concept of a fact or a dimension is what it belongs to, not where its data comes from.** A fact's concept is
+    its business process or subject area (Fact Sales in Sales); a dimension's is its subject (Dim Customer in Customer;
+    Dim Date, for example, in a shared concept). A fact fed from several concepts keeps one concept: `entity.concept_id`
+    stays required, and the concept still gives the colour, the Cube tab's groups and the concept frames. **Where the
+    data comes from is derived:** 15d adds **"Fed from concepts"** to a fact's and a dimension's panel, the concepts of
+    the logical entities whose attributes feed its attributes through dimensional mappings (any status, as the "fed"
+    coverage counts, P17), each with how many of its attributes it feeds. No new data. Rejected: an optional concept for
+    the dimensional level (a migration, and a decision for colour, groups, frames and thumbnails without a concept); a
+    fact's business process as a field of its own (it stays with the fact type in the backlog). The definition goes into
+    15d's D-decision.
+  - **Order:** the chore "Full e2e runs in GitHub Actions" comes before 15d; 15d's full runs are then that workflow's
+    runs (the chore changes CLAUDE.md's "Testing" accordingly).
+  - **Three InfoMapper items from the same testing are not in slice 15:** "Add attribute" in a card header's menu, the
+    canvas tabs' order from a tab's menu, and relationship lines shown or hidden by kind. They are a slice of their own
+    after slice 15 (`docs/ideas.md`, "InfoMapper's canvas and menus: a slice after slice 15").
 - **On the risks.** 15a starts with the table registry and a guard test: every table in the schema is known to undo and
   to the local adapter, or the build fails. Łukasz's KB file is backed up before the branch's first dev or e2e run; what
   `readDb` on `main` does with a newer format is reported (and listed if it does not refuse).
@@ -226,7 +244,7 @@ The steps that build them list every new user-facing text for approval.
 12. **The card (B-3):** the role with its cube mark where the stereotype stands; a fact's thicker left edge; Σ, Σ~, ∅Σ
     on measure rows; the coverage bar counting rows fed from the logical model.
 13. **Panels (B-4)** for dimensional entities, their attributes, logical attributes that feed them ("Feeds facts and
-    dimensions"), and dimensional mappings.
+    dimensions"), and dimensional mappings; a fact's and a dimension's "Fed from concepts" (15d, section 0).
 14. **Hints in a fact's panel (B-5 with R-4, 15b)**, read only: B-5's grain and measure hints, and R-4's key hints in
     place of B-5's key hints. **No key-name match** (RQ-3): a key is linked explicitly (R-1, R-3).
 14a. **Role-playing (15b, role-playing spec):** the role fields and the sentences in every relationship's panel and the
@@ -316,8 +334,11 @@ Claude Code session may start at a step's boundary, never inside a step; it star
      cascades and undo; the "fed" coverage on cards and in the Overview; the star's mappings; the dense canvas
      measurement. Criteria S15-05, 09, 11, 12, 13, 14 (the mappings' rows), 18, and the proposed S15-20 to S15-23; D-69
      and AD-36.
-   - **15d – Requirements and the bus matrix:** X-5 (scope, coverage, the lens), B-8, REQ-210 in the star;
-     criteria S15-15, 16, 19.
+   - **15d – Requirements and the bus matrix, and slice 15's closing:** X-5 (scope, coverage, the lens), B-8 with
+     RP-10's dots, REQ-210 in the star, "Fed from concepts" (section 0, "Before 15d"), the requirement index's bench
+     with feeds; Q-8 decided in 15d's step 1 (proposal: the spec's default, new facts and dimensions take the last
+     concept used; the "+" per concept stays in section 9); criteria S15-15, 16, 19 and RP-10; 15d's D-decision; the
+     closing of slice 15 as a whole. Its full runs are GitHub Actions runs (section 0).
    - **Tests in every sub-slice** (CLAUDE.md, Łukasz, 4 November 2026; one regime, no small or large slices): after each
      step the sub-slice's specs, the earlier specs of what the step touched, and CI (lint, typecheck, unit tests); a
      failing test run three times on its own. A step that touches shared infrastructure (undo and change groups, the
@@ -567,6 +588,11 @@ performance), each with the files and functions behind it and a proposal.
   attribute, drawn in both directions with lit targets and refusals (O4), approved by reviewers with four-eyes (O9),
   sent back to review by D-51's first rule (O12); the "fed" coverage. Its final text is quoted for approval at 15c's
   closing.
+- **D-70 (15d; the number to confirm in 15d's step 1)** Requirements through dimensional mappings (X-5: links to
+  dimensional entities and attributes, the scope to the logical attributes and their sources, coverage through
+  approved feeds, the lens), the bus matrix (B-8) with a dot per relationship (RP-10), and the concept of a fact or a
+  dimension as what it belongs to, with "Fed from concepts" derived (section 0). Its final text is quoted for approval
+  at 15d's closing.
 - **AD-36 (Q-6)** Dimensional mappings are InfoCube's own tables (`cube_mapping`, `cube_mapping_input`), pointing to
   InfoMapper's attributes; InfoMapper's `mapping` stays source column(s) → attribute (M1, accepted with step 1).
 
