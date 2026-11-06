@@ -78,9 +78,8 @@ test("S2B-06: inside a frame, Shift + drag draws an adding lasso; the middle but
 });
 
 test("S2B-06: inside a frame, a right drag pans; nothing moves, no toolbox", async ({ page }) => {
-  // chore CI e2e (Łukasz, 6 November 2026): docs/known-limitations.md, "A right-button pan opens the toolbox on Linux and
-  // macOS"; fixed in the slice "InfoMapper's canvas and menus"
-  test.fail(process.platform !== "win32", "Known limitation: on Linux and macOS contextmenu comes on the right button's press, before any move, so a right-button pan opens the toolbox (src/canvas/CanvasModes.tsx:198)");
+  // chore CI e2e split it out as an expected failure off Windows; slice 16 (item 4): the toolbox waits for the right
+  // button's release where contextmenu comes on the press, so it passes on every platform
   const { frame, start } = await openArea(page);
   await panFrom(page, "right");
   expect(await frame()).toMatchObject({ x: start.x, y: start.y });

@@ -54,7 +54,7 @@ test("S6A-10: nothing in the top bar is cut off from 2,560 to 800 px; what does 
     table[width] = { scroll: s.scroll, widths: s.widths };
     expect(s.outside, `${width}: past the bar`).toEqual([]);
     expect(s.overlapping, `${width}: overlapping`).toEqual([]);
-    if (width !== 1201) expect(s.scroll, `${width}: the bar scrolls`).toBe(0); // 1,201 px: the test below
+    expect(s.scroll, `${width}: the bar scrolls`).toBe(0);
     for (const id of ALWAYS) expect(s.ids, `${width}: ${id}`).toContain(id);
     // the prototype's steps
     expect(await page.locator('[data-testid="switch-layer"] [data-layer="all"]').innerText(), `${width}: layer label`).toBe(width > 2100 ? "Everything" : "All");
@@ -109,9 +109,8 @@ test("S6A-10: nothing in the top bar is cut off from 2,560 to 800 px; what does 
 });
 
 test("S6A-10: at 1,201 px the top bar does not scroll", async ({ page }) => {
-  // chore CI e2e (Łukasz, 6 November 2026): docs/known-limitations.md, "The top bar overflows by 1 px at 1,201 px on
-  // Linux"; fixed in the slice "InfoMapper's canvas and menus"
-  test.fail(process.platform === "linux", "Known limitation: at 1,201 px the top bar's content is 1 px wider than the bar with Linux's text drawing");
+  // chore CI e2e split it out as an expected failure on Linux; slice 16 (item 5): the working context's label gives way,
+  // so a font's extra pixels never make the bar scroll
   await openWide(page);
   for (const width of [1300, 1201]) {
     await page.setViewportSize({ width, height: 900 });

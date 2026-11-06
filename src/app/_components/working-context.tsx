@@ -110,7 +110,7 @@ export function WorkingContextProvider({
 }
 
 const btn =
-  "inline-flex h-[30px] flex-none items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical aria-pressed:bg-im-logical-soft aria-pressed:text-im-ink";
+  "inline-flex h-[30px] min-w-0 max-w-full items-center gap-1.5 rounded-md px-2 text-im-ink-2 hover:bg-im-hover hover:text-im-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-im-logical aria-pressed:bg-im-logical-soft aria-pressed:text-im-ink";
 
 /** The top bar's switch left of Undo, and its menu (PRD item 1). */
 export function WorkingContextButton() {
@@ -156,21 +156,23 @@ export function WorkingContextButton() {
     } else if (e.key === "Escape") close();
   };
 
+  // slice 16, item 5: the bar's flexible item once the switchers are at their minimum; the label shrinks, so a font's
+  // extra pixels never make the bar scroll
   return (
-    <div ref={box} className="relative flex-none">
+    <div ref={box} className="relative flex min-w-0">
       <button
         type="button"
         className={btn}
         aria-pressed={!!active}
         aria-expanded={!!open}
-        title="Working context: while active, everything you create or change in the model gets this label"
+        title={active ? `Working on ${active.name}. Everything you create or change in the model gets this label.` : "Working context: while active, everything you create or change in the model gets this label"}
         data-testid="button-context"
         onClick={toggle}
       >
         {active ? (
           <>
             <span className="size-2 flex-none rounded-full bg-im-logical" aria-hidden />
-            <span className="max-w-[180px] truncate max-[1301px]:max-w-[90px] max-[1201px]:max-w-[56px] max-[1001px]:max-w-[40px]">Working on {active.name}</span>
+            <span className="min-w-10 max-w-[180px] truncate max-[1301px]:max-w-[90px] max-[1201px]:max-w-[56px] max-[1001px]:max-w-[40px]">Working on {active.name}</span>
           </>
         ) : (
           <>

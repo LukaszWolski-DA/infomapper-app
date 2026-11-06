@@ -45,9 +45,10 @@ export function TopBar({ shell, tools, panelToggles = false }: { shell: ShellDat
       <PathSep />
       <ProjectSwitcher shell={shell} />
       <div className="flex-1" />
-      {/* the tools never shrink: the switchers' names shorten first, and the tools that do not fit move into “More”
-          at fixed widths (slice 6a), so nothing is cut off from 800 to 2,560 px */}
-      {tools && <div data-testid="bar-tools" className="flex flex-none items-center gap-2.5 max-[2101px]:gap-2 max-[1001px]:gap-1">{tools}</div>}
+      {/* the switchers' names shorten first, and the tools that do not fit move into “More” at fixed widths (slice 6a),
+          so nothing is cut off from 800 to 2,560 px; what is still missing comes out of the working context's label, the
+          only tool that shrinks (slice 16, item 5): the tools' tiny shrink weight lets the switchers reach their minimum first */}
+      {tools && <div data-testid="bar-tools" className="flex min-w-0 shrink-[0.001] items-center gap-2.5 max-[2101px]:gap-2 max-[1001px]:gap-1">{tools}</div>}
       {panelToggles && <PanelToggle side="right" />}
       <UserIndicator shell={shell} />
     </header>

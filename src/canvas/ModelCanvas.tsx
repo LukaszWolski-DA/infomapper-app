@@ -446,28 +446,45 @@ export function ModelCanvas({
     [cardsNow, frameRectsNow, ui.overviewOpen, rf],
   );
 
+  /**
+   * Stores the remembered view with the canvas's left edge on the screen (slice 6a, D-54): opened beside another left
+   * panel, the view is moved by the difference, so the model stands where it stood. Slice 16 (item 6, D-71): the view and
+   * the left edge are read at the same moment (`view` when the app has just set it, else the view shown now), and
+   * nothing is stored once the canvas is gone (a page being left still runs React Flow's timer).
+   */
+  const storeView = useCallback(
+    (view?: Viewport, left?: number) => {
+      const root = rootRef.current;
+      if (!root?.isConnected) return;
+      const [x, y, zoom] = view ? [view.x, view.y, view.zoom] : storeApi.getState().transform;
+      writePreference(viewKey(canvasId), JSON.stringify({ x, y, zoom, left: left ?? Math.round(root.getBoundingClientRect().left) }));
+    },
+    [canvasId, storeApi],
+  );
+
   const fit = useCallback(() => {
     const { width: w, height: h } = storeApi.getState();
-    void rf.setViewport(fitView(w, h), { duration: 250 });
-  }, [rf, storeApi, fitView]);
+    const view = fitView(w, h);
+    void rf.setViewport(view, { duration: 250 });
+    storeView(view);
+  }, [rf, storeApi, fitView, storeView]);
   /** No duration: React Flow sets the transform at once, so it reaches the screen with the panel's change (slice 5a). */
   const shiftView = useCallback(
     (dx: number) => {
       const [x, y, zoom] = storeApi.getState().transform;
-      if (dx) void rf.setViewport({ x: x + dx, y, zoom });
+      if (!dx) return;
+      void rf.setViewport({ x: x + dx, y, zoom });
+      // called in the panel's event, before its new width reaches the layout: the canvas's left edge moves by −dx
+      // (hidden: 264 → 0 with dx 264; resized: from the old width to the new one)
+      const left = rootRef.current ? Math.round(rootRef.current.getBoundingClientRect().left) - dx : undefined;
+      storeView({ x: x + dx, y, zoom }, left);
     },
-    [rf, storeApi],
+    [rf, storeApi, storeView],
   );
 
-  // saved with the canvas's left edge on the screen (slice 6a, D-54): opened beside another left panel, the view is
-  // moved by the difference, so the model stands where it stood
-  const onMoveEnd = useCallback(
-    (_: unknown, v: Viewport) => {
-      const left = rootRef.current?.getBoundingClientRect().left;
-      writePreference(viewKey(canvasId), JSON.stringify(left === undefined ? v : { ...v, left: Math.round(left) }));
-    },
-    [canvasId],
-  );
+  // React Flow calls it 150 ms after any view change (`panOnScroll`), the app's own ones too, with the view of the
+  // change's end: the view shown now is stored instead, with the left edge of now (slice 16, item 6)
+  const onMoveEnd = useCallback(() => storeView(), [storeView]);
 
   // ---- the grid (D-12): one CSS background behind the pane, on its own layer. Panning moves that layer by less than
   // one grid step (no repaint); zooming changes the step. Set without a render. ----
@@ -1726,9 +1743,11 @@ export function ModelCanvas({
     const left = Math.round(rootRef.current?.getBoundingClientRect().left ?? 0);
     const view = saved ? { x: saved.x + (saved.left === undefined ? 0 : saved.left - left), y: saved.y, zoom: saved.zoom } : fitView(width, height);
     void rf.setViewport(view);
+    // stored at once with this left edge (slice 16, item 6): no window change in the next 150 ms can pair it with another
+    storeView(view);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the view can only be set once the pane has a size
     setReady(true);
-  }, [ready, sized, storeApi, canvasId, rf, fitView]);
+  }, [ready, sized, storeApi, canvasId, rf, fitView, storeView]);
 
   // Cards, frames and notes that left the canvas (removed, deleted, undone, hidden) leave the selection too, and so do
   // the cards of a frame that was collapsed (slice 2c, prototype pruneMulti); checked when the set of cards, frames or
