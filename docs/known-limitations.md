@@ -756,17 +756,23 @@ ones above, and three new ones. Recorded here only; nothing changed. After the `
     releases old enough as well: `rolldown` 1.2.15 (21 October), `@oxc-project/types` 0.155.0 (19 October), `postcss`
     8.5.31 (18 October). (`npm update --before` failed on npm 10.9.3 with an internal error around the Tiptap
     override, so each package was installed at its version and removed again from `package.json`.)
+  - **`zod` 4.6.5 → 4.6.7** (in the same pull request, Łukasz's call): after the `next` update `npm audit --omit=dev`
+    reported one finding, new since 22 October: `zod` < 4.6.6
+    ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), high, memory exhaustion while validating
+    oversized constrained collections), a direct production dependency (Zod validates every server action's input).
+    4.6.7 (12 October, 26 days) is now exact in `package.json` (it was `^4.6.5`); the lock file changes `zod` only, and
+    the other packages' `zod` 4.x copies dedupe to it. 4.6.7 differs from 4.6.6 only in its version number
+    (`npm diff`); 4.6.6 has the advisory's fix (array, set and map size bounds are checked before the elements are
+    parsed: an oversized array is refused on its size alone; our `.max()` and `.min()` arrays in the canvas, import,
+    mapping and InfoCube commands refuse the same input as before) and a type fix for `z.record`, which the app does not
+    use. No code changed.
   - Checks: lint, typecheck, unit tests (143 files, 1,792 tests), `npm run build`, and one full e2e run (see the pull
     request).
-  - **`npm audit --omit=dev` after it** reports one finding, new since 22 October and not in `next`: `zod` < 4.6.6
-    ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), high, memory exhaustion while validating
-    oversized constrained collections), a direct production dependency (4.6.5; Zod validates every server action's
-    input). Fixed in 4.6.6 (11 October) and 4.6.7 (12 October), both old enough; not changed here, as it is outside
-    this pull request (Łukasz's call).
-  - The full `npm audit` reports 19 findings (1 low, 12 moderate, 6 high), all development-only apart from `zod`, and
-    none of them `next`, `vite` or `ip-address`: `body-parser`, `qs`, `undici`, `systeminformation`, `fast-uri`,
-    `minimatch` (through `typescript-eslint` and `ts-morph`), `deepmerge` and `zod` again (through `shadcn`). The
-    `braces` and `handlebars` findings above are no longer reported. Not changed here.
+  - **`npm audit --omit=dev` after it: `found 0 vulnerabilities`.**
+  - The full `npm audit` reports 19 findings (1 low, 12 moderate, 6 high), all development-only, none of them `next`,
+    `vite` or `ip-address`: `body-parser`, `qs`, `undici`, `systeminformation`, `fast-uri`, `minimatch` (through
+    `typescript-eslint` and `ts-morph`), `deepmerge`, and `zod` through `shadcn`'s own `zod` 3.25.76 (the shadcn CLI
+    only). The `braces` and `handlebars` findings above are no longer reported. Not changed here.
 
 ### `npm` override: `fast-equals` 5.4.3 under `@tiptap/react` (slice 4a, step 2)
 
