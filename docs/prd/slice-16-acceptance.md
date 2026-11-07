@@ -618,6 +618,10 @@ move the stored order would not make).
     hover and the miniature follow;
   - **from S16-11:** the miniature now takes only the mappings and relationships it draws (`Overview.tsx`,
     `795479d`); before, hiding the source lines gave it a new lines object and it redrew once.
+- **Item 6, from the closing checks** (`ModelCanvas.tsx`, `43c8628`): while the fit animates (250 ms), React Flow's
+  late call and the leave flush store nothing (`animatingUntil`); the fit's target is stored at its start. Before, a
+  fit clicked within 150 ms of hiding the left panel got the panel's late call during its animation, which stored the
+  view half-way over the target until the animation's own late call stored the end (S16-09 in check 42336170686).
 - **Item 7, no browser menu:** `keepsBrowserMenu` (`src/ui/browser-menu.ts`: text fields, selects,
   `contenteditable`, links, selected text) is the one rule for `NoBrowserMenu` (the root layout's document listener,
   `src/ui/no-browser-menu.tsx`), the canvas's `onContextMenu` and the toolbox. Text fields inside the canvas keep the
@@ -649,13 +653,14 @@ name shows in the undo toast, "Undone: Move canvas", not in the button's title.
 
 ### Earlier tests changed, and why
 
-Step 3 changed no earlier test. Over the whole slice:
+Over the whole slice:
 
 | Spec | Change | Why |
 | --- | --- | --- |
 | `e2e/slice-02b/S2B-06.spec.ts` | the right-drag test loses `test.fail(process.platform !== "win32", …)` | item 4 (step 2): it passes on every platform |
 | `e2e/slice-06a/S6A-10.spec.ts` | the 1,201 px test loses `test.fail(process.platform === "linux", …)`; the loop checks the scroll at 1,201 px too | item 5 (step 2) |
 | `e2e/slice-07c/S7C-02.spec.ts` | `whatShows` waits until the view has settled before it reads; no assertion changed | the diagnosis above: a race with the arrival animation |
+| `e2e/slice-11/S11-06.spec.ts` | each of its three tests waits until its names switches are stored before it ends (`canvasRow`); no assertion changed | full run 42333280121: the first test ended while its last switch was on its way, the save landed after the next test's reseed, so that test opened with entity aliases on and its click turned them off (the trace's two requests, `mode: "name"`, and the check box snapshots). The same symptom as step 2's run 42281346684 |
 
 `playwright.config.ts` ignores `S16-11.spec.ts` in normal runs, as the other measurement-build specs.
 
@@ -721,4 +726,31 @@ Step 3 changed no earlier test. Over the whole slice:
   S6B-09, S7B-14, S10A-07, S10A-09, S10A-11, S10B-04, S10C-01, S10C-02, S10C-08, slice 12a, slice 12b, S14B-01,
   S14B-03, S14B-07, S15-05 and `e2e/slice-16`: **107 passed, 1 skipped** (S16-11-commits, on demand), 19.8 min.
 
-- **The full run** is on this commit; its link and results are in the pull request.
+- **The closing runs:**
+
+  | Run | Commit | Result | What it found |
+  | --- | --- | --- | --- |
+  | [42331808967](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42331808967) | `2faf8d3` | 628 passed, 1 failed, 4 skipped | S16-05 read the Sales star's stored look once, before the save was written; it polls now (`8f24884`) |
+  | [42333280121](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42333280121) | `8f24884` | 628 passed, 1 failed, 4 skipped | S11-06: a save of the previous test landed after the reseed (above); `8a78f75` |
+  | [42334919006](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42334919006) | `8a78f75` | 628 passed, 1 failed, 4 skipped | S16-06 opened the tab menu 97 ms after Escape, while it closed; S16-03, S16-05 and S16-06 wait for it to go (`52ef13a`). The check of every slice 16 spec on `52ef13a` ([42336170686](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42336170686)) then found S16-09's half-way view in round 1: the app fix above, `43c8628` |
+  | **[42337272022](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42337272022)** | **`43c8628`** | **629 passed, 0 failed, 0 flaky, 4 skipped, 0 expected failures** | |
+
+- **Single-file checks:** S16-05 and S16-06 on `8f24884` ([42333054552](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42333054552)),
+  S11-06 and S16-05 on `8a78f75` ([42334730513](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42334730513)),
+  every slice 16 spec with S11-06, S5A-07, S6A-11 and S9-11 on `43c8628` ([42336895256](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42336895256)):
+  all rounds passed.
+- **The final full run, `43c8628`:** wall-clock 12 min 7 s (04:10:37 to 04:22:44 UTC).
+
+  | Part | Time | Heap peak |
+  | --- | --- | --- |
+  | 1 | 8 min 44 s | 1,303 MB |
+  | 2 | 9 min 22 s | 1,053 MB |
+  | 3 | 7 min 51 s | 1,283 MB |
+  | 4 | 6 min 53 s | 1,236 MB |
+  | 5 | 8 min 9 s | 1,129 MB |
+  | 6 | 4 min 41 s | 1,315 MB |
+  | 7 | 9 min 46 s | 1,111 MB |
+
+  No part came near the 6,431 MB restart threshold, and none printed a restart. After it only this report changed.
+- Locally on `43c8628`: S16-09 with the view specs (S5A-03, S5A-07, S6A-06, S6A-11, S6B-04, S6B-05, S9-11, S9-13,
+  S2A-08), 18 of 18; `npm run lint`, `npm run typecheck`, `npm test` (1,792): pass.
