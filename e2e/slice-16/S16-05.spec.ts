@@ -76,5 +76,5 @@ starTest("S16-05: dimensional relationships go too (the Sales star)", async ({ p
   await switchKind(page, "Sales star", "menu-item-lines-entities");
   await expect.poll(() => count(page, "line-relationship")).toBe(0);
   await expect(chip(page, "entity-relationships")).toBeVisible();
-  expect((await lookOf(STAR)).hideEntityRelationships).toBe(true);
+  await expect.poll(async () => (await lookOf(STAR)).hideEntityRelationships).toBe(true);
 });
