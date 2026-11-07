@@ -6,13 +6,22 @@
 // not saved and lasts until they leave the canvas. Saves go on the save chain keyed on the canvas's row (`rowSaves`,
 // slice 14b, O1), with its rename, its delete and the names switch, so none is refused because of another.
 // The frame around the tabs and the canvas carries the background (prototype #center[data-bg]).
+// Slice 16 (item 3, D-71): the relationship lines hidden by kind are look keys too (`canvas-look.ts`); reviewers and
+// readers have no switches, and a chip's × shows a kind in their browser only, as the layer.
 
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useToast } from "@/ui/components/toast";
 import { rowSaves } from "@/ui/row-saves";
 import { DEFAULT_CANVAS_LOOK, type CanvasLook } from "@/domain/types";
+import { applyLookPatch, HIDDEN_RELATIONSHIP_KEYS, type CanvasLookPatch } from "@/domain/model/canvas-look";
 
-export type LookPatch = Partial<CanvasLook>;
+export type LookPatch = CanvasLookPatch;
+
+/** What a reviewer or a reader changes in their browser only: the layer and the hidden kinds (not saved). */
+const localPart = (l: CanvasLook): CanvasLookPatch => ({
+  layer: l.layer,
+  ...Object.fromEntries(HIDDEN_RELATIONSHIP_KEYS.map((k) => [k, l[k] === true])),
+});
 export type SaveLookResult = { ok: true; value: { version: number } } | { ok: false; code?: string; message: string };
 
 export interface CanvasLookApi {
@@ -20,7 +29,7 @@ export interface CanvasLookApi {
   look: CanvasLook;
   /** May change and save the look (owner, admin, modeler; not archived). */
   editable: boolean;
-  /** Editors: shown at once and saved. Others: only the layer mode, in this browser. */
+  /** Editors: shown at once and saved. Others: only the layer mode and the hidden kinds, in this browser. */
   setLook: (patch: LookPatch) => void;
 }
 
@@ -66,19 +75,20 @@ export function CanvasLookProvider({
   });
 
   // A fresh page brings the saved look; a change still on its way keeps what the user picked.
-  const { background, grid, layer } = server;
+  const { background, grid, layer, hideEntityRelationships, hideSourceRelationships } = server;
   useEffect(() => {
     if (pending.current) return;
-    setLookState((l) => ({ background, grid, layer: editable ? layer : l.layer }));
-  }, [background, grid, layer, editable]);
+    const stored = applyLookPatch({ background, grid, layer }, { hideEntityRelationships: !!hideEntityRelationships, hideSourceRelationships: !!hideSourceRelationships });
+    setLookState((l) => (editable ? stored : applyLookPatch(stored, localPart(l))));
+  }, [background, grid, layer, hideEntityRelationships, hideSourceRelationships, editable]);
 
   const setLook = useCallback(
     (patch: LookPatch) => {
       if (!editable) {
-        if (patch.layer) setLookState((l) => ({ ...l, layer: patch.layer! }));
+        setLookState((l) => applyLookPatch(l, { layer: patch.layer, hideEntityRelationships: patch.hideEntityRelationships, hideSourceRelationships: patch.hideSourceRelationships }));
         return;
       }
-      setLookState({ ...look, ...patch });
+      setLookState(applyLookPatch(look, patch));
       pending.current += 1;
       void rowSaves
         .save(canvasId, page.current.version, async (expectedVersion): Promise<SaveLookResult> => {
@@ -93,8 +103,8 @@ export function CanvasLookProvider({
           if (result?.ok) return;
           // refused, or cut behind a refusal (its toast says why): the newest stored look shows (O3); a later page
           // brings a newer one through the effect above
-          const stored = page.current.look;
-          setLookState((l) => ({ background: stored.background, grid: stored.grid, layer: editable ? stored.layer : l.layer }));
+          const stored = applyLookPatch(page.current.look, {});
+          setLookState((l) => (editable ? stored : applyLookPatch(stored, localPart(l))));
           if (result) toast(result.message, "refusal");
         });
     },

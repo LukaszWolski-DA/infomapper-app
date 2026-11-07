@@ -1,11 +1,14 @@
 import type { Page } from "@playwright/test";
 import { expect, test } from "./fixtures";
-import { attributeBox, canvasUrl, entityBox, headerOf, idsOf, liveUrl, loadModel, openCanvas, openLiveFor, setAttributeAlias, setCard, setEntityAlias, setNamesAs, signInAs, labelItem } from "./helpers";
+import { attributeBox, canvasRow, canvasUrl, entityBox, headerOf, idsOf, liveUrl, loadModel, openCanvas, openLiveFor, setAttributeAlias, setCard, setEntityAlias, setNamesAs, signInAs, labelItem } from "./helpers";
 
 // Other cards (item 10): a collapsed card shows its entity alias by the entity mode; a live canvas's context card
 // follows the same rules; table and requirement cards are unchanged under both modes.
 
 const texts = (page: Page, testId: string) => page.getByTestId(testId).getByTestId("card-name").allTextContents();
+
+/** Both switches stored before the test ends: a save still on its way would land after the next test's reseed. */
+const bothStored = () => expect.poll(async () => { const c = await canvasRow(); return [c.entity_names, c.attribute_names]; }).toEqual(["alias", "alias"]);
 
 test("S11-06: a collapsed card shows the entity alias by the entity mode", async ({ page }) => {
   await setEntityAlias("Customer", "Klient");
@@ -18,6 +21,7 @@ test("S11-06: a collapsed card shows the entity alias by the entity mode", async
   await expect(headerOf(page, customer)).toHaveText("Klient");
   await attributeBox(page).click();
   await expect(headerOf(page, customer)).toHaveText("Klient");
+  await bothStored();
 });
 
 test("S11-06: table and requirement cards are unchanged under both modes", async ({ page }) => {
@@ -33,6 +37,7 @@ test("S11-06: table and requirement cards are unchanged under both modes", async
   await expect.poll(() => texts(page, "card-entity")).toEqual(expect.arrayContaining(["Customer alias"]));
   expect(await texts(page, "card-source")).toEqual(tables);
   expect(await texts(page, "card-requirement")).toEqual(requirements);
+  await bothStored();
 });
 
 test("S11-06: a live canvas's context card follows the same rules", async ({ page }) => {
@@ -52,4 +57,5 @@ test("S11-06: a live canvas's context card follows the same rules", async ({ pag
   await expect(headerOf(page, itemId)).toHaveText("Pozycja");
   await attributeBox(page).click();
   await expect(page.locator(`[data-card="${itemId}"] [data-row="${attributeId}"] .nm`)).toHaveText("Atrybut");
+  await expect.poll(async () => (await canvasRow(live)).attribute_names).toBe("alias");
 });

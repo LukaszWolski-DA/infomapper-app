@@ -348,11 +348,14 @@ The prototype's review promised "Shown later as a grey line between the table ca
 relationship; slice 7a left the sentence out. Lines between table cards for declared relationships, in the line layer
 (AD-24 rule 3), with their own layer switch, would show the source's structure next to the mappings.
 
-## Source relationships: a layer switch of their own (slice 10b, PRD section 9)
+## Source relationships: a layer switch of their own (slice 10b, PRD section 9): closed, replaced in slice 16
 
 Source relationship lines show in Everything and Relationships (D-62). A switch of their own would show them in the
 Mappings layer while mapping: a key in `canvas.look` and a control above the canvas (which must not read layout during
 a commit, CLAUDE.md).
+
+**Closed as replaced** (slice 16, P4, D-71): the layer modes stay as they are, and a canvas tab's menu shows or hides
+relationship lines by kind (between entities, between source tables) within the layers that show them.
 
 ## Source relationships: the key's name and its columns (slice 10b, PRD section 9)
 
@@ -584,7 +587,10 @@ hierarchies in dimensions.
   Measures section's empty text ("None yet. Open a numeric attribute and turn on Measure.") should change for factless
   facts.
 
-## InfoMapper's canvas and menus: a slice after slice 15 (Łukasz, 6 November 2026)
+## InfoMapper's canvas and menus: a slice after slice 15 (Łukasz, 6 November 2026): done in slice 16
+
+Built in slice 16 (D-71, `docs/prd/slice-16-canvas-menus.md`), with a seventh item: no browser context menu in the
+app's own surfaces.
 
 From Łukasz's testing of slice 15c, agreed as a slice of its own after slice 15's closing. All three are InfoMapper's,
 work at every model level, and need no new table.
@@ -766,3 +772,11 @@ does) or with a `ResizeObserver`, and check with a phase trace that a panel swit
   marker, as the prototype's `reqsFor` does. Not built (D-34 unchanged, P30).
 - **A browser figure for the index with feeds** (`__imIndexTiming` with the synthetic feeds): only Node was measured
   in slice 15d (Y7).
+
+## InfoMapper's canvas and menus: what comes later (slice 16, PRD section 9)
+
+- **Dragging canvas tabs** to reorder them (slice 16 moves them from the tab's menu).
+- **"Add attribute" from an attribute row's menu**, inserted below that row.
+- **A third switch for dimensional relationships** on their own (InfoCube); "Between entities" covers both levels.
+- **From slice 15d's closing:** a mapping from a column missing from the source says "not approved" in the requirement
+  panel, though the mapping is approved: a reason of its own, as "type conflict" now.

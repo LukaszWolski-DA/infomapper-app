@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { ToastProvider } from "@/ui/components/toast";
+import { NoBrowserMenu } from "@/ui/no-browser-menu";
 import "./globals.css";
 import "@/compose/styles";
 
@@ -32,6 +33,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html lang="en" className={`${plexSans.variable} ${plexMono.variable} h-full antialiased`}>
       <body className="flex min-h-full flex-col bg-im-panel font-sans text-[13px] text-im-ink">
+        {/* slice 16 (item 7, D-71): no browser context menu in the app's own surfaces */}
+        <NoBrowserMenu />
         <ToastProvider>{children}</ToastProvider>
       </body>
     </html>

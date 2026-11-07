@@ -96,6 +96,9 @@ export function Overview({ lines, notes = NO_NOTES, notesDragging = false }: { l
   const blockOf = useMemo(() => new Map(nodes.filter((n) => n.hidden && isCardNode(n)).map((n) => [n.id, blockNodeId((n as CardNodeT).data.card.frameId ?? "")])), [drawnKey]);
   /* eslint-enable react-hooks/exhaustive-deps */
   const rects = useMemo(() => new Map(shown.map((n) => [n.id, rectOf(n)])), [shown]);
+  // Only the lists the miniature draws (slice 16, S16-11): hiding the source lines gives the canvas new lines but leaves
+  // these two as they were, so the miniature does not redraw
+  const miniLines = useMemo<CanvasLines>(() => ({ mappings: lines.mappings, relationships: lines.relationships }), [lines.mappings, lines.relationships]);
   const content = useMemo(() => {
     let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
     for (const r of [...rects.values(), ...miniNotes]) {
@@ -161,7 +164,7 @@ export function Overview({ lines, notes = NO_NOTES, notesDragging = false }: { l
       {ui.overviewOpen && (
         <div className="overview-box">
           <svg className="overview-svg" width={W} height={H} viewBox={viewBox} preserveAspectRatio="xMidYMid meet" aria-hidden>
-            <Miniature nodes={shown} rects={rects} blockOf={blockOf} lines={lines} notes={miniNotes} />
+            <Miniature nodes={shown} rects={rects} blockOf={blockOf} lines={miniLines} notes={miniNotes} />
           </svg>
           <svg
             ref={svgRef}

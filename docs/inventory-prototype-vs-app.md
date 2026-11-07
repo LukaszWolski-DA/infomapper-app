@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 15c's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 16's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences; at slice 15c's close (5 November 2026) dimensional mappings and "fed" coverage were marked present, with their deliberate differences. The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences; at slice 15c's close (5 November 2026) dimensional mappings and "fed" coverage were marked present, with their deliberate differences. At slice 16's close (6 November 2026) the prototype was replaced by its version with the canvas menus (`docs/prd/slice-16-canvas-menus.md`), and its items 1 to 3 and 7 were marked present, with their deliberate differences (`docs/prd/slice-16-acceptance.md`). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -43,9 +43,24 @@ changed and retired row marks.
 
 **Present since the earlier inventory:** requirement markers, coverage colours and Focus (4b-1); requirement cards and
 trace lines (4b-2); showing, hiding and resizing the side panels (5a); the view-state bar and the narrow top bar (6a);
-a missing column's row and mapping line marks (7a); a zoom typed in the top bar (9, D-60).
+a missing column's row and mapping line marks (7a); a zoom typed in the top bar (9, D-60); "Add attribute" in an entity
+card header's menu, a canvas tab's Move left, Move right, Move to start and Move to end, the tab menu's "Relationship
+lines" with the chips "Entity relationships hidden" and "Source relationships hidden", and no browser context menu in
+the app's own surfaces (16, D-71).
 
 **Deliberate differences:**
+- **Slice 16 (D-71):**
+  - "Add attribute" stands directly before "Paste attribute", not before "Link to a requirement…", which the app's card
+    menu does not have.
+  - The move items and the relationship switches are also in the project home tile's menu, the same menu as the tab's.
+  - The switches are `canvas.look` keys, present only while a kind is hidden; the prototype keeps `hideRels` beside the
+    layer.
+  - Inside the canvas the prototype cancels every right click; the app's text fields there (a note's editor, the Changes
+    select, the toolbox's search) keep the browser's menu, as item 7's rule says.
+  - The prototype draws source relationships simplified (no self loop, no live canvas, no context cards); the app's
+    lines follow D-62.
+  - The chips have titles ("Lines between entities are hidden on this canvas", "Lines between source tables are hidden
+    on this canvas").
 - **Slice 11 (D-64):** entities and attributes have an alias, edited in their panels; the prototype has none. A canvas
   shows names or aliases in two dimensions, set by "Entity aliases" and "Attribute aliases" in the top bar after the
   layer switch (in "More" up to 1,300 px), with exceptions per card from its header's menu ("Entity name" and "Attribute

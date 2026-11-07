@@ -4,6 +4,8 @@
 // the look (background, grid, "Use this look on all canvases", D-12) and, last, Delete canvas or Remove from this
 // project (D-28). A look change on the open canvas shows at once (`look.tsx`). The writes of a canvas's row (its look,
 // "Use this look on all canvases", the delete) go on the save chain keyed on that row (slice 14b, O1).
+// Slice 16 (D-71): the tab's place in this project's order (Move left, right, to the start, to the end; one undo step
+// each, no toast, as the prototype), and the relationship lines by kind. The same menu is a tile's on the project home.
 
 import { useRouter } from "next/navigation";
 import type { ReactNode } from "react";
@@ -13,10 +15,13 @@ import {
   createCanvasAction,
   deleteCanvasAction,
   duplicateCanvasAction,
+  moveCanvasAction,
   removeCanvasFromProjectAction,
   setCanvasLookAction,
 } from "@/app/_actions/canvas";
 import { LookControls, useCanvasLook, type LookPatch } from "@/canvas/look";
+import type { CanvasMove } from "@/domain/commands/canvas";
+import { isHidden, type HiddenRelationshipKey } from "@/domain/model/canvas-look";
 import { copyView } from "@/canvas/views";
 import { useAction } from "@/app/_components/use-action";
 import { canvasHref } from "@/app/_lib/paths";
@@ -46,6 +51,21 @@ export const DotsIcon = () => (
 
 type Canvas = ProjectView["canvases"][number];
 
+/** The tab's moves (slice 16, item 2; prototype openMenu), in the menu's order. */
+const MOVES: readonly { to: CanvasMove; label: string; testId: string }[] = [
+  { to: "left", label: "Move left", testId: "menu-item-move-left" },
+  { to: "right", label: "Move right", testId: "menu-item-move-right" },
+  { to: "start", label: "Move to start", testId: "menu-item-move-start" },
+  { to: "end", label: "Move to end", testId: "menu-item-move-end" },
+];
+const disabledClass = " data-[disabled]:pointer-events-none data-[disabled]:opacity-50";
+
+/** The relationship lines by kind (slice 16, item 3; prototype openMenu "Relationship lines"). */
+const KINDS: readonly { key: HiddenRelationshipKey; label: string; testId: string }[] = [
+  { key: "hideEntityRelationships", label: "Between entities", testId: "menu-item-lines-entities" },
+  { key: "hideSourceRelationships", label: "Between source tables", testId: "menu-item-lines-sources" },
+];
+
 export function CanvasMenu({
   view,
   canvas,
@@ -66,6 +86,8 @@ export function CanvasMenu({
   const look = open?.look ?? canvas.look;
   const others = view.projects.filter((p) => p.id !== view.project.id && canvas.projectIds.includes(p.id));
   const isLast = view.canvases.length < 2;
+  const at = view.canvases.findIndex((c) => c.id === canvas.id);
+  const lastAt = view.canvases.length - 1;
 
   function setLook(patch: LookPatch) {
     if (open) open.setLook(patch);
@@ -81,6 +103,11 @@ export function CanvasMenu({
     if (!result.ok) return;
     copyView(canvas.id, result.value.canvasId);
     router.push(result.value.href);
+  }
+
+  /** The tab's place among this project's tabs (slice 16, item 2); the fresh page brings the new order. */
+  function move(to: CanvasMove) {
+    void run(() => moveCanvasAction({ workspaceId: view.workspaceId, projectId: view.project.id, canvasId: canvas.id, to }));
   }
 
   async function remove() {
@@ -135,6 +162,19 @@ export function CanvasMenu({
         <DropdownMenuItem className={itemClass} onSelect={() => void duplicate()} data-testid="menu-item-duplicate">
           Duplicate layout
         </DropdownMenuItem>
+        {!isLast && at >= 0 && (
+          <>
+            <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+            {MOVES.map(({ to, label, testId }) => {
+              const disabled = to === "left" || to === "start" ? at <= 0 : at >= lastAt;
+              return (
+                <DropdownMenuItem key={to} className={itemClass + disabledClass} disabled={disabled} onSelect={() => move(to)} data-testid={testId}>
+                  {label}
+                </DropdownMenuItem>
+              );
+            })}
+          </>
+        )}
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
         <DropdownMenuLabel className={sectionClass}>Background</DropdownMenuLabel>
         <div className="px-1.5 pb-1">
@@ -152,6 +192,28 @@ export function CanvasMenu({
         >
           Use this look on all canvases
         </DropdownMenuItem>
+        <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
+        {/* relationship lines by kind (slice 16, item 3, D-71): kept with the look, not undone; the menu stays open */}
+        <DropdownMenuLabel className={sectionClass}>Relationship lines</DropdownMenuLabel>
+        {KINDS.map(({ key, label, testId }) => {
+          const shown = !isHidden(look, key);
+          return (
+            <DropdownMenuItem
+              key={key}
+              role="menuitemcheckbox"
+              aria-checked={shown}
+              data-testid={testId}
+              className={itemClass + " justify-start gap-1.5"}
+              onSelect={(e) => {
+                e.preventDefault();
+                setLook({ [key]: shown });
+              }}
+            >
+              <span aria-hidden>{shown ? "☑" : "☐"}</span>
+              <span className="truncate">{label}</span>
+            </DropdownMenuItem>
+          );
+        })}
         <DropdownMenuSeparator className="mx-0.5 my-1 bg-im-line" />
         <DropdownMenuLabel className={sectionClass}>In projects</DropdownMenuLabel>
         {view.projects.map((p) => {

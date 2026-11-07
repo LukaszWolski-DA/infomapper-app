@@ -32,7 +32,7 @@ import { buildWriteSet, type CommandResult, type WriteSet } from "../changes";
 import type { WorkspaceAccess } from "../permissions";
 import type { Attribute, Canvas, CanvasItem, ChangeEvent, Label, WorkspaceRole } from "../types";
 import { addAttribute, createAttributeFromColumn, deleteAttribute, pasteAttribute, reorderAttribute, updateAttribute } from "./attribute";
-import { deleteCanvas, duplicateCanvas, renameCanvas, setCanvasLook } from "./canvas";
+import { deleteCanvas, duplicateCanvas, moveCanvas, renameCanvas, setCanvasLook } from "./canvas";
 import { removeFromCanvas } from "./canvas-item";
 import { moveOnCanvas } from "./frame";
 import { deleteEntity, updateEntity } from "./entity";
@@ -311,6 +311,31 @@ describe("undo and redo (slice 1b)", () => {
     // canvas 2's other link went meanwhile: undoing the add would leave canvas 2 without a project
     const alone = { ...afterAdd, project_canvas: afterAdd.project_canvas.filter((l) => l.project_id !== ids.projectB) };
     expect(revertChangeGroup(makeCtx(), modeler, { events: added.events, rows: alone }, "undo")).toMatchObject({ ok: false, error: { message: UNDO_REFUSED_MESSAGE } });
+  });
+
+  it("reverts a link row changed in place, as a rule for every link table (slice 16): undo, redo, and refused once changed since", () => {
+    const rows = { ...seed(), project_canvas: [link(ids.projectA, ids.canvas1, 0), link(ids.projectA, ids.canvas2, 1), link(ids.projectB, ids.canvas2, 0)] };
+    const moved = ok(moveCanvas(ctx, modeler, { project: find(rows, "project", ids.projectA) as never, projectLinks: rows.project_canvas.filter((l) => l.project_id === ids.projectA) }, { projectId: ids.projectA, canvasId: ids.canvas2, to: "start" }));
+    expect(moved.events.map((e) => e.operation)).toEqual(["update", "update"]);
+    const afterMove = apply(rows, moved);
+    const order = (r: Rows, p: string) => [...r.project_canvas].filter((l) => l.project_id === p).sort((a, b) => a.sort_order - b.sort_order).map((l) => l.canvas_id);
+    expect(order(afterMove, ids.projectA)).toEqual([ids.canvas2, ids.canvas1]);
+
+    const undone = revertChangeGroup(makeCtx(), modeler, { events: moved.events, rows: afterMove }, "undo");
+    if (!undone.ok) throw new Error(undone.error.message);
+    expect(undone.writeSet.writes.map((w) => [w.kind, w.table])).toEqual([["update", "project_canvas"], ["update", "project_canvas"]]);
+    const afterUndo = apply(afterMove, undone.writeSet);
+    expect(order(afterUndo, ids.projectA)).toEqual([ids.canvas1, ids.canvas2]);
+    expect(afterUndo.project_canvas.find((l) => l.project_id === ids.projectA && l.canvas_id === ids.canvas2)).toEqual(link(ids.projectA, ids.canvas2, 1));
+    const redone = revertChangeGroup(makeCtx(), modeler, { events: undone.writeSet.events, rows: afterUndo }, "redo");
+    if (!redone.ok) throw new Error(redone.error.message);
+    expect(order(apply(afterUndo, redone.writeSet), ids.projectA)).toEqual([ids.canvas2, ids.canvas1]);
+    // the other project's order was never touched
+    expect(afterMove.project_canvas.find((l) => l.project_id === ids.projectB)).toEqual(link(ids.projectB, ids.canvas2, 0));
+
+    // moved again meanwhile (another person, or a later step): the first move's undo is refused
+    const changed = { ...afterMove, project_canvas: afterMove.project_canvas.map((l) => (l.project_id === ids.projectA && l.canvas_id === ids.canvas1 ? { ...l, sort_order: 7 } : l)) };
+    expect(revertChangeGroup(makeCtx(), modeler, { events: moved.events, rows: changed }, "undo")).toMatchObject({ ok: false, error: { message: UNDO_REFUSED_MESSAGE } });
   });
 
   describe("permissions and the archive", () => {

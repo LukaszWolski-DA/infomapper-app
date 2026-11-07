@@ -16,6 +16,7 @@ import { CanvasUiCtx, type CanvasMode } from "@/canvas/context";
 import { changesOn } from "@/canvas/changes-view";
 import { focusOn } from "@/canvas/fade";
 import { useCanvasLook } from "@/canvas/look";
+import { isHidden, type HiddenRelationshipKey } from "@/domain/model/canvas-look";
 import { useValue } from "@/canvas/value-store";
 import { viewCounts } from "@/canvas/view-counts";
 import { fitChips } from "@/ui/fit-chips";
@@ -32,6 +33,12 @@ export interface ViewChip {
 }
 
 const EDITORS_ONLY = " Only editors can change this.";
+
+/** The chips of the relationship lines hidden by kind (slice 16, D-71), after the layer's (prototype viewState). */
+export const HIDDEN_KINDS: readonly { key: HiddenRelationshipKey; id: string; text: string; title: string }[] = [
+  { key: "hideEntityRelationships", id: "entity-relationships", text: "Entity relationships hidden", title: "Lines between entities are hidden on this canvas" },
+  { key: "hideSourceRelationships", id: "source-relationships", text: "Source relationships hidden", title: "Lines between source tables are hidden on this canvas" },
+];
 const plural = (n: number, one: string) => `${n} ${one}${n === 1 ? "" : "s"}`;
 
 /** The tools that change what a click does, as the prototype's chip names them; drawing a relationship has none. */
@@ -61,6 +68,11 @@ export function useViewChips(editable: boolean): ViewChip[] {
       title: "The other lines are hidden",
       off: () => look?.setLook({ layer: "all" }),
     });
+  // relationship lines hidden by kind (slice 16, item 3, D-71): in every layer, so switching back holds no surprise (P9)
+  for (const kind of HIDDEN_KINDS) {
+    if (look && isHidden(look.look, kind.key))
+      chips.push({ id: kind.id, text: kind.text, title: kind.title, off: () => look.setLook({ [kind.key]: false }) });
+  }
   if (counts?.filtered)
     chips.push({
       id: "filtered",
@@ -102,7 +114,11 @@ function useShowAll(): () => void {
   return useCallback(() => {
     focusOn.set(false);
     changesOn.set(null);
-    if (look && look.look.layer !== "all") look.setLook({ layer: "all" });
+    // the layer and the hidden kinds in one change of the look (slice 16)
+    if (look) {
+      const patch = { ...(look.look.layer !== "all" ? { layer: "all" as const } : {}), ...Object.fromEntries(HIDDEN_KINDS.filter((k) => isHidden(look.look, k.key)).map((k) => [k.key, false])) };
+      if (Object.keys(patch).length) look.setLook(patch);
+    }
     if (ui.hideResolved) ui.setHideResolved(false);
     if (ui.mode) ui.setMode(null);
     void ui.resetView({ filters: true, expandCards: true, expandFrames: true }).then((saved) => {

@@ -528,7 +528,7 @@ A canvas can belong to several projects (D-28).
 | standard columns | | | |
 | `name` | text | no | |
 | `live_label_id` | uuid | yes | set = live label canvas (D-10, D-25) |
-| `look` | jsonb | no | `{ "background": "grey", "grid": "dots", "layer": "all" }` (D-12, D-22) |
+| `look` | jsonb | no | `{ "background": "grey", "grid": "dots", "layer": "all" }` (D-12, D-22); since slice 16 also `hideEntityRelationships` and `hideSourceRelationships`, each present (as `true`) only while that kind of relationship line is hidden (D-71), so the default and every earlier look read as both shown |
 | `entity_names`, `attribute_names` | text | yes | `name` or `alias`: what the canvas's entity cards show in each dimension (slice 11, D-64); null = name, and names are stored as null; ordinary columns, so undo restores them (unlike `look`) |
 
 ### `canvas_item`

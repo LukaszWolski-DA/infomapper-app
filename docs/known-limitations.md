@@ -553,7 +553,7 @@ a hidden panel).
 
 - **Accepted** by Łukasz in slice 5a, step 1 (answer 5). **Later:** not planned.
 
-### The canvas saves its view about 150 ms late
+### The canvas saved its view about 150 ms late (chore CI e2e; fixed in slice 16)
 
 The canvas remembers its view in the browser (`infomapper:view:<canvas id>`, D-54) in `onMoveEnd`
 (`src/canvas/ModelCanvas.tsx:464-468`), which stores `{ x, y, zoom, left }` and reads `left`, the canvas's left edge
@@ -570,8 +570,15 @@ view changes too: the first view on open (`ModelCanvas.tsx:1728`), the view move
 - **Found** by S5A-07 and S6A-11 on GitHub's runner (chore CI e2e): both changed the stored view or the window within
   those 150 ms, and the old page's late save came after it. The tests now wait for the canvas's own save first
   (`viewStored`, `e2e/slice-05a/helpers.ts`).
-- **Later:** fixed in the slice "InfoMapper's canvas and menus": the app's own view changes save the view at once,
-  with the left edge of that moment, and `onMoveEnd` saves only after the person's own moves.
+- **Fixed in slice 16** (item 6, D-71): one `storeView` in `ModelCanvas.tsx` stores the view and the left edge read at
+  the same moment. The first view, `shiftView` (its left edge is the current one minus the shift, read in the panel's
+  event before the new width reaches the layout) and the fit (its target) store at once. `onMoveEnd` stores the view
+  shown now and nothing when it equals what the canvas stored last, so React Flow's late call after the canvas's own
+  change is no new save. A changed view is stored on `pagehide` and when the canvas unmounts, and nothing is stored
+  before the first view or once the canvas is gone. "Only after the person's own moves", told apart by React Flow's
+  `null` event, was not used: the Hand tool, the zoom, the miniature and Zoom to frame move the view through the app
+  too. `viewStored` stays in S5A-07 and S6A-11: a test that writes the key itself still waits for React Flow's late call
+  first. Test: S16-09.
 
 ### The top bar on narrow windows
 
@@ -758,7 +765,7 @@ Both found by the first full run in GitHub Actions; both pass on Windows. On Łu
 a test of its own, marked as an expected failure (`test.fail`) where the limitation applies; both are fixed in the slice
 "InfoMapper's canvas and menus" (`docs/ideas.md`).
 
-### A right-button pan opens the toolbox on Linux and macOS
+### A right-button pan opened the toolbox on Linux and macOS (chore CI e2e; fixed in slice 16)
 
 On Linux and macOS the `contextmenu` event comes on the right button's press, before any move, so a right-button pan
 opens the toolbox. The canvas opens the toolbox in `onContextMenu` (`src/canvas/CanvasModes.tsx:198`) unless the mouse
@@ -768,10 +775,19 @@ Space + drag pans are not affected. Seen on Linux (GitHub's runner); macOS fires
 been run. Test: "S2B-06: inside a frame, a right drag pans; nothing moves, no toolbox"
 (`e2e/slice-02b/S2B-06.spec.ts`), an expected failure on every platform but Windows.
 
-- **Later:** fixed in the slice "InfoMapper's canvas and menus" (for example: open the toolbox on the right button's
-  release when the press did not move, and ignore a `contextmenu` that comes before it).
+- **Fixed in slice 16** (item 4, D-71): a `contextmenu` that comes while the right button is still down waits for the
+  release (`rightPending` in `CanvasModes.tsx`); a window `pointerup` of the right button then opens the toolbox if the
+  mouse moved no more than `CLICK_SLOP`. Windows fires `contextmenu` after the release and keeps today's path; the
+  keyboard's menu key and a touch long-press have no right press and open it at once. S2B-06's right drag lost its
+  `test.fail`. Test: S16-07.
 
-### The top bar overflows by 1 px at 1,201 px on Linux
+### Firefox opens its own menu on Shift+right-click (slice 16, item 7)
+
+The app cancels the browser's context menu outside text fields, selects, the description editor, links and selected
+text (`NoBrowserMenu`, `src/ui/browser-menu.ts`, D-71). Firefox shows its menu on Shift+right-click whatever a page does
+(a user preference of Firefox's, `dom.event.contextmenu.enabled`, decides it); there is nothing for the app to do.
+
+### The top bar overflowed by 1 px at 1,201 px on Linux (chore CI e2e; fixed in slice 16)
 
 At 1,201 px, with the working context on and both panels shown, the top bar's content (`bar-top`) is 1 px wider than
 the bar with Linux's text drawing, so the bar scrolls by 1 px. 1,201 px is the narrowest width of its step (Focus, Changes and
@@ -782,10 +798,11 @@ files measure wider on the runner: the layer switch (`switch-layer`) 137 px agai
 the workspace switcher still had above its minimum on Windows. Every other width passes. Test: "S6A-10: at 1,201 px the
 top bar does not scroll" (`e2e/slice-06a/S6A-10.spec.ts`), an expected failure on Linux only.
 
-- **Later:** fixed in the slice "InfoMapper's canvas and menus" without depending on font metrics: the working
-  context's label (`button-context`, `working-context.tsx`) as the bar's flexible item (it may shrink, the browser
-  truncates it, the full name stays its tooltip) instead of the fixed `max-w-[90px]` step, so a font's extra pixels
-  come out of the label, never from the bar's scroll.
+- **Fixed in slice 16** (item 5): `bar-tools` may shrink with a tiny weight (`shrink-[0.001]`), so the switchers still
+  shorten first; what is still missing then comes out of the working context's label, the only tool that shrinks (its
+  caps stay as maximums, its minimum is 40 px). While a context is on, the button's title is "Working on {name}.
+  Everything you create or change in the model gets this label." S6A-10 lost its `test.fail` and its 1,201 px skip.
+  Test: S16-08.
 
 ## End-to-end tests (slice 1a, step 6)
 
@@ -806,7 +823,7 @@ minutes instead of the laptop's 93 to 97 (CLAUDE.md, "Testing").
   about 9.5 minutes in `npx playwright install --with-deps chromium`, downloading Chromium's font packages from
   Ubuntu's mirror at 39 kB/s (15 to 24 s on the other jobs). That makes a full run 18 to 21 minutes instead of about 12.
   **Later:** Playwright's own container image pinned to 1.63.0 (its dependencies preinstalled), validated with S6A-10's
-  text drawing, as its fonts decide the bar's widths (above, "The top bar overflows by 1 px at 1,201 px on Linux").
+  text drawing, as its fonts decide the bar's widths (above, "The top bar overflowed by 1 px at 1,201 px on Linux", fixed in slice 16).
 
 
 ### “The destination stream closed early” in the e2e server log

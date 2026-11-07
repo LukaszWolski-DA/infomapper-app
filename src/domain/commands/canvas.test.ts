@@ -11,6 +11,7 @@ import {
   deleteCanvas,
   duplicateCanvas,
   LAST_CANVAS_MESSAGE,
+  moveCanvas,
   removeCanvasFromProject,
   renameCanvas,
   resetCanvasView,
@@ -342,6 +343,43 @@ describe("canvas look and layer mode (slice 2a, D-12, D-22)", () => {
   });
 });
 
+describe("relationship lines by kind in the look (slice 16, item 3, D-71)", () => {
+  const third = "01900000-0000-7000-8000-000000002003";
+
+  it("hides and shows a kind as a look key: saved with a new version, not an undo step", () => {
+    const hide = setCanvasLook(makeCtx(), access("modeler"), { canvas: canvas() }, { canvasId: canvas1, expectedVersion: canvas().version, hideEntityRelationships: true });
+    if (!hide.ok) throw new Error(hide.error.message);
+    expect(hide.value.canvas.look).toEqual({ background: "grey", grid: "dots", layer: "all", hideEntityRelationships: true });
+    expect(isUndoable(hide.writeSet.events)).toBe(false);
+    const show = setCanvasLook(makeCtx(), access("modeler"), { canvas: hide.value.canvas }, { canvasId: canvas1, expectedVersion: hide.value.canvas.version, hideEntityRelationships: false });
+    if (!show.ok) throw new Error(show.error.message);
+    expect(show.value.canvas.look).toEqual({ background: "grey", grid: "dots", layer: "all" });
+    expect(setCanvasLook(makeCtx(), access("modeler"), { canvas: canvas() }, { canvasId: canvas1, expectedVersion: canvas().version, hideSourceRelationships: false })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(setCanvasLook(makeCtx(), access("reviewer"), { canvas: canvas() }, { canvasId: canvas1, expectedVersion: canvas().version, hideSourceRelationships: true })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+  });
+
+  it("“Use this look on all canvases” copies background and grid, never the hidden kinds (P8)", () => {
+    const canvases = [
+      canvas(canvas1, { look: { background: "warm", grid: "lines", layer: "all", hideEntityRelationships: true } }),
+      canvas(canvas2, { look: { background: "grey", grid: "dots", layer: "all", hideSourceRelationships: true } }),
+      canvas(third),
+    ];
+    const r = applyLookToAllCanvases(makeCtx(), access("modeler"), { canvases }, { canvasId: canvas1 });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes.map((w) => (w.kind === "update" ? (w.row as { look: unknown }).look : null))).toEqual([
+      { background: "warm", grid: "lines", layer: "all", hideSourceRelationships: true },
+      { background: "warm", grid: "lines", layer: "all" },
+    ]);
+  });
+
+  it("“Duplicate layout” copies them with the look (P8)", () => {
+    const look = { background: "grey", grid: "dots", layer: "all", hideEntityRelationships: true, hideSourceRelationships: true } as const;
+    const r = duplicateCanvas(makeCtx(), access("modeler"), { canvas: canvas(canvas1, { look }), project: project(projectA), projectLinks: [link(projectA, canvas1, 0)], items: [], frames: [] }, { projectId: projectA, canvasId: canvas1 });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes.find((w) => w.kind === "insert" && w.table === "canvas")).toMatchObject({ row: { look } });
+  });
+});
+
 // ---- resetCanvasView (slice 6a) ----
 
 const { itemCustomer, itemCrmCustomer, frameA, frameB, salesOrder } = ids;
@@ -354,6 +392,64 @@ const addressCard = (over: Partial<CanvasItem> = {}) => canvasItem(itemAddress, 
 const ref = (i: CanvasItem) => ({ canvasItemId: i.id, expectedVersion: i.version });
 const fref = (f: Frame) => ({ frameId: f.id, expectedVersion: f.version });
 const refusedAsStale = { ok: false, error: { code: "stale_version", message: STALE_VERSION_MESSAGE } };
+describe("moveCanvas (slice 16, item 2, D-71)", () => {
+  const canvas3 = "01900000-0000-7000-8000-000000002003";
+  // A has canvas1, canvas2 and canvas3 in that order; B has canvas1 only
+  const links = [link(projectA, canvas1, 0), link(projectA, canvas2, 1), link(projectA, canvas3, 2), link(projectB, canvas1, 0)];
+  const state = (projectId: string = projectA, ls = links) => ({ project: project(projectId), projectLinks: ls.filter((l) => l.project_id === projectId) });
+  /** Project A's order after the move. */
+  const orderAfter = (r: CommandResult, ls = links) => {
+    if (!r.ok) throw new Error(r.error.message);
+    const next = ls.map((l) => {
+      const w = r.writeSet.writes.find((x) => x.kind === "update" && x.table === "project_canvas" && (x.row as typeof l).canvas_id === l.canvas_id && (x.row as typeof l).project_id === l.project_id);
+      return w && w.kind === "update" ? (w.row as typeof l) : l;
+    });
+    return next.filter((l) => l.project_id === projectA).sort((a, b) => a.sort_order - b.sort_order).map((l) => l.canvas_id);
+  };
+
+  it("moves a tab left, right, to the start and to the end, in this project only", () => {
+    expect(orderAfter(moveCanvas(makeCtx(), access("modeler"), state(), { projectId: projectA, canvasId: canvas3, to: "start" }))).toEqual([canvas3, canvas1, canvas2]);
+    expect(orderAfter(moveCanvas(makeCtx(), access("modeler"), state(), { projectId: projectA, canvasId: canvas3, to: "left" }))).toEqual([canvas1, canvas3, canvas2]);
+    expect(orderAfter(moveCanvas(makeCtx(), access("modeler"), state(), { projectId: projectA, canvasId: canvas1, to: "right" }))).toEqual([canvas2, canvas1, canvas3]);
+    expect(orderAfter(moveCanvas(makeCtx(), access("modeler"), state(), { projectId: projectA, canvasId: canvas1, to: "end" }))).toEqual([canvas2, canvas3, canvas1]);
+    const r = moveCanvas(makeCtx(), access("modeler"), state(), { projectId: projectA, canvasId: canvas3, to: "start" });
+    if (!r.ok) throw new Error(r.error.message);
+    // every link of A gets a new number; B's link of the same canvas1 is not written
+    expect(r.writeSet.writes.every((w) => w.kind === "update" && w.table === "project_canvas" && (w.row as { project_id: string }).project_id === projectA)).toBe(true);
+    expect(r.writeSet.events.map((e) => [e.operation, e.object_type])).toEqual([["update", "project_canvas"], ["update", "project_canvas"], ["update", "project_canvas"]]);
+    expect(r.writeSet.label).toBe("Move canvas");
+  });
+
+  it("numbers the order again and writes only the links whose number changes (a duplicate shares its original's number)", () => {
+    const tied = [link(projectA, canvas1, 0), link(projectA, canvas2, 0), link(projectA, canvas3, 4)];
+    const r = moveCanvas(makeCtx(), access("modeler"), state(projectA, tied), { projectId: projectA, canvasId: canvas3, to: "left" });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes.map((w) => (w.kind === "update" ? [(w.row as { canvas_id: string }).canvas_id, (w.row as { sort_order: number }).sort_order] : null))).toEqual([
+      [canvas3, 1],
+      [canvas2, 2],
+    ]);
+  });
+
+  it("changes nothing for a move the stored order would not make (two quick clicks)", () => {
+    for (const [canvasId, to] of [[canvas1, "left"], [canvas1, "start"], [canvas3, "right"], [canvas3, "end"]] as const) {
+      expect(moveCanvas(makeCtx(), access("owner"), state(), { projectId: projectA, canvasId, to })).toMatchObject({ ok: false, error: { code: "invalid", message: "Nothing to change." } });
+    }
+  });
+
+  it("refuses a canvas not in the project, a deleted project and an unknown move", () => {
+    expect(moveCanvas(makeCtx(), access("owner"), state(projectB), { projectId: projectB, canvasId: canvas2, to: "left" })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(moveCanvas(makeCtx(), access("owner"), { ...state(), project: project(projectA, { deleted_at: NOW }) }, { projectId: projectA, canvasId: canvas2, to: "left" })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(moveCanvas(makeCtx(), access("owner"), state(), { projectId: projectA, canvasId: canvas2, to: "up" })).toMatchObject({ ok: false, error: { code: "invalid" } });
+  });
+
+  it("is refused to reviewers and readers, and in an archived workspace", () => {
+    for (const role of ["reviewer", "reader"] as const) {
+      expect(moveCanvas(makeCtx(), access(role), state(), { projectId: projectA, canvasId: canvas2, to: "left" })).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    }
+    expect(moveCanvas(makeCtx(), access("owner", archived), state(), { projectId: projectA, canvasId: canvas2, to: "left" })).toMatchObject({ ok: false, error: { code: "archived" } });
+  });
+});
+
 function ok<T>(r: CommandResult<T>): { value: T; writeSet: WriteSet } {
   if (!r.ok) throw new Error(r.error.message);
   return r;

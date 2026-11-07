@@ -6,7 +6,8 @@
 //   the next click on another entity creates the relationship, a click elsewhere ends it. Dragging from the button
 //   and releasing over an entity does the same.
 // - A right-click without moving opens the toolbox for what is under the mouse, after selecting it (D-19); a right-drag
-//   still pans (React Flow). On the header or body of a card of a selection of several it opens the group's toolbox
+//   still pans (React Flow); where the browser fires `contextmenu` on the press (Linux, macOS) the toolbox waits for
+//   the release (slice 16, item 4). On the header or body of a card of a selection of several it opens the group's toolbox
 //   (slice 2a); on a row, that row's own toolbox (D-52).
 // - Hand tool (H, slice 2a, D-18): a left drag anywhere, over cards too, pans the canvas and selects nothing; V or Esc
 //   end it. Right drag, the middle button and Space still pan as before. It is not saved.
@@ -18,6 +19,7 @@
 import { memo, useCallback, useContext, useEffect, useRef, useState, type MouseEvent as ReactMouseEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { EdgeLabelRenderer, useReactFlow, useStore } from "@xyflow/react";
 import { useToast } from "@/ui/components/toast";
+import { keepsBrowserMenu } from "@/ui/browser-menu";
 import type { CardNodeT } from "./CardNode";
 import { CanvasUiCtx, type ToolboxTarget } from "./context";
 import { cardKey, frameKey, noteKey, reqKey } from "./selection";
@@ -42,7 +44,13 @@ export function useCanvasModes(editable: boolean) {
   const rf = useReactFlow();
   const toast = useToast();
   const [cursor, setCursor] = useState<Pt | null>(null);
-  const rightDown = useRef<Pt | null>(null);
+  /** The right button's press on the canvas, and whether it has come up since (slice 16, item 4). */
+  const rightDown = useRef<(Pt & { released: boolean }) | null>(null);
+  /**
+   * A `contextmenu` that came while the right button was still down (Linux and macOS fire it on the press): the toolbox
+   * waits for the release, and opens only if the mouse did not move more than `CLICK_SLOP` (a right drag pans).
+   */
+  const rightPending = useRef<{ target: Element; x: number; y: number } | null>(null);
   /** A press on a relate button: becomes a relate drag after a few pixels. */
   const relatePress = useRef<{ cardId: string; sx: number; sy: number; dragging: boolean } | null>(null);
   /** A left drag with the Hand tool: where it started, on the screen and in the view. */
@@ -148,7 +156,8 @@ export function useCanvasModes(editable: boolean) {
   const onPointerDownCapture = useCallback(
     (e: ReactPointerEvent) => {
       if (e.button === 2) {
-        rightDown.current = { x: e.clientX, y: e.clientY };
+        rightDown.current = { x: e.clientX, y: e.clientY, released: false };
+        rightPending.current = null;
         return;
       }
       if (e.button !== 0) return;
@@ -194,16 +203,11 @@ export function useCanvasModes(editable: boolean) {
     [ui.selection, rf],
   );
 
-  /** A right-click without moving: select what is under the mouse, then ask the page for its toolbox. */
-  const onContextMenu = useCallback(
-    (e: ReactMouseEvent) => {
-      e.preventDefault();
-      const down = rightDown.current;
-      rightDown.current = null;
-      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_SLOP) return;
+  /** Select what lies at `el`, then ask the page for its toolbox at the screen point. */
+  const openToolboxAt = useCallback(
+    (el: HTMLElement, clientX: number, clientY: number) => {
       // A tool that takes the next click ends; the Hand tool stays (its toolbox offers “Back to selecting”).
       if (mode && mode.kind !== "hand") setMode(null);
-      const el = e.target as HTMLElement;
       if (el.closest(".overview, .react-flow__panel")) return;
       // a note lies above everything else (slice 3a)
       const noteId = el.closest<HTMLElement>("[data-note]")?.dataset.note;
@@ -262,10 +266,53 @@ export function useCanvasModes(editable: boolean) {
         target = { kind: "canvas" };
         select(null);
       }
-      ui.host()?.openToolbox({ target, screen: { x: e.clientX, y: e.clientY }, at: rf.screenToFlowPosition({ x: e.clientX, y: e.clientY }) });
+      ui.host()?.openToolbox({ target, screen: { x: clientX, y: clientY }, at: rf.screenToFlowPosition({ x: clientX, y: clientY }) });
     },
     [mode, setMode, select, rf, ui, inSelection],
   );
+
+  /**
+   * A right-click without moving opens the toolbox (slice 16, item 4). Windows fires `contextmenu` after the release, so
+   * the press is already up and the check runs here, as before. Linux and macOS fire it on the press: the toolbox then
+   * waits for the release (below), so a right drag pans without one. A `contextmenu` with no right press (the keyboard's
+   * menu key, a touch long-press) opens it at once, as before.
+   */
+  const onContextMenu = useCallback(
+    (e: ReactMouseEvent) => {
+      // a text field inside the canvas (a note's editor, the Changes view's select) keeps the browser's menu: paste,
+      // spelling (slice 16, item 7, D-71)
+      if (keepsBrowserMenu(e)) return;
+      e.preventDefault();
+      const down = rightDown.current;
+      if (down && !down.released) {
+        rightPending.current = { target: e.target as Element, x: down.x, y: down.y };
+        return;
+      }
+      rightDown.current = null;
+      if (down && Math.hypot(e.clientX - down.x, e.clientY - down.y) > CLICK_SLOP) return;
+      openToolboxAt(e.target as HTMLElement, e.clientX, e.clientY);
+    },
+    [openToolboxAt],
+  );
+
+  // The right button's release: marks the press as up (Windows' `contextmenu` comes after it) and opens a toolbox that
+  // waited for it. `pointerup`, not `mouseup`: d3-zoom swallows the mouse events of a pan.
+  useEffect(() => {
+    const up = (e: PointerEvent) => {
+      if (e.button !== 2) return;
+      const down = rightDown.current;
+      if (down) down.released = true;
+      const pending = rightPending.current;
+      if (!pending) return;
+      rightPending.current = null;
+      rightDown.current = null;
+      if (Math.hypot(e.clientX - pending.x, e.clientY - pending.y) > CLICK_SLOP) return;
+      if (!pending.target.isConnected) return;
+      openToolboxAt(pending.target as HTMLElement, e.clientX, e.clientY);
+    };
+    window.addEventListener("pointerup", up, { capture: true });
+    return () => window.removeEventListener("pointerup", up, { capture: true });
+  }, [openToolboxAt]);
 
   const relateFrom = mode?.kind === "relate" ? mode.fromCardId : null;
   return { startRelate, toggleEntityTool, toggleHandTool, toggleFrameTool, panning, onPointerDownCapture, onContextMenu, relateFrom, cursor };

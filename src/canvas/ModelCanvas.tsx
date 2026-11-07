@@ -33,7 +33,7 @@
 // shown (open, and resolved unless hidden); Fit everything counts the notes shown; resolved notes are hidden when the person chose so (`hideResolved`);
 // `focusNoteId` selects a note on arrival (the project home's open notes).
 
-import { useCallback, useContext, useEffect, useMemo, useRef, useState, type DragEvent } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState, type DragEvent } from "react";
 import {
   applyNodeChanges,
   ReactFlow,
@@ -345,20 +345,26 @@ export function ModelCanvas({
   const look = useCanvasLook()?.look;
   const layer = look?.layer ?? "all";
   const grid = look?.grid ?? "dots";
-  // Layer mode (D-22): Mappings hides the relationship lines, Relationships the mapping lines; cards stay.
-  const lines = useMemo<CanvasLines>(
-    () =>
-      diagnosis.noLines
-        ? { mappings: [], relationships: [] }
-        : layer === "all"
+  // Slice 16 (item 3, D-71): relationship lines hidden by kind, within the layers that show them
+  const hideEntityRelationships = look?.hideEntityRelationships === true;
+  const hideSourceRelationships = look?.hideSourceRelationships === true;
+  // Layer mode (D-22): Mappings hides the relationship lines, Relationships the mapping lines; cards stay. The hidden
+  // kinds go here too, so the bundles, Focus, the Changes view, hover and the miniature follow them as they follow the
+  // layer: entity relationships with their self loops and bundles (both levels), and the source lines (D-62).
+  const lines = useMemo<CanvasLines>(() => {
+    if (diagnosis.noLines) return { mappings: [], relationships: [] };
+    const layered: CanvasLines =
+      layer === "all"
         ? allLines
         : layer === "relationships"
-        ? // and a module's lines between rows (slice 15c: InfoCube's mappings are mappings)
-          { mappings: [], relationships: allLines.relationships, ...(allLines.sources ? { sources: allLines.sources } : {}) }
-        : // Mappings also hides the relationships between source tables (slice 10b, D-62)
-          { mappings: allLines.mappings, relationships: [], ...(allLines.modules ? { modules: allLines.modules } : {}) },
-    [allLines, layer, diagnosis.noLines],
-  );
+          ? // and a module's lines between rows (slice 15c: InfoCube's mappings are mappings)
+            { mappings: [], relationships: allLines.relationships, ...(allLines.sources ? { sources: allLines.sources } : {}) }
+          : // Mappings also hides the relationships between source tables (slice 10b, D-62)
+            { mappings: allLines.mappings, relationships: [], ...(allLines.modules ? { modules: allLines.modules } : {}) };
+    if (!hideEntityRelationships && !(hideSourceRelationships && layered.sources)) return layered;
+    const { sources, ...rest } = layered;
+    return { ...rest, relationships: hideEntityRelationships ? [] : rest.relationships, ...(sources && !hideSourceRelationships ? { sources } : {}) };
+  }, [allLines, layer, diagnosis.noLines, hideEntityRelationships, hideSourceRelationships]);
   const { selection, select, registerCanvas } = ui;
   const toast = useToast();
   const rf = useReactFlow();
@@ -446,28 +452,71 @@ export function ModelCanvas({
     [cardsNow, frameRectsNow, ui.overviewOpen, rf],
   );
 
+  /**
+   * Stores the remembered view with the canvas's left edge on the screen (slice 6a, D-54): opened beside another left
+   * panel, the view is moved by the difference, so the model stands where it stood. Slice 16 (item 6, D-71): the view and
+   * the left edge are read at the same moment (`view` when the app has just set it, else the view shown now), and
+   * nothing is stored once the canvas is gone (a page being left still runs React Flow's timer).
+   */
+  /** What this canvas stored last: React Flow's late call after the app's own change finds it unchanged and stores nothing. */
+  const lastStored = useRef<{ x: number; y: number; zoom: number; left: number } | null>(null);
+  /** Until when the app's own animated view change (the fit) runs; its target is stored already. */
+  const animatingUntil = useRef(0);
+  const storeView = useCallback(
+    (view?: Viewport, left?: number, onlyIfChanged = false) => {
+      const root = rootRef.current;
+      if (!root?.isConnected) return;
+      const [x, y, zoom] = view ? [view.x, view.y, view.zoom] : storeApi.getState().transform;
+      const next = { x, y, zoom, left: left ?? Math.round(root.getBoundingClientRect().left) };
+      const last = lastStored.current;
+      // before the first view is set there is nothing of this canvas's to store (React Flow's default view)
+      if (onlyIfChanged && !last) return;
+      // during the app's own animation the view shown is on its way to the target stored at its start: React Flow's late
+      // call of an earlier change landing then would store a view half-way (S16-09)
+      if (onlyIfChanged && performance.now() < animatingUntil.current) return;
+      // the view only: a window that changes the left edge alone (crossing 1,000 px) is no move of the view
+      if (onlyIfChanged && last && Math.abs(last.x - x) < 0.01 && Math.abs(last.y - y) < 0.01 && Math.abs(last.zoom - zoom) < 1e-6) return;
+      lastStored.current = next;
+      writePreference(viewKey(canvasId), JSON.stringify(next));
+    },
+    [canvasId, storeApi],
+  );
+
   const fit = useCallback(() => {
     const { width: w, height: h } = storeApi.getState();
-    void rf.setViewport(fitView(w, h), { duration: 250 });
-  }, [rf, storeApi, fitView]);
+    const view = fitView(w, h);
+    animatingUntil.current = performance.now() + 250;
+    void rf.setViewport(view, { duration: 250 });
+    storeView(view);
+  }, [rf, storeApi, fitView, storeView]);
   /** No duration: React Flow sets the transform at once, so it reaches the screen with the panel's change (slice 5a). */
   const shiftView = useCallback(
     (dx: number) => {
       const [x, y, zoom] = storeApi.getState().transform;
-      if (dx) void rf.setViewport({ x: x + dx, y, zoom });
+      if (!dx) return;
+      void rf.setViewport({ x: x + dx, y, zoom });
+      // called in the panel's event, before its new width reaches the layout: the canvas's left edge moves by −dx
+      // (hidden: 264 → 0 with dx 264; resized: from the old width to the new one)
+      const left = rootRef.current ? Math.round(rootRef.current.getBoundingClientRect().left) - dx : undefined;
+      storeView({ x: x + dx, y, zoom }, left);
     },
-    [rf, storeApi],
+    [rf, storeApi, storeView],
   );
 
-  // saved with the canvas's left edge on the screen (slice 6a, D-54): opened beside another left panel, the view is
-  // moved by the difference, so the model stands where it stood
-  const onMoveEnd = useCallback(
-    (_: unknown, v: Viewport) => {
-      const left = rootRef.current?.getBoundingClientRect().left;
-      writePreference(viewKey(canvasId), JSON.stringify(left === undefined ? v : { ...v, left: Math.round(left) }));
-    },
-    [canvasId],
-  );
+  // React Flow calls it 150 ms after any view change (`panOnScroll`), the app's own ones too, with the view of the
+  // change's end: the view shown now is stored instead, with the left edge of now, unless it is what the app's own
+  // change already stored (slice 16, item 6): that late call is no new move
+  const onMoveEnd = useCallback(() => storeView(undefined, undefined, true), [storeView]);
+  // a move less than 150 ms before the page is left (a link, a reload, a closed tab) is stored before it goes: on
+  // `pagehide`, and when the canvas unmounts (a layout effect's cleanup runs while its root is still in the document)
+  useLayoutEffect(() => {
+    const flush = () => storeView(undefined, undefined, true);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [storeView]);
 
   // ---- the grid (D-12): one CSS background behind the pane, on its own layer. Panning moves that layer by less than
   // one grid step (no repaint); zooming changes the step. Set without a render. ----
@@ -1726,9 +1775,11 @@ export function ModelCanvas({
     const left = Math.round(rootRef.current?.getBoundingClientRect().left ?? 0);
     const view = saved ? { x: saved.x + (saved.left === undefined ? 0 : saved.left - left), y: saved.y, zoom: saved.zoom } : fitView(width, height);
     void rf.setViewport(view);
+    // stored at once with this left edge (slice 16, item 6): no window change in the next 150 ms can pair it with another
+    storeView(view);
     // eslint-disable-next-line react-hooks/set-state-in-effect -- the view can only be set once the pane has a size
     setReady(true);
-  }, [ready, sized, storeApi, canvasId, rf, fitView]);
+  }, [ready, sized, storeApi, canvasId, rf, fitView, storeView]);
 
   // Cards, frames and notes that left the canvas (removed, deleted, undone, hidden) leave the selection too, and so do
   // the cards of a frame that was collapsed (slice 2c, prototype pruneMulti); checked when the set of cards, frames or

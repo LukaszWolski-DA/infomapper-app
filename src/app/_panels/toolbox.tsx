@@ -6,6 +6,7 @@
 // and, on the empty canvas, “Add an entity or table here…”: a search whose first result Enter picks. ↑/↓ move between
 // actions, Esc or a click elsewhere closes it.
 
+import { keepsBrowserMenu } from "@/ui/browser-menu";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 
@@ -117,7 +118,10 @@ export function Toolbox({ items, at, onClose }: { items: ToolboxItem[]; at: { x:
       className="fixed z-50 w-[260px] rounded-lg border border-im-line bg-im-surface p-1 text-[13px] shadow-lg"
       style={{ left: pos.x, top: pos.y }}
       onKeyDown={onKeyDown}
-      onContextMenu={(e) => e.preventDefault()}
+      // its search field keeps the browser's menu (slice 16, item 7)
+      onContextMenu={(e) => {
+        if (!keepsBrowserMenu(e)) e.preventDefault();
+      }}
     >
       {list.map((item, i) => {
         if ("head" in item) {

@@ -43,11 +43,29 @@ function asFormat7(segmentId: string) {
   fs.writeFileSync(E2E_DB, JSON.stringify(db));
 }
 
+/** Waits until the canvas's view has stopped moving: the same transform on two reads 150 ms apart. */
+async function viewSettled(page: Page) {
+  const transform = () => page.locator(".react-flow__viewport").evaluate((el) => (el as HTMLElement).style.transform);
+  let last = await transform();
+  await expect
+    .poll(async () => {
+      await page.waitForTimeout(150);
+      const now = await transform();
+      const same = now === last;
+      last = now;
+      return same;
+    })
+    .toBe(true);
+}
+
 /** What the canvas and the panels show of the flags: the customers card under the Keys filter, its BK badges, the
  * business key suggestion on customer_number, and cust_no's and fname's pressed toggles. */
 async function whatShows(page: Page) {
   const customers = card(page, "customers");
   await expect(customers).toBeVisible();
+  // the open with `?row=` centres the card with a 250 ms animation, whose zoom dips on its way (d3's interpolateZoom),
+  // here below the 40 % under which a card draws no rows: read the rows once the view has settled (slice 16, step 3)
+  await viewSettled(page);
   const rows = await customers.locator("[data-row]").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.row));
   const badges = await customers.locator("[data-row]:has(.tag.bk)").evaluateAll((els) => els.map((e) => (e as HTMLElement).dataset.row));
   const customerNumber = (await loadModel()).attributes.find((a) => a.name === "customer_number")!.id;
