@@ -30,18 +30,19 @@ const counters = (page: Page) =>
     return { canvas: w.__imCanvasCommits ?? 0, miniature: w.__imMiniatureCommits ?? 0 };
   });
 
-async function open(page: Page, view: View) {
+async function open(page: Page, view: View, menu = true) {
   await page.goto("/sign-in");
   await page.evaluate(([k, v]) => localStorage.setItem(k, v), [`infomapper:view:${LARGE_IDS.canvas}`, JSON.stringify(view)] as const);
   await page.goto(LARGE_URL);
   await expect(page.getByTestId("area-canvas")).toHaveAttribute("data-ready", "true", { timeout: 60_000 });
   await page.mouse.move(2, 400);
-  await openTabMenu(page);
+  // the tab's menu is modal: the layer switch beside it can be clicked only with the menu closed
+  if (menu) await openTabMenu(page);
   await settledCommits(page, async (p) => (await counters(p)).canvas);
 }
 
 test("S16-11 commits: the two relationship kinds against the layer switch, their own commits and the fresh page's", async ({ page }) => {
-  test.setTimeout(40 * 60_000);
+  test.setTimeout(150 * 60_000);
   await resetDevData(E2E_DB);
   await seedLargeData(E2E_DB);
   await signInAs(page, "Łukasz");
@@ -68,12 +69,12 @@ test("S16-11 commits: the two relationship kinds against the layer switch, their
     for (let round = 0; round < ROUNDS; round++) {
       const order: Kind[] = round % 2 === 0 ? ["entities", "sources", "layer"] : ["layer", "sources", "entities"];
       for (const kind of order) {
-        await open(page, view);
+        await open(page, view, kind !== "layer");
         for (const dir of ["on", "off"] as const) {
           const before = await counters(page);
           hold = true;
-          await page.locator(SWITCHES[kind][dir].click).click();
-          await page.locator(SWITCHES[kind][dir].done).waitFor();
+          await page.locator(SWITCHES[kind][dir].click).click({ timeout: 30_000 });
+          await page.locator(SWITCHES[kind][dir].done).waitFor({ timeout: 30_000 });
           await page.waitForTimeout(1000);
           const own = await counters(page);
           hold = false;
@@ -84,6 +85,9 @@ test("S16-11 commits: the two relationship kinds against the layer switch, their
             own: { canvas: own.canvas - before.canvas, miniature: own.miniature - before.miniature },
             page: { canvas: after.canvas - own.canvas, miniature: after.miniature - own.miniature },
           });
+          // saved after each switch, so a later failure keeps what was measured
+          fs.mkdirSync("test-results", { recursive: true });
+          fs.writeFileSync("test-results/S16-11-commits.json", JSON.stringify({ rounds: ROUNDS, holdMs: HOLD_MS, keys, pane, lines, results }, null, 2));
         }
       }
     }

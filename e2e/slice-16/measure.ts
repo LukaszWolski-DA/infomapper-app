@@ -57,7 +57,7 @@ export const SWITCHES: Record<Kind, Record<"on" | "off", { click: string; done: 
   },
 };
 
-/** Opens the open canvas tab's menu, where the two kinds are; every run measures with it open, the layer's too. */
+/** Opens the open canvas tab's menu, where the two kinds are (modal: the commits spec closes it for the layer switch). */
 export async function openTabMenu(page: Page): Promise<void> {
   const tab = page.locator('[data-testid="tab-canvas"][aria-selected="true"]');
   await tab.hover();
