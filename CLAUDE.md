@@ -776,7 +776,7 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     (`rightPending`); Windows, the keyboard and touch keep the old path.
   - **The view's save** (`storeView`, `ModelCanvas.tsx`): the view and the left edge of one moment; the app's own changes
     store at once; `onMoveEnd` stores only a changed view (`lastStored`); `pagehide` and the unmount store a changed
-    view; nothing before the first view or once the canvas is gone. **A later view change made by the app** calls
+    view; nothing before the first view, once the canvas is gone, or while the fit animates (`animatingUntil`). **A later view change made by the app** calls
     `storeView` with the view it sets.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
