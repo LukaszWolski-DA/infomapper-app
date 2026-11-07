@@ -84,13 +84,17 @@ async function main(): Promise<number> {
   if (listed) {
     const files = await Promise.all(listed.map(listPart));
     let total = 0;
+    const lines: string[] = [];
     for (const [i, part] of listed.entries()) {
       const folders = partFolders(part);
-      console.log(`part ${part} (${folders[0]} to ${folders.at(-1)}): ${files[i]!.length} files`);
-      for (const f of files[i]!) console.log(`  ${f}`);
+      lines.push(`part ${part} (${folders[0]} to ${folders.at(-1)}): ${files[i]!.length} files`);
+      for (const f of files[i]!) lines.push(`  ${f}`);
       total += files[i]!.length;
     }
-    if (listed.length > 1) console.log(`total: ${total} files`);
+    if (listed.length > 1) lines.push(`total: ${total} files`);
+    // One write, finished before `process.exit`: on Linux a pipe's stdout is asynchronous, and the exit dropped what
+    // was still on its way (CI listed parts 1 to 5 only once slice 16's specs made the list longer).
+    await new Promise<void>((done) => process.stdout.write(`${lines.join("\n")}\n`, () => done()));
     return 0;
   }
 
