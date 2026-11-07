@@ -585,3 +585,140 @@ move the stored order would not make).
   with an unknown cause.
 - **The fix, in the test only, no assertion changed:** `whatShows` waits until the view has settled before it reads
   (`viewSettled`: the same viewport transform on two reads 150 ms apart). Locally 3 of 3.
+
+## Step 3: items 1, 2, 3 and 7, and the closing (7 November 2026)
+
+### What changed
+
+- **Item 1, "Add attribute"** (`addAttributeTo`, `src/app/_panels/canvas-host.tsx`): in an entity card header's menu,
+  after "Relate to itself" and directly before "Paste attribute" (Y1). It runs the panel's command
+  (`addAttributeAction`), selects the new row, opens details (`openDetails()`) and focuses its name
+  (`setNameFocus`). Logical and dimensional entities alike; not on a table card, not in a row's menu, not for a
+  reviewer or a reader.
+- **Item 2, the tabs' order:**
+  - `moveCanvas` (`src/domain/commands/canvas.ts`, `movedOrder`, `CANVAS_MOVES`) numbers the project's links
+    0…n−1 in the new order and writes only the changed ones, label "Move canvas", permission
+    `canvas.edit_projects`; a move that would not move the canvas is refused with "Nothing to change.";
+  - `moveCanvasAction` (`src/app/_actions/canvas.ts`);
+  - the menu (`canvas-menu.tsx`, the tab's and the project home tile's, Y2): Move left, Move right, Move to start,
+    Move to end, hidden with one canvas, disabled where they would not move it;
+  - **undo reverts an update of a link-table row** as a general rule for every link table (`revertChangeGroup`,
+    `undo.ts`): with both images, the current row must equal the step's after image, and the before image is
+    written back. The local adapter compares the whole row (link tables have no version).
+- **Item 3, relationship lines by kind:**
+  - `canvas.look`'s `hideEntityRelationships` and `hideSourceRelationships`, present as `true` only while hidden;
+  - the rules in `src/domain/model/canvas-look.ts` (`applyLookPatch`, `isHidden`, `sameLook`), used by
+    `setCanvasLook`, `look.tsx` (reviewers and readers change the layer and the kinds in their browser only, Y3),
+    the menu and the chips;
+  - the tab menu's "Relationship lines" section with "Between entities" and "Between source tables" (check items
+    that keep the menu open);
+  - the chips "Entity relationships hidden" and "Source relationships hidden" (`HIDDEN_KINDS`,
+    `view-state-bar.tsx`); "Show all" clears them with the layer in one patch;
+  - the canvas filters the kinds in the layer's `useMemo` (`ModelCanvas.tsx`), so bundles, Focus, the Changes view,
+    hover and the miniature follow;
+  - **from S16-11:** the miniature now takes only the mappings and relationships it draws (`Overview.tsx`,
+    `795479d`); before, hiding the source lines gave it a new lines object and it redrew once.
+- **Item 7, no browser menu:** `keepsBrowserMenu` (`src/ui/browser-menu.ts`: text fields, selects,
+  `contenteditable`, links, selected text) is the one rule for `NoBrowserMenu` (the root layout's document listener,
+  `src/ui/no-browser-menu.tsx`), the canvas's `onContextMenu` and the toolbox. Text fields inside the canvas keep the
+  browser's menu (Y7).
+
+### When "Nothing to change." can appear for a move (Y9)
+
+The menu decides what is disabled from the order its page has, so the toast appears only when that order is older
+than the stored one: the menu is opened again and a move picked before the page of a move just made has arrived, or
+the canvas was moved meanwhile in another tab or by someone else; the item looked enabled, but the canvas is already
+there.
+
+**A correction to step 2's text table:** the top bar's Undo button has the fixed title "Undo (Ctrl+Z)"; the step's
+name shows in the undo toast, "Undone: Move canvas", not in the button's title.
+
+### New specs (`e2e/slice-16/`)
+
+| Spec | What it checks |
+| --- | --- |
+| S16-01 | "Add attribute" after "Relate to itself" and directly before "Paste attribute"; adds `new_attribute`, opens its panel with the name selected, one undo removes it; the same on a dimension (the Sales star) |
+| S16-02 | not in a row's menu, not on a table card, not for a reviewer or a reader (a direct call refused), refused in an archived workspace (3 tests) |
+| S16-03 | three canvases: Move to start, Move right, disabled items, hidden with one canvas; one undo step each; kept after a reload; the home's tiles follow (3 tests) |
+| S16-04 | a canvas in two projects moved in one keeps its place in the other (D-28) |
+| S16-05 | "Between entities" hides logical, dimensional and self relationships and a collapsed frame's bundles; source lines, mappings and trace lines stay; the chip and its ×; no undo step; kept after a reload; another canvas unchanged (2 tests) |
+| S16-06 | "Between source tables", "Show all" with both off, both chips in Mappings (P9), "Duplicate layout" copies the switches, "Use this look on all canvases" does not (P8) (3 tests) |
+| S16-10 | a right click is cancelled on the canvas, a tab, the top bar, the breadcrumbs row, a panel's header and list, a home's header; not on the search field, a name field, the description editor, a link, selected text; the toolbox and a card's menu still open (2 tests) |
+| S16-11-commits | on demand (`COMMITS=1`, dev server): commits per switch against the layer switch |
+| S16-11 | measurement build only: the switches to the screen against the layer switch, drawing layers and elements |
+
+### Earlier tests changed, and why
+
+Step 3 changed no earlier test. Over the whole slice:
+
+| Spec | Change | Why |
+| --- | --- | --- |
+| `e2e/slice-02b/S2B-06.spec.ts` | the right-drag test loses `test.fail(process.platform !== "win32", …)` | item 4 (step 2): it passes on every platform |
+| `e2e/slice-06a/S6A-10.spec.ts` | the 1,201 px test loses `test.fail(process.platform === "linux", …)`; the loop checks the scroll at 1,201 px too | item 5 (step 2) |
+| `e2e/slice-07c/S7C-02.spec.ts` | `whatShows` waits until the view has settled before it reads; no assertion changed | the diagnosis above: a race with the arrival animation |
+
+`playwright.config.ts` ignores `S16-11.spec.ts` in normal runs, as the other measurement-build specs.
+
+### Measurements
+
+- **S16-11's commits** (`COMMITS=1 ROUNDS=1`, dev server, "Performance test" with 20 source lines, `795479d`):
+
+  | Switch | Own commits, canvas / miniature | After the answer's page, canvas / miniature |
+  | --- | --- | --- |
+  | Between entities, on and off | 1 / 1 | 3 / 1 |
+  | Between source tables, on and off | 1 / 0 | 3 / 1 |
+  | Layer, 100 % dense, on and off | 1 / 1 | 3 / 1 |
+
+  The bars are met: one canvas commit per switch, one miniature commit for "Between entities", none for "Between
+  source tables". The first run (on `c9c3491`) found one miniature commit for "Between source tables"; fixed in
+  `795479d`. The fresh page after the answer costs what the layer switch's does. At 30 % the layer switch's page came
+  inside the 1 s window in that run (own 1 / 1 on, 4 / 2 off).
+  That first run also hung: the spec clicked the layer switch while the tab's (modal) menu was open. It now measures
+  the layer switch with the menu closed and limits every click to 30 s.
+- **S16-11 to the screen** (measurement build, `795479d`, 3 rounds, medians of 10 pairs; S11-13's method):
+
+  | View | Between entities on / off | Between source tables on / off | Layer on / off |
+  | --- | --- | --- | --- |
+  | 30 % around ent:23 | 732–784 / 777–798 ms | 723–758 / 763–776 ms | 686–705 / 786–798 ms |
+  | 100 % dense | 192–205 / 197–215 ms | 83–89 / 83–87 ms | 198–204 / 209–215 ms |
+
+  The kinds cost no more than the layer switch; "Between source tables" at 100 % repaints nothing (raster 0 ms).
+- **Drawing layers and elements** (CDP LayerTree, measurement build):
+  - elements: hiding source lines removes exactly 81 elements (20 lines × 4 and their group), hiding entity lines 342
+    at 30 % and at 100 % dense;
+  - layers, with the tab's menu closed: 47 shown, 47 with source lines hidden, 48 with entity lines hidden. The one
+    more is a card the compositor gives its own layer once the relationship pills' layer shrinks; the Mappings layer
+    (since slice 2a) gives exactly the same 48 with the same card. S16-11's own read (48 / 50 / 49) was taken with the
+    menu open and counts its clicked item's focus layer.
+- **The element guard** (`S3B-15-elements`, against slice 8's counts): passed; viewport counts equal
+  (4,508 / 19,305 / 1,465 / 4,907), page totals 6,000 / 20,797 / 2,867 / 6,309, as since slice 11.
+- **`npm run measure:canvas -- --no-build --quick --rounds 2 --against slice-15d`** (after `--prepare-only` and a
+  discarded `--rounds 1` warm-up, sitting `2026-11-07-01-39`): **only one round counts.** The quiet check (below 2 %
+  for 30 s) failed before rounds 1, 3 and 4 with other programs open on the laptop, so the script dropped them. The
+  one round:
+
+  | Figure | slice-15d | This branch | Change |
+  | --- | --- | --- | --- |
+  | Pan and zoom at the overview | 52.9 fps | 53.4 fps | +0.9 % |
+  | Pan and zoom at 100 %, dense | 39.5 fps | 41.8 fps | +5.8 % |
+  | Initial render (C-08) | 1,898 ms | 2,033 ms | +7.1 % |
+  | Hover (C-10) | 30 ms | 29 ms | −5.3 % |
+  | Lasso marks | 30 ms | 23 ms | −23.7 % |
+  | Fading off, 100 % expanded | 33.9 fps | 41.3 fps | +21.8 % |
+  | Fading off, 100 % dense, expanded | 38.6 fps | 35.6 fps | −7.8 % |
+
+  The changes run both ways and are larger than the slice's code could cause (it adds no element to a card and no
+  work to a pan); C-08's 1,500 ms bar is missed on both sides. One round is not a balanced
+  sitting: it does not show a regression, and it does not rule out a small one. A clean sitting needs the laptop with
+  no other programs.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`, `npm test` (143 files, 1,792 tests): pass, locally.
+- **Locally on Windows, `795479d`**, slice 16's specs with the earlier specs step 3 touches (the tab menu, the chips,
+  the layer switch, the card header menu, the miniature, the homes' tiles): S0-04, S0-05, S0-06, S2A-08 to S2A-11,
+  S2A-13, S2B-12, S2C-06, S2C-09, S3A-11, S3B-12, S3B-13, S4B2-03, S6A-01 to S6A-06, S6A-08, S6A-09, S6B-02, S6B-06,
+  S6B-09, S7B-14, S10A-07, S10A-09, S10A-11, S10B-04, S10C-01, S10C-02, S10C-08, slice 12a, slice 12b, S14B-01,
+  S14B-03, S14B-07, S15-05 and `e2e/slice-16`: **107 passed, 1 skipped** (S16-11-commits, on demand), 19.8 min.
+
+- **The full run** is on this commit; its link and results are in the pull request.
