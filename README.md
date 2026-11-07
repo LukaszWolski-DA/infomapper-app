@@ -171,7 +171,8 @@ else `.data/session-secret`, made on first use.
 | `npm run schema:check` | Applies `supabase/migrations/` to a Postgres and compares the schema with the domain's tables (AD-31; CI runs it) |
 
 **Tests per step** (CLAUDE.md, "Testing"): after each step the specs of what it touched plus CI, a full run in a step
-that touches shared infrastructure, and one full run before a merge. The full run is the workflow's run on the commit
+that touches shared infrastructure, and one full run before a merge (it also counts for a later commit whose diff
+from the tested one touches only Markdown files in `docs/` and the repository root). The full run is the workflow's run on the commit
 the report names; the local `npm run e2e` (about 95 minutes on the laptop) is the fallback when GitHub is down.
 
 Optional variables are listed in `.env.example`.

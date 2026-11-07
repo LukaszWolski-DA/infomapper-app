@@ -754,3 +754,31 @@ Over the whole slice:
   No part came near the 6,431 MB restart threshold, and none printed a restart. After it only this report changed.
 - Locally on `43c8628`: S16-09 with the view specs (S5A-03, S5A-07, S6A-06, S6A-11, S6B-04, S6B-05, S9-11, S9-13,
   S2A-08), 18 of 18; `npm run lint`, `npm run typecheck`, `npm test` (1,792): pass.
+
+## Łukasz's decisions before the merge (7 November 2026)
+
+**Manual acceptance of slice 16 passed** (Łukasz, 7 November 2026).
+
+1. **A full run counts for a later docs-only commit** (CLAUDE.md, "Testing", and the README's test line): a full run
+   also counts for a later commit when the diff from the tested commit touches only Markdown files in `docs/` and the
+   repository root; the report shows it with `git diff --stat <tested>..HEAD`. For this merge, the diff from the full
+   run's commit `43c8628` to the merged head:
+
+   ```
+    CLAUDE.md                       |  6 ++--
+    README.md                       |  3 +-
+    docs/prd/slice-16-acceptance.md | 64 +++++++++++++++++++++++++++++++++++++++--
+    scripts/e2e.ts                  | 10 +++++--
+    4 files changed, 75 insertions(+), 8 deletions(-)
+   ```
+
+   **`scripts/e2e.ts` is the one change outside Markdown** (`ac27821`). The PR's CI (`ci.yml`) failed on `2b72f61` in
+   `tests/e2e-parts.test.ts`: `npm run e2e -- --list` printed parts 1 to 5 only on Linux. Stdout to a pipe is
+   asynchronous there, and `process.exit` dropped the rest once slice 16's specs made the list longer (about 11 KB).
+   The list is now one write, finished before the exit. It changes only how the list is printed; the E2E workflow does
+   not use `--list`, and no application code or spec changed. A second full run on `ac27821`
+   ([42355663269](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42355663269)) was started and then
+   cancelled on Łukasz's word: **run 42337272022 on `43c8628` is slice 16's full run** (Łukasz, 7 November 2026).
+2. **measure:canvas, a clean sitting of three rounds against slice-15d:** started (both builds made at 09:28) and **stopped during its warm-up on Łukasz's word, to merge**. No round was counted;
+   step 3's one-round sitting (`2026-11-07-01-39`) stays the slice's last figure, inconclusive. No bench row in the
+   README changed. A clean sitting can be run later against the tag `slice-16`.

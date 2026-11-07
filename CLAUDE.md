@@ -206,7 +206,9 @@ versions, change events in the same write, uniqueness and the “exactly one tar
     tests). A failing test is run three times on its own to tell a flake from a bug: the single-file check below.
   - **Exception:** a step that touches shared infrastructure (undo and change groups, the save chain, the canvas's
     layers, the table registry, the local adapter) runs one full e2e run in that step, and its report says why.
-  - Before a merge: one full e2e run.
+  - Before a merge: one full e2e run. It also counts for a later commit when the diff from the tested commit touches
+    only Markdown files in `docs/` and the repository root; the report shows it with `git diff --stat <tested>..HEAD`
+    (Łukasz, 7 November 2026).
   - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its seven parts
     (`e2e/parts.ts`) side by side on GitHub's Linux runners, each with its own fresh dev server, no retries; one job
     merges their reports. Start it by hand (`gh workflow run e2e.yml --ref <branch>`, or "Run workflow" on the Actions
