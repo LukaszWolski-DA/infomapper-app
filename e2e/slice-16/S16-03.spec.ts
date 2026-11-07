@@ -13,6 +13,7 @@ async function disabled(page: Page, canvasName: string): Promise<boolean[]> {
   const menu = await openCanvasMenu(page, canvasName);
   const states = await Promise.all(MOVES.map(async (id) => (await menu.getByTestId(id).getAttribute("data-disabled")) !== null));
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("menu-canvas")).toHaveCount(0); // closed before the next open
   return states;
 }
 async function move(page: Page, canvasName: string, testId: (typeof MOVES)[number]) {

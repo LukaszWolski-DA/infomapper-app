@@ -12,6 +12,7 @@ async function switchKind(page: Page, testId: "menu-item-lines-entities" | "menu
   await menu.getByTestId(testId).click();
   await expect(menu.getByTestId(testId)).toHaveAttribute("aria-checked", "false"); // the menu stays open
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("menu-canvas")).toHaveCount(0); // closed before the next open
 }
 
 test("S16-06: “Between source tables” off hides the source lines; with both kinds off “Show all” brings both back", async ({ page }) => {

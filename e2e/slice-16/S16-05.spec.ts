@@ -16,6 +16,7 @@ async function switchKind(page: Page, tab: string, testId: "menu-item-lines-enti
   const menu = await openCanvasMenu(page, tab);
   await menu.getByTestId(testId).click();
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("menu-canvas")).toHaveCount(0); // closed before the next open
 }
 
 test("S16-05: “Between entities” off hides entity relationships with the self loop; the other lines stay; the chip's × brings them back", async ({ page }) => {
@@ -47,6 +48,7 @@ test("S16-05: “Between entities” off hides entity relationships with the sel
   await expect(menu.getByTestId("menu-item-lines-entities")).toHaveAttribute("aria-checked", "false");
   await expect(menu.getByTestId("menu-item-lines-sources")).toHaveAttribute("aria-checked", "true");
   await page.keyboard.press("Escape");
+  await expect(page.getByTestId("menu-canvas")).toHaveCount(0); // closed before the next open
 
   // the chip's × brings them back
   await chipOff(page, "entity-relationships").click();
