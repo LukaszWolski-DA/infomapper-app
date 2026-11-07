@@ -242,8 +242,16 @@ const objectId = (o: object) => {
   return id;
 };
 
-/** Position, size and the card state that moves rows: what a relationship line depends on. */
-const placedSig = (p: Placed) => `${p.x},${p.y},${p.card.width ?? ""},${p.card.collapsed ? 1 : 0},${p.card.rowFilter}`;
+/**
+ * A card's rectangle, as `relGeom` reads it: what a relationship line or a source line depends on. The height, not the
+ * state that sets it: a row added, pasted, deleted, undone or redone, or a row that a filter starts or stops showing
+ * (a mapping under "Mapped"), changes the height alone, and a line between cards one above the other ends on the upper
+ * card's bottom edge (fix/relationship-ends: the line kept its old end until something else redrew it).
+ */
+const placedSig = (p: Placed) => {
+  const r = cardRect(p);
+  return `${r.x},${r.y},${r.w},${r.h}`;
+};
 
 const NO_BUNDLES: Bundle[] = [];
 const NO_BLOCKS = new Map<string, Rect>();
@@ -398,7 +406,7 @@ function LineLayer({
       return (
         <RelPath
           key={l.id}
-          sig={`${placedSig(a)}|${placedSig(z)}|${notation}|${className}|${l.label}|${l.fromMin}${l.fromMax}${l.toMin}${l.toMax}`}
+          sig={`${placedSig(a)}|${placedSig(z)}|${notation}|${className}|${l.label}|${l.fromMin}${l.fromMax}${l.toMin}${l.toMax}|${l.offset}`}
           line={l}
           a={a}
           z={z}
@@ -675,7 +683,7 @@ export const LitLines = memo(function LitLines({
           const a = placed(l.fromCardId), z = placed(l.toCardId);
           if (!a || !z) return null;
           // a signature as in the line layer, so a lit line follows a drag (slice 4b-2, step 6: it kept its old place)
-          return <RelPath key={l.id} sig={`${placedSig(a)}|${placedSig(z)}|${notation}|${l.label}|${l.fromMin}${l.fromMax}${l.toMin}${l.toMax}`} line={l} a={a} z={z} notation={notation} className="lnk rel" onSelect={NOOP} />;
+          return <RelPath key={l.id} sig={`${placedSig(a)}|${placedSig(z)}|${notation}|${l.label}|${l.fromMin}${l.fromMax}${l.toMin}${l.toMax}|${l.offset}`} line={l} a={a} z={z} notation={notation} className="lnk rel" onSelect={NOOP} />;
         })}
       {lines.mappings
         .filter((l) => maps.has(l.id))
