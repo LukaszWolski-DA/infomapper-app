@@ -724,7 +724,7 @@ templates are compiled. Its only path is `eslint-plugin-boundaries` 7.2.0 (dev, 
     21 October) pin `handlebars` 4.7.10, the upstream fix within the current major. Once they are 14 days old, update the
     plugin to `^7.2.1`, remove the `handlebars` override and repeat the checks above.
 
-### `npm audit`: three further findings on 22 October 2026, one of them in `next` (not yet decided)
+### `npm audit`: three further findings on 22 October 2026, one of them in `next` (resolved 7 November 2026)
 
 On 22 October 2026 `npm audit` reports 15 findings (1 moderate, 10 high, 4 critical): the `braces` and `handlebars`
 ones above, and three new ones. Recorded here only; nothing changed. After the `handlebars` override the same day:
@@ -743,6 +743,30 @@ ones above, and three new ones. Recorded here only; nothing changed. After the `
 - `next` 16.4.x is a minor update outside `package.json`'s exact `16.3.8` and younger than 14 days (16.4.1: from
   28 October; 16.4.2: from 29 October). Planned as its own pull request from 29 October with a full e2e run, not inside
   a slice. Because the advisory is critical and in the production dependency, an earlier exception is Łukasz's call.
+- **Resolved on 7 November 2026 (fix/next-16.4, its own pull request).** All three are updated to releases at least
+  14 days old, without `--force` and without a new override:
+  - `next` and `eslint-config-next` 16.3.8 → **16.4.3** (exact; 23 October, 15 days). 16.4.4 (2 November) and 16.4.5
+    (3 November) are too young. Next's bundled docs between 16.3.8 and 16.4.3 change nothing the app uses: `proxy.md`,
+    the route handler pages and `proxyClientMaxBodySize` are unchanged (the option is still in the config schema);
+    server actions only reword the client's one-at-a-time dispatch; `next/font/local` adds an optional
+    `font-family` declaration; `distDir` now refuses a folder outside the project (ours, `.next-e2e`,
+    `.next-e2e-restart`, `.next-demo` and `.next-measure`, are inside it). No code changed.
+  - `vite` 8.3.2 → **8.3.5** (21 October) and `ip-address` 10.7.3 → **10.7.4** (11 October), in the lock file only:
+    both fit their parents' ranges (`vitest` 5.0.3: `^8.0.0`; `socks`: `^10.1.1`). Vite's new dependencies were held to
+    releases old enough as well: `rolldown` 1.2.15 (21 October), `@oxc-project/types` 0.155.0 (19 October), `postcss`
+    8.5.31 (18 October). (`npm update --before` failed on npm 10.9.3 with an internal error around the Tiptap
+    override, so each package was installed at its version and removed again from `package.json`.)
+  - Checks: lint, typecheck, unit tests (143 files, 1,792 tests), `npm run build`, and one full e2e run (see the pull
+    request).
+  - **`npm audit --omit=dev` after it** reports one finding, new since 22 October and not in `next`: `zod` < 4.6.6
+    ([GHSA-mrhx-c7xc-m3w5](https://github.com/advisories/GHSA-mrhx-c7xc-m3w5), high, memory exhaustion while validating
+    oversized constrained collections), a direct production dependency (4.6.5; Zod validates every server action's
+    input). Fixed in 4.6.6 (11 October) and 4.6.7 (12 October), both old enough; not changed here, as it is outside
+    this pull request (Łukasz's call).
+  - The full `npm audit` reports 19 findings (1 low, 12 moderate, 6 high), all development-only apart from `zod`, and
+    none of them `next`, `vite` or `ip-address`: `body-parser`, `qs`, `undici`, `systeminformation`, `fast-uri`,
+    `minimatch` (through `typescript-eslint` and `ts-morph`), `deepmerge` and `zod` again (through `shadcn`). The
+    `braces` and `handlebars` findings above are no longer reported. Not changed here.
 
 ### `npm` override: `fast-equals` 5.4.3 under `@tiptap/react` (slice 4a, step 2)
 
