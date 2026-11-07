@@ -460,6 +460,8 @@ export function ModelCanvas({
    */
   /** What this canvas stored last: React Flow's late call after the app's own change finds it unchanged and stores nothing. */
   const lastStored = useRef<{ x: number; y: number; zoom: number; left: number } | null>(null);
+  /** Until when the app's own animated view change (the fit) runs; its target is stored already. */
+  const animatingUntil = useRef(0);
   const storeView = useCallback(
     (view?: Viewport, left?: number, onlyIfChanged = false) => {
       const root = rootRef.current;
@@ -469,6 +471,9 @@ export function ModelCanvas({
       const last = lastStored.current;
       // before the first view is set there is nothing of this canvas's to store (React Flow's default view)
       if (onlyIfChanged && !last) return;
+      // during the app's own animation the view shown is on its way to the target stored at its start: React Flow's late
+      // call of an earlier change landing then would store a view half-way (S16-09)
+      if (onlyIfChanged && performance.now() < animatingUntil.current) return;
       // the view only: a window that changes the left edge alone (crossing 1,000 px) is no move of the view
       if (onlyIfChanged && last && Math.abs(last.x - x) < 0.01 && Math.abs(last.y - y) < 0.01 && Math.abs(last.zoom - zoom) < 1e-6) return;
       lastStored.current = next;
@@ -480,6 +485,7 @@ export function ModelCanvas({
   const fit = useCallback(() => {
     const { width: w, height: h } = storeApi.getState();
     const view = fitView(w, h);
+    animatingUntil.current = performance.now() + 250;
     void rf.setViewport(view, { duration: 250 });
     storeView(view);
   }, [rf, storeApi, fitView, storeView]);
