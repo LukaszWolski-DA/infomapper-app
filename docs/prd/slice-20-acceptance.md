@@ -724,3 +724,98 @@ Even with both, the estimate is about 70 ms on the synthetic model.
 
 - `npx tsx scripts/bench-checks.ts`
 - `npx tsx scripts/bench-checks-browser.ts`
+
+## Łukasz's decisions on step 2 continued (8 November 2026)
+
+1. **Remove the remaining duplicated work:**
+   - reuse the requirement lookup's maps and per-entity lists;
+   - normalise each name once;
+   - one cube index, passed in where the caller has one.
+2. **Split marks from texts.** After a write the browser computes only the marks (per element its severity and its
+   groups) and the counts. Lines with their texts are built only where they are shown:
+   - the home's section;
+   - the panel group;
+   - an element panel's section;
+   - a card's title.
+   The rules may return compact references.
+3. **The bars:**
+   - marks and counts: 20 ms in Chromium on the synthetic model, the lookup apart;
+   - the project home's whole computation, lines included: 50 ms in Node;
+   - "Performance test" and the demo reported without a bar.
+   If the marks are still over 20 ms in Chromium, stop and report the split; add no deferred or incremental
+   computation.
+4. **A draft pull request** so CI runs on every push; no `full-e2e` label, no E2E workflow.
+
+## Step 2 continued, second round: marks apart from texts (8 November 2026)
+
+**Draft pull request:** https://github.com/LukaszWolski-DA/infomapper-app/pull/47 (no label, no E2E run).
+
+### What changed
+
+- **Items, not lines** (`checks.ts`):
+  - a rule gives `CheckItem`s: what it opens, the panels that list it, its marks, the entities it names, a fact
+    hint's fact, and `text()`, which builds its name and detail only when called;
+  - `lineOf(item)` is the item with its words, where it is shown;
+  - `CheckGroup.items` replaces `lines`;
+  - InfoCube's items do the same: a type conflict's detail and the "not yet covered" words are built in `text()`;
+  - whether an input is covered is read from `lookup.coverageOf`, without words.
+- **No rebuilt maps:**
+  - InfoMapper's rules read `lookup.attribute` and `lookup.attributesOf` (the model's order), with no map or sort of
+    their own beyond the entities';
+  - one pass over the attributes in scope serves duplicate names, calculated and mapped, lost originals and keys
+    without a relationship;
+  - each name is normalised once and each copy's key worked out once (`nameKeys`, `copyKeys`);
+  - the cube index is passed in: `cubeChecks`' third argument, `cubeModuleChecks` and `pageModuleChecks` take it;
+  - the benches build it apart, as the page's sections do.
+- **The index** (`checkIndex(checks, entityOf)`):
+  - at once: the marks (`{ high, groups }` per entity and per row), `count`, `high` and `countOn(entityIds)`;
+  - on the first call: every list (`all`, `panel`, `hintsOf`, `entityItems`, `rowItems`, `onCanvas`);
+  - `markTitle(items)` builds a title's words when the card is drawn;
+  - a test checks that the marks, the counts and a panel's list build no text.
+- **The benches:**
+  - `bench-checks.ts` times the lookup and the cube index apart, the marks and counts, and the home with every line's
+    words (bar 50 ms);
+  - `bench-checks-browser.ts` times the same in Chromium (bar 20 ms for the marks), with a split of its parts.
+
+### The figures
+
+Medians on the laptop; the lookup and the cube index are apart.
+
+| Measure | Before this round | After | Bar |
+| --- | --- | --- | --- |
+| **Chromium: marks and counts**, synthetic (a canvas after a write) | 60.0 ms (checks and index with texts) | **19.2, 23.4, 22.1, 21.8, 21.8, 31.6 ms** in six sittings | 20 ms: **met once, missed five times** |
+| Chromium: every line with its words | — | 20.2–22.1 ms | none |
+| Chromium: the lookup / the cube index | 13.3 ms / — | 11.4–13.0 ms / 4.8–5.5 ms | apart |
+| **Node: the home, every entity in scope, lines included**, synthetic | 107.6 ms (whole model) | **44.2 ms** | 50 ms: **met** |
+| Node: the home, a project of 200 entities, lines included | 46.8 ms | 12.4 ms | — |
+| Node: marks and counts, synthetic | — | 46.3 ms | none (the bar is Chromium's) |
+| Node: the lookup / the cube index | 24.5 ms / 9.5 ms | 23.5 ms / 10.3 ms | apart |
+| "Performance test": marks and counts / the home | 1.9 ms | 0.7 ms / 0.7 ms | none |
+| Demo: marks and counts / the home | 0.4 ms | 0.2 ms / 0.2 ms | none |
+
+The synthetic model has 4,296 lines; "Performance test" 21, the demo 15. Node on this laptop is noisier than Chromium.
+Node's marks (46 ms) came out above its home with lines (44 ms) in the same sitting.
+
+### The marks are still over 20 ms in Chromium: the split (three sittings, medians)
+
+| Part | Sitting 1 | Sitting 2 | Sitting 3 |
+| --- | --- | --- | --- |
+| InfoMapper's rules | 15.2 ms | 16.3 ms | 16.2 ms |
+| InfoCube's rules (cube index passed) | 3.2 ms | 2.5 ms | 3.4 ms |
+| The marks (`checkIndex`) | 1.4 ms | 1.4 ms | 2.1 ms |
+| One canvas's count (`countOn`) | 0.3 ms | 0.3 ms | 0.4 ms |
+| **Marks and counts, as one** | **21.8 ms** | **21.8 ms** | **31.6 ms** |
+
+InfoMapper's rules are three quarters of it. They make one pass over 23,000 attributes and 2,000 relationships and build
+about 2,000 items. As decided, I stopped here: nothing is deferred or computed incrementally.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: pass.
+- `npm test`: 157 files, 1,930 tests, all pass (one new: no text for marks and counts).
+- CI on the draft pull request: see the report in chat.
+
+### How to check
+
+- `npx tsx scripts/bench-checks.ts`
+- `npx tsx scripts/bench-checks-browser.ts` (prints the split)
