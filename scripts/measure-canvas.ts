@@ -79,6 +79,9 @@ const CRITERIA: Record<string, Run> = {
   c09: { specs: ["e2e/slice-01b/S1B-09.spec.ts"], args: [], results: ["S1B-09.json"] },
   // slice 4b-2's closing sitting
   s4b2pans: { specs: ["e2e/slice-04b2/S4B2-10.spec.ts"], args: [], results: ["S4B2-10.json"] },
+  // slice 20: pan and zoom at 100 % and 30 % on “Performance test” with the checks' marks, and a write that adds a mark
+  // and its undo that removes it, to the screen; both sides (the reference draws no mark)
+  s20: { specs: ["e2e/slice-20/S20-sitting.spec.ts"], args: [], results: ["S20-sitting.json"] },
   s4b2focus: { specs: ["e2e/slice-04b2/S4B2-11.spec.ts"], args: [], results: ["S4B2-11.json"], branchOnly: true },
   s4b2screen: { specs: ["e2e/slice-04b2/S4B2-12.spec.ts"], args: [], results: ["S4B2-12.json"], branchOnly: true },
   s4b2drag: { specs: ["e2e/slice-04b2/S4B2-13.spec.ts"], args: [], results: ["S4B2-13.json"], branchOnly: true },
@@ -245,6 +248,15 @@ const FIGURES: Figure[] = [
     { id: `s4b2-14-${v}`, name: `S4B2-14 pan and zoom without requirement cards (“100 cards”), ${v}, presented fps`, unit: "fps", better: "higher", ab: true, get: (r) => at(r["S4B2-10.json"], "canvases", "100 cards", v, "presented", "fps") },
     { id: `s4b2-14-${v}-raf`, name: "– untraced (rAF), the calibration", unit: "fps", better: "higher", get: (r) => at(r["S4B2-10.json"], "canvases", "100 cards", v, "raf", "avgFps") },
   ]),
+  // slice 20: S20-sitting (pans with the marks; a mark's write and its undo to the screen, AD-24's bars)
+  ...(["100%", "30%"] as const).flatMap((v): Figure[] => [
+    { id: `s20-pan-${v}`, name: `S20 pan and zoom on Performance test, ${v}, presented fps (traced)`, unit: "fps", better: "higher", bar: 50, ab: true, get: (r) => at(r["S20-sitting.json"], "pans", v, "presented", "fps") },
+    { id: `s20-pan-${v}-raf`, name: "– untraced (rAF), the calibration", unit: "fps", better: "higher", ab: true, get: (r) => at(r["S20-sitting.json"], "pans", v, "raf", "avgFps") },
+  ]),
+  { id: "s20-write-on", name: "S20 a mark's write (redo) to the screen, median of 10 settled", unit: "ms", better: "lower", ab: true, get: (r) => at(r["S20-sitting.json"], "write", "toScreen", "byDir", "on", "toScreen", "median") },
+  { id: "s20-write-on-p95", name: "– p95", unit: "ms", better: "lower", get: (r) => at(r["S20-sitting.json"], "write", "toScreen", "byDir", "on", "toScreen", "p95") },
+  { id: "s20-write-off", name: "S20 its undo (the mark goes) to the screen, median of 10 settled", unit: "ms", better: "lower", ab: true, get: (r) => at(r["S20-sitting.json"], "write", "toScreen", "byDir", "off", "toScreen", "median") },
+  { id: "s20-write-off-p95", name: "– p95", unit: "ms", better: "lower", get: (r) => at(r["S20-sitting.json"], "write", "toScreen", "byDir", "off", "toScreen", "p95") },
   // slice 4p (S4P-08): pan and zoom with fading off around ent:23, both sides
   ...FADING_VIEWS.flatMap((v): Figure[] => [
     { id: `fade-off-${v}`, name: `Pan and zoom, fading off, ${v} (S4P-08)`, unit: "fps", better: "higher", ab: true, get: (r) => at(r["S4P-fading.json"], "views", v, "off", "avgFps") },
