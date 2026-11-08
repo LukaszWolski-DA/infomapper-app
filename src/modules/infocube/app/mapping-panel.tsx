@@ -329,15 +329,17 @@ function LookupFields({
           ))}
         </select>
       </Field>
-      {!candidates.length ? (
-        <Note warn testId="note-lookup-none">
-          {lookupNoRelationship(dictionary?.name ?? "The dictionary")}
-        </Note>
-      ) : gone ? (
+      {/* the one chosen is gone first (F15), and then whether there is another to choose */}
+      {gone && (
         <Note warn testId="note-lookup-gone">
           {LOOKUP_RELATIONSHIP_GONE}
         </Note>
-      ) : null}
+      )}
+      {!candidates.length && (
+        <Note warn testId="note-lookup-none">
+          {lookupNoRelationship(dictionary?.name ?? "The dictionary")}
+        </Note>
+      )}
       <Field label="When no match" htmlFor={NO_MATCH_ID}>
         <TextField
           key={fieldKey(m.id, "lookup_default")}

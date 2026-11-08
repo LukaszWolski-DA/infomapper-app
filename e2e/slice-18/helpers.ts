@@ -3,6 +3,8 @@
 
 import type { Locator } from "@playwright/test";
 import { addAttribute } from "../../src/domain/commands/attribute";
+import { calculateAttribute, setCalculationRule } from "../../src/domain/commands/derivation";
+import { deleteMapping } from "../../src/domain/commands/mapping";
 import type { AttributeInput } from "../../src/domain/types";
 import { asLukasz, RETAIL, store } from "../slice-01b/helpers";
 import { cubeStore } from "../slice-15a/helpers";
@@ -63,3 +65,33 @@ export async function expectAttributePanelAt(page: Page, attributeId: string): P
   const a = m.attributes.find((x) => x.id === attributeId)!;
   await expect(page.getByTestId("panel-attribute")).toHaveAttribute("data-version", String(a.version));
 }
+
+export { approvedMapping } from "../slice-04b1/helpers";
+export { openRequirement } from "../slice-04a/helpers";
+export { gapsOf, lensRows, litModules } from "../slice-15d/helpers";
+export { ids } from "../slice-01b/helpers";
+export { setCard } from "../slice-06a/helpers";
+
+/** Makes an attribute calculated from others of its entity, as Łukasz, through the domain; with a rule. */
+export async function calculateAs(entity: string, name: string, inputs: readonly string[], rule: string | null = null): Promise<void> {
+  const a = await attributeNamed(entity, name);
+  const m = await liveModel();
+  const inputIds = await Promise.all(inputs.map(async (n) => (await attributeNamed(entity, n)).id));
+  await asLukasz((ctx, access) => calculateAttribute(ctx, access, { attribute: a, attributes: m.attributes, attributeInputs: m.attributeInputs }, { attributeId: a.id, expectedVersion: a.version, inputIds }));
+  if (!rule) return;
+  const b = await attributeNamed(entity, name);
+  await asLukasz((ctx, access) => setCalculationRule(ctx, access, { attribute: b, attributes: [], attributeInputs: [] }, { attributeId: b.id, expectedVersion: b.version, rule }));
+}
+
+/** Deletes a source mapping as Łukasz, through the domain. */
+export async function deleteMappingAs(mappingId: string): Promise<void> {
+  const m = await store().model.load(RETAIL);
+  const mapping = m.mappings.find((x) => x.id === mappingId)!;
+  await asLukasz((ctx, access) => deleteMapping(ctx, access, { mapping, inputs: m.mappingInputs }, { mappingId, expectedVersion: mapping.version }));
+}
+
+/** A card's count ("8/9"). */
+export const cardCount = (page: Page, cardName: string): Locator =>
+  page.locator(".react-flow__node").filter({ has: page.getByTestId("card-name").getByText(cardName, { exact: true }) }).locator(".cov-t");
+/** The Overview's coverage line of an entity ("8 of 9 fed"). */
+export const overviewLine = (page: Page, entityName: string): Locator => page.getByTestId("inspector-overview").getByTestId("item-coverage").filter({ hasText: entityName });
