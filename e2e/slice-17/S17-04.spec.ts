@@ -26,7 +26,9 @@ import {
 
 const CO = SEED_IDS.canvasCustomerOrders;
 const VIEW = { x: 40, y: 80, zoom: 0.5 };
-const handle = (page: Page, dir: string) => frameEl(page, "Around Customer").getByTestId(dir === "se" ? "frame-resize" : `frame-resize-${dir}`);
+// the bottom-right handle is in the frame; the selected frame's others in a layer above the lines (no line covers them)
+const handle = (page: Page, dir: string) =>
+  dir === "se" ? frameEl(page, "Around Customer").getByTestId("frame-resize") : page.getByTestId(`frame-resize-${dir}`);
 
 /** A frame around Customer's card, with a note pinned to it and a free note inside it. */
 async function frameAroundCustomer() {
@@ -84,7 +86,10 @@ test("S17-04: the left edge and the top-left corner resize a frame; a card left 
   expect((await noteRow(pinned)).x).toBe(pin0.x);
 
   // the top-left corner moves both
-  await page.mouse.click(inside.x, inside.y);
+  await expect(page.getByTestId("toast")).toHaveAttribute("data-visible", "false");
+  const again = await emptyIn(page, "Around Customer");
+  await page.mouse.click(again.x, again.y);
+  await expect(handle(page, "nw")).toHaveCount(1);
   await dragBy(page, handle(page, "nw"), -40, -24);
   await expect.poll(async () => { const f = await frameRow(frameId, CO); return [f.x, f.y]; }).toEqual([f0.x - 80, f0.y - 48]);
   const f2 = await frameRow(frameId, CO);
@@ -100,7 +105,7 @@ test("S17-04: no handles for a reader, and none on a collapsed frame", async ({ 
   await openCanvas(page, canvasUrl(), VIEW);
   const inside = await emptyIn(page, "Around Customer");
   await page.mouse.click(inside.x, inside.y);
-  await expect(frameEl(page, "Around Customer").locator("[data-frame-handle]")).toHaveCount(0);
+  await expect(page.locator("[data-frame-handle]")).toHaveCount(0);
 
   await collapse(frameId);
   await page.reload();

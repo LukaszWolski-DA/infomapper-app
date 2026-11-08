@@ -362,6 +362,9 @@ body.im-rq-linking, body.im-rq-linking * { cursor: crosshair !important }
 .im-canvas .f-rs[data-dir="nw"] { right: auto; bottom: auto; left: -7px; top: -7px }
 .im-canvas .f-rs[data-dir="ne"] { bottom: auto; top: -7px; cursor: nesw-resize }
 .im-canvas .f-rs[data-dir="sw"] { right: auto; left: -7px; cursor: nesw-resize }
+.im-canvas .frame-handles { position: absolute; left: 0; top: 0; z-index: 2; pointer-events: none }
+.im-canvas .f-handles { position: absolute; pointer-events: none }
+.im-canvas .f-handles .f-rs { box-shadow: 0 0 0 1.5px var(--fc) }
 .im-canvas .f-rz { position: absolute; pointer-events: all; --t: calc(10px * var(--iz, 1)) }
 .im-canvas .f-rz[data-dir="n"] { left: 18px; right: 18px; top: calc(var(--t) / -2); height: var(--t); cursor: ns-resize }
 .im-canvas .f-rz[data-dir="s"] { left: 18px; right: 18px; bottom: calc(var(--t) / -2); height: var(--t); cursor: ns-resize }

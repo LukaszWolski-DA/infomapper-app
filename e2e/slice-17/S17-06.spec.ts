@@ -3,6 +3,8 @@
 // links; onto empty canvas nothing is linked; Escape links nothing. A drag from the card's name still moves it. No
 // handle for a reviewer or a reader.
 
+import { removeFromCanvas } from "../../src/domain/commands/canvas-item";
+import { asLukasz, RETAIL, store } from "../slice-01b/helpers";
 import { test as starTest } from "../slice-15a/fixtures";
 import { expect, test, type Page } from "./fixtures";
 import {
@@ -28,16 +30,30 @@ import {
   WHOLE_CO,
 } from "./helpers";
 
-// the seed has REQ-104's card on Customer & orders, beside the Sales cards (slice 4b-2)
+// the seed has REQ-104's card on Customer & orders, beside the Sales cards (slice 4b-2), where the Overview and the toasts
+// lie over it in this view: it is moved up, into the empty space right of Customer, as test data
 const VIEW = WHOLE_CO;
+async function moveReq104Up(): Promise<void> {
+  const card = (await reqCardData("REQ-104"))!;
+  const canvas = await store().canvases.get(RETAIL, card.canvas_id);
+  await asLukasz((ctx, access) => removeFromCanvas(ctx, access, { item: card, canvas }, { canvasItemId: card.id, expectedVersion: card.version }));
+  await placeReqCards([{ key: "REQ-104", x: 1176, y: 120 }]);
+}
+/** The Overview's miniature lies over REQ-104's card in this view: hidden (M, as its button). */
+async function hideOverview(page: Page) {
+  if (await page.locator(".overview-view").count()) await page.keyboard.press("m");
+  await expect(page.locator(".overview-view")).toHaveCount(0);
+}
 const linkHandle = (page: Page, key = "REQ-104") => reqCard(page, key).getByTestId("handle-requirement-link");
 
 test("S17-06: a drag from the handle onto a row links the attribute, one undo step; onto a header the entity; the card stays", async ({ page }) => {
   const { attribute, entity } = await ids();
   const customerId = attribute("Customer", "customer_id");
+  await moveReq104Up();
   const at0 = await reqCardData("REQ-104");
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), VIEW);
+  await hideOverview(page);
   await expect(linkHandle(page)).toHaveAttribute("title", "Drag onto an attribute, entity, mapping, table or column to link REQ-104");
 
   // onto the row: the line and the target are shown while dragging
@@ -63,10 +79,11 @@ test("S17-06: a drag from the handle onto a row links the attribute, one undo st
 });
 
 test("S17-06: onto empty canvas or after Escape nothing is linked; the card's name still moves it", async ({ page }) => {
+  await moveReq104Up();
   await signInAs(page, "Łukasz");
   await openCanvas(page, canvasUrl(), VIEW);
+  await hideOverview(page);
   const traces = await tracesOf("REQ-104");
-
   const spot = await emptySpot(page);
   await dragOnto(page, linkHandle(page), spot);
   await expectToast(page, "Drop REQ-104 on an attribute, entity, mapping, table or column to link it.");
@@ -81,8 +98,9 @@ test("S17-06: onto empty canvas or after Escape nothing is linked; the card's na
 
   // a drag from the name moves the card
   const at0 = await reqCardData("REQ-104");
-  await dragOnto(page, reqCard(page, "REQ-104").getByTestId("card-name"), { x: spot.x, y: spot.y });
-  await expect.poll(async () => (await reqCardData("REQ-104"))!.x).not.toBe(at0!.x);
+  const name = (await reqCard(page, "REQ-104").getByTestId("card-name").boundingBox())!;
+  await dragOnto(page, reqCard(page, "REQ-104").getByTestId("card-name"), { x: name.x - 160, y: name.y - 160 });
+  await expect.poll(async () => { const at = (await reqCardData("REQ-104"))!; return [at.x, at.y]; }).not.toEqual([at0!.x, at0!.y]);
   expect(await tracesOf("REQ-104")).toEqual(traces);
 });
 
@@ -90,6 +108,7 @@ test("S17-06: no handle for a reviewer or a reader", async ({ page }) => {
   for (const who of ["Piotr Wiśniewski", "Kasia Zielińska"] as const) {
     await signInAs(page, who);
     await openCanvas(page, canvasUrl(), VIEW);
+  await hideOverview(page);
     await expect(reqCard(page, "REQ-104")).toBeVisible();
     await expect(linkHandle(page)).toHaveCount(0);
   }
