@@ -186,5 +186,12 @@ export function derivedRowTitle(row: DerivedRow, word: "mapped" | "fed"): string
   return `Calculated from ${row.inputs.join(", ")}${row.ok ? `: every input is ${word}` : `: not every input is ${word} yet`}`;
 }
 
+/**
+ * An input's delete (item 3, F12; the prototype's `askDeleteAttr` row): the second click's part for the calculations
+ * that read it. Null when none does.
+ */
+export const calculationsLoseInput = (users: readonly string[]): string | null =>
+  !users.length ? null : users.length === 1 ? `the calculation of ${users[0]} loses this input` : `the calculations of ${users.join(", ")} lose this input`;
+
 /** The row mark's title: the rule. */
 export const calcMarkTitle = (rule: string | null): string => `Calculated: ${rule?.trim() ? rule : "no rule yet"}`;

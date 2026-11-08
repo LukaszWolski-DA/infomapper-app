@@ -6,10 +6,11 @@
 
 import { useContext } from "react";
 import { deleteRelationshipAction, swapRelationshipAction, updateRelationshipAction } from "@/app/_actions/model";
+import { useModules } from "@/app/_components/modules";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { CardinalityMax, CardinalityMin, Relationship } from "@/domain/types";
-import { Actions, buttonClass, dangerClass, Field, fieldKey, Kind, Seg, TextField } from "./fields";
+import { Actions, buttonClass, ConfirmDelete, dangerClass, Field, fieldKey, Kind, Seg, TextField } from "./fields";
 import { PANEL_SECTIONS } from "@/compose/panels";
 import { usePanel } from "./inspector";
 
@@ -47,6 +48,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
   const to = p.ix.entity.get(r.to_entity_id)?.name ?? "?";
   const ref = (expectedVersion: number) => ({ relationshipId: r.id, expectedVersion });
   const self = r.from_entity_id === r.to_entity_id;
+  const lookups = useModules().relationshipDeletes[r.id]?.then;
 
   const save = (change: Omit<Parameters<typeof updateRelationshipAction>[1], "relationshipId" | "expectedVersion">) =>
     saveRow(r, (v) => updateRelationshipAction(p.workspaceId, { ...ref(v), ...change }));
@@ -146,9 +148,14 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
           >
             Swap direction
           </button>
-          <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-relationship">
-            Delete relationship
-          </button>
+          {lookups?.length ? (
+            // slice 18 (F14): with lookups through it, a second click that says what they lose
+            <ConfirmDelete label="Delete relationship" then={lookups.join("; ")} onConfirm={() => void remove()} testId="button-delete-relationship" />
+          ) : (
+            <button type="button" className={dangerClass} onClick={() => void remove()} data-testid="button-delete-relationship">
+              Delete relationship
+            </button>
+          )}
         </Actions>
       )}
     </div>

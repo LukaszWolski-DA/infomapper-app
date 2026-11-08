@@ -141,7 +141,7 @@ describe("the pages' module view from the star (E6, E7, E13)", () => {
   it("gives nothing for a workspace with InfoCube off and no facts or dimensions", async () => {
     const store = createLocalDataStore(file, STORE_SCHEMA);
     const [workspace, model] = await Promise.all([store.workspaces.get(SEED_IDS.wsBankX), store.model.load(SEED_IDS.wsBankX)]);
-    expect(await moduleView(store, workspace!, model, ACTIONS)).toEqual({ roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, rowFeeds: {}, data: {} });
+    expect(await moduleView(store, workspace!, model, ACTIONS)).toEqual({ roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, rowFeeds: {}, relationshipDeletes: {}, data: {} });
   });
 
   it("lists a dimension's own rows in its delete preview, each fact once (X-4)", async () => {

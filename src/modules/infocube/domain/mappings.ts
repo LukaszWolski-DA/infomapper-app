@@ -259,6 +259,36 @@ export const lookupRelationshipGone = (relationships: readonly Relationship[], m
 export const lookupNoRelationship = (entity: string) => `${entity} has no relationship to another entity. Draw one in the logical model first.`;
 export const LOOKUP_RELATIONSHIP_GONE = "The relationship it went through is gone. Choose another.";
 
+/** A relationship's second click (F14): what its delete does to the lookups through it, by their targets. */
+export const lookupsLoseRelationship = (targets: readonly string[]) =>
+  targets.length === 1 ? `the lookup of ${targets[0]} loses its relationship` : `the lookups of ${targets.join(", ")} lose their relationship`;
+
+/** The live lookups through each relationship, their targets' labels in order ("Dim Customer.country_name"). */
+export function lookupsByRelationship(index: MappingIndex, cubeMappings: readonly CubeMapping[]): Map<Uuid, string[]> {
+  const out = new Map<Uuid, string[]>();
+  for (const m of cubeMappings) {
+    if (m.deleted_at !== null || m.kind !== "lookup" || !m.lookup_relationship_id || !index.mapping(m.id)) continue;
+    (out.get(m.lookup_relationship_id) ?? out.set(m.lookup_relationship_id, []).get(m.lookup_relationship_id)!).push(index.label(m.attribute_id));
+  }
+  for (const list of out.values()) list.sort((a, b) => a.localeCompare(b));
+  return out;
+}
+
+/** Each relationship with lookups through it: its delete's second click (F14). */
+export function relationshipDeletes(index: MappingIndex, cubeMappings: readonly CubeMapping[]): Record<Uuid, { then: string[] }> {
+  const out: Record<Uuid, { then: string[] }> = {};
+  for (const [id, targets] of lookupsByRelationship(index, cubeMappings)) out[id] = { then: [lookupsLoseRelationship(targets)] };
+  return out;
+}
+
+/** An entity's delete preview (F14, D-47): the lookups through the relationships it takes along, one row; none without. */
+export function lookupDependents(index: MappingIndex, cubeMappings: readonly CubeMapping[], relationships: readonly Relationship[], entityId: Uuid): [string, string][] {
+  const going = new Set(relationships.filter((r) => r.deleted_at === null && (r.from_entity_id === entityId || r.to_entity_id === entityId)).map((r) => r.id));
+  const byRelationship = lookupsByRelationship(index, cubeMappings);
+  const n = [...going].reduce((sum, id) => sum + (byRelationship.get(id)?.length ?? 0), 0);
+  return n ? [[`${n} lookup${n === 1 ? "" : "s"}`, n === 1 ? "loses its relationship" : "lose their relationship"]] : [];
+}
+
 // ---- D-51 ----
 
 /** D-51's first rule on a dimensional mapping: a content change of an approved one sends it to review (O12). */

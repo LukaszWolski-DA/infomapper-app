@@ -13,7 +13,7 @@ import type { ModuleLineData } from "@/canvas/line-data";
 import { cubeLines } from "@/modules/infocube/canvas/lines";
 import { BUS_MATRIX_TEXTS } from "@/modules/infocube/domain/bus-matrix";
 import { cubeIndex } from "@/modules/infocube/domain/keys";
-import { CUBE_MAPPING_LOG, cubeRequirementFeeds, mappingIndex } from "@/modules/infocube/domain/mappings";
+import { CUBE_MAPPING_LOG, cubeRequirementFeeds, mappingIndex, relationshipDeletes } from "@/modules/infocube/domain/mappings";
 import type { AttributeFeeds } from "@/domain/model/requirements";
 import type { CubeMapping, CubeMappingInput } from "@/modules/infocube/domain/types";
 import {
@@ -65,6 +65,8 @@ export async function moduleView(store: DataStore, workspace: Workspace, model: 
   const described = {
     rowMarks: measureMarks(index, model.attributes),
     attributeDeletes: attributeDeletes(index, model.attributes, mappings),
+    // slice 18 (F14): a relationship with lookups through it asks a second click
+    relationshipDeletes: hasDimensional ? relationshipDeletes(mappings, cubeMappings) : {},
     rowFeeds: hasDimensional ? cubeRowFeeds(mappings, model.attributes) : {},
     data: hasDimensional
       ? {
@@ -150,7 +152,7 @@ export async function moduleEntityDependents(store: DataStore, workspaceId: Uuid
     store.modules.list(workspaceId, "cube_mapping_input"),
   ]);
   const mappings = mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs });
-  return entityDependents(entityId, model, cube, measures, mappings);
+  return entityDependents(entityId, model, cube, measures, mappings, cubeMappings);
 }
 
 /** The rows a module counts on cards, for the thumbnails (slice 15c): `moduleFeeds`' `rowFeeds`. */

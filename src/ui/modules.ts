@@ -135,13 +135,18 @@ export interface ModuleView {
   /** The rows a module counts on cards (slice 15c: every dimensional attribute), by attribute id. */
   rowFeeds: Record<Uuid, RowFeed>;
   /**
+   * A relationship's delete with module rows that outlive it asks a second click (slice 18, F14: the lookups through
+   * it), by relationship id: the parts after "Click again to delete; ".
+   */
+  relationshipDeletes: Record<Uuid, { then: string[] }>;
+  /**
    * Each module's own rows for its panel sections (`src/compose/panels.ts`), by module: plain rows without
    * `created_*` and `updated_*` (O8). InfoMapper never reads them.
    */
   data: Readonly<Record<string, unknown>>;
 }
 
-export const NO_MODULES: ModuleView = { roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, rowFeeds: {}, data: {} };
+export const NO_MODULES: ModuleView = { roles: {}, tabs: [], creates: [], rowMarks: {}, attributeDeletes: {}, rowFeeds: {}, relationshipDeletes: {}, data: {} };
 
 /** A row of a delete preview that a module adds (X-1): what, and what happens to it. */
 export type DependentRow = [what: string, happens: string];

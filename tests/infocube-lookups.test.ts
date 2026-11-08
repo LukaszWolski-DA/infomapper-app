@@ -245,3 +245,24 @@ describe("slice 18's demo on the star (item 5, F20)", () => {
     expect(addStarDerivations(db as never, WS, "01900000-0000-7000-8000-000000000100")).toBe(false);
   });
 });
+
+describe("the delete previews (slice 18, F12, F14)", () => {
+  it("a relationship with a lookup through it, and an entity that takes it along, name the lookup", async () => {
+    const { lookupDependents, relationshipDeletes } = await import("@/modules/infocube/domain/mappings");
+    let rows = starRows();
+    rows = apply(rows, ok(update(rows, { kind: "lookup" })).writeSet);
+    const index = mappingIndex(state(rows));
+    expect(relationshipDeletes(index, mappings(rows))).toEqual({ [locates(rows).id]: { then: ["the lookup of Dim Customer.country_name loses its relationship"] } });
+    expect(lookupDependents(index, mappings(rows), relationships(rows), entityNamed(rows, "Customer Address").id)).toEqual([["1 lookup", "loses its relationship"]]);
+    expect(lookupDependents(index, mappings(rows), relationships(rows), entityNamed(rows, "Product").id)).toEqual([]);
+    // without lookups: nothing asks
+    expect(relationshipDeletes(mappingIndex(state(starRows())), mappings(starRows()))).toEqual({});
+  });
+
+  it("an input's second click names the calculations that read it", async () => {
+    const { calculationsLoseInput } = await import("@/domain/model/derivations");
+    expect(calculationsLoseInput([])).toBeNull();
+    expect(calculationsLoseInput(["net_amount"])).toBe("the calculation of net_amount loses this input");
+    expect(calculationsLoseInput(["a", "b"])).toBe("the calculations of a, b lose this input");
+  });
+});
