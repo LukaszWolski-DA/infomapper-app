@@ -376,6 +376,8 @@ export interface IndexedItem {
 export interface CheckMarkInfo {
   high: boolean;
   groups: readonly string[];
+  /** How many items it stands for ("Model checks: {n}"). */
+  n: number;
 }
 
 export interface CheckIndex {
@@ -415,13 +417,17 @@ export function markTitle(items: readonly IndexedItem[]): string {
  * once; every list on its first call.
  */
 export function checkIndex(checks: Pick<ModelChecks, "groups" | "count" | "high">, entityOf: (attributeId: Uuid) => Uuid | undefined): CheckIndex {
-  const entityMarks = new Map<Uuid, { high: boolean; groups: string[] }>();
-  const rowMarks = new Map<Uuid, { high: boolean; groups: string[] }>();
-  const note = (map: Map<Uuid, { high: boolean; groups: string[] }>, id: Uuid, g: CheckGroup) => {
+  type Mark = { high: boolean; groups: string[]; n: number; last: CheckItem | null };
+  const entityMarks = new Map<Uuid, Mark>();
+  const rowMarks = new Map<Uuid, Mark>();
+  // an item counts once per element, however many of its marks fall on it (a duplicate's rows on one header)
+  const note = (map: Map<Uuid, Mark>, id: Uuid, g: CheckGroup, item: CheckItem) => {
     const m = map.get(id);
-    if (!m) map.set(id, { high: g.high, groups: [g.id] });
-    else {
+    if (!m) map.set(id, { high: g.high, groups: [g.id], n: 1, last: item });
+    else if (m.last !== item) {
       m.high ||= g.high;
+      m.n++;
+      m.last = item;
       if (m.groups[m.groups.length - 1] !== g.id) m.groups.push(g.id);
     }
   };
@@ -429,21 +435,22 @@ export function checkIndex(checks: Pick<ModelChecks, "groups" | "count" | "high"
     for (const item of g.items) {
       for (const k of item.marks) {
         if (k.t === "attribute") {
-          note(rowMarks, k.id, g);
+          note(rowMarks, k.id, g, item);
           const e = entityOf(k.id);
-          if (e) note(entityMarks, e, g);
-        } else note(entityMarks, k.id, g);
+          if (e) note(entityMarks, e, g, item);
+        } else note(entityMarks, k.id, g, item);
       }
     }
   }
+  const info = (m: Mark | undefined): CheckMarkInfo | undefined => (m ? { high: m.high, groups: m.groups, n: m.n } : undefined);
 
   let lists: ReturnType<typeof buildLists> | null = null;
   const built = () => (lists ??= buildLists(checks.groups, entityOf));
   return {
     count: checks.count,
     high: checks.high,
-    entityMark: (id) => entityMarks.get(id),
-    rowMark: (id) => rowMarks.get(id),
+    entityMark: (id) => info(entityMarks.get(id)),
+    rowMark: (id) => info(rowMarks.get(id)),
     countOn(entityIds) {
       const on = entityIds instanceof Set ? (entityIds as ReadonlySet<Uuid>) : new Set(entityIds);
       let count = 0, high = false;

@@ -12,14 +12,16 @@ import { CanvasCardsCtx, DiagnosisCtx } from "./context";
 import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
 import { splitName } from "./names";
 import type { RequirementMark } from "./requirement-marks";
-import { lineNeedsClip, ROLE_MARK } from "./text-fit";
+import { CHECK_MARK_HEAD, CHECK_MARK_ROW, lineNeedsClip, ROLE_MARK, rowNeedsClip, titleNeedsClip } from "./text-fit";
+import { checkTitle, type CardCheck } from "./checks";
+import type { CheckMarkInfo } from "@/domain/model/checks";
 import { calcMarkTitle } from "@/domain/model/derivations";
 
 /**
  * `pinnedNotes`: the notes pinned to the card that are shown (slice 3a); `reqMark`: its requirement marker (slice 4b-1).
  * Both given by the canvas only when there are some.
  */
-export type CardNodeT = Node<{ card: CardData; pinnedNotes?: number; reqMark?: RequirementMark }, "card">;
+export type CardNodeT = Node<{ card: CardData; pinnedNotes?: number; reqMark?: RequirementMark; check?: CardCheck }, "card">;
 
 /** A card node, not a collapsed frame's block (slice 2c): React Flow holds both kinds. */
 export const isCardNode = (n: Node): n is CardNodeT => n.type === "card";
@@ -87,7 +89,7 @@ function keyTitle(r: CardRow) {
 /** A column with an open change to resolve (slice 7b, prototype `colRow`). */
 const CHANGED_TITLE = "Changed in the source: see the table's changes to resolve";
 
-function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; selected: boolean }) {
+function Row({ row, kind, selected, check, clip }: { row: CardRow; kind: CardData["kind"]; selected: boolean; check?: CheckMarkInfo; clip: boolean }) {
   // the alias in alias mode, otherwise the name (slice 11, F8)
   const text = shownText(row);
   const { head, tail } = splitName(text);
@@ -95,7 +97,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
   const status = row.mappings === 0 ? (row.calc?.square ? ` calc${row.calc.square === "ok" ? " ok" : ""}` : "") : row.warn ? " warn" : " ok";
   return (
     <div
-      className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}${row.retired ? " old" : row.missing ? " gone" : row.change ? ` ${row.change}` : ""}${row.mark ? ` ${row.mark}` : ""}`}
+      className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}${row.retired ? " old" : row.missing ? " gone" : row.change ? ` ${row.change}` : ""}${row.mark ? ` ${row.mark}` : ""}${check ? (check.high ? " chk high" : " chk") : ""}`}
       data-testid={kind === "ent" ? "row-attribute" : "row-column"}
       data-row={row.id}
       title={row.retired ? "Retired: historical" : row.missing ? "Missing from source" : row.change ? CHANGED_TITLE : undefined}
@@ -105,7 +107,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
         {row.pk && <b className="pk">PK</b>}
         {row.fk && <b>FK</b>}
       </span>
-      <span className={`nm${row.clip ? " clip" : ""}`} title={text}>
+      <span className={`nm${clip ? " clip" : ""}`} title={text}>
         <span className="a">{head}</span>
         {tail && <span className="b">{tail}</span>}
       </span>
@@ -125,7 +127,10 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
         </span>
       )}
       {row.labels && <LabelMark labels={row.labels} />}
-      <span className="dt">{row.type}</span>
+      {/* a model check's "!" is the type's ::after, put first (slice 20, F8); its title is built on hover (`checkTitle`) */}
+      <span className="dt" data-chk={check ? `a:${row.id}` : undefined}>
+        {row.type}
+      </span>
       <span className={`st${status}${row.mappings > 1 ? " n" : ""}`} data-testid="dot-mapped" title={row.title}>
         {row.mappings > 1 ? row.mappings : ""}
       </span>
@@ -134,7 +139,7 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
 }
 
 function CardNode({ data }: NodeProps<CardNodeT>) {
-  const { card, pinnedNotes = 0, reqMark } = data;
+  const { card, pinnedNotes = 0, reqMark, check } = data;
   const ctx = useContext(CanvasCardsCtx);
   const blocks = !!useContext(DiagnosisCtx).blocks;
   const lod = useStore((s) => blocks || s.transform[2] < LOD_ZOOM);
@@ -150,6 +155,18 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   const clipLine1 =
     card.clipLine1 ||
     ((pinnedNotes > 0 || !!reqMark) && lineNeedsClip([card.line1, card.line1b].filter(Boolean), card.kind, card.width ?? undefined, !!card.labels, pinnedNotes, reqMark?.n ?? 0, card.role ? ROLE_MARK : 0));
+
+  // slice 20: a model check's "!" takes room after the name and before a row's type (the server's clips know nothing of it)
+  const clipName = card.clipName || (!!check?.head && titleNeedsClip(shownText(card), card.kind, `${card.mapped}/${total}`, card.width ?? undefined, CHECK_MARK_HEAD));
+  const rowClip = (r: CardRow) => r.clip || (!!check?.rows?.[r.id] && rowNeedsClip({ ...r, name: shownText(r) }, card.kind, dual, card.width ?? undefined, CHECK_MARK_ROW));
+  /** A mark's title, built when the pointer is over it (no text in a render). */
+  const onPointerOver = check
+    ? (e: React.PointerEvent) => {
+        const el = (e.target as HTMLElement).closest<HTMLElement>("[data-chk]");
+        const at = el?.dataset.chk;
+        if (el && at) el.title = checkTitle({ t: at.startsWith("e:") ? "entity" : "attribute", id: at.slice(2) });
+      }
+    : undefined;
 
   // A click on a row selects the row, anywhere else on the card the card; the card tools do their own thing.
   // Shift+click anywhere on the card puts the card in or out of a selection of several (slice 2a).
@@ -169,7 +186,8 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
   return (
     <div
       onClick={onClick}
-      className={`card ${card.kind}${card.role ? ` ${card.role.card}` : ""}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${card.clipName ? " clip-name" : ""}${clipLine1 ? " clip-l1" : ""}${card.liveLevel === "context" ? " ctx" : ""}`}
+      onPointerOver={onPointerOver}
+      className={`card ${card.kind}${card.role ? ` ${card.role.card}` : ""}${card.collapsed ? " collapsed" : ""}${dual ? " dualkeys" : ""}${cardSelected ? " sel" : ""}${clipName ? " clip-name" : ""}${clipLine1 ? " clip-l1" : ""}${card.liveLevel === "context" ? " ctx" : ""}`}
       title={card.liveTitle ?? undefined}
       style={isEnt ? ({ "--cc": card.color ?? NO_CONCEPT_COLOR } as React.CSSProperties) : undefined}
       data-testid={isEnt ? "card-entity" : "card-source"}
@@ -240,7 +258,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
             </span>
           )}
         </div>
-        <div className="c-l2">
+        <div className={`c-l2${check?.head ? (check.head.high ? " chk high" : " chk") : ""}`} data-chk={check?.head ? `e:${card.targetId}` : undefined} data-testid="card-head-line">
           <span className="c-name" data-testid="card-name" title={shownText(card)}>
             {shownText(card)}
           </span>
@@ -273,7 +291,7 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
       {!card.collapsed && !lod && (
         <div className={card.attributeNames ? "c-body alt" : "c-body"}>
           {rows.map((r) => (
-            <Row key={r.id} row={r} kind={card.kind} selected={r.id === selectedRow} />
+            <Row key={r.id} row={r} kind={card.kind} selected={r.id === selectedRow} check={check?.rows?.[r.id]} clip={rowClip(r)} />
           ))}
           {rows.length === 0 && (
             <div className="row empty">

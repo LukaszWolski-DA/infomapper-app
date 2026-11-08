@@ -122,6 +122,7 @@ import { bundleLines, mapGeom, type Bundle } from "./line-geometry";
 import { Overview, type MiniNote } from "./Overview";
 import NoteLayer, { type ShownNote } from "./NoteLayer";
 import { grownVersions, mergeFresh } from "./fresh";
+import { cardCheck, ChecksCtx, sameCheck } from "./checks";
 import { countsKey, countsOf, frameNoteCounts, noteAt, noteShown, cardNoteCounts, placesOf, tether, type NoteData } from "./note-data";
 import { DRAFT_NOTE, NO_NOTE_WRITES, useNotes, type NoteMover, type NoteWrites } from "./useNotes";
 
@@ -194,6 +195,8 @@ export interface ModelCanvasProps {
    * view by their card (a mapping by its source's card, else its entity's; prototype `goTo`).
    */
   focusSelection?: Selection;
+  /** Slice 20: the card to centre on for an arrival without a card of its own (a relationship, a module's object). */
+  focusCenter?: string;
   /** The imports the Changes view's select offers, newest first (slice 7b, item 26). */
   changeImports?: readonly ChangesImport[];
   /** Measurement-only switches (only the measurement-only production build passes them). */
@@ -254,6 +257,7 @@ const toNode = (card: CardData, editable: boolean, keep?: Omit<CardNodeT["data"]
     card,
     ...(keep?.pinnedNotes ? { pinnedNotes: keep.pinnedNotes } : {}),
     ...(keep?.reqMark ? { reqMark: keep.reqMark } : {}),
+    ...(keep?.check ? { check: keep.check } : {}),
   },
   draggable: editable,
   dragHandle: ".c-head",
@@ -331,6 +335,7 @@ export function ModelCanvas({
   focusRequirementId,
   focusNoteId,
   focusSelection,
+  focusCenter,
   changeImports,
   diagnosis = NO_DIAGNOSIS,
   fadeData,
@@ -380,7 +385,15 @@ export function ModelCanvas({
   const namesRef = useRef(names);
   /** Writes of the canvas's names still on their way: a fresh page keeps the names shown until they are saved. */
   const namesPending = useRef(0);
-  const [nodes, setNodes] = useState<CardNodeT[]>(() => initialCards.map((c) => toNode(applyNames(c, pageNames), editable)));
+  // the model checks' marks (slice 20): from the page's check index, once per data version; a card's data changes only
+  // when its marks do, so no other card draws again
+  const checkIndex = useContext(ChecksCtx);
+  const [nodes, setNodes] = useState<CardNodeT[]>(() =>
+    initialCards.map((c) => {
+      const check = cardCheck(checkIndex, c);
+      return toNode(applyNames(c, pageNames), editable, check ? { check } : undefined);
+    }),
+  );
   // Development only (slice 2c, S2C-12): every commit of the canvas is counted, so a spec can check that nothing
   // re-renders the canvas while nobody touches it (a render loop once cost a collapsed canvas a third of its frames).
   useEffect(() => {
@@ -1032,7 +1045,9 @@ export function ModelCanvas({
     focusedSelection.current = true;
     select(focusSelection);
     const cardId =
-      focusSelection.t === "row"
+      focusSelection.t === "card"
+        ? focusSelection.id
+        : focusSelection.t === "row"
         ? focusSelection.cardId
         : focusSelection.t === "map"
           ? (() => {
@@ -1045,10 +1060,10 @@ export function ModelCanvas({
               const cards = cardNodesOf(rf).map((n) => n.data.card);
               return (cards.find((c) => c.kind === "src" && tables.has(c.targetId)) ?? cards.find((c) => c.kind === "ent" && c.targetId === entity))?.id;
             })()
-          : undefined;
+          : focusCenter;
     if (cardId) centerOn(cardId);
     window.history.replaceState(null, "", window.location.pathname);
-  }, [ready, focusSelection, fadeData, rf, select, centerOn]);
+  }, [ready, focusSelection, focusCenter, fadeData, rf, select, centerOn]);
 
   const cardOf = useCallback(
     (t: CardTarget) =>
@@ -1679,6 +1694,21 @@ export function ModelCanvas({
       return changed ? next : ns;
     });
   }, [reqMarks]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- the marks follow the checks, which live beside the cards
+    setNodes((ns) => {
+      let changed = false;
+      const next = ns.map((n) => {
+        const check = cardCheck(checkIndex, n.data.card);
+        if (sameCheck(n.data.check, check)) return n;
+        changed = true;
+        const { check: _drop, ...rest } = n.data;
+        void _drop;
+        return { ...n, data: check ? { ...rest, check } : rest };
+      });
+      return changed ? next : ns;
+    });
+  }, [checkIndex]);
   /** The nodes React Flow draws: the cards, those of a collapsed frame hidden, and the blocks. */
   const flowNodes = useMemo(() => {
     const cards = collapsedIds.size

@@ -70,6 +70,17 @@
 .im-canvas .tag.pii { color: var(--im-warn); background: var(--im-warn-soft) }
 .im-canvas .tag.bk { color: var(--im-physical); background: var(--im-physical-soft) }
 .im-canvas .dt { color: var(--im-ink-3); font-size: 11px; flex: none }
+/* model checks (slice 20, PRD item 3, Z1–Z6; prototype `.c-l2.chk`, `.row.chk .dt`): a slanted "!" after the card's name,
+   before its coverage, and before a row's type, before a measure's Σ (step 1 answer 3): pseudo-elements on existing
+   elements, no element (AD-24). Orange when a line is High, grey otherwise; the title is set on hover. */
+.im-canvas .c-l2.chk .c-name { order: 0 }
+.im-canvas .c-l2.chk::after { content: "!"; order: 1; flex: none; font: italic 700 14px/1 var(--font-plex-sans), ui-sans-serif, sans-serif; transform: skewX(-12deg); color: var(--im-ink-3); padding: 0 2px; margin-left: -4px }
+.im-canvas .c-l2.chk.high::after { color: var(--im-warn) }
+.im-canvas .c-l2.chk .cov { order: 2 }
+.im-canvas .c-l2.chk .cov-t { order: 3 }
+.im-canvas .row.chk .dt { display: inline-flex; align-items: center }
+.im-canvas .row.chk .dt::after { content: "!"; order: -1; display: inline-block; font: italic 700 12px/1 var(--font-plex-sans), ui-sans-serif, sans-serif; transform: skewX(-12deg); color: var(--im-ink-3); margin-right: 5px }
+.im-canvas .row.chk.high .dt::after { color: var(--im-warn) }
 /* live canvases (slice 3b, prototype .card.ctx, .row.lab): a context card is outlined and its header light; classes on
    the existing elements, no new element per card or row (AD-24) */
 .im-canvas .card.ctx { outline: 1.5px dashed var(--im-ink-3); outline-offset: 3px }

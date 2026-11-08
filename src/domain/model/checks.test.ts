@@ -253,9 +253,9 @@ describe("the order and the index", () => {
     expect(x.panel({ t: "entity", id: LINE }).map((l) => l.group.id)).toEqual(["nokey"]);
     expect(x.panel({ t: "ext", kind: "k", id: uid(120) }).map((l) => l.group.id)).toEqual(["m-high"]);
     // the header: its own and its rows' marks, High when one is, with their groups; titles are built where a card is drawn
-    expect(x.entityMark(ids.customer)).toEqual({ high: true, groups: ["wrong", "m-high", "dup", "m-hint"] });
+    expect(x.entityMark(ids.customer)).toEqual({ high: true, groups: ["wrong", "m-high", "dup", "m-hint"], n: 4 });
     expect(markTitle(x.entityItems(ids.customer))).toMatch(/^Model checks: 4\n/);
-    expect(x.rowMark(uid(111))).toEqual({ high: false, groups: ["dup"] });
+    expect(x.rowMark(uid(111))).toEqual({ high: false, groups: ["dup"], n: 1 });
     expect(markTitle(x.rowItems(uid(111)))).toBe("Model checks: 1\nDuplicate attribute names: Customer: email, EMAIL");
     // the counts (the status bar, the panel's group)
     expect([x.count, x.high, x.countOn([LINE]), x.countOn(new Set([ids.customer, LINE]))]).toEqual([5, true, { count: 1, high: false }, { count: 5, high: true }]);
