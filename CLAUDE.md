@@ -45,7 +45,9 @@ pans without a toolbox on every platform, the top bar never scrolls, and the can
 changes (slice 16, D-71). Outside a concept frame a new entity's, fact's or dimension's concept is chosen in a picker;
 element panels link several requirements at once and an entity panel all its attributes; a requirement card links by a
 drag from its handle; an entity found by an attribute shows that row; a selected frame resizes from every edge and
-corner; an attribute row's menu adds an attribute below it (slice 17, D-72).
+corner; an attribute row's menu adds an attribute below it (slice 17, D-72). An attribute may be calculated from others
+of its entity with a plain-text rule, counted as mapped or fed and covered through its inputs everywhere, with "=" and a
+square on its row; a dimensional mapping may be a Lookup through a dictionary's relationship (slice 18, D-73).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -107,12 +109,17 @@ list up to date in each sub-slice):
 - **Tables:** the table registry (`src/compose/tables.ts`: `UNDO_TABLES`, `STORE_SCHEMA`, `ComposedDb`). The build fails
   when a module's table is missing from undo, the local adapter's rules or the data file's shape;
   `tests/table-registry.test.ts` (the guard test) checks every table the migrations create against them, and a table
-  that is not registered is refused loudly, never skipped. Read a module's table only through a store made with
+  that is not registered is refused loudly, never skipped. Since slice 18 a module's column added after its table had
+  rows has a default (`TableRules.defaults`, read by the store's `modules.list` and `loadForUndo` through `readRows`) and
+  an undo image default (`ModuleUndoTable.defaults`), with no file format (AD-33). Read a module's table only through a store made with
   `getDataStore(STORE_SCHEMA)` (the default store knows InfoMapper's tables only and throws).
 - **Cascades:** `moduleCascade` (`src/domain/commands/module-cascade.ts`, run by `runCommand`): a module's rows that
   point to a deleted InfoMapper row go in the same change group; the parents are the ones the module registered for undo.
   Since slice 15c a table may also go whole with a row that points to it (`goesWhole` in its undo registration, Q-5):
-  a dimensional mapping goes when the cascade deletes one of its inputs; an input removed on purpose leaves it.
+  a dimensional mapping goes when the cascade deletes one of its inputs; an input removed on purpose leaves it. Since
+  slice 18 a row may outlive a row it points to (`follows: [column, table, rule]`, F16): when that row is deleted, the
+  module's pure rule changes it in the same change group or leaves it, and the column keeps its id (InfoCube: an
+  approved lookup whose relationship goes is sent back to review).
 - **Rules InfoMapper's commands take as arguments** (`src/compose/model.ts`, e.g. `relationshipOneEnd`) and the level
   rules on every write set (`src/domain/model/levels.ts`: `levelWritesRefusal`, `mappingWritesRefusal`).
 - **Pages:** `ModuleView` (`src/ui/modules.ts`, built by `moduleView` in `src/compose/view.ts`): plain data and server
@@ -131,6 +138,8 @@ list up to date in each sub-slice):
   - `AttributeDelete.toast` (the delete toast's parts, P10);
   - `moduleView` takes the page's change events: a module's four-eyes reads its own change log with
     `lastContentEditor(row, events, log)` (`MappingLog`, `src/domain/model/mapping-rules.ts`).
+  - Since slice 18 `relationshipDeletes` (by relationship id: the `then` parts of a relationship's second click), read
+    by the relationship panel and the line's menu; without it a relationship is deleted at once.
 - **Canvas lines and objects** (slice 15c): `CanvasLines.modules` (`ModuleLineData`, `src/canvas/line-data.ts`; built
   by `moduleLines` in `src/compose/view.ts`): lines between entity rows, drawn from what the module says (a class, a
   colour, an end mark, a chip). Code that does not know them leaves them out (as `sources`); hover, Focus, the Changes
@@ -533,6 +542,12 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   The seed has REQ-104's card on "Customer & orders" already; a right click inside a frame opens the frame's menu, so a
   create inside a concept frame uses the Entity tool.
 
+  Slice 18's fixtures reseed with the star and its derivations (`addDemoData`). Its helpers do the following:
+  - read calculations from the e2e data file (`liveModel`, `attributeNamed`, `inputsOf`) and write them as test data
+    through the domain (`addAttributeAs`, `calculateAs`, `deleteMappingAs`);
+  - use the section and its picker (`calcSection`, `calcPicker`, `pickItem`, `pickInputs`), wait for the panel's stored
+    version (`expectAttributePanelAt`), and read a card's count and the Overview's line (`cardCount`, `overviewLine`).
+
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,
     `keyOf`) and add a third Dim Date – Fact Sales relationship as test data (`thirdDateRelationship`);
@@ -815,6 +830,28 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     so they keep their place (D-20), and is named "Resize frame".
   - **"Add attribute below":** `addAttribute`'s `below` renumbers the entity's attributes in the same group ("Create
     attribute"); the client holds them all (`saveRows`).
+- **Derivations** (slice 18, D-73):
+  - **The rules in one place:** `src/domain/model/derivations.ts`: the index (`derivationIndex`: a calculated
+    attribute's live inputs of its own entity, in order, and its users), cycles (`reaches`, `closesCycle`), counting
+    through a calculation (`throughCalculation`, `countsAsMapped`; the direct rule is the caller's), the gaps, the rows'
+    squares (`derivedRows`, `rowCounts`) and the texts. `attribute.is_calculated` and `calc_rule`, `attribute_input`
+    (format 14).
+  - **The commands** (`src/domain/commands/derivation.ts`): "Calculate attribute", "Add calculation inputs", "Remove
+    calculation input", "Change calculation rule", "Stop calculating"; undo and redo refuse a revert that closes a cycle
+    (`calculationCycle`, `undo.ts`); `deleteAttribute` and `entityCascade` take the input rows (their states require
+    `attributeInputs`).
+  - **Two rules** (acceptance F1, F2): "mapped" and "fed" count any mapping or feed, any status (the row's dot, its
+    square, `CardData.mapped`, the filters, frames, the Overview, the status bar, the project home, the thumbnails, all
+    through `rowCounts` or `countsAsMapped`); "covered" is `lookupModel.coverageOf` (requirements), both through a
+    calculation. **A later count of mapped or fed rows** uses them, never a mapping count of its own.
+  - **The canvas:** `CardRow.calc` (rule, square) from `buildCards` on the server; the "=" mark is one element on
+    calculated rows only (`text-fit`'s `CALC_MARK`), the square classes on the dot. Focus on an attribute lights its
+    inputs' and users' mappings and the logical cards that feed them (`targetLit`'s `feeds`). The lens colours
+    `scope.inputs`.
+  - **InfoCube's lookups:** `cube_mapping.kind` `lookup`, `lookup_relationship_id` (may point to a deleted
+    relationship), `lookup_default`; `lookupRelationships`, `lookupSentence`, `lookupRelationshipGone`, the chip "L".
+  - **The demo:** `addDemoData` (`src/compose/seed.ts`) adds `addStarDerivations` after the star, for the seed, the reset,
+    `npm run demo` and slice 18's fixtures; slice 15's fixtures keep `addModuleDemoData`.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a

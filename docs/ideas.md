@@ -801,3 +801,20 @@ does) or with a `ResizeObserver`, and check with a phase trace that a panel swit
 - **The object browser's tree carries each attribute's id** for item 3 (slice 17, Z5): on "Performance test" (779
   attributes) the tree grew from 61,432 to 92,346 bytes of JSON. A smaller form (an index into `fields`, or ids only
   where a search needs them) if the page's payload matters later.
+
+## Derivations: done in slice 18 (Łukasz's testing of 7 November 2026)
+
+Done in slice 18 (D-73): a value computed from other attributes of the same entity (`net_amount = quantity * unit_price *
+(1 - discount_pct)`) is a calculated attribute, counted as mapped or fed and covered through its inputs; a descriptive
+value taken from a dictionary through a code (DimBuilding's `AssetCategory`, "Unbekannt") is an InfoCube lookup.
+
+What comes later (slice 18, PRD section 10 and step 1):
+- **A dimension's unknown member** (Kimball's −1 row), with InfoCube's types.
+- **Lookups in source mappings** (decision 4a).
+- **Structured expressions:** parsed rules, functions and type inference; the rule stays plain text.
+- **A model check for a calculation that is also mapped** (decision 2a), in the model validator (above).
+- **Suggesting a lookup** when a dictionary's attribute is dropped on a dimension.
+- **Exports and documents** that list calculations and lookups (Q7), with InfoDocumenter.
+- **"Fed from concepts" through a calculation's inputs** (Q8): unchanged, as their own feeds already bring their concepts.
+- **The Delete key on a relationship with lookups through it** says where to delete it (its menu or its panel) and deletes
+  nothing; a two-press Delete if that is too strict.

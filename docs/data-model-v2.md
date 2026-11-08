@@ -264,6 +264,8 @@ never the other way. The level is the one column of InfoMapper's that InfoCube n
 | `is_nullable` | boolean | no | |
 | `definition_html`, `definition_text` | text | yes | rich text (D-42) |
 | `copied_from_attribute_id` | uuid | yes | FK `attribute`: the attribute this one was pasted from (slice 10c, D-63); null when not made by paste and after “Stop following”; may point to a soft-deleted attribute (the copy's lost reference) |
+| `is_calculated` | boolean | no | calculated from other attributes of its entity (slice 18, D-73); false by default; may be true with no inputs yet |
+| `calc_rule` | text | yes | its rule, plain text like a mapping's rule; only while calculated (CHECK `attribute_calc_ck`) |
 
 **Copies (slice 10c, D-63).** A copy follows its original's `data_type`, `custom_type`, `type_length`,
 `type_precision`, `type_scale` and `is_pii`; everything else is its own from the paste on. The link is set only on a new
@@ -277,6 +279,25 @@ image lacks as null.
 null; the four mode columns with CHECKs `x is null or x in ('name', 'alias')`). The local data file's format 11 gave every
 entity, attribute, canvas and canvas item the new columns as null (no change events, no log line). Imports write no
 alias, and source tables and columns have none.
+
+**Calculations (slice 18, D-73).** A calculated attribute's inputs are `attribute_input` rows. Migration
+`20261108120000_derivations.sql` adds `is_calculated`, `calc_rule` and the table. The local data file's format 14 gave every
+attribute `is_calculated` false and `calc_rule` null and the file an empty `attribute_input` (no change events, no log
+line). A paste, a header drop and "Create dimension from this…" copy no calculation (its inputs belong to the original's
+entity).
+
+### `attribute_input`
+An attribute a calculated attribute reads, in order (slice 18). In the undo history (parents `attribute`, both columns).
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `attribute_id` | uuid | no | FK `attribute`: the calculated one |
+| `input_attribute_id` | uuid | no | FK `attribute`: of the same entity, never the attribute itself (CHECK `attribute_input_self_ck`), never one whose calculation reads the attribute (the domain's check); one live row per pair (`attribute_input_ux`) |
+| `sort_order` | integer | no | the inputs' order |
+
+Deleting an attribute soft-deletes its rows on both sides in the same change group; a calculation that loses its last
+input stays calculated.
 
 ### `relationship`
 | Column | Type | Null | Notes |
@@ -623,6 +644,10 @@ because they are business logic or must work on any database:
 - Mapping input counts (section 6) and type checking.
 - Duplicate-name warnings for entities (B-25); concept deletion moves entities first (D-47). Attribute names need not
   be unique in an entity and are not warned about (slice 10c, F12).
+- Calculations (slice 18, D-73): an input of the same entity, never the attribute itself, never closing a cycle at any
+  depth (checked by the commands and again by undo and redo); inputs only while calculated; counted as mapped or fed, and
+  covered for requirements, through every input, recursively (`src/domain/model/derivations.ts`). A lookup reads one
+  input through a candidate relationship of its entity.
 - Copies of attributes (slice 10c, D-63): a change of a followed field reaches every live copy below the attribute, copies
   of copies included, in the same change group, and so does an undo or redo (`followOriginals`); a copy's followed fields
   are refused while it has a link, its original live or deleted; the walk keeps a visited set although the links cannot
@@ -731,15 +756,20 @@ history (parent `attribute`, the target). Labels and requirement links do not po
 | --- | --- | --- | --- |
 | standard columns | | | |
 | `attribute_id` | uuid | no | FK `attribute`: the target, a dimensional attribute (the domain's check) |
-| `kind` | text | no | `direct` (exactly one input, AD-26) or `transform`; CHECK `cube_mapping_kind_ck` |
+| `kind` | text | no | `direct` (exactly one input, AD-26), `transform` or, since slice 18, `lookup` (exactly one input, the dictionary's value); CHECK `cube_mapping_kind_ck` |
 | `rule_expression` | text | yes | a transformation's rule, plain text |
 | `status` | text | no | `draft`, `review`, `approved`; CHECK `cube_mapping_status_ck`. Reviewers set it (`mapping.set_status`); with four-eyes the last content editor cannot approve |
 | `note` | text | yes | plain text, like a mapping's note |
 | `approved_by` | uuid | yes | FK `app_user`: who approved it (AD-06) |
 | `approved_at` | timestamptz | yes | set exactly when `status` is `approved`; CHECK `cube_mapping_approval_ck` |
+| `lookup_relationship_id` | uuid | yes | FK `relationship`: a lookup's relationship of its input's entity with another logical entity (slice 18, D-73); may point to a deleted relationship (its panel says it is gone); not an undo parent; kept when the kind changes |
+| `lookup_default` | text | yes | a lookup's value when there is no match ("Unknown"); kept when the kind changes |
 
 A change of the inputs, the kind, the rule or the target sends an approved mapping back to review and clears its
-approval (D-51's first rule); a note alone does not.
+approval (D-51's first rule); a note alone does not. Since slice 18 a lookup's relationship and value for no match are
+content too, and deleting the relationship sends an approved lookup back to review in the same change group (the
+module's `follows` cascade). Migration `20261108120000_derivations.sql` adds the kind and the two columns; InfoCube reads
+them as null on rows written before (`TableRules.defaults`), with no file format (AD-33).
 
 ### InfoCube: `cube_mapping_input`
 A logical attribute a dimensional mapping reads, in order (slice 15c). In the undo history (parents `cube_mapping` and

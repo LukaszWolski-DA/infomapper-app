@@ -1,11 +1,11 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 17's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 18's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
 every item planned for 7b was removed, as slice 7b delivered it (`docs/prd/slice-07b-acceptance.md`); at slice 7c's close
 (27 October 2026) every item planned for 7c was removed, as slice 7c delivered it (`docs/prd/slice-07c-acceptance.md`); at
 slice 8's close (28 October 2026) "New organization" and the People tab's changes were updated, as slice 8 delivered
-them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences; at slice 15c's close (5 November 2026) dimensional mappings and "fed" coverage were marked present, with their deliberate differences. At slice 16's close (6 November 2026) the prototype was replaced by its version with the canvas menus (`docs/prd/slice-16-canvas-menus.md`), and its items 1 to 3 and 7 were marked present, with their deliberate differences (`docs/prd/slice-16-acceptance.md`). At slice 17's close (8 November 2026) the prototype was replaced by its version with the modelling ergonomics (`docs/prd/slice-17-modelling-ergonomics.md`), and its five items were marked present, with their deliberate differences (`docs/prd/slice-17-acceptance.md`, P1 to P12). The earlier inventory (15 October 2026,
+them in their development form (`docs/prd/slice-08-acceptance.md`). At slice 10a's close (30 October 2026) its deliberate differences were added (`docs/prd/slice-10a-acceptance.md`); at slice 10b's close (30 October 2026) relationships between source tables on the canvas moved from "Still missing" to the deliberate differences (`docs/prd/slice-10b-acceptance.md`); at slice 10c's close (30 October 2026) copying an attribute was added to them (`docs/prd/slice-10c-acceptance.md`). At slice 12a's close (31 October 2026) deleting a project and Undo on the home pages were marked done, with their deliberate differences (`docs/prd/slice-12a-acceptance.md`). At slice 12b's close (1 November 2026) the canvas tiles' thumbnails and frame count were marked done, with their deliberate differences (`docs/prd/slice-12b-acceptance.md`). At slice 13's close (2 November 2026) the saving of fields was added to the deliberate differences (`docs/prd/slice-13-acceptance.md`). At slice 14a's close (3 November 2026) notes and frames joined them (`docs/prd/slice-14a-acceptance.md`); at slice 14b's close (3 November 2026) the canvas's rename in its tab and the warning on leaving a page (`docs/prd/slice-14b-acceptance.md`). At slice 15a's close (4 November 2026) the section InfoCube was added: the prototype was replaced in slice 15 by its version with the InfoCube module (`docs/prd/slice-15-infocube.md`, section 1), and 15a delivered its first part (`docs/prd/slice-15-acceptance.md`); at slice 15b's close (5 November 2026) the fact's and dimension's descriptions and role-playing dimensions were marked present, with their deliberate differences; at slice 15c's close (5 November 2026) dimensional mappings and "fed" coverage were marked present, with their deliberate differences. At slice 16's close (6 November 2026) the prototype was replaced by its version with the canvas menus (`docs/prd/slice-16-canvas-menus.md`), and its items 1 to 3 and 7 were marked present, with their deliberate differences (`docs/prd/slice-16-acceptance.md`). At slice 17's close (8 November 2026) the prototype was replaced by its version with the modelling ergonomics (`docs/prd/slice-17-modelling-ergonomics.md`), and its five items were marked present, with their deliberate differences (`docs/prd/slice-17-acceptance.md`, P1 to P12). At slice 18's close (8 November 2026) the prototype was replaced by its version with derivations (`docs/prd/slice-18-derivations.md`): calculated attributes and lookups were marked present, with their deliberate differences (`docs/prd/slice-18-acceptance.md`, P1 to P13). The earlier inventory (15 October 2026,
 against `infomapper-model-prototype.html` at slice 4b-1's start) is in git history.
 
 **How it was checked**
@@ -48,9 +48,26 @@ card header's menu, a canvas tab's Move left, Move right, Move to start and Move
 lines" with the chips "Entity relationships hidden" and "Source relationships hidden", and no browser context menu in
 the app's own surfaces (16, D-71); the concept picker for a new entity, fact or dimension, the requirement picker with
 several links at once and "Link all attributes…", a requirement card's link drag, a found attribute's row, a frame
-resized from every edge and corner, and "Add attribute below" (17, D-72).
+resized from every edge and corner, and "Add attribute below" (17, D-72); calculated attributes ("Calculated from", the
+row's "=" and square, counted as mapped or fed and covered through their inputs, Focus and the delete's second click) and
+InfoCube's lookups (the kind, its relationship, its value for no match, the chip "L") (18, D-73).
 
 **Deliberate differences:**
+- **Slice 18 (D-73):**
+  - Every count follows a calculation, the Mapped filter included; the prototype's filter reads source mappings only.
+  - A feed reading a calculated logical attribute counts through that calculation, and a calculation's inputs join a
+    requirement's scope at any depth; the prototype's are one level, and its feeds read only directly mapped inputs.
+  - Deleting a relationship with lookups through it asks a second click and sends an approved lookup back to review; the
+    prototype deletes it at once and leaves the lookup's status.
+  - Focus on an attribute lights its inputs' and users' mappings and lines, not their rows (the app's Focus is
+    card-level).
+  - A dimensional line has no title; the lookup's relationship is in its panel.
+  - "Not calculated. Mark it when …" is for editors; readers and reviewers see the section only when it has content.
+  - An input's delete names the calculations on its second click; the prototype asks in a dialog.
+  - A lookup's relationship or value, once changed, sends an approved lookup back to review (D-51), as the prototype does
+    not.
+  - The section's state says "Every input is mapped." or "Not yet: …"; the prototype says "Covered: …" and "Not covered
+    yet: …" ("covered" is D-31's word).
 - **Slice 17 (D-72):**
   - The Cube tab's New fact and New dimension always open the concept picker; the prototype takes a concept frame's
     concept when the free spot it picks lies in one.
