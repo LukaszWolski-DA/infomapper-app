@@ -189,6 +189,21 @@ signature: after a card was dragged they kept their old place while the holes fo
 4b-2's step 6 and fixed there (`LitLines` carries the line layer's signatures); S4B2-07 checks that every lit line lies
 where the line layer draws it after a drag.
 
+### A relationship line's end stayed behind a card that changed height (fixed on fix/relationship-ends)
+
+Found by Łukasz (7 November 2026): deleting an entity's attributes one by one made its card shorter, but the end of a
+relationship line on its bottom edge stayed where it was until a click on the canvas redrew the line. Between cards one
+above the other (`relGeom`, `geometry.ts`) a line ends on the upper card's bottom edge, so it depends on the card's
+height; `RelPath` and `SourcePath` (`LineLayer.tsx`) are memoised on a signature (`placedSig`) that held the card's
+position, width, collapse and row filter but not its height, so a change of the height alone (an attribute deleted,
+added or pasted, an undo or a redo of one, a row a filter starts or stops showing, such as a column mapped under
+"Mapped") kept the old drawing, in the line layer and in Focus's lit lines alike; the click changed the line's
+selection class, which redrew it. A line's offset was missing too: deleting one of two parallel relationships left the
+other beside an empty middle. The signature now holds the card's rectangle as `relGeom` reads it (`cardRect`) and the
+line's offset. Self loops, dimensional relationships and source relationships share the same signature; mapping,
+module and bundle lines were not affected (their signatures are their computed paths). Checked by
+`e2e/slice-01a/relationship-ends.spec.ts`.
+
 ### C-08: what the first render waits for (slice 4p)
 
 C-08 is met untraced (1,432 ms). The traced diagnosis (five loads, `scripts/c08-waiting.ts`) splits the first render:
