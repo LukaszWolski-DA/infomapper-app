@@ -1,4 +1,4 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 18's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 19's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
@@ -53,6 +53,13 @@ row's "=" and square, counted as mapped or fed and covered through their inputs,
 InfoCube's lookups (the kind, its relationship, its value for no match, the chip "L") (18, D-73).
 
 **Deliberate differences:**
+- **Slice 19 (D-74):**
+  - Many-to-many between two dimensions gives no outrigger; the prototype makes the `from` end one.
+  - Undo refuses a cycle of aggregates or a base that is a deleted fact; the prototype reads such a base as none.
+  - A long role chip is cut with "…" (the concept text first), its full text in the title; the prototype's is never cut.
+  - "Aggregate of" offers the facts in the model's order of entities (the Cube tab's), not InfoCube's row order.
+  - The panel's Role has the card's title, "(InfoCube)" included; the prototype's panel title has none.
+  - The demo is a seed step, not applied on every load (`cubeDemoV5`, `cubeDemoV6`).
 - **Slice 18 (D-73):**
   - Every count follows a calculation, the Mapped filter included; the prototype's filter reads source mappings only.
   - A feed reading a calculated logical attribute counts through that calculation, and a calculation's inputs join a

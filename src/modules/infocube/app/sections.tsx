@@ -8,7 +8,7 @@
 // every write is a module command on the save chain (slice 9, 10a): grain, SCD and additivity with their row checked,
 // a measure turned on with its attribute held, a key's link and Add key with the rows they write held.
 
-import { useContext, useMemo } from "react";
+import { useCallback, useContext, useMemo, useRef } from "react";
 import { useAction } from "@/app/_components/use-action";
 import { useModules } from "@/app/_components/modules";
 import { Field, fieldKey, Flag, Fold, Hint, inputClass, Li, Note, Seg, smallButtonClass, TextField, useChoice } from "@/app/_panels/fields";
@@ -18,8 +18,9 @@ import type { Uuid } from "@/domain/ids";
 import type { Attribute, Entity, Relationship } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { asRole, cubeIndex, dimensionAs, factEnds, factHints, NO_HINTS, roleAt, typeWord, usedBy, type CubeIndex, type Hint as CubeHint } from "../domain/keys";
-import type { CubeEntity, CubeKey, CubeMeasure, ScdType } from "../domain/types";
-import type { CubePageRows } from "../domain/view";
+import { baseChoices } from "../domain/aggregates";
+import type { CubeEntity, CubeKey, CubeMeasure, DimKind, FactType, History } from "../domain/types";
+import { DIM_KIND_NAMES, FACT_TYPE_NAMES, type CubePageRows } from "../domain/view";
 import { addKeyAction, linkKeyAction, setMeasureAction, updateCubeEntityAction, updateMeasureAction } from "./actions";
 
 export const ADDITIVITY_LABEL = { additive: "Additive", semi: "Semi-additive", non: "Non-additive" } as const;
@@ -29,17 +30,48 @@ const ADDITIVITY_OPTIONS = [
   ["semi", ADDITIVITY_LABEL.semi],
   ["non", ADDITIVITY_LABEL.non],
 ] as const;
-const SCD_OPTIONS = [
-  ["0", "0 · keep"],
-  ["1", "1 · overwrite"],
-  ["2", "2 · history"],
+// slice 19 (D-74, prototype cubeEntitySection): the history in two rows, each value with its sentence
+const HISTORY_OPTIONS = [
+  ["keep", "0 · keep"],
+  ["overwrite", "1 · overwrite"],
+  ["history", "2 · history"],
+  ["snapshot", "Snapshot"],
 ] as const;
-export const SCD_SENTENCE: Record<ScdType, string> = {
-  0: "Values never change once loaded.",
-  1: "A change overwrites the old value; no history.",
-  2: "A change adds a new version; the old one stays with its validity.",
+export const HISTORY_SENTENCE: Record<History, string> = {
+  keep: "SCD 0: values never change once loaded.",
+  overwrite: "SCD 1: a change overwrites the old value; no history.",
+  history: "SCD 2: a change adds a new version; the old one stays with its validity.",
+  snapshot:
+    "Snapshot: each snapshot keeps the whole dimension as it was on that date (in Data Vault, usually from a PIT table); a row is the business key and the snapshot date. Facts join it by the snapshot date.",
 };
-export const SCD_TECHNICAL = "Technical columns (valid from, valid to, current) are a physical matter and are not modelled here.";
+export const SCD_TECHNICAL = "Technical columns (valid from, valid to, current, snapshot date) are a physical matter and are not modelled here.";
+
+// slice 19 (D-74, prototype FTYPE_D, DKIND_D): a fact's type and a dimension's kind
+const FACT_TYPE_OPTIONS = [
+  ["transaction", "Transaction"],
+  ["periodic", "Periodic"],
+  ["accumulating", "Accumulating"],
+] as const;
+export const FACT_TYPE_SENTENCE: Record<FactType, string> = {
+  transaction: "One row per event or business transaction, written once.",
+  periodic: "One row per period and its dimensions (e.g. a month-end balance), whether or not anything happened.",
+  accumulating: "One row per process instance (e.g. an order), updated as it passes its milestones; usually several dates.",
+};
+export const FACTLESS_SENTENCE = {
+  on: "It records that something happened, or could happen, with no amounts: counting its rows is its measure.",
+  off: "Turn on when the fact deliberately has no measures (an event or a coverage).",
+} as const;
+const DIM_KIND_OPTIONS = [
+  ["standard", DIM_KIND_NAMES.standard],
+  ["junk", DIM_KIND_NAMES.junk],
+] as const;
+export const DIM_KIND_SENTENCE: Record<DimKind, string> = {
+  standard: "A dimension of one business object or topic.",
+  junk: "Low-cardinality flags and indicators gathered in one dimension instead of many small ones on the fact.",
+};
+export const OUTRIGGER_SENTENCE = "A dimension referenced by another dimension, not by a fact. It follows from the relationship.";
+export const NOT_AN_AGGREGATE = "Not an aggregate";
+const sentenceClass = "mt-1.5 text-[12px] text-im-ink-3";
 const NUMERIC = new Set<Attribute["data_type"]>(["integer", "decimal"]);
 
 const NO_ROWS: CubePageRows = { cubeEntities: [], cubeMeasures: [], cubeKeys: [], cubeMappings: [], cubeMappingInputs: [] };
@@ -77,8 +109,20 @@ function useAddKey(cube: CubeIndex) {
   };
 }
 
-const keyMeta = (key: Attribute | null) =>
-  key ? <span>key {key.name}</span> : <span className="text-im-warn">no key</span>;
+/** A dimension's key in a fact's Dimensions list; slice 19: "· snapshot" after a snapshot dimension's (`snapshotOf`: its name). */
+const keyMeta = (key: Attribute | null, snapshotOf: string | null = null) => (
+  <>
+    {key ? <span>key {key.name}</span> : <span className="text-im-warn">no key</span>}
+    {snapshotOf && (
+      <>
+        {" · "}
+        <span title={`${snapshotOf} is a snapshot dimension: the fact joins it by the snapshot date`} data-testid="mark-cube-snapshot">
+          snapshot
+        </span>
+      </>
+    )}
+  </>
+);
 
 const focusGrain = () => {
   const el = document.getElementById("f-grain");
@@ -113,9 +157,70 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
     else if (to.t === "attribute") p.goAttribute(to.id);
     else ui.select({ t: "rel", id: to.id });
   };
+  // slice 19 (D-74): the type, factless and the base, each saved on the chain with the row checked
+  const save = (change: Omit<Parameters<typeof updateCubeEntityAction>[1], "cubeEntityId" | "expectedVersion">) =>
+    saveRow(row, (v) => updateCubeEntityAction(p.workspaceId, { cubeEntityId: row.id, expectedVersion: v, ...change }));
+  const type = useChoice<FactType>(row.fact_type ?? "transaction", (factType) => save({ factType }));
+  const factless = useChoice<boolean>(!!row.is_factless, (isFactless) => save({ isFactless }));
+  const aggregates = cube.aggregates();
+  const base = aggregates.baseOf(entity.id);
+  const baseChoice = useChoice<string>(base ?? "", (id) => save({ baseFactEntityId: id || null }));
+  const choices = baseChoices(aggregates, entity.id, p.ix.model.entities.map((e) => e.id), (id) => cube.roleOf(id) === "fact");
+  const aggregatedBy = aggregates.aggregatesOf(entity.id);
+  const snapshotDimension = (id: Uuid) => cube.cubeOf(id)?.history === "snapshot";
   return (
     <Fold title="Fact" testId="section-cube-fact">
       <div className="rounded-lg border border-im-line px-3 pb-3 pt-0.5">
+        <Field label="Fact type">
+          <Seg key={fieldKey(row.id, "fact_type")} value={type.value} options={FACT_TYPE_OPTIONS} disabled={!p.editable} onChange={(v) => type.choose(v)} testId="seg-cube-fact-type" />
+          <p className={sentenceClass} data-testid="text-cube-fact-type">
+            <b className="font-semibold">{FACT_TYPE_NAMES[type.value]}.</b> {FACT_TYPE_SENTENCE[type.value]}
+          </p>
+        </Field>
+        <div className="mt-3" data-testid="field-cube-factless">
+          <Flag on={factless.value} label="Factless fact" disabled={!p.editable} onToggle={() => factless.choose(!factless.value)} />
+          <p className={sentenceClass} data-testid="text-cube-factless">
+            {factless.value ? FACTLESS_SENTENCE.on : FACTLESS_SENTENCE.off}
+          </p>
+        </div>
+        <Field label="Aggregate of" htmlFor="f-base">
+          <select
+            id="f-base"
+            className={inputClass}
+            value={baseChoice.value}
+            disabled={!p.editable}
+            onChange={(e) => baseChoice.choose(e.target.value)}
+            data-testid="select-cube-base"
+          >
+            <option value="">{NOT_AN_AGGREGATE}</option>
+            {/* a base no longer offered (made meanwhile) still shows as chosen */}
+            {[...(base && !choices.includes(base) ? [base] : []), ...choices].map((id) => (
+              <option key={id} value={id}>
+                {cube.nameOf(id)}
+              </option>
+            ))}
+          </select>
+          {base && (
+            <p className={sentenceClass} data-testid="text-cube-base">
+              It summarises{" "}
+              <button type="button" className="rounded-[10px] border border-im-line px-1.5 py-px text-im-ink hover:bg-im-hover" onClick={() => p.goEntity(base)} data-testid="link-cube-base">
+                {cube.nameOf(base)}
+              </button>{" "}
+              at a coarser grain: its dimensions should be {cube.nameOf(base)}&apos;s or fewer.
+            </p>
+          )}
+        </Field>
+        {aggregatedBy.length > 0 && (
+          <Field label="Aggregated by">
+            <div data-testid="list-cube-aggregated-by">
+              {aggregatedBy.map((id) => (
+                <Li key={id} onClick={() => p.goEntity(id)} meta={cube.cubeOf(id)?.grain?.trim() || "no grain"} testId="item-cube-aggregated-by">
+                  {cube.nameOf(id)}
+                </Li>
+              ))}
+            </div>
+          </Field>
+        )}
         <Field label="Grain" htmlFor="f-grain">
           <TextField
             key={fieldKey(row.id, "grain")}
@@ -138,7 +243,7 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
               ))}
             </div>
           ) : (
-            <Hint>None yet. Open a numeric attribute and turn on Measure.</Hint>
+            <Hint>{factless.value ? "None: a factless fact. Count its rows." : "None yet. Open a numeric attribute and turn on Measure."}</Hint>
           )}
         </Field>
         <Field label="Dimensions">
@@ -147,7 +252,7 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
               {keys.map((k) => (
                 <div key={k.relationshipId} className="flex items-center gap-2" data-testid="item-cube-dimension" data-relationship={k.relationshipId}>
                   <div className="min-w-0 flex-1">
-                    <Li onClick={() => ui.select({ t: "rel", id: k.relationshipId })} meta={keyMeta(k.key)}>
+                    <Li onClick={() => ui.select({ t: "rel", id: k.relationshipId })} meta={keyMeta(k.key, snapshotDimension(k.dimensionId) ? cube.nameOf(k.dimensionId) : null)}>
                       {dimensionAs(cube, k)}
                     </Li>
                   </div>
@@ -199,20 +304,78 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
 function DimensionSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; cube: CubeIndex }) {
   const p = usePanel();
   const { saveRow } = useAction();
-  const scd = (row.scd_type ?? 1) as ScdType;
-  const choice = useChoice(String(scd) as "0" | "1" | "2", (v) =>
-    saveRow(row, (version) => updateCubeEntityAction(p.workspaceId, { cubeEntityId: row.id, expectedVersion: version, scdType: Number(v) as ScdType })),
-  );
+  const save = (change: Omit<Parameters<typeof updateCubeEntityAction>[1], "cubeEntityId" | "expectedVersion">) =>
+    saveRow(row, (version) => updateCubeEntityAction(p.workspaceId, { cubeEntityId: row.id, expectedVersion: version, ...change }));
+  const kind = useChoice<DimKind>(row.dim_kind ?? "standard", (dimKind) => save({ dimKind }));
+  const choice = useChoice<History>(row.history ?? "overwrite", (history) => save({ history }));
   const users = usedBy(cube, entity.id, p.ix.model.relationships);
+  const outOf = cube.outriggers().outOf(entity.id);
+  const outs = cube.outriggers().outs(entity.id);
+  // the prototype focuses an empty period when Snapshot is chosen; the field mounts with the choice
+  const focusPeriod = useRef(false);
+  const chooseHistory = (v: History) => {
+    focusPeriod.current = v === "snapshot" && !row.snapshot_period;
+    choice.choose(v);
+  };
+  const periodRef = useCallback((el: HTMLInputElement | null) => {
+    if (el && focusPeriod.current) {
+      focusPeriod.current = false;
+      el.focus();
+    }
+  }, []);
   return (
     <Fold title="Dimension" testId="section-cube-dimension">
       <div className="rounded-lg border border-im-line px-3 pb-3 pt-0.5">
-        <Field label="Slowly changing dimension type">
-          <Seg key={fieldKey(row.id, "scd")} value={choice.value} options={SCD_OPTIONS} disabled={!p.editable} onChange={(v) => choice.choose(v)} testId="seg-cube-scd" />
-          <p className="mt-1.5 text-[12px] text-im-ink-3" data-testid="text-cube-scd">
-            {SCD_SENTENCE[scd]} {SCD_TECHNICAL}
+        <Field label="Kind">
+          <Seg key={fieldKey(row.id, "dim_kind")} value={kind.value} options={DIM_KIND_OPTIONS} disabled={!p.editable} onChange={(v) => kind.choose(v)} testId="seg-cube-kind-dim" />
+          <p className={sentenceClass} data-testid="text-cube-dim-kind">
+            {DIM_KIND_SENTENCE[kind.value]}
           </p>
         </Field>
+        {outOf.length > 0 && (
+          <Field label="Outrigger of">
+            <div data-testid="list-cube-outrigger-of">
+              {outOf.map((id) => (
+                <Li key={id} onClick={() => p.goEntity(id)} meta="from the relationship" testId="item-cube-outrigger-of">
+                  {cube.nameOf(id)}
+                </Li>
+              ))}
+            </div>
+            <p className={sentenceClass}>{OUTRIGGER_SENTENCE}</p>
+          </Field>
+        )}
+        {outs.length > 0 && (
+          <Field label="Outriggers">
+            <div data-testid="list-cube-outriggers">
+              {outs.map((id) => (
+                <Li key={id} onClick={() => p.goEntity(id)} meta="outrigger" testId="item-cube-outrigger">
+                  {cube.nameOf(id)}
+                </Li>
+              ))}
+            </div>
+          </Field>
+        )}
+        <Field label="History">
+          <Seg key={fieldKey(row.id, "scd")} value={choice.value} options={HISTORY_OPTIONS} columns={2} disabled={!p.editable} onChange={chooseHistory} testId="seg-cube-scd" />
+          <p className={sentenceClass} data-testid="text-cube-scd">
+            {HISTORY_SENTENCE[choice.value]} {SCD_TECHNICAL}
+          </p>
+        </Field>
+        {choice.value === "snapshot" && (
+          <Field label="Snapshot period" htmlFor="f-snap">
+            <TextField
+              key={fieldKey(row.id, "snapshot_period")}
+              id="f-snap"
+              value={row.snapshot_period ?? ""}
+              readOnly={!p.editable}
+              placeholder="e.g. Month-end, Daily"
+              inputRef={periodRef}
+              onSave={(snapshotPeriod) => save({ snapshotPeriod })}
+              keep={{ key: fieldKey(row.id, "snapshot_period"), field: "Snapshot period", object: entity.name }}
+              testId="input-cube-snapshot-period"
+            />
+          </Field>
+        )}
         <Field label="Used by">
           {users.length ? (
             <div data-testid="list-cube-used-by">
@@ -222,6 +385,8 @@ function DimensionSection({ entity, row, cube }: { entity: Entity; row: CubeEnti
                 </Li>
               ))}
             </div>
+          ) : outOf.length ? (
+            <Hint>{`No fact uses it directly; it is reached through ${outOf.map((id) => cube.nameOf(id)).join(", ")}.`}</Hint>
           ) : (
             <Hint>No fact uses it yet.</Hint>
           )}

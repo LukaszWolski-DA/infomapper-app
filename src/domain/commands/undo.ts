@@ -113,11 +113,22 @@ export interface ModuleUndoTable {
   /**
    * Columns that point to a row the row outlives (slice 18, F16): when a write deletes the row `column` points to (of
    * `table`), the module's own `rule` says how its row changes in the same change group, or `null` for not at all. The
-   * row is never deleted for it, and the column keeps its id. InfoCube: a lookup's relationship (an approved lookup goes
-   * back to review).
+   * row is never deleted for it. The rule may change any column, this one included. InfoCube: a lookup's relationship (an
+   * approved lookup goes back to review, the id kept); since slice 19 an aggregate's base (cleared).
    */
   follows?: readonly ModuleFollow[];
+  /**
+   * The module's own check of a revert (slice 19, F6), beside InfoMapper's (`calculationCycle`): given the rows as the
+   * revert leaves them and the rows it touched, a refusal's message, or null. Called when the revert touches this table.
+   * InfoCube: no aggregate of itself, at any depth, and no aggregate of a deleted fact.
+   */
+  revertRefusal?: ModuleRevertRefusal;
 }
+/** A module's revert check: the rows after the revert by table and key, and the touched rows. */
+export type ModuleRevertRefusal = (
+  rows: ReadonlyMap<string, ReadonlyMap<string, Readonly<Record<string, unknown>>>>,
+  touched: readonly { table: string; key: string }[],
+) => string | null;
 /** One `follows` entry: the column, the table it points to, and the module's pure rule. */
 export type ModuleFollow = readonly [column: string, table: string, rule: (row: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>> | null];
 /** A module's table is in the undo history or outside it, as InfoMapper's are. */
@@ -137,6 +148,8 @@ export interface UndoTables {
   readonly goesWhole: Readonly<Record<string, readonly (readonly [string, string, string])[]>>;
   /** By module table: the rows it outlives, with the module's rule (`ModuleUndoTable.follows`, slice 18). */
   readonly follows: Readonly<Record<string, readonly ModuleFollow[]>>;
+  /** By module table: its revert check (`ModuleUndoTable.revertRefusal`, slice 19). */
+  readonly revertRefusals: Readonly<Record<string, ModuleRevertRefusal>>;
 }
 
 /** The workspace's current rows of every undoable table, deleted rows included; a module's under its table's name. */
@@ -213,6 +226,7 @@ export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleT
   const defaults: Record<string, Readonly<Record<string, unknown>>> = { ...IMAGE_DEFAULTS };
   const goesWhole: Record<string, readonly (readonly [string, string, string])[]> = {};
   const follows: Record<string, readonly ModuleFollow[]> = {};
+  const revertRefusals: Record<string, ModuleRevertRefusal> = {};
   for (const [table, spec] of Object.entries(modules) as [string, ModuleTableClass | undefined][]) {
     if (!spec) continue;
     if (undoable.includes(table) || outside.has(table)) throw new Error(`The table ${table} is InfoMapper's or registered twice.`);
@@ -228,8 +242,9 @@ export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleT
     if (spec.defaults) defaults[table] = spec.defaults;
     if (spec.goesWhole?.length) goesWhole[table] = spec.goesWhole;
     if (spec.follows?.length) follows[table] = spec.follows;
+    if (spec.revertRefusal) revertRefusals[table] = spec.revertRefusal;
   }
-  return { undoable, outside, parents, nouns, actions, defaults, goesWhole, follows, modules: registered };
+  return { undoable, outside, parents, nouns, actions, defaults, goesWhole, follows, revertRefusals, modules: registered };
 }
 
 /** InfoMapper's tables only: what undo knows without a module (tests, and InfoMapper with an empty registry). */
@@ -433,6 +448,11 @@ export function revertChangeGroup(
   if (!consistent(after, touched, tables)) return fail(refused());
   const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched) ?? calculationCycle(after, touched);
   if (keyClash) return fail(keyClash);
+  // slice 19 (F6): each module's own check, for the tables the revert touched
+  for (const table of new Set(touched.map((t) => t.table))) {
+    const message = tables.revertRefusals[table]?.(after, touched);
+    if (message) return fail(domainError("invalid", message));
+  }
   // copies stay in step with their originals (slice 10c, F1): an undo or redo of a followed field, a paste or a
   // “Stop following” writes the copies that differ, in the same group; an original brought back writes none, as its
   // copies kept its values

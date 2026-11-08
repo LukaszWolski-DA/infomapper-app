@@ -6,12 +6,19 @@ import type { Uuid } from "@/domain/ids";
 import type { Entity, Relationship, StandardColumns } from "@/domain/types";
 import { carries, dimensionAs, type CubeIndex } from "./keys";
 import { lookupDependents, mappingAttributeDeletes, mappingDependents, type MappingIndex } from "./mappings";
-import type { Additivity, CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure, CubeRole } from "./types";
+import { aggregateIndex, type AggregateIndex } from "./aggregates";
+import { outriggers, type Outriggers } from "./outriggers";
+import { SCD_NUMBER, type Additivity, type CubeEntity, type CubeKey, type CubeMapping, type CubeMappingInput, type CubeMeasure, type CubeRole, type DimKind, type FactType } from "./types";
 
 export const ROLE_NAMES: Record<CubeRole, string> = { fact: "Fact", dimension: "Dimension" };
 
-/** The card's tooltip on the role (prototype `entCard`, without "is off here": a role exists only while on, C-7). */
-export const ROLE_TITLES: Record<CubeRole, string> = { fact: "A fact: one row per its grain (InfoCube)", dimension: "A dimension (InfoCube)" };
+/**
+ * Slice 19 (D-74, prototype `FTYPE_L`, `FTYPE_S`, `cubeTitle`): a fact type's full name and its word in the chip
+ * (a transaction adds none).
+ */
+export const FACT_TYPE_NAMES: Record<FactType, string> = { transaction: "Transaction", periodic: "Periodic snapshot", accumulating: "Accumulating snapshot" };
+export const FACT_TYPE_CHIP: Record<FactType, string> = { transaction: "", periodic: "Snapshot", accumulating: "Accumulating" };
+export const DIM_KIND_NAMES: Record<DimKind, string> = { standard: "Standard", junk: "Junk" };
 
 type Live<T> = T & { deleted_at: null };
 const live = <T extends { deleted_at: string | null }>(rows: readonly T[]) => rows.filter((r): r is Live<T> => r.deleted_at === null);
@@ -21,17 +28,89 @@ export function rolesOf(cubeEntities: readonly CubeEntity[]): Map<Uuid, CubeEnti
   return new Map(live(cubeEntities).map((c) => [c.entity_id, c]));
 }
 
-/** The right side of an item in the Cube tab (prototype `cubeTree`): a fact's grain, a dimension's SCD type. */
-export const tabMeta = (c: CubeEntity): string => (c.role === "fact" ? (c.grain?.trim() ? "grain set" : "no grain") : `SCD ${c.scd_type ?? 1}`);
+/** A dimension's history as shown (prototype `scdLabel`): "SCD 0", "SCD 1", "SCD 2", "Snapshot · {period}" or "Snapshot". */
+export function historyLabel(c: Pick<CubeEntity, "history" | "snapshot_period"> | undefined): string {
+  if (c?.history === "snapshot") return c.snapshot_period?.trim() ? `Snapshot · ${c.snapshot_period.trim()}` : "Snapshot";
+  return `SCD ${SCD_NUMBER[c?.history ?? "overwrite"]}`;
+}
+
+/** What the slice-19 texts read besides the row: the aggregates, the outriggers and the entities' names. */
+export interface TypeContext {
+  aggregates: AggregateIndex;
+  outriggers: Outriggers;
+  nameOf(entityId: Uuid): string;
+}
+
+/** The context from the rows and the model (the page's and the composition root's reads). */
+export function typeContext(
+  cubeEntities: readonly CubeEntity[],
+  relationships: readonly Relationship[],
+  entities: readonly Pick<Entity, "id" | "name" | "deleted_at">[],
+): TypeContext {
+  const roles = rolesOf(cubeEntities);
+  const names = new Map(entities.filter((e) => e.deleted_at === null).map((e) => [e.id, e.name]));
+  return { aggregates: aggregateIndex(cubeEntities), outriggers: outriggers(relationships, (id) => roles.get(id)?.role), nameOf: (id) => names.get(id) ?? "?" };
+}
+
+/**
+ * The right side of an item in the Cube tab (prototype `cubeTree`): a fact's type, factless, aggregate and grain; a
+ * dimension's history, junk and outrigger; each part only when it applies, joined with " · ".
+ */
+export function tabMeta(c: CubeEntity, x?: TypeContext): string {
+  if (c.role === "fact") {
+    return [
+      FACT_TYPE_CHIP[c.fact_type ?? "transaction"],
+      c.is_factless ? "factless" : "",
+      x?.aggregates.baseOf(c.entity_id) ? "aggregate" : "",
+      c.grain?.trim() ? "grain set" : "no grain",
+    ].filter(Boolean).join(" · ");
+  }
+  return [historyLabel(c), c.dim_kind === "junk" ? "junk" : "", x?.outriggers.outOf(c.entity_id).length ? "outrigger" : ""].filter(Boolean).join(" · ");
+}
+
+/**
+ * The card's and the panel's role (prototype `cubeTitle`): the short text ("Fact · Snapshot · Aggregate", "Dimension ·
+ * Junk") and the long one for the title ("Periodic snapshot fact, factless, aggregate of Fact Sales").
+ */
+export function cubeTitle(c: CubeEntity, x: TypeContext): { short: string; long: string } {
+  if (c.role === "fact") {
+    const base = x.aggregates.baseOf(c.entity_id);
+    const type = c.fact_type ?? "transaction";
+    return {
+      short: [ROLE_NAMES.fact, FACT_TYPE_CHIP[type], c.is_factless ? "Factless" : "", base ? "Aggregate" : ""].filter(Boolean).join(" · "),
+      long: [`${FACT_TYPE_NAMES[type]} fact`, c.is_factless ? "factless" : "", base ? `aggregate of ${x.nameOf(base)}` : ""].filter(Boolean).join(", "),
+    };
+  }
+  const outOf = x.outriggers.outOf(c.entity_id);
+  const snapshot = c.history === "snapshot";
+  const period = c.snapshot_period?.trim();
+  return {
+    short: [ROLE_NAMES.dimension, c.dim_kind === "junk" ? "Junk" : "", snapshot ? "Snapshot" : "", outOf.length ? "Outrigger" : ""].filter(Boolean).join(" · "),
+    long: [
+      c.dim_kind === "junk" ? "Junk dimension" : "Dimension",
+      snapshot ? `snapshot${period ? ` (${period})` : ""}` : "",
+      outOf.length ? `outrigger of ${outOf.map((d) => x.nameOf(d)).join(", ")}` : "",
+    ].filter(Boolean).join(", "),
+  };
+}
+
+/** The card's and the panel's tooltip on the role: the long text and " (InfoCube)" (step 1, P2). */
+export const roleTitle = (c: CubeEntity, x: TypeContext): string => `${cubeTitle(c, x).long} (InfoCube)`;
 
 /** The Cube tab's two groups (B-1): facts, then dimensions, each in the model's order of entities. */
-export function cubeSections(entities: readonly Entity[], cubeEntities: readonly CubeEntity[]): { role: CubeRole; entities: { id: Uuid; meta: string }[] }[] {
+export function cubeSections(
+  entities: readonly Entity[],
+  cubeEntities: readonly CubeEntity[],
+  /** Slice 19: for the aggregates and outriggers in the items' text. */
+  relationships: readonly Relationship[] = [],
+): { role: CubeRole; entities: { id: Uuid; meta: string }[] }[] {
   const roles = rolesOf(cubeEntities);
+  const x = typeContext(cubeEntities, relationships, entities);
   return (["fact", "dimension"] as const).map((role) => ({
     role,
     entities: entities.flatMap((e) => {
       const c = roles.get(e.id);
-      return e.deleted_at === null && c?.role === role ? [{ id: e.id, meta: tabMeta(c) }] : [];
+      return e.deleted_at === null && c?.role === role ? [{ id: e.id, meta: tabMeta(c, x) }] : [];
     }),
   }));
 }
@@ -58,9 +137,14 @@ export function entityDependents(
   const own = roles.get(entityId);
   if (!own) return mappings ? [...mappingDependents(mappings, { entityId }), ...lookupDependents(mappings, cubeMappings, model.relationships, entityId)] : [];
   const rows: [string, string][] = [];
-  if (own.role === "fact") rows.push([ROLE_NAMES.fact, own.grain?.trim() ? `its grain (“${own.grain.trim()}”) deleted` : "deleted"]);
-  else {
-    rows.push([ROLE_NAMES.dimension, `SCD type ${own.scd_type ?? 1} deleted`]);
+  if (own.role === "fact") {
+    rows.push([ROLE_NAMES.fact, own.grain?.trim() ? `its grain (“${own.grain.trim()}”) deleted` : "deleted"]);
+    // slice 19: the aggregates lose their base (the cascade's `follows` clears it)
+    const name = new Map(model.entities.map((e) => [e.id, e.name]));
+    const aggregates = aggregateIndex(cubeEntities).aggregatesOf(entityId);
+    if (aggregates.length) rows.push([aggregates.map((id) => name.get(id) ?? "?").join(", "), aggregates.length > 1 ? "lose their base fact" : "loses its base fact"]);
+  } else {
+    rows.push([ROLE_NAMES.dimension, own.history === "snapshot" ? `its history (${historyLabel(own)}) deleted` : `SCD type ${SCD_NUMBER[own.history ?? "overwrite"]} deleted`]);
     const name = new Map(model.entities.map((e) => [e.id, e.name]));
     const facts = [
       ...new Set(

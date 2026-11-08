@@ -104,7 +104,10 @@ starTest("S17-01: “New fact here”, “New dimension here” and the Cube tab
   await fact.locator('[data-testid="picker-item"][data-label="Sales"]').click();
   await expect.poll(facts).toBe(f0 + 1);
   await expect.poll(() => conceptOf("New fact")).toBe("Sales");
-  await page.mouse.click(spot.x, spot.y, { button: "right" });
+  // the page has the answer (its new name focused) before the next picker opens, and the new card now lies at `spot`
+  await expect(page.getByTestId("input-entity-name")).toBeFocused();
+  const next = await emptySpot(page);
+  await page.mouse.click(next.x, next.y, { button: "right" });
   await toolboxItem(page, "New dimension here").click();
   await expectConceptPicker(page, "dimension");
   await page.keyboard.press("Escape");
@@ -120,6 +123,9 @@ starTest("S17-01: “New fact here”, “New dimension here” and the Cube tab
   await dim.locator('[data-testid="picker-item"][data-label="Product"]').click();
   await expect.poll(dimensions).toBe(d0 + 1);
   await expect.poll(() => conceptOf("New dimension")).toBe("Product");
+  // the page has the create's answer: its new name has the focus (the data file is written before the answer reaches the
+  // page, and a later answer took the focus from the next picker's filter; slice 19 step 3)
+  await expect(page.getByTestId("input-entity-name")).toBeFocused();
   await page.getByTestId("button-new-fact").click();
   await expectConceptPicker(page, "fact");
   await page.keyboard.press("Escape");

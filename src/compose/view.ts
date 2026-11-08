@@ -21,13 +21,14 @@ import {
   cubePageRows,
   cubeRowFeeds,
   cubeSections,
+  cubeTitle,
   entityDependents,
   FED_COVERAGE,
   FEED_WORDS,
   measureMarks,
-  ROLE_NAMES,
-  ROLE_TITLES,
+  roleTitle,
   rolesOf,
+  typeContext,
   type CubePageRows,
 } from "@/modules/infocube/domain/view";
 
@@ -57,7 +58,9 @@ export async function moduleView(store: DataStore, workspace: Workspace, model: 
       ])
     : [[], [], [], [], []];
   const roles: ModuleView["roles"] = {};
-  for (const [entityId, c] of rolesOf(cube)) roles[entityId] = { text: ROLE_NAMES[c.role], title: ROLE_TITLES[c.role], card: `dimn ${c.role}`, mark: "cube", coverage: FED_COVERAGE, feed: FEED_WORDS };
+  // slice 19 (D-74): the chip names the type, factless, aggregate, junk, snapshot and outrigger; its title the long text
+  const types = typeContext(cube, model.relationships, model.entities);
+  for (const [entityId, c] of rolesOf(cube)) roles[entityId] = { text: cubeTitle(c, types).short, title: roleTitle(c, types), card: `dimn ${c.role}`, mark: "cube", coverage: FED_COVERAGE, feed: FEED_WORDS };
   // slice 15c: a dimensional row's feeds on cards (C12)
   const mappings = mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs });
   // slice 15b: the Σ marks, an attribute's delete with InfoCube's rows (R4) and the rows of the panels' sections
@@ -78,7 +81,7 @@ export async function moduleView(store: DataStore, workspace: Workspace, model: 
       : {},
   };
   if (!workspace.infocube) return { ...NO_MODULES, roles, ...described };
-  const sections = cubeSections(model.entities, cube).map(({ role, entities }) => ({
+  const sections = cubeSections(model.entities, cube, model.relationships).map(({ role, entities }) => ({
     key: `cube:${role}`,
     title: role === "fact" ? "Facts" : "Dimensions",
     mark: "cube",

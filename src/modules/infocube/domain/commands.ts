@@ -13,14 +13,28 @@ import type { WorkspaceAccess } from "@/domain/permissions";
 import type { Attribute } from "@/domain/types";
 import { optionalTextSchema, uuidSchema, versionSchema } from "@/domain/validation";
 import { cubeIndex, dimensionAs, factEnds, keyName, roleAt, type CubeIndex, type CubeModel } from "./keys";
-import { ADDITIVITIES, DEFAULT_SCD_TYPE, type CubeEntity, type CubeKey, type CubeMeasure, type CubeRole } from "./types";
+import { AGGREGATE_TEXTS, aggregateIndex } from "./aggregates";
+import {
+  ADDITIVITIES,
+  DEFAULT_DIM_KIND,
+  DEFAULT_FACT_TYPE,
+  DEFAULT_HISTORY,
+  DIM_KINDS,
+  FACT_TYPES,
+  HISTORIES,
+  type CubeEntity,
+  type CubeKey,
+  type CubeMeasure,
+  type CubeRole,
+} from "./types";
 
 /** "New fact", "New dimension": numbered among the dimensional names when taken (prototype `createEntity`). */
 const DEFAULT_NAME: Record<CubeRole, string> = { fact: "New fact", dimension: "New dimension" };
 
 /**
  * New fact or New dimension (B-1, the Cube tab and the canvas's toolbox): InfoMapper's \`createEntity\` at the dimensional
- * level, then InfoCube's row with the role (a fact without a grain yet, a dimension of SCD type 1). Refused while
+ * level, then InfoCube's row with the role (a fact without a grain yet, a transaction fact, not factless, without a
+ * base; a dimension standard, with the history overwrite, SCD 1; slice 19). Refused while
  * InfoCube is off in the workspace (C-7); the role, the rights and the rest are \`createEntity\`'s.
  */
 export function createCubeEntity(
@@ -41,7 +55,12 @@ export function createCubeEntity(
     entity_id: made.value.entityId,
     role,
     grain: null,
-    scd_type: role === "dimension" ? DEFAULT_SCD_TYPE : null,
+    fact_type: role === "fact" ? DEFAULT_FACT_TYPE : null,
+    is_factless: role === "fact" ? false : null,
+    base_fact_entity_id: null,
+    dim_kind: role === "dimension" ? DEFAULT_DIM_KIND : null,
+    history: role === "dimension" ? DEFAULT_HISTORY : null,
+    snapshot_period: null,
   };
   const writes: Write[] = [...made.writeSet.writes, { kind: "insert", table: "cube_entity", row: cube }];
   return { ok: true, value: made.value, writeSet: buildWriteSet(ctx, access.workspace.id, writes) };
@@ -59,7 +78,7 @@ export function dimensionEnd(cubeEntities: readonly Pick<CubeEntity, "entity_id"
   return null;
 }
 
-// ---- slice 15b: grain, SCD type, measures (B-4) ----
+// ---- slice 15b: grain, measures (B-4); slice 19: the types (D-74) ----
 
 const cubeEntityInput = z
   .object({
@@ -67,36 +86,101 @@ const cubeEntityInput = z
     expectedVersion: versionSchema,
     /** A fact's grain (plain text, trimmed, empty = none). */
     grain: optionalTextSchema.optional(),
-    /** A dimension's SCD type. */
-    scdType: z.union([z.literal(0), z.literal(1), z.literal(2)]).optional(),
+    /** Slice 19: a fact's type. */
+    factType: z.enum(FACT_TYPES).optional(),
+    /** Slice 19: a fact deliberately without measures. */
+    isFactless: z.boolean().optional(),
+    /** Slice 19: the fact this one aggregates (an entity id), null for none. */
+    baseFactEntityId: uuidSchema.nullable().optional(),
+    /** Slice 19: a dimension's kind. */
+    dimKind: z.enum(DIM_KINDS).optional(),
+    /** Slice 19: a dimension's history (was the SCD type). */
+    history: z.enum(HISTORIES).optional(),
+    /** Slice 19: a dimension's snapshot period (plain text, trimmed, empty = none), kept whatever the history. */
+    snapshotPeriod: optionalTextSchema.optional(),
   })
   .strict();
 export type UpdateCubeEntityInput = z.input<typeof cubeEntityInput>;
 
 export const GRAIN_ON_DIMENSION = "Only a fact has a grain.";
-export const SCD_ON_FACT = "Only a dimension has an SCD type.";
+// slice 19's refusals on the wrong role (approved in step 1); HISTORY_ON_FACT replaces "Only a dimension has an SCD type."
+export const FACT_TYPE_ON_DIMENSION = "Only a fact has a fact type.";
+export const FACTLESS_ON_DIMENSION = "Only a fact can be factless.";
+export const BASE_ON_DIMENSION = "Only a fact can be an aggregate.";
+export const KIND_ON_FACT = "Only a dimension has a kind.";
+export const HISTORY_ON_FACT = "Only a dimension has a history.";
+export const PERIOD_ON_FACT = "Only a dimension has a snapshot period.";
 
-/** A fact's grain or a dimension's SCD type (B-4): InfoCube's row of the entity, at the version the panel read. */
+/** The undo step's name of each field (approved in step 1); the grain keeps InfoMapper's "Change fact or dimension". */
+function labelOf(patch: Partial<CubeEntity>): string | null {
+  if ("fact_type" in patch) return "Change fact type";
+  if ("is_factless" in patch) return patch.is_factless ? "Mark fact factless" : "Unmark fact factless";
+  if ("base_fact_entity_id" in patch) return patch.base_fact_entity_id ? "Set aggregate base" : "Clear aggregate base";
+  if ("dim_kind" in patch) return "Change dimension kind";
+  if ("history" in patch) return "Change history";
+  if ("snapshot_period" in patch) return "Change snapshot period";
+  return null;
+}
+
+/** What `updateCubeEntity` reads: the row, and (slice 19, for a base) the workspace's InfoCube rows and entities' names. */
+export interface UpdateCubeEntityState {
+  cube: CubeEntity | null;
+  cubeEntities?: readonly CubeEntity[];
+  entities?: readonly { id: Uuid; name: string; deleted_at: string | null }[];
+}
+
+/**
+ * A fact's grain, type, factless flag or base, or a dimension's kind, history or snapshot period (B-4, D-74): InfoCube's
+ * row of the entity, at the version the panel read. Each field is refused on the wrong role; a base must be another live
+ * fact whose chain of bases does not reach this one (no cycle).
+ */
 export function updateCubeEntity(
   ctx: CommandContext,
   access: WorkspaceAccess,
-  state: { cube: CubeEntity | null },
+  state: UpdateCubeEntityState,
   input: unknown,
 ): CommandResult<{ version: number }> {
   const parsed = begin(access, "model.edit", cubeEntityInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { cubeEntityId, expectedVersion, grain, scdType } = parsed.data;
+  const { cubeEntityId, expectedVersion, grain, factType, isFactless, baseFactEntityId, dimKind, history, snapshotPeriod } = parsed.data;
   const got = current(state.cube, access, cubeEntityId, expectedVersion, "fact or dimension");
   if (!got.ok) return fail(got.error);
   const before = got.row;
-  if (grain !== undefined && before.role !== "fact") return fail(domainError("invalid", GRAIN_ON_DIMENSION));
-  if (scdType !== undefined && before.role !== "dimension") return fail(domainError("invalid", SCD_ON_FACT));
+  const fact = before.role === "fact";
+  const refuse = (message: string) => fail(domainError("invalid", message));
+  if (grain !== undefined && !fact) return refuse(GRAIN_ON_DIMENSION);
+  if (factType !== undefined && !fact) return refuse(FACT_TYPE_ON_DIMENSION);
+  if (isFactless !== undefined && !fact) return refuse(FACTLESS_ON_DIMENSION);
+  if (baseFactEntityId !== undefined && !fact) return refuse(BASE_ON_DIMENSION);
+  if (dimKind !== undefined && fact) return refuse(KIND_ON_FACT);
+  if (history !== undefined && fact) return refuse(HISTORY_ON_FACT);
+  if (snapshotPeriod !== undefined && fact) return refuse(PERIOD_ON_FACT);
+  if (baseFactEntityId) {
+    if (baseFactEntityId === before.entity_id) return refuse(AGGREGATE_TEXTS.self);
+    const rows = (state.cubeEntities ?? []).filter((c) => c.workspace_id === access.workspace.id);
+    const base = rows.find((c) => c.entity_id === baseFactEntityId && c.deleted_at === null);
+    if (base?.role !== "fact") return refuse(AGGREGATE_TEXTS.notFact);
+    // the chain as it would be with the new base: does it come back to this fact?
+    const index = aggregateIndex(rows.map((c) => (c.id === before.id ? { ...c, base_fact_entity_id: baseFactEntityId } : c)));
+    if (index.reaches(before.entity_id, before.entity_id)) {
+      const name = (id: Uuid) => state.entities?.find((e) => e.id === id)?.name ?? "?";
+      return refuse(AGGREGATE_TEXTS.cycle(name(baseFactEntityId), name(before.entity_id)));
+    }
+  }
   const patch: Partial<CubeEntity> = {};
   if (grain !== undefined && grain !== before.grain) patch.grain = grain;
-  if (scdType !== undefined && scdType !== before.scd_type) patch.scd_type = scdType;
+  if (factType !== undefined && factType !== before.fact_type) patch.fact_type = factType;
+  if (isFactless !== undefined && isFactless !== before.is_factless) patch.is_factless = isFactless;
+  if (baseFactEntityId !== undefined && baseFactEntityId !== before.base_fact_entity_id) patch.base_fact_entity_id = baseFactEntityId;
+  if (dimKind !== undefined && dimKind !== before.dim_kind) patch.dim_kind = dimKind;
+  if (history !== undefined && history !== before.history) patch.history = history;
+  if (snapshotPeriod !== undefined && snapshotPeriod !== before.snapshot_period) patch.snapshot_period = snapshotPeriod;
   if (!Object.keys(patch).length) return fail(nothingToChange());
   const row = nextVersion(ctx, before, patch);
-  return done(ctx, access, { version: row.version }, [{ kind: "update", table: "cube_entity", before, row }]);
+  const result = done(ctx, access, { version: row.version }, [{ kind: "update", table: "cube_entity", before, row }]);
+  const label = labelOf(patch);
+  if (result.ok && label) result.writeSet.label = label;
+  return result;
 }
 
 const NUMERIC = new Set<Attribute["data_type"]>(["integer", "decimal"]);

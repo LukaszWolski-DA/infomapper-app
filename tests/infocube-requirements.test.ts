@@ -20,7 +20,7 @@ import type { Mapping, MappingInput, WorkspaceModel } from "@/domain/types";
 import { busMatrix } from "@/modules/infocube/domain/bus-matrix";
 import { cubeIndex } from "@/modules/infocube/domain/keys";
 import { cubeRequirementFeeds, hasTypeConflict, mappingIndex } from "@/modules/infocube/domain/mappings";
-import type { CubeEntity, CubeKey } from "@/modules/infocube/domain/types";
+import { typeColumns, type CubeEntity, type CubeKey } from "@/modules/infocube/domain/types";
 
 const WS = SEED_IDS.wsRetailDwh;
 const ACTIONS = { fact: async () => ({ ok: false as const, message: "" }), dimension: async () => ({ ok: false as const, message: "" }) };
@@ -205,10 +205,10 @@ describe("the bus matrix's rows (B-8, R-8, RP-10)", () => {
       ["Fact Orders", "One sales order"],
       ["Fact Sales", "One order line"],
     ]);
-    expect(m.dimensions.map((d) => [d.name, d.scd, d.facts])).toEqual([
-      ["Dim Customer", 2, 2],
-      ["Dim Product", 1, 1],
-      ["Dim Date", 0, 2],
+    expect(m.dimensions.map((d) => [d.name, d.history, d.facts])).toEqual([
+      ["Dim Customer", "SCD 2", 2],
+      ["Dim Product", "SCD 1", 1],
+      ["Dim Date", "SCD 0", 2],
     ]);
     const id = (name: string) => model.entities.find((e) => e.name === name)!.id;
     const dates = m.cells[id("Fact Sales")]![id("Dim Date")]!;
@@ -229,7 +229,7 @@ describe("the bus matrix's rows (B-8, R-8, RP-10)", () => {
       ...Array.from({ length: 50 }, (_, i) => ({ ...std(`f${i}`), name: `Fact ${i}`, concept_id: "c" })),
       ...Array.from({ length: 100 }, (_, i) => ({ ...std(`d${i}`), name: `Dim ${i}`, concept_id: "c" })),
     ];
-    const cubeEntities = entities.map((e) => ({ ...std(`ce-${e.id}`), entity_id: e.id, role: e.id.startsWith("f") ? "fact" : "dimension", grain: null, scd_type: 1 })) as CubeEntity[];
+    const cubeEntities = entities.map((e) => ({ ...std(`ce-${e.id}`), entity_id: e.id, role: e.id.startsWith("f") ? "fact" : "dimension", grain: null, ...typeColumns(e.id.startsWith("f") ? "fact" : "dimension") })) as CubeEntity[];
     const relationships = Array.from({ length: 300 }, (_, i) => ({ ...std(`r${i}`), from_entity_id: `d${(i * 7) % 100}`, to_entity_id: `f${i % 50}`, from_role: null, to_role: null }));
     const index = cubeIndex({ entities, attributes: [], relationships: relationships as never, cubeEntities, cubeMeasures: [], cubeKeys: [] });
     const m = busMatrix(index, entities as never, [{ id: "c", sort_order: 0 }]);

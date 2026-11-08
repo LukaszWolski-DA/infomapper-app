@@ -706,8 +706,12 @@ missing, and the AD-31 schema check reads the whole file through it (`ComposedDb
 table is absent until its first row; a module's tables are not part of the file's format.
 
 ### InfoCube: `cube_entity`
-Exactly one row per dimensional entity (spec, data model): its role in place of the stereotype (C-5), a fact's grain, a
-dimension's SCD type. Migration `20261104100100_infocube_entities.sql`. In the undo history (parent `entity`).
+Exactly one row per dimensional entity (spec, data model): its role in place of the stereotype (C-5), a fact's grain,
+type, factless flag and base, a dimension's kind, history and snapshot period (slice 19, D-74). Migrations
+`20261104100100_infocube_entities.sql` and `20261108130000_infocube_types.sql`. In the undo history (parent `entity`; the
+base follows its entity's delete, cleared in the same change group; undo refuses a base that would be the fact itself, a
+cycle or a deleted fact). The local data file's rows written before slice 19 are converted when the file is loaded
+(`TableRules.upgrade`).
 
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
@@ -715,9 +719,16 @@ dimension's SCD type. Migration `20261104100100_infocube_entities.sql`. In the u
 | `entity_id` | uuid | no | FK `entity` (a dimensional one); unique among live rows |
 | `role` | text | no | `fact`, `dimension` |
 | `grain` | text | yes | a fact's grain, plain text ("One order line"); null for a dimension |
-| `scd_type` | smallint | yes | a dimension's type: 0 keep, 1 overwrite (default), 2 history; null for a fact |
+| `fact_type` | text | yes | a fact's: `transaction` (default), `periodic`, `accumulating`; null for a dimension |
+| `is_factless` | boolean | yes | a fact's, false by default; null for a dimension |
+| `base_fact_entity_id` | uuid | yes | FK `entity`: the fact this one aggregates; never itself (CHECK), a live fact and no cycle (domain) |
+| `dim_kind` | text | yes | a dimension's: `standard` (default), `junk`; null for a fact. An outrigger is derived, never stored |
+| `history` | text | yes | a dimension's: `keep` (SCD 0), `overwrite` (SCD 1, default), `history` (SCD 2), `snapshot`; null for a fact. Replaces `scd_type` (slice 19) |
+| `snapshot_period` | text | yes | a dimension's snapshot period ("Month-end"), kept whatever the history; null for a fact |
 
-CHECK `cube_entity_shape_ck`: a fact has no SCD type; a dimension has no grain and an SCD type of 0, 1 or 2.
+CHECKs `cube_entity_fact_type_ck`, `cube_entity_dim_kind_ck`, `cube_entity_history_ck` (the lists), `cube_entity_base_ck`
+(not itself) and `cube_entity_shape_ck`: a fact has a type and a factless flag and none of a dimension's fields; a
+dimension has no grain, a kind and a history, and none of a fact's fields. Index `cube_entity_base_ix`.
 
 ### InfoCube: `cube_measure`
 An attribute of a fact that is a measure: one row per such attribute (spec, data model). In the undo history (parent

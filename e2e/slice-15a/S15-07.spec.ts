@@ -25,14 +25,14 @@ test("S15-07: New fact in the Cube tab: a fact card, its name selected, Role Fac
   await expect(card(page, "New fact")).toHaveCount(1);
   await expectNameSelected(page, "New fact");
   await expect(roleOf(page, "New fact")).toHaveText("Fact");
-  await expect(roleOf(page, "New fact")).toHaveAttribute("title", "A fact: one row per its grain (InfoCube)");
+  await expect(roleOf(page, "New fact")).toHaveAttribute("title", "Transaction fact (InfoCube)");
   await expect(card(page, "New fact").locator(".card")).toHaveClass(/\bdimn\b.*\bfact\b/);
   await expect(page.getByTestId("text-entity-role")).toHaveText("Fact");
   await expect(page.getByTestId("select-entity-stereotype")).toHaveCount(0);
   await expect.poll(() => toasts(page)).toContainEqual(expect.stringMatching(/^Created New fact in .+\. Type its name now; change the concept in the panel\.$/));
   const fact = (await liveEntityNamed("New fact"))!;
   expect(fact.model_level).toBe("dimensional");
-  expect((await cubeEntities()).find((c) => c.entity_id === fact.id)).toMatchObject({ role: "fact", grain: null, scd_type: null });
+  expect((await cubeEntities()).find((c) => c.entity_id === fact.id)).toMatchObject({ role: "fact", grain: null, fact_type: "transaction", is_factless: false, history: null });
   // it is listed among the facts
   await expect(page.getByTestId("tree-tab-section").first().getByTestId("tree-item").filter({ hasText: "New fact" })).toHaveText(/no grain/);
 
@@ -53,7 +53,7 @@ test("S15-07: New fact in the Cube tab: a fact card, its name selected, Role Fac
   await expect(roleOf(page, "New dimension")).toHaveText("Dimension");
   await expect(page.getByTestId("text-entity-role")).toHaveText("Dimension");
   const dim = (await liveEntityNamed("New dimension"))!;
-  expect((await cubeEntities()).find((c) => c.entity_id === dim.id)).toMatchObject({ role: "dimension", grain: null, scd_type: 1 });
+  expect((await cubeEntities()).find((c) => c.entity_id === dim.id)).toMatchObject({ role: "dimension", grain: null, dim_kind: "standard", history: "overwrite" });
   await page.getByTestId("input-entity-name").press("Escape");
   await page.getByTestId("button-undo").click();
   await expect(card(page, "New dimension")).toHaveCount(0);

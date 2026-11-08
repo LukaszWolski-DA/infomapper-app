@@ -86,11 +86,15 @@ async function keyState(store: DataStore, workspaceId: string, model: WorkspaceM
   return { entities: model.entities, attributes: model.attributes, relationships: model.relationships, cubeEntities, cubeMeasures, cubeKeys };
 }
 
-/** A fact's grain or a dimension's SCD type (saved on the chain with the `cube_entity` row checked). */
+/**
+ * A fact's grain, type, factless flag or base, or a dimension's kind, history or snapshot period (saved on the chain with
+ * the `cube_entity` row checked; slice 19 reads every row for the base's checks).
+ */
 export async function updateCubeEntityAction(workspaceId: string, input: UpdateCubeEntityInput): Promise<ActionResult<{ version: number }>> {
-  return modelCommand(workspaceId, async (ctx, access, _model, store) => {
-    const cube = (await store.modules.list(access.workspace.id, "cube_entity")).find((c) => c.id === input?.cubeEntityId) ?? null;
-    return updateCubeEntity(ctx, access, { cube }, input);
+  return modelCommand(workspaceId, async (ctx, access, model, store) => {
+    const cubeEntities = await store.modules.list(access.workspace.id, "cube_entity");
+    const cube = cubeEntities.find((c) => c.id === input?.cubeEntityId) ?? null;
+    return updateCubeEntity(ctx, access, { cube, cubeEntities, entities: model.entities }, input);
   });
 }
 

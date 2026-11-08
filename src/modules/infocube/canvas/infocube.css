@@ -12,6 +12,13 @@
 .im-canvas .stereo.role.cube { display: inline-flex; align-items: center; gap: 3px; color: var(--im-ink); font-weight: 600 }
 .im-canvas .stereo.role.cube::before { content: ""; width: 11px; height: 11px; flex: none }
 .im-mark.cube { display: inline-block; width: 11px; height: 11px; flex: none }
+/* Slice 19 (D-74, Q7, F11): a long role ("Fact · Accumulating · Factless · Aggregate") is cut with "…" when the header's
+   first line does not fit (`clip-l1`, measured with the role's text by `lineNeedsClip`): the concept text after it gives
+   way first (its shrink is 10,000 times the role's), then the role. Its full text is the title. No element. The role's
+   shrink is 1, not a fraction: flexbox hands out only that fraction of the overflow once the concept text is at 0. */
+.im-canvas .clip-l1 .c-l1 > .stereo.role.cube { display: block; flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis }
+.im-canvas .clip-l1 .c-l1 > .stereo.role.cube + span { flex-shrink: 10000 }
+.im-canvas .clip-l1 .c-l1 > .stereo.role.cube::before { display: inline-block; margin-right: 3px; vertical-align: -1px }
 .im-canvas .ent.fact .c-head::before { width: 8px }
 .im-canvas .ent.fact .c-head { padding-left: 18px }
 /* A measure's mark on its row (slice 15b, B-3, R5; prototype `.row .meas`): Σ additive, Σ~ semi-additive, ∅Σ

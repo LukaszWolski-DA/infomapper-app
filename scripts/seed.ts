@@ -1,10 +1,10 @@
 // npm run seed: creates the demo data in .data/dev-db.json (or INFOMAPPER_DEV_DB) if it does not exist yet.
-import { addDemoData } from "../src/compose/seed";
+import { addFullDemoData } from "../src/compose/seed";
 import { devDbPath } from "../src/data/local/file";
 import { seedDevData } from "../src/data/local/dev-data";
 
 const file = devDbPath();
-seedDevData(file, addDemoData).then(
+seedDevData(file, addFullDemoData).then(
   (result) => {
     console.log(result === "created" ? `Seeded ${file}.` : `${file} exists already; nothing changed. Use "npm run reset-dev-data" to start over.`);
   },

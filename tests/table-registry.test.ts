@@ -18,7 +18,7 @@ import { buildWriteSet, type Write, type WriteSet } from "@/domain/changes";
 import { CORE_UNDO_TABLES, OUTSIDE_UNDO, UNDOABLE_TABLES, isUndoable, revertChangeGroup, undoTables, type WorkspaceRows } from "@/domain/commands/undo";
 import { access, attribute, canvas, canvasItem, concept, entity, ids, link, makeCtx, mapping, mappingInput, project, relationship, sourceColumn, sourceSystem, sourceTable } from "@/domain/__fixtures__/domain";
 import type { Entity } from "@/domain/types";
-import type { CubeEntity } from "@/modules/infocube/domain/types";
+import { typeColumns, type CubeEntity } from "@/modules/infocube/domain/types";
 import { NOT_IN_DOMAIN_YET } from "./schema/compare-schema";
 
 const MIGRATIONS = path.resolve(__dirname, "../supabase/migrations");
@@ -77,7 +77,7 @@ const CUBE = "01900000-0000-7000-8000-0000000d0002";
 const std = { workspace_id: ids.ws, version: 1, created_at: ctx.now, created_by: ids.actor, updated_at: ctx.now, updated_by: ids.actor, deleted_at: null };
 
 const dimension = (): Entity => entity(DIM, { name: "Dim Customer", model_level: "dimensional" });
-const cubeRow = (over: Partial<CubeEntity> = {}): CubeEntity => ({ id: CUBE, ...std, entity_id: DIM, role: "dimension", grain: null, scd_type: 1, ...over });
+const cubeRow = (over: Partial<CubeEntity> = {}): CubeEntity => ({ id: CUBE, ...std, entity_id: DIM, role: "dimension", grain: null, ...typeColumns("dimension"), ...over });
 
 type Rows = { -readonly [T in keyof WorkspaceRows]: NonNullable<WorkspaceRows[T]>[number][] };
 function seed(): Rows {
@@ -151,7 +151,7 @@ describe("undo with a module's rows (slice 15a)", () => {
     if (!redone.ok) throw new Error(redone.error.message);
     const afterRedo = apply(afterUndo, redone.writeSet);
     expect(afterRedo.entity.find((e) => e.id === DIM)!.deleted_at).toBeNull();
-    expect(afterRedo.cube_entity!.find((c) => c.id === CUBE)).toMatchObject({ deleted_at: null, role: "dimension", scd_type: 1 });
+    expect(afterRedo.cube_entity!.find((c) => c.id === CUBE)).toMatchObject({ deleted_at: null, role: "dimension", history: "overwrite" });
   });
 
   it("refuses to bring an InfoCube row back without its entity (its registered parent)", () => {
@@ -205,7 +205,7 @@ async function dimensionIn(db: DevDb, cubeId = CUBE) {
   const base = { workspace_id: ws.id, version: 1, created_at: at, created_by: by, updated_at: at, updated_by: by, deleted_at: null };
   const conceptId = db.concept.find((c) => c.workspace_id === ws.id)!.id;
   const row: Entity = { ...base, id: DIM, concept_id: conceptId, name: "Dim Customer", alias: null, model_level: "dimensional", stereotype: "object", definition_html: null, definition_text: null };
-  const cube: CubeEntity = { ...base, id: cubeId, entity_id: DIM, role: "dimension", grain: null, scd_type: 1 };
+  const cube: CubeEntity = { ...base, id: cubeId, entity_id: DIM, role: "dimension", grain: null, ...typeColumns("dimension") };
   const c = makeCtx(by);
   return { ws, row, cube, ctx: c, at };
 }

@@ -590,7 +590,13 @@ hierarchies in dimensions.
 - **Factless facts and the fact type** (Łukasz, 5 November 2026): a fact without measures is legitimate (a factless
   fact), so there is deliberately no "no measures" hint (D-68's hints, `factHints`). When the fact type is built, the
   Measures section's empty text ("None yet. Open a numeric attribute and turn on Measure.") should change for factless
-  facts.
+  facts. **Done in slice 19** (D-74), with an explicit Factless flag.
+- **Done in slice 19 (D-74):** junk dimensions (a kind), outrigger dimensions (derived from relationships between two
+  dimensions), the fact type, factless and aggregate facts, and a dimension's history with Snapshot. **Still later**
+  (slice 19, section 9): bridge dimensions (many-to-many with a weighting factor, so many-to-many gives no outrigger) and
+  hierarchies in dimensions, slices of their own; a dimension's unknown member, with the model validator (decision 5b);
+  mini-dimensions and other SCD types (4–7); checking an aggregate's grain or measures against its base beyond the
+  dimension hint.
 
 ## InfoMapper's canvas and menus: a slice after slice 15 (Łukasz, 6 November 2026): done in slice 16
 

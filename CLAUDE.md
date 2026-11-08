@@ -47,7 +47,10 @@ element panels link several requirements at once and an entity panel all its att
 drag from its handle; an entity found by an attribute shows that row; a selected frame resizes from every edge and
 corner; an attribute row's menu adds an attribute below it (slice 17, D-72). An attribute may be calculated from others
 of its entity with a plain-text rule, counted as mapped or fed and covered through its inputs everywhere, with "=" and a
-square on its row; a dimensional mapping may be a Lookup through a dictionary's relationship (slice 18, D-73).
+square on its row; a dimensional mapping may be a Lookup through a dictionary's relationship (slice 18, D-73). A fact has
+a type (Transaction, Periodic snapshot, Accumulating snapshot), may be factless and may be an aggregate of another fact; a
+dimension has a kind (Standard, Junk) and a history (SCD 0, 1, 2 or Snapshot with its period); an outrigger is derived
+from a relationship between two dimensions; the role chip names them (slice 19, D-74).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -118,8 +121,13 @@ list up to date in each sub-slice):
   Since slice 15c a table may also go whole with a row that points to it (`goesWhole` in its undo registration, Q-5):
   a dimensional mapping goes when the cascade deletes one of its inputs; an input removed on purpose leaves it. Since
   slice 18 a row may outlive a row it points to (`follows: [column, table, rule]`, F16): when that row is deleted, the
-  module's pure rule changes it in the same change group or leaves it, and the column keeps its id (InfoCube: an
-  approved lookup whose relationship goes is sent back to review).
+  module's pure rule changes it in the same change group or leaves it (InfoCube: an approved lookup whose relationship
+  goes is sent back to review, keeping the id; since slice 19 an aggregate's base is cleared when its base fact goes).
+- **Older rows and reverts** (slice 19): a module changes its own rows' shape with `TableRules.upgrade` (pure,
+  idempotent), which the local adapter runs on every row of the table when the file is loaded, before any read, check or
+  write (`upgradeRows`; InfoCube's `scd_type` became `history`). A module refuses a revert with
+  `ModuleUndoTable.revertRefusal`, called by undo for each table the revert touches, beside InfoMapper's own checks
+  (InfoCube: no aggregate of itself, at any depth, and no aggregate of a deleted fact).
 - **Rules InfoMapper's commands take as arguments** (`src/compose/model.ts`, e.g. `relationshipOneEnd`) and the level
   rules on every write set (`src/domain/model/levels.ts`: `levelWritesRefusal`, `mappingWritesRefusal`).
 - **Pages:** `ModuleView` (`src/ui/modules.ts`, built by `moduleView` in `src/compose/view.ts`): plain data and server
@@ -548,6 +556,17 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - use the section and its picker (`calcSection`, `calcPicker`, `pickItem`, `pickInputs`), wait for the panel's stored
     version (`expectAttributePanelAt`), and read a card's count and the Overview's line (`cardCount`, `overviewLine`).
 
+  Slice 19's fixtures reseed with `addFullDemoData` (the star, slice 18's derivations and slice 19's types,
+  `addInfoCubeTypesDemoData`, which seed, reset and `npm run demo` also run; slice 15's and 18's fixtures do not). Its
+  helpers do the following:
+  - read InfoCube's rows (`cubeRow`, `typeEntity`, `GROUPS`) and run a domain command through the composed store
+    (`asCube`; slice 1b's `asUser` writes InfoMapper's tables only);
+  - write the file's rows back in slice 18's shape (`writeOlderCubeRows`);
+  - find the panels' new fields (`factTypeSeg`, `factlessFlag`, `baseSelect`, `kindSeg`, `historySeg`, `periodField`,
+    `segment`, `cubeItem`).
+  A create's rows are in the data file before its answer reaches the page: wait for what the answer does on the page (the
+  new name focused) before the next step (S17-01, slice 19).
+
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,
     `keyOf`) and add a third Dim Date – Fact Sales relationship as test data (`thirdDateRelationship`);
@@ -852,6 +871,14 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     relationship), `lookup_default`; `lookupRelationships`, `lookupSentence`, `lookupRelationshipGone`, the chip "L".
   - **The demo:** `addDemoData` (`src/compose/seed.ts`) adds `addStarDerivations` after the star, for the seed, the reset,
     `npm run demo` and slice 18's fixtures; slice 15's fixtures keep `addModuleDemoData`.
+- **InfoCube types** (slice 19, D-74): `cube_entity`'s `fact_type`, `is_factless`, `base_fact_entity_id`, `dim_kind`,
+  `history` (replacing `scd_type`) and `snapshot_period`. **The rules in one place:** `aggregates.ts` (`aggregateIndex`:
+  a base that is not a live fact reads as none; `reaches`, `baseChoices`), `outriggers.ts` (1:N the "1" end, 1:1 the
+  `from` end, M:N none), `view.ts` (`historyLabel`, `tabMeta`, `cubeTitle`, `roleTitle`, `typeContext`) and `factHints`'
+  four new hints (`TYPE_HINTS`). One command, `updateCubeEntity`, with an undo name per field. The role chip is
+  `moduleView`'s `roles` text and title; a long one is cut in CSS (`infocube.css`; flex shrink factors of at least 1,
+  since a factor below 1 hands out only that fraction of the overflow). **A later reader of a dimension's history** uses
+  `historyLabel`, never an "SCD n" of its own.
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a

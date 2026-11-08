@@ -14,7 +14,7 @@ import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-
 import type { LostOriginal, ProjectCanvas } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
 import { assertNotProduction, readDbCached, writeDb } from "./file";
-import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
+import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, upgradeRows, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
 
 const live = <R extends { deleted_at: string | null }>(rows: R[]): R[] => rows.filter((r) => r.deleted_at === null);
 
@@ -41,7 +41,8 @@ const histories: Map<string, UndoHistory> = ((globalThis as { __infomapperUndo?:
  */
 export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SCHEMA): DataStore {
   assertNotProduction();
-  const load = () => readDbCached(file);
+  // slice 19 (F1): a module's older rows read in their current shape, before any read or check
+  const load = async () => upgradeRows(await readDbCached(file), schema);
 
   /** Links whose project and canvas both still exist. */
   const liveLinks = (db: DevDb, workspaceId: Uuid) => {
@@ -307,7 +308,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
 async function applyToFile(file: string, writeSet: WriteSet, schema: LocalSchema): Promise<ApplyResult> {
   // Copy on write (slice 7a): the cached file is frozen, so only the tables this write touches get new arrays; their
   // written rows are new objects, every other row is shared with the cache.
-  const current = await readDbCached(file);
+  const current = upgradeRows(await readDbCached(file), schema);
   const next = { ...current } as DevDb;
   const touched = new Set<StoreTable>(writeSet.writes.map((w) => w.table));
   // slice 15a: a table this store does not know is refused before anything is written, never skipped

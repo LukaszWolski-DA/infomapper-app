@@ -5,7 +5,7 @@
 import { attribute, entity, ids, relationship } from "@/domain/__fixtures__/domain";
 import type { Attribute, Entity, Relationship } from "@/domain/types";
 import type { CubeModel } from "../keys";
-import type { CubeEntity, CubeKey, CubeMeasure } from "../types";
+import { typeColumns, type CubeEntity, type CubeKey, type CubeMeasure } from "../types";
 
 const id = (n: number) => `01900000-0000-7000-8000-0000000c${n.toString(16).padStart(4, "0")}`;
 
@@ -55,7 +55,7 @@ const cube = (cid: string, entityId: string, role: CubeEntity["role"], over: Par
   entity_id: entityId,
   role,
   grain: role === "fact" ? "One row per order line" : null,
-  scd_type: role === "dimension" ? 1 : null,
+  ...typeColumns(role),
   ...over,
 });
 function std(rowId: string) {

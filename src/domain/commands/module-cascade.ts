@@ -8,7 +8,8 @@
 // input's logical attribute went; its other inputs then follow by `parents`. An input removed on purpose leaves it.
 // Since slice 18 a module row may outlive a row it points to (`follows`, F16): when that row is deleted, the module's
 // own rule changes it in the same change group (InfoCube: an approved lookup whose relationship goes is sent back to
-// review), or leaves it; it keeps the id. InfoMapper never knows what the rule does.
+// review, keeping the id; slice 19: an aggregate's base is cleared), or leaves it. InfoMapper never knows what the rule
+// does.
 
 import type { CommandContext, Write } from "../changes";
 import type { UndoTables } from "./undo";

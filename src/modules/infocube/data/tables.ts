@@ -1,6 +1,7 @@
 // InfoCube's tables in the local data file and the rules the database would enforce on them (slice 15a, AD-33),
 // mirroring supabase/migrations/20261104100100_infocube_entities.sql and (slice 15b, `cube_key`)
-// 20261104110100_infocube_keys.sql and (slice 15c, the dimensional mappings) 20261105110000_infocube_mappings.sql. Registered with the store by `src/compose/`.
+// 20261104110100_infocube_keys.sql and (slice 15c, the dimensional mappings) 20261105110000_infocube_mappings.sql and
+// (slice 19, the types) 20261108130000_infocube_types.sql. Registered with the store by `src/compose/`.
 
 import { model, oneOf, type AnyRow, type TableRules } from "@/data/local/schema";
 import {
@@ -8,7 +9,11 @@ import {
   CUBE_MAPPING_KINDS,
   CUBE_MAPPING_STATUSES,
   CUBE_ROLES,
-  SCD_TYPES,
+  DEFAULT_DIM_KIND,
+  DEFAULT_FACT_TYPE,
+  DIM_KINDS,
+  FACT_TYPES,
+  HISTORIES,
   type CubeEntity,
   type CubeKey,
   type CubeMapping,
@@ -26,19 +31,56 @@ export interface InfoCubeDb {
   cube_mapping_input: CubeMappingInput[];
 }
 
-/** A fact has a grain and no SCD type; a dimension an SCD type and no grain (`cube_entity_shape_ck`). */
+const noneOrOneOf = (values: readonly string[], column: string) => (r: AnyRow) => r[column] === null || values.includes(r[column] as string);
+
+/**
+ * A fact has a type and a factless flag and none of a dimension's fields; a dimension a kind and a history and none of a
+ * fact's, no grain either (`cube_entity_shape_ck`, slice 19).
+ */
 const shapeFits = (r: AnyRow) =>
-  r.role === "fact" ? r.scd_type === null : r.grain === null && (SCD_TYPES as readonly unknown[]).includes(r.scd_type);
+  r.role === "fact"
+    ? r.fact_type != null && r.is_factless != null && r.dim_kind == null && r.history == null && r.snapshot_period == null
+    : r.grain === null && r.fact_type == null && r.is_factless == null && r.base_fact_entity_id == null && r.dim_kind != null && r.history != null;
+
+const OLD_HISTORY: Record<number, string> = { 0: "keep", 1: "overwrite", 2: "history" };
+const NEW_COLUMNS = ["fact_type", "is_factless", "base_fact_entity_id", "dim_kind", "history", "snapshot_period"] as const;
+
+/**
+ * A `cube_entity` row written before slice 19 (F1), as it reads now: a fact a transaction, not factless, without a base; a
+ * dimension standard, its `scd_type` 0, 1 or 2 as keep, overwrite or history (overwrite when absent); `scd_type` dropped.
+ * Null for a row in the current shape. The migration does the same in the database.
+ */
+export function upgradeCubeEntity(row: AnyRow): AnyRow | null {
+  if (!("scd_type" in row) && NEW_COLUMNS.every((c) => c in row)) return null;
+  const { scd_type: scd, ...rest } = row;
+  const fact = row.role === "fact";
+  return {
+    ...rest,
+    fact_type: fact ? ((row.fact_type as string | undefined) ?? DEFAULT_FACT_TYPE) : null,
+    is_factless: fact ? ((row.is_factless as boolean | undefined) ?? false) : null,
+    base_fact_entity_id: fact ? ((row.base_fact_entity_id as string | undefined) ?? null) : null,
+    dim_kind: fact ? null : ((row.dim_kind as string | undefined) ?? DEFAULT_DIM_KIND),
+    history: fact ? null : ((row.history as string | undefined) ?? OLD_HISTORY[scd as number] ?? "overwrite"),
+    snapshot_period: fact ? null : ((row.snapshot_period as string | undefined) ?? null),
+  };
+}
 
 export const INFOCUBE_RULES: Readonly<Record<InfoCubeTable, TableRules>> = {
   cube_entity: {
     key: ["id"],
-    foreignKeys: { ...model, entity_id: "entity" },
+    // slice 19: the base may point to a deleted entity's row between a revert's steps; it reads as none then
+    foreignKeys: { ...model, entity_id: "entity", base_fact_entity_id: "entity" },
     unique: [{ columns: ["entity_id"], live: true }],
     checks: [
       { name: "cube_entity_role_ck", test: oneOf(CUBE_ROLES, "role") },
+      { name: "cube_entity_fact_type_ck", test: noneOrOneOf(FACT_TYPES, "fact_type") },
+      { name: "cube_entity_dim_kind_ck", test: noneOrOneOf(DIM_KINDS, "dim_kind") },
+      { name: "cube_entity_history_ck", test: noneOrOneOf(HISTORIES, "history") },
+      { name: "cube_entity_base_ck", test: (r) => r.base_fact_entity_id == null || r.base_fact_entity_id !== r.entity_id },
       { name: "cube_entity_shape_ck", test: shapeFits },
     ],
+    // slice 19 (F1): rows written before the types are converted when the file is loaded
+    upgrade: upgradeCubeEntity,
   },
   cube_measure: {
     key: ["id"],
