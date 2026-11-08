@@ -306,6 +306,8 @@ export function addKey(
     definition_html: null,
     definition_text: null,
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   };
   const order: Attribute[] = [...siblings];
   order.splice(order.findLastIndex((a) => a.is_primary_key || a.is_foreign_key) + 1, 0, attribute);

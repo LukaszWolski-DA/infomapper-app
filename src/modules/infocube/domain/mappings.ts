@@ -23,14 +23,19 @@ import { plainTextPair } from "@/domain/model/plain-text";
 import type { AttributeFeed, AttributeFeeds } from "@/domain/model/requirements";
 import { sanitizeRich } from "@/domain/model/rich-text";
 import type { WorkspaceAccess } from "@/domain/permissions";
-import type { Attribute, CanvasItem, Entity } from "@/domain/types";
+import type { Attribute, CanvasItem, Entity, Relationship } from "@/domain/types";
 import { uuidSchema, versionSchema } from "@/domain/validation";
 import { createCubeEntity } from "./commands";
 import { snakeCase, typeWord } from "./keys";
 import { CUBE_MAPPING_KINDS, CUBE_MAPPING_STATUSES, type CubeMapping, type CubeMappingInput } from "./types";
 
 /** The change log's tables of a dimensional mapping, for four-eyes (C11): a re-pointed target is content too (X5). */
-export const CUBE_MAPPING_LOG: MappingLog = { mapping: "cube_mapping", input: "cube_mapping_input", content: ["kind", "rule_expression", "attribute_id"] };
+export const CUBE_MAPPING_LOG: MappingLog = {
+  mapping: "cube_mapping",
+  input: "cube_mapping_input",
+  // slice 18 (F13): a lookup's relationship and its value for no match are content too
+  content: ["kind", "rule_expression", "attribute_id", "lookup_relationship_id", "lookup_default"],
+};
 
 // ---- the texts (the prototype's: `DIM_MSG`, `createCubeMap`, `createDimAttrFrom`, `insCmap`'s handlers, `createDimFrom`) ----
 
@@ -45,6 +50,9 @@ export const MAPPING_EXISTS_SELECTED = "That mapping already exists. It is selec
 /** A re-point onto a target that has the identical mapping (difference 8). */
 export const MAPPING_EXISTS = "That mapping already exists.";
 export const ALREADY_READS = "It already reads that attribute.";
+/** Slice 18 (F13): a lookup reads one attribute, as a direct copy (AD-26). */
+export const LOOKUP_READS_ONE = "A lookup reads one attribute, the dictionary's value. Remove the others first.";
+export const lookupRelationshipRefusal = (entity: string) => `Choose a relationship of ${entity}.`;
 export const DIRECT_READS_ONE = "A direct copy reads one attribute. Remove the others first.";
 /** The last input's remove (the panel offers no × there; "Delete mapping" does it). New text, for approval. */
 export const LAST_INPUT = "A mapping reads at least one attribute. Delete the mapping instead.";
@@ -69,6 +77,8 @@ export interface MappingModel {
   attributes: readonly Attribute[];
   cubeMappings: readonly CubeMapping[];
   cubeMappingInputs: readonly CubeMappingInput[];
+  /** Slice 18: the workspace's relationships, for a lookup's (absent: none, so a lookup has no candidate). */
+  relationships?: readonly Relationship[];
 }
 
 const live = <T extends { deleted_at: string | null }>(r: T | null | undefined): r is T => !!r && r.deleted_at === null;
@@ -195,6 +205,90 @@ function withExisting(index: MappingIndex, inputId: Uuid, targetId: Uuid): DropP
   return dup ? { t: "exists", mappingId: dup.id } : { t: "map", inputId, targetId };
 }
 
+// ---- lookups (slice 18, item 4) ----
+
+/**
+ * A lookup's candidate relationships (prototype `lookupRels`): the live relationships of the input's entity, the
+ * dictionary, with another logical entity; never a loop. The input is the mapping's first; a mapping with none has none.
+ */
+export function lookupRelationships(index: MappingIndex, relationships: readonly Relationship[], mappingId: Uuid): Relationship[] {
+  const first = index.inputsOf(mappingId)[0];
+  const dictionary = first && index.attribute(first.attribute_id)?.entity_id;
+  if (!dictionary) return [];
+  const logical = (id: Uuid) => {
+    const e = index.entity(id);
+    return !!e && !isDimensional(e);
+  };
+  return relationships.filter(
+    (r) =>
+      r.deleted_at === null &&
+      r.from_entity_id !== r.to_entity_id &&
+      (r.from_entity_id === dictionary || r.to_entity_id === dictionary) &&
+      logical(r.from_entity_id) &&
+      logical(r.to_entity_id),
+  );
+}
+
+/** "Country → Customer Address (locates)" (prototype `relText`). */
+export function relationshipText(index: MappingIndex, r: Pick<Relationship, "from_entity_id" | "to_entity_id" | "label">): string {
+  const name = (id: Uuid) => index.entity(id)?.name ?? "?";
+  return `${name(r.from_entity_id)} → ${name(r.to_entity_id)}${r.label ? ` (${r.label})` : ""}`;
+}
+
+/**
+ * The lookup's sentence (prototype `lookupFields`, F17): "Each {other} row finds its {dictionary} by {key} and takes
+ * {value}; when the code is empty or has no match, the value is “{default}”." Null without a live relationship.
+ */
+export function lookupSentence(index: MappingIndex, relationships: readonly Relationship[], m: CubeMapping): string | null {
+  const via = relationships.find((r) => r.id === m.lookup_relationship_id && r.deleted_at === null);
+  const first = index.inputsOf(m.id)[0];
+  const value = first && index.attribute(first.attribute_id);
+  if (!via || !value) return null;
+  const dictionary = index.entity(value.entity_id);
+  const other = index.entity(via.from_entity_id === value.entity_id ? via.to_entity_id : via.from_entity_id);
+  if (!dictionary || !other) return null;
+  const key = index.attributesOf(dictionary.id).find((a) => a.is_primary_key);
+  const noMatch = m.lookup_default ? `; when the code is empty or has no match, the value is “${m.lookup_default}”` : "";
+  return `Each ${other.name} row finds its ${dictionary.name}${key ? ` by ${key.name}` : ""} and takes ${value.name}${noMatch}.`;
+}
+
+/** Whether the lookup's relationship is gone (F15): it points to a relationship that is deleted or missing. */
+export const lookupRelationshipGone = (relationships: readonly Relationship[], m: Pick<CubeMapping, "lookup_relationship_id">): boolean =>
+  m.lookup_relationship_id !== null && !relationships.some((r) => r.id === m.lookup_relationship_id && r.deleted_at === null);
+
+export const lookupNoRelationship = (entity: string) => `${entity} has no relationship to another entity. Draw one in the logical model first.`;
+export const LOOKUP_RELATIONSHIP_GONE = "The relationship it went through is gone. Choose another.";
+
+/** A relationship's second click (F14): what its delete does to the lookups through it, by their targets. */
+export const lookupsLoseRelationship = (targets: readonly string[]) =>
+  targets.length === 1 ? `the lookup of ${targets[0]} loses its relationship` : `the lookups of ${targets.join(", ")} lose their relationship`;
+
+/** The live lookups through each relationship, their targets' labels in order ("Dim Customer.country_name"). */
+export function lookupsByRelationship(index: MappingIndex, cubeMappings: readonly CubeMapping[]): Map<Uuid, string[]> {
+  const out = new Map<Uuid, string[]>();
+  for (const m of cubeMappings) {
+    if (m.deleted_at !== null || m.kind !== "lookup" || !m.lookup_relationship_id || !index.mapping(m.id)) continue;
+    (out.get(m.lookup_relationship_id) ?? out.set(m.lookup_relationship_id, []).get(m.lookup_relationship_id)!).push(index.label(m.attribute_id));
+  }
+  for (const list of out.values()) list.sort((a, b) => a.localeCompare(b));
+  return out;
+}
+
+/** Each relationship with lookups through it: its delete's second click (F14). */
+export function relationshipDeletes(index: MappingIndex, cubeMappings: readonly CubeMapping[]): Record<Uuid, { then: string[] }> {
+  const out: Record<Uuid, { then: string[] }> = {};
+  for (const [id, targets] of lookupsByRelationship(index, cubeMappings)) out[id] = { then: [lookupsLoseRelationship(targets)] };
+  return out;
+}
+
+/** An entity's delete preview (F14, D-47): the lookups through the relationships it takes along, one row; none without. */
+export function lookupDependents(index: MappingIndex, cubeMappings: readonly CubeMapping[], relationships: readonly Relationship[], entityId: Uuid): [string, string][] {
+  const going = new Set(relationships.filter((r) => r.deleted_at === null && (r.from_entity_id === entityId || r.to_entity_id === entityId)).map((r) => r.id));
+  const byRelationship = lookupsByRelationship(index, cubeMappings);
+  const n = [...going].reduce((sum, id) => sum + (byRelationship.get(id)?.length ?? 0), 0);
+  return n ? [[`${n} lookup${n === 1 ? "" : "s"}`, n === 1 ? "loses its relationship" : "lose their relationship"]] : [];
+}
+
 // ---- D-51 ----
 
 /** D-51's first rule on a dimensional mapping: a content change of an approved one sends it to review (O12). */
@@ -215,6 +309,8 @@ const newMapping = (ctx: CommandContext, workspaceId: Uuid, targetId: Uuid): Cub
   note: null,
   approved_by: null,
   approved_at: null,
+  lookup_relationship_id: null,
+  lookup_default: null,
 });
 const newInput = (ctx: CommandContext, workspaceId: Uuid, mappingId: Uuid, attributeId: Uuid, sortOrder: number): CubeMappingInput => ({
   ...newRowColumns(ctx),
@@ -344,6 +440,8 @@ function plainCopy(ctx: CommandContext, workspaceId: Uuid, a: Attribute, entityI
     definition_html: a.definition_html,
     definition_text: a.definition_text,
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   };
 }
 
@@ -381,7 +479,8 @@ export function addCubeMappingInput(
   const refused = levelRefusal(index, attributeId, null);
   if (refused) return fail(refused);
   if (inputs.some((i) => i.attribute_id === attributeId)) return fail(domainError("conflict", ALREADY_READS));
-  const becameTransform = before.kind === "direct" && inputs.length >= 1;
+  // slice 18: a lookup reads one attribute too, so a second one makes it a transformation (F13)
+  const becameTransform = (before.kind === "direct" || before.kind === "lookup") && inputs.length >= 1;
   const content = cubeAfterContentChange(before);
   const row = nextVersion(ctx, before, { ...(becameTransform ? { kind: "transform" as const } : {}), ...content.patch });
   const added = newInput(ctx, access.workspace.id, before.id, attributeId, nextSortOrder(inputs));
@@ -424,17 +523,36 @@ const noteSchema = z
   .max(20000, "This note is too long.")
   .nullable()
   .transform((v) => (v?.trim() ? v.trim() : null));
-const updateInput = z.object({ ...ref, kind: z.enum(CUBE_MAPPING_KINDS).optional(), ruleExpression: ruleSchema.optional(), note: noteSchema.optional() }).strict();
+/** A lookup's value for no match ("Unknown", "Unbekannt"): plain text, trimmed, empty is none. */
+const lookupDefaultSchema = z
+  .string()
+  .max(200, "This value is too long.")
+  .nullable()
+  .transform((v) => (v?.trim() ? v.trim() : null));
+const updateInput = z
+  .object({
+    ...ref,
+    kind: z.enum(CUBE_MAPPING_KINDS).optional(),
+    ruleExpression: ruleSchema.optional(),
+    note: noteSchema.optional(),
+    // slice 18 (item 4): a lookup's relationship (null clears it) and its value for no match
+    lookupRelationshipId: uuidSchema.nullable().optional(),
+    lookupDefault: lookupDefaultSchema.optional(),
+  })
+  .strict();
 export type UpdateCubeMappingInput = z.input<typeof updateInput>;
 
 /**
  * "How the value is carried", the rule and the note. A direct copy with more than one input is refused. A change of the
- * kind or the rule is content (D-51); the note alone is not.
+ * kind or the rule is content (D-51); the note alone is not. Slice 18 (item 4, F13): a lookup with more than one input is
+ * refused too; choosing Lookup without a relationship, when the dictionary has exactly one, takes it; the relationship
+ * must be one of the candidates (`lookupRelationships`); the relationship and the value for no match are content. Both
+ * are kept when the kind changes, so switching away and back keeps them.
  */
 export function updateCubeMapping(ctx: CommandContext, access: WorkspaceAccess, state: MappingModel, input: unknown): CommandResult<{ version: number; notice: string | null }> {
   const parsed = begin(access, "model.edit", updateInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { mappingId, expectedVersion, kind, ruleExpression, note } = parsed.data;
+  const { mappingId, expectedVersion, kind, ruleExpression, note, lookupRelationshipId, lookupDefault } = parsed.data;
   const index = mappingIndex(state);
   const got = mappingAt(access, index, state, mappingId, expectedVersion);
   if (!got.ok) return fail(got.error);
@@ -442,12 +560,28 @@ export function updateCubeMapping(ctx: CommandContext, access: WorkspaceAccess, 
   const patch: Partial<CubeMapping> = {};
   if (kind !== undefined && kind !== before.kind) {
     if (kind === "direct" && inputs.length > 1) return fail(domainError("invalid", DIRECT_READS_ONE));
+    if (kind === "lookup" && inputs.length > 1) return fail(domainError("invalid", LOOKUP_READS_ONE));
     patch.kind = kind;
   }
+  const candidates = () => lookupRelationships(index, state.relationships ?? [], before.id);
+  if (lookupRelationshipId !== undefined && lookupRelationshipId !== before.lookup_relationship_id) {
+    if (lookupRelationshipId !== null && !candidates().some((r) => r.id === lookupRelationshipId)) {
+      const dictionary = index.entity(index.attribute(inputs[0]?.attribute_id ?? "")?.entity_id ?? "");
+      return fail(domainError("invalid", lookupRelationshipRefusal(dictionary?.name ?? "the dictionary")));
+    }
+    patch.lookup_relationship_id = lookupRelationshipId;
+  }
+  // one candidate: chosen for you (prototype `cmap.kind`), unless a relationship is set or given
+  if (patch.kind === "lookup" && lookupRelationshipId === undefined && before.lookup_relationship_id === null) {
+    const only = candidates();
+    if (only.length === 1) patch.lookup_relationship_id = only[0]!.id;
+  }
+  if (lookupDefault !== undefined && lookupDefault !== before.lookup_default) patch.lookup_default = lookupDefault;
   if (ruleExpression !== undefined && ruleExpression !== before.rule_expression) patch.rule_expression = ruleExpression;
   if (note !== undefined && note !== before.note) patch.note = note;
   if (!Object.keys(patch).length) return fail(nothingToChange());
-  const content = patch.kind !== undefined || patch.rule_expression !== undefined ? cubeAfterContentChange(before) : { patch: {}, notice: null };
+  const contentChanged = (["kind", "rule_expression", "lookup_relationship_id", "lookup_default"] as const).some((k) => patch[k] !== undefined);
+  const content = contentChanged ? cubeAfterContentChange(before) : { patch: {}, notice: null };
   const row = nextVersion(ctx, before, { ...patch, ...content.patch });
   return done(ctx, access, { version: row.version, notice: content.notice }, [{ kind: "update", table: "cube_mapping", before, row }]);
 }
@@ -644,6 +778,8 @@ export function createDimensionFrom(
     is_nullable: false,
     ...plainTextAsDefinition(SURROGATE_KEY_DESCRIPTION),
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   };
   writes.push({ kind: "insert", table: "attribute", row: key });
   const copies = own.filter((a) => ticked.has(a.id));
@@ -681,13 +817,15 @@ export interface FeedRow {
   mappingId: Uuid;
   status: CubeMapping["status"];
   transform: boolean;
+  /** Slice 18: a lookup ("lookup · " before its status, prototype `cubeAttrSection`). */
+  lookup: boolean;
   /** "Fact Sales.quantity" (what a logical attribute feeds) or "Order Line.unit_price + Order Line.discount" (what feeds). */
   label: string;
 }
 
 /** "Feeds facts and dimensions": what a logical attribute feeds, one row per mapping. */
 export const feedsOf = (index: MappingIndex, attributeId: Uuid): FeedRow[] =>
-  index.mappingsFrom(attributeId).map((m) => ({ mappingId: m.id, status: m.status, transform: m.kind === "transform", label: index.label(m.attribute_id) }));
+  index.mappingsFrom(attributeId).map((m) => ({ mappingId: m.id, status: m.status, transform: m.kind === "transform", lookup: m.kind === "lookup", label: index.label(m.attribute_id) }));
 
 /** "Comes from the logical model": what feeds a dimensional attribute, one row per mapping, its inputs joined by " + ". */
 export const fedFrom = (index: MappingIndex, attributeId: Uuid): FeedRow[] =>
@@ -695,6 +833,7 @@ export const fedFrom = (index: MappingIndex, attributeId: Uuid): FeedRow[] =>
     mappingId: m.id,
     status: m.status,
     transform: m.kind === "transform",
+    lookup: m.kind === "lookup",
     label: index.inputsOf(m.id).map((i) => index.label(i.attribute_id)).join(" + "),
   }));
 

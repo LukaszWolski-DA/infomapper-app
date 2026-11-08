@@ -10,7 +10,7 @@
 
 import { spawn } from "node:child_process";
 import path from "node:path";
-import { addModuleDemoData } from "../src/compose/seed";
+import { addDemoData } from "../src/compose/seed";
 import { resetDevData, seedDevData } from "../src/data/local/dev-data";
 
 const PORT = "3001";
@@ -22,10 +22,10 @@ const reset = process.argv.includes("--reset");
 async function main(): Promise<void> {
   if (file.toLowerCase() === KB.toLowerCase()) throw new Error(`${file} is the development data file. The demo uses a file of its own.`);
   if (reset) {
-    await resetDevData(file, addModuleDemoData);
+    await resetDevData(file, addDemoData);
     console.log(`Reset ${file} to the demo data.`);
   } else {
-    const result = await seedDevData(file, addModuleDemoData);
+    const result = await seedDevData(file, addDemoData);
     console.log(result === "created" ? `Seeded ${file}.` : `${file} exists already; "npm run demo -- --reset" starts it over.`);
   }
   console.log(`Demo on http://${HOST}:${PORT} (sign in by picking a test user).`);

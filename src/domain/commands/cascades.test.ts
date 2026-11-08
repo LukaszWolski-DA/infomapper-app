@@ -48,7 +48,7 @@ const secondMapping = "01900000-0000-7000-8000-00000000a002";
 
 describe("deleting model items takes their label links with them (D-47)", () => {
   it("an attribute: the links on it and on its mappings", () => {
-    const ws = ok(deleteAttribute(makeCtx(), modeler, { attribute: attribute(ids.email), mappings: [mapping()], mappingInputs: [mappingInput()], labelLinks: links }, { attributeId: ids.email, expectedVersion: 1 }));
+    const ws = ok(deleteAttribute(makeCtx(), modeler, { attribute: attribute(ids.email), mappings: [mapping()], mappingInputs: [mappingInput()], attributeInputs: [], labelLinks: links }, { attributeId: ids.email, expectedVersion: 1 }));
     expect(rowsOf(ws, "label_link")).toMatchObject([
       { id: linkEmail, deleted_at: NOW },
       { id: linkMapping, deleted_at: NOW },

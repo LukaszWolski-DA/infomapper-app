@@ -16,6 +16,7 @@ const model = (alias: string | null, attributeAlias: string | null): WorkspaceMo
     sourceTables: [],
     sourceColumns: [],
     mappings: [],
+    attributeInputs: [],
     mappingInputs: [],
     sourceRelationships: [],
     sourceRelationshipColumns: [],

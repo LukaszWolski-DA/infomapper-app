@@ -14,7 +14,7 @@ import { sanitizeRich } from "../model/rich-text";
 import { attributeNamedAfter } from "../model/mapping-choice";
 import { logicalTypeOf } from "../model/type-check";
 import type { WorkspaceAccess } from "../permissions";
-import { LOGICAL_TYPES, type Attribute, type AttributeType, type Classification, type ClassificationLink, type Entity, type LabelLink, type LostOriginal, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
+import { LOGICAL_TYPES, type Attribute, type AttributeInput, type AttributeType, type Classification, type ClassificationLink, type Entity, type LabelLink, type LostOriginal, type Mapping, type MappingInput, type RequirementLink, type SourceColumn } from "../types";
 import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
 import { linksOnItems, softDeleteLinks } from "./label";
 import { softDeleteRequirementLinks } from "./requirement";
@@ -132,6 +132,8 @@ export function addAttribute(
     definition_html: null,
     definition_text: null,
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   };
   if (at < 0) return done(ctx, access, { attributeId: attribute.id }, [{ kind: "insert", table: "attribute", row: attribute }]);
 
@@ -309,6 +311,8 @@ export function pasteAttribute(
     definition_html: original.definition_html,
     definition_text: original.definition_text,
     copied_from_attribute_id: original.id,
+    is_calculated: false,
+    calc_rule: null,
   };
   const nameTaken = siblings.some((a) => a.name.toLowerCase() === original.name.toLowerCase());
   return done(ctx, access, { attributeId: attribute.id, nameTaken }, [{ kind: "insert", table: "attribute", row: attribute }]);
@@ -324,6 +328,8 @@ export interface DeleteAttributeState {
   /** Live mappings of the attribute and their live inputs. */
   mappings: readonly Mapping[];
   mappingInputs: readonly MappingInput[];
+  /** Slice 18 (F9): the workspace's calculation inputs; the attribute's go on either side. */
+  attributeInputs: readonly AttributeInput[];
   /** The workspace's label links: those on the attribute and its mappings go with them (slice 3a). */
   labelLinks?: readonly LabelLink[];
   /** The workspace's requirement links: those on the attribute and its mappings go with them (slice 4a). */
@@ -349,10 +355,14 @@ export function deleteAttribute(
   const mappings = state.mappings.filter((m) => isLive(m, workspaceId) && m.attribute_id === attribute.id);
   const mappingIds = new Set(mappings.map((m) => m.id));
   const inputs = state.mappingInputs.filter((i) => isLive(i, workspaceId) && mappingIds.has(i.mapping_id));
+  // slice 18 (F9): its own inputs if it is calculated, and its rows in the calculations that read it; a calculation that
+  // loses its last input stays calculated (Q1)
+  const calcRows = state.attributeInputs.filter((i) => isLive(i, workspaceId) && (i.attribute_id === attribute.id || i.input_attribute_id === attribute.id));
 
   const writes: Write[] = [
     ...inputs.map((r) => softDelete(ctx, "mapping_input", r)),
     ...mappings.map((r) => softDelete(ctx, "mapping", r)),
+    ...calcRows.map((r) => softDelete(ctx, "attribute_input", r)),
     softDelete(ctx, "attribute", attribute),
     ...softDeleteLinks(ctx, linksOnItems(state.labelLinks, [{ kind: "attribute", id: attribute.id }, ...mappings.map((m) => ({ kind: "mapping" as const, id: m.id }))])),
     ...softDeleteRequirementLinks(ctx, state.requirementLinks, [{ kind: "attribute", id: attribute.id }, ...mappings.map((m) => ({ kind: "mapping" as const, id: m.id }))]),
@@ -430,6 +440,8 @@ export function createAttributeFromColumn(
     definition_html: html,
     definition_text: text,
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   };
   const r = createMapping(ctx, access, { attribute, column: column.row, mappings: [], mappingInputs: [] }, { attributeId: attribute.id, sourceColumnId });
   if (!r.ok) return r;

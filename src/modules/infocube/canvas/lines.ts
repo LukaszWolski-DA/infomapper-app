@@ -48,7 +48,8 @@ export function cubeLines(
       cls: `cmap ${m.status}`,
       colour: colour.get(conceptOf.get(entityId) ?? "") ?? NO_CONCEPT_COLOR,
       endMark: "diamond",
-      ...(m.kind === "transform" ? { chip: "ƒ" } : {}),
+      // slice 18: "L" on a lookup (prototype l. 2245); its relationship is in the panel, the line has no title (Q-C)
+      ...(m.kind === "transform" ? { chip: "ƒ" } : m.kind === "lookup" ? { chip: "L" } : {}),
     });
   }
   return lines;

@@ -53,7 +53,8 @@ import { useToast } from "@/ui/components/toast";
 import { attributeDeleted, STATUS_LABEL } from "./attribute-panel";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
 import { useMapColumn } from "./map-column";
-import { armedDeleteText, attributeDeleteParts } from "./fields";
+import { armedDeleteText, attributeDeleteParts, relationshipDeleteAsks } from "./fields";
+import { calculationsLoseInput } from "@/domain/model/derivations";
 import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, columnLabel, fedEntities, feedingSourceCards, feedingSources, inputsLabel, type ModelIndex } from "./model-index";
 import { usePanels } from "./panels-context";
@@ -313,8 +314,15 @@ export function useCanvasHost({
 
   /** Deletes a mapping or a relationship at once; the toast offers Undo (slice 1b). */
   const deleteLine = useCallback(
-    async (line: { t: "map" | "rel"; id: Uuid }) => {
+    async (line: { t: "map" | "rel"; id: Uuid }, confirmed = false) => {
       if (!editable) return;
+      // slice 18 (F14): a relationship with lookups through it is deleted after its second click (its menu or panel);
+      // the Delete key says so instead
+      const lookups = line.t === "rel" ? modules.relationshipDeletes[line.id]?.then : undefined;
+      if (lookups?.length && !confirmed) {
+        toast(relationshipDeleteAsks(lookups.join("; ")));
+        return;
+      }
       if (line.t === "map") {
         const m = ix.mapping.get(line.id);
         if (!m) return;
@@ -330,7 +338,7 @@ export function useCanvasHost({
         if (r.ok) ui.select(null);
       }
     },
-    [editable, ix, saveRow, workspaceId, ui],
+    [editable, ix, saveRow, workspaceId, ui, modules, toast],
   );
 
   useEffect(() => {
@@ -565,11 +573,14 @@ export function useCanvasHost({
       if (editable) {
         items.push({ label: "Edit name and cardinality…", act: () => focusDetails("f-rl") });
         items.push({ label: "Swap direction", act: () => void saveRow(r, (v) => swapRelationshipAction(workspaceId, { relationshipId: r.id, expectedVersion: v })) });
+        // slice 18 (F14): with lookups through it, a second click that says what they lose
+        const lookups = modules.relationshipDeletes[r.id]?.then;
         items.push({
           label: "Delete relationship",
           danger: true,
           kbd: "Del",
-          act: () => void deleteLine({ t: "rel", id: r.id }),
+          ...(lookups?.length ? { confirm: armedDeleteText(undefined, lookups.join("; ")) } : {}),
+          act: () => void deleteLine({ t: "rel", id: r.id }, true),
         });
       }
       return items;
@@ -713,7 +724,9 @@ export function useCanvasHost({
           const n = (ix.mappingsOf.get(a.id) ?? []).length;
           const copies = attributeCopiesImpact(ix.model.attributes, ix.model.entities, a.id).map((c) => c.label);
           // and a module's rows (slice 15b, R4): a measure, a key's link
-          const parts = attributeDeleteParts(n, copies.length ? copiesStopFollowing(copies) : undefined, modules.attributeDeletes[a.id]);
+          // slice 18 (F12): and the calculations that read it
+          const calcUsers = ix.derivations.usersOf(a.id).map((id) => ix.attribute.get(id)?.name ?? "?");
+          const parts = attributeDeleteParts(n, copies.length ? copiesStopFollowing(copies) : undefined, modules.attributeDeletes[a.id], calculationsLoseInput(calcUsers));
           items.push({
             label: "Delete attribute",
             danger: true,

@@ -5,7 +5,7 @@
 import type { Uuid } from "@/domain/ids";
 import type { Entity, Relationship, StandardColumns } from "@/domain/types";
 import { carries, dimensionAs, type CubeIndex } from "./keys";
-import { mappingAttributeDeletes, mappingDependents, type MappingIndex } from "./mappings";
+import { lookupDependents, mappingAttributeDeletes, mappingDependents, type MappingIndex } from "./mappings";
 import type { Additivity, CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure, CubeRole } from "./types";
 
 export const ROLE_NAMES: Record<CubeRole, string> = { fact: "Fact", dimension: "Dimension" };
@@ -51,10 +51,12 @@ export function entityDependents(
   cubeEntities: readonly CubeEntity[],
   cubeMeasures: readonly CubeMeasure[],
   mappings?: MappingIndex,
+  /** Slice 18 (F14): InfoCube's mapping rows, for the lookups through the relationships the entity takes along. */
+  cubeMappings: readonly CubeMapping[] = [],
 ): [string, string][] {
   const roles = rolesOf(cubeEntities);
   const own = roles.get(entityId);
-  if (!own) return mappings ? mappingDependents(mappings, { entityId }) : [];
+  if (!own) return mappings ? [...mappingDependents(mappings, { entityId }), ...lookupDependents(mappings, cubeMappings, model.relationships, entityId)] : [];
   const rows: [string, string][] = [];
   if (own.role === "fact") rows.push([ROLE_NAMES.fact, own.grain?.trim() ? `its grain (“${own.grain.trim()}”) deleted` : "deleted"]);
   else {
@@ -137,7 +139,8 @@ export function cubeRowFeeds(index: MappingIndex, attributes: readonly { id: Uui
     const inputs = ms.map((m) => index.inputsOf(m.id));
     out[a.id] = {
       n: ms.length,
-      title: ms.length ? inputs.map((list) => `from ${list.map((i) => index.label(i.attribute_id)).join(" + ")}`).join("\n") : NOT_FED,
+      // slice 18: "lookup of {input}" for a lookup (prototype `attrRow`)
+      title: ms.length ? ms.map((m, k) => `${m.kind === "lookup" ? "lookup of" : "from"} ${inputs[k]!.map((i) => index.label(i.attribute_id)).join(" + ")}`).join("\n") : NOT_FED,
       // the entity panel's list (prototype `insEntity`): one input's label, or "ƒ {n} attributes"
       list: inputs.map((list) => (list.length > 1 ? `ƒ ${list.length} attributes` : index.label(list[0]?.attribute_id ?? ""))).join(", "),
     };

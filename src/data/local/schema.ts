@@ -6,6 +6,7 @@
 import type {
   AppUser,
   Attribute,
+  AttributeInput,
   Canvas,
   CanvasItem,
   ChangeEvent,
@@ -90,11 +91,12 @@ import {
  * format-11 file every entity's model level `logical`, every workspace's InfoCube off and no licences (slice 15a: no
  * change events, no log line), a format-12 file every relationship's two roles null (slice 15b: no change events, no log
  * line). 12 = slice 15a (`model_level` on entities, `infocube` on workspaces, `organization_licence`), 13 = slice 15b
- * (`from_role` and `to_role` on relationships). It is written back at once; an older file no upgrade reaches is refused with a hint to
+ * (`from_role` and `to_role` on relationships), 14 = slice 18 (`is_calculated` false and `calc_rule` null on attributes,
+ * `attribute_input`; no change events, no log line). It is written back at once; an older file no upgrade reaches is refused with a hint to
  * run "npm run reset-dev-data", a newer one (a newer branch wrote it) with the advice to switch back to that branch or
  * restore a backup, never a reset (`newerFormatMessage`, slice 15a). A module's tables are not part of the format (AD-33): a file without one has none of its rows yet.
  */
-export const DEV_DB_FORMAT = 13;
+export const DEV_DB_FORMAT = 14;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -111,6 +113,7 @@ export interface DevDb {
   concept: Concept[];
   entity: Entity[];
   attribute: Attribute[];
+  attribute_input: AttributeInput[];
   relationship: Relationship[];
   source_system: SourceSystem[];
   source_table: SourceTable[];
@@ -160,6 +163,7 @@ export const emptyDb = (): DevDb => ({
   concept: [],
   entity: [],
   attribute: [],
+  attribute_input: [],
   relationship: [],
   source_system: [],
   source_table: [],
@@ -194,6 +198,11 @@ export interface TableRules {
    */
   unique?: readonly { columns: readonly string[]; live?: boolean; where?: (row: AnyRow) => boolean; lower?: readonly string[] }[];
   checks?: readonly { name: string; test: (row: AnyRow) => boolean }[];
+  /**
+   * A module's columns added after its table had rows (slice 18, Q2: InfoCube's lookup columns): a row without one reads
+   * it as this value. A module's tables are not part of the file's format (AD-33), so no upgrade writes them.
+   */
+  defaults?: Readonly<Record<string, unknown>>;
 }
 
 const audit = { created_by: "app_user", updated_by: "app_user" } as const;
@@ -285,7 +294,16 @@ export const RULES: Record<DevTable, TableRules> = {
       { name: "attribute_data_type_ck", test: oneOf(LOGICAL_TYPES, "data_type") },
       { name: "attribute_custom_type_ck", test: (r) => (r.data_type === "custom") === isSet(r.custom_type) },
       { name: "attribute_type_params_ck", test: typeParamsFit },
+      // slice 18 (Q1): a rule only on a calculated attribute
+      { name: "attribute_calc_ck", test: (r) => r.is_calculated === true || r.calc_rule == null },
     ],
+  },
+  // slice 18: one live row per pair, never the attribute itself; the same entity and no cycle are the domain's checks
+  attribute_input: {
+    key: ["id"],
+    foreignKeys: { ...model, attribute_id: "attribute", input_attribute_id: "attribute" },
+    unique: [{ columns: ["attribute_id", "input_attribute_id"], live: true }],
+    checks: [{ name: "attribute_input_self_ck", test: (r) => r.attribute_id !== r.input_attribute_id }],
   },
   relationship: {
     key: ["id"],
@@ -574,6 +592,15 @@ export const CORE_SCHEMA: LocalSchema = localSchema({});
  * the file (no rows yet): read as empty.
  */
 export const rowsOf = (db: DevDb, table: StoreTable): AnyRow[] => ((db as unknown as Record<string, AnyRow[] | undefined>)[table] ?? []);
+
+/** The rows as a command reads them: a module's columns a row lacks take their defaults (`TableRules.defaults`). */
+export function readRows(db: DevDb, table: StoreTable, schema: LocalSchema): AnyRow[] {
+  const rows = rowsOf(db, table);
+  const defaults = schema.rules[table]?.defaults;
+  if (!defaults) return rows;
+  const keys = Object.keys(defaults);
+  return rows.map((r) => (keys.every((k) => k in r) ? r : { ...defaults, ...r }));
+}
 
 export const keyOf = (table: StoreTable, row: AnyRow, schema: LocalSchema = CORE_SCHEMA): string => {
   const rules = schema.rules[table];

@@ -6,6 +6,7 @@
 
 import type { Uuid } from "../ids";
 import type { ImportModel } from "../import/model";
+import { derivationIndex } from "../model/derivations";
 import { buildRequirementIndex } from "../model/requirement-index";
 import type { AttributeFeeds, ScopeModel } from "../model/requirements";
 import { checkMappingTypes } from "../model/type-check";
@@ -25,6 +26,7 @@ export const scopeModelOf = (m: ImportModel): ScopeModel => ({
   attributes: [...m.attributes],
   mappings: [...m.mappings],
   mappingInputs: [...m.mappingInputs],
+  attributeInputs: [...(m.attributeInputs ?? [])],
   sourceTables: [...m.tables],
   sourceColumns: [...m.columns],
 });
@@ -42,10 +44,17 @@ export const coverageChangeText = (d: CoverageDelta): string => `${d.before.cove
 export function coverageDelta(requirements: readonly Requirement[], links: readonly RequirementLink[], before: ScopeModel, after: ScopeModel, feeds?: AttributeFeeds): CoverageDelta[] {
   const ixBefore = buildRequirementIndex(requirements, links, before, feeds);
   const ixAfter = buildRequirementIndex(requirements, links, after, feeds);
-  /** The attributes whose mappings decide an attribute's coverage: its own, or its approved feeds' inputs (slice 15d). */
-  const deciding = (id: Uuid): Uuid[] => {
+  /**
+   * The attributes whose mappings decide an attribute's coverage: its own, or its approved feeds' inputs (slice 15d), and
+   * since slice 18 its calculation's inputs, at any depth.
+   */
+  const calculations = derivationIndex(before.attributes, before.attributeInputs ?? []);
+  const deciding = (id: Uuid, seen = new Set<Uuid>()): Uuid[] => {
+    if (seen.has(id)) return [];
+    seen.add(id);
     const fed = (feeds?.[id] ?? []).filter((f) => f.approved && !f.typeConflict);
-    return fed.length ? [...new Set(fed.flatMap((f) => f.inputs))] : [id];
+    const own = fed.length ? [...new Set(fed.flatMap((f) => f.inputs))] : [id];
+    return [...new Set([...own, ...calculations.inputsOf(id).flatMap((i) => deciding(i, seen))])];
   };
   const attributes = new Map(live(before.attributes).map((a) => [a.id, a]));
   const entities = new Map(live(before.entities).map((e) => [e.id, e]));
@@ -85,7 +94,7 @@ export function coverageDelta(requirements: readonly Requirement[], links: reado
     const lost = new Set(b.covered.filter((id) => !a.covered.includes(id)));
     const why = new Set<string>();
     for (const id of lost) {
-      const attributeIds = (attributes.has(id) ? [id] : live(before.attributes).filter((x) => x.entity_id === id).map((x) => x.id)).flatMap(deciding);
+      const attributeIds = (attributes.has(id) ? [id] : live(before.attributes).filter((x) => x.entity_id === id).map((x) => x.id)).flatMap((x) => deciding(x));
       for (const m of live(before.mappings)) {
         if (!attributeIds.includes(m.attribute_id) || m.status !== "approved") continue;
         const reason = whyMapping(m);

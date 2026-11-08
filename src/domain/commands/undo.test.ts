@@ -67,6 +67,7 @@ function seed(): Rows {
     concept: [concept(ids.conceptCustomer), concept(ids.conceptSales)],
     entity: [entity(ids.customer), entity(ids.salesOrder)],
     attribute: [attribute(ids.customerId), attribute(ids.email), attribute(ids.orderId)],
+    attribute_input: [],
     relationship: [relationship()],
     source_system: [sourceSystem()],
     source_table: [sourceTable()],
@@ -279,7 +280,7 @@ describe("undo and redo (slice 1b)", () => {
     const rows = seed();
     const del = ok(deleteMapping(ctx, modeler, { mapping: find(rows, "mapping", ids.mapEmail) as never, inputs: rows.mapping_input }, { mappingId: ids.mapEmail, expectedVersion: 1 }));
     const afterDel = apply(rows, del);
-    const attrGone = ok(deleteAttribute(makeCtx(ids.someoneElse), modeler, { attribute: find(afterDel, "attribute", ids.email) as never, mappings: afterDel.mapping, mappingInputs: afterDel.mapping_input }, { attributeId: ids.email, expectedVersion: 1 }));
+    const attrGone = ok(deleteAttribute(makeCtx(ids.someoneElse), modeler, { attribute: find(afterDel, "attribute", ids.email) as never, mappings: afterDel.mapping, mappingInputs: afterDel.mapping_input, attributeInputs: afterDel.attribute_input }, { attributeId: ids.email, expectedVersion: 1 }));
     expect(revertChangeGroup(makeCtx(), modeler, { events: del.events, rows: apply(afterDel, attrGone) }, "undo")).toMatchObject({
       ok: false,
       error: { message: UNDO_REFUSED_MESSAGE },
@@ -598,6 +599,7 @@ describe("the working layer (slice 3a)", () => {
             attributes: r.attribute,
             mappings: r.mapping,
             mappingInputs: r.mapping_input,
+            attributeInputs: r.attribute_input,
             relationships: r.relationship,
             canvasItems: r.canvas_item,
             labelLinks: r.label_link,
@@ -786,7 +788,7 @@ describe("copies of attributes (slice 10c)", () => {
     expect(row).toMatchObject({ name: "email", copied_from_attribute_id: null });
     expect("copied_from_attribute_id" in row).toBe(true);
 
-    const deleted = ok(deleteAttribute(ctx, modeler, { attribute: find(rows, "attribute", ids.email) as never, mappings: [], mappingInputs: [] }, { attributeId: ids.email, expectedVersion: 1 }));
+    const deleted = ok(deleteAttribute(ctx, modeler, { attribute: find(rows, "attribute", ids.email) as never, mappings: [], mappingInputs: [], attributeInputs: [] }, { attributeId: ids.email, expectedVersion: 1 }));
     const afterDelete = apply(rows, deleted);
     const restored = revertChangeGroup(makeCtx(), modeler, { events: beforeFormat10(deleted.events), rows: afterDelete }, "undo");
     if (!restored.ok) throw new Error(restored.error.message);
@@ -807,9 +809,9 @@ describe("copies of attributes (slice 10c)", () => {
     // Customer.email is a copy of Customer.customer_id; the original is deleted, then the copy
     const rows = seed();
     rows.attribute = rows.attribute.map((a) => (a.id === ids.email ? { ...a, copied_from_attribute_id: ids.customerId } : a));
-    const original = ok(deleteAttribute(ctx, modeler, { attribute: find(rows, "attribute", ids.customerId) as never, mappings: [], mappingInputs: [] }, { attributeId: ids.customerId, expectedVersion: 1 }));
+    const original = ok(deleteAttribute(ctx, modeler, { attribute: find(rows, "attribute", ids.customerId) as never, mappings: [], mappingInputs: [], attributeInputs: [] }, { attributeId: ids.customerId, expectedVersion: 1 }));
     const afterOriginal = apply(rows, original);
-    const copy = ok(deleteAttribute(ctx, modeler, { attribute: find(afterOriginal, "attribute", ids.email) as never, mappings: rows.mapping, mappingInputs: rows.mapping_input }, { attributeId: ids.email, expectedVersion: 1 }));
+    const copy = ok(deleteAttribute(ctx, modeler, { attribute: find(afterOriginal, "attribute", ids.email) as never, mappings: rows.mapping, mappingInputs: rows.mapping_input, attributeInputs: [] }, { attributeId: ids.email, expectedVersion: 1 }));
     const afterCopy = apply(afterOriginal, copy);
     const back = revertChangeGroup(makeCtx(), modeler, { events: copy.events, rows: afterCopy }, "undo");
     if (!back.ok) throw new Error(back.error.message);
@@ -909,7 +911,7 @@ describe("undo and redo keep copies in step (slice 10c, F1, S10C-13)", () => {
 
   it("undo of an original's delete brings it back, and its copies follow again with no write of their own", () => {
     const rows = withCopy();
-    const deleted = ok(deleteAttribute(ctx, modeler, { attribute: attr(rows, ids.customerId), mappings: rows.mapping, mappingInputs: rows.mapping_input }, { attributeId: ids.customerId, expectedVersion: 1 }));
+    const deleted = ok(deleteAttribute(ctx, modeler, { attribute: attr(rows, ids.customerId), mappings: rows.mapping, mappingInputs: rows.mapping_input, attributeInputs: [] }, { attributeId: ids.customerId, expectedVersion: 1 }));
     const afterDelete = apply(rows, deleted);
     expect(attr(afterDelete, C1)).toMatchObject({ deleted_at: null, copied_from_attribute_id: ids.customerId });
     const undone = step(afterDelete, deleted.events, "undo");
@@ -920,7 +922,7 @@ describe("undo and redo keep copies in step (slice 10c, F1, S10C-13)", () => {
 
   it("undo of “Stop following” on a copy whose original is deleted links it again, writing nothing more", () => {
     const rows = withCopy();
-    const afterDelete = apply(rows, ok(deleteAttribute(ctx, modeler, { attribute: attr(rows, ids.customerId), mappings: rows.mapping, mappingInputs: rows.mapping_input }, { attributeId: ids.customerId, expectedVersion: 1 })));
+    const afterDelete = apply(rows, ok(deleteAttribute(ctx, modeler, { attribute: attr(rows, ids.customerId), mappings: rows.mapping, mappingInputs: rows.mapping_input, attributeInputs: [] }, { attributeId: ids.customerId, expectedVersion: 1 })));
     const stop = ok(updateAttribute(ctx, modeler, { attribute: attr(afterDelete, C1), attributes: afterDelete.attribute as Attribute[] }, { attributeId: C1, expectedVersion: 1, stopFollowing: true }));
     const undone = step(apply(afterDelete, stop), stop.events, "undo");
     expect(undone.writeSet.writes).toHaveLength(1);

@@ -125,7 +125,7 @@ describe("deleting an entity (D-47)", () => {
     canvasItem("01900000-0000-7000-8000-00000000c003", { canvas_id: canvas2, entity_id: customer }),
     canvasItem(ids.itemCrmCustomer),
   ];
-  const rows = { entity: entity(customer), attributes: [...attrs, orderAttr], mappings: maps, mappingInputs: inputs, relationships: rels, canvasItems: items };
+  const rows = { entity: entity(customer), attributes: [...attrs, orderAttr], mappings: maps, mappingInputs: inputs, attributeInputs: [], relationships: rels, canvasItems: items };
 
   it("shows the impact: attributes, mappings with the approved count, relationships, canvases, projects (S1A-10)", () => {
     const impact = entityImpact(rows, {

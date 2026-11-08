@@ -145,7 +145,7 @@ describe("commands end to end (local adapter)", () => {
     const email = model.attributes.find((a) => a.id === id("attribute:customer.email"))!;
     const before = (await store.requirements.listLinks(RETAIL)).filter((k) => k.attribute_id === email.id);
     expect(before).toHaveLength(3);
-    const del = deleteAttribute(ctxFor(SEED_IDS.userAnna), anna, { attribute: email, mappings: model.mappings, mappingInputs: model.mappingInputs, requirementLinks: await store.requirements.listLinks(RETAIL) }, { attributeId: email.id, expectedVersion: 1 });
+    const del = deleteAttribute(ctxFor(SEED_IDS.userAnna), anna, { attribute: email, mappings: model.mappings, mappingInputs: model.mappingInputs, attributeInputs: model.attributeInputs, requirementLinks: await store.requirements.listLinks(RETAIL) }, { attributeId: email.id, expectedVersion: 1 });
     expect(del.ok && (await store.apply(del.writeSet))).toEqual({ ok: true });
     if (!del.ok) return;
     expect((await store.requirements.listLinks(RETAIL)).filter((k) => k.attribute_id === email.id)).toEqual([]);

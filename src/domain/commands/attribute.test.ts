@@ -133,6 +133,7 @@ describe("deleteAttribute", () => {
       attribute: attribute(email),
       mappings: [mapping(), other],
       mappingInputs: [mappingInput(), mappingInput("01900000-0000-7000-8000-00000000b009", { mapping_id: other.id })],
+      attributeInputs: [],
     };
     const r = deleteAttribute(makeCtx(), access("modeler"), state, ref);
     if (!r.ok) throw new Error(r.error.message);
@@ -146,7 +147,7 @@ describe("deleteAttribute", () => {
   });
 
   it("is refused to reviewers", () => {
-    expect(deleteAttribute(makeCtx(), access("reviewer"), { attribute: attribute(email), mappings: [], mappingInputs: [] }, ref)).toMatchObject({ ok: false, error: { code: "forbidden" } });
+    expect(deleteAttribute(makeCtx(), access("reviewer"), { attribute: attribute(email), mappings: [], mappingInputs: [], attributeInputs: [] }, ref)).toMatchObject({ ok: false, error: { code: "forbidden" } });
   });
 });
 

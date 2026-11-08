@@ -128,7 +128,7 @@ export async function addKeyAction(workspaceId: string, input: AddKeyInput): Pro
 /** The model and InfoCube's mapping rows a mapping command reads. */
 async function mappingState(store: DataStore, workspaceId: string, model: WorkspaceModel): Promise<MappingModel> {
   const [cubeMappings, cubeMappingInputs] = await Promise.all([store.modules.list(workspaceId, "cube_mapping"), store.modules.list(workspaceId, "cube_mapping_input")]);
-  return { entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs };
+  return { entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs, relationships: model.relationships };
 }
 
 /** A logical attribute dropped on a dimensional one (either way round): a direct Draft mapping. */

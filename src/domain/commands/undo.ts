@@ -20,6 +20,7 @@
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
+import { derivationIndex } from "../model/derivations";
 import { followOriginals } from "../model/copies";
 import { levelWritesRefusal } from "../model/levels";
 import { keyTakenMessage, requirementKey, restoreKeyTakenMessage } from "../model/requirements";
@@ -28,6 +29,7 @@ import { checkPermission, type WorkspaceAccess, type WorkspaceAction } from "../
 import {
   LINK_TABLES,
   type Attribute,
+  type AttributeInput,
   type ChangeEvent,
   type CoreTable,
   type LinkTable,
@@ -51,6 +53,7 @@ export const UNDOABLE_TABLES = [
   "concept",
   "entity",
   "attribute",
+  "attribute_input",
   "relationship",
   "source_system",
   "source_table",
@@ -107,7 +110,16 @@ export interface ModuleUndoTable {
    * purpose (not by the cascade) leaves this one; its other rows then go with it by `parents`.
    */
   goesWhole?: readonly (readonly [table: string, column: string, via: string])[];
+  /**
+   * Columns that point to a row the row outlives (slice 18, F16): when a write deletes the row `column` points to (of
+   * `table`), the module's own `rule` says how its row changes in the same change group, or `null` for not at all. The
+   * row is never deleted for it, and the column keeps its id. InfoCube: a lookup's relationship (an approved lookup goes
+   * back to review).
+   */
+  follows?: readonly ModuleFollow[];
 }
+/** One `follows` entry: the column, the table it points to, and the module's pure rule. */
+export type ModuleFollow = readonly [column: string, table: string, rule: (row: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>> | null];
 /** A module's table is in the undo history or outside it, as InfoMapper's are. */
 export type ModuleTableClass = ModuleUndoTable | "outside undo";
 
@@ -123,6 +135,8 @@ export interface UndoTables {
   readonly defaults: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   /** By module table: the rows that take it along whole (`ModuleUndoTable.goesWhole`, slice 15c). */
   readonly goesWhole: Readonly<Record<string, readonly (readonly [string, string, string])[]>>;
+  /** By module table: the rows it outlives, with the module's rule (`ModuleUndoTable.follows`, slice 18). */
+  readonly follows: Readonly<Record<string, readonly ModuleFollow[]>>;
 }
 
 /** The workspace's current rows of every undoable table, deleted rows included; a module's under its table's name. */
@@ -137,6 +151,8 @@ type AnyRow = RowImage;
 const IMAGE_DEFAULTS: Partial<Record<UndoableTable, Readonly<Record<string, unknown>>>> = {
   entity: { model_level: "logical" },
   relationship: { from_role: null, to_role: null },
+  // slice 18: an image written before calculations is an attribute that is not calculated
+  attribute: { is_calculated: false, calc_rule: null },
 };
 
 /** Columns that point to a parent row whose deletion the domain cascades (data model, section 11). */
@@ -147,6 +163,8 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   entity: [["concept_id", "concept"]],
   // not `copied_from_attribute_id` (slice 10c, F9): a copy keeps a deleted original as its lost reference
   attribute: [["entity_id", "entity"]],
+  // slice 18 (F9): an input row goes with the calculated attribute and with the input it reads
+  attribute_input: [["attribute_id", "attribute"], ["input_attribute_id", "attribute"]],
   relationship: [["from_entity_id", "entity"], ["to_entity_id", "entity"]],
   source_table: [["source_system_id", "source_system"]],
   source_column: [["source_table_id", "source_table"]],
@@ -194,6 +212,7 @@ export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleT
   const actions: Record<string, (e: ChangeEvent) => WorkspaceAction> = {};
   const defaults: Record<string, Readonly<Record<string, unknown>>> = { ...IMAGE_DEFAULTS };
   const goesWhole: Record<string, readonly (readonly [string, string, string])[]> = {};
+  const follows: Record<string, readonly ModuleFollow[]> = {};
   for (const [table, spec] of Object.entries(modules) as [string, ModuleTableClass | undefined][]) {
     if (!spec) continue;
     if (undoable.includes(table) || outside.has(table)) throw new Error(`The table ${table} is InfoMapper's or registered twice.`);
@@ -208,8 +227,9 @@ export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleT
     if (spec.action) actions[table] = spec.action;
     if (spec.defaults) defaults[table] = spec.defaults;
     if (spec.goesWhole?.length) goesWhole[table] = spec.goesWhole;
+    if (spec.follows?.length) follows[table] = spec.follows;
   }
-  return { undoable, outside, parents, nouns, actions, defaults, goesWhole, modules: registered };
+  return { undoable, outside, parents, nouns, actions, defaults, goesWhole, follows, modules: registered };
 }
 
 /** InfoMapper's tables only: what undo knows without a module (tests, and InfoMapper with an empty registry). */
@@ -411,7 +431,7 @@ export function revertChangeGroup(
   }
 
   if (!consistent(after, touched, tables)) return fail(refused());
-  const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched);
+  const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched) ?? calculationCycle(after, touched);
   if (keyClash) return fail(keyClash);
   // copies stay in step with their originals (slice 10c, F1): an undo or redo of a followed field, a paste or a
   // “Stop following” writes the copies that differ, in the same group; an original brought back writes none, as its
@@ -423,6 +443,24 @@ export function revertChangeGroup(
   if (levels) return fail(levels);
   const writeSet = buildWriteSet(ctx, workspaceId, followed.writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
+}
+
+/** Slice 18 (F8): a revert that brings back a calculation input that closes a cycle (made by someone else meanwhile). */
+export const calculationCycleMessage = (attribute: string) => `Undoing this would make ${attribute} calculated from itself.`;
+
+function calculationCycle(rows: Map<string, Map<string, AnyRow>>, touched: readonly { table: string; key: string }[]): DomainError | null {
+  const inputs = touched.filter((t) => t.table === "attribute_input").map((t) => rows.get("attribute_input")?.get(t.key)).filter((r): r is AnyRow => !!r && r.deleted_at == null);
+  if (!inputs.length) return null;
+  const attributes = [...(rows.get("attribute")?.values() ?? [])] as unknown as Attribute[];
+  const index = derivationIndex(attributes, [...(rows.get("attribute_input")?.values() ?? [])] as unknown as AttributeInput[]);
+  for (const i of inputs) {
+    const attributeId = i.attribute_id as Uuid;
+    if (index.reaches(i.input_attribute_id as Uuid, attributeId) || i.input_attribute_id === attributeId) {
+      const name = (rows.get("attribute")?.get(attributeId)?.name as string | undefined) ?? "an attribute";
+      return domainError("invalid", calculationCycleMessage(name));
+    }
+  }
+  return null;
 }
 
 /**

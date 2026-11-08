@@ -651,11 +651,20 @@ export function GroupedSelect({
  * The parts of an attribute's second click (slice 15b, R4): its mappings and a module's rows ("2 mappings and 1
  * measure"), its copies and what a module's rows change elsewhere, joined with "; "; undefined when there is none.
  */
-export function attributeDeleteParts(mappings: number, copies: string | undefined, modules: { also: readonly string[]; then: readonly string[] } | undefined) {
+export function attributeDeleteParts(
+  mappings: number,
+  copies: string | undefined,
+  modules: { also: readonly string[]; then: readonly string[] } | undefined,
+  /** Slice 18 (F12): the calculations that read it ("the calculation of net_amount loses this input"). */
+  calculations?: string | null,
+) {
   const also = [...(mappings ? [`${mappings} mapping${mappings > 1 ? "s" : ""}`] : []), ...(modules?.also ?? [])];
-  const then = [...(copies ? [copies] : []), ...(modules?.then ?? [])];
+  const then = [...(copies ? [copies] : []), ...(calculations ? [calculations] : []), ...(modules?.then ?? [])];
   return { also: also.length ? also.join(" and ") : undefined, then: then.length ? then.join("; ") : undefined };
 }
+
+/** Slice 18 (F14): the Delete key on a relationship with lookups through it deletes nothing and says where to. */
+export const relationshipDeleteAsks = (then: string): string => `Delete it from its menu or its panel: ${then}.`;
 
 export const armedDeleteText = (also?: string, then?: string): string => `Click again to delete${also ? `, with ${also}` : ""}${then ? `; ${then}` : ""}`;
 

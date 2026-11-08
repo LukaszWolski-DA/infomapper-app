@@ -57,6 +57,7 @@ async function stateOf(store: DataStore, workspaceId: Uuid): Promise<SourceChang
     mappingInputs: model.mappingInputs,
     attributes: model.attributes,
     entities: model.entities,
+    attributeInputs: model.attributeInputs,
     changes,
     relationships: model.sourceRelationships,
     relationshipColumns: model.sourceRelationshipColumns,

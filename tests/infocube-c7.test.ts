@@ -33,6 +33,7 @@ function seed(): Rows {
     concept: [concept(ids.conceptSales)],
     entity: [entity(ids.salesOrder)],
     attribute: [attribute(ids.orderId)],
+    attribute_input: [],
     relationship: [],
     source_system: [],
     source_table: [],
@@ -119,7 +120,7 @@ const deleteFact = (rows: Rows, fact: Entity, ctx = makeCtx()) =>
   withCascades(
     ctx,
     rows,
-    ok(deleteEntity(ctx, access("modeler", on), { entity: fact, attributes: rows.attribute, mappings: [], mappingInputs: [], relationships: [], canvasItems: [], entities: rows.entity }, { entityId: fact.id, expectedVersion: fact.version })).writeSet,
+    ok(deleteEntity(ctx, access("modeler", on), { entity: fact, attributes: rows.attribute, mappings: [], mappingInputs: [], attributeInputs: [], relationships: [], canvasItems: [], entities: rows.entity }, { entityId: fact.id, expectedVersion: fact.version })).writeSet,
   );
 
 const turnOff = (rows: Rows, ws: Partial<Workspace> = on) =>
@@ -147,14 +148,14 @@ describe("deleting takes InfoCube's rows along (X-4, E14)", () => {
     expect(new Set(del.events.map((e) => e.change_group_id))).toEqual(new Set([del.changeGroupId]));
     // nothing else of InfoCube's is written, and a logical entity's delete takes nothing of InfoCube's
     const logical = rows.entity.find((e) => e.id === ids.salesOrder)!;
-    const plain = withCascades(makeCtx(), rows, ok(deleteEntity(makeCtx(), access("modeler", on), { entity: logical, attributes: rows.attribute, mappings: [], mappingInputs: [], relationships: [], canvasItems: [] }, { entityId: logical.id, expectedVersion: logical.version })).writeSet);
+    const plain = withCascades(makeCtx(), rows, ok(deleteEntity(makeCtx(), access("modeler", on), { entity: logical, attributes: rows.attribute, mappings: [], mappingInputs: [], attributeInputs: [], relationships: [], canvasItems: [] }, { entityId: logical.id, expectedVersion: logical.version })).writeSet);
     expect(plain.writes.some((w) => w.table.startsWith("cube_"))).toBe(false);
   });
 
   it("soft-deletes a measure's cube_measure with its attribute", () => {
     const { rows, amount, measure } = withFact();
     const ctx = makeCtx();
-    const del = withCascades(ctx, rows, ok(deleteAttribute(ctx, access("modeler", on), { attribute: amount, mappings: [], mappingInputs: [] }, { attributeId: amount.id, expectedVersion: amount.version })).writeSet);
+    const del = withCascades(ctx, rows, ok(deleteAttribute(ctx, access("modeler", on), { attribute: amount, mappings: [], mappingInputs: [], attributeInputs: [] }, { attributeId: amount.id, expectedVersion: amount.version })).writeSet);
     expect(del.writes.map((w) => w.table)).toEqual(["attribute", "cube_measure"]);
     expect((del.writes[1] as { row: CubeMeasure }).row).toMatchObject({ id: measure.id, deleted_at: ctx.now, version: 2 });
   });

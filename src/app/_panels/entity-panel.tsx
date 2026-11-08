@@ -163,7 +163,8 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
             testId="list-entity-attributes"
             text={(a) => `${a.name} ${feedOf(a.id)}`}
             render={(a) => {
-              const fed = feedOf(a.id);
+              // slice 18: a calculated attribute without a mapping or feed of its own says so
+              const fed = feedOf(a.id) || (ix.derivations.isCalculated(a.id) ? "calculated" : "");
               const meta = fed ? <span className="font-mono text-xs">{fed}</span> : <span className="italic">{feed?.none ?? "unmapped"}</span>;
               if (!p.editable) {
                 return (

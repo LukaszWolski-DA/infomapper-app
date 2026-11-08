@@ -10,6 +10,7 @@ import { cardShownNames } from "@/domain/model/aliases";
 import type { Canvas, CanvasItem, LiveLevel, NameMode, RowFilter, SourceChange, WorkspaceModel } from "@/domain/types";
 import type { EntityRole, RowFeed } from "@/ui/modules";
 import { lineNeedsClip, ROLE_MARK, rowNeedsClip, titleNeedsClip } from "./text-fit";
+import { derivationIndex, derivedRows, derivedRowTitle, rowCounts } from "@/domain/model/derivations";
 
 export type CardKind = "ent" | "src";
 
@@ -56,6 +57,11 @@ export interface CardRow {
    * draws the glyph as a pseudo-element, so the row gets no element. Only when set.
    */
   mark?: string;
+  /**
+   * A calculated attribute (slice 18, item 1): its rule for the "=" mark's title, and `square` when it is not mapped or
+   * fed directly: "ok" when every input counts (the filled square), "gap" otherwise (hollow). Only when calculated.
+   */
+  calc?: { rule: string | null; square?: "ok" | "gap" };
 }
 
 export interface CardData {
@@ -204,6 +210,17 @@ export function buildCards(
     return { mappings: r?.n ?? 0, warn: r?.warn ?? false, title: r ? r.lines.join("\n") : empty };
   };
 
+  // slice 18: calculated rows, worked out once per build (Q5); none in a model without calculations
+  const calculations = derivationIndex(model.attributes, model.attributeInputs ?? []);
+  const derived = calculations.any ? derivedRows(calculations, model.attributes, (id) => rowState(id, "").mappings > 0) : {};
+  const calcOf = (id: Uuid, dimensional: boolean): Partial<Pick<CardRow, "calc" | "title">> | null => {
+    if (!calculations.isCalculated(id)) return null;
+    const d = derived[id];
+    const rule = calculations.ruleOf(id);
+    if (!d) return { calc: { rule } };
+    return { calc: { rule, square: d.ok ? "ok" : "gap" }, title: derivedRowTitle(d, dimensional ? "fed" : "mapped") };
+  };
+
   const cards: Omit<CardData, "clipName" | "clipLine1">[] = [];
   for (const item of items) {
     const base = {
@@ -243,6 +260,7 @@ export function buildCards(
           labels: labelsOf(`attribute:${a.id}`),
           ...(live ? { relevant: live.relevantRows.has(a.id) } : {}),
           ...(rowMarks[a.id] ? { mark: rowMarks[a.id] } : {}),
+          ...calcOf(a.id, entity.model_level === "dimensional"),
         }));
       const role = roles[entity.id];
       cards.push({
@@ -260,7 +278,8 @@ export function buildCards(
         ...(live ? { liveRemove: live.removeOf({ kind: "entity", id: entity.id }) } : {}),
         color: concept?.color ?? null,
         rows,
-        mapped: rows.filter((r) => r.mappings > 0).length,
+        // slice 18: as the rows' dots and squares say (`rowCounts`)
+        mapped: rows.filter(rowCounts).length,
         subject: { entityConceptId: entity.concept_id },
         links: links(rows),
         labels: labelsOf(`entity:${entity.id}`),

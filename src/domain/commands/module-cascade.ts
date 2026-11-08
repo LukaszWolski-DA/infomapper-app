@@ -6,6 +6,9 @@
 // command, so no InfoMapper command names a module table. Since slice 15c a module table may also go whole with a row
 // that points to it (`goesWhole`, Q-5): a dimensional mapping goes when the cascade deletes one of its inputs because the
 // input's logical attribute went; its other inputs then follow by `parents`. An input removed on purpose leaves it.
+// Since slice 18 a module row may outlive a row it points to (`follows`, F16): when that row is deleted, the module's
+// own rule changes it in the same change group (InfoCube: an approved lookup whose relationship goes is sent back to
+// review), or leaves it; it keeps the id. InfoMapper never knows what the rule does.
 
 import type { CommandContext, Write } from "../changes";
 import type { UndoTables } from "./undo";
@@ -32,7 +35,9 @@ export function cascadingModuleTables(writes: readonly Write[], tables: UndoTabl
   const reach = new Set(deleted.keys());
   const out: string[] = [];
   const reached = (table: string) =>
-    (tables.parents[table] ?? []).some(([, parent]) => reach.has(parent)) || (tables.goesWhole[table] ?? []).some(([child]) => reach.has(child));
+    (tables.parents[table] ?? []).some(([, parent]) => reach.has(parent)) ||
+    (tables.goesWhole[table] ?? []).some(([child]) => reach.has(child)) ||
+    (tables.follows[table] ?? []).some(([, parent]) => reach.has(parent));
   for (let grew = true; grew; ) {
     grew = false;
     for (const table of tables.modules) {
@@ -85,6 +90,24 @@ export function moduleCascade(
         }
         grew = true;
       }
+    }
+  }
+  // slice 18 (F16): the rows that outlive what was deleted, changed by their module's rule (each row once, after the
+  // deletes, so a row this cascade deleted is not changed too)
+  for (const table of tables.modules) {
+    const follows = tables.follows[table];
+    if (!follows) continue;
+    for (const row of (rows[table] ?? []) as Row[]) {
+      if (row.deleted_at !== null || written.has(`${table}:${row.id}`)) continue;
+      let patch: Record<string, unknown> | null = null;
+      for (const [column, parent, rule] of follows) {
+        if (!deleted.get(parent)?.has(String(row[column]))) continue;
+        const p = rule({ ...row, ...(patch ?? {}) });
+        if (p) patch = { ...(patch ?? {}), ...p };
+      }
+      if (!patch) continue;
+      extra.push({ kind: "update", table, before: row, row: { ...row, ...patch, version: row.version + 1, updated_at: ctx.now, updated_by: ctx.actorId } } as unknown as Write);
+      written.add(`${table}:${row.id}`);
     }
   }
   return extra;

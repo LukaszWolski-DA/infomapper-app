@@ -211,6 +211,7 @@ export function deleteEntity(
   const writes: Write[] = [
     ...cascade.mappingInputs.map((r) => softDelete(ctx, "mapping_input", r)),
     ...cascade.mappings.map((r) => softDelete(ctx, "mapping", r)),
+    ...cascade.attributeInputs.map((r) => softDelete(ctx, "attribute_input", r)),
     ...cascade.attributes.map((r) => softDelete(ctx, "attribute", r)),
     ...cascade.relationships.map((r) => softDelete(ctx, "relationship", r)),
     ...cascade.canvasItems.map((r) => softDelete(ctx, "canvas_item", r)),

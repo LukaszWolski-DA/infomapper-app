@@ -14,7 +14,7 @@ import { emptyHistory, historyKey, type UndoHistory } from "@/domain/model/undo-
 import type { LostOriginal, ProjectCanvas } from "@/domain/types";
 import type { ApplyResult, DataStore } from "../ports";
 import { assertNotProduction, readDbCached, writeDb } from "./file";
-import { CORE_SCHEMA, findViolation, keyOf, rowsOf, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
+import { CORE_SCHEMA, findViolation, keyOf, readRows, rowsOf, type AnyRow, type DevDb, type IntegrityViolation, type LocalSchema, type StoreTable } from "./schema";
 
 const live = <R extends { deleted_at: string | null }>(rows: R[]): R[] => rows.filter((r) => r.deleted_at === null);
 
@@ -145,7 +145,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
     modules: {
       list: async (workspaceId, table) => {
         if (!schema.rules[table]) throw new Error(`The store does not know the table ${table}.`);
-        const rows = rowsOf(await load(), table) as unknown as { workspace_id: Uuid; deleted_at: string | null }[];
+        const rows = readRows(await load(), table, schema) as unknown as { workspace_id: Uuid; deleted_at: string | null }[];
         return rows.filter((r) => r.workspace_id === workspaceId && r.deleted_at === null) as never;
       },
     },
@@ -195,6 +195,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
           sourceColumns: of(db.source_column).sort((a, b) => a.source_table_id.localeCompare(b.source_table_id) || a.ordinal - b.ordinal),
           mappings: of(db.mapping),
           mappingInputs: of(db.mapping_input).sort((a, b) => a.mapping_id.localeCompare(b.mapping_id) || a.sort_order - b.sort_order),
+          attributeInputs: of(db.attribute_input).sort((a, b) => a.attribute_id.localeCompare(b.attribute_id) || a.sort_order - b.sort_order),
           sourceRelationships: of(db.source_relationship),
           sourceRelationshipColumns: of(db.source_relationship_column).sort(
             (a, b) => a.source_relationship_id.localeCompare(b.source_relationship_id) || a.sort_order - b.sort_order,
@@ -217,7 +218,7 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
 
         const db = await load();
         const rows = {} as Record<string, unknown[]>;
-        for (const table of schema.undoable) rows[table] = rowsOf(db, table as StoreTable).filter((r) => r.workspace_id === workspaceId);
+        for (const table of schema.undoable) rows[table] = readRows(db, table as StoreTable, schema).filter((r) => r.workspace_id === workspaceId);
         return rows as unknown as WorkspaceRows;
       },
     },

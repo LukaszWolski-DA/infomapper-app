@@ -38,7 +38,7 @@ describe("copies in the delete previews (slice 10c, F7, F8)", () => {
   });
 
   it("lists in an entity's impact only the copies in other entities", () => {
-    const impact = entityImpact({ entity: entity(customer), attributes, entities, mappings: [], mappingInputs: [], relationships: [], canvasItems: [] }, { canvases: [], projects: [], projectCanvases: [] });
+    const impact = entityImpact({ entity: entity(customer), attributes, entities, mappings: [], mappingInputs: [], attributeInputs: [], relationships: [], canvasItems: [] }, { canvases: [], projects: [], projectCanvases: [] });
     expect(impact.copies).toEqual([{ id: C1, label: "Sales Order.customer_id" }]);
     expect(impact.attributes).toBe(3);
   });

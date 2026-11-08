@@ -33,6 +33,7 @@ const model: WorkspaceModel = {
   sourceTables: Object.entries(T).map(([name, id]) => sourceTable({ id, name })),
   sourceColumns: [],
   mappings: [],
+  attributeInputs: [],
   mappingInputs: [],
   sourceRelationships: [
     sourceRelationship(R.lineHeader, T.line, T.header),

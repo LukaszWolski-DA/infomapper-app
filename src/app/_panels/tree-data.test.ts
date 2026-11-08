@@ -33,6 +33,7 @@ const model: WorkspaceModel = {
   classifications: [],
   classificationLinks: [],
   lostOriginals: [],
+  attributeInputs: [],
   mappingInputs: [],
 };
 const items = [

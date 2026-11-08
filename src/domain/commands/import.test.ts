@@ -104,6 +104,8 @@ function withEmailMapping(db: Db) {
     is_pii: true,
     is_nullable: true,
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   } as Attribute;
   const column = (db.source_column as unknown as SourceColumn[]).find((c) => c.name === "email_addr")!;
   const mapping: Mapping = {

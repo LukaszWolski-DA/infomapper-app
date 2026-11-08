@@ -94,7 +94,7 @@ describe("a key link goes with its relationship or its attribute (RP-B, RP-07, R
     const key = rows.attribute!.find((a) => a.id === link.attribute_id) as never as { id: string; version: number; name: string };
     expect(key.name).toBe("ship_date_key");
     const ctx = makeCtx();
-    const del = withCascades(ctx, rows, ok(deleteAttribute(ctx, modeler(), { attribute: key as never, mappings: [], mappingInputs: [] }, { attributeId: key.id, expectedVersion: key.version })).writeSet);
+    const del = withCascades(ctx, rows, ok(deleteAttribute(ctx, modeler(), { attribute: key as never, mappings: [], mappingInputs: [], attributeInputs: [] }, { attributeId: key.id, expectedVersion: key.version })).writeSet);
     expect(deletedIn(del)).toEqual([`attribute:${key.id}`, `cube_key:${link.id}`]);
     expect(del.writes.some((w) => w.table === "relationship")).toBe(false);
   });

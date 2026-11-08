@@ -49,7 +49,8 @@ export function coverageColours(index: RequirementIndex | null, requirementId: U
     sum(entityOf(a), c);
   }
   // slice 15d (D7, D-70): the logical attributes that feed the scope, by their own coverage (the prototype's `sc.up`)
-  for (const a of scope.feeding ?? []) {
+  // slice 18 (F11): and a calculation's inputs, at any depth, by their own coverage
+  for (const a of [...(scope.feeding ?? []), ...(scope.inputs ?? [])]) {
     const c: CoverageColour = index.attributeCoverage(a) === "covered" ? "covered" : "gap";
     out.rows.set(a, c);
     sum(entityOf(a), c);

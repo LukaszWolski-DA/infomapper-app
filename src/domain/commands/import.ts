@@ -94,6 +94,7 @@ export const importStateOf = (model: WorkspaceModel, changes: readonly SourceCha
     mappingInputs: model.mappingInputs,
     attributes: model.attributes,
     entities: model.entities,
+    attributeInputs: model.attributeInputs,
     changes,
     classifications: model.classifications,
     classificationLinks: model.classificationLinks,

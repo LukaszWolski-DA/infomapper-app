@@ -87,7 +87,9 @@ export async function readDb(file: string): Promise<DevDb> {
  * get `alias` null and canvases and canvas items `entity_names` and `attribute_names` null (slice 11; no change
  * events, no log line). From 11, every entity gets `model_level` logical, every workspace `infocube` false, and the
  * file an empty `organization_licence` (slice 15a; no change events, no log line). From 12, every relationship gets
- * `from_role` and `to_role` null (slice 15b; no change events, no log line).
+ * `from_role` and `to_role` null (slice 15b; no change events, no log line). From 13, every attribute gets
+ * `is_calculated` false and `calc_rule` null, and the file an empty `attribute_input` (slice 18, Q2; no change events, no
+ * log line).
  */
 export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number } {
   let report: Upgrade8Report | null = null;
@@ -171,7 +173,12 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
   // slice 15b: every relationship's two roles null (RP-A; no change events, no log line)
   if ((db.format as number) === 12) {
     for (const r of db.relationship) Object.assign(r, { from_role: r.from_role ?? null, to_role: r.to_role ?? null });
-    Object.assign(db, { format: DEV_DB_FORMAT });
+    Object.assign(db, { format: 13 });
+  }
+  // slice 18: no attribute is calculated yet, and there are no inputs (Q2; no change events, no log line)
+  if ((db.format as number) === 13) {
+    for (const a of db.attribute) Object.assign(a, { is_calculated: a.is_calculated ?? false, calc_rule: a.calc_rule ?? null });
+    Object.assign(db, { format: DEV_DB_FORMAT, attribute_input: (db as Partial<DevDb>).attribute_input ?? [] });
   }
   return { report, passwordsGiven };
 }

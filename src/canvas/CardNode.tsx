@@ -13,6 +13,7 @@ import { BODY_PAD, LOD_ZOOM, ROW_H } from "./geometry";
 import { splitName } from "./names";
 import type { RequirementMark } from "./requirement-marks";
 import { lineNeedsClip, ROLE_MARK } from "./text-fit";
+import { calcMarkTitle } from "@/domain/model/derivations";
 
 /**
  * `pinnedNotes`: the notes pinned to the card that are shown (slice 3a); `reqMark`: its requirement marker (slice 4b-1).
@@ -90,7 +91,8 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
   // the alias in alias mode, otherwise the name (slice 11, F8)
   const text = shownText(row);
   const { head, tail } = splitName(text);
-  const status = row.mappings === 0 ? "" : row.warn ? " warn" : " ok";
+  // slice 18: a row counted only through its calculation has a square, filled when every input counts
+  const status = row.mappings === 0 ? (row.calc?.square ? ` calc${row.calc.square === "ok" ? " ok" : ""}` : "") : row.warn ? " warn" : " ok";
   return (
     <div
       className={`row${selected ? " sel" : ""}${row.relevant ? " lab" : ""}${row.retired ? " old" : row.missing ? " gone" : row.change ? ` ${row.change}` : ""}${row.mark ? ` ${row.mark}` : ""}`}
@@ -115,6 +117,11 @@ function Row({ row, kind, selected }: { row: CardRow; kind: CardData["kind"]; se
       {row.bk && (
         <span className="tag bk" title="Business key">
           BK
+        </span>
+      )}
+      {row.calc && (
+        <span className="calc" title={calcMarkTitle(row.calc.rule)} data-testid="mark-calc">
+          =
         </span>
       )}
       {row.labels && <LabelMark labels={row.labels} />}

@@ -34,6 +34,7 @@ const model: WorkspaceModel = {
   classifications: [],
   classificationLinks: [],
   lostOriginals: [],
+  attributeInputs: [],
   mappingInputs: [
     mappingInput(),
     mappingInput("01900000-0000-7000-8000-00000000b002", { mapping_id: combined.id, source_column_id: ids.colFirstName, sort_order: 1 }),

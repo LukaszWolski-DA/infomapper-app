@@ -56,7 +56,7 @@ export async function setLengthAs(id: string, length: number): Promise<void> {
 export async function deleteAs(id: string): Promise<void> {
   const model = await loadModel();
   const a = model.attributes.find((x) => x.id === id)!;
-  await asLukasz((ctx, access) => deleteAttribute(ctx, access, { attribute: a, mappings: model.mappings, mappingInputs: model.mappingInputs }, { attributeId: id, expectedVersion: a.version }));
+  await asLukasz((ctx, access) => deleteAttribute(ctx, access, { attribute: a, mappings: model.mappings, mappingInputs: model.mappingInputs, attributeInputs: model.attributeInputs }, { attributeId: id, expectedVersion: a.version }));
 }
 
 /** “Copy” in an attribute row's menu, and its toast. */

@@ -13,6 +13,8 @@ import { deleteAttributeAction, updateAttributeAction } from "@/app/_actions/mod
 import { useAction } from "@/app/_components/use-action";
 import { useModules } from "@/app/_components/modules";
 import { PANEL_SECTIONS } from "@/compose/panels";
+import { CalculationSection } from "./calculation-section";
+import { calculationsLoseInput } from "@/domain/model/derivations";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { UpdateAttributeInput } from "@/domain/commands/attribute";
 import { copiesBelow, copiesStopFollowing } from "@/domain/model/copies";
@@ -100,7 +102,9 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
   const copies = attributeCopiesImpact(ix.model.attributes, ix.model.entities, a.id);
   // what a module's rows lose with it (slice 15b, R4): a measure, a key's link; the second click names them
   const moduleDelete = useModules().attributeDeletes[a.id];
-  const deleteParts = attributeDeleteParts(mappings.length, copies.length ? copiesStopFollowing(copies.map((c) => c.label)) : undefined, moduleDelete);
+  // slice 18 (F12): the calculations that read it lose it as an input
+  const calcUsers = ix.derivations.usersOf(a.id).map((id) => ix.attribute.get(id)?.name ?? "?");
+  const deleteParts = attributeDeleteParts(mappings.length, copies.length ? copiesStopFollowing(copies.map((c) => c.label)) : undefined, moduleDelete, calculationsLoseInput(calcUsers));
   // a copy's type and Personal data follow its original while it has a link, live or deleted (F2)
   const followEditable = p.editable && !originalId;
   const follows = original ? attributeLabel(ix, original.id) : null;
@@ -333,6 +337,8 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       {PANEL_SECTIONS.attributeFeeds.map((S, i) => (
         <S key={i} attribute={a} />
       ))}
+      {/* slice 18 (item 1): "Calculated from", both levels */}
+      <CalculationSection attribute={a} />
 
       {copies.length > 0 && (
         <Fold title="Copies" count={copies.length} testId="fold-attribute-copies">

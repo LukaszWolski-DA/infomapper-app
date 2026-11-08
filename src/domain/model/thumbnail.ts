@@ -13,6 +13,7 @@ import type { Canvas, CanvasItem, Frame, LabelLink, Note, NoteColor, WorkspaceMo
 import { cardHeightOf, type FilterableRow } from "./card-size";
 import { REQUIREMENT_CARD_WIDTH } from "./card-kinds";
 import { indexOf } from "./classifications";
+import { countsAsMapped, derivationIndex } from "./derivations";
 import { NO_CONCEPT_COLOR } from "./concept-colors";
 import { blockHeight, BLOCK, cardWidthOf, FREE_FRAME_COLORS, type Rect } from "./frames";
 import { liveMembership } from "./live";
@@ -99,8 +100,13 @@ export function thumbnailIndex(
     }
   }
   const rowsOfEntity = new Map<Uuid, Row[]>();
+  // slice 18: a calculated row has its square, as `buildCards` gives it, so a Mapped filter keeps the canvas's height
+  const direct = (id: Uuid) => (rest.rowFeeds?.[id]?.n ?? mappings.get(id) ?? 0) > 0;
+  const calculations = derivationIndex(model.attributes, model.attributeInputs ?? []);
+  const throughInputs = countsAsMapped(calculations, direct);
   for (const a of model.attributes) {
-    const row = { id: a.id, mappings: rest.rowFeeds?.[a.id]?.n ?? mappings.get(a.id) ?? 0, pk: a.is_primary_key, fk: a.is_foreign_key, bk: a.is_business_key };
+    const square = calculations.isCalculated(a.id) && !direct(a.id) ? { calc: { square: throughInputs(a.id) ? ("ok" as const) : ("gap" as const) } } : {};
+    const row = { id: a.id, mappings: rest.rowFeeds?.[a.id]?.n ?? mappings.get(a.id) ?? 0, pk: a.is_primary_key, fk: a.is_foreign_key, bk: a.is_business_key, ...square };
     (rowsOfEntity.get(a.entity_id) ?? rowsOfEntity.set(a.entity_id, []).get(a.entity_id)!).push(row);
   }
   const rowsOfTable = new Map<Uuid, Row[]>();

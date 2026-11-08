@@ -91,6 +91,8 @@ export function withEntity(model: ImportModel, name: string, attributes: (Partia
     definition_text: null,
     alias: null,
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
     ...a,
   }));
   return { ...model, entities: [...model.entities, entity], attributes: [...model.attributes, ...rows] };

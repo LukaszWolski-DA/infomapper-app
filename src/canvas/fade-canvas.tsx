@@ -46,6 +46,7 @@ export interface FadeNote {
 export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | null {
   const request = useFadeRequest();
   const index = useRequirementIndex(data);
+  const feeds = useContext(RequirementFeedsCtx);
   return useMemo(() => {
     if (!request) return null;
     if ("lit" in request) return { key: fadeKey(request), lit: request.lit };
@@ -61,12 +62,12 @@ export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | 
       if (!index?.byId.has(target.id)) return null;
       lit = requirementFocusLit(data.model, index.scope(target.id));
     } else {
-      lit = targetLit(data.model, target);
+      lit = targetLit(data.model, target, feeds);
       if (target.t === "several" && index) for (const r of target.requirements ?? []) if (index.byId.has(r)) mergeLit(lit, requirementFocusLit(data.model, index.scope(r)));
     }
     if (index) lit.requirements = litRequirements(data.model, target, index.byId.keys(), index.scope);
     return { key: fadeKey(request), lit };
-  }, [request, data, index]);
+  }, [request, data, index, feeds]);
 }
 
 /**

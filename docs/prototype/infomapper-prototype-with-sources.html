@@ -732,6 +732,11 @@ body.rqlinking #viewport,body.rqlinking #viewport *{cursor:crosshair !important}
 .posctl span{flex:1;color:var(--ink-2);font-size:12.5px}
 .posctl .btn{min-width:30px;padding:0 6px}
 .row.moved{animation:moved .6s ease-out}
+/* slice 18: a calculated attribute's mark on its row */
+.row .calc{font-family:var(--mono);font-weight:600;font-size:10.5px;line-height:1;padding:1px 4px;border-radius:4px;background:var(--logical-soft);color:var(--logical);flex:none;margin-left:4px}
+.row .st.calc{background:transparent;box-shadow:inset 0 0 0 1.6px var(--map);border-radius:2px}   /* covered through a calculation: a square */
+.row .st.calc.ok{background:var(--map)}
+.calc-rule{font-family:var(--mono);font-size:12px}
 @keyframes moved{from{background:var(--logical-soft)}to{background:transparent}}
 
 /* card width handle + middle-truncated names */
@@ -1639,6 +1644,34 @@ function cubeDemoV2(S) {
     {id:"rel_date_orders", from:"dent_date", to:"dent_orders", label:"dates", fromMin:1, fromMax:1, toMin:0, toMax:"N"});
   const d = S.diagrams.find(x => x.id === "dia_star"); if (d) d.ent.dent_orders = {x:1140, y:640, f:"all", c:false};
 }
+/* slice 18's demo: Dim Customer's country_name looked up from the Country dictionary through Customer Address;
+   Fact Sales' net_amount calculated from three attributes of the fact */
+function cubeDemoV4(S) {
+  if (S.cube.v4) return; S.cube.v4 = true;
+  const m = S.cube.maps.find(x => x.to === "datr_cust_country_name");
+  if (m && m.from.length === 1 && S.relationships.some(r => r.id === "rel_5")) Object.assign(m, {kind:"lookup", rule:"", via:"rel_5", unknown:"Unknown", status:"draft",
+    note:m.note || "Customer Address holds country_code; the name comes from the Country dictionary."});
+  const na = S.attributes.find(a => a.id === "datr_sales_net_amount"), ins = ["datr_sales_quantity", "datr_sales_unit_price", "datr_sales_discount_pct"];
+  if (na && !na.calc && ins.every(id => S.attributes.some(a => a.id === id))) {
+    na.calc = {rule:"quantity * unit_price * (1 - discount_pct)", from:ins};
+    S.cube.maps = S.cube.maps.filter(x => x.to !== na.id);
+  }
+}
+/* slice 18: an attribute is fed when it is mapped (logical) or fed (dimensional), or calculated from inputs that are all fed */
+function directFed(id) { const a = I.attr[id]; return !!a && (isDimId(a.entityId) ? !!(I.cube?.mTo[id] || []).length : !!(I.mA[id] || []).length); }
+function isFed(id, seen = new Set()) {
+  if (directFed(id)) return true; const a = I.attr[id];
+  if (!a?.calc?.from.length || seen.has(id)) return false; seen.add(id);
+  return a.calc.from.every(f => isFed(f, seen));
+}
+function usesCalc(id, target, seen = new Set()) {      // does id's calculation read target, directly or through other calculations?
+  const a = I.attr[id]; if (!a?.calc || seen.has(id)) return false; seen.add(id);
+  return a.calc.from.some(f => f === target || usesCalc(f, target, seen));
+}
+function calcGaps(a, seen = new Set()) {               // the inputs, at any depth, that are neither fed nor calculated from fed ones
+  if (!a?.calc || seen.has(a.id)) return []; seen.add(a.id);
+  return a.calc.from.flatMap(f => directFed(f) ? [] : I.attr[f].calc ? calcGaps(I.attr[f], seen) : [f]);
+}
 function cubeIndex() {
   const C = S.cube; C.ents ||= []; C.measures ||= []; C.maps ||= [];
   // InfoCube's rows follow InfoMapper's objects: rows whose object is gone are dropped here (iteration 1)
@@ -1682,7 +1715,7 @@ function cubeDemoV3(S) {          // RP-F: Dim Date plays Order date and Ship da
 function idx() {
   cubeRootMigrate();
   if (!S.cube) cubeDemo(S);                   // InfoCube: once per model (the demo star, or empty)
-  cubeDemoV2(S); cubeDemoV3(S);
+  cubeDemoV2(S); cubeDemoV3(S); cubeDemoV4(S);
   I = {con:{}, ent:{}, attr:{}, attrsOf:{}, src:{}, col:{}, colSrc:{}, mA:{}, mC:{}, map:{}, rel:{}};
   S.systems ||= []; S.issues ||= []; S.imports ||= []; S.srcRelations ||= []; S.classes ||= [];
   for (const s of S.sources) if (s.system && !S.systems.some(x => x.name === s.system)) S.systems.push({id:"sys_" + String(s.system).toLowerCase().replace(/\W+/g, "_") + "_" + S.systems.length, name:s.system});
@@ -1691,6 +1724,10 @@ function idx() {
   S.entities.forEach(e => { I.ent[e.id] = e; I.attrsOf[e.id] = []; });
   S.attributes.forEach(a => { I.attr[a.id] = a; (I.attrsOf[a.entityId] ||= []).push(a); });
   Object.values(I.attrsOf).forEach(l => l.sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || a.name.localeCompare(b.name)));
+  /* slice 18: a calculated attribute reads attributes of its own entity; inputs whose attribute is gone drop out */
+  I.calcUsers = {};
+  S.attributes.forEach(a => { if (!a.calc) return; a.calc.from = (a.calc.from || []).filter(f => f !== a.id && I.attr[f] && I.attr[f].entityId === a.entityId);
+    a.calc.rule ||= ""; a.calc.from.forEach(f => (I.calcUsers[f] ||= []).push(a.id)); });
   S.sources.forEach(s => { I.src[s.id] = s; s.columns.forEach(c => { I.col[c.id] = c; I.colSrc[c.id] = s.id; }); });
   S.mappings = S.mappings.filter(m => I.col[m.columnId] && I.attr[m.attributeId]);
   S.mappings.forEach(m => { I.map[m.id] = m; (I.mA[m.attributeId] ||= []).push(m); (I.mC[m.columnId] ||= []).push(m); });
@@ -1928,6 +1965,7 @@ function relatedOf(item) {
   const {t, id} = item;
   if (I.cube && t === "attr") [...(I.cube.mTo[id] || []), ...(I.cube.mFrom[id] || [])].forEach(addCube);
   if (I.cube && t === "entity") (I.attrsOf[id] || []).forEach(a => [...(I.cube.mTo[a.id] || []), ...(I.cube.mFrom[a.id] || [])].forEach(addCube));
+  if (t === "attr") [...(I.attr[id]?.calc?.from || []), ...(I.calcUsers[id] || [])].forEach(f => out.rows.add(f));   // slice 18
   if (t === "attr") { (I.mA[id] || []).forEach(addMap); out.rows.add(id); out.cards.add("ent:" + I.attr[id]?.entityId); }
   else if (t === "col") { (I.mC[id] || []).forEach(addMap); out.rows.add(id); out.cards.add("src:" + I.colSrc[id]); }
   else if (t === "map") { if (I.map[id]) addMap(I.map[id]); }
@@ -2047,8 +2085,10 @@ function attrRow(a) {
   const dimA = isDimId(a.entityId), cms = dimA ? I.cube.mTo[a.id] || [] : [];
   const ms = dimA ? [] : I.mA[a.id] || [], warn = ms.some(m => !typeCheck(m).ok);
   const n = dimA ? cms.length : ms.length;
-  const st = !n ? "" : warn ? "warn" : "ok";
-  const title = dimA ? (!n ? "Not fed from the logical model" : cms.map(m => "from " + m.from.map(attrLabel).join(" + ")).join("\n"))
+  const calc = a.calc, cfed = !n && calc && isFed(a.id);
+  const st = !n ? (calc ? "calc" + (cfed ? " ok" : "") : "") : warn ? "warn" : "ok";
+  const title = !n && calc ? `Calculated from ${calc.from.map(f => I.attr[f].name).join(", ") || "no attributes yet"}${cfed ? ": every input is " + (dimA ? "fed" : "mapped") : ": not every input is " + (dimA ? "fed" : "mapped") + " yet"}`
+    : dimA ? (!n ? "Not fed from the logical model" : cms.map(m => (m.kind === "lookup" ? "lookup of " : "from ") + m.from.map(attrLabel).join(" + ")).join("\n"))
     : !ms.length ? "Not mapped yet" : ms.map(m => "from " + colLabel(m.columnId)).join("\n");
   const mr = dimA && I.cube.meas[a.id];
   const lid = CV().live?.labelId, lab = lid && rowRelevant("ent", a.id, lid);
@@ -2056,7 +2096,7 @@ function attrRow(a) {
   return `<div class="row${isSel("attr", a.id) ? " sel" : ""}${lab ? " lab" : ""}${chg ? " im-chg" : ""}${IMP.hit("attrs", a.id)}" data-rk="attr" data-rid="${esc(a.id)}"><span class="hnd l"></span>
 ${keyBadges(a)}
 ${nmSplit(a.name)}${a.isPII ? '<span class="tag pii" title="Personal data">PII</span>' : ""}
-${lmark("attr", a.id)}${(I.reqOf["attr:" + a.id] || []).length ? `<span class="rdot" title="Requirements: ${esc(I.reqOf["attr:" + a.id].map(r => r.key).join(", "))}"></span>` : ""}${mr ? `<span class="meas${mr.additivity === "non" ? " non" : ""}" title="Measure: ${ADD_L[mr.additivity]}${mr.semiNote ? ", " + esc(mr.semiNote) : ""}">${ADD_MARK[mr.additivity]}</span>` : ""}<span class="dt">${esc((a.dataType || "–") + (a.length ? `(${a.length})` : ""))}</span><span class="st ${st}${n > 1 ? " n" : ""}" title="${esc(title)}">${n > 1 ? n : ""}</span><span class="hnd r"></span></div>`;
+${calc ? `<span class="calc" title="${esc("Calculated: " + (calc.rule || "no rule yet"))}">=</span>` : ""}${lmark("attr", a.id)}${(I.reqOf["attr:" + a.id] || []).length ? `<span class="rdot" title="Requirements: ${esc(I.reqOf["attr:" + a.id].map(r => r.key).join(", "))}"></span>` : ""}${mr ? `<span class="meas${mr.additivity === "non" ? " non" : ""}" title="Measure: ${ADD_L[mr.additivity]}${mr.semiNote ? ", " + esc(mr.semiNote) : ""}">${ADD_MARK[mr.additivity]}</span>` : ""}<span class="dt">${esc((a.dataType || "–") + (a.length ? `(${a.length})` : ""))}</span><span class="st ${st}${n > 1 ? " n" : ""}" title="${esc(title)}">${n > 1 ? n : ""}</span><span class="hnd r"></span></div>`;
 }
 function colRow(c) {
   const ms = I.mC[c.id] || [], warn = ms.some(m => !typeCheck(m).ok);
@@ -2076,12 +2116,12 @@ function tools(L) {
 }
 function entCard(id) {
   const e = I.ent[id], L = CV().ent[id], con = I.con[e.conceptId];
-  const attrs = I.attrsOf[id] || []; let mapped = attrs.filter(a => (I.mA[a.id] || []).length).length;
+  const attrs = I.attrsOf[id] || []; let mapped = attrs.filter(a => isFed(a.id)).length;
   const rows = rowsOf("ent", id);
   const lid = CV().live?.labelId, ctx = lid && !(I.lblOf["entity:" + id] || []).some(l => l.id === lid);
   const dual = rows.some(x => x.isPrimaryKey && x.isForeignKey);
   const role = isDimE(e) ? roleOf(id) : null;
-  if (role) mapped = attrs.filter(a => (I.cube.mTo[a.id] || []).length).length;
+  if (role) mapped = attrs.filter(a => isFed(a.id)).length;
   return `<div class="card ent${role ? " dimn " + role : ""}${IMP.hit("ents", id)}${isSel("entity", id) ? " sel" : ""}${L.c ? " collapsed" : ""}${ctx ? " ctx" : ""}${dual ? " dualkeys" : ""}" data-kind="ent" data-id="${id}" style="left:${L.x}px;top:${L.y}px;width:${wOf(L)}px;--cc:${con?.color || "#889"}"${ctx ? ` title="Context: the entity itself is not labeled ${esc(I.lbl[lid]?.name)}, only some of its attributes are"` : ""}>
 <div class="c-rs" title="Drag to change the width; double-click to fit the names"></div><div class="c-head"><div class="c-l1">${role ? `<span class="stereo cube" title="${role === "fact" ? "A fact: one row per its grain" : "A dimension"} (InfoCube)">${CUBE_IC}${ROLE_L[role]}</span>` : `<span class="stereo">${esc(e.stereotype || "Object")}</span>`}<span>${ctx ? "context only" : "in " + esc(con?.name || "–")}</span>${lmark("entity", id)}${noteMark("ent:" + id)}${reqMark("ent", id)}
 <span class="c-tools"><button class="ib" data-act="relate" title="Draw a relationship from this entity">${IC.rel}</button>${tools(L)}</span></div>
@@ -2196,14 +2236,14 @@ ${chip ? `<g class="chip"><circle cx="${g.mid.x}" cy="${g.mid.y}" r="8"/><text x
   if (V.layer !== "rel" && I.cube) {                // InfoCube: logical attribute → dimensional attribute, in the target's concept colour
     for (const m of S.cube.maps) {
       const to = I.attr[m.to]; if (!to) continue;
-      const lc = I.con[I.ent[to.entityId]?.conceptId]?.color || "#889", tc = m.kind === "transform";
+      const lc = I.con[I.ent[to.entityId]?.conceptId]?.color || "#889", tc = m.kind === "transform", lk = m.kind === "lookup";
       m.from.forEach((f, i) => {
         const fa = I.attr[f]; if (!fa) return;
         const a = endOf("ent", fa.entityId, f), z = endOf("ent", to.entityId, m.to); if (!a || !z || a.fr || z.fr) return;
         const g = curve(a, z);
-        map += `<g class="lnk cmap ${m.status}${a.part || z.part ? " part" : ""}${isSel("cmap", m.id) ? " sel" : ""}${act && act.maps.has(m.id) ? " hl" : ""}" data-t="cmap" data-id="${m.id}" style="--lc:${lc}"><title>${esc(attrLabel(f))} → ${esc(attrLabel(m.to))} (dimensional mapping)</title>
+        map += `<g class="lnk cmap ${m.status}${a.part || z.part ? " part" : ""}${isSel("cmap", m.id) ? " sel" : ""}${act && act.maps.has(m.id) ? " hl" : ""}" data-t="cmap" data-id="${m.id}" style="--lc:${lc}"><title>${esc(attrLabel(f))} → ${esc(attrLabel(m.to))} (${lk ? `lookup${I.rel[m.via] ? " through " + esc(relText(I.rel[m.via])) : ""}` : "dimensional mapping"})</title>
 <path class="hit" d="${g.d}"/><path class="s" d="${g.d}"/><circle class="end" cx="${g.p0.x}" cy="${g.p0.y}" r="2.6"/><rect class="cube-end" x="${g.p3.x - 3}" y="${g.p3.y - 3}" width="6" height="6" transform="rotate(45 ${g.p3.x} ${g.p3.y})"/>
-${tc && i === 0 ? `<g class="chip"><circle cx="${g.mid.x}" cy="${g.mid.y}" r="8"/><text x="${g.mid.x}" y="${g.mid.y}">ƒ</text></g>` : ""}</g>`;
+${(tc || lk) && i === 0 ? `<g class="chip"><circle cx="${g.mid.x}" cy="${g.mid.y}" r="8"/><text x="${g.mid.x}" y="${g.mid.y}">${lk ? "L" : "ƒ"}</text></g>` : ""}</g>`;
       });
     }
   }
@@ -2339,7 +2379,7 @@ function insOverview() {
 <p>${ents.length} entit${ents.length === 1 ? "y" : "ies"} and ${srcs.length} source table${srcs.length === 1 ? "" : "s"} on <b>${esc(CV().name)}</b>. The model is shared by ${S.diagrams.length} canvas${S.diagrams.length > 1 ? "es" : ""}. Select anything to see and edit its details here.</p>`;
   if (ents.length) {
     h += `<h3>Mapping coverage</h3><div class="list">` + ents.map(id => {
-      const at = I.attrsOf[id] || [], dim = isDimId(id), mp = at.filter(a => (dim ? I.cube.mTo[a.id] : I.mA[a.id] || []) ?.length).length;
+      const at = I.attrsOf[id] || [], dim = isDimId(id), mp = at.filter(a => isFed(a.id)).length;
       return `<button class="li" data-go="entity:${id}"${dim ? ` title="Attributes fed from the logical model"` : ""}><span class="n">${esc(I.ent[id].name)}</span><span class="bar2"><i style="width:${at.length ? mp / at.length * 100 : 0}%"></i></span><span class="m">${mp} of ${at.length}${dim ? " fed" : ""}</span></button>`;
     }).join("") + `</div>`;
   }
@@ -2416,22 +2456,62 @@ ${tmsg ? `<div class="note warn">${tmsg}</div>` : ""}
 <h3>Reads from the logical model</h3><div class="list">${m.from.map((id, i) => `<div class="li" style="cursor:default"><span class="n mono">${esc(attrLabel(id))}</span>${m.from.length > 1 ? `<button class="ib" data-do="cmap-rm" data-i="${i}" title="Stop reading this attribute">×</button>` : ""}</div>`).join("")}</div>
 <div class="fld"><label for="f-cfrom">Add a logical attribute</label><select id="f-cfrom" data-f="cmap.addfrom"><option value="">Choose an attribute…</option>${attrOptions("")}</select></div>
 <div class="fld"><label for="f-cto">Target attribute</label><select id="f-cto" data-f="cmap.to">${attrOptions(m.to, true)}</select></div>
-<div class="fld"><label>How the value is carried</label>${seg("cmap.kind", m.kind, [["direct", "Direct copy"], ["transform", "Transformation"]])}</div>
-<div class="fld"><label for="f-crule">Transformation rule</label><textarea id="f-crule" class="code" data-f="cmap.rule" ${m.kind === "transform" ? "" : "disabled"} placeholder="e.g. a key lookup, a date key, or plain words">${esc(m.rule)}</textarea></div>
+<div class="fld"><label>How the value is carried</label>${seg("cmap.kind", m.kind, [["direct", "Direct copy"], ["transform", "Transformation"], ["lookup", "Lookup"]])}</div>
+${m.kind === "lookup" ? lookupFields(m) : `<div class="fld"><label for="f-crule">Transformation rule</label><textarea id="f-crule" class="code" data-f="cmap.rule" ${m.kind === "transform" ? "" : "disabled"} placeholder="e.g. a key lookup, a date key, or plain words">${esc(m.rule)}</textarea></div>`}
 <div class="fld"><label>Status</label>${seg("cmap.status", m.status, [["draft", "Draft"], ["review", "In review"], ["approved", "Approved"]])}</div>
 <div class="fld"><label for="f-cnote">Note</label><textarea id="f-cnote" data-f="cmap.note" placeholder="Why this mapping, open questions, who decided">${esc(m.note)}</textarea></div>
 <div class="actions"><button class="btn danger" data-do="del-cmap">Delete mapping</button></div>`;
+}
+/* slice 18: a lookup reads one attribute of a dictionary (its value, e.g. a name) through a relationship of that dictionary */
+function lookupRels(m) { const de = I.attr[m.from[0]]?.entityId; return S.relationships.filter(r => (r.from === de || r.to === de) && r.from !== r.to && !isDimId(r.from) && !isDimId(r.to)); }
+function relText(r) { return `${I.ent[r.from].name} → ${I.ent[r.to].name}${r.label ? ` (${r.label})` : ""}`; }
+function lookupFields(m) {
+  const dict = I.ent[I.attr[m.from[0]].entityId], rels = lookupRels(m), via = I.rel[m.via], other = via && I.ent[via.from === dict.id ? via.to : via.from];
+  const keyA = via && (I.attrsOf[dict.id] || []).find(a => a.isPrimaryKey);
+  return `<div class="fld"><label for="f-cvia">Through relationship</label><select id="f-cvia" data-f="cmap.via"><option value="">Choose a relationship of ${esc(dict.name)}…</option>${rels.map(r => `<option value="${r.id}"${r.id === m.via ? " selected" : ""}>${esc(relText(r))}</option>`).join("")}</select></div>
+${!rels.length ? `<div class="note warn">${esc(dict.name)} has no relationship to another entity. Draw one in the logical model first.</div>` : m.via && !via ? `<div class="note warn">The relationship it went through is gone. Choose another.</div>` : ""}
+<div class="fld"><label for="f-cunk">When no match</label><input id="f-cunk" data-f="cmap.unknown" value="${esc(m.unknown || "")}" placeholder="e.g. Unknown"></div>
+${via ? `<div class="note">Each ${esc(other.name)} row finds its ${esc(dict.name)}${keyA ? ` by ${esc(keyA.name)}` : ""} and takes ${esc(I.attr[m.from[0]].name)}${m.unknown ? `; when the code is empty or has no match, the value is “${esc(m.unknown)}”` : ""}.</div>` : ""}`;
 }
 function cubeAttrSection(a) {
   if (isDimId(a.entityId)) {
     const cms = I.cube.mTo[a.id] || [];
     return `<h3>Comes from the logical model</h3>
-${cms.length ? `<div class="list">${cms.map(m => `<button class="li" data-go="cmap:${m.id}">${statusDot(m)}<span class="n mono">${esc(m.from.map(attrLabel).join(" + "))}</span><span class="m">${m.kind === "transform" ? "ƒ " : ""}${STATUS[m.status]}</span></button>`).join("")}</div>`
+${cms.length ? `<div class="list">${cms.map(m => `<button class="li" data-go="cmap:${m.id}">${statusDot(m)}<span class="n mono">${esc(m.from.map(attrLabel).join(" + "))}</span><span class="m">${m.kind === "transform" ? "ƒ " : m.kind === "lookup" ? "lookup · " : ""}${STATUS[m.status]}</span></button>`).join("")}</div>`
     : `<p>Not fed yet. Drag a logical attribute onto this row, or pick one below.</p>`}
 <div class="fld"><label for="f-addla">Add a logical attribute</label><select id="f-addla" data-f="attr.addlattr"><option value="">Choose an attribute…</option>${attrOptions("")}</select></div>`;
   }
   const cms = I.cube?.mFrom[a.id] || [];
-  return cms.length ? `<h3>Feeds facts and dimensions</h3><div class="list">${cms.map(m => `<button class="li" data-go="cmap:${m.id}">${statusDot(m)}<span class="n mono">${esc(attrLabel(m.to))}</span><span class="m">${m.kind === "transform" ? "ƒ " : ""}${STATUS[m.status]}</span></button>`).join("")}</div>` : "";
+  return cms.length ? `<h3>Feeds facts and dimensions</h3><div class="list">${cms.map(m => `<button class="li" data-go="cmap:${m.id}">${statusDot(m)}<span class="n mono">${esc(attrLabel(m.to))}</span><span class="m">${m.kind === "transform" ? "ƒ " : m.kind === "lookup" ? "lookup · " : ""}${STATUS[m.status]}</span></button>`).join("")}</div>` : "";
+}
+/* slice 18: "Calculated from" in an attribute's panel, both levels */
+function calcSection(a) {
+  const e = I.ent[a.entityId], dimA = isDimId(a.entityId), ed = wsPerm() === "full", c = a.calc, fedW = dimA ? "fed" : "mapped";
+  const users = (I.calcUsers[a.id] || []).map(id => I.attr[id]);
+  const usedBy = users.length ? `<p class="sub" style="margin-top:6px">Used by ${users.map(u => `<button class="pill l" style="display:inline;padding:1px 6px" data-go="attr:${esc(u.id)}">${esc(u.name)}</button>`).join(" ")}</p>` : "";
+  if (!c) return `<h3>Calculated from</h3><p>Not calculated. Mark it when its value is computed from other attributes of ${esc(e.name)}.</p>${ed ? `<div class="actions"><button class="btn sm" data-do="calc-on">Calculate from attributes…</button></div>` : ""}${usedBy}`;
+  const gaps = calcGaps(a), direct = directFed(a.id);
+  const state = !c.from.length ? `<div class="note warn">Choose the attributes it is calculated from.</div>`
+    : gaps.length ? `<div class="note warn">Not covered yet: ${gaps.map(g => esc(I.attr[g].name)).join(", ")} ${gaps.length > 1 ? "are" : "is"} not ${fedW}.</div>`
+    : `<div class="note">Covered: every input is ${fedW}${c.from.some(f => I.attr[f].calc) ? ", directly or through its own calculation" : ""}.</div>`;
+  return `<h3>Calculated from</h3>
+<div class="list">${c.from.map((f, i) => `<div class="li"><button class="n mono" style="all:unset;cursor:pointer;flex:1 1 auto" data-go="attr:${esc(f)}">${esc(I.attr[f].name)}</button><span class="m">${directFed(f) ? fedW : I.attr[f].calc ? "calculated" : "not " + fedW}</span>${ed ? `<button class="ib" data-do="calc-rm" data-i="${i}" title="Stop reading this attribute">×</button>` : ""}</div>`).join("")}</div>
+${ed ? `<div class="actions" style="margin-top:6px"><button class="btn sm" data-do="calc-add">Add inputs…</button></div>` : ""}
+<div class="fld"><label for="f-calc">Rule</label><textarea id="f-calc" class="code calc-rule" data-f="attr.calcrule" ${ed ? "" : "disabled"} placeholder="e.g. ${esc(c.from.map(f => I.attr[f].name).slice(0, 2).join(" * ") || "quantity * unit_price")}">${esc(c.rule)}</textarea></div>
+${state}${direct ? `<div class="note warn">It is also ${fedW} directly. Keep one way to get its value: the calculation or the ${dimA ? "feed" : "mapping"}.</div>` : ""}
+${ed ? `<div class="actions"><button class="btn sm" data-do="calc-off">Stop calculating</button></div>` : ""}${usedBy}`;
+}
+function openCalcPick(btn, a, first) {
+  const r = btn.getBoundingClientRect(), have = new Set(a.calc?.from || []);
+  openPick({at:{x:r.left, y:r.bottom + 4}, multi:true, placeholder:"Type to filter attributes…",
+    title: first ? `Calculate ${a.name} from…` : `Add inputs to ${a.name}`,
+    note: "Attributes of the same entity. One that is calculated from this attribute cannot be chosen.",
+    doneTitle:"Already an input, or calculated from this attribute", empty:"This entity has no other attributes.",
+    items:(I.attrsOf[a.entityId] || []).filter(x => x.id !== a.id).map(x => ({id:x.id, label:x.name, key:x.dataType, done:have.has(x.id) || usesCalc(x.id, a.id)})),
+    confirm: n => n ? `Use ${n}` : "Use",
+    pick: ids => { mutate(() => { const t = S.attributes.find(x => x.id === a.id); t.calc ||= {rule:"", from:[]}; t.calc.from.push(...ids.filter(i => !t.calc.from.includes(i))); });
+      toast(first ? `${a.name} is calculated from ${ids.map(i => I.attr[i].name).join(", ")}. Write its rule.` : `${a.name} reads ${ids.length} more attribute${ids.length > 1 ? "s" : ""}.`, true);
+      if (first) setTimeout(() => $("#f-calc")?.focus(), 30); }});
 }
 function insAttr(a) {
   const ms = I.mA[a.id] || [], e = I.ent[a.entityId];
@@ -2451,6 +2531,7 @@ ${ms.length ? `<div class="list">${ms.map(m => `<button class="li" data-go="map:
     : `<p>Not mapped yet. Drag a source column onto this row, or pick one below.</p>`}
 <div class="fld"><label for="f-addc">Add a source column</label><select id="f-addc" data-f="attr.addcol"><option value="">Choose a column…</option>${colOptions("")}</select></div>
 ${cubeAttrSection(a)}`}
+${calcSection(a)}
 <div class="actions"><button class="btn danger" data-do="del-attr">Delete attribute</button></div>`;
 }
 function insCol(c) {
@@ -2560,7 +2641,7 @@ function renderInspector() {
 function renderStatus() {
   renderNavBar();
   let tot = 0, mp = 0;
-  Object.keys(CV().ent).filter(id => !isDimId(id)).forEach(id => (I.attrsOf[id] || []).forEach(a => { tot++; if ((I.mA[a.id] || []).length) mp++; }));   // logical attributes only
+  Object.keys(CV().ent).filter(id => !isDimId(id)).forEach(id => (I.attrsOf[id] || []).forEach(a => { tot++; if (isFed(a.id)) mp++; }));   // logical attributes only
   const warn = S.mappings.filter(m => !typeCheck(m).ok).length;
   const drafts = S.mappings.filter(m => m.status === "draft").length;
   $("#status").innerHTML = `<span>Mapped attributes on canvas <b>${mp} of ${tot}</b></span><span>Mappings <b>${S.mappings.length}</b>, drafts <b>${drafts}</b></span>
@@ -3063,13 +3144,14 @@ $("#q").addEventListener("input", ev => { V.q = ev.target.value; renderSide(); }
 const ins = $("#ins");
 ins.addEventListener("change", ev => {
   const f = ev.target.dataset.f; if (!f) return; const v = ev.target.value, s = V.sel;
+  if (f === "attr.calcrule") { mutate(() => { S.attributes.find(x => x.id === s.id).calc.rule = v; }); return; }   // slice 18
   if (f === "attr.addlattr") { if (v) createCubeMap(v, s.id); return; }
   if (f === "cube.grain") { mutate(() => { S.cube.ents.find(r => r.entityId === s.id).grain = v.trim(); }); return; }
   if (f === "cube.semi") { mutate(() => { S.cube.measures.find(r => r.attributeId === s.id).semiNote = v.trim(); }); return; }
   if (f.startsWith("cmap.")) { const cm = () => S.cube.maps.find(x => x.id === s.id);
-    if (f === "cmap.rule" || f === "cmap.note") { mutate(() => { cm()[f.slice(5)] = v; }); return; }
+    if (f === "cmap.rule" || f === "cmap.note" || f === "cmap.via" || f === "cmap.unknown") { mutate(() => { cm()[f.slice(5)] = v; }); return; }
     if (f === "cmap.addfrom" && v) { if (cm().from.includes(v)) { toast("It already reads that attribute."); renderInspector(); return; }
-      const was = cm().kind; mutate(() => { const m = cm(); m.from.push(v); if (m.from.length > 1) m.kind = "transform"; });
+      const was = cm().kind; mutate(() => { const m = cm(); m.from.push(v); if (m.from.length > 1) m.kind = "transform"; });   // a lookup with two inputs becomes a transformation too
       toast(`It reads ${attrLabel(v)} too${was === "direct" ? ", so it is a transformation now. Describe the rule" : ""}.`, true);
       if (was === "direct") setTimeout(() => $("#f-crule")?.focus(), 0); return; }
     if (f === "cmap.to" && v) { mutate(() => { cm().to = v; }); toast(`Re-pointed to ${attrLabel(v)}`, true); return; }
@@ -3131,7 +3213,11 @@ ins.addEventListener("click", ev => {
       if (v === "semi") setTimeout(() => $("#f-semi")?.focus(), 0); return; }
     if (k === "cmap.kind") { const m = S.cube.maps.find(x => x.id === s.id);
       if (v === "direct" && m.from.length > 1) { toast("A direct copy reads one attribute. Remove the others first."); return; }
-      mutate(() => { m.kind = v; }); if (v === "transform") setTimeout(() => $("#f-crule")?.focus(), 0); return; }
+      if (v === "lookup" && m.from.length > 1) { toast("A lookup reads one attribute, the dictionary's value. Remove the others first."); return; }
+      const rels = v === "lookup" ? lookupRels(m) : [];
+      mutate(() => { m.kind = v; if (v === "lookup" && !m.via && rels.length === 1) m.via = rels[0].id; });   // one candidate: chosen for you
+      if (v === "transform") setTimeout(() => $("#f-crule")?.focus(), 0);
+      if (v === "lookup") setTimeout(() => $(m.via ? "#f-cunk" : "#f-cvia")?.focus(), 0); return; }
     if (k === "cmap.status") { mutate(() => { S.cube.maps.find(x => x.id === s.id).status = v; }); return; }
     if (k === "map.kind") mutate(() => { S.mappings.find(x => x.id === s.id).kind = v; });
     else if (k === "map.status") mutate(() => { S.mappings.find(x => x.id === s.id).status = v; });
@@ -3190,6 +3276,9 @@ ins.addEventListener("click", ev => {
     toast(`Arranged the canvas into ${n} frames. Undo restores your previous layout.`, true); return; }
   if (a === "goto-dia") { const k = doB.dataset.k, id = s.id; switchDia(doB.dataset.dia); centerOn(k, id); return; }
   if (a === "add-key") { addKey(doB.dataset.rel); return; }
+  if (a === "calc-on" || a === "calc-add") { ev.stopImmediatePropagation(); openCalcPick(doB, I.attr[s.id], a === "calc-on"); return; }   // slice 18
+  if (a === "calc-rm") { const i = +doB.dataset.i; mutate(() => { S.attributes.find(x => x.id === s.id).calc.from.splice(i, 1); }); return; }
+  if (a === "calc-off") { const nm = I.attr[s.id].name; mutate(() => { delete S.attributes.find(x => x.id === s.id).calc; }); toast(`${nm} is no longer calculated.`, true); return; }
   if (a === "del-cmap") { mutate(() => { S.cube.maps = S.cube.maps.filter(x => x.id !== s.id); V.sel = null; }); toast("Mapping deleted", true); return; }
   if (a === "cmap-rm") { const i = +doB.dataset.i; mutate(() => { S.cube.maps.find(x => x.id === s.id).from.splice(i, 1); }); return; }
   if (a === "del-map") { mutate(() => { S.mappings = S.mappings.filter(x => x.id !== s.id); V.sel = null; }); toast("Mapping deleted", true); }
@@ -3197,7 +3286,7 @@ ins.addEventListener("click", ev => {
   else if (a === "swap-rel") mutate(() => { const r = S.relationships.find(x => x.id === s.id);
     [r.from, r.to, r.fromMin, r.fromMax, r.toMin, r.toMax, r.fromRole, r.toRole] = [r.to, r.from, r.toMin, r.toMax, r.fromMin, r.fromMax, r.toRole, r.fromRole];
     if (!r.fromRole) delete r.fromRole; if (!r.toRole) delete r.toRole; });
-  else if (a === "del-attr" && moduleDependents("attr", s.id).length) askDeleteAttr(s.id);
+  else if (a === "del-attr" && (moduleDependents("attr", s.id).length || (I.calcUsers[s.id] || []).length)) askDeleteAttr(s.id);
   else if (a === "del-attr") { const n = (I.mA[s.id] || []).length, e = I.attr[s.id].entityId;
     mutate(() => { S.attributes = S.attributes.filter(x => x.id !== s.id); S.mappings = S.mappings.filter(m => m.attributeId !== s.id); V.sel = {t:"entity", id:e}; });
     toast(`Attribute deleted${n ? ` together with ${n} mapping${n > 1 ? "s" : ""}` : ""}`, true); }
@@ -3396,7 +3485,7 @@ function misfits(f) {
 function frameStats(f) {
   const ms = members(f), ids = new Set(); let at = 0, mp = 0, cols = 0, used = 0;
   ms.forEach(([k, id]) => {
-    if (k === "ent") (I.attrsOf[id] || []).forEach(a => { at++; const m = I.mA[a.id] || []; if (m.length) mp++; m.forEach(x => ids.add(x.id)); });
+    if (k === "ent") (I.attrsOf[id] || []).forEach(a => { at++; const m = I.mA[a.id] || []; if (isFed(a.id)) mp++; m.forEach(x => ids.add(x.id)); });
     else I.src[id].columns.forEach(c => { cols++; const m = I.mC[c.id] || []; if (m.length) used++; m.forEach(x => ids.add(x.id)); });
   });
   let warn = 0, draft = 0; ids.forEach(mid => { const m = I.map[mid]; if (!typeCheck(m).ok) warn++; if (m.status === "draft") draft++; });
@@ -4537,7 +4626,7 @@ function renderHome() {
   const box = $("#home"); box.hidden = !V.home; if (!V.home) return;
   const p = curProj(), cs = projCanvases(p);
   const ents = new Set(), srcs = new Set(); cs.forEach(d => { Object.keys(d.ent).forEach(x => ents.add(x)); Object.keys(d.src).forEach(x => srcs.add(x)); });
-  let at = 0, mp = 0; ents.forEach(id => (I.attrsOf[id] || []).forEach(a => { at++; if ((I.mA[a.id] || []).length) mp++; }));
+  let at = 0, mp = 0; ents.forEach(id => (I.attrsOf[id] || []).forEach(a => { at++; if (isFed(a.id)) mp++; }));
   const notes = []; cs.forEach(d => (d.notes || []).forEach(n => { if (!n.resolved) notes.push([d, n]); }));
   const lbls = projLabels(p), rqs = projReqs(p), rqDone = rqs.filter(r => reqCoverage(r.id).done).length;
   const tiles = cs.map(d => { const n = Object.keys(d.ent).length + Object.keys(d.src).length, also = S.projects.filter(x => x.id !== p.id && x.canvasIds.includes(d.id));
@@ -4666,15 +4755,19 @@ function reqScope(rid) {
     else if (k.t === "src") sc.srcs.add(k.id);
     else if (k.t === "col") { sc.cols.add(k.id); sc.srcs.add(I.colSrc[k.id]); } });
   sc.up = new Set(); sc.cmaps = new Set();                       // InfoCube: logical attributes feeding scope attributes, and their sources
-  if (I.cube) [...sc.attrs].forEach(a => (I.cube.mTo[a] || []).forEach(cm => { sc.cmaps.add(cm.id);
+  [...sc.attrs].forEach(a => (I.attr[a]?.calc?.from || []).forEach(f => { if (sc.attrs.has(f)) return; sc.up.add(f);    // slice 18: a calculation's inputs
+    (I.mA[f] || []).forEach(m => { sc.maps.add(m.id); sc.cols.add(m.columnId); sc.srcs.add(I.colSrc[m.columnId]); }); }));
+  if (I.cube) [...sc.attrs, ...sc.up].forEach(a => (I.cube.mTo[a] || []).forEach(cm => { sc.cmaps.add(cm.id);
     cm.from.forEach(f => { if (sc.attrs.has(f)) return; sc.up.add(f); sc.ents.add(I.attr[f].entityId);
       (I.mA[f] || []).forEach(m => { sc.maps.add(m.id); sc.cols.add(m.columnId); sc.srcs.add(I.colSrc[m.columnId]); }); }); }));
   return sc;
 }
 /* covered: a logical attribute by an approved, type-correct mapping; a dimensional one by an approved feed whose inputs are all covered */
 const srcOk = a => (I.mA[a] || []).some(m => m.status === "approved" && typeCheck(m).ok && !I.col[m.columnId]?.missingSince);
-const attrOk = a => isDimId(I.attr[a]?.entityId) ? (I.cube.mTo[a] || []).some(cm => cm.status === "approved" && cm.from.every(srcOk)) : srcOk(a);
-const attrFed = a => isDimId(I.attr[a]?.entityId) ? !!(I.cube.mTo[a] || []).length : !!(I.mA[a] || []).length;
+const attrOk0 = a => isDimId(I.attr[a]?.entityId) ? (I.cube.mTo[a] || []).some(cm => cm.status === "approved" && cm.from.every(srcOk)) : srcOk(a);
+const attrOkR = (a, seen) => attrOk0(a) || (!seen.has(a) && !!I.attr[a]?.calc?.from.length && (seen.add(a), I.attr[a].calc.from.every(f => attrOkR(f, seen))));   // slice 18: through a calculation
+const attrOk = a => attrOkR(a, new Set());
+const attrFed = a => isFed(a);
 function reqCoverage(rid) {
   const sc = reqScope(rid), attrs = [...sc.attrs];
   const ok = attrs.filter(attrOk);
@@ -5882,7 +5975,8 @@ document.addEventListener("click", ev => {
 /* X-3: deleting an attribute asks first only when a module depends on it */
 function askDeleteAttr(id) {
   const a = I.attr[id], e = I.ent[a.entityId], n = (I.mA[id] || []).length;
-  const rows = [...(n ? [[`${n} mapping${n === 1 ? "" : "s"} from sources`, "deleted"]] : []), ...moduleDependents("attr", id)];
+  const cu = (I.calcUsers[id] || []).map(u => I.attr[u].name);
+  const rows = [...(n ? [[`${n} mapping${n === 1 ? "" : "s"} from sources`, "deleted"]] : []), ...(cu.length ? [[`${cu.length === 1 ? "The calculation" : cu.length + " calculations"} of ${cu.join(", ")}`, "loses this input"]] : []), ...moduleDependents("attr", id)];
   showModal(`${e.name} · attribute`, `Delete ${a.name}?`,
     `<p>Other parts of the model depend on it. You can undo it right after.</p>
 <table><tr><th>What</th><th>What happens</th></tr>${rows.map(([x, y]) => `<tr><td>${esc(x)}</td><td>${esc(y)}</td></tr>`).join("")}</table>`,

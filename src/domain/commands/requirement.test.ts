@@ -391,13 +391,13 @@ describe("links of deleted model elements", () => {
 
   it("an entity takes the links on itself, its attributes and their mappings", () => {
     const r = ok(
-      deleteEntity(makeCtx(), owner, { ...targets, entity: entity(), relationships: [], mappingInputs: [mappingInput()], canvasItems: [canvasItem()], requirementLinks: links }, { entityId: ids.customer, expectedVersion: 1 }),
+      deleteEntity(makeCtx(), owner, { ...targets, entity: entity(), relationships: [], mappingInputs: [mappingInput()], attributeInputs: [], canvasItems: [canvasItem()], requirementLinks: links }, { entityId: ids.customer, expectedVersion: 1 }),
     );
     check(r.writeSet, [ids.reqLink1, ids.reqLink2, ids.reqLink3]);
   });
 
   it("an attribute takes the links on itself and its mappings", () => {
-    const r = ok(deleteAttribute(makeCtx(), owner, { attribute: attribute(ids.email), mappings: [mapping()], mappingInputs: [mappingInput()], requirementLinks: links }, { attributeId: ids.email, expectedVersion: 1 }));
+    const r = ok(deleteAttribute(makeCtx(), owner, { attribute: attribute(ids.email), mappings: [mapping()], mappingInputs: [mappingInput()], attributeInputs: [], requirementLinks: links }, { attributeId: ids.email, expectedVersion: 1 }));
     check(r.writeSet, [ids.reqLink2, ids.reqLink3]);
   });
 

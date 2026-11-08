@@ -2,6 +2,7 @@
 // and the domain, which places cards itself when it opens a live canvas (slice 3b). Never measured from the DOM.
 
 import type { RowFilter } from "../types";
+import { rowCounts } from "./derivations";
 import { CARD_HEADER_HEIGHT } from "./frames";
 
 /** Row height and body padding (prototype R, PAD); the header height is `CARD_HEADER_HEIGHT` (D-05). */
@@ -15,15 +16,18 @@ export interface FilterableRow {
   fk: boolean;
   bk: boolean;
   relevant?: boolean;
+  /** Slice 18: a calculated row's square, "ok" when every input counts; such a row counts as mapped. */
+  calc?: { square?: "ok" | "gap" };
 }
 
 /** Whether a row shows under a row filter (prototype rowsOf; `labeled`: the relevant rows of a live canvas, slice 3b). */
 export function rowShown(row: FilterableRow, filter: RowFilter): boolean {
   switch (filter) {
+    // slice 18 (F1): a row counted through its calculation is mapped, as its filled square says
     case "mapped":
-      return row.mappings > 0;
+      return rowCounts(row);
     case "unmapped":
-      return row.mappings === 0;
+      return !rowCounts(row);
     case "keys":
       return row.pk || row.fk || row.bk;
     case "labeled":
