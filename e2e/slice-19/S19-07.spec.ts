@@ -4,10 +4,18 @@
 // existing elements: no element more on a card (AD-24).
 
 import { expect, test } from "./fixtures";
-import { canvasCommits, card, emptySpot, openStar, roleOf, settledCommits, signInAs } from "./helpers";
+import { SEED_USERS } from "../../src/data/local/seed";
+import { updateCubeEntity } from "../../src/modules/infocube/domain/commands";
+import { asCube, canvasCommits, card, cubeRow, emptySpot, openStar, roleOf, settledCommits, signInAs, typeEntity } from "./helpers";
 import { miniatureCommits } from "../slice-03b/helpers";
 
 test("S19-07: the star with its types does not commit while idle or panned; a chip adds no element", async ({ page }) => {
+  // Fact Orders an accumulating, factless aggregate (test data): its chip is the longest one, "Fact · Accumulating ·
+  // Factless · Aggregate"
+  for (const change of [{ factType: "accumulating" as const }, { isFactless: true }]) {
+    const row = (await cubeRow(typeEntity("orders")))!;
+    await asCube(SEED_USERS.lukasz.id, (ctx, access) => updateCubeEntity(ctx, access, { cube: row }, { cubeEntityId: row.id, expectedVersion: row.version, ...change }));
+  }
   await signInAs(page, "Łukasz");
   await openStar(page);
   await expect(roleOf(page, "Dim Category")).toHaveText("Dimension · Outrigger");
@@ -28,6 +36,16 @@ test("S19-07: the star with its types does not commit while idle or panned; a ch
   await page.waitForTimeout(1000);
   expect(await canvasCommits(page), "canvas commits after a pan").toBe(canvas);
   expect(await miniatureCommits(page), "miniature commits after a pan").toBe(mini);
+
+  // a long chip on the default width is cut with "…", the concept text first, and the header line still fits (Q7, F11)
+  const fact = page.locator(".react-flow__node").filter({ has: page.getByTestId("card-name").getByText("Fact Orders", { exact: true }) });
+  const cut = await fact.locator(".c-l1").evaluate((l1) => {
+    const role = l1.querySelector<HTMLElement>('[data-testid="card-role"]')!;
+    const concept = role.nextElementSibling as HTMLElement;
+    return { cut: role.scrollWidth > role.clientWidth, concept: concept.offsetWidth, fits: l1.scrollWidth <= l1.clientWidth };
+  });
+  expect(cut).toEqual({ cut: true, concept: 0, fits: true });
+  await expect(roleOf(page, "Fact Orders")).toHaveAttribute("title", "Accumulating snapshot fact, factless, aggregate of Fact Sales (InfoCube)");
 
   // each chip is the one span a plain fact's is, its text and the cube's ::before only: no element more
   for (const name of ["Fact Orders", "Dim Category", "Dim Order Flags", "Dim Product", "Fact Sales"]) {
