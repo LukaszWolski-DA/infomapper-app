@@ -474,3 +474,13 @@ test's own wait, `await (await renamed).finished()` (`e2e/slice-13/S13-09.spec.t
 It looks like a race in the test's wait on the answer's body, not a bug of the slice, but the counts are small. Proposed
 (a question for Łukasz): in step 3, replace `finished()` with the page showing the rename's version (`data-version` on
 the name field, as the next line already waits for), and keep watching S13-09 in step 3's checks.
+
+## Łukasz's answers to step 2 (8 November 2026)
+
+1. **S13-09:** in step 3 it waits for the page to show the rename's version instead of `response.finished()`, its
+   assertions unchanged; keep watching it and report it if it fails again.
+2. **Four-eyes after a relationship's delete:** unchanged. Whoever chooses the lookup's new relationship becomes its
+   last content editor (the relationship is content, `CUBE_MAPPING_LOG`).
+3. **The rule** is its own command, `setCalculationRule`, undo name "Change calculation rule".
+4. **The schema check** against Postgres runs for this branch before step 3: `schema.yml` has no manual start, and the
+   E2E workflow starts on a pull request only when the label `full-e2e` is added, so a draft pull request runs it.
