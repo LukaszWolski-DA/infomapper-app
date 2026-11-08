@@ -566,3 +566,171 @@ S18-01, S18-04, S18-05, S18-07 and S18-08 come in step 4.
   the delete button, after the module's sections, and the app's Copies section is not in the prototype.
 - **A cancelled picker writes nothing** (prototype). A calculated attribute with no inputs arises only from × or an
   input's delete.
+
+## Step 4: coverage and dependents, the close (8 November 2026)
+
+### What changed
+
+- **Every count agrees with the row's square** (item 2, F1; Łukasz's condition for step 4). One rule in the domain:
+  `rowCounts(row)` (a mapping or feed, or the filled square) and `countsAsMapped(index, direct)` in
+  `src/domain/model/derivations.ts`.
+  - **The card:** its count (`CardData.mapped` in `buildCards`), the Mapped and Not mapped row filters (`rowShown` in
+    `card-size.ts`), and so the card's height.
+  - **What reads the card:** the frames' stats and the collapsed frames' blocks read `CardData.mapped`.
+  - **The thumbnails:** `thumbnailIndex` gives a calculated row the same square.
+  - **The panels and homes:** the Overview, the status bar and the project home (`stats.ts` `coverage`, with
+    `ModelIndex.derivations`, built once per model). The entity panel's list says "calculated" for a calculated
+    attribute without a mapping or feed of its own.
+  - **Requirement coverage** follows the calculation by D-31's rule (step 2, F2). It counts an input only when it is
+    *covered*: an approved mapping without a type conflict. So a draft mapping behind every input fills the square
+    without covering the requirement, as for any mapped row. The requirement panel's gap reason says "an input of its
+    calculation is not covered".
+- **Focus on an attribute** (item 3, F10, answer Q-A) lights its calculation's inputs and the attributes calculated from
+  it, one level. That means their source mappings with their tables, and the logical cards that feed any of them
+  (`targetLit`'s `feeds`). So the dimensional lines between lit cards light by 15c's rule. No row is marked.
+- **The delete previews** (F12, F14):
+  - **An input:** its second click adds "the calculation of {x} loses this input" (in the panel and the row's menu).
+  - **A relationship with a lookup through it:** it asks a second click in its panel and in its line's menu: "Click
+    again to delete; the lookup of Dim Customer.country_name loses its relationship" (`ModuleView.relationshipDeletes`).
+    Without a lookup it goes at once, as before. The Delete key on such a relationship deletes nothing and says where to
+    (below, a new text).
+  - **An entity's delete preview** counts the lookups through the relationships it takes along: "1 lookup – loses its
+    relationship".
+- **A gone relationship:** the lookup's panel shows "The relationship it went through is gone. Choose another." first,
+  and below it the "no relationship" warning when the dictionary has no other one (S18-07 found the second alone).
+- **The lens** colours a calculation's inputs, at any depth, by their own coverage (`scope.inputs`), as it colours a
+  feed's logical inputs.
+- **The bench:** `scripts/bench-requirement-index.ts` with 500 calculated attributes of two inputs each.
+
+### New specs (`e2e/slice-18/`)
+
+| File | Criterion |
+| --- | --- |
+| `S18-01.spec.ts` | A format-13 file (slice 17's: no calculation columns, no `attribute_input`, InfoCube's rows without the lookup columns) is upgraded to 14 on its first read, rows and counts unchanged. InfoCube's rows are read with the two columns null and saved as before. A calculation and a lookup's value survive a reload, an undo and a redo. |
+| `S18-04.spec.ts` | Fact Sales 8/9 on its card and "8 of 9 fed" in the Overview, net_amount's square filled with its title. With discount_pct's feed deleted: 6/9, the square hollow, "Not yet: discount_pct is not fed.". REQ-210 covers net_amount only with approved source mappings behind its three inputs, and loses it again when one input's feed goes. The logical level: Customer's full_name calculated from first_name and last_name counts on the card and in the status bar, shows under Mapped and not under Not mapped. With last_name's mapping deleted, both counts are one lower. |
+| `S18-05.spec.ts` | Focus on net_amount lights Fact Sales and Order Line and the dimensional lines between them; Focus on an input lights the feeds of the attribute calculated from it. An input's delete names the calculation, the calculation loses it, one undo restores both. |
+| `S18-07.spec.ts` | The Country – Customer Address relationship's second click names the lookup. After the delete the approved lookup is in review with the relationship's id, and its panel says the relationship is gone. One undo restores the relationship and the approval. A relationship without a lookup is deleted at once. |
+| `S18-08.spec.ts` | A calculated row has exactly one element more than an ordinary row (its "=" mark), and its square is a class on the dot. |
+
+With step 3's S18-02, S18-03 and S18-06: every criterion has its spec. S18-08's other parts are the runs below.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: 153 files, 1,868 tests, all passed.
+- **Locally:** `e2e/slice-18`, 15 tests, all passed (S18-04's and S18-07's first local run had two failures, both
+  mine: a table name in the spec, and the "gone" note's order above).
+- **The element guard** (`S3B-15-elements.spec.ts`, measurement build, against slice-08's counts): the viewports are
+  **equal** (4,508 / 19,305 / 1,465 / 4,907). The page totals are 6,001 / 20,798 / 2,868 / 6,310, slice 17's own.
+  "Performance test" has no calculation.
+- **The commit counts** while idle and panned (S2C-12, S3A-14-idle, S3B-15-idle) passed in the full run.
+- **The requirement index bench** (30 builds): 26.6 ms median without, 28.7 ms with 1,500 feeds (+8 %, bar +25 %),
+  28.0 ms with 500 calculations (**+5 %, bar +10 %**).
+- **The schema check** on Postgres: passed on `c9b3a50` (step 3). The migration has not changed since.
+
+### The full run on the final commit
+
+[Run 42476513372](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42476513372), commit `813f70f` (the last
+code commit; the commits after it change only Markdown in `docs/`, shown by `git diff --stat 813f70f..HEAD`):
+
+| Wall-clock | Parts' times (1–7, min) | Heap peaks (1–7, MB, limit 8,039) | Passed | Failed | Skipped | Flaky | Expected failures |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| 15.0 min | 11.1, 7.8, 9.5, 7.5, 8.8, 5.3, 13.4 | 1,161, 1,256, 1,194, 1,294, 1,091, 1,349, 1,095 | 666 | 0 | 4 | 0 | 0 |
+
+- No part's server restarted, and at least 9,111 MB was available.
+- S13-09 passed in it. It waits for the page to show the rename's version, not `response.finished()` (answer 1).
+
+### Earlier tests changed, and why
+
+- `e2e/slice-13/S13-09.spec.ts` (step 3; Łukasz, step 2 answer 1): it waits for the page to show the rename's version
+  (`data-version`) instead of `response.finished()`, which once never resolved while the server had answered in 82 ms.
+  Its assertions are unchanged.
+- `tests/infocube-star.test.ts`: the module view without InfoCube compares the whole empty `ModuleView`, which has the
+  new field `relationshipDeletes: {}`.
+- Step 2's test fixtures and unit tests that build a `WorkspaceModel`, an attribute or a delete's state gained the new
+  empty fields (`attributeInputs: []`, `is_calculated: false`, `calc_rule: null`); no assertion changed.
+
+### New user-facing texts (not in step 1's list, for approval)
+
+| Where | Text |
+| --- | --- |
+| The Delete key on a relationship with a lookup through it (it deletes nothing) | **Delete it from its menu or its panel: the lookup of {target} loses its relationship.** |
+| An entity's delete preview | **{n} lookup(s) – loses its relationship / lose their relationship** (step 1 said "lose their relationship" for any number) |
+| The entity panel's list, a calculated attribute without a mapping or feed | **calculated** |
+
+### D-73 (as in `docs/decisions.md`, for approval)
+
+> **D-73** Derivations (slice 18). An attribute, logical or dimensional, may be calculated from other attributes of the
+> same entity, in order, with a plain-text rule; it is calculated or not, and may be left with no inputs. The picker
+> never offers the attribute itself, an input it has, or an attribute calculated from it at any depth, and no write or
+> undo makes a cycle. It counts as mapped (logical) or fed (dimensional) when it is, or when it has inputs and every
+> input counts, recursively, cycles excluded; every place that shows a row as mapped or fed says so the same way: the
+> row's square (filled when every input counts, hollow otherwise), the card's count, the Mapped and Not mapped filters,
+> the frames, the Overview, the status bar, the project home and the thumbnails. A requirement's item that is calculated
+> is covered when every input is covered by D-31's rule ("an input of its calculation is not covered" otherwise), and
+> the calculation's inputs, at any depth, join its scope and the lens. A calculation and a mapping or feed of its own may
+> coexist; the panel warns. The row shows "=" with the rule as its title. Focus on an attribute also lights its inputs'
+> and users' mappings and lines, one level. Deleting an input removes it from the calculations that read it, in the same
+> undo step; its second click names them. A dimensional mapping may be a Lookup: one attribute of a dictionary, read
+> through a logical relationship of the dictionary's entity (chosen for you when there is one), with an optional value
+> for no match; two inputs refuse it and a second input makes it a transformation. A change of its kind, relationship or
+> no-match value sends an approved lookup back to review; a note alone does not. Deleting the relationship keeps the
+> lookup and the relationship's id, so its panel says the relationship is gone, sends an approved lookup back to review
+> in the same undo step, and asks a second click that names the lookups; an entity's delete preview counts them. Its
+> line's chip is "L" and panels list it as "lookup ·". "Covered" stays D-31's word: the section says "Every input is
+> mapped." or "Not yet: … not mapped.". Accepted by Łukasz, 8 November 2026.
+
+D-31 ends with "(Changed by D-73: a calculated attribute is covered when every input is.)".
+
+### The docs
+
+- `docs/decisions.md`: D-73 and the note on D-31.
+- `docs/data-model-v2.md`: `attribute`'s two columns, `attribute_input`, `cube_mapping`'s kind and two columns, and
+  section 11's rule.
+- `docs/ideas.md`: "Derivations: done in slice 18", with what comes later.
+- `docs/inventory-prototype-vs-app.md`: present, and the deliberate differences.
+- `README.md`: the status and slice 18's paragraph.
+- `CLAUDE.md`:
+  - the status;
+  - the extension points `TableRules.defaults`, `follows` and `ModuleView.relationshipDeletes`;
+  - the Derivations notes;
+  - slice 18's helpers.
+
+### Manual acceptance
+
+**On the demo** (`npm run demo -- --reset`, http://127.0.0.1:3001; it never touches `.data/dev-db.json`):
+
+1. Open "Sales star". Check these:
+   - Fact Sales reads 8/9.
+   - net_amount has "=" and a filled square; their titles name the rule and the inputs.
+   - The Overview says "8 of 9 fed".
+2. Open net_amount's panel. Check "Calculated from":
+   - its three inputs, each "fed";
+   - its rule;
+   - "Every input is fed.".
+
+   Then remove unit_price with ×: the square stays filled, and the count stays 8/9. Undo.
+3. Delete Fact Sales.discount_pct's feed (its line's menu): Fact Sales reads 6/9, net_amount's square is hollow, and its
+   panel says "Not yet: discount_pct is not fed.". Undo.
+4. Open Dim Customer.country_name's line: chip "L". Its panel shows Lookup, "Country → Customer Address (locates)",
+   "Unknown" and the sentence. Switch to Direct copy and back: the fields stay.
+5. Open the Country – Customer Address relationship and click "Delete relationship" twice: the second click names the
+   lookup. The lookup's panel now says the relationship is gone. Undo: both come back.
+6. Focus on net_amount: Fact Sales, Order Line and their lines stay lit.
+
+**In KB** (Łukasz's `.data/dev-db.json`):
+- The backup taken before step 2 is `.data/backups/dev-db-20261108-1021.json`, also `kb-model-latest.json`.
+- The first read on this branch upgrades the file to format 14. Back on `main` (format 13) the app refuses the newer
+  file: restore the backup there, or merge first.
+
+1. On a logical entity, "Calculate from attributes…" with two of its attributes and a rule. Its row shows "=". The
+   card's count and the status bar count it when its inputs are mapped.
+2. On DimBuilding's AssetCategory, create a mapping from AssetCategory.AssetCategoryName, and choose Lookup:
+   - "Through relationship": Building → AssetCategory, chosen for you if it is AssetCategory's only one;
+   - "When no match": "Unbekannt";
+   - the sentence reads "Each Building row finds its AssetCategory by AssetCategoryCode and takes AssetCategoryName;
+     …".
+3. Remove the duplicated codes in Building by hand (`AssetCategoryCode` and `FacilityTypeCode`, each twice since slice
+   17).
+
+The branch is not merged. Draft pull request [#45](https://github.com/LukaszWolski-DA/infomapper-app/pull/45) is the one
+for the merge, on Łukasz's command, with the tag `slice-18`.
