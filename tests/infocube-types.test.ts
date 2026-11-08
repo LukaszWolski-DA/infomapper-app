@@ -195,10 +195,10 @@ describe("an older row's upgrade (F1)", () => {
 
 describe("slice 19's demo (item 8, answer 6)", () => {
   it("makes Fact Orders an aggregate, Dim Category an outrigger, Dim Order Flags junk and Dim Product a snapshot, once", async () => {
-    const { addFullDemoData, addInfoCubeTypesDemoData } = await import("@/compose/seed");
+    const { addTypesDemoData, addInfoCubeTypesDemoData } = await import("@/compose/seed");
     const { typeContext, cubeTitle, tabMeta } = await import("@/modules/infocube/domain/view");
-    const db = buildSeed() as never as Parameters<typeof addFullDemoData>[0] & { cube_entity: CubeEntity[] };
-    expect(addFullDemoData(db)).toBe(true);
+    const db = buildSeed() as never as Parameters<typeof addTypesDemoData>[0] & { cube_entity: CubeEntity[] };
+    expect(addTypesDemoData(db)).toBe(true);
     expect(addInfoCubeTypesDemoData(db)).toBe(false);
     const rows = db.cube_entity.filter((c) => c.workspace_id === WS);
     const x = typeContext(rows, db.relationship.filter((r) => r.workspace_id === WS), db.entity.filter((e) => e.workspace_id === WS));
