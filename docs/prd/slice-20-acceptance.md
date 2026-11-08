@@ -1019,7 +1019,12 @@ measurement build is from `dda8ac8`, and only specs, the script and docs changed
      check";
    - undo from the home.
 6. **On a measure with a mark:** to see "!" before Σ, give Fact Sales two attributes of one name.
-7. **KB:**
-   - its home's section and counts (step 2's count: 6 no copied key and 18 fact hints, on the older backup);
-   - a canvas's count and marks;
-   - the two duplicate names of slice 17, if they are still there.
+7. **KB** (step 4's count on a copy of the new backup `.data/backups/dev-db-20261108-2244.json`, also
+   `kb-model-latest.json`; read only, counts only):
+   - `.data/dev-db.json` was last written at 09:59 on 8 November, so the counts equal step 2's;
+   - W4 (29 entities, 190 attributes, 32 relationships, InfoCube on): **24 lines, 6 "Relationships without a copied key"
+     and 18 "Facts to check"**, all in its one project (P1, all 29 entities on its canvases);
+   - W1 to W3 have none;
+   - in the app: the home's section shows 24 with those two groups; a canvas's count and the many sides' headers are
+     grey (no High line); a fact's box says "{n} hints in the Fact section below.";
+   - slice 17's two duplicate names are not in this file (no "Duplicate attribute names" group).
