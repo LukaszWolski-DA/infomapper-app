@@ -293,3 +293,25 @@ One step, as the PRD says, in small commits (KB backed up first):
 7. **The close:** the docs (D-72 and D-46's note, `ideas.md` with its two entries done and section 8's as later,
    `inventory-prototype-vs-app.md`, README, CLAUDE.md), S17-07, lint, typecheck, unit tests, the slice's and the touched
    specs as single-file checks, then one full run on the final commit. Then stop with the manual acceptance steps.
+
+## Łukasz's answers to step 1 (8 November 2026)
+
+- **Z1:** yes, the Cube tab's New fact and New dimension always open the picker.
+- **Z2:** yes, the item in a card header's, a row's and a mapping line's menus, with the text "Link to requirements…"
+  (the panel button's). The prototype keeps its old text; that is fine.
+- **Z3:** yes, one undo step "Show row". A row filter is reset only when it hides the row (the PRD), not any filter. A
+  card in a collapsed frame stays in its block, the row selected with its panel (F13).
+- **Z4:** notes pinned to a frame keep their place on a left or top resize (D-20); their offset is corrected in the
+  same step.
+- **Z5:** first answered "find the row by name at click time", on the condition that attribute names are unique within
+  an entity. **They are not** (step 2 checked before any code): `addAttribute` always names a new attribute
+  `new_attribute` and checks nothing, `pasteAttribute` only warns (`nameTaken`), no rule or index makes them unique, and
+  Łukasz's KB had 2 duplicated names out of 258 attributes (both in Kanton Basel's Building: `AssetCategoryCode` and
+  `FacilityTypeCode`, each twice). **Final answer: the attribute ids in the tree** (F11), the row selected by the
+  matched attribute's id; the payload reported as one number (step 2). No uniqueness rule in this slice; the duplicates
+  go into `ideas.md` under the model validator.
+- **Z6:** yes, the handle at full detail only, scaled with the card.
+- **Z7:** the texts and D-72's draft are approved as written.
+- **Z8:** yes, one full run, on the final commit before the merge.
+- **Docs:** the PRD's sentence about a requirement card's double-click goes (it describes the prototype), and its
+  section 3 says Q1–Q7.

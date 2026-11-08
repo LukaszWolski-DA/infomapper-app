@@ -36,8 +36,8 @@ criterion, it says so and proposes the full path for that item or drops it.
    colour from the card's nearer side to the pointer and lights the target under the pointer; dropping on an attribute
    row, an entity card (both levels), a mapping line, a table card or a column row links the requirement to it (the same
    targets and command as a drop from the left panel, slice 4b-2), one undo step. Dropping elsewhere links nothing and
-   says where to drop; Escape cancels. A drag anywhere else on the card still moves it; a double-click still opens its
-   description. No multi-row selection on the canvas.
+   says where to drop; Escape cancels. A drag anywhere else on the card still moves it. No multi-row selection on the
+   canvas.
 3. **A found attribute shows its row.** A click on an entity found through one of its attributes in the object
    browser's search (the row with the hint "attribute {name}") does what a click on an entity does today (centred when
    its card is on the canvas, otherwise placed on this canvas in a free spot) and then selects the attribute's row (a
@@ -70,7 +70,7 @@ criterion, it says so and proposes the full path for that item or drops it.
 Stop after each step; wait for Łukasz. A new session starts only at a step's boundary, reading CLAUDE.md, this PRD and
 the acceptance doc.
 
-1. **Check and plan.** Answer Q1–Q6 in `slice-17-acceptance.md`; list the prototype's differences the slice touches;
+1. **Check and plan.** Answer Q1–Q7 in `slice-17-acceptance.md`; list the prototype's differences the slice touches;
    confirm the light-path criteria per item; propose every new UI text. Copy the prototype. No application code.
 2. **Build, test, close.** Items 1 to 5; the slice's specs and the earlier specs each item touches, CI; the element guard
    (section 5); the docs and D-72's text quoted for approval; then **one full run** on the final commit (the run before

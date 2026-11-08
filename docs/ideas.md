@@ -126,7 +126,9 @@ check across the model would report what does not fit:
 - a relationship with no copied key on its "many" side;
 - a copy whose original is deleted ("reference lost");
 - a foreign key flag without a copy;
-- keys copied in the wrong direction (from the "many" side to the "one" side).
+- keys copied in the wrong direction (from the "many" side to the "one" side);
+- duplicate attribute names within an entity (adding and pasting allow them; 2 of 258 in Łukasz's KB on 8 November
+  2026, slice 17 step 2).
 
 The results as a list in a panel, each linking to the place; later a mark on the card rows (an element guard and a
 measurement). The validator reads only; it changes nothing.
@@ -280,7 +282,10 @@ A requirement with parts (“Broken down into REQ-102”) could be covered when 
 well as) through its own links: e.g. a business need covered when its data requirements are. Today a requirement's
 coverage counts only its own items (D-31). Option C of the entity-level idea above; changes D-31.
 
-## “Link all attributes” in an entity panel (slice 4b-1, step 8)
+## “Link all attributes” in an entity panel (slice 4b-1, step 8): done in slice 17
+
+**Done in slice 17** (D-72): “Link all attributes…” in an entity panel's Requirements section, one undo step.
+
 
 Since slice 4b-1 a link to an entity is one item, not its attributes (D-31). An entity panel's Requirements section
 could offer “Link all attributes” to link a requirement to each of the entity's attributes in one step (one undo step),
@@ -776,7 +781,23 @@ does) or with a `ResizeObserver`, and check with a phase trace that a panel swit
 ## InfoMapper's canvas and menus: what comes later (slice 16, PRD section 9)
 
 - **Dragging canvas tabs** to reorder them (slice 16 moves them from the tab's menu).
-- **"Add attribute" from an attribute row's menu**, inserted below that row.
+- **"Add attribute" from an attribute row's menu**, inserted below that row. **Done in slice 17** (D-72): "Add
+  attribute below".
 - **A third switch for dimensional relationships** on their own (InfoCube); "Between entities" covers both levels.
 - **From slice 15d's closing:** a mapping from a column missing from the source says "not approved" in the requirement
   panel, though the mapping is approved: a reason of its own, as "type conflict" now.
+
+## Modelling ergonomics: what comes later (slice 17, PRD section 8 and step 2)
+
+- **"New concept…" inside the concept picker:** creating a concept and an entity in one step.
+- **X1:** a logical row dragged onto a source column.
+- **Multi-row selection on the canvas** for linking requirements to several rows at once.
+- **Opening another canvas of the project from a search hit** (a found attribute stays on the current canvas).
+- **Dragging a requirement marker** from an entity card onto another row.
+- **A found column in the Sources tab** showing its row, as a found attribute does (slice 17 covers the Model and
+  Cube tabs, as the prototype; step 1, Q3).
+- **"Fit frame to its content" and pinned notes:** a fit that moves the frame's top-left moves the notes pinned to it
+  (their place is an offset from that corner); a resize from the left or top keeps them in place since slice 17 (D-20).
+- **The object browser's tree carries each attribute's id** for item 3 (slice 17, Z5): on "Performance test" (779
+  attributes) the tree grew from 61,432 to 92,346 bytes of JSON. A smaller form (an index into `fields`, or ids only
+  where a search needs them) if the page's payload matters later.

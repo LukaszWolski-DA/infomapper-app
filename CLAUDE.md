@@ -42,7 +42,10 @@ canvas tab's menu (also a tile's on the project home) moves the canvas in its pr
 relationship lines by kind (between entities, between source tables) with a chip in the view-state bar; the browser's
 context menu is not shown in the app outside text fields, the description editor, links and selected text; a right drag
 pans without a toolbox on every platform, the top bar never scrolls, and the canvas stores its view at once after its own
-changes (slice 16, D-71).
+changes (slice 16, D-71). Outside a concept frame a new entity's, fact's or dimension's concept is chosen in a picker;
+element panels link several requirements at once and an entity panel all its attributes; a requirement card links by a
+drag from its handle; an entity found by an attribute shows that row; a selected frame resizes from every edge and
+corner; an attribute row's menu adds an attribute below it (slice 17, D-72).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -518,6 +521,18 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - run a domain command as a person without the page (`refusalAs`, `switchRefusal`), grant the licence as test data
     (`grantLicence`) and delete an entity through its impact dialog (`deleteFromModel`).
 
+  Slice 17's helpers do the following:
+  - pick a concept in the concept picker (`pickConcept`, in slice 1b's helpers, for every spec that creates an entity
+    outside a concept frame) and read it (`conceptPicker`, `expectConceptPicker`: shown, titled, nothing selected, the
+    filter focused);
+  - link requirements from an element panel's picker (`linkFromPanel`, with `all` for "Link all attributes…") and
+    create one from its footer (`newRequirementFromPanel`; both in slice 4a's helpers, which the earlier specs use);
+  - drag with the real mouse from an element by an offset or onto another (`dragBy`, `dragOnto`, which may hold the
+    button to read the drag's line and mark), read an entity's attribute order (`attributeOrder`) and a frame's row
+    (`frameRow`).
+  The seed has REQ-104's card on "Customer & orders" already; a right click inside a frame opens the frame's menu, so a
+  create inside a concept frame uses the Entity tool.
+
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,
     `keyOf`) and add a third Dim Date – Fact Sales relationship as test data (`thirdDateRelationship`);
@@ -780,6 +795,26 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     store at once; `onMoveEnd` stores only a changed view (`lastStored`); `pagehide` and the unmount store a changed
     view; nothing before the first view, once the canvas is gone, or while the fit animates (`animatingUntil`). **A later view change made by the app** calls
     `storeView` with the view it sets.
+- **Modelling ergonomics** (slice 17, D-72):
+  - **The picker** (`src/ui/pick.ts` for its rules, `src/ui/pick-popover.tsx`): one for the page, opened with
+    `openPick` and drawn by `PickHost` in the root layout; it opens hidden, a `ResizeObserver` on itself keeps it on the
+    screen, then it shows and its filter takes the focus (no layout read in a commit). The concept picker is
+    `pickConcept` (`src/app/_panels/concept-pick.ts`), used by `createEntityAt` (`canvas-host.tsx`, the click's or the
+    toolbox's screen point) and `createFromTab` (`left-panel.tsx`, under the button). No concept is remembered.
+  - **Several links:** `linkRequirements` (`requirement.ts`): every pair without a live link, one change group, "Link
+    requirements" for more than one; `allOf` for "Link all attributes…" (its toast and "Every attribute is linked
+    already."). The menus' "Link to requirements…" opens the panel's picker through `focusDetails` (`data-pop`).
+  - **The link drag** (`LinkDrag.tsx`, `startLinkDrag` in `ModelCanvas.tsx`): the handle `.rq-lk.nodrag` (one element,
+    a mask, full detail, editors); the line and the target are value stores (`linkStore`, the left panel's `dropStore`),
+    drawn in the overlay; the drop links through `linkDropped`, shared with the left panel's drop.
+  - **A found row:** the tree keeps attribute ids (`fieldIds`, `FieldAlias.id`); `show` returns `hitId`; `open`
+    (`left-panel.tsx`) calls `ui.showRow`, which opens a collapsed card or a hiding filter as one step "Show row"
+    (`updateCanvasItem`'s `showRow`) and selects the row; `ui.place` answers the placed card's id.
+  - **Frame handles:** the bottom-right one on every frame, the others on the selected frame only (`FrameLayer.tsx`);
+    `resizedRect` (`frame-resize.ts`); `resizeFrame` takes `x` and `y`, writes the offsets of notes pinned to the frame
+    so they keep their place (D-20), and is named "Resize frame".
+  - **"Add attribute below":** `addAttribute`'s `below` renumbers the entity's attributes in the same group ("Create
+    attribute"); the client holds them all (`saveRows`).
 - **Changes to resolve** (slice 7b, D-56): `source_change` rows, raised and settled by the import engine
   (`src/domain/import/`) and by the action commands (`src/domain/commands/source-change.ts`, the rules in
   `src/domain/source-changes/`); any command that deletes or decides the object of an open change settles it with a
