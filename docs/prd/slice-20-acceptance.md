@@ -459,3 +459,28 @@ Steps 2 and 3 list every test actually changed, with its reason.
 - README and CLAUDE.md (status, the extension point `ModuleChecks` and `moduleHomeData`, `ChecksProvider`, the addresses).
 Then one full run on the final commit and the manual acceptance steps. Merge and the tag `slice-20` only on Łukasz's
 command.
+
+## Łukasz's answers to step 1 (8 November 2026)
+
+1. **"No copied key" (F1): (b).** On the many side, a foreign key with the primary key's name (trimmed, case ignored)
+   also counts, beside a copy (followed to the end of its chain). The demo's example: the foreign-key flag taken off
+   Customer Address.country_code.
+2. **Duplicate names (F2):** yes. Trimmed, runs of spaces collapsed, case ignored, per entity, both levels; the hint says
+   "ignoring case and extra spaces".
+3. **The row mark beside Σ (F8):** yes. "!" first, then Σ, then the type; CSS only, no element.
+4. **`under` (F25):** counted in the status bar and in the panel's group.
+5. **Copies of copies (F5):** yes.
+6. **Levels (F6):** yes.
+7. **"Keys copied the wrong way"** is also in the relationship's panel, as in the prototype (F14).
+8. **"Not yet covered" (F12):** the texts and their order as proposed.
+9. **Addresses (F17):** yes, provided every new address is a history place (D-38) and says so when its object is gone
+   (`GONE`), as `?map=` and `?row=` do.
+10. **Q10:** (a) yes, a guard spec `S20-Q10` in step 3. (b) yes, an entry in `docs/ideas.md`.
+11. **The demo (F23):** yes, provided `addChecksDemo` runs only in the seed, the reset, `npm run demo` and slice 20's
+    fixtures, never in the earlier slices' fixtures (the plain e2e seed, slices 15 and 18). S20-01's numbers are
+    recounted after answer 1.
+12. **KB:** yes, on a copy of `.data/backups/kb-model-latest.json`, never `.data/dev-db.json`. The script writes nothing
+    and prints counts per group and per project only, no names.
+13. **Bench:** 20 ms, Node median, on the synthetic model; "Performance test" and the demo reported without a bar. If it
+    is over, report before optimising.
+14. **No full run in step 3.** If more earlier specs change than this document lists, stop and ask.
