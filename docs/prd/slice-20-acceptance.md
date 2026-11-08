@@ -1028,3 +1028,53 @@ measurement build is from `dda8ac8`, and only specs, the script and docs changed
    - in the app: the home's section shows 24 with those two groups; a canvas's count and the many sides' headers are
      grey (no High line); a fact's box says "{n} hints in the Fact section below.";
    - slice 17's two duplicate names are not in this file (no "Duplicate attribute names" group).
+
+## Step 4: close (8 November 2026)
+
+### Docs changed
+
+- `docs/decisions.md`: **D-75** under a new heading "Model checks", proposed for approval; one sentence at the end of
+  AD-34.
+- `docs/ideas.md`:
+  - "A model validator" marked done;
+  - "Model checks: what comes later" (the PRD's section 9);
+  - "The plan after slice 13" brought up to date: slice 16 done, then 17 to 19, the validator done in slice 20.
+- `docs/inventory-prototype-vs-app.md`: slice 20 added to what the app has, and its deliberate differences.
+- `docs/known-limitations.md`: step 2's entry ("The marks cost about 22 ms after each write on a very large model") was
+  there. Two were added: "Marks follow a write's fresh page" and "The project home's checks are fresh on each load".
+- `CLAUDE.md`:
+  - the status sentence;
+  - the extension point "Model checks" (`src/compose/checks.ts`, the index, the shared requirement index);
+  - the benches and the count in Commands;
+  - slice 19's fixtures (`addTypesDemoData`) and slice 20's fixtures and helpers.
+- `README.md`: the status (slices 0 to 20 built, each merged and tagged on acceptance), slices 19 and 20 in the
+  narrative, and the three new scripts.
+- **`docs/data-model-v2.md`: unchanged.** Slice 20 has no table, column, migration or file format.
+
+### The full run on the final commit
+
+- **Run:** workflow "E2E" run 42526694464 (https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42526694464)
+  on `0fd3c32`, started by hand (`gh workflow run e2e.yml --ref slice/20-model-checks`).
+- **Result:** success, wall-clock 14 min 57 s (21:44:23 to 21:59:20 UTC).
+- **Counts: 685 passed, 4 skipped, 0 failed, 0 flaky, no expected failures.** The skipped ones run on demand only:
+  `S7C-14-commits`, `S11-13-commits`, `S14A-13-commits` and `S16-11-commits`.
+
+| Part | Time | Heap peak (limit) | Restarts |
+| --- | --- | --- | --- |
+| 1 | 11:04 | 1,118 MB (8,039) | 0 |
+| 2 | 7:41 | 1,269 MB (8,039) | 0 |
+| 3 | 11:59 | 1,018 MB (4,144) | 0 |
+| 4 | 8:25 | 962 MB (8,039) | 0 |
+| 5 | 7:38 | 1,257 MB (8,039) | 0 |
+| 6 | 5:28 | 1,226 MB (8,039) | 0 |
+| 7 (from slice-14a, with slice 20) | 13:24 | 1,279 MB (8,039) | 0 |
+
+The later commits change only Markdown in `docs/` (`git diff --stat 0fd3c32..HEAD`: `docs/prd/slice-20-acceptance.md`),
+so the run counts for them too.
+
+### KB
+
+A backup was made as CLAUDE.md says: `.data/backups/dev-db-20261108-2244.json`, also `kb-model-latest.json`, both equal
+to `.data/dev-db.json` by `cmp`. The read-only count ran on a copy of it, whose SHA-256 was the same before and after; the
+copy was deleted. The counts are in the manual acceptance steps (item 7): W4 has 24 lines (6 no copied key, 18 fact
+hints), and W1 to W3 have none.
