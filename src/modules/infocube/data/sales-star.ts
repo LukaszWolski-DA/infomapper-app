@@ -288,3 +288,41 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
   if (workspace) workspace.infocube = true;
   return true;
 }
+
+/**
+ * Slice 18's demo on the star (item 5, prototype `cubeDemoV4`; acceptance F20): Dim Customer.country_name becomes a
+ * Draft lookup from Country.country_name through Country → Customer Address, "Unknown" when there is no match; Fact
+ * Sales.net_amount is calculated from the fact's own quantity, unit_price and discount_pct, and its transformation from
+ * Order Line goes. Run after `addSalesStar` by the seed, the reset, `npm run demo` and slice 18's fixtures, never by
+ * slice 15's (their specs read the star as it was). False when the star is missing or this ran already.
+ */
+export function addStarDerivations(db: DevDb & Partial<InfoCubeDb>, workspaceId: Uuid, authorId: Uuid, at: string = new Date().toISOString()): boolean {
+  const ws = workspaceId;
+  const id = (key: string) => starId(ws, key);
+  const net = db.attribute.find((a) => a.id === id("attribute:sales.net_amount"));
+  const country = (db.cube_mapping ?? []).find((m) => m.id === id("cube-mapping:cust.country_name"));
+  const via = db.relationship.find((r) => r.id === seedId(ws, "relationship:country>address") && r.deleted_at === null);
+  const inputs = ["quantity", "unit_price", "discount_pct"].map((n) => db.attribute.find((a) => a.id === id(`attribute:sales.${n}`)));
+  if (!net || net.is_calculated || !country || !via || inputs.some((a) => !a)) return false;
+
+  Object.assign(country, {
+    kind: "lookup",
+    rule_expression: null,
+    lookup_relationship_id: via.id,
+    lookup_default: "Unknown",
+    status: "draft",
+    approved_by: null,
+    approved_at: null,
+    note: country.note ?? "Customer Address holds country_code; the name comes from the Country dictionary.",
+  });
+  Object.assign(net, { is_calculated: true, calc_rule: "quantity * unit_price * (1 - discount_pct)" });
+  const std = (key: string) => ({ id: id(key), workspace_id: ws, version: 1, created_at: at, created_by: authorId, updated_at: at, updated_by: authorId, deleted_at: null });
+  db.attribute_input.push(
+    ...inputs.map((a, i) => ({ ...std(`attribute-input:sales.net_amount<${a!.name}`), attribute_id: net.id, input_attribute_id: a!.id, sort_order: i })),
+  );
+  // the calculation replaces the transformation from Order Line (the prototype's `cubeDemoV4`)
+  const old = id("cube-mapping:sales.net_amount");
+  db.cube_mapping = (db.cube_mapping ?? []).filter((m) => m.id !== old);
+  db.cube_mapping_input = (db.cube_mapping_input ?? []).filter((i) => i.mapping_id !== old);
+  return true;
+}

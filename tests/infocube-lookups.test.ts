@@ -224,3 +224,24 @@ describe("a lookup's relationship deleted (slice 18, S18-07, F15, F16)", () => {
     expect(countryName(after)).toMatchObject({ deleted_at: null, status: "review" });
   });
 });
+
+describe("slice 18's demo on the star (item 5, F20)", () => {
+  it("makes country_name a Draft lookup and net_amount calculated from the fact's own three attributes; the file stays valid", async () => {
+    const { addDemoData } = await import("@/compose/seed");
+    const { STORE_SCHEMA } = await import("@/compose");
+    const { findViolation } = await import("@/data/local/schema");
+    const db = buildSeed() as never as Parameters<typeof addDemoData>[0];
+    expect(addDemoData(db)).toBe(true);
+    expect(findViolation(db, undefined, STORE_SCHEMA)).toBeNull();
+    const rows = Object.fromEntries(Object.entries(db).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, (v as Record<string, unknown>[]).filter((r) => r.workspace_id === WS)])) as Rows;
+    expect(countryName(rows)).toMatchObject({ kind: "lookup", status: "draft", lookup_default: "Unknown", lookup_relationship_id: locates(rows).id, approved_at: null });
+    const net = attributeOf(rows, "Fact Sales", "net_amount");
+    expect(net).toMatchObject({ is_calculated: true, calc_rule: "quantity * unit_price * (1 - discount_pct)" });
+    const inputs = (rows.attribute_input as unknown as { attribute_id: string; input_attribute_id: string; sort_order: number }[]).filter((i) => i.attribute_id === net.id).sort((a, b) => a.sort_order - b.sort_order);
+    expect(inputs.map((i) => attributes(rows).find((a) => a.id === i.input_attribute_id)!.name)).toEqual(["quantity", "unit_price", "discount_pct"]);
+    expect(mappings(rows).some((m) => m.attribute_id === net.id)).toBe(false);
+    // twice is a no-op
+    const { addStarDerivations } = await import("@/modules/infocube/data/sales-star");
+    expect(addStarDerivations(db as never, WS, "01900000-0000-7000-8000-000000000100")).toBe(false);
+  });
+});
