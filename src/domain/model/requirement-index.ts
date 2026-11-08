@@ -14,6 +14,7 @@ import {
   type AttributeFeeds,
   type ElementRequirements,
   type GapReason,
+  type ModelLookup,
   type RequirementCoverage,
   type RequirementScope,
   type ScopeModel,
@@ -41,6 +42,8 @@ export interface RequirementIndex {
   gapReason: (attributeId: Uuid) => GapReason | null;
   /** Slice 15d: an attribute of a fact or a dimension (the panel's "not fed"). */
   isDimensional: (attributeId: Uuid) => boolean;
+  /** Slice 20: the model looked up once, for the model checks on the same page (no second pass). */
+  lookup: ModelLookup;
 }
 
 const EMPTY_SCOPE: RequirementScope = { entities: new Set(), attributes: new Set(), mappings: new Set(), tables: new Set(), columns: new Set(), entityItems: new Set(), attributeItems: new Set() };
@@ -135,6 +138,7 @@ export function buildRequirementIndex(requirements: readonly Requirement[], link
     attributeCoverage: lookup.coverageOf,
     gapReason: lookup.gapReason,
     isDimensional: lookup.isDimensional,
+    lookup,
   };
 }
 
