@@ -347,3 +347,87 @@ All from the prototype unless marked.
 
 Also taken: the two PRD corrections. The rights are AD-05's `model.edit` (F16), and S19-03's relationship is stored from
 the dimension (D-67, F17).
+
+## Step 2: data and domain (8 November 2026)
+
+KB (`.data/dev-db.json`) and the demo file were backed up first (`.data/backups/dev-db-20261108-1559.json`,
+`kb-model-latest.json`, `demo-db-20261108-1559.json`).
+
+### What changed
+
+- **The migration** `20261108130000_infocube_types.sql`, as approved: the six columns, the conversion of `scd_type`, the
+  checks and `cube_entity_base_ix`.
+- **The local adapter's module row upgrade (F1):** `TableRules.upgrade` and `upgradeRows` (`src/data/local/schema.ts`).
+  The store runs it on the loaded file before any read, check or write (`store.ts`: `load` and `applyToFile`), once per
+  cached read. The file holds the new shape after its next write. InfoCube's `upgradeCubeEntity`
+  (`src/modules/infocube/data/tables.ts`): a fact `transaction`, not factless, no base; a dimension `standard`, 0/1/2 →
+  keep/overwrite/history; `scd_type` dropped; null for a current row. The local rules mirror the new checks.
+- **Types** (`types.ts`): `FACT_TYPES`, `DIM_KINDS`, `HISTORIES` (replacing `SCD_TYPES`), `SCD_NUMBER`, `typeColumns`.
+- **Rules:**
+  - `aggregates.ts`: `aggregateIndex` (`baseOf` reads a base that is not a live fact as none), `reaches`, `baseChoices`
+    and the texts.
+  - `outriggers.ts`: 1:N gives the "1" end, 1:1 the `from` end, M:N none; loops and deleted relationships are skipped.
+  - `CubeIndex` gains `aggregates()`, `outriggers()` and `dimensionsOf()`.
+- **The command:** `updateCubeEntity` takes `factType`, `isFactless`, `baseFactEntityId`, `dimKind`, `history` and
+  `snapshotPeriod` (no more `scdType`), with the approved refusals and undo names. The action reads every `cube_entity`
+  row and the entities for the base's checks. `createCubeEntity` writes the defaults.
+- **The cascade (F7):** `cube_entity.follows = [["base_fact_entity_id", "entity", aggregateLosesBase]]`. The comments in
+  `module-cascade.ts` and `ModuleUndoTable.follows` now say a rule may change any column.
+- **Undo (F6):** a new extension point, `ModuleUndoTable.revertRefusal` (`ModuleRevertRefusal`, `UndoTables.revertRefusals`),
+  called after InfoMapper's own checks for each table a revert touches. InfoCube's `aggregateRevertRefusal` refuses a
+  fact that would be an aggregate of itself (at any depth), or of a deleted fact.
+- **The hints:** the four new hints in `factHints` (`TYPE_HINTS`), after the existing ones.
+- **The texts** (`view.ts`): `historyLabel`, `tabMeta` with the context, `cubeTitle`, `roleTitle` and `typeContext`. They
+  are used by `moduleView` (the chip's text and title), the Cube tab (`cubeSections` takes the relationships), the bus
+  matrix (`dimensions[].history` replaces `scd`) and `entityDependents` (a snapshot's history; "loses its base fact" /
+  "lose their base fact").
+
+### Differences from step 1's plan
+
+- **The chip's text and title are wired in this step** (in `moduleView`), not in step 3. They are pure composition and
+  needed no UI code. As a result the title of a plain fact or dimension already reads "Transaction fact (InfoCube)" /
+  "Dimension (InfoCube)" (P2, answer 7).
+- **The dimension panel is unchanged on screen.** Its three segments now save `history` (keep, overwrite, history), with
+  the same labels and sentences, and a snapshot row shows as "1 · overwrite" until step 3 builds the panel. No UI exists
+  yet to set the other new fields.
+- **The upgrade's unit test is in `tests/infocube-types.test.ts`**, not next to the domain. A module's domain part may
+  not import its data part (lint).
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: clean.
+- `npm test`: 155 files and 1,895 tests passed. New: `src/modules/infocube/domain/types.test.ts` (20) and
+  `tests/infocube-types.test.ts` (7: the upgrade, the store reading older rows and writing over them, `loadForUndo`, the
+  base's delete with one undo, an aggregate deleted in the same write, both undo refusals, an undo that passes).
+- **KB, on a copy of the backup in the scratchpad:** its 9 `cube_entity` rows (3 facts; dimensions 2 × SCD 1, 4 ×
+  SCD 2) read as transaction, overwrite and history; none keeps `scd_type`; the shape check passes. KB itself was not
+  touched.
+- **Touched earlier specs, locally** (`npm run e2e`, 12 tests, 2.7 min, all passed): S15-01, S15-06, S15-07 (15a),
+  S15-14 (15a), S15-07 (15b), S15-08, S15-08b, S15-14 (15c), S15-16.
+
+### Earlier tests changed, and why
+
+| Test | Change | Why |
+| --- | --- | --- |
+| e2e `slice-15a/S15-07` | the title "Transaction fact (InfoCube)"; the row read with the new columns | P2, answer 7; `scd_type` is gone |
+| e2e `slice-15a/S15-14`, `slice-15b/S15-08b` | `history: "keep"` … in place of `scd_type` 0/1/2 | the column (Q1) |
+| `commands.test.ts`, `description-and-keys.test.ts` | the new defaults and the history input; `HISTORY_ON_FACT` | F3, F4 |
+| `tests/infocube-star.test.ts`, `src/canvas/canvas.test.ts` | the title text; `history` in the star's rows | P2 |
+| `tests/infocube-requirements.test.ts` | the bus matrix's `history` label ("SCD 2"); rows with `typeColumns` | F13 |
+| `tests/infocube-mapping-commands.test.ts`, `tests/table-registry.test.ts` | the dimension's new columns | F4 |
+| `__fixtures__/star.ts`, `scripts/lib/star-canvas.ts`, `sales-star.ts` | rows written with `typeColumns` | the column |
+
+### The full run (shared infrastructure: the local adapter, undo, the module cascade)
+
+[Run 42494465470](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42494465470) on `046ce78`. Wall-clock
+13 min 16 s (15:22:15–15:35:31 UTC). **665 passed, 1 failed, 4 skipped, 0 expected failures.**
+
+| Part | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| time | 11:35 | 7:35 | 11:17 | 9:06 | 6:38 | 6:37 | 11:38 |
+| heap peak (MB) | 1,073 | 1,349 | 923 | 844 | 1,421 | 1,165 | 1,203 |
+
+No server restarted. **The one failure** was `slice-17/S17-01` ("New fact here" … ask for the concept): the concept
+picker's filter was not focused within 15 s. The single-file check
+([run 42495693752](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42495693752), 3 rounds side by side)
+passed all three, so it is a flake. Slice 19 does not touch the picker or its focus (`src/ui/pick-popover.tsx`).
