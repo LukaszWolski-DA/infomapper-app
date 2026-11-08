@@ -203,6 +203,13 @@ export interface TableRules {
    * it as this value. A module's tables are not part of the file's format (AD-33), so no upgrade writes them.
    */
   defaults?: Readonly<Record<string, unknown>>;
+  /**
+   * A module's row stored in an older shape (slice 19, F1: InfoCube's `scd_type` became `history`): the row as it reads
+   * now, or null when it is current. Pure and idempotent; the adapter runs it on every row of the table when the file is
+   * loaded, before any read or check (`upgradeRows`), so the file holds the new shape after its next write. A module's
+   * tables are not part of the file's format (AD-33): this is how a module changes its own rows' shape.
+   */
+  upgrade?: (row: AnyRow) => AnyRow | null;
 }
 
 const audit = { created_by: "app_user", updated_by: "app_user" } as const;
@@ -592,6 +599,38 @@ export const CORE_SCHEMA: LocalSchema = localSchema({});
  * the file (no rows yet): read as empty.
  */
 export const rowsOf = (db: DevDb, table: StoreTable): AnyRow[] => ((db as unknown as Record<string, AnyRow[] | undefined>)[table] ?? []);
+
+const upgraded = new WeakMap<object, WeakMap<LocalSchema, DevDb>>();
+
+/**
+ * The file as the store reads it (slice 19, F1): every module table with an `upgrade` gets its older rows in the current
+ * shape. The same object when nothing needs it; otherwise a copy with only those tables new, frozen like the cached file,
+ * and remembered per loaded file and schema, so a cached read is upgraded once.
+ */
+export function upgradeRows(db: Readonly<DevDb>, schema: LocalSchema): Readonly<DevDb> {
+  const seen = upgraded.get(db)?.get(schema);
+  if (seen) return seen;
+  let out: DevDb | null = null;
+  for (const [table, rules] of Object.entries(schema.rules)) {
+    if (!rules.upgrade) continue;
+    const rows = rowsOf(db as DevDb, table as StoreTable);
+    let changed: AnyRow[] | null = null;
+    rows.forEach((r, i) => {
+      const next = rules.upgrade!(r);
+      if (!next) return;
+      changed ??= [...rows];
+      changed[i] = Object.freeze(next);
+    });
+    if (!changed) continue;
+    out ??= { ...(db as DevDb) };
+    (out as unknown as Record<string, unknown>)[table] = Object.freeze(changed);
+  }
+  const result = out ? (Object.freeze(out) as Readonly<DevDb>) : db;
+  let bySchema = upgraded.get(db);
+  if (!bySchema) upgraded.set(db, (bySchema = new WeakMap()));
+  bySchema.set(schema, result as DevDb);
+  return result;
+}
 
 /** The rows as a command reads them: a module's columns a row lacks take their defaults (`TableRules.defaults`). */
 export function readRows(db: DevDb, table: StoreTable, schema: LocalSchema): AnyRow[] {
