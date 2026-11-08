@@ -35,11 +35,11 @@ describe("the Sales star (O5)", () => {
     expect(addModuleDemoData(db)).toBe(false);
     const dims = db.entity.filter((e) => e.workspace_id === WS && e.model_level === "dimensional").map((e) => e.name);
     expect(dims).toEqual(["Fact Sales", "Dim Customer", "Dim Product", "Dim Date", "Fact Orders"]);
-    expect(db.cube_entity!.map((c) => [db.entity.find((e) => e.id === c.entity_id)!.name, c.role, c.grain, c.scd_type])).toEqual([
+    expect(db.cube_entity!.map((c) => [db.entity.find((e) => e.id === c.entity_id)!.name, c.role, c.grain, c.history])).toEqual([
       ["Fact Sales", "fact", "One order line", null],
-      ["Dim Customer", "dimension", null, 2],
-      ["Dim Product", "dimension", null, 1],
-      ["Dim Date", "dimension", null, 0],
+      ["Dim Customer", "dimension", null, "history"],
+      ["Dim Product", "dimension", null, "overwrite"],
+      ["Dim Date", "dimension", null, "keep"],
       ["Fact Orders", "fact", "One sales order", null],
     ]);
     const fact = named(db, "Fact Sales");
@@ -107,7 +107,7 @@ describe("the pages' module view from the star (E6, E7, E13)", () => {
     const [workspace, model] = await Promise.all([store.workspaces.get(WS), store.model.load(WS)]);
     const view = await moduleView(store, workspace!, model, ACTIONS);
     const db = await readDb(file);
-    expect(view.roles[named(db, "Fact Sales").id]).toEqual({ text: "Fact", title: "A fact: one row per its grain (InfoCube)", card: "dimn fact", mark: "cube", coverage: "fed from the logical model", feed: FEED_WORDS });
+    expect(view.roles[named(db, "Fact Sales").id]).toEqual({ text: "Fact", title: "Transaction fact (InfoCube)", card: "dimn fact", mark: "cube", coverage: "fed from the logical model", feed: FEED_WORDS });
     expect(view.roles[named(db, "Dim Date").id]).toMatchObject({ text: "Dimension", card: "dimn dimension" });
     expect(view.roles[named(db, "Customer").id]).toBeUndefined();
     expect(view.tabs.map((t) => [t.id, t.name, t.sections.map((s) => [s.title, s.entities.map((e) => e.meta)])])).toEqual([

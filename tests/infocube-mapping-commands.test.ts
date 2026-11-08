@@ -368,7 +368,7 @@ describe("Create dimension from this… (B-2)", () => {
     const w = made.writeSet.writes;
     const entity = w.find((x) => x.table === "entity")!.row as unknown as Entity;
     expect(entity).toMatchObject({ name: "Dim Product 2", model_level: "dimensional", concept_id: product.concept_id });
-    expect(w.find((x) => x.table === "cube_entity")!.row).toMatchObject({ entity_id: entity.id, role: "dimension", scd_type: 1, grain: null });
+    expect(w.find((x) => x.table === "cube_entity")!.row).toMatchObject({ entity_id: entity.id, role: "dimension", history: "overwrite", dim_kind: "standard", grain: null });
     const attributes = w.filter((x) => x.table === "attribute").map((x) => x.row as unknown as Attribute);
     expect(attributes.map((a) => [a.name, a.sort_order, a.is_primary_key, a.is_nullable])).toEqual([
       ["product_key", 0, true, false],

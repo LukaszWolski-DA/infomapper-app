@@ -30,6 +30,6 @@ test("S15-14: Dim Date's preview lists SCD type 0 and 2 facts; the delete takes 
   await page.getByTestId("button-undo").click();
   await expect(card(page, "Dim Date")).toHaveCount(1);
   await expect.poll(async () => (await liveEntityNamed("Dim Date"))?.id).toBe(entityIdOf("date"));
-  await expect.poll(async () => (await cubeEntities()).find((c) => c.entity_id === entityIdOf("date"))).toMatchObject({ role: "dimension", scd_type: 0 });
+  await expect.poll(async () => (await cubeEntities()).find((c) => c.entity_id === entityIdOf("date"))).toMatchObject({ role: "dimension", history: "keep" });
   await expect.poll(liveLinks).toBe(3);
 });
