@@ -351,3 +351,24 @@ Unchanged: "Change dimensional mapping", "Delete attribute", "Relationship delet
    `inventory-prototype-vs-app.md`, README, CLAUDE.md (the new table, the `follows` extension point, the rules in one
    place).
 5. **One full run** on the final commit, then the manual acceptance steps. Merge and tag only on Łukasz's command.
+
+## Łukasz's answers to step 1 (8 November 2026)
+
+1. **Q1:** yes, an explicit `is_calculated` flag.
+2. **Q-A:** yes, Focus on an attribute lights its inputs' and users' mappings and lines (F10).
+3. **Q-B:** yes, the lookup keeps its relationship's id when the relationship is deleted, so the panel can say it is gone;
+   an approved lookup still goes back to review (F15).
+4. **Q-C:** no title on the lookup's line, as InfoCube's other lines; the panel explains it (F18).
+5. **Q-D:** yes, a "done in slice 18" entry in `ideas.md` (F22).
+6. **Q-E:** "covered" is not used for a calculation (it is D-31's word for requirements). The section says **"Every
+   input is mapped."** / **"Every input is fed."** (with ", directly or through its own calculation" when an input is
+   calculated) and **"Not yet: {names} {is/are} not mapped."** / **"… not fed."**. The row dot's titles keep "every
+   input is mapped" / "not every input is mapped yet", which do not say "covered".
+7. **Q2:** yes: InfoMapper's local format 14; InfoCube reads the two new `cube_mapping` columns as null when missing.
+8. **Q3 and Q8:** yes, the counts as in Q3's table; "Fed from concepts" unchanged.
+9. **F20:** yes, the demo's two examples as a separate seed step (seed, reset, `npm run demo`, slice 18's fixtures),
+   not slice 15's.
+10. **F14:** yes: deleting a relationship that lookups go through shows them and asks a second click (only then); an
+    entity's delete preview gets a lookup row.
+11. **Texts and undo names:** approved as listed, changed as answer 6 says.
+12. **Runs:** one full run at the end of step 2, one at the end of step 4; single-file checks in step 3.
