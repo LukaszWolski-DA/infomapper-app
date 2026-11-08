@@ -169,6 +169,8 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
         definition_html: null,
         definition_text: null,
         copied_from_attribute_id: null,
+        is_calculated: false,
+        calc_rule: null,
       };
       db.attribute.push(row);
     });
@@ -209,6 +211,8 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
       note: note ?? null,
       approved_by: status === "approved" ? t.authorId : null,
       approved_at: status === "approved" ? at : null,
+      lookup_relationship_id: null,
+      lookup_default: null,
     });
     inputs.forEach((input, i) => {
       cubeMappingInputs.push({ ...std(`${mapping}<${input}`), mapping_id: id(mapping), attribute_id: model(`attribute:${input}`), sort_order: i });

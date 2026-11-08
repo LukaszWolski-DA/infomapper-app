@@ -10,6 +10,7 @@ const NOUN: Record<string, string> = {
   concept: "concept",
   entity: "entity",
   attribute: "attribute",
+  attribute_input: "calculation input",
   relationship: "relationship",
   source_system: "source system",
   source_table: "source table",

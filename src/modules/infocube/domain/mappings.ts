@@ -215,6 +215,8 @@ const newMapping = (ctx: CommandContext, workspaceId: Uuid, targetId: Uuid): Cub
   note: null,
   approved_by: null,
   approved_at: null,
+  lookup_relationship_id: null,
+  lookup_default: null,
 });
 const newInput = (ctx: CommandContext, workspaceId: Uuid, mappingId: Uuid, attributeId: Uuid, sortOrder: number): CubeMappingInput => ({
   ...newRowColumns(ctx),
@@ -344,6 +346,8 @@ function plainCopy(ctx: CommandContext, workspaceId: Uuid, a: Attribute, entityI
     definition_html: a.definition_html,
     definition_text: a.definition_text,
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   };
 }
 
@@ -644,6 +648,8 @@ export function createDimensionFrom(
     is_nullable: false,
     ...plainTextAsDefinition(SURROGATE_KEY_DESCRIPTION),
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   };
   writes.push({ kind: "insert", table: "attribute", row: key });
   const copies = own.filter((a) => ticked.has(a.id));

@@ -132,6 +132,8 @@ export function addAttribute(
     definition_html: null,
     definition_text: null,
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   };
   if (at < 0) return done(ctx, access, { attributeId: attribute.id }, [{ kind: "insert", table: "attribute", row: attribute }]);
 
@@ -309,6 +311,8 @@ export function pasteAttribute(
     definition_html: original.definition_html,
     definition_text: original.definition_text,
     copied_from_attribute_id: original.id,
+    is_calculated: false,
+    calc_rule: null,
   };
   const nameTaken = siblings.some((a) => a.name.toLowerCase() === original.name.toLowerCase());
   return done(ctx, access, { attributeId: attribute.id, nameTaken }, [{ kind: "insert", table: "attribute", row: attribute }]);
@@ -430,6 +434,8 @@ export function createAttributeFromColumn(
     definition_html: html,
     definition_text: text,
     copied_from_attribute_id: null,
+    is_calculated: false,
+    calc_rule: null,
   };
   const r = createMapping(ctx, access, { attribute, column: column.row, mappings: [], mappingInputs: [] }, { attributeId: attribute.id, sourceColumnId });
   if (!r.ok) return r;

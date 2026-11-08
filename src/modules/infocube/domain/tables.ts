@@ -14,6 +14,8 @@ export const INFOCUBE_UNDO: Readonly<Record<InfoCubeTable, ModuleTableClass>> = 
   cube_mapping: {
     parents: [["attribute_id", "attribute"]],
     noun: "dimensional mapping",
+    // slice 18: an image written before lookups had no lookup
+    defaults: { lookup_relationship_id: null, lookup_default: null },
     goesWhole: [["cube_mapping_input", "mapping_id", "attribute_id"]],
     action: (e) => (statusOnlyEvent(e) ? "mapping.set_status" : "model.edit"),
   },

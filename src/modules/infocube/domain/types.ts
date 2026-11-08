@@ -48,8 +48,11 @@ export interface CubeKey extends StandardColumns {
   attribute_id: Uuid;
 }
 
-/** How a dimensional mapping carries its value (spec, data model; AD-26): a direct copy reads exactly one attribute. */
-export const CUBE_MAPPING_KINDS = ["direct", "transform"] as const;
+/**
+ * How a dimensional mapping carries its value (spec, data model; AD-26): a direct copy reads exactly one attribute, and
+ * so does a lookup (slice 18): one attribute of a dictionary, read through a logical relationship of that dictionary.
+ */
+export const CUBE_MAPPING_KINDS = ["direct", "transform", "lookup"] as const;
 export type CubeMappingKind = (typeof CUBE_MAPPING_KINDS)[number];
 
 /** A dimensional mapping's status, as InfoMapper's mappings' (spec, B-4; O9: reviewers approve). */
@@ -71,6 +74,13 @@ export interface CubeMapping extends StandardColumns {
   note: string | null;
   approved_by: Uuid | null;
   approved_at: Timestamp | null;
+  /**
+   * A lookup's relationship (slice 18): a logical relationship of the input's entity, the dictionary. It may point to a
+   * deleted relationship (F15: the panel says it is gone). Kept when the kind changes; read only for a lookup.
+   */
+  lookup_relationship_id: Uuid | null;
+  /** A lookup's value when the code is empty or has no match ("Unknown"); null when not given. Kept as the relationship. */
+  lookup_default: string | null;
 }
 
 /** One input of a dimensional mapping: a logical attribute, in the mapping's order. Unique per mapping among live rows. */

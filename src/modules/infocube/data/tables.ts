@@ -60,7 +60,9 @@ export const INFOCUBE_RULES: Readonly<Record<InfoCubeTable, TableRules>> = {
   // the module's commands' check; the database checks the closed lists and one row per input attribute
   cube_mapping: {
     key: ["id"],
-    foreignKeys: { ...model, attribute_id: "attribute", approved_by: "app_user" },
+    foreignKeys: { ...model, attribute_id: "attribute", approved_by: "app_user", lookup_relationship_id: "relationship" },
+    // slice 18 (Q2): rows written before lookups read their two columns as null
+    defaults: { lookup_relationship_id: null, lookup_default: null },
     checks: [
       { name: "cube_mapping_kind_ck", test: oneOf(CUBE_MAPPING_KINDS, "kind") },
       { name: "cube_mapping_status_ck", test: oneOf(CUBE_MAPPING_STATUSES, "status") },

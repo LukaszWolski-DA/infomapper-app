@@ -254,6 +254,7 @@ function emptyWorkspaceModel() {
     sourceTables: [],
     sourceColumns: [],
     mappings: [],
+    attributeInputs: [],
     mappingInputs: [],
     sourceRelationships: [],
     sourceRelationshipColumns: [],

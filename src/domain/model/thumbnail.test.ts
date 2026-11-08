@@ -50,6 +50,7 @@ const model = (over: Partial<WorkspaceModel> = {}): WorkspaceModel => ({
   sourceColumns: [sourceColumn(ids.colCustId), sourceColumn(ids.colEmail), sourceColumn(ids.colFirstName)],
   mappings: [mapping()],
   mappingInputs: [mappingInput()],
+  attributeInputs: [],
   sourceRelationships: [],
   sourceRelationshipColumns: [],
   classifications: [],

@@ -669,6 +669,7 @@ function rowsOf(items: CanvasItem[], frames: Frame[], entities: Entity[] = model
     concept: model.concepts,
     entity: entities,
     attribute: [],
+    attribute_input: [],
     relationship: [],
     source_system: model.sourceSystems,
     source_table: model.sourceTables,

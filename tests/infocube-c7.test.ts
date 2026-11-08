@@ -33,6 +33,7 @@ function seed(): Rows {
     concept: [concept(ids.conceptSales)],
     entity: [entity(ids.salesOrder)],
     attribute: [attribute(ids.orderId)],
+    attribute_input: [],
     relationship: [],
     source_system: [],
     source_table: [],

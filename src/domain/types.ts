@@ -176,6 +176,22 @@ export interface Attribute extends StandardColumns, AttributeType {
    * point to a deleted attribute (a lost reference).
    */
   copied_from_attribute_id: Uuid | null;
+  /**
+   * Calculated from other attributes of the same entity (slice 18, D-73): its inputs are `attribute_input` rows, and a
+   * calculated attribute may have none yet (Q1). `calc_rule` is its plain-text rule, null when not calculated.
+   */
+  is_calculated: boolean;
+  calc_rule: string | null;
+}
+
+/**
+ * An attribute a calculated attribute reads, in order (slice 18): of the same entity, never itself, never closing a
+ * cycle (the domain's checks); one live row per pair.
+ */
+export interface AttributeInput extends StandardColumns {
+  attribute_id: Uuid;
+  input_attribute_id: Uuid;
+  sort_order: number;
 }
 
 export interface Relationship extends StandardColumns {
@@ -401,6 +417,8 @@ export interface WorkspaceModel {
   mappings: Mapping[];
   /** Per mapping in rule order (sort_order). */
   mappingInputs: MappingInput[];
+  /** Slice 18: the inputs of calculated attributes, per attribute in order (sort_order). */
+  attributeInputs: AttributeInput[];
   /** Foreign keys between source tables (slice 7a). */
   sourceRelationships: SourceRelationship[];
   /** Per relationship in key order (sort_order). */
@@ -656,6 +674,7 @@ export interface CoreWritableRows {
   concept: Concept;
   entity: Entity;
   attribute: Attribute;
+  attribute_input: AttributeInput;
   relationship: Relationship;
   source_system: SourceSystem;
   source_table: SourceTable;

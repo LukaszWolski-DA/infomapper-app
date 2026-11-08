@@ -267,6 +267,8 @@ export function addDemoModel(db: DevDb, o: DemoModelOptions): void {
         definition_html: null,
         definition_text: null,
         copied_from_attribute_id: null,
+        is_calculated: false,
+        calc_rule: null,
       });
     });
   }

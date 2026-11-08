@@ -88,6 +88,7 @@ function seed(): Rows {
     concept: [concept(ids.conceptCustomer), concept(ids.conceptSales)],
     entity: [entity(ids.customer), entity(ids.salesOrder)],
     attribute: [attribute(ids.customerId), attribute(ids.email), attribute(ids.orderId)],
+    attribute_input: [],
     relationship: [relationship()],
     source_system: [sourceSystem()],
     source_table: [sourceTable()],

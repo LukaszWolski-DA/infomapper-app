@@ -51,6 +51,7 @@ export const UNDOABLE_TABLES = [
   "concept",
   "entity",
   "attribute",
+  "attribute_input",
   "relationship",
   "source_system",
   "source_table",
@@ -137,6 +138,8 @@ type AnyRow = RowImage;
 const IMAGE_DEFAULTS: Partial<Record<UndoableTable, Readonly<Record<string, unknown>>>> = {
   entity: { model_level: "logical" },
   relationship: { from_role: null, to_role: null },
+  // slice 18: an image written before calculations is an attribute that is not calculated
+  attribute: { is_calculated: false, calc_rule: null },
 };
 
 /** Columns that point to a parent row whose deletion the domain cascades (data model, section 11). */
@@ -147,6 +150,8 @@ const PARENTS: Partial<Record<UndoableTable, readonly (readonly [string, Undoabl
   entity: [["concept_id", "concept"]],
   // not `copied_from_attribute_id` (slice 10c, F9): a copy keeps a deleted original as its lost reference
   attribute: [["entity_id", "entity"]],
+  // slice 18 (F9): an input row goes with the calculated attribute and with the input it reads
+  attribute_input: [["attribute_id", "attribute"], ["input_attribute_id", "attribute"]],
   relationship: [["from_entity_id", "entity"], ["to_entity_id", "entity"]],
   source_table: [["source_system_id", "source_system"]],
   source_column: [["source_table_id", "source_table"]],
