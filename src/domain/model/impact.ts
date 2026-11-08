@@ -1,7 +1,7 @@
 // Deleting an entity (D-47): what goes with it, and the impact the dialog shows before anything is deleted.
 
 import type { Uuid } from "../ids";
-import type { Attribute, Canvas, CanvasItem, Entity, Mapping, MappingInput, Project, ProjectCanvas, Relationship } from "../types";
+import type { Attribute, AttributeInput, Canvas, CanvasItem, Entity, Mapping, MappingInput, Project, ProjectCanvas, Relationship } from "../types";
 import { liveCopiesOf, namedList, pathsOf } from "./copies";
 import type { RequirementIndex } from "./requirement-index";
 
@@ -11,6 +11,8 @@ export interface EntityRows {
   attributes: readonly Attribute[];
   mappings: readonly Mapping[];
   mappingInputs: readonly MappingInput[];
+  /** Slice 18: the workspace's calculation inputs; those of the entity's attributes go with them. */
+  attributeInputs: readonly AttributeInput[];
   relationships: readonly Relationship[];
   canvasItems: readonly CanvasItem[];
   /** The workspace's live entities: the copies' names (slice 10c, F8). */
@@ -21,6 +23,7 @@ export interface EntityCascade {
   attributes: Attribute[];
   mappings: Mapping[];
   mappingInputs: MappingInput[];
+  attributeInputs: AttributeInput[];
   relationships: Relationship[];
   canvasItems: CanvasItem[];
 }
@@ -38,6 +41,8 @@ export function entityCascade(rows: EntityRows): EntityCascade {
     attributes,
     mappings,
     mappingInputs: live(rows.mappingInputs).filter((i) => mappingIds.has(i.mapping_id)),
+    // slice 18 (F9): a calculation reads attributes of its own entity only, so its rows go on either side
+    attributeInputs: live(rows.attributeInputs).filter((i) => attributeIds.has(i.attribute_id) || attributeIds.has(i.input_attribute_id)),
     relationships: live(rows.relationships).filter((r) => r.from_entity_id === id || r.to_entity_id === id),
     canvasItems: live(rows.canvasItems).filter((c) => c.entity_id === id),
   };

@@ -202,9 +202,9 @@ export async function deleteAttributeAction(
   workspaceId: string,
   input: { attributeId: string; expectedVersion: number },
 ): Promise<ActionResult<{ mappings: number }>> {
-  return modelCommand(workspaceId, async (ctx, access, { attributes, mappings, mappingInputs }, store) => {
+  return modelCommand(workspaceId, async (ctx, access, { attributes, mappings, mappingInputs, attributeInputs }, store) => {
     const [labelLinks, requirementLinks] = await Promise.all([store.labels.listLinks(access.workspace.id), store.requirements.listLinks(access.workspace.id)]);
-    return deleteAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), mappings, mappingInputs, labelLinks, requirementLinks }, input);
+    return deleteAttribute(ctx, access, { attribute: byId(attributes, input?.attributeId), mappings, mappingInputs, attributeInputs, labelLinks, requirementLinks }, input);
   });
 }
 

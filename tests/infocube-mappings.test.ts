@@ -77,7 +77,7 @@ function deleteAttr(rows: Rows, a: Named): WriteSet {
   const mine = (rows.mapping ?? []).filter((m) => m.attribute_id === a.id && m.deleted_at === null);
   const mineInputs = (rows.mapping_input ?? []).filter((i) => mine.some((m) => m.id === i.mapping_id) && i.deleted_at === null);
   const links = { labelLinks: (rows.label_link ?? []).filter(isLive) as never, requirementLinks: (rows.requirement_link ?? []).filter(isLive) as never };
-  return withCascades(ctx, rows, ok(deleteAttribute(ctx, modeler(), { attribute: a as never, mappings: mine as never, mappingInputs: mineInputs as never, ...links }, { attributeId: a.id, expectedVersion: a.version })).writeSet);
+  return withCascades(ctx, rows, ok(deleteAttribute(ctx, modeler(), { attribute: a as never, mappings: mine as never, mappingInputs: mineInputs as never, attributeInputs: [], ...links }, { attributeId: a.id, expectedVersion: a.version })).writeSet);
 }
 
 const undo = (after: Rows, step: WriteSet) => ok(revertChangeGroup(makeCtx(), modeler(), { events: step.events, rows: after as unknown as WorkspaceRows }, "undo", UNDO_TABLES)).writeSet;
@@ -149,7 +149,7 @@ describe("Q-5: a mapping goes whole when one of its inputs goes with its attribu
     const of = (t: string) => (rows[t] ?? []).filter(isLive);
     const model = {
       entity: line, entities: of("entity"), attributes: of("attribute").filter((a) => a.entity_id === line.id), relationships: of("relationship"),
-      mappings: of("mapping"), mappingInputs: of("mapping_input"), canvasItems: of("canvas_item"), notes: of("note"),
+      mappings: of("mapping"), mappingInputs: of("mapping_input"), attributeInputs: of("attribute_input"), canvasItems: of("canvas_item"), notes: of("note"),
       labelLinks: of("label_link"), requirementLinks: of("requirement_link"),
     };
     const result = deleteEntity(ctx, modeler(), model as never, { entityId: line.id, expectedVersion: (line as unknown as { version: number }).version });

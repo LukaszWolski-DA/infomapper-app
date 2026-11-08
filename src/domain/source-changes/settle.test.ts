@@ -75,11 +75,11 @@ describe("settled by any command's writes (settleAfterWrites, Q12)", () => {
       "dbo.customers.email": "Settled: the mapping was deleted",
     });
     const a = attributeNamed(s.model, "email");
-    expect(settledBy(s.model, writesOf(deleteAttribute(ctx, modeler, { attribute: a, mappings: s.model.mappings, mappingInputs: s.model.mappingInputs }, { attributeId: a.id, expectedVersion: a.version })))).toEqual({
+    expect(settledBy(s.model, writesOf(deleteAttribute(ctx, modeler, { attribute: a, mappings: s.model.mappings, mappingInputs: s.model.mappingInputs, attributeInputs: [] }, { attributeId: a.id, expectedVersion: a.version })))).toEqual({
       "dbo.customers.email": "Settled: the attribute was deleted",
     });
     const e = s.model.entities[0]!;
-    const all = settledBy(s.model, writesOf(deleteEntity(ctx, modeler, { entity: e, attributes: s.model.attributes, mappings: s.model.mappings, mappingInputs: s.model.mappingInputs, relationships: [], canvasItems: [] }, { entityId: e.id, expectedVersion: e.version })));
+    const all = settledBy(s.model, writesOf(deleteEntity(ctx, modeler, { entity: e, attributes: s.model.attributes, mappings: s.model.mappings, mappingInputs: s.model.mappingInputs, attributeInputs: [], relationships: [], canvasItems: [] }, { entityId: e.id, expectedVersion: e.version })));
     expect(all).toEqual({ "dbo.customers.cust_no": "Settled: the entity was deleted", "dbo.customers.email": "Settled: the entity was deleted" });
   });
 
