@@ -484,3 +484,85 @@ the name field, as the next line already waits for), and keep watching S13-09 in
 3. **The rule** is its own command, `setCalculationRule`, undo name "Change calculation rule".
 4. **The schema check** against Postgres runs for this branch before step 3: `schema.yml` has no manual start, and the
    E2E workflow starts on a pull request only when the label `full-e2e` is added, so a draft pull request runs it.
+
+### The schema check (before step 3)
+
+Draft pull request [#45](https://github.com/LukaszWolski-DA/infomapper-app/pull/45) started it. It ran on `c9b3a50`
+([run 42472231575](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42472231575)): Postgres 17.11, every
+migration applied, `20261108120000_derivations.sql` included. "The schema matches the domain: 40 tables, 533 columns".
+The not yet built `invitation` and `baseline` are left out, as before. CI ("check") passed too. The E2E workflow did not
+start: it starts on a pull request only with the label `full-e2e`.
+
+## Step 3: panels and canvas (8 November 2026)
+
+### What changed
+
+- **Server actions** for the calculation commands: `src/app/_actions/derivation.ts`. Each answers the attribute's new
+  version, for the save chain.
+- **"Calculated from"** (`src/app/_panels/calculation-section.tsx`), in the attribute panel after the feeds and before
+  Copies, at both levels:
+  - **Not calculated:** the sentence and "Calculate from attributes…". That button opens slice 17's picker on the
+    entity's other attributes. Those it reads already, or that are calculated from it at any depth, are shown done.
+  - **Calculated:** the inputs, each with its state (mapped, fed, calculated, not mapped, not fed), its link and ×.
+    Then "Add inputs…", the rule (code field, slice 13's draft), the state ("Every input is mapped." or "Not yet: … are
+    not mapped.", answer 6), the warning when it is also mapped or fed directly, and "Stop calculating".
+  - **"Used by"** for the attributes calculated from it.
+  - **The writes:** all go on the chain. × and "Stop calculating" hold the input rows they delete.
+  - **Focus:** after the first pick, the rule takes the cursor.
+  - **Readers and reviewers** see it without controls, and only when it is calculated or read by a calculation (P7).
+- **The card row** (`card-data.ts`, `CardNode.tsx`, `canvas.css`):
+  - **The data:** `CardRow.calc` (rule, square), built once with the cards on the server.
+  - **The mark:** "=", one element, only on calculated rows, its title "Calculated: {rule}"; `text-fit` counts its
+    16 px.
+  - **The square:** a row counted only through its calculation has a square dot, the classes `st calc` and
+    `st calc ok`. Its title is "Calculated from …: every input is mapped" (or "fed"), or "… not every input is mapped
+    yet".
+  - **Counts:** the counts and the Mapped filter come in step 4.
+- **The lookup's fields** (`mapping-panel.tsx`):
+  - "How the value is carried" has a third choice, Lookup, which shows its fields in place of the rule.
+  - "Through relationship" lists the candidates as "{from} → {to} ({label})".
+  - A warning shows when there are none, or when the chosen relationship is gone.
+  - "When no match" is a text field with a draft.
+  - The sentence follows the fields.
+  - After choosing Lookup, the cursor goes to "When no match" if a relationship is set, else to the relationship.
+  - The type warning of a direct copy shows for a lookup too.
+- **The lists, the row and the line:** "lookup · {status}" in both lists (`feeds.tsx`), "lookup of {input}" in the
+  row's title (`cubeRowFeeds`), the chip "L" (`lines.ts`), and no title on the line (Q-C).
+- **The demo:** `addStarDerivations` (`sales-star.ts`) and `addDemoData` (`compose/seed.ts`), used by `npm run seed`,
+  `reset-dev-data`, `npm run demo` and slice 18's fixtures. Slice 15's fixtures still use `addModuleDemoData`.
+  `country_name` becomes a Draft lookup through Country → Customer Address with "Unknown" and its note. `net_amount` is
+  calculated from the fact's quantity, unit_price and discount_pct, and its transformation from Order Line goes. A unit
+  test checks the file's rules and that a second run changes nothing.
+- **S13-09** waits for the page to show the rename's version (`data-version`) instead of `response.finished()`; its
+  assertions are unchanged (answer 1).
+
+### New specs (`e2e/slice-18/`)
+
+| File | Criterion |
+| --- | --- |
+| `S18-02.spec.ts` | Calculate on a new attribute of Order Line with two inputs: the toast, the rule focused and saved, the state, the "=" mark and its title; "Add inputs…", ×, "Stop calculating"; each step undone by name. A reviewer and a reader see net_amount's calculation without controls, no section on an attribute without one, and "Used by" on an input. |
+| `S18-03.spec.ts` | On quantity's picker net_amount is done ("Already an input, or calculated from this attribute"), quantity itself and other entities' attributes are not offered; the domain refuses a cycle and an input of another entity sent directly. |
+| `S18-06.spec.ts` | The demo's lookup: its kind, relationship, value, sentence and chip "L"; Direct copy and back keeps the fields; Dim Product.sku's Lookup takes Product's one relationship, the cursor in "When no match"; two inputs refuse Lookup with the toast. An approved lookup stays approved when its note changes, and goes back to review when its value or relationship changes. |
+
+S18-01, S18-04, S18-05, S18-07 and S18-08 come in step 4.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: pass. `npm test`: 151 files, 1,859 tests, all passed.
+- **Locally:** `e2e/slice-18`, 6 passed on the first run.
+- **Single-file checks on GitHub's runners** (commit `7de7a8c`):
+
+  | Run | Files | Rounds | Result |
+  | --- | --- | --- | --- |
+  | [42473400880](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42473400880) | `e2e/slice-18`, `slice-15b`, `slice-15c`, `slice-15d` and `slice-10c`: the panels, lines, lists and paste this step touches | 1 | 58 passed, 0 failed |
+  | [42473406260](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42473406260) | `e2e/slice-13/S13-09.spec.ts` | 3 | 3 of 3 passed |
+
+- **No earlier spec changed** except S13-09 (answer 1).
+- Step 3 touched no shared infrastructure, so it has no full run. The next one is at the end of step 4.
+
+### Assumptions
+
+- **The section's place:** after "Comes from" or the dimensional feeds, before Copies. The prototype puts it last before
+  the delete button, after the module's sections, and the app's Copies section is not in the prototype.
+- **A cancelled picker writes nothing** (prototype). A calculated attribute with no inputs arises only from × or an
+  input's delete.
