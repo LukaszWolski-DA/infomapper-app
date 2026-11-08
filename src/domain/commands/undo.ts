@@ -20,6 +20,7 @@
 
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
+import { derivationIndex } from "../model/derivations";
 import { followOriginals } from "../model/copies";
 import { levelWritesRefusal } from "../model/levels";
 import { keyTakenMessage, requirementKey, restoreKeyTakenMessage } from "../model/requirements";
@@ -28,6 +29,7 @@ import { checkPermission, type WorkspaceAccess, type WorkspaceAction } from "../
 import {
   LINK_TABLES,
   type Attribute,
+  type AttributeInput,
   type ChangeEvent,
   type CoreTable,
   type LinkTable,
@@ -416,7 +418,7 @@ export function revertChangeGroup(
   }
 
   if (!consistent(after, touched, tables)) return fail(refused());
-  const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched);
+  const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched) ?? calculationCycle(after, touched);
   if (keyClash) return fail(keyClash);
   // copies stay in step with their originals (slice 10c, F1): an undo or redo of a followed field, a paste or a
   // “Stop following” writes the copies that differ, in the same group; an original brought back writes none, as its
@@ -428,6 +430,24 @@ export function revertChangeGroup(
   if (levels) return fail(levels);
   const writeSet = buildWriteSet(ctx, workspaceId, followed.writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
+}
+
+/** Slice 18 (F8): a revert that brings back a calculation input that closes a cycle (made by someone else meanwhile). */
+export const calculationCycleMessage = (attribute: string) => `Undoing this would make ${attribute} calculated from itself.`;
+
+function calculationCycle(rows: Map<string, Map<string, AnyRow>>, touched: readonly { table: string; key: string }[]): DomainError | null {
+  const inputs = touched.filter((t) => t.table === "attribute_input").map((t) => rows.get("attribute_input")?.get(t.key)).filter((r): r is AnyRow => !!r && r.deleted_at == null);
+  if (!inputs.length) return null;
+  const attributes = [...(rows.get("attribute")?.values() ?? [])] as unknown as Attribute[];
+  const index = derivationIndex(attributes, [...(rows.get("attribute_input")?.values() ?? [])] as unknown as AttributeInput[]);
+  for (const i of inputs) {
+    const attributeId = i.attribute_id as Uuid;
+    if (index.reaches(i.input_attribute_id as Uuid, attributeId) || i.input_attribute_id === attributeId) {
+      const name = (rows.get("attribute")?.get(attributeId)?.name as string | undefined) ?? "an attribute";
+      return domainError("invalid", calculationCycleMessage(name));
+    }
+  }
+  return null;
 }
 
 /**
