@@ -17,6 +17,7 @@ import type { CanvasExtContext, CanvasExtHandlers, ExtMenuItem } from "@/canvas/
 import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
 import { CUBE_MAPPING_KIND } from "../canvas/lines";
+import { CUBE_MAPPING_GONE } from "../domain/checks";
 import { MAPPING_EXISTS_SELECTED, mappingIndex, planDrop, type MappingIndex } from "../domain/mappings";
 import type { CubeMapping, CubeMappingInput, CubeMappingStatus } from "../domain/types";
 import type { CubePageRows } from "../domain/view";
@@ -24,8 +25,8 @@ import { createCubeMappingAction, createOnHeaderAction, deleteCubeMappingAction,
 import { CreateDimensionDialog } from "./create-dimension-dialog";
 import { ruleFocus } from "./rule-focus";
 
-/** "That mapping no longer exists." (a history place, D-38; InfoMapper's mapping's text). */
-export const CUBE_MAPPING_GONE = "That mapping no longer exists.";
+/** "That mapping no longer exists." (a history place, D-38; InfoMapper's mapping's text), the domain's. */
+export { CUBE_MAPPING_GONE };
 const STATUS_LABEL: Record<CubeMappingStatus, string> = { draft: "Draft", review: "In review", approved: "Approved" };
 const STATUSES: CubeMappingStatus[] = ["draft", "review", "approved"];
 const NO_ROWS: Pick<CubePageRows, "cubeMappings" | "cubeMappingInputs"> = { cubeMappings: [], cubeMappingInputs: [] };

@@ -27,6 +27,7 @@ import { useMoveAttribute } from "./move-attribute";
 import { feedingSources, inputsLabel } from "./model-index";
 import { usePanels } from "./panels-context";
 import { RequirementsSection } from "./requirements-section";
+import { ChecksBox } from "./checks-box";
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -83,6 +84,8 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   return (
     <div data-testid="panel-entity">
       <div className="mb-1.5 text-[11.5px] text-im-ink-3">Entity</div>
+      {/* slice 20 (PRD item 6): its own model checks and its attributes' */}
+      <ChecksBox of={{ t: "entity", id: e.id }} />
       <Field label="Name" htmlFor="f-en">
         <TextField key={fieldKey(e.id, "name")} id="f-en" value={e.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-entity-name" inputRef={nameRef} keep={{ key: fieldKey(e.id, "name"), field: "Name", object: e.name }} />
       </Field>

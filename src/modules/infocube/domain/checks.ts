@@ -12,6 +12,8 @@ import type { CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure } 
 
 /** A dimensional mapping's selection kind on the canvas (`CUBE_MAPPING_KIND` in `../canvas/lines.ts`; the test keeps them equal). */
 export const CHECK_MAPPING_KIND = "cube_mapping";
+/** "That mapping no longer exists." (a history place, D-38; InfoMapper's mapping's text): the canvas's and an arrival's. */
+export const CUBE_MAPPING_GONE = "That mapping no longer exists.";
 
 /** InfoCube's rows as a page or the home reads them (the page's come without `created_*` and `updated_*`). */
 export interface CubeCheckRows {
