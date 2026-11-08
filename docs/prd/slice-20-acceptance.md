@@ -610,3 +610,116 @@ which without names. The manual acceptance will look at it in the app.
 
 - `npx vitest run src/domain/model/checks.test.ts tests/model-checks.test.ts`
 - `npx tsx scripts/bench-checks.ts`
+
+## Łukasz's decisions on step 2 (8 November 2026)
+
+1. **The 20 ms bar stays.** Remove the three causes found, and nothing else:
+   - "no copied key"'s key test once per entity;
+   - InfoCube's rules on the existing indexes, without sorting every attribute;
+   - no mark titles in the index.
+   Measure again. If the synthetic model is still over 20 ms but under 50 ms, stop and report.
+2. **No ready-made lines with texts on the canvas page.** The canvas builds the index in the browser from what the page
+   already has (as `requirementFeeds`): marks are classes, and texts are built when a panel or the list opens. The
+   project home renders only its scope's lines on the server, 20 per group, the rest on "Show all" (D-35). Check what
+   the canvas page has, and add one browser figure on the synthetic model, with no gate.
+3. **Accepted as differences from the plan:** the name test collapsing runs of spaces, the InfoCube switch in the shell's
+   workspace data, and the module's mapping-kind constant kept equal by a test (below).
+4. **KB:** Łukasz makes a fresh backup himself; the recount runs on its copy when he says so, under the same conditions.
+
+## Step 2 continued: the three causes removed (8 November 2026)
+
+### What changed
+
+- **"No copied key"** (`checks.ts`):
+  - each copy's key is worked out once per page (`copyKeys`), for all the rules that read it;
+  - what an entity holds of other entities' keys (its copies' keys and its foreign keys' names) is worked out once per
+    entity (`carriedBy`), not once per key and attribute.
+- **InfoCube's rules** (`infocube/domain/checks.ts`):
+  - `feeds` and `under` read the requirement index's lookup: its feeds are the dimensional mappings, with their
+    approval, type conflict and inputs (`cubeRequirementFeeds`);
+  - the targets come in the model's order (`lookup.attributesOf` per dimensional entity), so nothing is sorted and no
+    second mapping index is built;
+  - `cubeChecks` takes an existing `CubeIndex` when its caller has one (third argument).
+  So InfoCube's lines need a lookup built with the module's feeds, as every page builds it.
+- **The index:**
+  - `entityMark` and `rowMark` give only the severity (`{ high }`);
+  - `entityLines` and `rowLines` give the lines behind a mark, for `markTitle` where the card is drawn.
+- **The benches:**
+  - the synthetic model is shared (`scripts/lib/synthetic-checks.ts`);
+  - `scripts/bench-checks-browser.ts` bundles the same code with esbuild and runs it in headless Chromium.
+
+### The figures, before and after (Node median, laptop; the lookup not counted)
+
+| Model | Step 2 | After the three causes | Bar |
+| --- | --- | --- | --- |
+| Synthetic, whole model | 120.8 ms | **107.6 ms** (fastest 93.3) | 20 ms, **missed** |
+| Synthetic, a project of 200 entities | 72.1 ms | 46.8 ms | — |
+| "Performance test" | 1.6 ms | 1.9 ms | none |
+| Demo | 0.5 ms | 0.4 ms | none |
+| **Browser:** synthetic, whole model, Chromium 153 headless | — | **60.0 ms** (fastest 46.7, slowest 82.0); the lookup 13.3 ms | no gate |
+
+**It is over 50 ms, so I stopped, as decided.** Step 2's split of InfoMapper's groups was wrong. A split after the change
+(diagnosis only, not kept) shows where the time is:
+
+| Part | Time |
+| --- | --- |
+| InfoMapper's groups | 69 ms |
+| InfoCube's groups | 24 ms; 14 ms with a cube index passed in (building one takes 9.5 ms) |
+| The index | 16 ms |
+
+The causes left in InfoMapper's groups are spread out, none above about 12 ms:
+- maps of entities and attributes rebuilt (9 ms), which the lookup already has (`lookup.attribute`,
+  `lookup.attributesOf`);
+- the attributes grouped and sorted per entity again (3.5 ms);
+- the duplicate rule computing `nameKey` three times per attribute (12 ms; once would be 3.6 ms);
+- the copies' keys (5 ms);
+- building about 2,000 lines with their texts.
+
+The index's 16 ms is its loops over 4,296 lines. The cost grows with the number of lines, and the synthetic model has
+one line per five attributes. "Performance test" has 21 lines, the demo 15 and KB 24.
+
+**Not done** (outside the three causes):
+- InfoMapper's groups on the lookup's maps, and `nameKey` once per attribute (estimated −20 ms);
+- one cube index shared by the page's sections and the checks (−10 ms).
+Even with both, the estimate is about 70 ms on the synthetic model.
+
+### Point 2: what the canvas page already has
+
+**Everything the rules read is on the canvas page already, so it carries 0 bytes more.**
+- **The whole model.** The page hands the live `WorkspaceModel` to the browser for the Inspector, the StatusBar and the
+  fading (`fadeData.model`, `canvas page.tsx` l. 245, 278, 332). It has `entities`, `attributes`, `relationships`,
+  `attributeInputs`, `mappings`, `mappingInputs`, `sourceColumns` and `lostOriginals`, which are all the
+  `CheckModel` and the lookup read.
+- **InfoCube's rows.** `ModuleView.data.infocube` (`cubePageRows`) carries `cubeEntities`, `cubeMeasures`, `cubeKeys`,
+  `cubeMappings` and `cubeMappingInputs` whenever the model has a fact or a dimension. The InfoCube switch is
+  `ModuleView.tabs` (the Cube tab only while it is on), which `pageModuleChecks` reads.
+- **The requirement feeds and the lookup.** `ModulesProvider` derives the feeds in the browser (`requirementFeeds`),
+  and the Inspector builds its requirement index from them; the index now exposes its `lookup`.
+
+**For step 3:**
+- one requirement index per page in a provider that the Inspector, the status bar and the checks share, so the lookup
+  is not built twice;
+- the cards' classes read from the index, which client components also compute during the server's render, so the
+  first paint has them;
+- the project home renders the first 20 lines per group on the server; "Show all" reads the rest through a read
+  action (as the bus matrix's `modelRead`).
+
+### Differences from the plan (accepted, Łukasz's point 3)
+
+1. **The name test for "no copied key" is `nameKey`.** It trims, collapses runs of white space and ignores case: one
+   rule shared with duplicate names. D-75 will say so.
+2. **The shell's workspace data carries the InfoCube switch** (`ShellData.workspace.infocube`), which the home's checks
+   read.
+3. **The mapping-kind constant is in the module's domain** (`CHECK_MAPPING_KIND`, `"cube_mapping"`). A test keeps it
+   equal to the canvas's `CUBE_MAPPING_KIND`, because the domain may not import the module's canvas part.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: pass.
+- `npm test`: 157 files, 1,929 tests, all pass (the index's tests read titles through `markTitle`).
+- CI on the pushed commit: see the report in chat.
+
+### How to check
+
+- `npx tsx scripts/bench-checks.ts`
+- `npx tsx scripts/bench-checks-browser.ts`
