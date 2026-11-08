@@ -157,6 +157,18 @@ Read only, each linking to its place; nothing is enforced.
 - "{attribute} is a measure but its type is {type}. Measures are usually Integer or Decimal."
 - None: "Nothing to check: grain, keys and measures look complete."
 
+### Types (slice 19, D-74)
+
+Added after iteration 1 (`docs/prd/slice-19-infocube-types.md`). A fact's section starts with Fact type (Transaction,
+Periodic, Accumulating), Factless fact, Aggregate of and Aggregated by; Measures says "None: a factless fact. Count its
+rows." for a factless fact; a snapshot dimension's key is marked "· snapshot". A dimension's section starts with Kind
+(Standard, Junk), Outrigger of and Outriggers (derived from relationships between two dimensions), and its SCD type is
+now History (0 · keep, 1 · overwrite, 2 · history, Snapshot, with its period). Four hints are added to B-5's: a factless
+fact with measures, an additive measure in a periodic snapshot, an accumulating snapshot with no dimension in two roles,
+an aggregate related to a dimension its base is not. The card's role names the type ("Fact · Snapshot", "Dimension ·
+Junk"); the Cube tab and the bus matrix show "Snapshot · {period}". Bridge dimensions, hierarchies and a dimension's
+unknown member come later.
+
 ### B-6 Dimensional mappings
 
 - **Drag a logical attribute row onto a dimensional attribute row** to map it (direct, Draft). Onto a fact's or

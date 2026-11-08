@@ -1359,3 +1359,14 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
 - **A linked fact or dimension brings no feeds** (P28, D-31): only a linked dimensional attribute's dimensional
   mappings enter the scope; an entity item's coverage still counts any covered attribute.
 - **The bus matrix's order** is the Cube tab's (by concept, then the model's order), not the prototype's (P31).
+
+### What slice 19 leaves for later, and an older undo step (slice 19, D-74)
+
+- **Bridge dimensions, hierarchies, a dimension's unknown member** and other SCD types are later slices (PRD section 9);
+  a many-to-many relationship between two dimensions is no outrigger until bridges exist.
+- **An aggregate's grain and measures** are not checked against its base; only the dimension hint is.
+- **An undo step recorded before slice 19 on a fact or dimension** (its images hold `scd_type`) is refused as "changed
+  since" (F2). The undo history lives in the server's memory, so a restart, which the new code needs, empties it; only a
+  development server that reloads code without restarting can meet it, and the refusal is safe.
+- **A role chip changes with the save's fresh page:** a relationship drawn or deleted between two dimensions, or a type
+  chosen in the panel, shows on the card once the page has the answer, as the Σ marks do.
