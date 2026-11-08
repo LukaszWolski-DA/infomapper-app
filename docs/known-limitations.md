@@ -1380,3 +1380,14 @@ of about 23,000 attributes (2,000 entities, 2,000 relationships, 3,000 copies, 1
 about 22 ms in Chromium (median of six runs: 19.2 to 31.6 ms, `scripts/bench-checks-browser.ts`); on "Performance
 test" (41 entities, 779 attributes) 0.7 ms. Three quarters of it are InfoMapper's rules. Nothing is deferred or
 computed incrementally (`docs/ideas.md`, "Model checks for much larger models").
+
+### Marks follow a write's fresh page
+
+The checks' marks, the status bar's count and the panels' boxes are computed from the page's data, so they change when a
+write's fresh page arrives, as the Σ marks and the role chip do. A card placed on the canvas gets its marks with that
+page. A change made by someone else shows with the next fresh page, as the rest of the canvas.
+
+### The project home's checks are fresh on each load
+
+As model consistency, the home computes its model checks when it loads. "Show all" reads its group again from the model
+as it stands, so a change made meanwhile may show there before the rest of the section.

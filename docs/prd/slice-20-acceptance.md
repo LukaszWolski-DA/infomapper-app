@@ -981,6 +981,8 @@ measurement build is from `dda8ac8`, and only specs, the script and docs changed
 - **The absolute 50 fps at 100 % is missed on both sides** (slice-19 48.3, this branch 46.5) on this laptop in this
   sitting; 30 % meets it on both.
 - **The writes are within the interaction bars** (median ≤ 300 ms, p95 ≤ 350 ms) as traced.
+- **The gate:** the absolute 50 fps bar at 100 % is missed by both sides on this laptop (slice-19 48.3, slice 20 46.5
+  fps). The slice's gate is the relative bar, which is met.
 
 ### Assumptions
 

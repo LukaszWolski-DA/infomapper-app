@@ -1,4 +1,4 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 19's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 20's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
@@ -50,9 +50,23 @@ the app's own surfaces (16, D-71); the concept picker for a new entity, fact or 
 several links at once and "Link all attributes…", a requirement card's link drag, a found attribute's row, a frame
 resized from every edge and corner, and "Add attribute below" (17, D-72); calculated attributes ("Calculated from", the
 row's "=" and square, counted as mapped or fed and covered through their inputs, Focus and the delete's second click) and
-InfoCube's lookups (the kind, its relationship, its value for no match, the chip "L") (18, D-73).
+InfoCube's lookups (the kind, its relationship, its value for no match, the chip "L") (18, D-73); the model checks: the project home's section and its stats' link, the card
+marks, the status bar's count, the details panel's group and the panels' box (20, D-75).
 
 **Deliberate differences:**
+- **Slice 20 (D-75):**
+  - A copy of a copy counts by the key at the end of its chain, and a foreign key with the primary key's name counts as
+    its copy for "no copied key"; the prototype reads only a copy's first link.
+  - `lost` is checked at both levels; the prototype checks the logical level only.
+  - The type conflict is the app's rule (Integer → Decimal and a lookup can conflict); the prototype's `cmTypeIssue`
+    accepts the first and skips the second.
+  - "Not yet covered" follows D-31's rule with calculations, with two more reasons (an approved mapping with a type
+    conflict, a calculation's input); the prototype's `srcOk` is the direct rule.
+  - The row's "!" is the type's `::after`, put before a measure's Σ; the prototype's is `::before`.
+  - The details panel's group has D-35's filter; a mark's title is set on hover; the name keeps its own title.
+  - A line without a canvas that shows its entities opens the project's first canvas.
+  - The demo is a seed step (`checksDemo`); the prototype's "Copy of" field stands in for D-63's copies, which the app
+    has.
 - **Slice 19 (D-74):**
   - Many-to-many between two dimensions gives no outrigger; the prototype makes the `from` end one.
   - Undo refuses a cycle of aggregates or a base that is a deleted fact; the prototype reads such a base as none.

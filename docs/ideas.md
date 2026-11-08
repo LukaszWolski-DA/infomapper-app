@@ -64,15 +64,16 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   the licence and the switch; AD-33 to AD-35, D-67), **15b done** (grain, measures, SCD type, role-playing dimensions;
   D-68), **15c done** (dimensional mappings and "fed" coverage, "Create dimension from this…"; AD-36, D-69), **15d done**
   (requirements on facts and dimensions, "Fed from concepts", the bus matrix; D-70): **InfoCube iteration 1 is done.**
-- **Next: the slice "InfoMapper's canvas and menus"** (below, "InfoMapper's canvas and menus: a slice after slice
-  15"), then the InfoCube backlog (`docs/prd/slice-15-infocube.md`, section 9).
+- **InfoMapper's canvas and menus: done in slice 16** (D-71). Then slices 17 (modelling ergonomics, D-72), 18
+  (derivations, D-73) and 19 (InfoCube types, D-74), from the InfoCube backlog (`docs/prd/slice-15-infocube.md`,
+  section 9) and Łukasz's testing.
 - **Chore CI e2e: done** (6 November 2026): the full e2e run and the single-file check in GitHub Actions, seven parts
   side by side in about 12 minutes (`.github/workflows/e2e.yml`, `docs/prd/chore-ci-e2e-acceptance.md`); the local run
   is the fallback.
   Left for later: Playwright's own container image pinned to 1.63.0 (dependencies preinstalled) instead of
   `playwright install --with-deps`, whose Ubuntu mirror once took about 9.5 minutes in one job per run
   (`docs/known-limitations.md`); validate it with S6A-10's text drawing.
-- **Then the model validator** (below, "A model validator").
+- **The model validator: done in slice 20** (D-75; below, "A model validator").
 - **The database slice last** (AD-31).
 
 ## A field's draft: what comes later (slice 13, PRD section 9)
@@ -118,7 +119,10 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
 Measure the layer switch at 30 % on slice-10c and earlier: slice 11's sitting found about 650 ms to the screen (240 ms
 on the main thread), not touched by slice 11.
 
-## A model validator (slice 10c, PRD section 9)
+## A model validator (slice 10c, PRD section 9): done in slice 20
+
+**Done in slice 20** (D-75): the model checks on the project home, the canvas and the panels, with InfoCube's facts and
+feeds. Left out: a foreign key flag without a copy (below, "Model checks: what comes later").
 
 **A model validator (slice 10c, PRD section 9).** Copies of attributes are not tied to relationships (slice 10c), so a
 check across the model would report what does not fit:
@@ -837,3 +841,13 @@ The checks' marks and counts are computed again in full after each write: about 
 (`docs/known-limitations.md`). For much larger models: compute them **deferred**, after the write's commit has been
 painted (the marks of the old state stay until then), and **incrementally**, only for the entities a write touched and
 their relationships' other ends. Measure first with `scripts/bench-checks-browser.ts`.
+
+## Model checks: what comes later (slice 20, PRD section 9)
+
+- **A foreign key flag without a copy** (R3e): left out as noise in a hand-built model.
+- **"Column left the source" as a requirement gap's reason** (R6), for the slice of small items.
+- **Checks read from the change log since an approval** (decision 4b): an input renamed or retyped after it.
+- **Dismissing a line**, with who and why (needs data).
+- **A "Show checks" view** that fades everything else, as the Changes view; next and previous line on the canvas.
+- **Marks on relationship and mapping lines**; a switch to hide the marks; marks on collapsed frames' blocks.
+- **Source-side and Data Vault checks**; a dimension's unknown member (slice 19, decision 5b).
