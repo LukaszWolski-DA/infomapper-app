@@ -11,7 +11,7 @@ import { seedId } from "@/data/local/seed-model";
 import type { DevDb } from "@/data/local/schema";
 import type { Uuid } from "@/domain/ids";
 import { DEFAULT_CANVAS_LOOK, type Attribute, type CanvasItem, type LogicalType } from "@/domain/types";
-import type { Additivity, CubeEntity, CubeMappingKind, CubeMappingStatus, CubeRole, ScdType } from "../domain/types";
+import { typeColumns, type Additivity, type CubeEntity, type CubeMappingKind, type CubeMappingStatus, type CubeRole, type History } from "../domain/types";
 import type { InfoCubeDb } from "./tables";
 
 /** The seed's fixed ids this step reads (`SEED_IDS` in `src/data/local/seed.ts`, which this module may not import). */
@@ -23,11 +23,11 @@ export interface SalesStarTarget {
   authorId: Uuid;
 }
 
-const STAR: [key: string, concept: string, name: string, role: CubeRole, definition: string, grain: string | null, scd: ScdType | null][] = [
+const STAR: [key: string, concept: string, name: string, role: CubeRole, definition: string, grain: string | null, history: History | null][] = [
   ["sales", "sales", "Fact Sales", "fact", "Sales of products, one row per order line.", "One order line", null],
-  ["cust", "cust", "Dim Customer", "dimension", "The customer as reports see it, with its history.", null, 2],
-  ["prod", "prod", "Dim Product", "dimension", "", null, 1],
-  ["date", "ref", "Dim Date", "dimension", "Generated calendar, one row per day.", null, 0],
+  ["cust", "cust", "Dim Customer", "dimension", "The customer as reports see it, with its history.", null, "history"],
+  ["prod", "prod", "Dim Product", "dimension", "", null, "overwrite"],
+  ["date", "ref", "Dim Date", "dimension", "Generated calendar, one row per day.", null, "keep"],
   ["orders", "sales", "Fact Orders", "fact", "Orders as a whole, one row per order.", "One sales order", null],
 ];
 
@@ -138,7 +138,7 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
   const cubeMappings = (db.cube_mapping ??= []);
   const cubeMappingInputs = (db.cube_mapping_input ??= []);
 
-  for (const [key, concept, name, role, definition, grain, scd] of STAR) {
+  for (const [key, concept, name, role, definition, grain, history] of STAR) {
     db.entity.push({
       ...std(`entity:${key}`),
       concept_id: model(`concept:${concept}`),
@@ -174,7 +174,7 @@ export function addSalesStar(db: DevDb & Partial<InfoCubeDb>, t: SalesStarTarget
       };
       db.attribute.push(row);
     });
-    const cube: CubeEntity = { ...std(`cube-entity:${key}`), entity_id: id(`entity:${key}`), role, grain, scd_type: scd };
+    const cube: CubeEntity = { ...std(`cube-entity:${key}`), entity_id: id(`entity:${key}`), role, grain, ...typeColumns(role, history ?? undefined) };
     cubeEntities.push(cube);
   }
 

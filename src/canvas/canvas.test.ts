@@ -338,7 +338,7 @@ describe("buildCards: the BK badge and the Keys filter read the Business key cla
 });
 
 describe("buildCards: a dimensional entity's role (slice 15a, B-3, D-67)", () => {
-  const role = { text: "Fact", title: "A fact: one row per its grain (InfoCube)", card: "dimn fact", mark: "cube" };
+  const role = { text: "Fact", title: "Transaction fact (InfoCube)", card: "dimn fact", mark: "cube" };
   const withRole = buildCards(model, items, undefined, null, [], undefined, { [ids.customer]: role });
 
   it("shows the role where the stereotype stands, with its classes; a card without a role is unchanged", () => {

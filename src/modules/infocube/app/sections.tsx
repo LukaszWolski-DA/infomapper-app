@@ -18,7 +18,7 @@ import type { Uuid } from "@/domain/ids";
 import type { Attribute, Entity, Relationship } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { asRole, cubeIndex, dimensionAs, factEnds, factHints, NO_HINTS, roleAt, typeWord, usedBy, type CubeIndex, type Hint as CubeHint } from "../domain/keys";
-import type { CubeEntity, CubeKey, CubeMeasure, ScdType } from "../domain/types";
+import type { CubeEntity, CubeKey, CubeMeasure, History } from "../domain/types";
 import type { CubePageRows } from "../domain/view";
 import { addKeyAction, linkKeyAction, setMeasureAction, updateCubeEntityAction, updateMeasureAction } from "./actions";
 
@@ -29,15 +29,16 @@ const ADDITIVITY_OPTIONS = [
   ["semi", ADDITIVITY_LABEL.semi],
   ["non", ADDITIVITY_LABEL.non],
 ] as const;
+// slice 19 step 2: the stored history behind the same three segments; step 3 adds Snapshot and the new texts
 const SCD_OPTIONS = [
-  ["0", "0 · keep"],
-  ["1", "1 · overwrite"],
-  ["2", "2 · history"],
+  ["keep", "0 · keep"],
+  ["overwrite", "1 · overwrite"],
+  ["history", "2 · history"],
 ] as const;
-export const SCD_SENTENCE: Record<ScdType, string> = {
-  0: "Values never change once loaded.",
-  1: "A change overwrites the old value; no history.",
-  2: "A change adds a new version; the old one stays with its validity.",
+export const SCD_SENTENCE: Record<Exclude<History, "snapshot">, string> = {
+  keep: "Values never change once loaded.",
+  overwrite: "A change overwrites the old value; no history.",
+  history: "A change adds a new version; the old one stays with its validity.",
 };
 export const SCD_TECHNICAL = "Technical columns (valid from, valid to, current) are a physical matter and are not modelled here.";
 const NUMERIC = new Set<Attribute["data_type"]>(["integer", "decimal"]);
@@ -199,9 +200,9 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
 function DimensionSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; cube: CubeIndex }) {
   const p = usePanel();
   const { saveRow } = useAction();
-  const scd = (row.scd_type ?? 1) as ScdType;
-  const choice = useChoice(String(scd) as "0" | "1" | "2", (v) =>
-    saveRow(row, (version) => updateCubeEntityAction(p.workspaceId, { cubeEntityId: row.id, expectedVersion: version, scdType: Number(v) as ScdType })),
+  const scd = row.history === "snapshot" || !row.history ? "overwrite" : row.history;
+  const choice = useChoice<History>(scd, (v) =>
+    saveRow(row, (version) => updateCubeEntityAction(p.workspaceId, { cubeEntityId: row.id, expectedVersion: version, history: v })),
   );
   const users = usedBy(cube, entity.id, p.ix.model.relationships);
   return (

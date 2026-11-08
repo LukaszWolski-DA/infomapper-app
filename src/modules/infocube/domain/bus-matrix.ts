@@ -1,10 +1,11 @@
 // The bus matrix (slice 15d, B-8 with R-8 and RP-10; prototype `openBusMatrix`): facts with their grain against
-// dimensions with their SCD type, one dot per relationship between them, filled when an active key carries it. Derived
+// dimensions with their history (slice 19: SCD 0 to 2 or a snapshot), one dot per relationship between them, filled when an active key carries it. Derived
 // from InfoMapper's relationships and InfoCube's rows when the dialog opens (Y5: a snapshot); nothing is stored.
 
 import type { Uuid } from "@/domain/ids";
 import type { Concept, Entity } from "@/domain/types";
 import { asRole, type CubeIndex } from "./keys";
+import { historyLabel } from "./view";
 
 export const BUS_MATRIX_TEXTS = {
   button: "Bus matrix",
@@ -16,7 +17,6 @@ export const BUS_MATRIX_TEXTS = {
   fact: "Fact",
   grain: "grain",
   noGrain: "no grain",
-  scd: (n: number) => `SCD ${n}`,
   usedBy: "Used by",
   facts: (n: number) => `${n} fact${n === 1 ? "" : "s"}`,
   conformed: "conformed",
@@ -38,7 +38,8 @@ export interface BusMatrix {
   /** The workspace's name, for the dialog's head. */
   workspace: string;
   facts: { id: Uuid; name: string; grain: string | null }[];
-  dimensions: { id: Uuid; name: string; scd: number; facts: number }[];
+  /** `history`: the dimension's history as shown (slice 19: "SCD 1", "Snapshot · Month-end"). */
+  dimensions: { id: Uuid; name: string; history: string; facts: number }[];
   /** The dots by fact, then by dimension, in the relationships' order. */
   cells: Record<Uuid, Record<Uuid, BusDot[]>>;
 }
@@ -79,7 +80,7 @@ export function busMatrix(
   return {
     workspace,
     facts: facts.map((f) => ({ id: f.id, name: f.name, grain: index.cubeOf(f.id)?.grain?.trim() || null })),
-    dimensions: dimensions.map((d) => ({ id: d.id, name: d.name, scd: index.cubeOf(d.id)?.scd_type ?? 1, facts: users.get(d.id)?.size ?? 0 })),
+    dimensions: dimensions.map((d) => ({ id: d.id, name: d.name, history: historyLabel(index.cubeOf(d.id)), facts: users.get(d.id)?.size ?? 0 })),
     cells,
   };
 }

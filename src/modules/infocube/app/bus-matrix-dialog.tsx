@@ -62,7 +62,7 @@ export function BusMatrixDialog({ workspaceId, openEntity, openRelationship, onC
                     <button type="button" className={nameButton} onClick={() => go(() => openEntity(d.id))} data-testid="bus-open-entity">
                       {d.name}
                     </button>
-                    <small className="block text-im-ink-3">{T.scd(d.scd)}</small>
+                    <small className="block text-im-ink-3">{d.history}</small>
                   </th>
                 ))}
               </tr>

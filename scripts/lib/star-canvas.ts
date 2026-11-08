@@ -12,7 +12,7 @@ import { seedId } from "../../src/data/local/seed-model";
 import { SEED_IDS } from "../../src/data/local/seed";
 import type { Uuid } from "../../src/domain/ids";
 import type { Attribute, Entity, Relationship } from "../../src/domain/types";
-import type { CubeEntity, CubeMapping, CubeMappingInput } from "../../src/modules/infocube/domain/types";
+import { typeColumns, type CubeEntity, type CubeMapping, type CubeMappingInput } from "../../src/modules/infocube/domain/types";
 
 export const STAR_CANVAS_ID = seedId(LARGE_IDS.workspace, "perf-star:canvas");
 export const STAR_CANVAS_NAME = "Performance test – star";
@@ -68,7 +68,7 @@ export async function addStarCanvas(file: string, joined: "mappings" | "relation
     };
     db.entity.push(entity);
     dimensional.push(entity);
-    db.cube_entity.push({ ...std(`cube-entity:${n}`), entity_id: entity.id, role: fact ? "fact" : "dimension", grain: fact ? "One row per measured event" : null, scd_type: fact ? null : 1 } as CubeEntity);
+    db.cube_entity.push({ ...std(`cube-entity:${n}`), entity_id: entity.id, role: fact ? "fact" : "dimension", grain: fact ? "One row per measured event" : null, ...typeColumns(fact ? "fact" : "dimension") } as CubeEntity);
     const attributes: Attribute[] = [];
     for (let k = 0; k < 8; k++) {
       const a: Attribute = {

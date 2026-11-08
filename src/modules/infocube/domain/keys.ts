@@ -10,6 +10,8 @@
 
 import type { Uuid } from "@/domain/ids";
 import type { Attribute, Entity, Relationship } from "@/domain/types";
+import { aggregateIndex, type AggregateIndex } from "./aggregates";
+import { outriggers, type Outriggers } from "./outriggers";
 import type { CubeEntity, CubeKey, CubeMeasure } from "./types";
 
 /** The model and InfoCube's rows a read needs (deleted rows are ignored). */
@@ -74,6 +76,12 @@ export interface CubeIndex {
   measureOf(attributeId: Uuid): CubeMeasure | undefined;
   /** The fact's relationships to dimensions, in the model's order (R-2). */
   factKeys(factId: Uuid): FactKey[];
+  /** Slice 19: aggregate facts (`aggregates.ts`), built on first use. */
+  aggregates(): AggregateIndex;
+  /** Slice 19: outriggers, derived from the live relationships (`outriggers.ts`), built on first use. */
+  outriggers(): Outriggers;
+  /** Slice 19: the dimensions a fact is related to, each once, in the order of its relationships. */
+  dimensionsOf(factId: Uuid): Uuid[];
 }
 
 export function cubeIndex(model: CubeModel): CubeIndex {
@@ -103,6 +111,8 @@ export function cubeIndex(model: CubeModel): CubeIndex {
   };
   const pkOf = (entityId: Uuid) => attributesOf.get(entityId)?.find((a) => a.is_primary_key) ?? null;
   let byFact: Map<Uuid, { r: Relationship; dimension: Uuid }[]> | undefined;
+  let aggregates: AggregateIndex | undefined;
+  let outs: Outriggers | undefined;
   const groupByFact = () => {
     const out = new Map<Uuid, { r: Relationship; dimension: Uuid }[]>();
     for (const r of relationships) {
@@ -133,6 +143,13 @@ export function cubeIndex(model: CubeModel): CubeIndex {
       // the relationships grouped by fact once (slice 15d, D12: the bus matrix asks for every fact)
       byFact ??= groupByFact();
       return (byFact.get(factId) ?? []).map(({ r, dimension }) => ({ relationshipId: r.id, factId, dimensionId: dimension, role: roleAt(r, dimension), key: keyOf(r.id), pk: pkOf(dimension) }));
+    },
+    aggregates: () => (aggregates ??= aggregateIndex(model.cubeEntities)),
+    outriggers: () => (outs ??= outriggers(relationships, roleOf)),
+    dimensionsOf(factId) {
+      if (roleOf(factId) !== "fact") return [];
+      byFact ??= groupByFact();
+      return [...new Set((byFact.get(factId) ?? []).map((x) => x.dimension))];
     },
   };
 }
@@ -220,8 +237,28 @@ export function factHints(index: CubeIndex, factId: Uuid): Hint[] {
   for (const a of attributes.filter((a) => index.measureOf(a.id) && !NUMERIC.has(a.data_type))) {
     out.push({ text: `${a.name} is a measure but its type is ${typeWord(a)}. Measures are usually Integer or Decimal.`, go: { t: "attribute", id: a.id } });
   }
+  // slice 19 (D-74): the fact's type, factless and base (prototype `factHints`)
+  const measures = attributes.filter((a) => index.measureOf(a.id));
+  if (cube.is_factless && measures.length) out.push({ text: TYPE_HINTS.factless(measures.map((a) => a.name)), go: { t: "attribute", id: measures[0]!.id } });
+  if (cube.fact_type === "periodic") {
+    for (const a of measures.filter((a) => index.measureOf(a.id)!.additivity === "additive")) out.push({ text: TYPE_HINTS.periodic(a.name), go: { t: "attribute", id: a.id } });
+  }
+  if (cube.fact_type === "accumulating" && Math.max(0, ...[...byDimension.values()].map((l) => l.length)) < 2) out.push({ text: TYPE_HINTS.accumulating, go: { t: "entity", id: factId } });
+  const base = index.aggregates().baseOf(factId);
+  if (base) {
+    const ofBase = new Set(index.dimensionsOf(base));
+    for (const d of index.dimensionsOf(factId).filter((d) => !ofBase.has(d))) out.push({ text: TYPE_HINTS.base(index.nameOf(d), index.nameOf(base)), go: { t: "entity", id: d } });
+  }
   return out;
 }
+
+/** Slice 19's hints (approved in step 1, the prototype's texts). */
+export const TYPE_HINTS = {
+  factless: (names: readonly string[]) => `It is marked factless but has measures: ${names.join(", ")}. Turn off one or the other.`,
+  periodic: (name: string) => `${name} is additive. In a periodic snapshot, balances and levels are usually semi-additive across the date.`,
+  accumulating: "An accumulating snapshot usually carries several dates of its process: a date dimension in several roles.",
+  base: (dimension: string, base: string) => `${dimension} is not a dimension of ${base}, its base. An aggregate has the base's dimensions or fewer.`,
+} as const;
 
 // ---- the dimension's "Used by" (R-5), a foreign key's "Carries" (R-6) ----
 

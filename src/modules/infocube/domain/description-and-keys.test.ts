@@ -17,7 +17,7 @@ import {
   noPrimaryKey,
   NOT_FACT_DIMENSION,
   notFactsForeignKey,
-  SCD_ON_FACT,
+  HISTORY_ON_FACT,
   SEMI_NOTE_ONLY_SEMI,
   setMeasure,
   updateCubeEntity,
@@ -37,7 +37,7 @@ const ok = <T,>(r: CommandResult<T>) => {
 const rowOf = (w: Write | undefined) => (w as { row?: Record<string, unknown> } | undefined)?.row;
 const rows = (writes: Write[]) => writes.map((w) => [w.kind, w.table, rowOf(w)?.deleted_at === null ? "live" : "deleted"]);
 
-describe("updateCubeEntity (B-4): a fact's grain, a dimension's SCD type", () => {
+describe("updateCubeEntity (B-4): a fact's grain, a dimension's history", () => {
   it("sets a fact's grain, trimmed, and clears it when empty (IC-04)", () => {
     const set = ok(updateCubeEntity(makeCtx(), modeler(), { cube: cubeRow(S.cubeSales) }, { cubeEntityId: S.cubeSales, expectedVersion: 1, grain: "  One row per order line and day " }));
     expect(set.writeSet.writes).toMatchObject([{ kind: "update", table: "cube_entity", row: { grain: "One row per order line and day", version: 2 } }]);
@@ -45,17 +45,18 @@ describe("updateCubeEntity (B-4): a fact's grain, a dimension's SCD type", () =>
     expect(ok(updateCubeEntity(makeCtx(), modeler(), { cube: cubeRow(S.cubeSales) }, { cubeEntityId: S.cubeSales, expectedVersion: 1, grain: " " })).writeSet.writes[0]).toMatchObject({ row: { grain: null } });
   });
 
-  it("sets a dimension's SCD type", () => {
-    const r = ok(updateCubeEntity(makeCtx(), modeler(), { cube: cubeRow(S.cubeDate) }, { cubeEntityId: S.cubeDate, expectedVersion: 1, scdType: 2 }));
-    expect(r.writeSet.writes[0]).toMatchObject({ row: { scd_type: 2, grain: null } });
+  it("sets a dimension's history (slice 19: was the SCD type)", () => {
+    const r = ok(updateCubeEntity(makeCtx(), modeler(), { cube: cubeRow(S.cubeDate) }, { cubeEntityId: S.cubeDate, expectedVersion: 1, history: "history" }));
+    expect(r.writeSet.writes[0]).toMatchObject({ row: { history: "history", grain: null } });
+    expect(r.writeSet.label).toBe("Change history");
   });
 
   it("refuses a grain on a dimension, a type on a fact, an unknown type, nothing to change, a stale version, a reviewer, the archive", () => {
     const run = (cube: string, input: object, a = modeler()) => updateCubeEntity(makeCtx(), a, { cube: cubeRow(cube) }, { cubeEntityId: cube, expectedVersion: 1, ...input });
     expect(run(S.cubeDate, { grain: "x" })).toMatchObject({ ok: false, error: { code: "invalid", message: GRAIN_ON_DIMENSION } });
-    expect(run(S.cubeSales, { scdType: 1 })).toMatchObject({ ok: false, error: { code: "invalid", message: SCD_ON_FACT } });
-    expect(run(S.cubeDate, { scdType: 3 })).toMatchObject({ ok: false, error: { code: "invalid" } });
-    expect(run(S.cubeDate, { scdType: 1 })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
+    expect(run(S.cubeSales, { history: "overwrite" })).toMatchObject({ ok: false, error: { code: "invalid", message: HISTORY_ON_FACT } });
+    expect(run(S.cubeDate, { history: "3" })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    expect(run(S.cubeDate, { history: "overwrite" })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
     expect(run(S.cubeSales, { grain: "One row per order line" })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
     expect(run(S.cubeSales, { grain: "x", expectedVersion: 2 })).toMatchObject({ ok: false, error: { code: "stale_version" } });
     expect(run(S.cubeSales, { grain: "x" }, access("reviewer", on))).toMatchObject({ ok: false, error: { code: "forbidden" } });
