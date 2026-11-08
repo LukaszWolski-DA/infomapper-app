@@ -10,7 +10,7 @@ import {
   openCanvas,
   openEntityFromTree,
   openRequirementsTab,
-  pickOption,
+  linkFromPanel,
   RETAIL,
   row,
   SEED_IDS,
@@ -71,7 +71,7 @@ test("S4A-13: the workspace Overview's “{covered} of {total} requirements cove
   expect(group.map((e) => e.object_type).sort()).toEqual(["requirement", "workspace"]);
   expect(group.every((e) => e.context_label_id === cr23.id)).toBe(true);
   await openEntityFromTree(page, "Order Line");
-  await pickOption(page.getByTestId("select-link-requirement"), "REQ-106");
+  await linkFromPanel(page, ["REQ-106"]);
   await expect.poll(async () => (await lastGroup()).map((e) => e.object_type)).toEqual(["requirement_link"]);
   group = await lastGroup();
   expect(group[0]!.context_label_id).toBe(cr23.id);

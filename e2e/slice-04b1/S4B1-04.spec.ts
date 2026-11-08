@@ -3,7 +3,7 @@
 // drawn at 30 %; a click on a marker changes nothing (no selection, no write).
 
 import { expect, test, type Page } from "./fixtures";
-import { canvasUrl, card, loadRequirementLinks, openCanvas, openEntityFromTree, openRequirement, requirementByKey, sectionRows, signInAs, WHOLE } from "./helpers";
+import { canvasUrl, card, linkFromPanel, loadRequirementLinks, openCanvas, openEntityFromTree, openRequirement, sectionRows, signInAs, WHOLE } from "./helpers";
 
 const marker = (page: Page, name: string) => card(page, name).getByTestId("mark-requirements");
 /** The marker's count and the requirement keys of its tooltip, in order. */
@@ -33,7 +33,7 @@ test("S4B1-04: markers on entity and table cards match their panels; link, unlin
   await page.getByTestId("tab-sources").click();
   await page.getByTestId("tree-item").filter({ has: page.getByText("order_line", { exact: true }) }).click();
   await expect(page.getByTestId("panel-source-table")).toBeVisible();
-  await page.getByTestId("select-link-requirement").selectOption((await requirementByKey("REQ-103")).id);
+  await linkFromPanel(page, ["REQ-103"]);
   await expect(marker(page, "order_line")).toHaveAttribute("data-count", "1");
   // unlinking it takes the marker away
   await page.getByTestId("button-requirement-unlink").click();

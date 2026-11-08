@@ -3,7 +3,7 @@
 // name is typed without a click, saved with Enter, and the field kept the focus throughout.
 
 import { expect, test } from "./fixtures";
-import { canvasUrl, emptySpot, expectSelected, loadModel, openCanvas, signInAs, toolboxAt, WHOLE_CO } from "./helpers";
+import { canvasUrl, emptySpot, expectSelected, loadModel, openCanvas, signInAs, toolboxAt, WHOLE_CO, pickConcept } from "./helpers";
 
 test("S6B-02: a new entity's name is typed straight away; the place it records does not take the focus", async ({ page }) => {
   await signInAs(page, "Łukasz");
@@ -13,6 +13,8 @@ test("S6B-02: a new entity's name is typed straight away; the place it records d
 
   await toolboxAt(page, await emptySpot(page));
   await page.getByTestId("menu-toolbox").getByTestId("toolbox-item").filter({ hasText: "New entity here" }).click();
+  // slice 17 (D-72): outside a concept frame the concept is chosen in a picker
+  await pickConcept(page, "Customer");
   const name = page.getByTestId("input-entity-name");
   await expect(name).toBeFocused();
   await expect.poll(length).toBe(start + 1);

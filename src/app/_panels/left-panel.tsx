@@ -167,9 +167,10 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   const open = async (target: CardTarget, cardId: string | null, rows: number, hitId?: string) => {
     closeLeftOverlay();
     if (cardId) {
-      ui.select({ t: "card", id: cardId });
-      ui.centerOn(cardId);
+      // a hit selects the row only: one history place, so Back returns to what was selected before
       if (hitId) ui.showRow(cardId, hitId);
+      else ui.select({ t: "card", id: cardId });
+      ui.centerOn(cardId);
       return;
     }
     const placed = await ui.place(target, rows);

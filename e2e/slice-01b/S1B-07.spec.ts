@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { canvasUrl, card, closeToolbox, emptySpot, ids, loadItems, loadModel, openCanvas, pointOnLine, rowNamed, signInAs, toolboxAt } from "./helpers";
+import { canvasUrl, card, closeToolbox, emptySpot, ids, loadItems, loadModel, openCanvas, pointOnLine, rowNamed, signInAs, toolboxAt, pickConcept } from "./helpers";
 
 test("S1B-07: the Entity tool and “New entity here” create an entity at the clicked spot with the name ready to type; the toolbox offers the actions listed for each kind of item", async ({ page }) => {
   const { model, attribute } = await ids();
@@ -12,6 +12,8 @@ test("S1B-07: the Entity tool and “New entity here” create an entity at the 
   // the Entity tool: the next click creates an entity there (its card at the click − 24, − 20);
   await page.getByTestId("button-tool-entity").click();
   await page.mouse.click(area.x + 300, area.y + 200);
+  // slice 17 (D-72): outside a concept frame the concept is chosen in a picker
+  await pickConcept(page, "Customer");
   await expect(nameField).toBeFocused();
   await expect(nameField).toHaveValue("New entity");
   await page.keyboard.type("Loyalty Card");
@@ -27,6 +29,7 @@ test("S1B-07: the Entity tool and “New entity here” create an entity at the 
   expect(onCanvas).toEqual(expect.arrayContaining(["New entity here", "Fit everything on screen"]));
   await expect(page.getByTestId("input-toolbox-search")).toBeVisible();
   await page.getByTestId("menu-toolbox").getByRole("menuitem", { name: /New entity here/ }).click();
+  await pickConcept(page, "Customer");
   await expect(nameField).toBeFocused();
   await expect(nameField).toHaveValue("New entity");
   await expect.poll(async () => (await loadModel()).entities.length).toBe(model.entities.length + 2);
@@ -57,14 +60,15 @@ test("S1B-07: the Entity tool and “New entity here” create an entity at the 
   // an attribute row: only the row's actions, no card actions (D-52)
   const email = (await rowNamed(page, "Customer", "email").boundingBox())!;
   const onRow = await toolboxAt(page, { x: email.x + 30, y: email.y + email.height / 2 });
-  // slice 10c: "Copy" (D-63)
-  expect(onRow).toEqual(["Move up", "Move down", "Move to the top", "Move to the bottom", "Map from a column…", "Copy", "Delete attribute"]);
+  // slice 10c: "Copy" (D-63); slice 17: "Add attribute below" and "Link to requirements…" (D-72)
+  expect(onRow).toEqual(["Move up", "Move down", "Move to the top", "Move to the bottom", "Add attribute below", "Link to requirements…", "Map from a column…", "Copy", "Delete attribute"]);
   await expect(page.getByTestId("menu-toolbox").getByText("Rows", { exact: true })).toHaveCount(0);
   await closeToolbox(page);
 
   // a column row: only the row's action (D-52)
   const segment = (await rowNamed(page, "customers", "segment").boundingBox())!;
-  expect(await toolboxAt(page, { x: segment.x + 30, y: segment.y + segment.height / 2 })).toEqual(["Map to an attribute…"]);
+  // slice 17: "Link to requirements…" (D-72)
+  expect(await toolboxAt(page, { x: segment.x + 30, y: segment.y + segment.height / 2 })).toEqual(["Link to requirements…", "Map to an attribute…"]);
   await closeToolbox(page);
 
   // a mapping line: status, edit rule, delete

@@ -34,6 +34,7 @@ import {
   togglePanel,
   toolboxAt,
   treeItem,
+  pickConcept,
 } from "./helpers";
 
 async function hideRight(page: Page) {
@@ -165,6 +166,8 @@ test("S5A-04: creating something whose name is typed in the details panel opens 
   const area = (await page.locator(".react-flow__pane").boundingBox())!;
   await page.getByTestId("button-tool-entity").click();
   await page.mouse.click(area.x + 300, area.y + 200);
+  // slice 17 (D-72): outside a concept frame the concept is chosen in a picker
+  await pickConcept(page, "Customer");
   await expectOpened(page);
   await expect(nameField).toBeFocused();
   await page.keyboard.press("Enter");
@@ -173,6 +176,7 @@ test("S5A-04: creating something whose name is typed in the details panel opens 
   await hideRight(page);
   await toolboxAt(page, await emptySpot(page));
   await pick(page, "New entity here");
+  await pickConcept(page, "Customer");
   await expectOpened(page);
   await expect(nameField).toBeFocused();
   await page.keyboard.press("Enter");

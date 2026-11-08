@@ -155,6 +155,8 @@ function Picker({ options }: { options: PickOptions }) {
                 type="button"
                 data-pick-item={it.id}
                 data-testid="picker-item"
+                data-key={it.key}
+                data-label={it.label}
                 role={multi ? "menuitemcheckbox" : "option"}
                 aria-checked={multi ? on : undefined}
                 aria-selected={multi ? undefined : false}

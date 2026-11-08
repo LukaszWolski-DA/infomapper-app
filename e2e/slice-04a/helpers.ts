@@ -54,6 +54,27 @@ export async function openRequirementsTab(page: Page): Promise<void> {
 }
 
 /** A requirement's row in the Requirements tab. */
+/**
+ * “Link to requirements…” in an element panel (slice 17, D-72): its picker, the keys checked, then “Link {n}”. With
+ * `all`, the entity panel's “Link all attributes…”.
+ */
+export async function linkFromPanel(page: Page, keys: readonly string[], options: { all?: boolean } = {}): Promise<void> {
+  await page.getByTestId(options.all ? "button-link-all-attributes" : "button-link-requirements").click();
+  const picker = page.getByTestId(options.all ? "picker-link-all" : "picker-requirements");
+  await expect(picker).toHaveAttribute("data-shown", "true");
+  for (const key of keys) await picker.locator(`[data-testid="picker-item"][data-key="${key}"]`).click();
+  await picker.getByTestId("picker-confirm").click();
+  await expect(picker).toHaveCount(0);
+}
+
+/** “New requirement…” in an element panel's requirement picker (slice 17; was the select's “+ New requirement…”). */
+export async function newRequirementFromPanel(page: Page): Promise<void> {
+  await page.getByTestId("button-link-requirements").click();
+  const picker = page.getByTestId("picker-requirements");
+  await expect(picker).toHaveAttribute("data-shown", "true");
+  await picker.getByTestId("picker-extra").click();
+}
+
 export const requirementRow = (page: Page, key: string) => page.locator(`[data-testid="tree-req"][data-key="${key}"]`);
 
 /** Opens a requirement's panel from the Requirements tab. */

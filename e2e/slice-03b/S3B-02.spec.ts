@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { canvasUrl, card, contextOn, dragTo, expectToast, ids, labelNamed, lastGroup, linkedTo, loadModel, openCanvas, rowNamed, signInAs, undo } from "./helpers";
+import { canvasUrl, card, contextOn, dragTo, expectToast, ids, labelNamed, lastGroup, linkedTo, loadModel, openCanvas, rowNamed, signInAs, undo, pickConcept } from "./helpers";
 
 test("S3B-02: with CR-23 on, creating an entity, adding an attribute, renaming an attribute, creating a mapping by drag, changing a mapping's rule and drawing a relationship each label what they created or changed (relationship: both entities) in the same undo step; one Ctrl+Z takes change and label away; every change event of the group has the context", async ({ page }) => {
   test.setTimeout(180_000);
@@ -75,6 +75,8 @@ test("S3B-02: with CR-23 on, creating an entity, adding an attribute, renaming a
   const area = (await page.locator(".react-flow__pane").boundingBox())!;
   await page.getByTestId("button-tool-entity").click();
   await page.mouse.click(area.x + 300, area.y + 200);
+  // slice 17 (D-72): outside a concept frame the concept is chosen in a picker
+  await pickConcept(page, "Customer");
   const entityName = page.getByTestId("input-entity-name");
   await expect(entityName).toBeFocused();
   await entityName.fill("Loyalty Card");

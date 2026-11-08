@@ -16,6 +16,7 @@ import {
   signInAs,
   store,
   treeItem,
+  pickConcept,
 } from "./helpers";
 
 test("S3B-10: dropping an entity on the live canvas asks; “Add CR-23” labels and places it where dropped; “Cancel” changes nothing; the Entity tool labels without asking; bulk adds are refused with the prototype's toast", async ({ page }) => {
@@ -52,6 +53,8 @@ test("S3B-10: dropping an entity on the live canvas asks; “Add CR-23” labels
   await openCanvas(page, liveUrl(live), { x: 0, y: -900, zoom: 1 });
   await page.getByTestId("button-tool-entity").click();
   await page.mouse.click(area.x + 300, area.y + 200);
+  // slice 17 (D-72): outside a concept frame the concept is chosen in a picker
+  await pickConcept(page, "Customer");
   await expect(page.getByTestId("dialog-live-question")).toHaveCount(0);
   await expectToast(page, /^Created New entity in .+, labeled CR-23\. Type its name now; change the concept in the panel\.$/);
   await expect.poll(async () => (await loadModel()).entities.some((e) => e.name === "New entity")).toBe(true);
