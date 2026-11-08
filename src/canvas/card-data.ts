@@ -10,7 +10,7 @@ import { cardShownNames } from "@/domain/model/aliases";
 import type { Canvas, CanvasItem, LiveLevel, NameMode, RowFilter, SourceChange, WorkspaceModel } from "@/domain/types";
 import type { EntityRole, RowFeed } from "@/ui/modules";
 import { lineNeedsClip, ROLE_MARK, rowNeedsClip, titleNeedsClip } from "./text-fit";
-import { derivationIndex, derivedRows, derivedRowTitle } from "@/domain/model/derivations";
+import { derivationIndex, derivedRows, derivedRowTitle, rowCounts } from "@/domain/model/derivations";
 
 export type CardKind = "ent" | "src";
 
@@ -278,7 +278,8 @@ export function buildCards(
         ...(live ? { liveRemove: live.removeOf({ kind: "entity", id: entity.id }) } : {}),
         color: concept?.color ?? null,
         rows,
-        mapped: rows.filter((r) => r.mappings > 0).length,
+        // slice 18: as the rows' dots and squares say (`rowCounts`)
+        mapped: rows.filter(rowCounts).length,
         subject: { entityConceptId: entity.concept_id },
         links: links(rows),
         labels: labelsOf(`entity:${entity.id}`),

@@ -5,6 +5,7 @@ import { isLogical } from "@/domain/model/levels";
 import type { Uuid } from "@/domain/ids";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
 import { coverageParts } from "@/domain/model/requirements";
+import { countsAsMapped } from "@/domain/model/derivations";
 import type { CanvasItem, Entity, Frame, Note, RequirementKind, RequirementStatus, WorkspaceModel } from "@/domain/types";
 import type { ModuleView } from "@/ui/modules";
 import { indexModel, typeCheckOf, type ModelIndex } from "./model-index";
@@ -26,8 +27,13 @@ export function coverage(
     .map((entity) => {
       const attributes = ix.attributesOf.get(entity.id) ?? [];
       const feed = modules.roles[entity.id]?.feed;
-      if (feed) return { entity, attributes: attributes.length, mapped: attributes.filter((a) => (modules.rowFeeds[a.id]?.n ?? 0) > 0).length, feed };
-      return { entity, attributes: attributes.length, mapped: attributes.filter((a) => isMapped(ix, a.id)).length };
+      // slice 18 (F1): an attribute counted through its calculation counts, as its row's filled square says
+      if (feed) {
+        const fed = countsAsMapped(ix.derivations, (id) => (modules.rowFeeds[id]?.n ?? 0) > 0);
+        return { entity, attributes: attributes.length, mapped: attributes.filter((a) => fed(a.id)).length, feed };
+      }
+      const mapped = countsAsMapped(ix.derivations, (id) => isMapped(ix, id));
+      return { entity, attributes: attributes.length, mapped: attributes.filter((a) => mapped(a.id)).length };
     });
 }
 

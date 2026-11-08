@@ -5,6 +5,7 @@
 import { isLogical } from "@/domain/model/levels";
 import type { Uuid } from "@/domain/ids";
 import { indexOf, type ClassificationIndex } from "@/domain/model/classifications";
+import { derivationIndex, type DerivationIndex } from "@/domain/model/derivations";
 import { suggestsBusinessKey } from "@/domain/model/mapping-rules";
 import { checkMappingTypes, formatAttributeType, formatColumnType, type MappingTypeCheck } from "@/domain/model/type-check";
 import type { Attribute, Entity, Mapping, MappingInput, SourceColumn, SourceRelationship, SourceTable, WorkspaceModel } from "@/domain/types";
@@ -26,6 +27,8 @@ export interface ModelIndex {
   inputsOf: Map<Uuid, MappingInput[]>;
   /** Classifications of tables and columns (slice 7c, item 6): built once per model. */
   classes: ClassificationIndex;
+  /** Slice 18: the calculations, built once per model. */
+  derivations: DerivationIndex;
 }
 
 const push = <K, V>(m: Map<K, V[]>, k: K, v: V) => m.set(k, [...(m.get(k) ?? []), v]);
@@ -57,6 +60,7 @@ export function indexModel(model: WorkspaceModel): ModelIndex {
     mappingsOf,
     inputsOf,
     classes: indexOf(model),
+    derivations: derivationIndex(model.attributes, model.attributeInputs ?? []),
   };
 }
 

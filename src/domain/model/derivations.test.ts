@@ -126,7 +126,8 @@ describe("calculationGaps and the rows (slice 18)", () => {
   it("counts a row with a mapping or a calculation that counts", () => {
     expect(rowCounts({ mappings: 1 })).toBe(true);
     expect(rowCounts({ mappings: 0 })).toBe(false);
-    expect(rowCounts({ mappings: 0, calc: { ok: true } })).toBe(true);
-    expect(rowCounts({ mappings: 0, calc: { ok: false } })).toBe(false);
+    expect(rowCounts({ mappings: 0, calc: { square: "ok" } })).toBe(true);
+    expect(rowCounts({ mappings: 0, calc: { square: "gap" } })).toBe(false);
+    expect(rowCounts({ mappings: 0, calc: {} })).toBe(false);
   });
 });

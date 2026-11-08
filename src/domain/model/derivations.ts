@@ -164,8 +164,19 @@ export function derivedRows(
   return out;
 }
 
-/** Whether a row counts as mapped (or fed): a direct mapping or feed, or its calculation's inputs (slice 18, F1). */
-export const rowCounts = (row: { mappings: number; calc?: { ok: boolean } }): boolean => row.mappings > 0 || row.calc?.ok === true;
+/**
+ * Whether a row counts as mapped (or fed): a direct mapping or feed, or its filled square, a calculation whose inputs all
+ * count (slice 18, F1). The card's count, the Mapped and Not mapped filters and the thumbnails' heights read this.
+ */
+export const rowCounts = (row: { mappings: number; calc?: { square?: "ok" | "gap" } }): boolean => row.mappings > 0 || row.calc?.square === "ok";
+
+/**
+ * Whether an attribute counts as mapped (or fed) by the same rule as its row (`rowCounts`), from the model: `direct` is
+ * the caller's (a source mapping for a logical attribute, a module's feed for a dimensional one). Memoised; build it once
+ * per count. The Overview, the status bar, the project home and the frames read it through their rows or this.
+ */
+export const countsAsMapped = (index: DerivationIndex, direct: (attributeId: Uuid) => boolean): ((attributeId: Uuid) => boolean) =>
+  index.any ? throughCalculation(index, direct) : direct;
 
 // ---- texts (approved in step 1, answer 6: "covered" is D-31's word, never a calculation's) ----
 
