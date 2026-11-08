@@ -2,8 +2,10 @@
 // built once per page, on a synthetic model of about 20,000 attributes (2,000 entities of 10 attributes, 2,000
 // relationships, 3,000 copies with chains, wrong ways and missing relationships, duplicates, calculations, 3,000
 // approved source mappings, 1,500 dimensional mappings), on "Performance test" and on the demo. The lookup is the
-// requirement index's, built anyway; it is timed apart. One warm-up, then 9 rounds; median, fastest, slowest.
-// Bar: 20 ms (Node median) on the synthetic model; the others are reported without a bar.
+// requirement index's and the cube index the page's sections build: both timed apart. One warm-up, then 9 rounds;
+// median, fastest, slowest. Bars (Łukasz, step 2's second round): the project home's whole computation, lines
+// included, 50 ms in Node on the synthetic model; the marks and counts 20 ms in Chromium (`bench-checks-browser.ts`).
+// "Performance test" and the demo are reported without a bar.
 // Run: npx tsx scripts/bench-checks.ts
 
 import { performance } from "node:perf_hooks";
@@ -11,11 +13,12 @@ import { addFullDemoData } from "../src/compose/seed";
 import { buildSeed, SEED_IDS } from "../src/data/local/seed";
 import { addLargeWorkspace, LARGE_IDS } from "../src/data/local/seed-large";
 import { lookupModel } from "../src/domain/model/requirements";
-import { checksOf, prepare, type ChecksDb } from "./lib/checks-model";
+import { cubeOf, homeOf, marksOf, prepare, type ChecksDb } from "./lib/checks-model";
 import { synthetic, SYNTHETIC_WS } from "./lib/synthetic-checks";
 
 const ROUNDS = 9;
-const BAR = 20;
+/** The project home's whole computation, lines included, in Node (Łukasz, step 2's second round); the marks' bar is the browser's. */
+const HOME_BAR = 50;
 const ms = (v: number) => `${v.toFixed(1)} ms`;
 
 function time(label: string, bar: number | null, run: () => unknown): void {
@@ -31,21 +34,22 @@ function time(label: string, bar: number | null, run: () => unknown): void {
   console.log(`  ${label}: median ${ms(median)}, fastest ${ms(times[0]!)}, slowest ${ms(times.at(-1)!)}${bar === null ? "" : `; bar ${ms(bar)} ${median <= bar ? "met" : "MISSED"}`}`);
 }
 
-function report(name: string, db: ChecksDb, ws: string, bar: number | null, scopeOf?: (p: ReturnType<typeof prepare>) => Set<string>) {
+function report(name: string, db: ChecksDb, ws: string, bar: number | null, project?: number) {
   const p = prepare(db, ws);
-  const { checks } = checksOf(p, null);
+  const all = new Set(p.model.entities.map((e) => e.id));
+  const canvas = new Set(p.model.entities.slice(0, 40).map((e) => e.id));
+  const { checks, lines } = homeOf(p, null);
   console.log(`${name}: ${p.model.entities.length} entities, ${p.model.attributes.length} attributes, ${p.model.relationships.length} relationships, ${p.rows.cubeMappings.length} dimensional mappings`);
-  console.log(`  lines: ${checks.count} (${checks.groups.map((g) => `${g.id} ${g.lines.length}`).join(", ")}); ${JSON.stringify(checks.groups).length.toLocaleString("en")} bytes as JSON`);
-  time("lookup (the requirement index's, not counted)", null, () => lookupModel(p.model));
-  time("checks and index, whole model (a canvas page)", bar, () => checksOf(p, null));
-  if (scopeOf) {
-    const scope = scopeOf(p);
-    time(`checks, a project of ${scope.size} entities (the home)`, null, () => checksOf(p, scope));
-  }
+  console.log(`  lines: ${checks.count} (${checks.groups.map((g) => `${g.id} ${g.items.length}`).join(", ")}); ${JSON.stringify(lines).length.toLocaleString("en")} bytes as JSON`);
+  time("lookup (the requirement index's, apart)", null, () => lookupModel(p.model));
+  time("cube index (the page's sections', apart)", null, () => cubeOf(p.model, p.rows));
+  time("marks and counts (a canvas after a write)", null, () => marksOf(p, canvas));
+  time("the home, every entity in scope, lines included", bar, () => homeOf(p, all));
+  if (project) time(`the home, a project of ${project} entities, lines included`, null, () => homeOf(p, new Set(p.model.entities.slice(0, project).map((e) => e.id))));
 }
 
 const synth = synthetic();
-report("Synthetic", synth, SYNTHETIC_WS, BAR, (p) => new Set(p.model.entities.slice(0, 200).map((e) => e.id)));
+report("Synthetic", synth, SYNTHETIC_WS, HOME_BAR, 200);
 
 const large = buildSeed() as ChecksDb;
 addLargeWorkspace(large, new Date().toISOString());

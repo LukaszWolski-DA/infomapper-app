@@ -7,7 +7,8 @@ import type { DevDb } from "../../src/data/local/schema";
 import type { InfoCubeDb } from "../../src/modules/infocube/data/tables";
 import { cubeRequirementFeeds, mappingIndex } from "../../src/modules/infocube/domain/mappings";
 import { cubePageRows } from "../../src/modules/infocube/domain/view";
-import { checkIndex, modelChecks, type CheckInput, type ModelChecks } from "../../src/domain/model/checks";
+import { checkIndex, lineOf, modelChecks, type CheckInput, type CheckLine, type ModelChecks } from "../../src/domain/model/checks";
+import { cubeIndex, type CubeIndex } from "../../src/modules/infocube/domain/keys";
 import { lookupModel, type ModelLookup } from "../../src/domain/model/requirements";
 import type { Uuid } from "../../src/domain/ids";
 import type { WorkspaceModel } from "../../src/domain/types";
@@ -47,6 +48,8 @@ export interface Prepared {
   lookup: ModelLookup;
   rows: ReturnType<typeof cubePageRows>;
   on: boolean;
+  /** The page's cube index (its sections build one), passed to InfoCube's rules. */
+  cube: CubeIndex;
 }
 
 /** What a page has before the checks: the model, the module's rows and the requirement index's lookup. */
@@ -54,12 +57,23 @@ export function prepare(db: ChecksDb, ws: Uuid): Prepared {
   const model = modelOf(db, ws);
   const rows = cubePageRows(of(db.cube_entity, ws), of(db.cube_measure, ws), of(db.cube_key, ws), of(db.cube_mapping, ws), of(db.cube_mapping_input, ws));
   const feeds = cubeRequirementFeeds(mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings: rows.cubeMappings as never, cubeMappingInputs: rows.cubeMappingInputs as never }), model.attributes);
-  return { model, lookup: lookupModel(model, feeds), rows, on: !!db.workspace.find((w) => w.id === ws)?.infocube };
+  return { model, lookup: lookupModel(model, feeds), rows, on: !!db.workspace.find((w) => w.id === ws)?.infocube, cube: cubeOf(model, rows) };
 }
 
-/** The checks and their index, as a page builds them once (the bench's timed part). */
-export function checksOf(p: Prepared, scope: ReadonlySet<Uuid> | null): { checks: ModelChecks; index: ReturnType<typeof checkIndex> } {
+export const cubeOf = (model: WorkspaceModel, rows: ReturnType<typeof cubePageRows>): CubeIndex =>
+  cubeIndex({ entities: model.entities, attributes: model.attributes, relationships: model.relationships, cubeEntities: rows.cubeEntities as never, cubeMeasures: rows.cubeMeasures as never, cubeKeys: rows.cubeKeys as never });
+
+/** What a canvas page computes after a write: the checks' items, the marks and one canvas's count (no texts). */
+export function marksOf(p: Prepared, canvasEntities: ReadonlySet<Uuid>) {
+  const input: CheckInput = { model: p.model, lookup: p.lookup, scope: null };
+  const checks = modelChecks(input, cubeModuleChecks(p.on, p.rows, input, p.cube));
+  const index = checkIndex(checks, (id) => p.lookup.attribute.get(id)?.entity_id);
+  return { checks, index, canvas: index.countOn(canvasEntities) };
+}
+
+/** What the project home computes: its scope's items and every line's words. */
+export function homeOf(p: Prepared, scope: ReadonlySet<Uuid> | null): { checks: ModelChecks; lines: CheckLine[] } {
   const input: CheckInput = { model: p.model, lookup: p.lookup, scope };
-  const checks = modelChecks(input, cubeModuleChecks(p.on, p.rows, input));
-  return { checks, index: checkIndex(checks, p.model.attributes) };
+  const checks = modelChecks(input, cubeModuleChecks(p.on, p.rows, input, p.cube));
+  return { checks, lines: checks.groups.flatMap((g) => g.items.map(lineOf)) };
 }
