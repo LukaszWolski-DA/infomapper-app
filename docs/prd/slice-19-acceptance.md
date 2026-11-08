@@ -431,3 +431,187 @@ No server restarted. **The one failure** was `slice-17/S17-01` ("New fact here" 
 picker's filter was not focused within 15 s. The single-file check
 ([run 42495693752](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42495693752), 3 rounds side by side)
 passed all three, so it is a flake. Slice 19 does not touch the picker or its focus (`src/ui/pick-popover.tsx`).
+
+## Łukasz's answers to step 2 (8 November 2026)
+
+Step 2 accepted. No rerun of the full run; step 3's full run on the final commit counts. Find why S17-01 failed (the second
+time) and fix it in the test or in the app, reporting the cause either way.
+
+## Step 3: panels, canvas, seed and close (8 November 2026)
+
+### S17-01: the cause
+
+**It was a race in the test, not in the app.** The trace of run 42494465470 shows the order of events:
+1. 537,355 ms: the Cube tab's "New dimension" create is sent. It took 165 ms, so its answer arrived at about
+   537,520 ms.
+2. 537,480 ms: the test clicked "New fact". The test had polled the data file, and the file is written before the
+   answer reaches the page.
+3. The picker opened, and its filter got the focus.
+4. The create's answer then did what it does by design (`createIn`, `left-panel.tsx`: `setNameFocus`): the new
+   dimension's name field took the focus, away from the picker's filter.
+
+The toolbox part of the same test had the same race. It also right-clicked the same spot before the new fact's card was
+drawn there.
+
+**The fix, in the test only:**
+- After each create, the test waits for the new name field's focus. That is the observable result of the answer.
+- The toolbox part then takes a fresh empty spot, since the new card now lies at the old one.
+- The assertions are unchanged. The test passed 3 of 3 locally and in the final run. CLAUDE.md now names the pattern.
+
+The app's picker focuses its filter in an effect once it is shown, with no timer, so there is nothing to fix there.
+
+### What changed
+
+- **The fact's section** (`sections.tsx`, approved texts):
+  - Fact type (Transaction, Periodic, Accumulating, with the full name and its sentence);
+  - Factless fact (a flag with its sentence);
+  - Aggregate of: a select of `baseChoices`, "Not an aggregate" first; a base no longer offered still shows as chosen;
+    with a base, the sentence and a link to it;
+  - Aggregated by, with each aggregate's grain;
+  - Measures' factless text, and "· snapshot" after a snapshot dimension's key, with its title.
+- **The dimension's section:**
+  - Kind (Standard, Junk), with its sentence;
+  - Outrigger of, with its sentence, and Outriggers;
+  - History: the four values in two rows (`Seg`'s new `columns={2}`), each with its sentence and the technical sentence;
+  - Snapshot period: a `TextField` with `keep`, shown only for Snapshot, focused when Snapshot is chosen and it is empty;
+  - "Used by" for an outrigger: "No fact uses it directly; it is reached through …".
+- **Rights:** every control is disabled or read only for readers and reviewers (AD-05).
+- **The chip's cut** (`infocube.css`): under `clip-l1` the role is a block with an ellipsis, and the concept text after it
+  shrinks first.
+  - Checking the demo in the browser found a bug in my first version. The chip's flex shrink factor was 0.0001, and
+    flexbox hands out only that fraction of the overflow once the concept text is at 0. The chip did not shrink, and it
+    pushed the header's tools out of the card.
+  - Now the chip shrinks with factor 1 and the concept text with 10,000. On the demo at 75 %, "Fact · Accumulating ·
+    Factless · Aggregate" shows 134 of its 227 px with "…", the concept text is at 0, the line fits, and the short chips
+    stay whole.
+  - S19-07 checks this.
+- **The demo** (answer 6):
+  - `addStarTypes` (`sales-star.ts`) and `addInfoCubeTypesDemoData` (`compose/seed.ts`).
+  - `addFullDemoData` (`addDemoData`, then the types) is used by `npm run seed`, `npm run reset-dev-data`,
+    `npm run demo` and slice 19's fixtures.
+  - Slice 18's fixtures and `tests/infocube-lookups.test.ts` keep `addDemoData`.
+  - The demo makes Dim Category (Product; category_key, category_code, category_name) at (780, 860), with "groups"
+    1..1 → Dim Product 0..n. Dim Order Flags (Sales, junk; order_flags_key, payment_type, channel, is_gift) goes at
+    (1500, 40). Fact Orders' base becomes Fact Sales, and Dim Product a snapshot, "Month-end".
+  - The full demo file passes every table rule (`findViolation`, no violation).
+- **The docs:**
+  - D-74 in `decisions.md` (below, for approval);
+  - `data-model-v2.md` § `cube_entity`;
+  - the InfoCube spec ("Types (slice 19, D-74)");
+  - `ideas.md` (the backlog's done items, and section 9 as later);
+  - `inventory-prototype-vs-app.md` (slice 19's deliberate differences);
+  - `known-limitations.md` (what is left for later, an older undo step, the chip after the fresh page);
+  - README (status, the acceptance link);
+  - CLAUDE.md: the status paragraph, the two new extension points (`TableRules.upgrade`,
+    `ModuleUndoTable.revertRefusal`; `follows` may clear its column), the InfoCube types' rules, and slice 19's
+    fixtures and helpers.
+
+### New specs (`e2e/slice-19/`)
+
+| Spec | What it checks |
+| --- | --- |
+| S19-01 (2 tests) | The file's rows written back in slice 18's shape read as before (Cube tab, chips); a write stores the new shape. Fact type, factless, base, kind, history and period each survive a save, a reload, undo and redo. |
+| S19-02 (2) | Periodic: "Fact · Snapshot", its title, the Cube tab's "Snapshot · grain set", the two additive hints (quantity, net_amount), undo. Accumulating: no hint on Fact Sales (Dim Date in two roles), a hint on Fact Orders, undo. Factless with measures: its hint, undo. Without measures (test data): the Measures text, undo. |
+| S19-03 | Fact Orders' chip, title, base and sentence; the base hint after Dim Order Flags → Fact Orders (test data, from the dimension); the link to Fact Sales; Aggregated by; the select offers only "Not an aggregate"; the preview row; the base cleared after the delete; one undo brings both back. |
+| S19-04 | Dim Order Flags: chip, title, Junk and its sentence. Dim Category: chip, title, Outrigger of, the sentence, Used by. Dim Product: Outriggers. Deleting "groups" removes them everywhere; undo brings them back. |
+| S19-05 | Dim Product: Snapshot and its sentence, "Month-end"; the Cube tab and the bus matrix "Snapshot · Month-end"; the "· snapshot" mark and its title in Fact Sales' Dimensions (once); 2 · history hides the period and keeps it, Snapshot shows it again; the delete preview's history row. |
+| S19-06 (3) | Kasia (reader) and Piotr (reviewer) see every value, and every control is disabled or read only; the domain refuses a base that is the fact itself or closes a cycle. |
+| S19-07 | With Fact Orders an accumulating, factless aggregate: no canvas or miniature commit while idle or after a pan; the long chip cut, the concept text at 0, the line fitting, the full title; every chip one span with no child element. |
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: clean. `npm test`: 155 files and 1,896 tests passed.
+- Locally: slice 19's 15 tests; S15-07 (15b), S15-08 and S15-08b; S17-01 (3 tests).
+- **The element guard** (`S3B-15-elements.spec.ts` against `slice-08.json`, measurement build): passed. The viewport counts
+  equal the baseline. The page totals are 6,001 / 20,798 / 2,868 / 6,310: slice 11's +6, unchanged. "Performance test"
+  has no InfoCube data.
+- **Commit counts** on the Sales star with every type: idle and panned unchanged (S19-07). Slice 18's guards are
+  unchanged on their canvases (the full run).
+- **The demo in the browser** (`infomapper-demo-15b`, its own file `.data/preview-15b.json`, never KB): the chips, the
+  panels and the cut as above, no console errors.
+
+### The full run on the final commit
+
+[Run 42498455899](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42498455899) on `5667761`. Wall-clock
+16 min 16 s (16:09:41–16:25:57 UTC). **677 passed, 0 failed, 4 skipped, 0 expected failures, 0 flaky.**
+
+| Part | 1 | 2 | 3 | 4 | 5 | 6 | 7 |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| time | 7:52 | 9:32 | 8:13 | 6:57 | 8:15 | 6:38 | 14:36 |
+| heap peak (MB) | 1,264 | 986 | 1,299 | 1,269 | 1,162 | 1,037 | 1,164 |
+
+No server restarted. Part 7 (from `slice-14a`, now with `slice-19`) is the longest at 14:36, up from 11:38 in step 2's run.
+Its heap is far from 2 GB, so the cuts stay.
+
+### Earlier tests changed in step 3, and why
+
+| Test | Change | Why |
+| --- | --- | --- |
+| e2e `slice-17/S17-01` | waits for the new name's focus after each create; a fresh empty spot for the toolbox | the race above; assertions unchanged |
+| e2e `slice-15b/S15-08b` | the History's sentences "SCD n: …" and the technical sentence with "snapshot date" | answer 7 |
+
+### Assumptions
+
+- **The undo names of the grain and the slice-15 fields stay InfoMapper's default** ("Change fact or dimension"), as
+  approved.
+- **"Aggregate of" offers the facts in the model's order of entities** (P4), and a base no longer offered still shows as
+  chosen.
+- **The snapshot period's field is focused only when Snapshot is chosen and the period is empty**, as in the prototype.
+- **The demo's Dim Order Flags has no relationship to a fact**, as in the prototype, so the bus matrix shows it "unused".
+
+### D-74 (as in `docs/decisions.md`, for approval)
+
+> **D-74** InfoCube types (slice 19). A fact has a type: Transaction (every fact, existing or new, starts as one),
+> Periodic snapshot or Accumulating snapshot, each with its sentence. It may be marked factless, deliberately without
+> measures ("None: a factless fact. Count its rows."). It may be an aggregate of another fact ("Aggregate of"; the base
+> lists it under "Aggregated by"): never of itself or in a cycle at any depth, which the select never offers, the domain
+> refuses and undo refuses; deleting the base clears its aggregates' base in the same undo step, and the delete preview
+> names them. A dimension has a kind, Standard or Junk, and a history that replaces the SCD type: 0 · keep, 1 ·
+> overwrite, 2 · history, or Snapshot, the whole dimension kept per snapshot date (in Data Vault usually from a PIT
+> table), with a snapshot period kept whatever the history; every place that showed "SCD n" shows a snapshot as
+> "Snapshot · {period}", and a fact's Dimensions mark a snapshot dimension's key. An outrigger is derived, never stored:
+> in a relationship between two dimensions, the "one" end (with 1:1 the relationship's from end; many-to-many none) is
+> an outrigger of the other ("Outrigger of", "Outriggers", and "Used by" says it is reached through its dimension); the
+> relationship panel says nothing about it. The card's and the panel's role name the type: "Fact · Snapshot", "Fact ·
+> Accumulating", "Factless", "Aggregate", "Dimension · Junk", "Snapshot", "Outrigger"; the title is the long text
+> ("Transaction fact (InfoCube)"); a chip that does not fit is cut with "…", the concept text first. The Cube tab's items
+> and the bus matrix follow. Four hints are added: a factless fact with measures, an additive measure in a periodic
+> snapshot, an accumulating snapshot with no dimension in two roles, an aggregate related to a dimension its base is
+> not. Every change is one undo step for those who may edit the model (AD-05); readers and reviewers see the values
+> without controls. Accepted by Łukasz, 8 November 2026 (step 1).
+
+### Manual acceptance steps
+
+**The demo** (`npm run demo -- --reset`, then http://127.0.0.1:3001 as Łukasz; never KB). Open Order management →
+"Sales star".
+1. **Fact Orders** shows "Fact · Aggregate"; its title reads "Transaction fact, aggregate of Fact Sales (InfoCube)".
+   - Its panel shows Fact type Transaction and Aggregate of Fact Sales, with the sentence and its link.
+   - Fact Sales' panel lists Fact Orders under "Aggregated by", and its select offers only "Not an aggregate".
+2. **Fact Sales: Periodic.**
+   - The chip reads "Fact · Snapshot", and the Cube tab "Snapshot · grain set".
+   - Hints appear for quantity and net_amount.
+   - Undo, then Accumulating: no "several dates" hint (Dim Date plays two roles). On Fact Orders, Accumulating gives the
+     hint.
+3. **Fact Orders: Factless fact.** The hint names total_amount and line_count; the chip reads "Fact · Factless · Aggregate"
+   (with Accumulating, cut with "…" on its default width).
+4. **Dim Order Flags:** "Dimension · Junk", with Kind Junk and its sentence.
+5. **Dim Category:** "Dimension · Outrigger".
+   - Its panel shows Outrigger of Dim Product and "No fact uses it directly; it is reached through Dim Product.".
+   - Dim Product's panel shows Outriggers: Dim Category.
+   - Delete the line "groups": the outrigger disappears everywhere. Undo brings it back.
+6. **Dim Product:** History Snapshot, period "Month-end".
+   - The Cube tab and the bus matrix show "Snapshot · Month-end".
+   - Fact Sales' Dimensions show "key product_key · snapshot", with its title.
+   - Choose 2 · history: the period hides. Choose Snapshot: "Month-end" is back.
+7. **Delete Fact Sales from the model.** The preview names "Fact Orders – loses its base fact". After the delete, Fact
+   Orders' chip is "Fact". One undo brings back both.
+8. **As Kasia (reader) or Piotr (reviewer):** the same values show, and nothing can be changed.
+
+**KB** (`npm run dev`, your `.data/dev-db.json`; backed up before step 2 as `kb-model-latest.json`):
+1. KB's 9 InfoCube rows convert when the file is loaded:
+   - the 3 facts become Transaction;
+   - the dimensions keep SCD 1 (2) and SCD 2 (4), now as overwrite and history.
+   - The Cube tab and the bus matrix show the same "SCD n" as before.
+2. Set the fact types of DimBuilding's facts, and a junk or snapshot dimension if the model has one. Check the chips on
+   their usual widths.
+3. The file holds the new shape after its first InfoCube save. Its backup holds the old one.
