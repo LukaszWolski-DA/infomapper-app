@@ -323,3 +323,27 @@ All from the prototype unless marked.
    two new extension points: `TableRules.upgrade` and `ModuleUndoTable.revertRefusal`).
 7. **One full run** on the final commit, then the manual acceptance steps. Merge and the tag `slice-19` only on Łukasz's
    command.
+
+## Łukasz's answers to step 1 (8 November 2026)
+
+1. **Older rows:** yes. The local adapter converts InfoCube's older rows when it loads the file, before any read or
+   check; the migration does the same in Postgres (F1).
+2. **Undo:** yes. Undo refuses a cycle of aggregates and a base that is a deleted fact, through a revert check InfoCube
+   supplies, as slice 18 does for calculations (F6).
+3. **Outriggers:** yes. A many-to-many relationship between two dimensions gives no outrigger (F8).
+4. **Relationship panel:** yes. It says nothing about outriggers (F9).
+5. **The chip:** yes. A chip that does not fit is cut with "…", the concept text first, the full text in the tooltip
+   (F11).
+6. **The demo: differently.** Slice 18's fixtures stay as they are. Slice 19's demo is a function of its own,
+   `addInfoCubeTypesDemoData`, called after `addDemoData` by seed, reset and `npm run demo`, and by slice 19's fixtures.
+   This works with how `addDemoData` is used: `seedDevData` and `resetDevData` take one function, so the three scripts
+   pass one that calls `addDemoData` and then `addInfoCubeTypesDemoData`; slice 18's fixtures and
+   `tests/infocube-lookups.test.ts` keep calling `addDemoData` alone. No `addDerivationsDemoData` (F14 as changed).
+7. **Changed texts:** yes. The card's and the panel's titles and the "SCD 0: …" sentences follow the prototype; S15-07
+   and S15-08b change, with the reason recorded.
+8. **Texts, refusals and undo names:** approved as listed.
+9. **The data model:** as proposed, migration `20261108130000_infocube_types.sql`.
+10. **Runs:** one full run at the end of step 2, one on the final commit, single-file checks in between.
+
+Also taken: the two PRD corrections. The rights are AD-05's `model.edit` (F16), and S19-03's relationship is stored from
+the dimension (D-67, F17).
