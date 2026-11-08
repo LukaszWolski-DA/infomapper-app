@@ -619,3 +619,7 @@ Its heap is far from 2 GB, so the cuts stay.
 ## Łukasz's answer to step 3 (8 November 2026)
 
 D-74 approved as written in `docs/decisions.md`. The manual acceptance follows.
+
+## Manual acceptance (8 November 2026)
+
+Passed (Łukasz). Merged into `main` and tagged `slice-19` on his command.
