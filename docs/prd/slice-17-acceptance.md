@@ -387,7 +387,10 @@ copy; `.data/dev-db.json` was only read (Z5's names).
   bytes before, 92,346 after** (+30,914), built on a fresh copy (`seed:large` into `.data/measure/`, removed after).
   Noted in `ideas.md`, with a smaller form for later.
 - **A selected frame:** its seven handles and their layer's two boxes, nine elements while one frame is selected.
-- **Not done yet:** the full run (one, on the final commit, in GitHub Actions).
+- **The full run** ([run 42436157008](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42436157008)) on
+  `812441c`: **650 passed, 4 skipped, 0 failed, 0 flaky, no expected failures**; wall-clock 13 min (01:53 to 02:06 UTC).
+  Parts (time, heap peak): 1: 11:05, 1,072 MB; 2: 7:00, 1,294 MB; 3: 8:19, 1,323 MB; 4: 7:27, 1,289 MB; 5: 8:52,
+  1,096 MB; 6: 6:42, 1,068 MB; 7: 11:38, 1,025 MB. Later commits change only Markdown in `docs/`.
 
 ### Assumptions
 
@@ -398,3 +401,16 @@ copy; `.data/dev-db.json` was only read (Z5's names).
 - A link drag dropped on a target already linked shows the left panel's toast and writes nothing.
 - "Fit frame to its content" still moves notes pinned to a frame when the fit moves its top-left, as before; listed in
   `ideas.md`.
+
+### Manual acceptance (demo and KB)
+
+1. Create an entity outside a concept frame (the Entity tool, "New entity here", the toolbox search): the picker, type,
+   Enter or a click; Escape creates nothing. Inside a concept frame: no picker.
+2. On a fact's attribute, "Link to requirements…": check three, "Link 3", one undo removes all three. On a dimension,
+   "Link all attributes…".
+3. Drag from a requirement card's chain icon onto an attribute row and onto an entity's header; onto empty canvas
+   (nothing linked); Escape during a drag.
+4. Collapse a card, search one of its attributes in the object browser, click the hit: the card opens, the row is
+   selected; Undo closes it again ("Show row"); Back returns.
+5. Select a frame, resize it from its left edge and its top-left corner; a note pinned to it stays in place; undo.
+6. "Add attribute below" on an attribute row: the new attribute directly below it, its name ready.
