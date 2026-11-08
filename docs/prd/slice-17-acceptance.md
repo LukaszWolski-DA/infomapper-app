@@ -315,3 +315,86 @@ One step, as the PRD says, in small commits (KB backed up first):
 - **Z8:** yes, one full run, on the final commit before the merge.
 - **Docs:** the PRD's sentence about a requirement card's double-click goes (it describes the prototype), and its
   section 3 says Q1–Q7.
+
+## Step 2: items 1 to 5, tests and the close (8 November 2026)
+
+KB was backed up before any run: `.data/backups/dev-db-20261108-0119.json` and `.data/backups/kb-model-latest.json`,
+both checked with `cmp`. Every run used the e2e data file, the demo copy `.data/preview-15b.json` or a measurement
+copy; `.data/dev-db.json` was only read (Z5's names).
+
+### What changed
+
+- **The picker** (`src/ui/pick.ts`, `src/ui/pick-popover.tsx`, `PickHost` in the root layout): F5 as proposed. It opens
+  hidden, a `ResizeObserver` on itself keeps it on the screen, then it shows and its filter takes the focus (a hidden
+  field cannot take it: the first version lost the typing to the canvas, found in the browser).
+- **Item 1:** `pickConcept` (`concept-pick.ts`) in `createEntityAt` (`canvas-host.tsx`: the Entity tool's click, the
+  toolbox's creates and its search, at their screen points) and `createFromTab` (`left-panel.tsx`, under the button).
+  `lastConcept` and its key are gone (F3). No domain change.
+- **Item 2 (a, b):** `linkRequirements` and `linkRequirementsAction` (F6); the section's "Link to requirements…" and
+  "Link all attributes…" (F7); "Link to requirements…" in the entity and table headers', the attribute and column rows'
+  and the mapping line's menus (Z2), opening the panel's picker (`focusField` clicks a `data-pop` button, opening a
+  folded section first).
+- **Item 2 (c):** the handle `.rq-lk.nodrag` (one element, a mask; F8, Z6); `startLinkDrag` (`ModelCanvas.tsx`) with
+  `linkStore` and the left panel's `dropStore`, `LinkDragLayer` in the overlay (`LinkDrag.tsx`); the drop links through
+  `linkDropped`, now shared with the left panel's drop.
+- **Item 3:** `fieldIds` and `FieldAlias.id` in the tree, `show`'s `hitId`, `open` → `ui.showRow` (F11 to F13, Z3, Z5);
+  `updateCanvasItem`'s `showRow` names the step "Show row"; `ui.place` answers the placed card's id. A hit selects only
+  the row (one history place), so Back returns to what was selected before.
+- **Item 4:** `resizeFrame`'s `x` and `y`, the pinned notes' offsets in the same group, "Resize frame" (F14 to F16, Z4);
+  `resizedRect` (`frame-resize.ts`); `useFrames`' direction, and pinned notes shown in place while dragging.
+  **Found in step 2:** a mapping line's hit path lay over a frame's left edge, so its handle could not be pressed (the
+  frame layer is below the lines, z-index −1). The selected frame's seven handles are drawn in a layer of their own
+  above the lines (`.frame-handles`, z-index 2, inside `FrameLayer`); the bottom-right handle stays in the frame.
+- **Item 5:** `addAttribute`'s `below` (F18), "Add attribute below" (F19), sent with `saveRows` over the entity's
+  attributes.
+
+### New specs (`e2e/slice-17/`)
+
+| Spec | Covers |
+| --- | --- |
+| S17-01 (3 tests) | the Entity tool, "New entity here" and the toolbox search's create open the picker (nothing selected, filter focused, typing filters, Escape creates nothing, Enter picks the one left, one undo step); inside a concept frame no picker; with the star: "New fact here", "New dimension here", the Cube tab's two (under the button) |
+| S17-02 (4) | two requirements at once on an attribute, linked ones checked and disabled, "Undone: Link requirements"; "Link all attributes…" on Customer adds the others only, one undo; on Dim Customer; a reader sees neither button |
+| S17-03 (3) | a collapsed card opened ("Undone: Show row"), the row selected with its panel, Back returns; a filter reset only when it hides the row; Country placed with its row selected; a hit on a name unchanged |
+| S17-04 (2) | the left edge moves x, Customer leaves the frame, the pinned note keeps its place, a free note is not claimed, "Undone: Resize frame"; the top-left corner; no handles for a reader or on a collapsed frame |
+| S17-05 (1) | "Add attribute below" on the second row: third, name selected, menu order, "Undone: Create attribute"; not on a column row |
+| S17-06 (4) | the drag onto customer_id (line, mark, hint "Link to customer_id"), the card not moved, one undo; onto Customer's header; onto empty canvas (the toast); Escape; the name still moves the card; no handle for a reviewer or a reader; onto Dim Customer's row on the star |
+| S17-elements | measurement build only: the handles' element count (below) |
+
+### Earlier tests changed, and why
+
+- **The concept picker** (item 1): S1B-07, S3B-02, S3B-10, S5A-04, S6B-02-focus, S15-07 (15a and 15b) pick a concept
+  after a create outside a frame (`pickConcept`, slice 1b's helpers).
+- **The requirement select became a picker** (item 2a): S4A-06, S4A-11, S4A-13, S4B1-04, S15-15 use `linkFromPanel` and
+  `newRequirementFromPanel` (slice 4a's helpers); S4A-06 and S4A-11 send the captured action `linkRequirementsAction`'s
+  input; S4A-11's reader checks the two buttons instead of the select.
+- **The row menus' lists** (items 2a and 5): S1B-07 compares the attribute row's and the column row's whole lists.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: clean. `npm test`: 146 files, 1,816 tests passed.
+- **The slice's specs and the touched earlier specs**, locally on Windows, each run with its own fresh server: the last
+  run was `e2e/slice-17` with S1B-07, S2B-05, S2B-13, S2C-03, S14A-02 and S4A-06: **27 passed**. The wider run before it
+  (slice 17 and 36 earlier files, the whole of `slice-04b2` among them) had 98 passed and 4 failed: S1B-07 (its row menus,
+  fixed after that run had started) and three slice-17 tests, spec issues (a pinned note over the frame's name, the
+  Overview over REQ-104's seed card) except the frame handle under a line, fixed in the app (above).
+- **The element guard** (`S3B-15-elements.spec.ts`, measurement build, slice-08's baseline): every viewport count
+  **equal** (4,508 / 19,305 / 1,465 / 4,907); page totals 6,001 / 20,798 / 2,868 / 6,310. "Performance test" has no
+  requirement cards, and with no frame selected no new handle is drawn.
+- **The link handles** on "Performance test – requirements" (`S17-elements.spec.ts`, measurement build): at 100 %,
+  19,701 elements in the viewport, of them **12 handles**, one per card (slice 16's count is 19,689); at 30 %, 4,730 and
+  no handle (blocks below 40 %). That is the new baseline: +12 at full detail.
+- **The tree's size** (Z5's number) on "Performance test" (779 attributes, 41 entities): `buildTree`'s JSON **61,432
+  bytes before, 92,346 after** (+30,914), built on a fresh copy (`seed:large` into `.data/measure/`, removed after).
+  Noted in `ideas.md`, with a smaller form for later.
+- **A selected frame:** its seven handles and their layer's two boxes, nine elements while one frame is selected.
+- **Not done yet:** the full run (one, on the final commit, in GitHub Actions).
+
+### Assumptions
+
+- The concept picker lists the concepts in their panel order with their colour swatch.
+- "Link to requirements…" stands first in a mapping line's editor items, before "Edit transformation rule…"; after
+  "Fit width to names" in a header's menu; after "Add attribute below" in an attribute row's menu, and before "Map to an
+  attribute…" in a column row's.
+- A link drag dropped on a target already linked shows the left panel's toast and writes nothing.
+- "Fit frame to its content" still moves notes pinned to a frame when the fit moves its top-left, as before; listed in
+  `ideas.md`.
