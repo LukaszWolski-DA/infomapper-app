@@ -517,15 +517,19 @@ export function Seg<V extends string>({
   onChange,
   disabled,
   testId,
+  columns,
 }: {
   value: V;
   options: readonly (readonly [V, string])[];
   onChange: (v: V) => void;
   disabled?: boolean;
   testId?: string;
+  /** Slice 19 (prototype .seg.g2): the choices in a grid of two columns. */
+  columns?: 2;
 }) {
+  const layout = columns === 2 ? "grid grid-cols-2 gap-0.5" : "inline-flex";
   return (
-    <div className="inline-flex rounded-[7px] bg-im-hover p-0.5" role="group" data-testid={testId}>
+    <div className={`${layout} rounded-[7px] bg-im-hover p-0.5`} role="group" data-testid={testId}>
       {options.map(([v, label]) => (
         <button
           key={v}
