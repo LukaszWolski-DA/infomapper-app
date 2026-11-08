@@ -819,3 +819,15 @@ about 2,000 items. As decided, I stopped here: nothing is deferred or computed i
 
 - `npx tsx scripts/bench-checks.ts`
 - `npx tsx scripts/bench-checks-browser.ts` (prints the split)
+
+## Step 2 closed (8 November 2026)
+
+- **CI** on `34fde18` (draft pull request #47): CI and Schema passed.
+- **The marks' bar becomes a reference** (Łukasz): in Chromium the marks and counts on the synthetic model are a
+  reference of **25 ms**, the median of six runs' medians. It is reported at the closing and is not a gate. The six
+  runs: 19.2, 23.4, 22.1, 21.8, 21.8 and 31.6 ms (the median of the six is 22.0 ms, under the reference). The split
+  (three runs): InfoMapper's rules 15.2–16.3 ms, InfoCube's rules 2.5–3.4 ms, the marks 1.4–2.1 ms, one canvas's count
+  0.3–0.4 ms.
+- `docs/known-limitations.md`: "The marks cost about 22 ms after each write on a very large model". `docs/ideas.md`:
+  "Model checks for much larger models" (deferred and incremental).
+- Auto-fix stays off.

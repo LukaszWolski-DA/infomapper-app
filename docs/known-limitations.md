@@ -1370,3 +1370,13 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
   development server that reloads code without restarting can meet it, and the refusal is safe.
 - **A role chip changes with the save's fresh page:** a relationship drawn or deleted between two dimensions, or a type
   chosen in the panel, shows on the card once the page has the answer, as the Σ marks do.
+
+## Model checks (slice 20)
+
+### The marks cost about 22 ms after each write on a very large model
+
+A canvas page computes the model checks' marks and counts again after each write, in the browser. On a synthetic model
+of about 23,000 attributes (2,000 entities, 2,000 relationships, 3,000 copies, 1,500 dimensional mappings) that takes
+about 22 ms in Chromium (median of six runs: 19.2 to 31.6 ms, `scripts/bench-checks-browser.ts`); on "Performance
+test" (41 entities, 779 attributes) 0.7 ms. Three quarters of it are InfoMapper's rules. Nothing is deferred or
+computed incrementally (`docs/ideas.md`, "Model checks for much larger models").

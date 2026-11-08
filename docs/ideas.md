@@ -830,3 +830,10 @@ What comes later (slice 18, PRD section 10 and step 1):
 InfoMapper's mapping panel keeps a typed rule across fresh pages and refusals (slice 13), but its field has no `keep`:
 if the panel ever unmounted while the rule still had the focus, the text would be lost (never saved elsewhere; slice
 20's Q10). InfoCube's rule has `keep`. Give InfoMapper's rule `keep` too, as a small item.
+
+## Model checks for much larger models (slice 20, step 2)
+
+The checks' marks and counts are computed again in full after each write: about 22 ms in Chromium on 23,000 attributes
+(`docs/known-limitations.md`). For much larger models: compute them **deferred**, after the write's commit has been
+painted (the marks of the old state stay until then), and **incrementally**, only for the entities a write touched and
+their relationships' other ends. Measure first with `scripts/bench-checks-browser.ts`.
