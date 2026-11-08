@@ -6,17 +6,19 @@
 import type { CheckInput, ModuleChecks } from "@/domain/model/checks";
 import type { ModuleView } from "@/ui/modules";
 import { cubeChecks, NO_CHECK_ROWS, type CubeCheckRows } from "@/modules/infocube/domain/checks";
+import type { CubeIndex } from "@/modules/infocube/domain/keys";
 
-/** InfoCube's checks from its rows, or none while it is off in the workspace. */
-export function cubeModuleChecks(on: boolean, rows: CubeCheckRows | null | undefined, input: CheckInput): ModuleChecks[] {
-  return on ? [cubeChecks(rows ?? NO_CHECK_ROWS, input)] : [];
+/** InfoCube's checks from its rows, or none while it is off in the workspace; `index`: the caller's cube index, when it has one. */
+export function cubeModuleChecks(on: boolean, rows: CubeCheckRows | null | undefined, input: CheckInput, index?: CubeIndex): ModuleChecks[] {
+  return on ? [cubeChecks(rows ?? NO_CHECK_ROWS, input, index)] : [];
 }
 
 /** A canvas page's module checks, from the page's module rows: InfoCube's while its Cube tab is there (it is on). */
-export function pageModuleChecks(view: ModuleView, input: CheckInput): ModuleChecks[] {
+export function pageModuleChecks(view: ModuleView, input: CheckInput, index?: CubeIndex): ModuleChecks[] {
   return cubeModuleChecks(
     view.tabs.some((t) => t.id === "cube"),
     view.data.infocube as CubeCheckRows | undefined,
     input,
+    index,
   );
 }

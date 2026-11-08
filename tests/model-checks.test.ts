@@ -12,7 +12,7 @@ import { CHECK_MAPPING_KIND } from "@/modules/infocube/domain/checks";
 import { CUBE_MAPPING_KIND } from "@/modules/infocube/canvas/lines";
 import { cubeRequirementFeeds, mappingIndex } from "@/modules/infocube/domain/mappings";
 import { cubePageRows } from "@/modules/infocube/domain/view";
-import { checkIndex, modelChecks, projectScope, type ModelChecks } from "@/domain/model/checks";
+import { checkIndex, lineOf, modelChecks, projectScope, type CheckGroup, type ModelChecks } from "@/domain/model/checks";
 import { lookupModel } from "@/domain/model/requirements";
 import type { WorkspaceModel } from "@/domain/types";
 
@@ -58,9 +58,12 @@ function checksOf(db: Db, project: string | null, on = true): ModelChecks {
   return modelChecks(input, cubeModuleChecks(on, rows, input));
 }
 const canvasesOf = (db: Db, project: string) => db.project_canvas.filter((l) => l.project_id === project).sort((a, b) => a.sort_order - b.sort_order).map((l) => l.canvas_id);
-const counts = (c: ModelChecks) => Object.fromEntries(c.groups.map((g) => [g.id, g.lines.length]));
+const counts = (c: ModelChecks) => Object.fromEntries(c.groups.map((g) => [g.id, g.items.length]));
+/** A group's items with their words, as a page shows them. */
+const linesOf = (g: CheckGroup) => g.items.map(lineOf);
 const onCanvas = (db: Db, c: ModelChecks, canvasId: string) => {
-  const x = checkIndex(c, modelOf(db).attributes);
+  const entityOf = new Map(modelOf(db).attributes.map((a) => [a.id, a.entity_id]));
+  const x = checkIndex(c, (id) => entityOf.get(id));
   const lines = x.onCanvas(live(db.canvas_item).filter((i) => i.canvas_id === canvasId && i.entity_id).map((i) => i.entity_id!));
   return { n: lines.length, high: lines.some((l) => l.group.high) };
 };
@@ -78,7 +81,7 @@ describe("the demo (step 1, Q12, recounted after answer 1)", () => {
     expect(counts(checksOf(db, SEED_IDS.projCustomer360))).toEqual({ wrong: 1, calc: 1, under: 7 });
     const c = checksOf(db, SEED_IDS.projOrderManagement);
     // the "under" lines follow the targets' order in the model; compared as a set
-    const shown = c.groups.map((g) => [g.id, g.lines.map((l) => `${l.name} · ${l.detail}`).sort()]);
+    const shown = c.groups.map((g) => [g.id, linesOf(g).map((l) => `${l.name} · ${l.detail}`).sort()]);
     expect(shown).toEqual([
       ["wrong", ["Customer.last_order_id · copy of Sales Order.order_id, but Customer is the one side of “places”"]],
       ["dup", ["Product: product_name, Product_Name · 2 attributes, one name"]],
@@ -136,15 +139,15 @@ describe("S20-01's changes, read as the rules see them", () => {
     attr(db, "Customer", "segment_code").data_type = "integer";
     const c = checksOf(db, SEED_IDS.projOrderManagement);
     const feeds = c.groups.find((g) => g.id === "feeds")!;
-    expect(feeds.lines.map((l) => `${l.name} · ${l.detail}`)).toEqual(["Customer.segment_code → Dim Customer.segment_code · type conflict: Customer.segment_code is Integer, Dim Customer.segment_code is String"]);
-    expect([feeds.high, feeds.module, feeds.lines[0]!.go.t, (feeds.lines[0]!.go as { kind: string }).kind]).toEqual([true, "InfoCube", "ext", CHECK_MAPPING_KIND]);
+    expect(linesOf(feeds).map((l) => `${l.name} · ${l.detail}`)).toEqual(["Customer.segment_code → Dim Customer.segment_code · type conflict: Customer.segment_code is Integer, Dim Customer.segment_code is String"]);
+    expect([feeds.high, feeds.module, feeds.items[0]!.go.t, (feeds.items[0]!.go as { kind: string }).kind]).toEqual([true, "InfoCube", "ext", CHECK_MAPPING_KIND]);
     expect(c.groups.map((g) => g.id).slice(0, 2)).toEqual(["wrong", "feeds"]);
   });
   it("deleting Sales Order.order_id leaves its two copies lost", () => {
     const db = demo();
     attr(db, "Sales Order", "order_id").deleted_at = "2026-11-08T10:00:00.000Z";
     const lost = checksOf(db, SEED_IDS.projOrderManagement).groups.find((g) => g.id === "lost")!;
-    expect(lost.lines.map((l) => `${l.name} · ${l.detail}`).sort()).toEqual(["Customer.last_order_id · copy of Sales Order.order_id, which was deleted", "Order Line.order_id · copy of Sales Order.order_id, which was deleted"]);
+    expect(linesOf(lost).map((l) => `${l.name} · ${l.detail}`).sort()).toEqual(["Customer.last_order_id · copy of Sales Order.order_id, which was deleted", "Order Line.order_id · copy of Sales Order.order_id, which was deleted"]);
     expect(checksOf(db, SEED_IDS.projOrderManagement).groups.some((g) => g.id === "wrong")).toBe(false);
   });
   it("a fact without a grain gets a hint line, marked on its header and kept out of the panels' lists", () => {
@@ -153,14 +156,15 @@ describe("S20-01's changes, read as the rules see them", () => {
     db.cube_entity.find((c) => c.entity_id === sales.id)!.grain = null;
     const c = checksOf(db, SEED_IDS.projOrderManagement);
     const facts = c.groups.find((g) => g.id === "facts")!;
-    expect(facts.lines.map((l) => [l.name, l.detail, l.go, l.marks, l.hintOf])).toEqual([["Fact Sales", "No grain yet. Write what one row of this fact stands for.", { t: "entity", id: sales.id }, [{ t: "entity", id: sales.id }], sales.id]]);
-    const x = checkIndex(c, modelOf(db).attributes);
+    expect(linesOf(facts).map((l) => [l.name, l.detail, l.go, l.marks, l.hintOf])).toEqual([["Fact Sales", "No grain yet. Write what one row of this fact stands for.", { t: "entity", id: sales.id }, [{ t: "entity", id: sales.id }], sales.id]]);
+    const entityOf = new Map(modelOf(db).attributes.map((a) => [a.id, a.entity_id]));
+    const x = checkIndex(c, (id) => entityOf.get(id));
     expect([x.hintsOf(sales.id), x.panel({ t: "entity", id: sales.id }).length, x.entityMark(sales.id)?.high]).toEqual([1, 0, false]);
   });
 });
 
 describe("InfoCube's feeds by the app's rules (F11, F12)", () => {
-  const feedsOf = (db: Db) => checksOf(db, SEED_IDS.projOrderManagement).groups.find((g) => g.id === "feeds")?.lines.map((l) => l.name) ?? [];
+  const feedsOf = (db: Db) => checksOf(db, SEED_IDS.projOrderManagement).groups.find((g) => g.id === "feeds")?.items.map((i) => lineOf(i).name) ?? [];
   it("counts Integer → Decimal on a direct copy as a conflict; a transformation with a rule never conflicts", () => {
     const db = demo();
     attr(db, "Fact Sales", "quantity").data_type = "decimal";
@@ -176,13 +180,13 @@ describe("InfoCube's feeds by the app's rules (F11, F12)", () => {
     lookup.status = "approved";
     expect(feedsOf(db)).toEqual(["Country.country_name → Dim Customer.country_name"]);
     const under = checksOf(db, SEED_IDS.projOrderManagement).groups.find((g) => g.id === "under")!;
-    expect(under.lines.filter((l) => l.name.startsWith("Country.")).map((l) => l.detail)).toEqual(["country_name is not mapped"]);
+    expect(linesOf(under).filter((l) => l.name.startsWith("Country.")).map((l) => l.detail)).toEqual(["country_name is not mapped"]);
   });
   it("puts a feed in a project's scope by its target's entity or an input's entity", () => {
     const db = demo();
     // Customer 360 has no star card: its feeds are there through their logical inputs only
     const c = checksOf(db, SEED_IDS.projCustomer360);
-    expect(c.groups.find((g) => g.id === "under")!.lines.every((l) => /^(Sales Order|Order Line|Customer)\./.test(l.name))).toBe(true);
+    expect(c.groups.find((g) => g.id === "under")!.items.map(lineOf).every((l) => /^(Sales Order|Order Line|Customer)\./.test(l.name))).toBe(true);
   });
 });
 

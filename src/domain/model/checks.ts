@@ -12,6 +12,14 @@
 // A copy's key (answer 5): a copy of a copy is read at the end of its chain, the first attribute that is not a copy;
 // a lost link on the way gives no key (that copy is a "lost" line). A foreign key on a relationship's many side whose
 // name is the one side's primary key's (`nameKey`) also counts as its copy for "no copied key" (answer 1).
+//
+// Marks apart from texts (Łukasz, step 2's second round): a rule gives items, each with what it opens, the panels that
+// list it, the marks it puts on cards and the entities it names, and a `text()` that builds its name and detail only
+// when the item is shown (the home's section, the panels, a card's title). After a write a page needs only the marks
+// and the counts (`checkIndex`); the lines are built where they are shown (`lineOf`).
+//
+// The rules read the requirement index's lookup (its live attributes, per entity in the model's order, its mappings,
+// feeds and calculations) and build no map of their own beyond the entities'.
 
 import type { Uuid } from "../ids";
 import type { Attribute, CanvasItem, Entity, Relationship, WorkspaceModel } from "../types";
@@ -24,22 +32,34 @@ export type CheckRef = { t: "entity"; id: Uuid } | { t: "attribute"; id: Uuid } 
 /** A card mark: an entity's header or an attribute's row. */
 export type CheckMark = { t: "entity"; id: Uuid } | { t: "attribute"; id: Uuid };
 
-export interface CheckLine {
+/** A line's words: the prototype's `n` and `m`. */
+export interface CheckText {
+  name: string;
+  detail: string;
+}
+
+/** What a rule finds: references only; its words are built by `text()` when it is shown. */
+export interface CheckItem {
   /** What a click opens (the prototype's `go`). */
   go: CheckRef;
-  /** The prototype's `n`. */
-  name: string;
-  /** The prototype's `m`. */
-  detail: string;
   /** The panels that list it (the prototype's `refs`). */
-  panels: CheckRef[];
+  panels: readonly CheckRef[];
   /** The marks it puts on cards. */
-  marks: CheckMark[];
+  marks: readonly CheckMark[];
   /** The entities it names: the canvas's count and the home's choice of canvas, the first one first. */
-  entities: Uuid[];
-  /** A fact's hint (InfoCube): its fact; the fact's panel counts it and lists it in its own section. */
+  entities: readonly Uuid[];
+  /** A fact's hint (a module's): its fact; the fact's panel counts it and lists it in its own section. */
   hintOf?: Uuid;
+  /** Its name and detail, built when it is shown. */
+  text: () => CheckText;
 }
+
+/** An item with its words, where it is shown. */
+export type CheckLine = Omit<CheckItem, "text"> & CheckText;
+export const lineOf = (item: CheckItem): CheckLine => {
+  const { text, ...rest } = item;
+  return { ...rest, ...text() };
+};
 
 export interface CheckGroup {
   id: string;
@@ -51,7 +71,7 @@ export interface CheckGroup {
   high: boolean;
   /** A module's groups carry its tag ("InfoCube"); InfoMapper's have none. */
   module?: string;
-  lines: CheckLine[];
+  items: CheckItem[];
 }
 
 /** What a module adds (the extension point): its groups, and its words for the home's sentences. */
@@ -67,16 +87,16 @@ export type CheckModel = Pick<WorkspaceModel, "entities" | "attributes" | "relat
 
 export interface CheckInput {
   model: CheckModel;
-  /** The requirement index's lookup (`RequirementIndex.lookup`): mappings, feeds, calculations, coverage. */
+  /** The requirement index's lookup (`RequirementIndex.lookup`): attributes, mappings, feeds, calculations, coverage. */
   lookup: ModelLookup;
   /** The entities in scope (the project home); null: the whole model (a canvas, the panels). */
   scope: ReadonlySet<Uuid> | null;
 }
 
 export interface ModelChecks {
-  /** Groups with lines only, High first. */
+  /** Groups with items only, High first. */
   groups: CheckGroup[];
-  /** Lines in all groups. */
+  /** Items in all groups. */
   count: number;
   high: boolean;
   /** The modules' topics and empty-text parts, for the home's sentences. */
@@ -155,7 +175,7 @@ export const CHECK_TEXTS = {
 export const nameKey = (name: string): string => name.trim().replace(/\s+/g, " ").toLocaleLowerCase();
 
 const live = <T extends { deleted_at: string | null }>(rows: readonly T[]): T[] => rows.filter((r) => r.deleted_at === null);
-const byOrder = (a: Attribute, b: Attribute) => a.sort_order - b.sort_order || a.name.localeCompare(b.name);
+const NONE: readonly Attribute[] = [];
 
 /** The key a copy stands for: the end of its chain of copies; null for an attribute that is no copy, or a lost link. */
 export function keyOfCopy(attributeId: Uuid, attribute: (id: Uuid) => Attribute | undefined): Attribute | null {
@@ -184,160 +204,18 @@ export function projectScope(items: readonly Pick<CanvasItem, "canvas_id" | "ent
 
 /**
  * The model's checks: InfoMapper's groups and the modules' (each module's already built for the same input), High
- * first, InfoMapper's before the modules' within a severity; groups without lines are dropped.
+ * first, InfoMapper's before the modules' within a severity; groups without items are dropped.
  */
 export function modelChecks(input: CheckInput, modules: readonly ModuleChecks[] = []): ModelChecks {
-  const own = infoMapperGroups(input);
-  const theirs = modules.flatMap((m) => m.groups);
-  const all = [...own, ...theirs].filter((g) => g.lines.length);
+  const all = [...infoMapperGroups(input), ...modules.flatMap((m) => m.groups)].filter((g) => g.items.length);
   const groups = [...all.filter((g) => g.high), ...all.filter((g) => !g.high)];
   return {
     groups,
-    count: groups.reduce((n, g) => n + g.lines.length, 0),
+    count: groups.reduce((n, g) => n + g.items.length, 0),
     high: groups.some((g) => g.high),
     topics: modules.map((m) => m.topic),
     allWell: modules.map((m) => m.allWell),
   };
-}
-
-/** InfoMapper's six groups, in their order (wrong, dup, calc, lost, norel, nokey); empty ones included. */
-export function infoMapperGroups({ model, lookup, scope }: CheckInput): CheckGroup[] {
-  const entities = live(model.entities);
-  const entityById = new Map<Uuid, Entity>(entities.map((e) => [e.id, e]));
-  const attributes = live(model.attributes).filter((a) => entityById.has(a.entity_id));
-  const attributeById = new Map(attributes.map((a) => [a.id, a]));
-  const attributesOf = new Map<Uuid, Attribute[]>();
-  for (const a of attributes) (attributesOf.get(a.entity_id) ?? attributesOf.set(a.entity_id, []).get(a.entity_id)!).push(a);
-  for (const list of attributesOf.values()) list.sort(byOrder);
-  const inScope = (entityId: Uuid) => entityById.has(entityId) && (!scope || scope.has(entityId));
-  const logical = (entityId: Uuid) => entityById.get(entityId)?.model_level === "logical";
-  const entityName = (id: Uuid) => entityById.get(id)?.name ?? "?";
-  const path = (a: Attribute) => `${entityName(a.entity_id)}.${a.name}`;
-  const scoped = entities.filter((e) => inScope(e.id));
-  const attributesInScope = scoped.flatMap((e) => attributesOf.get(e.id) ?? []);
-  const attributeRef = (a: Attribute): CheckRef => ({ t: "attribute", id: a.id });
-  const rowMark = (a: Attribute): CheckMark => ({ t: "attribute", id: a.id });
-  // each copy's key once (several rules read it)
-  const copyKeys = new Map<Uuid, Attribute | null>();
-  const keyOf = (a: Attribute) => {
-    if (!copyKeys.has(a.id)) copyKeys.set(a.id, keyOfCopy(a.id, (id) => attributeById.get(id)));
-    return copyKeys.get(a.id)!;
-  };
-
-  // duplicate names, per entity, both levels
-  const dup: CheckLine[] = [];
-  for (const e of scoped) {
-    const byName = new Map<string, Attribute[]>();
-    for (const a of attributesOf.get(e.id) ?? []) (byName.get(nameKey(a.name)) ?? byName.set(nameKey(a.name), []).get(nameKey(a.name))!).push(a);
-    for (const list of byName.values()) {
-      if (list.length < 2) continue;
-      dup.push({
-        go: attributeRef(list[1]!),
-        name: `${e.name}: ${list.map((a) => a.name).join(", ")}`,
-        detail: CHECK_TEXTS.sameName(list.length),
-        panels: list.map(attributeRef),
-        marks: list.map(rowMark),
-        entities: [e.id],
-      });
-    }
-  }
-
-  // calculated and mapped (logical) or fed (dimensional), any status
-  const calc: CheckLine[] = [];
-  for (const a of attributesInScope) {
-    if (!a.is_calculated) continue;
-    const dimensional = !logical(a.entity_id);
-    const n = dimensional ? lookup.feedsOf(a.id).length : (lookup.mappingsOfAttribute.get(a.id) ?? []).length;
-    if (!n) continue;
-    calc.push({ go: attributeRef(a), name: path(a), detail: CHECK_TEXTS.calculatedToo(lookup.calculationInputs(a.id).length, n, dimensional), panels: [attributeRef(a)], marks: [rowMark(a)], entities: [a.entity_id] });
-  }
-
-  // copies whose original was deleted, both levels
-  const lostName = new Map(model.lostOriginals.map((o) => [o.id, `${o.entityName}.${o.name}`]));
-  const lost: CheckLine[] = [];
-  for (const a of attributesInScope) {
-    const original = a.copied_from_attribute_id;
-    if (!original || attributeById.has(original)) continue;
-    lost.push({ go: attributeRef(a), name: path(a), detail: CHECK_TEXTS.copyDeleted(lostName.get(original) ?? "an attribute"), panels: [attributeRef(a)], marks: [rowMark(a)], entities: [a.entity_id] });
-  }
-
-  // logical relationships between two entities, by pair
-  const relationships = live(model.relationships).filter((r) => r.from_entity_id !== r.to_entity_id && logical(r.from_entity_id) && logical(r.to_entity_id));
-  const pair = (x: Uuid, y: Uuid) => (x < y ? `${x}|${y}` : `${y}|${x}`);
-  const related = new Set(relationships.map((r) => pair(r.from_entity_id, r.to_entity_id)));
-
-  // keys copied without a relationship (logical)
-  const norel: CheckLine[] = [];
-  for (const a of attributesInScope) {
-    if (!logical(a.entity_id)) continue;
-    const key = keyOf(a);
-    if (!key?.is_primary_key || key.entity_id === a.entity_id || related.has(pair(a.entity_id, key.entity_id))) continue;
-    norel.push({
-      go: attributeRef(a),
-      name: path(a),
-      detail: CHECK_TEXTS.notRelated(path(key), entityName(a.entity_id), entityName(key.entity_id)),
-      panels: [attributeRef(a)],
-      marks: [rowMark(a)],
-      entities: [a.entity_id],
-    });
-  }
-
-  // one-to-many relationships: the wrong way, and no copied key (1:1, M:N and self relationships are not checked)
-  // what an entity holds of other entities' keys, worked out once per entity (step 2's bench): the keys its copies
-  // stand for, and the names of its foreign keys (answer 1 (b))
-  const held = new Map<Uuid, { keys: Set<Uuid>; names: Set<string> }>();
-  const carriedBy = (entityId: Uuid) => {
-    let h = held.get(entityId);
-    if (!h) {
-      h = { keys: new Set(), names: new Set() };
-      for (const a of attributesOf.get(entityId) ?? []) {
-        const key = keyOf(a);
-        if (key) h.keys.add(key.id);
-        if (a.is_foreign_key) h.names.add(nameKey(a.name));
-      }
-      held.set(entityId, h);
-    }
-    return h;
-  };
-  const wrong: CheckLine[] = [];
-  const nokey: CheckLine[] = [];
-  const wrongSeen = new Set<Uuid>();
-  for (const r of relationships) {
-    if (!inScope(r.from_entity_id) && !inScope(r.to_entity_id)) continue;
-    const ends = oneAndMany(r);
-    if (!ends) continue;
-    const { one, many } = ends;
-    const relationshipRef: CheckRef = { t: "relationship", id: r.id };
-    const keys = (attributesOf.get(one) ?? []).filter((a) => a.is_primary_key);
-    const held = carriedBy(many);
-    const missing = keys.filter((pk) => !held.keys.has(pk.id) && !held.names.has(nameKey(pk.name)));
-    if (missing.length) {
-      nokey.push({
-        go: relationshipRef,
-        name: `${entityName(one)} – ${entityName(many)}${r.label?.trim() ? ` (${r.label.trim()})` : ""}`,
-        detail: CHECK_TEXTS.noCopy(entityName(many), missing.map((k) => k.name)),
-        panels: [relationshipRef, { t: "entity", id: many }],
-        marks: [{ t: "entity", id: many }],
-        entities: [one, many],
-      });
-    }
-    for (const a of attributesOf.get(one) ?? []) {
-      const key = keyOf(a);
-      if (!key?.is_primary_key || key.entity_id !== many || wrongSeen.has(a.id)) continue;
-      wrongSeen.add(a.id);
-      wrong.push({
-        go: attributeRef(a),
-        name: path(a),
-        detail: CHECK_TEXTS.copyOneSide(path(key), entityName(one), r.label?.trim() || null),
-        panels: [attributeRef(a), relationshipRef],
-        marks: [rowMark(a)],
-        entities: [one, many],
-      });
-    }
-  }
-
-  const group = (id: "wrong" | "dup" | "calc" | "lost" | "norel" | "nokey", lines: CheckLine[], high = false): CheckGroup => ({ id, ...CHECK_TEXTS[id], high, lines });
-  return [group("wrong", wrong, true), group("dup", dup), group("calc", calc), group("lost", lost), group("norel", norel), group("nokey", nokey)];
 }
 
 /** A relationship's "one" and "many" ends; null for 1:1 and many-to-many. `from_max` is the multiplicity at the from end. */
@@ -345,6 +223,131 @@ export function oneAndMany(r: Pick<Relationship, "from_entity_id" | "to_entity_i
   const fromOne = r.from_max === "1", toOne = r.to_max === "1";
   if (fromOne === toOne) return null;
   return fromOne ? { one: r.from_entity_id, many: r.to_entity_id } : { one: r.to_entity_id, many: r.from_entity_id };
+}
+
+/** InfoMapper's six groups, in their order (wrong, dup, calc, lost, norel, nokey); empty ones included. */
+export function infoMapperGroups({ model, lookup, scope }: CheckInput): CheckGroup[] {
+  const entities = live(model.entities);
+  const entityById = new Map<Uuid, Entity>();
+  for (const e of entities) entityById.set(e.id, e);
+  const attributeById = lookup.attribute;
+  const attributesOf = (entityId: Uuid) => lookup.attributesOf.get(entityId) ?? NONE;
+  const inScope = (entityId: Uuid) => entityById.has(entityId) && (!scope || scope.has(entityId));
+  const logical = (entityId: Uuid) => entityById.get(entityId)?.model_level === "logical";
+  const entityName = (id: Uuid) => entityById.get(id)?.name ?? "?";
+  const path = (a: Attribute) => `${entityName(a.entity_id)}.${a.name}`;
+  const at = (a: Attribute): CheckRef => ({ t: "attribute", id: a.id });
+  // each name normalised once, each copy's key once (several rules read them)
+  const nameKeys = new Map<Uuid, string>();
+  const keyName = (a: Attribute) => {
+    let k = nameKeys.get(a.id);
+    if (k === undefined) nameKeys.set(a.id, (k = nameKey(a.name)));
+    return k;
+  };
+  const copyKeys = new Map<Uuid, Attribute | null>();
+  const keyOf = (a: Attribute) => {
+    if (!a.copied_from_attribute_id) return null;
+    let k = copyKeys.get(a.id);
+    if (k === undefined) copyKeys.set(a.id, (k = keyOfCopy(a.id, (id) => attributeById.get(id))));
+    return k;
+  };
+
+  const wrong: CheckItem[] = [], dup: CheckItem[] = [], calc: CheckItem[] = [], lost: CheckItem[] = [], norel: CheckItem[] = [], nokey: CheckItem[] = [];
+
+  // logical relationships between two entities, by pair
+  const relationships = live(model.relationships).filter((r) => r.from_entity_id !== r.to_entity_id && logical(r.from_entity_id) && logical(r.to_entity_id));
+  const pair = (x: Uuid, y: Uuid) => (x < y ? `${x}|${y}` : `${y}|${x}`);
+  const related = new Set<string>();
+  for (const r of relationships) related.add(pair(r.from_entity_id, r.to_entity_id));
+  const lostName = new Map(model.lostOriginals.map((o) => [o.id, `${o.entityName}.${o.name}`]));
+
+  // one pass over the attributes of the entities in scope: dup, calc, lost and norel
+  for (const e of entities) {
+    if (!inScope(e.id)) continue;
+    const list = attributesOf(e.id);
+    const isLogical = e.model_level === "logical";
+    let byName: Map<string, Attribute[]> | null = null;
+    const seen = new Map<string, Attribute>();
+    for (const a of list) {
+      // duplicate names, both levels: a second attribute of a name opens the set
+      const k = keyName(a);
+      const first = seen.get(k);
+      if (first) {
+        byName ??= new Map();
+        const set = byName.get(k);
+        if (set) set.push(a);
+        else byName.set(k, [first, a]);
+      } else seen.set(k, a);
+      // calculated and mapped (logical) or fed (dimensional), any status
+      if (a.is_calculated) {
+        const n = isLogical ? (lookup.mappingsOfAttribute.get(a.id)?.length ?? 0) : lookup.feedsOf(a.id).length;
+        if (n) calc.push({ go: at(a), panels: [at(a)], marks: [at(a)] as CheckMark[], entities: [e.id], text: () => ({ name: path(a), detail: CHECK_TEXTS.calculatedToo(lookup.calculationInputs(a.id).length, n, !isLogical) }) });
+      }
+      const original = a.copied_from_attribute_id;
+      if (!original) continue;
+      // copies whose original was deleted, both levels
+      if (!attributeById.has(original)) {
+        lost.push({ go: at(a), panels: [at(a)], marks: [at(a)] as CheckMark[], entities: [e.id], text: () => ({ name: path(a), detail: CHECK_TEXTS.copyDeleted(lostName.get(original) ?? "an attribute") }) });
+        continue;
+      }
+      // keys copied without a relationship (logical)
+      if (!isLogical) continue;
+      const key = keyOf(a);
+      if (!key?.is_primary_key || key.entity_id === e.id || related.has(pair(e.id, key.entity_id))) continue;
+      norel.push({ go: at(a), panels: [at(a)], marks: [at(a)] as CheckMark[], entities: [e.id], text: () => ({ name: path(a), detail: CHECK_TEXTS.notRelated(path(key), e.name, entityName(key.entity_id)) }) });
+    }
+    if (byName) {
+      for (const set of byName.values()) {
+        const refs = set.map(at);
+        dup.push({ go: refs[1]!, panels: refs, marks: refs as CheckMark[], entities: [e.id], text: () => ({ name: `${e.name}: ${set.map((a) => a.name).join(", ")}`, detail: CHECK_TEXTS.sameName(set.length) }) });
+      }
+    }
+  }
+
+  // what an entity holds of other entities' keys, once per entity: its copies' keys and its foreign keys' names
+  const held = new Map<Uuid, { keys: Set<Uuid>; names: Set<string> }>();
+  const carriedBy = (entityId: Uuid) => {
+    let h = held.get(entityId);
+    if (!h) {
+      h = { keys: new Set(), names: new Set() };
+      for (const a of attributesOf(entityId)) {
+        const key = keyOf(a);
+        if (key) h.keys.add(key.id);
+        if (a.is_foreign_key) h.names.add(keyName(a));
+      }
+      held.set(entityId, h);
+    }
+    return h;
+  };
+
+  // one-to-many relationships: the wrong way, and no copied key (1:1, M:N and self relationships are not checked)
+  const wrongSeen = new Set<Uuid>();
+  for (const r of relationships) {
+    if (!inScope(r.from_entity_id) && !inScope(r.to_entity_id)) continue;
+    const ends = oneAndMany(r);
+    if (!ends) continue;
+    const { one, many } = ends;
+    const rel: CheckRef = { t: "relationship", id: r.id };
+    const verb = r.label?.trim() || null;
+    const oneList = attributesOf(one);
+    const h = carriedBy(many);
+    let missing: Attribute[] | null = null;
+    for (const a of oneList) if (a.is_primary_key && !h.keys.has(a.id) && !h.names.has(keyName(a))) (missing ??= []).push(a);
+    if (missing) {
+      const keys = missing;
+      const manyRef: CheckMark = { t: "entity", id: many };
+      nokey.push({ go: rel, panels: [rel, manyRef], marks: [manyRef], entities: [one, many], text: () => ({ name: `${entityName(one)} – ${entityName(many)}${verb ? ` (${verb})` : ""}`, detail: CHECK_TEXTS.noCopy(entityName(many), keys.map((k) => k.name)) }) });
+    }
+    for (const a of oneList) {
+      const key = keyOf(a);
+      if (!key?.is_primary_key || key.entity_id !== many || wrongSeen.has(a.id)) continue;
+      wrongSeen.add(a.id);
+      wrong.push({ go: at(a), panels: [at(a), rel], marks: [at(a)] as CheckMark[], entities: [one, many], text: () => ({ name: path(a), detail: CHECK_TEXTS.copyOneSide(path(key), entityName(one), verb) }) });
+    }
+  }
+
+  const group = (id: "wrong" | "dup" | "calc" | "lost" | "norel" | "nokey", items: CheckItem[], high = false): CheckGroup => ({ id, ...CHECK_TEXTS[id], high, items });
+  return [group("wrong", wrong, true), group("dup", dup), group("calc", calc), group("lost", lost), group("norel", norel), group("nokey", nokey)];
 }
 
 /**
@@ -362,100 +365,141 @@ export function coverageGapText(lookup: ModelLookup, attributeId: Uuid): string 
   return mappings.length ? CHECK_TEXTS.notApproved(name) : CHECK_TEXTS.notMapped(name);
 }
 
-// ---- the index (by element: marks, panels, a canvas's lines) ----
+// ---- the index: marks and counts at once, lists when they are shown ----
 
-export interface IndexedLine {
+export interface IndexedItem {
   group: Pick<CheckGroup, "id" | "title" | "short" | "high" | "module">;
-  line: CheckLine;
+  item: CheckItem;
 }
 
-/** A card mark: High when any of its lines is; its title is built only where the card is drawn (`markTitle`). */
+/** A card mark: its severity and its groups (ids, in the groups' order). Its title is built where the card is drawn. */
 export interface CheckMarkInfo {
   high: boolean;
+  groups: readonly string[];
 }
 
 export interface CheckIndex {
-  /** Every line, High first, in the groups' order. */
-  lines: readonly IndexedLine[];
-  /** The lines a panel lists for its object, High first. An entity's also has its attributes' lines. */
-  panel(ref: CheckRef): IndexedLine[];
-  /** How many fact hints an entity has (its panel counts them; the Fact section lists them). */
-  hintsOf(entityId: Uuid): number;
-  /** An entity card header's mark: its own lines and its attributes' rows' lines. */
+  count: number;
+  high: boolean;
+  /** An entity card header's mark: its own items and its attributes' rows' items. */
   entityMark(entityId: Uuid): CheckMarkInfo | undefined;
   /** An attribute row's mark. */
   rowMark(attributeId: Uuid): CheckMarkInfo | undefined;
-  /** The lines behind a header's or a row's mark, for its title (`markTitle`) where the card is drawn. */
-  entityLines(entityId: Uuid): readonly IndexedLine[];
-  rowLines(attributeId: Uuid): readonly IndexedLine[];
-  /** The lines that name an entity with a card on a canvas, High first. */
-  onCanvas(entityIds: Iterable<Uuid>): IndexedLine[];
+  /** How many items name an entity with a card on a canvas, and whether one is High (the status bar, the panel's group). */
+  countOn(entityIds: Iterable<Uuid>): { count: number; high: boolean };
+  // the lists below are built on their first call
+  /** Every item, High first, in the groups' order. */
+  all(): readonly IndexedItem[];
+  /** The items a panel lists for its object, High first. An entity's also has its attributes' items. */
+  panel(ref: CheckRef): IndexedItem[];
+  /** How many fact hints an entity has (its panel counts them; the Fact section lists them). */
+  hintsOf(entityId: Uuid): number;
+  /** The items behind a header's or a row's mark, for its title (`markTitle`). */
+  entityItems(entityId: Uuid): readonly IndexedItem[];
+  rowItems(attributeId: Uuid): readonly IndexedItem[];
+  /** The items that name an entity with a card on a canvas, High first. */
+  onCanvas(entityIds: Iterable<Uuid>): IndexedItem[];
 }
 
 export const refKey = (r: CheckRef): string => (r.t === "ext" ? `ext:${r.kind}:${r.id}` : `${r.t}:${r.id}`);
 
-/** The marks' title (prototype `chkTitle`). */
-export function markTitle(lines: readonly IndexedLine[]): string {
-  const parts = [...new Set(lines.map((l) => `${l.group.title}: ${l.line.hintOf ? l.line.detail : l.line.name}`))];
-  return [`${CHECK_TEXTS.title}: ${lines.length}`, ...parts.slice(0, 6), ...(lines.length > 6 ? ["…"] : [])].join("\n");
+/** The marks' title (prototype `chkTitle`): "Model checks: {n}" and up to six "{group}: {name or hint}", then "…". */
+export function markTitle(items: readonly IndexedItem[]): string {
+  const parts = [...new Set(items.slice(0, 64).map((l) => { const t = l.item.text(); return `${l.group.title}: ${l.item.hintOf ? t.detail : t.name}`; }))];
+  return [`${CHECK_TEXTS.title}: ${items.length}`, ...parts.slice(0, 6), ...(items.length > 6 ? ["…"] : [])].join("\n");
 }
 
 /**
- * The index of a model's checks, built once per page; `attributes` gives each attribute's entity (a row's mark also
- * marks its card's header, and an entity's panel lists its attributes' lines).
+ * The index of a model's checks, built once per data version. `entityOf` gives an attribute's entity (a row's mark also
+ * marks its card's header; an entity's panel lists its attributes' items). The marks and the counts are worked out at
+ * once; every list on its first call.
  */
-export function checkIndex(checks: Pick<ModelChecks, "groups">, attributes: readonly Pick<Attribute, "id" | "entity_id">[]): CheckIndex {
-  const entityOf = new Map(attributes.map((a) => [a.id, a.entity_id]));
-  const lines: IndexedLine[] = checks.groups.flatMap((g) => {
+export function checkIndex(checks: Pick<ModelChecks, "groups" | "count" | "high">, entityOf: (attributeId: Uuid) => Uuid | undefined): CheckIndex {
+  const entityMarks = new Map<Uuid, { high: boolean; groups: string[] }>();
+  const rowMarks = new Map<Uuid, { high: boolean; groups: string[] }>();
+  const note = (map: Map<Uuid, { high: boolean; groups: string[] }>, id: Uuid, g: CheckGroup) => {
+    const m = map.get(id);
+    if (!m) map.set(id, { high: g.high, groups: [g.id] });
+    else {
+      m.high ||= g.high;
+      if (m.groups[m.groups.length - 1] !== g.id) m.groups.push(g.id);
+    }
+  };
+  for (const g of checks.groups) {
+    for (const item of g.items) {
+      for (const k of item.marks) {
+        if (k.t === "attribute") {
+          note(rowMarks, k.id, g);
+          const e = entityOf(k.id);
+          if (e) note(entityMarks, e, g);
+        } else note(entityMarks, k.id, g);
+      }
+    }
+  }
+
+  let lists: ReturnType<typeof buildLists> | null = null;
+  const built = () => (lists ??= buildLists(checks.groups, entityOf));
+  return {
+    count: checks.count,
+    high: checks.high,
+    entityMark: (id) => entityMarks.get(id),
+    rowMark: (id) => rowMarks.get(id),
+    countOn(entityIds) {
+      const on = entityIds instanceof Set ? (entityIds as ReadonlySet<Uuid>) : new Set(entityIds);
+      let count = 0, high = false;
+      for (const g of checks.groups) for (const item of g.items) if (item.entities.some((e) => on.has(e))) {
+        count++;
+        high ||= g.high;
+      }
+      return { count, high };
+    },
+    all: () => built().all,
+    panel(ref) {
+      const l = built();
+      const own = l.byPanel.get(refKey(ref)) ?? [];
+      if (ref.t !== "entity") return own;
+      const set = new Set([...own, ...(l.byEntityPanel.get(ref.id) ?? [])]);
+      return l.all.filter((x) => set.has(x));
+    },
+    hintsOf: (id) => built().hints.get(id) ?? 0,
+    entityItems: (id) => built().byEntity.get(id) ?? [],
+    rowItems: (id) => built().byRow.get(id) ?? [],
+    onCanvas(entityIds) {
+      const on = new Set(entityIds);
+      return built().all.filter((x) => x.item.entities.some((e) => on.has(e)));
+    },
+  };
+}
+
+function buildLists(groups: readonly CheckGroup[], entityOf: (attributeId: Uuid) => Uuid | undefined) {
+  const all: IndexedItem[] = groups.flatMap((g) => {
     const group = { id: g.id, title: g.title, short: g.short, high: g.high, ...(g.module ? { module: g.module } : {}) };
-    return g.lines.map((line) => ({ group, line }));
+    return g.items.map((item) => ({ group, item }));
   });
-  const put = <K>(map: Map<K, IndexedLine[]>, key: K, l: IndexedLine) => {
+  const put = <K>(map: Map<K, IndexedItem[]>, key: K, l: IndexedItem) => {
     const list = map.get(key);
     if (!list) map.set(key, [l]);
     else if (list[list.length - 1] !== l) list.push(l);
   };
-  const byPanel = new Map<string, IndexedLine[]>();
-  const byEntityPanel = new Map<Uuid, IndexedLine[]>();
-  const byEntity = new Map<Uuid, IndexedLine[]>();
-  const byRow = new Map<Uuid, IndexedLine[]>();
+  const byPanel = new Map<string, IndexedItem[]>();
+  const byEntityPanel = new Map<Uuid, IndexedItem[]>();
+  const byEntity = new Map<Uuid, IndexedItem[]>();
+  const byRow = new Map<Uuid, IndexedItem[]>();
   const hints = new Map<Uuid, number>();
-  const byName = new Map<Uuid, IndexedLine[]>();
-  for (const l of lines) {
-    for (const r of l.line.panels) {
+  for (const l of all) {
+    for (const r of l.item.panels) {
       put(byPanel, refKey(r), l);
-      const entity = r.t === "attribute" ? entityOf.get(r.id) : undefined;
+      const entity = r.t === "attribute" ? entityOf(r.id) : undefined;
       if (entity) put(byEntityPanel, entity, l);
     }
-    for (const m of l.line.marks) {
+    for (const m of l.item.marks) {
       if (m.t === "attribute") {
         put(byRow, m.id, l);
-        const entity = entityOf.get(m.id);
+        const entity = entityOf(m.id);
         if (entity) put(byEntity, entity, l);
       } else put(byEntity, m.id, l);
     }
-    if (l.line.hintOf) hints.set(l.line.hintOf, (hints.get(l.line.hintOf) ?? 0) + 1);
-    for (const e of new Set(l.line.entities)) put(byName, e, l);
+    if (l.item.hintOf) hints.set(l.item.hintOf, (hints.get(l.item.hintOf) ?? 0) + 1);
   }
-  const ordered = (set: Set<IndexedLine>) => lines.filter((l) => set.has(l));
-  const HIGH: CheckMarkInfo = { high: true }, NORMAL: CheckMarkInfo = { high: false };
-  const mark = (list: IndexedLine[] | undefined): CheckMarkInfo | undefined => (list?.length ? (list.some((l) => l.group.high) ? HIGH : NORMAL) : undefined);
-  return {
-    lines,
-    panel(ref) {
-      const own = byPanel.get(refKey(ref)) ?? [];
-      if (ref.t !== "entity") return own;
-      return ordered(new Set([...own, ...(byEntityPanel.get(ref.id) ?? [])]));
-    },
-    hintsOf: (id) => hints.get(id) ?? 0,
-    entityMark: (id) => mark(byEntity.get(id)),
-    rowMark: (id) => mark(byRow.get(id)),
-    entityLines: (id) => byEntity.get(id) ?? [],
-    rowLines: (id) => byRow.get(id) ?? [],
-    onCanvas(entityIds) {
-      const set = new Set<IndexedLine>();
-      for (const e of entityIds) for (const l of byName.get(e) ?? []) set.add(l);
-      return ordered(set);
-    },
-  };
+  return { all, byPanel, byEntityPanel, byEntity, byRow, hints };
 }

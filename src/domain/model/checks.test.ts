@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 import { attribute, canvasItem, entity, ids, mapping, mappingInput, relationship, sourceColumn, sourceTable } from "../__fixtures__/domain";
 import type { Attribute, AttributeInput, Entity, Relationship, WorkspaceModel } from "../types";
-import { checkIndex, coverageGapText, infoMapperGroups, keyOfCopy, markTitle, modelChecks, nameKey, oneAndMany, projectScope, type CheckInput, type ModuleChecks } from "./checks";
+import { checkIndex, coverageGapText, infoMapperGroups, keyOfCopy, lineOf, markTitle, modelChecks, nameKey, oneAndMany, projectScope, type CheckInput, type ModuleChecks } from "./checks";
 import { lookupModel, type AttributeFeeds } from "./requirements";
 
 const uid = (n: number) => `01900000-0000-7000-8000-2000000${String(n).padStart(5, "0")}`;
@@ -37,7 +37,7 @@ function base(): Model {
 }
 
 const input = (m: Model, scope: Set<string> | null = null, feeds: AttributeFeeds = {}): CheckInput => ({ model: m, lookup: lookupModel(m, feeds), scope });
-const groups = (m: Model, scope: Set<string> | null = null, feeds?: AttributeFeeds) => Object.fromEntries(infoMapperGroups(input(m, scope, feeds)).map((g) => [g.id, g.lines]));
+const groups = (m: Model, scope: Set<string> | null = null, feeds?: AttributeFeeds) => Object.fromEntries(infoMapperGroups(input(m, scope, feeds)).map((g) => [g.id, g.items.map(lineOf)]));
 const with_ = (m: Model, over: Partial<Model>): Model => ({ ...m, ...over });
 const add = (m: Model, ...attributes: Attribute[]): Model => ({ ...m, attributes: [...m.attributes, ...attributes] });
 
@@ -232,9 +232,9 @@ describe("the order and the index", () => {
     topic: "Mod",
     allWell: "so does the module",
     groups: [
-      { id: "m-high", title: "Module high", short: "mh", hint: "", high: true, module: "Mod", lines: [{ go: { t: "ext", kind: "k", id: uid(120) }, name: "a → b", detail: "x", panels: [{ t: "ext", kind: "k", id: uid(120) }, { t: "attribute", id: ids.email }], marks: [{ t: "attribute", id: ids.email }], entities: [ids.customer] }] },
-      { id: "m-hint", title: "Module hints", short: "hint", hint: "", high: false, module: "Mod", lines: [{ go: { t: "entity", id: ids.customer }, name: "Customer", detail: "No grain yet.", panels: [], marks: [{ t: "entity", id: ids.customer }], entities: [ids.customer], hintOf: ids.customer }] },
-      { id: "m-empty", title: "Empty", short: "e", hint: "", high: false, lines: [] },
+      { id: "m-high", title: "Module high", short: "mh", hint: "", high: true, module: "Mod", items: [{ go: { t: "ext", kind: "k", id: uid(120) }, text: () => ({ name: "a → b", detail: "x" }), panels: [{ t: "ext", kind: "k", id: uid(120) }, { t: "attribute", id: ids.email }], marks: [{ t: "attribute", id: ids.email }], entities: [ids.customer] }] },
+      { id: "m-hint", title: "Module hints", short: "hint", hint: "", high: false, module: "Mod", items: [{ go: { t: "entity", id: ids.customer }, text: () => ({ name: "Customer", detail: "No grain yet." }), panels: [], marks: [{ t: "entity", id: ids.customer }], entities: [ids.customer], hintOf: ids.customer }] },
+      { id: "m-empty", title: "Empty", short: "e", hint: "", high: false, items: [] },
     ],
   };
   it("puts High first, InfoMapper's before the modules' within a severity, and drops empty groups", () => {
@@ -244,28 +244,47 @@ describe("the order and the index", () => {
   });
   it("indexes panels, marks and a canvas's lines", () => {
     const c = modelChecks(input(broken()), [mod]);
-    const x = checkIndex(c, broken().attributes);
+    const entityOf = new Map(broken().attributes.map((a) => [a.id, a.entity_id]));
+    const x = checkIndex(c, (id) => entityOf.get(id));
     // Customer's panel: its attributes' lines (wrong, the module's, dup) and not the hint; the hint counted
     expect(x.panel({ t: "entity", id: ids.customer }).map((l) => l.group.id)).toEqual(["wrong", "m-high", "dup"]);
     expect(x.hintsOf(ids.customer)).toBe(1);
     expect(x.panel({ t: "relationship", id: ids.relPlaces }).map((l) => l.group.id)).toEqual(["wrong"]);
     expect(x.panel({ t: "entity", id: LINE }).map((l) => l.group.id)).toEqual(["nokey"]);
     expect(x.panel({ t: "ext", kind: "k", id: uid(120) }).map((l) => l.group.id)).toEqual(["m-high"]);
-    // the header: its own and its rows' marks, High when one is
-    // marks are a severity only; their titles are built where a card is drawn
-    expect(x.entityMark(ids.customer)).toEqual({ high: true });
-    expect(markTitle(x.entityLines(ids.customer))).toMatch(/^Model checks: 4\n/);
-    expect(x.rowMark(uid(111))).toEqual({ high: false });
-    expect(markTitle(x.rowLines(uid(111)))).toBe("Model checks: 1\nDuplicate attribute names: Customer: email, EMAIL");
+    // the header: its own and its rows' marks, High when one is, with their groups; titles are built where a card is drawn
+    expect(x.entityMark(ids.customer)).toEqual({ high: true, groups: ["wrong", "m-high", "dup", "m-hint"] });
+    expect(markTitle(x.entityItems(ids.customer))).toMatch(/^Model checks: 4\n/);
+    expect(x.rowMark(uid(111))).toEqual({ high: false, groups: ["dup"] });
+    expect(markTitle(x.rowItems(uid(111)))).toBe("Model checks: 1\nDuplicate attribute names: Customer: email, EMAIL");
+    // the counts (the status bar, the panel's group)
+    expect([x.count, x.high, x.countOn([LINE]), x.countOn(new Set([ids.customer, LINE]))]).toEqual([5, true, { count: 1, high: false }, { count: 5, high: true }]);
     expect(x.entityMark(LINE)?.high).toBe(false);
     expect(x.rowMark(ids.customerId)).toBeUndefined();
     expect(x.onCanvas([LINE]).map((l) => l.group.id)).toEqual(["nokey"]);
     expect(x.onCanvas([ids.salesOrder]).map((l) => l.group.id)).toEqual(["wrong", "nokey"]);
     expect(x.onCanvas([ids.customer, LINE]).length).toBe(5);
   });
+  it("builds no text for the marks and the counts (step 2's second round, point 2)", () => {
+    const c = modelChecks(input(broken()), [mod]);
+    let built = 0;
+    for (const g of c.groups) for (const item of g.items) {
+      const text = item.text;
+      item.text = () => (built++, text());
+    }
+    const entityOf = new Map(broken().attributes.map((a) => [a.id, a.entity_id]));
+    const x = checkIndex(c, (id) => entityOf.get(id));
+    x.entityMark(ids.customer);
+    x.rowMark(uid(111));
+    x.countOn([ids.customer, LINE]);
+    x.panel({ t: "entity", id: ids.customer });
+    expect(built).toBe(0);
+    markTitle(x.rowItems(uid(111)));
+    expect(built).toBe(1);
+  });
   it("titles a mark with at most six lines, a hint by its text", () => {
-    const line = (n: number) => ({ group: { id: "g", title: "G", short: "g", high: false }, line: { go: { t: "entity" as const, id: uid(n) }, name: `n${n}`, detail: `d${n}`, panels: [], marks: [], entities: [] } });
+    const line = (n: number) => ({ group: { id: "g", title: "G", short: "g", high: false }, item: { go: { t: "entity" as const, id: uid(n) }, text: () => ({ name: `n${n}`, detail: `d${n}` }), panels: [], marks: [], entities: [] } });
     expect(markTitle([1, 2, 3, 4, 5, 6, 7].map(line))).toBe("Model checks: 7\nG: n1\nG: n2\nG: n3\nG: n4\nG: n5\nG: n6\n…");
-    expect(markTitle([{ ...line(1), line: { ...line(1).line, hintOf: uid(1) } }])).toBe("Model checks: 1\nG: d1");
+    expect(markTitle([{ ...line(1), item: { ...line(1).item, hintOf: uid(1) } }])).toBe("Model checks: 1\nG: d1");
   });
 });

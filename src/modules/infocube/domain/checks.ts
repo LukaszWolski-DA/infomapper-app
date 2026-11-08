@@ -5,7 +5,7 @@
 // names InfoCube; the texts are the module's.
 
 import type { Uuid } from "@/domain/ids";
-import { coverageGapText, type CheckGroup, type CheckInput, type CheckLine, type CheckRef, type ModuleChecks } from "@/domain/model/checks";
+import { coverageGapText, type CheckGroup, type CheckInput, type CheckItem, type CheckRef, type ModuleChecks } from "@/domain/model/checks";
 import { cubeIndex, factHints, typeWord, type CubeIndex, type Hint } from "./keys";
 import { typesDiffer } from "./mappings";
 import type { CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure } from "./types";
@@ -67,15 +67,14 @@ export function cubeChecks(rows: CubeCheckRows, { model, lookup, scope }: CheckI
   };
 
   // every fact's hints, in the model's order of entities
-  const facts: CheckLine[] = [];
+  const facts: CheckItem[] = [];
   for (const e of entities) {
     if (cube.roleOf(e.id) !== "fact" || !inScope(e.id)) continue;
     for (const h of factHints(cube, e.id)) {
       const go = hintTarget(h, e.id);
       facts.push({
         go,
-        name: e.name,
-        detail: h.text,
+        text: () => ({ name: e.name, detail: h.text }),
         panels: [],
         marks: [h.go.t === "attribute" ? { t: "attribute", id: h.go.id } : { t: "entity", id: e.id }],
         entities: [...new Set([e.id, ...entitiesOf(go)])],
@@ -85,8 +84,8 @@ export function cubeChecks(rows: CubeCheckRows, { model, lookup, scope }: CheckI
   }
 
   // approved dimensional mappings: the lookup's feeds, by their targets in the model's order (entities, then attributes)
-  const feeds: CheckLine[] = [];
-  const under: CheckLine[] = [];
+  const feeds: CheckItem[] = [];
+  const under: CheckItem[] = [];
   for (const e of entities) {
     if (e.model_level !== "dimensional") continue;
     for (const target of lookup.attributesOf.get(e.id) ?? []) {
@@ -95,26 +94,29 @@ export function cubeChecks(rows: CubeCheckRows, { model, lookup, scope }: CheckI
         const inputEntities = f.inputs.map((id) => lookup.attribute.get(id)?.entity_id).filter((id): id is Uuid => !!id);
         if (!inScope(e.id) && !inputEntities.some(inScope)) continue;
         const ref: CheckRef = { t: "ext", kind: CHECK_MAPPING_KIND, id: f.id };
-        const line = `${f.inputs.map(label).join(" + ")} → ${label(target.id)}`;
-        const named = [...new Set([e.id, ...inputEntities])];
+        const name = () => `${f.inputs.map(label).join(" + ")} → ${label(target.id)}`;
+        const named = inputEntities.length === 1 && inputEntities[0] !== e.id ? [e.id, inputEntities[0]!] : [...new Set([e.id, ...inputEntities])];
         if (f.typeConflict) {
-          const differ = f.inputs.map((id) => ({ id, types: typesDiffer(lookup.attribute.get(id), target) })).find((x) => x.types);
           feeds.push({
             go: ref,
-            name: line,
-            detail: differ ? CUBE_CHECK_TEXTS.typeConflict(label(differ.id), differ.types![0], label(target.id), differ.types![1]) : CUBE_CHECK_TEXTS.typeConflict("?", "?", label(target.id), typeWord(target)),
+            text: () => {
+              const differ = f.inputs.map((id) => ({ id, types: typesDiffer(lookup.attribute.get(id), target) })).find((x) => x.types);
+              return { name: name(), detail: differ ? CUBE_CHECK_TEXTS.typeConflict(label(differ.id), differ.types![0], label(target.id), differ.types![1]) : CUBE_CHECK_TEXTS.typeConflict("?", "?", label(target.id), typeWord(target)) };
+            },
             panels: [ref, { t: "attribute", id: target.id }, ...f.inputs.map((id): CheckRef => ({ t: "attribute", id }))],
             marks: [{ t: "attribute", id: target.id }],
             entities: named,
           });
         }
-        const gaps = f.inputs.map((id) => coverageGapText(lookup, id)).filter((t): t is string => !!t);
-        if (gaps.length) under.push({ go: ref, name: line, detail: gaps.join("; "), panels: [ref], marks: [], entities: named });
+        // an input not covered by D-31's rule; its words when the line is shown
+        if (f.inputs.some((id) => lookup.coverageOf(id) !== "covered")) {
+          under.push({ go: ref, text: () => ({ name: name(), detail: f.inputs.map((id) => coverageGapText(lookup, id)).filter((t): t is string => !!t).join("; ") }), panels: [ref], marks: [], entities: named });
+        }
       }
     }
   }
 
-  const group = (id: "facts" | "feeds" | "under", lines: CheckLine[], high = false): CheckGroup => ({ id, ...CUBE_CHECK_TEXTS[id], high, module: CUBE_CHECK_TEXTS.tag, lines });
+  const group = (id: "facts" | "feeds" | "under", items: CheckItem[], high = false): CheckGroup => ({ id, ...CUBE_CHECK_TEXTS[id], high, module: CUBE_CHECK_TEXTS.tag, items });
   return { topic: CUBE_CHECK_TEXTS.topic, allWell: CUBE_CHECK_TEXTS.allWell, groups: [group("feeds", feeds, true), group("facts", facts), group("under", under)] };
 
   function hintTarget(h: Hint, factId: Uuid): CheckRef {
