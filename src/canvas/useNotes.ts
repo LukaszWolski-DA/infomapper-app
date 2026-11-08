@@ -65,6 +65,8 @@ export type NoteMove = { id: Uuid; from: { x: number; y: number }; to: { x: numb
 /** What the frames and the selection need of the notes while they move them (slice 3a, step 4). */
 export interface NoteMover {
   noteOf: (id: Uuid) => NoteData | null;
+  /** The notes pinned to a frame (slice 17: they keep their place when its top-left moves). */
+  pinnedTo: (frameId: Uuid) => NoteData[];
   /** Shows notes at once with these changes (not saved). */
   show: (patches: ReadonlyMap<Uuid, Partial<NoteData>>) => void;
 }

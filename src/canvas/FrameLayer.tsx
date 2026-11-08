@@ -164,7 +164,18 @@ const FrameBox = memo(function FrameBox({
           </svg>
         </button>
       )}
-      {editable && <div className="f-rs" data-frame-handle title="Drag to resize" data-testid="frame-resize" />}
+      {editable && <div className="f-rs" data-frame-handle="se" title="Drag to resize" data-testid="frame-resize" />}
+      {/* the selected frame resizes from every edge and corner (slice 17, D-72; prototype .f-rs[data-dir], .f-rz) */}
+      {editable && selected && (
+        <>
+          {(["nw", "ne", "sw"] as const).map((d) => (
+            <div key={d} className="f-rs" data-frame-handle={d} data-dir={d} title="Drag to resize" data-testid={`frame-resize-${d}`} />
+          ))}
+          {(["n", "s", "w", "e"] as const).map((d) => (
+            <div key={d} className="f-rz" data-frame-handle={d} data-dir={d} title="Drag to resize" data-testid={`frame-resize-${d}`} />
+          ))}
+        </>
+      )}
     </div>
   );
 });

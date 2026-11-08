@@ -19,6 +19,8 @@ export interface TreeEntity {
   stereotype: string;
   /** Attribute names, for the search (prototype: search includes fields). */
   fields: string[];
+  /** The attributes' ids, in the order of `fields`: a hit on one selects its row (slice 17, D-72). */
+  fieldIds: Uuid[];
   /** The entity's alias, for the search (slice 11, item 14); absent without one. */
   alias?: string;
   /** Its attributes that have an alias, for the search; absent when none has. */
@@ -32,6 +34,7 @@ export interface TreeEntity {
 
 /** An attribute's name and alias (slice 11). */
 export interface FieldAlias {
+  id: Uuid;
   name: string;
   alias: string;
 }
@@ -163,11 +166,13 @@ export function buildTree(
   const presence = (id: Uuid): Presence => (here.has(id) ? "here" : elsewhere.has(id) ? "elsewhere" : "none");
 
   const fieldsOf = new Map<Uuid, string[]>();
+  const fieldIdsOf = new Map<Uuid, Uuid[]>();
   const aliasesOf = new Map<Uuid, FieldAlias[]>();
   const columnsMissing = new Set<Uuid>();
   for (const a of model.attributes) {
     fieldsOf.set(a.entity_id, [...(fieldsOf.get(a.entity_id) ?? []), a.name]);
-    if (a.alias) aliasesOf.set(a.entity_id, [...(aliasesOf.get(a.entity_id) ?? []), { name: a.name, alias: a.alias }]);
+    fieldIdsOf.set(a.entity_id, [...(fieldIdsOf.get(a.entity_id) ?? []), a.id]);
+    if (a.alias) aliasesOf.set(a.entity_id, [...(aliasesOf.get(a.entity_id) ?? []), { id: a.id, name: a.name, alias: a.alias }]);
   }
   for (const c of model.sourceColumns) {
     fieldsOf.set(c.source_table_id, [...(fieldsOf.get(c.source_table_id) ?? []), c.name]);
@@ -180,6 +185,7 @@ export function buildTree(
     name: e.name,
     stereotype: meta,
     fields: fieldsOf.get(e.id) ?? [],
+    fieldIds: fieldIdsOf.get(e.id) ?? [],
     ...(e.alias ? { alias: e.alias } : {}),
     ...(aliasesOf.has(e.id) ? { aliases: aliasesOf.get(e.id) } : {}),
     presence: presence(e.id),
@@ -278,6 +284,8 @@ export interface TreeFilter {
 export interface Shown<T> {
   item: T;
   hint: string | null;
+  /** The attribute the search found the entity by, its name or its alias (slice 17); absent otherwise. */
+  hitId?: Uuid;
 }
 
 export interface ShownConcept {
@@ -293,7 +301,7 @@ export interface ShownSystem {
 
 const isFiltering = (f: TreeFilter) => !!f.q.trim() || f.canvasOnly || !!f.projectOnly;
 
-function show<T extends { name: string; fields: string[]; alias?: string; aliases?: FieldAlias[]; presence: Presence; inProject: boolean }>(
+function show<T extends { name: string; fields: string[]; fieldIds?: Uuid[]; alias?: string; aliases?: FieldAlias[]; presence: Presence; inProject: boolean }>(
   item: T,
   f: TreeFilter,
   field: string,
@@ -303,10 +311,13 @@ function show<T extends { name: string; fields: string[]; alias?: string; aliase
   const q = f.q.trim().toLowerCase();
   if (!q || item.name.toLowerCase().includes(q)) return { item, hint: null };
   if (item.alias?.toLowerCase().includes(q)) return { item, hint: `alias ${item.alias}` };
-  const hit = item.fields.find((n) => n.toLowerCase().includes(q));
-  if (hit) return { item, hint: `${field} ${hit}` };
+  const at = item.fields.findIndex((n) => n.toLowerCase().includes(q));
+  if (at >= 0) {
+    const hitId = item.fieldIds?.[at];
+    return { item, hint: `${field} ${item.fields[at]}`, ...(hitId ? { hitId } : {}) };
+  }
   const aliased = item.aliases?.find((a) => a.alias.toLowerCase().includes(q));
-  return aliased ? { item, hint: `${field} ${aliased.name} · ${aliased.alias}` } : null;
+  return aliased ? { item, hint: `${field} ${aliased.name} · ${aliased.alias}`, hitId: aliased.id } : null;
 }
 
 /** Concepts and their matching entities. While filtering, concepts with nothing to show are left out. */

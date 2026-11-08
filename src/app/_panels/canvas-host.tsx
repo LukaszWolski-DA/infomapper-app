@@ -57,6 +57,7 @@ import { armedDeleteText, attributeDeleteParts } from "./fields";
 import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, columnLabel, fedEntities, feedingSourceCards, feedingSources, inputsLabel, type ModelIndex } from "./model-index";
 import { usePanels } from "./panels-context";
+import { pickConcept } from "./concept-pick";
 import { useSidePanels } from "../_components/side-panels";
 import { Toolbox, type SearchResult, type ToolboxItem } from "./toolbox";
 
@@ -78,6 +79,8 @@ export interface HostCard {
 }
 
 const snap8 = (v: number) => Math.round(v / 8) * 8;
+/** The menus' item that opens an element panel's requirement picker (slice 17, D-72). */
+const LINK_REQUIREMENTS = "Link to requirements…";
 const MAX_RESULTS = 8;
 
 /**
@@ -86,7 +89,14 @@ const MAX_RESULTS = 8;
  */
 function focusField(id: string, tries = 20) {
   const el = document.getElementById(id) as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement | null;
-  if (el && !el.disabled && !el.closest("[inert]")) {
+  // a folded section opens first (D-35), then its button's picker opens under it (slice 17: `data-pop`)
+  const fold = el?.closest("section")?.querySelector<HTMLButtonElement>(":scope > h3 > button[aria-expanded=false]");
+  if (el && fold && el.closest("[hidden]")) {
+    fold.click();
+    setTimeout(() => focusField(id, tries - 1), 30);
+  } else if (el && !el.disabled && !el.closest("[inert]") && el.dataset.pop !== undefined) {
+    el.click();
+  } else if (el && !el.disabled && !el.closest("[inert]")) {
     el.focus();
     if ("select" in el && el.tagName !== "SELECT") el.select();
   } else if (tries > 0) setTimeout(() => focusField(id, tries - 1), 30);
@@ -121,7 +131,7 @@ export function useCanvasHost({
     openDetails();
     focusField(id);
   };
-  const { run, saveRow } = useAction();
+  const { run, saveRow, saveRows } = useAction();
   const toast = useToast();
   const [toolbox, setToolbox] = useState<ToolboxRequest | null>(null);
   const [deleting, setDeleting] = useState<Uuid | null>(null);
@@ -175,40 +185,45 @@ export function useCanvasHost({
     extsRef.current = exts;
   });
 
-  /** "New entity here", or a module's create ("New fact here", slice 15a, E18): the same placement and focus. */
+  /**
+   * "New entity here", or a module's create ("New fact here", slice 15a, E18): the same placement and focus. Inside a
+   * concept frame the new entity belongs to its concept (D-46, prototype conceptAt); elsewhere the concept is chosen in
+   * a picker at `screen`, the click or the toolbox's point (slice 17, D-72). Escape there creates nothing.
+   */
   const createEntityAt = useCallback(
-    async (at: { x: number; y: number }, name?: string, create?: EntityCreate) => {
+    (at: { x: number; y: number }, o: { name?: string; create?: EntityCreate; screen?: { x: number; y: number } } = {}) => {
       if (!editable) return;
       const concepts = [...ix.model.concepts].sort((a, b) => a.sort_order - b.sort_order);
-      const last = panels.lastConcept();
-      // inside a concept frame the new entity belongs to its concept (D-46, prototype conceptAt), else the last used
       const frame = ui.frameAt({ x: at.x + 24, y: at.y + 20 });
       const fromFrame = frame?.kind === "concept" ? concepts.find((c) => c.id === frame.conceptId) : undefined;
-      const concept = fromFrame ?? concepts.find((c) => c.id === last) ?? concepts[0];
-      if (!concept) {
-        toast("Create a concept first (left panel, New concept).");
+      const create = async (concept: (typeof concepts)[number]) => {
+        const { name } = o;
+        // with its height the new card joins the frame it lands in (slice 2b)
+        const placement = { canvasId, x: snap8(at.x), y: snap8(at.y), height: newCardHeight(0), frames: ui.frameRefs() };
+        const result = await run(() =>
+          o.create
+            ? (o.create.action(workspaceId, { conceptId: concept.id, placement }) as ReturnType<typeof createEntityAction>)
+            : createEntityAction(workspaceId, { conceptId: concept.id, ...(name ? { name } : {}), placement }),
+        );
+        if (!result.ok) return;
+        const cardId = result.value.canvasItemId;
+        if (cardId) ui.select({ t: "card", id: cardId });
+        if (name) toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}.`);
+        else {
+          // on a live canvas the new entity is labeled at once, without a question (PRD item 10)
+          toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}. Type its name now; change the concept in the panel.`);
+          if (cardId) {
+            openDetails();
+            panels.setNameFocus(cardId);
+          }
+        }
+      };
+      if (fromFrame) {
+        void create(fromFrame);
         return;
       }
-      // with its height the new card joins the frame it lands in (slice 2b)
-      const placement = { canvasId, x: snap8(at.x), y: snap8(at.y), height: newCardHeight(0), frames: ui.frameRefs() };
-      const result = await run(() =>
-        create
-          ? (create.action(workspaceId, { conceptId: concept.id, placement }) as ReturnType<typeof createEntityAction>)
-          : createEntityAction(workspaceId, { conceptId: concept.id, ...(name ? { name } : {}), placement }),
-      );
-      if (!result.ok) return;
-      panels.setLastConcept(concept.id);
-      const cardId = result.value.canvasItemId;
-      if (cardId) ui.select({ t: "card", id: cardId });
-      if (name) toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}.`);
-      else {
-        // on a live canvas the new entity is labeled at once, without a question (PRD item 10)
-        toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}. Type its name now; change the concept in the panel.`);
-        if (cardId) {
-          openDetails();
-          panels.setNameFocus(cardId);
-        }
-      }
+      const role = o.create ? (o.create.key === "fact" ? "fact" : "dimension") : "entity";
+      pickConcept(o.screen ?? { x: window.innerWidth / 2 - 130, y: window.innerHeight / 3 }, role, concepts, (c) => void create(c));
     },
     [editable, ix, panels, toast, run, workspaceId, canvasId, ui, live, openDetails],
   );
@@ -277,18 +292,23 @@ export function useCanvasHost({
   /**
    * “Add attribute” (slice 16, item 1): the entity panel's command from the card header's menu. It leads to the new
    * attribute's name, so a hidden details panel opens (D-54), as for “Paste attribute”. A collapsed card or a row filter
-   * that hides the new row stays as it is: the panel shows the attribute.
+   * that hides the new row stays as it is: the panel shows the attribute. `below` (slice 17, item 5: “Add attribute
+   * below” in a row's menu): directly below that attribute; the entity's attributes are renumbered, so the save holds
+   * them all (`saveRows`, as a move) and their next saves carry the new versions.
    */
   const addAttributeTo = useCallback(
-    async (card: HostCard) => {
+    async (card: HostCard, below?: Uuid) => {
       if (!editable || card.kind !== "ent") return;
-      const result = await run(() => addAttributeAction(workspaceId, { entityId: card.targetId }));
+      const siblings = below ? (ix.attributesOf.get(card.targetId) ?? []) : [];
+      const result = below
+        ? await saveRows(siblings.map((a) => ({ id: a.id })), () => addAttributeAction(workspaceId, { entityId: card.targetId, below }))
+        : await run(() => addAttributeAction(workspaceId, { entityId: card.targetId }));
       if (!result.ok) return;
       ui.select({ t: "row", cardId: card.id, id: result.value.attributeId });
       openDetails();
       panels.setNameFocus(result.value.attributeId);
     },
-    [editable, run, workspaceId, ui, openDetails, panels],
+    [editable, ix, run, saveRows, workspaceId, ui, openDetails, panels],
   );
 
   /** Deletes a mapping or a relationship at once; the toast offers Undo (slice 1b). */
@@ -326,7 +346,7 @@ export function useCanvasHost({
         if (editable) ext(kind)?.remove(id);
       },
       extGone: (kind, id) => ext(kind)?.gone(id) ?? null,
-      createEntityAt: (at, name) => void createEntityAt(at, name),
+      createEntityAt: (at, o) => createEntityAt(at, o),
       relate: (from, to) => void relate(from, to),
       openToolbox: setToolbox,
       moveAttribute: (attributeId, how) => {
@@ -393,6 +413,8 @@ export function useCanvasHost({
       }
       items.push({ label: view.collapsed ? "Expand card" : "Collapse card", act: () => ui.setCardView(card.id, { collapsed: !view.collapsed }) });
       items.push({ label: "Fit width to names", act: () => ui.fitWidth(card.id) });
+      // the panel's picker (slice 17, D-72; prototype ctxFor's "Link to a requirement…")
+      items.push({ label: LINK_REQUIREMENTS, act: () => focusDetails(isEnt ? "f-req-entity" : "f-req-source_table") });
       if (canNote) items.push({ label: "Add a note to this", act: () => ui.newNote({ cardId: card.id }) });
       if (!ui.cardFrame(card.id)) {
         items.push({ label: `Put in a new ${isEnt ? "concept" : "source system"} frame`, act: () => ui.putInNewFrame([card.id], true) });
@@ -452,7 +474,7 @@ export function useCanvasHost({
         meta: "new entity",
         kind: "new",
         here: false,
-        pick: () => toolbox && void createEntityAt({ x: toolbox.at.x - 24, y: toolbox.at.y - 20 }, name),
+        pick: () => toolbox && createEntityAt({ x: toolbox.at.x - 24, y: toolbox.at.y - 20 }, { name, screen: toolbox.screen }),
       });
     }
     return found;
@@ -464,9 +486,9 @@ export function useCanvasHost({
     if (t.kind === "canvas") {
       if (editable) {
         items.push({ search });
-        items.push({ label: "New entity here", kbd: "E", act: () => void createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }) });
+        items.push({ label: "New entity here", kbd: "E", act: () => createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }, { screen: req.screen }) });
         // a module's creates, after it (prototype: "New fact here", "New dimension here"; slice 15a, B-2)
-        for (const c of modules.creates) items.push({ label: c.here, act: () => void createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }, undefined, c) });
+        for (const c of modules.creates) items.push({ label: c.here, act: () => createEntityAt({ x: req.at.x - 24, y: req.at.y - 20 }, { create: c, screen: req.screen }) });
       }
       // a note here: its corner up-left of the click, as the prototype's “Add a note here”
       if (canNote) items.push({ label: "Add a note here", act: () => ui.newNote({ at: { x: req.at.x - 110, y: req.at.y - 20 } }) });
@@ -499,6 +521,7 @@ export function useCanvasHost({
         }
       }
       if (editable) {
+        items.push({ label: LINK_REQUIREMENTS, act: () => focusDetails("f-req-mapping") });
         items.push({ sep: true });
         items.push({ label: "Edit transformation rule…", act: () => {
           openDetails();
@@ -672,6 +695,9 @@ export function useCanvasHost({
           items.push({ label: "Move to the top", kbd: "Ctrl Shift ↑", disabled: pos <= 0, act: move("top") });
           items.push({ label: "Move to the bottom", kbd: "Ctrl Shift ↓", disabled: pos >= last, act: move("bottom") });
           items.push({ sep: true });
+          // slice 17, items 5 and 2a (prototype ctxFor)
+          items.push({ label: "Add attribute below", act: () => void addAttributeTo(card, a.id) });
+          items.push({ label: LINK_REQUIREMENTS, act: () => focusDetails("f-req-attribute") });
           // a fact or a dimension is fed from the logical model, not from columns (slice 15c, difference 9)
           const entity = ix.entity.get(a.entity_id);
           if (entity && isLogical(entity)) items.push({ label: "Map from a column…", act: () => focusDetails("f-addc") });
@@ -709,7 +735,10 @@ export function useCanvasHost({
     }
     if (t.kind === "row" && card.kind === "src" && ix.column.has(t.rowId)) {
       items.push({ head: columnLabel(ix, t.rowId) });
-      if (editable) items.push({ label: "Map to an attribute…", act: () => focusDetails("f-adda") });
+      if (editable) {
+        items.push({ label: LINK_REQUIREMENTS, act: () => focusDetails("f-req-source_column") });
+        items.push({ label: "Map to an attribute…", act: () => focusDetails("f-adda") });
+      }
       items.push(focusItem());
       return items;
     }

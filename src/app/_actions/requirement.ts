@@ -12,11 +12,13 @@ import {
   createRequirement,
   deleteRequirement,
   linkRequirement,
+  linkRequirements,
   setRequirementStatus,
   unlinkRequirement,
   updateRequirement,
   type CreateRequirementInput,
   type LinkRequirementInput,
+  type LinkRequirementsInput,
   type UpdateRequirementInput,
 } from "@/domain/commands/requirement";
 import type { Uuid } from "@/domain/ids";
@@ -94,6 +96,16 @@ export async function linkRequirementAction(workspaceId: string, input: LinkRequ
     const ws = access.workspace.id;
     const [requirement, links, model] = await Promise.all([store.requirements.get(ws, str(input?.requirementId)), store.requirements.listLinks(ws), store.model.load(ws)]);
     const r = linkRequirement(ctx, access, { requirement, links, ...model }, input);
+    return r.ok ? { ...r, value: { message: r.value.message } } : r;
+  });
+}
+
+/** Links several requirements to several elements in one step (slice 17, D-72); the toast's text comes back. */
+export async function linkRequirementsAction(workspaceId: string, input: LinkRequirementsInput): Promise<ActionResult<{ message: string }>> {
+  return requirementCommand(workspaceId, async (ctx, access, store) => {
+    const ws = access.workspace.id;
+    const [requirements, links, model] = await Promise.all([store.requirements.list(ws), store.requirements.listLinks(ws), store.model.load(ws)]);
+    const r = linkRequirements(ctx, access, { requirements, links, ...model }, input);
     return r.ok ? { ...r, value: { message: r.value.message } } : r;
   });
 }

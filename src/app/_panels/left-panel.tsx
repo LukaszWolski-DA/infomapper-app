@@ -37,6 +37,7 @@ import type { ImportData } from "./import/wizard-model";
 import { NewSourceTableDialog } from "./new-source-table-dialog";
 import { useImported } from "./import/use-imported";
 import { usePanels, type LeftTab } from "./panels-context";
+import { pickConcept } from "./concept-pick";
 import { useModules } from "../_components/modules";
 import { useSidePanels } from "../_components/side-panels";
 import { CoverageBar, coverageTitle, KindIcon, ReqDot } from "./requirement-ui";
@@ -86,7 +87,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const { run, saveRow } = useAction();
-  const { setNameFocus, setLastConcept, lastConcept, leftTab: chosenTab, setLeftTab: setTab } = usePanels();
+  const { setNameFocus, leftTab: chosenTab, setLeftTab: setTab } = usePanels();
   const imported = useImported();
   const modules = useModules();
   // slice 5a (Q4): creating something whose name is typed in the details panel, and a requirement's click, open it
@@ -159,13 +160,20 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     saveShut(next);
   };
 
-  /** A click: show the card that is here, else place the element in a free spot of the view. */
-  const open = (target: CardTarget, cardId: string | null, rows: number) => {
+  /**
+   * A click: show the card that is here, else place the element in a free spot of the view. An entity found by one of
+   * its attributes (`hitId`, slice 17, D-72) then shows that row, selected (a collapsed card or a hiding filter opens).
+   */
+  const open = async (target: CardTarget, cardId: string | null, rows: number, hitId?: string) => {
     closeLeftOverlay();
     if (cardId) {
       ui.select({ t: "card", id: cardId });
       ui.centerOn(cardId);
-    } else ui.place(target, rows);
+      if (hitId) ui.showRow(cardId, hitId);
+      return;
+    }
+    const placed = await ui.place(target, rows);
+    if (placed && hitId) ui.showRow(placed, hitId);
   };
 
   async function addEntity(c: TreeConcept) {
@@ -175,7 +183,6 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
       createEntityAction(workspaceId, { conceptId: c.id, placement: { canvasId, ...spot, height: newCardHeight(0), frames: ui.frameRefs() } }),
     );
     if (!result.ok) return;
-    setLastConcept(c.id);
     toast(`Created ${result.value.name} in ${c.name}. Type its name now; change the concept in the panel.`);
     const cardId = result.value.canvasItemId;
     if (cardId) {
@@ -201,7 +208,6 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     setAddingConcept(false);
     const result = await run(() => createConceptAction(workspaceId, { name }));
     if (!result.ok) return;
-    setLastConcept(result.value.conceptId);
     toast(`Created the concept ${name}. Use + next to it to add entities.`);
   }
 
@@ -286,7 +292,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
               </div>
               {opened &&
                 (items.length ? (
-                  items.map(({ item: e, hint }) => (
+                  items.map(({ item: e, hint, hitId }) => (
                     <TreeItem
                       key={e.id}
                       kind="ent"
@@ -295,7 +301,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                       meta={e.stereotype}
                       presence={e.presence}
                       dragData={{ target: { entityId: e.id }, rows: e.fields.length }}
-                      onClick={() => open({ entityId: e.id }, e.cardId, e.fields.length)}
+                      onClick={() => void open({ entityId: e.id }, e.cardId, e.fields.length, hitId)}
                     />
                   ))
                 ) : (
@@ -406,7 +412,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                         missing={t.retired ? "retired" : t.missing ? "table" : t.columnsMissing ? "columns" : null}
                         presence={t.presence}
                         dragData={{ target: { sourceTableId: t.id }, rows: t.fields.length }}
-                        onClick={() => open({ sourceTableId: t.id }, t.cardId, t.fields.length)}
+                        onClick={() => void open({ sourceTableId: t.id }, t.cardId, t.fields.length)}
                       />
                     ))}
                 </div>
@@ -530,19 +536,17 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
   const TabDialog = tabDialog ? TAB_DIALOGS[tabDialog] : undefined;
 
   // ---- a module's tab (slice 15a, B-1; prototype cubeTree): its creates, then each group's entities by concept ----
-  async function createFromTab(createKey: string) {
+  // the concept is chosen in a picker under the button (slice 17, D-72; prototype: the Cube tab's anchor)
+  function createFromTab(createKey: string, button: HTMLElement) {
     const create = modules.creates.find((c) => c.key === createKey);
     if (!create) return;
-    // the concept last used for a new entity, else the first (prototype createEntity from the panel)
-    const concept = tree.concepts.find((c) => c.id === lastConcept()) ?? tree.concepts[0];
-    if (!concept) {
-      toast("Create a concept first (left panel, New concept).");
-      return;
-    }
+    const r = button.getBoundingClientRect();
+    pickConcept({ x: r.left, y: r.bottom + 4 }, create.key === "fact" ? "fact" : "dimension", tree.concepts, (concept) => void createIn(create, concept));
+  }
+  async function createIn(create: (typeof modules.creates)[number], concept: { id: string; name: string }) {
     const spot = ui.freeSpot();
     const result = await run(() => create.action(workspaceId, { conceptId: concept.id, placement: { canvasId, ...spot, height: newCardHeight(0), frames: ui.frameRefs() } }) as Promise<CreateResult>);
     if (!result.ok) return;
-    setLastConcept(concept.id);
     toast(`Created ${result.value.name} in ${concept.name}. Type its name now; change the concept in the panel.`);
     const cardId = result.value.canvasItemId;
     if (cardId) {
@@ -565,7 +569,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
         {(creates.length > 0 || actions.length > 0) && (
           <div className="flex flex-wrap gap-1.5 px-2.5 pb-0.5 pt-1.5">
             {creates.map((c) => (
-              <button key={c.key} type="button" className={`${smallButton} whitespace-nowrap`} data-testid={c.testId} onClick={() => void createFromTab(c.key)}>
+              <button key={c.key} type="button" className={`${smallButton} whitespace-nowrap`} data-testid={c.testId} onClick={(e) => createFromTab(c.key, e.currentTarget)}>
                 {c.button}
               </button>
             ))}
@@ -598,7 +602,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                           </GroupHead>
                         </div>
                         {isOpen(shut, sub, q) &&
-                          items.map(({ item: e, hint }) => (
+                          items.map(({ item: e, hint, hitId }) => (
                             <TreeItem
                               key={e.id}
                               kind="ent"
@@ -607,7 +611,7 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
                               meta={e.stereotype}
                               presence={e.presence}
                               dragData={{ target: { entityId: e.id }, rows: e.fields.length }}
-                              onClick={() => open({ entityId: e.id }, e.cardId, e.fields.length)}
+                              onClick={() => void open({ entityId: e.id }, e.cardId, e.fields.length, hitId)}
                             />
                           ))}
                       </div>

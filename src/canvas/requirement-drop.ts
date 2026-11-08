@@ -50,6 +50,9 @@ export const DROP_TOAST = {
   moved: (key: string) => `Moved ${key}'s card.`,
 } as const;
 
+/** A requirement card's link drag dropped on nothing it can link to (slice 17, prototype). */
+export const LINK_DRAG_ELSEWHERE = (key: string) => `Drop ${key} on an attribute, entity, mapping, table or column to link it.`;
+
 /** What the hit test needs from the canvas: the cards' data, a mapping's name, and the requirement's links. */
 export interface DropLookup {
   /** An entity or table card by its id: its kind, element, name and its rows' names. */

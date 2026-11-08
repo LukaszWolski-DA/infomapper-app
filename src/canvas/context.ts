@@ -34,6 +34,8 @@ export interface CanvasCardsApi {
   setFrameCollapsed: (frameId: string, collapsed: boolean) => void;
   /** A card row of a block: expand the frame and select that card. */
   openMember: (frameId: string, cardId: string) => void;
+  /** A press on a requirement card's link handle (slice 17): the link drag. */
+  startLinkDrag: (e: ReactPointerEvent, requirementId: string, key: string) => void;
 }
 
 const noop = () => {};
@@ -49,6 +51,7 @@ export const CanvasCardsCtx = createContext<CanvasCardsApi>({
   framePress: noop,
   setFrameCollapsed: noop,
   openMember: noop,
+  startLinkDrag: noop,
 });
 
 /**
@@ -85,7 +88,8 @@ export interface CanvasHandle {
    */
   shiftView: (dx: number) => void;
   /** Places an element in a free spot of the view, or shows its card when it is already here. `rows` sizes the card. */
-  place: (target: CardTarget, rows: number, options?: { quiet?: boolean }) => void;
+  /** Answers the card's id once it is here (null when nothing was placed, or on a live canvas, which adds it later). */
+  place: (target: CardTarget, rows: number, options?: { quiet?: boolean }) => Promise<Uuid | null>;
   /** Takes a card off this canvas (D-02); waits for the card's pending saves. */
   remove: (cardId: Uuid) => void;
   /** Moves the view so the card is in the middle. */
@@ -111,6 +115,11 @@ export interface CanvasHandle {
    * card's names or aliases; a choice equal to the canvas's mode follows the canvas again.
    */
   setCardView: (cardId: Uuid, view: { collapsed?: boolean; rowFilter?: RowFilter; entityNames?: NameMode; attributeNames?: NameMode }) => void;
+  /**
+   * Selects a row of a card on this canvas and flashes it (slice 17, D-72: an attribute found in the object browser); a
+   * collapsed card, or a row filter that hides the row, opens first, one undo step "Show row".
+   */
+  showRow: (cardId: Uuid, rowId: Uuid) => void;
   /**
    * Places elements beside a card in one change (B-08): feeding sources on the left, fed entities on the right, each
    * in a free spot. Elements already here are skipped.
@@ -384,7 +393,8 @@ export interface CanvasHost {
   /** The module's text when its object no longer exists (a history place, slice 15c); null while it does. */
   extGone: (kind: string, id: Uuid) => string | null;
   /** The Entity tool or “New entity here”: a new entity whose card's top left is at a canvas point. */
-  createEntityAt: (at: { x: number; y: number }, name?: string) => void;
+  /** `screen`: where the concept picker opens when no concept frame is under `at` (slice 17, D-72). */
+  createEntityAt: (at: { x: number; y: number }, o?: { name?: string; screen?: { x: number; y: number } }) => void;
   /** A relationship from one entity card to another (relate button or “Draw a relationship from here”). */
   relate: (fromCardId: Uuid, toCardId: Uuid) => void;
   openToolbox: (request: ToolboxRequest) => void;
@@ -452,7 +462,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   select: noop,
   fit: noop,
   shiftView: noop,
-  place: noop,
+  place: async () => null,
   remove: noop,
   centerOn: noop,
   showPlace: () => null,
@@ -461,6 +471,7 @@ export const CanvasUiCtx = createContext<CanvasUiApi>({
   placeAt: noop,
   fitWidth: noop,
   setCardView: noop,
+  showRow: noop,
   placeBeside: noop,
   settled: () => Promise.resolve(),
   cardView: () => null,

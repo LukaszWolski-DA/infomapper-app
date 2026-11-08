@@ -71,7 +71,7 @@ describe("filtering the tree", () => {
   it("searches names and attribute names, and says which attribute matched", () => {
     const shown = filterConcepts(tree.concepts, { q: "EMAIL", canvasOnly: false });
     expect(shown).toHaveLength(1);
-    expect(shown[0]!.items).toEqual([{ item: tree.concepts[0]!.entities[0], hint: "attribute email" }]);
+    expect(shown[0]!.items).toEqual([{ item: tree.concepts[0]!.entities[0], hint: "attribute email", hitId: ids.email }]);
     expect(filterConcepts(tree.concepts, { q: "order", canvasOnly: false })[0]!.items[0]!.hint).toBeNull();
   });
 
@@ -173,7 +173,7 @@ describe("the search finds aliases (slice 11, item 14, F13)", () => {
   const found = (q: string) => filterConcepts(t.concepts, { q, canvasOnly: false }).flatMap((g) => g.items.map((s) => [s.item.name, s.hint]));
 
   it("carries an alias only where one is set", () => {
-    expect(t.concepts[0]!.entities[0]).toMatchObject({ alias: "Klient", aliases: [{ name: "customer_id", alias: "Numer klienta" }] });
+    expect(t.concepts[0]!.entities[0]).toMatchObject({ alias: "Klient", aliases: [{ id: ids.customerId, name: "customer_id", alias: "Numer klienta" }] });
     expect(t.concepts[1]!.entities[0]).not.toHaveProperty("alias");
     expect(t.concepts[1]!.entities[0]).not.toHaveProperty("aliases");
     expect(tree.concepts[0]!.entities[0]).not.toHaveProperty("alias");
@@ -190,6 +190,14 @@ describe("the search finds aliases (slice 11, item 14, F13)", () => {
     // "customer_id" is an attribute's name: its hint names the attribute, not the alias
     expect(found("customer_")).toEqual([["Customer", "attribute customer_id"]]);
     expect(found("Kopia")).toEqual([]);
+  });
+
+  it("names the attribute found by its id, by name or by alias, even when two share a name (slice 17)", () => {
+    const hit = (q: string) => filterConcepts(t.concepts, { q, canvasOnly: false }).flatMap((g) => g.items.map((s) => s.hitId ?? null));
+    expect(hit("email")).toEqual([ids.email]);
+    expect(hit("Numer")).toEqual([ids.customerId]);
+    expect(hit("Customer")).toEqual([null]);
+    expect(hit("klient")).toEqual([null]);
   });
 });
 
