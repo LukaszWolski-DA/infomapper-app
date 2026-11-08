@@ -372,3 +372,105 @@ Unchanged: "Change dimensional mapping", "Delete attribute", "Relationship delet
     entity's delete preview gets a lookup row.
 11. **Texts and undo names:** approved as listed, changed as answer 6 says.
 12. **Runs:** one full run at the end of step 2, one at the end of step 4; single-file checks in step 3.
+
+## Step 2: data and domain (8 November 2026)
+
+KB was backed up first: `.data/backups/dev-db-20261108-1021.json`, also `kb-model-latest.json`. KB itself was not opened
+or changed; it is at format 13 and is upgraded to 14 the first time the app reads it (no change events, no log line).
+
+### What changed
+
+- **Migration `20261108120000_derivations.sql`:** `attribute.is_calculated` (boolean, not null, false), `calc_rule`
+  (text) with `attribute_calc_ck`; the table `attribute_input` with `attribute_input_self_ck`, three indexes and the live
+  unique `attribute_input_ux`; `cube_mapping`'s kind `lookup`, `lookup_relationship_id` (a foreign key to
+  `relationship`, indexed) and `lookup_default`. No CHECK ties the lookup's columns to the kind (they are kept across a
+  kind change). Row Level Security is on.
+- **Local file format 14** (`schema.ts`, `file.ts`, `upgrade-14.test.ts`), the local rules for `attribute` and
+  `attribute_input`, and the store's model load (`attributeInputs`).
+- **InfoCube reads the two lookup columns as null where a row lacks them** (Q2). `TableRules.defaults` (new) is read by
+  the store's `modules.list` and `loadForUndo` (`readRows`), and undo's image defaults are the module's `defaults`.
+- **Undo:** `attribute_input` is undoable, with both columns as parents (F9). An older image of an attribute stands for
+  "not calculated". `consistent` was not touched; a new check refuses a revert that would bring back an input closing a
+  cycle: "Undoing this would make {attribute} calculated from itself." (F8).
+- **The rules in one place:** `src/domain/model/derivations.ts`. It has the index (`derivationIndex`: inputs in order,
+  users, `reaches`), `closesCycle`, `throughCalculation` (any direct rule, memoised, cycles excluded),
+  `calculationGaps`, `derivedRows` and `rowCounts` for step 4's counts, and the row's titles.
+- **The commands** (`src/domain/commands/derivation.ts`, `model.edit`), each one change group with its label:
+  `calculateAttribute` "Calculate attribute", `addAttributeInputs` "Add calculation inputs", `removeAttributeInput`
+  "Remove calculation input" (the last one too: the attribute stays calculated, Q1), `setCalculationRule` "Change
+  calculation rule" and `stopCalculating` "Stop calculating". The checks follow F7, with step 1's texts and toasts.
+  Every command writes the calculated attribute's row with a new version, for the panel's save chain.
+- **The cascades** (F9): `deleteAttribute` and `entityCascade` soft-delete the attribute's input rows on both sides.
+  Their states now require `attributeInputs`, so the compiler found every caller. Paste, the header drop, "Create
+  dimension from this…" and "Add key" write uncalculated attributes.
+- **InfoCube's lookups** (F13), in `mappings.ts`:
+  - `updateCubeMapping` takes `lookupRelationshipId` and `lookupDefault`. Lookup with two inputs is refused, and
+    choosing Lookup takes the dictionary's one relationship. A relationship that is not a candidate is refused: "Choose
+    a relationship of {entity}.". D-51 covers the kind, the rule, the relationship and the value.
+  - `CUBE_MAPPING_LOG.content` lists the two new columns.
+  - A second input makes a lookup a transformation.
+  - `lookupRelationships`, `relationshipText`, `lookupSentence` and `lookupRelationshipGone` serve step 3's panel.
+  - The mapping command's state carries the relationships.
+- **The new cascade kind `follows`** (F16): `ModuleUndoTable.follows`, `UndoTables.follows` and `moduleCascade`. A
+  module row outlives a row it points to, changed by the module's own rule. InfoCube's rule (`lookupLosesRelationship`):
+  an approved lookup whose relationship is deleted, directly or with an entity, goes back to review in the same change
+  group. It keeps the id (F15). The relationship is not a parent, so one undo brings both back.
+- **Requirements** (F2, F11):
+  - `lookupModel` covers a calculated attribute when every input is covered, at both levels and recursively, with a
+    cycle never counting. Its gap reason is "calculation" ("an input of its calculation is not covered").
+  - A logical calculation also counts for a dimensional feed that reads it (P2).
+  - `scopeOfLinks` brings inputs at any depth (`scope.inputs`).
+  - `ScopeModel.attributeInputs` is optional: a caller without it sees no calculation.
+  - The import review, the import command and a source's delete preview pass the inputs. `coverageDelta`'s reasons
+    follow the inputs.
+
+### Differences from step 1's plan
+
+1. **The rule is its own command,** `setCalculationRule`, not a field of `updateAttribute` (Q4). Its undo name is then
+   always "Change calculation rule", and `updateAttribute` keeps its fields.
+2. **Four-eyes after a relationship's delete is not changed.** F16 proposed that the person who deleted the relationship
+   counts as the lookup's last content editor. The cascade's event changes only the status, which is not content, so
+   the lookup's last content editor stays the one who last changed it. A question for Łukasz (below).
+3. **No server actions yet.** The new commands have no actions until step 3 (the panels). The data, the commands and
+   the cascades are reached through unit tests only.
+
+### Checks
+
+- `npm run lint` and `npm run typecheck` pass.
+- `npm test`: 151 files, 1,858 tests, all passed. New are `derivations.test.ts` (11), `derivation.test.ts` (12),
+  `requirements-derivations.test.ts` (7), `tests/infocube-lookups.test.ts` (9) and `upgrade-14.test.ts` (3).
+- The schema check against Postgres (`schema.yml`) runs on a pull request or `main` only, so it has not run for this
+  branch. The local `compare-schema` test reads the new table.
+
+### The full runs (shared infrastructure: undo, the module cascade, the local file's format)
+
+Both runs are on `a6fc747`. The commits after it change only Markdown files in `docs/`.
+
+| Run | Wall-clock | Parts' times (1–7, min) | Heap peaks (1–7, MB, limit 8,039) | Passed | Failed | Skipped | Flaky | Expected failures |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| [42469037187](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42469037187) | 12.2 min | 8.2, 6.8, 7.9, 8.2, 7.1, 7.1, 10.7 | 1,168, 1,312, 1,208, 964, 1,371, 1,195, 1,200 | 649 | 1 (S13-09, first test) | 4 | 0 | 0 |
+| [42470568862](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42470568862) | 13.2 min | 10.4, 9.2, 11.6, 6.7, 9.3, 6.0, 8.5 | 1,068, 1,005, 1,164, 1,316, 1,021, 1,221, 1,488 | 650 | 0 | 4 | 0 | 0 |
+
+In both runs: no server restart in any part, and at least 9,095 MB available.
+
+**S13-09's failure** ("an undo on the project home shows the stored name in the field") was a 60 s timeout in the
+test's own wait, `await (await renamed).finished()` (`e2e/slice-13/S13-09.spec.ts:23`).
+- **The server finished.** The server's log shows the rename's POST answered 200 in 82 ms, and the data file had the new
+  name.
+- **The browser did not.** Its network record has the response's headers but no end of body (`receive: -1`). No
+  console error.
+- **The single-file checks:**
+
+  | Ref | Run | Rounds | Failed |
+  | --- | --- | --- | --- |
+  | branch | [42469983929](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42469983929) | 3 | 1, the same wait |
+  | branch | [42470404132](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42470404132) | 6 | 0 |
+  | `main` (slice 17) | [42470238386](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42470238386) | 6 | 0 |
+
+- **Count:** on the branch 2 failures in 11 executions, on `main` 0 in 6.
+- **What it touches:** the project home's rename and undo, which slice 18 does not change. Slice 18 changes only what
+  the page loads: the model's `attributeInputs`, and InfoCube's rows read through `readRows`.
+
+It looks like a race in the test's wait on the answer's body, not a bug of the slice, but the counts are small. Proposed
+(a question for Łukasz): in step 3, replace `finished()` with the page showing the rename's version (`data-version` on
+the name field, as the next line already waits for), and keep watching S13-09 in step 3's checks.
