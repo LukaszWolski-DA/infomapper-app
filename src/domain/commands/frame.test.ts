@@ -396,6 +396,30 @@ describe("resizeFrame (D-06)", () => {
     expect(resize({ width: 600, expectedVersion: 2 })).toMatchObject(refusedAsStale);
     expect(resize({})).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
   });
+
+  it("from its left or top edge (slice 17): moves its top-left, keeps the minimum, decides membership, named “Resize frame”", () => {
+    // the left edge 800 px to the right: the frame starts at 800, narrows to 200, and Customer (header middle at 740) leaves
+    const left = ok(resize({ x: 800, y: 0, width: 200 }));
+    expect(written(left.writeSet)[`frame:${frameA}`]).toMatchObject({ x: 800, y: 0, width: 200, height: 1000 });
+    expect(written(left.writeSet)[`canvas_item:${itemCustomer}`]).toMatchObject({ frame_id: null });
+    expect(left.writeSet.label).toBe("Resize frame");
+    expect(changeLabel(left.writeSet.events)).not.toBe("Resize frame");
+    expect(resize({ x: 900, y: 0, width: 100 })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    expect(resize({ x: 800, width: 200 })).toMatchObject({ ok: false, error: { code: "invalid" } });
+  });
+
+  it("keeps notes pinned to it in place when its top-left moves, and never claims free notes (D-20)", () => {
+    const pinned = note(ids.notePinned, { pin_canvas_item_id: null, pin_frame_id: frameA, x: 40, y: 1020 });
+    const loose = note(ids.noteFree, { x: 300, y: 300, frame_id: null });
+    const withNotes = { ...state, notes: [pinned, loose] };
+    const r = ok(resizeFrame(makeCtx(), access("modeler"), withNotes, { frameId: frameA, expectedVersion: 1, x: -80, y: -40, width: 1080, height: 1040, cards: [member, free, ofB].map(ref) }));
+    const rows = written(r.writeSet);
+    expect(rows[`note:${ids.notePinned}`]).toMatchObject({ x: 120, y: 1060 });
+    expect(rows[`note:${ids.noteFree}`]).toBeUndefined();
+    expect(r.value.versions[ids.notePinned]).toBe(2);
+    // from the bottom-right nothing moves, so no note is written
+    expect(written(ok(resizeFrame(makeCtx(), access("modeler"), withNotes, { frameId: frameA, expectedVersion: 1, width: 1200, height: 1000, cards: [member, free, ofB].map(ref) })).writeSet)[`note:${ids.notePinned}`]).toBeUndefined();
+  });
 });
 
 describe("deleteFrame", () => {

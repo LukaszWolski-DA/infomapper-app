@@ -99,6 +99,16 @@ describe("updateCanvasItem: collapse, row filter", () => {
     });
   });
 
+  it("a card opened to show a found row is one step named “Show row” (slice 17)", () => {
+    const shut = { item: canvasItem(itemCustomer, { collapsed: true, row_filter: "keys" }) };
+    const r = updateCanvasItem(makeCtx(), access("modeler"), shut, { ...ref, collapsed: false, rowFilter: "all", showRow: true });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.value.item).toMatchObject({ collapsed: false, row_filter: "all" });
+    expect(r.writeSet.label).toBe("Show row");
+    const plain = updateCanvasItem(makeCtx(), access("modeler"), shut, { ...ref, collapsed: false });
+    expect(plain.ok && plain.writeSet.label).toBeUndefined();
+  });
+
   it("refuses the labeled filter (labels come later), a position or width (moveOnCanvas, slice 2b) and no change", () => {
     expect(updateCanvasItem(makeCtx(), access("owner"), state, { ...ref, rowFilter: "labeled" })).toMatchObject({ ok: false, error: { code: "invalid" } });
     expect(updateCanvasItem(makeCtx(), access("owner"), state, { ...ref, x: 1, y: 1 })).toMatchObject({ ok: false, error: { code: "invalid" } });

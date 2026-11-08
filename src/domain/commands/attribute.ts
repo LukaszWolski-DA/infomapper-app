@@ -85,10 +85,16 @@ export function attributeType(input: z.output<typeof typeInput>): { ok: true; ty
 
 // ---- add ----
 
-const addAttributeInput = z.object({ entityId: uuidSchema, name: nameSchema.optional() }).strict();
+const addAttributeInput = z.object({ entityId: uuidSchema, name: nameSchema.optional(), below: uuidSchema.optional() }).strict();
 export type AddAttributeInput = z.input<typeof addAttributeInput>;
 
-/** Adds an attribute at the end of the entity: a nullable string, ready to be renamed. */
+export const CREATE_ATTRIBUTE_LABEL = "Create attribute";
+
+/**
+ * Adds an attribute at the end of the entity: a nullable string, ready to be renamed. With `below` (slice 17, D-72:
+ * "Add attribute below" in a row's menu) it goes directly below that attribute and the entity's attributes are
+ * renumbered 0..n-1 as a move does, in the same change group; only rows whose number changes are written.
+ */
 export function addAttribute(
   ctx: CommandContext,
   access: WorkspaceAccess,
@@ -97,9 +103,14 @@ export function addAttribute(
 ): CommandResult<{ attributeId: Uuid }> {
   const parsed = begin(access, "model.edit", addAttributeInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { entityId, name } = parsed.data;
+  const { entityId, name, below } = parsed.data;
   const workspaceId = access.workspace.id;
   if (!isLive(state.entity, workspaceId) || state.entity.id !== entityId) return fail(notFound("entity"));
+  const siblings = state.attributes
+    .filter((a) => isLive(a, workspaceId) && a.entity_id === entityId)
+    .sort((a, b) => a.sort_order - b.sort_order || a.name.localeCompare(b.name));
+  const at = below === undefined ? -1 : siblings.findIndex((a) => a.id === below);
+  if (below !== undefined && at < 0) return fail(notFound("attribute"));
 
   const attribute: Attribute = {
     ...newRowColumns(ctx),
@@ -122,7 +133,22 @@ export function addAttribute(
     definition_text: null,
     copied_from_attribute_id: null,
   };
-  return done(ctx, access, { attributeId: attribute.id }, [{ kind: "insert", table: "attribute", row: attribute }]);
+  if (at < 0) return done(ctx, access, { attributeId: attribute.id }, [{ kind: "insert", table: "attribute", row: attribute }]);
+
+  const order = [...siblings];
+  order.splice(at + 1, 0, attribute);
+  const writes: Write[] = [];
+  order.forEach((a, index) => {
+    if (a === attribute) writes.unshift({ kind: "insert", table: "attribute", row: { ...attribute, sort_order: index } });
+    else if (a.sort_order !== index) writes.push({ kind: "update", table: "attribute", before: a, row: nextVersion(ctx, a, { sort_order: index }) });
+  });
+  const result = done(ctx, access, { attributeId: attribute.id }, writes);
+  if (result.ok) {
+    result.writeSet.label = CREATE_ATTRIBUTE_LABEL;
+    // the active context labels the new attribute only, not those renumbered below it (as a move, slice 3b, Q2)
+    result.writeSet.mainTargets = [{ kind: "attribute", id: attribute.id }];
+  }
+  return result;
 }
 
 // ---- edit ----
