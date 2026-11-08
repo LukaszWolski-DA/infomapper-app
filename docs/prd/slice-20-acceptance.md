@@ -717,7 +717,8 @@ Even with both, the estimate is about 70 ms on the synthetic model.
 
 - `npm run lint`, `npm run typecheck`: pass.
 - `npm test`: 157 files, 1,929 tests, all pass (the index's tests read titles through `markTitle`).
-- CI on the pushed commit: see the report in chat.
+- GitHub's CI (`ci.yml`) runs on pull requests and on `main` only. Slice 20 has no pull request yet, so CI has not run
+  on GitHub; its three jobs (lint, typecheck, unit tests) pass locally on the pushed commit.
 
 ### How to check
 
