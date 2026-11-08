@@ -15,10 +15,15 @@
 //   when its requirement is the Focus target, or when its requirement's scope contains the focused element itself; for
 //   several items any of them, a requirement among them (its card in a multi-selection) included. A multi-selection's
 //   requirements light their own scopes too (prototype relatedOf “multi”, the union of each item's).
+// - Slice 18 (item 3, F10, Łukasz's answer Q-A): Focus on an attribute also lights its calculation's inputs and the
+//   attributes calculated from it, one level (prototype relatedOf): their source mappings with their tables, and the
+//   logical cards that feed any of them (a module's feeds, `feeds`), so the dimensional lines between lit cards light.
+//   No row is marked; the inputs and users share the attribute's card.
 
 import type { Uuid } from "../ids";
 import type { WorkspaceModel } from "../types";
-import type { RequirementScope } from "./requirements";
+import { derivationIndex } from "./derivations";
+import type { AttributeFeeds, RequirementScope } from "./requirements";
 
 export type LitRowColour = "covered" | "gap";
 
@@ -38,7 +43,7 @@ export interface Lit {
   lines?: ReadonlySet<Uuid>;
 }
 
-export type LitModel = Pick<WorkspaceModel, "attributes" | "mappings" | "mappingInputs" | "relationships" | "sourceColumns">;
+export type LitModel = Pick<WorkspaceModel, "attributes" | "mappings" | "mappingInputs" | "relationships" | "sourceColumns"> & Partial<Pick<WorkspaceModel, "attributeInputs">>;
 
 const live = <T extends { deleted_at: string | null }>(rows: readonly T[]) => rows.filter((r) => r.deleted_at === null);
 
@@ -115,7 +120,7 @@ function entityLit(model: LitModel, l: ReturnType<typeof lookup>, lit: Lit, enti
 }
 
 /** What Focus lights for a selection other than a requirement (prototype relatedOf); nothing for an unknown id. */
-export function targetLit(model: LitModel, target: LitTarget): Lit {
+export function targetLit(model: LitModel, target: LitTarget, feeds: AttributeFeeds = {}): Lit {
   const l = lookup(model);
   const lit = empty();
   switch (target.t) {
@@ -129,7 +134,17 @@ export function targetLit(model: LitModel, target: LitTarget): Lit {
       const entity = l.entityOf.get(target.id);
       if (!entity) break;
       lit.entities.add(entity);
-      for (const m of l.mappingsOfAttribute.get(target.id) ?? []) addMapping(lit, l, m);
+      // slice 18 (F10): the attribute, its calculation's inputs and the attributes calculated from it, one level
+      const calc = derivationIndex(model.attributes, model.attributeInputs ?? []);
+      const around = [target.id, ...calc.inputsOf(target.id), ...calc.usersOf(target.id)];
+      for (const a of around) {
+        for (const m of l.mappingsOfAttribute.get(a) ?? []) addMapping(lit, l, m);
+        // a module's feeds: the logical cards they read (their lines light between lit cards, `litModules`)
+        for (const f of feeds[a] ?? []) for (const i of f.inputs) {
+          const e = l.entityOf.get(i);
+          if (e) lit.entities.add(e);
+        }
+      }
       break;
     }
     case "column": {
