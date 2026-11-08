@@ -615,3 +615,7 @@ Its heap is far from 2 GB, so the cuts stay.
 2. Set the fact types of DimBuilding's facts, and a junk or snapshot dimension if the model has one. Check the chips on
    their usual widths.
 3. The file holds the new shape after its first InfoCube save. Its backup holds the old one.
+
+## Łukasz's answer to step 3 (8 November 2026)
+
+D-74 approved as written in `docs/decisions.md`. The manual acceptance follows.
