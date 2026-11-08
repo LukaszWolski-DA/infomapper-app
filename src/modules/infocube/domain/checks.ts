@@ -6,8 +6,8 @@
 
 import type { Uuid } from "@/domain/ids";
 import { coverageGapText, type CheckGroup, type CheckInput, type CheckLine, type CheckRef, type ModuleChecks } from "@/domain/model/checks";
-import { cubeIndex, factHints, typeWord, type Hint } from "./keys";
-import { hasTypeConflict, mappingIndex, typesDiffer } from "./mappings";
+import { cubeIndex, factHints, typeWord, type CubeIndex, type Hint } from "./keys";
+import { typesDiffer } from "./mappings";
 import type { CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure } from "./types";
 
 /** A dimensional mapping's selection kind on the canvas (`CUBE_MAPPING_KIND` in `../canvas/lines.ts`; the test keeps them equal). */
@@ -42,19 +42,29 @@ export const CUBE_CHECK_TEXTS = {
   typeConflict: (input: string, inputType: string, target: string, targetType: string) => `type conflict: ${input} is ${inputType}, ${target} is ${targetType}`,
 } as const;
 
-/** InfoCube's three groups (facts, feeds, under) for the input's scope; empty groups included. */
-export function cubeChecks(rows: CubeCheckRows, { model, lookup, scope }: CheckInput): ModuleChecks {
+/**
+ * InfoCube's three groups (facts, feeds, under) for the input's scope; empty groups included. They read the indexes the
+ * page has already (step 2's bench): the requirement index's lookup (its feeds are the dimensional mappings, with their
+ * approval, type conflict and inputs) and the cube index (the facts' hints), which a caller that has one passes in.
+ */
+export function cubeChecks(rows: CubeCheckRows, { model, lookup, scope }: CheckInput, index?: CubeIndex): ModuleChecks {
   const entities = model.entities.filter((e) => e.deleted_at === null);
   const inScope = (id: Uuid | undefined) => !!id && (!scope || scope.has(id));
-  const cube = cubeIndex({
-    entities,
-    attributes: model.attributes,
-    relationships: model.relationships,
-    cubeEntities: rows.cubeEntities as CubeEntity[],
-    cubeMeasures: rows.cubeMeasures as CubeMeasure[],
-    cubeKeys: rows.cubeKeys as CubeKey[],
-  });
-  const maps = mappingIndex({ entities, attributes: model.attributes, cubeMappings: rows.cubeMappings as CubeMapping[], cubeMappingInputs: rows.cubeMappingInputs as CubeMappingInput[] });
+  const cube =
+    index ??
+    cubeIndex({
+      entities,
+      attributes: model.attributes,
+      relationships: model.relationships,
+      cubeEntities: rows.cubeEntities as CubeEntity[],
+      cubeMeasures: rows.cubeMeasures as CubeMeasure[],
+      cubeKeys: rows.cubeKeys as CubeKey[],
+    });
+  const name = new Map(entities.map((e) => [e.id, e.name]));
+  const label = (attributeId: Uuid) => {
+    const a = lookup.attribute.get(attributeId);
+    return `${(a && name.get(a.entity_id)) ?? "?"}.${a?.name ?? "?"}`;
+  };
 
   // every fact's hints, in the model's order of entities
   const facts: CheckLine[] = [];
@@ -74,33 +84,33 @@ export function cubeChecks(rows: CubeCheckRows, { model, lookup, scope }: CheckI
     }
   }
 
-  // approved dimensional mappings, by their targets in the model's order
+  // approved dimensional mappings: the lookup's feeds, by their targets in the model's order (entities, then attributes)
   const feeds: CheckLine[] = [];
   const under: CheckLine[] = [];
-  const attributes = model.attributes.filter((a) => a.deleted_at === null).sort((a, b) => a.entity_id.localeCompare(b.entity_id) || a.sort_order - b.sort_order);
-  for (const target of attributes) {
-    if (maps.levelOf(target.id) !== "dimensional") continue;
-    for (const m of maps.mappingsTo(target.id)) {
-      if (m.status !== "approved") continue;
-      const inputs = maps.inputsOf(m.id).map((i) => i.attribute_id);
-      const inputEntities = inputs.map((id) => maps.attribute(id)?.entity_id).filter((id): id is Uuid => !!id);
-      if (!inScope(target.entity_id) && !inputEntities.some(inScope)) continue;
-      const ref: CheckRef = { t: "ext", kind: CHECK_MAPPING_KIND, id: m.id };
-      const name = `${inputs.map((id) => maps.label(id)).join(" + ")} → ${maps.label(target.id)}`;
-      const named = [...new Set([target.entity_id, ...inputEntities])];
-      if (hasTypeConflict(maps, m)) {
-        const differ = inputs.map((id) => ({ id, types: typesDiffer(maps.attribute(id), target) })).find((x) => x.types);
-        feeds.push({
-          go: ref,
-          name,
-          detail: differ ? CUBE_CHECK_TEXTS.typeConflict(maps.label(differ.id), differ.types![0], maps.label(target.id), differ.types![1]) : CUBE_CHECK_TEXTS.typeConflict("?", "?", maps.label(target.id), typeWord(target)),
-          panels: [ref, { t: "attribute", id: target.id }, ...inputs.map((id): CheckRef => ({ t: "attribute", id }))],
-          marks: [{ t: "attribute", id: target.id }],
-          entities: named,
-        });
+  for (const e of entities) {
+    if (e.model_level !== "dimensional") continue;
+    for (const target of lookup.attributesOf.get(e.id) ?? []) {
+      for (const f of lookup.feedsOf(target.id)) {
+        if (!f.approved) continue;
+        const inputEntities = f.inputs.map((id) => lookup.attribute.get(id)?.entity_id).filter((id): id is Uuid => !!id);
+        if (!inScope(e.id) && !inputEntities.some(inScope)) continue;
+        const ref: CheckRef = { t: "ext", kind: CHECK_MAPPING_KIND, id: f.id };
+        const line = `${f.inputs.map(label).join(" + ")} → ${label(target.id)}`;
+        const named = [...new Set([e.id, ...inputEntities])];
+        if (f.typeConflict) {
+          const differ = f.inputs.map((id) => ({ id, types: typesDiffer(lookup.attribute.get(id), target) })).find((x) => x.types);
+          feeds.push({
+            go: ref,
+            name: line,
+            detail: differ ? CUBE_CHECK_TEXTS.typeConflict(label(differ.id), differ.types![0], label(target.id), differ.types![1]) : CUBE_CHECK_TEXTS.typeConflict("?", "?", label(target.id), typeWord(target)),
+            panels: [ref, { t: "attribute", id: target.id }, ...f.inputs.map((id): CheckRef => ({ t: "attribute", id }))],
+            marks: [{ t: "attribute", id: target.id }],
+            entities: named,
+          });
+        }
+        const gaps = f.inputs.map((id) => coverageGapText(lookup, id)).filter((t): t is string => !!t);
+        if (gaps.length) under.push({ go: ref, name: line, detail: gaps.join("; "), panels: [ref], marks: [], entities: named });
       }
-      const gaps = inputs.map((id) => coverageGapText(lookup, id)).filter((t): t is string => !!t);
-      if (gaps.length) under.push({ go: ref, name, detail: gaps.join("; "), panels: [ref], marks: [], entities: named });
     }
   }
 

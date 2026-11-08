@@ -217,7 +217,12 @@ export function infoMapperGroups({ model, lookup, scope }: CheckInput): CheckGro
   const attributesInScope = scoped.flatMap((e) => attributesOf.get(e.id) ?? []);
   const attributeRef = (a: Attribute): CheckRef => ({ t: "attribute", id: a.id });
   const rowMark = (a: Attribute): CheckMark => ({ t: "attribute", id: a.id });
-  const keyOf = (a: Attribute) => keyOfCopy(a.id, (id) => attributeById.get(id));
+  // each copy's key once (several rules read it)
+  const copyKeys = new Map<Uuid, Attribute | null>();
+  const keyOf = (a: Attribute) => {
+    if (!copyKeys.has(a.id)) copyKeys.set(a.id, keyOfCopy(a.id, (id) => attributeById.get(id)));
+    return copyKeys.get(a.id)!;
+  };
 
   // duplicate names, per entity, both levels
   const dup: CheckLine[] = [];
@@ -278,6 +283,22 @@ export function infoMapperGroups({ model, lookup, scope }: CheckInput): CheckGro
   }
 
   // one-to-many relationships: the wrong way, and no copied key (1:1, M:N and self relationships are not checked)
+  // what an entity holds of other entities' keys, worked out once per entity (step 2's bench): the keys its copies
+  // stand for, and the names of its foreign keys (answer 1 (b))
+  const held = new Map<Uuid, { keys: Set<Uuid>; names: Set<string> }>();
+  const carriedBy = (entityId: Uuid) => {
+    let h = held.get(entityId);
+    if (!h) {
+      h = { keys: new Set(), names: new Set() };
+      for (const a of attributesOf.get(entityId) ?? []) {
+        const key = keyOf(a);
+        if (key) h.keys.add(key.id);
+        if (a.is_foreign_key) h.names.add(nameKey(a.name));
+      }
+      held.set(entityId, h);
+    }
+    return h;
+  };
   const wrong: CheckLine[] = [];
   const nokey: CheckLine[] = [];
   const wrongSeen = new Set<Uuid>();
@@ -287,10 +308,9 @@ export function infoMapperGroups({ model, lookup, scope }: CheckInput): CheckGro
     if (!ends) continue;
     const { one, many } = ends;
     const relationshipRef: CheckRef = { t: "relationship", id: r.id };
-    const manyAttributes = attributesOf.get(many) ?? [];
     const keys = (attributesOf.get(one) ?? []).filter((a) => a.is_primary_key);
-    const carries = (a: Attribute, pk: Attribute) => keyOf(a)?.id === pk.id || (a.is_foreign_key && nameKey(a.name) === nameKey(pk.name));
-    const missing = keys.filter((pk) => !manyAttributes.some((a) => carries(a, pk)));
+    const held = carriedBy(many);
+    const missing = keys.filter((pk) => !held.keys.has(pk.id) && !held.names.has(nameKey(pk.name)));
     if (missing.length) {
       nokey.push({
         go: relationshipRef,
@@ -349,10 +369,9 @@ export interface IndexedLine {
   line: CheckLine;
 }
 
+/** A card mark: High when any of its lines is; its title is built only where the card is drawn (`markTitle`). */
 export interface CheckMarkInfo {
   high: boolean;
-  /** "Model checks: {n}" and up to six "{group}: {name or hint}", then "…". */
-  title: string;
 }
 
 export interface CheckIndex {
@@ -366,6 +385,9 @@ export interface CheckIndex {
   entityMark(entityId: Uuid): CheckMarkInfo | undefined;
   /** An attribute row's mark. */
   rowMark(attributeId: Uuid): CheckMarkInfo | undefined;
+  /** The lines behind a header's or a row's mark, for its title (`markTitle`) where the card is drawn. */
+  entityLines(entityId: Uuid): readonly IndexedLine[];
+  rowLines(attributeId: Uuid): readonly IndexedLine[];
   /** The lines that name an entity with a card on a canvas, High first. */
   onCanvas(entityIds: Iterable<Uuid>): IndexedLine[];
 }
@@ -416,7 +438,8 @@ export function checkIndex(checks: Pick<ModelChecks, "groups">, attributes: read
     for (const e of new Set(l.line.entities)) put(byName, e, l);
   }
   const ordered = (set: Set<IndexedLine>) => lines.filter((l) => set.has(l));
-  const mark = (list: IndexedLine[] | undefined): CheckMarkInfo | undefined => (list?.length ? { high: list.some((l) => l.group.high), title: markTitle(list) } : undefined);
+  const HIGH: CheckMarkInfo = { high: true }, NORMAL: CheckMarkInfo = { high: false };
+  const mark = (list: IndexedLine[] | undefined): CheckMarkInfo | undefined => (list?.length ? (list.some((l) => l.group.high) ? HIGH : NORMAL) : undefined);
   return {
     lines,
     panel(ref) {
@@ -427,6 +450,8 @@ export function checkIndex(checks: Pick<ModelChecks, "groups">, attributes: read
     hintsOf: (id) => hints.get(id) ?? 0,
     entityMark: (id) => mark(byEntity.get(id)),
     rowMark: (id) => mark(byRow.get(id)),
+    entityLines: (id) => byEntity.get(id) ?? [],
+    rowLines: (id) => byRow.get(id) ?? [],
     onCanvas(entityIds) {
       const set = new Set<IndexedLine>();
       for (const e of entityIds) for (const l of byName.get(e) ?? []) set.add(l);

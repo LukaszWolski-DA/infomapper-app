@@ -252,8 +252,11 @@ describe("the order and the index", () => {
     expect(x.panel({ t: "entity", id: LINE }).map((l) => l.group.id)).toEqual(["nokey"]);
     expect(x.panel({ t: "ext", kind: "k", id: uid(120) }).map((l) => l.group.id)).toEqual(["m-high"]);
     // the header: its own and its rows' marks, High when one is
-    expect(x.entityMark(ids.customer)).toEqual({ high: true, title: expect.stringMatching(/^Model checks: 4\n/) });
-    expect(x.rowMark(uid(111))).toEqual({ high: false, title: "Model checks: 1\nDuplicate attribute names: Customer: email, EMAIL" });
+    // marks are a severity only; their titles are built where a card is drawn
+    expect(x.entityMark(ids.customer)).toEqual({ high: true });
+    expect(markTitle(x.entityLines(ids.customer))).toMatch(/^Model checks: 4\n/);
+    expect(x.rowMark(uid(111))).toEqual({ high: false });
+    expect(markTitle(x.rowLines(uid(111)))).toBe("Model checks: 1\nDuplicate attribute names: Customer: email, EMAIL");
     expect(x.entityMark(LINE)?.high).toBe(false);
     expect(x.rowMark(ids.customerId)).toBeUndefined();
     expect(x.onCanvas([LINE]).map((l) => l.group.id)).toEqual(["nokey"]);
