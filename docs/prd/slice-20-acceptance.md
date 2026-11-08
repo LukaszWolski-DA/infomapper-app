@@ -484,3 +484,129 @@ command.
 13. **Bench:** 20 ms, Node median, on the synthetic model; "Performance test" and the demo reported without a bar. If it
     is over, report before optimising.
 14. **No full run in step 3.** If more earlier specs change than this document lists, stop and ask.
+
+## Step 2: rules and index (8 November 2026)
+
+### What changed
+
+- **InfoMapper's rules and the index** (`src/domain/model/checks.ts`, pure). The six groups and their texts
+  (`CHECK_TEXTS`):
+  - `wrong` (High), then `dup`, `calc`, `lost`, `norel` and `nokey`;
+  - `nameKey` (trimmed, runs of white space as one, case ignored);
+  - `keyOfCopy`: a copy's key at the end of its chain; a lost link or a cycle gives none;
+  - `oneAndMany`: from `from_max` and `to_max`; 1:1 and M:N give none, and self relationships are skipped;
+  - `projectScope`: the entities with a live card on the project's canvases.
+
+  `modelChecks` puts High first, InfoMapper's groups before the modules' within a severity, and drops empty groups.
+  `checkIndex` reads the lines by panel ref, by mark and by canvas:
+  - an entity's panel also lists its attributes' lines;
+  - a row's mark also marks its header;
+  - fact hints are counted (`hintsOf`), never listed.
+
+  `markTitle` and `coverageGapText` are the five "not yet covered" texts in their order. The requirement index exposes
+  its `lookup`, so the checks make no second pass over the model.
+- **"No copied key" (answer 1 (b)).** On the many side, a copy of the key (at the end of its chain) counts, or a foreign
+  key whose name is the key's by `nameKey`. That also collapses runs of inner spaces, beyond the answer's "trimmed,
+  case ignored", so a name means the same here and for duplicates.
+- **InfoCube's rules** (`src/modules/infocube/domain/checks.ts`):
+  - `cubeChecks` gives `feeds` (High), `facts` and `under`, with the module's own texts, its tag, its topic
+    ("InfoCube") and its empty-text part ("so do facts and their feeds");
+  - built on `cubeIndex`, `factHints`, `mappingIndex`, `hasTypeConflict`, `typesDiffer` and InfoMapper's
+    `coverageGapText`;
+  - a dimensional mapping is `{ t: "ext", kind: "cube_mapping" }`. The kind is a constant in the module's domain (it
+    may not import its canvas part), and a test keeps it equal to `CUBE_MAPPING_KIND`.
+- **The extension point** (`src/compose/checks.ts`). `cubeModuleChecks(on, rows, input)`, and `pageModuleChecks(view,
+  input)` for a canvas page, from `ModuleView.data`, only while the Cube tab is there. InfoMapper's code never names
+  the module.
+- **One read on the home** (`moduleHomeData` in `src/compose/view.ts`, F19). One read of the five InfoCube tables, which
+  returns `rowFeeds`, `feeds` and `checks(input)`. Nothing is read without a fact or a dimension. The project home now
+  uses it for its feeds; it shows no checks yet (step 3). `moduleFeeds` stays for the workspace home and the
+  source-change action.
+- **The shell's workspace has `infocube`** (`src/app/_lib/shell.ts`). The home's checks need the switch.
+- **The demo** (`src/data/local/seed-checks.ts`, `addChecksDemo`; `src/compose/seed.ts`):
+  - `addChecksDemoData`, in "Retail Co – DWH" only;
+  - `addTypesDemoData` (what `addFullDemoData` was);
+  - `addFullDemoData` = `addTypesDemoData` + checks, for the seed, the reset and `npm run demo`.
+
+  Slice 19's fixtures and `tests/infocube-types.test.ts` read `addTypesDemoData`. The plain e2e reseed and slices
+  15's and 18's fixtures are unchanged.
+- **Tests:**
+  - `src/domain/model/checks.test.ts` (20): every rule and its edges, as listed in the plan;
+  - `tests/model-checks.test.ts` (13): the composed demo and the plain seed; S20-01's three changes as the rules see
+    them; InfoCube's Integer → Decimal, a transformation with a rule, an approved lookup and a draft; the scope through
+    inputs; InfoCube off.
+- **Scripts:**
+  - `scripts/bench-checks.ts`;
+  - `scripts/count-checks.ts`: read-only, refuses `dev-db.json`, prints counts only;
+  - `scripts/lib/checks-model.ts`.
+
+### The demo, recounted after answer 1
+
+Unit tests confirm the numbers by reading. With answer 1 (b) the plain e2e seed has **no line** (its hand-typed
+foreign keys carry the keys), so no earlier spec's data changes. Slice 19's fixture data has only the star's 10 `under`
+lines, as before slice 20.
+
+| Where | wrong | dup | calc | norel | nokey | under | total |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| Order management's home | 1 | 1 | 1 | 1 | 1 (Country – Customer Address) | 10 | **15** |
+| Customer 360's home | 1 | 0 | 1 | 0 | 0 | 7 | **9** |
+| "Customer & orders" | | | | | | | **9**, orange |
+| "Order lines & products" | | | | | | | **9**, grey |
+| "Sales star" | | | | | | | **15**, orange |
+
+### The bench (`npx tsx scripts/bench-checks.ts`; Node, laptop; 9 rounds after a warm-up)
+
+| Model | Size | Lines (JSON) | Checks and index, whole model | Bar |
+| --- | --- | --- | --- | --- |
+| Synthetic | 2,000 entities, 23,000 attributes, 2,000 relationships, 3,000 copies, 3,000 source and 1,500 dimensional mappings | 4,296 (1.84 MB) | **median 120.8 ms** (fastest 103.0, slowest 200.3) | 20 ms **missed** |
+| Synthetic, a project of 200 entities | | | median 72.1 ms | — |
+| "Performance test" | 41 entities, 779 attributes, 40 relationships | 21 `nokey` (10 KB) | median 1.6 ms | none |
+| Demo | 13 entities, 72 attributes, 19 dimensional mappings | 15 (7 KB) | median 0.5 ms | none |
+
+The lookup is the requirement index's, built anyway, and is not counted: 22.8 ms on the synthetic model.
+
+**Not optimised, as you asked.** A one-off split on the synthetic model (diagnosis only, not kept): InfoMapper's groups
+about 80 ms, InfoCube's about 58 ms, the index about 16 ms. The likely costs:
+- InfoMapper: `nokey`'s key test runs `keyOfCopy` and `nameKey` again for every key against every attribute of the many
+  side;
+- InfoCube: building its own two indexes, sorting 23,000 attributes by string, and a `coverageGapText` per input;
+- the index: one title per mark.
+
+The synthetic model is also far denser in lines than any real one (about one line per five attributes; KB has 24 on 190
+attributes). Its 1.84 MB of lines is the larger question for step 3, where a canvas page carries them to the browser.
+
+### KB, read-only (`scripts/count-checks.ts` on a copy of `.data/backups/kb-model-latest.json`)
+
+The copy's SHA-256 was the same before and after the run. The copy was deleted afterwards. Workspaces and projects are
+numbered, not named:
+
+| Workspace | Size | Whole model | Projects |
+| --- | --- | --- | --- |
+| W1 | 6 entities, 34 attributes, 5 relationships; InfoCube off | 0 | P1 0, P2 0 |
+| W2 | empty | 0 | P1 0 |
+| W3 | 6 entities, 34 attributes, 5 relationships; InfoCube off | 0 | P1 0 |
+| W4 | 29 entities, 190 attributes, 32 relationships; InfoCube on | **24**: `nokey` 6, `facts` 18 | P1 (all 29 entities): 24 |
+
+W4 is the only workspace of KB's size. **The two duplicate names slice 17 found (2 of 258) are not in this backup.** It
+has 190 live attributes, so either the backup is older or newer than that count, or the two were renamed. I cannot tell
+which without names. The manual acceptance will look at it in the app.
+
+### Differences from step 1's plan
+
+1. **The bench missed its bar** (above); nothing optimised.
+2. **The shell's workspace gained `infocube`,** and the project home already reads through `moduleHomeData`. Neither
+   was in the plan; neither shows anything new.
+3. **The name test for "no copied key" uses `nameKey`** (also collapses inner spaces).
+4. **The selection kind is a constant in the module's domain**, kept equal to the canvas's by a test (the domain may
+   not import the canvas part).
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`: pass.
+- `npm test`: 157 files, 1,929 tests, all pass.
+- e2e: `e2e/slice-19` (its fixture's export renamed; same data): 11 passed (2.9 min), run locally once (`npm run e2e -- e2e/slice-19`). Not a full run (step 2 touches no shared infrastructure).
+
+### How to check
+
+- `npx vitest run src/domain/model/checks.test.ts tests/model-checks.test.ts`
+- `npx tsx scripts/bench-checks.ts`

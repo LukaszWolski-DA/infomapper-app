@@ -824,3 +824,9 @@ What comes later (slice 18, PRD section 10 and step 1):
 - **"Fed from concepts" through a calculation's inputs** (Q8): unchanged, as their own feeds already bring their concepts.
 - **The Delete key on a relationship with lookups through it** says where to delete it (its menu or its panel) and deletes
   nothing; a two-press Delete if that is too strict.
+
+## Keep the mapping rule's draft when its panel closes (slice 20, step 1 answer 10)
+
+InfoMapper's mapping panel keeps a typed rule across fresh pages and refusals (slice 13), but its field has no `keep`:
+if the panel ever unmounted while the rule still had the focus, the text would be lost (never saved elsewhere; slice
+20's Q10). InfoCube's rule has `keep`. Give InfoMapper's rule `keep` too, as a small item.
