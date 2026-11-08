@@ -787,13 +787,15 @@ export interface FeedRow {
   mappingId: Uuid;
   status: CubeMapping["status"];
   transform: boolean;
+  /** Slice 18: a lookup ("lookup · " before its status, prototype `cubeAttrSection`). */
+  lookup: boolean;
   /** "Fact Sales.quantity" (what a logical attribute feeds) or "Order Line.unit_price + Order Line.discount" (what feeds). */
   label: string;
 }
 
 /** "Feeds facts and dimensions": what a logical attribute feeds, one row per mapping. */
 export const feedsOf = (index: MappingIndex, attributeId: Uuid): FeedRow[] =>
-  index.mappingsFrom(attributeId).map((m) => ({ mappingId: m.id, status: m.status, transform: m.kind === "transform", label: index.label(m.attribute_id) }));
+  index.mappingsFrom(attributeId).map((m) => ({ mappingId: m.id, status: m.status, transform: m.kind === "transform", lookup: m.kind === "lookup", label: index.label(m.attribute_id) }));
 
 /** "Comes from the logical model": what feeds a dimensional attribute, one row per mapping, its inputs joined by " + ". */
 export const fedFrom = (index: MappingIndex, attributeId: Uuid): FeedRow[] =>
@@ -801,6 +803,7 @@ export const fedFrom = (index: MappingIndex, attributeId: Uuid): FeedRow[] =>
     mappingId: m.id,
     status: m.status,
     transform: m.kind === "transform",
+    lookup: m.kind === "lookup",
     label: index.inputsOf(m.id).map((i) => index.label(i.attribute_id)).join(" + "),
   }));
 

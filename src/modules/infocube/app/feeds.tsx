@@ -34,7 +34,7 @@ function FeedList({ rows, index, testId }: { rows: FeedRow[]; index: MappingInde
       testId={testId}
       text={(r) => r.label}
       render={(r) => (
-        <Li key={r.mappingId} onClick={() => ui.select({ t: "ext", kind: CUBE_MAPPING_KIND, id: r.mappingId })} meta={`${r.transform ? "ƒ " : ""}${CUBE_STATUS_LABEL[r.status]}`} testId="item-cube-feed">
+        <Li key={r.mappingId} onClick={() => ui.select({ t: "ext", kind: CUBE_MAPPING_KIND, id: r.mappingId })} meta={`${r.transform ? "ƒ " : r.lookup ? "lookup · " : ""}${CUBE_STATUS_LABEL[r.status]}`} testId="item-cube-feed">
           <span className="flex items-center gap-2">
             <TypeDot ok={typesOk(index, r)} />
             <span className="truncate font-mono text-xs">{r.label}</span>
