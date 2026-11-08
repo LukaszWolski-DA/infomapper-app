@@ -518,8 +518,18 @@ export function moveOnCanvas(
 // ---- resize (D-06) and fit to content ----
 
 const resizeInput = z
-  .object({ frameId: uuidSchema, expectedVersion: versionSchema, width: frameWidth, height: frameHeight, cards: cardRefs })
-  .strict();
+  .object({
+    frameId: uuidSchema,
+    expectedVersion: versionSchema,
+    // its left and top edges (slice 17, D-72): both, or neither (the top-left stays)
+    x: coordinate.optional(),
+    y: coordinate.optional(),
+    width: frameWidth,
+    height: frameHeight,
+    cards: cardRefs,
+  })
+  .strict()
+  .refine((v) => (v.x === undefined) === (v.y === undefined), "Give both x and y, or neither.");
 export type ResizeFrameInput = z.input<typeof resizeInput>;
 
 const fitInput = z.object({ frameId: uuidSchema, expectedVersion: versionSchema, cards: sizedCards }).strict();
@@ -538,6 +548,8 @@ function reframe(
   state: FrameCanvasState,
   ref: { frameId: Uuid; expectedVersion: number; cards: readonly { canvasItemId: Uuid; expectedVersion: number }[] },
   rectOf: (frame: Frame, draft: Draft) => Rect | DomainError,
+  /** Notes pinned to the frame keep their place on the canvas when its top-left moves (slice 17, D-20). */
+  keepPinnedNotes = false,
 ): Reframed {
   const { frameId, expectedVersion, cards } = ref;
   const frameRow = state.frames.find((f) => f.id === frameId) ?? null;
@@ -551,6 +563,7 @@ function reframe(
   if (frame.collapsed) return fail(domainError("invalid", "Expand the frame first."));
   const rect = rectOf(frame, draft);
   if ("code" in rect) return fail(rect);
+  const dx = rect.x - frame.x, dy = rect.y - frame.y;
   Object.assign(frame, { x: rect.x, y: rect.y, width: rect.width, height: rect.height });
 
   const changes = membershipAfterResize(frameBox(frame), frameBoxes(draft), [...draft.items.values()].map((i) => boxOf(i, 0)));
@@ -559,16 +572,33 @@ function reframe(
   const committed = commit(ctx, draft, seen([{ frameId, expectedVersion }], cards));
   if (!committed.ok) return fail(committed.error);
   if (!committed.writes.length) return fail(nothingToChange());
+  // a pinned note's place is an offset from its frame's top-left (`notePosition`): moved back by the frame's move
+  if (keepPinnedNotes && (dx || dy)) {
+    for (const n of state.notes ?? []) {
+      if (!isLive(n, access.workspace.id) || n.pin_frame_id !== frameId) continue;
+      const row = nextVersion(ctx, n, { x: n.x - dx, y: n.y - dy });
+      committed.writes.push({ kind: "update", table: "note", before: n, row });
+      committed.versions[n.id] = row.version;
+    }
+  }
   const joined = changes.filter((c) => c.frameId === frameId).length;
   return done(ctx, access, { joined, left: changes.length - joined, versions: committed.versions }, committed.writes);
 }
 
-/** Resizes a frame from its bottom-right corner (its top-left stays), at least 160 × 96 px; then membership (D-06). */
+export const RESIZE_FRAME_LABEL = "Resize frame";
+
+/**
+ * Resizes a frame, at least 160 × 96 px; then membership (D-06). From its bottom-right corner its top-left stays;
+ * since slice 17 (D-72) any edge or corner: `x` and `y` move its top-left too, and notes pinned to it keep their place
+ * (D-20). Named "Resize frame" whatever moved.
+ */
 export function resizeFrame(ctx: CommandContext, access: WorkspaceAccess, state: FrameCanvasState, input: unknown): Reframed {
   const parsed = begin(access, "canvas.edit_items", resizeInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { width, height } = parsed.data;
-  return reframe(ctx, access, state, parsed.data, (f) => ({ x: f.x, y: f.y, width, height }));
+  const { width, height, x, y } = parsed.data;
+  const result = reframe(ctx, access, state, parsed.data, (f) => ({ x: x ?? f.x, y: y ?? f.y, width, height }), true);
+  if (result.ok) result.writeSet.label = RESIZE_FRAME_LABEL;
+  return result;
 }
 
 /**

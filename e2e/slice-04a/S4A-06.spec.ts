@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures";
+import { expect, test } from "./fixtures";
 import {
   callActionDirectly,
   captureActionId,
@@ -10,15 +10,16 @@ import {
   openCanvas,
   openEntityFromTree,
   openRequirement,
-  pickOption,
+  linkFromPanel,
+  newRequirementFromPanel,
   requirementByKey,
   row,
   signInAs,
   tracesOf,
 } from "./helpers";
 
-const linkSelect = (page: Page) => page.getByTestId("select-link-requirement");
-
+// Slice 17 (D-72): the panels' select became “Link to requirements…” and its picker; “+ New requirement…” is its
+// footer's “New requirement…”.
 test("S4A-06: linking from each of the five element panels (a toast per type); the same link twice is “Already linked.” and writes nothing; “+ New requirement…” on email makes REQ-106 linked to it (one undo removes both); × in the element panel and in Traces to unlink (“Unlinked.”, one undo each)", async ({ page }) => {
   const { entity, attribute, table, column } = await ids();
   const email = attribute("Customer", "email");
@@ -28,28 +29,28 @@ test("S4A-06: linking from each of the five element panels (a toast per type); t
 
   // entity
   await openEntityFromTree(page, "Customer");
-  await pickOption(linkSelect(page), "REQ-104");
+  await linkFromPanel(page, ["REQ-104"]);
   await expectToast(page, "Linked REQ-104 to the entity.");
   // attribute
   await row(page, "Customer", email.id).click();
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
-  await pickOption(linkSelect(page), "REQ-104");
+  await linkFromPanel(page, ["REQ-104"]);
   await expectToast(page, "Linked REQ-104 to the attribute.");
   // mapping (from the attribute's “Comes from”)
   await page.getByTestId("list-attribute-mappings").getByText("customers.email_addr").click();
   await expect(page.getByTestId("panel-mapping")).toBeVisible();
-  await pickOption(linkSelect(page), "REQ-104");
+  await linkFromPanel(page, ["REQ-104"]);
   await expectToast(page, "Linked REQ-104 to the mapping.");
   // table
   await page.getByTestId("tab-sources").click();
   await page.getByTestId("tree-item").filter({ has: page.getByText("customers", { exact: true }) }).click();
   await expect(page.getByTestId("panel-source-table")).toBeVisible();
-  await pickOption(linkSelect(page), "REQ-104");
+  await linkFromPanel(page, ["REQ-104"]);
   await expectToast(page, "Linked REQ-104 to the table.");
   // column (from the table's column list); the action's id, to send the same link again
   await page.getByTestId("list-table-columns").getByText("email_addr", { exact: true }).click();
   await expect(page.getByTestId("panel-source-column")).toBeVisible();
-  const linkAction = await captureActionId(page, () => pickOption(linkSelect(page), "REQ-104"));
+  const linkAction = await captureActionId(page, () => linkFromPanel(page, ["REQ-104"]));
   await expectToast(page, "Linked REQ-104 to the column.");
 
   const traced = [entity("Customer").id, email.id, emailMapping, table("customers").id, column("customers", "email_addr").id];
@@ -59,14 +60,14 @@ test("S4A-06: linking from each of the five element panels (a toast per type); t
   // the same link again, sent directly: refused, nothing written
   const r104 = await requirementByKey("REQ-104");
   const linksBefore = (await loadRequirementLinks()).length;
-  const body = await callActionDirectly(page, linkAction, [r104.workspace_id, { requirementId: r104.id, target: { kind: "source_column", id: column("customers", "email_addr").id } }]);
+  const body = await callActionDirectly(page, linkAction, [r104.workspace_id, { requirementIds: [r104.id], targets: [{ kind: "source_column", id: column("customers", "email_addr").id }] }]);
   expect(body).toContain("Already linked.");
   expect((await loadRequirementLinks()).length).toBe(linksBefore);
 
   // “+ New requirement…” on email: REQ-106 linked to it, its panel open; one undo removes both
   await row(page, "Customer", email.id).click();
   await expect(page.getByTestId("panel-attribute")).toBeVisible();
-  await linkSelect(page).selectOption("__new__");
+  await newRequirementFromPanel(page);
   await expect(page.getByTestId("input-req-key")).toHaveValue("REQ-106");
   await expect(page.getByTestId("input-req-name")).toBeFocused();
   expect(await tracesOf("REQ-106")).toEqual([email.id]);

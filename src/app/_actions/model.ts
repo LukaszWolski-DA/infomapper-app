@@ -132,9 +132,11 @@ export async function deleteEntityAction(
 
 // ---- attributes ----
 
-export async function addAttributeAction(workspaceId: string, input: { entityId: string }): Promise<ActionResult<{ attributeId: string }>> {
+export async function addAttributeAction(workspaceId: string, input: { entityId: string; below?: string }): Promise<ActionResult<{ attributeId: string }>> {
+  // below a row (slice 17): its siblings are renumbered, so every version written comes back for the save chain
   return modelCommand(workspaceId, (ctx, access, { entities, attributes }) =>
     addAttribute(ctx, access, { entity: byId(entities, input?.entityId), attributes }, input),
+    { versions: true },
   );
 }
 

@@ -11,7 +11,7 @@ import {
   openEntityFromTree,
   openRequirement,
   openRequirementsTab,
-  pickOption,
+  linkFromPanel,
   requirementByKey,
   SEED_IDS,
   signInAs,
@@ -30,7 +30,7 @@ async function expectReadOnly(page: Page) {
   for (const id of ["field-req-description-edit", "button-trace-unlink", "button-delete-requirement"]) await expect(page.getByTestId(id)).toHaveCount(0);
   await openEntityFromTree(page, "Customer");
   await expect(page.getByTestId("section-requirements")).toBeVisible();
-  for (const id of ["select-link-requirement", "button-requirement-unlink"]) await expect(page.getByTestId(id)).toHaveCount(0);
+  for (const id of ["button-link-requirements", "button-link-all-attributes", "button-requirement-unlink"]) await expect(page.getByTestId(id)).toHaveCount(0);
   await openRequirementsTab(page);
   await expect(page.getByTestId("button-new-requirement")).toHaveCount(0);
 }
@@ -49,7 +49,8 @@ test("S4A-11: roles: Piotr changes REQ-103's status and nothing else, his other 
     await page.getByTestId("input-req-owner").press("Enter");
   });
   await openEntityFromTree(page, "Customer");
-  const link = await captureActionId(page, () => pickOption(page.getByTestId("select-link-requirement"), "REQ-104"));
+  // slice 17: the panel links through the picker (several at once)
+  const link = await captureActionId(page, () => linkFromPanel(page, ["REQ-104"]));
   await expect.poll(async () => (await loadRequirementLinks()).length).toBe(14);
   const unlink = await captureActionId(page, () => page.locator('[data-testid="item-requirement"][data-key="REQ-104"]').getByTestId("button-requirement-unlink").click());
   await openRequirementsTab(page);
@@ -69,7 +70,7 @@ test("S4A-11: roles: Piotr changes REQ-103's status and nothing else, his other 
   await expect.poll(async () => (await requirementByKey("REQ-103")).status).toBe("implemented");
   const sent = {
     update: await callActionDirectly(piotr.page, update, [ws, { requirementId: owned.id, expectedVersion: owned.version, field: "name", value: "Hijacked" }]),
-    link: await callActionDirectly(piotr.page, link, [ws, { requirementId: owned.id, target: { kind: "entity", id: entity("Sales Order").id } }]),
+    link: await callActionDirectly(piotr.page, link, [ws, { requirementIds: [owned.id], targets: [{ kind: "entity", id: entity("Sales Order").id }] }]),
     unlink: await callActionDirectly(piotr.page, unlink, [ws, { requirementLinkId: linkRow.id, expectedVersion: linkRow.version }]),
     create: await callActionDirectly(piotr.page, create, [ws, {}]),
     remove: await callActionDirectly(piotr.page, remove, [ws, { requirementId: owned.id, expectedVersion: owned.version }]),

@@ -24,6 +24,27 @@ describe("addAttribute", () => {
     ]);
   });
 
+  it("below an attribute (slice 17): inserted directly below it, the rest renumbered, one step named “Create attribute”", () => {
+    const third = "01900000-0000-7000-8000-00000000a0f1";
+    const three = { ...state, attributes: [...state.attributes, attribute(third, { sort_order: 2 })] };
+    const r = addAttribute(makeCtx(), access("modeler"), three, { entityId: customer, below: customerId });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes).toMatchObject([
+      { kind: "insert", table: "attribute", row: { id: r.value.attributeId, sort_order: 1 } },
+      { kind: "update", table: "attribute", row: { id: email, sort_order: 2 } },
+      { kind: "update", table: "attribute", row: { id: third, sort_order: 3 } },
+    ]);
+    expect(r.writeSet.label).toBe("Create attribute");
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+    expect(contextTargets(r.writeSet.writes, r.writeSet.mainTargets)).toEqual([{ kind: "attribute", id: r.value.attributeId }]);
+    // below the last one nothing else moves
+    const last = addAttribute(makeCtx(), access("modeler"), state, { entityId: customer, below: email });
+    if (!last.ok) throw new Error(last.error.message);
+    expect(last.writeSet.writes).toMatchObject([{ kind: "insert", row: { sort_order: 2 } }]);
+    // an attribute of another entity, or a deleted one, is not found
+    expect(addAttribute(makeCtx(), access("modeler"), state, { entityId: customer, below: ids.orderId })).toMatchObject({ ok: false, error: { code: "not_found" } });
+  });
+
   it("refuses an unknown entity and reviewers", () => {
     expect(addAttribute(makeCtx(), access("owner"), { ...state, entity: entity(customer, { deleted_at: NOW }) }, { entityId: customer })).toMatchObject({ ok: false, error: { code: "not_found" } });
     expect(addAttribute(makeCtx(), access("reviewer"), state, { entityId: customer })).toMatchObject({ ok: false, error: { code: "forbidden" } });

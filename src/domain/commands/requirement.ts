@@ -294,6 +294,79 @@ export function linkRequirement(ctx: CommandContext, access: WorkspaceAccess, st
   return done(ctx, access, { link, message: linkedMessage(requirement.key, target.kind) }, [{ kind: "insert", table: "requirement_link", row: link }]);
 }
 
+// ---- several at once (slice 17, D-72) ----
+
+export const LINK_REQUIREMENTS_LABEL = "Link requirements";
+export const ALL_ATTRIBUTES_LINKED_MESSAGE = "Every attribute is linked already.";
+
+const linkManyInput = z
+  .object({
+    requirementIds: z.array(uuidSchema).min(1).max(50),
+    targets: z.array(targetSchema).min(1).max(1000),
+    /** "Link all attributes…" of this entity: only for its toast (and "Every attribute is linked already."). */
+    allOf: z.object({ entityId: uuidSchema }).strict().optional(),
+  })
+  .strict();
+export type LinkRequirementsInput = z.input<typeof linkManyInput>;
+
+export interface LinkRequirementsState extends LabelTargetRows {
+  /** The workspace's requirements (deleted ones may be included). */
+  requirements: readonly Requirement[];
+  /** The workspace's requirement links. */
+  links: readonly RequirementLink[];
+}
+
+/**
+ * Links each chosen requirement to each target, skipping the links that exist, in one change group (one undo step,
+ * "Link requirements" for more than one link): an element panel's picker with one target, or an entity's "Link all
+ * attributes…" with its attributes. A deleted requirement or target refuses the whole set; nothing new is "Already
+ * linked." (one target) or "Every attribute is linked already." (`allOf`).
+ */
+export function linkRequirements(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: LinkRequirementsState,
+  input: unknown,
+): CommandResult<{ links: RequirementLink[]; message: string }> {
+  const parsed = begin(access, "requirement.edit", linkManyInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { targets, allOf } = parsed.data;
+  const requirementIds = [...new Set(parsed.data.requirementIds)];
+  const ws = access.workspace.id;
+  const requirements = requirementIds.map((id) => state.requirements.find((r) => r.id === id));
+  if (!requirements.every((r): r is Requirement => isLive(r, ws))) return fail(gone(REQUIREMENT_GONE_MESSAGE));
+  if (!targets.every((t) => targetLive(state, t, ws))) return fail(gone(ELEMENT_GONE_MESSAGE));
+  const live = state.links.filter((k) => isLive(k, ws));
+  const links: RequirementLink[] = [];
+  const seen = new Set<string>();
+  for (const requirement of requirements) {
+    for (const target of targets) {
+      const key = `${requirement.id}|${target.kind}|${target.id}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (live.some((k) => k.requirement_id === requirement.id && marks(k, target))) continue;
+      links.push({ ...newRowColumns(ctx), workspace_id: ws, requirement_id: requirement.id, ...targetColumns(target) });
+    }
+  }
+  if (!links.length) return fail(domainError("conflict", allOf ? ALL_ATTRIBUTES_LINKED_MESSAGE : ALREADY_LINKED_MESSAGE));
+  const keyOf = new Map(requirements.map((r) => [r.id, r.key]));
+  const entityName = allOf ? (state.entities.find((e) => e.id === allOf.entityId)?.name ?? "") : "";
+  const message = allOf
+    ? linkedAllMessage(new Set(links.map((k) => k.attribute_id)).size, entityName, requirements.map((r) => r.key))
+    : links.length === 1
+      ? linkedMessage(keyOf.get(links[0]!.requirement_id)!, targets[0]!.kind)
+      : targets.length === 1
+        ? `Linked ${links.length} requirements to ${NOUN[targets[0]!.kind]}.`
+        : `Linked ${links.length} requirement links.`;
+  const result = done(ctx, access, { links, message }, links.map((row): Write => ({ kind: "insert", table: "requirement_link", row })));
+  if (result.ok && links.length > 1) result.writeSet.label = LINK_REQUIREMENTS_LABEL;
+  return result;
+}
+
+/** "Link all attributes…"'s toast (prototype linkAllAttrs): "Linked 3 attributes of Customer to REQ-1, REQ-2." */
+export const linkedAllMessage = (attributes: number, entityName: string, keys: readonly string[]): string =>
+  `Linked ${attributes} ${attributes === 1 ? "attribute" : "attributes"} of ${entityName} to ${keys.join(", ")}.`;
+
 const unlinkInput = z.object({ requirementLinkId: uuidSchema, expectedVersion: versionSchema }).strict();
 export type UnlinkRequirementInput = z.input<typeof unlinkInput>;
 

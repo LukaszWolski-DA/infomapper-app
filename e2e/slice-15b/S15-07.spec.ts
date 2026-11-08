@@ -1,5 +1,5 @@
 import { expect, test } from "./fixtures";
-import { card, hints, openStar, signInAs } from "./helpers";
+import { card, hints, openStar, signInAs, pickConcept } from "./helpers";
 
 // S15-07 (IC-03, 15b's part: B-5's hints): a new fact's panel shows "No grain yet" and "No dimension keys"; the grain
 // hint puts the cursor in Grain, the keys hint opens the fact.
@@ -9,6 +9,8 @@ test("S15-07 (hints): a new fact shows No grain yet and No dimension keys; the g
   await openStar(page);
   await page.getByTestId("tab-cube").click();
   await page.getByTestId("button-new-fact").click();
+  // slice 17 (D-72): outside a concept frame the concept is chosen in a picker
+  await pickConcept(page, "Sales");
   await expect(card(page, "New fact")).toHaveCount(1);
   await page.getByTestId("input-entity-name").press("Escape");
   await expect(hints(page)).toHaveText([

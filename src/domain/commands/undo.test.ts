@@ -1057,3 +1057,18 @@ describe("a project's delete (slice 12a, D-65)", () => {
     expect(revertChangeGroup(makeCtx(), modeler, { events: undone.writeSet.events, rows: withoutB }, "redo")).toMatchObject({ ok: false, error: { code: "conflict", message: REDO_REFUSED_MESSAGE } });
   });
 });
+
+describe("an attribute added below another (slice 17, item 5)", () => {
+  it("one undo removes it and puts the order back", () => {
+    const rows = seed();
+    const entityId = (find(rows, "attribute", ids.customerId) as unknown as Attribute).entity_id;
+    const live = (r: Rows) => (r.attribute as unknown as Attribute[]).filter((a) => a.entity_id === entityId && !a.deleted_at).sort((a, b) => a.sort_order - b.sort_order).map((a) => a.id);
+    const before = live(rows);
+    const added = ok(addAttribute(ctx, modeler, { entity: find(rows, "entity", entityId) as never, attributes: rows.attribute }, { entityId, below: before[0] }));
+    const after = apply(rows, added);
+    expect(live(after)[1]).toBe(insertedId(added));
+    const undone = revertChangeGroup(makeCtx(), modeler, { events: added.events, rows: after }, "undo");
+    if (!undone.ok) throw new Error(undone.error.message);
+    expect(live(apply(after, undone.writeSet))).toEqual(before);
+  });
+});

@@ -6,23 +6,24 @@
 // without ×. A click opens the requirement's panel. Slice 4b-2 (items 14–15), for those who may edit: each row's “Place
 // card” icon places the requirement's card next to the element (or selects its card when it is here and brings it into
 // view); a row dragged onto the canvas places the card where it is dropped (never a link); “Add all to this canvas” or
-// “Add the {n} missing to this canvas” under the list. Below, for those who may edit: “Link to a requirement…”,
-// with “+ New requirement…” at the end, which creates a requirement linked to this element and opens it with its name
-// selected. Read from the requirement index, never computed while rendering.
+// “Add the {n} missing to this canvas” under the list. Below, for those who may edit (slice 17, D-72): “Link to
+// requirements…” opens a picker that links several at once (one undo step), the linked ones checked and disabled, with
+// “New requirement…” in its footer, which creates a requirement linked to this element and opens it with its name
+// selected; an entity's panel also has “Link all attributes…”: each live attribute linked to each chosen requirement,
+// existing links skipped. Read from the requirement index, never computed while rendering.
 
 import { useContext, type DragEvent } from "react";
-import { createRequirementAction, linkRequirementAction, unlinkRequirementAction } from "@/app/_actions/requirement";
+import { createRequirementAction, linkRequirementsAction, unlinkRequirementAction } from "@/app/_actions/requirement";
 import { useAction } from "@/app/_components/use-action";
 import { CanvasUiCtx, REQ_CARD_DRAG_TYPE } from "@/canvas/context";
 import { marks } from "@/domain/model/labels";
 import type { TraceTarget } from "@/domain/model/requirements";
 import type { Requirement } from "@/domain/types";
-import { Field, Fold, Hint, inputClass, List, smallButtonClass } from "./fields";
+import { openPick } from "@/ui/pick-popover";
+import { Fold, Hint, List, smallButtonClass } from "./fields";
 import { usePanel } from "./inspector";
 import { usePanels } from "./panels-context";
 import { KindIcon } from "./requirement-ui";
-
-const NEW = "__new__";
 
 /** The name field a requirement panel focuses after “+ New requirement…” (`usePanels().nameFocus`). */
 export const requirementNameFocus = (requirementId: string) => `req:${requirementId}`;
@@ -34,7 +35,7 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
   const { setNameFocus } = usePanels();
   const { direct, indirect } = p.rx.of(target);
   const linked = new Set(direct.map((r) => r.id));
-  const available = p.rx.requirements.filter((r) => !linked.has(r.id));
+  const attributes = target.kind === "entity" ? (p.ix.attributesOf.get(target.id) ?? []) : [];
   // the requirements listed, each once, and those whose card is not on this canvas (ui changes with the canvas's layout)
   const listed = [...direct, ...indirect.map((x) => x.requirement)].filter((r, i, all) => all.findIndex((x) => x.id === r.id) === i);
   const missing = listed.filter((r) => !ui.requirementCard(r.id));
@@ -48,16 +49,41 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
     const link = p.rx.linksOf(r.id).find((k) => marks(k, target));
     if (link) void run(() => unlinkRequirementAction(p.workspaceId, { requirementLinkId: link.id, expectedVersion: link.version }), "Unlinked.", { undoable: true });
   };
-  const pick = async (value: string) => {
-    if (value === NEW) {
-      const result = await run(() => createRequirementAction(p.workspaceId, { link: target }));
-      if (result.ok) {
-        setNameFocus(requirementNameFocus(result.value.requirementId));
-        p.goRequirement(result.value.requirementId);
-      }
-      return;
+  const newRequirement = async () => {
+    const result = await run(() => createRequirementAction(p.workspaceId, { link: target }));
+    if (result.ok) {
+      setNameFocus(requirementNameFocus(result.value.requirementId));
+      p.goRequirement(result.value.requirementId);
     }
-    await run(() => linkRequirementAction(p.workspaceId, { requirementId: value, target }), (v) => v.message, { undoable: true });
+  };
+  // the picker under its button (prototype openReqPick); `all`: "Link all attributes…" of this entity
+  const openPicker = (button: HTMLElement, all: boolean) => {
+    const r = button.getBoundingClientRect();
+    const entityName = all ? (p.ix.model.entities.find((e) => e.id === target.id)?.name ?? "") : "";
+    openPick({
+      at: { x: r.left, y: r.bottom + 4 },
+      multi: true,
+      title: all ? `Link all ${attributes.length} attributes of ${entityName} to…` : "Link to requirements",
+      note: all ? "Attributes already linked to a chosen requirement are skipped." : undefined,
+      placeholder: "Type to filter requirements…",
+      empty: "No requirements yet.",
+      doneTitle: "Already linked",
+      items: p.rx.requirements.map((q) => ({ id: q.id, key: q.key, label: q.name, done: !all && linked.has(q.id) })),
+      confirm: (n) => (all ? (n ? `Link to ${n}` : "Link") : n ? `Link ${n}` : "Link"),
+      extra: all ? undefined : { label: "New requirement…", act: () => void newRequirement() },
+      testId: all ? "picker-link-all" : "picker-requirements",
+      pick: (requirementIds) =>
+        void run(
+          () =>
+            linkRequirementsAction(p.workspaceId, {
+              requirementIds,
+              targets: all ? attributes.map((a) => ({ kind: "attribute" as const, id: a.id })) : [target],
+              ...(all ? { allOf: { entityId: target.id } } : {}),
+            }),
+          (v) => v.message,
+          { undoable: true },
+        ),
+    });
   };
 
   const row = (r: Requirement, viaText: string | null) => (
@@ -127,23 +153,29 @@ export function RequirementsSection({ target }: { target: TraceTarget }) {
         </div>
       )}
       {p.editable && (
-        <Field label="Link to a requirement" htmlFor={`f-req-${target.kind}`}>
-          <select
+        <div className="mt-1.5 flex flex-wrap gap-1.5">
+          <button
+            type="button"
             id={`f-req-${target.kind}`}
-            value=""
-            className={inputClass}
-            data-testid="select-link-requirement"
-            onChange={(e) => e.target.value && void pick(e.target.value)}
+            data-pop=""
+            className={smallButtonClass}
+            data-testid="button-link-requirements"
+            onClick={(e) => openPicker(e.currentTarget, false)}
           >
-            <option value="">Link to a requirement…</option>
-            {available.map((r) => (
-              <option key={r.id} value={r.id}>
-                {`${r.key}  ${r.name}`}
-              </option>
-            ))}
-            <option value={NEW}>+ New requirement…</option>
-          </select>
-        </Field>
+            Link to requirements…
+          </button>
+          {target.kind === "entity" && attributes.length > 0 && (
+            <button
+              type="button"
+              className={smallButtonClass}
+              title="Link chosen requirements to each attribute of this entity"
+              data-testid="button-link-all-attributes"
+              onClick={(e) => openPicker(e.currentTarget, true)}
+            >
+              Link all attributes…
+            </button>
+          )}
+        </div>
       )}
     </Fold>
   );

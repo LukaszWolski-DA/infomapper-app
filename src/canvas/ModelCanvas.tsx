@@ -50,7 +50,7 @@ import type { Uuid } from "@/domain/ids";
 import { useToast } from "@/ui/components/toast";
 import { track } from "@/ui/leave-guard";
 import { rowSaves } from "@/ui/row-saves";
-import { applyNames, shownText, withClips, type CanvasNames, type CardData } from "./card-data";
+import { applyNames, shownText, visibleRows, withClips, type CanvasNames, type CardData } from "./card-data";
 import { canvasMode, cardMode, NAMES_COLUMN, namesControl, type NameDimension } from "@/domain/model/aliases";
 import type { NameMode } from "@/domain/types";
 import { namesState } from "./names-state";
@@ -61,8 +61,9 @@ import { REQ_CARD, requirementCardHeight, requirementCardHeightOf, type Requirem
 import { requirementCardSpots } from "@/domain/model/requirement-placement";
 import type { TraceTarget } from "@/domain/model/requirements";
 import { buildTraces, type TraceData } from "./trace-data";
-import { DROP_TOAST, dropTargetAt, requirementDrag, sameDropTarget, type DropTarget } from "./requirement-drop";
+import { DROP_TOAST, dropTargetAt, LINK_DRAG_ELSEWHERE, requirementDrag, sameDropTarget, type DropTarget } from "./requirement-drop";
 import { DropHint, DropTargetMark, moveDropHint } from "./RequirementDrop";
+import { LinkDragLayer, linkLineStart, type LinkDragLine } from "./LinkDrag";
 import type { LabelTarget } from "@/domain/model/labels";
 import { NOTE_TOOL_HINT, RelateLine, useCanvasModes } from "./CanvasModes";
 import { useCardResize } from "./CardResize";
@@ -145,6 +146,8 @@ export interface CardChange {
   /** A card's names or aliases (slice 11): the choice; the server stores none when it equals the canvas's mode. */
   entityNames?: NameMode;
   attributeNames?: NameMode;
+  /** Opened to show a found row (slice 17): named "Show row" in the undo history. */
+  showRow?: true;
 }
 type CardChangeFields = Omit<CardChange, "canvasItemId" | "expectedVersion">;
 /** What a canvas write returns: the value, or the domain's message for a toast. */
@@ -342,6 +345,7 @@ export function ModelCanvas({
   linkRequirement,
 }: ModelCanvasProps) {
   const ui = useContext(CanvasUiCtx);
+  const flashRowNow = ui.flashRow;
   const look = useCanvasLook()?.look;
   const layer = look?.layer ?? "all";
   const grid = look?.grid ?? "dots";
@@ -1092,15 +1096,15 @@ export function ModelCanvas({
       if (here) {
         select({ t: "card", id: here.id });
         centerOn(here.id);
-        return;
+        return here.id;
       }
       // on a live canvas, adding a card labels its element, after the question (D-11, PRD item 10); reviewers and
       // readers get no add there (PRD item 16)
-      if (live && !editable) return;
+      if (live && !editable) return null;
       const liveName = live ? (dropped?.name ?? live.names[isEntity(target) ? target.entityId : target.sourceTableId] ?? "it") : "";
       if (live) {
         const yes = await askRef.current({ message: `Label ${liveName} with ${live.labelName}? It then appears on this live canvas.`, yes: `Add ${live.labelName}`, no: "Cancel" }, "live");
-        if (!yes) return;
+        if (!yes) return null;
         quietUntil.current = Date.now() + 8000;
         if (!dropped) {
           let labeled: CanvasWriteResult<unknown>;
@@ -1114,7 +1118,7 @@ export function ModelCanvas({
             const u = ui.undo();
             toast(`${liveName} is now labeled ${live.labelName}.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
           }
-          return;
+          return null;
         }
       }
       const counts = memberCounts(cardNodesOf(rf).map((n) => n.data.card));
@@ -1145,21 +1149,23 @@ export function ModelCanvas({
       }
       if (!result.ok) {
         toast(result.message, "refusal");
-        return;
+        return null;
       }
-      select({ t: "card", id: result.value.canvasItemId });
+      const placed = result.value.canvasItemId;
+      select({ t: "card", id: placed });
       if (live) {
         const u = ui.undo();
         toast(`${liveName} is now labeled ${live.labelName}.`, "info", u ? { label: "Undo", run: u.undo } : undefined);
-        return;
+        return placed;
       }
       if (filedInto) {
         toast(`${dropped!.name} added to the collapsed frame ${filedInto.name}.`);
-        return;
+        return placed;
       }
       const box = { ...spot, w: CARD_W, h };
       if (!inside(viewRect(), box)) centerOnRect(box);
       if (clicked) toast(`Added 1 ${isEntity(target) ? "entity" : "source table"} to the canvas.`);
+      return placed;
     },
     [cardOf, select, centerOn, centerOnRect, placeCard, toast, viewRect, frameRefs, rf, entityConcepts, concepts, live, ui, editable],
   );
@@ -1167,7 +1173,7 @@ export function ModelCanvas({
   const place = useCallback(
     (target: CardTarget, rows: number, options?: { quiet?: boolean }) => {
       const h = newCardHeight(rows);
-      void placeAt(target, stackSpot(viewRect(), occupied(), h), h, !options?.quiet);
+      return placeAt(target, stackSpot(viewRect(), occupied(), h), h, !options?.quiet);
     },
     [placeAt, viewRect, occupied],
   );
@@ -1446,7 +1452,7 @@ export function ModelCanvas({
       return true;
     };
     framesNowRef.current = frameState.framesNow;
-    noteMoverRef.current = { noteOf: noteState.noteOf, show: noteState.show };
+    noteMoverRef.current = { noteOf: noteState.noteOf, show: noteState.show, pinnedTo: (frameId) => noteState.notes.filter((n) => n.pinFrameId === frameId) };
   });
   const cardData = useMemo(() => nodes.map((n) => n.data.card), [nodes]);
   // what Focus is on for this selection (slice 4b-1, item 21); Focus itself is a store of its own (`FocusDriver`)
@@ -2066,9 +2072,24 @@ export function ModelCanvas({
         }
         change(id, patch, undo, view);
       },
+      showRow: (cardId, rowId) => {
+        // a collapsed card or a filter that hides the row opens, one undo step "Show row" (slice 17, D-72); a card in a
+        // collapsed frame stays in its block, the row selected all the same
+        const card = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
+        if (card?.rows.some((r) => r.id === rowId)) {
+          const filtered = !visibleRows({ ...card, collapsed: false }).some((r) => r.id === rowId);
+          const patch: CardPatch = { ...(card.collapsed ? { collapsed: false } : {}), ...(filtered ? { rowFilter: "all" as const } : {}) };
+          if (Object.keys(patch).length) {
+            const undo: CardPatch = { ...(card.collapsed ? { collapsed: true } : {}), ...(filtered ? { rowFilter: card.rowFilter } : {}) };
+            change(cardId, patch, undo, { ...(patch as CardChangeFields), showRow: true });
+          }
+        }
+        select({ t: "row", cardId, id: rowId });
+        flashRowNow(rowId);
+      },
     });
     return () => registerCanvas(null);
-  }, [registerCanvas, frameRectsNow, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, withCard, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, noteState.drafts, notesNow, nameOf, select, centerOnRect, live, toast]);
+  }, [registerCanvas, frameRectsNow, fit, shiftView, showPlace, place, remove, placeRequirementCard, removeRequirementCard, reqNodeOf, placeRequirementCardsBeside, showRequirementCard, addToCanvas, centerOn, viewRect, occupied, placeAt, change, rf, fitWidth, placeBeside, settled, withCard, selectAll, group.arrangeSelection, group.fitSelectionWidths, group.removeSelection, group.placeSourcesOfSelection, frameState.createFrameAt, frameState.frameView, frameState.updateFrame, frameState.deleteFrame, frameState.fitFrame, frameState.zoomToFrame, frameState.selectFrameCards, frameState.setCollapsed, frameState.setAllCollapsed, frameState.resetView, setNames, frameState.framesView, frameState.cardFrame, frameState.frameAt, frameState.frameRefs, frameState.putInNewFrame, arrangeIntoFrames, noteState.noteView, noteState.newNote, noteState.edit, noteState.update, noteState.pin, noteState.unpin, noteState.remove, noteState.drafts, notesNow, nameOf, select, centerOnRect, live, toast, flashRowNow]);
 
   // ---- an item dropped from the left panel: the top middle of its card goes where the mouse is ----
   // ---- a requirement dragged from the left panel (slice 4b-2, items 17–19): the target under the pointer in a store
@@ -2077,7 +2098,7 @@ export function ModelCanvas({
   const [dropStore] = useState(() => createValueStore<DropTarget | null>(null, sameDropTarget));
   const hintRef = useRef<HTMLDivElement | null>(null);
   const dropTargetFor = useCallback(
-    (e: DragEvent, requirementId: string): DropTarget =>
+    (e: { clientX: number; clientY: number }, requirementId: string): DropTarget =>
       dropTargetAt(document.elementFromPoint(e.clientX, e.clientY), {
         card: (cardId) => {
           const c = (rf.getNode(cardId) as CardNodeT | undefined)?.data.card;
@@ -2107,6 +2128,30 @@ export function ModelCanvas({
     [rf, allMappings, requirementIndex, reqNodeOf],
   );
   const endRequirementDrag = useCallback(() => dropStore.set(null), [dropStore]);
+  /** A link from a drop (the left panel's, or a card's link drag, slice 17): Undo in the toast; a linked one writes nothing. */
+  const linkDropped = useCallback(
+    async (r: { requirementId: string; key: string }, target: Exclude<DropTarget, { t: "place" }>) => {
+      if (target.linked) {
+        toast(DROP_TOAST.already(r.key, target.name));
+        return;
+      }
+      if (!linkRequirement) return;
+      let result: CanvasWriteResult<unknown>;
+      try {
+        result = await linkRequirement({ requirementId: r.requirementId, target: target.target });
+      } catch {
+        result = FAILED;
+      }
+      if (!result.ok) {
+        toast(result.message, "refusal");
+        return;
+      }
+      const u = ui.undo();
+      u?.noteSaved();
+      toast(DROP_TOAST.linked(r.key, target.name), "info", u ? { label: "Undo", run: u.undo } : undefined);
+    },
+    [toast, linkRequirement, ui],
+  );
   useEffect(() => {
     window.addEventListener("dragend", endRequirementDrag);
     window.addEventListener("drop", endRequirementDrag);
@@ -2152,26 +2197,63 @@ export function ModelCanvas({
         } else if (await placeReqCards([{ requirementId: r.requirementId, ...spot }])) toast(DROP_TOAST.placed(r.key));
         return;
       }
-      if (target.linked) {
-        toast(DROP_TOAST.already(r.key, target.name));
-        return;
-      }
-      if (!linkRequirement) return;
-      let result: CanvasWriteResult<unknown>;
-      try {
-        result = await linkRequirement({ requirementId: r.requirementId, target: target.target });
-      } catch {
-        result = FAILED;
-      }
-      if (!result.ok) {
-        toast(result.message, "refusal");
-        return;
-      }
-      const u = ui.undo();
-      u?.noteSaved();
-      toast(DROP_TOAST.linked(r.key, target.name), "info", u ? { label: "Undo", run: u.undo } : undefined);
+      await linkDropped(r, target);
     },
-    [dropTargetFor, dropStore, rf, reqNodeOf, select, saveLayout, toast, placeReqCards, linkRequirement, ui],
+    [dropTargetFor, dropStore, rf, reqNodeOf, select, saveLayout, toast, placeReqCards, linkDropped],
+  );
+
+  // ---- a requirement card's link drag (slice 17, D-72; prototype "rqlink"): from its handle, a dashed line to the
+  // pointer and the target lit, both from value stores (no canvas render); a drop on an attribute, entity, mapping,
+  // table or column links as a drop from the left panel does; elsewhere nothing; Escape cancels ----
+  const [linkStore] = useState(() => createValueStore<LinkDragLine | null>(null));
+  const startLinkDrag = useCallback(
+    (e: React.PointerEvent, requirementId: string, key: string) => {
+      if (!editable || e.button !== 0) return;
+      const node = reqNodeOf(requirementId);
+      if (!node) return;
+      e.stopPropagation();
+      e.preventDefault();
+      const card = node.position;
+      const show = (ev: { clientX: number; clientY: number }) => {
+        const to = rf.screenToFlowPosition({ x: ev.clientX, y: ev.clientY });
+        linkStore.set({ from: linkLineStart(card, to), to });
+        const target = dropTargetFor(ev, requirementId);
+        dropStore.set(target.t === "place" ? null : target);
+        moveDropHint(hintRef.current, ev.clientX, ev.clientY);
+      };
+      const end = () => {
+        window.removeEventListener("pointermove", show);
+        window.removeEventListener("pointerup", up);
+        window.removeEventListener("pointercancel", end);
+        window.removeEventListener("keydown", escape, true);
+        document.body.classList.remove("im-rq-linking");
+        linkStore.set(null);
+        dropStore.set(null);
+      };
+      const up = (ev: PointerEvent) => {
+        end();
+        // the click that follows lands on whatever is under the pointer: it must not select or deselect
+        const swallow = (c: MouseEvent) => c.stopPropagation();
+        window.addEventListener("click", swallow, { capture: true, once: true });
+        setTimeout(() => window.removeEventListener("click", swallow, { capture: true }), 0);
+        const target = dropTargetFor(ev, requirementId);
+        if (target.t === "place") toast(LINK_DRAG_ELSEWHERE(key));
+        else void linkDropped({ requirementId, key }, target);
+      };
+      const escape = (ev: KeyboardEvent) => {
+        if (ev.key !== "Escape") return;
+        ev.preventDefault();
+        ev.stopPropagation();
+        end();
+      };
+      window.addEventListener("pointermove", show);
+      window.addEventListener("pointerup", up);
+      window.addEventListener("pointercancel", end);
+      window.addEventListener("keydown", escape, true);
+      document.body.classList.add("im-rq-linking");
+      show(e);
+    },
+    [editable, reqNodeOf, rf, linkStore, dropTargetFor, dropStore, toast, linkDropped],
   );
 
   const onDrop = useCallback(
@@ -2248,8 +2330,9 @@ export function ModelCanvas({
       framePress: (e, frameId) => onFramePointerDown(e, frameId, "label"),
       setFrameCollapsed: frameState.setCollapsed,
       openMember,
+      startLinkDrag,
     }),
-    [editable, selection, select, change, rf, modes.startRelate, fitWidth, toggleCard, onFramePointerDown, frameState.setCollapsed, openMember],
+    [editable, selection, select, change, rf, modes.startRelate, fitWidth, toggleCard, onFramePointerDown, frameState.setCollapsed, openMember, startLinkDrag],
   );
 
   // A selected card dragged in a group moves the others too, in the same update (slice 2a).
@@ -2470,6 +2553,7 @@ export function ModelCanvas({
             <HoverOverlay hoverStore={hoverStore} lassoStore={lasso.lasso} busy={busy} lines={lines} flash={ui.flash} outline={resize.outline} />
             <SelectionOverlay selection={selection} lassoStore={lasso.lasso} frames={frames} frameRects={frameRects} noteRects={noteRects} />
             <DropTargetMark store={dropStore} lines={bundled ?? lines} bundles={bundled?.bundles} blocks={blocks} mapsById={mapsById} />
+            {editable && <LinkDragLayer store={linkStore} />}
           </OverlayLayer>
           <FocusDriver target={focusTarget} canvasId={canvasId} />
           <ChangesDriver data={fadeData} canvasId={canvasId} />

@@ -50,6 +50,17 @@ export async function toolboxAt(page: Page, point: { x: number; y: number }): Pr
   return menu.locator('[data-testid="toolbox-item"] span.min-w-0').allInnerTexts();
 }
 
+/**
+ * Slice 17 (D-72): a new entity, fact or dimension outside a concept frame asks for its concept in a picker; picks
+ * `name` there (by its whole name).
+ */
+export async function pickConcept(page: Page, name: string) {
+  const picker = page.getByTestId("picker-concept");
+  await expect(picker).toHaveAttribute("data-shown", "true");
+  await picker.locator(`[data-testid="picker-item"][data-label="${name}"]`).click();
+  await expect(picker).toHaveCount(0);
+}
+
 export async function closeToolbox(page: Page) {
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("menu-toolbox")).toHaveCount(0);

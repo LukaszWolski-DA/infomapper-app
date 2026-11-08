@@ -18,7 +18,7 @@ import {
   undoButton,
   veil,
 } from "./helpers";
-import { loadRequirementLinks } from "../slice-04a/helpers";
+import { linkFromPanel, loadRequirementLinks } from "../slice-04a/helpers";
 
 // S15-15 (X-5, D-70, IC-12): REQ-210's coverage through dimensional mappings. It reads 0 of 3 with the reasons of D5
 // (option A's set at both levels); the lens colours its three rows and the four logical rows that feed them; Focus lights
@@ -68,7 +68,7 @@ test("S15-15: an approved source mapping behind segment_code covers it, its tabl
   // a link to a dimension's attribute from its panel, as to a logical one; one undo takes it back
   const req = await requirementByKey("REQ-210");
   await openAttribute(page, "Dim Product", "sku");
-  await page.getByTestId("select-link-requirement").selectOption(req.id);
+  await linkFromPanel(page, [req.key]);
   await expect.poll(async () => (await loadRequirementLinks()).filter((k) => k.requirement_id === req.id && k.deleted_at === null).length).toBe(4);
   await openRequirement(page, "REQ-210");
   await expect(page.getByTestId("text-req-coverage")).toHaveText(/^\d of 4 covered$/);

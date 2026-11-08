@@ -200,6 +200,23 @@ main.noleft #side,main.noright #insp{visibility:hidden}
 .menu button:disabled{opacity:.4;cursor:default;background:transparent}
 .menu hr{border:0;border-top:1px solid var(--line);margin:4px 2px}
 .menu.ctx{min-width:230px;max-width:300px;max-height:min(70vh,560px);overflow:auto}
+/* slice 17: the picker (a concept for a new entity; requirements to link) */
+#pickpop{min-width:260px;max-width:340px;display:flex;flex-direction:column;max-height:min(70vh,520px);overflow:hidden}
+#pickpop[hidden]{display:none}
+#pickpop .pk-list{overflow:auto;flex:1 1 auto;min-height:0}
+#pickpop .pk-list>button{display:flex;align-items:center;gap:8px}
+#pickpop .pk-list>button .pk-k{font-family:var(--mono,monospace);font-size:11.5px;color:var(--ink-3);flex:none}
+#pickpop .pk-list>button .pk-n{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#pickpop .pk-list>button .pk-box{width:14px;height:14px;border-radius:3px;box-shadow:0 0 0 1.5px var(--ink-3);flex:none;display:grid;place-items:center;font-size:11px;line-height:1;color:#fff}
+#pickpop .pk-list>button[aria-checked="true"] .pk-box{background:var(--logical);box-shadow:none}
+#pickpop .pk-list>button[aria-checked="true"] .pk-box::after{content:"✓"}
+#pickpop .pk-sw{width:10px;height:10px;border-radius:3px;flex:none}
+#pickpop .pk-none{padding:8px 10px;color:var(--ink-3);font-size:12.5px}
+#pickpop .pk-foot{display:flex;gap:6px;justify-content:space-between;align-items:center;border-top:1px solid var(--line);padding:6px 4px 2px;margin-top:4px}
+#pickpop .pk-foot>button{width:auto}
+#pickpop .pk-foot .btn.primary{background:var(--logical);color:#fff}
+#pickpop .pk-foot .btn.primary:disabled{opacity:.45}
+
 .menu.ctx>button{display:flex;align-items:center;justify-content:space-between;gap:16px}
 .menu.ctx>button[aria-checked="true"]::after{content:"✓";color:var(--logical);font-weight:600}
 .menu.ctx kbd{font-size:10.5px;color:var(--ink-3);background:transparent;box-shadow:none;padding:0}
@@ -395,6 +412,16 @@ body.relating .c-head{cursor:crosshair}
 .f-rs{position:absolute;right:-7px;bottom:-7px;width:14px;height:14px;border-radius:4px;background:var(--surface);box-shadow:0 0 0 1.5px var(--fc);
   pointer-events:auto;cursor:nwse-resize;transform:scale(var(--iz,1));transform-origin:50% 50%;opacity:.35}
 .f-rs:hover,.frame.sel .f-rs{opacity:1}
+/* slice 17, item 4: a selected frame resizes from every edge and corner */
+.f-rs[data-dir="nw"]{right:auto;bottom:auto;left:-7px;top:-7px;cursor:nwse-resize}
+.f-rs[data-dir="ne"]{bottom:auto;top:-7px;cursor:nesw-resize}
+.f-rs[data-dir="sw"]{right:auto;left:-7px;cursor:nesw-resize}
+.f-rz{position:absolute;pointer-events:auto;--t:calc(10px * var(--iz,1))}
+.f-rz[data-dir="n"]{left:18px;right:18px;top:calc(var(--t) / -2);height:var(--t);cursor:ns-resize}
+.f-rz[data-dir="s"]{left:18px;right:18px;bottom:calc(var(--t) / -2);height:var(--t);cursor:ns-resize}
+.f-rz[data-dir="w"]{top:18px;bottom:18px;left:calc(var(--t) / -2);width:var(--t);cursor:ew-resize}
+.f-rz[data-dir="e"]{top:18px;bottom:18px;right:calc(var(--t) / -2);width:var(--t);cursor:ew-resize}
+.f-rz:hover{background:color-mix(in srgb,var(--fc) 35%,transparent);border-radius:4px}
 #mkf{position:absolute;border:1.5px dashed var(--logical);background:color-mix(in srgb,var(--logical) 6%,transparent);border-radius:16px;pointer-events:none}
 #mkf[hidden]{display:none}
 #viewport.tool-frame,#viewport.tool-frame .frame{cursor:crosshair}
@@ -661,6 +688,15 @@ footer .ctxw b{color:var(--ink)}
 .rq-card .rh svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linejoin:round;stroke-linecap:round;flex:none}
 .rq-card .rh .k{font-family:var(--mono);font-weight:500}
 .rq-card .rh .kind{margin-left:auto;opacity:.9}
+/* slice 17, item 2(c): drag from the handle to link the requirement */
+.rq-card .rq-lk{display:grid;place-items:center;width:20px;height:20px;margin:-3px -6px -3px 0;border-radius:5px;cursor:crosshair;color:var(--req-on)}
+.rq-card .rq-lk:hover{background:color-mix(in srgb,var(--req-on) 22%,transparent)}
+#rqtmp{position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none;z-index:40}
+#rqtmp path{fill:none;stroke:var(--req);stroke-width:2;stroke-dasharray:6 4}
+#rqtmp circle{fill:var(--req)}
+.rq-tgt{outline:2px solid var(--req) !important;outline-offset:1px;background:color-mix(in srgb,var(--req) 12%,transparent) !important}
+.lnk.rq-tgt path{stroke:var(--req) !important;stroke-width:3px}
+body.rqlinking #viewport,body.rqlinking #viewport *{cursor:crosshair !important}
 .rq-card .rn{padding:8px 10px 6px;font-weight:600;font-size:13px;line-height:1.3}
 .rq-card .tri{display:flex;height:5px;margin:0 10px 6px;border-radius:3px;overflow:hidden;background:var(--line)}
 .rq-card .tri i{display:block;height:100%}
@@ -1196,6 +1232,7 @@ body.im-chgmode #lines .lnk.map.im-hit .s{stroke-width:2.6px}
 <footer id="status"></footer>
 <div id="dmenu" class="menu" hidden></div>
 <div id="cmenu" class="menu ctx" hidden role="menu"></div>
+<div id="pickpop" class="menu ctx" hidden role="dialog"></div>
 <div id="wsmodal" hidden role="dialog" aria-modal="true" aria-labelledby="wsm-title"><div class="rte-box"><div class="rte-head"><div><div class="rte-sub" id="wsm-sub"></div><div class="rte-title" id="wsm-title"></div></div><button class="ib" data-wsm="close" aria-label="Close">✕</button></div><div class="wsm-body" id="wsm-body"></div><div class="rte-foot" id="wsm-foot"></div></div></div>
 <div id="rte" hidden role="dialog" aria-modal="true" aria-labelledby="rte-title"><div class="rte-box">
   <div class="rte-head"><div><div class="rte-sub" id="rte-sub"></div><div class="rte-title" id="rte-title"></div></div><button class="ib" data-rte="cancel" aria-label="Close" title="Close (Esc)">✕</button></div>
@@ -1683,10 +1720,13 @@ function idx() {
 }
 const snap = () => JSON.stringify(S);
 /* Slice 16 (item 1): one way to add an attribute, from the entity panel and from a card header's menu. */
-function addAttr(entityId) {
+function addAttr(entityId, belowId) {
   const at = I.attrsOf[entityId] || [];
   const na = {id:uid("latr"), entityId, name:"new_attribute", dataType:"String", isPrimaryKey:false, isForeignKey:false, isPII:false, isNullable:true, description:"", order:Math.max(-1, ...at.map(x => x.order ?? 0)) + 1};
-  mutate(() => { S.attributes.push(na); V.sel = {t:"attr", id:na.id}; }); setTimeout(() => { const i = $("#f-an"); i?.focus(); i?.select(); }, 0);
+  const pos = belowId ? at.findIndex(x => x.id === belowId) : -1;   // slice 17, item 5: inserted directly below a row
+  mutate(() => { S.attributes.push(na);
+    if (pos >= 0) { const list = at.slice(); list.splice(pos + 1, 0, na); list.forEach((x, i) => { S.attributes.find(y => y.id === x.id).order = i; }); }
+    V.sel = {t:"attr", id:na.id}; }); setTimeout(() => { const i = $("#f-an"); i?.focus(); i?.select(); }, 0);
 }
 function mutate(fn) {
   const before = snap();
@@ -2208,7 +2248,7 @@ function renderSide() {
         const nameHit = !q || e.name.toLowerCase().includes(q);
         const fHit = q && !nameHit ? (I.attrsOf[e.id] || []).find(a => a.name.toLowerCase().includes(q)) : null;
         if (!nameHit && !fHit) return "";
-        return `<button class="titem${onCanvas("ent", e.id) ? " oncanvas" : onOther("ent", e.id) ? " elsewhere" : ""}" draggable="true" data-add="ent:${e.id}" title="${onCanvas("ent", e.id) ? "On this canvas. Click to show it." : onOther("ent", e.id) ? "On another canvas. Click or drag to add it here too." : "Click or drag to add to the canvas"}">
+        return `<button class="titem${onCanvas("ent", e.id) ? " oncanvas" : onOther("ent", e.id) ? " elsewhere" : ""}" draggable="true" data-add="ent:${e.id}"${fHit ? ` data-hitattr="${fHit.id}"` : ""} title="${onCanvas("ent", e.id) ? "On this canvas. Click to show it." : onOther("ent", e.id) ? "On another canvas. Click or drag to add it here too." : "Click or drag to add to the canvas"}">
 <span class="on"></span><span class="n">${esc(e.name)}${fHit ? `<span class="hint">attribute ${esc(fHit.name)}</span>` : ""}</span><span class="m">${esc(e.stereotype || "")}</span></button>`;
       }).filter(Boolean);
       const filtering = !!q || V.projOnly || V.canvasOnly;
@@ -2239,7 +2279,7 @@ function cubeTree(q) {
         const fHit = q && !nameHit ? (I.attrsOf[e.id] || []).find(a => a.name.toLowerCase().includes(q)) : null;
         if (!nameHit && !fHit) return "";
         const r = I.cube.ent[e.id], meta = role === "fact" ? (r?.grain ? "grain set" : "no grain") : "SCD " + (r?.scd ?? 1);
-        return `<button class="titem${onCanvas("ent", e.id) ? " oncanvas" : onOther("ent", e.id) ? " elsewhere" : ""}" draggable="true" data-add="ent:${e.id}" title="${onCanvas("ent", e.id) ? "On this canvas. Click to show it." : onOther("ent", e.id) ? "On another canvas. Click or drag to add it here too." : "Click or drag to add to the canvas"}">
+        return `<button class="titem${onCanvas("ent", e.id) ? " oncanvas" : onOther("ent", e.id) ? " elsewhere" : ""}" draggable="true" data-add="ent:${e.id}"${fHit ? ` data-hitattr="${fHit.id}"` : ""} title="${onCanvas("ent", e.id) ? "On this canvas. Click to show it." : onOther("ent", e.id) ? "On another canvas. Click or drag to add it here too." : "Click or drag to add to the canvas"}">
 <span class="on"></span><span class="n">${esc(e.name)}${fHit ? `<span class="hint">attribute ${esc(fHit.name)}</span>` : ""}</span><span class="m">${esc(meta)}</span></button>`;
       }).filter(Boolean);
       if (!items.length) continue;
@@ -2711,9 +2751,9 @@ vp.addEventListener("pointerdown", ev => {
     ev.preventDefault(); return;
   }
   if (t.closest("button")) return;
-  const frs = t.closest(".f-rs");
+  const frs = t.closest(".f-rs,.f-rz");
   if (frs) { const el = frs.closest(".frame"), f = frameById(el.dataset.fid);
-    D = {type:"fresize", id:f.id, w0:toWorld(ev.clientX, ev.clientY), start:{w:f.w, h:f.h}, before:snap(), moved:false, el}; ev.preventDefault(); return; }
+    D = {type:"fresize", dir:frs.dataset.dir || "se", id:f.id, w0:toWorld(ev.clientX, ev.clientY), start:{x:f.x, y:f.y, w:f.w, h:f.h}, before:snap(), moved:false, el}; ev.preventDefault(); return; }
   /* A frame moves when grabbed by its name or by any empty spot inside it (as in Miro); a click selects it. */
   const startFrameDrag = el => { const f = frameById(el.dataset.fid);
     D = {type:"frame", id:f.id, w0:toWorld(ev.clientX, ev.clientY), start:{x:f.x, y:f.y}, before:snap(), moved:false, el,
@@ -2807,6 +2847,13 @@ function dragUpdate(cx, cy) {
     const w = toWorld(cx, cy), n = noteById(D.id);
     n.w = clamp(Math.round((D.start.w + w.x - D.w0.x) / 8) * 8, 160, 520); D.moved = true; D.el.style.width = n.w + "px";
     V.noteH.set(n.id, D.el.offsetHeight); renderLines();
+  } else if (D.type === "rqlink") {
+    const w = toWorld(cx, cy); let g = $("#rqtmp");
+    if (!g) { g = document.createElementNS("http://www.w3.org/2000/svg", "svg"); g.id = "rqtmp"; $("#world").append(g); }
+    const P = CV().reqs[D.rid], a = w.x < P.x + 115 ? {x:P.x, y:P.y + 14} : D.a, mx = (a.x + w.x) / 2;   // from the side nearer the pointer
+    g.innerHTML = `<path d="M${a.x} ${a.y} C${mx} ${a.y} ${mx} ${w.y} ${w.x} ${w.y}"/><circle cx="${w.x}" cy="${w.y}" r="4"/>`;
+    const t = rqTarget(cx, cy), el = t?.el || null;
+    if (D.tgt !== el) { D.tgt?.classList.remove("rq-tgt"); el?.classList.add("rq-tgt"); D.tgt = el; }
   } else if (D.type === "rq") {
     const w = toWorld(cx, cy), P = CV().reqs[D.rid], nx = D.start.x + Math.round((w.x - D.w0.x) / 8) * 8, ny = D.start.y + Math.round((w.y - D.w0.y) / 8) * 8;
     if (nx === P.x && ny === P.y) return;
@@ -2827,9 +2874,12 @@ function dragUpdate(cx, cy) {
       if (it.el) { it.el.style.left = o.x + "px"; it.el.style.top = o.y + "px"; } });
     renderLines(); scheduleMini(); applyMulti();
   } else if (D.type === "fresize") {
-    const w = toWorld(cx, cy), f = frameById(D.id);
-    f.w = Math.max(240, Math.round((D.start.w + w.x - D.w0.x) / 8) * 8); f.h = Math.max(160, Math.round((D.start.h + w.y - D.w0.y) / 8) * 8);
-    D.moved = true; D.el.style.width = f.w + "px"; D.el.style.height = f.h + "px"; D.el.style.setProperty("--fw", f.w); scheduleMini();
+    const w = toWorld(cx, cy), f = frameById(D.id), s0 = D.start, dir = D.dir, dx = w.x - D.w0.x, dy = w.y - D.w0.y;
+    if (dir.includes("e")) f.w = Math.max(240, Math.round((s0.w + dx) / 8) * 8);
+    if (dir.includes("s")) f.h = Math.max(160, Math.round((s0.h + dy) / 8) * 8);
+    if (dir.includes("w")) { const x = Math.min(Math.round((s0.x + dx) / 8) * 8, s0.x + s0.w - 240); f.x = x; f.w = s0.x + s0.w - x; }   // slice 17: the left and top edges move the frame too
+    if (dir.includes("n")) { const y = Math.min(Math.round((s0.y + dy) / 8) * 8, s0.y + s0.h - 160); f.y = y; f.h = s0.y + s0.h - y; }
+    D.moved = true; D.el.style.left = f.x + "px"; D.el.style.top = f.y + "px"; D.el.style.width = f.w + "px"; D.el.style.height = f.h + "px"; D.el.style.setProperty("--fw", f.w); scheduleMini();
   } else if (D.type === "mkframe") {
     const w = toWorld(cx, cy), m = $("#mkf");
     D.r = {x:Math.min(w.x, D.w0.x), y:Math.min(w.y, D.w0.y), w:Math.abs(w.x - D.w0.x), h:Math.abs(w.y - D.w0.y)};
@@ -2884,6 +2934,14 @@ function endPointer(ev, cancelled) {
     return;
   }
   if (d.type === "cresize") { if (d.moved) { afterCardDrop(d.kind, d.id); undoStack.push(d.before); redoStack = []; rebuild(); } return; }
+  if (d.type === "rqlink") {
+    $("#rqtmp")?.remove(); d.tgt?.classList.remove("rq-tgt"); document.body.classList.remove("rqlinking");
+    if (cancelled) return;
+    const t = rqTarget(ev.clientX, ev.clientY);
+    if (t) linkReq(d.rid, t.t, t.id);
+    else toast(`Drop ${I.req[d.rid].key} on an attribute, entity, mapping, table or column to link it.`);
+    return;
+  }
   if (d.type === "rq") {
     if (d.moved) { undoStack.push(d.before); redoStack = []; rebuild(); } else if (!cancelled) select({t:"req", id:d.rid});
     return;
@@ -2985,11 +3043,17 @@ $("#tree").addEventListener("dragstart", ev => { const b = ev.target.closest("[d
 $("#tree").addEventListener("click", ev => {
   const b = ev.target.closest("[data-add]"); if (!b) return;
   if (V.home) { V.home = false; rebuild(); }
-  const [kind, id] = b.dataset.add.split(":");
-  if (onCanvas(kind, id)) { V.sel = {t: kind === "ent" ? "entity" : "source", id}; rebuild(); centerOn(kind, id); return; }
+  const [kind, id] = b.dataset.add.split(":"), hit = b.dataset.hitattr;
+  /* slice 17, item 3: a hit on an attribute shows its row: the card opened if collapsed or filtered (view state), the row selected */
+  const showRow = () => { if (!hit || !I.attr[hit] || !onCanvas("ent", id)) return; const L = CV().ent[id];
+    if (L.c || (L.f && L.f !== "all")) { L.c = false; L.f = "all"; save(); }
+    V.sel = {t:"attr", id:hit}; rebuild();
+    requestAnimationFrame(() => document.querySelectorAll(`.row[data-rid="${CSS.escape(hit)}"]`).forEach(r => r.classList.add("moved"))); };
+  if (onCanvas(kind, id)) { V.sel = {t: kind === "ent" ? "entity" : "source", id}; showRow(); if (!hit) rebuild(); centerOn(kind, id); return; }
   const r = vp.getBoundingClientRect(), w = toWorld(r.left + r.width / 2, r.top + r.height / 3);
   if (CV().live) addToCanvas(kind, id, w.x - W / 2, w.y);
   else placeNear(kind, [id], null);          // a clicked item lands in a free spot in view, never on top of another card
+  showRow();
   if (window.innerWidth <= 1000) $("#main").classList.remove("mleft");
 });
 document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click", () => { V.tab = b.dataset.tab; renderSide(); }));
@@ -3351,7 +3415,7 @@ function renderFrames() {
     const dim = focus && !(V.sel.t === "frame" && V.sel.id === f.id) && !members(f).some(([k, id]) => focus.cards.has(k + ":" + id));
     return `<div class="frame ${f.kind}${isSel("frame", f.id) ? " sel" : ""}${dim ? " dim" : ""}" data-fid="${f.id}" style="left:${f.x}px;top:${f.y}px;width:${f.w}px;height:${f.h}px;--fw:${f.w};--fc:${frameColor(f)}">
 <div class="f-lab" title="${esc(f.name)}${kindL ? " (" + kindL.toLowerCase() + ")" : ""}. Drag to move the frame with everything in it, click to select, double-click to collapse."><button class="ib" data-fact="collapse" title="Collapse into one block">${IC.shrink}</button><span class="f-dot"></span><span class="f-name">${esc(f.name)}</span>${chips.join("")}</div>
-<div class="f-rs" title="Drag to resize"></div></div>`;
+<div class="f-rs" data-dir="se" title="Drag to resize"></div>${isSel("frame", f.id) && wsPerm() === "full" ? `<div class="f-rs" data-dir="nw" title="Drag to resize"></div><div class="f-rs" data-dir="ne" title="Drag to resize"></div><div class="f-rs" data-dir="sw" title="Drag to resize"></div>${["n", "s", "w", "e"].map(d => `<div class="f-rz" data-dir="${d}" title="Drag to resize"></div>`).join("")}` : ""}</div>`;
   }).join("");
 }
 function frameAt(x, y) {
@@ -3961,7 +4025,7 @@ const cmenu = $("#cmenu");
 let ctxItems = [];
 function closeCtx() { cmenu.hidden = true; ctxItems = []; }
 function screenOf(wx, wy) { const r = vp.getBoundingClientRect(); return {x:r.left + V.px + wx * V.zoom, y:r.top + V.py + wy * V.zoom}; }
-function focusField(sel, id) { setTimeout(() => { const e = $(id); e?.focus(); e?.select?.(); }, 30); }
+function focusField(sel, id) { setTimeout(() => { const e = $(id); e?.focus(); if (e?.dataset?.pop) e.click(); else e?.select?.(); }, 30); }
 function moveUnit(k, dx, dy) { movingItems([k]).forEach(it => { if (it.note) { setNoteXY(it.note, it.x + dx, it.y + dy); return; } const o = it.f || CV()[it.k][it.id]; o.x += dx; o.y += dy; }); }
 function arrange(mode) {
   const keys = [...V.msel].filter(k => itemRect(k)); if (keys.length < 2) return;
@@ -4086,6 +4150,7 @@ function ctxFor(target, x, y) {
           add("Move down", () => moveAttr(rid, 1), {kbd:"Ctrl ↓", disabled:pos >= last});
           add("Move to the top", () => moveAttr(rid, "top"), {kbd:"Ctrl Shift ↑", disabled:pos <= 0});
           add("Move to the bottom", () => moveAttr(rid, "bottom"), {kbd:"Ctrl Shift ↓", disabled:pos >= last}); SEP(); }
+        if (wsPerm() === "full") add("Add attribute below", () => addAttr(I.attr[rid].entityId, rid));   // slice 17, item 5
         add("Link to a requirement…", () => focusField(null, "#rq-pick"));
         add("Map from a column…", () => focusField(null, "#f-addc"));
         add("Add a label…", () => focusField(null, "#lbl-in"));
@@ -4579,6 +4644,7 @@ $("#projOnly").addEventListener("change", ev => { V.projOnly = ev.target.checked
    ========================================================= */
 const RKIND = {need:"Business need", data:"Data requirement", brule:"Business rule", dq:"Data quality rule", nfr:"Non-functional"};
 /* one icon per kind, so a rule is told apart from a need at a glance */
+const RQ_LINK_IC = '<svg viewBox="0 0 16 16"><path d="M6.5 9.5l3-3M7 4.5l1-1a2.5 2.5 0 0 1 3.5 3.5l-1 1M9 11.5l-1 1A2.5 2.5 0 0 1 4.5 9l1-1"/></svg>';
 const RICON = {
   need:'<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.5"/><circle cx="8" cy="8" r="2.5"/></svg>',
   data:'<svg viewBox="0 0 16 16"><ellipse cx="8" cy="4" rx="5" ry="2"/><path d="M3 4v8c0 1.1 2.2 2 5 2s5-.9 5-2V4M3 8c0 1.1 2.2 2 5 2s5-.9 5-2"/></svg>',
@@ -4659,7 +4725,7 @@ function reqSection(t, id) {
   return `<h3>Requirements</h3>${all.length ? `<div class="list">${direct.map(r => row(r, false)).join("")}${via.map(r => row(r, true)).join("")}</div>`
     + (missing.length ? `<div class="actions" style="margin-top:6px"><button class="btn sm" data-do="req-cards-all" data-at="${t}" data-ai="${esc(id)}">${missing.length === all.length ? "Add all to this canvas" : `Add the ${missing.length} missing to this canvas`}</button></div>` : "")
     : `<p>Not linked to any requirement yet.</p>`}
-<div class="fld" style="margin-top:6px"><select id="rq-pick" data-f="req.link" data-t="${t}" data-i="${esc(id)}"><option value="">Link to a requirement…</option>${avail.map(r => `<option value="${r.id}">${esc(r.key + "  " + r.name)}</option>`).join("")}<option value="__new">+ New requirement…</option></select></div>`;
+<div class="actions" style="margin-top:6px"><button class="btn sm" id="rq-pick" data-pop="1" data-do="req-pick" data-t="${t}" data-i="${esc(id)}">Link to requirements…</button>${t === "entity" && wsPerm() === "full" && (I.attrsOf[id] || []).length ? `<button class="btn sm" data-do="req-pick-all" data-i="${esc(id)}" title="Link chosen requirements to each attribute of this entity">Link all attributes…</button>` : ""}</div>`;
 }
 /* where an element sits on this canvas (for placing requirement cards next to it) */
 function elemAnchor(t, id) {
@@ -4701,6 +4767,41 @@ ins.addEventListener("click", ev => {
   if (CV().reqs?.[rid]) showReqCard(rid); else placeReqCards([rid], elemAnchor(r.dataset.at, r.dataset.ai));
 }, true);
 ins.addEventListener("dragstart", ev => { const a = ev.target.closest(".li.feedreq[data-addreq]"); if (a) ev.dataTransfer.setData("text/plain", "reqcard:" + a.dataset.addreq); });
+/* slice 17, item 2: several requirements at once (one undo step); an entity's attributes all at once */
+const T_NAME = {entity:"the entity", attr:"the attribute", map:"the mapping", src:"the table", col:"the column"};
+function openReqPick(btn, t, id, all) {
+  const r = btn.getBoundingClientRect(), linked = new Set((I.reqOf[t + ":" + id] || []).map(x => x.id));
+  const attrs = all ? (I.attrsOf[id] || []) : [];
+  openPick({at:{x:r.left, y:r.bottom + 4}, multi:true, placeholder:"Type to filter requirements…",
+    title: all ? `Link all ${attrs.length} attributes of ${I.ent[id].name} to…` : "Link to requirements",
+    note: all ? "Attributes already linked to a chosen requirement are skipped." : "",
+    doneTitle:"Already linked", empty:"No requirements yet.",
+    items:S.requirements.map(q => ({id:q.id, key:q.key, label:q.name, done:!all && linked.has(q.id)})),
+    confirm: n => all ? (n ? `Link to ${n}` : "Link") : (n ? `Link ${n}` : "Link"),
+    extra: all ? null : {label:"New requirement…", act:() => newReq({t, id})},
+    pick: rids => all ? linkAllAttrs(id, rids) : linkReqs(rids, t, id)});
+}
+function linkReqs(rids, t, id) {
+  rids = rids.filter(rid => !S.reqLinks.some(k => k.reqId === rid && k.t === t && k.id === id)); if (!rids.length) return;
+  mutate(() => { rids.forEach(rid => S.reqLinks.push({reqId:rid, t, id})); });
+  toast(rids.length === 1 ? `Linked ${I.req[rids[0]].key} to ${T_NAME[t]}.` : `Linked ${rids.length} requirements to ${T_NAME[t]}.`, true);
+}
+function linkAllAttrs(entityId, rids) {
+  const attrs = I.attrsOf[entityId] || [], add = [];
+  rids.forEach(rid => attrs.forEach(a => { if (!S.reqLinks.some(k => k.reqId === rid && k.t === "attr" && k.id === a.id)) add.push({reqId:rid, t:"attr", id:a.id}); }));
+  if (!add.length) { toast("Every attribute is linked already."); return; }
+  mutate(() => { S.reqLinks.push(...add); });
+  const keys = rids.map(r => I.req[r].key).join(", "), n = new Set(add.map(k => k.id)).size;
+  toast(`Linked ${n} attribute${n > 1 ? "s" : ""} of ${I.ent[entityId].name} to ${keys}.`, true);
+}
+/* what a requirement's link drag is over: a row, a mapping line or a card (the same targets as a drop from the left panel) */
+function rqTarget(cx, cy) {
+  const el = document.elementFromPoint(cx, cy); if (!el || el.closest(".rq-card")) return null;
+  const row = el.closest(".row[data-rk]"); if (row) return {el:row, t:row.dataset.rk === "attr" ? "attr" : "col", id:row.dataset.rid};
+  const ln = el.closest(".lnk.map"); if (ln) return {el:ln, t:"map", id:ln.dataset.id};
+  const card = el.closest(".card:not(.fblock)"); if (card) return {el:card, t:card.dataset.kind === "ent" ? "entity" : "src", id:card.dataset.id};
+  return null;
+}
 function linkReq(rid, t, id) {
   if (S.reqLinks.some(k => k.reqId === rid && k.t === t && k.id === id)) { toast("Already linked."); return; }
   mutate(() => { S.reqLinks.push({reqId:rid, t, id}); });
@@ -4755,7 +4856,7 @@ function renderReqCards() {
   for (const rid in d.reqs || {}) { const r = I.req[rid]; if (!r) continue; const P = d.reqs[rid], c = reqCoverage(rid);
     const pc = n => c.total ? n / c.total * 100 : 0;
     h += `<div class="rq-card${isSel("req", rid) ? " sel" : ""}" data-rq="${rid}" style="left:${P.x}px;top:${P.y}px" title="${esc(plainText(r.desc).slice(0, 300))}">
-<div class="rh">${RICON[r.kind] || ""}<span class="k">${esc(r.key)}</span><span class="kind">${RKIND[r.kind]}</span></div>
+<div class="rh">${RICON[r.kind] || ""}<span class="k">${esc(r.key)}</span><span class="kind">${RKIND[r.kind]}</span>${wsPerm() === "full" ? `<span class="rq-lk" title="Drag onto an attribute, entity, mapping, table or column to link ${esc(r.key)}">${RQ_LINK_IC}</span>` : ""}</div>
 <div class="rn">${esc(r.name)}</div>
 <div class="tri" title="${c.ok} covered, ${c.draft.length} mapped but not approved, ${c.none.length} not mapped"><i class="ok" style="width:${pc(c.ok)}%"></i><i class="dr" style="width:${pc(c.draft.length)}%"></i><i class="no" style="width:${pc(c.none.length)}%"></i></div>
 <div class="rf"><span class="st-pill">${RSTAT[r.status]}</span><span>${c.total ? `${c.ok} of ${c.total} covered` : "nothing traced yet"}</span></div></div>`; }
@@ -4827,6 +4928,8 @@ ins.addEventListener("click", ev => {
   const sb = ev.target.closest('[data-set^="req."]');
   if (sb) { ev.stopImmediatePropagation(); const k = sb.dataset.set.slice(4), v = sb.dataset.v; mutate(() => { S.requirements.find(x => x.id === V.sel.id)[k] = v; }); return; }
   const d = ev.target.closest("[data-do]"); if (!d) return; const a = d.dataset.do;
+  if (a === "req-pick") { ev.stopImmediatePropagation(); openReqPick(d, d.dataset.t, d.dataset.i, false); return; }
+  if (a === "req-pick-all") { ev.stopImmediatePropagation(); openReqPick(d, "entity", d.dataset.i, true); return; }
   if (a === "req-unlink") { ev.stopImmediatePropagation(); const {r, t, i} = d.dataset;
     mutate(() => { S.reqLinks = S.reqLinks.filter(k => !(k.reqId === r && k.t === t && k.id === i)); }); toast("Unlinked.", true); }
   else if (a === "req-card") { ev.stopImmediatePropagation(); const v = viewRect();
@@ -4842,6 +4945,8 @@ ins.addEventListener("click", ev => {
 vp.addEventListener("pointerdown", ev => {
   const c = ev.target.closest(".rq-card"); if (!c || ev.button !== 0 || V.tool) return;
   ev.stopImmediatePropagation(); ev.preventDefault();
+  if (ev.target.closest(".rq-lk")) { const rid = c.dataset.rq, P = CV().reqs[rid];   // slice 17, item 2(c): a link drag, not a move
+    D = {type:"rqlink", rid, a:{x:P.x + 230, y:P.y + 14}, tgt:null}; document.body.classList.add("rqlinking"); return; }
   if (secondPress("rq:" + c.dataset.rq)) { openRichFor("req:" + c.dataset.rq); return; }
   const rid = c.dataset.rq, P = CV().reqs[rid];
   D = {type:"rq", rid, w0:toWorld(ev.clientX, ev.clientY), start:{x:P.x, y:P.y}, before:snap(), moved:false, el:c};
@@ -5577,6 +5682,58 @@ applyPanels();
    Creating entities (B-25, D-46): on the canvas (Entity tool, toolbox) and in the left panel (+ per concept).
    The concept comes from the concept frame clicked into, else the concept last used. The name is ready to type at once.
    ========================================================= */
+/* =========================================================
+   slice 17: one small picker, anchored at a point. A single choice picks at once; with several choices
+   (multi) the items are check items and a button confirms. Escape or a click outside closes it.
+   ========================================================= */
+const pickpop = $("#pickpop");
+let PK = null;
+function closePick() { pickpop.hidden = true; PK = null; document.removeEventListener("pointerdown", pickOutside, true); }
+function pickOutside(ev) { if (!pickpop.contains(ev.target)) closePick(); }
+function openPick(o) {
+  closeCtx?.(); PK = {...o, on:new Set(), q:""};
+  renderPick();
+  pickpop.hidden = false;
+  const W_ = pickpop.offsetWidth, H_ = pickpop.offsetHeight;
+  pickpop.style.left = Math.max(8, Math.min(o.at.x, window.innerWidth - W_ - 8)) + "px";
+  pickpop.style.top = Math.max(8, Math.min(o.at.y, window.innerHeight - H_ - 8)) + "px";
+  setTimeout(() => { $("#pk-q")?.focus(); document.addEventListener("pointerdown", pickOutside, true); }, 0);
+}
+function pickVisible() { const q = PK.q.trim().toLowerCase(); return PK.items.filter(it => !q || (it.label + " " + (it.key || "")).toLowerCase().includes(q)); }
+function renderPick() {
+  const vis = pickVisible(), n = PK.on.size;
+  const list = vis.length ? vis.map(it => `<button data-pk="${esc(it.id)}"${PK.multi ? ` role="menuitemcheckbox" aria-checked="${it.done || PK.on.has(it.id)}"` : ""}${it.done ? " disabled" : ""}${it.done ? ` title="${esc(PK.doneTitle || "")}"` : ""}>${PK.multi ? `<span class="pk-box"></span>` : ""}${it.color ? `<span class="pk-sw" style="background:${it.color}"></span>` : ""}${it.key ? `<span class="pk-k">${esc(it.key)}</span>` : ""}<span class="pk-n">${esc(it.label)}</span></button>`).join("")
+    : `<div class="pk-none">${esc(PK.items.length ? `Nothing matches “${PK.q.trim()}”.` : PK.empty)}</div>`;
+  const keep = $("#pk-q"), had = keep && document.activeElement === keep, pos = keep?.selectionStart;
+  pickpop.innerHTML = `<div class="msec">${esc(PK.title)}</div>${PK.note ? `<div class="pk-none" style="padding-top:0">${esc(PK.note)}</div>` : ""}
+<div class="ctx-search"><input id="pk-q" placeholder="${esc(PK.placeholder || "Type to filter…")}" autocomplete="off" value="${esc(PK.q)}"></div>
+<div class="pk-list">${list}</div>${PK.multi || PK.extra ? `<div class="pk-foot">${PK.extra ? `<button class="btn sm" data-pkx>${esc(PK.extra.label)}</button>` : "<span></span>"}${PK.multi ? `<button class="btn sm primary" data-pkok${n ? "" : " disabled"}>${esc(PK.confirm(n))}</button>` : ""}</div>` : ""}`;
+  if (had) { const i = $("#pk-q"); i.focus(); i.setSelectionRange(pos, pos); }
+}
+pickpop.addEventListener("input", ev => { if (ev.target.id === "pk-q") { PK.q = ev.target.value; renderPick(); } });
+pickpop.addEventListener("keydown", ev => {
+  ev.stopPropagation();
+  if (ev.key === "Escape") { ev.preventDefault(); closePick(); return; }
+  const btns = [...pickpop.querySelectorAll(".pk-list>button:not(:disabled)")], at = btns.indexOf(document.activeElement);
+  if (ev.key === "ArrowDown") { ev.preventDefault(); (btns[at + 1] || btns[0])?.focus(); return; }
+  if (ev.key === "ArrowUp") { ev.preventDefault(); if (at <= 0) $("#pk-q").focus(); else btns[at - 1].focus(); return; }
+  if (ev.key === "Enter" && ev.target.id === "pk-q") { ev.preventDefault();
+    if (PK.multi) { if (PK.on.size) pickpop.querySelector("[data-pkok]").click(); }
+    else if (btns.length === 1) btns[0].click(); }
+});
+pickpop.addEventListener("click", ev => {
+  if (!PK) return;
+  const x = ev.target.closest("[data-pkx]"); if (x) { const f = PK.extra.act; closePick(); f(); return; }
+  const ok = ev.target.closest("[data-pkok]"); if (ok) { const ids = [...PK.on], f = PK.pick; closePick(); f(ids); return; }
+  const b = ev.target.closest("[data-pk]"); if (!b || b.disabled) return;
+  if (PK.multi) { const id = b.dataset.pk; PK.on.has(id) ? PK.on.delete(id) : PK.on.add(id); renderPick(); pickpop.querySelector(`[data-pk="${CSS.escape(id)}"]`)?.focus(); return; }
+  const id = b.dataset.pk, f = PK.pick; closePick(); f(id);
+});
+/* item 1: the concept of a new entity, fact or dimension outside a concept frame is chosen, never suggested */
+function pickConcept(at, role, then) {
+  openPick({at, title:`Concept for the new ${role || "entity"}`, empty:"No concepts yet. Create one in the Model tab (New concept).",
+    placeholder:"Type to filter concepts…", items:S.concepts.map(c => ({id:c.id, label:c.name, color:c.color})), pick:then});
+}
 function conceptAt(x, y) { const f = frameAt(x, y); return f && f.kind === "concept" && S.concepts.some(c => c.id === f.ref) ? f.ref : null; }
 function createEntity(o) {
   if (wsPerm() !== "full") { V.blockedAt = performance.now(); toast(curWs().archived ? "This workspace is archived, so it is read-only." : "Your role cannot create entities here.", false, true); return; }
@@ -5594,9 +5751,11 @@ function createEntity(o) {
       const px = cx + dx * ring * 48, py = cy + dy * ring * 48; if (free(px, py)) { best = [px, py]; break; } }
     [x, y] = best || [cx, cy];
   }
-  const conceptId = o.conceptId || conceptAt(x + 24, y + 20) || (S.concepts.some(c => c.id === V.lastConcept) ? V.lastConcept : S.concepts[0]?.id);
-  if (!conceptId) { toast("Create a concept first (left panel, New concept)."); return; }
   if (o.role && !cubeOn()) { toast(CUBE_OFF, false, true); return; }
+  const conceptId = o.conceptId || conceptAt(x + 24, y + 20);   // slice 17: no "last used" suggestion
+  if (!conceptId) {
+    const vr = vp.getBoundingClientRect(), at = o.at || (o.x != null ? screenOf(o.x + 24, o.y + 20) : {x:vr.left + vr.width / 2 - 130, y:vr.top + vr.height / 3});
+    pickConcept(at, o.role, cid => createEntity({...o, conceptId:cid})); return; }
   const dimRole = o.role || null, same = x => !!dimRole === isDimE(x);   // names are compared within one model level
   const base = (o.name || (dimRole ? "New " + dimRole : "New entity")).trim(); let name = base, n = 2;
   if (!o.name) while (S.entities.some(e => same(e) && e.name.toLowerCase() === name.toLowerCase())) name = `${base} ${n++}`;
@@ -5622,7 +5781,7 @@ function createEntity(o) {
 /* left panel: + per concept, new concept, rename a concept */
 $("#tree").addEventListener("click", ev => {
   const nd = ev.target.closest("[data-newdim]");
-  if (nd) { ev.stopImmediatePropagation(); V.shut.delete("cube:" + nd.dataset.newdim); createEntity({role:nd.dataset.newdim}); return; }
+  if (nd) { ev.stopImmediatePropagation(); V.shut.delete("cube:" + nd.dataset.newdim); const br = nd.getBoundingClientRect(); createEntity({role:nd.dataset.newdim, at:{x:br.left, y:br.bottom + 4}}); return; }
   const a = ev.target.closest("[data-addent]");
   if (a) { ev.stopImmediatePropagation(); V.shut.delete("model:" + a.dataset.addent); createEntity({conceptId:a.dataset.addent}); return; }
   const nc = ev.target.closest("[data-newconcept]");

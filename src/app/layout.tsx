@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import localFont from "next/font/local";
 import { ToastProvider } from "@/ui/components/toast";
 import { NoBrowserMenu } from "@/ui/no-browser-menu";
+import { PickHost } from "@/ui/pick-popover";
 import "./globals.css";
 import "@/compose/styles";
 
@@ -36,6 +37,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
         {/* slice 16 (item 7, D-71): no browser context menu in the app's own surfaces */}
         <NoBrowserMenu />
         <ToastProvider>{children}</ToastProvider>
+        {/* slice 17 (D-72): the picker for a new entity's concept and for requirements to link */}
+        <PickHost />
       </body>
     </html>
   );

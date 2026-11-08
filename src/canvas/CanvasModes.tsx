@@ -184,7 +184,7 @@ export function useCanvasModes(editable: boolean) {
       setMode(null);
       if (mode.kind === "entity") {
         const at = rf.screenToFlowPosition({ x: e.clientX, y: e.clientY });
-        ui.host()?.createEntityAt({ x: at.x - NEW_ENTITY_OFFSET.x, y: at.y - NEW_ENTITY_OFFSET.y });
+        ui.host()?.createEntityAt({ x: at.x - NEW_ENTITY_OFFSET.x, y: at.y - NEW_ENTITY_OFFSET.y }, { screen: { x: e.clientX, y: e.clientY } });
       } else {
         const to = entityCardAt(e.target as Element);
         if (to) ui.host()?.relate(mode.fromCardId, to);

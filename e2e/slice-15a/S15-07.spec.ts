@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "./fixtures";
-import { card, cubeEntities, emptySpot, liveEntityNamed, openCanvas, recordToasts, roleOf, signInAs, STAR_VIEW, starUrl, toasts, toolboxAt } from "./helpers";
+import { card, cubeEntities, emptySpot, liveEntityNamed, openCanvas, recordToasts, roleOf, signInAs, STAR_VIEW, starUrl, toasts, toolboxAt, pickConcept } from "./helpers";
 
 // S15-07 (IC-03, B-2, without 15b's hints): New fact from the Cube tab makes a fact card with its name selected in the
 // panel, Role Fact, a fact's edge; one undo removes it with its role. The same from the canvas's toolbox, for a
@@ -20,6 +20,8 @@ test("S15-07: New fact in the Cube tab: a fact card, its name selected, Role Fac
 
   await page.getByTestId("tab-cube").click();
   await page.getByTestId("button-new-fact").click();
+  // slice 17 (D-72): outside a concept frame the concept is chosen in a picker
+  await pickConcept(page, "Sales");
   await expect(card(page, "New fact")).toHaveCount(1);
   await expectNameSelected(page, "New fact");
   await expect(roleOf(page, "New fact")).toHaveText("Fact");
@@ -45,6 +47,7 @@ test("S15-07: New fact in the Cube tab: a fact card, its name selected, Role Fac
   const items = await toolboxAt(page, spot);
   expect(items.slice(items.indexOf("New entity here"), items.indexOf("New entity here") + 3)).toEqual(["New entity here", "New fact here", "New dimension here"]);
   await page.getByTestId("menu-toolbox").getByTestId("toolbox-item").filter({ hasText: "New dimension here" }).click();
+  await pickConcept(page, "Customer");
   await expect(card(page, "New dimension")).toHaveCount(1);
   await expectNameSelected(page, "New dimension");
   await expect(roleOf(page, "New dimension")).toHaveText("Dimension");

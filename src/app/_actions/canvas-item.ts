@@ -28,6 +28,8 @@ export interface CardChangeInput {
   /** The card's own names or aliases (slice 11): `name`, `alias`, or null to follow the canvas. */
   entityNames?: string | null;
   attributeNames?: string | null;
+  /** A card opened to show a found row (slice 17): the undo step is "Show row". */
+  showRow?: true;
 }
 
 /** Saves a card's collapse state, row filter or names (slice 11). Returns the card's new version for the next change. */

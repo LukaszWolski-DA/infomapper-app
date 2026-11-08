@@ -34,7 +34,10 @@ import {
   createRequirement,
   deleteRequirement,
   ELEMENT_GONE_MESSAGE,
+  ALL_ATTRIBUTES_LINKED_MESSAGE,
+  LINK_REQUIREMENTS_LABEL,
   linkRequirement,
+  linkRequirements,
   REQUIREMENT_GONE_MESSAGE,
   setRequirementStatus,
   unlinkRequirement,
@@ -218,6 +221,55 @@ describe("delete, link and unlink (PRD items 6, 9)", () => {
     ]);
     expect(refusal(unlinkRequirement(makeCtx(), owner, { link: { ...links[0]!, deleted_at: T0 } }, { requirementLinkId: ids.reqLink1, expectedVersion: 1 }))).toBe(ALREADY_UNLINKED_MESSAGE);
     expect(refusal(unlinkRequirement(makeCtx(), owner, { link: null }, { requirementLinkId: ids.reqLink1, expectedVersion: 1 }))).toBe(ALREADY_UNLINKED_MESSAGE);
+  });
+});
+
+describe("several links at once (slice 17, D-72)", () => {
+  const existing = [requirementLink(ids.reqLink1, { requirement_id: ids.req102, attribute_id: ids.email })];
+  const linkMany = (input: object, who = owner, state = { requirements: reqs, links: existing, ...targets }) => linkRequirements(makeCtx(), who, state, input);
+
+  it("links two requirements to an attribute in one change group, named “Link requirements”", () => {
+    const r = ok(linkMany({ requirementIds: [ids.req101, ids.req103], targets: [{ kind: "attribute", id: ids.customerId }] }));
+    expect(r.writeSet.writes).toHaveLength(2);
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+    expect(r.writeSet.label).toBe(LINK_REQUIREMENTS_LABEL);
+    expect(r.value.message).toBe("Linked 2 requirements to the attribute.");
+  });
+
+  it("skips the links that exist; one new link keeps the one-link toast and the label from the events", () => {
+    const r = ok(linkMany({ requirementIds: [ids.req102, ids.req103], targets: [{ kind: "attribute", id: ids.email }] }));
+    expect(r.value.links).toMatchObject([{ requirement_id: ids.req103, attribute_id: ids.email }]);
+    expect(r.value.message).toBe("Linked REQ-103 to the attribute.");
+    expect(r.writeSet.label).toBeUndefined();
+    expect(linkMany({ requirementIds: [ids.req102], targets: [{ kind: "attribute", id: ids.email }] })).toMatchObject({ ok: false, error: { code: "conflict", message: ALREADY_LINKED_MESSAGE } });
+  });
+
+  it("links all attributes of an entity, skipping existing links; its toast counts the attributes", () => {
+    const attrs = [{ kind: "attribute", id: ids.customerId }, { kind: "attribute", id: ids.email }];
+    const r = ok(linkMany({ requirementIds: [ids.req102], targets: attrs, allOf: { entityId: ids.customer } }));
+    expect(r.value.links.map((k) => k.attribute_id)).toEqual([ids.customerId]);
+    expect(r.value.message).toBe("Linked 1 attribute of Customer to REQ-102.");
+    const two = ok(linkMany({ requirementIds: [ids.req101, ids.req102], targets: attrs, allOf: { entityId: ids.customer } }));
+    expect(two.value.links).toHaveLength(3);
+    expect(two.value.message).toBe("Linked 2 attributes of Customer to REQ-101, REQ-102.");
+    expect(refusal(linkMany({ requirementIds: [ids.req102], targets: [attrs[1]!], allOf: { entityId: ids.customer } }))).toBe(ALL_ATTRIBUTES_LINKED_MESSAGE);
+  });
+
+  it("refuses the whole set for a deleted requirement or element, and for a reviewer or a reader", () => {
+    expect(refusal(linkMany({ requirementIds: [ids.req101, ids.req101.replace("1", "9")], targets: [{ kind: "entity", id: ids.customer }] }))).toBe(REQUIREMENT_GONE_MESSAGE);
+    expect(refusal(linkMany({ requirementIds: [ids.req101], targets: [{ kind: "entity", id: ids.customer }, { kind: "attribute", id: ids.orderId.replace("5003", "5999") }] }))).toBe(ELEMENT_GONE_MESSAGE);
+    expect(refusal(linkMany({ requirementIds: [ids.req101], targets: [{ kind: "entity", id: ids.customer }] }, access("reviewer")))).toBe(REVIEWER_REQUIREMENT_MESSAGE);
+    expect(linkMany({ requirementIds: [ids.req101], targets: [{ kind: "entity", id: ids.customer }] }, access("reader")).ok).toBe(false);
+  });
+
+  it("one undo removes every link of the step", () => {
+    const rows = baseRows({ requirement_link: [...existing] });
+    const r = ok(linkMany({ requirementIds: [ids.req101, ids.req103], targets: [{ kind: "attribute", id: ids.customerId }] }));
+    const after = applied(rows, r.writeSet);
+    expect(live(after.requirement_link)).toHaveLength(3);
+    const back = undo(after, r.writeSet);
+    if (!back.ok) throw new Error(back.error.message);
+    expect(live(applied(after, back.writeSet).requirement_link)).toHaveLength(1);
   });
 });
 

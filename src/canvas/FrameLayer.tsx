@@ -41,9 +41,17 @@ function FrameLayer({ frames, cards, conceptColors, selectedId, editable, drawin
   // when the zoom changes: on the canvas root it made every card restyle on each zoom step (S2B-14, slice 2b step 5).
   const storeApi = useStoreApi();
   const layer = useRef<HTMLDivElement | null>(null);
+  const handlesLayer = useRef<HTMLDivElement | null>(null);
   const setLayer = useCallback(
     (el: HTMLDivElement | null) => {
       layer.current = el;
+      el?.style.setProperty("--iz", String(1 / storeApi.getState().transform[2]));
+    },
+    [storeApi],
+  );
+  const setHandlesLayer = useCallback(
+    (el: HTMLDivElement | null) => {
+      handlesLayer.current = el;
       el?.style.setProperty("--iz", String(1 / storeApi.getState().transform[2]));
     },
     [storeApi],
@@ -55,22 +63,38 @@ function FrameLayer({ frames, cards, conceptColors, selectedId, editable, drawin
       if (z === last) return;
       last = z;
       layer.current?.style.setProperty("--iz", String(1 / z));
+      handlesLayer.current?.style.setProperty("--iz", String(1 / z));
     });
   }, [storeApi]);
+  const press = (e: ReactPointerEvent) => {
+    const el = e.target as HTMLElement;
+    const frameId = el.closest<HTMLElement>("[data-frame]")?.dataset.frame;
+    if (!frameId) return;
+    const part: FramePart = el.closest("[data-frame-handle]") ? "handle" : el.closest(".f-lab") ? "label" : "body";
+    onPointerDown(e, frameId, part);
+  };
+  const selected = editable ? frames.find((f) => f.id === selectedId && !f.collapsed) : undefined;
   return (
     <EdgeLabelRenderer>
-      <div
-        ref={setLayer}
-        className="frame-layer"
-        data-testid="layer-frames"
-        onPointerDown={(e) => {
-          const el = e.target as HTMLElement;
-          const frameId = el.closest<HTMLElement>("[data-frame]")?.dataset.frame;
-          if (!frameId) return;
-          const part: FramePart = el.closest("[data-frame-handle]") ? "handle" : el.closest(".f-lab") ? "label" : "body";
-          onPointerDown(e, frameId, part);
-        }}
-      >
+      {/* the selected frame's other handles (slice 17, D-72): in a layer of their own above the lines and cards, so no
+          line's hit path covers an edge; the bottom-right one stays in the frame, as before */}
+      {selected && (
+        <div ref={setHandlesLayer} className="frame-handles" data-testid="layer-frame-handles" onPointerDown={press}>
+          <div
+            className="f-handles"
+            data-frame={selected.id}
+            style={{ left: selected.x, top: selected.y, width: selected.width, height: selected.height, "--fc": frameColor(selected, color) } as CSSProperties}
+          >
+            {(["nw", "ne", "sw"] as const).map((d) => (
+              <div key={d} className="f-rs" data-frame-handle={d} data-dir={d} title="Drag to resize" data-testid={`frame-resize-${d}`} />
+            ))}
+            {(["n", "s", "w", "e"] as const).map((d) => (
+              <div key={d} className="f-rz" data-frame-handle={d} data-dir={d} title="Drag to resize" data-testid={`frame-resize-${d}`} />
+            ))}
+          </div>
+        </div>
+      )}
+      <div ref={setLayer} className="frame-layer" data-testid="layer-frames" onPointerDown={press}>
         {/* a collapsed frame is drawn as a block, a node with the cards (BlockNode, slice 2c) */}
         {frames
           .filter((f) => !f.collapsed)
@@ -164,7 +188,7 @@ const FrameBox = memo(function FrameBox({
           </svg>
         </button>
       )}
-      {editable && <div className="f-rs" data-frame-handle title="Drag to resize" data-testid="frame-resize" />}
+      {editable && <div className="f-rs" data-frame-handle="se" title="Drag to resize" data-testid="frame-resize" />}
     </div>
   );
 });

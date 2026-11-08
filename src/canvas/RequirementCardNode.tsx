@@ -58,6 +58,17 @@ function RequirementCardNode({ data }: NodeProps<ReqNodeT>) {
         <i className={`ric ${card.kind}`} />
         <span className="k">{card.key}</span>
         <span className="kind">{card.kindName}</span>
+        {/* the link handle (slice 17, D-72): one element, its icon a mask, at full detail for editors; a drag from it
+            links, never moves the card (React Flow's `nodrag`) */}
+        {ctx.editable && !lod && (
+          <span
+            className="rq-lk nodrag"
+            title={`Drag onto an attribute, entity, mapping, table or column to link ${card.key}`}
+            data-testid="handle-requirement-link"
+            onPointerDown={(e) => ctx.startLinkDrag(e, card.requirementId, card.key)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        )}
       </div>
       {lod ? (
         <div className="c-lod" data-testid="card-block" style={{ height: h - REQ_CARD.headH }}>

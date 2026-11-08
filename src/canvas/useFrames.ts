@@ -50,6 +50,7 @@ import { buildFrames, conceptAsk, frameStats, memberCounts, type ConceptAsk, typ
 import { grownVersions, mergeFresh } from "./fresh";
 import type { FramePart } from "./FrameLayer";
 import { cardHeight, cardWidth, snap8, type Pt, type Rect } from "./geometry";
+import { resizedRect, sameRect, shiftedBack, type FrameRect } from "./frame-resize";
 import { planLayout, planReframe, type LayoutChange, type PlanCard } from "./layout-plan";
 import type { Selection } from "./line-data";
 import type { NoteData } from "./note-data";
@@ -86,7 +87,7 @@ export interface FrameWrites {
   setAllFramesCollapsed: (input: { frames: { frameId: Uuid; expectedVersion: number }[]; collapsed: boolean }) => Promise<WriteResult<Versions & { frames: number }>>;
   createFrame: (input: { x: number; y: number; width: number; height: number; cards: SizedRef[] }) => Promise<WriteResult<Versions & { frameId: Uuid; claimed: number }>>;
   updateFrame: (input: { frameId: Uuid; expectedVersion: number } & FramePatch) => Promise<WriteResult<{ frame: Frame }>>;
-  resizeFrame: (input: { frameId: Uuid; expectedVersion: number; width: number; height: number; cards: CardRef[] }) => Promise<WriteResult<Versions>>;
+  resizeFrame: (input: { frameId: Uuid; expectedVersion: number; x?: number; y?: number; width: number; height: number; cards: CardRef[] }) => Promise<WriteResult<Versions>>;
   fitFrame: (input: { frameId: Uuid; expectedVersion: number; cards: SizedRef[] }) => Promise<WriteResult<Versions>>;
   deleteFrame: (input: { frameId: Uuid; expectedVersion: number; cards: CardRef[] }) => Promise<WriteResult<{ name: string; released: number }>>;
   putInNewFrame: (input: { cards: SizedRef[]; others?: SizedRef[] }) => Promise<WriteResult<Versions & { frameId: Uuid; kind: Frame["kind"]; cards: number }>>;
@@ -426,7 +427,19 @@ export function useFrames(o: Options) {
         dy: number;
         moved: boolean;
       }
-    | { kind: "resize"; frameId: Uuid; sx: number; sy: number; zoom: number; start: { w: number; h: number }; w: number; h: number }
+    | {
+        kind: "resize";
+        frameId: Uuid;
+        /** Which edges move (slice 17): "se" from the bottom-right corner, as before; "w", "nw", … */
+        dir: string;
+        sx: number;
+        sy: number;
+        zoom: number;
+        start: FrameRect;
+        now: FrameRect;
+        /** Notes pinned to the frame and their offsets, kept in place while its top-left moves. */
+        pinned: ReadonlyMap<Uuid, Pt>;
+      }
     | { kind: "click"; frameId: Uuid; sx: number; sy: number; moved: boolean }
     | null
   >(null);
@@ -445,7 +458,10 @@ export function useFrames(o: Options) {
       }
       if (part === "handle") {
         e.stopPropagation();
-        press.current = { kind: "resize", frameId, sx: e.clientX, sy: e.clientY, zoom, start: { w: f.width, h: f.height }, w: f.width, h: f.height };
+        const dir = (e.target as HTMLElement).closest<HTMLElement>("[data-frame-handle]")?.dataset.frameHandle || "se";
+        const start = { x: f.x, y: f.y, w: f.width, h: f.height };
+        const pinned = new Map((noteMover.current?.pinnedTo(frameId) ?? []).map((n) => [n.id, { x: n.x, y: n.y }] as const));
+        press.current = { kind: "resize", frameId, dir, sx: e.clientX, sy: e.clientY, zoom, start, now: start, pinned };
         setBusy(true);
         return;
       }
@@ -480,7 +496,7 @@ export function useFrames(o: Options) {
   // drop the other listeners still to run for it (see Lasso.ts).
   const live = useRef<{
     saveLayout: typeof saveLayout;
-    resize: (frameId: Uuid, from: { w: number; h: number }, to: { w: number; h: number }) => void;
+    resize: (frameId: Uuid, from: FrameRect, to: FrameRect, pinned: ReadonlyMap<Uuid, Pt>) => void;
     select: typeof select;
     patchFrames: typeof patchFrames;
     createFrame: (rect: Rect) => Promise<void>;
@@ -499,12 +515,12 @@ export function useFrames(o: Options) {
         return;
       }
       if (p.kind === "resize") {
-        const w = Math.max(FRAME_MIN_SIZE.width, snap8(p.start.w + (e.clientX - p.sx) / p.zoom));
-        const h = Math.max(FRAME_MIN_SIZE.height, snap8(p.start.h + (e.clientY - p.sy) / p.zoom));
-        if (w === p.w && h === p.h) return;
-        p.w = w;
-        p.h = h;
-        patchFrames(new Map([[p.frameId, { width: w, height: h }]]));
+        const now = resizedRect(p.start, p.dir, (e.clientX - p.sx) / p.zoom, (e.clientY - p.sy) / p.zoom);
+        if (sameRect(now, p.now)) return;
+        p.now = now;
+        patchFrames(new Map([[p.frameId, { x: now.x, y: now.y, width: now.w, height: now.h }]]));
+        // a pinned note's place is an offset from the frame's top-left: shown back by the frame's move (D-20)
+        if (p.pinned.size) noteMover.current?.show(shiftedBack(p.pinned, now.x - p.start.x, now.y - p.start.y));
         return;
       }
       if (!p.moved && Math.hypot(e.clientX - p.sx, e.clientY - p.sy) <= CLICK_SLOP) return;
@@ -544,9 +560,9 @@ export function useFrames(o: Options) {
         return;
       }
       if (p.kind === "resize") {
-        if (p.w === p.start.w && p.h === p.start.h) return;
+        if (sameRect(p.now, p.start)) return;
         swallowNextClick();
-        resize(p.frameId, p.start, { w: p.w, h: p.h });
+        resize(p.frameId, p.start, p.now, p.pinned);
         return;
       }
       if (!p.moved || (p.dx === 0 && p.dy === 0)) {
@@ -580,21 +596,32 @@ export function useFrames(o: Options) {
     };
   }, [setNodes, noteMover, reqMover]);
 
-  /** A frame given a new size: saved with the cards that join or leave it (D-06). */
+  /**
+   * A frame given a new size, from any edge or corner (slice 17): saved with the cards that join or leave it (D-06) and,
+   * when its top-left moved, the offsets of the notes pinned to it, which keep their place (D-20).
+   */
   const resize = useCallback(
-    (frameId: Uuid, from: { w: number; h: number }, to: { w: number; h: number }) => {
+    (frameId: Uuid, from: FrameRect, to: FrameRect, pinned: ReadonlyMap<Uuid, Pt>) => {
       const f = framesRef.current.find((x) => x.id === frameId);
       if (!f) return;
       const cards = planCards();
       const [own] = boxes([f]);
-      const changes = planReframe(boxes(framesRef.current), cards, { ...own!, width: to.w, height: to.h });
+      const changes = planReframe(boxes(framesRef.current), cards, { ...own!, x: to.x, y: to.y, width: to.w, height: to.h });
       const back = new Map(changes.map((c) => [c.cardId, cards.find((x) => x.id === c.cardId)!.frameId]));
       for (const c of changes) patchCard(c.cardId, { frameId: c.frameId });
       const ids = cards.map((c) => c.id);
       enqueueGroup([frameId, ...ids], async () => {
         let result: WriteResult<Versions>;
         try {
-          result = await writes.resizeFrame({ frameId, expectedVersion: ver(frameId), width: to.w, height: to.h, cards: ids.map((id) => ({ canvasItemId: id, expectedVersion: ver(id) })) });
+          const moved = to.x !== from.x || to.y !== from.y;
+          result = await writes.resizeFrame({
+            frameId,
+            expectedVersion: ver(frameId),
+            ...(moved ? { x: to.x, y: to.y } : {}),
+            width: to.w,
+            height: to.h,
+            cards: ids.map((id) => ({ canvasItemId: id, expectedVersion: ver(id) })),
+          });
         } catch {
           result = FAILED;
         }
@@ -602,13 +629,14 @@ export function useFrames(o: Options) {
           noteVersions(result.value.versions);
           undo()?.noteSaved();
         } else {
-          patchFrames(new Map([[frameId, { width: from.w, height: from.h }]]));
+          patchFrames(new Map([[frameId, { x: from.x, y: from.y, width: from.w, height: from.h }]]));
+          if (pinned.size) noteMover.current?.show(pinned);
           for (const [id, frame] of back) patchCard(id, { frameId: frame });
           toast(result.message, "refusal");
         }
       });
     },
-    [planCards, boxes, patchCard, enqueueGroup, writes, ver, noteVersions, undo, patchFrames, toast],
+    [planCards, boxes, patchCard, enqueueGroup, writes, ver, noteVersions, undo, patchFrames, toast, noteMover],
   );
 
   // ---- creating a frame: the Frame tool and “New frame here” ----

@@ -273,6 +273,8 @@ const updateItemInput = z
     entityNames: z.enum(NAME_MODES).nullable().optional(),
     /** The same for its attribute names. */
     attributeNames: z.enum(NAME_MODES).nullable().optional(),
+    /** A card opened to show a found attribute's row (slice 17, D-72): the step is named "Show row". */
+    showRow: z.literal(true).optional(),
   })
   .strict();
 export type UpdateCanvasItemInput = z.input<typeof updateItemInput>;
@@ -318,8 +320,12 @@ export function updateCanvasItem(
   const keys = Object.keys(patch);
   const names: NameDimension | null = keys.length !== 1 ? null : keys[0] === "entity_names" ? "entity" : keys[0] === "attribute_names" ? "attribute" : null;
   if (result.ok && names && state.canvas) result.writeSet.label = CARD_NAMES_LABEL[names][cardMode(row, state.canvas, names)];
+  if (result.ok && parsed.data.showRow) result.writeSet.label = SHOW_ROW_LABEL;
   return result;
 }
+
+/** A card expanded, or its row filter reset, to show a row found in the object browser (slice 17, D-72). */
+export const SHOW_ROW_LABEL = "Show row";
 
 /** The undo history's names of a card's choice (slice 11). */
 export const CARD_NAMES_LABEL = {
