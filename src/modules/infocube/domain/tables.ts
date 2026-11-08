@@ -4,6 +4,10 @@
 import { statusOnlyEvent, type ModuleTableClass } from "@/domain/commands/undo";
 import type { InfoCubeTable } from "./types";
 
+/** A lookup whose relationship is deleted (slice 18, F16): an approved one goes back to review; any other is left. */
+export const lookupLosesRelationship = (row: Readonly<Record<string, unknown>>): Readonly<Record<string, unknown>> | null =>
+  row.kind === "lookup" && row.status === "approved" ? { status: "review", approved_by: null, approved_at: null } : null;
+
 export const INFOCUBE_UNDO: Readonly<Record<InfoCubeTable, ModuleTableClass>> = {
   cube_entity: { parents: [["entity_id", "entity"]], noun: "fact or dimension" },
   cube_measure: { parents: [["attribute_id", "attribute"]], noun: "measure" },
@@ -16,6 +20,9 @@ export const INFOCUBE_UNDO: Readonly<Record<InfoCubeTable, ModuleTableClass>> = 
     noun: "dimensional mapping",
     // slice 18: an image written before lookups had no lookup
     defaults: { lookup_relationship_id: null, lookup_default: null },
+    // slice 18 (F15, F16): a lookup outlives its relationship and keeps its id, so its panel can say it is gone; an
+    // approved one goes back to review in the same change group. Not a parent: undo brings either back alone.
+    follows: [["lookup_relationship_id", "relationship", lookupLosesRelationship]],
     goesWhole: [["cube_mapping_input", "mapping_id", "attribute_id"]],
     action: (e) => (statusOnlyEvent(e) ? "mapping.set_status" : "model.edit"),
   },

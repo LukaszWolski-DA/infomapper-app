@@ -110,7 +110,16 @@ export interface ModuleUndoTable {
    * purpose (not by the cascade) leaves this one; its other rows then go with it by `parents`.
    */
   goesWhole?: readonly (readonly [table: string, column: string, via: string])[];
+  /**
+   * Columns that point to a row the row outlives (slice 18, F16): when a write deletes the row `column` points to (of
+   * `table`), the module's own `rule` says how its row changes in the same change group, or `null` for not at all. The
+   * row is never deleted for it, and the column keeps its id. InfoCube: a lookup's relationship (an approved lookup goes
+   * back to review).
+   */
+  follows?: readonly ModuleFollow[];
 }
+/** One `follows` entry: the column, the table it points to, and the module's pure rule. */
+export type ModuleFollow = readonly [column: string, table: string, rule: (row: Readonly<Record<string, unknown>>) => Readonly<Record<string, unknown>> | null];
 /** A module's table is in the undo history or outside it, as InfoMapper's are. */
 export type ModuleTableClass = ModuleUndoTable | "outside undo";
 
@@ -126,6 +135,8 @@ export interface UndoTables {
   readonly defaults: Readonly<Record<string, Readonly<Record<string, unknown>>>>;
   /** By module table: the rows that take it along whole (`ModuleUndoTable.goesWhole`, slice 15c). */
   readonly goesWhole: Readonly<Record<string, readonly (readonly [string, string, string])[]>>;
+  /** By module table: the rows it outlives, with the module's rule (`ModuleUndoTable.follows`, slice 18). */
+  readonly follows: Readonly<Record<string, readonly ModuleFollow[]>>;
 }
 
 /** The workspace's current rows of every undoable table, deleted rows included; a module's under its table's name. */
@@ -201,6 +212,7 @@ export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleT
   const actions: Record<string, (e: ChangeEvent) => WorkspaceAction> = {};
   const defaults: Record<string, Readonly<Record<string, unknown>>> = { ...IMAGE_DEFAULTS };
   const goesWhole: Record<string, readonly (readonly [string, string, string])[]> = {};
+  const follows: Record<string, readonly ModuleFollow[]> = {};
   for (const [table, spec] of Object.entries(modules) as [string, ModuleTableClass | undefined][]) {
     if (!spec) continue;
     if (undoable.includes(table) || outside.has(table)) throw new Error(`The table ${table} is InfoMapper's or registered twice.`);
@@ -215,8 +227,9 @@ export function undoTables(modules: Readonly<Partial<Record<ModuleTable, ModuleT
     if (spec.action) actions[table] = spec.action;
     if (spec.defaults) defaults[table] = spec.defaults;
     if (spec.goesWhole?.length) goesWhole[table] = spec.goesWhole;
+    if (spec.follows?.length) follows[table] = spec.follows;
   }
-  return { undoable, outside, parents, nouns, actions, defaults, goesWhole, modules: registered };
+  return { undoable, outside, parents, nouns, actions, defaults, goesWhole, follows, modules: registered };
 }
 
 /** InfoMapper's tables only: what undo knows without a module (tests, and InfoMapper with an empty registry). */

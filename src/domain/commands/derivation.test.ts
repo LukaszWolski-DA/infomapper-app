@@ -61,7 +61,7 @@ function apply(rows: Rows, writeSet: WriteSet): Rows {
     if (w.kind === "insert") list.push(structuredClone(w.row) as never);
     else {
       const i = list.findIndex((r) => r.id === (w.before as { id: string }).id);
-      list[i] = structuredClone(w.row) as never;
+      list[i] = structuredClone((w as { row: unknown }).row) as never;
     }
   }
   return next;
