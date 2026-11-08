@@ -114,6 +114,12 @@
 .im-canvas .st.ok { background: var(--im-map); box-shadow: none }
 .im-canvas .st.warn { background: var(--im-warn); box-shadow: none }
 .im-canvas .st.n { width: auto; min-width: 16px; height: 14px; border-radius: 7px; padding: 0 4px }
+/* slice 18 (prototype .row .calc, .row .st.calc): a calculated attribute's "=" mark, one element on calculated rows only;
+   a row counted only through its calculation has a square dot, filled when every input counts (classes on the dot) */
+.im-canvas .row .calc { font-family: var(--font-plex-mono), ui-monospace, monospace; font-weight: 600; font-size: 10.5px; line-height: 1; padding: 1px 4px;
+  border-radius: 4px; background: var(--im-logical-soft); color: var(--im-logical); flex: none }
+.im-canvas .st.calc { background: transparent; box-shadow: inset 0 0 0 1.6px var(--im-map); border-radius: 2px }
+.im-canvas .st.calc.ok { background: var(--im-map) }
 
 /* below 40 % zoom: one plain block of the same height as the rows it replaces (AD-24 rule 1) */
 .im-canvas .c-lod { padding: 6px 10px }

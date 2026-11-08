@@ -13,6 +13,7 @@ import { deleteAttributeAction, updateAttributeAction } from "@/app/_actions/mod
 import { useAction } from "@/app/_components/use-action";
 import { useModules } from "@/app/_components/modules";
 import { PANEL_SECTIONS } from "@/compose/panels";
+import { CalculationSection } from "./calculation-section";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { UpdateAttributeInput } from "@/domain/commands/attribute";
 import { copiesBelow, copiesStopFollowing } from "@/domain/model/copies";
@@ -333,6 +334,8 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
       {PANEL_SECTIONS.attributeFeeds.map((S, i) => (
         <S key={i} attribute={a} />
       ))}
+      {/* slice 18 (item 1): "Calculated from", both levels */}
+      <CalculationSection attribute={a} />
 
       {copies.length > 0 && (
         <Fold title="Copies" count={copies.length} testId="fold-attribute-copies">
