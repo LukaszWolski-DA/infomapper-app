@@ -937,16 +937,50 @@ The run covered the slice 00 to 19 files the step 1 table names: `S0-02`, `S0-04
   - `S2C-12`, `S3A-14-idle` and `S3B-15-idle` passed in the run above;
   - S20-06: no canvas commit while idle or panned, on the count's click or a mark's hover.
 
-### The measuring sitting: not run
+### The measuring sitting (8 November 2026, 21:26)
 
-`npm run measure:canvas -- --to-screen --only s20 --rounds 2 --against slice-19` (`e2e/slice-20/S20-sitting.spec.ts`,
-registered as `s20`):
-- what it measures: pan and zoom at 100 % (dense area) and at 30 % on "Performance test", rAF and presented frames, and
-  a rename that adds a duplicate's mark, then undo and redo by the keys, each from a settled screen, to the screen;
-- the worktree `../infomapper-ab-main` is at slice-19 (`98cd39c`), and both builds are made (`--prepare-only`);
-- the discarded warm-up dropped all three rounds: "the machine did not get quiet before the reference side". Windows
-  Search's indexing (about 80 % of a core), Spotify, Word and the Claude app kept the load at 8–40 %;
-- the sitting waits for a quiet laptop (question below).
+`npm run measure:canvas -- --no-build --to-screen --only s20 --rounds 2 --against slice-19`
+(`e2e/slice-20/S20-sitting.spec.ts`; sitting `.data/measure/2026-11-08-21-26/`). This branch is `fc26fdd`, its
+measurement build is from `dda8ac8`, and only specs, the script and docs changed since. The reference is slice-19
+`98cd39c` in `../infomapper-ab-main`.
+
+**How it ran:**
+- **Balanced:** round 1 reference first, round 2 branch first. The quiet checks waited 34–62 s and none dropped a round.
+- **The warm-up:** a discarded round ran before it (sitting `2026-11-08-21-20`).
+- **Earlier attempts:** they did not get quiet (sittings `20-40` and `20-51`; peaks up to 8.6 %). One warm-up failed in
+  the spec itself, on the reference: its choice of a card in view found none. The write now picks its card from the
+  generator's layout and centres on it (`fc26fdd`). The spec was tried once on the branch before the warm-up.
+- **The laptop:** Spotify, Word, Chrome, the Xbox app's window and Windows Search's indexing were closed or stopped by
+  Łukasz. Background processes of iCloud, Phone Link, Photoshop Express and AdobeCollabSync were still running, on
+  Łukasz's decision ("Run it anyway"). In the 3-minute reading before the sitting, the quiet rule's load averaged
+  0.62 %, peaked at 2.1 %, and stayed under 2 % for up to 134 s in a row.
+
+| Figure | Bar (AD-24, the script's) | slice-19: median (min–max) | This branch: median (min–max) | Change | Result |
+| --- | --- | --- | --- | --- | --- |
+| Pan and zoom, 100 % dense area, presented fps (traced) | ≥ 50 fps, ≥ −5 % vs reference | 48.3 (48.0–48.6) | 46.5 (46.0–46.9) | −3.8 % | **change met, absolute not met (on both sides)** |
+| – untraced (rAF) | – | 49.2 (48.6–49.7) | 47.7 (47.7–47.7) | −3.0 % | – |
+| – frames over 50 ms (rAF, per round) | – | 7, 6 | 8, 7 | – | – |
+| Pan and zoom, 30 %, presented fps (traced) | ≥ 50 fps, ≥ −5 % vs reference | 52.1 (52.1–52.1) | 52.8 (52.3–53.4) | +1.4 % | **met** |
+| – untraced (rAF) | – | 54.1 (54.0–54.3) | 53.9 (53.0–54.8) | −0.5 % | – |
+| – frames over 50 ms (rAF, per round) | – | 2, 3 | 2, 5 | – | – |
+| Redo (the mark comes): first present after the key (traced) | median ≤ 300 ms, p95 ≤ 350 ms at 100 % | 69 (66–72), p95 83 | 67 (66–68), p95 79 | −3.4 % | **met** |
+| Undo (the mark goes): first present after the key (traced) | median ≤ 300 ms, p95 ≤ 350 ms at 100 % | 68 (67–69), p95 130 | 67 (65–70), p95 110 | −1.9 % | **met** |
+| Redo: in page, from the key to the row showing its new name and the next frame | – | 462.8, 456.3 (per round) | 382.8, 393.2 | about −16 % | – |
+| Undo: in page, the same | – | 462.0, 437.2 | 481.7, 402.5 | about −2 % | – |
+
+**What the write figures mean:**
+- The traced figure (`scripts/lib/to-screen.ts`, `presentAfter`) is the first frame presented after the key. For a write
+  that goes to the server, that is the page's first reaction, not the frame with the new marks.
+- The in-page time is the write's whole way: the key, the server's undo, the fresh page with the marks computed again,
+  the row drawn and the next frame. No figure measures the present of the frame with the mark itself.
+- On both measures this branch is not slower than slice-19, although it recomputes the checks and redraws the marks
+  after each write.
+
+**The bars:**
+- **The pans are within AD-24's ≥ −5 % against the reference** (−3.8 % at 100 %, +1.4 % at 30 %).
+- **The absolute 50 fps at 100 % is missed on both sides** (slice-19 48.3, this branch 46.5) on this laptop in this
+  sitting; 30 % meets it on both.
+- **The writes are within the interaction bars** (median ≤ 300 ms, p95 ≤ 350 ms) as traced.
 
 ### Assumptions
 
