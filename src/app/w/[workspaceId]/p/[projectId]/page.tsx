@@ -6,7 +6,7 @@ import { projectOpenNotes, projectRequirements, projectStats } from "@/app/_pane
 import { canvasHref } from "@/app/_lib/paths";
 import { thumbnailHrefs } from "@/app/_lib/thumbnails";
 import { getDataStore } from "@/data";
-import { moduleFeeds } from "@/compose";
+import { moduleHomeData } from "@/compose";
 import type { Uuid } from "@/domain/ids";
 import { projectLabels, type ProjectLabelContext } from "@/domain/model/labels";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
@@ -77,8 +77,9 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   });
 
   // Requirements whose scope touches the project's canvases (slice 4a): one index for the page
-  // what feeds the facts and dimensions (slice 15d, D4): the requirements follow dimensional mappings; the thumbnails count them
-  const { rowFeeds, feeds } = await moduleFeeds(ws, model);
+  // what feeds the facts and dimensions (slice 15d, D4): the requirements follow dimensional mappings; the thumbnails count them.
+  // One read of the module's rows serves the model checks too (slice 20, F19).
+  const { rowFeeds, feeds } = await moduleHomeData(shell.workspace, model);
   const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model, feeds);
   const projectReqs = projectRequirements(requirementIndex, items, view.canvases.map((c) => c.id));
   const reqCovered = projectReqs.filter((r) => r.done).length;

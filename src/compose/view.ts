@@ -15,6 +15,8 @@ import { BUS_MATRIX_TEXTS } from "@/modules/infocube/domain/bus-matrix";
 import { cubeIndex } from "@/modules/infocube/domain/keys";
 import { CUBE_MAPPING_LOG, cubeRequirementFeeds, mappingIndex, relationshipDeletes } from "@/modules/infocube/domain/mappings";
 import type { AttributeFeeds } from "@/domain/model/requirements";
+import type { CheckInput, ModuleChecks } from "@/domain/model/checks";
+import { cubeModuleChecks } from "./checks";
 import type { CubeMapping, CubeMappingInput } from "@/modules/infocube/domain/types";
 import {
   attributeDeletes,
@@ -134,6 +136,30 @@ export async function moduleFeeds(
   const [cubeMappings, cubeMappingInputs] = await Promise.all([store.modules.list(workspaceId, "cube_mapping"), store.modules.list(workspaceId, "cube_mapping_input")]);
   const index = mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs });
   return { rowFeeds: cubeRowFeeds(index, model.attributes), feeds: cubeRequirementFeeds(index, model.attributes) };
+}
+
+/**
+ * The project home's module data in one read (slice 20, F19): the rows a module counts on cards (the thumbnails), the
+ * requirement feeds, and its model checks for an input built with those feeds (`checks`). Nothing is read while the
+ * model has no fact or dimension; InfoCube's checks are present while it is on in the workspace (`workspace.infocube`).
+ */
+export async function moduleHomeData(
+  workspace: Pick<Workspace, "id" | "infocube">,
+  model: { entities: readonly WorkspaceModel["entities"][number][]; attributes: readonly WorkspaceModel["attributes"][number][] },
+  store: DataStore = getDataStore(STORE_SCHEMA),
+): Promise<{ rowFeeds: Record<Uuid, { n: number }>; feeds: AttributeFeeds; checks: (input: CheckInput) => ModuleChecks[] }> {
+  const on = !!workspace.infocube;
+  if (!model.entities.some((e) => e.model_level === "dimensional" && e.deleted_at === null)) return { rowFeeds: {}, feeds: {}, checks: (input) => cubeModuleChecks(on, null, input) };
+  const [cubeEntities, cubeMeasures, cubeKeys, cubeMappings, cubeMappingInputs] = await Promise.all([
+    store.modules.list(workspace.id, "cube_entity"),
+    store.modules.list(workspace.id, "cube_measure"),
+    store.modules.list(workspace.id, "cube_key"),
+    store.modules.list(workspace.id, "cube_mapping"),
+    store.modules.list(workspace.id, "cube_mapping_input"),
+  ]);
+  const index = mappingIndex({ entities: model.entities, attributes: model.attributes, cubeMappings, cubeMappingInputs });
+  const rows = cubePageRows(cubeEntities, cubeMeasures, cubeKeys, cubeMappings, cubeMappingInputs);
+  return { rowFeeds: cubeRowFeeds(index, model.attributes), feeds: cubeRequirementFeeds(index, model.attributes), checks: (input) => cubeModuleChecks(on, rows, input) };
 }
 
 /** Each live dimensional mapping's last content editor (four-eyes, O9), by mapping id. */

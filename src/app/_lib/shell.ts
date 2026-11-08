@@ -18,7 +18,8 @@ export interface ShellData {
   organization: { id: Uuid; name: string };
   /** `locked`: not yet unlocked in this session; choosing it asks for its password once (slice 8, item 5). */
   organizations: { id: Uuid; name: string; guest: boolean; workspaceCount: number; firstWorkspaceId: Uuid | null; locked: boolean }[];
-  workspace: { id: Uuid; name: string; archived: boolean };
+  /** `infocube`: the workspace's InfoCube switch (slice 20: the home's model checks name the module's topics). */
+  workspace: { id: Uuid; name: string; archived: boolean; infocube: boolean };
   /** Workspaces of the current organization the user is a member of. */
   workspaces: { id: Uuid; name: string; archived: boolean; role: WorkspaceRole }[];
   role: WorkspaceRole;
@@ -142,7 +143,7 @@ export async function loadShellFor(user: AppUser, where: Where, unlocked: Readon
         locked: !unlocked.has(o.id),
       };
     }),
-    workspace: { id: workspace.id, name: workspace.name, archived },
+    workspace: { id: workspace.id, name: workspace.name, archived, infocube: !!workspace.infocube },
     workspaces: workspacesHere.map((w, i) => ({ id: w.id, name: w.name, archived: isArchived(w), role: roles[i]!.role })),
     role: member.role,
     guest: isGuest(workspace, user.id, myOrgMemberships),
