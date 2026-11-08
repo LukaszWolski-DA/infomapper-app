@@ -192,3 +192,23 @@ describe("an older row's upgrade (F1)", () => {
     expect(upgradeCubeEntity(current)).toBeNull();
   });
 });
+
+describe("slice 19's demo (item 8, answer 6)", () => {
+  it("makes Fact Orders an aggregate, Dim Category an outrigger, Dim Order Flags junk and Dim Product a snapshot, once", async () => {
+    const { addFullDemoData, addInfoCubeTypesDemoData } = await import("@/compose/seed");
+    const { typeContext, cubeTitle, tabMeta } = await import("@/modules/infocube/domain/view");
+    const db = buildSeed() as never as Parameters<typeof addFullDemoData>[0] & { cube_entity: CubeEntity[] };
+    expect(addFullDemoData(db)).toBe(true);
+    expect(addInfoCubeTypesDemoData(db)).toBe(false);
+    const rows = db.cube_entity.filter((c) => c.workspace_id === WS);
+    const x = typeContext(rows, db.relationship.filter((r) => r.workspace_id === WS), db.entity.filter((e) => e.workspace_id === WS));
+    const named = (name: string) => rows.find((c) => c.entity_id === db.entity.find((e) => e.name === name && e.workspace_id === WS)!.id)!;
+    expect(["Fact Orders", "Dim Category", "Dim Order Flags", "Dim Product", "Fact Sales"].map((n) => [n, cubeTitle(named(n), x).short, tabMeta(named(n), x)])).toEqual([
+      ["Fact Orders", "Fact · Aggregate", "aggregate · grain set"],
+      ["Dim Category", "Dimension · Outrigger", "SCD 1 · outrigger"],
+      ["Dim Order Flags", "Dimension · Junk", "SCD 1 · junk"],
+      ["Dim Product", "Dimension · Snapshot", "Snapshot · Month-end"],
+      ["Fact Sales", "Fact", "grain set"],
+    ]);
+  });
+});

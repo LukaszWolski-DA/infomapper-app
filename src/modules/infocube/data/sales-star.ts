@@ -326,3 +326,99 @@ export function addStarDerivations(db: DevDb & Partial<InfoCubeDb>, workspaceId:
   db.cube_mapping_input = (db.cube_mapping_input ?? []).filter((i) => i.mapping_id !== old);
   return true;
 }
+
+/** Slice 19's two new dimensions on the star (prototype `cubeDemoV5`): their concept, attributes, kind and place. */
+const TYPE_DIMENSIONS: [key: string, concept: string, name: string, definition: string, kind: "standard" | "junk", x: number, y: number, attributes: [string, LogicalType, "PK"?][]][] = [
+  ["cat", "prod", "Dim Category", "Product categories, shared by products.", "standard", 780, 860, [["category_key", "integer", "PK"], ["category_code", "string"], ["category_name", "string"]]],
+  ["flags", "sales", "Dim Order Flags", "Payment type, channel and gift flag of an order line.", "junk", 1500, 40, [["order_flags_key", "integer", "PK"], ["payment_type", "string"], ["channel", "string"], ["is_gift", "boolean"]]],
+];
+
+/**
+ * Slice 19's demo on the star (item 8; prototype `cubeDemoV5`, `cubeDemoV6`; Łukasz, step 1, answer 6): Fact Orders an
+ * aggregate of Fact Sales; Dim Category (Product) with its relationship "groups" to Dim Product (Dim Category 1..1 →
+ * Dim Product 0..n), so an outrigger of it; Dim Order Flags (Sales), a junk dimension; Dim Product a snapshot, "Month-end".
+ * The two new cards go on "Sales star". Run after `addDemoData` by the seed, the reset, `npm run demo` and slice 19's
+ * fixtures, never by slice 15's or 18's. False when the star is missing or this ran already.
+ */
+export function addStarTypes(db: DevDb & Partial<InfoCubeDb>, workspaceId: Uuid, authorId: Uuid, at: string = new Date().toISOString()): boolean {
+  const ws = workspaceId;
+  const model = (key: string) => seedId(ws, key);
+  const id = (key: string) => starId(ws, key);
+  const cubes = db.cube_entity ?? [];
+  const orders = cubes.find((c) => c.id === id("cube-entity:orders"));
+  const product = cubes.find((c) => c.id === id("cube-entity:prod"));
+  if (!orders || !product || !cubes.some((c) => c.id === id("cube-entity:sales")) || db.entity.some((e) => e.id === id("entity:cat"))) return false;
+  const std = (key: string) => ({ id: id(key), workspace_id: ws, version: 1, created_at: at, created_by: authorId, updated_at: at, updated_by: authorId, deleted_at: null });
+
+  Object.assign(orders, { base_fact_entity_id: id("entity:sales") });
+  Object.assign(product, { history: "snapshot", snapshot_period: "Month-end" });
+
+  const canvasId = salesStarCanvasId(ws);
+  for (const [key, concept, name, definition, kind, x, y, attributes] of TYPE_DIMENSIONS) {
+    db.entity.push({
+      ...std(`entity:${key}`),
+      concept_id: model(`concept:${concept}`),
+      name,
+      alias: null,
+      model_level: "dimensional",
+      stereotype: "object",
+      definition_html: `<p>${definition}</p>`,
+      definition_text: definition,
+    });
+    attributes.forEach(([attr, type, flag], i) => {
+      db.attribute.push({
+        ...std(`attribute:${key}.${attr}`),
+        entity_id: id(`entity:${key}`),
+        name: attr,
+        alias: null,
+        sort_order: i,
+        data_type: type,
+        custom_type: null,
+        type_length: null,
+        type_precision: null,
+        type_scale: null,
+        is_primary_key: flag === "PK",
+        is_foreign_key: false,
+        is_business_key: false,
+        is_pii: false,
+        is_nullable: !flag,
+        definition_html: null,
+        definition_text: null,
+        copied_from_attribute_id: null,
+        is_calculated: false,
+        calc_rule: null,
+      });
+    });
+    (db.cube_entity ??= []).push({ ...std(`cube-entity:${key}`), entity_id: id(`entity:${key}`), role: "dimension", grain: null, ...typeColumns("dimension"), dim_kind: kind });
+    db.canvas_item.push({
+      ...std(`card:star:${key}`),
+      canvas_id: canvasId,
+      entity_id: id(`entity:${key}`),
+      source_table_id: null,
+      requirement_id: null,
+      x,
+      y,
+      width: null,
+      collapsed: false,
+      row_filter: "all",
+      frame_id: null,
+      live_level: null,
+      entity_names: null,
+      attribute_names: null,
+    });
+  }
+  db.relationship.push({
+    ...std("relationship:cat>prod"),
+    from_entity_id: id("entity:cat"),
+    to_entity_id: id("entity:prod"),
+    label: "groups",
+    from_min: 1,
+    from_max: "1",
+    to_min: 0,
+    to_max: "n",
+    description: null,
+    from_role: null,
+    to_role: null,
+  });
+  return true;
+}
