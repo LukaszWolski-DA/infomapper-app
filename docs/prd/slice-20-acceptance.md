@@ -831,3 +831,159 @@ about 2,000 items. As decided, I stopped here: nothing is deferred or computed i
 - `docs/known-limitations.md`: "The marks cost about 22 ms after each write on a very large model". `docs/ideas.md`:
   "Model checks for much larger models" (deferred and incremental).
 - Auto-fix stays off.
+
+## Step 3: home, canvas and panels (8 November 2026)
+
+### What changed
+
+- **One requirement index and one check index per canvas page** (`ModulesProvider`, `src/app/_components/modules.tsx`):
+  - the page now gives it its requirements and links;
+  - it builds the requirement index and, from it, the check index (`pageCheckIndex` in `src/compose/checks.ts`: the
+    whole model, the module's rows, one cube index), once per data version in the browser, with no bytes added;
+  - the canvas (`useRequirementIndex`) and the details panel (`Inspector`) use the shared index, and build their own only
+    without one;
+  - `checksNow` holds the index for what reads it outside a render.
+- **Card marks** (`src/canvas/checks.ts`, `ModelCanvas.tsx`, `CardNode.tsx`, `canvas.css`):
+  - a card's node carries `check` (its header's and its rows' severity and groups) only when it has one, set from the
+    index once per data version as the requirement marker is (one effect, and the nodes' first state), so a card draws
+    again only when its marks change;
+  - the header's "!" is `.c-l2.chk::after` (with `order`, after the name, before the coverage); a row's is
+    `.row.chk .dt::after`, put first, so "!", Σ, then the type;
+  - orange with `.high`;
+  - no element: the row's `.dt` and the header line get only classes and a `data-chk` attribute;
+  - the title is built when the pointer is over a mark (`onPointerOver` on the card sets it from `checkTitle`), never in
+    a render;
+  - the name's and a row's clip count the mark's width (`CHECK_MARK_HEAD` 14 px, `CHECK_MARK_ROW` 10 px in
+    `text-fit.ts`);
+  - a collapsed card and a card below 40 % keep the header line, and so its mark.
+- **The status bar** (`status-bar.tsx`): "Model checks {n}" after "Open notes on canvas", a `<button>`, so S6A-07's spans
+  are as they were. It counts the lines that name an entity with a card here (`countOn`), from the page's index and the
+  page's cards, as the bar's other counts, with no canvas commit. It is orange with a High line and absent with none.
+  Its click:
+  - clears the selection and calls `openDetails()` (hidden or narrow: shown or slid over);
+  - asks the group (`checksJump`); the group acts on the request in the next animation frame (marked handled there, so a
+    mount undone at once, as React's development double run, leaves it for the next one);
+  - the group opens if folded (`Fold`'s `openOn`), scrolls into view and flashes once (900 ms; `Fold`'s `flash`).
+- **The details panel without a selection** (`overview-panel.tsx`): "Model checks" between Mapping coverage and Needs
+  attention:
+  - the sentence, then the lines for this canvas's cards, High first, each with its "!", its name, its group's short
+    label and its whole text as title;
+  - D-35's `LongList`: a filter and "Show all" over 20;
+  - a click selects the object and centres its card.
+- **The element panels' box** (`src/app/_panels/checks-box.tsx`): after the kind line in the entity, attribute and
+  relationship panels, and in InfoCube's dimensional mapping panel (through InfoMapper's app part):
+  - an orange edge with a High line;
+  - "{group}. {name}: {detail}"; an attribute's own line gives its detail only;
+  - an item naming another object is a button (the panels' go-to links), the object's own is not;
+  - a fact's hints are counted: "1 hint in the Fact section below.";
+  - read only for every role.
+- **The project home** (`src/app/_lib/project-checks.ts`, `_components/project-checks.tsx`, `src/app/_actions/checks.ts`):
+  - the section after Model consistency, with its badge, the sentence with the modules' topics, and each group's box
+    (severity, the module's tag, title, count, hint);
+  - 20 lines per group rendered on the server; "Show all {n}" reads the group through `projectChecksAction` (a read,
+    every role) and "Show the first 20" folds it again;
+  - the all-well text with the modules' parts;
+  - the stats' link "! {n} model checks", orange with a High line, scrolls to the section;
+  - each line's address opens the project's first canvas (its order) that shows the line's first entity, else any it
+    names, else the first canvas;
+  - the home reads InfoCube's rows once (`moduleHomeData`) and uses its requirement index's lookup.
+- **Arrival addresses** (canvas `page.tsx`, `ModelCanvas.tsx`, `SelectionHistory.tsx`):
+  - `?entity=` selects an entity's card, else its panel;
+  - `?rel=` and `?ext={kind}:{id}` select a relationship or a module's object and centre the first card here that it
+    names (`focusCenter`; `extEntities` in the composition root);
+  - each is in `ARRIVAL`, so it is the page's own history place, and the address is cleaned;
+  - a gone object is said with the places' words (`GONE`; a module's own text from the server, `extGoneText`, because
+    the canvas host is not registered yet when the page mounts);
+  - `?map=` and `?row=` are unchanged.
+- **The module's gone text** moved to its domain (`CUBE_MAPPING_GONE`), re-exported where it was.
+
+### New specs (`e2e/slice-20/`, all passed locally, each once)
+
+| Spec | What it checks | Result |
+| --- | --- | --- |
+| S20-01 | the demo's 15 lines on Order management's home; Customer.segment_code to Integer adds `feeds` (High, after `wrong`); deleting Sales Order.order_id gives 2 `lost` and drops `wrong`; Fact Sales without a grain gives `facts` (tagged InfoCube); the home's Undo takes each back | passed |
+| S20-02 | the section after consistency, its badge (36 with 21 test lines), the sentence, High first, 20 of 21 and "Show all 21" / "Show the first 20", the stats' link (orange, scrolls), lines opening an attribute, a relationship and a dimensional mapping on the right canvas, Customer 360's scope, the all-well text on Bank X's project | passed |
+| S20-03 | the marks on "Customer & orders" (Customer and last_order_id orange, Sales Order and total_amount grey), their titles on hover, no element, a rename that adds a duplicate's marks and its undo, collapsed, below 40 %, aliases, a reader | passed |
+| S20-04 | the box after the kind line in the entity, attribute, relationship and dimensional mapping panels; an item selecting another object; an attribute's own detail; Fact Sales without a grain: "1 hint in the Fact section below."; a reader | passed |
+| S20-05 | "Model checks 9" on both demo canvases (orange on "Customer & orders"); a click with a card selected, the panel hidden and the group folded: the panel shown, the group open, in view, flashed once; its lines (High first, short label, title) selecting a row and a mapping; no count on a canvas without lines | passed |
+| S20-06 | on the Sales star: no canvas or miniature commit while idle, after a pan, after the count's click, or on a mark's hover | passed |
+| S20-07 | `?entity=` (card, or panel without one), `?rel=` and `?ext=`, Back and Forward between them, the address cleaned, and the gone texts | passed |
+| S20-Q10 | a rule typed in InfoMapper's and InfoCube's mapping panels, then a click on another mapping, a card or the empty canvas: stored on its own mapping only | passed: the app has no such bug |
+| S20-sitting, S20-layers | measurement build only (below) | — |
+
+### Earlier specs run (the acceptance doc's list), and changes
+
+The run covered the slice 00 to 19 files the step 1 table names: `S0-02`, `S0-04`, `S0-07`, `S1A-05`,
+`relationship-ends`, `S1B-12`, `slice-02a`, `S2C-12`, `S3A-14-idle`, `S3B-15-idle`, `S4B1-06` to `S4B1-08`, `S4B2-07`,
+`S5A-02`, `S6A-07`, `slice-06b`, `slice-07b`, `slice-11`, `S12A-05`, `S12A-07`, `S12A-11`, `S14B-10`, `S15-08`,
+`S15-22` and `slice-19`.
+- **Result:** 125 passed and 1 skipped (`S11-13-commits`, on demand only) in 25.5 min, locally, once.
+- **No earlier spec was changed.** With answer 1 (b) the plain seed has no line, so no earlier page shows a mark.
+
+### Guards (measurement build)
+
+- **The element guard** (`S3B-15-elements`) against slice-08's baseline, which slices 9 to 19 matched.
+  - The viewport counts are equal at every view: 4,508 / 19,305 / 1,465 / 4,907.
+  - On slice-19's build in the same session, the viewport counts are the same and the page totals are 6,001 / 20,798 /
+    2,868 / 6,310. This branch's are 6,135 / 20,932 / 3,002 / 6,444: **+134 at every view**.
+  - The +134 are the details panel's new group (Performance test's 21 "no copied key" lines: the filter, 20 lines and
+    "Show all"), plus the status bar's button, outside the canvas.
+  - Performance test's 21 header marks add no element.
+- **LayerTree** (`S20-layers`, the Sales star from slice 19's demo, then three renames that make duplicates):
+  - this branch, without marks: 9 drawing layers, 4.3 MP, 1,016 viewport elements;
+  - this branch, with 3 header and 6 row marks: the same 9, 4.3 MP and 1,016;
+  - slice-19 on the same data: 9, 4.3 MP and 1,016, with no marks.
+- **Commit counts:**
+  - `S2C-12`, `S3A-14-idle` and `S3B-15-idle` passed in the run above;
+  - S20-06: no canvas commit while idle or panned, on the count's click or a mark's hover.
+
+### The measuring sitting: not run
+
+`npm run measure:canvas -- --to-screen --only s20 --rounds 2 --against slice-19` (`e2e/slice-20/S20-sitting.spec.ts`,
+registered as `s20`):
+- what it measures: pan and zoom at 100 % (dense area) and at 30 % on "Performance test", rAF and presented frames, and
+  a rename that adds a duplicate's mark, then undo and redo by the keys, each from a settled screen, to the screen;
+- the worktree `../infomapper-ab-main` is at slice-19 (`98cd39c`), and both builds are made (`--prepare-only`);
+- the discarded warm-up dropped all three rounds: "the machine did not get quiet before the reference side". Windows
+  Search's indexing (about 80 % of a core), Spotify, Word and the Claude app kept the load at 8–40 %;
+- the sitting waits for a quiet laptop (question below).
+
+### Assumptions
+
+- **Marks change with a write's fresh page**, as the Σ marks and the role chip do (F22). A card placed here before its
+  fresh page arrives gets its marks with it.
+- **A gone object's toast** is for the new addresses only (`?entity=`, `?rel=`, `?ext=`). `?map=` and `?row=` keep
+  today's behaviour (nothing selected, no toast), so no earlier spec changes. Back and Forward onto any gone place still
+  say so, as before.
+- **The status bar's count uses the page's cards** (`entityIds`), as "Mapped attributes on canvas" does.
+- **The home's "Show all"** reads the group again from the model as it stands. A change made meanwhile by someone else
+  shows there and on the next load (as consistency, `known-limitations.md`).
+
+### Manual acceptance steps (demo: `npm run demo`, http://127.0.0.1:3001; then KB)
+
+1. **Order management's home:**
+   - "Model checks" after Model consistency, badge 15; groups in the order wrong, dup, calc, norel, nokey, under, with
+     "InfoCube" on the last;
+   - the stats end with an orange "! 15 model checks"; it scrolls to the section;
+   - each line opens its canvas: last_order_id's row on "Customer & orders"; Country – Customer Address and a feed on
+     "Sales star".
+2. **Customer 360's home:** 9 lines (wrong, calc, under 7).
+3. **"Customer & orders":**
+   - Customer's header and last_order_id's row show an orange slanted "!", Sales Order's header and total_amount's row a
+     grey one;
+   - hovering a mark shows "Model checks: 1" and its line;
+   - the status bar shows an orange "Model checks 9"; with the details panel hidden, its click shows the panel at the
+     group, which flashes; a line there selects its row.
+4. **Panels:**
+   - Customer's panel opens with the box (one wrong-way line); its item opens last_order_id;
+   - the relationship "places" lists the same line;
+   - a dimensional mapping's line on "Sales star" shows its "not yet covered" line.
+5. **On "Sales star":**
+   - clear Fact Sales' grain: the panel's box shows only "1 hint in the Fact section below." and the home gets "Facts to
+     check";
+   - undo from the home.
+6. **On a measure with a mark:** to see "!" before Σ, give Fact Sales two attributes of one name.
+7. **KB:**
+   - its home's section and counts (step 2's count: 6 no copied key and 18 fact hints, on the older backup);
+   - a canvas's count and marks;
+   - the two duplicate names of slice 17, if they are still there.
