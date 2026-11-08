@@ -33,13 +33,23 @@ const GONE: Record<Exclude<PlaceGone, { text: string }>, string> = {
   source_system: "That source system no longer exists.",
 };
 
-const ARRIVAL = ["card", "label", "req", "note", "map", "row", "system"];
+// slice 20: `entity`, `rel` and `ext` from the project home's model checks
+const ARRIVAL = ["card", "label", "req", "note", "map", "row", "system", "entity", "rel", "ext"];
 
 /** The place a selection stands for, or null when it is not one (nothing, several items, a bundle). */
 const placeOf = (canvasId: string, sel: Selection): Place | null => (!sel || sel.t === "multi" || sel.t === "bundle" ? null : { canvasId, sel });
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 
-export function SelectionHistory({ canvasId, labelIds }: { canvasId: string; labelIds: readonly string[] }) {
+export function SelectionHistory({
+  canvasId,
+  labelIds,
+  arrivalGone,
+}: {
+  canvasId: string;
+  labelIds: readonly string[];
+  /** Slice 20: an arrival address whose object is gone, said once with the places' words. */
+  arrivalGone?: { t: "element" | "rel"; id: string } | { t: "ext"; text: string };
+}) {
   const ui = useContext(CanvasUiCtx);
   const toast = useToast();
   const pathname = usePathname();
@@ -58,6 +68,15 @@ export function SelectionHistory({ canvasId, labelIds }: { canvasId: string; lab
   useEffect(() => {
     if (!ARRIVAL.some((k) => search.has(k))) arrival.current = false;
   }, [search]);
+
+  // an arrival whose object is gone (slice 20, answer 9): said as a history place that no longer exists, once
+  const said = useRef(false);
+  useEffect(() => {
+    if (!arrivalGone || said.current) return;
+    said.current = true;
+    latest.current.toast(arrivalGone.t === "ext" ? arrivalGone.text : GONE[arrivalGone.t]);
+    window.history.replaceState(null, "", window.location.pathname);
+  }, [arrivalGone]);
 
   // recording
   useEffect(() => {
