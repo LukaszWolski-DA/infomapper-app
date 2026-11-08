@@ -44,19 +44,19 @@ test("S20 sitting: pan and zoom at 100 % and 30 % on Performance test; a mark's 
     (results.pans as Record<string, unknown>)[name] = { raf, presented };
   }
 
-  // the write: an entity card in view, its second attribute renamed to its third's name (Enter), stored
-  await openLarge(page, views[0]![1]);
-  const row = await page.evaluate(() => {
-    const w = window.innerWidth, h = window.innerHeight;
+  // the write: an entity card of the generator with at least four rows (not the 200-row card), the view centred on it at
+  // 100 %, its second attribute renamed to its third's name (Enter), stored
+  const target = generate().cards.find((c) => c.kind === "ent" && c.id !== "ent:40" && c.rows.length >= 4)!;
+  await openLarge(page, { x: 768 - target.x - 128, y: 200 - target.y, zoom: 1 });
+  const row = await page.evaluate((name) => {
     for (const c of document.querySelectorAll<HTMLElement>('[data-testid="card-entity"]')) {
-      const r = c.getBoundingClientRect();
+      if (c.querySelector('[data-testid="card-name"]')?.textContent !== name) continue;
       const rows = c.querySelectorAll<HTMLElement>("[data-row]");
-      if (r.left < 300 || r.top < 80 || r.right > w - 360 || r.top > h - 300 || rows.length < 4) continue;
       return { id: rows[1]!.dataset.row!, name: rows[1]!.querySelector(".nm")!.textContent!, to: rows[2]!.querySelector(".nm")!.textContent! };
     }
     return null;
-  });
-  expect(row, "an entity card with four rows in view").not.toBeNull();
+  }, target.name);
+  expect(row, `the card ${target.name} in view`).not.toBeNull();
   await page.locator(`[data-row="${row!.id}"]`).click();
   const field = page.getByTestId("input-attribute-name");
   await field.fill(row!.to);
