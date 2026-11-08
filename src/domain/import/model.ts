@@ -5,7 +5,7 @@
 // Link key suggestion).
 
 import type { Uuid } from "../ids";
-import type { Attribute, Classification, ClassificationLink, Entity, Mapping, MappingInput, SourceChange, SourceColumn, SourceRelationship, SourceRelationshipColumn, SourceSystem, SourceTable, Timestamp } from "../types";
+import type { Attribute, AttributeInput, Classification, ClassificationLink, Entity, Mapping, MappingInput, SourceChange, SourceColumn, SourceRelationship, SourceRelationshipColumn, SourceSystem, SourceTable, Timestamp } from "../types";
 
 export type ImportTable = SourceTable;
 export type ImportColumn = SourceColumn;
@@ -33,6 +33,8 @@ export interface ImportModel {
   mappingInputs: readonly MappingInput[];
   attributes: readonly Attribute[];
   entities: readonly Entity[];
+  /** Slice 18: the calculations' inputs, for the coverage a calculated attribute takes from its inputs. */
+  attributeInputs?: readonly AttributeInput[];
   /** The workspace's changes to resolve (slice 7b): an import settles the open ones the source settles (P7). */
   changes?: readonly SourceChange[];
   /** The workspace's classification list and live links (slice 7c). */

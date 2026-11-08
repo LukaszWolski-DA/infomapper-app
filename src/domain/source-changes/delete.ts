@@ -22,6 +22,7 @@ import { afterContentChange } from "../model/mapping-rules";
 import type { ScopeModel } from "../model/requirements";
 import type {
   Attribute,
+  AttributeInput,
   Canvas,
   CanvasItem,
   ClassificationLink,
@@ -53,6 +54,8 @@ export interface SourceDeleteRows {
   mappingInputs: readonly MappingInput[];
   attributes: readonly Attribute[];
   entities: readonly Entity[];
+  /** Slice 18: the calculations' inputs, for the coverage change (a calculated attribute takes its inputs'). */
+  attributeInputs?: readonly AttributeInput[];
   relationships: readonly SourceRelationship[];
   relationshipColumns: readonly SourceRelationshipColumn[];
   canvasItems: readonly CanvasItem[];
@@ -215,6 +218,7 @@ export function sourceDeleteImpact(
     attributes: [...rows.attributes],
     mappings: [...rows.mappings],
     mappingInputs: [...rows.mappingInputs],
+    attributeInputs: [...(rows.attributeInputs ?? [])],
     sourceTables: [...rows.tables],
     sourceColumns: [...rows.columns],
   };

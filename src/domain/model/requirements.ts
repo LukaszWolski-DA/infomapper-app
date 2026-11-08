@@ -5,6 +5,7 @@
 import type { Uuid } from "../ids";
 import type {
   Attribute,
+  AttributeInput,
   ChangeEvent,
   Mapping,
   Requirement,
@@ -16,6 +17,7 @@ import type {
   WorkspaceModel,
 } from "../types";
 import { targetOf, type LabelTarget, type LabelTargetKind } from "./labels";
+import { derivationIndex } from "./derivations";
 import { checkMappingTypes } from "./type-check";
 
 export const KIND_NAMES: Record<RequirementKind, string> = {
@@ -94,7 +96,10 @@ export const canBeParent = (requirements: readonly Requirement[], id: Uuid, pare
 
 // ---- scope and coverage (D-31) ----
 
-export type ScopeModel = Pick<WorkspaceModel, "entities" | "attributes" | "mappings" | "mappingInputs" | "sourceTables" | "sourceColumns">;
+/** Slice 18: `attributeInputs`, the calculations' inputs; absent, nothing is calculated (callers without calculations). */
+export type ScopeModel = Pick<WorkspaceModel, "entities" | "attributes" | "mappings" | "mappingInputs" | "sourceTables" | "sourceColumns"> & {
+  attributeInputs?: readonly AttributeInput[];
+};
 
 /**
  * One mapping that feeds an attribute from other attributes (slice 15d, D-70): a module's own mapping (InfoCube's
@@ -117,7 +122,7 @@ export type AttributeFeeds = Readonly<Record<Uuid, readonly AttributeFeed[]>>;
  * attribute whose approved feed reads uncovered attributes, or an attribute at either level whose approved mappings all
  * have a type conflict.
  */
-export type GapReason = "logical_feed" | "type_conflict";
+export type GapReason = "logical_feed" | "type_conflict" | "calculation";
 
 /**
  * A requirement's scope (D-31; slice 4b-1, PRD item 9). The five sets say what it touches on a canvas (cards, rows and
@@ -140,6 +145,11 @@ export interface RequirementScope {
   feeding?: Set<Uuid>;
   /** Slice 15d: the feeds (a module's mappings) of the dimensional attributes in scope; present only when there are any. */
   feeds?: Set<Uuid>;
+  /**
+   * Slice 18 (F11): the inputs of calculated attributes in scope, at any depth, that are not items themselves; also in
+   * `attributes`. Present only when there are any.
+   */
+  inputs?: Set<Uuid>;
 }
 
 /** An attribute's state for coverage (D-31). */
@@ -174,6 +184,8 @@ export interface ModelLookup {
   feedsOf: (attributeId: Uuid) => readonly AttributeFeed[];
   /** Slice 15d: why an attribute with approved mappings or feeds is not covered (both levels); null otherwise. */
   gapReason: (attributeId: Uuid) => GapReason | null;
+  /** Slice 18: a calculated attribute's live inputs, in order; empty for any other. */
+  calculationInputs: (attributeId: Uuid) => readonly Uuid[];
 }
 
 const NO_FEEDS: readonly AttributeFeed[] = [];
@@ -181,8 +193,12 @@ const NO_FEEDS: readonly AttributeFeed[] = [];
 /**
  * `feeds` (slice 15d): the modules' mappings onto dimensional attributes. A dimensional attribute is covered by D-31's
  * rule one level up (D-70): one of its feeds approved, without a type conflict, and every attribute it reads a live
- * logical attribute covered by its own mappings. No recursion: a feed reads logical attributes only (AD-36); an input that
- * is not one counts as not covered.
+ * logical attribute covered itself. A feed reads logical attributes only (AD-36); an input that is not one counts as not
+ * covered.
+ *
+ * Slice 18 (D-73, acceptance F2): an attribute at either level is also covered when it is calculated, has at least one
+ * input, and every input is covered, recursively; a cycle counts as not covered. A calculated attribute that is not
+ * covered by either way and has inputs is a gap with the reason "calculation" (its own mappings' reasons first).
  */
 export function lookupModel(model: ScopeModel, feeds: AttributeFeeds = {}): ModelLookup {
   const attribute = new Map<Uuid, Attribute>();
@@ -235,12 +251,17 @@ export function lookupModel(model: ScopeModel, feeds: AttributeFeeds = {}): Mode
     return a && level.get(a.entity_id);
   };
   const isDimensional = (attributeId: Uuid) => levelOf(attributeId) === "dimensional";
+  const derivation = derivationIndex([...attribute.values()], model.attributeInputs ?? []);
+  const visiting = new Set<Uuid>();
   const feedsOf = (attributeId: Uuid) => (isDimensional(attributeId) ? (feeds[attributeId] ?? NO_FEEDS) : NO_FEEDS);
   const states = new Map<Uuid, AttributeCoverage>();
   const inputsCovered = (f: AttributeFeed) => f.inputs.length > 0 && f.inputs.every((i) => levelOf(i) === "logical" && coverageOf(i) === "covered");
   const coverageOf = (attributeId: Uuid): AttributeCoverage => {
     let state = states.get(attributeId);
     if (!state) {
+      // a cycle (never written by the commands) counts as not covered, and is not remembered half-way
+      if (visiting.has(attributeId)) return "not_mapped";
+      visiting.add(attributeId);
       if (isDimensional(attributeId)) {
         const fs = feedsOf(attributeId);
         state = !fs.length ? "not_mapped" : fs.some((f) => f.approved && !f.typeConflict && inputsCovered(f)) ? "covered" : "not_approved";
@@ -248,12 +269,20 @@ export function lookupModel(model: ScopeModel, feeds: AttributeFeeds = {}): Mode
         const ms = mappingsOf.get(attributeId) ?? [];
         state = !ms.length ? "not_mapped" : ms.some(counts) ? "covered" : "not_approved";
       }
+      if (state !== "covered" && derivation.isCalculated(attributeId)) {
+        const ins = derivation.inputsOf(attributeId);
+        if (ins.length) state = ins.every((i) => coverageOf(i) === "covered") ? "covered" : "not_approved";
+      }
+      visiting.delete(attributeId);
       states.set(attributeId, state);
     }
     return state;
   };
   const gapReason = (attributeId: Uuid): GapReason | null => {
     if (coverageOf(attributeId) !== "not_approved") return null;
+    // slice 18: a calculated attribute without approved mappings or feeds of its own: its calculation's input
+    const own = isDimensional(attributeId) ? feedsOf(attributeId) : (mappingsOf.get(attributeId) ?? []);
+    if (derivation.inputsOf(attributeId).length && !own.some((m) => ("approved" in m ? m.approved : m.status === "approved"))) return "calculation";
     if (!isDimensional(attributeId)) {
       // slice 15d (option A): a logical attribute whose approved mappings all have a type conflict
       const approved = (mappingsOf.get(attributeId) ?? []).filter((m) => m.status === "approved");
@@ -280,6 +309,7 @@ export function lookupModel(model: ScopeModel, feeds: AttributeFeeds = {}): Mode
     isDimensional,
     feedsOf,
     gapReason,
+    calculationInputs: derivation.inputsOf,
   };
 }
 
@@ -320,7 +350,25 @@ export function scopeOfLinks(lookup: ModelLookup, links: readonly RequirementLin
   }
   // slice 15d (D-70): a dimensional attribute in scope brings its feeds and the logical attributes they read, with their
   // entities; they are not items. Their sources follow: Focus lights every scope attribute's mappings with their tables.
-  for (const id of [...scope.attributes]) {
+  // Slice 18 (F11): a calculated attribute in scope brings its inputs, at any depth, the same way (`inputs`); an input's
+  // feeds come along, and a feed's logical input's calculation too.
+  const queue = [...scope.attributes];
+  const seen = new Set(queue);
+  const visit = (id: Uuid) => {
+    if (seen.has(id)) return;
+    seen.add(id);
+    queue.push(id);
+  };
+  while (queue.length) {
+    const id = queue.shift()!;
+    for (const input of lookup.calculationInputs(id)) {
+      const a = lookup.attribute.get(input);
+      if (!a) continue;
+      scope.attributes.add(a.id);
+      scope.entities.add(a.entity_id);
+      if (!scope.attributeItems.has(a.id) && !scope.feeding?.has(a.id)) (scope.inputs ??= new Set()).add(a.id);
+      visit(a.id);
+    }
     for (const f of lookup.feedsOf(id)) {
       (scope.feeds ??= new Set()).add(f.id);
       for (const input of f.inputs) {
@@ -328,7 +376,8 @@ export function scopeOfLinks(lookup: ModelLookup, links: readonly RequirementLin
         if (!a || lookup.isDimensional(input)) continue;
         scope.attributes.add(a.id);
         scope.entities.add(a.entity_id);
-        if (!scope.attributeItems.has(a.id)) (scope.feeding ??= new Set()).add(a.id);
+        if (!scope.attributeItems.has(a.id) && !scope.inputs?.has(a.id)) (scope.feeding ??= new Set()).add(a.id);
+        visit(a.id);
       }
     }
   }
@@ -381,6 +430,8 @@ export const GAP_REASONS: Record<GapReason | "none", string> = {
   none: "not approved",
   logical_feed: "logical feed not covered",
   type_conflict: "type conflict",
+  // slice 18 (approved in step 1)
+  calculation: "an input of its calculation is not covered",
 };
 
 /** Coverage of a scope, attributes in model order. */
