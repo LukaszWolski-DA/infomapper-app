@@ -734,3 +734,11 @@ D-31 ends with "(Changed by D-73: a calculated attribute is covered when every i
 
 The branch is not merged. Draft pull request [#45](https://github.com/LukaszWolski-DA/infomapper-app/pull/45) is the one
 for the merge, on Łukasz's command, with the tag `slice-18`.
+
+### Accepted (8 November 2026)
+
+- Łukasz approved D-73 as quoted above and the three new texts (the Delete key's "Delete it from its menu or its panel:
+  …", "{n} lookup(s) – loses its relationship / lose their relationship", "calculated").
+- Łukasz's manual acceptance passed, on the demo and in KB.
+- The full run on `813f70f` counts for the merge: the commits after it change only Markdown in `docs/`
+  (`git diff --stat 813f70f..HEAD`). Pull request #45 is merged into `main`, and the merge commit is tagged `slice-18`.
