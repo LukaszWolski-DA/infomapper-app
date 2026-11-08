@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "./fixtures";
+import { expect, test } from "./fixtures";
 import {
   callActionDirectly,
   captureActionId,
