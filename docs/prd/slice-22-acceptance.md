@@ -383,3 +383,81 @@ in the step's diff.
    member of {dimension}", "Set unknown member value of {Dimension}.{attribute}", "Clear unknown member value of
    {Dimension}.{attribute}". Changed in step 3, with their unit tests.
 2. Every other text of step 2 is accepted as written. The differences from the plan are accepted.
+
+## Step 3: interface (9 November 2026)
+
+CI on `ca807cc` (step 2's last commit) had passed: `check` and `migrations`.
+
+### What changed
+
+- **The undo names** (the review, 1): `updateCubeEntity` reads the dimension's name from the entities its action passes;
+  `setUnknownValue`'s state has the dimension's name. Unit tests changed with them.
+- **The panel** (`src/modules/infocube/app/sections.tsx`, `UnknownMember` inside `DimensionSection`, after History and the
+  Snapshot period, before "Used by"): the flag (`useChoice` on the `cube_entity` row, `saveRow`), its sentence, and one
+  line per attribute in the panel's order: the name, the type's word and " · PK", and a `TextField` with the default as
+  its placeholder, `keep`, `invalid` and the sentence under the line. Read-only for readers, reviewers and an archived
+  workspace; the flag disabled.
+- **A value's save** (F3): `saveRows([{ id: attribute.id }], …)`, so one field's saves go one at a time. Each sends the
+  row the page shows, or the row the last answer gave while the page still shows what it showed when that answer came.
+- **`TextField`'s `invalid`** (`src/app/_panels/fields.tsx`, F7): `aria-invalid`, the warning border, the reason as its
+  title. Optional; no other field uses it.
+- **A fact's Dimensions** (`keyMeta`): " · no match → {value}" before "snapshot", for a row with a key whose dimension
+  has its unknown member on and a primary key; the first primary key's value, stored or default, "NULL" when empty.
+- **The lookup's placeholder** (`mapping-panel.tsx`, `lookupPlaceholder` in `unknown-member.ts`).
+- **The checks** needed no interface code: the groups, marks, panels' boxes, the home's section and the status bar's
+  count are D-75's, fed by step 2's rules and row lists.
+- **The bench's synthetic model** (`scripts/lib/synthetic-checks.ts`): 400 relationships from the dimensions to the
+  facts, every fourth dimension's unknown member off, "abc" stored on three attributes of every dimension (1,200 rows).
+
+### What differs from the PRD or the prototype
+
+1. **Fields are read-only, not disabled** (F6, accepted): S22-06 checks `readonly`.
+2. **The mark follows the stored value**, as the prototype: while "abc" is typed and not yet left, nothing is marked.
+3. **The lookup's placeholder in the demo is behind a stored "Unknown"** (F10): S22-04 reads the attribute.
+4. **"InfoCube off" in S22-05** is written into the e2e file directly: the app does not turn InfoCube off while facts or
+   dimensions exist (C-7). The unit test covers the same.
+5. **To look at, not changed:** in the details panel at its default width a fact's Dimensions row is now long enough to
+   cut the dimension's name ("Dim Custo…", "Di…" for Dim Product with "· snapshot";
+   `docs/prd/slice-22-screens/step-3/dimensions-light.png`). The row is the shared list row (name, then its meta on one
+   line), as in the prototype. A wider panel shows it whole. Proposal, if it bothers: the no-match part on a second
+   line of the row, a decision for Łukasz.
+
+### Tests
+
+- **Unit:** `npm run lint`, `npm run typecheck`, `npm test` pass (161 files, 2,002 tests; two added for the lookup's
+  placeholder, the undo names' expectations changed).
+- **`e2e/slice-22`:** S22-01 (2 tests), S22-02 (2: the panel; two saves of one field with the first's answer held, then
+  a clear the same way), S22-03, S22-04 (2), S22-05 (2), S22-06 (4: the delete and the type change, a reader, a reviewer,
+  the archive); `S22-screens` on demand (6 screenshots, light and dark, in `docs/prd/slice-22-screens/step-3/`).
+- **First run:** 17 passed, 1 failed: S22-02's first test, on the undo toast. The cause was the spec: it installed the
+  toast recorder after the page had loaded (`recordToasts` must be called before); the page showed the right toast.
+  Fixed in the spec; the single-file check, three local rounds, each with a fresh server: 3 of 3 passed.
+- **The touched earlier specs and the commit-count guards, one local run with slice 22's, 58 tests, 58 passed:**
+  `slice-15b` (all), `slice-18/S18-01`, `S18-06`, `slice-19/S19-04`, `S19-05`, `S19-07` (the star idle and panned),
+  `slice-20` (all: the home's and the status bar's counts are unchanged), `S2C-12`, `S3A-14-idle`, `S3B-15-idle`,
+  `S3B-13`, `S4P-12`.
+- **The element guard** (`S3B-15-elements`, measurement build, against `slice-08.json`): passed; viewport 4,508, 19,305,
+  1,465, 4,907 and page totals 6,135, 20,932, 3,002, 6,444, all equal to slice 21's. No measuring sitting.
+- No full run in this step.
+
+### Earlier specs changed
+
+| Spec | Change | Reason |
+| --- | --- | --- |
+| `slice-15b/RP-02` | the four Dimensions rows end with " · no match → -1" | every seeded dimension has its unknown member on (decision 1b); each key's dimension has an Integer primary key |
+| `slice-15b/RP-06` | the Ship date row after the undo ends with " · no match → -1" | the same; the row without a key ("no key", "Add key") is unchanged, as the part shows only with a key |
+| `slice-15b/RP-07` | the same row after the undo | the same |
+| `slice-15b/RP-12` | the two Dim Date rows end with " · no match → -1" | the same |
+| `slice-19/S19-05` | "key product_key · no match → -1 · snapshot" | the part stands before the snapshot mark (PRD item 5) |
+
+### The checks' bench (`npx tsx scripts/bench-checks.ts`, Node, medians of 9 rounds)
+
+| Synthetic model | Lines | The home, every entity, lines included (bar 50 ms) | Marks and counts | A project of 200 entities |
+| --- | --- | --- | --- | --- |
+| before (the column only) | 4,296 | 42.1 ms | 50.4 ms | 15.5 ms |
+| with the relationships, the turned-off dimensions and the values | 5,391 (`unkval` 675, `nounk` 100, facts 150 → 470) | 45.4 ms, **met** | 50.8 ms | 14.3 ms |
+
+The model has 1,095 more lines: 675 values that do not fit, 100 dimensions without an unknown member, and 320 more fact
+hints, since the 400 new relationships have no key. One run of each, one after the other on an idle laptop; the slowest
+of the nine rounds of the home was 59.6 ms. "Performance test" (no InfoCube rows) and the demo (15 lines) are
+unchanged.
