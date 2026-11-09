@@ -273,7 +273,7 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   - Before a merge: one full e2e run. It also counts for a later commit when the diff from the tested commit touches
     only Markdown files in `docs/` and the repository root; the report shows it with `git diff --stat <tested>..HEAD`
     (Łukasz, 7 November 2026).
-  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its seven parts
+  - **The full run is the workflow "E2E" (`.github/workflows/e2e.yml`) on the commit the report names:** its eight parts
     (`e2e/parts.ts`) side by side on GitHub's Linux runners, each with its own fresh dev server, no retries; one job
     merges their reports. Start it by hand (`gh workflow run e2e.yml --ref <branch>`, or "Run workflow" on the Actions
     page) or with the label `full-e2e` on the pull request (it tests the branch's head commit). A push starts none; a
@@ -346,7 +346,7 @@ npm run lint             # ESLint, including the layer rules (eslint-plugin-boun
 npm run typecheck        # next typegen && tsc --noEmit
 npm test                 # Vitest: src/**/*.test.ts and tests/
 npm run e2e              # Playwright: e2e/; own dev server on port 3200, .data/e2e-db.json reseeded before every test
-npm run e2e -- --part 2   # one of the full run's seven parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
+npm run e2e -- --part 2   # one of the full run's eight parts (e2e/parts.ts); `npm run e2e -- <files>` is one run as before
 npm run e2e -- --list    # each part's files, as CI runs them (--part <n>: one part); starts no server
 gh workflow run e2e.yml --ref <branch>                                          # the full run in GitHub Actions (or the label full-e2e on the pull request)
 gh workflow run e2e.yml --ref <branch> -f files="e2e/slice-06a/S6A-07.spec.ts" -f rounds=3   # a single-file check: 3 jobs side by side, each with a fresh server
@@ -726,9 +726,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   and total objects, paint, layerize; as `S6A-09-hand.spec.ts` does) rather than unprepared medians to the screen, whose
   run-to-run spread (up to 12 ms in slice 6a) is larger than what is measured.
 - Never run `npm run e2e` while your own dev server runs: stop it first.
-- **The full run in seven parts** (chore e2e reliability, P2 B; seven since chore CI e2e): `npm run e2e`
-  (`scripts/e2e.ts`) runs the folders in seven parts (`e2e/parts.ts`, `PART_STARTS`: from `slice-02b`, `slice-04a`,
-  `slice-07a`, `slice-08`, `slice-10c`, `slice-14a`; `tests/e2e-parts.test.ts`), each with its own fresh dev server, one
+- **The full run in eight parts** (chore e2e reliability, P2 B; seven since chore CI e2e; eight since chore e2e eight
+  parts): `npm run e2e` (`scripts/e2e.ts`) runs the folders in eight parts (`e2e/parts.ts`, `PART_STARTS`: from
+  `slice-02a`, `slice-03b`, `slice-04p`, `slice-07b`, `slice-10a`, `slice-13`, `slice-15d`; `tests/e2e-parts.test.ts`),
+  each with its own fresh dev server, one
   after another locally and side by side in CI, and merges their blob reports into one result (`playwright-report/`);
   failure traces and the server's output (`server.log`, `scripts/e2e-server.ts`) are in `test-results/part-<n>/`.
   `npm run e2e -- --list` prints each part's files (`--part <n>`: one part); CI runs exactly these. A server's heap
@@ -736,7 +737,9 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   server at 80 % of its heap limit (half the RAM: 3,255 MB on the laptop, 6,431 MB on GitHub's 16 GB runner). In chore
   CI e2e's runs each part peaked at about 0.9 to 1.4 GB and took 5 to 11 minutes on the runner. When a part's heap
   (`E2E_MEMORY_LOG=1`; the summary in CI) comes near 2 GB, move the cuts or add a part. The local full run refuses to
-  start while port 3200 is in use.
+  start while port 3200 is in use. **Recut rule** (Łukasz, 9 November 2026): a new slice's folder joins the last part;
+  when the last part is the longest by more than about a minute on the median of the last three full runs (the tests'
+  times in each part's memory log), recut `PART_STARTS` in folder order.
 - **Fonts** (P3 B): IBM Plex is hosted in `src/app/fonts/ibm-plex/` (IBM's unmodified WOFF2 files, OFL 1.1, `README.md`
   with their checksums) and loaded through `next/font/local`; no build or start fetches fonts. "Plex" is a Reserved Font
   Name: never subset or change the files; replace them only with other unmodified files from IBM.

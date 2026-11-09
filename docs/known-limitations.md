@@ -853,7 +853,7 @@ top bar does not scroll" (`e2e/slice-06a/S6A-10.spec.ts`), an expected failure o
 
 ### The full e2e run in GitHub Actions (chore CI e2e, 6 November 2026)
 
-Since chore CI e2e the full run is the workflow "E2E" (`.github/workflows/e2e.yml`): the seven parts of `e2e/parts.ts`
+Since chore CI e2e the full run is the workflow "E2E" (`.github/workflows/e2e.yml`): the parts of `e2e/parts.ts` (eight since chore e2e eight parts)
 side by side on GitHub's Linux runners (4 cores, 16 GB), each with its own fresh dev server, no retries, in about 12
 minutes instead of the laptop's 93 to 97 (CLAUDE.md, "Testing").
 

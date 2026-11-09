@@ -1,5 +1,5 @@
 // `npm run e2e` (chore e2e reliability, P2 B; chore CI e2e).
-//   npm run e2e                     the full run in seven parts (e2e/parts.ts), each with its own fresh dev server, one result
+//   npm run e2e                     the full run in eight parts (e2e/parts.ts), each with its own fresh dev server, one result
 //   npm run e2e -- --part 2         one part on its own, as a normal run
 //   npm run e2e -- --list           the spec files of each part, as each part's run would find them (no server starts)
 //   npm run e2e -- --list --part 2  the same for one part

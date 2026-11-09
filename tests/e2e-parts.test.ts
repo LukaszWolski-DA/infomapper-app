@@ -3,28 +3,29 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { PART_COUNT, PART_STARTS, listedFiles, partFolders } from "../e2e/parts";
 
-// The full e2e run's parts (slice 14b, item 1, F18; seven since chore CI e2e): every folder runs in exactly one part, in
-// Playwright's order; `npm run e2e -- --list` lists each part's files as its run finds them, the same files as one
-// plain list of the whole e2e folder, and GitHub Actions runs exactly those (CI-02).
-const FOLDERS = ["fixes", "measure", "slice-00", "slice-02a", "slice-02b", "slice-03b", "slice-04a", "slice-06b", "slice-07a", "slice-07c", "slice-08", "slice-10b", "slice-10c", "slice-13", "slice-14a", "slice-15c"];
+// The full e2e run's parts (slice 14b, item 1, F18; seven since chore CI e2e; eight since chore e2e eight parts): every
+// folder runs in exactly one part, in Playwright's order; `npm run e2e -- --list` lists each part's files as its run
+// finds them, the same files as one plain list of the whole e2e folder, and GitHub Actions runs exactly those (CI-02).
+const FOLDERS = ["fixes", "measure", "slice-00", "slice-01b", "slice-02a", "slice-03a", "slice-03b", "slice-04b2", "slice-04p", "slice-07a", "slice-07b", "slice-09", "slice-10a", "slice-12b", "slice-13", "slice-15c", "slice-15d", "slice-20"];
 
 describe("e2e parts", () => {
-  it("has seven parts", () => {
-    expect(PART_COUNT).toBe(7);
-    expect(PART_STARTS).toEqual(["slice-02b", "slice-04a", "slice-07a", "slice-08", "slice-10c", "slice-14a"]);
+  it("has eight parts", () => {
+    expect(PART_COUNT).toBe(8);
+    expect(PART_STARTS).toEqual(["slice-02a", "slice-03b", "slice-04p", "slice-07b", "slice-10a", "slice-13", "slice-15d"]);
   });
 
   it("puts every folder in exactly one part, in order", () => {
     const parts = Array.from({ length: PART_COUNT }, (_, i) => partFolders(i + 1, FOLDERS));
     expect(parts.flat()).toEqual(FOLDERS);
     expect(parts).toEqual([
-      ["fixes", "measure", "slice-00", "slice-02a"],
-      ["slice-02b", "slice-03b"],
-      ["slice-04a", "slice-06b"],
-      ["slice-07a", "slice-07c"],
-      ["slice-08", "slice-10b"],
-      ["slice-10c", "slice-13"],
-      ["slice-14a", "slice-15c"],
+      ["fixes", "measure", "slice-00", "slice-01b"],
+      ["slice-02a", "slice-03a"],
+      ["slice-03b", "slice-04b2"],
+      ["slice-04p", "slice-07a"],
+      ["slice-07b", "slice-09"],
+      ["slice-10a", "slice-12b"],
+      ["slice-13", "slice-15c"],
+      ["slice-15d", "slice-20"],
     ]);
   });
 
@@ -33,8 +34,8 @@ describe("e2e parts", () => {
   });
 
   it("refuses a part that does not exist", () => {
-    expect(() => partFolders(0, FOLDERS)).toThrow("E2E_PART must be 1 to 7");
-    expect(() => partFolders(8, FOLDERS)).toThrow("E2E_PART must be 1 to 7");
+    expect(() => partFolders(0, FOLDERS)).toThrow("E2E_PART must be 1 to 8");
+    expect(() => partFolders(9, FOLDERS)).toThrow("E2E_PART must be 1 to 8");
   });
 
   it("reads the files of Playwright's JSON list, relative to e2e/, once each, sorted", () => {
