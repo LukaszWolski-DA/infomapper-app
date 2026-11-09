@@ -82,7 +82,7 @@ export function synthetic(): ChecksDb {
   db.cube_mapping_input = [];
   for (let e = LOGICAL; e < ENTITIES; e++) {
     const fact = e % 5 === 0;
-    db.cube_entity.push({ ...std(), entity_id: entities[e]!, role: fact ? "fact" : "dimension", grain: fact && e % 2 ? "One row" : null, fact_type: fact ? "transaction" : null, is_factless: fact ? false : null, base_fact_entity_id: null, dim_kind: fact ? null : "standard", history: fact ? null : "overwrite", snapshot_period: null } as never);
+    db.cube_entity.push({ ...std(), entity_id: entities[e]!, role: fact ? "fact" : "dimension", grain: fact && e % 2 ? "One row" : null, fact_type: fact ? "transaction" : null, is_factless: fact ? false : null, base_fact_entity_id: null, dim_kind: fact ? null : "standard", history: fact ? null : "overwrite", snapshot_period: null, has_unknown_member: fact ? null : true } as never);
   }
   for (let i = 0; i < 1_500; i++) {
     const target = attrs[LOGICAL + (i % (ENTITIES - LOGICAL))]![(i % 9) + 1]!;

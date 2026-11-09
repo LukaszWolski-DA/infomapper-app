@@ -178,7 +178,7 @@ describe("an older row's upgrade (F1)", () => {
   const old = { id: "x", workspace_id: ids.ws, entity_id: "e", version: 3, deleted_at: null };
   it("converts a fact and each SCD type, and drops scd_type", () => {
     expect(upgradeCubeEntity({ ...old, role: "fact", grain: "g", scd_type: null })).toEqual({
-      ...old, role: "fact", grain: "g", fact_type: "transaction", is_factless: false, base_fact_entity_id: null, dim_kind: null, history: null, snapshot_period: null,
+      ...old, role: "fact", grain: "g", fact_type: "transaction", is_factless: false, base_fact_entity_id: null, dim_kind: null, history: null, snapshot_period: null, has_unknown_member: null,
     });
     for (const [scd, history] of [[0, "keep"], [1, "overwrite"], [2, "history"], [undefined, "overwrite"]] as const) {
       const r = upgradeCubeEntity({ ...old, role: "dimension", grain: null, ...(scd === undefined ? {} : { scd_type: scd }) })!;

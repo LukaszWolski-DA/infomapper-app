@@ -35,8 +35,9 @@ export type Additivity = (typeof ADDITIVITIES)[number];
 
 /**
  * Exactly one row per dimensional entity (spec, data model): its role, a fact's grain (plain text, null until written),
- * type, factless flag and base (slice 19), a dimension's kind, history and snapshot period (slice 19). A fact has none of
- * a dimension's fields and a dimension none of a fact's (`cube_entity_shape_ck`).
+ * type, factless flag and base (slice 19), a dimension's kind, history and snapshot period (slice 19) and whether it has
+ * an unknown member (slice 22). A fact has none of a dimension's fields and a dimension none of a fact's
+ * (`cube_entity_shape_ck`).
  */
 export interface CubeEntity extends StandardColumns {
   entity_id: Uuid;
@@ -57,6 +58,22 @@ export interface CubeEntity extends StandardColumns {
   history: History | null;
   /** A dimension's snapshot period ("Month-end"), plain text, kept whatever the history; null for a fact. */
   snapshot_period: string | null;
+  /**
+   * A dimension's unknown member (slice 22, D-77): the row a fact row gets when its key is empty or has no match. True
+   * for every dimension, existing and new, until turned off; null for a fact.
+   */
+  has_unknown_member: boolean | null;
+}
+
+/**
+ * Per-attribute settings of a dimensional attribute (slice 22): the unknown member's value of a dimension's attribute,
+ * as typed. A row exists only while it holds a value (a cleared value soft-deletes it), one live row per attribute; it
+ * goes with its attribute in the same change group.
+ */
+export interface CubeAttribute extends StandardColumns {
+  attribute_id: Uuid;
+  /** The unknown member's value as typed: trimmed, never empty; null when not set (no live row has it null yet). */
+  unknown_value: string | null;
 }
 
 /** An attribute of a fact that is a measure (spec, data model): one row per such attribute. */
@@ -128,6 +145,7 @@ export interface InfoCubeRows {
   cube_key: CubeKey;
   cube_mapping: CubeMapping;
   cube_mapping_input: CubeMappingInput;
+  cube_attribute: CubeAttribute;
 }
 export type InfoCubeTable = keyof InfoCubeRows;
 
@@ -138,10 +156,13 @@ declare module "@/domain/types" {
 }
 
 /**
- * A new row's slice-19 columns for its role (`createCubeEntity`, the demo, tests): a fact a transaction, not factless,
- * without a base; a dimension standard with `history` (overwrite unless given).
+ * A new row's slice-19 and slice-22 columns for its role (`createCubeEntity`, the demo, tests): a fact a transaction,
+ * not factless, without a base; a dimension standard with `history` (overwrite unless given) and its unknown member on.
  */
-export function typeColumns(role: CubeRole, history: History = DEFAULT_HISTORY): Pick<CubeEntity, "fact_type" | "is_factless" | "base_fact_entity_id" | "dim_kind" | "history" | "snapshot_period"> {
+export function typeColumns(
+  role: CubeRole,
+  history: History = DEFAULT_HISTORY,
+): Pick<CubeEntity, "fact_type" | "is_factless" | "base_fact_entity_id" | "dim_kind" | "history" | "snapshot_period" | "has_unknown_member"> {
   const fact = role === "fact";
   return {
     fact_type: fact ? DEFAULT_FACT_TYPE : null,
@@ -150,5 +171,6 @@ export function typeColumns(role: CubeRole, history: History = DEFAULT_HISTORY):
     dim_kind: fact ? null : DEFAULT_DIM_KIND,
     history: fact ? null : history,
     snapshot_period: null,
+    has_unknown_member: fact ? null : true,
   };
 }

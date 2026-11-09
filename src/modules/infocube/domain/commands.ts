@@ -16,12 +16,11 @@ import { cubeIndex, dimensionAs, factEnds, keyName, roleAt, type CubeIndex, type
 import { AGGREGATE_TEXTS, aggregateIndex } from "./aggregates";
 import {
   ADDITIVITIES,
-  DEFAULT_DIM_KIND,
-  DEFAULT_FACT_TYPE,
-  DEFAULT_HISTORY,
   DIM_KINDS,
   FACT_TYPES,
   HISTORIES,
+  typeColumns,
+  type CubeAttribute,
   type CubeEntity,
   type CubeKey,
   type CubeMeasure,
@@ -34,7 +33,7 @@ const DEFAULT_NAME: Record<CubeRole, string> = { fact: "New fact", dimension: "N
 /**
  * New fact or New dimension (B-1, the Cube tab and the canvas's toolbox): InfoMapper's \`createEntity\` at the dimensional
  * level, then InfoCube's row with the role (a fact without a grain yet, a transaction fact, not factless, without a
- * base; a dimension standard, with the history overwrite, SCD 1; slice 19). Refused while
+ * base; a dimension standard, with the history overwrite, SCD 1; slice 19; its unknown member on, slice 22). Refused while
  * InfoCube is off in the workspace (C-7); the role, the rights and the rest are \`createEntity\`'s.
  */
 export function createCubeEntity(
@@ -55,12 +54,7 @@ export function createCubeEntity(
     entity_id: made.value.entityId,
     role,
     grain: null,
-    fact_type: role === "fact" ? DEFAULT_FACT_TYPE : null,
-    is_factless: role === "fact" ? false : null,
-    base_fact_entity_id: null,
-    dim_kind: role === "dimension" ? DEFAULT_DIM_KIND : null,
-    history: role === "dimension" ? DEFAULT_HISTORY : null,
-    snapshot_period: null,
+    ...typeColumns(role),
   };
   const writes: Write[] = [...made.writeSet.writes, { kind: "insert", table: "cube_entity", row: cube }];
   // the undo step's name of a fact or a dimension made with a new concept (slice 21, D-76) is InfoMapper's
@@ -101,6 +95,8 @@ const cubeEntityInput = z
     history: z.enum(HISTORIES).optional(),
     /** Slice 19: a dimension's snapshot period (plain text, trimmed, empty = none), kept whatever the history. */
     snapshotPeriod: optionalTextSchema.optional(),
+    /** Slice 22: whether a dimension has an unknown member. */
+    hasUnknownMember: z.boolean().optional(),
   })
   .strict();
 export type UpdateCubeEntityInput = z.input<typeof cubeEntityInput>;
@@ -113,6 +109,8 @@ export const BASE_ON_DIMENSION = "Only a fact can be an aggregate.";
 export const KIND_ON_FACT = "Only a dimension has a kind.";
 export const HISTORY_ON_FACT = "Only a dimension has a history.";
 export const PERIOD_ON_FACT = "Only a dimension has a snapshot period.";
+// slice 22 (approved in step 1)
+export const UNKNOWN_ON_FACT = "Only a dimension has an unknown member.";
 
 /** The undo step's name of each field (approved in step 1); the grain keeps InfoMapper's "Change fact or dimension". */
 function labelOf(patch: Partial<CubeEntity>): string | null {
@@ -122,6 +120,7 @@ function labelOf(patch: Partial<CubeEntity>): string | null {
   if ("dim_kind" in patch) return "Change dimension kind";
   if ("history" in patch) return "Change history";
   if ("snapshot_period" in patch) return "Change snapshot period";
+  if ("has_unknown_member" in patch) return patch.has_unknown_member ? "Turn on unknown member" : "Turn off unknown member";
   return null;
 }
 
@@ -133,7 +132,8 @@ export interface UpdateCubeEntityState {
 }
 
 /**
- * A fact's grain, type, factless flag or base, or a dimension's kind, history or snapshot period (B-4, D-74): InfoCube's
+ * A fact's grain, type, factless flag or base, or a dimension's kind, history, snapshot period (B-4, D-74) or whether it
+ * has an unknown member (slice 22; turning it off keeps the stored values): InfoCube's
  * row of the entity, at the version the panel read. Each field is refused on the wrong role; a base must be another live
  * fact whose chain of bases does not reach this one (no cycle).
  */
@@ -145,7 +145,7 @@ export function updateCubeEntity(
 ): CommandResult<{ version: number }> {
   const parsed = begin(access, "model.edit", cubeEntityInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { cubeEntityId, expectedVersion, grain, factType, isFactless, baseFactEntityId, dimKind, history, snapshotPeriod } = parsed.data;
+  const { cubeEntityId, expectedVersion, grain, factType, isFactless, baseFactEntityId, dimKind, history, snapshotPeriod, hasUnknownMember } = parsed.data;
   const got = current(state.cube, access, cubeEntityId, expectedVersion, "fact or dimension");
   if (!got.ok) return fail(got.error);
   const before = got.row;
@@ -158,6 +158,7 @@ export function updateCubeEntity(
   if (dimKind !== undefined && fact) return refuse(KIND_ON_FACT);
   if (history !== undefined && fact) return refuse(HISTORY_ON_FACT);
   if (snapshotPeriod !== undefined && fact) return refuse(PERIOD_ON_FACT);
+  if (hasUnknownMember !== undefined && fact) return refuse(UNKNOWN_ON_FACT);
   if (baseFactEntityId) {
     if (baseFactEntityId === before.entity_id) return refuse(AGGREGATE_TEXTS.self);
     const rows = (state.cubeEntities ?? []).filter((c) => c.workspace_id === access.workspace.id);
@@ -178,6 +179,7 @@ export function updateCubeEntity(
   if (dimKind !== undefined && dimKind !== before.dim_kind) patch.dim_kind = dimKind;
   if (history !== undefined && history !== before.history) patch.history = history;
   if (snapshotPeriod !== undefined && snapshotPeriod !== before.snapshot_period) patch.snapshot_period = snapshotPeriod;
+  if (hasUnknownMember !== undefined && hasUnknownMember !== before.has_unknown_member) patch.has_unknown_member = hasUnknownMember;
   if (!Object.keys(patch).length) return fail(nothingToChange());
   const row = nextVersion(ctx, before, patch);
   const result = done(ctx, access, { version: row.version }, [{ kind: "update", table: "cube_entity", before, row }]);
@@ -277,6 +279,70 @@ export function updateMeasure(
   if (!Object.keys(patch).length) return fail(nothingToChange());
   const row = nextVersion(ctx, before, patch);
   return done(ctx, access, { version: row.version }, [{ kind: "update", table: "cube_measure", before, row }]);
+}
+
+// ---- slice 22: an unknown member's value (D-77) ----
+
+const unknownValueInput = z
+  .object({
+    attributeId: uuidSchema,
+    /** The value as typed (trimmed; empty or null = none: the default applies). */
+    value: optionalTextSchema,
+    /** The attribute's live row as the page knows it, or null for none: the save's optimistic check (acceptance F3). */
+    current: z.object({ id: uuidSchema, version: versionSchema }).strict().nullable(),
+  })
+  .strict();
+export type SetUnknownValueInput = z.input<typeof unknownValueInput>;
+
+export const UNKNOWN_VALUE_NOT_ON_DIMENSION = "Only an attribute of a dimension has an unknown member value.";
+
+export interface UnknownValueState {
+  attribute: Attribute | null;
+  /** The attribute's entity's InfoCube row (a value only on a dimension's attribute). */
+  cube: CubeEntity | null;
+  /** The attribute's live row, if any. */
+  row: CubeAttribute | null;
+}
+
+/**
+ * Sets or clears the unknown member's value of a dimension's attribute (slice 22), one undo step. Only typed values are
+ * stored: the first value inserts the attribute's row, a changed one updates it, an empty one soft-deletes it (the
+ * default applies again). The row must be the one the page knows, at its version, or none when the page knows none
+ * (AD-12, D-59): a row made, changed or cleared by someone else meanwhile is a stale version. A value that does not fit
+ * the attribute's type is stored (the panel and the model checks say so). Allowed while the dimension's unknown member
+ * is off: the values stay then, and an undo may write one.
+ */
+export function setUnknownValue(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: UnknownValueState,
+  input: unknown,
+): CommandResult<{ row: { id: Uuid; version: number } | null }> {
+  const parsed = begin(access, "model.edit", unknownValueInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { attributeId, value, current: known } = parsed.data;
+  const attribute = found(state.attribute, access, attributeId, "attribute");
+  if (!attribute.ok) return fail(attribute.error);
+  const a = attribute.row;
+  const cube = state.cube;
+  if (!isLive(cube, access.workspace.id) || cube.entity_id !== a.entity_id || cube.role !== "dimension") return fail(domainError("invalid", UNKNOWN_VALUE_NOT_ON_DIMENSION));
+  const live = isLive(state.row, access.workspace.id) && state.row.attribute_id === a.id ? state.row : null;
+  if ((live?.id ?? null) !== (known?.id ?? null) || (live && known && live.version !== known.version)) return fail(staleVersion());
+  const labelled = <T>(result: CommandResult<T>, label: string) => {
+    if (result.ok) result.writeSet.label = label;
+    return result;
+  };
+  if (value === null) {
+    if (!live) return fail(nothingToChange());
+    return labelled(done(ctx, access, { row: null }, [softDelete(ctx, "cube_attribute", live)]), "Clear unknown member value");
+  }
+  if (!live) {
+    const row: CubeAttribute = { ...newRowColumns(ctx), workspace_id: access.workspace.id, attribute_id: a.id, unknown_value: value };
+    return labelled(done(ctx, access, { row: { id: row.id, version: row.version } }, [{ kind: "insert", table: "cube_attribute", row }]), "Set unknown member value");
+  }
+  if (live.unknown_value === value) return fail(nothingToChange());
+  const row = nextVersion(ctx, live, { unknown_value: value });
+  return labelled(done(ctx, access, { row: { id: row.id, version: row.version } }, [{ kind: "update", table: "cube_attribute", before: live, row }]), "Set unknown member value");
 }
 
 // ---- key links (RP-B, R-1) and Add key (R-3) ----
