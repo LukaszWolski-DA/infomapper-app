@@ -53,7 +53,7 @@ Table groups (AD-10):
 | Working layer | `label`, `label_link`, `note` |
 | Organisation of work | `project`, `project_canvas`, `project_pinned_label`, `canvas`, `canvas_item`, `frame` |
 | History | `change_event`, `baseline` |
-| Modules (section 15) | InfoCube: `cube_entity`, `cube_measure`, `cube_key`, `cube_mapping`, `cube_mapping_input` |
+| Modules (section 15) | InfoCube: `cube_entity`, `cube_measure`, `cube_key`, `cube_mapping`, `cube_mapping_input`, `cube_attribute` |
 
 ---
 
@@ -707,11 +707,12 @@ table is absent until its first row; a module's tables are not part of the file'
 
 ### InfoCube: `cube_entity`
 Exactly one row per dimensional entity (spec, data model): its role in place of the stereotype (C-5), a fact's grain,
-type, factless flag and base, a dimension's kind, history and snapshot period (slice 19, D-74). Migrations
-`20261104100100_infocube_entities.sql` and `20261108130000_infocube_types.sql`. In the undo history (parent `entity`; the
+type, factless flag and base, a dimension's kind, history and snapshot period (slice 19, D-74), and whether a dimension
+has an unknown member (slice 22, D-77). Migrations `20261104100100_infocube_entities.sql`,
+`20261108130000_infocube_types.sql` and `20261109120000_infocube_unknown_member.sql`. In the undo history (parent `entity`; the
 base follows its entity's delete, cleared in the same change group; undo refuses a base that would be the fact itself, a
-cycle or a deleted fact). The local data file's rows written before slice 19 are converted when the file is loaded
-(`TableRules.upgrade`).
+cycle or a deleted fact). The local data file's rows written before slice 19 or slice 22 are converted when the file is
+loaded (`TableRules.upgrade`): a dimension written before slice 22 has its unknown member on.
 
 | Column | Type | Null | Notes |
 | --- | --- | --- | --- |
@@ -725,10 +726,12 @@ cycle or a deleted fact). The local data file's rows written before slice 19 are
 | `dim_kind` | text | yes | a dimension's: `standard` (default), `junk`; null for a fact. An outrigger is derived, never stored |
 | `history` | text | yes | a dimension's: `keep` (SCD 0), `overwrite` (SCD 1, default), `history` (SCD 2), `snapshot`; null for a fact. Replaces `scd_type` (slice 19) |
 | `snapshot_period` | text | yes | a dimension's snapshot period ("Month-end"), kept whatever the history; null for a fact |
+| `has_unknown_member` | boolean | yes | a dimension's: whether it has an unknown member, the row a fact row gets when its key is empty or has no match; true by default and for every dimension that existed before slice 22; null for a fact. Turning it off keeps the stored values (`cube_attribute`) |
 
 CHECKs `cube_entity_fact_type_ck`, `cube_entity_dim_kind_ck`, `cube_entity_history_ck` (the lists), `cube_entity_base_ck`
 (not itself) and `cube_entity_shape_ck`: a fact has a type and a factless flag and none of a dimension's fields; a
-dimension has no grain, a kind and a history, and none of a fact's fields. Index `cube_entity_base_ix`.
+dimension has no grain, a kind, a history and the unknown member's flag, and none of a fact's fields; a fact has no
+unknown member's flag (slice 22). Index `cube_entity_base_ix`.
 
 ### InfoCube: `cube_measure`
 An attribute of a fact that is a measure: one row per such attribute (spec, data model). In the undo history (parent
@@ -793,8 +796,27 @@ A logical attribute a dimensional mapping reads, in order (slice 15c). In the un
 | `attribute_id` | uuid | no | FK `attribute`: a logical attribute (the domain's check); one live input per attribute and mapping (`cube_mapping_input_ux`) |
 | `sort_order` | integer | no | the inputs' order |
 
+### InfoCube: `cube_attribute`
+Per-attribute settings of a dimensional attribute (slice 22, D-77); so far the unknown member's value of a dimension's
+attribute. Migration `20261109120000_infocube_unknown_member.sql`. In the undo history (parent `attribute`).
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `attribute_id` | uuid | no | FK `attribute` (of a dimension: the domain's check); unique among live rows (`cube_attribute_attribute_ux`) |
+| `unknown_value` | text | yes | the unknown member's value as typed: trimmed, never empty (CHECK `cube_attribute_unknown_value_ck`); null when not set |
+
+Only typed values are stored: a row exists only while it holds a value. The first value inserts the row, a changed one
+updates it, a cleared one soft-deletes it (a later value is a new row), as a measure's row comes and goes; so no live row
+has a null value yet, and the column is nullable for the later settings the table is named for. An attribute without a
+row takes its default (an Integer primary key −1, a String "Unknown", any other type empty). A value that does not fit
+its attribute's type is stored all the same; the panel and the model checks say so. The command checks the row the page
+knows, its id and version, or that there is none (AD-12): a row made, changed or cleared by someone else meanwhile is a
+stale version. Values stay while the dimension's unknown member is off.
+
 Deleting an entity, an attribute or a relationship soft-deletes its InfoCube rows in the same change group (the domain
-cascades, AD-23; slice 15a step 3, the key links slice 15b, the dimensional mappings slice 15c). A dimensional mapping
+cascades, AD-23; slice 15a step 3, the key links slice 15b, the dimensional mappings slice 15c, the unknown members'
+values slice 22). A dimensional mapping
 goes whole when one of its inputs goes with its attribute (Q-5, `goesWhole`); an input removed in the panel leaves the
 mapping (the panel offers × only while it has more than one). The local data file needs no new format for these tables
 (C1): they appear in it with InfoCube's first mapping.
