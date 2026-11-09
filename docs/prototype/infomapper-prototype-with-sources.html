@@ -305,6 +305,13 @@ main.noleft #side,main.noright #insp{visibility:hidden}
 .titem .m.cube svg{width:10px;height:10px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linejoin:round}
 .tcube{display:flex;flex-wrap:wrap;gap:6px;padding:6px 10px 2px}
 .tcube .btn{white-space:nowrap}
+.uvlist{display:grid;gap:4px;margin-top:6px}
+.uvrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;align-items:center}
+.uvrow label{display:flex;flex-direction:column;min-width:0;margin:0}
+.uvrow .n{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.uvrow .m{font-size:11px;color:var(--ink-3)}
+.uvrow input[aria-invalid="true"]{border-color:var(--warn)}
+.uvbad{font-size:11.5px;color:var(--warn);margin:-1px 0 2px}
 .cubebox{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:4px 0 6px;background:var(--surface)}
 .cubebox h4{margin:0 0 8px;font-size:12px;color:var(--ink-2);display:flex;align-items:center;gap:6px}
 .cubebox .fld:last-child{margin-bottom:0}
@@ -1604,6 +1611,19 @@ function factHints(fid) {
   return out;
 }
 const SCD_L = {0:"0 · keep the original", 1:"1 · overwrite", 2:"2 · keep history"};
+/* slice 22: a dimension's unknown member (Kimball's -1 row; in Data Vault usually from the ghost record). On unless turned off. */
+const unkOn = dimId => I.cube?.ent[dimId]?.role === "dimension" && I.cube.ent[dimId].unknown !== false;
+function unkDefault(a) { return a.isPrimaryKey && a.dataType === "Integer" ? "-1" : (a.dataType || "String") === "String" ? "Unknown" : ""; }
+const unkValue = a => I.cube?.uv[a.id] ?? unkDefault(a);
+/* a typed value against the attribute's type (Integer, Decimal with a point, Boolean, Date as YYYY-MM-DD, JSON, String within its length) */
+function unkFit(v, a) {
+  const t = a.dataType || "String", L = +a.length || 0;
+  const ok = {Integer:/^-?\d+$/, Decimal:/^-?\d+(\.\d+)?$/, Boolean:/^(true|false)$/i, Date:/^\d{4}-\d{2}-\d{2}([ T]\d{2}:\d{2}(:\d{2})?)?$/}[t];
+  if (ok && !ok.test(v)) return `“${v}” is not ${t === "Integer" ? "an Integer" : t === "Date" ? "a Date (YYYY-MM-DD)" : "a " + t}`;
+  if (t === "JSON") { try { JSON.parse(v); } catch { return `“${v}” is not JSON`; } }
+  if (t === "String" && L && v.length > L) return `“${v}” is longer than String(${L})`;
+  return "";
+}
 function cubeEntitySection(e) {
   const r = I.cube.ent[e.id]; if (!r) return "";
   if (r.role === "fact") {
@@ -1622,7 +1642,7 @@ ${aggs.length ? `<div class="fld"><label>Aggregated by</label><div class="list">
 <div class="fld"><label>Measures</label>${meas.length ? `<div class="list">${meas.map(a => { const m = I.cube.meas[a.id];
       return `<button class="li" data-go="attr:${esc(a.id)}"><span class="n">${esc(a.name)}</span><span class="m">${ADD_MARK[m.additivity]} ${ADD_L[m.additivity]}${m.semiNote ? ", " + esc(m.semiNote) : ""}</span></button>`; }).join("")}</div>`
       : r.factless ? `<p style="margin:0">None: a factless fact. Count its rows.</p>` : `<p style="margin:0">None yet. Open a numeric attribute and turn on Measure.</p>`}</div>
-<div class="fld keys"><label>Dimensions</label>${keys.length ? `<div class="list">${keys.map(k => `<div class="keyrow"><button class="li" data-go="rel:${k.rel}"><span class="n">${esc(I.ent[k.dim].name + asRole(k.role))}</span><span class="m${k.key ? "" : " miss"}">${k.key ? "key " + esc(k.key.name) : "no key"}${I.cube.ent[k.dim]?.scd === "snapshot" ? ` · <span title="${esc(I.ent[k.dim].name)} is a snapshot dimension: the fact joins it by the snapshot date">snapshot</span>` : ""}</span></button>${k.key ? "" : `<button class="btn sm" data-do="add-key" data-rel="${k.rel}" ${k.pk ? "" : `disabled title="${esc(I.ent[k.dim].name)} has no primary key yet."`}>Add key</button>`}</div>`).join("")}</div>`
+<div class="fld keys"><label>Dimensions</label>${keys.length ? `<div class="list">${keys.map(k => `<div class="keyrow"><button class="li" data-go="rel:${k.rel}"><span class="n">${esc(I.ent[k.dim].name + asRole(k.role))}</span><span class="m${k.key ? "" : " miss"}">${k.key ? "key " + esc(k.key.name) : "no key"}${k.key && unkOn(k.dim) && k.pk ? ` · <span title="A fact row whose ${esc(k.key.name)} is empty or has no match gets ${esc(I.ent[k.dim].name)}'s unknown member">no match → ${esc(unkValue(k.pk) || "NULL")}</span>` : ""}${I.cube.ent[k.dim]?.scd === "snapshot" ? ` · <span title="${esc(I.ent[k.dim].name)} is a snapshot dimension: the fact joins it by the snapshot date">snapshot</span>` : ""}</span></button>${k.key ? "" : `<button class="btn sm" data-do="add-key" data-rel="${k.rel}" ${k.pk ? "" : `disabled title="${esc(I.ent[k.dim].name)} has no primary key yet."`}>Add key</button>`}</div>`).join("")}</div>`
       : `<p style="margin:0">None yet. Draw a relationship to a dimension.</p>`}</div>
 <div class="fld"><label>Hints</label><div class="hints">${hints.length ? hints.map(h => `<button class="h" data-cgo="${esc(h.go)}">${esc(h.msg)}</button>`).join("") : `<span class="ok">Nothing to check: grain, keys and measures look complete.</span>`}</div></div></div>`;
   }
@@ -1638,8 +1658,19 @@ ${outs.length ? `<div class="fld"><label>Outriggers</label><div class="list">${o
 <p style="margin:6px 0 0;color:var(--ink-3);font-size:12px">${{0:"SCD 0: values never change once loaded.", 1:"SCD 1: a change overwrites the old value; no history.", 2:"SCD 2: a change adds a new version; the old one stays with its validity.",
   snapshot:"Snapshot: each snapshot keeps the whole dimension as it was on that date (in Data Vault, usually from a PIT table); a row is the business key and the snapshot date. Facts join it by the snapshot date."}[r.scd ?? 1]} Technical columns (valid from, valid to, current, snapshot date) are a physical matter and are not modelled here.</p></div>
 ${r.scd === "snapshot" ? `<div class="fld"><label for="f-snap">Snapshot period</label><input id="f-snap" data-f="cube.snap" value="${esc(r.snapPeriod || "")}" placeholder="e.g. Month-end, Daily"></div>` : ""}
+${unkSection(e, r)}
 <div class="fld"><label>Used by</label>${facts.length ? `<div class="list">${facts.flatMap(f => factKeys(f).filter(k => k.dim === e.id).map(k =>
     `<button class="li" data-go="entity:${f}"><span class="n">${esc(I.ent[f].name + asRole(k.role))}</span><span class="m${k.key ? "" : " miss"}">${k.key ? "key " + esc(k.key.name) : "no key"}</span></button>`)).join("")}</div>` : (outOf.length ? `<p style="margin:0">No fact uses it directly; it is reached through ${esc(outOf.map(d => I.ent[d].name).join(", "))}.</p>` : `<p style="margin:0">No fact uses it yet.</p>`)}</div></div>`;
+}
+function unkSection(e, r) {
+  const on = r.unknown !== false, ed = wsPerm() === "full", at = I.attrsOf[e.id] || [];
+  const rows = at.map(a => { const v = I.cube.uv[a.id], bad = v != null ? unkFit(v, a) : "", d = unkDefault(a);
+    return `<div class="uvrow"><label for="f-uv-${esc(a.id)}"><span class="n">${esc(a.name)}</span><span class="m">${esc(a.dataType || "String")}${a.isPrimaryKey ? " · PK" : ""}</span></label>
+<input id="f-uv-${esc(a.id)}" data-f="cube.uv" data-a="${esc(a.id)}" value="${esc(v ?? "")}" placeholder="${d ? esc(d) : "empty (NULL)"}"${ed ? "" : " disabled"}${bad ? ` aria-invalid="true" title="${esc(bad)}"` : ""}></div>${bad ? `<div class="uvbad">${esc(bad)}</div>` : ""}`; }).join("");
+  return `<div class="fld"><label class="flags" style="display:flex"><button class="flag" data-set="cube.unk" data-v="1" aria-pressed="${on}"${ed ? "" : " disabled"}>Unknown member</button></label>
+<p style="margin:6px 0 0;color:var(--ink-3);font-size:12px">${on ? "A row for fact rows whose key is empty or has no match, so they are not lost (Kimball's −1 row; in Data Vault, usually from the ghost record). Its values; an empty field takes the default shown."
+  : "No unknown member: a fact row whose key is empty or has no match finds no row here. Turn it on to give it one."}</p>
+${on ? (at.length ? `<div class="uvlist">${rows}</div>` : `<p style="margin:6px 0 0">No attributes yet.</p>`) : ""}</div>`;
 }
 function cubeMeasureSection(a) {
   if (roleOf(a.entityId) !== "fact") return "";
@@ -1777,7 +1808,7 @@ function calcGaps(a, seen = new Set()) {               // the inputs, at any dep
   return a.calc.from.flatMap(f => directFed(f) ? [] : I.attr[f].calc ? calcGaps(I.attr[f], seen) : [f]);
 }
 function cubeIndex() {
-  const C = S.cube; C.ents ||= []; C.measures ||= []; C.maps ||= [];
+  const C = S.cube; C.ents ||= []; C.measures ||= []; C.maps ||= []; C.uvals ||= [];
   // InfoCube's rows follow InfoMapper's objects: rows whose object is gone are dropped here (iteration 1)
   C.ents = C.ents.filter(r => isDimE(I.ent[r.entityId]));
   S.entities.filter(isDimE).forEach(e => { if (!C.ents.some(r => r.entityId === e.id)) C.ents.push({entityId:e.id, role:"dimension", grain:"", scd:1}); });
@@ -1785,6 +1816,8 @@ function cubeIndex() {
       if (r.base && (r.base === r.entityId || roleOf0(C, r.base) !== "fact")) r.base = null; r.base ||= null; }
     else r.kind ||= "standard"; });
   C.measures = C.measures.filter(r => I.attr[r.attributeId] && roleOf0(C, I.attr[r.attributeId].entityId) === "fact");
+  // slice 22: a dimension's unknown member; a value is stored only when typed (cube_attribute), gone with its attribute
+  C.uvals = C.uvals.filter(r => I.attr[r.attributeId] && roleOf0(C, I.attr[r.attributeId].entityId) === "dimension" && String(r.value ?? "") !== "");
   C.maps = C.maps.filter(m => m.from.length && m.from.every(id => I.attr[id] && !isDimId(I.attr[id].entityId)) && I.attr[m.to] && isDimId(I.attr[m.to].entityId) && (m.kind !== "direct" || m.from.length === 1));
   // RP-B: a key link lives while its relationship joins a fact and a dimension and its attribute is a foreign key of that fact
   const factEnd = r => { const a = roleOf0(C, r.from), b = roleOf0(C, r.to); return a === "fact" && b === "dimension" ? r.from : b === "fact" && a === "dimension" ? r.to : null; };
@@ -1802,6 +1835,7 @@ function cubeIndex() {
   C.keys.forEach(k => { X.keyOfRel[k.rel] = k.attr; X.relOfKey[k.attr] = k.rel; });
   C.ents.forEach(r => X.ent[r.entityId] = r);
   C.measures.forEach(r => X.meas[r.attributeId] = r);
+  X.uv = {}; C.uvals.forEach(r => X.uv[r.attributeId] = r.value);
   X.outOf = {}; X.outs = {};      // slice 19: an outrigger is the "one" end of a relationship between two dimensions
   S.relationships.forEach(r => { if (roleOf0(C, r.from) !== "dimension" || roleOf0(C, r.to) !== "dimension" || r.from === r.to) return;
     const one = String(r.toMax) === "1" && String(r.fromMax) !== "1" ? r.to : r.from, many = one === r.from ? r.to : r.from;
@@ -2583,7 +2617,8 @@ function lookupFields(m) {
   const keyA = via && (I.attrsOf[dict.id] || []).find(a => a.isPrimaryKey);
   return `<div class="fld"><label for="f-cvia">Through relationship</label><select id="f-cvia" data-f="cmap.via"><option value="">Choose a relationship of ${esc(dict.name)}…</option>${rels.map(r => `<option value="${r.id}"${r.id === m.via ? " selected" : ""}>${esc(relText(r))}</option>`).join("")}</select></div>
 ${!rels.length ? `<div class="note warn">${esc(dict.name)} has no relationship to another entity. Draw one in the logical model first.</div>` : m.via && !via ? `<div class="note warn">The relationship it went through is gone. Choose another.</div>` : ""}
-<div class="fld"><label for="f-cunk">When no match</label><input id="f-cunk" data-f="cmap.unknown" value="${esc(m.unknown || "")}" placeholder="e.g. Unknown"></div>
+<div class="fld"><label for="f-cunk">When no match</label><input id="f-cunk" data-f="cmap.unknown" value="${esc(m.unknown || "")}" placeholder="${(() => { const t = I.attr[m.to]; const u = t && unkOn(t.entityId) ? unkValue(t) : "";   // slice 22
+  return u ? esc(u) + " (the unknown member's value)" : "e.g. Unknown"; })()}"></div>
 ${via ? `<div class="note">Each ${esc(other.name)} row finds its ${esc(dict.name)}${keyA ? ` by ${esc(keyA.name)}` : ""} and takes ${esc(I.attr[m.from[0]].name)}${m.unknown ? `; when the code is empty or has no match, the value is “${esc(m.unknown)}”` : ""}.</div>` : ""}`;
 }
 function cubeAttrSection(a) {
@@ -2991,6 +3026,7 @@ vp.addEventListener("pointerdown", ev => {
   if (lnk) { select({t:lnk.dataset.t, id:lnk.dataset.id}); ev.preventDefault(); return; }
   const row = t.closest(".row[data-rk]");
   if (row) { const card = row.closest(".card");
+    const ae = document.activeElement; if (ae && ins.contains(ae)) ae.blur();   // D-76: a row's press first ends a panel field's editing
     D = {type:"row", rk:row.dataset.rk, rid:row.dataset.rid, card:card.dataset.id, sx:ev.clientX, sy:ev.clientY}; ev.preventDefault(); return; }
   const crs = t.closest(".c-rs");
   if (crs) { const card = crs.closest(".card"), L = CV()[card.dataset.kind][card.dataset.id];
@@ -3263,6 +3299,9 @@ const insChange = ev => {
   const f = ev.target.dataset.f; if (!f) return; const v = ev.target.value, s = ev.sel || V.sel;
   if (f === "attr.calcrule") { mutate(() => { S.attributes.find(x => x.id === s.id).calc.rule = v; }); return; }   // slice 18
   if (f === "attr.addlattr") { if (v) createCubeMap(v, s.id); return; }
+  if (f === "cube.uv") { const id = ev.target.dataset.a, val = v.trim();   // slice 22: one undo step; empty takes the default
+    if ((I.cube.uv[id] ?? "") === val) return;
+    mutate(() => { S.cube.uvals = (S.cube.uvals || []).filter(r => r.attributeId !== id); if (val) S.cube.uvals.push({attributeId:id, value:val}); }); return; }
   if (f === "cube.grain") { mutate(() => { S.cube.ents.find(r => r.entityId === s.id).grain = v.trim(); }); return; }
   if (f === "cube.snap") { mutate(() => { S.cube.ents.find(r => r.entityId === s.id).snapPeriod = v.trim(); }); return; }   // slice 19
   if (f === "cube.base") { mutate(() => { S.cube.ents.find(r => r.entityId === s.id).base = v || null; }); return; }   // slice 19
@@ -3334,6 +3373,7 @@ ins.addEventListener("click", ev => {
       if (v === "snapshot") setTimeout(() => { const i = $("#f-snap"); if (i && !i.value) i.focus(); }, 0); return; }
     if (k === "cube.ftype") { mutate(() => { S.cube.ents.find(r => r.entityId === s.id).type = v; }); return; }   // slice 19
     if (k === "cube.dkind") { mutate(() => { S.cube.ents.find(r => r.entityId === s.id).kind = v; }); return; }
+    if (k === "cube.unk") { mutate(() => { const r = S.cube.ents.find(r => r.entityId === s.id); r.unknown = r.unknown === false; }); return; }   // slice 22
     if (k === "cube.factless") { mutate(() => { const r = S.cube.ents.find(r => r.entityId === s.id); r.factless = !r.factless; }); return; }
     if (k === "cube.measure") { const a = I.attr[s.id], on = !!I.cube.meas[a.id];
       mutate(() => { if (on) S.cube.measures = S.cube.measures.filter(r => r.attributeId !== a.id);
@@ -4832,6 +4872,14 @@ function modelChecks(p) {        // p: a project (the home's scope); null: the w
       if (un.length) under.push({go:"cmap:" + cm.id, n:nm(cm), m:un.map(f => `${I.attr[f].name} ${(I.mA[f] || []).some(m => I.col[m.columnId]?.missingSince) ? "reads a column that left the source"
         : (I.mA[f] || []).length ? "has no approved source mapping" : "is not mapped"}`).join("; "), refs:["cmap:" + cm.id], marks:[]}); });
     g("feeds", "Approved feeds broken by the logical model", "high", "The type of a logical attribute no longer fits an approved dimensional mapping that reads it. Fix the logical side, or set the mapping back to In review.", broken, true);
+    /* C6 slice 22: dimensions used by a fact without an unknown member; typed values that do not fit their type */
+    const dims = [...ents].filter(d => roleOf(d) === "dimension");
+    const factsOf = d => [...new Set(S.relationships.filter(x => (x.from === d || x.to === d) && x.from !== x.to).map(x => x.from === d ? x.to : x.from).filter(f => roleOf(f) === "fact"))];
+    const nounk = dims.filter(d => !unkOn(d) && factsOf(d).length).map(d => ({go:"entity:" + d, n:I.ent[d].name, m:`used by ${factsOf(d).map(f => I.ent[f].name).join(", ")}`, refs:["entity:" + d], marks:["ent:" + d]}));
+    const badu = dims.filter(unkOn).flatMap(d => (I.attrsOf[d] || []).filter(a => I.cube.uv[a.id] != null && unkFit(I.cube.uv[a.id], a))
+      .map(a => ({go:"attr:" + a.id, n:chkAttr(a.id), m:`unknown member: ${unkFit(I.cube.uv[a.id], a)}`, refs:["attr:" + a.id, "entity:" + d], marks:["attr:" + a.id]})));
+    g("unkval", "Unknown member values that do not fit", "high", "A value of a dimension's unknown member does not fit its attribute's type. Change the value or the type.", badu, true);
+    g("nounk", "Dimensions without an unknown member", "normal", "A fact row whose key is empty or has no match finds no row. Turn on the dimension's unknown member, or say in its description why not.", nounk, true);
     g("under", "Approved feeds over logical attributes not yet covered", "normal", "The dimensional mapping is approved, but what it reads has no approved source mapping, so it covers no requirement yet.", under, true);
   }
   return G;
@@ -6101,7 +6149,7 @@ function openPick(o) {
   pickpop.style.top = Math.max(8, Math.min(o.at.y, window.innerHeight - H_ - 8)) + "px";
   setTimeout(() => { $("#pk-q")?.focus(); document.addEventListener("pointerdown", pickOutside, true); }, 0);
 }
-function pickVisible() { const q = PK.q.trim().toLowerCase(); return PK.items.filter(it => !q || (it.label + " " + (it.key || "")).toLowerCase().includes(q)); }
+function pickVisible() { const q = pkNorm(PK.q); return PK.items.filter(it => !q || pkNorm(it.label + " " + (it.key || "")).includes(q)); }   // D-76: extra spaces ignored
 /* slice 21: a picker may offer to create an item from the typed text, last in the list, when no item has exactly that name */
 const pkNorm = t => String(t).trim().replace(/\s+/g, " ").toLowerCase();
 function pickCreate() { const q = PK.q.trim().replace(/\s+/g, " "); return PK.create && q && !PK.items.some(it => pkNorm(it.label) === pkNorm(q)) ? q : ""; }
