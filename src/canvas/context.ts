@@ -383,7 +383,8 @@ export interface CanvasHost {
   dropColumn: (drop: ColumnDrop) => void;
   /**
    * A row's drag (slice 15c, C4, C5): what the page says of a drag from a source column's row or an entity's row, once
-   * it starts; null: no drag from this row (an entity row without a module's drag).
+   * it starts; null: no drag from this row (an entity row with neither a module's drag nor, slice 21, a logical row's
+   * drag onto a column: InfoMapper's, while a table card is on the canvas).
    */
   rowDrag: (from: RowDragFrom) => RowDrag | null;
   /** An entity row dropped (slice 15c): the module decides (`RowDrag.plan` said "ok" or gave a refusal). */

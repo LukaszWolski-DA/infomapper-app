@@ -206,6 +206,8 @@ main.noleft #side,main.noright #insp{visibility:hidden}
 #pickpop .pk-list{overflow:auto;flex:1 1 auto;min-height:0}
 #pickpop .pk-list>button{display:flex;align-items:center;gap:8px}
 #pickpop .pk-list>button .pk-k{font-family:var(--mono,monospace);font-size:11.5px;color:var(--ink-3);flex:none}
+#pickpop .pk-list>button.pk-new{color:var(--logical);border-top:1px solid var(--line)}
+#pickpop .pk-list>button .pk-plus{width:12px;flex:none;text-align:center;font-weight:600}
 #pickpop .pk-list>button .pk-n{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #pickpop .pk-list>button .pk-box{width:14px;height:14px;border-radius:3px;box-shadow:0 0 0 1.5px var(--ink-3);flex:none;display:grid;place-items:center;font-size:11px;line-height:1;color:#fff}
 #pickpop .pk-list>button[aria-checked="true"] .pk-box{background:var(--logical);box-shadow:none}
@@ -2915,7 +2917,7 @@ function findDrop(el) {
   }
   if (!fromDim) {                                   // a logical attribute: onto a column (mapping), or onto a fact or dimension
     if (row && row.dataset.rk === "col") return {t:"row", rid:row.dataset.rid, el:row};
-    if (row && row.dataset.rk === "attr") return row.dataset.rid === D.rid ? null : rowDim ? {t:"crow", rid:row.dataset.rid, el:row} : {t:"bad", msg:DIM_MSG.lToL};
+    if (row && row.dataset.rk === "attr") return row.dataset.rid === D.rid ? null : rowDim ? {t:"crow", rid:row.dataset.rid, el:row} : cubeOn() ? {t:"bad", msg:DIM_MSG.lToL} : null;   // slice 21: no refusal without InfoCube
     if (onHead && isDimId(card.dataset.id)) return {t:"ccard", id:card.dataset.id, el:card};
     return null;
   }
@@ -5281,7 +5283,9 @@ function reqTraces() {
 function insReq(r) {
   if (!r) return insOverview();
   const c = reqCoverage(r.id), links = S.reqLinks.filter(k => k.reqId === r.id), parent = r.parent && I.req[r.parent], kids = S.requirements.filter(x => x.parent === r.id);
-  const gapList = [...c.none.map(a => [a, "unmapped"]), ...c.draft.map(a => [a, "not approved"])];
+  // slice 21 (R6): an approved mapping from a column that left the source (missing or retired) says so, not "not approved"
+  const leftSrc = a => !isDimId(I.attr[a]?.entityId) && (I.mA[a] || []).some(m => m.status === "approved" && (I.col[m.columnId]?.missingSince || I.col[m.columnId]?.retiredSince));
+  const gapList = [...c.none.map(a => [a, "unmapped"]), ...c.draft.map(a => [a, leftSrc(a) ? "column left the source" : "not approved"])];
   const linkRow = k => { const lab = k.t === "entity" ? I.ent[k.id].name : k.t === "attr" ? attrLabel(k.id) : k.t === "map" ? colLabel(I.map[k.id].columnId) + " → " + attrLabel(I.map[k.id].attributeId) : k.t === "src" ? I.src[k.id].name : colLabel(k.id);
     const go = {entity:"entity", attr:"attr", map:"map", src:"source", col:"col"}[k.t] + ":" + k.id;
     return `<div class="li"><button class="lname n" data-go="${esc(go)}" style="text-align:left">${esc(lab)}</button><span class="m">${({entity:"entity", attr:"attribute", map:"mapping", src:"table", col:"column"})[k.t]}</span><button class="lx" data-do="req-unlink" data-r="${r.id}" data-t="${k.t}" data-i="${esc(k.id)}" title="Unlink">×</button></div>`; };
@@ -5933,7 +5937,7 @@ ${V.cubeRefused ? `<p class="cuberef" style="margin:6px 0 0;color:var(--warn);fo
 <label style="display:flex;gap:8px;align-items:center"><input type="checkbox" data-wsset="fourEyes" ${w.settings?.fourEyes ? "checked" : ""} ${dis}> Four-eyes approval</label>
 <p style="margin-top:8px">Statuses: <span class="chips" style="display:inline-flex"><span>Draft</span><span>In review</span><span>Approved</span></span></p>
 <p>Requirement templates: built in for now; editable here later (D-45).</p></div>
-<div class="box"><h4>Concept colours</h4><p>Violet is reserved for requirements, so it is not offered here.</p>${S.concepts.map(c => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:130px">${esc(c.name)}</span><div class="swatches">${ALLOWED_CONCEPT_COLORS.map(col => `<button style="background:${col}" data-ccol="${c.id}" data-v="${col}" aria-pressed="${String(c.color).toUpperCase() === col}" aria-label="${col}" ${dis}></button>`).join("")}</div></div>`).join("")}</div>
+<div class="box"><h4>Concept colours</h4><p>Violet is reserved for requirements, so it is not offered here.</p>${S.concepts.map(c => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:130px">${esc(c.name)}</span><div class="swatches">${ALLOWED_CONCEPT_COLORS.map(col => `<button style="background:${col}" data-ccol="${c.id}" data-v="${col}" aria-pressed="${String(c.color).toUpperCase() === col}" aria-label="${col}" ${wsPerm() === "full" ? "" : "disabled"}></button>`).join("")}</div></div>`).join("")}</div>
 <div class="box"><h4>Model conventions</h4><p>Entity stereotypes</p><div class="chips">${["Object", "Link", "Dictionary", "Context", "Informative"].map(x => `<span>${x}</span>`).join("")}</div>
 <p style="margin-top:12px">Column classification</p><div class="chips"><span>BK · business key</span><span>PII · personal data</span></div>
 <p style="margin-top:12px">Physical to logical types</p><div class="chips"><span>varchar, nvarchar, char → String</span><span>int, bigint → Integer</span><span>decimal → Decimal</span><span>date, datetime2 → Date</span></div>
@@ -5961,7 +5965,8 @@ wsBox.addEventListener("click", ev => {
     if (bl.dataset.bl === "cmp") compareBaseline(b); else if (bl.dataset.bl === "map") docFromBaseline(b, "map"); else if (bl.dataset.bl === "dict") docFromBaseline(b, "dict");
     else if (bl.dataset.bl === "del") rootChange(() => { curWs().baselines = curWs().baselines.filter(x => x.id !== b.id); }, `Deleted the baseline ${b.name}.`);
     return; }
-  const cc = ev.target.closest("[data-ccol]"); if (cc && !cc.disabled) { const id = cc.dataset.ccol, v = cc.dataset.v; mutate(() => { S.concepts.find(c => c.id === id).color = v; }); return; }
+  const cc = ev.target.closest("[data-ccol]"); if (cc && !cc.disabled) { const id = cc.dataset.ccol, v = cc.dataset.v; const cn = S.concepts.find(c => c.id === id); if (String(cn.color).toUpperCase() === v) return;
+    mutate(() => { cn.color = v; }); toast(`Changed the colour of ${cn.name}.`, true); return; }   // slice 21: model.edit, one undo step
   const rm = ev.target.closest("[data-rm]"); if (rm) { const m = curWs().members.find(x => x.id === rm.dataset.rm); rootChange(() => { curWs().members = curWs().members.filter(x => x !== m); }, `${m.name || m.email} no longer has access.`); return; }
   const a = ev.target.closest("[data-wa]"); if (!a || a.disabled) return; const w = curWs();
   if (a.dataset.wa === "newproj") { const np = {id:uid("prj"), name:"New project", desc:"", canvasIds:[], pinned:[]}, d = {id:uid("dia"), name:"First canvas", ent:{}, src:{}, frames:[], notes:[]};
@@ -6097,14 +6102,19 @@ function openPick(o) {
   setTimeout(() => { $("#pk-q")?.focus(); document.addEventListener("pointerdown", pickOutside, true); }, 0);
 }
 function pickVisible() { const q = PK.q.trim().toLowerCase(); return PK.items.filter(it => !q || (it.label + " " + (it.key || "")).toLowerCase().includes(q)); }
+/* slice 21: a picker may offer to create an item from the typed text, last in the list, when no item has exactly that name */
+const pkNorm = t => String(t).trim().replace(/\s+/g, " ").toLowerCase();
+function pickCreate() { const q = PK.q.trim().replace(/\s+/g, " "); return PK.create && q && !PK.items.some(it => pkNorm(it.label) === pkNorm(q)) ? q : ""; }
 function renderPick() {
-  const vis = pickVisible(), n = PK.on.size;
-  const list = vis.length ? vis.map(it => `<button data-pk="${esc(it.id)}"${PK.multi ? ` role="menuitemcheckbox" aria-checked="${it.done || PK.on.has(it.id)}"` : ""}${it.done ? " disabled" : ""}${it.done ? ` title="${esc(PK.doneTitle || "")}"` : ""}>${PK.multi ? `<span class="pk-box"></span>` : ""}${it.color ? `<span class="pk-sw" style="background:${it.color}"></span>` : ""}${it.key ? `<span class="pk-k">${esc(it.key)}</span>` : ""}<span class="pk-n">${esc(it.label)}</span></button>`).join("")
+  const vis = pickVisible(), n = PK.on.size, cq = pickCreate();
+  const cbtn = cq ? `<button data-pkc class="pk-new"><span class="pk-plus">+</span><span class="pk-n">${esc(PK.create.label(cq))}</span></button>` : "";
+  const list = cq && !vis.length ? cbtn : vis.length ? vis.map(it => `<button data-pk="${esc(it.id)}"${PK.multi ? ` role="menuitemcheckbox" aria-checked="${it.done || PK.on.has(it.id)}"` : ""}${it.done ? " disabled" : ""}${it.done ? ` title="${esc(PK.doneTitle || "")}"` : ""}>${PK.multi ? `<span class="pk-box"></span>` : ""}${it.color ? `<span class="pk-sw" style="background:${it.color}"></span>` : ""}${it.key ? `<span class="pk-k">${esc(it.key)}</span>` : ""}<span class="pk-n">${esc(it.label)}</span></button>`).join("")
     : `<div class="pk-none">${esc(PK.items.length ? `Nothing matches “${PK.q.trim()}”.` : PK.empty)}</div>`;
+  const list2 = cq && vis.length ? list + cbtn : list;
   const keep = $("#pk-q"), had = keep && document.activeElement === keep, pos = keep?.selectionStart;
   pickpop.innerHTML = `<div class="msec">${esc(PK.title)}</div>${PK.note ? `<div class="pk-none" style="padding-top:0">${esc(PK.note)}</div>` : ""}
 <div class="ctx-search"><input id="pk-q" placeholder="${esc(PK.placeholder || "Type to filter…")}" autocomplete="off" value="${esc(PK.q)}"></div>
-<div class="pk-list">${list}</div>${PK.multi || PK.extra ? `<div class="pk-foot">${PK.extra ? `<button class="btn sm" data-pkx>${esc(PK.extra.label)}</button>` : "<span></span>"}${PK.multi ? `<button class="btn sm primary" data-pkok${n ? "" : " disabled"}>${esc(PK.confirm(n))}</button>` : ""}</div>` : ""}`;
+<div class="pk-list">${list2}</div>${PK.multi || PK.extra ? `<div class="pk-foot">${PK.extra ? `<button class="btn sm" data-pkx>${esc(PK.extra.label)}</button>` : "<span></span>"}${PK.multi ? `<button class="btn sm primary" data-pkok${n ? "" : " disabled"}>${esc(PK.confirm(n))}</button>` : ""}</div>` : ""}`;
   if (had) { const i = $("#pk-q"); i.focus(); i.setSelectionRange(pos, pos); }
 }
 pickpop.addEventListener("input", ev => { if (ev.target.id === "pk-q") { PK.q = ev.target.value; renderPick(); } });
@@ -6116,21 +6126,27 @@ pickpop.addEventListener("keydown", ev => {
   if (ev.key === "ArrowUp") { ev.preventDefault(); if (at <= 0) $("#pk-q").focus(); else btns[at - 1].focus(); return; }
   if (ev.key === "Enter" && ev.target.id === "pk-q") { ev.preventDefault();
     if (PK.multi) { if (PK.on.size) pickpop.querySelector("[data-pkok]").click(); }
-    else if (btns.length === 1) btns[0].click(); }
+    else { const its = btns.filter(b => b.hasAttribute("data-pk")), cr = btns.find(b => b.hasAttribute("data-pkc"));   // slice 21: D-72's Enter
+      if (its.length === 1) its[0].click(); else if (!its.length && cr) cr.click(); } }
 });
 pickpop.addEventListener("click", ev => {
   if (!PK) return;
   const x = ev.target.closest("[data-pkx]"); if (x) { const f = PK.extra.act; closePick(); f(); return; }
+  const c = ev.target.closest("[data-pkc]"); if (c) { const q = pickCreate(), f = PK.create.act; closePick(); if (q) f(q); return; }
   const ok = ev.target.closest("[data-pkok]"); if (ok) { const ids = [...PK.on], f = PK.pick; closePick(); f(ids); return; }
   const b = ev.target.closest("[data-pk]"); if (!b || b.disabled) return;
   if (PK.multi) { const id = b.dataset.pk; PK.on.has(id) ? PK.on.delete(id) : PK.on.add(id); renderPick(); pickpop.querySelector(`[data-pk="${CSS.escape(id)}"]`)?.focus(); return; }
   const id = b.dataset.pk, f = PK.pick; closePick(); f(id);
 });
 /* item 1: the concept of a new entity, fact or dimension outside a concept frame is chosen, never suggested */
-function pickConcept(at, role, then) {
-  openPick({at, title:`Concept for the new ${role || "entity"}`, empty:"No concepts yet. Create one in the Model tab (New concept).",
-    placeholder:"Type to filter concepts…", items:S.concepts.map(c => ({id:c.id, label:c.name, color:c.color})), pick:then});
+function pickConcept(at, role, then, newConcept) {
+  openPick({at, title:`Concept for the new ${role || "entity"}`, empty:"No concepts yet. Type a name to create one.",
+    placeholder:"Type to filter or name a new concept…", items:S.concepts.map(c => ({id:c.id, label:c.name, color:c.color})), pick:then,
+    create: newConcept ? {label:q => `New concept “${q}”`, act:newConcept} : null});
 }
+/* a new concept takes the first palette colour no concept uses, else the next in turn; changed in the settings' Concept colours */
+function nextConceptColor() { const used = S.concepts.map(c => String(c.color).toUpperCase());
+  return ALLOWED_CONCEPT_COLORS.find(c => !used.includes(c)) || ALLOWED_CONCEPT_COLORS[S.concepts.length % ALLOWED_CONCEPT_COLORS.length]; }
 function conceptAt(x, y) { const f = frameAt(x, y); return f && f.kind === "concept" && S.concepts.some(c => c.id === f.ref) ? f.ref : null; }
 function createEntity(o) {
   if (wsPerm() !== "full") { V.blockedAt = performance.now(); toast(curWs().archived ? "This workspace is archived, so it is read-only." : "Your role cannot create entities here.", false, true); return; }
@@ -6149,10 +6165,12 @@ function createEntity(o) {
     [x, y] = best || [cx, cy];
   }
   if (o.role && !cubeOn()) { toast(CUBE_OFF, false, true); return; }
-  const conceptId = o.conceptId || conceptAt(x + 24, y + 20);   // slice 17: no "last used" suggestion
+  // slice 21: a concept created in the picker is made with the entity, in the same undo step
+  const nc = o.newConcept ? {id:uid("conc"), name:o.newConcept, color:nextConceptColor()} : null;
+  const conceptId = nc ? nc.id : o.conceptId || conceptAt(x + 24, y + 20);   // slice 17: no "last used" suggestion
   if (!conceptId) {
     const vr = vp.getBoundingClientRect(), at = o.at || (o.x != null ? screenOf(o.x + 24, o.y + 20) : {x:vr.left + vr.width / 2 - 130, y:vr.top + vr.height / 3});
-    pickConcept(at, o.role, cid => createEntity({...o, conceptId:cid})); return; }
+    pickConcept(at, o.role, cid => createEntity({...o, conceptId:cid}), name => createEntity({...o, newConcept:name})); return; }
   const dimRole = o.role || null, same = x => !!dimRole === isDimE(x);   // names are compared within one model level
   const base = (o.name || (dimRole ? "New " + dimRole : "New entity")).trim(); let name = base, n = 2;
   if (!o.name) while (S.entities.some(e => same(e) && e.name.toLowerCase() === name.toLowerCase())) name = `${base} ${n++}`;
@@ -6160,6 +6178,7 @@ function createEntity(o) {
   const e = {id:uid(dimRole ? "dent" : "lent"), conceptId, name, stereotype:"Object", description:"", ...(dimRole ? {level:"dimensional"} : {})};
   const live = CV().live && I.lbl[CV().live.labelId];
   mutate(() => {
+    if (nc) { S.concepts.push(nc); I.con[nc.id] = nc; }
     S.entities.push(e); I.ent[e.id] = e; I.attrsOf[e.id] = [];            // frame logic below reads the index
     if (dimRole) S.cube.ents.push({entityId:e.id, role:dimRole, grain:"", scd:dimRole === "dimension" ? 1 : null});
     CV().ent[e.id] = {x:Math.round(x / 8) * 8, y:Math.round(y / 8) * 8, f:"all", c:false, ...(live ? {lv:"full"} : {})};
@@ -6173,7 +6192,7 @@ function createEntity(o) {
   if (r && (r.x < vv.x || r.y < vv.y || r.x + r.w > vv.x + vv.w || r.y + 120 > vv.y + vv.h)) centerOnSel();
   setTimeout(() => { const i = $("#f-en"); if (i) { i.focus(); i.select(); } }, 30);
   toast(dup ? `Created ${name}, but another entity already has this name. Rename one of them if they differ.`
-            : `Created ${dimRole ? (dimRole === "fact" ? "the fact " : "the dimension ") : ""}${name} in ${I.con[conceptId]?.name}${live ? `, labeled ${live.name}` : ""}. Type its name now; change the concept in the panel.`, true);
+            : `Created ${dimRole ? (dimRole === "fact" ? "the fact " : "the dimension ") : ""}${name} in ${nc ? "the new concept " : ""}${I.con[conceptId]?.name}${live ? `, labeled ${live.name}` : ""}. Type its name now; change the concept in the panel.`, true);
 }
 /* left panel: + per concept, new concept, rename a concept */
 $("#tree").addEventListener("click", ev => {
@@ -6186,7 +6205,7 @@ $("#tree").addEventListener("click", ev => {
     box.innerHTML = `<input id="nc-in" placeholder="Concept name, then Enter" autocomplete="off">`; const i = $("#nc-in"); i.focus();
     i.addEventListener("keydown", e => { e.stopPropagation();
       if (e.key === "Escape") renderSide();
-      if (e.key === "Enter" && i.value.trim()) { const used = S.concepts.map(c => String(c.color).toUpperCase()), col = ALLOWED_CONCEPT_COLORS.find(c => !used.includes(c)) || ALLOWED_CONCEPT_COLORS[S.concepts.length % ALLOWED_CONCEPT_COLORS.length];
+      if (e.key === "Enter" && i.value.trim()) { const col = nextConceptColor();
         const c = {id:uid("conc"), name:i.value.trim(), color:col}; mutate(() => { S.concepts.push(c); }); V.lastConcept = c.id; toast(`Created the concept ${c.name}. Use + next to it to add entities.`, true); } });
     i.addEventListener("blur", () => setTimeout(renderSide, 100)); }
 }, true);

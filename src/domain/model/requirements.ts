@@ -120,9 +120,10 @@ export type AttributeFeeds = Readonly<Record<Uuid, readonly AttributeFeed[]>>;
 /**
  * Why an attribute item with approved mappings does not count (slice 15d, D5, Y1, option A): a fact's or a dimension's
  * attribute whose approved feed reads uncovered attributes, or an attribute at either level whose approved mappings all
- * have a type conflict.
+ * have a type conflict. Slice 21 (R6, D-76): a logical attribute with an approved mapping that reads a column that left
+ * the source (missing or retired), named before a type conflict.
  */
-export type GapReason = "logical_feed" | "type_conflict" | "calculation";
+export type GapReason = "logical_feed" | "type_conflict" | "calculation" | "column_left";
 
 /**
  * A requirement's scope (D-31; slice 4b-1, PRD item 9). The five sets say what it touches on a canvas (cards, rows and
@@ -284,8 +285,10 @@ export function lookupModel(model: ScopeModel, feeds: AttributeFeeds = {}): Mode
     const own = isDimensional(attributeId) ? feedsOf(attributeId) : (mappingsOf.get(attributeId) ?? []);
     if (derivation.inputsOf(attributeId).length && !own.some((m) => ("approved" in m ? m.approved : m.status === "approved"))) return "calculation";
     if (!isDimensional(attributeId)) {
-      // slice 15d (option A): a logical attribute whose approved mappings all have a type conflict
       const approved = (mappingsOf.get(attributeId) ?? []).filter((m) => m.status === "approved");
+      // slice 21 (R6): an approved mapping that reads a column that left the source (missing or retired)
+      if (approved.some((m) => (inputsOf.get(m.id) ?? []).some((c) => c.missing_since !== null || c.retired_since !== null))) return "column_left";
+      // slice 15d (option A): a logical attribute whose approved mappings all have a type conflict
       const a = attribute.get(attributeId);
       return !!a && approved.length > 0 && approved.every((m) => !checkMappingTypes(m, a, inputsOf.get(m.id) ?? []).ok) ? "type_conflict" : null;
     }
@@ -432,6 +435,8 @@ export const GAP_REASONS: Record<GapReason | "none", string> = {
   type_conflict: "type conflict",
   // slice 18 (approved in step 1)
   calculation: "an input of its calculation is not covered",
+  // slice 21 (R6, D-76)
+  column_left: "column left the source",
 };
 
 /** Coverage of a scope, attributes in model order. */

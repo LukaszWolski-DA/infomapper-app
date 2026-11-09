@@ -45,7 +45,7 @@ export function createCubeEntity(
   input: unknown,
   /** The default name's base (slice 15c: "Dim {entity}" for "Create dimension from this…"). */
   defaultName: string = DEFAULT_NAME[role],
-): CommandResult<{ entityId: Uuid; canvasItemId: Uuid | null; warning: string | null }> {
+): CommandResult<{ entityId: Uuid; canvasItemId: Uuid | null; warning: string | null; concept: { id: Uuid; name: string } }> {
   const made = createEntity(ctx, access, state, input, { level: "dimensional", defaultName });
   if (!made.ok) return made;
   if (!access.workspace.infocube) return { ok: false, error: infocubeOff() };
@@ -63,7 +63,10 @@ export function createCubeEntity(
     snapshot_period: null,
   };
   const writes: Write[] = [...made.writeSet.writes, { kind: "insert", table: "cube_entity", row: cube }];
-  return { ok: true, value: made.value, writeSet: buildWriteSet(ctx, access.workspace.id, writes) };
+  // the undo step's name of a fact or a dimension made with a new concept (slice 21, D-76) is InfoMapper's
+  const writeSet = buildWriteSet(ctx, access.workspace.id, writes);
+  if (made.writeSet.label) writeSet.label = made.writeSet.label;
+  return { ok: true, value: made.value, writeSet };
 }
 
 /**

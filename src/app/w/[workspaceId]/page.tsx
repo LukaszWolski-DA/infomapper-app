@@ -312,6 +312,12 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
               editable={can(access, "workspace.edit_settings")}
               modules={await settingsBoxes(store, access)}
               dataVaultUses={dataVaultUses(indexOf(model))}
+              // slice 21 (D-76): "Concept colours", for those who may edit the model (as a concept's rename)
+              concepts={model.concepts
+                .filter((c) => c.deleted_at === null)
+                .sort((x, y) => x.sort_order - y.sort_order)
+                .map((c) => ({ id: c.id, version: c.version, name: c.name, color: c.color }))}
+              conceptsEditable={can(access, "model.edit")}
               initial={{
                 workspaceId: workspace.id,
                 version: workspace.version,

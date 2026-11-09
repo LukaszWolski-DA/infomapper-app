@@ -332,7 +332,10 @@ draws it for everyone and refuses the change. The armed button disarms after 4 s
 and re-importing only for owners, admins and modelers in a workspace that is not archived (7a, item 40). Since slice 8,
 in the development form (D-58): "Add a person" (name, e-mail, role, a summary; the account at once, reached through the
 organization's link and password), the role select and Remove per member for owners and admins, and the "Organization
-access" box (the link, changing the password).
+access" box (the link, changing the password). Since slice 21 (D-76): the settings' "Concept colours" box (prototype
+`data-ccol`), for those who may edit the model, one undo step per change. Still missing from the settings: the
+prototype's "Model conventions" box (stereotypes, column classification, type mapping chips) and its "Statuses" and
+"Requirement templates" lines.
 
 **Deliberate differences (slice 8, PRD section 8):** a start page with signing in and creating an organization; adding
 makes the account at once instead of an invitation; Remove asks first and says when the person leaves the organization;
@@ -405,6 +408,15 @@ licence in development); InfoCube is turned off only while the workspace has no 
 nothing creates or brings one back, so there is no read-only mode, hatch or off note (C-7 as changed on 4 November
 2026); the box's text and the "off" toast say so; the role titles have no "is off here: read-only"; each fact is listed
 once in a dimension's delete preview; paste within one level only (the prototype has no paste).
+
+## The app ahead of the prototype (slice 21)
+
+To be brought into the prototype at its next handover:
+
+- **Every picker's filter ignores extra spaces** (and case), as its create item compares (`pickNorm`); the prototype's
+  `pickVisible` trims only, so a name typed with extra spaces shows no item.
+- **A press on a canvas row first ends the editing of a focused panel field** (its blur saves it for its own row); the
+  prototype keeps the focus in the field.
 
 ## Not product features
 

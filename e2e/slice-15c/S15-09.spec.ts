@@ -101,9 +101,10 @@ test("S15-09: the veil lights the other level's cards while a row is dragged; a 
   await signInAs(page, "Łukasz");
   await openStar(page);
 
-  // a logical row: the five facts and dimensions stay lit
+  // a logical row: the five facts and dimensions stay lit, and since slice 21 (X1, D-76) the table too, which now takes
+  // the drop (a logical row onto a column maps them)
   await startDrag(page, rowNamed(page, "Customer", "segment_code"));
-  await expect.poll(() => veil(page)).toMatchObject({ litCards: 5 });
+  await expect.poll(() => veil(page)).toMatchObject({ litCards: 6 });
   await page.keyboard.press("Escape");
   await page.mouse.up();
   await expect.poll(() => veil(page)).toBeNull();

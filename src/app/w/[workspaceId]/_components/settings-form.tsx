@@ -4,7 +4,8 @@
 // Every save goes through the workspace's save chain (slice 9) with the newest version known; a stale version is refused
 // with the domain's message (AD-12), and the refusal brings the fresh page. Slice 13 (D-66): a text field keeps its
 // draft across fresh pages and after a refusal (an empty name goes back with "Enter a name.", D-59); the language and
-// the two modes show the newest stored value after a refusal. Settings are not undo steps. A draft refused for a
+// the two modes show the newest stored value after a refusal. Settings are not undo steps; slice 21's concept colours
+// are (they change the model's concepts, D-76). A draft refused for a
 // permission or the archive stays readable: its field is read-only instead of disabled, so its text can be copied.
 // Slice 7c (item 17, answers F16, F17): the methodology text names the source table panels; switching Data Vault 2.0
 // mode off says how many uses of Data Vault classifications stay stored.
@@ -12,7 +13,9 @@
 import { DATA_VAULT_MODE_TEXT, dataVaultOffMessage } from "@/domain/model/classifications";
 import type { ReactNode } from "react";
 import type { DocLanguage } from "@/domain/types";
+import { setConceptColorAction } from "@/app/_actions/model";
 import { updateWorkspaceSettingsAction } from "@/app/_actions/workspace";
+import { CONCEPT_PALETTE } from "@/domain/model/concept-colors";
 import { useAction } from "@/app/_components/use-action";
 import { DraftLine, useChoice, useDraft } from "@/app/_panels/fields";
 import { NAME_REQUIRED } from "@/domain/validation";
@@ -50,7 +53,30 @@ const fieldClass =
  * `dataVaultUses`: the workspace's uses of Data Vault classifications (answer F16), for the mode-off message. `modules`:
  * the modules' boxes after Data Vault 2.0 mode (slice 15a, O2), from the composition root.
  */
-export function SettingsForm({ initial, editable, dataVaultUses = 0, modules }: { initial: SettingsValues; editable: boolean; dataVaultUses?: number; modules?: ReactNode }) {
+/** A concept as the "Concept colours" box shows it (slice 21, D-76): its row's version, for the save chain. */
+export interface ConceptColorRow {
+  id: string;
+  version: number;
+  name: string;
+  color: string;
+}
+
+export function SettingsForm({
+  initial,
+  editable,
+  dataVaultUses = 0,
+  modules,
+  concepts = [],
+  conceptsEditable = false,
+}: {
+  initial: SettingsValues;
+  editable: boolean;
+  dataVaultUses?: number;
+  modules?: ReactNode;
+  /** Slice 21: the live concepts in panel order, and whether this person may edit the model (D-76: as a rename). */
+  concepts?: readonly ConceptColorRow[];
+  conceptsEditable?: boolean;
+}) {
   const { saveRow } = useAction();
   const toast = useToast();
 
@@ -158,6 +184,63 @@ export function SettingsForm({ initial, editable, dataVaultUses = 0, modules }: 
           <input type="checkbox" data-testid="checkbox-four-eyes" checked={fourEyes.value} disabled={dis} onChange={(e) => fourEyes.choose(e.currentTarget.checked)} />{" "}
           Four-eyes approval
         </label>
+      </div>
+
+      <ConceptColours workspaceId={initial.workspaceId} concepts={concepts} editable={conceptsEditable} />
+    </div>
+  );
+}
+
+/**
+ * "Concept colours" (slice 21, D-76; prototype `data-ccol`): one line per concept with the palette's swatches, violet
+ * never offered (D-41). A click is one undo step on the workspace's history, saved on the concept's chain with the
+ * newest version known (D-59); a choice keeps no draft (D-66). Those who may edit the model change them, as a
+ * concept's rename; everyone else, and an archived workspace, sees them disabled.
+ */
+function ConceptColours({ workspaceId, concepts, editable }: { workspaceId: string; concepts: readonly ConceptColorRow[]; editable: boolean }) {
+  return (
+    <div className="rounded-[10px] bg-im-surface px-4 py-3.5 shadow-[0_0_0_1px_var(--im-line)]" data-testid="box-concept-colours">
+      <h4 className="m-0 mb-1 text-[13.5px] font-semibold">Concept colours</h4>
+      <p className="m-0 mb-2.5 text-[12.5px] text-im-ink-2">Violet is reserved for requirements, so it is not offered here.</p>
+      {concepts.length ? (
+        concepts.map((c) => <ConceptColourLine key={c.id} workspaceId={workspaceId} concept={c} editable={editable} />)
+      ) : (
+        <p className="m-0 text-[12.5px] text-im-ink-3">No concepts yet.</p>
+      )}
+    </div>
+  );
+}
+
+function ConceptColourLine({ workspaceId, concept, editable }: { workspaceId: string; concept: ConceptColorRow; editable: boolean }) {
+  const { saveRow } = useAction();
+  const stored = concept.color.toUpperCase();
+  const colour = useChoice(stored, (color: string) =>
+    saveRow(
+      { id: concept.id, version: concept.version },
+      (v) => setConceptColorAction(workspaceId, { conceptId: concept.id, expectedVersion: v, color }),
+      `Changed the colour of ${concept.name}.`,
+      { undoable: true },
+    ),
+  );
+  return (
+    <div className="mb-2 flex items-center gap-2.5" data-testid="concept-colour" data-concept={concept.name}>
+      <span className="w-[130px] truncate" title={concept.name}>
+        {concept.name}
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {CONCEPT_PALETTE.map((c) => (
+          <button
+            key={c}
+            type="button"
+            aria-pressed={colour.value === c}
+            aria-label={`Colour ${c}`}
+            data-colour={c}
+            disabled={!editable}
+            onClick={() => colour.choose(c)}
+            className="size-[22px] rounded-[5px] shadow-[inset_0_0_0_1px_rgba(0,0,0,.15)] disabled:cursor-default disabled:opacity-60 aria-pressed:shadow-[0_0_0_2px_var(--im-surface),0_0_0_4px_var(--im-logical)]"
+            style={{ background: c }}
+          />
+        ))}
       </div>
     </div>
   );

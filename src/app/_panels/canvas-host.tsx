@@ -41,7 +41,7 @@ import { useAction } from "@/app/_components/use-action";
 import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
 import { newCardHeight } from "@/canvas/geometry";
 import { FILTER_LABEL, filtersOf } from "@/canvas/CardNode";
-import { CanvasUiCtx, type RowDrag, type RowDragFrom, type RowFilter, type ToolboxRequest } from "@/canvas/context";
+import { CanvasUiCtx, type RowDrag, type RowDragFrom, type RowDrop, type RowFilter, type ToolboxRequest } from "@/canvas/context";
 import { isCardKey, isReqKey } from "@/canvas/selection";
 import { focusOn } from "@/canvas/fade";
 import { toggleFocus } from "@/canvas/Focus";
@@ -157,17 +157,35 @@ export function useCanvasHost({
   for (const e of CANVAS_EXTENSIONS) exts.push({ kind: e.kind, h: e.useHandlers(extContext) });
   const extOf = (kind: string) => exts.find((e) => e.kind === kind)?.h;
 
+  /** A live logical attribute: its row's drag onto a column is InfoMapper's (slice 21, X1). */
+  const isLogicalAttribute = (attributeId: Uuid) => {
+    const entityId = ix.attribute.get(attributeId)?.entity_id;
+    const entity = entityId ? ix.entity.get(entityId) : undefined;
+    return !!entity && isLogical(entity);
+  };
+
   /**
    * A row's drag (slice 15c): a column's maps onto logical entity rows and cards; with facts or dimensions on the
    * canvas they stay under the veil and a drop on them is refused with B-6's toast. An entity row's is a module's.
+   * Slice 21 (X1, D-76): a logical row's drag is InfoMapper's too, composed with the module's: the table cards stay lit
+   * (beside the module's facts and dimensions) and a column takes the drop as the column dropped on the row would; every
+   * other target is the module's, or nothing without the module's drag (F2). No drag without a table card on the
+   * canvas and without the module's. A dimensional row's stays the module's (its refusal on a column).
    */
   const rowDrag = (from: RowDragFrom): RowDrag | null => {
     if ("attributeId" in from) {
+      let moduleDrag: RowDrag | null = null;
       for (const e of exts) {
-        const d = e.h.rowDrag(from.attributeId);
-        if (d) return d;
+        moduleDrag = e.h.rowDrag(from.attributeId);
+        if (moduleDrag) break;
       }
-      return null;
+      const tables = cards.filter((c) => c.kind === "src").map((c) => c.targetId);
+      if (!isLogicalAttribute(from.attributeId) || !tables.length) return moduleDrag;
+      const fromModule = moduleDrag;
+      return {
+        lit: { entities: fromModule?.lit?.entities ?? [], tables: [...new Set([...(fromModule?.lit?.tables ?? []), ...tables])] },
+        plan: (t) => ("columnId" in t ? "ok" : fromModule ? fromModule.plan(t) : "none"),
+      };
     }
     const dimensional = new Set(cards.filter((c) => c.kind === "ent" && ix.entity.get(c.targetId) && !isLogical(ix.entity.get(c.targetId)!)).map((c) => c.targetId));
     const onDimensional = (entityId: string | undefined) => !!entityId && dimensional.has(entityId);
@@ -179,10 +197,24 @@ export function useCanvasHost({
       },
     };
   };
+  /**
+   * An entity row's drop: a logical row on a column maps them as the column dropped on the row does (slice 21, X1:
+   * D-48's direct mapping or choice, the hint, the toast, the selection); otherwise the module whose drag it is decides
+   * (only one module drags entity rows today).
+   */
+  const dropRow = (drop: RowDrop) => {
+    if ("columnId" in drop.target && isLogicalAttribute(drop.attributeId)) {
+      if (editable) columns.mapColumn(drop.target.columnId, drop.attributeId, drop.at);
+      return;
+    }
+    for (const e of exts) if (e.h.rowDrag(drop.attributeId)) return e.h.drop(drop);
+  };
   const rowDragRef = useRef(rowDrag);
+  const dropRowRef = useRef(dropRow);
   const extsRef = useRef(exts);
   useEffect(() => {
     rowDragRef.current = rowDrag;
+    dropRowRef.current = dropRow;
     extsRef.current = exts;
   });
 
@@ -197,22 +229,24 @@ export function useCanvasHost({
       const concepts = [...ix.model.concepts].sort((a, b) => a.sort_order - b.sort_order);
       const frame = ui.frameAt({ x: at.x + 24, y: at.y + 20 });
       const fromFrame = frame?.kind === "concept" ? concepts.find((c) => c.id === frame.conceptId) : undefined;
-      const create = async (concept: (typeof concepts)[number]) => {
+      /** In a concept, or (slice 21, D-76) in a new one named in the picker, made in the same undo step. */
+      const create = async (into: { conceptId: string } | { newConcept: { name: string } }) => {
         const { name } = o;
         // with its height the new card joins the frame it lands in (slice 2b)
         const placement = { canvasId, x: snap8(at.x), y: snap8(at.y), height: newCardHeight(0), frames: ui.frameRefs() };
         const result = await run(() =>
           o.create
-            ? (o.create.action(workspaceId, { conceptId: concept.id, placement }) as ReturnType<typeof createEntityAction>)
-            : createEntityAction(workspaceId, { conceptId: concept.id, ...(name ? { name } : {}), placement }),
+            ? (o.create.action(workspaceId, { ...into, placement }) as ReturnType<typeof createEntityAction>)
+            : createEntityAction(workspaceId, { ...into, ...(name ? { name } : {}), placement }),
         );
         if (!result.ok) return;
         const cardId = result.value.canvasItemId;
         if (cardId) ui.select({ t: "card", id: cardId });
-        if (name) toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}.`);
+        const where = `${"newConcept" in into ? "the new concept " : ""}${result.value.concept.name}${live ? `, labeled ${live.labelName}` : ""}`;
+        if (name) toast(`Created ${result.value.name} in ${where}.`);
         else {
           // on a live canvas the new entity is labeled at once, without a question (PRD item 10)
-          toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}. Type its name now; change the concept in the panel.`);
+          toast(`Created ${result.value.name} in ${where}. Type its name now; change the concept in the panel.`);
           if (cardId) {
             openDetails();
             panels.setNameFocus(cardId);
@@ -220,11 +254,17 @@ export function useCanvasHost({
         }
       };
       if (fromFrame) {
-        void create(fromFrame);
+        void create({ conceptId: fromFrame.id });
         return;
       }
       const role = o.create ? (o.create.key === "fact" ? "fact" : "dimension") : "entity";
-      pickConcept(o.screen ?? { x: window.innerWidth / 2 - 130, y: window.innerHeight / 3 }, role, concepts, (c) => void create(c));
+      pickConcept(
+        o.screen ?? { x: window.innerWidth / 2 - 130, y: window.innerHeight / 3 },
+        role,
+        concepts,
+        (c) => void create({ conceptId: c.id }),
+        (conceptName) => void create({ newConcept: { name: conceptName } }),
+      );
     },
     [editable, ix, panels, toast, run, workspaceId, canvasId, ui, live, openDetails],
   );
@@ -346,10 +386,7 @@ export function useCanvasHost({
     ui.registerHost({
       dropColumn: columns.dropColumn,
       rowDrag: (from) => rowDragRef.current(from),
-      dropRow: (drop) => {
-        // the module whose drag it is decides (only one module drags entity rows today)
-        for (const e of extsRef.current) if (e.h.rowDrag(drop.attributeId)) return e.h.drop(drop);
-      },
+      dropRow: (drop) => dropRowRef.current(drop),
       deleteExt: (kind, id) => {
         if (editable) ext(kind)?.remove(id);
       },

@@ -181,7 +181,8 @@ export type DropPlan =
 /**
  * An attribute's row dropped on another attribute's row, an entity card's header or a source column's row (the
  * prototype's `findDrop`): the mapping always runs logical → dimensional, whichever end the drag started from. A logical
- * row's drop on a column does nothing in 15c (X1). A source column's own drag stays InfoMapper's.
+ * row's drop on a column is "none" here: InfoMapper maps it (slice 21, X1, the canvas host). A source column's own drag
+ * stays InfoMapper's.
  */
 export function planDrop(index: MappingIndex, fromId: Uuid, onto: { attributeId: Uuid } | { entityId: Uuid } | { columnId: Uuid } | null): DropPlan {
   const from = index.levelOf(fromId);

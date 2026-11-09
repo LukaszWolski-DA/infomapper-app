@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { clampAt, enterAction, nextFocus, noneText, visibleItems, type PickItem } from "./pick";
+import { clampAt, createText, enterAction, nextFocus, noneText, pickNorm, visibleItems, type PickItem } from "./pick";
 
 const items: PickItem[] = [
   { id: "a", label: "Customer" },
@@ -38,5 +38,43 @@ describe("the picker (slice 17)", () => {
   it("stays 8 px inside the window", () => {
     expect(clampAt({ x: 900, y: 700 }, { width: 260, height: 200 }, { width: 1000, height: 800 })).toEqual({ x: 732, y: 592 });
     expect(clampAt({ x: -5, y: 2 }, { width: 260, height: 200 }, { width: 1000, height: 800 })).toEqual({ x: 8, y: 8 });
+  });
+});
+
+describe("the picker's create item (slice 21, D-76)", () => {
+  const create = { label: (t: string) => `New concept “${t}”`, act: () => {} };
+  const concepts: PickItem[] = [
+    { id: "s", label: "Sales" },
+    { id: "r", label: "Reference data" },
+  ];
+
+  it("compares ignoring case and extra spaces", () => {
+    expect(pickNorm("  Reference   DATA ")).toBe("reference data");
+  });
+
+  it("the filter ignores extra spaces too, so a name typed with them still shows its item", () => {
+    expect(visibleItems(concepts, "  reference   DATA ").map((i) => i.id)).toEqual(["r"]);
+    expect(visibleItems(concepts, "e  d").map((i) => i.id)).toEqual(["r"]);
+  });
+
+  it("is absent with an empty filter, an exact match (other case, extra spaces) or no create option", () => {
+    expect(createText({ items: concepts, create }, "   ")).toBe("");
+    expect(createText({ items: concepts, create }, " reference   data ")).toBe("");
+    expect(createText({ items: concepts, create }, "SALES")).toBe("");
+    expect(createText({ items: concepts }, "Finance")).toBe("");
+  });
+
+  it("is the typed text with its extra spaces removed otherwise, also beside matches", () => {
+    expect(createText({ items: concepts, create }, "  Fin   ance ")).toBe("Fin ance");
+    expect(createText({ items: concepts, create }, "sal")).toBe("sal");
+    expect(createText({ items: [], create }, "Retail")).toBe("Retail");
+  });
+
+  it("Enter keeps D-72: one match is picked, the create item only when nothing matches, several do nothing", () => {
+    expect(enterAction(false, [concepts[0]!], 0, "sal")).toEqual({ pick: "s" });
+    expect(enterAction(false, [], 0, "Finance")).toEqual({ create: "Finance" });
+    expect(enterAction(false, concepts, 0, "a")).toBeNull();
+    expect(enterAction(false, [], 0, "")).toBeNull();
+    expect(enterAction(true, [], 0, "Finance")).toBeNull();
   });
 });

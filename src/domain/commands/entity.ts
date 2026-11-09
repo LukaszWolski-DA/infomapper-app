@@ -13,6 +13,7 @@ import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../va
 import { begin, current, done, isLive, nothingToChange, richTextSchema, softDelete } from "./shared";
 import { cardHeightSchema, frameRefsSchema, joinFrames, newCanvasItem, positionSchema } from "./canvas-item";
 import { linksOnItems, softDeleteLinks } from "./label";
+import { newConcept, tidyName } from "./concept";
 import { softDeleteRequirementLinks } from "./requirement";
 import { releaseNotes } from "./note";
 
@@ -49,7 +50,9 @@ export interface CreateEntityOptions {
 
 const createEntityInput = z
   .object({
-    conceptId: uuidSchema,
+    /** The concept it belongs to, or (slice 21, D-76) a new concept made with it, in the same change group. */
+    conceptId: uuidSchema.optional(),
+    newConcept: z.object({ name: nameSchema }).strict().optional(),
     name: nameSchema.optional(),
     /**
      * Where to place the card: the panel finds a free spot near the middle of the view (D-46). With the card's height
@@ -61,11 +64,17 @@ const createEntityInput = z
       .strict()
       .optional(),
   })
-  .strict();
+  .strict()
+  .refine((v) => (v.conceptId === undefined) !== (v.newConcept === undefined), { message: "Choose a concept." });
 export type CreateEntityInput = z.input<typeof createEntityInput>;
+
+/** The undo step of an entity made with a new concept (slice 21, D-76). */
+export const newConceptLabel = (entity: string, concept: string) => `Create ${entity} in new concept ${concept}`;
 
 export interface CreateEntityState {
   concept: Concept | null;
+  /** The workspace's concepts, for a new concept's colour and place (slice 21); needed only with `newConcept`. */
+  concepts?: readonly Concept[];
   /** Live entities of the workspace, for the default name and the duplicate warning. */
   entities: readonly Entity[];
   /** The canvas to place the card on, when the input has a placement. */
@@ -81,12 +90,15 @@ export function createEntity(
   state: CreateEntityState,
   input: unknown,
   options: CreateEntityOptions = { level: "logical" },
-): CommandResult<{ entityId: Uuid; canvasItemId: Uuid | null; warning: string | null }> {
+): CommandResult<{ entityId: Uuid; canvasItemId: Uuid | null; warning: string | null; concept: { id: Uuid; name: string } }> {
   const parsed = begin(access, "model.edit", createEntityInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const { conceptId, name, placement } = parsed.data;
+  const { name, placement } = parsed.data;
   const workspaceId = access.workspace.id;
-  if (!isLive(state.concept, workspaceId) || state.concept.id !== conceptId) return fail(notFound("concept"));
+  // slice 21 (D-76): a concept made with the entity, as “New concept” makes it
+  const made = parsed.data.newConcept ? newConcept(ctx, workspaceId, tidyName(parsed.data.newConcept.name), state.concepts ?? []) : null;
+  const conceptId = made ? made.id : parsed.data.conceptId!;
+  if (!made && (!isLive(state.concept, workspaceId) || state.concept.id !== conceptId)) return fail(notFound("concept"));
   if (placement && (!isLive(state.canvas, workspaceId) || state.canvas.id !== placement.canvasId)) return fail(notFound("canvas"));
 
   const entity: Entity = {
@@ -100,7 +112,7 @@ export function createEntity(
     definition_html: null,
     definition_text: null,
   };
-  const writes: Write[] = [{ kind: "insert", table: "entity", row: entity }];
+  const writes: Write[] = [...(made ? [{ kind: "insert" as const, table: "concept" as const, row: made }] : []), { kind: "insert", table: "entity", row: entity }];
   let item: CanvasItem | null = null;
   if (placement) {
     item = newCanvasItem(ctx, workspaceId, placement.canvasId, { entity_id: entity.id }, { x: placement.x, y: placement.y });
@@ -109,7 +121,10 @@ export function createEntity(
     writes.push({ kind: "insert", table: "canvas_item", row: item }, ...joined.writes);
   }
   const warning = name && hasDuplicate(state.entities, name, null, options.level) ? duplicateNameWarning(name) : null;
-  return done(ctx, access, { entityId: entity.id, canvasItemId: item?.id ?? null, warning }, writes);
+  const concept = made ? { id: made.id, name: made.name } : { id: conceptId, name: state.concept!.name };
+  const result = done(ctx, access, { entityId: entity.id, canvasItemId: item?.id ?? null, warning, concept }, writes);
+  if (result.ok && made) result.writeSet.label = newConceptLabel(entity.name, made.name);
+  return result;
 }
 
 // ---- edit ----

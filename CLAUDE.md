@@ -53,7 +53,10 @@ dimension has a kind (Standard, Junk) and a history (SCD 0, 1, 2 or Snapshot wit
 from a relationship between two dimensions; the role chip names them (slice 19, D-74). The model is checked as it stands, read only:
 duplicate names, calculations also mapped, lost originals, copied keys and relationships without them, and with InfoCube
 the facts' hints and the approved feeds the logical model no longer supports; the project home lists them, cards carry a
-slanted "!", the status bar counts them and the panels show their own (slice 20, D-75).
+slanted "!", the status bar counts them and the panels show their own (slice 20, D-75). A logical row dropped onto a source
+column maps them as the opposite drag does; the concept picker makes a new concept with the entity, fact or dimension in
+one undo step; a requirement gap says "column left the source"; the mapping rule keeps its draft; the settings set a
+concept's colour (slice 21, D-76).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -165,7 +168,9 @@ list up to date in each sub-slice):
 - **Rules InfoMapper's commands take as arguments** (`src/compose/model.ts`, e.g. `relationshipOneEnd`) and the level
   rules on every write set (`src/domain/model/levels.ts`: `levelWritesRefusal`, `mappingWritesRefusal`).
 - **Pages:** `ModuleView` (`src/ui/modules.ts`, built by `moduleView` in `src/compose/view.ts`): plain data and server
-  actions (an entity's role, left panel tabs, creates for the tab and the toolbox), handed down through
+  actions (an entity's role, left panel tabs, creates for the tab and the toolbox; since slice 21 a create's
+  `EntityCreateInput` takes `newConcept: { name }` in place of `conceptId`, exactly one of them, and the module passes it
+  on to InfoMapper's `createEntity`, which makes the concept in the same change group and names the undo step), handed down through
   `ModulesProvider`, `buildTree` and `buildCards`; delete previews (`moduleEntityDependents`); the settings' boxes
   (`settingsBoxes`); the module's CSS (`src/compose/styles.ts`); its demo data (`src/compose/seed.ts`). Since slice
   15b `ModuleView` also has `rowMarks` (classes on an attribute's card row by attribute id, through `buildCards`' last
@@ -188,7 +193,8 @@ list up to date in each sub-slice):
   view, collapsed frames and the miniature handle them. Their selection is `{ t: "ext", kind, id }`, a history place.
   `CANVAS_EXTENSIONS` (`src/compose/canvas.ts`, apart from the index): per kind a `CanvasExtension`: `useHandlers`, a
   hook the canvas host calls once per render with `CanvasExtContext` (its line's text when gone, its menu, Delete, a
-  row's drag with what it lights and its drops, `cardMenu` items before "Delete from model…", an `overlay` such as its
+  row's drag with what it lights and its drops (since slice 21 a logical row's drop on a column is InfoMapper's: the
+  canvas host composes its own target, the table cards, with the module's drag; `canvas-host.tsx` `rowDrag`, `dropRow`), `cardMenu` items before "Delete from model…", an `overlay` such as its
   own dialog), and its `Panel` in the details panel (`src/canvas/extensions.ts`).
 - **Panel sections** (slice 15b): `PANEL_SECTIONS` (`src/compose/panels.ts`): the entity, attribute and relationship
   panels render every module's section of their kind (the entity's after its definition, the attribute's before it,
@@ -909,7 +915,10 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     `openPick` and drawn by `PickHost` in the root layout; it opens hidden, a `ResizeObserver` on itself keeps it on the
     screen, then it shows and its filter takes the focus (no layout read in a commit). The concept picker is
     `pickConcept` (`src/app/_panels/concept-pick.ts`), used by `createEntityAt` (`canvas-host.tsx`, the click's or the
-    toolbox's screen point) and `createFromTab` (`left-panel.tsx`, under the button). No concept is remembered.
+    toolbox's screen point) and `createFromTab` (`left-panel.tsx`, under the button). No concept is remembered. Since slice 21 (D-76) a picker may have a create item (`PickOptions.create`, `createText`,
+    test id `picker-create`): last, while the typed text names no item (case and extra spaces ignored, `pickNorm`, which
+    the filter uses too); Enter takes it only when no item is left (D-72's Enter). The concept picker's makes the concept
+    with the entity (`createEntity`'s `newConcept`, shared with `createConcept` through `newConcept()`).
   - **Several links:** `linkRequirements` (`requirement.ts`): every pair without a live link, one change group, "Link
     requirements" for more than one; `allOf` for "Link all attributes…" (its toast and "Every attribute is linked
     already."). The menus' "Link to requirements…" opens the panel's picker through `focusDetails` (`data-pop`).

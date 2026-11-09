@@ -29,6 +29,16 @@ describe("createCubeEntity", () => {
     expect(r.ok && r.writeSet.writes[0]).toMatchObject({ row: { name: "New fact 2" } });
   });
 
+  it("makes a fact in a new concept in the same change group, with InfoMapper's undo name (slice 21, D-76)", () => {
+    const r = createCubeEntity(makeCtx(), access("modeler", on), { ...state(), concept: null, concepts: [concept(ids.conceptCustomer), concept(ids.conceptSales)] }, "fact", { newConcept: { name: "Retail" } });
+    if (!r.ok) throw new Error(r.error.message);
+    expect(r.writeSet.writes.map((w) => w.table)).toEqual(["concept", "entity", "cube_entity"]);
+    expect(r.writeSet.writes[0]).toMatchObject({ row: { name: "Retail", color: "#C0437A" } });
+    expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
+    expect(r.writeSet.label).toBe("Create New fact in new concept Retail");
+    expect(r.value.concept.name).toBe("Retail");
+  });
+
   it("is refused while InfoCube is off, and keeps InfoMapper's rights and the archive", () => {
     expect(createCubeEntity(makeCtx(), access("modeler"), state(), "fact", input)).toMatchObject({ ok: false, error: { code: "forbidden", message: INFOCUBE_OFF_MESSAGE } });
     expect(createCubeEntity(makeCtx(), access("reviewer", on), state(), "fact", input)).toMatchObject({ ok: false, error: { code: "forbidden" } });

@@ -162,8 +162,13 @@ export function MappingPanel({ mapping: m }: { mapping: Mapping }) {
     }
     return null;
   }
-  // the rule's draft (slice 13): kept across fresh pages and after a refusal
-  const { bind: ruleBind, defaultValue: ruleInitial, commit: ruleCommit, keyDown: ruleKeyDown, mark: ruleMark, takeStored: ruleTake, keepMine: ruleKeep } = useDraft<HTMLTextAreaElement>(m.rule_expression ?? "", onRuleBlur, { elementRef: rule, readOnly: !p.editable });
+  // the rule's draft (slice 13): kept across fresh pages and after a refusal; slice 21 (D-76): kept for this mapping when
+  // the panel goes while the field still has it, as InfoCube's rule and this panel's Note
+  const { bind: ruleBind, defaultValue: ruleInitial, commit: ruleCommit, keyDown: ruleKeyDown, mark: ruleMark, takeStored: ruleTake, keepMine: ruleKeep } = useDraft<HTMLTextAreaElement>(m.rule_expression ?? "", onRuleBlur, {
+    elementRef: rule,
+    readOnly: !p.editable,
+    keep: { key: fieldKey(m.id, "rule"), field: "Transformation rule", object: `the mapping to ${attribute?.name ?? "?"}` },
+  });
 
   /** A click on an input puts its column name into the rule, at the cursor (D-49). */
   function insert(columnId: Uuid) {

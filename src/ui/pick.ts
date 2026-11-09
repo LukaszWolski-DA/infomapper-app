@@ -30,16 +30,25 @@ export interface PickOptions {
   confirm?: (n: number) => string;
   /** A button in the footer, which closes the picker and runs `act`. */
   extra?: { label: string; act: () => void };
+  /**
+   * Slice 21 (D-76): an item that creates one from the typed text, last in the list, while the text equals no item's
+   * label (`createText`). `act` gets the text with its extra spaces removed. A single choice only.
+   */
+  create?: { label: (text: string) => string; act: (text: string) => void };
   /** The chosen ids: one for a single choice, the checked ones for `multi`. */
   pick: (ids: string[]) => void;
   testId?: string;
 }
 
-/** The items the filter leaves, by the label and the key, case ignored (prototype pickVisible). */
+/**
+ * The items the filter leaves, by the label and the key, case ignored (prototype pickVisible). Slice 21: extra spaces
+ * are ignored on both sides, as the create item compares (`pickNorm`), so a name typed with extra spaces still shows
+ * its item (the prototype's filter keeps them, and showed neither the item nor the create item).
+ */
 export function visibleItems(items: readonly PickItem[], query: string): PickItem[] {
-  const q = query.trim().toLowerCase();
+  const q = pickNorm(query);
   if (!q) return [...items];
-  return items.filter((it) => `${it.label} ${it.key ?? ""}`.toLowerCase().includes(q));
+  return items.filter((it) => pickNorm(`${it.label} ${it.key ?? ""}`).includes(q));
 }
 
 /** What a list without items says: the empty text, or that nothing matches the filter. */
@@ -47,13 +56,29 @@ export function noneText(options: Pick<PickOptions, "items" | "empty">, query: s
   return options.items.length ? `Nothing matches “${query.trim()}”.` : options.empty;
 }
 
+/** A label as the create item compares it (the prototype's `pkNorm`): trimmed, inner spaces collapsed, case ignored. */
+export const pickNorm = (text: string): string => text.trim().replace(/\s+/g, " ").toLowerCase();
+
+/**
+ * The create item's text (slice 21, D-76): the typed text with its extra spaces removed, while it equals no item's
+ * label (case and extra spaces ignored); "" with an empty filter, an exact match or no create option.
+ */
+export function createText(options: Pick<PickOptions, "items" | "create">, query: string): string {
+  const text = query.trim().replace(/\s+/g, " ");
+  if (!options.create || !text) return "";
+  const norm = pickNorm(text);
+  return options.items.some((it) => pickNorm(it.label) === norm) ? "" : text;
+}
+
 /**
  * Enter in the filter field: with `multi` it confirms when something is checked; a single choice picks the one
- * enabled item left, else nothing. Returns what Enter does.
+ * enabled item left, else nothing. Slice 21 (D-72 kept): the create item (`create`, its text) is taken only when no
+ * item is left, so "sal" + Enter still picks Sales beside “New concept “sal””. Returns what Enter does.
  */
-export function enterAction(multi: boolean, enabled: readonly PickItem[], checked: number): { confirm: true } | { pick: string } | null {
+export function enterAction(multi: boolean, enabled: readonly PickItem[], checked: number, create = ""): { confirm: true } | { pick: string } | { create: string } | null {
   if (multi) return checked ? { confirm: true } : null;
-  return enabled.length === 1 ? { pick: enabled[0]!.id } : null;
+  if (enabled.length === 1) return { pick: enabled[0]!.id };
+  return !enabled.length && create ? { create } : null;
 }
 
 /**

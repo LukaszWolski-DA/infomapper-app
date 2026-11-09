@@ -8,7 +8,7 @@
 import { moduleEntityDependents, relationshipOneEnd, STORE_SCHEMA } from "@/compose";
 import { getDataStore } from "@/data";
 import { addAttribute, createAttributeFromColumn, deleteAttribute, pasteAttribute, reorderAttribute, updateAttribute, type PasteAttributeInput, type UpdateAttributeInput } from "@/domain/commands/attribute";
-import { createConcept, deleteConcept, renameConcept } from "@/domain/commands/concept";
+import { createConcept, deleteConcept, renameConcept, setConceptColor } from "@/domain/commands/concept";
 import { createEntity, deleteEntity, updateEntity, type UpdateEntityInput } from "@/domain/commands/entity";
 import { createRelationship, deleteRelationship, swapRelationship, updateRelationship, type UpdateRelationshipInput } from "@/domain/commands/relationship";
 import { createSourceTable, deleteSourceTable, type CreateSourceTableInput } from "@/domain/commands/source";
@@ -24,6 +24,14 @@ const str = (v: unknown) => (typeof v === "string" ? v : "");
 const byId = <R extends { id: string }>(rows: readonly R[], id: unknown): R | null => rows.find((r) => r.id === id) ?? null;
 
 // ---- concepts ----
+
+/** A concept's colour from the workspace settings' “Concept colours” (slice 21, D-76): one undo step. */
+export async function setConceptColorAction(workspaceId: string, input: { conceptId: string; expectedVersion: number; color: string }): Promise<ActionResult<Saved>> {
+  return modelCommand(workspaceId, (ctx, access, { concepts }) => {
+    const result = setConceptColor(ctx, access, { concept: byId(concepts, input?.conceptId) }, input);
+    return result.ok ? { ...result, value: { version: result.value.concept.version } } : result;
+  });
+}
 
 export async function createConceptAction(workspaceId: string, input: { name: string }): Promise<ActionResult<{ conceptId: string }>> {
   return modelCommand(workspaceId, (ctx, access, { concepts }) => createConcept(ctx, access, { concepts }, input));
@@ -56,15 +64,17 @@ export async function deleteConceptAction(
 export async function createEntityAction(
   workspaceId: string,
   input: {
-    conceptId: string;
+    /** Exactly one of them: the entity's concept, or a new one made with it (slice 21, D-76). */
+    conceptId?: string;
+    newConcept?: { name: string };
     name?: string;
     placement: { canvasId: string; x: number; y: number; height?: number; frames?: { frameId: string; expectedVersion: number }[] };
   },
-): Promise<ActionResult<{ entityId: string; canvasItemId: string | null; name: string }>> {
+): Promise<ActionResult<{ entityId: string; canvasItemId: string | null; name: string; concept: { id: string; name: string } }>> {
   return modelCommand(workspaceId, async (ctx, access, { concepts, entities }, store) => {
     const canvasId = str(input?.placement?.canvasId);
     const [canvas, frames] = await Promise.all([store.canvases.get(access.workspace.id, canvasId), store.frames.listOfCanvas(access.workspace.id, canvasId)]);
-    const result = createEntity(ctx, access, { concept: byId(concepts, input?.conceptId), entities, canvas, frames }, input);
+    const result = createEntity(ctx, access, { concept: byId(concepts, input?.conceptId), concepts, entities, canvas, frames }, input);
     if (!result.ok) return result;
     const write = result.writeSet.writes.find((w) => w.kind === "insert" && w.table === "entity");
     const name = write?.kind === "insert" && write.table === "entity" ? write.row.name : "";

@@ -1339,8 +1339,6 @@ AD-35), but the app has no copy or transfer of a workspace yet, so nothing appli
   lit" rule of source lines, accepted in 15c step 4); the prototype lights the one mapping.
 - **Labels and requirement links cannot point to a dimensional mapping** (C13, AD-36): a dimensional mapping carries no
   working label and is not traced to a requirement; the prototype has neither.
-- **A logical row dropped onto a source column** makes nothing (X1): it would be an ordinary source mapping, InfoMapper's
-  behaviour, not InfoCube's (`docs/ideas.md`).
 - **The page's data grows with InfoCube's mappings:** a workspace with facts or dimensions sends its live
   `cube_mapping` and `cube_mapping_input` rows, and while four-eyes is on each mapping's last content editor, with every
   canvas page (`ModuleView.data.infocube`), also a canvas without facts or dimensions.
