@@ -409,6 +409,15 @@ nothing creates or brings one back, so there is no read-only mode, hatch or off 
 2026); the box's text and the "off" toast say so; the role titles have no "is off here: read-only"; each fact is listed
 once in a dimension's delete preview; paste within one level only (the prototype has no paste).
 
+## The app ahead of the prototype (slice 21)
+
+To be brought into the prototype at its next handover:
+
+- **Every picker's filter ignores extra spaces** (and case), as its create item compares (`pickNorm`); the prototype's
+  `pickVisible` trims only, so a name typed with extra spaces shows no item.
+- **A press on a canvas row first ends the editing of a focused panel field** (its blur saves it for its own row); the
+  prototype keeps the focus in the field.
+
 ## Not product features
 
 - **"Demo data restored" and "Reset the prototype's demo data":** the prototype's own reset. The app has
