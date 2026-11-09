@@ -39,6 +39,8 @@ import type { CubePageRows } from "../domain/view";
 import { addCubeMappingInputAction, removeCubeMappingInputAction, retargetCubeMappingAction, setCubeMappingStatusAction, updateCubeMappingAction } from "./actions";
 import { useCubeMappingDelete, useMappingIndex } from "./canvas-ext";
 import { ruleFocus } from "./rule-focus";
+import { ChecksBox } from "@/app/_panels/checks-box";
+import { CHECK_MAPPING_KIND } from "../domain/checks";
 
 const KINDS = [
   ["direct", "Direct copy"],
@@ -156,6 +158,8 @@ function MappingFields({ id, index }: { id: Uuid; index: MappingIndex }) {
           InfoCube
         </span>
       </Kind>
+      {/* slice 20: InfoMapper's model checks of this mapping (its type conflict, its inputs not covered) */}
+      <ChecksBox of={{ t: "ext", kind: CHECK_MAPPING_KIND, id: m.id }} />
       <div className="mb-1 mt-3 grid grid-cols-[1fr_auto_1fr] items-center gap-1.5" data-testid="cube-mapping-trace">
         <span className="flex min-w-0 flex-col gap-1">
           {inputs.map((i) => {

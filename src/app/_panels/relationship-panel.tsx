@@ -13,6 +13,7 @@ import type { CardinalityMax, CardinalityMin, Relationship } from "@/domain/type
 import { Actions, buttonClass, ConfirmDelete, dangerClass, Field, fieldKey, Kind, Seg, TextField } from "./fields";
 import { PANEL_SECTIONS } from "@/compose/panels";
 import { usePanel } from "./inspector";
+import { ChecksBox } from "./checks-box";
 
 /** The four cardinalities the prototype offers (CARDS). */
 const CARDS = [
@@ -61,6 +62,7 @@ export function RelationshipPanel({ relationship: r }: { relationship: Relations
   return (
     <div data-testid="panel-relationship">
       <Kind>Relationship</Kind>
+      <ChecksBox of={{ t: "relationship", id: r.id }} />
       <h2 className="text-base font-semibold leading-snug">
         {from} and {to}
       </h2>

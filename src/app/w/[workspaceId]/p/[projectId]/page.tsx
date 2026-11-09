@@ -6,7 +6,7 @@ import { projectOpenNotes, projectRequirements, projectStats } from "@/app/_pane
 import { canvasHref } from "@/app/_lib/paths";
 import { thumbnailHrefs } from "@/app/_lib/thumbnails";
 import { getDataStore } from "@/data";
-import { moduleFeeds } from "@/compose";
+import { moduleHomeData } from "@/compose";
 import type { Uuid } from "@/domain/ids";
 import { projectLabels, type ProjectLabelContext } from "@/domain/model/labels";
 import { buildRequirementIndex } from "@/domain/model/requirement-index";
@@ -14,6 +14,8 @@ import { modelConsistency } from "@/domain/source-changes/consistency";
 import type { CanvasItem, WorkspaceModel } from "@/domain/types";
 import { CanvasThumbnail } from "@/ui/canvas-thumbnail";
 import { ProjectConsistency } from "./_components/project-consistency";
+import { ChecksStat, ProjectChecks } from "./_components/project-checks";
+import { homeChecks, projectModelChecks } from "@/app/_lib/project-checks";
 import { ProjectDelete } from "./_components/project-delete";
 import { ProjectHeading } from "./_components/project-heading";
 import { ProjectLabels } from "./_components/project-labels";
@@ -77,8 +79,10 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   });
 
   // Requirements whose scope touches the project's canvases (slice 4a): one index for the page
-  // what feeds the facts and dimensions (slice 15d, D4): the requirements follow dimensional mappings; the thumbnails count them
-  const { rowFeeds, feeds } = await moduleFeeds(ws, model);
+  // what feeds the facts and dimensions (slice 15d, D4): the requirements follow dimensional mappings; the thumbnails count them.
+  // One read of the module's rows serves the model checks too (slice 20, F19).
+  const homeData = await moduleHomeData(shell.workspace, model);
+  const { rowFeeds, feeds } = homeData;
   const requirementIndex = buildRequirementIndex(requirements, requirementLinks, model, feeds);
   const projectReqs = projectRequirements(requirementIndex, items, view.canvases.map((c) => c.id));
   const reqCovered = projectReqs.filter((r) => r.done).length;
@@ -86,6 +90,9 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
   // Model consistency (slice 7b, item 25): computed on every load; each line opens its object on a canvas (F15)
   const consistency = modelConsistency(model, items, view.canvases.map((c) => c.id), requirementIndex, projectReqs, sourceChanges);
   const firstCanvasId = view.canvases[0]!.id;
+  // Model checks (slice 20, PRD items 1–2): the project's scope, after consistency; 20 lines per group rendered here
+  const canvasIds = view.canvases.map((c) => c.id);
+  const checks = homeChecks(await projectModelChecks(shell.workspace, model, items, canvasIds, { data: homeData, lookup: requirementIndex.lookup }), { workspaceId: ws, projectId: view.project.id, canvasIds, items });
   const consistencyHref = (canvasId: string, query: string) => `${canvasHref(ws, view.project.id, canvasId || firstCanvasId)}?${query}`;
 
   // Open notes: canvas by canvas in tab order; each opens its canvas with the note selected (S3A-05)
@@ -127,8 +134,10 @@ export default async function ProjectHomePage({ params }: PageProps<"/w/[workspa
             <span data-testid="stat-requirements">
               <b>{projectReqs.length}</b> requirement{projectReqs.length === 1 ? "" : "s"}, <b>{reqCovered}</b> covered
             </span>
+            <ChecksStat count={checks.count} high={checks.high} />
           </div>
           <ProjectConsistency consistency={consistency} href={consistencyHref} />
+          <ProjectChecks checks={checks} workspaceId={ws} projectId={view.project.id} />
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Canvases</h3>
           <CanvasTiles view={view} thumbnails={thumbnails} frames={frameCounts} />
           <h3 className="mb-2.5 mt-7 text-[13px] font-semibold text-im-ink-2">Requirements</h3>

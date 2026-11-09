@@ -7,8 +7,11 @@
 // “Notes on this canvas” (prototype insOverview): the open notes as links, “All N notes are resolved.” or how to make
 // one, and “Show resolved notes on the canvas”, this person's preference in this browser (not saved, no undo step).
 
-import { useContext } from "react";
-import { useModules } from "@/app/_components/modules";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
+import { useChecks, useModules } from "@/app/_components/modules";
+import { checksJump, checksJumpHandled } from "@/canvas/checks";
+import { useValue } from "@/canvas/value-store";
+import { CHECK_TEXTS, lineOf, type CheckRef, type IndexedItem } from "@/domain/model/checks";
 import { CanvasUiCtx } from "@/canvas/context";
 import { frameColor } from "@/canvas/frame-data";
 import { firstLine } from "@/canvas/note-data";
@@ -70,6 +73,7 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
           />
         </Fold>
       )}
+      <CanvasChecks entityIds={entityIds} />
       {problems.length > 0 && (
         <Fold title="Needs attention" count={problems.length}>
           <LongList
@@ -184,5 +188,75 @@ export function OverviewPanel({ entityIds, tableCount, canvasName, canvasCount }
         </Fold>
       )}
     </div>
+  );
+}
+
+/**
+ * "Model checks" for the cards on this canvas (slice 20, PRD item 5, Z5; prototype `chkOverview`): High first, each line
+ * with its "!", its name and its group's short label, the whole text as its title; a click selects its object and
+ * centres its card. The words are built when the group is shown. The status bar's count opens and flashes it once
+ * (`checksJump`), scrolling it into view on the next frame, never in a commit.
+ */
+function CanvasChecks({ entityIds }: { entityIds: string[] }) {
+  const p = usePanel();
+  const ui = useContext(CanvasUiCtx);
+  const index = useChecks();
+  const jump = useValue(checksJump);
+  const items = useMemo(() => (index ? index.onCanvas(entityIds) : []), [index, entityIds]);
+  const lines = useMemo(() => items.map((x) => ({ x, line: lineOf(x.item) })), [items]);
+  const ref = useRef<HTMLElement>(null);
+  const [flash, setFlash] = useState(false);
+  const [opened, setOpened] = useState(0);
+  const any = items.length > 0;
+  useEffect(() => {
+    if (!any || jump <= checksJumpHandled.get()) return;
+    // marked as handled in the frame: a mount that is undone at once (a remount, React's development double run) leaves
+    // the request for the next one
+    let done = 0;
+    const frame = requestAnimationFrame(() => {
+      checksJumpHandled.set(jump);
+      setOpened(jump);
+      ref.current?.scrollIntoView({ block: "start" });
+      setFlash(true);
+      done = window.setTimeout(() => setFlash(false), 900);
+    });
+    return () => {
+      cancelAnimationFrame(frame);
+      window.clearTimeout(done);
+    };
+  }, [jump, any]);
+  if (!lines.length) return null;
+  const open = (x: IndexedItem) => {
+    const go: CheckRef = x.item.go;
+    if (go.t === "entity") return p.goEntity(go.id);
+    if (go.t === "attribute") {
+      p.goAttribute(go.id);
+      const card = p.cardOf(p.ix.attribute.get(go.id)?.entity_id ?? "");
+      if (card) ui.centerOn(card);
+      return;
+    }
+    ui.select(go.t === "relationship" ? { t: "rel", id: go.id } : { t: "ext", kind: go.kind, id: go.id });
+    const card = x.item.entities.map((e) => p.cardOf(e)).find((c) => c);
+    if (card) ui.centerOn(card);
+  };
+  return (
+    <Fold title={CHECK_TEXTS.title} count={lines.length} testId="section-canvas-checks" openOn={opened} flash={flash} sectionRef={ref}>
+      <Hint>{CHECK_TEXTS.canvasHint}</Hint>
+      <LongList
+        items={lines}
+        testId="list-canvas-checks"
+        text={({ line }) => line.name}
+        render={({ x, line }) => (
+          <Li key={`${x.group.id}:${line.go.t}:${line.go.id}:${line.name}`} onClick={() => open(x)} meta={x.group.short} title={`${x.group.title}: ${line.detail}`} testId="item-canvas-check">
+            <span className="flex items-center gap-2">
+              <span className={`w-2.5 flex-none -skew-x-12 text-center text-sm font-bold italic leading-none ${x.group.high ? "text-im-warn" : "text-im-ink-3"}`} aria-hidden>
+                !
+              </span>
+              <span className="truncate">{line.name}</span>
+            </span>
+          </Li>
+        )}
+      />
+    </Fold>
   );
 }

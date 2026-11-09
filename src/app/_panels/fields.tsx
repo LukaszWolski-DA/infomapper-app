@@ -731,13 +731,36 @@ function readShut(): Set<string> {
 }
 
 /** A panel section whose heading folds it; the state is remembered per title in this browser. */
-export function Fold({ title, count, children, testId }: { title: string; count?: number; children: ReactNode; testId?: string }) {
+export function Fold({ title, count, children, testId, openOn, flash, sectionRef }: {
+  title: string;
+  count?: number;
+  children: ReactNode;
+  testId?: string;
+  /** Slice 20: a request to show the section opened (a counter; 0 asks nothing): unfolded, and remembered so. */
+  openOn?: number;
+  /** Slice 20: the section flashes once (the status bar's jump). */
+  flash?: boolean;
+  sectionRef?: React.Ref<HTMLElement>;
+}) {
   const key = sectionKey(title);
   const [shut, setShut] = useState(false);
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- browser-only preference, read after mount
     setShut(readShut().has(key));
   }, [key]);
+  useEffect(() => {
+    if (!openOn) return;
+    const all = readShut();
+    if (all.delete(key)) {
+      try {
+        window.localStorage.setItem(SECTIONS_KEY, JSON.stringify([...all]));
+      } catch {
+        // not remembered
+      }
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- asked for from outside (the status bar's count)
+    setShut(false);
+  }, [openOn, key]);
   const toggle = () => {
     const all = readShut();
     if (!all.delete(key)) all.add(key);
@@ -749,7 +772,7 @@ export function Fold({ title, count, children, testId }: { title: string; count?
     setShut(all.has(key));
   };
   return (
-    <section data-testid={testId}>
+    <section data-testid={testId} ref={sectionRef} data-flash={flash || undefined} className={flash ? "rounded bg-im-warn-soft transition-colors duration-300" : "transition-colors duration-300"}>
       <h3 className="-ml-1 mb-2 mt-5 text-xs font-semibold text-im-ink-2">
         <button
           type="button"

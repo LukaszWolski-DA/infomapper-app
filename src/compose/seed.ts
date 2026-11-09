@@ -3,6 +3,7 @@
 
 import type { DevDb } from "@/data/local/schema";
 import { SEED_IDS, SEED_USERS } from "@/data/local/seed";
+import { addChecksDemo } from "@/data/local/seed-checks";
 import { addSalesStar, addStarDerivations, addStarTypes } from "@/modules/infocube/data/sales-star";
 
 /** The Sales star in "Retail Co – DWH", with InfoMate's InfoCube licence and InfoCube on there. */
@@ -31,9 +32,27 @@ export function addInfoCubeTypesDemoData(db: DevDb, at?: string): boolean {
   return addStarTypes(db, SEED_IDS.wsRetailDwh, SEED_USERS.anna.id, at);
 }
 
-/** What the seed, the reset and `npm run demo` write: `addDemoData`, then `addInfoCubeTypesDemoData` (slice 19). */
-export function addFullDemoData(db: DevDb, at?: string): boolean {
+/**
+ * Slice 19's demo and everything before it: `addDemoData`, then `addInfoCubeTypesDemoData`. Slice 19's fixtures and its
+ * unit test read this (slice 20, F23), so they keep what they read before slice 20's demo.
+ */
+export function addTypesDemoData(db: DevDb, at?: string): boolean {
   const added = addDemoData(db, at);
   addInfoCubeTypesDemoData(db, at);
+  return added;
+}
+
+/**
+ * Slice 20's demo for the model checks (PRD item 7): copies of the demo model's keys and what the checks find, in "Retail
+ * Co – DWH". InfoMapper's own step. Run by `addFullDemoData` and slice 20's fixtures only.
+ */
+export function addChecksDemoData(db: DevDb, at?: string): boolean {
+  return addChecksDemo(db, SEED_IDS.wsRetailDwh, SEED_USERS.anna.id, at);
+}
+
+/** What the seed, the reset and `npm run demo` write: `addTypesDemoData`, then `addChecksDemoData` (slice 20). */
+export function addFullDemoData(db: DevDb, at?: string): boolean {
+  const added = addTypesDemoData(db, at);
+  addChecksDemoData(db, at);
   return added;
 }

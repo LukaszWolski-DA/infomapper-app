@@ -3,5 +3,6 @@
 
 export { relationshipOneEnd } from "./model";
 export { STORE_SCHEMA, UNDO_TABLES } from "./tables";
-export { moduleEntityDependents, moduleFeeds, moduleLines, moduleRowFeeds, moduleView, type CreateActions } from "./view";
+export { moduleEntityDependents, moduleFeeds, moduleHomeData, moduleLines, moduleRowFeeds, moduleView, type CreateActions } from "./view";
 export { conceptFeeds, NO_FEEDS, requirementFeeds } from "./feeds";
+export { cubeModuleChecks, pageModuleChecks } from "./checks";

@@ -21,6 +21,7 @@ import { createNoteAction, deleteNoteAction, moveNoteAction, moveNotesAction, pi
 import { AppShell } from "@/app/_components/app-shell";
 import { ModulesProvider } from "@/app/_components/modules";
 import { moduleLines, moduleView, requirementFeeds, STORE_SCHEMA } from "@/compose";
+import { extEntities, extGoneText } from "@/compose/checks";
 import { CREATE_ACTIONS } from "@/compose/actions";
 import { NO_MODULES } from "@/ui/modules";
 import { MovedNotice } from "@/app/_components/moved-notice";
@@ -180,6 +181,9 @@ export default async function CanvasPage({
   const focusNoteId = typeof query.note === "string" && noteRows.some((n) => n.id === query.note) ? query.note : null;
   // `?map=`, `?row=<attribute or column id>`, `?system=` (slice 7b, F15): the project home's model consistency
   const focusSelection = arrivalSelection(query, model, cards);
+  // `?entity=`, `?rel=`, `?ext={kind}:{id}` (slice 20, F17, answer 9): the project home's model checks; the card to
+  // centre on for a relationship or a module's object, and what to say when the object is gone
+  const checkArrival = focusSelection ? null : checkArrivalOf(query, model, cards, modules);
 
   // “On canvases” (slice 2a): every canvas of the workspace and where it opens, and the canvases each element is on.
   // A canvas outside this project opens in the first project that has it (assumption 4).
@@ -224,7 +228,7 @@ export default async function CanvasPage({
         editable={editable}
         save={saveCanvasLookAction.bind(null, ws)}
       >
-      <ModulesProvider view={modules} model={model}>
+      <ModulesProvider view={modules} model={model} requirements={requirements} requirementLinks={requirementLinks}>
       <PanelsProvider>
         <UndoProvider workspaceId={ws} projectId={projectId} canvasId={canvasId} state={undoState}>
           <WorkingContextProvider workspaceId={ws} userId={shell.user.id} labels={countedLabels} initial={contextCookie} canLabel={editable}>
@@ -269,7 +273,7 @@ export default async function CanvasPage({
                   dataVault={!!workspace?.dv2_mode}
                 />
               ),
-              openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId || focusSelection),
+              openDetails: !!(focusCardId || focusLabelId || focusRequirementId || focusNoteId || focusSelection || checkArrival?.selection),
               // `?diag=noviewbar` (measurement build only, slice 6a S6A-09): the page without the bar, to time a switch alone
               viewState: diag.includes("noviewbar") ? undefined : <ViewStateBar editable={editable} live={liveLabel ? { labelName: liveLabel.name } : null} />,
               status: (
@@ -286,7 +290,7 @@ export default async function CanvasPage({
             {query.moved === "1" && <MovedNotice project={view.project.name} canvas={canvas.name} />}
             <RememberLastCanvas projectId={projectId} canvasId={canvasId} />
             {/* selections as places in the browser's history (slice 6b) */}
-            <SelectionHistory key={canvasId} canvasId={canvasId} labelIds={labels.filter((l) => l.deleted_at === null).map((l) => l.id)} />
+            <SelectionHistory key={canvasId} canvasId={canvasId} labelIds={labels.filter((l) => l.deleted_at === null).map((l) => l.id)} arrivalGone={checkArrival?.gone} />
             {/* the measuring hook (slice 4p): e2e dev server and measurement build only */}
             {areTestHooksOn() && <TestHooks indexData={{ model, requirements, requirementLinks }} />}
             {/* an error inside the canvas shows a message in its place; the panels and the top bar keep working (slice 4p) */}
@@ -327,7 +331,8 @@ export default async function CanvasPage({
               focusLabelId={focusLabelId}
               focusRequirementId={focusRequirementId}
               focusNoteId={focusNoteId}
-              focusSelection={focusSelection}
+              focusSelection={focusSelection ?? checkArrival?.selection}
+              focusCenter={checkArrival?.center}
               // fading (slice 4p): the same objects the inspector gets, so the page's payload carries them once
               fadeData={{ model, requirements, requirementLinks, changes: sourceChanges }}
               changeImports={changeImports}
@@ -381,6 +386,40 @@ function arrivalSelection(query: Record<string, string | string[] | undefined>, 
   if (!attribute && !column) return undefined;
   const card = cards.find((c) => (attribute ? c.kind === "ent" && c.targetId === attribute.entity_id : c.kind === "src" && c.targetId === column!.source_table_id));
   return card ? { t: "row", cardId: card.id, id: row } : { t: "element", kind: attribute ? "attribute" : "source_column", id: row };
+}
+
+/**
+ * `?entity=`, `?rel=` or `?ext={kind}:{id}` (slice 20): what the project home's model checks open. An entity with a card
+ * here is its card, else its panel; a relationship or a module's object is selected and its first card here centred.
+ * A gone object is said by the selection history's words (`GONE`).
+ */
+function checkArrivalOf(
+  query: Record<string, string | string[] | undefined>,
+  model: WorkspaceModel,
+  cards: readonly CardData[],
+  modules: Parameters<typeof extEntities>[0],
+): { selection?: Selection; center?: string; gone?: { t: "element" | "rel"; id: string } | { t: "ext"; text: string } } | null {
+  const { entity, rel, ext } = query;
+  const cardOf = (entityIds: readonly string[]) => entityIds.map((e) => cards.find((c) => c.kind === "ent" && c.targetId === e)?.id).find((id) => id);
+  if (typeof entity === "string") {
+    if (!model.entities.some((e) => e.id === entity)) return { gone: { t: "element", id: entity } };
+    const card = cardOf([entity]);
+    return { selection: card ? { t: "card", id: card } : { t: "element", kind: "entity", id: entity } };
+  }
+  if (typeof rel === "string") {
+    const r = model.relationships.find((x) => x.id === rel);
+    if (!r) return { gone: { t: "rel", id: rel } };
+    return { selection: { t: "rel", id: rel }, center: cardOf([r.from_entity_id, r.to_entity_id]) };
+  }
+  if (typeof ext === "string") {
+    const at = ext.indexOf(":");
+    const kind = ext.slice(0, at), id = ext.slice(at + 1);
+    if (at < 1 || !id) return null;
+    const ends = extEntities(modules, model, kind, id);
+    if (!ends) return { gone: { t: "ext", text: extGoneText(kind) ?? "That element no longer exists." } };
+    return { selection: { t: "ext", kind, id }, center: cardOf(ends) };
+  }
+  return null;
 }
 
 // On a narrow window the names' check boxes (slice 11), then Focus and the notation, then the four tools, leave the bar for “More” (slice 6a): each wrapper is

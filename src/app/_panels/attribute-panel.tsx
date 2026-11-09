@@ -53,6 +53,7 @@ import { useMoveAttribute } from "./move-attribute";
 import { attributeLabel, businessKeyHint, columnLabel, columnOptions, inputColumns, inputsLabel, typeCheckOf } from "./model-index";
 import { usePanels } from "./panels-context";
 import { RequirementsSection } from "./requirements-section";
+import { ChecksBox } from "./checks-box";
 
 export const STATUS_LABEL = { draft: "Draft", review: "In review", approved: "Approved" } as const;
 
@@ -161,6 +162,7 @@ export function AttributePanel({ attribute: a }: { attribute: Attribute }) {
           {entity?.name}
         </button>
       </Kind>
+      <ChecksBox of={{ t: "attribute", id: a.id }} />
       <Field label="Name" htmlFor="f-an">
         <TextField key={fieldKey(a.id, "name")} id="f-an" value={a.name} required readOnly={!p.editable} onSave={(name) => save({ name })} testId="input-attribute-name" inputRef={nameRef} keep={{ key: fieldKey(a.id, "name"), field: "Name", object: a.name }} />
       </Field>

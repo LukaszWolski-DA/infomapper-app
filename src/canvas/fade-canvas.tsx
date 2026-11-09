@@ -5,6 +5,7 @@
 // covered or gap in the overlay above the cards (`LitRows`). The veil is `FadeLayer.tsx`'s. Slice 4b-2, step 6: the
 // requirement cards a Focus lights (the domain's `litRequirements`, PRD item 21, C) and the trace lines with both ends lit.
 
+import { RequirementIndexCtx } from "./checks";
 import { createContext, memo, useContext, useMemo } from "react";
 import { useStore, type InternalNode } from "@xyflow/react";
 import type { Uuid } from "@/domain/ids";
@@ -78,7 +79,9 @@ export function useLit(data: FadeData | undefined): { key: string; lit: Lit } | 
 export function useRequirementIndex(data: FadeData | undefined) {
   const model = data?.model, requirements = data?.requirements, links = data?.requirementLinks;
   const feeds = useContext(RequirementFeedsCtx);
-  return useMemo(() => (model && requirements && links ? buildRequirementIndex([...requirements], [...links], model, feeds) : null), [model, requirements, links, feeds]);
+  // slice 20: the page's one index when the app provides it (the details panel, the status bar and the checks share it)
+  const shared = useContext(RequirementIndexCtx);
+  return useMemo(() => shared ?? (model && requirements && links ? buildRequirementIndex([...requirements], [...links], model, feeds) : null), [shared, model, requirements, links, feeds]);
 }
 
 /**

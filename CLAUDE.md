@@ -50,7 +50,10 @@ of its entity with a plain-text rule, counted as mapped or fed and covered throu
 square on its row; a dimensional mapping may be a Lookup through a dictionary's relationship (slice 18, D-73). A fact has
 a type (Transaction, Periodic snapshot, Accumulating snapshot), may be factless and may be an aggregate of another fact; a
 dimension has a kind (Standard, Junk) and a history (SCD 0, 1, 2 or Snapshot with its period); an outrigger is derived
-from a relationship between two dimensions; the role chip names them (slice 19, D-74).
+from a relationship between two dimensions; the role chip names them (slice 19, D-74). The model is checked as it stands, read only:
+duplicate names, calculations also mapped, lost originals, copied keys and relationships without them, and with InfoCube
+the facts' hints and the approved feeds the logical model no longer supports; the project home lists them, cards carry a
+slanted "!", the status bar counts them and the panels show their own (slice 20, D-75).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -184,6 +187,16 @@ list up to date in each sub-slice):
     unlocked organization, a read only).
   - `PANEL_SECTIONS.entityFeeds`: where a logical entity's "Feeding sources" are, which a fact or a dimension does
     not show ("Fed from concepts").
+- **Model checks** (slice 20, D-75): InfoMapper's rules and the index are `src/domain/model/checks.ts` (`modelChecks`,
+  `checkIndex`, `projectScope`, `coverageGapText`, `CHECK_TEXTS`); a rule gives `CheckItem`s (what it opens, the panels
+  that list it, its marks, the entities it names) whose words are built by `text()` only where they are shown
+  (`lineOf`). A module adds `ModuleChecks` (its groups, its topic and its empty-text part) through `src/compose/checks.ts`:
+  `cubeModuleChecks`, `pageModuleChecks` (a canvas page, from `ModuleView.data`), `pageCheckIndex` (the browser's index),
+  `extEntities` and `extGoneText` (`?ext=`); the home's one read of a module's rows is `moduleHomeData`
+  (`src/compose/view.ts`). The rules read the requirement index's `lookup` (`RequirementIndex.lookup`) and a cube index
+  passed in. A canvas page's index lives in `ModulesProvider` (with the page's one requirement index,
+  `RequirementIndexCtx`, `ChecksCtx`, `src/canvas/checks.ts`). **A later rule** is a group of `CheckItem`s, its texts in
+  `text()`; **a later caller of the requirement index** on a canvas page uses the page's (`usePageRequirementIndex`).
 - **A new module** adds its folder, its name to `modules` in `eslint.config.mjs`, its tables to the registry's three
   records and a migration, and its pieces to `src/compose/`; InfoMapper's code does not change.
 
@@ -365,6 +378,11 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
 npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the homes' server work and the thumbnails' cost (index, shapes, paths, bytes, 20 requests, keys; not a gate)
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
+npx tsx scripts/bench-checks.ts                               # slice 20: the model checks (marks and counts, the home with its lines; bar 50 ms in Node), synthetic, Performance test, demo
+npx tsx scripts/bench-checks-browser.ts                       # slice 20: the same in headless Chromium, with the split (the marks: reference 25 ms, not a gate)
+npx tsx scripts/count-checks.ts <copy of a backup>             # slice 20: a read-only count of the check lines per workspace and project (counts only, never .data/dev-db.json)
+npm run measure:canvas -- --to-screen --only s20 --rounds 2 --against slice-19   # slice 20's sitting: pans at 100 % and 30 % on Performance test, a mark's write and its undo
+MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-20/S20-layers.spec.ts   # slice 20: layers and elements on the Sales star without and with the marks
 npm run seed:large -- --changes                               # slice 7b: also an import with changes into "Performance test" (16 changes on 9 tables)
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-07b/S7B-16-changes.spec.ts # slice 7b: the Changes view and Focus to the screen; the home's load
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-06b/S6B-10.spec.ts         # slice 6b: selection places, the buttons, the background refresh, phase by phase
@@ -556,8 +574,8 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - use the section and its picker (`calcSection`, `calcPicker`, `pickItem`, `pickInputs`), wait for the panel's stored
     version (`expectAttributePanelAt`), and read a card's count and the Overview's line (`cardCount`, `overviewLine`).
 
-  Slice 19's fixtures reseed with `addFullDemoData` (the star, slice 18's derivations and slice 19's types,
-  `addInfoCubeTypesDemoData`, which seed, reset and `npm run demo` also run; slice 15's and 18's fixtures do not). Its
+  Slice 19's fixtures reseed with `addTypesDemoData` (the star, slice 18's derivations and slice 19's types,
+  `addInfoCubeTypesDemoData`; slice 15's and 18's fixtures do not). Its
   helpers do the following:
   - read InfoCube's rows (`cubeRow`, `typeEntity`, `GROUPS`) and run a domain command through the composed store
     (`asCube`; slice 1b's `asUser` writes InfoMapper's tables only);
@@ -566,6 +584,19 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
     `segment`, `cubeItem`).
   A create's rows are in the data file before its answer reaches the page: wait for what the answer does on the page (the
   new name focused) before the next step (S17-01, slice 19).
+
+  Slice 20's fixtures reseed with `addFullDemoData`: slice 19's demo and slice 20's checks demo (`addChecksDemoData`,
+  `src/data/local/seed-checks.ts`: the demo model's keys as copies, Customer.last_order_id, Product.country_code and
+  Product_Name, Sales Order.total_amount calculated, Customer Address.country_code no foreign key), which the seed, the
+  reset and `npm run demo` also run; no earlier fixture does, and the plain e2e seed has no check line. Its helpers do the
+  following:
+  - name the demo's objects (`demoAttr`, `demoEntity`, `demoRel`, `OM_HOME`, `C360_HOME`);
+  - read the home's section (`checksSection`, `checkGroup`, `checkLines`, `groupCounts`);
+  - read a card's marks (`headLine`, `rowType`, `markOf`, `expectMark`, `markTitleOf`: a mark's title is set on hover);
+  - read the status bar's count, the details panel's group and the panels' box (`statusChecks`, `canvasChecks`,
+    `canvasCheckItems`, `checksBox`, `boxItems`).
+  React's development mode runs effects twice: a request handled in an effect is marked handled where it is acted on
+  (in its animation frame), or the second run finds it done (the status bar's jump, slice 20).
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,

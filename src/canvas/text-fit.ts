@@ -43,19 +43,19 @@ export interface RowText {
 }
 
 /** Whether a row's name may not fit beside its key, badges, type and mapped dot (prototype .row layout). */
-export function rowNeedsClip(row: RowText, kind: "ent" | "src", dualKeys: boolean, width: number = CARD_W): boolean {
+export function rowNeedsClip(row: RowText, kind: "ent" | "src", dualKeys: boolean, width: number = CARD_W, extra = 0): boolean {
   const key = dualKeys ? 34 : 18;
   const tags = (row.pii ? TAG + GAP : 0) + (row.bk ? TAG + GAP : 0) + (row.labels ? MARK + GAP : 0) + (row.mark ? ROW_MARK + GAP : 0) + (row.calc ? CALC_MARK + GAP : 0);
   const type = kind === "src" ? monoWidth(row.type, 10.5) : sansWidth(row.type, 11);
   const dot = row.mappings > 1 ? 16 + 2 * 4 + String(row.mappings).length * 6 : 10;
-  const available = width - ROW_PAD - key - GAP - tags - GAP - type - GAP - dot - SAFETY;
+  const available = width - ROW_PAD - key - GAP - tags - GAP - type - extra - GAP - dot - SAFETY;
   const name = kind === "src" ? monoWidth(row.name, 12) : sansWidth(row.name, 12.5);
   return name > available;
 }
 
 /** Whether a card's title may not fit beside the coverage bar and its count (prototype .c-l2). */
-export function titleNeedsClip(name: string, kind: "ent" | "src", coverage: string, width: number = CARD_W): boolean {
-  const available = width - 14 - 8 - 8 - 42 - 8 - sansWidth(coverage, 11) - SAFETY;
+export function titleNeedsClip(name: string, kind: "ent" | "src", coverage: string, width: number = CARD_W, extra = 0): boolean {
+  const available = width - 14 - 8 - 8 - 42 - 8 - sansWidth(coverage, 11) - extra - SAFETY;
   return (kind === "src" ? monoWidth(name, 13.5) : sansWidth(name, 14) * 1.05) > available;
 }
 
@@ -73,6 +73,9 @@ export const reqMarkWidth = (n: number): number => (n > 0 ? 4 + 6 + 2 + 6 * Stri
 export const ROLE_MARK = 14;
 /** A module's mark on a row (slice 15b: a measure's Σ, Σ~ or ∅Σ, prototype `.row .meas`, at least 18 px). */
 export const ROW_MARK = 18;
+/** A model check's "!" (slice 20): after the card's name, with the header line's 8 px gap; before a row's type, with its margin. */
+export const CHECK_MARK_HEAD = 14;
+export const CHECK_MARK_ROW = 10;
 /** A calculated attribute's "=" on its row (slice 18, prototype `.row .calc`): the glyph, its padding and margin. */
 export const CALC_MARK = 16;
 
