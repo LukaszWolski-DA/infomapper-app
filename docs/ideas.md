@@ -73,6 +73,14 @@ What is still off the chain is in `docs/known-limitations.md` ("Writes still off
   Left for later: Playwright's own container image pinned to 1.63.0 (dependencies preinstalled) instead of
   `playwright install --with-deps`, whose Ubuntu mirror once took about 9.5 minutes in one job per run
   (`docs/known-limitations.md`); validate it with S6A-10's text drawing.
+- **Chore e2e eight parts** (9 November 2026): eight parts, cut in folder order by the median folder times of five full
+  runs; a new slice joins the last part, recut by the rule in CLAUDE.md. Left for later:
+  - **A script for the cuts:** read the `part-<n>` artifacts of the last full runs (`gh run download`, each part's
+    `e2e-memory-ci-part<n>.tests.jsonl`), sum each folder's test times, take the median per folder and print the best
+    in-order cuts for the current part count (the lowest longest part), with each part's expected time.
+  - **Why slice-00 to slice-02a cost about twice as much per test** as later folders (about 8 to 11 s against 4 to 5 s
+    on the runner): the older helpers, sign-in per test, slice 17's concept picker in slice 1b's create helpers, or
+    waits that later slices no longer need.
 - **The model validator: done in slice 20** (D-75; below, "A model validator").
 - **The database slice last** (AD-31).
 
