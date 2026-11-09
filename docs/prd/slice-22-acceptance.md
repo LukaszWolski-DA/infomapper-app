@@ -315,3 +315,64 @@ manual acceptance steps (the demo, then KB after a fresh backup).
 
 The corrections that needed no decision stand as written: `upgrade` for old rows (F4), read-only fields for readers and
 reviewers (F6), `TextField`'s optional `invalid` prop (F7), the five earlier specs (F9).
+
+## Step 2: data and domain (9 November 2026)
+
+Draft PR 51 was opened at the start of the step.
+
+### What changed
+
+- **The migration** `supabase/migrations/20261109120000_infocube_unknown_member.sql`: `cube_entity.has_unknown_member`
+  (true for every dimension, null for a fact), `cube_entity_shape_ck` again with it, the table `cube_attribute` with its
+  unique index among live rows, `cube_attribute_unknown_value_ck` and row level security.
+- **The module's tables** (`domain/types.ts`, `data/tables.ts`, `domain/tables.ts`): `CubeEntity.has_unknown_member`,
+  `CubeAttribute`, `typeColumns` (a new dimension on), `shapeFits`, the table's rules, `InfoCubeDb`, and the undo
+  registration (parent `attribute`, noun "unknown member value"). `createCubeEntity` now takes its columns from
+  `typeColumns`, so every path that makes a dimension sets the flag.
+- **Old rows** (F4): `upgradeCubeEntity` gives a dimension without the column true and a fact null, from slice 19's
+  shape and from slice 18's. The local file's format stays 14.
+- **The rule** (`domain/unknown-member.ts`): `unknownDefault`, `unknownFit` for all eight types, `unknownValueOf`, and
+  the texts of the Dimensions row and the lookup's placeholder for step 3.
+- **The commands** (`domain/commands.ts`, `app/actions.ts`): `hasUnknownMember` on `updateCubeEntity`; `setUnknownValue`
+  with F3's check and `setUnknownValueAction`.
+- **The cube index** (`domain/keys.ts`): `unknownOn(entityId)` and `unknownOf(attributeId)`.
+- **The checks** (`domain/checks.ts`): `unkval` and `nounk`, the groups in the order feeds, unkval, facts, nounk, under.
+- **The row lists** (F14): `cubeAttributes` in `CubePageRows`, `CubeCheckRows`, the page's and the home's reads
+  (`src/compose/view.ts`) and the bench's (`scripts/lib/checks-model.ts`).
+- **`docs/data-model-v2.md`:** the column, the CHECK and the table.
+
+### What differs from the plan
+
+1. **`unknownValueOf` is in `unknown-member.ts`, not on the cube index.** The index answers `unknownOn` and the stored
+   row (`unknownOf`); the default is added by `unknownValueOf(cube, attribute)`. `keys.ts` importing the rule and the
+   rule importing the index's type would have been a cycle.
+2. **The checks read the stored values from the rows, not from a cube index passed in.** A caller may pass an index
+   built without them (the page's, the bench's); the rule would then miss every line without an error.
+3. **A row the page knows that is gone, or is another row, is a stale version, not "not found".** D-66 drops the draft
+   after "not found"; a stale version keeps it and shows the conflict line, which is what the person needs when someone
+   cleared the value meanwhile.
+4. **The row lists were done here, not in step 3** (the plan named them in both): a page of a model with facts or
+   dimensions now reads `cube_attribute` and carries `cubeAttributes` (empty until a value is typed). Nothing shows it
+   yet.
+5. **`cubeAttributes` is optional** in `CubeModel` and `CubeCheckRows`, so the callers that read no value are unchanged.
+6. **The synthetic bench model** got the column only; its stored values and dimensions turned off come in step 3, with
+   the bench.
+
+Nothing needed `src/compose/tables.ts`, undo, the module cascade, the save chain or `src/data/local/`: none of them is
+in the step's diff.
+
+### Tests
+
+- **New:** `src/modules/infocube/domain/unknown-member.test.ts` (27 tests: the rule for every type with its sentence,
+  the String length, Custom, the defaults, the index, the flag, the value's command with the conflict when another user
+  created the row meanwhile and three more stale cases, the refusals) and `tests/infocube-unknown-member.test.ts`
+  (22 tests: the seeded star, the upgrade, a file written before slice 22, the shape CHECK, `cube_attribute`'s rules,
+  an attribute's and a dimension's delete with one undo, undo and redo of a value, undo refused on a deleted attribute
+  and on a value changed meanwhile, the two checks, InfoCube off).
+- **Changed:** `commands.test.ts` and `tests/infocube-types.test.ts` (the new column in two expected rows),
+  `tests/table-registry.test.ts` and `tests/schema/compare-schema.test.ts` (the sixth table in the guard lists).
+- **Checks:** `npm run lint`, `npm run typecheck` and `npm test` pass (161 files, 2,000 tests).
+- **Earlier e2e specs the step touched, one local run, 8 tests passed, none changed:** `slice-15a/S15-07`, `S15-14`
+  (the stored rows), `slice-19/S19-01` (an older file's rows; a save, reload, undo and redo), `S19-05`,
+  `slice-15b/RP-02` (the panels on the star), `slice-20/S20-01`, `S20-02` (the checks' lines and counts: unchanged).
+- No full run (answer 4).
