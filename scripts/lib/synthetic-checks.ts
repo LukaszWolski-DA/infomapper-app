@@ -84,6 +84,17 @@ export function synthetic(): ChecksDb {
     const fact = e % 5 === 0;
     db.cube_entity.push({ ...std(), entity_id: entities[e]!, role: fact ? "fact" : "dimension", grain: fact && e % 2 ? "One row" : null, fact_type: fact ? "transaction" : null, is_factless: fact ? false : null, base_fact_entity_id: null, dim_kind: fact ? null : "standard", history: fact ? null : "overwrite", snapshot_period: null, has_unknown_member: fact ? null : true } as never);
   }
+  // slice 22: every dimension related to a fact (400 relationships); every 4th dimension's unknown member off (100
+  // `nounk` lines); a stored value "abc" on three attributes of every dimension (1,200 rows; those of the 300 dimensions
+  // with it on that are no String do not fit: `unkval` lines)
+  db.cube_attribute = [];
+  for (let e = LOGICAL, d = 0; e < ENTITIES; e++) {
+    if (e % 5 === 0) continue;
+    const fact = LOGICAL + ((e - LOGICAL) % 100) * 5;
+    db.relationship.push({ ...std(), from_entity_id: entities[e]!, to_entity_id: entities[fact]!, label: "describes", from_min: 1, from_max: "1", to_min: 0, to_max: "n", description: null, from_role: null, to_role: null } as never);
+    if (d++ % 4 === 0) (db.cube_entity.find((c) => c.entity_id === entities[e]) as { has_unknown_member: boolean }).has_unknown_member = false;
+    for (const k of [1, 4, 7]) db.cube_attribute.push({ ...std(), attribute_id: attrs[e]![k]!.id, unknown_value: "abc" } as never);
+  }
   for (let i = 0; i < 1_500; i++) {
     const target = attrs[LOGICAL + (i % (ENTITIES - LOGICAL))]![(i % 9) + 1]!;
     const input = attrs[(i * 3) % LOGICAL]![(i % 9) + 1]!;
