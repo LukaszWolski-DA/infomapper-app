@@ -41,7 +41,7 @@ import { useAction } from "@/app/_components/use-action";
 import { HAND_TOOL_HINT, RELATE_HINT } from "@/canvas/CanvasModes";
 import { newCardHeight } from "@/canvas/geometry";
 import { FILTER_LABEL, filtersOf } from "@/canvas/CardNode";
-import { CanvasUiCtx, type RowDrag, type RowDragFrom, type RowFilter, type ToolboxRequest } from "@/canvas/context";
+import { CanvasUiCtx, type RowDrag, type RowDragFrom, type RowDrop, type RowFilter, type ToolboxRequest } from "@/canvas/context";
 import { isCardKey, isReqKey } from "@/canvas/selection";
 import { focusOn } from "@/canvas/fade";
 import { toggleFocus } from "@/canvas/Focus";
@@ -157,17 +157,35 @@ export function useCanvasHost({
   for (const e of CANVAS_EXTENSIONS) exts.push({ kind: e.kind, h: e.useHandlers(extContext) });
   const extOf = (kind: string) => exts.find((e) => e.kind === kind)?.h;
 
+  /** A live logical attribute: its row's drag onto a column is InfoMapper's (slice 21, X1). */
+  const isLogicalAttribute = (attributeId: Uuid) => {
+    const entityId = ix.attribute.get(attributeId)?.entity_id;
+    const entity = entityId ? ix.entity.get(entityId) : undefined;
+    return !!entity && isLogical(entity);
+  };
+
   /**
    * A row's drag (slice 15c): a column's maps onto logical entity rows and cards; with facts or dimensions on the
    * canvas they stay under the veil and a drop on them is refused with B-6's toast. An entity row's is a module's.
+   * Slice 21 (X1, D-76): a logical row's drag is InfoMapper's too, composed with the module's: the table cards stay lit
+   * (beside the module's facts and dimensions) and a column takes the drop as the column dropped on the row would; every
+   * other target is the module's, or nothing without the module's drag (F2). No drag without a table card on the
+   * canvas and without the module's. A dimensional row's stays the module's (its refusal on a column).
    */
   const rowDrag = (from: RowDragFrom): RowDrag | null => {
     if ("attributeId" in from) {
+      let moduleDrag: RowDrag | null = null;
       for (const e of exts) {
-        const d = e.h.rowDrag(from.attributeId);
-        if (d) return d;
+        moduleDrag = e.h.rowDrag(from.attributeId);
+        if (moduleDrag) break;
       }
-      return null;
+      const tables = cards.filter((c) => c.kind === "src").map((c) => c.targetId);
+      if (!isLogicalAttribute(from.attributeId) || !tables.length) return moduleDrag;
+      const fromModule = moduleDrag;
+      return {
+        lit: { entities: fromModule?.lit?.entities ?? [], tables: [...new Set([...(fromModule?.lit?.tables ?? []), ...tables])] },
+        plan: (t) => ("columnId" in t ? "ok" : fromModule ? fromModule.plan(t) : "none"),
+      };
     }
     const dimensional = new Set(cards.filter((c) => c.kind === "ent" && ix.entity.get(c.targetId) && !isLogical(ix.entity.get(c.targetId)!)).map((c) => c.targetId));
     const onDimensional = (entityId: string | undefined) => !!entityId && dimensional.has(entityId);
@@ -179,10 +197,24 @@ export function useCanvasHost({
       },
     };
   };
+  /**
+   * An entity row's drop: a logical row on a column maps them as the column dropped on the row does (slice 21, X1:
+   * D-48's direct mapping or choice, the hint, the toast, the selection); otherwise the module whose drag it is decides
+   * (only one module drags entity rows today).
+   */
+  const dropRow = (drop: RowDrop) => {
+    if ("columnId" in drop.target && isLogicalAttribute(drop.attributeId)) {
+      if (editable) columns.mapColumn(drop.target.columnId, drop.attributeId, drop.at);
+      return;
+    }
+    for (const e of exts) if (e.h.rowDrag(drop.attributeId)) return e.h.drop(drop);
+  };
   const rowDragRef = useRef(rowDrag);
+  const dropRowRef = useRef(dropRow);
   const extsRef = useRef(exts);
   useEffect(() => {
     rowDragRef.current = rowDrag;
+    dropRowRef.current = dropRow;
     extsRef.current = exts;
   });
 
@@ -354,10 +386,7 @@ export function useCanvasHost({
     ui.registerHost({
       dropColumn: columns.dropColumn,
       rowDrag: (from) => rowDragRef.current(from),
-      dropRow: (drop) => {
-        // the module whose drag it is decides (only one module drags entity rows today)
-        for (const e of extsRef.current) if (e.h.rowDrag(drop.attributeId)) return e.h.drop(drop);
-      },
+      dropRow: (drop) => dropRowRef.current(drop),
       deleteExt: (kind, id) => {
         if (editable) ext(kind)?.remove(id);
       },
