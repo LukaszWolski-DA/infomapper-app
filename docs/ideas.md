@@ -185,6 +185,9 @@ edge, mentioned here before, was built in step 2 at Łukasz's request.)
 or dimensional), but a logical row dropped onto a source column stays out of 15c: it is InfoMapper's behaviour, not
 InfoCube's. When it is built, it reuses 15c's row drag (the canvas extension's `rowDrag` and `drop`, `RowDrag` in `src/canvas/context.ts`) and the veil that dims what cannot take the drop.
 
+**Done in slice 21** (D-76): a logical row dropped onto a source column maps them as the column dropped onto the row does
+(D-48's choice included), InfoCube on or off; InfoMapper's drag is composed with the module's in the canvas host.
+
 ## Feeding sources: drag from the panel onto the canvas (slice 1b, step 5)
 
 In the prototype, a feeding source (or fed entity) in the right panel can also be dragged onto the canvas and lands
@@ -803,12 +806,18 @@ does) or with a `ResizeObserver`, and check with a phase trace that a panel swit
   attribute below".
 - **A third switch for dimensional relationships** on their own (InfoCube); "Between entities" covers both levels.
 - **From slice 15d's closing:** a mapping from a column missing from the source says "not approved" in the requirement
-  panel, though the mapping is approved: a reason of its own, as "type conflict" now.
+  panel, though the mapping is approved: a reason of its own, as "type conflict" now. **Done in slice 21** (R6, D-76):
+  "column left the source".
 
 ## Modelling ergonomics: what comes later (slice 17, PRD section 8 and step 2)
 
-- **"New concept…" inside the concept picker:** creating a concept and an entity in one step.
-- **X1:** a logical row dragged onto a source column.
+- **"New concept…" inside the concept picker:** creating a concept and an entity in one step. **Done in slice 21**
+  (D-76), for facts and dimensions too.
+- **X1:** a logical row dragged onto a source column. **Done in slice 21** (D-76).
+- **The requirement card's link handle at a constant on-screen size at low zoom** (slice 21, decision 1A): left for a
+  slice that changes how the canvas is drawn anyway, as it needs a measuring sitting.
+- **Choosing a new concept's colour in the concept picker** (slice 21, PRD section 9): it takes the automatic colour,
+  changed afterwards in the settings' "Concept colours".
 - **Multi-row selection on the canvas** for linking requirements to several rows at once.
 - **Opening another canvas of the project from a search hit** (a found attribute stays on the current canvas).
 - **Dragging a requirement marker** from an entity card onto another row.
@@ -841,7 +850,7 @@ What comes later (slice 18, PRD section 10 and step 1):
 
 InfoMapper's mapping panel keeps a typed rule across fresh pages and refusals (slice 13), but its field has no `keep`:
 if the panel ever unmounted while the rule still had the focus, the text would be lost (never saved elsewhere; slice
-20's Q10). InfoCube's rule has `keep`. Give InfoMapper's rule `keep` too, as a small item.
+20's Q10). InfoCube's rule has `keep`. Give InfoMapper's rule `keep` too, as a small item. **Done in slice 21** (D-76).
 
 ## Model checks for much larger models (slice 20, step 2)
 
@@ -853,7 +862,8 @@ their relationships' other ends. Measure first with `scripts/bench-checks-browse
 ## Model checks: what comes later (slice 20, PRD section 9)
 
 - **A foreign key flag without a copy** (R3e): left out as noise in a hand-built model.
-- **"Column left the source" as a requirement gap's reason** (R6), for the slice of small items.
+- **"Column left the source" as a requirement gap's reason** (R6), for the slice of small items. **Done in slice 21**
+  (D-76).
 - **Checks read from the change log since an approval** (decision 4b): an input renamed or retyped after it.
 - **Dismissing a line**, with who and why (needs data).
 - **A "Show checks" view** that fades everything else, as the Changes view; next and previous line on the canvas.

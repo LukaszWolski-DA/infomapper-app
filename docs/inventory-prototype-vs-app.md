@@ -332,7 +332,10 @@ draws it for everyone and refuses the change. The armed button disarms after 4 s
 and re-importing only for owners, admins and modelers in a workspace that is not archived (7a, item 40). Since slice 8,
 in the development form (D-58): "Add a person" (name, e-mail, role, a summary; the account at once, reached through the
 organization's link and password), the role select and Remove per member for owners and admins, and the "Organization
-access" box (the link, changing the password).
+access" box (the link, changing the password). Since slice 21 (D-76): the settings' "Concept colours" box (prototype
+`data-ccol`), for those who may edit the model, one undo step per change. Still missing from the settings: the
+prototype's "Model conventions" box (stereotypes, column classification, type mapping chips) and its "Statuses" and
+"Requirement templates" lines.
 
 **Deliberate differences (slice 8, PRD section 8):** a start page with signing in and creating an organization; adding
 makes the account at once instead of an invitation; Remove asks first and says when the person leaves the organization;
