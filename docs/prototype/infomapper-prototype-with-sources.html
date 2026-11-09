@@ -206,6 +206,8 @@ main.noleft #side,main.noright #insp{visibility:hidden}
 #pickpop .pk-list{overflow:auto;flex:1 1 auto;min-height:0}
 #pickpop .pk-list>button{display:flex;align-items:center;gap:8px}
 #pickpop .pk-list>button .pk-k{font-family:var(--mono,monospace);font-size:11.5px;color:var(--ink-3);flex:none}
+#pickpop .pk-list>button.pk-new{color:var(--logical);border-top:1px solid var(--line)}
+#pickpop .pk-list>button .pk-plus{width:12px;flex:none;text-align:center;font-weight:600}
 #pickpop .pk-list>button .pk-n{flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #pickpop .pk-list>button .pk-box{width:14px;height:14px;border-radius:3px;box-shadow:0 0 0 1.5px var(--ink-3);flex:none;display:grid;place-items:center;font-size:11px;line-height:1;color:#fff}
 #pickpop .pk-list>button[aria-checked="true"] .pk-box{background:var(--logical);box-shadow:none}
@@ -1061,34 +1063,6 @@ dialog.set.iw::backdrop{background:rgba(16,22,30,.42)}
 .lnk.map.gone .s{stroke-dasharray:2 5;opacity:.5}
 dialog.wiz.iw,dialog.set.iw{font:13px/1.45 var(--sans)}
 .im-cons{margin:18px 0 6px;max-width:900px}
-/* slice 20: model checks' marks: a slanted "!" on the name line and before an attribute row's type; orange High, grey Normal */
-.c-l2.chk .c-name{order:0}
-.c-l2.chk::after{content:"!";order:1;flex:none;font:italic 700 14px/1 var(--sans);transform:skewX(-12deg);color:var(--ink-3);padding:0 2px;margin-left:-4px}
-.c-l2.chk.high::after{color:var(--warn)}
-.c-l2.chk .cov{order:2}.c-l2.chk .cov-t{order:3}
-.row.chk .dt::before{content:"!";display:inline-block;font:italic 700 12px/1 var(--sans);transform:skewX(-12deg);color:var(--ink-3);margin-right:5px}
-.row.chk.high .dt::before{color:var(--warn)}
-#status .sb-chk{all:unset;cursor:pointer;color:inherit;border-radius:4px;padding:0 4px;margin:0 -4px}
-#status .sb-chk:hover{background:var(--hover);text-decoration:underline}
-#status .sb-chk:focus-visible{outline:2px solid var(--accent, #2F7DD1)}
-#status .sb-chk.w{color:var(--warn)}
-.chkli .chki{flex:none}
-#ov-chk.flash{background:var(--warn-soft);border-radius:4px;transition:background .3s}
-.ph-chk{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:4px;border-radius:4px;padding:0 4px;margin:0 -4px}
-.ph-chk:hover{background:var(--hover);text-decoration:underline}
-.ph-chk.high{color:var(--warn)}
-.ph-chk:focus-visible{outline:2px solid var(--accent, #2F7DD1)}
-.chkbox{border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:8px 0 12px;background:var(--surface)}
-.chkbox.high{border-left:3px solid var(--warn)}
-.chkh{display:flex;gap:6px;align-items:center;margin-bottom:6px;font-size:12.5px}
-.chki{font:italic 700 14px/1 var(--sans);transform:skewX(-12deg);color:var(--ink-3);width:10px;text-align:center}
-.chki.high{color:var(--warn)}
-.chkbox .hints{margin:0}
-.chkbox .hints .h{display:block;width:100%}
-.chkbox .hints .h::before{display:none}
-.chkbox .hints .h.normal,.chkbox .hints span.h{background:var(--hover)}
-.chkbox .hints .h b{font-weight:600}
-.chkbox .hints button.h:not([data-cgo]){cursor:default}
 dialog.wiz.iw{width:min(920px,calc(100vw - 32px))}
 .iw .col1{max-width:760px;margin:0 auto}
 .iw .wsec{margin:0 0 22px}
@@ -1824,8 +1798,8 @@ function cubeDemoV3(S) {          // RP-F: Dim Date plays Order date and Ship da
 function idx() {
   cubeRootMigrate();
   if (!S.cube) cubeDemo(S);                   // InfoCube: once per model (the demo star, or empty)
-  cubeDemoV2(S); cubeDemoV3(S); cubeDemoV4(S); cubeDemoV5(S); cubeDemoV6(S); checksDemo(S);
-  I = {con:{}, ent:{}, attr:{}, attrsOf:{}, src:{}, col:{}, colSrc:{}, mA:{}, mC:{}, map:{}, rel:{}}; CHKI = null;
+  cubeDemoV2(S); cubeDemoV3(S); cubeDemoV4(S); cubeDemoV5(S); cubeDemoV6(S);
+  I = {con:{}, ent:{}, attr:{}, attrsOf:{}, src:{}, col:{}, colSrc:{}, mA:{}, mC:{}, map:{}, rel:{}};
   S.systems ||= []; S.issues ||= []; S.imports ||= []; S.srcRelations ||= []; S.classes ||= [];
   for (const s of S.sources) if (s.system && !S.systems.some(x => x.name === s.system)) S.systems.push({id:"sys_" + String(s.system).toLowerCase().replace(/\W+/g, "_") + "_" + S.systems.length, name:s.system});
   I.sys = Object.fromEntries(S.systems.map(x => [x.id, x]));
@@ -2201,11 +2175,11 @@ function attrRow(a) {
     : !ms.length ? "Not mapped yet" : ms.map(m => "from " + colLabel(m.columnId)).join("\n");
   const mr = dimA && I.cube.meas[a.id];
   const lid = CV().live?.labelId, lab = lid && rowRelevant("ent", a.id, lid);
-  const chg = ms.some(m => m.status === "review" && m.reviewReason), ck = chkRowMark(a.id);
-  return `<div class="row${isSel("attr", a.id) ? " sel" : ""}${lab ? " lab" : ""}${chg ? " im-chg" : ""}${ck ? ck.cls : ""}${IMP.hit("attrs", a.id)}" data-rk="attr" data-rid="${esc(a.id)}"><span class="hnd l"></span>
+  const chg = ms.some(m => m.status === "review" && m.reviewReason);
+  return `<div class="row${isSel("attr", a.id) ? " sel" : ""}${lab ? " lab" : ""}${chg ? " im-chg" : ""}${IMP.hit("attrs", a.id)}" data-rk="attr" data-rid="${esc(a.id)}"><span class="hnd l"></span>
 ${keyBadges(a)}
 ${nmSplit(a.name)}${a.isPII ? '<span class="tag pii" title="Personal data">PII</span>' : ""}
-${calc ? `<span class="calc" title="${esc("Calculated: " + (calc.rule || "no rule yet"))}">=</span>` : ""}${lmark("attr", a.id)}${(I.reqOf["attr:" + a.id] || []).length ? `<span class="rdot" title="Requirements: ${esc(I.reqOf["attr:" + a.id].map(r => r.key).join(", "))}"></span>` : ""}${mr ? `<span class="meas${mr.additivity === "non" ? " non" : ""}" title="Measure: ${ADD_L[mr.additivity]}${mr.semiNote ? ", " + esc(mr.semiNote) : ""}">${ADD_MARK[mr.additivity]}</span>` : ""}<span class="dt"${ck ? ` title="${esc(ck.title)}"` : ""}>${esc((a.dataType || "–") + (a.length ? `(${a.length})` : ""))}</span><span class="st ${st}${n > 1 ? " n" : ""}" title="${esc(title)}">${n > 1 ? n : ""}</span><span class="hnd r"></span></div>`;
+${calc ? `<span class="calc" title="${esc("Calculated: " + (calc.rule || "no rule yet"))}">=</span>` : ""}${lmark("attr", a.id)}${(I.reqOf["attr:" + a.id] || []).length ? `<span class="rdot" title="Requirements: ${esc(I.reqOf["attr:" + a.id].map(r => r.key).join(", "))}"></span>` : ""}${mr ? `<span class="meas${mr.additivity === "non" ? " non" : ""}" title="Measure: ${ADD_L[mr.additivity]}${mr.semiNote ? ", " + esc(mr.semiNote) : ""}">${ADD_MARK[mr.additivity]}</span>` : ""}<span class="dt">${esc((a.dataType || "–") + (a.length ? `(${a.length})` : ""))}</span><span class="st ${st}${n > 1 ? " n" : ""}" title="${esc(title)}">${n > 1 ? n : ""}</span><span class="hnd r"></span></div>`;
 }
 function colRow(c) {
   const ms = I.mC[c.id] || [], warn = ms.some(m => !typeCheck(m).ok);
@@ -2234,7 +2208,7 @@ function entCard(id) {
   return `<div class="card ent${role ? " dimn " + role : ""}${IMP.hit("ents", id)}${isSel("entity", id) ? " sel" : ""}${L.c ? " collapsed" : ""}${ctx ? " ctx" : ""}${dual ? " dualkeys" : ""}" data-kind="ent" data-id="${id}" style="left:${L.x}px;top:${L.y}px;width:${wOf(L)}px;--cc:${con?.color || "#889"}"${ctx ? ` title="Context: the entity itself is not labeled ${esc(I.lbl[lid]?.name)}, only some of its attributes are"` : ""}>
 <div class="c-rs" title="Drag to change the width; double-click to fit the names"></div><div class="c-head"><div class="c-l1">${role ? `<span class="stereo cube" title="${esc(cubeTitle(id).long)} (InfoCube)">${CUBE_IC}${esc(cubeTitle(id).short)}</span>` : `<span class="stereo">${esc(e.stereotype || "Object")}</span>`}<span>${ctx ? "context only" : "in " + esc(con?.name || "–")}</span>${lmark("entity", id)}${noteMark("ent:" + id)}${reqMark("ent", id)}
 <span class="c-tools"><button class="ib" data-act="relate" title="Draw a relationship from this entity">${IC.rel}</button>${tools(L)}</span></div>
-<div class="c-l2${chkHeadMark(id)}"><span class="c-name">${esc(e.name)}</span><span class="cov" title="${mapped} of ${attrs.length} attributes ${role ? "fed from the logical model" : "mapped"}"><i style="width:${attrs.length ? mapped / attrs.length * 100 : 0}%"></i></span><span class="cov-t">${mapped}/${attrs.length}</span></div></div>
+<div class="c-l2"><span class="c-name">${esc(e.name)}</span><span class="cov" title="${mapped} of ${attrs.length} attributes ${role ? "fed from the logical model" : "mapped"}"><i style="width:${attrs.length ? mapped / attrs.length * 100 : 0}%"></i></span><span class="cov-t">${mapped}/${attrs.length}</span></div></div>
 ${L.c ? "" : `<div class="c-body">${rows.length ? rows.map(attrRow).join("") : `<div class="row empty">${(I.attrsOf[id] || []).length ? `Nothing matches “${FL[L.f]}”` : "No attributes yet. Add them in the panel, or drag a source column here."}</div>`}</div>`}</div>`;
 }
 function srcCard(id) {
@@ -2493,7 +2467,6 @@ function insOverview() {
       return `<button class="li" data-go="entity:${id}"${dim ? ` title="Attributes fed from the logical model"` : ""}><span class="n">${esc(I.ent[id].name)}</span><span class="bar2"><i style="width:${at.length ? mp / at.length * 100 : 0}%"></i></span><span class="m">${mp} of ${at.length}${dim ? " fed" : ""}</span></button>`;
     }).join("") + `</div>`;
   }
-  h += chkOverview();
   if (warns.length) {
     h += `<h3>Needs attention</h3><div class="list">` + warns.map(m =>
       `<button class="li" data-go="map:${m.id}"><span class="st warn"></span><span class="n mono">${esc(colLabel(m.columnId))}</span><span class="m">type</span></button>`).join("") + `</div>`;
@@ -2559,7 +2532,7 @@ function insCmap(m) {
   const pill = id => { const a = I.attr[id]; return `<button class="pill l" data-go="attr:${esc(id)}"><small>${esc(I.ent[a.entityId].name)}</small><b>${esc(a.name)}</b></button>`; };
   const types = m.from.map(id => I.attr[id]).filter(a => a.dataType !== to.dataType);
   const tmsg = m.kind === "direct" && types.length ? `The types differ: ${esc(types[0].dataType)} → ${esc(to.dataType)}. Use a transformation, or change one of the types.` : "";
-  return `<div class="kind">Dimensional mapping <span class="stereo cube" style="font-weight:500">${CUBE_IC}InfoCube</span></div>${chkSection("cmap", m.id)}
+  return `<div class="kind">Dimensional mapping <span class="stereo cube" style="font-weight:500">${CUBE_IC}InfoCube</span></div>
 <div class="trace"><span style="display:flex;flex-direction:column;gap:4px">${m.from.map(pill).join("")}</span>
 <span class="arrow"><svg class="i" viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg></span>
 <button class="pill l d" data-go="attr:${esc(to.id)}"><small>${esc(te.name)}</small><b>${esc(to.name)}</b></button></div>
@@ -2626,14 +2599,13 @@ function openCalcPick(btn, a, first) {
 }
 function insAttr(a) {
   const ms = I.mA[a.id] || [], e = I.ent[a.entityId];
-  return `<div class="kind">Attribute of <button class="pill l" style="display:inline;padding:1px 6px" data-go="entity:${e.id}">${esc(e.name)}</button></div>${chkSection("attr", a.id)}
+  return `<div class="kind">Attribute of <button class="pill l" style="display:inline;padding:1px 6px" data-go="entity:${e.id}">${esc(e.name)}</button></div>
 <div class="fld"><label for="f-an">Name</label><input id="f-an" data-f="attr.name" value="${esc(a.name)}"></div>
 ${attrPosition(a)}
 <div class="fld"><label for="f-at">Data type</label><select id="f-at" data-f="attr.dataType">${LTYPES.map(t => `<option${t === a.dataType ? " selected" : ""}>${t}</option>`).join("")}</select></div>
 ${(a.dataType || "String") === "String" ? `<div class="fld"><label for="f-al">Length</label><input id="f-al" data-f="attr.length" inputmode="numeric" value="${esc(a.length || "")}" placeholder="Optional, e.g. 120"></div>` : ""}
 <div class="fld"><label>Flags</label><div class="flags">${[["isPrimaryKey", "Primary key"], ["isForeignKey", "Foreign key"], ["isPII", "Personal data"], ["isNullable", "Can be empty"]].map(([k, l]) =>
     `<button class="flag" data-set="attr.flag" data-v="${k}" aria-pressed="${!!a[k]}">${l}</button>`).join("")}</div></div>
-${copyField(a)}
 ${cubeMeasureSection(a)}
 ${richField("Definition", a.description, "What this attribute means for the business. Click to write it.", "attr:" + a.id)}
 ${labelField("attr", a.id)}
@@ -2666,7 +2638,7 @@ function canvasList(kind, id) {
 }
 function insEntity(e) {
   const at = I.attrsOf[e.id] || [], rels = S.relationships.filter(r => r.from === e.id || r.to === e.id);
-  return `<div class="kind">Entity</div>${chkSection("entity", e.id)}
+  return `<div class="kind">Entity</div>
 <div class="fld"><label for="f-en">Name</label><input id="f-en" data-f="ent.name" value="${esc(e.name)}"></div>
 <div class="two"><div class="fld">${isDimE(e) ? `<label>Role</label><div class="ro" style="padding:6px 0;display:flex;align-items:center;gap:4px"><span class="stereo cube" title="${esc(cubeTitle(e.id).long)}">${CUBE_IC}${esc(cubeTitle(e.id).short)}</span></div>` : `<label for="f-es">Stereotype</label><select id="f-es" data-f="ent.stereotype">${STEREO.map(s => `<option${s === e.stereotype ? " selected" : ""}>${s}</option>`).join("")}</select>`}</div>
 <div class="fld"><label for="f-ec">Concept</label><select id="f-ec" data-f="ent.conceptId">${S.concepts.map(c => `<option value="${c.id}"${c.id === e.conceptId ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div></div>
@@ -2699,7 +2671,7 @@ ${pk ? "" : `<p style="margin:6px 0 0;color:var(--warn);font-size:12px">${esc(de
 }
 function insRel(r) {
   const f = I.ent[r.from], t = I.ent[r.to], fr = (r.fromRole || "").trim(), tr = (r.toRole || "").trim();
-  return `<div class="kind">Relationship</div>${chkSection("rel", r.id)}<h2>${esc(f.name)} and ${esc(t.name)}</h2>
+  return `<div class="kind">Relationship</div><h2>${esc(f.name)} and ${esc(t.name)}</h2>
 <div class="verb"><p>Each ${esc(f.name)} ${esc(r.label || "is related to")} ${phrase(r.toMin, r.toMax)} ${esc(t.name + asRole(tr))}.</p>
 <p>Each ${esc(t.name)} belongs to ${phrase(r.fromMin, r.fromMax)} ${esc(f.name + asRole(fr))}.</p></div>
 <div class="fld"><label for="f-rl">Verb phrase</label><input id="f-rl" data-f="rel.label" value="${esc(r.label)}" placeholder="places, contains, belongs to…"></div>
@@ -2744,8 +2716,7 @@ function renderInspector() {
   else if (s.t === "note") h = insNote(noteById(s.id));
   else if (s.t === "req") h = insReq(I.req[s.id]);
   const box = $("#ins"), top = box.scrollTop;
-  INS_SWAP.sel = JSON.parse(box.dataset.for || "null")?.[0] || null; INS_SWAP.on = true;   // the item the outgoing panel shows
-  try { box.innerHTML = h; } finally { INS_SWAP.on = false; }
+  box.innerHTML = h;
   foldSections(box);
   if (box.dataset.for === JSON.stringify([s, V.suggest])) box.scrollTop = top;
   box.dataset.for = JSON.stringify([s, V.suggest]);
@@ -2758,8 +2729,7 @@ function renderStatus() {
   const warn = S.mappings.filter(m => !typeCheck(m).ok).length;
   const drafts = S.mappings.filter(m => m.status === "draft").length;
   $("#status").innerHTML = `<span>Mapped attributes on canvas <b>${mp} of ${tot}</b></span><span>Mappings <b>${S.mappings.length}</b>, drafts <b>${drafts}</b></span>
-<span class="${warn ? "w" : ""}">Type problems <b>${warn}</b></span><span>Relationships <b>${S.relationships.length}</b></span><span>Requirements <b>${S.requirements.length}</b>, covered <b>${S.requirements.filter(r => reqCoverage(r.id).done).length}</b></span><span>Open notes on canvas <b>${(CV().notes || []).filter(n => !n.resolved).length}</b></span>${(() => { const l = V.home || V.wsHome ? [] : canvasChecks();
-  return l.length ? `<button class="sb-chk${l.some(x => x.sev === "high") ? " w" : ""}" data-chk-open title="Show the model checks for the cards on this canvas">Model checks <b>${l.length}</b></button>` : ""; })()}${IMP.openIssueCount() ? `<span class="w">Source changes to resolve <b>${IMP.openIssueCount()}</b></span>` : ""}${V.ctxLabel && I.lbl[V.ctxLabel] ? `<span class="ctxw">Working on <b>${esc(I.lbl[V.ctxLabel].name)}</b>, items labeled <b>${I.lblCnt[V.ctxLabel] || 0}</b></span>` : ""}`;
+<span class="${warn ? "w" : ""}">Type problems <b>${warn}</b></span><span>Relationships <b>${S.relationships.length}</b></span><span>Requirements <b>${S.requirements.length}</b>, covered <b>${S.requirements.filter(r => reqCoverage(r.id).done).length}</b></span><span>Open notes on canvas <b>${(CV().notes || []).filter(n => !n.resolved).length}</b></span>${IMP.openIssueCount() ? `<span class="w">Source changes to resolve <b>${IMP.openIssueCount()}</b></span>` : ""}${V.ctxLabel && I.lbl[V.ctxLabel] ? `<span class="ctxw">Working on <b>${esc(I.lbl[V.ctxLabel].name)}</b>, items labeled <b>${I.lblCnt[V.ctxLabel] || 0}</b></span>` : ""}`;
   const n = suggestions().length;
   $("#sugN").textContent = n; $("#sugN").style.display = n ? "" : "none";
   $("#tUndo").disabled = !undoStack.length; $("#tRedo").disabled = !redoStack.length;
@@ -3255,10 +3225,9 @@ document.querySelectorAll(".tabs button").forEach(b => b.addEventListener("click
 $("#q").addEventListener("input", ev => { V.q = ev.target.value; renderSide(); });
 
 /* ---------- inspector events ---------- */
-var INS_SWAP = {on:false, sel:null};
 const ins = $("#ins");
-const insChange = ev => {
-  const f = ev.target.dataset.f; if (!f) return; const v = ev.target.value, s = ev.sel || V.sel;
+ins.addEventListener("change", ev => {
+  const f = ev.target.dataset.f; if (!f) return; const v = ev.target.value, s = V.sel;
   if (f === "attr.calcrule") { mutate(() => { S.attributes.find(x => x.id === s.id).calc.rule = v; }); return; }   // slice 18
   if (f === "attr.addlattr") { if (v) createCubeMap(v, s.id); return; }
   if (f === "cube.grain") { mutate(() => { S.cube.ents.find(r => r.entityId === s.id).grain = v.trim(); }); return; }
@@ -3302,14 +3271,6 @@ const insChange = ev => {
   if (f === "rel.fromRole" || f === "rel.toRole") { mutate(() => { const r = S.relationships.find(x => x.id === s.id), k = f.slice(4);
     if (v.trim()) r[k] = v.trim(); else delete r[k]; }); return; }
   if (f === "cube.relkey") { linkKey(s.id, v); return; }
-};
-/* a field's change belongs to the item its panel showed: while the panel is being replaced, save it afterwards, for that item */
-ins.addEventListener("change", ev => {
-  if (!INS_SWAP.on) return insChange(ev);
-  const sel = INS_SWAP.sel, target = ev.target; if (!sel || !target.dataset.f) return;
-  setTimeout(() => { const live = {map:I.map, cmap:I.cube?.map, attr:I.attr, entity:I.ent, rel:I.rel, source:I.src, col:I.col, req:I.req, label:I.lbl, system:I.sys}[sel.t];
-    if (live && !live[sel.id]) return;                    // its item is gone meanwhile: nothing to save into
-    insChange({target, sel}); }, 0);
 });
 ins.addEventListener("click", ev => {
   const setB = ev.target.closest("[data-set]"), go = ev.target.closest("[data-go]"), doB = ev.target.closest("[data-do]");
@@ -4751,179 +4712,6 @@ function projLabels(p) {
     if (on) ids.add(k.labelId); });
   return [...ids].map(id => I.lbl[id]).filter(Boolean).sort((a, b) => (p.pinned || []).includes(b.id) - (p.pinned || []).includes(a.id) || (I.lblCnt[b.id] || 0) - (I.lblCnt[a.id] || 0));
 }
-/* =========================================================
-   Slice 20: model checks (a validator). Read only, computed on each visit to the project home; nothing is stored.
-   Copies: the app has slice 10c's copies (attribute.copied_from_attribute_id, D-63); the prototype never had them, so
-   a demo attribute carries `copyOf` (the original's id) and `copyLabel` (its "Entity.attribute" when copied), set only
-   by checksDemo below. The panel shows "Copy of"; there is no Copy / Paste here.
-   ========================================================= */
-function checksDemo(S) {
-  if (S.checksV1) return; S.checksV1 = true;
-  const at = id => S.attributes.find(a => a.id === id), ent = id => S.entities.find(e => e.id === id);
-  const cp = (copy, orig) => { const c = at(copy), o = at(orig); if (c && o) Object.assign(c, {copyOf:o.id, copyLabel:ent(o.entityId).name + "." + o.name}); };
-  cp("latr_order_customer_id", "latr_customer_customer_id"); cp("latr_address_customer_id", "latr_customer_customer_id");
-  cp("latr_line_order_id", "latr_order_order_id"); cp("latr_line_product_id", "latr_product_product_id");
-  const add = (eid, name, dataType, f, orig) => { if (!ent(eid) || S.attributes.some(a => a.entityId === eid && a.name === name)) return;
-    const n = S.attributes.filter(a => a.entityId === eid).length;
-    S.attributes.push({id:"latr_" + eid.slice(5) + "_chk_" + name.toLowerCase(), entityId:eid, name, dataType, isPrimaryKey:false, isForeignKey:f === "FK", isPII:false, isNullable:true, description:"", order:n});
-    if (orig) cp("latr_" + eid.slice(5) + "_chk_" + name.toLowerCase(), orig); };
-  add("lent_customer", "last_order_id", "Integer", "FK", "latr_order_order_id");      // a key copied against the relationship (Customer is the one side)
-  add("lent_product", "country_code", "String", "FK", "latr_country_country_code");   // a key copied with no relationship between the entities
-  add("lent_product", "Product_Name", "String", "");                                  // a duplicate name (case ignored)
-  const ta = at("latr_order_total_amount"); if (ta && !ta.calc) ta.calc = {rule:"Sum of its order lines' net amounts", from:[]};   // calculated and mapped
-}
-const CHK_NAME = n => String(n || "").trim().toLowerCase().replace(/\s+/g, " ");
-const chkAttr = id => { const a = I.attr[id]; return a ? `${I.ent[a.entityId]?.name}.${a.name}` : "a deleted attribute"; };
-const isOneEnd = (r, side) => String(r[side + "Max"]) === "1";
-function cmTypeIssue(cm) {      // a dimensional mapping's types: a transformation with a rule passes; a lookup is not compared here
-  if (cm.kind === "lookup" || (cm.kind === "transform" && String(cm.rule || "").trim())) return null;
-  const to = I.attr[cm.to]?.dataType || "String";
-  const bad = cm.from.map(f => I.attr[f]).find(a => { const t = a?.dataType || "String"; return t !== to && !(t === "Integer" && to === "Decimal"); });
-  return bad ? `${chkAttr(bad.id)} is ${bad.dataType || "String"}, ${chkAttr(cm.to)} is ${to}` : null;
-}
-function modelChecks(p) {        // p: a project (the home's scope); null: the whole model (marks on cards, panels)
-  const ents = new Set(); if (p) projCanvases(p).forEach(d => Object.keys(d.ent).forEach(x => { if (I.ent[x]) ents.add(x); })); else S.entities.forEach(e => ents.add(e.id));
-  const G = [];   // {id, title, sev, hint, lines:[{go, n, m, refs:[panels "t:id"], marks:[cards "attr:id" | "ent:id"]}], cube}
-  const g = (id, title, sev, hint, lines, cube = false) => { if (lines.length) G.push({id, title, sev: typeof sev === "function" ? sev(lines) : sev, hint, lines, cube}); };
-  const attrsIn = [...ents].flatMap(e => I.attrsOf[e] || []);
-  const lvl = e => isDimId(e) ? "dimensional" : "logical";
-  /* C1 duplicate attribute names within an entity, both levels */
-  const dup = [];
-  ents.forEach(e => { const by = {}; (I.attrsOf[e] || []).forEach(a => (by[CHK_NAME(a.name)] ||= []).push(a));
-    Object.values(by).filter(l => l.length > 1).forEach(l => dup.push({go:"attr:" + l[1].id, n:`${I.ent[e].name}: ${l.map(a => a.name).join(", ")}`, m:`${l.length} attributes, one name`, refs:l.map(a => "attr:" + a.id), marks:l.map(a => "attr:" + a.id)})); });
-  g("dup", "Duplicate attribute names", "normal", "Two attributes of one entity share a name, ignoring case and spaces. Rename or delete one.", dup);
-  /* C2 calculated and also mapped (logical) or fed (dimensional) */
-  const calc = attrsIn.filter(a => a.calc && directFed(a.id)).map(a => { const dim = isDimId(a.entityId), n = dim ? (I.cube.mTo[a.id] || []).length : (I.mA[a.id] || []).length;
-    return {go:"attr:" + a.id, n:chkAttr(a.id), m:`calculated from ${a.calc.from.length}, also ${n} ${dim ? "feed" : "mapping"}${n === 1 ? "" : "s"}`, refs:["attr:" + a.id], marks:["attr:" + a.id]}; });
-  g("calc", "Calculated and mapped", "normal", "A calculated attribute takes its value from its inputs. Keep the calculation or the mapping, or say in the rule why both.", calc);
-  /* C3 copies and keys (logical level) */
-  const logical = attrsIn.filter(a => !isDimId(a.entityId));
-  const lost = logical.filter(a => a.copyOf && !I.attr[a.copyOf]).map(a => ({go:"attr:" + a.id, n:chkAttr(a.id), m:`copy of ${a.copyLabel || "an attribute"}, which was deleted`, refs:["attr:" + a.id], marks:["attr:" + a.id]}));
-  g("lost", "Copies whose original was deleted", "normal", "The copy keeps its type, but nothing updates it any more. Stop following, or undo the delete.", lost);
-  const relBetween = (x, y) => S.relationships.filter(r => r.from !== r.to && ((r.from === x && r.to === y) || (r.from === y && r.to === x)));
-  const pkCopies = logical.filter(a => a.copyOf && I.attr[a.copyOf]?.isPrimaryKey && I.attr[a.copyOf].entityId !== a.entityId);
-  const norel = pkCopies.filter(a => !relBetween(a.entityId, I.attr[a.copyOf].entityId).length)
-    .map(a => ({go:"attr:" + a.id, n:chkAttr(a.id), m:`copy of ${chkAttr(a.copyOf)}; ${I.ent[a.entityId].name} and ${I.ent[I.attr[a.copyOf].entityId].name} are not related`, refs:["attr:" + a.id], marks:["attr:" + a.id]}));
-  g("norel", "Keys copied without a relationship", "normal", "A copied key stands for a relationship. Relate the two entities, or delete the copy.", norel);
-  const rels = S.relationships.filter(r => r.from !== r.to && lvl(r.from) === "logical" && lvl(r.to) === "logical" && (ents.has(r.from) || ents.has(r.to)));
-  const nokey = [], wrong = [];
-  rels.forEach(r => { const f1 = isOneEnd(r, "from"), t1 = isOneEnd(r, "to");
-    if (f1 === t1) return;                                  // 1:1 either way round, M:N no key: nothing to check
-    const one = f1 ? r.from : r.to, many = f1 ? r.to : r.from, pks = (I.attrsOf[one] || []).filter(a => a.isPrimaryKey);
-    if (pks.length && !pks.every(pk => (I.attrsOf[many] || []).some(a => a.copyOf === pk.id)))
-      nokey.push({go:"rel:" + r.id, n:`${I.ent[one].name} – ${I.ent[many].name}${r.label ? " (" + r.label + ")" : ""}`, m:`${I.ent[many].name} has no copy of ${pks.map(a => a.name).join(", ")}`, refs:["rel:" + r.id, "entity:" + many], marks:["ent:" + many]});
-    (I.attrsOf[one] || []).filter(a => a.copyOf && I.attr[a.copyOf]?.isPrimaryKey && I.attr[a.copyOf].entityId === many)
-      .forEach(a => wrong.push({go:"attr:" + a.id, n:chkAttr(a.id), m:`copy of ${chkAttr(a.copyOf)}, but ${I.ent[one].name} is the one side of “${r.label || "the relationship"}”`, refs:["attr:" + a.id, "rel:" + r.id], marks:["attr:" + a.id]})); });
-  g("wrong", "Keys copied the wrong way", "high", "A foreign key belongs on the many side of its relationship. Copy the key of the one side instead.", wrong);
-  g("nokey", "Relationships without a copied key", "normal", "The many side should hold a copy of the one side's primary key. Copy it, or check the cardinality.", nokey);
-  /* C4 InfoCube: every fact's hints, gathered (factHints, as in the fact's panel) */
-  if (I.cube && cubeOn()) {
-    const fh = [...ents].filter(e => roleOf(e) === "fact").flatMap(f => factHints(f).map(h => ({go:h.go.startsWith("field:") ? "entity:" + f : h.go, n:I.ent[f].name, m:h.msg, refs:[], hintOf:f, marks:[h.go.startsWith("attr:") ? h.go.replace("attr:", "attr:") : "ent:" + f]})));
-    g("facts", "Facts to check", "normal", "The hints from each fact's panel, for the whole project.", fh, true);
-    /* C5 principle 4: the logical model under approved dimensional mappings (computed from the model as it stands) */
-    const ap = S.cube.maps.filter(cm => cm.status === "approved" && I.attr[cm.to] && (ents.has(I.attr[cm.to].entityId) || cm.from.some(f => ents.has(I.attr[f]?.entityId))));
-    const nm = cm => `${cm.from.map(chkAttr).join(" + ")} → ${chkAttr(cm.to)}`, broken = [], under = [];
-    ap.forEach(cm => { const why = [];
-      const ti = cmTypeIssue(cm); if (ti) why.push("type conflict: " + ti);
-      if (why.length) broken.push({go:"cmap:" + cm.id, n:nm(cm), m:why.join("; "), refs:["cmap:" + cm.id, "attr:" + cm.to, ...cm.from.map(f => "attr:" + f)], marks:["attr:" + cm.to]});
-      const un = cm.from.filter(f => !srcOk(f));
-      if (un.length) under.push({go:"cmap:" + cm.id, n:nm(cm), m:un.map(f => `${I.attr[f].name} ${(I.mA[f] || []).some(m => I.col[m.columnId]?.missingSince) ? "reads a column that left the source"
-        : (I.mA[f] || []).length ? "has no approved source mapping" : "is not mapped"}`).join("; "), refs:["cmap:" + cm.id], marks:[]}); });
-    g("feeds", "Approved feeds broken by the logical model", "high", "The type of a logical attribute no longer fits an approved dimensional mapping that reads it. Fix the logical side, or set the mapping back to In review.", broken, true);
-    g("under", "Approved feeds over logical attributes not yet covered", "normal", "The dimensional mapping is approved, but what it reads has no approved source mapping, so it covers no requirement yet.", under, true);
-  }
-  return G;
-}
-/* Z1–Z9 (slice 20): the same checks for the whole model, by element, for the cards' marks and the panels' "Checks" */
-let CHKI = null;
-function chkIndex() {
-  if (CHKI) return CHKI;
-  const X = {panel:{}, attr:{}, ent:{}, all:[]};
-  const put = (o, k, v) => (o[k] ||= []).push(v);
-  const entsOf = r => { const [t, ...rest] = r.split(":"), id = rest.join(":");
-    if (t === "attr") return [I.attr[id]?.entityId]; if (t === "entity" || t === "ent") return [id]; if (t === "rel") return [I.rel[id]?.from, I.rel[id]?.to];
-    if (t === "cmap") { const cm = I.cube?.map[id]; return cm ? [I.attr[cm.to]?.entityId, ...cm.from.map(f => I.attr[f]?.entityId)] : []; } return []; };
-  modelChecks(null).forEach(gr => gr.lines.forEach(l => { const item = {sev:gr.sev, title:gr.title, n:l.n, m:l.m, go:l.go, hintOf:l.hintOf};
-    X.all.push({...item, ents:new Set([l.go, ...l.refs, ...l.marks].flatMap(entsOf).filter(Boolean))});
-    l.refs.forEach(r => put(X.panel, r, item));
-    l.marks.forEach(mk => { const [t, ...rest] = mk.split(":"), id = rest.join(":");
-      if (t === "attr") { put(X.attr, id, item); if (I.attr[id]) put(X.ent, I.attr[id].entityId, item); } else put(X.ent, id, item); }); }));
-  return CHKI = X;
-}
-const chkSev = list => list.some(x => x.sev === "high") ? "high" : "normal";
-const chkTitle = list => `Model checks: ${list.length}\n` + [...new Set(list.map(x => `${x.title}: ${x.hintOf ? x.m : x.n}`))].slice(0, 6).join("\n") + (list.length > 6 ? "\n…" : "");
-function chkHeadMark(eid) { const l = chkIndex().ent[eid]; return l ? ` chk ${chkSev(l)}" title="${esc(chkTitle(l))}` : ""; }
-function chkRowMark(aid) { const l = chkIndex().attr[aid]; return l ? {cls:` chk ${chkSev(l)}`, title:chkTitle(l)} : null; }
-function chkSection(t, id) {
-  const X = chkIndex(), own = X.panel[t + ":" + id] || [];
-  let list = own;
-  if (t === "entity") { const seen = new Set(own); (I.attrsOf[id] || []).forEach(a => (X.panel["attr:" + a.id] || []).forEach(x => { if (!seen.has(x)) { seen.add(x); list = list.concat(x); } })); }
-  const hints = t === "entity" && roleOf(id) === "fact" ? factHints(id).length : 0;
-  if (!list.length && !hints) return "";
-  const sev = chkSev(list);
-  const items = [...list.filter(x => x.sev === "high"), ...list.filter(x => x.sev !== "high")].map(x => {
-    const self = x.go === t + ":" + id;
-    return `<button class="h ${x.sev}"${self ? "" : ` data-cgo="${esc(x.go)}"`}><b>${esc(x.title)}.</b> ${esc(t === "attr" && x.n === chkAttr(id) ? x.m : x.n + ": " + x.m)}</button>`; }).join("");
-  return `<div class="chkbox ${list.length ? sev : "normal"}"><div class="chkh"><span class="chki ${list.length ? sev : "normal"}" aria-hidden="true">!</span><b>Model checks</b><span class="muted">${list.length + hints}</span></div>
-<div class="hints">${items}${hints ? `<span class="h">${hints === 1 ? "1 hint" : hints + " hints"} in the Fact section below.</span>` : ""}</div></div>`;
-}
-const CHK_SHORT = {"Keys copied the wrong way":"wrong way", "Duplicate attribute names":"duplicate name", "Calculated and mapped":"calculated and mapped",
-  "Copies whose original was deleted":"original deleted", "Keys copied without a relationship":"no relationship", "Relationships without a copied key":"no copied key",
-  "Facts to check":"fact hint", "Approved feeds broken by the logical model":"type conflict", "Approved feeds over logical attributes not yet covered":"input not covered"};
-function canvasChecks() {
-  const on = CV().ent, l = chkIndex().all.filter(x => [...x.ents].some(e => on[e]));
-  return [...l.filter(x => x.sev === "high"), ...l.filter(x => x.sev !== "high")];
-}
-function chkOverview() {
-  const l = canvasChecks(); if (!l.length) return "";
-  const all = (V.chkAll || {}).canvas, shown = all ? l : l.slice(0, 20);
-  return `<h3 id="ov-chk">Model checks</h3><p style="margin:0 0 6px;font-size:12px;color:var(--ink-3)">For the cards on this canvas. Click one to select it.</p><div class="list">${shown.map(x =>
-    `<button class="li chkli" data-chk-cv="${esc(x.go)}" title="${esc(x.title + ": " + x.m)}"><span class="chki ${x.sev}" aria-hidden="true">!</span><span class="n">${esc(x.n)}</span><span class="m">${esc(CHK_SHORT[x.title] || x.title)}</span></button>`).join("")}</div>${l.length > 20 ? `<button class="btn sm" data-chk-all="canvas" style="margin-top:4px">${all ? "Show the first 20" : `Show all ${l.length}`}</button>` : ""}`;
-}
-function openCanvasChecks() {        // the status bar's count: nothing selected, the details panel shown at its Model checks
-  V.sel = null; V.msel = new Set(); V.suggest = false;
-  const m = $("#main"); if (window.innerWidth <= 1000) { m.classList.add("mright"); m.classList.remove("mleft"); } else m.classList.remove("noright");
-  rebuild();
-  setTimeout(() => { const h = $("#ov-chk"); if (h) { h.scrollIntoView({block:"start"}); h.classList.add("flash"); setTimeout(() => h.classList.remove("flash"), 900); } }, 0);
-}
-function checksHtml(p) {
-  const G = modelChecks(p), n = G.reduce((k, x) => k + x.lines.length, 0), all = V.chkAll || {};
-  const li = l => `<button class="li" data-chk-go="${esc(l.go)}"><span class="n">${esc(l.n)}</span><span class="m">${esc(l.m)}</span></button>`;
-  const grp = x => `<div class="im-cgrp ${x.sev}" data-chk="${x.id}"><div class="im-ch"><span class="tag ${x.sev}">${x.sev === "high" ? "High" : "Normal"}</span>${x.cube ? `<span class="tag normal">InfoCube</span>` : ""}<b>${esc(x.title)}</b><span class="muted">${x.lines.length}</span></div>
-<p class="hint" style="margin:2px 0 6px">${esc(x.hint)}</p><div class="list">${(all[x.id] ? x.lines : x.lines.slice(0, 20)).map(li).join("")}</div>${x.lines.length > 20 ? `<button class="btn sm" data-chk-all="${x.id}" style="margin-top:4px">${all[x.id] ? "Show the first 20" : `Show all ${x.lines.length}`}</button>` : ""}</div>`;
-  const order = [...G.filter(x => x.sev === "high"), ...G.filter(x => x.sev !== "high")];
-  return `<div class="imx im-cons im-chk"><h3>Model checks${n ? ` <span class="im-badge">${n}</span>` : ""}</h3>
-<p class="muted" style="margin:0 0 8px;font-size:12px">What the model itself says, for the entities on this project's canvases: names, calculations, copied keys${I.cube && cubeOn() ? " and InfoCube" : ""}. Computed when this page opens; nothing is stored or changed.</p>
-${n ? order.map(grp).join("") : `<p class="muted">Names, calculations and keys agree${I.cube && cubeOn() ? ", and so do facts and their feeds" : ""}. Nothing to look at.</p>`}</div>`;
-}
-function goCheck(t, id) {
-  const p = curProj(), cs = projCanvases(p);
-  const eids = t === "entity" ? [id] : t === "attr" ? [I.attr[id]?.entityId] : t === "rel" ? [I.rel[id]?.from, I.rel[id]?.to]
-    : t === "cmap" ? (() => { const cm = I.cube?.map[id]; return cm ? [I.attr[cm.to]?.entityId, ...cm.from.map(f => I.attr[f]?.entityId)] : []; })() : [];
-  const best = cs.find(d => d.ent[eids[0]]) || cs.find(d => eids.some(e => d.ent[e]));
-  if (best) openCanvasFromHome(best.id); else { V.home = false; V.wsHome = false; rebuild(); }
-  select({t, id});
-  setTimeout(() => { if (t === "rel" || t === "cmap") { const e = eids.find(x => onCanvas("ent", x)); if (e) centerOn("ent", e); } else centerOnSel(); }, 30);
-}
-document.addEventListener("click", ev => {
-  const go = ev.target.closest("[data-chk-go]");
-  if (go) { ev.stopPropagation(); ev.preventDefault(); const [t, ...rest] = go.dataset.chkGo.split(":"); goCheck(t, rest.join(":")); return; }
-  const sa = ev.target.closest("[data-chk-all]");
-  if (sa) { ev.stopPropagation(); V.chkAll ||= {}; V.chkAll[sa.dataset.chkAll] = !V.chkAll[sa.dataset.chkAll]; if (sa.dataset.chkAll === "canvas") renderInspector(); else renderHome(); return; }
-  if (ev.target.closest("[data-chk-open]")) { ev.stopPropagation(); openCanvasChecks(); return; }
-  const cv = ev.target.closest("[data-chk-cv]");
-  if (cv) { ev.stopPropagation(); ev.preventDefault(); const [t, ...rest] = cv.dataset.chkCv.split(":"), id = rest.join(":"); select({t, id});
-    const e = t === "entity" ? id : t === "attr" ? I.attr[id]?.entityId : t === "rel" ? [I.rel[id]?.from, I.rel[id]?.to].find(x => onCanvas("ent", x))
-      : t === "cmap" ? [I.attr[I.cube.map[id]?.to]?.entityId, ...(I.cube.map[id]?.from || []).map(f => I.attr[f]?.entityId)].find(x => onCanvas("ent", x)) : null;
-    if (e && onCanvas("ent", e)) centerOn("ent", e); return; }
-  if (ev.target.closest("[data-chk-jump]")) { ev.stopPropagation(); const h = document.querySelector(".im-chk"); if (h) { h.scrollIntoView({block:"start", behavior:"smooth"}); } return; }
-}, true);
-function copyField(a) {          // slice 20's stand-in for D-63: which attribute this one is a copy of
-  if (!a.copyOf) return "";
-  const o = I.attr[a.copyOf];
-  return `<div class="fld"><label>Copy of</label>${o ? `<div class="list"><button class="li" data-go="attr:${esc(o.id)}"><span class="n">${esc(chkAttr(o.id))}</span><span class="m">original</span></button></div>`
-    : `<p style="margin:0;color:var(--warn)">${esc(a.copyLabel || "An attribute")}, which was deleted.</p>`}</div>`;
-}
 function renderHome() {
   const box = $("#home"); box.hidden = !V.home; if (!V.home) return;
   const p = curProj(), cs = projCanvases(p);
@@ -4940,10 +4728,8 @@ function renderHome() {
 <div class="ph-kicker">Project</div>
 <input class="ph-name" data-pf="name" value="${esc(p.name)}" aria-label="Project name">
 <textarea class="ph-desc" data-pf="desc" rows="1" placeholder="What is this project about?" aria-label="Project description">${esc(p.desc || "")}</textarea>
-<div class="ph-stats"><span><b>${cs.length}</b> canvas${cs.length === 1 ? "" : "es"}</span><span><b>${ents.size}</b> entit${ents.size === 1 ? "y" : "ies"}</span><span><b>${srcs.size}</b> source table${srcs.size === 1 ? "" : "s"}</span><span><b>${mp}</b> of <b>${at}</b> attributes mapped</span><span><b>${notes.length}</b> open note${notes.length === 1 ? "" : "s"}</span><span><b>${rqs.length}</b> requirement${rqs.length === 1 ? "" : "s"}, <b>${rqDone}</b> covered</span>${(() => { const G = modelChecks(p), n = G.reduce((k, x) => k + x.lines.length, 0), hi = G.some(x => x.sev === "high");
-  return n ? `<button class="ph-chk${hi ? " high" : ""}" data-chk-jump title="Go to Model checks"><span class="chki ${hi ? "high" : "normal"}" aria-hidden="true">!</span><b>${n}</b> model check${n === 1 ? "" : "s"}</button>` : ""; })()}</div>
+<div class="ph-stats"><span><b>${cs.length}</b> canvas${cs.length === 1 ? "" : "es"}</span><span><b>${ents.size}</b> entit${ents.size === 1 ? "y" : "ies"}</span><span><b>${srcs.size}</b> source table${srcs.size === 1 ? "" : "s"}</span><span><b>${mp}</b> of <b>${at}</b> attributes mapped</span><span><b>${notes.length}</b> open note${notes.length === 1 ? "" : "s"}</span><span><b>${rqs.length}</b> requirement${rqs.length === 1 ? "" : "s"}, <b>${rqDone}</b> covered</span></div>
 ${IMP.consistencyHtml(p)}
-${checksHtml(p)}
 <h3>Canvases</h3><div class="tiles">${tiles}
 <button class="tile add" data-hnew><div><svg class="i" viewBox="0 0 16 16"><path d="M8 3.5v9M3.5 8h9"/></svg>New canvas</div></button>
 ${outside.length ? `<button class="tile add" data-hadd><div><svg class="i" viewBox="0 0 16 16"><path d="M2.5 8h11M9.5 4l4 4-4 4"/></svg>Add a canvas from another project</div></button>` : ""}</div>
@@ -5281,7 +5067,9 @@ function reqTraces() {
 function insReq(r) {
   if (!r) return insOverview();
   const c = reqCoverage(r.id), links = S.reqLinks.filter(k => k.reqId === r.id), parent = r.parent && I.req[r.parent], kids = S.requirements.filter(x => x.parent === r.id);
-  const gapList = [...c.none.map(a => [a, "unmapped"]), ...c.draft.map(a => [a, "not approved"])];
+  // slice 21 (R6): an approved mapping from a column that left the source (missing or retired) says so, not "not approved"
+  const leftSrc = a => !isDimId(I.attr[a]?.entityId) && (I.mA[a] || []).some(m => m.status === "approved" && (I.col[m.columnId]?.missingSince || I.col[m.columnId]?.retiredSince));
+  const gapList = [...c.none.map(a => [a, "unmapped"]), ...c.draft.map(a => [a, leftSrc(a) ? "column left the source" : "not approved"])];
   const linkRow = k => { const lab = k.t === "entity" ? I.ent[k.id].name : k.t === "attr" ? attrLabel(k.id) : k.t === "map" ? colLabel(I.map[k.id].columnId) + " → " + attrLabel(I.map[k.id].attributeId) : k.t === "src" ? I.src[k.id].name : colLabel(k.id);
     const go = {entity:"entity", attr:"attr", map:"map", src:"source", col:"col"}[k.t] + ":" + k.id;
     return `<div class="li"><button class="lname n" data-go="${esc(go)}" style="text-align:left">${esc(lab)}</button><span class="m">${({entity:"entity", attr:"attribute", map:"mapping", src:"table", col:"column"})[k.t]}</span><button class="lx" data-do="req-unlink" data-r="${r.id}" data-t="${k.t}" data-i="${esc(k.id)}" title="Unlink">×</button></div>`; };
@@ -6097,14 +5885,19 @@ function openPick(o) {
   setTimeout(() => { $("#pk-q")?.focus(); document.addEventListener("pointerdown", pickOutside, true); }, 0);
 }
 function pickVisible() { const q = PK.q.trim().toLowerCase(); return PK.items.filter(it => !q || (it.label + " " + (it.key || "")).toLowerCase().includes(q)); }
+/* slice 21: a picker may offer to create an item from the typed text, last in the list, when no item has exactly that name */
+const pkNorm = t => String(t).trim().replace(/\s+/g, " ").toLowerCase();
+function pickCreate() { const q = PK.q.trim().replace(/\s+/g, " "); return PK.create && q && !PK.items.some(it => pkNorm(it.label) === pkNorm(q)) ? q : ""; }
 function renderPick() {
-  const vis = pickVisible(), n = PK.on.size;
-  const list = vis.length ? vis.map(it => `<button data-pk="${esc(it.id)}"${PK.multi ? ` role="menuitemcheckbox" aria-checked="${it.done || PK.on.has(it.id)}"` : ""}${it.done ? " disabled" : ""}${it.done ? ` title="${esc(PK.doneTitle || "")}"` : ""}>${PK.multi ? `<span class="pk-box"></span>` : ""}${it.color ? `<span class="pk-sw" style="background:${it.color}"></span>` : ""}${it.key ? `<span class="pk-k">${esc(it.key)}</span>` : ""}<span class="pk-n">${esc(it.label)}</span></button>`).join("")
+  const vis = pickVisible(), n = PK.on.size, cq = pickCreate();
+  const cbtn = cq ? `<button data-pkc class="pk-new"><span class="pk-plus">+</span><span class="pk-n">${esc(PK.create.label(cq))}</span></button>` : "";
+  const list = cq && !vis.length ? cbtn : vis.length ? vis.map(it => `<button data-pk="${esc(it.id)}"${PK.multi ? ` role="menuitemcheckbox" aria-checked="${it.done || PK.on.has(it.id)}"` : ""}${it.done ? " disabled" : ""}${it.done ? ` title="${esc(PK.doneTitle || "")}"` : ""}>${PK.multi ? `<span class="pk-box"></span>` : ""}${it.color ? `<span class="pk-sw" style="background:${it.color}"></span>` : ""}${it.key ? `<span class="pk-k">${esc(it.key)}</span>` : ""}<span class="pk-n">${esc(it.label)}</span></button>`).join("")
     : `<div class="pk-none">${esc(PK.items.length ? `Nothing matches “${PK.q.trim()}”.` : PK.empty)}</div>`;
+  const list2 = cq && vis.length ? list + cbtn : list;
   const keep = $("#pk-q"), had = keep && document.activeElement === keep, pos = keep?.selectionStart;
   pickpop.innerHTML = `<div class="msec">${esc(PK.title)}</div>${PK.note ? `<div class="pk-none" style="padding-top:0">${esc(PK.note)}</div>` : ""}
 <div class="ctx-search"><input id="pk-q" placeholder="${esc(PK.placeholder || "Type to filter…")}" autocomplete="off" value="${esc(PK.q)}"></div>
-<div class="pk-list">${list}</div>${PK.multi || PK.extra ? `<div class="pk-foot">${PK.extra ? `<button class="btn sm" data-pkx>${esc(PK.extra.label)}</button>` : "<span></span>"}${PK.multi ? `<button class="btn sm primary" data-pkok${n ? "" : " disabled"}>${esc(PK.confirm(n))}</button>` : ""}</div>` : ""}`;
+<div class="pk-list">${list2}</div>${PK.multi || PK.extra ? `<div class="pk-foot">${PK.extra ? `<button class="btn sm" data-pkx>${esc(PK.extra.label)}</button>` : "<span></span>"}${PK.multi ? `<button class="btn sm primary" data-pkok${n ? "" : " disabled"}>${esc(PK.confirm(n))}</button>` : ""}</div>` : ""}`;
   if (had) { const i = $("#pk-q"); i.focus(); i.setSelectionRange(pos, pos); }
 }
 pickpop.addEventListener("input", ev => { if (ev.target.id === "pk-q") { PK.q = ev.target.value; renderPick(); } });
@@ -6121,16 +5914,21 @@ pickpop.addEventListener("keydown", ev => {
 pickpop.addEventListener("click", ev => {
   if (!PK) return;
   const x = ev.target.closest("[data-pkx]"); if (x) { const f = PK.extra.act; closePick(); f(); return; }
+  const c = ev.target.closest("[data-pkc]"); if (c) { const q = pickCreate(), f = PK.create.act; closePick(); if (q) f(q); return; }
   const ok = ev.target.closest("[data-pkok]"); if (ok) { const ids = [...PK.on], f = PK.pick; closePick(); f(ids); return; }
   const b = ev.target.closest("[data-pk]"); if (!b || b.disabled) return;
   if (PK.multi) { const id = b.dataset.pk; PK.on.has(id) ? PK.on.delete(id) : PK.on.add(id); renderPick(); pickpop.querySelector(`[data-pk="${CSS.escape(id)}"]`)?.focus(); return; }
   const id = b.dataset.pk, f = PK.pick; closePick(); f(id);
 });
 /* item 1: the concept of a new entity, fact or dimension outside a concept frame is chosen, never suggested */
-function pickConcept(at, role, then) {
-  openPick({at, title:`Concept for the new ${role || "entity"}`, empty:"No concepts yet. Create one in the Model tab (New concept).",
-    placeholder:"Type to filter concepts…", items:S.concepts.map(c => ({id:c.id, label:c.name, color:c.color})), pick:then});
+function pickConcept(at, role, then, newConcept) {
+  openPick({at, title:`Concept for the new ${role || "entity"}`, empty:"No concepts yet. Type a name to create one.",
+    placeholder:"Type to filter or name a new concept…", items:S.concepts.map(c => ({id:c.id, label:c.name, color:c.color})), pick:then,
+    create: newConcept ? {label:q => `New concept “${q}”`, act:newConcept} : null});
 }
+/* a new concept takes the first palette colour no concept uses, else the next in turn; changed in the settings' Concept colours */
+function nextConceptColor() { const used = S.concepts.map(c => String(c.color).toUpperCase());
+  return ALLOWED_CONCEPT_COLORS.find(c => !used.includes(c)) || ALLOWED_CONCEPT_COLORS[S.concepts.length % ALLOWED_CONCEPT_COLORS.length]; }
 function conceptAt(x, y) { const f = frameAt(x, y); return f && f.kind === "concept" && S.concepts.some(c => c.id === f.ref) ? f.ref : null; }
 function createEntity(o) {
   if (wsPerm() !== "full") { V.blockedAt = performance.now(); toast(curWs().archived ? "This workspace is archived, so it is read-only." : "Your role cannot create entities here.", false, true); return; }
@@ -6149,10 +5947,12 @@ function createEntity(o) {
     [x, y] = best || [cx, cy];
   }
   if (o.role && !cubeOn()) { toast(CUBE_OFF, false, true); return; }
-  const conceptId = o.conceptId || conceptAt(x + 24, y + 20);   // slice 17: no "last used" suggestion
+  // slice 21: a concept created in the picker is made with the entity, in the same undo step
+  const nc = o.newConcept ? {id:uid("conc"), name:o.newConcept, color:nextConceptColor()} : null;
+  const conceptId = nc ? nc.id : o.conceptId || conceptAt(x + 24, y + 20);   // slice 17: no "last used" suggestion
   if (!conceptId) {
     const vr = vp.getBoundingClientRect(), at = o.at || (o.x != null ? screenOf(o.x + 24, o.y + 20) : {x:vr.left + vr.width / 2 - 130, y:vr.top + vr.height / 3});
-    pickConcept(at, o.role, cid => createEntity({...o, conceptId:cid})); return; }
+    pickConcept(at, o.role, cid => createEntity({...o, conceptId:cid}), name => createEntity({...o, newConcept:name})); return; }
   const dimRole = o.role || null, same = x => !!dimRole === isDimE(x);   // names are compared within one model level
   const base = (o.name || (dimRole ? "New " + dimRole : "New entity")).trim(); let name = base, n = 2;
   if (!o.name) while (S.entities.some(e => same(e) && e.name.toLowerCase() === name.toLowerCase())) name = `${base} ${n++}`;
@@ -6160,6 +5960,7 @@ function createEntity(o) {
   const e = {id:uid(dimRole ? "dent" : "lent"), conceptId, name, stereotype:"Object", description:"", ...(dimRole ? {level:"dimensional"} : {})};
   const live = CV().live && I.lbl[CV().live.labelId];
   mutate(() => {
+    if (nc) { S.concepts.push(nc); I.con[nc.id] = nc; }
     S.entities.push(e); I.ent[e.id] = e; I.attrsOf[e.id] = [];            // frame logic below reads the index
     if (dimRole) S.cube.ents.push({entityId:e.id, role:dimRole, grain:"", scd:dimRole === "dimension" ? 1 : null});
     CV().ent[e.id] = {x:Math.round(x / 8) * 8, y:Math.round(y / 8) * 8, f:"all", c:false, ...(live ? {lv:"full"} : {})};
@@ -6173,7 +5974,7 @@ function createEntity(o) {
   if (r && (r.x < vv.x || r.y < vv.y || r.x + r.w > vv.x + vv.w || r.y + 120 > vv.y + vv.h)) centerOnSel();
   setTimeout(() => { const i = $("#f-en"); if (i) { i.focus(); i.select(); } }, 30);
   toast(dup ? `Created ${name}, but another entity already has this name. Rename one of them if they differ.`
-            : `Created ${dimRole ? (dimRole === "fact" ? "the fact " : "the dimension ") : ""}${name} in ${I.con[conceptId]?.name}${live ? `, labeled ${live.name}` : ""}. Type its name now; change the concept in the panel.`, true);
+            : `Created ${dimRole ? (dimRole === "fact" ? "the fact " : "the dimension ") : ""}${name} in ${nc ? "the new concept " : ""}${I.con[conceptId]?.name}${live ? `, labeled ${live.name}` : ""}. Type its name now; change the concept in the panel.`, true);
 }
 /* left panel: + per concept, new concept, rename a concept */
 $("#tree").addEventListener("click", ev => {
@@ -6186,7 +5987,7 @@ $("#tree").addEventListener("click", ev => {
     box.innerHTML = `<input id="nc-in" placeholder="Concept name, then Enter" autocomplete="off">`; const i = $("#nc-in"); i.focus();
     i.addEventListener("keydown", e => { e.stopPropagation();
       if (e.key === "Escape") renderSide();
-      if (e.key === "Enter" && i.value.trim()) { const used = S.concepts.map(c => String(c.color).toUpperCase()), col = ALLOWED_CONCEPT_COLORS.find(c => !used.includes(c)) || ALLOWED_CONCEPT_COLORS[S.concepts.length % ALLOWED_CONCEPT_COLORS.length];
+      if (e.key === "Enter" && i.value.trim()) { const col = nextConceptColor();
         const c = {id:uid("conc"), name:i.value.trim(), color:col}; mutate(() => { S.concepts.push(c); }); V.lastConcept = c.id; toast(`Created the concept ${c.name}. Use + next to it to add entities.`, true); } });
     i.addEventListener("blur", () => setTimeout(renderSide, 100)); }
 }, true);
