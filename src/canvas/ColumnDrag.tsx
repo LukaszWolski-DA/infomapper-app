@@ -196,6 +196,11 @@ export function useColumnDrag(
       const from: RowDragFrom = card.classList.contains("src") ? { columnId: row.dataset.row! } : { attributeId: row.dataset.row! };
       const drag = latest.current.drag(from);
       if (!drag) return;
+      // Slice 21: the cancelled press below also keeps the focus where it is (Chromium moves it on the press's mousedown,
+      // which a cancelled pointerdown does not send), so a panel's text field would stay focused while the click replaces
+      // its panel. Leave it first, as any other press on the canvas does: its blur saves it for its own row (S21-04).
+      const active = document.activeElement;
+      if (active instanceof HTMLElement && active !== document.body && (active.matches("input, textarea, select") || active.isContentEditable)) active.blur();
       e.preventDefault(); // no text selection while dragging
       press.current = { cardId, from, drag, sx: e.clientX, sy: e.clientY, dragging: false, before: null, row, pointerId: e.pointerId };
     },

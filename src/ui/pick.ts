@@ -40,11 +40,15 @@ export interface PickOptions {
   testId?: string;
 }
 
-/** The items the filter leaves, by the label and the key, case ignored (prototype pickVisible). */
+/**
+ * The items the filter leaves, by the label and the key, case ignored (prototype pickVisible). Slice 21: extra spaces
+ * are ignored on both sides, as the create item compares (`pickNorm`), so a name typed with extra spaces still shows
+ * its item (the prototype's filter keeps them, and showed neither the item nor the create item).
+ */
 export function visibleItems(items: readonly PickItem[], query: string): PickItem[] {
-  const q = query.trim().toLowerCase();
+  const q = pickNorm(query);
   if (!q) return [...items];
-  return items.filter((it) => `${it.label} ${it.key ?? ""}`.toLowerCase().includes(q));
+  return items.filter((it) => pickNorm(`${it.label} ${it.key ?? ""}`).includes(q));
 }
 
 /** What a list without items says: the empty text, or that nothing matches the filter. */

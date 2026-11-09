@@ -52,6 +52,11 @@ describe("the picker's create item (slice 21, D-76)", () => {
     expect(pickNorm("  Reference   DATA ")).toBe("reference data");
   });
 
+  it("the filter ignores extra spaces too, so a name typed with them still shows its item", () => {
+    expect(visibleItems(concepts, "  reference   DATA ").map((i) => i.id)).toEqual(["r"]);
+    expect(visibleItems(concepts, "e  d").map((i) => i.id)).toEqual(["r"]);
+  });
+
   it("is absent with an empty filter, an exact match (other case, extra spaces) or no create option", () => {
     expect(createText({ items: concepts, create }, "   ")).toBe("");
     expect(createText({ items: concepts, create }, " reference   data ")).toBe("");
