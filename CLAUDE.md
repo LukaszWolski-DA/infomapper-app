@@ -75,13 +75,18 @@ If these disagree, stop and ask. Do not resolve a conflict silently.
   are not in it, even small ones. Put ideas in `docs/ideas.md` and mention them at the end of your answer.
 - **Work in the steps the PRD lists, and stop after each step** with a short summary of what changed and how to
   check it. Wait for Łukasz before the next step unless he said to continue.
-- **Step 1 checks the PRD against the code.** A PRD is a proposal to verify, not a specification: it may be written
-  from the prototype and the docs without reading the code. In step 1, check every item, decision and acceptance
+- **Step 1 checks the PRD against the code.** A PRD is a proposal to verify, not a specification: it is written
+  without reading the code (The slice cycle, 1). In step 1, check every item, decision and acceptance
   criterion against the code, `docs/decisions.md` and the earlier slices' acceptance docs, and write into
   `docs/prd/slice-XX-acceptance.md` where the PRD is wrong, contradicts the code or a decision, duplicates what the app
   already has, misses what the code needs, or costs more than it assumes (data model, undo, change events,
   performance), each with the files and functions behind it and a proposal. List the differences between the
   reference prototype and the app that the slice touches. No application code in step 1; Łukasz answers before step 2.
+- **One branch per slice** (`slice/00-skeleton`, …), small commits in Conventional Commits style
+  (`feat:`, `fix:`, `test:`, `docs:`, `chore:`). Never push to `main` directly.
+- **Done means:** the PRD’s acceptance tests pass, `npm run lint`, `npm run typecheck` and `npm test` pass, the full
+  run (Testing, "Test runs") passes, and you have described anything you assumed.
+- **When unsure, ask.** A question costs less than a wrong guess.
 
 ### The slice cycle (Łukasz, 9 November 2026)
 
@@ -89,30 +94,30 @@ If these disagree, stop and ask. Do not resolve a conflict silently.
    then the prototype is changed and Łukasz accepts it, then the PRD is written from the docs and the accepted
    prototype, without reading the code. Step 1 checks it against the code.
 2. **Two paths.** The PRD says which. The light path (two steps: step 1, then build and close) is for a small slice
-   that changes no data and no shared infrastructure. The full path (three or four steps) is for a slice that changes
-   the data model, the local file's format or shared infrastructure.
+   that changes no data and no shared infrastructure (the list in "Test runs"' exception). The full path (three or four
+   steps) is for a slice that changes the data model, the local file's format or shared infrastructure; changing shared
+   infrastructure as the PRD plans it is allowed in a slice, with a full run in that step (the same exception).
 3. **Files from Łukasz.** A PRD or prototype he hands over is in his Downloads folder. Copy it into the repository, check
    it with `cmp` and against the SHA-256 the prompt gives, and stop if either differs. The prototype in
-   `docs/prototype/` is replaced by the version accepted for the slice.
-4. **Shared infrastructure is fixed outside slices**, on its own `fix/…` branch from `main`, one thing per branch, with
-   its own PR and its own full run. A slice that finds such a problem reports it and does not fix it.
+   `docs/prototype/` is replaced by the version accepted for the slice, under the same file name
+   (`infomapper-prototype-with-sources.html`).
+4. **A defect in shared infrastructure is fixed outside slices** (the list in "Test runs"' exception): repairing a
+   defect found during a slice goes to its own `fix/…` branch from `main`, one thing per branch, with its own PR and its
+   own full run. The slice reports it and does not fix it. Changing shared infrastructure as a PRD plans it is allowed
+   in a slice (the full path, 2).
 5. **CI early.** Open a draft PR for the slice's branch at step 2, so CI runs on every push. Never add the label
-   `full-e2e` or start the E2E workflow unless the step or Łukasz says so.
-6. **Stop rather than decide.** Stop and report when: a performance bar is missed (report the split, do not optimise
-   further or add deferred or incremental computation on your own); more earlier specs change than the acceptance doc
-   lists; a measuring sitting cannot start (never close or change Łukasz's programs); KB would need a write. KB is read
-   only on a copy of a backup, printing counts only.
+   `full-e2e` or start the E2E workflow unless the step or Łukasz says so. The exceptions are explicit: the single-file
+   check for a failing test, and the full runs the "Test runs" rules require.
+6. **Stop rather than decide.** Stop and report when: a performance bar is missed (a gate, Testing, "When to measure";
+   report the split, do not optimise further or add deferred or incremental computation on your own); more earlier specs
+   change than the acceptance doc lists; a measuring sitting cannot start (never close or change Łukasz's programs); KB
+   would need a write (the local file's format upgrade on KB happens only in Łukasz's own manual acceptance, after the
+   backup "Łukasz's test model" requires). KB is read only on a copy of a backup, printing counts only.
 7. **Closing.** The last step updates the docs and quotes every new or changed decision (D-, AD-) in full for Łukasz's
-   approval; the full run goes ahead on the final commit without waiting for it (a later Markdown-only fix keeps the run
-   valid). It ends with the manual acceptance steps. Merge and tag only on his command; that command's prompt holds the
-   merge and only what he asks for, and first checks that the approved decision texts are committed and CI passed on
-   the last commit, stopping if not.
-
-- **One branch per slice** (`slice/00-skeleton`, …), small commits in Conventional Commits style
-  (`feat:`, `fix:`, `test:`, `docs:`, `chore:`). Never push to `main` directly.
-- **Done means:** the PRD’s acceptance tests pass, `npm run lint`, `npm run typecheck`, `npm test` and
-  `npm run e2e` pass, and you have described anything you assumed.
-- **When unsure, ask.** A question costs less than a wrong guess.
+   approval; the full run goes ahead on the final commit without waiting for it (a later commit keeps the run valid as
+   "Test runs" allows). It ends with the manual acceptance steps. Merge and tag only on his command; that command's
+   prompt holds the merge and only what he asks for, and first checks that the approved decision texts are committed and
+   CI passed on the last commit, stopping if not.
 
 ## Architecture rules
 
@@ -294,10 +299,11 @@ versions, change events in the same write, uniqueness and the “exactly one tar
     sets `TZ`).
 - **A race in a test** (Łukasz, 9 November 2026): find its cause. The test waits for a state the user can observe
   (a text, a class, a count), never for a fixed time, and its assertions stay as they are. If the cause is in the
-  application, fix it and report it as a bug.
+  application, fix it and report it as a bug, unless the cause is shared infrastructure (The slice cycle, 4).
 - **When to measure** (Łukasz, 9 November 2026): a measuring sitting only in a slice that changes how the canvas is
   drawn (cards, lines, layers), as that slice's performance gate; otherwise the element guard, LayerTree and the commit
-  counts are enough. Benches of derived indexes report a reference figure; a gate needs Łukasz's decision.
+  counts are enough. The bench bars listed under "Commands" stay gates (they came from decided PRDs); a new bench has a
+  bar only when Łukasz approves one (usually in step 1), and without one it reports a reference figure.
 - Use `data-testid` attributes for elements tests need; name them after the components (e.g. `card-entity`,
   `panel-inspector`, `nav-breadcrumbs`).
 - **Łukasz's test model** (since slice 8's manual acceptance, 28 October 2026): the organization KB with the workspace
@@ -316,10 +322,13 @@ versions, change events in the same write, uniqueness and the “exactly one tar
 
 ## Things not to touch
 
-- `docs/prototype/` – the frozen reference.
+- `docs/prototype/` – the frozen reference: changed only by replacing it with the version Łukasz accepted for a slice
+  (The slice cycle, 3).
 - `spikes/` – throwaway evaluations; only change them when asked.
 - `docs/decisions.md` and `docs/data-model-v2.md` – change only together with Łukasz, in the same pull request as the
-  code that needs the change.
+  code that needs the change. Decisions are taken before the prototype (The slice cycle, 1) and written into
+  `docs/decisions.md` at the closing (7); a change to the process alone may change `docs/decisions.md` without code, on
+  Łukasz's explicit instruction.
 
 ## Commands
 
