@@ -62,7 +62,7 @@ import {
 } from "./tree-data";
 
 /** A module's create answers as `createEntityAction` does (`EntityCreateResult` is its shape in `src/ui`). */
-type CreateResult = ActionResult<{ entityId: string; canvasItemId: string | null; name: string }>;
+type CreateResult = ActionResult<{ entityId: string; canvasItemId: string | null; name: string; concept: { id: string; name: string } }>;
 
 const SHUT_KEY = "infomapper:tree-shut";
 const CANVAS_ONLY_KEY = "infomapper:tree-canvas-only";
@@ -542,13 +542,20 @@ export function LeftPanel({ workspaceId, canvasId, tree, editable, conceptFrames
     const create = modules.creates.find((c) => c.key === createKey);
     if (!create) return;
     const r = button.getBoundingClientRect();
-    pickConcept({ x: r.left, y: r.bottom + 4 }, create.key === "fact" ? "fact" : "dimension", tree.concepts, (concept) => void createIn(create, concept));
+    pickConcept(
+      { x: r.left, y: r.bottom + 4 },
+      create.key === "fact" ? "fact" : "dimension",
+      tree.concepts,
+      (concept) => void createIn(create, { conceptId: concept.id }),
+      // slice 21 (D-76): a fact or a dimension in a new concept, one undo step
+      (name) => void createIn(create, { newConcept: { name } }),
+    );
   }
-  async function createIn(create: (typeof modules.creates)[number], concept: { id: string; name: string }) {
+  async function createIn(create: (typeof modules.creates)[number], into: { conceptId: string } | { newConcept: { name: string } }) {
     const spot = ui.freeSpot();
-    const result = await run(() => create.action(workspaceId, { conceptId: concept.id, placement: { canvasId, ...spot, height: newCardHeight(0), frames: ui.frameRefs() } }) as Promise<CreateResult>);
+    const result = await run(() => create.action(workspaceId, { ...into, placement: { canvasId, ...spot, height: newCardHeight(0), frames: ui.frameRefs() } }) as Promise<CreateResult>);
     if (!result.ok) return;
-    toast(`Created ${result.value.name} in ${concept.name}. Type its name now; change the concept in the panel.`);
+    toast(`Created ${result.value.name} in ${"newConcept" in into ? "the new concept " : ""}${result.value.concept.name}. Type its name now; change the concept in the panel.`);
     const cardId = result.value.canvasItemId;
     if (cardId) {
       openDetails();

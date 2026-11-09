@@ -197,22 +197,24 @@ export function useCanvasHost({
       const concepts = [...ix.model.concepts].sort((a, b) => a.sort_order - b.sort_order);
       const frame = ui.frameAt({ x: at.x + 24, y: at.y + 20 });
       const fromFrame = frame?.kind === "concept" ? concepts.find((c) => c.id === frame.conceptId) : undefined;
-      const create = async (concept: (typeof concepts)[number]) => {
+      /** In a concept, or (slice 21, D-76) in a new one named in the picker, made in the same undo step. */
+      const create = async (into: { conceptId: string } | { newConcept: { name: string } }) => {
         const { name } = o;
         // with its height the new card joins the frame it lands in (slice 2b)
         const placement = { canvasId, x: snap8(at.x), y: snap8(at.y), height: newCardHeight(0), frames: ui.frameRefs() };
         const result = await run(() =>
           o.create
-            ? (o.create.action(workspaceId, { conceptId: concept.id, placement }) as ReturnType<typeof createEntityAction>)
-            : createEntityAction(workspaceId, { conceptId: concept.id, ...(name ? { name } : {}), placement }),
+            ? (o.create.action(workspaceId, { ...into, placement }) as ReturnType<typeof createEntityAction>)
+            : createEntityAction(workspaceId, { ...into, ...(name ? { name } : {}), placement }),
         );
         if (!result.ok) return;
         const cardId = result.value.canvasItemId;
         if (cardId) ui.select({ t: "card", id: cardId });
-        if (name) toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}.`);
+        const where = `${"newConcept" in into ? "the new concept " : ""}${result.value.concept.name}${live ? `, labeled ${live.labelName}` : ""}`;
+        if (name) toast(`Created ${result.value.name} in ${where}.`);
         else {
           // on a live canvas the new entity is labeled at once, without a question (PRD item 10)
-          toast(`Created ${result.value.name} in ${concept.name}${live ? `, labeled ${live.labelName}` : ""}. Type its name now; change the concept in the panel.`);
+          toast(`Created ${result.value.name} in ${where}. Type its name now; change the concept in the panel.`);
           if (cardId) {
             openDetails();
             panels.setNameFocus(cardId);
@@ -220,11 +222,17 @@ export function useCanvasHost({
         }
       };
       if (fromFrame) {
-        void create(fromFrame);
+        void create({ conceptId: fromFrame.id });
         return;
       }
       const role = o.create ? (o.create.key === "fact" ? "fact" : "dimension") : "entity";
-      pickConcept(o.screen ?? { x: window.innerWidth / 2 - 130, y: window.innerHeight / 3 }, role, concepts, (c) => void create(c));
+      pickConcept(
+        o.screen ?? { x: window.innerWidth / 2 - 130, y: window.innerHeight / 3 },
+        role,
+        concepts,
+        (c) => void create({ conceptId: c.id }),
+        (conceptName) => void create({ newConcept: { name: conceptName } }),
+      );
     },
     [editable, ix, panels, toast, run, workspaceId, canvasId, ui, live, openDetails],
   );

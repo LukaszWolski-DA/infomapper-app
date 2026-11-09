@@ -10,6 +10,7 @@ import { cubeIndex } from "../domain/keys";
 import type { ActionResult } from "@/app/_lib/run-command";
 import type { DataStore } from "@/data";
 import type { WorkspaceModel } from "@/domain/types";
+import type { EntityCreateInput } from "@/ui/modules";
 import {
   addKey,
   createCubeEntity,
@@ -52,17 +53,18 @@ import {
 const create = (role: CubeRole) =>
   async function (
     workspaceId: string,
-    input: { conceptId: string; placement: { canvasId: string; x: number; y: number; height?: number; frames?: { frameId: string; expectedVersion: number }[] } },
-  ): Promise<ActionResult<{ entityId: string; canvasItemId: string | null; name: string }>> {
+    input: EntityCreateInput,
+  ): Promise<ActionResult<{ entityId: string; canvasItemId: string | null; name: string; concept: { id: string; name: string } }>> {
     return modelCommand(workspaceId, async (ctx, access, { concepts, entities }, store) => {
       const canvasId = typeof input?.placement?.canvasId === "string" ? input.placement.canvasId : "";
       const [canvas, frames] = await Promise.all([store.canvases.get(access.workspace.id, canvasId), store.frames.listOfCanvas(access.workspace.id, canvasId)]);
       const concept = concepts.find((c) => c.id === input?.conceptId) ?? null;
-      const result = createCubeEntity(ctx, access, { concept, entities, canvas, frames }, role, input);
+      // slice 21 (D-76): `concepts` for a new concept made with it (`newConcept`), built by InfoMapper's `createEntity`
+      const result = createCubeEntity(ctx, access, { concept, concepts, entities, canvas, frames }, role, input);
       if (!result.ok) return result;
       const write = result.writeSet.writes.find((w) => w.kind === "insert" && w.table === "entity");
       const name = write?.kind === "insert" && write.table === "entity" ? write.row.name : "";
-      return { ...result, value: { entityId: result.value.entityId, canvasItemId: result.value.canvasItemId, name } };
+      return { ...result, value: { entityId: result.value.entityId, canvasItemId: result.value.canvasItemId, name, concept: result.value.concept } };
     });
   };
 

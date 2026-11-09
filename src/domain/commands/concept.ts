@@ -4,11 +4,11 @@ import { z } from "zod";
 import { fail, newRowColumns, nextVersion, type CommandContext, type CommandResult } from "../changes";
 import { domainError, notFound } from "../errors";
 import type { Uuid } from "../ids";
-import { nextConceptColor } from "../model/concept-colors";
+import { isConceptColor, nextConceptColor } from "../model/concept-colors";
 import type { WorkspaceAccess } from "../permissions";
 import type { Concept, Entity, Frame } from "../types";
 import { nameSchema, uuidSchema, versionSchema } from "../validation";
-import { begin, current, done, isLive, nextSortOrder, softDeleted } from "./shared";
+import { begin, current, done, isLive, nextSortOrder, nothingToChange, softDeleted } from "./shared";
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
 
@@ -26,17 +26,61 @@ export function createConcept(
 ): CommandResult<{ conceptId: Uuid }> {
   const parsed = begin(access, "model.edit", createConceptInput, input);
   if (!parsed.ok) return fail(parsed.error);
-  const concepts = state.concepts.filter((c) => isLive(c, access.workspace.id));
-  const concept: Concept = {
+  const concept = newConcept(ctx, access.workspace.id, parsed.data.name, state.concepts);
+  return done(ctx, access, { conceptId: concept.id }, [{ kind: "insert", table: "concept", row: concept }]);
+}
+
+/** Extra spaces out of a typed name (slice 21, the prototype's `pkNorm` without the case): "  Fin   ance " → "Fin ance". */
+export const tidyName = (name: string): string => name.trim().replace(/\s+/g, " ");
+
+/**
+ * A new concept's row, as “New concept” writes it (D-46): at the end of the list, in the first palette colour no live
+ * concept uses yet (D-41). Shared with a concept made in the concept picker (slice 21, D-76), so the two cannot drift.
+ */
+export function newConcept(ctx: CommandContext, workspaceId: Uuid, name: string, all: readonly Concept[]): Concept {
+  const concepts = all.filter((c) => isLive(c, workspaceId));
+  return {
     ...newRowColumns(ctx),
-    workspace_id: access.workspace.id,
-    name: parsed.data.name,
+    workspace_id: workspaceId,
+    name,
     description_html: null,
     description_text: null,
     color: nextConceptColor(concepts.map((c) => c.color)),
     sort_order: nextSortOrder(concepts),
   };
-  return done(ctx, access, { conceptId: concept.id }, [{ kind: "insert", table: "concept", row: concept }]);
+}
+
+// ---- colour (slice 21, D-76): the workspace settings' "Concept colours" ----
+
+/** A colour outside the palette (a hand-made request only: the settings offer the palette). */
+export const COLOR_NOT_IN_PALETTE = "Choose a colour from the palette.";
+export const conceptColorLabel = (concept: string) => `Change colour of ${concept}`;
+
+const setConceptColorInput = z.object({ conceptId: uuidSchema, expectedVersion: versionSchema, color: z.string() }).strict();
+export type SetConceptColorInput = z.input<typeof setConceptColorInput>;
+
+/**
+ * Sets a concept's colour from the palette, violet never offered (D-41): one undo step. Those who may edit the model
+ * (as a concept's rename and delete, D-76). The same colour again writes nothing ("Nothing to change.").
+ */
+export function setConceptColor(
+  ctx: CommandContext,
+  access: WorkspaceAccess,
+  state: { concept: Concept | null },
+  input: unknown,
+): CommandResult<{ concept: Concept }> {
+  const parsed = begin(access, "model.edit", setConceptColorInput, input);
+  if (!parsed.ok) return fail(parsed.error);
+  const { conceptId, expectedVersion } = parsed.data;
+  const color = parsed.data.color.toUpperCase();
+  if (!isConceptColor(color)) return fail(domainError("invalid", COLOR_NOT_IN_PALETTE));
+  const got = current(state.concept, access, conceptId, expectedVersion, "concept");
+  if (!got.ok) return fail(got.error);
+  if (got.row.color.toUpperCase() === color) return fail(nothingToChange());
+  const row = nextVersion(ctx, got.row, { color });
+  const result = done(ctx, access, { concept: row }, [{ kind: "update", table: "concept", before: got.row, row }]);
+  if (result.ok) result.writeSet.label = conceptColorLabel(row.name);
+  return result;
 }
 
 // ---- rename ----

@@ -88,15 +88,20 @@ export interface TabDialogProps {
   onClose: () => void;
 }
 
-/** What a create action takes: InfoMapper's `createEntityAction` input. */
+/**
+ * What a create action takes: InfoMapper's `createEntityAction` input. Exactly one of `conceptId` and `newConcept` (slice
+ * 21, D-76): a concept made with the entity in the same undo step; the module passes the input on to `createEntity`,
+ * which builds the concept.
+ */
 export interface EntityCreateInput {
-  conceptId: string;
+  conceptId?: string;
+  newConcept?: { name: string };
   placement: { canvasId: string; x: number; y: number; height?: number; frames?: { frameId: string; expectedVersion: number }[] };
 }
 
 /** The answer of a create action, shaped as `ActionResult`. */
 export type EntityCreateResult =
-  | { ok: true; value: { entityId: string; canvasItemId: string | null; name: string } }
+  | { ok: true; value: { entityId: string; canvasItemId: string | null; name: string; concept: { id: string; name: string } } }
   | { ok: false; code?: string; message: string };
 
 /** An entity a module creates (B-2): the tab's button, the toolbox's item, and the server action. */
