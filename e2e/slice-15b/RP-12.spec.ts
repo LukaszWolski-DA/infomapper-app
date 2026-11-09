@@ -12,7 +12,7 @@ test("RP-12: Dim Date's date_key renamed date_sk: the links are unchanged, no ke
   await page.getByTestId("input-attribute-name").fill("date_sk");
   await page.getByTestId("input-attribute-name").press("Tab");
   await openEntity(page, "Fact Sales");
-  await expect(dimensionRows(page).filter({ hasText: "Dim Date" })).toHaveText([/key date_key$/, /key ship_date_key$/]);
+  await expect(dimensionRows(page).filter({ hasText: "Dim Date" })).toHaveText([/key date_key · no match → -1$/, /key ship_date_key · no match → -1$/]);
   await expect(hintsOk(page)).toBeVisible();
   expect(await keyOf(relId("date>sales"))).toBe(attrId("sales.date_key"));
   expect(await keyOf(relId("date>sales:ship"))).toBe(attrId("sales.ship_date_key"));
