@@ -376,3 +376,10 @@ in the step's diff.
   (the stored rows), `slice-19/S19-01` (an older file's rows; a save, reload, undo and redo), `S19-05`,
   `slice-15b/RP-02` (the panels on the star), `slice-20/S20-01`, `S20-02` (the checks' lines and counts: unchanged).
 - No full run (answer 4).
+
+## Step 2: Łukasz's review (9 November 2026)
+
+1. **The undo names carry their object**, as slice 21's do: "Turn on unknown member of {dimension}", "Turn off unknown
+   member of {dimension}", "Set unknown member value of {Dimension}.{attribute}", "Clear unknown member value of
+   {Dimension}.{attribute}". Changed in step 3, with their unit tests.
+2. Every other text of step 2 is accepted as written. The differences from the plan are accepted.

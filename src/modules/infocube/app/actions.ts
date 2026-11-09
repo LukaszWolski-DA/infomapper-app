@@ -115,12 +115,12 @@ export async function setMeasureAction(workspaceId: string, input: SetMeasureInp
 
 /** Slice 22: sets or clears a dimension's attribute's unknown member's value; answers the row's new id and version, or none. */
 export async function setUnknownValueAction(workspaceId: string, input: SetUnknownValueInput): Promise<ActionResult<{ row: { id: string; version: number } | null }>> {
-  return modelCommand(workspaceId, async (ctx, access, { attributes }, store) => {
+  return modelCommand(workspaceId, async (ctx, access, { attributes, entities }, store) => {
     const attribute = attributes.find((a) => a.id === input?.attributeId) ?? null;
     const [cubes, values] = await Promise.all([store.modules.list(access.workspace.id, "cube_entity"), store.modules.list(access.workspace.id, "cube_attribute")]);
     const cube = cubes.find((c) => c.deleted_at === null && c.entity_id === attribute?.entity_id) ?? null;
     const row = values.find((v) => v.deleted_at === null && v.attribute_id === attribute?.id) ?? null;
-    return setUnknownValue(ctx, access, { attribute, cube, row }, input);
+    return setUnknownValue(ctx, access, { attribute, cube, row, entityName: entities.find((e) => e.id === attribute?.entity_id)?.name }, input);
   });
 }
 

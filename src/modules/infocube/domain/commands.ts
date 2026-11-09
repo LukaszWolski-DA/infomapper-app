@@ -113,14 +113,15 @@ export const PERIOD_ON_FACT = "Only a dimension has a snapshot period.";
 export const UNKNOWN_ON_FACT = "Only a dimension has an unknown member.";
 
 /** The undo step's name of each field (approved in step 1); the grain keeps InfoMapper's "Change fact or dimension". */
-function labelOf(patch: Partial<CubeEntity>): string | null {
+function labelOf(patch: Partial<CubeEntity>, name: string | undefined): string | null {
   if ("fact_type" in patch) return "Change fact type";
   if ("is_factless" in patch) return patch.is_factless ? "Mark fact factless" : "Unmark fact factless";
   if ("base_fact_entity_id" in patch) return patch.base_fact_entity_id ? "Set aggregate base" : "Clear aggregate base";
   if ("dim_kind" in patch) return "Change dimension kind";
   if ("history" in patch) return "Change history";
   if ("snapshot_period" in patch) return "Change snapshot period";
-  if ("has_unknown_member" in patch) return patch.has_unknown_member ? "Turn on unknown member" : "Turn off unknown member";
+  // slice 22 (Łukasz's review of step 2): the name carries the dimension
+  if ("has_unknown_member" in patch) return `${patch.has_unknown_member ? "Turn on" : "Turn off"} unknown member${name ? ` of ${name}` : ""}`;
   return null;
 }
 
@@ -183,7 +184,7 @@ export function updateCubeEntity(
   if (!Object.keys(patch).length) return fail(nothingToChange());
   const row = nextVersion(ctx, before, patch);
   const result = done(ctx, access, { version: row.version }, [{ kind: "update", table: "cube_entity", before, row }]);
-  const label = labelOf(patch);
+  const label = labelOf(patch, state.entities?.find((e) => e.id === before.entity_id)?.name);
   if (result.ok && label) result.writeSet.label = label;
   return result;
 }
@@ -302,6 +303,8 @@ export interface UnknownValueState {
   cube: CubeEntity | null;
   /** The attribute's live row, if any. */
   row: CubeAttribute | null;
+  /** The dimension's name, for the undo step's name ("… of {Dimension}.{attribute}"). */
+  entityName?: string;
 }
 
 /**
@@ -328,8 +331,9 @@ export function setUnknownValue(
   if (!isLive(cube, access.workspace.id) || cube.entity_id !== a.entity_id || cube.role !== "dimension") return fail(domainError("invalid", UNKNOWN_VALUE_NOT_ON_DIMENSION));
   const live = isLive(state.row, access.workspace.id) && state.row.attribute_id === a.id ? state.row : null;
   if ((live?.id ?? null) !== (known?.id ?? null) || (live && known && live.version !== known.version)) return fail(staleVersion());
+  // the undo step's name carries its object (Łukasz's review of step 2)
   const labelled = <T>(result: CommandResult<T>, label: string) => {
-    if (result.ok) result.writeSet.label = label;
+    if (result.ok) result.writeSet.label = `${label} of ${state.entityName ? `${state.entityName}.` : ""}${a.name}`;
     return result;
   };
   if (value === null) {
