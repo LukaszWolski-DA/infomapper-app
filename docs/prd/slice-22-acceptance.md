@@ -301,3 +301,17 @@ New, proposed here:
 **Step 4, close:** `decisions.md` (D-77, quoted in full, with what questions 1 and 2 decide), `data-model-v2.md`,
 `ideas.md`, the inventory, `known-limitations.md` (F2, F8), README and CLAUDE.md; the full run on the final commit; the
 manual acceptance steps (the demo, then KB after a fresh backup).
+
+## Step 1: Łukasz's answers (9 November 2026)
+
+1. **F1:** Datetime follows Date's rule with its own sentence ("“{v}” is not a Datetime (YYYY-MM-DD HH:MM)"); Custom
+   fits any value; both default to empty.
+2. **F2:** with several primary keys, a fact's Dimensions row shows the first key's value, as Add key uses the first;
+   every key attribute has its own value in the dimension's panel.
+3. **F3:** the value's command checks the row's id and version as the page knows them, or that there is none (D-59); a
+   unit test covers the conflict when another user created the row meanwhile.
+4. **F12:** no full run in step 2.
+5. **The new texts** as proposed in this document; step 2's report quotes them all for review.
+
+The corrections that needed no decision stand as written: `upgrade` for old rows (F4), read-only fields for readers and
+reviewers (F6), `TextField`'s optional `invalid` prop (F7), the five earlier specs (F9).
