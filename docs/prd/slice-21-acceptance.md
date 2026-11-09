@@ -367,3 +367,50 @@ typed text, which was saved when the field was next left. No sentence for `docs/
 - The element guard (`S3B-15-elements`, measurement build, against `slice-08.json`): every viewport count equal (4,508,
   19,305, 1,465, 4,907); page totals 6,135, 20,932, 3,002, 6,444 (not compared, `<head>` included). No measuring sitting
   (nothing is drawn differently).
+- The single-file checks (3 rounds each, GitHub): `S0-07` passed 3/3
+  ([run 42688912082](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42688912082)); `S14B-09` (below)
+  passed 3/3 ([run 42691675089](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42691675089)). Both are
+  flakes, neither touches this slice's code.
+
+### The full run on the final commit (`a970d5e`)
+
+- **First run** ([42689189589](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42689189589), 13 min 37 s):
+  694 passed, 1 failed, 4 skipped, 0 flaky, 0 expected failures. The failure: `S14B-09` "a focused field with typed
+  text asks; once it is saved, nothing" timed out waiting for the entity name's save answer after the page's leave
+  warning; no error in part 7's `server.log`; its single-file check passed 3/3. So a second full run on the same commit.
+- **Second run** ([42692149453](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42692149453), wall-clock
+  16 min 29 s): **695 passed, 0 failed, 4 skipped, 0 flaky, 0 expected failures.**
+
+  | Part | Time | Heap peak (limit 8,039 MB; restart at 80 %) | Lowest available memory | Restarts |
+  | --- | --- | --- | --- | --- |
+  | 1 | 6.8 min | 979 MB | 9,720 MB | 0 |
+  | 2 | 7.9 min | 1,211 MB | 11,023 MB | 0 |
+  | 3 | 6.2 min | 1,127 MB | 11,381 MB | 0 |
+  | 4 | 7.9 min | 1,147 MB | 11,507 MB | 0 |
+  | 5 | 10.4 min | 1,016 MB | 10,781 MB | 0 |
+  | 6 | 8.5 min | 1,103 MB | 10,926 MB | 0 |
+  | 7 | 10.3 min | 1,110 MB | 11,458 MB | 0 |
+  | 8 | 9.4 min | 1,034 MB | 11,478 MB | 0 |
+
+  The last part (8, with `slice-21`) is not the longest by more than a minute: no recut.
+
+### Manual acceptance steps (demo: `npm run demo`, http://127.0.0.1:3001; then KB)
+
+1. **A row onto a column (item 1).** On "Customer & orders", drag Customer.segment_code onto customers.segment: the
+   tables stay lit while you drag, the mapping is made ("Mapped customers.segment to Customer.segment_code"), and one
+   Undo takes it back. Drag Customer.customer_number onto web_users.cust_no: D-48's choice opens with "Separate mapping"
+   selected; Esc cancels, Enter makes it. Drag a logical row onto another logical row: nothing. On "Sales star", place a
+   table, drag a logical row onto one of its columns (it maps), and a Dim row onto it (the refusal).
+2. **New concept (item 2).** With the Entity tool click outside a frame, type "sal": Sales and "+ New concept “sal”";
+   Enter picks Sales. Type "Finance": only the create item; Enter makes Finance (a new colour) and the entity; the toast;
+   one Undo takes both, Redo brings both. On "Sales star", the Cube tab's New fact, type "Retail", Enter: the fact in the
+   new concept Retail; Undo.
+3. **The gap's reason (item 3).** Re-import a source without a column that feeds an approved mapping in a requirement's
+   scope (KB: a column of your choice; on a copy only if you prefer): the requirement panel says "column left the
+   source" for its attribute; retire the column from the system's changes: still so; the counts unchanged.
+4. **The rule's draft (item 4).** Type in a mapping's transformation rule and click a card: the rule is saved into its
+   own mapping (S20-Q10 as before); click a logical row instead: the same (the press leaves the field first).
+5. **Concept colours (item 5).** As a modeler, the workspace settings: "Concept colours", eight swatches, no violet.
+   Change a concept's colour: the toast; open a canvas: its cards, frame and the Model tab's dot follow; Undo there
+   takes it back. A reviewer or reader sees the swatches disabled.
+6. **KB:** the four concepts keep their colours until you change one (all four are palette colours, Q5).
