@@ -431,6 +431,7 @@ export function TextField({
   mono,
   placeholder,
   keep,
+  invalid,
 }: {
   id?: string;
   value: string;
@@ -445,6 +446,8 @@ export function TextField({
   placeholder?: string;
   /** Keep the draft when the panel closes (slice 13, item 5a). */
   keep?: DraftKeep;
+  /** Why the stored value is not valid (slice 22): the field is marked (`aria-invalid`, the warning border), this its title. */
+  invalid?: string | null;
 }) {
   const { bind, defaultValue: initial, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(value, onSave, {
     prepare: (t) => t.trim(),
@@ -464,7 +467,9 @@ export function TextField({
         placeholder={placeholder}
         data-testid={testId}
         autoComplete="off"
-        className={`${inputClass} ${mono ? "font-mono text-xs" : ""}`}
+        aria-invalid={invalid ? true : undefined}
+        title={invalid || undefined}
+        className={`${inputClass} ${mono ? "font-mono text-xs" : ""} ${invalid ? "border-im-warn" : ""}`}
         onKeyDown={(e) => {
           if (e.key === "Enter") e.currentTarget.blur();
           keyDown(e);

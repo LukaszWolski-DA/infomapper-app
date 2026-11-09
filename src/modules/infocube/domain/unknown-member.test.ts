@@ -9,7 +9,7 @@ import { S, attr, star } from "./__fixtures__/star";
 import { setUnknownValue, updateCubeEntity, UNKNOWN_ON_FACT, UNKNOWN_VALUE_NOT_ON_DIMENSION, type UnknownValueState } from "./commands";
 import { cubeIndex } from "./keys";
 import type { CubeAttribute } from "./types";
-import { UNKNOWN_TEXTS, unknownDefault, unknownFit, unknownValueOf } from "./unknown-member";
+import { lookupPlaceholder, UNKNOWN_TEXTS, unknownDefault, unknownFit, unknownValueOf } from "./unknown-member";
 
 const on = { infocube: true };
 const typed = (data_type: Attribute["data_type"], type_length: number | null = null) => ({ data_type, type_length });
@@ -101,7 +101,8 @@ describe("updateCubeEntity: the unknown member's flag (F13)", () => {
   const m = star();
   const cust = m.cubeEntities.find((c) => c.id === S.cubeCust)!;
   const sales = m.cubeEntities.find((c) => c.id === S.cubeSales)!;
-  const run = (cube = cust, hasUnknownMember = false, who = access("modeler", on)) => updateCubeEntity(makeCtx(), who, { cube }, { cubeEntityId: cube.id, expectedVersion: cube.version, hasUnknownMember });
+  const run = (cube = cust, hasUnknownMember = false, who = access("modeler", on)) =>
+    updateCubeEntity(makeCtx(), who, { cube, entities: m.entities }, { cubeEntityId: cube.id, expectedVersion: cube.version, hasUnknownMember });
 
   it("a new dimension has it on, a fact has none", () => {
     expect([cust.has_unknown_member, sales.has_unknown_member]).toEqual([true, null]);
@@ -110,9 +111,9 @@ describe("updateCubeEntity: the unknown member's flag (F13)", () => {
     const off = run();
     if (!off.ok) throw new Error(off.error.message);
     expect(off.writeSet.writes).toMatchObject([{ kind: "update", table: "cube_entity", row: { id: cust.id, has_unknown_member: false, version: cust.version + 1 } }]);
-    expect(off.writeSet.label).toBe("Turn off unknown member");
+    expect(off.writeSet.label).toBe("Turn off unknown member of Dim Customer");
     const back = run({ ...cust, has_unknown_member: false }, true);
-    expect(back.ok && back.writeSet.label).toBe("Turn on unknown member");
+    expect(back.ok && back.writeSet.label).toBe("Turn on unknown member of Dim Customer");
   });
   it("writes nothing for the same value, and is refused on a fact, for a reviewer and in an archived workspace", () => {
     expect(run(cust, true)).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
@@ -132,6 +133,7 @@ describe("setUnknownValue (PRD item 3, acceptance F3)", () => {
     attribute: m.attributes.find((a) => a.id === S.custPk)!,
     cube: m.cubeEntities.find((c) => c.id === S.cubeCust)!,
     row: null,
+    entityName: "Dim Customer",
     ...over,
   });
   const run = (s: UnknownValueState, v: string | null, current: { id: string; version: number } | null, who = access("modeler", on), attributeId: string = S.custPk) =>
@@ -143,7 +145,7 @@ describe("setUnknownValue (PRD item 3, acceptance F3)", () => {
     expect(r.writeSet.writes).toMatchObject([{ kind: "insert", table: "cube_attribute", row: { attribute_id: S.custPk, unknown_value: "0", version: 1, deleted_at: null } }]);
     expect(r.value.row).toEqual({ id: (r.writeSet.writes[0] as { row: { id: string } }).row.id, version: 1 });
     expect(new Set(r.writeSet.events.map((e) => e.change_group_id)).size).toBe(1);
-    expect(r.writeSet.label).toBe("Set unknown member value");
+    expect(r.writeSet.label).toBe("Set unknown member value of Dim Customer.customer_key");
   });
 
   it("keeps a value that does not fit its type: the panel and the checks say so", () => {
@@ -156,7 +158,7 @@ describe("setUnknownValue (PRD item 3, acceptance F3)", () => {
     if (!r.ok) throw new Error(r.error.message);
     expect(r.writeSet.writes).toMatchObject([{ kind: "update", table: "cube_attribute", row: { id: ROW, unknown_value: "-2", version: 2 } }]);
     expect(r.value.row).toEqual({ id: ROW, version: 2 });
-    expect(r.writeSet.label).toBe("Set unknown member value");
+    expect(r.writeSet.label).toBe("Set unknown member value of Dim Customer.customer_key");
   });
 
   it("clears a value by deleting its row: an empty value, spaces or null", () => {
@@ -166,7 +168,7 @@ describe("setUnknownValue (PRD item 3, acceptance F3)", () => {
       expect(r.writeSet.writes).toMatchObject([{ kind: "update", table: "cube_attribute", row: { id: ROW, version: 2 } }]);
       expect((r.writeSet.writes[0] as { row: CubeAttribute }).row.deleted_at).not.toBeNull();
       expect(r.value.row).toBeNull();
-      expect(r.writeSet.label).toBe("Clear unknown member value");
+      expect(r.writeSet.label).toBe("Clear unknown member value of Dim Customer.customer_key");
     }
   });
 
@@ -204,5 +206,21 @@ describe("setUnknownValue (PRD item 3, acceptance F3)", () => {
   it("stores a value while the dimension's unknown member is off (the values stay)", () => {
     const off = { ...state().cube!, has_unknown_member: false };
     expect(run(state({ cube: off }), "0", null).ok).toBe(true);
+  });
+});
+
+describe("lookupPlaceholder (PRD item 6)", () => {
+  const m = star();
+  const pk = m.attributes.find((a) => a.id === S.custPk)!;
+  it("is the unknown member's value of the target, stored or default, while its dimension has one", () => {
+    expect(lookupPlaceholder(cubeIndex(m), pk)).toBe("-1 (the unknown member's value)");
+    expect(lookupPlaceholder(cubeIndex({ ...m, cubeAttributes: [value()] }), pk)).toBe("0 (the unknown member's value)");
+  });
+  it("is e.g. Unknown for a dimension turned off, an empty value, a fact's attribute and no target", () => {
+    const off = { ...m, cubeEntities: m.cubeEntities.map((c) => (c.id === S.cubeCust ? { ...c, has_unknown_member: false } : c)) };
+    expect(lookupPlaceholder(cubeIndex(off), pk)).toBe("e.g. Unknown");
+    expect(lookupPlaceholder(cubeIndex(m), { ...pk, is_primary_key: false })).toBe("e.g. Unknown");
+    expect(lookupPlaceholder(cubeIndex(m), m.attributes.find((a) => a.id === S.orderNumber))).toBe("e.g. Unknown");
+    expect(lookupPlaceholder(cubeIndex(m), undefined)).toBe("e.g. Unknown");
   });
 });

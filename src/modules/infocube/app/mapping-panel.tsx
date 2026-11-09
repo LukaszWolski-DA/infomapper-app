@@ -34,7 +34,8 @@ import {
   typesDiffer,
   type MappingIndex,
 } from "../domain/mappings";
-import type { CubeMappingKind, CubeMappingStatus } from "../domain/types";
+import type { CubeAttribute, CubeMappingKind, CubeMappingStatus } from "../domain/types";
+import { lookupPlaceholder } from "../domain/unknown-member";
 import type { CubePageRows } from "../domain/view";
 import { addCubeMappingInputAction, removeCubeMappingInputAction, retargetCubeMappingAction, setCubeMappingStatusAction, updateCubeMappingAction } from "./actions";
 import { useCubeMappingDelete, useMappingIndex } from "./canvas-ext";
@@ -308,6 +309,16 @@ function LookupFields({
   const p = usePanel();
   const m = index.mapping(id)!;
   const relationships = p.ix.model.relationships;
+  // slice 22 (PRD item 6): the unknown member's value of the target, while its dimension has one
+  const rows = useModules().data.infocube as CubePageRows | undefined;
+  const placeholder = useMemo(() => {
+    const cubes = new Map((rows?.cubeEntities ?? []).map((c) => [c.entity_id, c]));
+    const values = new Map((rows?.cubeAttributes ?? []).map((v) => [v.attribute_id, v as CubeAttribute]));
+    return lookupPlaceholder(
+      { unknownOf: (attributeId) => values.get(attributeId), unknownOn: (entityId) => cubes.get(entityId)?.role === "dimension" && cubes.get(entityId)?.has_unknown_member !== false },
+      index.attribute(m.attribute_id),
+    );
+  }, [rows, index, m.attribute_id]);
   const candidates = lookupRelationships(index, relationships, id);
   const first = index.inputsOf(id)[0];
   const dictionary = first ? index.entity(index.attribute(first.attribute_id)?.entity_id ?? "") : undefined;
@@ -350,7 +361,7 @@ function LookupFields({
           id={NO_MATCH_ID}
           value={m.lookup_default ?? ""}
           readOnly={!p.editable}
-          placeholder="e.g. Unknown"
+          placeholder={placeholder}
           testId="input-cube-lookup-default"
           onSave={(value) => write((v) => updateCubeMappingAction(p.workspaceId, { ...ref(v), lookupDefault: value.trim() ? value : null }))}
           keep={{ key: fieldKey(m.id, "lookup_default"), field: "When no match", object: `the mapping to ${index.attribute(m.attribute_id)?.name ?? "?"}` }}

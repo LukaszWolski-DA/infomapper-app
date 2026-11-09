@@ -49,7 +49,24 @@ export const UNKNOWN_TEXTS = {
   /** A lookup's "When no match" placeholder while its target's dimension has an unknown member with a value. */
   lookupPlaceholder: (value: string) => `${value} (the unknown member's value)`,
   emptyDefault: "empty (NULL)",
+  /** The dimension's panel (PRD items 1 and 2). */
+  flag: "Unknown member",
+  on: "A row for fact rows whose key is empty or has no match, so they are not lost (Kimball's −1 row; in Data Vault, usually from the ghost record). Its values; an empty field takes the default shown.",
+  off: "No unknown member: a fact row whose key is empty or has no match finds no row here. Turn it on to give it one.",
+  noAttributes: "No attributes yet.",
+  /** A kept draft's field name (D-66's toast "Not saved: {field} of {object}. …"). */
+  field: "Unknown member value",
+  lookupDefault: "e.g. Unknown",
 } as const;
+
+/**
+ * A lookup's "When no match" placeholder (PRD item 6): the unknown member's value of the lookup's target while the
+ * target's dimension has its unknown member on and the value (stored or default) is not empty; "e.g. Unknown" otherwise.
+ */
+export function lookupPlaceholder(cube: Pick<CubeIndex, "unknownOf" | "unknownOn">, target: (Typed & { id: Uuid; entity_id: Uuid }) | undefined): string {
+  const value = target && cube.unknownOn(target.entity_id) ? unknownValueOf(cube, target) : "";
+  return value ? UNKNOWN_TEXTS.lookupPlaceholder(value) : UNKNOWN_TEXTS.lookupDefault;
+}
 
 /**
  * The value-fit rule (PRD item 7; acceptance, answer 1): why a typed value does not fit its attribute's type, or null

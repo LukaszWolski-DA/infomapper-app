@@ -6,9 +6,11 @@
 // relationship's key. InfoMapper's panels render them through the composition root (`src/compose/panels.ts`) and never
 // name them. Everything is derived in the browser from the model and InfoCube's rows of the page (`ModuleView.data`);
 // every write is a module command on the save chain (slice 9, 10a): grain, SCD and additivity with their row checked,
-// a measure turned on with its attribute held, a key's link and Add key with the rows they write held.
+// a measure turned on with its attribute held, a key's link and Add key with the rows they write held. Slice 22 (D-77;
+// prototype `unkSection`): a dimension's unknown member, its flag and one value per attribute, each saved with its
+// attribute held and the row the page knows checked; a fact's Dimensions say "no match → {key value}".
 
-import { useCallback, useContext, useMemo, useRef } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef } from "react";
 import { useAction } from "@/app/_components/use-action";
 import { useModules } from "@/app/_components/modules";
 import { Field, fieldKey, Flag, Fold, Hint, inputClass, Li, Note, Seg, smallButtonClass, TextField, useChoice } from "@/app/_panels/fields";
@@ -19,9 +21,10 @@ import type { Attribute, Entity, Relationship } from "@/domain/types";
 import { useToast } from "@/ui/components/toast";
 import { asRole, cubeIndex, dimensionAs, factEnds, factHints, NO_HINTS, roleAt, typeWord, usedBy, type CubeIndex, type Hint as CubeHint } from "../domain/keys";
 import { baseChoices } from "../domain/aggregates";
-import type { CubeEntity, CubeKey, CubeMeasure, DimKind, FactType, History } from "../domain/types";
+import type { CubeAttribute, CubeEntity, CubeKey, CubeMeasure, DimKind, FactType, History } from "../domain/types";
+import { UNKNOWN_TEXTS, unknownDefault, unknownFit, unknownValueOf } from "../domain/unknown-member";
 import { DIM_KIND_NAMES, FACT_TYPE_NAMES, type CubePageRows } from "../domain/view";
-import { addKeyAction, linkKeyAction, setMeasureAction, updateCubeEntityAction, updateMeasureAction } from "./actions";
+import { addKeyAction, linkKeyAction, setMeasureAction, setUnknownValueAction, updateCubeEntityAction, updateMeasureAction } from "./actions";
 
 export const ADDITIVITY_LABEL = { additive: "Additive", semi: "Semi-additive", non: "Non-additive" } as const;
 export const ADDITIVITY_MARK = { additive: "Σ", semi: "Σ~", non: "∅Σ" } as const;
@@ -93,6 +96,7 @@ function useCube(): CubeIndex {
         cubeEntities: rows.cubeEntities as CubeEntity[],
         cubeMeasures: rows.cubeMeasures as CubeMeasure[],
         cubeKeys: rows.cubeKeys as CubeKey[],
+        cubeAttributes: rows.cubeAttributes as CubeAttribute[],
       }),
     [entities, attributes, relationships, rows],
   );
@@ -109,10 +113,21 @@ function useAddKey(cube: CubeIndex) {
   };
 }
 
-/** A dimension's key in a fact's Dimensions list; slice 19: "· snapshot" after a snapshot dimension's (`snapshotOf`: its name). */
-const keyMeta = (key: Attribute | null, snapshotOf: string | null = null) => (
+/**
+ * A dimension's key in a fact's Dimensions list; slice 19: "· snapshot" after a snapshot dimension's (`snapshotOf`: its
+ * name); slice 22: before it "· no match → {value}", the dimension's unknown member's key value (`noMatch`).
+ */
+const keyMeta = (key: Attribute | null, snapshotOf: string | null = null, noMatch: { value: string; dimension: string } | null = null) => (
   <>
     {key ? <span>key {key.name}</span> : <span className="text-im-warn">no key</span>}
+    {key && noMatch && (
+      <>
+        {" · "}
+        <span title={UNKNOWN_TEXTS.noMatchTitle(key.name, noMatch.dimension)} data-testid="mark-cube-no-match">
+          {UNKNOWN_TEXTS.noMatch(noMatch.value)}
+        </span>
+      </>
+    )}
     {snapshotOf && (
       <>
         {" · "}
@@ -168,6 +183,9 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
   const choices = baseChoices(aggregates, entity.id, p.ix.model.entities.map((e) => e.id), (id) => cube.roleOf(id) === "fact");
   const aggregatedBy = aggregates.aggregatesOf(entity.id);
   const snapshotDimension = (id: Uuid) => cube.cubeOf(id)?.history === "snapshot";
+  // slice 22: the dimension's unknown member's key value: its first primary key's (as Add key uses the first), stored or default
+  const noMatch = (k: { dimensionId: Uuid; pk: Attribute | null }) =>
+    k.pk && cube.unknownOn(k.dimensionId) ? { value: unknownValueOf(cube, k.pk), dimension: cube.nameOf(k.dimensionId) } : null;
   return (
     <Fold title="Fact" testId="section-cube-fact">
       <div className="rounded-lg border border-im-line px-3 pb-3 pt-0.5">
@@ -252,7 +270,7 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
               {keys.map((k) => (
                 <div key={k.relationshipId} className="flex items-center gap-2" data-testid="item-cube-dimension" data-relationship={k.relationshipId}>
                   <div className="min-w-0 flex-1">
-                    <Li onClick={() => ui.select({ t: "rel", id: k.relationshipId })} meta={keyMeta(k.key, snapshotDimension(k.dimensionId) ? cube.nameOf(k.dimensionId) : null)}>
+                    <Li onClick={() => ui.select({ t: "rel", id: k.relationshipId })} meta={keyMeta(k.key, snapshotDimension(k.dimensionId) ? cube.nameOf(k.dimensionId) : null, noMatch(k))}>
                       {dimensionAs(cube, k)}
                     </Li>
                   </div>
@@ -376,6 +394,7 @@ function DimensionSection({ entity, row, cube }: { entity: Entity; row: CubeEnti
             />
           </Field>
         )}
+        <UnknownMember entity={entity} row={row} cube={cube} save={save} />
         <Field label="Used by">
           {users.length ? (
             <div data-testid="list-cube-used-by">
@@ -393,6 +412,111 @@ function DimensionSection({ entity, row, cube }: { entity: Entity; row: CubeEnti
         </Field>
       </div>
     </Fold>
+  );
+}
+
+// ---- slice 22: a dimension's unknown member ----
+
+type Known = { id: string; version: number } | null;
+/**
+ * The newest row an answer gave per attribute, with the page's row when it came (acceptance F3): a save sent before the
+ * fresh page arrives sends the answer's row; once the page shows another row than it did then, the page's is newer.
+ */
+const answered = new Map<Uuid, { row: Known; page: string }>();
+const keyOfRow = (row: Known | undefined) => (row ? `${row.id}:${row.version}` : "");
+
+function UnknownMember({
+  entity,
+  row,
+  cube,
+  save,
+}: {
+  entity: Entity;
+  row: CubeEntity;
+  cube: CubeIndex;
+  save: (change: { hasUnknownMember: boolean }) => ReturnType<ReturnType<typeof useAction>["saveRow"]>;
+}) {
+  const p = usePanel();
+  const { saveRows } = useAction();
+  const flag = useChoice<boolean>(row.has_unknown_member !== false, (hasUnknownMember) => save({ hasUnknownMember }));
+  const attributes = cube.attributesOf(entity.id);
+  // the rows as the page shows them now, for a save sent later than it was started
+  const shown = useRef<(attributeId: Uuid) => Known>(() => null);
+  useEffect(() => {
+    shown.current = (attributeId) => {
+      const r = cube.unknownOf(attributeId);
+      return r ? { id: r.id, version: r.version } : null;
+    };
+  }, [cube]);
+
+  /** Sets or clears an attribute's value: its saves one at a time (the attribute held), each with the newest row known. */
+  const saveValue = (a: Attribute, value: string) =>
+    saveRows([{ id: a.id }], async () => {
+      const page = shown.current(a.id);
+      const last = answered.get(a.id);
+      const current = last && last.page === keyOfRow(page) ? last.row : page;
+      const result = await setUnknownValueAction(p.workspaceId, { attributeId: a.id, value, current });
+      if (result.ok) answered.set(a.id, { row: result.value.row, page: keyOfRow(shown.current(a.id)) });
+      else answered.delete(a.id);
+      return result;
+    });
+
+  return (
+    <div className="mt-3" data-testid="field-cube-unknown">
+      <div className="flex flex-wrap gap-1.5" data-testid="flag-cube-unknown">
+        <Flag on={flag.value} label={UNKNOWN_TEXTS.flag} disabled={!p.editable} onToggle={() => flag.choose(!flag.value)} />
+      </div>
+      <p className={sentenceClass} data-testid="text-cube-unknown">
+        {flag.value ? UNKNOWN_TEXTS.on : UNKNOWN_TEXTS.off}
+      </p>
+      {flag.value &&
+        (attributes.length ? (
+          <div className="mt-1.5 grid gap-1" data-testid="list-cube-unknown">
+            {attributes.map((a) => {
+              const stored = cube.unknownOf(a.id)?.unknown_value ?? "";
+              const bad = stored ? unknownFit(stored, a) : null;
+              const id = `f-uv-${a.id}`;
+              return (
+                <div key={a.id} data-testid="item-cube-unknown" data-attribute={a.id}>
+                  <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2">
+                    <label htmlFor={id} className="flex min-w-0 flex-col">
+                      <span className="truncate" title={a.name}>
+                        {a.name}
+                      </span>
+                      <span className="text-[11px] text-im-ink-3">
+                        {typeWord(a)}
+                        {a.is_primary_key ? " · PK" : ""}
+                      </span>
+                    </label>
+                    <div className="min-w-0">
+                      <TextField
+                        key={fieldKey(a.id, "unknown_value")}
+                        id={id}
+                        value={stored}
+                        readOnly={!p.editable}
+                        placeholder={unknownDefault(a) || UNKNOWN_TEXTS.emptyDefault}
+                        invalid={bad}
+                        onSave={(value) => saveValue(a, value)}
+                        keep={{ key: fieldKey(a.id, "unknown_value"), field: UNKNOWN_TEXTS.field, object: `${entity.name}.${a.name}` }}
+                        testId="input-cube-unknown"
+                      />
+                    </div>
+                  </div>
+                  {bad && (
+                    <p className="mb-0.5 text-[11.5px] text-im-warn" data-testid="text-cube-unknown-bad">
+                      {bad}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="mt-1.5" data-testid="text-cube-unknown-none">
+            {UNKNOWN_TEXTS.noAttributes}
+          </p>
+        ))}
+    </div>
   );
 }
 
