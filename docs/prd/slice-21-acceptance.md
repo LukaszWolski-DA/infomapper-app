@@ -277,3 +277,20 @@ registry or the local adapter.
    CLAUDE.md's ModuleView entry), `ideas.md`, `inventory-prototype-vs-app.md`, `known-limitations.md`, README and
    CLAUDE.md's status; D-76's text quoted for approval; one full run on the final commit (S21-06); the manual acceptance
    steps. Merge and tag `slice-21` only on Łukasz's command.
+
+## Step 1: Łukasz's answers (9 November 2026; PRD version 2, section 10)
+
+1. **P0:** the prototype rebuilt on slice 20's version. Copied at the start of step 2: 712,576 bytes, SHA-256
+   `2c135f3a3ca7a120ada8128c6239cc2f3046e81602172ea737c79e49a85fc389`, `cmp` equal; `modelChecks`, `INS_SWAP` and
+   `checksDemo` present. Against slice 20's version it changes 51 lines: the 41 of step 1's P0 and the answers below
+   (the picker's Enter, `findDrop` without InfoCube, the "Concept colours" click with its toast and no write for the
+   same colour). PRD version 2: 18,901 bytes, SHA-256 `03a7dc0164858356468d66c2ad172b0179c772e7c0f0ae3a8501f8e32c22f62a`,
+   `cmp` equal.
+2. **Item 2 for facts and dimensions:** (a), the additive `newConcept` in `EntityCreateInput`, on the light path.
+3. **Enter:** D-72's Enter kept (F4).
+4. **A logical row on a logical row with InfoCube off:** nothing (F2).
+5. **Item 4's spec:** one observable outcome (the text shown again, no other mapping changed); the path Chromium took is
+   recorded in the report; if it saves on removal, one sentence in `docs/known-limitations.md` that the spec does not
+   exercise `keep`.
+6. **Item 5's permission:** `model.edit`, as a concept's rename and delete.
+7. **The new texts:** the table as proposed, the create toast without a role (the app's).
