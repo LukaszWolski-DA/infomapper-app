@@ -294,3 +294,76 @@ registry or the local adapter.
    exercise `keep`.
 6. **Item 5's permission:** `model.edit`, as a concept's rename and delete.
 7. **The new texts:** the table as proposed, the create toast without a role (the app's).
+
+## Step 2: build and close (9 November 2026)
+
+### What changed
+
+- **Item 3 (R6):** `GapReason` `column_left` in `src/domain/model/requirements.ts`: a logical attribute with an approved
+  mapping that reads a missing or retired column, after "calculation" and before "type conflict";
+  `GAP_REASONS.column_left = "column left the source"`. The coverage rule is unchanged. Unit tests:
+  `requirements-column-left.test.ts`.
+- **Item 4:** `keep` on InfoMapper's rule (`mapping-panel.tsx`), as InfoCube's.
+- **Item 2:** `createEntity` takes `newConcept: { name }` in place of `conceptId` (exactly one), builds the concept with
+  `newConcept()` (shared with `createConcept`, `concept.ts`; `tidyName`), writes it first in the same change group and
+  names the step `Create {name} in new concept {concept}` (`writeSet.label`); the answer carries the concept's id and
+  name. **The extension point, additively (answer 2a):** `EntityCreateInput.conceptId` is optional beside `newConcept`,
+  `EntityCreateResult` carries `concept`; InfoCube's `create` action passes `concepts` and the input on, and
+  `createCubeEntity` keeps InfoMapper's undo name when it rebuilds the write set. Nothing more of the module changed. The
+  picker (`src/ui/pick.ts`, `pick-popover.tsx`): `PickOptions.create`, `createText`, `pickNorm`, `enterAction`'s create
+  (D-72's Enter), the button `picker-create`; `concept-pick.ts`: the texts and `newConcept`; the canvas host's
+  `createEntityAt` and the Cube tab's `createIn` pass either. Unit tests: `src/domain/commands/slice-21.test.ts`,
+  `src/ui/pick.test.ts`, `src/modules/infocube/domain/commands.test.ts`.
+- **Item 1 (X1):** the canvas host composes InfoMapper's drag for a logical row with the module's (`rowDrag`: the table
+  cards lit beside the module's; a column `"ok"`, every other target the module's verdict or `"none"`; no drag without
+  a table card and the module's) and routes a logical row's drop on a column to `mapColumn` (`dropRow`). The extension
+  contract, `RowDrag`, `CanvasHost` and the canvas's layers keep their shape; two comments changed (`context.ts`,
+  `planDrop`).
+- **Item 5:** `setConceptColor` (`concept.ts`, `model.edit`, the palette, "Nothing to change." for the same colour,
+  `Change colour of {concept}`), `setConceptColorAction`, the box "Concept colours" in `settings-form.tsx` (a
+  `useChoice` per line on `saveRow` with the undo toast), its rows from the workspace page.
+
+### Two changes beyond the plan (for Łukasz's review)
+
+1. **The picker's filter ignores extra spaces** (`visibleItems` uses `pickNorm`). Found by S21-02: "  reference   DATA "
+   is an exact match for the create item's rule but the old filter (`trim` only, as the prototype's `pickVisible`) left
+   no item, so the list showed nothing at all. It now shows "Reference data". A difference from the prototype, in its
+   favour; slice 17's filter is otherwise unchanged (its specs pass).
+2. **A row's drag press leaves a focused panel field first** (`ColumnDrag.tsx` `onPointerDown`). Found by S21-04: the
+   press calls `preventDefault` (no text selection while dragging), and in Chromium that also keeps the focus where it
+   is, so a click on a logical row replaced the panel with its field still focused; a field without `keep` would lose
+   its text. Before this slice that happened only on column rows (and on logical rows while a fact or dimension was on
+   the canvas); item 1 made every logical row a drag start for editors. The press now blurs a focused input, textarea,
+   select or editable element first, as any other press on the canvas does, and its blur saves it for its own row.
+   `ColumnDrag.tsx` is the canvas's gesture code, not in CLAUDE.md's list of shared infrastructure; the full run covers
+   it. The column-row half was a latent defect older than this slice (slice 1b): if Łukasz prefers, it can move to a
+   `fix/…` branch of its own.
+
+Also: the unit test "a retired column without `missing_since`" was dropped. Coverage reads `missing_since` only (D-31
+holds because a retired column is always missing), so such a row would count as covered and give no reason; changing
+the coverage rule was out of scope (counts unchanged). The reason itself tests both columns.
+
+### S21-04: the path Chromium took
+
+**Kept as a draft (`keep`).** With the panel replaced by a click event without a press, Chromium did not save the rule
+on the field's removal: the stored rule stayed as it was, and with the mapping selected again its field showed the
+typed text, which was saved when the field was next left. No sentence for `docs/known-limitations.md` is needed (answer
+5: only if it saved on removal).
+
+### Earlier tests changed
+
+- `e2e/slice-15c/S15-09.spec.ts`: "a logical row: the five facts and dimensions stay lit" now expects 6 lit cards: the
+  table the test places takes a logical row's drop since slice 21 (X1).
+- Unit tests added to `src/ui/pick.test.ts` and `src/modules/infocube/domain/commands.test.ts`; none changed.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`, `npm test` (159 files, 1,950 tests before the last two additions; all pass).
+- `e2e/slice-21`: 10 tests pass (first run: 8 passed, 2 failed, the two findings above; the two files again after the
+  fixes: pass).
+- Q6's earlier specs and the commit-count guards (54 files, 102 tests, local): 101 passed, 1 failed:
+  `S0-07` "only the owner can archive…" timed out at its second session's sign-in (`bar-top` not shown) while the
+  measurement build ran beside it; the single-file check (3 rounds) is below.
+- The element guard (`S3B-15-elements`, measurement build, against `slice-08.json`): every viewport count equal (4,508,
+  19,305, 1,465, 4,907); page totals 6,135, 20,932, 3,002, 6,444 (not compared, `<head>` included). No measuring sitting
+  (nothing is drawn differently).
