@@ -74,7 +74,7 @@ export const NOT_AN_AGGREGATE = "Not an aggregate";
 const sentenceClass = "mt-1.5 text-[12px] text-im-ink-3";
 const NUMERIC = new Set<Attribute["data_type"]>(["integer", "decimal"]);
 
-const NO_ROWS: CubePageRows = { cubeEntities: [], cubeMeasures: [], cubeKeys: [], cubeMappings: [], cubeMappingInputs: [] };
+const NO_ROWS: CubePageRows = { cubeEntities: [], cubeMeasures: [], cubeKeys: [], cubeMappings: [], cubeMappingInputs: [], cubeAttributes: [] };
 
 /**
  * The index of the model and InfoCube's rows on this page, once per data version. The page's rows come without

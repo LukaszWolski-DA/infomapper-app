@@ -8,7 +8,7 @@ import { carries, dimensionAs, type CubeIndex } from "./keys";
 import { lookupDependents, mappingAttributeDeletes, mappingDependents, type MappingIndex } from "./mappings";
 import { aggregateIndex, type AggregateIndex } from "./aggregates";
 import { outriggers, type Outriggers } from "./outriggers";
-import { SCD_NUMBER, type Additivity, type CubeEntity, type CubeKey, type CubeMapping, type CubeMappingInput, type CubeMeasure, type CubeRole, type DimKind, type FactType } from "./types";
+import { SCD_NUMBER, type Additivity, type CubeAttribute, type CubeEntity, type CubeKey, type CubeMapping, type CubeMappingInput, type CubeMeasure, type CubeRole, type DimKind, type FactType } from "./types";
 
 export const ROLE_NAMES: Record<CubeRole, string> = { fact: "Fact", dimension: "Dimension" };
 
@@ -184,6 +184,8 @@ export interface CubePageRows {
   /** Slice 15c: the dimensional mappings and their inputs (the drag's plan, the line's menu, the panels). */
   cubeMappings: PageRow<CubeMapping>[];
   cubeMappingInputs: PageRow<CubeMappingInput>[];
+  /** Slice 22: the unknown members' stored values (the dimension's panel, the fact's Dimensions, a lookup, the checks). */
+  cubeAttributes: PageRow<CubeAttribute>[];
   /** Each mapping's last content editor while four-eyes is on (O9; `moduleView`): the panel's note before approving. */
   contentAuthors?: Record<Uuid, Uuid>;
 }
@@ -194,6 +196,7 @@ export function cubePageRows(
   cubeKeys: readonly CubeKey[],
   cubeMappings: readonly CubeMapping[] = [],
   cubeMappingInputs: readonly CubeMappingInput[] = [],
+  cubeAttributes: readonly CubeAttribute[] = [],
 ): CubePageRows {
   return {
     cubeEntities: live(cubeEntities).map(pageRow),
@@ -201,6 +204,7 @@ export function cubePageRows(
     cubeKeys: live(cubeKeys).map(pageRow),
     cubeMappings: live(cubeMappings).map(pageRow),
     cubeMappingInputs: live(cubeMappingInputs).map(pageRow),
+    cubeAttributes: live(cubeAttributes).map(pageRow),
   };
 }
 

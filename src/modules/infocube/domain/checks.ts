@@ -1,14 +1,17 @@
 // InfoCube's model checks (slice 20, PRD R4 and R5; prototype `modelChecks`' C4 and C5): every fact's hints gathered
 // ("Facts to check"), and the logical model under approved dimensional mappings (InfoCube's principle 4: the LDM is its
 // upstream), computed from the model as it stands (decision 4a): a type conflict by the app's rule (High) and inputs
-// not covered by D-31's rule (Normal). InfoMapper reads them through the composition root (`ModuleChecks`) and never
+// not covered by D-31's rule (Normal). Slice 22 (PRD item 8; prototype C6): a dimension's unknown member's typed values
+// that do not fit their attribute's type (High), and dimensions a fact relates to without an unknown member (Normal).
+// InfoMapper reads them through the composition root (`ModuleChecks`) and never
 // names InfoCube; the texts are the module's.
 
 import type { Uuid } from "@/domain/ids";
 import { coverageGapText, type CheckGroup, type CheckInput, type CheckItem, type CheckRef, type ModuleChecks } from "@/domain/model/checks";
 import { cubeIndex, factHints, typeWord, type CubeIndex, type Hint } from "./keys";
 import { typesDiffer } from "./mappings";
-import type { CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure } from "./types";
+import type { CubeAttribute, CubeEntity, CubeKey, CubeMapping, CubeMappingInput, CubeMeasure } from "./types";
+import { unknownFit } from "./unknown-member";
 
 /** A dimensional mapping's selection kind on the canvas (`CUBE_MAPPING_KIND` in `../canvas/lines.ts`; the test keeps them equal). */
 export const CHECK_MAPPING_KIND = "cube_mapping";
@@ -22,9 +25,11 @@ export interface CubeCheckRows {
   cubeKeys: readonly Omit<CubeKey, "created_at" | "created_by" | "updated_at" | "updated_by">[];
   cubeMappings: readonly Omit<CubeMapping, "created_at" | "created_by" | "updated_at" | "updated_by">[];
   cubeMappingInputs: readonly Omit<CubeMappingInput, "created_at" | "created_by" | "updated_at" | "updated_by">[];
+  /** Slice 22: the unknown members' stored values; rows read before it have none. */
+  cubeAttributes?: readonly Omit<CubeAttribute, "created_at" | "created_by" | "updated_at" | "updated_by">[];
 }
 
-export const NO_CHECK_ROWS: CubeCheckRows = { cubeEntities: [], cubeMeasures: [], cubeKeys: [], cubeMappings: [], cubeMappingInputs: [] };
+export const NO_CHECK_ROWS: CubeCheckRows = { cubeEntities: [], cubeMeasures: [], cubeKeys: [], cubeMappings: [], cubeMappingInputs: [], cubeAttributes: [] };
 
 export const CUBE_CHECK_TEXTS = {
   tag: "InfoCube",
@@ -41,11 +46,23 @@ export const CUBE_CHECK_TEXTS = {
     short: "input not covered",
     hint: "The dimensional mapping is approved, but what it reads has no approved source mapping, so it covers no requirement yet.",
   },
+  unkval: {
+    title: "Unknown member values that do not fit",
+    short: "value does not fit",
+    hint: "A value of a dimension's unknown member does not fit its attribute's type. Change the value or the type.",
+  },
+  nounk: {
+    title: "Dimensions without an unknown member",
+    short: "no unknown member",
+    hint: "A fact row whose key is empty or has no match finds no row. Turn on the dimension's unknown member, or say in its description why not.",
+  },
+  unknownValue: (sentence: string) => `unknown member: ${sentence}`,
+  usedBy: (facts: readonly string[]) => `used by ${facts.join(", ")}`,
   typeConflict: (input: string, inputType: string, target: string, targetType: string) => `type conflict: ${input} is ${inputType}, ${target} is ${targetType}`,
 } as const;
 
 /**
- * InfoCube's three groups (facts, feeds, under) for the input's scope; empty groups included. They read the indexes the
+ * InfoCube's groups (feeds, unkval, facts, nounk, under) for the input's scope; empty groups included. They read the indexes the
  * page has already (step 2's bench): the requirement index's lookup (its feeds are the dimensional mappings, with their
  * approval, type conflict and inputs) and the cube index (the facts' hints), which a caller that has one passes in.
  */
@@ -118,8 +135,58 @@ export function cubeChecks(rows: CubeCheckRows, { model, lookup, scope }: CheckI
     }
   }
 
-  const group = (id: "facts" | "feeds" | "under", items: CheckItem[], high = false): CheckGroup => ({ id, ...CUBE_CHECK_TEXTS[id], high, module: CUBE_CHECK_TEXTS.tag, items });
-  return { topic: CUBE_CHECK_TEXTS.topic, allWell: CUBE_CHECK_TEXTS.allWell, groups: [group("feeds", feeds, true), group("facts", facts), group("under", under)] };
+  // slice 22: the dimensions' unknown members, in the model's order of entities. The stored values come from the rows,
+  // not from a cube index passed in (it may have been built without them).
+  const unkval: CheckItem[] = [];
+  const nounk: CheckItem[] = [];
+  const values = new Map((rows.cubeAttributes ?? []).filter((v) => v.deleted_at === null && v.unknown_value != null).map((v) => [v.attribute_id, v.unknown_value!]));
+  let factsOf: Map<Uuid, Uuid[]> | undefined;
+  /** The live facts at the other end of each dimension's live relationships (never one to itself), each once. */
+  const usedBy = (dimensionId: Uuid): Uuid[] => {
+    if (!factsOf) {
+      factsOf = new Map();
+      for (const r of model.relationships) {
+        if (r.deleted_at !== null || r.from_entity_id === r.to_entity_id) continue;
+        for (const [d, f] of [[r.from_entity_id, r.to_entity_id], [r.to_entity_id, r.from_entity_id]] as const) {
+          if (cube.roleOf(d) !== "dimension" || cube.roleOf(f) !== "fact" || !name.has(f)) continue;
+          const list = factsOf.get(d) ?? factsOf.set(d, []).get(d)!;
+          if (!list.includes(f)) list.push(f);
+        }
+      }
+    }
+    return factsOf.get(dimensionId) ?? [];
+  };
+  const order = new Map(entities.map((e, i) => [e.id, i]));
+  for (const e of entities) {
+    if (cube.roleOf(e.id) !== "dimension" || !inScope(e.id)) continue;
+    if (!cube.unknownOn(e.id)) {
+      const users = usedBy(e.id);
+      if (!users.length) continue;
+      const ref: CheckRef = { t: "entity", id: e.id };
+      nounk.push({
+        go: ref,
+        text: () => ({ name: e.name, detail: CUBE_CHECK_TEXTS.usedBy([...users].sort((a, b) => order.get(a)! - order.get(b)!).map((f) => name.get(f)!)) }),
+        panels: [ref],
+        marks: [ref],
+        entities: [e.id],
+      });
+      continue;
+    }
+    if (!values.size) continue;
+    for (const a of lookup.attributesOf.get(e.id) ?? []) {
+      const value = values.get(a.id);
+      if (value === undefined || !unknownFit(value, a)) continue;
+      const ref: CheckRef = { t: "attribute", id: a.id };
+      unkval.push({ go: ref, text: () => ({ name: label(a.id), detail: CUBE_CHECK_TEXTS.unknownValue(unknownFit(value, a)!) }), panels: [ref], marks: [ref], entities: [e.id] });
+    }
+  }
+
+  const group = (id: "facts" | "feeds" | "under" | "unkval" | "nounk", items: CheckItem[], high = false): CheckGroup => ({ id, ...CUBE_CHECK_TEXTS[id], high, module: CUBE_CHECK_TEXTS.tag, items });
+  return {
+    topic: CUBE_CHECK_TEXTS.topic,
+    allWell: CUBE_CHECK_TEXTS.allWell,
+    groups: [group("feeds", feeds, true), group("unkval", unkval, true), group("facts", facts), group("nounk", nounk), group("under", under)],
+  };
 
   function hintTarget(h: Hint, factId: Uuid): CheckRef {
     switch (h.go.t) {
