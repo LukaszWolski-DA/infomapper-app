@@ -43,6 +43,8 @@ for (const scheme of ["light", "dark"] as const) {
     await stRow(page, "business_event").getByTestId("button-remove-stereotype").click();
     const dialog = page.getByTestId("dialog-remove-stereotype");
     await expect(dialog.getByTestId("button-confirm-remove-stereotype")).toHaveText("Remove and move 2 entities");
+    // the dialog fades in: shoot once its and its overlay's animations are done
+    await page.evaluate(() => Promise.all(document.getAnimations().map((a) => a.finished)));
     await page.screenshot({ path: path.join(OUT, `remove-${scheme}.png`) });
   });
 

@@ -496,3 +496,85 @@ Step 2 accepted, with one point settled before step 3:
   `e2e/slice-11/helpers.ts` (`setEntityAlias`), `e2e/slice-13/helpers.ts` (`changeEntityAsAnna`), and the unit tests
   `aliases.test.ts`, `entity.test.ts`, `stereotype.test.ts`, `undo.test.ts`. `npm test`: 2,075 passed.
 - **The repair of `docs/data-model-v2.md`** (`bfa4c58`, "Found on the way" above) is named in the PR's description.
+
+## Step 3: interface (10 November 2026)
+
+### KB's file was upgraded to format 16 before the manual acceptance
+
+While step 2 was being built, a `next dev` started from this checkout (port 3000, from 12:18; not started by me) served
+the working tree. The format-16 upgrade code was in the tree from 12:56, and `.data/dev-db.json` was written at 12:59:36:
+a page load read the file and the upgrade wrote it back. I found it in step 3 (the port in use) and stopped before any
+run; Łukasz stopped the server. Then, on his file:
+- **Backup** `.data/backups/dev-db-20261110-1414.json`, also `.data/backups/kb-model-latest.json` (both equal to the file,
+  `cmp`); the backup of 8 November 22:44 (format 13) is kept as it was.
+- **A read-only count on a copy of the new backup** (counts only, the copy deleted): format 16; 4 workspaces, 20
+  stereotype rows; KB's workspace has its five built-in rows (no own one, so no log line) and its live entities keep
+  their codes: `object` 17 (11 logical, 6 dimensional, as Q9 counted on 8 November), `dictionary` 10, `link` 2.
+- The upgrade only adds the five rows per workspace (English names, definitions in the workspace's language): no
+  entity and no other row changed, and no change event. The file now needs this branch or a later one; an older branch
+  refuses it with the "newer format" message (slice 15a).
+- For the manual acceptance (step 4): the step "back up, then let the upgrade run" is already done; the steps that check
+  KB's five stereotypes and its entities' codes stay.
+
+### What changed
+
+- **The box** (`src/app/w/[workspaceId]/_components/stereotypes-box.tsx`, new; `conventions.tsx` places it between
+  Classifications and Concept colours): the prototype's hint; a row per live stereotype in the list's order with its
+  name (D-66's draft, saved on leaving it on the row's chain; a taken name refused under the field with "That name is
+  taken", F8; the toast "Renamed to {name}; entities keep the stereotype." with Undo), its code, its definition (plain
+  text, the classifications' toasts with Undo, F9), Used ("n entities", "1 entity", "unused"; live logical entities) and
+  Remove for an own one with the chip "own"; the Add row (the code proposed from the name with `proposedCode` until the
+  code field is edited by hand, F6; errors under the fields; the toast "Stereotype “{name}” added ({code})." with Undo;
+  the hint). Removing an unused own one is at once ("{name} removed." with Undo); a used one opens the dialog (the
+  question, the select of every other live stereotype, the note, Cancel, "Remove and move {n} entities"; singular forms,
+  F17), whose toast takes the server's count. Read only for reviewers, readers and an archived workspace.
+- **The tab's lines** (`conventions.tsx`): the intro gains "entity panels offer the stereotypes;", the last line drops
+  the stereotypes. **Settings' sentence** (`settings-form.tsx`): "Classifications, entity stereotypes, concept colours and
+  naming conventions are edited in".
+- **The three places that show a stereotype** (F12), each through `stereotypeIndex` (a built-in code without a row reads
+  as its English name, as before):
+  - the card's first line (`buildCards`, `card-data.ts`): the workspace's name; `CardData.line1Title`, the definition,
+    only when there is one, as the `.stereo` span's `title` (`CardNode.tsx`): an attribute, no element;
+  - the Model tab's meta (`buildTree`, `tree-data.ts`; `left-panel.tsx` unchanged);
+  - the entity panel's select (`entity-panel.tsx`): the live list in order, value the code, text the name, each option's
+    definition as its `title` (F24), the chosen one's definition under it (`text-entity-stereotype-definition`).
+- **The page** (`src/app/w/[workspaceId]/page.tsx`): the box gets every stereotype (removed ones too) and `stereotypeUses`.
+
+### Tests
+
+- **Unit:** `canvas.test.ts` (the card's name and title, none without a definition), `tree-data.test.ts` (the meta),
+  `stereotypes.test.ts` (a built-in code without a row); `tests/infocube-lines.test.ts`'s loose model takes the list.
+  `npm run lint`, `npm run typecheck`: clean. `npm test`: 2,077 passed.
+- **S24-01 to S24-07** (`e2e/slice-24/`, 14 tests): all passed locally. S24-04's first run read the list from the page
+  before the new row reached it (the data file is written before the answer, CLAUDE.md); it now waits for the page's
+  list, its assertion unchanged.
+- **Earlier specs** (locally, 75 tests): `S24-04`, `slice-23` (all), `S1A-11`, `S9-04`, `slice-13` (all), `S14B-09`,
+  `S15-07`, `S4A-05`, `S1B-12`, `slice-11` (all): 73 passed, 1 skipped, 1 failed (`S23-02`, below).
+- **Earlier specs changed**, all on the acceptance doc's lists: `S23-01` (the intro and the last line, item 8), `S23-06`
+  (Settings' sentence, item 11); and the type-level test-data helpers of "Step 2: … the point settled".
+- **The element guard** (`S3B-15-elements`, measurement build, against `slice-08.json`): passed; viewport 4,508, 19,305,
+  1,465, 4,907 and page totals 6,135, 20,932, 3,002, 6,444, all equal to slice 22's. The card's label changes its text
+  and gains a `title` on the same element; no element is added, so no measuring sitting.
+- **The canvas commit counts:** `S2C-12`, `S3A-14-idle` (both), `S3B-15-idle`: 4 passed.
+- **Screenshots** (`e2e/slice-24/S24-screens.spec.ts`, `SCREENS=step-3`): `docs/prd/slice-24-screens/step-3/`
+  (`box-*`, `remove-*`, `panel-*`, light and dark). The dialog's shot waits for its fade-in (it opens at once, unlike
+  slice 23's, which reads its impact first).
+
+### S23-02 fails now and then locally (found in this step, not fixed: shared infrastructure)
+
+`S23-02`'s first test types a classification's definition, waits for its toast and for the stored value, presses the
+top bar's Undo, sees the toast "Undone: …" and the stored value back, and expects the field to show it. In 3 of 9 local
+runs the field kept the typed (trimmed) text for the whole 15 s:
+- 1 in the run above; 1 of 3 runs on its own on `2ef3cde` (step 3); **1 of 5 runs on its own with step 3's changes
+  stashed** (`d1ab542`): step 3 does not cause it.
+- The single-file check on GitHub, 3 rounds each: `main` (`239ffad`, slice 23)
+  [run 42826181680](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42826181680) 3/3 passed; this branch
+  (`2ef3cde`) [run 42826198511](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42826198511) 3/3 passed.
+  It passed in step 2's full run and in slice 23's runs.
+- The trace (`.data/traces/s23-02-20261110/`, git-ignored, with the run's log): every server action answered with 200,
+  the undo's answer (665 ms) carrying the fresh page; the undo was pressed about 0.4 s after the definition's save was
+  sent. The field kept its draft although its stored value changed: the draft rules (`useDraft`, `field-draft.ts`) and
+  the save chain's answer after the page (`afterPage`, `rowSaves`), shared infrastructure (CLAUDE.md, the slice cycle,
+  4). I did not prove the exact interleaving; I have not reproduced it on `main` locally (the checkout is on this branch).
+- **Proposal:** its own `fix/` branch from `main`: reproduce on `main` locally, find the interleaving from the trace,
+  fix it with its own full run. The slice does not change the test.
