@@ -392,3 +392,93 @@ Elsewhere:
 11. **F24:** yes, each option's definition as its title.
 
 Step 2 has its full run (the format and undo).
+
+## Step 2: data and domain (10 November 2026)
+
+Draft PR: https://github.com/LukaszWolski-DA/infomapper-app/pull/53, opened at the start of the step.
+
+### What changed
+
+- **Migration** `supabase/migrations/20261110180000_entity_stereotypes.sql` (DDL only, AD-31): the table `stereotype`
+  (RLS on) with `stereotype_origin_ck`, `stereotype_code_format_ck`, `stereotype_builtin_code_ck`,
+  `stereotype_builtin_kept_ck` (F3) and `stereotype_definition_ck`; the unique index on `(workspace_id, code)` over every
+  row and on `(workspace_id, name_key)` among live rows; `entity_stereotype_ck` dropped, `entity_stereotype_code_ck`
+  (the code's shape) and the composite key `entity_stereotype_fk` on `(workspace_id, stereotype)` with its index (F1, in
+  SQL only).
+- **Types** (`src/domain/types.ts`): `Stereotype` is the list's row (`code`, `name`, `name_key`, `definition`, `origin`
+  `builtin` / `own`), `StereotypeCode` (a string) is what `Entity.stereotype` holds; `STEREOTYPES` is gone;
+  `WorkspaceModel.stereotypes` (required, F11), the table in `CoreWritableRows`.
+- **The rules** (`src/domain/model/stereotypes.ts`, new): `BUILTIN_STEREOTYPE_CODES`, `DEFAULT_STEREOTYPE` (`object`),
+  `BUILTIN_STEREOTYPE_TEXTS` (Appendix A word for word), `builtinStereotypeRows(ctx, workspace, language, names?)`, the
+  list's order, `proposedCode` (the prototype's `stSnake`, F6), `typedStereotypeCode`, `stereotypeNameTakenBy` and
+  `stereotypeCodeRefusal` (F5: a name against every live name and every row's code, its own code excepted; a code
+  against every row's code and every live name), `stereotypeIndex` (`live`, `of`, `name`, `definition`),
+  `stereotypeUses` (live logical entities per code), and the write rule (`writesStereotypeCodes`,
+  `stereotypeWritesRefusal`, `entityWithoutStereotype`, "That stereotype is not in the list."). A built-in code is
+  always live (the five rows exist in every workspace and are never deleted), so the rule reads the model only when a
+  write puts an entity on an own code or removes a stereotype.
+- **Commands** (`src/domain/commands/stereotype.ts`, new; all `model.edit`, one change group each, named for the
+  history): `addStereotype` (the code required, lower-cased), `renameStereotype`, `setStereotypeDefinition` (trimmed,
+  empty clears), `removeStereotype` (own only; a used one needs `moveTo`, another live stereotype; its live entities
+  move in the same group; F16), with the toasts' texts. `createEntity` writes `DEFAULT_STEREOTYPE`. `updateEntity`
+  checks a chosen code against the workspace's live list; its state's `stereotypes` is optional, and without it only a
+  built-in code passes (callers that change no stereotype, the earlier tests and e2e helpers, stay as they were).
+  `newWorkspaceRows` writes the five rows in the workspace's language (both creations).
+- **The write rule on every write** (`runCommand`, `src/app/_lib/run-command.ts`, beside the level rules): F1's domain
+  check, whatever command built the writes.
+- **Undo** (`undo.ts`): `stereotype` in `UNDOABLE_TABLES`; `stereotypeNameClash` (F2 ii,
+  `STEREOTYPE_NAME_CLASH`) and `stereotypeGone` (F2 i, `STEREOTYPE_GONE`), both with step 1's texts.
+- **The undo history's names** (`change-label.ts`): "Add stereotype {name}", "Rename stereotype {name}", "Change
+  definition of {name}", "Remove stereotype {name}" (with its moved entities).
+- **Actions** (`src/app/_actions/stereotype.ts`, new): add, rename and definition (`Saved`, for the save chain), remove;
+  `updateEntityAction` passes the list. No UI uses the new ones yet (step 3); the entity panel's select shows the five
+  codes as before.
+- **The local file's format 16** (`schema.ts`, `file.ts`, `upgrade-16.ts`): the table and its rules (the CHECKs above;
+  the code's uniqueness over every row; no key on the entity's code, F1); the entity's check is its code's shape; the
+  upgrade from 15 writes every workspace's five rows (English names, definitions in its language, F18), and an own row
+  for any other code an entity has with one log line (F19); no change events.
+- **The seeds** (`seed-model.ts` `addBuiltinStereotypes`, `seed.ts`, `seed-large.ts`): each workspace's five rows in its
+  language with stable ids ("Sales analytics" in Polish).
+- **Docs**: `data-model-v2.md` (the table, the entity's column, the rule), `known-limitations.md` (F1's missing key in
+  the local adapter; F4's code after an undone add).
+
+### Found on the way: `data-model-v2.md` was broken by slice 23
+
+Slice 23's step 2 (`c883dfd`) edited `docs/data-model-v2.md` with a JavaScript `replace` whose replacement text held
+`` $` `` (the end of the pattern `{0,29}$` and a backtick), which JavaScript reads as "the text before the match": the
+file's first 375 lines were pasted into the classification table's `code` row, and the document had two titles. It is on
+`main` since PR 52. Repaired in its own commit (`bfa4c58`): the pasted block taken out and `` $` `` put back; the repaired
+file differs from slice 22's only by slice 23's intended changes (checked with `diff`). Only Markdown; I wrote these docs'
+edits with the Edit tool so nothing in them is read as a pattern.
+
+### Tests
+
+- New unit tests: `src/domain/model/stereotypes.test.ts` (the texts in three languages, the rows per language and with
+  English names, the order, the proposal, typed codes, names and codes in both directions with the own-code exception and
+  removed rows, the index, the uses, the write rule), `src/domain/commands/stereotype.test.ts` (add, its refusals and
+  roles, rename with the version check and its refusals, the definition, both removals and their refusals, the
+  entity's code against the list and on a fact), `src/data/local/upgrade-16.test.ts` (the upgrade, the own row and its
+  log line, written back once, not repeated, the seed in its languages with stable ids, the adapter's CHECKs and the
+  code's uniqueness over deleted rows), `undo.test.ts` (a rename undone, a removal with its move undone and redone, a
+  code kept after an undone add, both refusals), `workspace.test.ts` (the five rows in Polish, German and English).
+- Changed for the new table (F11, F25): the `WorkspaceModel` literals and undo row fixtures (`stereotypes: []`,
+  `stereotype: []`), `workspace.test.ts` and `organization.test.ts` (five more inserts; 29 events), `model-store.test.ts`
+  (Bank X has its five rows; the adapter refuses a code of the wrong shape and lets a well-formed unknown one through,
+  which the domain refuses), `tests/schema/compare-schema.test.ts` (the table).
+- `npm run lint`, `npm run typecheck`: clean. `npm test`: 2,075 tests passed.
+- No earlier e2e spec changed in this step.
+- **Do not run `npm run dev` on this branch with `.data/dev-db.json`**: it upgrades the file to format 16, which is
+  for Łukasz's manual acceptance after the backup ("Łukasz's test model"). The e2e runs use their own file.
+
+### The full run (step 2: the local file's format and undo changed)
+
+- [Run 42813994186](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42813994186) on `c95e9b8`, the
+  workflow "E2E", all eight parts, no retries: **723 passed, 0 failed, 4 skipped, 0 flaky**, no expected failures. CI
+  (lint, typecheck, unit tests) and the schema check (the migrations on Postgres against the domain's types) passed on
+  the same commit.
+- Wall-clock 16 min 10 s (12:14:03 to 12:30:13 UTC); the tests 14 min 11 s.
+- Parts (time; heap peak, against the runner's restart threshold of 6,431 MB, 80 % of its 8,039 MB limit; no server
+  restart in any part): 1: 6.3 min, 985 MB · 2: 8.0 min, 1,269 MB · 3: 8.9 min, 1,051 MB · 4: 7.8 min, 1,136 MB ·
+  5: 9.1 min, 1,668 MB · 6: 9.7 min, 1,079 MB · 7: 10.2 min, 972 MB · 8: 10.0 min, 1,488 MB.
+- A commit after `c95e9b8` that touches only Markdown in `docs/` and the root keeps this run valid
+  (`git diff --stat c95e9b8..HEAD`).
