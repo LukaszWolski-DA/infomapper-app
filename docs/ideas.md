@@ -874,14 +874,9 @@ What comes later (slice 22, PRD section 9 and the steps):
 
 Slice 23 (D-78) gave the conventions one place, the workspace home's "Metadata conventions" tab. Left for later, each
 with what step 1 found it needs (`docs/prd/slice-23-acceptance.md`, Q8):
-- **Entity stereotypes' names and definitions** (decision 6a; own stereotypes after that, 6b). The five codes stay
-  (`entity_stereotype_ck` and the local schema's `oneOf(STEREOTYPES)`; a fact or a dimension keeps `object`, unused,
-  C-5). A row per workspace and stereotype code, in the shape of the built-in classifications' texts per language
-  (`BUILTIN_TEXTS`). Four places show a stereotype's name today and must read it: `buildCards` (`card-data.ts`, the
-  card's first line, which `text-fit.ts` measures, so the card's width follows the shown name as aliases did in slice
-  11), `tree-data.ts`, `left-panel.tsx` (twice, the raw code) and the entity panel's select. Own stereotypes need the
-  CHECK dropped (a migration, the local schema, a format) and `entity.stereotype` read as a code of the workspace's
-  list.
+- **Entity stereotypes' names and definitions, and own stereotypes**: done in slice 24 (D-79, the box "Entity
+  stereotypes"; `docs/prd/slice-24-acceptance.md`). What comes after it is in "Entity stereotypes: what comes later"
+  below.
 - **The map from physical to logical types** (decision 7). First a decision on approved mappings whose type conflict
   appears or disappears when the map changes (D-51). The rule is one module, `src/domain/model/type-check.ts`, with the
   classes as module constants (`PHYSICAL_CLASSES`, `CLASS_OF`); a workspace's map is a parameter through its callers:
@@ -898,6 +893,24 @@ with what step 1 found it needs (`docs/prd/slice-23-acceptance.md`, Q8):
   would compare each built-in row with them and show what changes.
 - **A check of names against the naming conventions** (they are plain text now, D-78).
 - **InfoDocumenter** printing the definitions, the colours and the naming conventions (its own PRDs).
+
+## Entity stereotypes: what comes later (slice 24, PRD sections 2 and 9)
+
+Slice 24 (D-79) made the stereotypes the workspace's list, edited in the Metadata conventions tab. Left for later:
+- **Reordering the list.** Today the built-in ones come in their fixed order (`BUILTIN_STEREOTYPE_CODES`), then own ones
+  by when they were added (`byStereotypeOrder`, `src/domain/model/stereotypes.ts`); an order would be a column of
+  `stereotype` and one undo step per move, as a canvas's tab order (`moveCanvas`, slice 16).
+- **Hiding an unused built-in one** from the entity panel's select. Built-in rows are never deleted (the CHECK
+  `stereotype_builtin_kept_ck`, and the write rule reads no model for a built-in code because of it), so hiding needs a
+  column of its own, not a delete.
+- **Another default stereotype for new entities.** `createEntity` writes `DEFAULT_STEREOTYPE` (`object`) for both
+  levels; a workspace's default would be a workspace setting, with facts and dimensions keeping `object` (C-5).
+- **Naming rules per stereotype**, checked by the model checks (D-75), once names are checked against the naming
+  conventions at all (D-78's later item).
+- **A colour or an icon per stereotype** on cards. Today the label is text with the definition as its title, one
+  element (AD-24); a mark would follow slice 3a's rule (a CSS mask on an existing element) and the element guard.
+- **Documents printing the definitions** (InfoDocumenter); the type map and an organization's default conventions carry
+  the stereotypes by code (D-78's later items).
 
 ## Keep the mapping rule's draft when its panel closes (slice 20, step 1 answer 10)
 

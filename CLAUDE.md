@@ -61,7 +61,9 @@ concept's colour (slice 21, D-76). A dimension has an unknown member, on unless 
 with two model checks (slice 22, D-77). A workspace's conventions have one place, the workspace home's "Metadata
 conventions" tab: the classification list (slice 7c's dialog moved there) with definitions and own codes the import
 matches, the concepts' colours and the naming conventions; a new workspace's built-in classifications are named and
-defined in the documentation language chosen when it is created (slice 23, D-78).
+defined in the documentation language chosen when it is created (slice 23, D-78). Entity stereotypes are the workspace's
+list in that tab: the five built-in ones renamed and defined, own ones with a code; entities keep codes, cards, the Model
+tab and the entity panel show the names (slice 24, D-79).
 
 The product owner is Łukasz. He accepts every slice. He reads Polish and English; code, comments, commit messages
 and docs in the repository are in English.
@@ -322,7 +324,9 @@ versions, change events in the same write, uniqueness and the “exactly one tar
   acceptance sessions use it. Never run `npm run reset-dev-data` on that file without a fresh backup and his OK; back it
   up on request and before a slice that changes the local file's format (`.data/backups/dev-db-<yyyymmdd-hhmm>.json`,
   the newest also `.data/backups/kb-model-latest.json`; git-ignored). It holds his real e-mail and KB's password hash,
-  so it is never committed; it stays on his disk only (his decision, 28 October 2026).
+  so it is never committed; it stays on his disk only (his decision, 28 October 2026). **Since 10 November 2026 his file
+  is changed only on his explicit command** (a format upgrade included): a dev server of his that serves this checkout
+  runs the branch's code on it, so before a step that changes the format, check that none does (slice 24, step 3).
 
 ## Security
 
@@ -429,6 +433,7 @@ MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-10.spe
 MEASURE=1 MEASURE_BUILD=production npx playwright test e2e/slice-12b/S12B-bytes.spec.ts   # slice 12b: the project home's document, RSC payload and write answers; the thumbnails' share
 BROWSERS=1 npx playwright test e2e/slice-12b/S12B-browsers.spec.ts                         # slice 12b: the thumbnails' token colours in Chromium, Firefox and WebKit (on demand)
 npx tsx scripts/bench-thumbnails.ts                           # slice 12b: the homes' server work and the thumbnails' cost (index, shapes, paths, bytes, 20 requests, keys; not a gate)
+SCREENS=<folder> npx playwright test e2e/slice-24/S24-screens.spec.ts                     # slice 24: the Entity stereotypes box, its remove dialog, the entity panel's select with the definition; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-23/S23-screens.spec.ts                     # slice 23: the Metadata conventions tab, the remove dialog, Settings' Model conventions, the new workspace's language; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-22/S22-screens.spec.ts                     # slice 22: the unknown member's section (a value, a value that does not fit, off), Fact Sales' Dimensions; light and dark
 SCREENS=<folder> npx playwright test e2e/slice-10c/S10C-screens.spec.ts                   # slice 10c: copies in the panels, the delete, D-47's row, the paste item
@@ -668,6 +673,13 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   - read the e2e data file's classifications and workspaces (`stored`, `workspaceNamed`, `builtinOfWorkspace`).
   Slice 7c's `openList` opens the tab through "Edit the list…" and `backToColumn` returns to a column's panel; the tab
   is a page of its own, so a removal's form is in its own dialog on the page.
+
+  Slice 24's fixtures are slice 0's (S24-07 uses slice 15a's, the star). Its helpers do the following:
+  - find the Entity stereotypes box and a row by code (`box`, `stRow`, `stName`, `stDefinition`, `stCodes`), add one
+    through the Add row (`addStereotype`) and read an entity card's label (`cardStereotype`);
+  - read the e2e data file's stereotypes and entities (`storedStereotypes`, `storedStereotype`, `storedEntity`,
+    `expectStoredName`) and set an entity's stereotype as Łukasz through the domain (`setStereotypeAs`).
+  A row the Add row writes is in the data file before the page shows it: wait for the page's list (S24-04).
 
   Slice 15b's fixtures are 15a's (the star). Its helpers do the following:
   - read the star's ids and InfoCube's rows (`relId`, `attrId`, `liveKeys`, `liveMeasures`, `cubeRowOf`, `model`,
@@ -1025,6 +1037,16 @@ DIAG=nonotes,nolabelmarks MEASURE=1 MEASURE_BUILD=production npx playwright test
   is edited in the workspace home's Metadata conventions tab (`src/app/w/[workspaceId]/_components/conventions.tsx`; the
   page sends the rows and their use counts, the removal reads its impact with `classificationImpactAction`); the naming
   conventions are `workspace.naming_conventions`, outside undo (`setNamingConventions`, `model.edit`).
+- **Entity stereotypes** (slice 24, D-79): the table `stereotype` (format 16) and `entity.stereotype` holding a code.
+  **The rules in one place:** `src/domain/model/stereotypes.ts` (the five built-in codes and their texts per language,
+  `builtinStereotypeRows`, the order, `proposedCode`, `stereotypeNameTakenBy` and `stereotypeCodeRefusal` in D-78's
+  comparison in either direction, `stereotypeIndex` for names and definitions, `stereotypeUses`, the write rule). The
+  commands are `src/domain/commands/stereotype.ts`; `updateEntity` takes the list (required). **Every write** is checked by
+  `stereotypeWritesRefusal` in `runCommand` (an own code must be live; a built-in code always is: the five rows exist and
+  are never deleted, the CHECK `stereotype_builtin_kept_ck`), and undo by `stereotypeGone` and `stereotypeNameClash`. The
+  SQL has a composite key on `(workspace_id, code)`; the local adapter none (`known-limitations.md`). **Read a stereotype's
+  name through `stereotypeIndex`, never the code capitalised**; the card's `line1Title` is the definition (an attribute, no
+  element). The box is `src/app/w/[workspaceId]/_components/stereotypes-box.tsx`.
 - **Session and unlocked organizations** (slice 8, D-58, F1, F3): the session is a signed cookie
   (`src/app/_lib/dev-session.ts`, HMAC with `INFOMAPPER_SESSION_SECRET` or `.data/session-secret`) holding the person
   and the organizations unlocked in it; `getSession()` (`src/app/_lib/session.ts`) refuses an unsigned or edited

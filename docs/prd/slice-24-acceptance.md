@@ -593,3 +593,54 @@ signed in as Łukasz, Retail Co – DWH, the workspace home's "Metadata conventi
 5. Remove "Event": the dialog asks where Customer goes; choose Context; the toast; Undo brings back both.
 6. Create a workspace in Polish from the top bar: its tab shows Obiekt, Powiązanie, Słownik, Kontekst, Informacyjna.
 7. As Piotr (reviewer) or Kasia (reader): the box is read only.
+
+## Step 4: closing (10 November 2026)
+
+### What changed
+
+- `docs/decisions.md`: **D-79** (below, proposed for approval); D-78's "later" list without the entity stereotypes.
+- `docs/data-model-v2.md`: the table `stereotype`, `entity.stereotype`'s code and the write rule (step 2).
+- `docs/known-limitations.md`: the local adapter's missing composite key (step 2); a code taken after an undone add
+  (step 2); S23-02's Undo right after a definition's save, with the trace's path, for a `fix/…` branch from `main` after
+  this merge together with slice 23's text area trim note.
+- `docs/ideas.md`: the stereotypes' entry done; "Entity stereotypes: what comes later" (reordering, hiding an unused
+  built-in one, another default stereotype, naming rules per stereotype, a colour or an icon per stereotype, documents).
+- `docs/inventory-prototype-vs-app.md`: the box and the names present; slice 24's deliberate differences (step 1).
+- `README.md`, `CLAUDE.md`: the status, the stereotypes' notes, slice 24's helpers and screenshots, and Łukasz's rule of
+  10 November 2026: his file is changed only on his explicit command.
+
+### D-79, for Łukasz's approval
+
+> **D-79** Entity stereotypes (slice 24).
+> A workspace keeps a list of entity stereotypes in the Metadata conventions tab, in a box "Entity stereotypes" between Classifications and Concept colours: the five built in (`object`, `link`, `dictionary`, `context`, `informative`), which can be renamed and defined but never removed (`object` is every new entity's stereotype and every fact's and dimension's, C-5), and the workspace's own, after them in the order they were added. Each has a name, an optional plain-text definition and a code. An own stereotype's code is required, proposed from its name while the code field is not edited by hand (lower case, diacritics removed, every run of other characters one `_`, no `_` at either end, `s_` before a leading digit, at most 30), letters, digits and `_`, starting with a letter; it is set when the stereotype is added and never changed. Names and codes are compared as D-78 compares them (case, spaces, `_`, `-` and `/` ignored), in either direction: a name is refused when another live stereotype has it or when it is any stereotype's code, removed and deleted ones included (its own code does not count); a code is refused when any stereotype has it, removed and deleted ones included, so a code is never given twice, also after its add is undone. A refused name or code is shown under its field. An entity keeps its stereotype's code, never its name, so a rename or a definition changes no entity, import or export: the card's first line (with the definition as its title), the Model tab and the entity panel's select (each option's definition as its title, the chosen one's under it) show the workspace's name. The domain checks on every write that every live entity's code is a live stereotype of its workspace; the SQL schema has a composite foreign key on `(workspace_id, code)`, the local adapter none (its keys point to ids; known limitation). Undo refuses a revert that leaves an entity on a stereotype no longer in the list, or that brings back a stereotype whose name another one has or is another's code. Removing an own stereotype that entities have opens a dialog that asks which stereotype they get instead and moves them in the same undo step; an unused one is removed at once, with Undo. A new workspace gets the built-in names and definitions in its documentation language; when slice 24 was installed, existing workspaces got the English names and the definitions in their language, and an entity's code outside the five in an older file became an own stereotype named by its code, with one log line. Renaming, defining, adding and removing are each one undo step, for owners, admins and modelers in a workspace that is not archived; reviewers, readers and an archived workspace see the box read only. Facts and dimensions keep `object` and show their InfoCube role. Reordering the list, hiding an unused built-in one, another default stereotype, naming rules per stereotype and a colour or an icon per stereotype are later. Proposed for Łukasz's approval on 10 November 2026.
+
+D-78's last sentences now read: "… The map from physical to logical types, an organization's default conventions and a
+reset to a language's defaults are later (entity stereotypes came in slice 24, D-79). Accepted by Łukasz on 10 November
+2026."
+
+### Manual acceptance
+
+On the demo (`npm run demo`, http://127.0.0.1:3001, `.data/demo-db.json`; it never touches `.data/dev-db.json`), signed in
+as Łukasz, Retail Co – DWH, the workspace home's "Metadata conventions":
+1. The box "Entity stereotypes" between Classifications and Concept colours: five rows with codes and English
+   definitions; Object "4 entities", Link and Dictionary "1 entity", the others "unused"; no Remove on them.
+2. Rename Link to "Association": the toast "Renamed to Association; entities keep the stereotype."; Undo and Redo in the
+   top bar. Type "OBJECT" in another row: "That name is taken" under it, nothing saved.
+3. Define Association; the toast "Saved the definition of Association.".
+4. Customer 360 › Customer & orders: Order Line's card says "Association" and its title (hover) is the definition; the
+   Model tab says "Association"; Order Line's panel shows it selected, the definition under it, and each option's
+   definition on hover.
+5. Back in the tab: type "Event" in the Add row (the code shows `event`), change the code to `business_event`, Add; the
+   toast "Stereotype “Event” added (business_event)."; try the code `link` once more: "That code is taken".
+6. Choose Event on Customer in its panel (last in the select); in the tab, Event's Used says "1 entity".
+7. Remove Event: the dialog asks which stereotype Customer gets; choose Context; the toast "Event removed; 1 entity is
+   now Context."; Undo brings back Event and Customer's Event.
+8. The top bar's "New workspace" in Polish: its tab shows Obiekt, Powiązanie, Słownik, Kontekst, Informacyjna with Polish
+   definitions.
+9. As Piotr (reviewer) or Kasia (reader): the box is read only.
+
+KB (`.data/dev-db.json`, already at format 16 since 10 November 12:59, backed up as
+`.data/backups/dev-db-20261110-1414.json`; step 3): with Łukasz's own `npm run dev`, Kanton Basel's tab shows the five
+built-in stereotypes with English names and English definitions, and its entities keep their stereotypes (23 live logical
+entities on 10 November: Object 11, Dictionary 10, Link 2; the 6 facts and dimensions keep `object` and show their role). No step here writes to the file unless
+Łukasz does it himself.
