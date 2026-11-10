@@ -2,6 +2,7 @@
 // passed to the client canvas. Pure TypeScript, so it is tested without a browser.
 
 import type { Uuid } from "@/domain/ids";
+import { stereotypeIndex } from "@/domain/model/stereotypes";
 import { rowShown } from "@/domain/model/card-size";
 import { indexOf } from "@/domain/model/classifications";
 import type { CardSubject } from "@/domain/model/frames";
@@ -80,8 +81,13 @@ export interface CardData {
   /** The entity card's exceptions to the canvas's names or aliases, only when set (slice 11, D-64). */
   entityNames?: NameMode;
   attributeNames?: NameMode;
-  /** Entity: stereotype (`Object`), or a dimensional entity's role (`Fact`); source: path (`CRM / crmprod.dbo`). */
+  /**
+   * Entity: its stereotype's name in the workspace (`Object`, slice 24), or a dimensional entity's role (`Fact`); source:
+   * path (`CRM / crmprod.dbo`).
+   */
   line1: string;
+  /** A logical entity's stereotype's definition, the first line's title, only when it has one (slice 24, item 9). */
+  line1Title?: string;
   /** A dimensional entity's role (slice 15a, D-67): its text is `line1`, with a mark and the card's classes. */
   role?: EntityRole;
   /** Entity: `in Customer`; source: empty. */
@@ -120,6 +126,8 @@ export interface CardData {
 }
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+/** The card's first line's title: the stereotype's definition, only when it has one. */
+const stereotypeTitle = (definition: string | null): { line1Title?: string } => (definition ? { line1Title: definition } : {});
 
 /** Label names per item (`labelNamesByItem`); empty when the page has no labels to show. */
 export type LabelNames = ReadonlyMap<string, readonly string[]>;
@@ -169,6 +177,8 @@ export function buildCards(
   const columnTable = (columnId: Uuid) => tableById.get(columnById.get(columnId)?.source_table_id ?? "");
   // a source row's BK badge and the Keys filter read the Business key classification (slice 7c, P11): one index per build
   const classes = indexOf(model);
+  // the workspace's stereotype names and definitions (slice 24): one index per build; entities keep codes
+  const stereotypes = stereotypeIndex(model.stereotypes);
   // open changes by column (slice 7b, item 24): another kind wins over a new column's
   const changeOf = new Map<Uuid, "new" | "chg">();
   for (const c of changes) {
@@ -270,8 +280,8 @@ export function buildCards(
         name: entity.name,
         ...(entity.alias ? { alias: entity.alias } : {}),
         // a fact or dimension shows its role where a logical entity's stereotype stands (D-67)
-        line1: role ? role.text : cap(entity.stereotype),
-        ...(role ? { role } : {}),
+        line1: role ? role.text : stereotypes.name(entity.stereotype),
+        ...(role ? { role } : stereotypeTitle(stereotypes.definition(entity.stereotype))),
         // a context card says why it is here (prototype entCard, slice 3b)
         line1b: live && item.live_level === "context" ? "context only" : `in ${concept?.name ?? "–"}`,
         liveTitle: live && item.live_level === "context" ? `Context: the entity itself is not labeled ${live.labelName}, only some of its attributes are` : null,

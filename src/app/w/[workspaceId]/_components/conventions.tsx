@@ -2,7 +2,7 @@
 
 // The workspace home's "Metadata conventions" tab (slice 23, items 1–15, D-78; prototype `CONV.tab`): the one place to
 // edit the classification list (slice 7c's dialog moved here), the concepts' colours (moved from Settings) and the
-// naming conventions. Every member sees it; owners, admins and modelers in a workspace that is not archived edit it
+// naming conventions; since slice 24 the entity stereotypes (`stereotypes-box.tsx`). Every member sees it; owners, admins and modelers in a workspace that is not archived edit it
 // (D-57's roles); everyone else sees it read only.
 //   Classifications: two tables, for source columns and for source tables, each row with its name (saved on leaving it,
 // D-66's draft, refused when taken: the message under the field), its code (built-in, own or "—"), its definition (plain
@@ -30,17 +30,18 @@ import { RemoveClassificationForm } from "@/app/_panels/classifications";
 import { DEFINITION_CLEARED, DEFINITION_SAVED, type ClassificationImpact } from "@/domain/commands/classification";
 import { NAMING_CLEARED, NAMING_SAVED } from "@/domain/commands/workspace";
 import { byListOrder, codeRefusal, isBuiltin, isDataVault, nameTakenBy, TAKEN_CODE, TAKEN_NAME, typedCode, whatStops } from "@/domain/model/classifications";
-import type { Classification, ClassificationScope } from "@/domain/types";
+import type { Classification, ClassificationScope, Stereotype } from "@/domain/types";
 import { Dialog, DialogContent, DialogTitle } from "@/ui/components/dialog";
 import { ConceptColours, type ConceptColorRow } from "./settings-form";
+import { StereotypesBox } from "./stereotypes-box";
 
 export const CONVENTIONS_INTRO =
-  "The workspace's conventions, in one place. The import matches classifications by their name or code; table and column panels set them; documents and exports print their definitions.";
+  "The workspace's conventions, in one place. The import matches classifications by their name or code; table and column panels set them; entity panels offer the stereotypes; documents and exports print their definitions.";
 export const CLASSIFICATIONS_HINT =
   "One list for the workspace's source tables and columns. Every name can be changed; built-in ones keep a code the app's rules read (BK, PII, LK…), so a renamed one keeps working and a removed one is absent until it is restored. An own classification may get a code when it is added, for import files that should not depend on its name; the code cannot change later. A new workspace starts with the built-in names and definitions in its documentation language; changing the language later renames nothing.";
 export const NAMING_HINT = "Your rules for names of entities, attributes, keys and codes, as plain text. Documents print them in their conventions section; nothing checks names against them yet.";
 export const NAMING_PLACEHOLDER = "- Entities: singular, Title Case (Sales Order)\n- Attributes: snake_case (order_date)\n- Keys: …_id; surrogate keys: …_key";
-export const CONVENTIONS_LATER = "Later, in their own slices: entity stereotypes' names and definitions, the map from physical to logical types, an organization's default conventions.";
+export const CONVENTIONS_LATER = "Later, in their own slices: the map from physical to logical types, an organization's default conventions.";
 export const NO_CODE_TITLE = "No code: an import file names it by its name";
 
 export interface ConventionsProps {
@@ -54,6 +55,9 @@ export interface ConventionsProps {
   uses: Readonly<Record<string, number>>;
   concepts: readonly ConceptColorRow[];
   namingConventions: string | null;
+  /** Slice 24: every stereotype of the workspace, removed ones included, and the live logical entities per code. */
+  stereotypes: readonly Stereotype[];
+  stereotypeUses: Readonly<Record<string, number>>;
 }
 
 const trimmed = (t: string) => t.trim();
@@ -91,6 +95,9 @@ export function Conventions(p: ConventionsProps) {
           <ScopeTable key={scope} scope={scope} {...p} onRemove={(c) => void askRemove(c)} />
         ))}
       </section>
+
+      {/* slice 24 (item 1): between Classifications and Concept colours */}
+      <StereotypesBox workspaceId={p.workspaceId} editable={p.editable} stereotypes={p.stereotypes} uses={p.stereotypeUses} />
 
       <ConceptColours workspaceId={p.workspaceId} concepts={p.concepts} editable={p.editable} />
 

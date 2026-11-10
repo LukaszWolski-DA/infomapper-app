@@ -122,6 +122,7 @@ describe("the index (items 9, 10)", () => {
     expect(ix.of("gone")).toBeUndefined();
     expect(ix.name("gone")).toBe("Gone");
     expect(ix.name("other")).toBe("other");
+    expect(stereotypeIndex([]).name("dictionary")).toBe("Dictionary");
   });
 
   it("counts live logical entities per code, not facts and dimensions", () => {

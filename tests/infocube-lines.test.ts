@@ -41,6 +41,7 @@ function star() {
     sourceRelationships: of("source_relationship"),
     classifications: of("classification"),
     classificationLinks: of("classification_link"),
+    stereotypes: of("stereotype"),
   } as unknown as WorkspaceModel;
   const items = of<CanvasItem>("canvas_item").filter((i) => i.canvas_id === salesStarCanvasId(WS));
   const cubeMappings = of<CubeMapping>("cube_mapping");

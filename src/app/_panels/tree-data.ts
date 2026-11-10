@@ -4,6 +4,7 @@
 import type { Uuid } from "@/domain/ids";
 import type { RequirementIndex } from "@/domain/model/requirement-index";
 import { isLogical } from "@/domain/model/levels";
+import { stereotypeIndex } from "@/domain/model/stereotypes";
 import { coverageParts } from "@/domain/model/requirements";
 import type { ModuleTab, TabAction } from "@/ui/modules";
 import { REQUIREMENT_KINDS, type CanvasItem, type RequirementKind, type SourceChange, type WorkspaceModel } from "@/domain/types";
@@ -129,7 +130,6 @@ export interface TreeData {
   tabs: TreeTab[];
 }
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
  * The model in panel order: concepts with their entities; source systems with their `database.schema` groups and
@@ -164,6 +164,8 @@ export function buildTree(
     if (projectCanvases.has(i.canvas_id)) inProject.add(target);
   }
   const presence = (id: Uuid): Presence => (here.has(id) ? "here" : elsewhere.has(id) ? "elsewhere" : "none");
+  // an entity's meta is its stereotype's name in the workspace (slice 24, item 9)
+  const stereotypes = stereotypeIndex(model.stereotypes);
 
   const fieldsOf = new Map<Uuid, string[]>();
   const fieldIdsOf = new Map<Uuid, Uuid[]>();
@@ -197,7 +199,7 @@ export function buildTree(
     version: c.version,
     name: c.name,
     color: c.color,
-    entities: model.entities.filter((e) => e.concept_id === c.id && isLogical(e)).map((e) => treeEntity(e, cap(e.stereotype))),
+    entities: model.entities.filter((e) => e.concept_id === c.id && isLogical(e)).map((e) => treeEntity(e, stereotypes.name(e.stereotype))),
   }));
   const entityById = new Map(model.entities.map((e) => [e.id, e]));
   const tabs = moduleTabs.map<TreeTab>((t) => ({

@@ -167,7 +167,7 @@ export interface StereotypeIndex {
   live: readonly Stereotype[];
   /** The live row of a code. */
   of(code: string): Stereotype | undefined;
-  /** What shows for a code: its live row's name, else its row's name, else the code (a test model, an old image). */
+  /** What shows for a code: its live row's name, else its row's name, else a built-in code's English name or the code. */
   name(code: string): string;
   /** A live row's definition, or null. */
   definition(code: string): string | null;
@@ -181,7 +181,7 @@ export function stereotypeIndex(list: readonly Stereotype[]): StereotypeIndex {
   return {
     live,
     of: (code) => byCode.get(code),
-    name: (code) => byCode.get(code)?.name ?? anyByCode.get(code)?.name ?? code,
+    name: (code) => byCode.get(code)?.name ?? anyByCode.get(code)?.name ?? (isBuiltinStereotypeCode(code) ? BUILTIN_STEREOTYPE_TEXTS.en[code].name : code),
     definition: (code) => byCode.get(code)?.definition ?? null,
   };
 }

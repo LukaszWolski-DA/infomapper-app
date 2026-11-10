@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   attribute,
+  builtinStereotypes,
   builtins,
   canvasItem,
   classificationLink,
@@ -355,5 +356,14 @@ describe("buildCards: a dimensional entity's role (slice 15a, B-3, D-67)", () =>
     const flips = Array.from({ length: 401 }, (_, i) => 200 + i).filter((w) => !lineNeedsClip(parts, "ent", w) && lineNeedsClip(parts, "ent", w, false, 0, 0, ROLE_MARK));
     expect(flips.length).toBeGreaterThan(0);
     expect(flips.length).toBeLessThanOrEqual(ROLE_MARK);
+  });
+});
+
+describe("an entity card's stereotype (slice 24, item 9)", () => {
+  it("shows the workspace's name for its code with the definition as its title, and no title without one", () => {
+    const list = builtinStereotypes().map((x) => (x.code === "object" ? { ...x, name: "Obiekt", definition: "Rzecz biznesowa." } : x.code === "link" ? { ...x, definition: null } : x));
+    const shown = buildCards({ ...model, stereotypes: list, entities: [...model.entities, entity(ids.salesOrder, { stereotype: "link" })] }, [canvasItem(ids.itemCustomer), canvasItem("01900000-0000-7000-8000-0000000ccc01", { entity_id: ids.salesOrder, source_table_id: null, requirement_id: null })]);
+    expect(shown.map((c) => [c.line1, c.line1Title])).toEqual([["Obiekt", "Rzecz biznesowa."], ["Link", undefined]]);
+    expect("line1Title" in shown[1]!).toBe(false);
   });
 });

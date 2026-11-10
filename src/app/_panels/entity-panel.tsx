@@ -5,7 +5,7 @@
 // “Add the N missing to this canvas”, B-08), relationships,
 // “Remove from this canvas” and “Delete from model…” with the impact dialog (D-47).
 
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { addAttributeAction, updateEntityAction } from "@/app/_actions/model";
 import type { UpdateEntityInput } from "@/domain/commands/entity";
 import { useAction } from "@/app/_components/use-action";
@@ -14,7 +14,7 @@ import { PANEL_SECTIONS } from "@/compose/panels";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
 import type { Entity } from "@/domain/types";
-import { BUILTIN_STEREOTYPE_CODES } from "@/domain/model/stereotypes";
+import { stereotypeIndex } from "@/domain/model/stereotypes";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
@@ -30,7 +30,6 @@ import { usePanels } from "./panels-context";
 import { RequirementsSection } from "./requirements-section";
 import { ChecksBox } from "./checks-box";
 
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /** `cardId` is null when the entity has no card on this canvas (a go-to link's fallback, slice 4a): its panel only. */
 export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uuid | null }) {
@@ -71,6 +70,12 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
   // choice fields show the newest stored value after a refusal (slice 13, R4)
   const stereotype = useChoice(e.stereotype, (s) => save({ stereotype: s }));
   const concept = useChoice(e.concept_id, (c) => save({ conceptId: c }));
+  // the workspace's stereotypes in the list's order, value the code and text the name (slice 24, item 10, F24)
+  const stereotypes = useMemo(() => stereotypeIndex(ix.model.stereotypes), [ix.model.stereotypes]);
+  const stereotypeOptions = stereotypes.of(stereotype.value)
+    ? stereotypes.live
+    : [...stereotypes.live, { code: stereotype.value, name: stereotypes.name(stereotype.value), definition: null }];
+  const stereotypeDefinition = stereotypes.definition(stereotype.value);
 
   const saveDefinition = (html: string) => saveRow(e, (v) => updateEntityAction(p.workspaceId, { entityId: e.id, expectedVersion: v, definition: html }));
 
@@ -115,12 +120,17 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
             data-testid="select-entity-stereotype"
             onChange={(x) => stereotype.choose(x.target.value)}
           >
-            {BUILTIN_STEREOTYPE_CODES.map((s) => (
-              <option key={s} value={s}>
-                {cap(s)}
+            {stereotypeOptions.map((s) => (
+              <option key={s.code} value={s.code} title={s.definition ?? undefined}>
+                {s.name}
               </option>
             ))}
           </select>
+          {stereotypeDefinition && (
+            <div className="mt-1 text-[11.5px] leading-[1.35] text-im-ink-3" data-testid="text-entity-stereotype-definition">
+              {stereotypeDefinition}
+            </div>
+          )}
         </Field>
         )}
         <Field label="Concept" htmlFor="f-ec">
