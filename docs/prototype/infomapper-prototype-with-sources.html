@@ -1189,6 +1189,7 @@ body.im-chgmode #lines .lnk.map.im-hit .s{stroke-width:2.6px}
 .cv-t td:first-child input{max-width:240px}
 .cv-t textarea{min-width:320px;width:100%}
 .cv-t td:nth-child(3){width:48%}
+.st-def{font-size:11.5px;color:var(--ink-3);margin-top:4px;line-height:1.35}
 </style>
 </head>
 <body>
@@ -2297,7 +2298,7 @@ function entCard(id) {
   const role = isDimE(e) ? roleOf(id) : null;
   if (role) mapped = attrs.filter(a => isFed(a.id)).length;
   return `<div class="card ent${role ? " dimn " + role : ""}${IMP.hit("ents", id)}${isSel("entity", id) ? " sel" : ""}${L.c ? " collapsed" : ""}${ctx ? " ctx" : ""}${dual ? " dualkeys" : ""}" data-kind="ent" data-id="${id}" style="left:${L.x}px;top:${L.y}px;width:${wOf(L)}px;--cc:${con?.color || "#889"}"${ctx ? ` title="Context: the entity itself is not labeled ${esc(I.lbl[lid]?.name)}, only some of its attributes are"` : ""}>
-<div class="c-rs" title="Drag to change the width; double-click to fit the names"></div><div class="c-head"><div class="c-l1">${role ? `<span class="stereo cube" title="${esc(cubeTitle(id).long)} (InfoCube)">${CUBE_IC}${esc(cubeTitle(id).short)}</span>` : `<span class="stereo">${esc(e.stereotype || "Object")}</span>`}<span>${ctx ? "context only" : "in " + esc(con?.name || "–")}</span>${lmark("entity", id)}${noteMark("ent:" + id)}${reqMark("ent", id)}
+<div class="c-rs" title="Drag to change the width; double-click to fit the names"></div><div class="c-head"><div class="c-l1">${role ? `<span class="stereo cube" title="${esc(cubeTitle(id).long)} (InfoCube)">${CUBE_IC}${esc(cubeTitle(id).short)}</span>` : `<span class="stereo" title="${esc(CONV.stDef(e.stereotype || "Object"))}">${esc(CONV.stName(e.stereotype || "Object"))}</span>`}<span>${ctx ? "context only" : "in " + esc(con?.name || "–")}</span>${lmark("entity", id)}${noteMark("ent:" + id)}${reqMark("ent", id)}
 <span class="c-tools"><button class="ib" data-act="relate" title="Draw a relationship from this entity">${IC.rel}</button>${tools(L)}</span></div>
 <div class="c-l2${chkHeadMark(id)}"><span class="c-name">${esc(e.name)}</span><span class="cov" title="${mapped} of ${attrs.length} attributes ${role ? "fed from the logical model" : "mapped"}"><i style="width:${attrs.length ? mapped / attrs.length * 100 : 0}%"></i></span><span class="cov-t">${mapped}/${attrs.length}</span></div></div>
 ${L.c ? "" : `<div class="c-body">${rows.length ? rows.map(attrRow).join("") : `<div class="row empty">${(I.attrsOf[id] || []).length ? `Nothing matches “${FL[L.f]}”` : "No attributes yet. Add them in the panel, or drag a source column here."}</div>`}</div>`}</div>`;
@@ -2463,7 +2464,7 @@ function renderSide() {
         const fHit = q && !nameHit ? (I.attrsOf[e.id] || []).find(a => a.name.toLowerCase().includes(q)) : null;
         if (!nameHit && !fHit) return "";
         return `<button class="titem${onCanvas("ent", e.id) ? " oncanvas" : onOther("ent", e.id) ? " elsewhere" : ""}" draggable="true" data-add="ent:${e.id}"${fHit ? ` data-hitattr="${fHit.id}"` : ""} title="${onCanvas("ent", e.id) ? "On this canvas. Click to show it." : onOther("ent", e.id) ? "On another canvas. Click or drag to add it here too." : "Click or drag to add to the canvas"}">
-<span class="on"></span><span class="n">${esc(e.name)}${fHit ? `<span class="hint">attribute ${esc(fHit.name)}</span>` : ""}</span><span class="m">${esc(e.stereotype || "")}</span></button>`;
+<span class="on"></span><span class="n">${esc(e.name)}${fHit ? `<span class="hint">attribute ${esc(fHit.name)}</span>` : ""}</span><span class="m">${esc(CONV.stName(e.stereotype || ""))}</span></button>`;
       }).filter(Boolean);
       const filtering = !!q || V.projOnly || V.canvasOnly;
       if (!items.length && filtering) continue;
@@ -2734,7 +2735,7 @@ function insEntity(e) {
   const at = I.attrsOf[e.id] || [], rels = S.relationships.filter(r => r.from === e.id || r.to === e.id);
   return `<div class="kind">Entity</div>${chkSection("entity", e.id)}
 <div class="fld"><label for="f-en">Name</label><input id="f-en" data-f="ent.name" value="${esc(e.name)}"></div>
-<div class="two"><div class="fld">${isDimE(e) ? `<label>Role</label><div class="ro" style="padding:6px 0;display:flex;align-items:center;gap:4px"><span class="stereo cube" title="${esc(cubeTitle(e.id).long)}">${CUBE_IC}${esc(cubeTitle(e.id).short)}</span></div>` : `<label for="f-es">Stereotype</label><select id="f-es" data-f="ent.stereotype">${STEREO.map(s => `<option${s === e.stereotype ? " selected" : ""}>${s}</option>`).join("")}</select>`}</div>
+<div class="two"><div class="fld">${isDimE(e) ? `<label>Role</label><div class="ro" style="padding:6px 0;display:flex;align-items:center;gap:4px"><span class="stereo cube" title="${esc(cubeTitle(e.id).long)}">${CUBE_IC}${esc(cubeTitle(e.id).short)}</span></div>` : `<label for="f-es">Stereotype</label><select id="f-es" data-f="ent.stereotype">${CONV.stList().map(s => `<option value="${esc(s.key)}" title="${esc(s.def || "")}"${s.key === (e.stereotype || "Object") ? " selected" : ""}>${esc(s.name)}</option>`).join("")}</select>${CONV.stDef(e.stereotype || "Object") ? `<div class="hint st-def">${esc(CONV.stDef(e.stereotype || "Object"))}</div>` : ""}`}</div>
 <div class="fld"><label for="f-ec">Concept</label><select id="f-ec" data-f="ent.conceptId">${S.concepts.map(c => `<option value="${c.id}"${c.id === e.conceptId ? " selected" : ""}>${esc(c.name)}</option>`).join("")}</select></div></div>
 ${richField("Definition", e.description, "What this entity means for the business. Click to write it.", "ent:" + e.id)}
 ${isDimE(e) ? cubeEntitySection(e) : ""}
@@ -5948,7 +5949,7 @@ function docFromBaseline(b, kind) {
           : `<tr><td>${esc(a.name)}</td><td colspan="3" style="color:var(--warn)">Not mapped</td></tr>`; }).join("");
       return `<h4>${esc(e.name)} <span style="font-weight:400;color:var(--ink-3)">${esc(con(e.conceptId))}</span></h4><table><tr><th>Attribute</th><th>Source column</th><th>How</th><th>Status</th></tr>${rows}</table>`; }).join("");
   } else {
-    body = m.entities.map(e => `<h4>${esc(e.name)} <span style="font-weight:400;color:var(--ink-3)">${esc(e.stereotype || "")} in ${esc(con(e.conceptId))}</span></h4>${e.description ? `<div class="rich">${richOrText(e.description)}</div>` : ""}<table><tr><th>Attribute</th><th>Type</th><th>Flags</th><th>Definition</th></tr>${m.attributes.filter(a => a.entityId === e.id).sort((x, y) => (x.order ?? 0) - (y.order ?? 0)).map(a => `<tr><td>${esc(a.name)}</td><td>${esc(a.dataType || "")}</td><td>${[a.isPrimaryKey && "PK", a.isForeignKey && "FK", a.isPII && "PII"].filter(Boolean).join(" ")}</td><td>${a.description ? richOrText(a.description) : ""}</td></tr>`).join("")}</table>`).join("");
+    body = m.entities.map(e => `<h4>${esc(e.name)} <span style="font-weight:400;color:var(--ink-3)">${esc(CONV.stName(e.stereotype || ""))} in ${esc(con(e.conceptId))}</span></h4>${e.description ? `<div class="rich">${richOrText(e.description)}</div>` : ""}<table><tr><th>Attribute</th><th>Type</th><th>Flags</th><th>Definition</th></tr>${m.attributes.filter(a => a.entityId === e.id).sort((x, y) => (x.order ?? 0) - (y.order ?? 0)).map(a => `<tr><td>${esc(a.name)}</td><td>${esc(a.dataType || "")}</td><td>${[a.isPrimaryKey && "PK", a.isForeignKey && "FK", a.isPII && "PII"].filter(Boolean).join(" ")}</td><td>${a.description ? richOrText(a.description) : ""}</td></tr>`).join("")}</table>`).join("");
   }
   showModal(`${curWs().name} · baseline “${b.name}” (${b.created})`, kind === "map" ? "Mapping specification" : "Data dictionary",
     `<p style="color:var(--ink-3)">Generated from the frozen baseline, not from today's model. In the app this is exported to HTML, PDF, Word or Markdown (A-05).</p>${body}`);
@@ -6017,7 +6018,7 @@ ${V.cubeRefused ? `<p class="cuberef" style="margin:6px 0 0;color:var(--warn);fo
 <p style="margin-top:8px">Statuses: <span class="chips" style="display:inline-flex"><span>Draft</span><span>In review</span><span>Approved</span></span></p>
 <p>Requirement templates: built in for now; editable here later (D-45).</p></div>
 <div class="box" style="display:none"><h4>Concept colours</h4><p>Violet is reserved for requirements, so it is not offered here.</p>${S.concepts.map(c => `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span style="width:130px">${esc(c.name)}</span><div class="swatches">${ALLOWED_CONCEPT_COLORS.map(col => `<button style="background:${col}" data-ccol="${c.id}" data-v="${col}" aria-pressed="${String(c.color).toUpperCase() === col}" aria-label="${col}" ${wsPerm() === "full" ? "" : "disabled"}></button>`).join("")}</div></div>`).join("")}</div>
-<div class="box"><h4>Model conventions</h4><p>Classifications, concept colours and naming conventions are edited in <button class="btn sm" onclick="V.wsTab='conv';renderWsHome()">Metadata conventions</button>.</p><p>Entity stereotypes</p><div class="chips">${["Object", "Link", "Dictionary", "Context", "Informative"].map(x => `<span>${x}</span>`).join("")}</div>
+<div class="box"><h4>Model conventions</h4><p>Classifications, entity stereotypes, concept colours and naming conventions are edited in <button class="btn sm" onclick="V.wsTab='conv';renderWsHome()">Metadata conventions</button>.</p>
 <p style="margin-top:12px">Column classification</p><div class="chips"><span>BK · business key</span><span>PII · personal data</span></div>
 <p style="margin-top:12px">Physical to logical types</p><div class="chips"><span>varchar, nvarchar, char → String</span><span>int, bigint → Integer</span><span>decimal → Decimal</span><span>date, datetime2 → Date</span></div>
 <p style="margin-top:10px;color:var(--ink-3)">Editable per workspace in the app.</p></div></div>`;
@@ -8489,7 +8490,8 @@ return {_dev:{toCSV, sampleRows, SAMPLE_CRM, W, readText, renderWizard}, openWiz
    (D-57's dialog moves here): every classification gets a definition; an own classification may get a code, set once;
    a new workspace gets the built-in names and definitions in its documentation language. The tab also holds the
    concepts' colours (moved from Settings) and the workspace's naming conventions (plain text).
-   Later (not here): stereotypes' names and definitions, the type map, an organization's default conventions.
+   Slice 24: entity stereotypes (S.conv.st: the five built-in ones by fixed key, own ones by their code; names and
+   definitions per workspace). Later (not here): the type map, an organization's default conventions.
    Prototype storage: S.classes holds own classifications ({code, name, scope, builtin:false, own code flag `uc`});
    S.conv.cls[code] = {name (a built-in's name in this workspace), def}; S.conv.removed = removed built-in codes;
    S.conv.naming = the naming conventions. The import module's list reads the same (its indexClasses is patched).
@@ -8520,10 +8522,32 @@ const CONV = (() => {
       T_STG:["Staging", "Eine Kopie zum Laden, keine führende Quelle."], T_LOG:["Log / Audit", "Logs und Audit-Trails."], T_HIST:["Historie (SCD2)", "Die Quelle führt selbst Historie (SCD Typ 2)."],
       T_HUB:["Hub-Kandidat", "Wahrscheinlich Quelle eines Hubs."], T_LNK:["Link-Kandidat", "Wahrscheinlich Quelle eines Links."], T_SAT:["Satellitenquelle", "Wahrscheinlich Quelle eines Satelliten."]}};
   const LANG = {English:"en", Polski:"pl", Deutsch:"de"};
+  /* slice 24: entity stereotypes. The five built-in ones keep fixed codes (the prototype's keys are their English names,
+     the app's codes object, link, dictionary, context, informative); a workspace names and defines them and adds its own. */
+  const ST_BUILTIN = ["Object", "Link", "Dictionary", "Context", "Informative"];
+  const ST_DEF = {
+    en:{Object:["Object", "A business thing with its own identity and life cycle: customer, product, order."], Link:["Link", "Connects objects and takes its identity from them, e.g. an order line."],
+      Dictionary:["Dictionary", "A list of codes and their meanings (reference data)."], Context:["Context", "Describes another object in a given context or over time, e.g. a role or a changing set of attributes."],
+      Informative:["Informative", "Derived or reported information, not a business object of its own."]},
+    pl:{Object:["Obiekt", "Rzecz biznesowa z własną tożsamością i cyklem życia: klient, produkt, zamówienie."], Link:["Powiązanie", "Łączy obiekty i bierze od nich tożsamość, np. pozycja zamówienia."],
+      Dictionary:["Słownik", "Lista kodów i ich znaczeń (dane referencyjne)."], Context:["Kontekst", "Opisuje inny obiekt w danym kontekście lub w czasie, np. rolę albo zmieniający się zestaw atrybutów."],
+      Informative:["Informacyjna", "Informacja wyliczana lub raportowa, nie samodzielny obiekt biznesowy."]},
+    de:{Object:["Objekt", "Ein Geschäftsobjekt mit eigener Identität und eigenem Lebenszyklus: Kunde, Produkt, Bestellung."], Link:["Verknüpfung", "Verbindet Objekte und erhält seine Identität von ihnen, z. B. eine Bestellposition."],
+      Dictionary:["Wörterbuch", "Eine Liste von Codes und ihren Bedeutungen (Referenzdaten)."], Context:["Kontext", "Beschreibt ein anderes Objekt in einem Kontext oder über die Zeit, z. B. eine Rolle oder wechselnde Attribute."],
+      Informative:["Informativ", "Abgeleitete oder berichtete Information, kein eigenes Geschäftsobjekt."]}};
+  const stList = () => { const c = conv(); return c.st; };
+  const stOf = key => (S?.conv?.st || []).find(x => x.key === key);
+  const stName = key => stOf(key)?.name || key || "";
+  const stDef = key => stOf(key)?.def || "";
+  const stCode = x => x.own ? x.key : x.key.toLowerCase();
+  const stUse = key => S.entities.filter(e => !isDimE(e) && (e.stereotype || "Object") === key).length;
   const defaults = lg => Object.fromEntries(Object.keys(BUILTIN).map(k => [k, lg === "en" ? {name:BUILTIN[k][0], def:DEF.en[k]} : {name:DEF[lg][k][0], def:DEF[lg][k][1]}]));
   /* seeded once per workspace, in its documentation language at that moment (= its creation); a later change of the
      language renames nothing */
   const conv = () => { S.conv ||= {}; const c = S.conv; c.cls ||= {}; c.removed ||= []; c.naming ??= "";
+    if (!c.v24) { c.v24 = 1; const lg = LANG[curWs()?.lang] || "en"; c.stCodes ||= [];
+      c.st ||= ST_BUILTIN.map(k => ({key:k, own:false, name:ST_DEF[lg][k][0], def:ST_DEF[lg][k][1]}));
+      S.entities.forEach(e => { if (e.stereotype && !c.st.some(x => x.key === e.stereotype)) c.st.push({key:e.stereotype, own:true, name:e.stereotype, def:""}); }); }
     if (!c.v23) { c.v23 = 1; const d = defaults(LANG[curWs()?.lang] || "en"); for (const k in d) { const x = c.cls[k] ||= {}; x.name ||= d[k].name; x.def ||= d[k].def; } (S.classes || []).forEach(o => { o.uc ??= false; }); }
     return c; };
   const nk = s => String(s ?? "").toLowerCase().replace(/[\s_\-\/]+/g, "");          // D-57's comparison
@@ -8546,18 +8570,46 @@ const CONV = (() => {
     const sect = (scope, title) => `<h4>${title}</h4><div class="cv-wrap"><table class="cv-t"><thead><tr><th>Name</th><th>Code</th><th>Definition</th><th>Used</th><th></th></tr></thead><tbody>${list().filter(x => x.scope === scope).map(row).join("")}</tbody></table></div>
 ${gone(scope).length ? `<div class="cv-gone">Removed built-in: ${gone(scope).map(k => `<span>${esc(bName(k))} <span class="mono">${esc(k)}</span>${ro ? "" : ` <button class="btn sm" data-cvrestore="${esc(k)}">Restore</button>`}</span>`).join("")}</div>` : ""}
 ${ro ? "" : `<div class="cv-add"><input data-cvaddname="${scope}" placeholder="New ${scope} classification, e.g. ${scope === "column" ? "Hash candidate" : "Golden source"}" aria-label="Name"><input data-cvaddcode="${scope}" placeholder="Code (optional), e.g. ${scope === "column" ? "HASH" : "GOLD"}" class="mono" aria-label="Code"><button class="btn sm" data-cvadd="${scope}">Add</button></div>`}`;
-    return `<p class="cv-intro">The workspace's conventions, in one place. The import matches classifications by their name or code; table and column panels set them; documents and exports print their definitions.</p>
+    return `<p class="cv-intro">The workspace's conventions, in one place. The import matches classifications by their name or code; table and column panels set them; entity panels offer the stereotypes; documents and exports print their definitions.</p>
 <section class="cv-box"><h3>Classifications</h3><p class="cv-hint">One list for the workspace's source tables and columns. Every name can be changed; built-in ones keep a code the app's rules read (BK, PII, LK…), so a renamed one keeps working and a removed one is absent until it is restored. An own classification may get a code when it is added, for import files that should not depend on its name; the code cannot change later. This workspace started with the names and definitions in ${esc(lg)}; changing the documentation language later renames nothing.</p>
 ${sect("column", "For source columns")}${sect("table", "For source tables")}</section>
+${stSection(ro)}
 <section class="cv-box"><h3>Concept colours</h3><p class="cv-hint">Each concept's colour on canvases and in documents. Violet is reserved for requirements, so it is not offered here; a new concept takes the first colour no concept uses.</p>
 ${S.concepts.map(k => `<div class="cv-col"><span>${esc(k.name)}</span><div class="swatches">${ALLOWED_CONCEPT_COLORS.map(col => `<button style="background:${col}" data-ccol="${k.id}" data-v="${col}" aria-pressed="${String(k.color).toUpperCase() === col}" aria-label="${col}" ${ro}></button>`).join("")}</div></div>`).join("") || `<p class="cv-hint">No concepts yet.</p>`}</section>
 <section class="cv-box"><h3>Naming conventions</h3><p class="cv-hint">Your rules for names of entities, attributes, keys and codes, as plain text. Documents print them in their conventions section; nothing checks names against them yet.</p>
 <textarea data-cvnaming rows="7" ${ro} placeholder="- Entities: singular, Title Case (Sales Order)&#10;- Attributes: snake_case (order_date)&#10;- Keys: …_id; surrogate keys: …_key">${esc(c.naming || "")}</textarea></section>
-<p class="cv-hint cv-later">Later, in their own slices: entity stereotypes' names and definitions, the map from physical to logical types, an organization's default conventions.</p>`;
+<p class="cv-hint cv-later">Later, in their own slices: the map from physical to logical types, an organization's default conventions.</p>`;
+  }
+  function stSection(ro) {
+    const l = stList();
+    return `<section class="cv-box"><h3>Entity stereotypes</h3><p class="cv-hint">What an entity is in the model. Names and definitions are the workspace's; codes never change, so entities, imports and exports keep them while names change. The five built-in ones stay (Object is a new entity's stereotype and every fact's and dimension's); own ones can be added and removed. Facts and dimensions show their InfoCube role instead.</p>
+<div class="cv-wrap"><table class="cv-t"><thead><tr><th>Name</th><th>Code</th><th>Definition</th><th>Used</th><th></th></tr></thead><tbody>${l.map(x => { const n = stUse(x.key);
+  return `<tr><td><input data-cvstn="${esc(x.key)}" value="${esc(x.name)}" ${ro} aria-label="Name">${x.own ? ` <span class="cv-chip own">own</span>` : ""}</td><td class="mono" style="white-space:nowrap">${esc(stCode(x))}</td>
+<td><textarea data-cvstdef="${esc(x.key)}" rows="2" ${ro} placeholder="What it means, when to use it" aria-label="Definition">${esc(x.def || "")}</textarea></td><td class="cv-n">${n ? n + " entit" + (n > 1 ? "ies" : "y") : "unused"}</td>
+<td>${x.own && !ro ? `<button class="btn sm danger" data-cvstrm="${esc(x.key)}">Remove</button>` : ""}</td></tr>`; }).join("")}</tbody></table></div>
+${ro ? "" : `<div class="cv-add"><input data-cvstaddname placeholder="New stereotype, e.g. Event" aria-label="Name"><input data-cvstaddcode placeholder="Code, e.g. event" class="mono" aria-label="Code"><button class="btn sm" data-cvstadd>Add</button></div><p class="cv-hint">The code is proposed from the name; letters, digits and _, starting with a letter. It cannot change later.</p>`}</section>`;
+  }
+  const stSnake = s => String(s).trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/ł/g, "l").replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").replace(/^([0-9])/, "s_$1").slice(0, 30);
+  function stRemove(key) {
+    const x = stOf(key), n = stUse(key), others = stList().filter(y => y.key !== key);
+    if (!n) { ch(() => { const c = conv(); c.st = c.st.filter(y => y.key !== key); }, `${x.name} removed.`); return; }
+    showModal(curWs().name, `Remove ${x.name}?`, `<p>${n} entit${n > 1 ? "ies have" : "y has"} this stereotype. Choose the one ${n > 1 ? "they" : "it"} get${n > 1 ? "" : "s"} instead:</p>
+<div class="wh"><div class="row2"><label for="cv-st-to">Stereotype</label><select id="cv-st-to">${others.map(y => `<option value="${esc(y.key)}">${esc(y.name)}</option>`).join("")}</select></div></div><p class="cv-hint" style="margin-top:8px">One undo step brings back the stereotype and every entity's.</p>`,
+      `<span class="sp"></span><button class="btn" data-wsm="close">Cancel</button><button class="btn danger" id="cv-st-ok">Remove and move ${n} entit${n > 1 ? "ies" : "y"}</button>`);
+    $("#cv-st-ok").addEventListener("click", () => { const to = $("#cv-st-to").value; $("#wsmodal").hidden = true;
+      ch(() => { const c = conv(); S.entities.forEach(e => { if (e.stereotype === key) e.stereotype = to; }); c.st = c.st.filter(y => y.key !== key); }, `${x.name} removed; ${n} entit${n > 1 ? "ies are" : "y is"} now ${stName(to)}.`); });
   }
   const ch = (fn, msg) => { mutate(fn); renderWsHome(); if (msg) toast(msg, true); };
   function click(ev) {
     const g = s => ev.target.closest(s); let x;
+    if ((x = g("[data-cvstrm]"))) { stRemove(x.dataset.cvstrm); return true; }
+    if ((x = g("[data-cvstadd]"))) { const ni = $("[data-cvstaddname]"), ci = $("[data-cvstaddcode]"), nm = ni.value.trim(), code = (ci.value.trim() || stSnake(nm)).toLowerCase(), cv = conv();
+      if (!nm) { ni.focus(); return true; }
+      const taken = v => stList().some(y => nk(y.name) === nk(v) || nk(stCode(y)) === nk(v)) || cv.stCodes.some(k => nk(k) === nk(v));
+      if (taken(nm)) { ni.setCustomValidity("That name is taken"); ni.reportValidity(); ni.setCustomValidity(""); return true; }
+      if (!/^[a-z][a-z0-9_]{0,29}$/.test(code)) { ci.value = code; ci.setCustomValidity("Letters, digits and _; starting with a letter"); ci.reportValidity(); ci.setCustomValidity(""); return true; }
+      if (taken(code)) { ci.value = code; ci.setCustomValidity("That code is taken"); ci.reportValidity(); ci.setCustomValidity(""); return true; }
+      ch(() => { const c = conv(); c.st.push({key:code, own:true, name:nm, def:""}); c.stCodes.push(code); }, `Stereotype “${nm}” added (${code}).`); return true; }
     if ((x = g("[data-cvadd]"))) { const scope = x.dataset.cvadd, ni = $(`[data-cvaddname="${scope}"]`), ci = $(`[data-cvaddcode="${scope}"]`), nm = ni.value.trim(), code = ci.value.trim().toUpperCase();
       if (!nm) { ni.focus(); return true; }
       if (nameClash(nm, scope, null)) { ni.setCustomValidity("That name is taken"); ni.reportValidity(); ni.setCustomValidity(""); return true; }
@@ -8574,6 +8626,8 @@ ${S.concepts.map(k => `<div class="cv-col"><span>${esc(k.name)}</span><div class
       ch(() => { const cv = conv(); cv.removed = cv.removed.filter(k => k !== code); }, `${nm} restored, unused.`); return true; }
     return false;
   }
+  document.addEventListener("input", ev => { if (!ev.target.matches?.("[data-cvstaddname]")) return; const ci = $("[data-cvstaddcode]"); if (ci && !ci.dataset.touched) ci.value = stSnake(ev.target.value); });
+  document.addEventListener("input", ev => { if (ev.target.matches?.("[data-cvstaddcode]")) ev.target.dataset.touched = "1"; });
   function change(ev) {
     const s = ev.target.dataset, v = ev.target.value;
     if (s.cvdef !== undefined) { const code = s.cvdef; ch(() => { if (BUILTIN[code]) (conv().cls[code] ||= {}).def = v.trim(); else { const o = S.classes.find(y => y.code === code); if (o) o.def = v.trim(); } }); return true; }
@@ -8581,10 +8635,15 @@ ${S.concepts.map(k => `<div class="cv-col"><span>${esc(k.name)}</span><div class
       if (!nm || nm === me0.name) { renderWsHome(); return true; }
       if (nameClash(nm, me0.scope, code)) { toast("That name is taken."); renderWsHome(); return true; }
       ch(() => { if (BUILTIN[code]) (conv().cls[code] ||= {}).name = nm; else S.classes.find(y => y.code === code).name = nm; }); return true; }
+    if (s.cvstn !== undefined) { const key = s.cvstn, x = stOf(key), nm = v.trim();
+      if (!nm || nm === x.name) { renderWsHome(); return true; }
+      if (stList().some(y => y.key !== key && (nk(y.name) === nk(nm) || nk(stCode(y)) === nk(nm)))) { toast("That name is taken."); renderWsHome(); return true; }
+      ch(() => { stOf(key).name = nm; }, `Renamed to ${nm}; entities keep the stereotype.`); return true; }
+    if (s.cvstdef !== undefined) { ch(() => { stOf(s.cvstdef).def = v.trim(); }); return true; }
     if (s.cvnaming !== undefined) { ch(() => { conv().naming = v; }); return true; }
     return false;
   }
-  return {tab, click, change, conv};
+  return {tab, click, change, conv, stList, stName, stDef};
 })();
 
 window.__conv23 = () => CONV.conv();
