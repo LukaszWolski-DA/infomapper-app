@@ -176,7 +176,7 @@ function TabRename({ view, canvas, onLeave, onClose }: { view: ProjectView; canv
     return result;
   };
   const readOnly = !view.canEdit;
-  const { bind, defaultValue, commit, keyDown: draftKeyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(canvas.name, save, { prepare: (t) => t.trim(), required: true, onEmpty: () => toast(NAME_REQUIRED, "refusal"), readOnly });
+  const { bind, defaultValue, commit, keyDown: draftKeyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(canvas.name, save, { prepare: (t) => t.trim(), required: true, onEmpty: () => toast(NAME_REQUIRED, "refusal"), readOnly, version: canvas.version });
 
   const leave = (el: HTMLInputElement) => {
     onLeave();

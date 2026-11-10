@@ -79,7 +79,7 @@ export async function renameCanvasAction(input: { workspaceId: string; canvasId:
         expectedVersion: input?.expectedVersion,
         name: input?.name,
       });
-      return result.ok ? { ...result, value: { name: result.value.canvas.name } } : result;
+      return result.ok ? { ...result, value: { name: result.value.canvas.name, version: result.value.canvas.version } } : result;
     }),
   );
 }

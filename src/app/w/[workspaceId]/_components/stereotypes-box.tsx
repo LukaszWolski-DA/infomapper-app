@@ -126,7 +126,7 @@ function Row({ s, onRemove, ...p }: StereotypesBoxProps & { s: Stereotype; onRem
     setError(r.ok || r.code === "cut" ? null : r.message);
     return r;
   };
-  const { bind, defaultValue, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(s.name, rename, { prepare: trimmed, required: true, onEmpty: () => setError(null) });
+  const { bind, defaultValue, commit, keyDown, mark, takeStored, keepMine } = useDraft<HTMLInputElement>(s.name, rename, { prepare: trimmed, required: true, onEmpty: () => setError(null), version: s.version });
   return (
     <tr className="align-top" data-testid="stereotype-row" data-code={s.code}>
       <td className="border-b border-im-line py-1.5 pr-2">
@@ -169,6 +169,7 @@ function Row({ s, onRemove, ...p }: StereotypesBoxProps & { s: Stereotype; onRem
       <td className="w-[48%] min-w-[220px] border-b border-im-line py-1.5 pr-2">
         <TextArea
           key={fieldKey(s.id, "definition")}
+          version={s.version}
           value={s.definition ?? ""}
           rows={2}
           readOnly={!p.editable}

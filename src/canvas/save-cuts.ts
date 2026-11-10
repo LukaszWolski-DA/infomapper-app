@@ -17,7 +17,8 @@ export const PAGE_REFUSALS: ReadonlySet<string> = new Set(["stale_version", "for
 export const FRESH_WAIT_MS = 3000;
 
 /** What a note's or frame's save answers its caller: stored, or refused with the refusal's code (`cut` included). */
-export type CanvasSave = { ok: true } | { ok: false; code: string };
+/** A canvas save's answer; a stored one may give the row's new version (a frame's, for its name's draft). */
+export type CanvasSave = { ok: true; version?: number } | { ok: false; code: string };
 export const CUT_SAVE: CanvasSave = { ok: false, code: "cut" };
 
 /** The cutting refusals per row: a save remembers the count when it is queued and is cut when it grew meanwhile. */

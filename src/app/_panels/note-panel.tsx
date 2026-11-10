@@ -43,6 +43,8 @@ export function NotePanel({ noteId }: { noteId: Uuid }) {
       <Field label="Text" htmlFor="f-nt">
         <TextArea
           key={fieldKey(n.id, "text")}
+          // the note's draft ends by its own rule (`NoteDrafts.stored`), which the field follows through `outside`
+          version={null}
           id="f-nt"
           value={n.text}
           readOnly={!can}

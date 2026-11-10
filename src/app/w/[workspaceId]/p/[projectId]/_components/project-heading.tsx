@@ -71,9 +71,10 @@ function EditableHeading({
     required: true,
     onEmpty: () => toast(PROJECT_NAME_REQUIRED, "refusal"),
     readOnly,
+    version: project.version,
   });
   // trimmed as the server stores it; the lines inside stay
-  const { bind: descriptionBind, defaultValue: descriptionInitial, commit: descriptionCommit, keyDown: descriptionKeyDown, mark: descriptionMark, takeStored: descriptionTake, keepMine: descriptionKeep } = useDraft<HTMLTextAreaElement>(project.description ?? "", (v) => save({ description: v }), { prepare: (t) => t.trim(), readOnly });
+  const { bind: descriptionBind, defaultValue: descriptionInitial, commit: descriptionCommit, keyDown: descriptionKeyDown, mark: descriptionMark, takeStored: descriptionTake, keepMine: descriptionKeep } = useDraft<HTMLTextAreaElement>(project.description ?? "", (v) => save({ description: v }), { prepare: (t) => t.trim(), readOnly, version: project.version });
   // read-only now: once the saves on their way are settled, the fields without a refused draft become text again
   const [quiet, setQuiet] = useState(false);
   useEffect(() => {

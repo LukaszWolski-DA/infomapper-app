@@ -85,6 +85,7 @@ export function SourceNote({ target, name, version, value, placeholder, hint }: 
     <Field label="Note" htmlFor={id}>
       <TextArea
         key={fieldKey(target.id, "note")}
+        version={version}
         id={id}
         value={value ?? ""}
         readOnly={!p.editable}

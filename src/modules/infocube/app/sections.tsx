@@ -231,6 +231,7 @@ function FactSection({ entity, row, cube }: { entity: Entity; row: CubeEntity; c
         <Field label="Grain" htmlFor="f-grain">
           <TextField
             key={fieldKey(row.id, "grain")}
+            version={row.version}
             id="f-grain"
             value={row.grain ?? ""}
             readOnly={!p.editable}
@@ -383,6 +384,7 @@ function DimensionSection({ entity, row, cube }: { entity: Entity; row: CubeEnti
           <Field label="Snapshot period" htmlFor="f-snap">
             <TextField
               key={fieldKey(row.id, "snapshot_period")}
+              version={row.version}
               id="f-snap"
               value={row.snapshot_period ?? ""}
               readOnly={!p.editable}
@@ -491,6 +493,8 @@ function UnknownMember({
                     <div className="min-w-0">
                       <TextField
                         key={fieldKey(a.id, "unknown_value")}
+                        // the value's row comes and goes with the value, and its answer is that row: no version to follow
+                        version={null}
                         id={id}
                         value={stored}
                         readOnly={!p.editable}
@@ -593,6 +597,7 @@ function MeasureFields({ a, m }: { a: Attribute; m: CubeMeasure }) {
         <Field label="Not additive across" htmlFor="f-semi">
           <TextField
             key={fieldKey(m.id, "semi")}
+            version={m.version}
             id="f-semi"
             value={m.semi_note ?? ""}
             readOnly={!p.editable}
