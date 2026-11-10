@@ -55,6 +55,7 @@ const model = (over: Partial<WorkspaceModel> = {}): WorkspaceModel => ({
   sourceRelationshipColumns: [],
   classifications: [],
   classificationLinks: [],
+  stereotypes: [],
   lostOriginals: [],
   ...over,
 });

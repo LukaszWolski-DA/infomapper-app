@@ -1,4 +1,4 @@
-# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 23's close)
+# Inventory: what the prototype has that the app does not (24 October 2026, updated at slice 24's close)
 
 Written at slice 7a's close. It compares the reference prototype `docs/prototype/infomapper-prototype-with-sources.html`
 (the reference since 22 October 2026) with the app on `slice/07a-source-import`; at slice 7b's close (25 October 2026)
@@ -256,6 +256,27 @@ panels opens it (`data-imx-opencls`); a new workspace's built-in names and defin
   prototype's seeding also renames (F2);
 - the hint names no language (F13); a taken name shows under the field, not as a toast (F19);
 - the naming conventions are a workspace setting outside undo (F11).
+
+**Present since slice 24 (D-79):** the tab's "Entity stereotypes" box (prototype `stSection`, `stRemove`) between
+Classifications and Concept colours: the five built-in ones renamed and defined, own ones added with a code proposed from
+the name and removed (an unused one at once with Undo, a used one through the dialog that moves its entities), the uses
+of logical entities; the workspace's names on the entity card's label (the definition as its title), in the Model tab
+and in the entity panel's select (each option's definition as its title, the chosen one's under it); Settings' sentence
+names the stereotypes.
+
+**Deliberate differences (slice 24, step 1 answers):**
+- entities, the list and every rule keep codes; the prototype keys built-in ones by their English names (PRD section 4);
+- a removed own stereotype is a soft-deleted row whose code stays taken (F4), where the prototype drops it and keeps
+  its code in `stCodes`;
+- a name is compared with every code, removed ones included, in a rename as in an add (F5); the prototype's rename
+  compares only with the live list;
+- a taken name or a bad or taken code shows under its field (F8), not as a toast or the browser's validity bubble;
+- a definition saved or cleared has the classifications' toasts (F9); the prototype has none;
+- the code field's proposal starts again after a successful Add (F6);
+- an older file's code outside the five becomes an own stereotype with one log line (F19); existing workspaces got the
+  English names with definitions in their language (F18);
+- not in the app, left as is: the baseline view's heading and the entity panel's Data Vault hint for `Link` (the app has
+  neither).
 
 **Deliberate differences (slice 7a, PRD section 8 and `docs/prd/slice-07a-acceptance.md`):**
 - mappings have inputs (AD-26): conflicts, business key changes and rule rewrites are judged per input;

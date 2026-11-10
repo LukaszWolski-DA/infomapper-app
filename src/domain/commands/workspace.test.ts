@@ -28,6 +28,8 @@ describe("createWorkspace", () => {
       "insert:canvas",
       "insert:project_canvas",
       ...Array<string>(19).fill("insert:classification"),
+      // slice 24: the five built-in stereotypes
+      ...Array<string>(5).fill("insert:stereotype"),
     ]);
     const [ws, mem, proj, canv, link] = writes.map((w) => (w.kind === "insert" ? w.row : null)) as never[];
     expect(ws).toMatchObject({
@@ -49,7 +51,7 @@ describe("createWorkspace", () => {
     expect(canv).toMatchObject({ id: r.value.canvasId, workspace_id: r.value.workspaceId, name: FIRST_CANVAS_NAME });
     expect(link).toMatchObject({ project_id: r.value.projectId, canvas_id: r.value.canvasId, sort_order: 0 });
 
-    expect(events).toHaveLength(24);
+    expect(events).toHaveLength(29);
     for (const e of events) {
       expect(e).toMatchObject({
         change_group_id: changeGroupId,
@@ -105,6 +107,21 @@ describe("createWorkspace in a documentation language (slice 23, F1, items 9, 11
     const en = createWorkspace(makeCtx(), state, { organizationId: ids.org, name: "English" });
     expect(builtinRows(en).find((c) => c.code === "PII")).toMatchObject({ name: "Personal data", definition: "The column holds personal data in the sense of the GDPR." });
     expect(createWorkspace(makeCtx(), state, { organizationId: ids.org, name: "X", docLanguage: "fr" }).ok).toBe(false);
+  });
+
+  it("writes the five built-in stereotypes in its language (slice 24, S24-06)", () => {
+    const stereotypes = (r: ReturnType<typeof createWorkspace>) =>
+      r.ok ? r.writeSet.writes.filter((w) => w.kind === "insert" && w.table === "stereotype").map((w) => (w as { row: { code: string; name: string; origin: string } }).row) : [];
+    const pl = stereotypes(createWorkspace(makeCtx(), state, { organizationId: ids.org, name: "Polski", docLanguage: "pl" }));
+    expect(pl.map((s) => [s.code, s.name, s.origin])).toEqual([
+      ["object", "Obiekt", "builtin"],
+      ["link", "Powiązanie", "builtin"],
+      ["dictionary", "Słownik", "builtin"],
+      ["context", "Kontekst", "builtin"],
+      ["informative", "Informacyjna", "builtin"],
+    ]);
+    expect(stereotypes(createWorkspace(makeCtx(), state, { organizationId: ids.org, name: "Deutsch", docLanguage: "de" })).map((s) => s.name)).toEqual(["Objekt", "Verknüpfung", "Wörterbuch", "Kontext", "Informativ"]);
+    expect(stereotypes(createWorkspace(makeCtx(), state, { organizationId: ids.org, name: "English" }))[0]?.name).toBe("Object");
   });
 
   it("changing the language later renames nothing and rewrites no definition (item 11)", () => {

@@ -66,7 +66,7 @@ describe("createEntity (D-46)", () => {
 });
 
 describe("updateEntity", () => {
-  const state = { entity: entity(customer), entities: [entity(customer), entity(salesOrder)], concept: concept(conceptSales) };
+  const state = { entity: entity(customer), entities: [entity(customer), entity(salesOrder)], concept: concept(conceptSales), stereotypes: [] };
   const ref = { entityId: customer, expectedVersion: 1 };
 
   it("changes name, stereotype, concept and the rich-text definition, sanitized on the server (slice 4a)", () => {
@@ -94,7 +94,7 @@ describe("updateEntity", () => {
   it("refuses an unknown stereotype, an empty name, an unknown concept and no change", () => {
     expect(updateEntity(makeCtx(), access("owner"), state, { ...ref, stereotype: "hub" })).toMatchObject({ ok: false, error: { code: "invalid" } });
     expect(updateEntity(makeCtx(), access("owner"), state, { ...ref, name: " " })).toMatchObject({ ok: false, error: { code: "invalid" } });
-    expect(updateEntity(makeCtx(), access("owner"), { ...state, concept: null }, { ...ref, conceptId: conceptSales })).toMatchObject({ ok: false, error: { code: "not_found" } });
+    expect(updateEntity(makeCtx(), access("owner"), { ...state, concept: null, stereotypes: [] }, { ...ref, conceptId: conceptSales })).toMatchObject({ ok: false, error: { code: "not_found" } });
     expect(updateEntity(makeCtx(), access("owner"), state, { ...ref, name: "Customer" })).toMatchObject({ ok: false, error: { message: "Nothing to change." } });
   });
 
@@ -230,17 +230,17 @@ describe("the model level of entities (slice 15a, C-3, X-6)", () => {
     // a rename compares within the entity's own level
     const fact = dim(salesOrder, { name: "Fact Sales" });
     const entities = [entity(customer), fact];
-    expect(updateEntity(makeCtx(), access("modeler"), { entity: fact, entities, concept: null }, { entityId: salesOrder, expectedVersion: 1, name: "Customer" })).toMatchObject({ ok: true, value: { warning: null } });
+    expect(updateEntity(makeCtx(), access("modeler"), { entity: fact, entities, concept: null, stereotypes: [] }, { entityId: salesOrder, expectedVersion: 1, name: "Customer" })).toMatchObject({ ok: true, value: { warning: null } });
   });
 
   it("refuses a stereotype on a fact or dimension (C-5), and never changes a level", () => {
     const fact = dim(salesOrder);
-    expect(updateEntity(makeCtx(), access("modeler"), { entity: fact, entities: [fact], concept: null }, { entityId: salesOrder, expectedVersion: 1, stereotype: "link" })).toMatchObject({
+    expect(updateEntity(makeCtx(), access("modeler"), { entity: fact, entities: [fact], concept: null, stereotypes: [] }, { entityId: salesOrder, expectedVersion: 1, stereotype: "link" })).toMatchObject({
       ok: false,
       error: { code: "invalid", message: "A fact or dimension has a role, not a stereotype." },
     });
-    expect(updateEntity(makeCtx(), access("modeler"), { entity: fact, entities: [fact], concept: null }, { entityId: salesOrder, expectedVersion: 1, modelLevel: "logical" })).toMatchObject({ ok: false, error: { code: "invalid" } });
-    const renamed = updateEntity(makeCtx(), access("modeler"), { entity: fact, entities: [fact], concept: null }, { entityId: salesOrder, expectedVersion: 1, name: "Fact Sales" });
+    expect(updateEntity(makeCtx(), access("modeler"), { entity: fact, entities: [fact], concept: null, stereotypes: [] }, { entityId: salesOrder, expectedVersion: 1, modelLevel: "logical" })).toMatchObject({ ok: false, error: { code: "invalid" } });
+    const renamed = updateEntity(makeCtx(), access("modeler"), { entity: fact, entities: [fact], concept: null, stereotypes: [] }, { entityId: salesOrder, expectedVersion: 1, name: "Fact Sales" });
     expect(renamed.ok && renamed.value.entity.model_level).toBe("dimensional");
   });
 });

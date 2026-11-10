@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   attribute,
+  builtinStereotypes,
   canvasItem,
   concept,
   entity,
@@ -32,6 +33,7 @@ const model: WorkspaceModel = {
   sourceRelationshipColumns: [],
   classifications: [],
   classificationLinks: [],
+  stereotypes: [],
   lostOriginals: [],
   attributeInputs: [],
   mappingInputs: [],
@@ -52,6 +54,12 @@ describe("buildTree", () => {
       ["Sales", [["Sales Order", "Link", "elsewhere", null]]],
     ]);
     expect(tree.concepts[0]!.entities[0]!.fields).toEqual(["customer_id", "email"]);
+  });
+
+  it("shows the workspace's name for a stereotype's code (slice 24, item 9)", () => {
+    const renamed = builtinStereotypes().map((s) => (s.code === "link" ? { ...s, name: "Association" } : s));
+    const t = buildTree({ ...model, stereotypes: renamed }, items, ids.canvas1, [ids.canvas1]);
+    expect(t.concepts.flatMap((c) => c.entities.map((e) => [e.name, e.stereotype]))).toEqual([["Customer", "Object"], ["Sales Order", "Association"]]);
   });
 
   it("groups source tables by system and database.schema", () => {

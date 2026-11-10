@@ -12,7 +12,7 @@ import {
 } from "@/domain/types";
 import { emptyDb, findViolation, type DevDb } from "./schema";
 import { DEMO_PASSWORD_HASH } from "./demo-password";
-import { addBuiltinClassifications, addDemoModel, DEMO_LAYOUT } from "./seed-model";
+import { addBuiltinClassifications, addBuiltinStereotypes, addDemoModel, DEMO_LAYOUT } from "./seed-model";
 import { addDemoRequirementCard, addDemoRequirements, DEMO_REQUIREMENT_KEY_NEXT } from "./seed-requirements";
 import { addDemoWorkingLayer } from "./seed-working-layer";
 
@@ -104,6 +104,7 @@ export function buildSeed(now: Date = new Date()): DevDb {
     };
     db.workspace.push(ws);
     addBuiltinClassifications(db, ws.id, users[by].id, at, w.lang);
+    addBuiltinStereotypes(db, ws.id, users[by].id, at, w.lang);
     for (const [m, role] of members) {
       db.workspace_member.push({ workspace_id: ws.id, user_id: users[m].id, role, added_by: users[by].id, created_at: at });
     }

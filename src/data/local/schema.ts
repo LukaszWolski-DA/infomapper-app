@@ -38,10 +38,12 @@ import type {
   SourceRelationshipColumn,
   SourceSystem,
   SourceTable,
+  Stereotype,
   Workspace,
   WorkspaceMember,
   WritableRows,
 } from "@/domain/types";
+import { BUILTIN_STEREOTYPE_CODES } from "@/domain/model/stereotypes";
 import { UNDOABLE_TABLES } from "@/domain/commands/undo";
 import {
   CARDINALITY_MAX,
@@ -71,7 +73,7 @@ import {
   SOURCE_CHANGE_STATUSES,
   SOURCE_OBJECT_TYPES,
   SOURCE_RELATIONSHIP_KINDS,
-  STEREOTYPES,
+  STEREOTYPE_ORIGINS,
   WORKSPACE_ROLES,
 } from "@/domain/types";
 
@@ -93,11 +95,13 @@ import {
  * line). 12 = slice 15a (`model_level` on entities, `infocube` on workspaces, `organization_licence`), 13 = slice 15b
  * (`from_role` and `to_role` on relationships), 14 = slice 18 (`is_calculated` false and `calc_rule` null on attributes,
  * `attribute_input`; no change events, no log line), 15 = slice 23 (`definition` on classifications, the built-in ones' in
- * their workspace's documentation language, and `naming_conventions` on workspaces, null; no change events, no log line). It is written back at once; an older file no upgrade reaches is refused with a hint to
+ * their workspace's documentation language, and `naming_conventions` on workspaces, null; no change events, no log line), 16 = slice 24
+ * (`stereotype`: every workspace's five built-in rows, English names, definitions in its documentation language, and an
+ * own row for any other code an entity has, with one log line; no change events). It is written back at once; an older file no upgrade reaches is refused with a hint to
  * run "npm run reset-dev-data", a newer one (a newer branch wrote it) with the advice to switch back to that branch or
  * restore a backup, never a reset (`newerFormatMessage`, slice 15a). A module's tables are not part of the format (AD-33): a file without one has none of its rows yet.
  */
-export const DEV_DB_FORMAT = 15;
+export const DEV_DB_FORMAT = 16;
 
 export interface DevDb {
   format: typeof DEV_DB_FORMAT;
@@ -125,6 +129,7 @@ export interface DevDb {
   source_change: SourceChange[];
   classification: Classification[];
   classification_link: ClassificationLink[];
+  stereotype: Stereotype[];
   mapping: Mapping[];
   mapping_input: MappingInput[];
   requirement: Requirement[];
@@ -175,6 +180,7 @@ export const emptyDb = (): DevDb => ({
   source_change: [],
   classification: [],
   classification_link: [],
+  stereotype: [],
   mapping: [],
   mapping_input: [],
   requirement: [],
@@ -216,6 +222,8 @@ export interface TableRules {
 const audit = { created_by: "app_user", updated_by: "app_user" } as const;
 export const oneOf = (values: readonly string[], column: string) => (row: AnyRow) => values.includes(row[column] as string);
 const isSet = (v: unknown) => v !== null && v !== undefined;
+/** A stereotype's code (slice 24): lower-case letters, digits and `_`, starting with a letter, at most 30. */
+const STEREOTYPE_CODE_RE = /^[a-z][a-z0-9_]{0,29}$/;
 /** A nullable closed value (`x is null or x in (...)`). */
 const noneOrOneOf = (values: readonly string[], column: string) => (row: AnyRow) => row[column] === null || values.includes(row[column] as string);
 /** Standard model columns: the workspace and the audit users (a module's tables use them too, slice 15a). */
@@ -295,7 +303,9 @@ export const RULES: Record<DevTable, TableRules> = {
     key: ["id"],
     foreignKeys: { ...model, concept_id: "concept" },
     checks: [
-      { name: "entity_stereotype_ck", test: oneOf(STEREOTYPES, "stereotype") },
+      // slice 24 (F1): the code is one of the workspace's live stereotypes, which the domain checks on every write; the
+      // SQL has a composite foreign key, the local adapter none (its keys point to ids; known-limitations.md)
+      { name: "entity_stereotype_code_ck", test: (r) => typeof r.stereotype === "string" && STEREOTYPE_CODE_RE.test(r.stereotype) },
       { name: "entity_model_level_ck", test: oneOf(MODEL_LEVELS, "model_level") },
     ],
   },
@@ -431,6 +441,24 @@ export const RULES: Record<DevTable, TableRules> = {
       { columns: ["classification_id", "source_column_id"], live: true, where: (r) => isSet(r.source_column_id) },
     ],
     checks: [{ name: "classification_link_one_target_ck", test: (r) => [r.source_table_id, r.source_column_id].filter(isSet).length === 1 }],
+  },
+  // slice 24 (D-79): the workspace's entity stereotypes. A code is unique among every row, deleted ones too (never given
+  // twice); D-78's comparison of names and codes is the domain's. Built-in rows have one of the five codes and are never
+  // deleted, so a built-in code is always live (the write rule reads no model for it).
+  stereotype: {
+    key: ["id"],
+    foreignKeys: model,
+    unique: [
+      { columns: ["workspace_id", "code"] },
+      { columns: ["workspace_id", "name_key"], live: true },
+    ],
+    checks: [
+      { name: "stereotype_origin_ck", test: oneOf(STEREOTYPE_ORIGINS, "origin") },
+      { name: "stereotype_code_format_ck", test: (r) => typeof r.code === "string" && STEREOTYPE_CODE_RE.test(r.code) },
+      { name: "stereotype_builtin_code_ck", test: (r) => r.origin !== "builtin" || (BUILTIN_STEREOTYPE_CODES as readonly string[]).includes(r.code as string) },
+      { name: "stereotype_builtin_kept_ck", test: (r) => r.origin === "own" || r.deleted_at === null },
+      { name: "stereotype_definition_ck", test: (r) => !isSet(r.definition) || (typeof r.definition === "string" && r.definition.length > 0) },
+    ],
   },
   mapping: {
 

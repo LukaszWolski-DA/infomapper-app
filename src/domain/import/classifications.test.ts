@@ -286,6 +286,7 @@ function emptyWorkspaceModel() {
     sourceRelationshipColumns: [],
     classifications: [],
     classificationLinks: [],
+    stereotypes: [],
     lostOriginals: [],
   };
 }

@@ -207,7 +207,9 @@ function CardNode({ data }: NodeProps<CardNodeT>) {
                   {card.line1}
                 </span>
               ) : (
-                <span className="stereo">{card.line1}</span>
+                <span className="stereo" title={card.line1Title}>
+                  {card.line1}
+                </span>
               )}
               <span>{card.line1b}</span>
             </>

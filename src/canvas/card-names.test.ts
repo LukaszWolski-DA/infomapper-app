@@ -22,6 +22,7 @@ const model = (alias: string | null, attributeAlias: string | null): WorkspaceMo
     sourceRelationshipColumns: [],
     classifications: [],
     classificationLinks: [],
+    stereotypes: [],
     lostOriginals: [],
   }) as WorkspaceModel;
 const names = (entity_names: CanvasNames["entity_names"], attribute_names: CanvasNames["attribute_names"]): CanvasNames => ({ entity_names, attribute_names });

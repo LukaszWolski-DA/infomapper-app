@@ -2,6 +2,7 @@
 
 import type { CommandContext } from "../changes";
 import { BUILTIN_CLASSIFICATIONS, BUILTIN_TEXTS, normClassification, type ClassificationCode } from "../model/classifications";
+import { BUILTIN_STEREOTYPE_CODES, BUILTIN_STEREOTYPE_TEXTS, type BuiltinStereotypeCode } from "../model/stereotypes";
 import type { WorkspaceAccess } from "../permissions";
 import {
   DEFAULT_CANVAS_LOOK,
@@ -10,6 +11,7 @@ import {
   type CanvasItem,
   type ChangeEvent,
   type Classification,
+  type Stereotype,
   type ClassificationLink,
   type Concept,
   type Entity,
@@ -522,3 +524,32 @@ export const fixtureLinks = (): ClassificationLink[] => [
   classificationLink("PII", { columnId: ids.colEmail }),
   classificationLink("PII", { columnId: ids.colFirstName }),
 ];
+
+// ---- Entity stereotypes (slice 24) ----
+
+/** The workspace's five built-in stereotypes, ids `01900000-0000-7000-8000-5000000000NN` in the list's order, English. */
+export const builtinStereotypes = (): Stereotype[] =>
+  BUILTIN_STEREOTYPE_CODES.map((code, i) => ({
+    id: `01900000-0000-7000-8000-5${String(i + 1).padStart(11, "0")}`,
+    ...ws,
+    code,
+    name: BUILTIN_STEREOTYPE_TEXTS.en[code].name,
+    name_key: normClassification(BUILTIN_STEREOTYPE_TEXTS.en[code].name),
+    definition: BUILTIN_STEREOTYPE_TEXTS.en[code].definition,
+    origin: "builtin",
+  }));
+
+/** One built-in stereotype of `builtinStereotypes()` by its code. */
+export const builtinStereotype = (code: BuiltinStereotypeCode): Stereotype => builtinStereotypes().find((s) => s.code === code)!;
+
+/** An own stereotype. */
+export const ownStereotype = (id: string, name: string, code: string, over: Partial<Stereotype> = {}): Stereotype => ({
+  id,
+  ...ws,
+  code,
+  name,
+  name_key: normClassification(name),
+  definition: null,
+  origin: "own",
+  ...over,
+});

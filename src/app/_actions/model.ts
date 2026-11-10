@@ -84,8 +84,8 @@ export async function createEntityAction(
 
 /** Name, stereotype, concept, definition (right panel). A duplicate name comes back as a warning (B-25). */
 export async function updateEntityAction(workspaceId: string, input: UpdateEntityInput): Promise<ActionResult<Saved<{ warning: string | null }>>> {
-  return modelCommand(workspaceId, (ctx, access, { entities, concepts }) => {
-    const state = { entity: byId(entities, input?.entityId), entities, concept: byId(concepts, input?.conceptId) };
+  return modelCommand(workspaceId, (ctx, access, { entities, concepts, stereotypes }) => {
+    const state = { entity: byId(entities, input?.entityId), entities, concept: byId(concepts, input?.conceptId), stereotypes };
     const result = updateEntity(ctx, access, state, input);
     return result.ok ? { ...result, value: { warning: result.value.warning, version: result.value.entity.version } } : result;
   });

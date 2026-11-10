@@ -39,7 +39,7 @@ export interface SettingsValues {
 const LANGUAGES = DOC_LANGUAGE_OPTIONS;
 
 /** Settings' "Model conventions" box (slice 23, F12): the sentence, then the button that opens the tab. */
-export const MODEL_CONVENTIONS_TEXT = "Classifications, concept colours and naming conventions are edited in";
+export const MODEL_CONVENTIONS_TEXT = "Classifications, entity stereotypes, concept colours and naming conventions are edited in";
 
 type Patch = Partial<Omit<SettingsValues, "workspaceId" | "version">>;
 

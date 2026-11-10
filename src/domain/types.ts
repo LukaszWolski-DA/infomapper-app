@@ -112,8 +112,11 @@ export interface WorkspaceMember {
 
 // ---- Model (data model section 4) ----
 
-export const STEREOTYPES = ["object", "link", "dictionary", "context", "informative"] as const;
-export type Stereotype = (typeof STEREOTYPES)[number];
+/**
+ * An entity's stereotype is a code of its workspace's list (slice 24, D-79): the five built-in codes (fixed, never
+ * removed) or an own one's. The list's rows are `Stereotype`; names and definitions are the workspace's.
+ */
+export type StereotypeCode = string;
 
 /**
  * An entity's model level (slice 15a, C-3, AD-34): set when it is created, never changed. InfoMapper knows the level,
@@ -145,8 +148,11 @@ export interface Entity extends StandardColumns {
   alias: string | null;
   /** Set on create, never changed (slice 15a, C-3); every entity from before slice 15a is logical. */
   model_level: ModelLevel;
-  /** A dimensional entity keeps `object`, never shown or changed (C-5; slice 15 acceptance, Q4). */
-  stereotype: Stereotype;
+  /**
+   * A code of the workspace's stereotypes (slice 24): never a name, so a rename changes no entity. A dimensional entity
+   * keeps `object`, never shown or changed (C-5; slice 15 acceptance, Q4).
+   */
+  stereotype: StereotypeCode;
   definition_html: string | null;
   definition_text: string | null;
 }
@@ -295,6 +301,27 @@ export interface Classification extends StandardColumns {
   definition: string | null;
 }
 
+// ---- Entity stereotypes (slice 24, D-79) ----
+
+/** Built in (the five fixed codes, never removed) or the workspace's own. */
+export const STEREOTYPE_ORIGINS = ["builtin", "own"] as const;
+export type StereotypeOrigin = (typeof STEREOTYPE_ORIGINS)[number];
+
+/**
+ * One entry of the workspace's stereotype list. `code` is what entities keep: set when the row is made, never changed,
+ * unique in the workspace among every row (removed and deleted ones too), so a code is never given twice. `name_key` is
+ * the normalized name the server writes (D-78's comparison), unique among live rows. Removing an own one soft-deletes
+ * it; built-in rows are never deleted.
+ */
+export interface Stereotype extends StandardColumns {
+  code: StereotypeCode;
+  name: string;
+  name_key: string;
+  /** What it means, plain text, trimmed, never empty. */
+  definition: string | null;
+  origin: StereotypeOrigin;
+}
+
 /** One classification on one source table or column (AD-15): exactly one of the two is set. */
 export interface ClassificationLink extends StandardColumns {
   classification_id: Uuid;
@@ -433,6 +460,8 @@ export interface WorkspaceModel {
   classifications: Classification[];
   /** Live links only. */
   classificationLinks: ClassificationLink[];
+  /** Slice 24: the workspace's entity stereotypes, removed ones included (their codes stay taken). */
+  stereotypes: Stereotype[];
   /** The deleted originals that live copies point to, by name (slice 10c, F6). */
   lostOriginals: LostOriginal[];
 }
@@ -691,6 +720,7 @@ export interface CoreWritableRows {
   source_change: SourceChange;
   classification: Classification;
   classification_link: ClassificationLink;
+  stereotype: Stereotype;
   mapping: Mapping;
   mapping_input: MappingInput;
   requirement: Requirement;

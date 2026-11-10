@@ -1,4 +1,5 @@
 import { dataVaultUses, indexOf } from "@/domain/model/classifications";
+import { stereotypeUses } from "@/domain/model/stereotypes";
 import Link from "next/link";
 import { headers } from "next/headers";
 import type { ReactNode } from "react";
@@ -325,6 +326,9 @@ export default async function WorkspaceHomePage({ params, searchParams }: PagePr
                 .sort((x, y) => x.sort_order - y.sort_order)
                 .map((c) => ({ id: c.id, version: c.version, name: c.name, color: c.color }))}
               namingConventions={workspace.naming_conventions}
+              // slice 24: the stereotypes, removed ones too (their codes stay taken), and their live logical uses
+              stereotypes={model.stereotypes}
+              stereotypeUses={stereotypeUses(model.entities)}
             />
           )}
 

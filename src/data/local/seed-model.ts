@@ -18,8 +18,8 @@ import type {
   MappingStatus,
   SourceColumn,
   SourceTable,
-  Stereotype,
 } from "@/domain/types";
+import { builtinStereotypeRows, type BuiltinStereotypeCode } from "@/domain/model/stereotypes";
 import type { DevDb } from "./schema";
 
 /**
@@ -50,6 +50,15 @@ export function addBuiltinClassifications(db: DevDb, workspaceId: Uuid, by: Uuid
       definition: text.definition,
     });
   }
+}
+
+/**
+ * The five built-in stereotypes of a seeded workspace (slice 24), with stable ids, named and defined in its documentation
+ * language as a new workspace gets them (the Polish demo workspace has the Polish names).
+ */
+export function addBuiltinStereotypes(db: DevDb, workspaceId: Uuid, by: Uuid, at: string, language: DocLanguage): void {
+  const rows = builtinStereotypeRows({ actorId: by, now: at, newId: () => "" }, workspaceId, language);
+  for (const row of rows) db.stereotype.push({ ...row, id: seedId(workspaceId, `stereotype:${row.code}`) });
 }
 
 /** A built-in classification on a seeded table or column (slice 7c). */
@@ -85,7 +94,7 @@ const CONCEPTS: [key: string, name: string, color: string][] = [
   ["ref", "Reference data", "#5F8A2E"],
 ];
 
-const ENTITIES: [key: string, concept: string, name: string, stereotype: Stereotype, definition: string][] = [
+const ENTITIES: [key: string, concept: string, name: string, stereotype: BuiltinStereotypeCode, definition: string][] = [
   ["customer", "cust", "Customer", "object", "A person or organisation that buys from us."],
   ["address", "cust", "Customer Address", "object", ""],
   ["order", "sales", "Sales Order", "object", "A confirmed order placed by a customer."],

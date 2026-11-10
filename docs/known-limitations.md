@@ -19,6 +19,19 @@ moment can therefore both pass the check and leave a canvas or project without i
   `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed. The same for a project's
   delete and its shared canvases.
 
+### An entity's stereotype has no foreign key in the local adapter (slice 24)
+
+Since slice 24 an entity keeps a code of its workspace's stereotype list (D-79). The SQL migration has a composite foreign
+key `(workspace_id, stereotype)` → `stereotype (workspace_id, code)`; the local adapter's foreign keys point to an `id`
+only, and it gets no other kind (Łukasz, step 1, F1). There the domain is the rule's only keeper: `runCommand` checks
+every write set (`stereotypeWritesRefusal`: every live entity written, or on a code removed, has a live stereotype) and
+undo checks every revert. The adapter checks the code's shape only (`entity_stereotype_code_ck`), so a write that went
+round the domain, or a file edited by hand, could leave an entity on a code the workspace lacks; the database refuses it.
+
+- **Accepted** in the local adapter (development only).
+- **The database slice (last, AD-31):** the composite key is in the migration already; a soft-deleted stereotype stays
+  the domain's to keep from being used.
+
 ### The last owner under concurrent writes (slice 8; fixed in the local adapter)
 
 A workspace keeps at least one owner. The domain counts the owners from what the command read; two owners removing or
@@ -1129,6 +1142,12 @@ the same code is refused with "That code is taken", and Redo brings the first on
 a removed own classification is never restored, and its code is never given again (F16, accepted by Łukasz on
 10 November 2026). This keeps an undo of a removal from ever meeting a code given again in the meantime.
 
+### A code stays taken after its stereotype's add is undone (slice 24)
+
+As for classifications: an own stereotype's code is unique among every row of the workspace, deleted ones included, so
+undoing "Add stereotype" keeps the row and its code stays taken ("That code is taken"); a removed own stereotype's code
+is never given again either, and it also blocks a name (F4, F5, accepted by Łukasz on 10 November 2026).
+
 ### A text area whose command trims may keep an untrimmed draft (found in slice 23, not checked elsewhere)
 
 A plain-text area saves what was typed and its command stores it trimmed. Without `prepare` the field keeps the typed
@@ -1137,7 +1156,21 @@ change) does not show in it until the field is left or Escape is pressed. Slice 
 gave `TextArea` an optional `prepare`, which the Metadata conventions tab's two text areas use (a trim, as
 `TextField`'s). The other text areas (a source's note, a mapping's note and rule, a note's text, a requirement's
 fields, a calculation's rule) were not changed or checked; whether they show it, and the fix (`prepare` where the
-command trims), is a `fix/…` branch of its own (The slice cycle, 4).
+command trims), is a `fix/…` branch of its own (The slice cycle, 4), with the next note's fix after slice 24's merge.
+
+### Undo right after a definition's save can leave the typed text in the field (found in slice 24, S23-02)
+
+In S23-02 a classification's definition is typed and left, its toast and its stored value come, and the top bar's Undo
+is pressed about 0.4 s after the save was sent: the toast "Undone: …" shows and the stored value is back, but in 3 of 9
+local runs (on 10 November 2026; also with slice 24's interface taken out) the text area kept the typed, trimmed text
+for the whole 15 s. On GitHub it passed 3 of 3 on `main` and on slice 24's branch, and in slice 24's full runs. The
+trace and the run's log are in `.data/traces/s23-02-20261110/` (git-ignored): every server action answered 200, the
+undo's answer carrying the fresh page. The draft rules (`useDraft`, `src/ui/field-draft.ts`) and the save chain's
+answer after the page (`afterPage`, `rowSaves`) are shared infrastructure, so the slice did not change them or the test.
+
+- **To fix on a `fix/…` branch from `main` after slice 24's merge** (The slice cycle, 4), together with the note above
+  (a text area whose command trims): reproduce it on `main`, find the interleaving from the trace, fix it with its own
+  full run.
 
 ## Organizations and sign-in (slice 8)
 

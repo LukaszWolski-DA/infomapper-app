@@ -12,7 +12,7 @@ test("S11-07: a long alias in a 200 px card is truncated like a name of the same
   // Sales Order gets the same text as its name, for the comparison
   const model = await loadModel();
   const order = model.entities.find((e) => e.name === "Sales Order")!;
-  await asLukasz((ctx, access) => updateEntity(ctx, access, { entity: order, entities: model.entities, concept: null }, { entityId: order.id, expectedVersion: order.version, name: LONG }));
+  await asLukasz((ctx, access) => updateEntity(ctx, access, { entity: order, entities: model.entities, concept: null, stereotypes: model.stereotypes }, { entityId: order.id, expectedVersion: order.version, name: LONG }));
   await setWidth("Customer", 200);
   await setWidth(LONG, 200);
   const customer = (await idsOf("Customer")).itemId;

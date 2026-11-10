@@ -182,10 +182,11 @@ describe("demo model (slice 1a PRD, demo data)", () => {
     // Different rows: ids are derived per workspace.
     expect(sales.entities.map((e) => e.id)).not.toContain(seedId(RETAIL, "entity:customer"));
 
-    // Bank X: no model, only its built-in classification list (slice 7c)
+    // Bank X: no model, only its built-in classification list (slice 7c) and its five stereotypes (slice 24)
     const bank = await store.model.load(SEED_IDS.wsBankX);
-    expect(Object.entries(bank).every(([k, rows]) => k === "classifications" || rows.length === 0)).toBe(true);
+    expect(Object.entries(bank).every(([k, rows]) => k === "classifications" || k === "stereotypes" || rows.length === 0)).toBe(true);
     expect(bank.classifications).toHaveLength(19);
+    expect(bank.stereotypes.map((s) => s.code)).toEqual(["object", "link", "dictionary", "context", "informative"]);
   });
 
   it("keeps the same ids on every seed", () => {
@@ -391,7 +392,9 @@ describe("the data model's checks on the model tables", () => {
   it("value lists and the attribute type rules", async () => {
     const m = await store.model.load(RETAIL);
     const e = m.entities[0]!;
-    expect(await apply([{ kind: "update", table: "entity", before: e, row: { ...e, version: 2, stereotype: "hub" as "object" } }])).toMatchObject({ ok: false, error: { code: "invalid" } });
+    expect(await apply([{ kind: "update", table: "entity", before: e, row: { ...e, version: 2, stereotype: "Hub!" } }])).toMatchObject({ ok: false, error: { code: "invalid" } });
+    // slice 24 (F1): a well-formed code the workspace lacks passes the adapter; the domain refuses it (no key that is not an id here)
+    expect(await apply([{ kind: "update", table: "entity", before: e, row: { ...e, version: 2, stereotype: "hub" } }])).toMatchObject({ ok: true });
     const a = m.attributes[0]!;
     expect(await apply([{ kind: "update", table: "attribute", before: a, row: { ...a, version: 2, data_type: "custom" } }])).toMatchObject({
       ok: false,

@@ -69,7 +69,7 @@ export const keepMine = (scope: Page | Locator) => scope.getByTestId("button-kee
 export async function changeEntityAsAnna(name: string, change: { name?: string; alias?: string | null; stereotype?: string }) {
   const model = await loadModel();
   const entity = model.entities.find((e) => e.name === name)!;
-  await asUser(SEED_IDS.userAnna, (ctx, access) => updateEntity(ctx, access, { entity, entities: model.entities, concept: null }, { entityId: entity.id, expectedVersion: entity.version, ...change }));
+  await asUser(SEED_IDS.userAnna, (ctx, access) => updateEntity(ctx, access, { entity, entities: model.entities, concept: null, stereotypes: model.stereotypes }, { entityId: entity.id, expectedVersion: entity.version, ...change }));
 }
 
 /** A source table's note changed by Anna. */
