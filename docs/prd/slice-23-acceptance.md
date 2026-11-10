@@ -451,3 +451,64 @@ Elsewhere:
 9. **F13:** yes, the proposed text.
 10. **F16:** accepted; listed in `known-limitations.md`.
 11. **Toasts and undo names:** as listed above.
+
+## Step 2: data and domain (10 November 2026)
+
+Draft PR: https://github.com/LukaszWolski-DA/infomapper-app/pull/52, opened at the start of the step.
+
+### What changed
+
+- **Migration** `supabase/migrations/20261110120000_metadata_conventions.sql` (DDL only, F14): `classification.definition`;
+  `classification_code_ck` now `origin = 'own' or code is not null` (F3); `classification_code_format_ck` (the pattern);
+  `classification_definition_ck` and `workspace_naming_conventions_ck` (never empty); `workspace.naming_conventions`.
+- **Types** (`src/domain/types.ts`): `Classification.definition`, `Workspace.naming_conventions`.
+- **The rules** (`src/domain/model/classifications.ts`):
+  - `BUILTIN_TEXTS` (Appendix A word for word, `en`, `pl`, `de`), `builtinText`;
+  - `builtinClassificationRows(ctx, workspaceId, language)`;
+  - `isBuiltin` (by origin, F5), used by `byListOrder`, the index's `byCode` (built-in ones only), `whatStops`,
+    `restoreClassification` and the dialog's removed list and "built in" label (the dialog goes in step 3);
+  - own codes (F4): `CODE_PATTERN`, `typedCode`, `codeRefusal` ("Letters, digits and _; starting with a letter",
+    "That code is taken"): normalized against every code of the workspace (built-in codes, removed and deleted rows,
+    both scopes) and the live names of its scope. `nameTakenBy` needed no change: it already compares a name with
+    every row's code of the scope, which now includes own codes.
+- **Commands** (`src/domain/commands/`):
+  - `addClassification` takes an optional `code` (trimmed, upper-cased, empty is none); no other command takes one, so a
+    code is never changed;
+  - `setClassificationDefinition` (new): plain text, trimmed, empty clears, up to 20,000 characters, one undo step
+    named "Change definition of {name}" (also in `change-label.ts`); its toasts `DEFINITION_SAVED`,
+    `DEFINITION_CLEARED`;
+  - `restoreClassification` refuses every own one by origin;
+  - `createWorkspace` takes `docLanguage` (optional, `en`); `createOrganization` and `createOrganizationForUser` take
+    `workspaceLanguage`; both through `newWorkspaceRows(…, language)`, which writes the language and the built-in texts
+    in it, and `naming_conventions` null;
+  - `setNamingConventions` (new, F11): `model.edit` (owners, admins, modelers, not archived), the workspace row's
+    version (D-59), trimmed, empty clears, up to 20,000; outside undo; toasts `NAMING_SAVED`, `NAMING_CLEARED`;
+  - undo (`classificationNameClash`): also refuses a revert that makes a live name another one's code of its scope
+    (removed ones too), with `CLASSIFICATION_NAME_CLASH` (F4).
+- **The import**: no engine change (F17); the unknown value's warning now ends "Add it in Metadata conventions on the
+  workspace home to use it." (F8).
+- **Actions**: `setClassificationDefinitionAction` (`Saved`, on the classification's chain), `setNamingConventionsAction`
+  (`Saved`), `createWorkspaceAction`'s `docLanguage`, the organization actions' `workspaceLanguage`;
+  `addClassificationAction` passes the code through. No UI uses them yet (step 3).
+- **The local file's format 15** (`schema.ts`, `file.ts`): the CHECKs above; the upgrade from 14 gives every built-in
+  classification without a definition its definition in its workspace's language, names kept (F2), own ones null,
+  every workspace `naming_conventions` null; no change events, no log line.
+- **The seed** (`seed-model.ts`, `seed.ts`, `seed-large.ts`): each workspace's built-in rows in its language with their
+  definitions; "Sales analytics" (Polish) has the Polish names and definitions (F2). The domain fixture's built-in
+  rows carry the English definitions.
+- **Docs**: `data-model-v2.md` (the columns, the CHECKs, the rules), `known-limitations.md` (F16).
+
+### Tests
+
+- New and changed unit tests: `classifications.test.ts` (texts per language for every code, names clear of codes in
+  every language, `isBuiltin`, list order, the index by code, code shape, codes taken as the import compares, names
+  against own codes), `commands/classification.test.ts` (add with a code, refusals, a code never changed, the definition
+  and its refusals, a removed own one not restored), `workspace.test.ts` (the language at creation, a later change
+  renames nothing, the naming conventions and their refusals), `organization.test.ts` (the first workspace's language),
+  `undo.test.ts` (a name that is another's code now, a definition undone, a code taken after its add is undone),
+  `import/classifications.test.ts` (an own code matched as compared, a removed one's code unknown, written on a new
+  column; the warning's text), `upgrade-15.test.ts` (new: the upgrade, names kept, a definition kept, written back
+  once, not repeated; the seed in its languages).
+- `npm run lint`, `npm run typecheck`: clean. `npm test`: 162 files, 2,035 tests passed.
+- **Earlier e2e spec changed:** `e2e/slice-07c/S7C-10.spec.ts`, the unknown value's warning text (F8).
+- **The full run** (local adapter and undo changed, the "Test runs" exception): below.

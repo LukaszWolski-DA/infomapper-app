@@ -1119,6 +1119,16 @@ and untouched rows are not dimmed as in the prototype (`docs/ideas.md`, “Per-r
 Switching the view on with many cards lit costs more than Focus on one entity: 74.7 ms to the screen at 30 % on
 “Performance test” with 22 cards lit, against 50.9 ms for Focus on ent:23 (within the 100 ms bar; step 5).
 
+## Metadata conventions (slice 23)
+
+### A code stays taken after its classification's add is undone
+
+An own classification's code is unique among every row of the workspace, removed and deleted ones included (D-78, the
+code index). Undoing "Add" removes the classification but keeps its row, so its code stays taken: adding another one with
+the same code is refused with "That code is taken", and Redo brings the first one back. The same holds after a removal:
+a removed own classification is never restored, and its code is never given again (F16, accepted by Łukasz on
+10 November 2026). This keeps an undo of a removal from ever meeting a code given again in the meantime.
+
 ## Organizations and sign-in (slice 8)
 
 Slice 8's sign-in is a development form (D-58; AD-04's note): it exists only where the development sign-in does, and a
