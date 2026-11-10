@@ -173,3 +173,31 @@ stored text or the text that save sent; `useNotes.save` passes the text it sent.
   (`slice-21-acceptance.md`); its single-file check passed 3/3 locally. Its traces were lost: the rerun cleared
   `test-results/` before I kept them.
 - **S23-02 repeated:** 5 of 5 local runs passed (3 of 9 failed before the fix).
+
+## 7. The full runs (workflow "E2E", `64e0532`, all eight parts, no retries)
+
+- **First run** ([42919400613](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42919400613), 16 min 33 s):
+  738 passed, 1 failed, 4 skipped, 0 flaky. The failure: `S14B-09` "a save held on its way asks; after its answer,
+  nothing" timed out in `answerOf` (`e2e/slice-14b/helpers.ts`), the same line as section 6's local failure and slice
+  21's. Its trace: the page's held save request ended `net::ERR_ABORTED` at the test's leave check
+  (`page.close({ runBeforeUnload: true })`, dialog dismissed); `holdUntil` then fulfilled a request the page no longer
+  waited for, so no `response` event came. Chromium aborting a request in flight during the beforeunload check is in the
+  test's helpers (`leaveAsks`, `answerOf`), not in the draft rules: the field sends and cancels no request. Not fixed here
+  (a defect in shared test infrastructure goes to its own `fix/` branch, the slice cycle, 4); proposed below.
+- **Second run** ([42922094935](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42922094935), wall-clock
+  13 min 17 s): **739 passed, 0 failed, 4 skipped, 0 flaky, 0 expected failures.** No server restarted.
+
+  | Part | Time | Heap peak (limit 8,039 MB) |
+  | --- | --- | --- |
+  | 1 | 7.5 min | 1,066 MB |
+  | 2 | 10.2 min | 1,038 MB |
+  | 3 | 8.7 min | 1,005 MB |
+  | 4 | 8.1 min | 976 MB |
+  | 5 | 10.0 min | 1,412 MB |
+  | 6 | 8.7 min | 1,602 MB |
+  | 7 | 9.2 min | 1,090 MB |
+  | 8 | 11.1 min | 1,741 MB |
+
+- **Proposal for S14B-09** (its own `fix/` branch): the leave check aborts a request on its way now and then (three times
+  so far: slice 21, and twice here); `answerOf` should wait for what the page shows (the card's name, the guard's state)
+  instead of a `response` event, or the check should run before the save is sent.
