@@ -461,3 +461,115 @@ The model has 1,095 more lines: 675 values that do not fit, 100 dimensions witho
 hints, since the 400 new relationships have no key. One run of each, one after the other on an idle laptop; the slowest
 of the nine rounds of the home was 59.6 ms. "Performance test" (no InfoCube rows) and the demo (15 lines) are
 unchanged.
+
+## Step 3: Łukasz's review (10 November 2026)
+
+1. **A fact's Dimensions row:** the "no match → {value}" part moves to a second line of that row only; the dimension's
+   name and its key stay whole on the first line. The shared list row's component is not changed. S22-04, the five
+   earlier specs of step 3 and the screenshots are updated.
+2. **The checks' bench:** name the bar for "Marks and counts" (Node) and where it is written; if 50.8 ms is above it,
+   stop and report the split.
+3. Everything else in step 3 is accepted.
+
+## Step 4: close (10 November 2026)
+
+CI on `11a735c` (step 3's last commit) had passed: `check` and `migrations`.
+
+### The review's two points
+
+1. **The no-match part on the row's second line.** Done in that row alone (`FactSection` in
+   `src/modules/infocube/app/sections.tsx`): the line stands under the shared list row, inside the row's own element,
+   right-aligned under the key, with its title; `Li` (`src/app/_panels/fields.tsx`) is not changed. The first line is
+   again what it was before slice 22 ("key product_key · snapshot"). The second line is not part of the row's button: a
+   click on it does not open the relationship (the first line does). S22-04 also checks that the part lies under the
+   first line and that no dimension's name is cut at the default panel width.
+2. **The bar for "Marks and counts".** In Node it has **no bar**. Slice 20's acceptance doc, step 2's table: "Node:
+   marks and counts, synthetic | 46.3 ms | none (the bar is Chromium's)". The Chromium figure
+   (`scripts/bench-checks-browser.ts`) was a bar of 20 ms and became **a reference of 25 ms, not a gate**, at slice 20's
+   closing ("The marks' bar becomes a reference", Łukasz); CLAUDE.md's Commands and the README's table say the same. The
+   only gate of this bench is the home's 50 ms in Node, which is met (45.4 ms). So 50.8 ms is above no bar and nothing
+   stops. The two scripts still said "bar 20 ms" in a comment and in the browser bench's printed line ("bar 20.0 ms
+   MISSED"); both now say "reference 25 ms, not a gate".
+
+   For the reference, one run in headless Chromium on the extended synthetic model (5,391 lines): marks and counts
+   **24.1 ms** (fastest 19.7, slowest 37.3), within the 25 ms reference; slice 20's was 22.0 ms on 4,296 lines. The
+   split: InfoMapper's rules 15.7 ms, InfoCube's rules 4.4 ms (2.5–3.4 ms in slice 20: the two new rules and 320 more
+   fact hints), the marks 1.4 ms, one canvas's count 0.5 ms.
+
+### What changed
+
+- The Dimensions row (above); `keyMeta` is as before slice 22.
+- **Specs:** S22-04 and the five earlier specs read the part after the first line:
+
+  | Spec | Now | Reason |
+  | --- | --- | --- |
+  | `slice-15b/RP-02` | each row: `key …`, then `no match → -1` | the part is the row's second line |
+  | `slice-15b/RP-06`, `RP-07` | the Ship date row after the undo, the same | the same |
+  | `slice-15b/RP-12` | the two Dim Date rows, the same | the same |
+  | `slice-19/S19-05` | "key product_key · snapshot" as before slice 22, then `no match → -1` | the snapshot mark stays on the key's line |
+
+- **Screenshots:** `docs/prd/slice-22-screens/step-4/` (step 3's kept beside them).
+- **The bench scripts' texts** (point 2).
+- **Docs:** `decisions.md` (D-77), `ideas.md`, `inventory-prototype-vs-app.md`, `known-limitations.md`, README,
+  CLAUDE.md. `data-model-v2.md` was written in step 2.
+
+### D-77, as proposed for approval
+
+> **D-77** A dimension's unknown member (slice 22). A dimension has an unknown member, on by default for every
+> dimension, existing and new, and can be turned off: the row a fact row gets when its key is empty or has no match
+> (Kimball's −1 row; in Data Vault usually from the ghost record). Its values are one per attribute; only typed values
+> are stored, trimmed, and an empty field takes the default: an Integer primary key −1, a String "Unknown", any other
+> type empty (NULL). A typed value that does not fit its attribute's type (Integer; Decimal with a point; Boolean true
+> or false; Date as YYYY-MM-DD; Datetime as YYYY-MM-DD HH:MM; JSON; String within its length; Custom takes any value)
+> is kept, and its field is marked with why. The dimension's panel shows the flag and the values after History; a
+> fact's Dimensions show "no match → {value}" on the row's second line, the value of the dimension's first primary
+> key; a lookup's "When no match" shows the unknown member's value as its placeholder. Two model checks (D-75): unknown
+> member values that do not fit (High), and dimensions used by a fact without an unknown member (Normal). A value is
+> saved against the version the page knows (D-59); deleting an attribute or a dimension takes its values in the same
+> undo step; turning the flag off keeps the values. Every change is one undo step for those who may edit the model
+> (AD-05); readers, reviewers and an archived workspace see the values read only. Proposed in slice 22's step 4, for
+> Łukasz's approval.
+
+No other decision's text changed.
+
+### Checks
+
+- `npm run lint`, `npm run typecheck`, `npm test` pass (161 files, 2,002 tests).
+- `e2e/slice-22` with its screenshots and the five earlier specs, one local run: 24 passed.
+- The element guard and the commit-count guards ran in step 3; the row's second line is in a panel, not on the canvas.
+
+### Manual acceptance steps
+
+**The demo** (`npm run demo -- --reset`, http://127.0.0.1:3001, sign in as Łukasz, "Retail Co – DWH", canvas "Sales
+star"):
+
+1. Click Dim Customer's name. In "Dimension", after History: "Unknown member" pressed, its sentence, five lines;
+   customer_key shows "-1" as placeholder, the four Strings "Unknown".
+2. In segment_code type " n/a " and press Tab: it shows "n/a". Undo (the toast names "Set unknown member value of Dim
+   Customer.segment_code"), Redo. Clear the field and press Tab: the placeholder "Unknown" is back.
+3. In customer_key type "abc" and press Tab: the field has the orange border and "“abc” is not an Integer" under it.
+   On the card, customer_key's row and the header carry the orange "!"; the status bar's "Model checks" count is one
+   higher; the panel's "Model checks" box names the line.
+4. Open the project home (Order management): "Unknown member values that do not fit" (InfoCube, High) with "Dim
+   Customer.customer_key · unknown member: “abc” is not an Integer". Click the line: the canvas opens with the
+   attribute's panel. Type "-1" (or clear the field): the mark and the line are gone.
+5. Click Dim Product's name and turn "Unknown member" off: the lines go, the sentence says "No unknown member: …", the
+   header carries a grey "!". The project home shows "Dimensions without an unknown member" with "Dim Product · used by
+   Fact Sales". Turn it on again (or Undo): both are gone, and a value typed before is back.
+6. Click Fact Sales' name. "Dimensions": each row shows the dimension and its key on the first line and "no match → -1"
+   under it; Dim Product's first line still ends with "· snapshot". Hover "no match → -1" for its title. With "0" typed
+   in Dim Customer.customer_key the row says "no match → 0".
+7. Click the line into Dim Customer.country_name (the chip "L"). "When no match" holds "Unknown"; clear it and press
+   Tab: the placeholder reads "Unknown (the unknown member's value)". Turn Dim Customer's unknown member off: the
+   placeholder is "e.g. Unknown".
+8. As Kasia Zielińska (reader) or Piotr Wiśniewski (reviewer): the flag is disabled and the fields are read-only.
+
+**KB** (`npm run dev`, after a fresh backup of `.data/dev-db.json`, as "Łukasz's test model" requires; the file's rows
+are upgraded when the new code loads it and written with its next write; the format stays 14):
+
+1. Open a dimension's panel in "Kanton Basel": "Unknown member" is pressed, every attribute has a line, no field holds
+   a value. The two Integer keys show "-1", the two String keys "Unknown", the two Date keys "empty (NULL)".
+2. Open a fact's panel: each Dimensions row with a key has its "no match → …" line (the first key's value where a
+   dimension has two keys; "NULL" for a Date key).
+3. The project home's "Model checks" has no "Unknown member values that do not fit" and no "Dimensions without an
+   unknown member" group, and the other groups' counts are what they were.

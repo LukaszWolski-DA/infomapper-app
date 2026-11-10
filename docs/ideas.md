@@ -609,7 +609,8 @@ hierarchies in dimensions.
 - **Done in slice 19 (D-74):** junk dimensions (a kind), outrigger dimensions (derived from relationships between two
   dimensions), the fact type, factless and aggregate facts, and a dimension's history with Snapshot. **Still later**
   (slice 19, section 9): bridge dimensions (many-to-many with a weighting factor, so many-to-many gives no outrigger) and
-  hierarchies in dimensions, slices of their own; a dimension's unknown member, with the model validator (decision 5b);
+  hierarchies in dimensions, slices of their own; a dimension's unknown member, with the model validator (decision 5b;
+  **done in slice 22**, D-77);
   mini-dimensions and other SCD types (4–7); checking an aggregate's grain or measures against its base beyond the
   dimension hint.
 
@@ -836,7 +837,7 @@ Done in slice 18 (D-73): a value computed from other attributes of the same enti
 value taken from a dictionary through a code (DimBuilding's `AssetCategory`, "Unbekannt") is an InfoCube lookup.
 
 What comes later (slice 18, PRD section 10 and step 1):
-- **A dimension's unknown member** (Kimball's −1 row), with InfoCube's types.
+- **A dimension's unknown member** (Kimball's −1 row), with InfoCube's types. **Done in slice 22** (D-77).
 - **Lookups in source mappings** (decision 4a).
 - **Structured expressions:** parsed rules, functions and type inference; the rule stays plain text.
 - **A model check for a calculation that is also mapped** (decision 2a), in the model validator (above).
@@ -845,6 +846,23 @@ What comes later (slice 18, PRD section 10 and step 1):
 - **"Fed from concepts" through a calculation's inputs** (Q8): unchanged, as their own feeds already bring their concepts.
 - **The Delete key on a relationship with lookups through it** says where to delete it (its menu or its panel) and deletes
   nothing; a two-press Delete if that is too strict.
+
+## A dimension's unknown member: done in slice 22; what comes later
+
+Done in slice 22 (D-77): a dimension has an unknown member unless turned off, with one value per attribute (typed values
+stored, defaults otherwise), a fact's Dimensions say "no match → {value}", a lookup's "When no match" takes the value as
+its placeholder, and two model checks.
+
+What comes later (slice 22, PRD section 9 and the steps):
+- **Special rows besides Unknown:** Not applicable (−2) and Late arriving (−3), each with its values.
+- **A date dimension's default** (for example 1900-01-01 or 19000101) and a rule per role.
+- **A model check for a primary key whose unknown member value is empty:** a key of a type without a default (a Date
+  key) shows "no match → NULL" until a value is typed. KB has two Date keys.
+- **Generating the row** (SQL, a dbt seed) and Data Vault's ghost record; exports and documents that list it
+  (InfoDocumenter).
+- **Per-attribute history** (SCD per attribute) in `cube_attribute`, the table named for such settings.
+- **A check comparing a lookup's no-match value with the unknown member's** (decision 4b, not taken).
+- **Every primary key's value in a fact's Dimensions row** when a dimension has several (the row shows the first key's).
 
 ## Keep the mapping rule's draft when its panel closes (slice 20, step 1 answer 10)
 
@@ -868,4 +886,4 @@ their relationships' other ends. Measure first with `scripts/bench-checks-browse
 - **Dismissing a line**, with who and why (needs data).
 - **A "Show checks" view** that fades everything else, as the Changes view; next and previous line on the canvas.
 - **Marks on relationship and mapping lines**; a switch to hide the marks; marks on collapsed frames' blocks.
-- **Source-side and Data Vault checks**; a dimension's unknown member (slice 19, decision 5b).
+- **Source-side and Data Vault checks**; a dimension's unknown member (slice 19, decision 5b; done in slice 22, D-77).
