@@ -642,3 +642,42 @@ On `npm run demo -- --reset` (its own file, `.data/demo-db.json`; never `.data/d
 
 **Changed:** D-57 ends "(Changed by D-78.)". No other decision changes; D-76's colour rules and D-59's version check
 are referred to, not changed.
+
+### The full run (before the merge)
+
+- [Run 42800328233](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42800328233) on `be1d58e`, the
+  workflow "E2E", all eight parts, no retries: **723 passed, 0 failed, 4 skipped, 0 flaky**, no expected failures (708
+  of step 2's run plus slice 23's 15).
+- Wall-clock 13 min 26 s (10:34:41 to 10:48:07 UTC); the tests 11 min 12 s.
+- Parts (time; heap peak against the runner's restart threshold of 6,431 MB; no server restart in any part):
+  1: 6.2 min, 1,078 MB · 2: 9.9 min, 1,069 MB · 3: 8.5 min, 1,048 MB · 4: 9.8 min, 1,061 MB · 5: 7.3 min, 1,649 MB ·
+  6: 10.8 min, 1,209 MB · 7: 7.6 min, 1,407 MB · 8: 9.2 min, 1,514 MB.
+- **The recut rule:** `e2e/slice-23` joined the last part (8, 9.2 min), which is not the longest (part 6, 10.8 min); no
+  recut.
+- A commit after `be1d58e` that touches only Markdown in `docs/` and the root keeps this run valid
+  (`git diff --stat be1d58e..HEAD`).
+
+### Manual acceptance
+
+**The demo** (`npm run demo -- --reset`, on http://127.0.0.1:3001, its own file `.data/demo-db.json`):
+1. Sign in as Łukasz; Retail Co – DWH's home, tab "Metadata conventions" (between People and Settings): both tables,
+   codes, English definitions, "used 4×" on Business key, the Data Vault rows dimmed with the mode off.
+2. Rename Business key and change its definition; Undo and Redo in the top bar. On "Customer & orders", a column's panel
+   shows the new name on its toggle; "Edit the list…" there opens the tab, Back returns.
+3. Add "Hash candidate" with the code `hash` (stored as `HASH`); try `BK`, `9x`, `hash_` and `hash` again; add one
+   without a code ("—"). Import a file whose `classifications` column says `HASH`: the review shows Hash candidate.
+4. Remove Personal data: the small dialog lists its six columns and what stops; Remove; Undo. Remove it again, add an
+   own "Personal data": Restore is refused ("Rename Personal data first: …"); rename the own one; Restore: back, unused.
+5. Change a concept's colour in the tab (Undo works). Settings: no colours, a "Model conventions" box whose button opens
+   the tab.
+6. Write naming conventions, leave the field, reload. Sign in as Kasia (reader): the tab is read only.
+7. The workspace menu: "New workspace" with "Polski": its tab shows "Klucz biznesowy" and the Polish definitions;
+   change its language in Settings: nothing is renamed. "Sales analytics" (Polish) has the Polish names after the reset.
+   Optionally the organization menu's "New organization…" with "Deutsch": "Fachlicher Schlüssel".
+
+**KB** (after the backup "Łukasz's test model" requires; the branch upgrades `.data/dev-db.json` to format 15 when it
+first reads it):
+8. `npm run dev`, sign in to KB, open its workspace's Metadata conventions tab: the 19 built-in classifications keep
+   their names and have the English definitions (KB's documentation language is English); no own classification; the
+   naming conventions are empty.
+9. A KB column's panel: the toggles are as before; "Edit the list…" opens the tab.
