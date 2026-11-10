@@ -5,6 +5,7 @@ import { buildWriteSet, fail, newRowColumns, nextVersion, type CommandContext, t
 import { notFound, staleVersion } from "../errors";
 import type { Uuid } from "../ids";
 import { builtinClassificationRows } from "../model/classifications";
+import { builtinStereotypeRows } from "../model/stereotypes";
 import { domainError } from "../errors";
 import { noLicenceMessage, turnOffRefusedMessage } from "../model/levels";
 import { checkCreateWorkspace, checkPermission, type WorkspaceAccess } from "../permissions";
@@ -131,6 +132,8 @@ export function newWorkspaceRows(
       { kind: "insert", table: "canvas", row: canvas },
       { kind: "insert", table: "project_canvas", row: link },
       ...builtinClassificationRows(ctx, workspace.id, language).map((row): Write => ({ kind: "insert", table: "classification", row })),
+      // slice 24 (decision 7): the five built-in stereotypes, named and defined in its documentation language
+      ...builtinStereotypeRows(ctx, workspace.id, language).map((row): Write => ({ kind: "insert", table: "stereotype", row })),
     ],
   };
 }

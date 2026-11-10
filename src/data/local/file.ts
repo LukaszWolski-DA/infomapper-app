@@ -11,6 +11,7 @@ import { isLocalModeAllowed } from "./measure-mode";
 import { DEMO_PASSWORD_HASH } from "./demo-password";
 import { DEV_DB_FORMAT, type DevDb } from "./schema";
 import { upgradeReportText, upgradeTo8, type Upgrade8Report } from "./upgrade-8";
+import { upgradeTo16 } from "./upgrade-16";
 
 /** Where the file lives: INFOMAPPER_DEV_DB if set (tests), else .data/dev-db.json in the project. */
 export function devDbPath(): string {
@@ -55,7 +56,7 @@ export async function readDb(file: string): Promise<DevDb> {
   const db = JSON.parse(text) as DevDb;
   const was = db.format as number;
   const now = new Date().toISOString();
-  const { report, passwordsGiven } = upgradeDb(db, now, () => uuidv7());
+  const { report, passwordsGiven, ownStereotypes } = upgradeDb(db, now, () => uuidv7());
   // a newer branch wrote the file (slice 15a): it may hold someone's own model, so the way back is that branch or a
   // backup, never a reset, which would replace it with the demo data
   if (typeof db.format === "number" && db.format > DEV_DB_FORMAT) throw new Error(newerFormatMessage(file, db.format));
@@ -73,6 +74,8 @@ export async function readDb(file: string): Promise<DevDb> {
   }
   // slice 8 (item 18, F18): one line, no password and no hash
   if (passwordsGiven > 0) console.log(`Slice 8 upgrade: ${passwordsGiven} organization${passwordsGiven === 1 ? "" : "s"} got the development password (see README).`);
+  // slice 24 (F19): one line, codes not named
+  if (ownStereotypes > 0) console.log(`Slice 24 upgrade: ${ownStereotypes} entity stereotype code${ownStereotypes === 1 ? "" : "s"} outside the five built-in ones became own stereotypes.`);
   return db;
 }
 
@@ -94,7 +97,7 @@ export async function readDb(file: string): Promise<DevDb> {
  * documentation language, own ones and every other row `definition` null, and every workspace `naming_conventions`
  * null; names are kept (slice 23, F2, F15; no change events, no log line).
  */
-export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number } {
+export function upgradeDb(db: DevDb, now: string, newId: () => string): { report: Upgrade8Report | null; passwordsGiven: number; ownStereotypes: number } {
   let report: Upgrade8Report | null = null;
   if ((db.format as number) === 2) Object.assign(db, { format: 3, frame: [] });
   if ((db.format as number) === 3) Object.assign(db, { format: 4, label: [], label_link: [], project_pinned_label: [], note: [] });
@@ -192,9 +195,16 @@ export function upgradeDb(db: DevDb, now: string, newId: () => string): { report
       c.definition ??= code ? builtinText(code, language.get(c.workspace_id) ?? "en").definition : null;
     }
     for (const w of db.workspace) w.naming_conventions ??= null;
+    Object.assign(db, { format: 15 });
+  }
+  // slice 24 (F18, F19): every workspace's five built-in stereotypes, English names, definitions in its language; an own
+  // one for any other code an entity has (no change events; one log line for those)
+  let ownStereotypes = 0;
+  if ((db.format as number) === 15) {
+    ownStereotypes = upgradeTo16(db, now, newId);
     Object.assign(db, { format: DEV_DB_FORMAT });
   }
-  return { report, passwordsGiven };
+  return { report, passwordsGiven, ownStereotypes };
 }
 
 

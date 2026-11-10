@@ -9,7 +9,8 @@ import { CONTEXT_LABEL_GONE, contextTargets } from "@/domain/model/live";
 import { cascadingModuleTables, moduleCascade } from "@/domain/commands/module-cascade";
 import { isUndoable } from "@/domain/commands/undo";
 import { levelWritesRefusal, mappingWritesRefusal, writesEntities, writesMappingTargets } from "@/domain/model/levels";
-import type { DomainErrorCode } from "@/domain/errors";
+import { stereotypeWritesRefusal, writesStereotypeCodes } from "@/domain/model/stereotypes";
+import { domainError, type DomainErrorCode } from "@/domain/errors";
 import { ACCOUNT_EXISTS_MESSAGE } from "@/domain/commands/organization";
 import { uuidv7 } from "@/domain/ids";
 import { changeLabel } from "@/domain/model/change-label";
@@ -175,16 +176,24 @@ export async function withLiveCanvases(
 }
 
 /**
- * The level rules (slice 15a, C-7, `levelWritesRefusal`; a mapping's target, `mappingWritesRefusal`) on any command's
- * writes: read the model only when the writes add or retarget a mapping, the workspace only when they touch an entity,
+ * The level rules (slice 15a, C-7, `levelWritesRefusal`; a mapping's target, `mappingWritesRefusal`) and the stereotype
+ * rule (slice 24, `stereotypeWritesRefusal`) on any command's writes: read the model only when the writes add or retarget
+ * a mapping or can leave an entity on a missing stereotype, the workspace only when they touch an entity,
  * as it stands after them (a settings write carries its new row).
  */
 async function levelRefusal(store: DataStore, writeSet: WriteSet) {
   const workspaceId = writeSet.events[0]?.workspace_id;
   if (!workspaceId) return null;
-  if (writesMappingTargets(writeSet.writes)) {
+  const mappings = writesMappingTargets(writeSet.writes);
+  const stereotypes = writesStereotypeCodes(writeSet.writes);
+  const model = mappings || stereotypes ? await store.model.load(workspaceId) : null;
+  // slice 24 (F1): every live entity a write leaves is on a live stereotype of its workspace, whatever command wrote it
+  if (model && stereotypes) {
+    const refusal = stereotypeWritesRefusal(writeSet.writes, model.entities, model.stereotypes);
+    if (refusal) return domainError("invalid", refusal);
+  }
+  if (model && mappings) {
     // a mapping's target is a logical attribute (slice 15a step 5, B-6's refusal): whatever command added the mapping
-    const model = await store.model.load(workspaceId);
     const refusal = mappingWritesRefusal(writeSet.writes, model.entities, model.attributes);
     if (refusal) return refusal;
   }

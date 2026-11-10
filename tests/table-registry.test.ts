@@ -109,6 +109,7 @@ function seed(): Rows {
     requirement_link: [],
     classification: [],
     classification_link: [],
+    stereotype: [],
   };
 }
 

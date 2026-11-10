@@ -48,6 +48,7 @@ const model: WorkspaceModel = {
   sourceRelationshipColumns: [],
   classifications: [],
   classificationLinks: [],
+  stereotypes: [],
   lostOriginals: [],
 };
 

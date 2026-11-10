@@ -21,6 +21,7 @@
 import { buildWriteSet, fail, type CommandContext, type CommandResult, type Write } from "../changes";
 import { domainError, type DomainError } from "../errors";
 import { normClassification } from "../model/classifications";
+import { entityWithoutStereotype } from "../model/stereotypes";
 import { derivationIndex } from "../model/derivations";
 import { followOriginals } from "../model/copies";
 import { levelWritesRefusal } from "../model/levels";
@@ -33,6 +34,8 @@ import {
   type AttributeInput,
   type ChangeEvent,
   type CoreTable,
+  type Entity,
+  type Stereotype,
   type LinkTable,
   type ModuleTable,
   type RowImage,
@@ -65,6 +68,7 @@ export const UNDOABLE_TABLES = [
   "source_change",
   "classification",
   "classification_link",
+  "stereotype",
   "mapping",
   "mapping_input",
   "canvas_item",
@@ -447,7 +451,12 @@ export function revertChangeGroup(
   }
 
   if (!consistent(after, touched, tables)) return fail(refused());
-  const keyClash = requirementKeyClash(after, touched) ?? classificationNameClash(after, touched) ?? calculationCycle(after, touched);
+  const keyClash =
+    requirementKeyClash(after, touched) ??
+    classificationNameClash(after, touched) ??
+    stereotypeNameClash(after, touched) ??
+    stereotypeGone(after, touched) ??
+    calculationCycle(after, touched);
   if (keyClash) return fail(keyClash);
   // slice 19 (F6): each module's own check, for the tables the revert touched
   for (const table of new Set(touched.map((t) => t.table))) {
@@ -464,6 +473,45 @@ export function revertChangeGroup(
   if (levels) return fail(levels);
   const writeSet = buildWriteSet(ctx, workspaceId, followed.writes);
   return { ok: true, value: { changeGroupId: writeSet.changeGroupId }, writeSet };
+}
+
+/**
+ * Slice 24 (F2 ii): a stereotype live after the revert whose name another live one has, or whose name is, as D-78
+ * compares, the code of another row (removed and deleted ones too, as `stereotypeNameTakenBy`).
+ */
+export const STEREOTYPE_NAME_CLASH = (name: string) => `This can't be undone: another stereotype is called ${name} now.`;
+function stereotypeNameClash(rows: Map<string, Map<string, AnyRow>>, touched: readonly { table: string; key: string }[]): DomainError | null {
+  const all = [...(rows.get("stereotype")?.values() ?? [])];
+  for (const { table, key } of touched) {
+    if (table !== "stereotype") continue;
+    const row = rows.get("stereotype")!.get(key);
+    if (!row || row.deleted_at !== null) continue;
+    const clash = all.some(
+      (o) => o.id !== row.id && ((o.deleted_at === null && o.name_key === row.name_key) || normClassification(String(o.code)) === row.name_key),
+    );
+    if (clash) return domainError("conflict", STEREOTYPE_NAME_CLASH(String(row.name)));
+  }
+  return null;
+}
+
+/**
+ * Slice 24 (F2 i): a revert that leaves a live entity on a code with no live stereotype: an own one's add undone after an
+ * entity chose it, an entity brought back after its stereotype was removed, an entity's choice redone after its
+ * stereotype was removed. Entities name their stereotype by code, so `PARENTS` (ids) cannot see it.
+ */
+export const STEREOTYPE_GONE = (name: string) => `This can't be undone: the stereotype ${name} is no longer in the list.`;
+function stereotypeGone(rows: Map<string, Map<string, AnyRow>>, touched: readonly { table: string; key: string }[]): DomainError | null {
+  const stereotypes = [...(rows.get("stereotype")?.values() ?? [])] as unknown as Stereotype[];
+  const touchedEntities = new Set(touched.filter((t) => t.table === "entity").map((t) => t.key));
+  const removedCodes = new Set(
+    touched.filter((t) => t.table === "stereotype").map((t) => rows.get("stereotype")!.get(t.key)).filter((r) => !!r && r.deleted_at !== null).map((r) => String(r!.code)),
+  );
+  if (!touchedEntities.size && !removedCodes.size) return null;
+  const entities = [...(rows.get("entity")?.values() ?? [])] as unknown as Entity[];
+  const gap = entityWithoutStereotype(entities, stereotypes, (e) => touchedEntities.has(e.id) || removedCodes.has(e.stereotype));
+  if (!gap) return null;
+  const row = stereotypes.find((s) => s.code === gap.stereotype);
+  return domainError("conflict", STEREOTYPE_GONE(row?.name ?? gap.stereotype));
 }
 
 /** Slice 18 (F8): a revert that brings back a calculation input that closes a cycle (made by someone else meanwhile). */

@@ -41,6 +41,7 @@ function modelOf(db: Db): WorkspaceModel {
     sourceRelationshipColumns: [],
     classifications: [],
     classificationLinks: [],
+    stereotypes: [],
     lostOriginals: lost.flatMap((id) => {
       const a = byId.get(id);
       return a ? [{ id, name: a.name, entityName: db.entity.find((e) => e.id === a.entity_id)?.name ?? "?" }] : [];

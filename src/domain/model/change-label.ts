@@ -21,6 +21,7 @@ const NOUN: Record<string, string> = {
   source_change: "change to resolve",
   classification: "classification",
   classification_link: "classification",
+  stereotype: "stereotype",
   mapping: "mapping",
   mapping_input: "mapping input",
   canvas_item: "card",
@@ -57,6 +58,7 @@ const PRIORITY = [
   "requirement_link",
   "classification",
   "classification_link",
+  "stereotype",
 ];
 
 /** A change's resolution (texts.ts, `RESOLUTION`) and the undo label of the action that wrote it. */
@@ -153,6 +155,19 @@ export function changeLabel(events: readonly ChangeEvent[], nouns: Readonly<Reco
     return cards.length > 1 ? "Move cards" : "Move card";
   }
   if (frames.filter((e) => e.operation === "create").length > 1) return "Arrange into frames";
+
+  // Entity stereotypes (slice 24, F10): add, rename, definition, remove (its entities moved in the same group)
+  const stereotypes = of("stereotype");
+  const moved = of("entity");
+  if (stereotypes.length === 1 && stereotypes.length + moved.length === events.length && moved.every((e) => e.operation === "update" && only(e, ["stereotype"]))) {
+    const e = stereotypes[0]!;
+    const name = String((e.after_image ?? e.before_image)?.name ?? "");
+    if (e.operation === "create") return `Add stereotype ${name}`;
+    if (e.operation === "delete") return `Remove stereotype ${name}`;
+    if (e.operation === "restore") return `Restore stereotype ${name}`;
+    if (only(e, ["name", "name_key"])) return `Rename stereotype ${String(e.before_image?.name ?? "")}`;
+    if (only(e, ["definition"])) return `Change definition of ${name}`;
+  }
 
   // Classifications (slice 7c): the list's add, rename, remove and restore; one set or cleared on a table or column (a
   // cleared Business key may settle changes to resolve in the same group, Q7); a source's note

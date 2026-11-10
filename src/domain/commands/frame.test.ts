@@ -690,6 +690,7 @@ function rowsOf(items: CanvasItem[], frames: Frame[], entities: Entity[] = model
     requirement_link: [],
     classification: [],
     classification_link: [],
+    stereotype: [],
   };
 }
 

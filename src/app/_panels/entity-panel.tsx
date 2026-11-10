@@ -13,7 +13,8 @@ import { useModules } from "@/app/_components/modules";
 import { PANEL_SECTIONS } from "@/compose/panels";
 import { CanvasUiCtx } from "@/canvas/context";
 import type { Uuid } from "@/domain/ids";
-import { STEREOTYPES, type Entity, type Stereotype } from "@/domain/types";
+import type { Entity } from "@/domain/types";
+import { BUILTIN_STEREOTYPE_CODES } from "@/domain/model/stereotypes";
 import { useToast } from "@/ui/components/toast";
 import { RichTextField } from "@/ui/rich-text/rich-text-field";
 import { DeleteEntityDialog } from "./delete-entity-dialog";
@@ -112,9 +113,9 @@ export function EntityPanel({ entity: e, cardId }: { entity: Entity; cardId: Uui
             disabled={!p.editable}
             className={inputClass}
             data-testid="select-entity-stereotype"
-            onChange={(x) => stereotype.choose(x.target.value as Stereotype)}
+            onChange={(x) => stereotype.choose(x.target.value)}
           >
-            {STEREOTYPES.map((s) => (
+            {BUILTIN_STEREOTYPE_CODES.map((s) => (
               <option key={s} value={s}>
                 {cap(s)}
               </option>

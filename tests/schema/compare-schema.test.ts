@@ -88,6 +88,8 @@ describe("domainTables (the domain's row types, per table of the local adapter)"
         "source_system", "source_table", "workspace", "workspace_member",
         "source_relationship", "source_relationship_column", "source_import", "source_change",
         "classification", "classification_link",
+        // slice 24: entity stereotypes
+        "stereotype",
         "organization_access", "organization_licence",
         // slice 15a: InfoCube's tables, through the composition root (AD-33)
         "cube_entity", "cube_measure",

@@ -6,9 +6,10 @@ import { domainError, notFound } from "../errors";
 import type { Uuid } from "../ids";
 import { entityCascade, type EntityRows } from "../model/impact";
 import { DIMENSIONAL_STEREOTYPE_MESSAGE, isDimensional } from "../model/levels";
+import { DEFAULT_STEREOTYPE, isBuiltinStereotypeCode, stereotypeIndex, UNKNOWN_STEREOTYPE } from "../model/stereotypes";
 import { sanitizeRich } from "../model/rich-text";
 import type { WorkspaceAccess } from "../permissions";
-import { STEREOTYPES, type ModelLevel, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type LabelLink, type Note, type RequirementLink } from "../types";
+import { type ModelLevel, type Canvas, type CanvasItem, type Concept, type Entity, type Frame, type LabelLink, type Note, type RequirementLink, type Stereotype } from "../types";
 import { nameSchema, optionalTextSchema, uuidSchema, versionSchema } from "../validation";
 import { begin, current, done, isLive, nothingToChange, richTextSchema, softDelete } from "./shared";
 import { cardHeightSchema, frameRefsSchema, joinFrames, newCanvasItem, positionSchema } from "./canvas-item";
@@ -108,7 +109,7 @@ export function createEntity(
     name: name ?? freeDefaultName(state.entities, options.level, options.defaultName),
     alias: null,
     model_level: options.level,
-    stereotype: "object",
+    stereotype: DEFAULT_STEREOTYPE,
     definition_html: null,
     definition_text: null,
   };
@@ -136,7 +137,8 @@ const updateEntityInput = z
     name: nameSchema.optional(),
     /** Another name, shown on canvases that ask for it (slice 11, D-64): trimmed, empty clears it. */
     alias: optionalTextSchema.optional(),
-    stereotype: z.enum(STEREOTYPES).optional(),
+    /** A code of the workspace's live stereotypes (slice 24): checked against `stereotypes`. */
+    stereotype: z.string().min(1).max(30).optional(),
     conceptId: uuidSchema.optional(),
     definition: richTextSchema.optional(),
   })
@@ -149,6 +151,11 @@ export interface UpdateEntityState {
   entities: readonly Entity[];
   /** The concept named by `conceptId`, when the input moves the entity. */
   concept: Concept | null;
+  /**
+   * The workspace's stereotypes (slice 24): a chosen code must be a live one. Without them (a caller that changes no
+   * stereotype) only a built-in code is accepted, which is always live; runCommand's rule checks every write as well.
+   */
+  stereotypes?: readonly Stereotype[];
 }
 
 /**
@@ -173,6 +180,10 @@ export function updateEntity(
   if (alias !== undefined && alias !== before.alias) patch.alias = alias;
   if (stereotype !== undefined && stereotype !== before.stereotype) {
     if (isDimensional(before)) return fail(domainError("invalid", DIMENSIONAL_STEREOTYPE_MESSAGE));
+    const known = state.stereotypes
+      ? !!stereotypeIndex(state.stereotypes.filter((x) => x.workspace_id === access.workspace.id)).of(stereotype)
+      : isBuiltinStereotypeCode(stereotype);
+    if (!known) return fail(domainError("invalid", UNKNOWN_STEREOTYPE));
     patch.stereotype = stereotype;
   }
   if (conceptId !== undefined && conceptId !== before.concept_id) {

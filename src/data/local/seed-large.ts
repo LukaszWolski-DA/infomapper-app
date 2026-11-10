@@ -11,14 +11,15 @@ import { openLiveCanvas } from "@/domain/commands/live";
 import type { Uuid } from "@/domain/ids";
 import { CONCEPT_PALETTE } from "@/domain/model/concept-colors";
 import { parseColumnLines } from "@/domain/model/column-lines";
-import { DEFAULT_CANVAS_LOOK, type LogicalType, type MappingStatus, type Stereotype } from "@/domain/types";
+import { DEFAULT_CANVAS_LOOK, type LogicalType, type MappingStatus } from "@/domain/types";
+import type { BuiltinStereotypeCode } from "@/domain/model/stereotypes";
 import { ATTR_TYPES, ENT_COLORS, FRAME_NAMES, generate, STEREOS } from "./large-generator";
 import { findViolation, type DevDb } from "./schema";
 import { addLargeRequirementCards } from "./seed-large-requirement-cards";
 import { addLargeRequirements } from "./seed-large-requirements";
 import { addLargeWorkingLayer } from "./seed-large-working-layer";
 import { SEED_IDS } from "./seed";
-import { addBuiltinClassifications, addSeedClassificationLink, seedId } from "./seed-model";
+import { addBuiltinClassifications, addBuiltinStereotypes, addSeedClassificationLink, seedId } from "./seed-model";
 import type { ClassificationCode } from "@/domain/model/classifications";
 
 /**
@@ -47,7 +48,7 @@ const LOGICAL: Record<(typeof ATTR_TYPES)[number], LogicalType> = {
   Code: "string",
 };
 
-const STEREOTYPE: Record<(typeof STEREOS)[number], Stereotype> = {
+const STEREOTYPE: Record<(typeof STEREOS)[number], BuiltinStereotypeCode> = {
   Hub: "object",
   Satellite: "context",
   Link: "link",
@@ -85,6 +86,7 @@ export function addLargeWorkspace(db: DevDb, at: string): boolean {
   });
   db.workspace_member.push({ workspace_id: ws, user_id: by, role: "owner", added_by: by, created_at: at });
   addBuiltinClassifications(db, ws, by, at, "en");
+  addBuiltinStereotypes(db, ws, by, at, "en");
   let columnsSeen = 0, tablesSeen = 0;
   db.project.push({ id: LARGE_IDS.project, workspace_id: ws, name: "Performance", description: null, ...audit });
   db.canvas.push({ id: LARGE_IDS.canvas, workspace_id: ws, name: "100 cards", live_label_id: null, look: { ...DEFAULT_CANVAS_LOOK }, entity_names: null, attribute_names: null, ...audit });

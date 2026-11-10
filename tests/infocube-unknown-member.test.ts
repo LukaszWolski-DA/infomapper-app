@@ -307,6 +307,7 @@ function modelOf(db: Db): WorkspaceModel {
     sourceRelationshipColumns: [],
     classifications: [],
     classificationLinks: [],
+    stereotypes: [],
     lostOriginals: [],
   };
 }

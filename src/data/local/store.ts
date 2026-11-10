@@ -204,6 +204,8 @@ export function createLocalDataStore(file: string, schema: LocalSchema = CORE_SC
           // slice 7c: the list with its removed rows (a removed built-in one can be restored), live links only
           classifications: db.classification.filter((c) => c.workspace_id === workspaceId),
           classificationLinks: of(db.classification_link),
+          // slice 24: the list with its removed rows (their codes stay taken)
+          stereotypes: db.stereotype.filter((x) => x.workspace_id === workspaceId),
           lostOriginals: lostOriginals(db, workspaceId),
         };
       },

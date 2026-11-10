@@ -98,6 +98,7 @@ describe("createOrganization (item 8)", () => {
       "insert:canvas",
       "insert:project_canvas",
       ...Array<string>(19).fill("insert:classification"),
+      ...Array<string>(5).fill("insert:stereotype"),
     ]);
     const row = (table: string) => {
       const w = writes.find((x) => x.table === table);

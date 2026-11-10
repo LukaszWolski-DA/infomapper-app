@@ -27,10 +27,14 @@ import {
   sourceColumn,
   sourceSystem,
   sourceTable,
+  builtinStereotype,
+  builtinStereotypes,
+  ownStereotype,
 } from "../__fixtures__/domain";
+import { addStereotype, removeStereotype, renameStereotype } from "./stereotype";
 import { buildWriteSet, type CommandResult, type WriteSet } from "../changes";
 import type { WorkspaceAccess } from "../permissions";
-import type { Attribute, Canvas, CanvasItem, ChangeEvent, Label, WorkspaceRole } from "../types";
+import type { Attribute, Canvas, CanvasItem, ChangeEvent, Label, Stereotype, WorkspaceRole } from "../types";
 import { addAttribute, createAttributeFromColumn, deleteAttribute, pasteAttribute, reorderAttribute, updateAttribute } from "./attribute";
 import { deleteCanvas, duplicateCanvas, moveCanvas, renameCanvas, setCanvasLook } from "./canvas";
 import { removeFromCanvas } from "./canvas-item";
@@ -45,6 +49,8 @@ import { createRelationship, deleteRelationship } from "./relationship";
 import { addClassification, removeClassification, renameClassification, setClassification, setClassificationDefinition } from "./classification";
 import {
   CLASSIFICATION_NAME_CLASH,
+  STEREOTYPE_GONE,
+  STEREOTYPE_NAME_CLASH,
   isUndoable,
   NOT_UNDOABLE_MESSAGE,
   REDO_REFUSED_MESSAGE,
@@ -88,6 +94,7 @@ function seed(): Rows {
     requirement_link: [],
     classification: [],
     classification_link: [],
+    stereotype: [],
   };
 }
 
@@ -1101,5 +1108,117 @@ describe("an attribute added below another (slice 17, item 5)", () => {
     const undone = revertChangeGroup(makeCtx(), modeler, { events: added.events, rows: after }, "undo");
     if (!undone.ok) throw new Error(undone.error.message);
     expect(live(apply(after, undone.writeSet))).toEqual(before);
+  });
+});
+
+describe("entity stereotypes (slice 24): one undo step each, and the two refusals (F2)", () => {
+  const EVENT = "01900000-0000-7000-8000-5000000000e1";
+  const withList = (own: Stereotype[] = []): Rows => ({ ...seed(), stereotype: [...builtinStereotypes(), ...own] });
+  const event = (over: Partial<Stereotype> = {}) => ownStereotype(EVENT, "Event", "business_event", over);
+  const choose = (rows: Rows, code: string) =>
+    ok(
+      updateEntity(
+        makeCtx(),
+        modeler,
+        { entity: find(rows, "entity", ids.customer) as never, entities: rows.entity, concept: null, stereotypes: rows.stereotype },
+        { entityId: ids.customer, expectedVersion: find(rows, "entity", ids.customer).version as number, stereotype: code },
+      ),
+    );
+  const deleteCustomer = (rows: Rows) =>
+    ok(
+      deleteEntity(
+        makeCtx(),
+        modeler,
+        {
+          entity: find(rows, "entity", ids.customer) as never,
+          attributes: rows.attribute,
+          mappings: rows.mapping,
+          mappingInputs: rows.mapping_input,
+          attributeInputs: rows.attribute_input,
+          relationships: rows.relationship,
+          canvasItems: rows.canvas_item,
+          labelLinks: rows.label_link,
+          notes: rows.note,
+        },
+        { entityId: ids.customer, expectedVersion: 1 },
+      ),
+    );
+
+  it("undoes and redoes a rename; the entities keep their code", () => {
+    const rows = withList();
+    const link = builtinStereotype("link");
+    const { undone, afterDo, afterUndo } = doAndUndo(rows, (r) => ok(renameStereotype(ctx, modeler, { stereotypes: r.stereotype }, { stereotypeId: link.id, expectedVersion: 1, name: "Association" })));
+    expect(find(afterDo, "stereotype", link.id).name).toBe("Association");
+    expect(undone.ok).toBe(true);
+    expect(find(afterUndo, "stereotype", link.id)).toMatchObject({ name: "Link", code: "link" });
+    expect(afterUndo.entity.map((e) => e.stereotype)).toEqual(rows.entity.map((e) => e.stereotype));
+  });
+
+  it("brings back a removed stereotype and every moved entity's code in one step, and redoes both", () => {
+    const rows: Rows = { ...withList([event()]), entity: seed().entity.map((e) => ({ ...e, stereotype: "business_event" })) };
+    const { done, undone, afterDo, afterUndo } = doAndUndo(rows, (r) =>
+      ok(removeStereotype(ctx, modeler, { stereotypes: r.stereotype, entities: r.entity }, { stereotypeId: EVENT, expectedVersion: 1, moveTo: builtinStereotype("context").id })),
+    );
+    expect(done.events.filter((e) => e.object_type === "entity")).toHaveLength(2);
+    expect(afterDo.entity.map((e) => e.stereotype)).toEqual(["context", "context"]);
+    expect(undone.ok).toBe(true);
+    expect(afterUndo.entity.map((e) => e.stereotype)).toEqual(["business_event", "business_event"]);
+    expect(find(afterUndo, "stereotype", EVENT).deleted_at).toBeNull();
+    if (!undone.ok) return;
+    const redone = revertChangeGroup(makeCtx(), modeler, { events: undone.writeSet.events, rows: afterUndo }, "redo");
+    if (!redone.ok) throw new Error(redone.error.message);
+    expect(apply(afterUndo, redone.writeSet).entity.map((e) => e.stereotype)).toEqual(["context", "context"]);
+  });
+
+  it("keeps a code taken after its add is undone (F4)", () => {
+    const { undone, afterUndo } = doAndUndo(withList(), (r) => ok(addStereotype(ctx, modeler, { stereotypes: r.stereotype }, { name: "Event", code: "event" })));
+    expect(undone.ok).toBe(true);
+    expect(afterUndo.stereotype.find((s) => s.code === "event")?.deleted_at).toBe(NOW);
+    expect(addStereotype(makeCtx(), modeler, { stereotypes: afterUndo.stereotype }, { name: "Happening", code: "event" })).toMatchObject({ ok: false, error: { message: "That code is taken" } });
+    // and its code blocks the name too (F5)
+    expect(addStereotype(makeCtx(), modeler, { stereotypes: afterUndo.stereotype }, { name: "Event", code: "event_2" })).toMatchObject({ ok: false, error: { message: "That name is taken" } });
+  });
+
+  it("refuses to undo an own stereotype's add once an entity has it (F2 i)", () => {
+    const rows = withList();
+    const added = ok(addStereotype(makeCtx(), modeler, { stereotypes: rows.stereotype }, { name: "Event", code: "event" }));
+    const afterAdd = apply(rows, added);
+    const afterChoice = apply(afterAdd, choose(afterAdd, "event"));
+    expect(revertChangeGroup(makeCtx(), modeler, { events: added.events, rows: afterChoice }, "undo")).toMatchObject({ ok: false, error: { code: "conflict", message: STEREOTYPE_GONE("Event") } });
+  });
+
+  it("refuses to bring back an entity whose stereotype was removed since (F2 i), and lets it back once the removal is undone", () => {
+    const rows: Rows = { ...withList([event()]), entity: seed().entity.map((e) => (e.id === ids.customer ? { ...e, stereotype: "business_event" } : e)) };
+    const deleted = deleteCustomer(rows);
+    const afterDelete = apply(rows, deleted);
+    const removed = ok(removeStereotype(makeCtx(), modeler, { stereotypes: afterDelete.stereotype, entities: afterDelete.entity }, { stereotypeId: EVENT, expectedVersion: 1 }));
+    const afterRemove = apply(afterDelete, removed);
+    expect(revertChangeGroup(makeCtx(), modeler, { events: deleted.events, rows: afterRemove }, "undo")).toMatchObject({ ok: false, error: { message: STEREOTYPE_GONE("Event") } });
+    const back = revertChangeGroup(makeCtx(), modeler, { events: removed.events, rows: afterRemove }, "undo");
+    if (!back.ok) throw new Error(back.error.message);
+    expect(revertChangeGroup(makeCtx(), modeler, { events: deleted.events, rows: apply(afterRemove, back.writeSet) }, "undo").ok).toBe(true);
+  });
+
+  it("refuses to bring back a stereotype whose name another one has now (F2 ii), and allows a name that is only its own code", () => {
+    const rows = withList([event()]);
+    const removed = ok(removeStereotype(makeCtx(), modeler, { stereotypes: rows.stereotype, entities: rows.entity }, { stereotypeId: EVENT, expectedVersion: 1 }));
+    const afterRemove = apply(rows, removed);
+    const link = builtinStereotype("link");
+    const renamed = apply(afterRemove, ok(renameStereotype(makeCtx(ids.someoneElse), modeler, { stereotypes: afterRemove.stereotype }, { stereotypeId: link.id, expectedVersion: 1, name: "Event" })));
+    expect(revertChangeGroup(makeCtx(), modeler, { events: removed.events, rows: renamed }, "undo")).toMatchObject({ ok: false, error: { code: "conflict", message: STEREOTYPE_NAME_CLASH("Event") } });
+
+    const r2 = withList();
+    const first = ok(renameStereotype(makeCtx(), modeler, { stereotypes: r2.stereotype }, { stereotypeId: link.id, expectedVersion: 1, name: "Association" }));
+    const afterFirst = apply(r2, first);
+    const own = apply(afterFirst, ok(addStereotype(makeCtx(ids.someoneElse), modeler, { stereotypes: afterFirst.stereotype }, { name: "Linkage", code: "link_2" })));
+    expect(revertChangeGroup(makeCtx(), modeler, { events: first.events, rows: own }, "undo").ok).toBe(true);
+  });
+
+  it("refuses to bring back a name that is another row's code now (F2 ii)", () => {
+    const rows = withList([event()]);
+    const renamed = ok(renameStereotype(makeCtx(), modeler, { stereotypes: rows.stereotype }, { stereotypeId: EVENT, expectedVersion: 1, name: "Happening" }));
+    const afterRename = apply(rows, renamed);
+    const added = apply(afterRename, ok(addStereotype(makeCtx(ids.someoneElse), modeler, { stereotypes: afterRename.stereotype }, { name: "Occurrence", code: "event" })));
+    expect(revertChangeGroup(makeCtx(), modeler, { events: renamed.events, rows: added }, "undo")).toMatchObject({ ok: false, error: { message: STEREOTYPE_NAME_CLASH("Event") } });
   });
 });
