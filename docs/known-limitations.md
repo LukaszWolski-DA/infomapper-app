@@ -1129,6 +1129,16 @@ the same code is refused with "That code is taken", and Redo brings the first on
 a removed own classification is never restored, and its code is never given again (F16, accepted by Łukasz on
 10 November 2026). This keeps an undo of a removal from ever meeting a code given again in the meantime.
 
+### A text area whose command trims may keep an untrimmed draft (found in slice 23, not checked elsewhere)
+
+A plain-text area saves what was typed and its command stores it trimmed. Without `prepare` the field keeps the typed
+text as a draft (it differs from the stored text by its spaces), so a later stored value (an undo, another person's
+change) does not show in it until the field is left or Escape is pressed. Slice 23 found it on a definition (S23-02) and
+gave `TextArea` an optional `prepare`, which the Metadata conventions tab's two text areas use (a trim, as
+`TextField`'s). The other text areas (a source's note, a mapping's note and rule, a note's text, a requirement's
+fields, a calculation's rule) were not changed or checked; whether they show it, and the fix (`prepare` where the
+command trims), is a `fix/…` branch of its own (The slice cycle, 4).
+
 ## Organizations and sign-in (slice 8)
 
 Slice 8's sign-in is a development form (D-58; AD-04's note): it exists only where the development sign-in does, and a

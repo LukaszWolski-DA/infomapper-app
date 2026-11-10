@@ -614,3 +614,31 @@ On `npm run demo -- --reset` (its own file, `.data/demo-db.json`; never `.data/d
 7. The workspace menu's "New workspace" with "Polski": its tab shows "Klucz biznesowy"; changing its language in
    Settings renames nothing. "Sales analytics" (Polish) has the Polish names after the reset.
 8. In a column's or a table's panel, "Edit the list…" opens the tab; Back returns to the canvas.
+
+## Step 4: closing (10 November 2026)
+
+### What changed
+
+- `docs/decisions.md`: **D-78** (new, below), written from what was built, with step 1's answers; **D-57** ends "(Changed
+  by D-78.)" (its text is otherwise as accepted: the list now lives in the tab, own classifications may have a code, and
+  names are checked against every code, not only built-in ones).
+- `docs/ideas.md`: the two slice 7c entries ("Built-in classification names per documentation language", "Own
+  classifications with a code") marked done in slice 23; a new entry "Metadata conventions: what comes later" with the
+  stereotypes' names and definitions, the type map, an organization's default conventions and a reset to a language's
+  defaults, each with what step 1's Q8 found it needs; a check of names against the naming conventions; InfoDocumenter.
+- `docs/known-limitations.md`, "Metadata conventions (slice 23)": F16 (a code stays taken after its add is undone,
+  written in step 2) and "A text area whose command trims may keep an untrimmed draft": found in slice 23 on a
+  definition and fixed for the tab's two text areas with `TextArea`'s optional `prepare`; the other text areas were not
+  checked and are left to a `fix/…` branch (The slice cycle, 4).
+- `docs/inventory-prototype-vs-app.md`: the tab, the language at creation and Settings' box present; the deliberate
+  differences (F1, F12, F6, F7, F3/F4/F16, F2, F13, F19, F11).
+- `README.md` and `CLAUDE.md`: the status line; slice 23's helpers, the screenshots command, the classifications'
+  paragraph.
+- `docs/ideas_infodocumenter.md` (untracked, Łukasz's) is not part of the slice.
+
+### D-78, for Łukasz's approval
+
+> **D-78** Metadata conventions (slice 23). A workspace's conventions have one place, the workspace home's tab "Metadata conventions", between People and Settings, which every member sees: its classification list (D-57's dialog moved there; "Edit the list…" in a table's or a column's panel opens the tab), its concepts' colours (moved from Settings; D-76's rules unchanged) and its naming conventions. Settings keeps a box "Model conventions" with one sentence and a button that opens the tab. Every classification has an optional definition, plain text. An own classification may get a code when it is added, never changed afterwards: letters, digits and `_`, starting with a letter, at most 30, upper-cased; unique in the import's comparison (case, spaces, `_`, `-` and `/` ignored) against every code of the workspace, built-in ones and those of removed and deleted classifications included, so a code is never given twice, also after its classification's add is undone; and codes and names of the same scope never collide in that comparison, in either direction. The import matches an own classification by its name or its code. Built-in classifications are told by their origin, never by having a code, and only they can be restored. A workspace gets its built-in classifications' names and definitions in its documentation language when it is created (English, Polish, German), chosen in a "Documentation language" select wherever a workspace is created: beside the top bar's "New workspace" and with an organization's first workspace; English by default. Changing the language later renames nothing and rewrites no definition; when slice 23 was installed, the built-in classifications of existing workspaces kept their names and got the definitions in their workspace's language. Removing a classification that is used or that a rule reads shows D-57's form first, in a small dialog; any other is removed at once, with Undo. Names, definitions, codes, removals, restores and colours are each one undo step, for owners, admins and modelers in a workspace that is not archived; reviewers, readers and an archived workspace see the tab read only. The naming conventions are plain text, a workspace setting outside undo, edited by owners, admins and modelers with the workspace's version (D-59); nothing checks names against them yet. Entity stereotypes' names and definitions, the map from physical to logical types, an organization's default conventions and a reset to a language's defaults are later. Proposed in slice 23's step 4, for Łukasz's approval.
+
+**Changed:** D-57 ends "(Changed by D-78.)". No other decision changes; D-76's colour rules and D-59's version check
+are referred to, not changed.
