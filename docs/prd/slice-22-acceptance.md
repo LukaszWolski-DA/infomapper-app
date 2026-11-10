@@ -573,3 +573,29 @@ are upgraded when the new code loads it and written with its next write; the for
    dimension has two keys; "NULL" for a Date key).
 3. The project home's "Model checks" has no "Unknown member values that do not fit" and no "Dimensions without an
    unknown member" group, and the other groups' counts are what they were.
+
+### The full run on the final commit (`086f093`)
+
+[Run 42767543060](https://github.com/LukaszWolski-DA/infomapper-app/actions/runs/42767543060), the workflow "E2E" on
+`slice/22-unknown-member` at `086f093`, started by hand, all eight parts.
+
+- **Result:** 708 passed, 0 failed, 4 skipped, 0 flaky, no expected failures (none exists). The four skipped are the
+  on-demand commit specs (`S7C-14-commits`, `S11-13-commits`, `S14A-13-commits`, `S16-11-commits`), as in every run.
+- **Wall-clock:** 17 min 9 s (06:17:44 to 06:34:53 UTC), the report job included.
+- **Parts** (each with its own fresh dev server; no server restarted; the runner's restart threshold is 6,431 MB):
+
+  | Part | Time | Heap peak |
+  | --- | --- | --- |
+  | 1 | 6 min 48 s | 885 MB |
+  | 2 | 9 min 51 s | 954 MB |
+  | 3 | 7 min 52 s | 1,052 MB |
+  | 4 | 9 min 42 s | 980 MB |
+  | 5 | 10 min 28 s | 1,015 MB |
+  | 6 | 9 min 35 s | 1,078 MB |
+  | 7 | 9 min 55 s | 1,094 MB |
+  | 8 | 11 min 8 s | 1,157 MB |
+
+- **The recut rule:** `e2e/slice-22` joined the last part, which is the longest in this run by 40 s. One run is not the
+  median of three; no recut.
+- A commit after `086f093` that touches only Markdown in `docs/` and the root keeps this run valid
+  (`git diff --stat 086f093..HEAD`).
