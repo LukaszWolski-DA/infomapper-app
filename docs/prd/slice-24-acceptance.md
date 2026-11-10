@@ -372,3 +372,23 @@ Elsewhere:
    refused?
 10. **F11:** `stereotypes` required on `WorkspaceModel` (recommended), or optional?
 11. **F24:** each option's definition as its title, as the prototype (recommended)?
+
+## Step 1: Łukasz's answers (10 November 2026)
+
+1. **F1:** the domain checks the code on every write and is the source of truth now. The composite foreign key on
+   `(workspace_id, code)` goes into the SQL migration only; the local adapter gets no foreign key that does not point to
+   an `id`. That difference is listed in `known-limitations.md`.
+2. **F2:** yes, both undo refusals with the proposed texts.
+3. **F5:** yes. A name equal to any code, removed ones included, is refused, when adding and when renaming.
+4. **F6:** yes, the prototype's proposal as it is.
+5. **F8:** yes, errors under the fields, as the classifications show them.
+6. **F9:** yes, the classifications' toasts for a definition saved or cleared.
+7. **F14:** yes. S24-07 tests the app's actual readers: `createEntity`'s default `object` (logical entities, and
+   InfoCube's facts and dimensions), the seeds, and every entity's code unchanged after renaming all five.
+8. **F18:** yes. English names for every existing workspace, as decision 7 says; definitions in its documentation
+   language.
+9. **F19:** yes. An own stereotype and one log line.
+10. **F11:** yes, required on `WorkspaceModel`.
+11. **F24:** yes, each option's definition as its title.
+
+Step 2 has its full run (the format and undo).
