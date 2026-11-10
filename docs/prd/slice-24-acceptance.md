@@ -578,3 +578,18 @@ runs the field kept the typed (trimmed) text for the whole 15 s:
   4). I did not prove the exact interleaving; I have not reproduced it on `main` locally (the checkout is on this branch).
 - **Proposal:** its own `fix/` branch from `main`: reproduce on `main` locally, find the interleaving from the trace,
   fix it with its own full run. The slice does not change the test.
+
+### How to check it by hand
+
+On the demo data (`npm run demo`, http://127.0.0.1:3001, `.data/demo-db.json`; it never touches `.data/dev-db.json`),
+signed in as Łukasz, Retail Co – DWH, the workspace home's "Metadata conventions":
+1. "Entity stereotypes" between Classifications and Concept colours: five rows, codes, English definitions, Object
+   "4 entities" (the star's facts and dimensions not counted), no Remove on them.
+2. Rename Link to "Association": the toast, Undo in the top bar and Redo. Try "OBJECT": "That name is taken" under it.
+3. Open Customer 360 › Customer & orders: Order Line's card says "Association", its title (hover) the definition; the
+   Model tab says "Association"; Order Line's panel shows it selected with the definition under it.
+4. Back in the tab: type "Event" in the Add row (the code says `event`), change the code to `business_event`, Add; choose
+   it on Customer in its panel (last in the select).
+5. Remove "Event": the dialog asks where Customer goes; choose Context; the toast; Undo brings back both.
+6. Create a workspace in Polish from the top bar: its tab shows Obiekt, Powiązanie, Słownik, Kontekst, Informacyjna.
+7. As Piotr (reviewer) or Kasia (reader): the box is read only.
