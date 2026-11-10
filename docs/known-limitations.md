@@ -19,6 +19,19 @@ moment can therefore both pass the check and leave a canvas or project without i
   `project_canvas` rows, count, then delete), so concurrent removals cannot both succeed. The same for a project's
   delete and its shared canvases.
 
+### An entity's stereotype has no foreign key in the local adapter (slice 24)
+
+Since slice 24 an entity keeps a code of its workspace's stereotype list (D-79). The SQL migration has a composite foreign
+key `(workspace_id, stereotype)` → `stereotype (workspace_id, code)`; the local adapter's foreign keys point to an `id`
+only, and it gets no other kind (Łukasz, step 1, F1). There the domain is the rule's only keeper: `runCommand` checks
+every write set (`stereotypeWritesRefusal`: every live entity written, or on a code removed, has a live stereotype) and
+undo checks every revert. The adapter checks the code's shape only (`entity_stereotype_code_ck`), so a write that went
+round the domain, or a file edited by hand, could leave an entity on a code the workspace lacks; the database refuses it.
+
+- **Accepted** in the local adapter (development only).
+- **The database slice (last, AD-31):** the composite key is in the migration already; a soft-deleted stereotype stays
+  the domain's to keep from being used.
+
 ### The last owner under concurrent writes (slice 8; fixed in the local adapter)
 
 A workspace keeps at least one owner. The domain counts the owners from what the command read; two owners removing or
@@ -1128,6 +1141,12 @@ code index). Undoing "Add" removes the classification but keeps its row, so its 
 the same code is refused with "That code is taken", and Redo brings the first one back. The same holds after a removal:
 a removed own classification is never restored, and its code is never given again (F16, accepted by Łukasz on
 10 November 2026). This keeps an undo of a removal from ever meeting a code given again in the meantime.
+
+### A code stays taken after its stereotype's add is undone (slice 24)
+
+As for classifications: an own stereotype's code is unique among every row of the workspace, deleted ones included, so
+undoing "Add stereotype" keeps the row and its code stays taken ("That code is taken"); a removed own stereotype's code
+is never given again either, and it also blocks a name (F4, F5, accepted by Łukasz on 10 November 2026).
 
 ### A text area whose command trims may keep an untrimmed draft (found in slice 23, not checked elsewhere)
 

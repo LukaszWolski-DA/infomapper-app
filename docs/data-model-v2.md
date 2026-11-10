@@ -237,7 +237,7 @@ again in its serialised write; the database slice does it in the write's transac
 | `name` | text | no | not unique; the domain warns on duplicates (B-25) |
 | `alias` | text | yes | another name, free text (slice 11, D-64); trimmed, an empty alias is null; not unique, no warning |
 | `model_level` | text | no | `logical` (default), `dimensional` (slice 15a, C-3, AD-34); set on create, never changed |
-| `stereotype` | text | no | `object`, `link`, `dictionary`, `context`, `informative`; a dimensional entity keeps `object`, unused (C-5) |
+| `stereotype` | text | no | a code of the workspace's `stereotype` list (slice 24): one of the five built-in codes (`object`, `link`, `dictionary`, `context`, `informative`) or an own one's, never a name; `^[a-z][a-z0-9_]{0,29}$` (CHECK); composite FK `(workspace_id, stereotype)` → `stereotype (workspace_id, code)` in SQL; that the stereotype is live is the domain's rule (the local adapter has no key that is not an id); a new entity gets `object`, and a dimensional entity keeps it, unused (C-5) |
 | `definition_html`, `definition_text` | text | yes | rich text (D-42) |
 
 **The model level (slice 15a, C-2 to C-4, AD-34).** Facts and dimensions are entities with the level `dimensional`;
@@ -379,6 +379,23 @@ restored, empty; a removed own one never.
 | `scope` | text | no | `column`, `table` |
 | `origin` | text | no | `builtin` (the General group), `data_vault` (shown only in Data Vault 2.0 mode), `own` (code optional); built-in ones are told by it, never by having a code; CHECK: a code unless `own` |
 | `definition` | text | yes | what it means, plain text, trimmed, never empty (slice 23); in the undo history as the list's other changes |
+
+### `stereotype`
+The workspace's list of entity stereotypes (slice 24, D-79), in the undo history. Every workspace has the five built-in
+ones from its creation (`src/domain/model/stereotypes.ts`), named and defined in its documentation language when it is
+created; existing workspaces got them with the local data file's format 16 (English names, definitions in their
+language). A built-in one can be renamed and defined, never removed; a workspace adds its own, each with a code set when
+it is added and never changed. Removing an own one soft-deletes it, its entities moved to another in the same change
+group; its code stays taken.
+
+| Column | Type | Null | Notes |
+| --- | --- | --- | --- |
+| standard columns | | | |
+| `code` | text | no | what entities keep: the five built-in codes or an own one; `^[a-z][a-z0-9_]{0,29}$` (CHECK), a built-in row one of the five (CHECK); never changed; unique per workspace among all rows, deleted ones included (the index), so a code is never given twice; and, compared as `name_key` is, against every code and every live name of the workspace (the domain) |
+| `name` | text | no | what people see; unique per workspace among non-deleted rows, compared through `name_key`, and never another row's code (removed and deleted ones included); its own code does not count |
+| `name_key` | text | no | the name in lower case without spaces, `_`, `-` and `/` (D-78's comparison); written by the server |
+| `definition` | text | yes | what it means, plain text, trimmed, never empty |
+| `origin` | text | no | `builtin`, `own`; a built-in row is never deleted (CHECK `origin = 'own' or deleted_at is null`) |
 
 ### `classification_link`
 One classification on one source table or column (AD-15), as `label_link` is for labels.
@@ -673,6 +690,10 @@ because they are business logic or must work on any database:
   a removed built-in one is restored only while its name is free; the rules read codes, through one index per load.
   Slice 23: an own code is set only when it is added, unique as the import compares against every code and the names of
   its scope; undo refuses a revert that makes a live name another one's code; a removed own one is never restored.
+- Entity stereotypes (slice 24): every live entity's code is a live stereotype of its workspace, checked on every write
+  (`stereotypeWritesRefusal`, run by `runCommand`) and by undo, which refuses a revert that leaves an entity on a removed
+  stereotype or brings back a stereotype whose name another one has or is another row's code; names and codes unique
+  in D-78's comparison, in either direction; a code never given twice.
 - Requirement parents without cycles at any depth, and a deleted requirement brought back only while no other
   requirement uses its key (slice 4a).
 - Requirement coverage and scope (D-31), live label canvas membership (D-10, D-25), auto-labeling in an active
